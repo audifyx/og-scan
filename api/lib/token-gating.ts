@@ -18,7 +18,9 @@ export const TOKEN_GATE_EXEMPT_WALLETS = [
 export function isTokenGateExemptWallet(wallet?: string | null): boolean {
   const addr = (wallet || '').trim();
   if (!addr) return false;
-  return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === addr);
+  // Base58 is case-sensitive; compare exact, also accept SIWS email form.
+  const bare = addr.includes('@') ? addr.split('@')[0] : addr;
+  return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
 }
 
 function exemptAccess(): AccessVerification {

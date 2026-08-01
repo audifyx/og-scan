@@ -1,11 +1,55 @@
-
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useWalletSignIn } from '@/hooks/useWalletSignIn';
+import { isTokenGateExemptWallet, resolveAuthWallet } from '@/lib/agentTokenGate';
 
 export function TokenGatingVerifier() {
   const [tokenCA] = useState('13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9');
-  const [currentHolding, setCurrentHolding] = useState<number | null>(null);
-  const [cumulativeBuys, setCumulativeBuys] = useState<number | null>(null);
+  const { publicKey } = useWallet();
+  const { user, profile } = useAuth();
+  const { pickable, signInWith, busy } = useWalletSignIn();
+  const [error, setError] = useState<string | null>(null);
+
+  const walletAddress = useMemo(
+    () =>
+      resolveAuthWallet({
+        connectedPk: publicKey?.toBase58() ?? null,
+        email: user?.email,
+        userMetadata: (user?.user_metadata as Record<string, unknown> | undefined) ?? null,
+        profileWallet:
+          (profile as { wallet_address?: string | null; sol_wallet?: string | null } | null)
+            ?.wallet_address ||
+          (profile as { sol_wallet?: string | null } | null)?.sol_wallet ||
+          null,
+      }),
+    [publicKey, user?.email, user?.user_metadata, profile],
+  );
+
+  const short =
+    walletAddress && walletAddress.length > 12
+      ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+      : walletAddress;
+
+  const connectWallet = async (name: string) => {
+    setError(null);
+    try {
+      await signInWith(name, { replaceEmailSession: true });
+      // Parent AgentPage re-checks on auth/wallet change; force reload as fallback.
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to connect wallet');
+    }
+  };
+
+  // If DEF wallet is already resolved, don't keep showing the gate (parent should unlock).
+  if (isTokenGateExemptWallet(walletAddress)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin">Unlocking…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-4">
@@ -25,6 +69,16 @@ export function TokenGatingVerifier() {
 
           <div className="bg-muted rounded-lg p-6 mb-6 space-y-4 text-left">
             <div>
+              <p className="text-sm text-muted-foreground mb-2">Detected wallet</p>
+              <p className="font-mono text-sm break-all text-foreground bg-background p-3 rounded">
+                {walletAddress || 'None — connect your Solana wallet below'}
+              </p>
+              {short && (
+                <p className="mt-1 text-xs text-muted-foreground">Signed in as {short}</p>
+              )}
+            </div>
+
+            <div>
               <p className="text-sm text-muted-foreground mb-2">Required Token</p>
               <p className="font-mono text-sm break-all text-foreground bg-background p-3 rounded">
                 {tokenCA}
@@ -35,38 +89,37 @@ export function TokenGatingVerifier() {
               <h3 className="font-semibold text-foreground mb-3">How to Unlock Access</h3>
               <ol className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <span className="text-primary font-semibold">1.</span> Buy ORBITX tokens through Jupiter or any supported DEX
+                  <span className="text-primary font-semibold">1.</span> Connect the correct Solana wallet
                 </li>
                 <li>
-                  <span className="text-primary font-semibold">2.</span> Your cumulative buy value must total $10 or more
+                  <span className="text-primary font-semibold">2.</span> Hold at least $10 of ORBITX, or have $10+ cumulative buys
                 </li>
                 <li>
-                  <span className="text-primary font-semibold">3.</span> OR hold at least $10 worth of ORBITX tokens in your wallet
-                </li>
-                <li>
-                  <span className="text-primary font-semibold">4.</span> Connect your wallet and verify your holdings
+                  <span className="text-primary font-semibold">3.</span> Tap Verify Holdings after connecting
                 </li>
               </ol>
             </div>
-
-            <div className="border-t border-border pt-4">
-              <p className="text-xs text-muted-foreground mb-3">
-                Current Status (if connected):
-              </p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between p-2 bg-background rounded">
-                  <span className="text-muted-foreground">Current Holdings:</span>
-                  <span className="text-foreground font-semibold">{currentHolding ? `$${currentHolding.toFixed(2)}` : 'Not verified'}</span>
-                </div>
-                <div className="flex justify-between p-2 bg-background rounded">
-                  <span className="text-muted-foreground">Cumulative Buys:</span>
-                  <span className="text-foreground font-semibold">{cumulativeBuys ? `$${cumulativeBuys.toFixed(2)}` : 'Not verified'}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
+          {error && (
+            <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-3">
+            {pickable.slice(0, 4).map((w) => (
+              <button
+                key={w.name}
+                type="button"
+                disabled={busy === w.name}
+                onClick={() => connectWallet(w.name)}
+                className="flex w-full items-center justify-center gap-2 px-6 py-3 border border-border text-foreground rounded-lg font-semibold hover:bg-muted transition disabled:opacity-50"
+              >
+                {w.icon ? <img src={w.icon} alt="" className="h-5 w-5 rounded" /> : null}
+                {busy === w.name ? `Connecting ${w.name}…` : `Connect ${w.name}`}
+              </button>
+            ))}
             <a
               href="https://jup.ag/swap/USDC-ORBITX"
               target="_blank"
