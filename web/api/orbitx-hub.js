@@ -1,17 +1,18 @@
 /**
  * OrbitX API — Node (req, res) handler (Web Response handlers hang on this project).
  *
+ * Entry is orbitx-hub.js (not orbitx.js) — api/orbitx/ directory would collide.
  * Rewrites:
- *   /api/orbitx-agent/* → /api/orbitx?path=agent/*
- *   /api/orbitx-mcp/*   → /api/orbitx?path=mcp/*
- *   /api/orbitx/*       → /api/orbitx?path=*
+ *   /api/orbitx-agent/* → /api/orbitx-hub?path=agent/*
+ *   /api/orbitx-mcp/*   → /api/orbitx-hub?path=mcp/*
+ *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "crypto";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const PUBLIC_BASE = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL || "https://www.ogscan.fun";
+const PUBLIC_BASE = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL || "https://orbitx.world";
 const MCP_URL = `${PUBLIC_BASE}/api/orbitx-mcp`;
 const AUTH_PAGE = `${PUBLIC_BASE}/agent/mcp-auth`;
 
@@ -59,7 +60,7 @@ function pathParts(req) {
     /* ignore */
   }
   const raw = String(req.url || "");
-  const after = raw.split("/api/orbitx")[1] || raw.split("/orbitx")[1] || "";
+  const after = raw.split("/api/orbitx-hub")[1] || raw.split("/orbitx-hub")[1] || "";
   return after.replace(/^\//, "").split("?")[0].split("/").filter(Boolean);
 }
 
@@ -687,7 +688,7 @@ async function handleCryptoScan(req, res) {
   }
 
   const proto = header(req, "x-forwarded-proto") || "https";
-  const host = header(req, "x-forwarded-host") || header(req, "host") || "www.ogscan.fun";
+  const host = header(req, "x-forwarded-host") || header(req, "host") || "orbitx.world";
   const base = `${proto}://${host}`;
 
   async function fetchJson(url) {
