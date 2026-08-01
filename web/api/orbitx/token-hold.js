@@ -1,5 +1,5 @@
 /**
- * Agent MCP token-hold gate — $10 ORBITX (or exempt wallet).
+ * Agent MCP token-hold gate — $10 ORBITX (or exempt wallet / owner email).
  * Used by orbitx-hub agent routes + MCP tools/call.
  */
 
@@ -8,15 +8,39 @@ export const AGENT_HOLD_MINT =
 
 export const AGENT_HOLD_MIN_USD = Number(process.env.AGENT_GATE_MIN_USD) || 10;
 
-/** DEF + platform / owner fee wallets — skip $10 ORBITX hold. */
-export const TOKEN_GATE_EXEMPT_WALLETS = [
+/** Hardcoded owner / platform wallets — always skip $10 ORBITX hold. */
+export const TOKEN_GATE_EXEMPT_WALLETS_BASE = [
   "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
   "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
   "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET (owner — starts with j)
 ];
 
+function parseCsvEnv(...keys) {
+  const out = [];
+  for (const key of keys) {
+    const raw = process.env[key];
+    if (!raw) continue;
+    for (const part of String(raw).split(",")) {
+      const s = part.trim();
+      if (s) out.push(s);
+    }
+  }
+  return out;
+}
+
+/** Base + AGENT_GATE_EXEMPT_WALLETS / OWNER_WALLETS / VITE_OWNER_WALLETS env extras. */
+export const TOKEN_GATE_EXEMPT_WALLETS = [
+  ...TOKEN_GATE_EXEMPT_WALLETS_BASE,
+  ...parseCsvEnv("AGENT_GATE_EXEMPT_WALLETS", "OWNER_WALLETS", "VITE_OWNER_WALLETS"),
+].filter((w, i, arr) => arr.indexOf(w) === i);
+
 /** Owner emails that skip the hold (matches owner desk). */
-export const TOKEN_GATE_EXEMPT_EMAILS = ["audifyx@gmail.com"];
+export const TOKEN_GATE_EXEMPT_EMAILS_BASE = ["audifyx@gmail.com"];
+
+export const TOKEN_GATE_EXEMPT_EMAILS = [
+  ...TOKEN_GATE_EXEMPT_EMAILS_BASE,
+  ...parseCsvEnv("AGENT_GATE_EXEMPT_EMAILS", "OWNER_EMAILS").map((e) => e.toLowerCase()),
+].filter((e, i, arr) => arr.indexOf(e) === i);
 
 export function isTokenGateExemptWallet(wallet) {
   const addr = String(wallet || "").trim();
@@ -26,16 +50,26 @@ export function isTokenGateExemptWallet(wallet) {
 }
 
 export function isTokenGateExemptEmail(email) {
-  const e = String(email || "").toLowerCase().trim();
-  if (!e) return false;
+  const raw = String(email || "").trim();
+  if (!raw) return false;
+  const e = raw.toLowerCase();
   if (TOKEN_GATE_EXEMPT_EMAILS.includes(e)) return true;
-  // Wallet SIWS session for an exempt pubkey
-  const m = e.match(/^([1-9a-hj-np-za-km-z]{32,44})@wallet\.orbitx\.app$/i);
+  // Wallet SIWS session — keep original base58 casing (case-sensitive).
+  const m = raw.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
   return Boolean(m && isTokenGateExemptWallet(m[1]));
 }
 
 export function isTokenGateExempt({ wallet, email } = {}) {
   return isTokenGateExemptWallet(wallet) || isTokenGateExemptEmail(email);
+}
+
+/** True if any candidate wallet or email is owner/exempt. */
+export function isTokenGateExemptAny({ wallets = [], email } = {}) {
+  if (isTokenGateExemptEmail(email)) return true;
+  for (const w of wallets) {
+    if (isTokenGateExemptWallet(w)) return true;
+  }
+  return false;
 }
 
 export function holdBlockedPayload(extra = {}) {

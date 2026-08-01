@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
-import { isTokenGateExemptWallet, resolveAuthWallet } from "@/lib/agentTokenGate";
+import { isAgentHoldExempt, resolveAuthWallet } from "@/lib/agentTokenGate";
 import {
   bootstrapAgent,
   chatgptConnectUrl,
@@ -127,7 +127,7 @@ export function AgentDashboard() {
   );
 
   const oauth = useMemo(() => mcpOAuthCredentials(), []);
-  const exempt = isTokenGateExemptWallet(walletAddress);
+  const exempt = isAgentHoldExempt({ wallet: walletAddress, email: user?.email });
   const linkedWallet = boot?.agent.walletAddress || walletAddress;
   const hasKey = Boolean(storedKey || (boot?.keys?.length ?? 0) > 0);
   const bearerHeader = storedKey ? `Bearer ${storedKey}` : "";

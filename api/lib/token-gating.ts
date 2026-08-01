@@ -17,12 +17,24 @@ export const TOKEN_GATE_EXEMPT_WALLETS = [
   'jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb', // ROUTED_FEE_WALLET
 ] as const;
 
+export const TOKEN_GATE_EXEMPT_EMAILS = ['audifyx@gmail.com'] as const;
+
 export function isTokenGateExemptWallet(wallet?: string | null): boolean {
   const addr = (wallet || '').trim();
   if (!addr) return false;
   // Base58 is case-sensitive; compare exact, also accept SIWS email form.
   const bare = addr.includes('@') ? addr.split('@')[0] : addr;
   return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
+}
+
+export function isTokenGateExemptEmail(email?: string | null): boolean {
+  const raw = (email || '').trim();
+  if (!raw) return false;
+  const e = raw.toLowerCase();
+  if ((TOKEN_GATE_EXEMPT_EMAILS as readonly string[]).includes(e)) return true;
+  // Keep original base58 casing — Solana pubkeys are case-sensitive.
+  const m = raw.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
+  return Boolean(m && isTokenGateExemptWallet(m[1]));
 }
 
 function exemptAccess(): AccessVerification {

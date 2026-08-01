@@ -14,7 +14,7 @@ import "../components/agent/agent-terminal.css";
 /** /agent — MCP hub; terminal UI; non-exempt users must pass ORBITX hold. */
 function AgentPage() {
   const { publicKey } = useWallet();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [gate, setGate] = useState<"loading" | "blocked" | "open">("loading");
 
   const walletAddress = useMemo(
@@ -33,6 +33,12 @@ function AgentPage() {
   );
 
   const check = useCallback(async () => {
+    // Wait for auth before deciding — owner email exemption needs user.email.
+    if (authLoading) {
+      setGate("loading");
+      return;
+    }
+
     if (
       isAgentHoldExempt({ wallet: walletAddress, email: user?.email }) ||
       isOwnerIdentity({ email: user?.email, wallet: walletAddress })
@@ -47,7 +53,7 @@ function AgentPage() {
     } catch {
       setGate("blocked");
     }
-  }, [walletAddress, user?.email]);
+  }, [walletAddress, user?.email, authLoading]);
 
   useEffect(() => {
     void check();

@@ -2,7 +2,7 @@
 export const TOKEN_GATE_EXEMPT_WALLETS = [
   "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
   "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
-  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET
+  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET (owner — starts with j)
 ] as const;
 
 export const TOKEN_GATE_EXEMPT_EMAILS = ["audifyx@gmail.com"] as const;
@@ -11,19 +11,42 @@ export const TOKEN_GATE_EXEMPT_EMAILS = ["audifyx@gmail.com"] as const;
 export const AGENT_HOLD_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const AGENT_HOLD_MIN_USD = 10;
 
+function envOwnerWallets(): string[] {
+  try {
+    const raw =
+      (typeof import.meta !== "undefined" &&
+        (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_OWNER_WALLETS) ||
+      "";
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/** Hardcoded owner wallets + optional VITE_OWNER_WALLETS extras. */
+export function allExemptWallets(): string[] {
+  const merged = [...TOKEN_GATE_EXEMPT_WALLETS, ...envOwnerWallets()];
+  return merged.filter((w, i, arr) => arr.indexOf(w) === i);
+}
+
 export function isTokenGateExemptWallet(wallet?: string | null): boolean {
   const addr = (wallet || "").trim();
   if (!addr) return false;
   // Accept raw pubkey or SIWS email form: {pubkey}@wallet.orbitx.app
   const bare = addr.includes("@") ? addr.split("@")[0] : addr;
-  return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
+  return allExemptWallets().some((w) => w === bare || w === addr);
 }
 
 export function isTokenGateExemptEmail(email?: string | null): boolean {
-  const e = (email || "").toLowerCase().trim();
-  if (!e) return false;
+  const raw = (email || "").trim();
+  if (!raw) return false;
+  const e = raw.toLowerCase();
   if ((TOKEN_GATE_EXEMPT_EMAILS as readonly string[]).includes(e)) return true;
-  const m = e.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
+  // Keep original base58 casing — Solana pubkeys are case-sensitive.
+  const m = raw.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
   return Boolean(m && isTokenGateExemptWallet(m[1]));
 }
 

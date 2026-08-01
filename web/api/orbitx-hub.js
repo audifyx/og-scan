@@ -17,6 +17,7 @@ import {
 import {
   holdBlockedPayload,
   isHoldGatedTool,
+  isTokenGateExemptAny,
   isTokenGateExemptWallet,
   verifyTokenHold,
 } from "./orbitx/token-hold.js";
@@ -229,6 +230,44 @@ async function getAuthUser(req) {
   const u = await r.json();
   if (!u?.id) return null;
   return { id: u.id, email: u.email || null };
+}
+
+/** Resolve owner email for API-key / OAuth sessions (service role). Cached per request via auth object. */
+async function getUserEmailById(userId) {
+  const id = String(userId || "").trim();
+  if (!id || !SUPA_URL || !SRK) return null;
+  try {
+    const r = await fetch(`${SUPA_URL}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${SRK}`, apikey: SRK },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u?.email || null;
+  } catch {
+    return null;
+  }
+}
+
+async function withAuthEmail(auth) {
+  if (!auth?.userId) return auth;
+  if (auth.email) return auth;
+  const email = await getUserEmailById(auth.userId);
+  return email ? { ...auth, email } : auth;
+}
+
+function holdCandidateWallets(auth, args = {}) {
+  return [
+    auth?.walletAddress,
+    args.publicKey,
+    args.address,
+    args.wallet,
+    args.buyerWallet,
+    args.sellerWallet,
+    args.bidderWallet,
+  ]
+    .map((w) => String(w || "").trim())
+    .filter(Boolean)
+    .filter((w, i, arr) => arr.indexOf(w) === i);
 }
 
 async function getUserId(req) {
@@ -648,7 +687,14 @@ async function resolveAuth(req) {
 async function enrichAuth(req, args = {}) {
   const { token, bearerPresent } = extractBearerToken(req);
   let auth = await resolveAuth(req);
-  if (auth?.userId) return { ...auth, bearerPresent, bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null };
+  if (auth?.userId) {
+    const withEmail = await withAuthEmail({
+      ...auth,
+      bearerPresent,
+      bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
+    });
+    return withEmail;
+  }
 
   const wallet = String(
     args.publicKey || args.address || args.wallet || args.buyerWallet || args.sellerWallet || "",
@@ -656,12 +702,12 @@ async function enrichAuth(req, args = {}) {
   if (wallet) {
     const linked = await resolveAgentByWallet(wallet);
     if (linked?.userId) {
-      return {
+      return withAuthEmail({
         ...linked,
         bearerPresent,
         bearerInvalid: bearerPresent,
         bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
-      };
+      });
     }
   }
 
@@ -669,6 +715,7 @@ async function enrichAuth(req, args = {}) {
     userId: null,
     agentId: null,
     walletAddress: wallet || null,
+    email: null,
     source: bearerPresent ? "bearer_unresolved" : wallet ? "wallet_unlinked" : "anonymous",
     bearerPresent,
     bearerInvalid: bearerPresent,
@@ -1833,19 +1880,27 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
   if (generated !== null && generated !== undefined) return generated;
 
   if (name === "orbitx_whoami") {
-    const session = auth || {
-      userId: null,
-      agentId: null,
-      walletAddress: wallet || null,
-      source: "anonymous",
-      bearerPresent: false,
-    };
+    const session = await withAuthEmail(
+      auth || {
+        userId: null,
+        agentId: null,
+        walletAddress: wallet || null,
+        email: null,
+        source: "anonymous",
+        bearerPresent: false,
+      },
+    );
     const identified = Boolean(session.userId);
     let status = "anonymous";
     if (identified && session.walletAddress) status = "authenticated_with_wallet";
     else if (identified) status = "authenticated";
     else if (session.bearerInvalid || session.source === "bearer_unresolved") status = "bearer_invalid";
     else if (session.walletAddress || wallet) status = "wallet_unlinked";
+
+    const holdExempt = isTokenGateExemptAny({
+      wallets: [session.walletAddress, wallet],
+      email: session.email,
+    });
 
     return {
       ok: true,
@@ -1875,8 +1930,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       tokenHold: {
         mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
         minUsd: 10,
-        required: !isTokenGateExemptWallet(session.walletAddress || wallet),
-        exempt: isTokenGateExemptWallet(session.walletAddress || wallet),
+        required: !holdExempt,
+        exempt: holdExempt,
       },
       totalTools: TOOLS.length,
     };
@@ -3014,23 +3069,19 @@ async function handleMcp(req, res, parts) {
         ).trim(),
       );
 
-      // Token hold block — write/tx/media tools require ≥$10 ORBITX (exempt wallets skip).
+      // Token hold block — write/tx tools require ≥$10 ORBITX.
+      // Owner wallets + audifyx@gmail.com (resolved from API-key userId) skip entirely.
       if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
-        const holdWallet = String(
-          auth?.walletAddress ||
-            args.publicKey ||
-            args.address ||
-            args.wallet ||
-            args.buyerWallet ||
-            "",
-        ).trim();
-        if (!isTokenGateExemptWallet(holdWallet)) {
-          const hold = await verifyTokenHold(holdWallet, base);
+        const candidates = holdCandidateWallets(auth, args);
+        const holdWallet = candidates[0] || "";
+        const holdEmail = auth?.email || null;
+        if (!isTokenGateExemptAny({ wallets: candidates, email: holdEmail })) {
+          const hold = await verifyTokenHold(holdWallet, base, { email: holdEmail });
           if (!hold.meetsRequirement) {
             const tip = holdBlockedPayload({
               tool: name,
               hold,
-              fix: "Hold ≥$10 ORBITX, link wallet on https://orbitx.world/agent, then retry.",
+              fix: "Hold ≥$10 ORBITX, link wallet on https://orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
             });
             return json(res, {
               jsonrpc: "2.0",

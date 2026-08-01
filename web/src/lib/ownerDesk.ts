@@ -19,21 +19,30 @@ export const OWNER_EMAILS = [OWNER_EMAIL] as const;
 
 /**
  * Owner Solana wallets that may unlock the desk via wallet SIWS.
- * Set `VITE_OWNER_WALLETS=addr1,addr2` in env (comma-separated).
+ * Hardcoded platform/owner wallets always apply; extras via
+ * `VITE_OWNER_WALLETS=addr1,addr2` (comma-separated).
  * Wallet sessions use `{pubkey}@wallet.orbitx.app` as email.
  */
+const OWNER_WALLETS_BASE = [
+  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
+  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
+  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET
+] as const;
+
 function parseOwnerWallets(): readonly string[] {
+  let extras: string[] = [];
   try {
     const raw =
       (typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_OWNER_WALLETS) ||
       "";
-    return raw
+    extras = raw
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
   } catch {
-    return [];
+    extras = [];
   }
+  return [...OWNER_WALLETS_BASE, ...extras].filter((w, i, arr) => arr.indexOf(w) === i);
 }
 export const OWNER_WALLETS = parseOwnerWallets();
 

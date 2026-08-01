@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import {
   AGENT_HOLD_MINT,
   AGENT_HOLD_MIN_USD,
-  isTokenGateExemptWallet,
+  isAgentHoldExempt,
   resolveAuthWallet,
   verifyAgentHold,
   type HoldVerifyResult,
@@ -39,6 +39,21 @@ export function TokenGatingVerifier({
       }),
     [publicKey, user?.email, user?.user_metadata, profile],
   );
+
+  const exempt = isAgentHoldExempt({ wallet: walletAddress, email: user?.email });
+
+  useEffect(() => {
+    if (!exempt) return;
+    onUnlocked?.({
+      ok: true,
+      meetsRequirement: true,
+      exempt: true,
+      wallet: walletAddress,
+      mint: AGENT_HOLD_MINT,
+      minUsd: AGENT_HOLD_MIN_USD,
+      message: "Owner/DEF exempt",
+    });
+  }, [exempt, onUnlocked, walletAddress]);
 
   const connectWallet = async (name: string) => {
     setError(null);
@@ -74,10 +89,10 @@ export function TokenGatingVerifier({
     }
   };
 
-  if (isTokenGateExemptWallet(walletAddress)) {
+  if (exempt) {
     return (
       <div className="ox-term__loading">
-        <span>unlocking exempt wallet</span>
+        <span>unlocking exempt owner</span>
         <span className="ox-term__cursor" />
       </div>
     );
