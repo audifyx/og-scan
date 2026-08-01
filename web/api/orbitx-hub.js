@@ -492,6 +492,8 @@ const WALLET_TOOLS = new Set([
   "orbitx_nft_like",
   "orbitx_nft_comment",
   "orbitx_nft_follow",
+  "orbitx_nft_register",
+  "orbitx_nft_register_collection",
 ]);
 
 /** Community write tools — need Bearer userId (or publicKey of a wallet linked on /agent). */
@@ -726,9 +728,29 @@ const TOOLS = [
     },
   },
   {
+    name: "orbitx_create_token",
+    description:
+      "CREATE a new Pump.fun token via OrbitX launchpad + Phantom. Returns openUrl — user opens it, connects Phantom, pays fee, signs create. Prefer this over raw prepare_launch. Optional imageUrl or call orbitx_launch_ipfs first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        imageUrl: { type: "string", description: "Public image URL for the token logo" },
+        twitter: { type: "string" },
+        telegram: { type: "string" },
+        website: { type: "string" },
+        lane: { type: "string", enum: ["pump", "custom"], default: "pump" },
+        publicKey: { type: "string" },
+      },
+      required: ["name", "symbol"],
+    },
+  },
+  {
     name: "orbitx_prepare_launch",
     description:
-      "Prepare unsigned Pump.fun / SPL launch create tx. Needs metadataUri + mintPublicKey (use orbitx_vanity_mint).",
+      "Low-level launch step. Prefer orbitx_create_token (opens Phantom launchpad). Needs metadataUri + mintPublicKey from orbitx_vanity_mint.",
     inputSchema: {
       type: "object",
       properties: {
@@ -906,6 +928,26 @@ const TOOLS = [
     },
   },
   {
+    name: "orbitx_mint_nft",
+    description:
+      "MINT a real Metaplex NFT via Phantom. Returns openUrl to /agent/nft-mint — user connects Phantom and approves. Requires metadata uri (JSON URL). Optionally registers on OrbitX marketplace.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string", default: "NFT" },
+        uri: { type: "string", description: "Public metadata JSON URL" },
+        royaltyBps: { type: "integer", default: 500 },
+        collectionMint: { type: "string" },
+        isCollection: { type: "boolean", default: false },
+        imageUrl: { type: "string" },
+        register: { type: "boolean", default: true },
+        publicKey: { type: "string" },
+      },
+      required: ["name", "uri"],
+    },
+  },
+  {
     name: "orbitx_nft_collections",
     description: "List OrbitX NFT collections.",
     inputSchema: {
@@ -914,11 +956,58 @@ const TOOLS = [
     },
   },
   {
+    name: "orbitx_nft_items",
+    description: "List OrbitX registered NFTs (optional creatorWallet filter).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", default: 40 },
+        creatorWallet: { type: "string" },
+      },
+    },
+  },
+  {
     name: "orbitx_nft_listings",
     description: "List active OrbitX NFT marketplace listings.",
     inputSchema: {
       type: "object",
       properties: { limit: { type: "integer", default: 40 } },
+    },
+  },
+  {
+    name: "orbitx_nft_register",
+    description:
+      "Register an already-minted NFT mint address into the OrbitX marketplace registry (after orbitx_mint_nft or external mint).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mintAddress: { type: "string" },
+        creatorWallet: { type: "string" },
+        name: { type: "string" },
+        symbol: { type: "string" },
+        imageUrl: { type: "string" },
+        metadataUri: { type: "string" },
+        royaltyBps: { type: "integer", default: 500 },
+        collectionId: { type: "string" },
+      },
+      required: ["mintAddress", "creatorWallet", "name"],
+    },
+  },
+  {
+    name: "orbitx_nft_register_collection",
+    description: "Register a collection NFT mint on OrbitX marketplace.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mintAddress: { type: "string" },
+        creatorWallet: { type: "string" },
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        logoUrl: { type: "string" },
+        royaltyBps: { type: "integer", default: 500 },
+      },
+      required: ["mintAddress", "creatorWallet", "name", "symbol"],
     },
   },
   {
@@ -994,9 +1083,49 @@ const TOOLS = [
     },
   },
   {
+    name: "orbitx_xray",
+    description: "Deep token risk / xray scan (holders, risks, flags).",
+    inputSchema: {
+      type: "object",
+      properties: { mint: { type: "string" } },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_research",
+    description: "Research brief for a mint (aggregated intel).",
+    inputSchema: {
+      type: "object",
+      properties: { mint: { type: "string" } },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_leaderboard",
+    description: "OrbitX / OG DEX trader or token leaderboard.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 25 } },
+    },
+  },
+  {
+    name: "orbitx_dex_listings",
+    description: "DEX / launchpad listings feed.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 30 } },
+    },
+  },
+  {
     name: "orbitx_platform_stats",
     description: "OrbitX platform stats snapshot.",
     inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "orbitx_tools_help",
+    description:
+      "Catalog of MCP tools by category (create token, mint NFT, trade, social, intel). Call this when unsure which tool to use.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
 
@@ -1076,9 +1205,132 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
     orbitx_launch_config: () =>
       `${base}/api/ogdex/launch?config=1&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
     orbitx_platform_stats: () => `${base}/api/ogdex/platform-stats`,
+    orbitx_xray: () => `${base}/api/ogdex/xray?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_research: () => `${base}/api/ogdex/research?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_leaderboard: () => `${base}/api/ogdex/leaderboard?limit=${Number(args.limit) || 25}`,
+    orbitx_dex_listings: () => `${base}/api/ogdex/listings?limit=${Number(args.limit) || 30}`,
   };
 
+  if (name === "orbitx_tools_help") {
+    return {
+      ok: true,
+      create: ["orbitx_create_token", "orbitx_launch_check", "orbitx_launch_ipfs", "orbitx_vanity_mint", "orbitx_prepare_launch", "orbitx_launch_record"],
+      nft: [
+        "orbitx_mint_nft",
+        "orbitx_nft_collections",
+        "orbitx_nft_items",
+        "orbitx_nft_listings",
+        "orbitx_nft_register",
+        "orbitx_nft_register_collection",
+        "orbitx_nft_prepare_buy",
+        "orbitx_nft_submit_buy",
+        "orbitx_nft_like",
+        "orbitx_nft_comment",
+        "orbitx_nft_follow",
+      ],
+      trade: ["orbitx_prepare_buy", "orbitx_prepare_sell", "orbitx_claim_fees", "orbitx_rent_refund", "orbitx_burn"],
+      social: [
+        "orbitx_social_communities",
+        "orbitx_social_feed",
+        "orbitx_social_join",
+        "orbitx_social_post",
+        "orbitx_social_create_community",
+      ],
+      intel: [
+        "orbitx_search",
+        "orbitx_get_token",
+        "orbitx_screen_tokens",
+        "orbitx_get_forensics",
+        "orbitx_get_safety",
+        "orbitx_crypto_scan",
+        "orbitx_xray",
+        "orbitx_research",
+        "orbitx_get_ath",
+        "orbitx_get_chart",
+        "orbitx_get_kols",
+        "orbitx_get_traders",
+        "orbitx_get_signals",
+        "orbitx_get_launches",
+        "orbitx_leaderboard",
+        "orbitx_dex_listings",
+      ],
+      note: "Create token / mint NFT / buy-sell return openUrl or signUrl — open in browser for Phantom. Never broadcast unsigned txs.",
+      all: TOOLS.map((t) => t.name),
+    };
+  }
+
   if (get[name]) return fetchJson(get[name]());
+
+  if (name === "orbitx_create_token") {
+    const tokName = String(args.name || "").trim();
+    const symbol = String(args.symbol || "").trim().toUpperCase();
+    if (!tokName || !symbol) throw new Error("name and symbol required");
+    const q = new URLSearchParams({
+      name: tokName,
+      symbol,
+      description: String(args.description || ""),
+      lane: args.lane === "custom" ? "custom" : "pump",
+    });
+    if (args.imageUrl) q.set("imageUrl", String(args.imageUrl));
+    if (args.twitter) q.set("twitter", String(args.twitter));
+    if (args.telegram) q.set("telegram", String(args.telegram));
+    if (args.website) q.set("website", String(args.website));
+    if (wallet) q.set("publicKey", wallet);
+    const openUrl = `${base}/agent/create-token?${q.toString()}`;
+    return {
+      ok: true,
+      status: "awaiting_phantom_launch",
+      requiresSignature: true,
+      openUrl,
+      launchpadUrl: `${base}/orbitxlaunch/create/pump`,
+      name: tokName,
+      symbol,
+      instructions: [
+        "Open openUrl in the user's browser.",
+        "Connect Phantom on the OrbitX launchpad.",
+        "Confirm image/details, pay the small launch fee, then Sign create in Phantom.",
+        "Token is not live until Phantom confirms the create transaction.",
+      ],
+      tip: args.imageUrl
+        ? "Image URL prefilled — user can still replace the logo on the launchpad."
+        : "Provide imageUrl, or user uploads a logo on the launchpad before launch.",
+      note: "Non-custodial create. Do not attempt to mint/create without Phantom.",
+    };
+  }
+
+  if (name === "orbitx_mint_nft") {
+    const nftName = String(args.name || "").trim();
+    const uri = String(args.uri || args.metadataUri || "").trim();
+    if (!nftName || !uri) throw new Error("name and uri (metadata JSON URL) required");
+    const q = new URLSearchParams({
+      name: nftName,
+      symbol: String(args.symbol || "NFT").trim().toUpperCase() || "NFT",
+      uri,
+      royaltyBps: String(Number(args.royaltyBps) || 500),
+      register: args.register === false ? "0" : "1",
+    });
+    if (args.collectionMint) q.set("collectionMint", String(args.collectionMint));
+    if (args.isCollection) q.set("isCollection", "1");
+    if (args.imageUrl) q.set("imageUrl", String(args.imageUrl));
+    if (wallet) q.set("publicKey", wallet);
+    const openUrl = `${base}/agent/nft-mint?${q.toString()}`;
+    return {
+      ok: true,
+      status: "awaiting_phantom_mint",
+      requiresSignature: true,
+      openUrl,
+      studioUrl: `${base}/nft/create`,
+      name: nftName,
+      uri,
+      instructions: [
+        "Open openUrl in the user's browser.",
+        "Connect Phantom and click Mint NFT.",
+        "Approve the Metaplex create transaction in Phantom.",
+        "Mint is incomplete until Phantom confirms.",
+      ],
+      note: "Non-custodial Metaplex mint. Never claim minted without a confirmed signature.",
+    };
+  }
 
   if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
@@ -1182,25 +1434,32 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_prepare_launch") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const data = await fetchJson(`${base}/api/ogdex/launch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        step: "create",
-        publicKey: wallet,
-        name: String(args.name || ""),
-        symbol: String(args.symbol || ""),
-        metadataUri: String(args.metadataUri || ""),
-        mintPublicKey: String(args.mintPublicKey || ""),
-        devBuySol: Number(args.devBuySol) || 0,
-        slippage: Number(args.slippage) || 10,
-        chain: String(args.chain || "solana"),
-      }),
+    const tokName = String(args.name || "");
+    const symbol = String(args.symbol || "");
+    const q = new URLSearchParams({
+      name: tokName,
+      symbol,
+      description: "",
+      lane: "pump",
+      publicKey: wallet,
     });
+    const openUrl = `${base}/agent/create-token?${q.toString()}`;
+    // Prefer Phantom launchpad handoff — raw create txs need a mint keypair Claude cannot safely hold.
     return {
-      ...data,
-      note: "Unsigned create tx. Sign with creator wallet, then orbitx_launch_record.",
+      ok: true,
+      status: "awaiting_phantom_launch",
+      requiresSignature: true,
+      openUrl,
+      preferredTool: "orbitx_create_token",
+      metadataUri: String(args.metadataUri || ""),
+      mintPublicKey: String(args.mintPublicKey || ""),
       wallet,
+      instructions: [
+        "Prefer opening openUrl (or call orbitx_create_token) so the user signs create in Phantom on the launchpad.",
+        "Do not broadcast an unsigned create transaction.",
+        "After confirmation, call orbitx_launch_record with mint + payment_tx if needed.",
+      ],
+      note: "Use orbitx_create_token for the full Phantom flow. Low-level PumpPortal create requires a mint secret that must stay in the browser.",
     };
   }
 
@@ -1350,6 +1609,64 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
   if (name === "orbitx_nft_collections") {
     const limit = Math.min(Number(args.limit) || 40, 100);
     return sb(`orbitx_nft_collections?order=created_at.desc&limit=${limit}&select=*`);
+  }
+
+  if (name === "orbitx_nft_items") {
+    const limit = Math.min(Number(args.limit) || 40, 100);
+    let path = `orbitx_nfts?order=created_at.desc&limit=${limit}&select=*`;
+    if (args.creatorWallet) {
+      path += `&creator_wallet=eq.${encodeURIComponent(String(args.creatorWallet))}`;
+    }
+    return sb(path);
+  }
+
+  if (name === "orbitx_nft_register") {
+    const mintAddress = String(args.mintAddress || "").trim();
+    const creatorWallet = String(args.creatorWallet || wallet || "").trim();
+    const nftName = String(args.name || "").trim();
+    if (!mintAddress || !creatorWallet || !nftName) {
+      throw new Error("mintAddress, creatorWallet, and name required");
+    }
+    return sb("rpc/orbitx_register_nft", {
+      method: "POST",
+      body: JSON.stringify({
+        p_collection_id: args.collectionId || null,
+        p_mint_address: mintAddress,
+        p_creator_wallet: creatorWallet,
+        p_name: nftName,
+        p_symbol: args.symbol || null,
+        p_image_url: args.imageUrl || null,
+        p_metadata_uri: args.metadataUri || null,
+        p_royalty_bps: Number(args.royaltyBps) || 500,
+        p_attributes: [],
+        p_content_hash: null,
+      }),
+    });
+  }
+
+  if (name === "orbitx_nft_register_collection") {
+    const mintAddress = String(args.mintAddress || "").trim();
+    const creatorWallet = String(args.creatorWallet || wallet || "").trim();
+    const colName = String(args.name || "").trim();
+    const symbol = String(args.symbol || "").trim();
+    if (!mintAddress || !creatorWallet || !colName || !symbol) {
+      throw new Error("mintAddress, creatorWallet, name, and symbol required");
+    }
+    return sb("rpc/orbitx_register_nft_collection", {
+      method: "POST",
+      body: JSON.stringify({
+        p_creator_wallet: creatorWallet,
+        p_name: colName,
+        p_symbol: symbol,
+        p_description: args.description || null,
+        p_banner_url: null,
+        p_logo_url: args.logoUrl || null,
+        p_royalty_bps: Number(args.royaltyBps) || 500,
+        p_mint_price_sol: 0,
+        p_mint_limit: null,
+        p_mint_address: mintAddress,
+      }),
+    });
   }
 
   if (name === "orbitx_nft_listings") {
