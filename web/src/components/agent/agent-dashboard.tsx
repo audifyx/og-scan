@@ -21,6 +21,7 @@ import {
   createAgentApiKey,
   linkAgentWallet,
   listAgentApiKeys,
+  mcpOAuthCredentials,
   mcpPublicUrl,
   revokeAgentApiKey,
   shortKey,
@@ -58,6 +59,7 @@ export function AgentDashboard() {
   );
 
   const mcpUrl = mcpPublicUrl();
+  const oauth = useMemo(() => mcpOAuthCredentials(), []);
   const exempt = isTokenGateExemptWallet(walletAddress);
   const linkedWallet = boot?.agent.walletAddress || walletAddress;
   const hasKey = Boolean(revealedKey || (boot?.keys?.length ?? 0) > 0);
@@ -339,27 +341,78 @@ export function AgentDashboard() {
         </div>
       </section>
 
-      {/* Step 3 — MCP + one-click */}
+      {/* Step 3 — MCP + OAuth credentials */}
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-bold">
           <Plug className="h-4 w-4 text-emerald-400" />
-          MCP setup
+          MCP + OAuth credentials
+        </div>
+        <p className="mb-4 text-xs text-white/45">
+          ChatGPT asks for these when you add a custom MCP connector. Copy each field — leave Client Secret
+          blank.
+        </p>
+
+        <div className="mb-5 space-y-2">
+          {(
+            [
+              { id: "mcp", label: "MCP server URL", value: oauth.mcpUrl },
+              { id: "auth", label: "Authorization URL", value: oauth.authorizationUrl },
+              { id: "token", label: "Token URL", value: oauth.tokenUrl },
+              { id: "client", label: "Client ID", value: oauth.clientId },
+              { id: "secret", label: "Client secret", value: "(leave blank)", copyValue: "" },
+              { id: "scope", label: "Scope", value: oauth.scope },
+              {
+                id: "authMethod",
+                label: "Token auth method",
+                value: oauth.tokenEndpointAuthMethod,
+              },
+            ] as Array<{ id: string; label: string; value: string; copyValue?: string }>
+          ).map((row) => (
+            <div
+              key={row.id}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-black/30 px-3 py-2"
+            >
+              <div className="min-w-[8rem] text-[11px] font-semibold uppercase tracking-wide text-white/35">
+                {row.label}
+              </div>
+              <code className="min-w-0 flex-1 break-all font-mono text-xs text-white/80">{row.value}</code>
+              {row.copyValue !== "" && (
+                <button
+                  type="button"
+                  onClick={() => copy(row.id, row.copyValue ?? row.value)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold hover:bg-white/5"
+                >
+                  {copied === row.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {copied === row.id ? "Copied" : "Copy"}
+                </button>
+              )}
+            </div>
+          ))}
         </div>
 
-        <p className="mb-2 text-xs text-white/40">MCP server URL</p>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <code className="flex-1 break-all rounded-xl bg-black/40 px-3 py-2 font-mono text-xs text-white/80">
-            {mcpUrl}
-          </code>
-          <button
-            type="button"
-            onClick={() => copy("mcp", mcpUrl)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/5"
-          >
-            {copied === "mcp" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            Copy
-          </button>
-        </div>
+        {revealedKey && (
+          <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/8 px-3 py-3">
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+              Optional Bearer API key
+            </p>
+            <p className="mb-2 text-[11px] text-white/45">
+              If ChatGPT offers a custom header instead of OAuth, use{" "}
+              <code className="text-white/60">Authorization: Bearer {"<key>"}</code>
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="min-w-0 flex-1 break-all font-mono text-xs text-white/70">
+                {shortKey(revealedKey)}
+              </code>
+              <button
+                type="button"
+                onClick={() => copy("key", revealedKey)}
+                className="rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-bold text-black"
+              >
+                Copy full key
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <button
@@ -378,38 +431,79 @@ export function AgentDashboard() {
           </button>
         </div>
 
-        <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-xs text-white/45">
-          <li>Create an API key above (copied when you click Add).</li>
-          <li>Confirm the connector in Claude / ChatGPT with the MCP URL.</li>
-          <li>
-            Click <span className="text-white/70">Authenticate</span> — you&apos;ll return here to link your
-            wallet, then the MCP is connected.
-          </li>
-          <li>
-            Or paste <code className="font-mono text-white/60">Authorization: Bearer {"<key>"}</code> in
-            request headers.
-          </li>
-        </ol>
-
-        {revealedKey && (
-          <p className="mt-3 text-[11px] text-white/35">
-            Active key preview: <span className="font-mono text-white/55">{shortKey(revealedKey)}</span>
-          </p>
-        )}
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">ChatGPT setup</h3>
+            <ol className="list-decimal space-y-1.5 pl-5 text-xs text-white/45">
+              <li>Settings → Apps &amp; connectors → enable Developer mode.</li>
+              <li>Create a custom MCP connector; paste the MCP server URL.</li>
+              <li>
+                When asked for OAuth: Client ID <code className="text-white/60">{oauth.clientId}</code>, leave
+                Client secret empty, paste Auth + Token URLs, scope{" "}
+                <code className="text-white/60">{oauth.scope}</code>.
+              </li>
+              <li>
+                Click Authenticate → approve on OrbitX (link wallet) → return to ChatGPT.
+              </li>
+            </ol>
+          </div>
+          <div>
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Claude setup</h3>
+            <ol className="list-decimal space-y-1.5 pl-5 text-xs text-white/45">
+              <li>Click Add to Claude (opens connectors with URL filled).</li>
+              <li>Confirm the OrbitX connector name and MCP URL.</li>
+              <li>Authenticate → link wallet on OrbitX → done.</li>
+            </ol>
+          </div>
+        </div>
       </section>
 
       {chatgptGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setChatgptGuide(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setChatgptGuide(false)}
+        >
           <div
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c111a] p-5 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#0c111a] p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-2 text-lg font-bold">Add OrbitX in ChatGPT</h3>
+            <h3 className="mb-1 text-lg font-bold">ChatGPT OAuth fields</h3>
+            <p className="mb-4 text-xs text-white/45">
+              Paste these into ChatGPT when it asks for auth credentials. Client secret stays empty.
+            </p>
+            <div className="mb-4 space-y-2">
+              {(
+                [
+                  ["MCP URL", oauth.mcpUrl, "mcp"],
+                  ["Authorization URL", oauth.authorizationUrl, "auth"],
+                  ["Token URL", oauth.tokenUrl, "token"],
+                  ["Client ID", oauth.clientId, "client"],
+                  ["Scope", oauth.scope, "scope"],
+                ] as const
+              ).map(([label, value, id]) => (
+                <div key={id} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-white/40">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() => copy(id, value)}
+                      className="text-[11px] font-semibold text-emerald-300 hover:underline"
+                    >
+                      {copied === id ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <code className="block break-all font-mono text-[11px] text-white/75">{value}</code>
+                </div>
+              ))}
+              <div className="rounded-xl border border-amber-400/20 bg-amber-400/8 px-3 py-2 text-xs text-amber-100/80">
+                Client secret: <strong>leave blank</strong> (public PKCE client)
+              </div>
+            </div>
             <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm text-white/65">
-              <li>Enable Developer mode (Settings → Security).</li>
-              <li>Create a connector / MCP app and paste the MCP URL (copied).</li>
-              <li>Click Authenticate — link your wallet on OrbitX.</li>
-              <li>Or add header Authorization Bearer with your API key.</li>
+              <li>Enable Developer mode in ChatGPT settings.</li>
+              <li>Add connector → paste MCP URL above.</li>
+              <li>Fill OAuth fields from this dialog.</li>
+              <li>Authenticate → approve + link wallet on OrbitX.</li>
             </ol>
             <div className="flex gap-2">
               <button

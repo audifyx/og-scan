@@ -2,6 +2,9 @@
 
 export const MCP_PATH = "/api/orbitx-mcp";
 export const AGENT_API = "/api/orbitx-agent";
+/** Public OAuth client for ChatGPT / Claude manual connector forms. */
+export const MCP_OAUTH_CLIENT_ID = "orbitx-mcp";
+export const MCP_OAUTH_SCOPE = "orbitx";
 
 export function mcpPublicUrl(origin?: string): string {
   const base = (origin || (typeof window !== "undefined" ? window.location.origin : "https://orbitx.world")).replace(
@@ -9,6 +12,33 @@ export function mcpPublicUrl(origin?: string): string {
     "",
   );
   return `${base}${MCP_PATH}`;
+}
+
+export type McpOAuthCredentials = {
+  mcpUrl: string;
+  authorizationUrl: string;
+  tokenUrl: string;
+  registrationUrl: string;
+  clientId: string;
+  /** Always empty — public PKCE client; ChatGPT should leave secret blank. */
+  clientSecret: string;
+  scope: string;
+  tokenEndpointAuthMethod: "none";
+};
+
+/** All fields ChatGPT / Claude OAuth MCP forms typically ask for. */
+export function mcpOAuthCredentials(origin?: string): McpOAuthCredentials {
+  const mcpUrl = mcpPublicUrl(origin);
+  return {
+    mcpUrl,
+    authorizationUrl: `${mcpUrl}/oauth/authorize`,
+    tokenUrl: `${mcpUrl}/oauth/token`,
+    registrationUrl: `${mcpUrl}/oauth/register`,
+    clientId: MCP_OAUTH_CLIENT_ID,
+    clientSecret: "",
+    scope: MCP_OAUTH_SCOPE,
+    tokenEndpointAuthMethod: "none",
+  };
 }
 
 export function claudeConnectUrl(mcpUrl: string, name = "OrbitX"): string {
@@ -20,7 +50,7 @@ export function claudeConnectUrl(mcpUrl: string, name = "OrbitX"): string {
   return `https://claude.ai/customize/connectors?${params.toString()}`;
 }
 
-/** ChatGPT has no official install deep link — open plugins/connectors and guide paste. */
+/** ChatGPT connectors settings — paste MCP URL + OAuth fields from the agent page. */
 export function chatgptConnectUrl(): string {
   return "https://chatgpt.com/#settings/Connectors";
 }

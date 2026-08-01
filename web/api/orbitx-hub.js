@@ -504,11 +504,37 @@ async function handleMcp(req, res, parts) {
       issuer: PUBLIC_BASE,
       authorization_endpoint: `${MCP_URL}/oauth/authorize`,
       token_endpoint: `${MCP_URL}/oauth/token`,
+      registration_endpoint: `${MCP_URL}/oauth/register`,
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code"],
       code_challenge_methods_supported: ["S256", "plain"],
       token_endpoint_auth_methods_supported: ["none"],
+      scopes_supported: ["orbitx"],
+      client_id_metadata_document_supported: true,
     });
+  }
+
+  // Dynamic Client Registration (RFC 7591) — ChatGPT may call this when adding the connector
+  if (route === "oauth/register" && req.method === "POST") {
+    const body = await readBody(req);
+    const clientId =
+      (typeof body.client_id === "string" && body.client_id.startsWith("https://"))
+        ? body.client_id
+        : opaque("oxcli");
+    return json(
+      res,
+      {
+        client_id: clientId,
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        client_secret_expires_at: 0,
+        redirect_uris: Array.isArray(body.redirect_uris) ? body.redirect_uris : [],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code"],
+        response_types: ["code"],
+        client_name: body.client_name || "ChatGPT MCP Connector",
+      },
+      201,
+    );
   }
 
   if (route === "oauth/authorize" && req.method === "GET") {
@@ -595,8 +621,14 @@ async function handleMcp(req, res, parts) {
       mcp_url: MCP_URL,
       auth: {
         type: "oauth2",
+        client_id: "orbitx-mcp",
+        client_secret: null,
+        client_secret_note: "Leave blank — public PKCE client",
         authorization_endpoint: `${MCP_URL}/oauth/authorize`,
         token_endpoint: `${MCP_URL}/oauth/token`,
+        registration_endpoint: `${MCP_URL}/oauth/register`,
+        scope: "orbitx",
+        token_endpoint_auth_method: "none",
       },
       tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
     });
