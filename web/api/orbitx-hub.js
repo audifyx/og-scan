@@ -237,6 +237,28 @@ async function handleAgent(req, res, parts) {
     });
   }
 
+  // Public prepare for /agent/sign (claim / burn / rent) — returns unsigned txs only.
+  if (route === "ops-prepare" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const pk = String(body.publicKey || "").trim();
+      const kind = String(body.kind || "").toLowerCase();
+      if (!pk) return json(res, { ok: false, error: "publicKey required" }, 400);
+      const ops = await mcpOps();
+      if (kind === "claim") return json(res, await ops.preparePumpClaim(pk));
+      if (kind === "rent") return json(res, await ops.prepareRentRefund(pk));
+      if (kind === "burn") {
+        if (body.amount == null && body.percent == null) {
+          return json(res, { ok: false, error: "amount or percent required" }, 400);
+        }
+        return json(res, await ops.prepareBurn(pk, String(body.mint || ""), body.amount, body.percent));
+      }
+      return json(res, { ok: false, error: "kind must be claim|burn|rent" }, 400);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "ops-prepare failed" }, 400);
+    }
+  }
+
   if (route === "bootstrap" && req.method === "POST") {
     const userId = await getUserId(req);
     if (!userId) return json(res, { error: "unauthorized" }, 401);
@@ -494,6 +516,13 @@ const WALLET_TOOLS = new Set([
   "orbitx_nft_follow",
   "orbitx_nft_register",
   "orbitx_nft_register_collection",
+  "orbitx_nft_make_offer",
+  "orbitx_nft_cancel_offer",
+  "orbitx_nft_list_for_sale",
+  "orbitx_nft_cancel_listing",
+  "orbitx_nft_create_auction",
+  "orbitx_nft_place_bid",
+  "orbitx_nft_favorite",
 ]);
 
 /** Community write tools — need Bearer userId (or publicKey of a wallet linked on /agent). */
@@ -501,7 +530,15 @@ const SESSION_TOOLS = new Set([
   "orbitx_social_join",
   "orbitx_social_post",
   "orbitx_social_create_community",
+  "orbitx_social_leave",
 ]);
+
+const TOOL_ALIASES = {
+  orbitx_buy: "orbitx_prepare_buy",
+  orbitx_sell: "orbitx_prepare_sell",
+  orbitx_launch_token: "orbitx_create_token",
+  orbitx_create_coin: "orbitx_create_token",
+};
 
 async function resolveSocialUser(auth, args) {
   if (auth?.userId) {
@@ -835,25 +872,27 @@ const TOOLS = [
   {
     name: "orbitx_claim_fees",
     description:
-      "Prepare unsigned pump.fun collectCreatorFee tx — claim trading fees for coins you launched.",
+      "Claim pump.fun creator fees via Phantom. Returns signUrl — open and approve. Requires publicKey of creator wallet.",
     inputSchema: {
       type: "object",
       properties: { publicKey: { type: "string" } },
+      required: ["publicKey"],
     },
   },
   {
     name: "orbitx_rent_refund",
     description:
-      "Scan empty token accounts and build unsigned close-account txs to reclaim rent SOL.",
+      "Reclaim rent SOL from empty token accounts via Phantom. Returns signUrl. Requires publicKey.",
     inputSchema: {
       type: "object",
       properties: { publicKey: { type: "string" } },
+      required: ["publicKey"],
     },
   },
   {
     name: "orbitx_burn",
     description:
-      "Prepare unsigned burn tx for a mint. Use amount (tokens) or percent (0-100). Full burn also closes ATA for rent.",
+      "Burn tokens via Phantom. Returns signUrl. Use amount (tokens) or percent (0-100). Full burn can close ATA for rent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -862,7 +901,71 @@ const TOOLS = [
         percent: { type: "number" },
         publicKey: { type: "string" },
       },
-      required: ["mint"],
+      required: ["mint", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_buy",
+    description: "Alias for orbitx_prepare_buy — returns Phantom signUrl.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_sell",
+    description: "Alias for orbitx_prepare_sell — returns Phantom signUrl.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amount: { type: ["number", "string"] },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amount", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_launch_token",
+    description: "Alias for orbitx_create_token — opens Phantom launchpad.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        imageUrl: { type: "string" },
+        twitter: { type: "string" },
+        telegram: { type: "string" },
+        website: { type: "string" },
+        lane: { type: "string", enum: ["pump", "custom"], default: "pump" },
+        publicKey: { type: "string" },
+      },
+      required: ["name", "symbol"],
+    },
+  },
+  {
+    name: "orbitx_create_coin",
+    description: "Alias for orbitx_create_token.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        imageUrl: { type: "string" },
+        publicKey: { type: "string" },
+      },
+      required: ["name", "symbol"],
     },
   },
   {
@@ -1122,6 +1225,198 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "orbitx_get_metadata",
+    description: "Read on-chain token metadata + update authority (for metadata editor eligibility).",
+    inputSchema: {
+      type: "object",
+      properties: { mint: { type: "string" } },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_boosts",
+    description: "List active OG DEX token boosts.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "orbitx_boost_tiers",
+    description: "Boost pricing tiers and pay wallet.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "orbitx_health",
+    description: "OG DEX API health check.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "orbitx_config",
+    description: "OG DEX public config.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "orbitx_report_url",
+    description: "PDF research report URL for a mint (open in browser).",
+    inputSchema: {
+      type: "object",
+      properties: { mint: { type: "string" } },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_open_dex",
+    description: "Deep link to OrbitX DEX token page or home.",
+    inputSchema: {
+      type: "object",
+      properties: { mint: { type: "string" } },
+    },
+  },
+  {
+    name: "orbitx_open_alerts",
+    description: "Deep link to DEX alerts UI (wallet-proof alerts require the web UI).",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "orbitx_nft_offers",
+    description: "List offers on an NFT id.",
+    inputSchema: {
+      type: "object",
+      properties: { nftId: { type: "string" } },
+      required: ["nftId"],
+    },
+  },
+  {
+    name: "orbitx_nft_make_offer",
+    description: "Make an offer on an OrbitX NFT (registry). Requires buyer wallet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nftId: { type: "string" },
+        priceSol: { type: "number" },
+        buyerWallet: { type: "string" },
+        expiresHours: { type: "number", default: 72 },
+      },
+      required: ["nftId", "priceSol"],
+    },
+  },
+  {
+    name: "orbitx_nft_cancel_offer",
+    description: "Cancel your NFT offer.",
+    inputSchema: {
+      type: "object",
+      properties: { offerId: { type: "string" }, buyerWallet: { type: "string" } },
+      required: ["offerId"],
+    },
+  },
+  {
+    name: "orbitx_nft_list_for_sale",
+    description: "List an OrbitX NFT for sale at a SOL price.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nftId: { type: "string" },
+        priceSol: { type: "number" },
+        sellerWallet: { type: "string" },
+        currency: { type: "string", enum: ["SOL", "USDC"], default: "SOL" },
+      },
+      required: ["nftId", "priceSol"],
+    },
+  },
+  {
+    name: "orbitx_nft_cancel_listing",
+    description: "Cancel an active NFT listing.",
+    inputSchema: {
+      type: "object",
+      properties: { nftId: { type: "string" }, sellerWallet: { type: "string" } },
+      required: ["nftId"],
+    },
+  },
+  {
+    name: "orbitx_nft_auctions",
+    description: "List active OrbitX NFT auctions.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 40 } },
+    },
+  },
+  {
+    name: "orbitx_nft_create_auction",
+    description: "Create an NFT auction on OrbitX marketplace.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nftId: { type: "string" },
+        startPriceSol: { type: "number" },
+        minIncrementSol: { type: "number", default: 0.01 },
+        durationHours: { type: "number", default: 24 },
+        sellerWallet: { type: "string" },
+      },
+      required: ["nftId", "startPriceSol"],
+    },
+  },
+  {
+    name: "orbitx_nft_place_bid",
+    description: "Place a bid on an NFT auction.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        auctionId: { type: "string" },
+        amountSol: { type: "number" },
+        bidderWallet: { type: "string" },
+      },
+      required: ["auctionId", "amountSol"],
+    },
+  },
+  {
+    name: "orbitx_nft_recent_sales",
+    description: "Recent NFT marketplace sales.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+    },
+  },
+  {
+    name: "orbitx_nft_sales",
+    description: "Sale history for one NFT id.",
+    inputSchema: {
+      type: "object",
+      properties: { nftId: { type: "string" } },
+      required: ["nftId"],
+    },
+  },
+  {
+    name: "orbitx_nft_favorite",
+    description: "Toggle favorite on an NFT for a wallet.",
+    inputSchema: {
+      type: "object",
+      properties: { nftId: { type: "string" }, wallet: { type: "string" } },
+      required: ["nftId"],
+    },
+  },
+  {
+    name: "orbitx_social_members",
+    description: "List members of an OrbitX community.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        communityId: { type: "string" },
+        limit: { type: "integer", default: 50 },
+      },
+      required: ["communityId"],
+    },
+  },
+  {
+    name: "orbitx_social_leave",
+    description: "Leave an OrbitX community (Bearer or linked wallet).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        communityId: { type: "string" },
+        publicKey: { type: "string" },
+      },
+      required: ["communityId"],
+    },
+  },
+  {
     name: "orbitx_tools_help",
     description:
       "Catalog of MCP tools by category (create token, mint NFT, trade, social, intel). Call this when unsure which tool to use.",
@@ -1150,9 +1445,12 @@ async function fetchJson(url, init) {
   return data;
 }
 
-async function callTool(name, args, auth, base = FALLBACK_BASE) {
+async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
+  const name = TOOL_ALIASES[rawName] || rawName;
   const mcpUrl = `${base}/api/orbitx-mcp`;
-  const wallet = String(args.publicKey || args.address || auth?.walletAddress || "").trim();
+  const wallet = String(
+    args.publicKey || args.address || args.buyerWallet || args.sellerWallet || args.bidderWallet || auth?.walletAddress || "",
+  ).trim();
 
   if (name === "orbitx_whoami") {
     return {
@@ -1209,17 +1507,42 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
     orbitx_research: () => `${base}/api/ogdex/research?mint=${encodeURIComponent(String(args.mint || ""))}`,
     orbitx_leaderboard: () => `${base}/api/ogdex/leaderboard?limit=${Number(args.limit) || 25}`,
     orbitx_dex_listings: () => `${base}/api/ogdex/listings?limit=${Number(args.limit) || 30}`,
+    orbitx_get_metadata: () => `${base}/api/ogdex/metadata?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_boosts: () => `${base}/api/ogdex/boosts`,
+    orbitx_boost_tiers: () => `${base}/api/ogdex/boosts?tiers=1`,
+    orbitx_health: () => `${base}/api/ogdex/health`,
+    orbitx_config: () => `${base}/api/ogdex/config`,
   };
 
   if (name === "orbitx_tools_help") {
     return {
       ok: true,
-      create: ["orbitx_create_token", "orbitx_launch_check", "orbitx_launch_ipfs", "orbitx_vanity_mint", "orbitx_prepare_launch", "orbitx_launch_record"],
+      create: [
+        "orbitx_create_token",
+        "orbitx_launch_token",
+        "orbitx_create_coin",
+        "orbitx_launch_check",
+        "orbitx_launch_ipfs",
+        "orbitx_vanity_mint",
+        "orbitx_prepare_launch",
+        "orbitx_launch_record",
+      ],
       nft: [
         "orbitx_mint_nft",
         "orbitx_nft_collections",
         "orbitx_nft_items",
         "orbitx_nft_listings",
+        "orbitx_nft_offers",
+        "orbitx_nft_make_offer",
+        "orbitx_nft_cancel_offer",
+        "orbitx_nft_list_for_sale",
+        "orbitx_nft_cancel_listing",
+        "orbitx_nft_auctions",
+        "orbitx_nft_create_auction",
+        "orbitx_nft_place_bid",
+        "orbitx_nft_recent_sales",
+        "orbitx_nft_sales",
+        "orbitx_nft_favorite",
         "orbitx_nft_register",
         "orbitx_nft_register_collection",
         "orbitx_nft_prepare_buy",
@@ -1228,23 +1551,35 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
         "orbitx_nft_comment",
         "orbitx_nft_follow",
       ],
-      trade: ["orbitx_prepare_buy", "orbitx_prepare_sell", "orbitx_claim_fees", "orbitx_rent_refund", "orbitx_burn"],
+      trade: [
+        "orbitx_buy",
+        "orbitx_sell",
+        "orbitx_prepare_buy",
+        "orbitx_prepare_sell",
+        "orbitx_claim_fees",
+        "orbitx_rent_refund",
+        "orbitx_burn",
+      ],
       social: [
         "orbitx_social_communities",
         "orbitx_social_feed",
+        "orbitx_social_members",
         "orbitx_social_join",
+        "orbitx_social_leave",
         "orbitx_social_post",
         "orbitx_social_create_community",
       ],
       intel: [
         "orbitx_search",
         "orbitx_get_token",
+        "orbitx_get_metadata",
         "orbitx_screen_tokens",
         "orbitx_get_forensics",
         "orbitx_get_safety",
         "orbitx_crypto_scan",
         "orbitx_xray",
         "orbitx_research",
+        "orbitx_report_url",
         "orbitx_get_ath",
         "orbitx_get_chart",
         "orbitx_get_kols",
@@ -1253,9 +1588,42 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
         "orbitx_get_launches",
         "orbitx_leaderboard",
         "orbitx_dex_listings",
+        "orbitx_boosts",
+        "orbitx_boost_tiers",
+        "orbitx_health",
+        "orbitx_config",
+        "orbitx_open_dex",
+        "orbitx_open_alerts",
       ],
-      note: "Create token / mint NFT / buy-sell return openUrl or signUrl — open in browser for Phantom. Never broadcast unsigned txs.",
+      note: "Create token / mint NFT / buy-sell / claim / burn / rent return openUrl or signUrl — open in browser for Phantom. Never broadcast unsigned txs.",
       all: TOOLS.map((t) => t.name),
+    };
+  }
+
+  if (name === "orbitx_report_url") {
+    const mint = String(args.mint || "").trim();
+    if (!mint) throw new Error("mint required");
+    return {
+      ok: true,
+      mint,
+      reportUrl: `${base}/api/ogdex/report?mint=${encodeURIComponent(mint)}`,
+      note: "Open reportUrl in a browser to download the PDF.",
+    };
+  }
+
+  if (name === "orbitx_open_dex") {
+    const mint = String(args.mint || "").trim();
+    return {
+      ok: true,
+      openUrl: mint ? `${base}/ORBITX_DEX/token/${encodeURIComponent(mint)}` : `${base}/ORBITX_DEX`,
+    };
+  }
+
+  if (name === "orbitx_open_alerts") {
+    return {
+      ok: true,
+      openUrl: `${base}/ORBITX_DEX/alerts`,
+      note: "Alerts require wallet signature proof in the DEX UI.",
     };
   }
 
@@ -1495,21 +1863,59 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_claim_fees") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const ops = await mcpOps();
-    return ops.preparePumpClaim(wallet);
+    const q = new URLSearchParams({ kind: "claim", publicKey: wallet });
+    return {
+      ok: true,
+      status: "awaiting_phantom_signature",
+      requiresSignature: true,
+      signUrl: `${base}/agent/sign?${q.toString()}`,
+      action: "claim_fees",
+      wallet,
+      instructions: [
+        "Open signUrl in the browser.",
+        "Connect the creator wallet in Phantom and Sign.",
+        "Do not broadcast unsigned transactions yourself.",
+      ],
+    };
   }
 
   if (name === "orbitx_rent_refund") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const ops = await mcpOps();
-    return ops.prepareRentRefund(wallet);
+    const q = new URLSearchParams({ kind: "rent", publicKey: wallet });
+    return {
+      ok: true,
+      status: "awaiting_phantom_signature",
+      requiresSignature: true,
+      signUrl: `${base}/agent/sign?${q.toString()}`,
+      action: "rent_refund",
+      wallet,
+      instructions: [
+        "Open signUrl — may require signing multiple close-account txs.",
+        "Connect Phantom and approve each batch.",
+      ],
+    };
   }
 
   if (name === "orbitx_burn") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
     if (args.amount == null && args.percent == null) throw new Error("amount or percent required");
-    const ops = await mcpOps();
-    return ops.prepareBurn(wallet, String(args.mint || ""), args.amount, args.percent);
+    const q = new URLSearchParams({
+      kind: "burn",
+      publicKey: wallet,
+      mint: String(args.mint || ""),
+    });
+    if (args.percent != null) q.set("percent", String(args.percent));
+    else q.set("amount", String(args.amount));
+    return {
+      ok: true,
+      status: "awaiting_phantom_signature",
+      requiresSignature: true,
+      signUrl: `${base}/agent/sign?${q.toString()}`,
+      action: "burn",
+      wallet,
+      mint: String(args.mint || ""),
+      instructions: ["Open signUrl", "Approve burn in Phantom", "Never submit unsigned burn txs yourself"],
+    };
   }
 
   if (name === "orbitx_social_communities") {
@@ -1524,6 +1930,31 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
     let path = `oxw_community_posts?deleted_at=is.null&order=created_at.desc&limit=${limit}&select=id,community_id,author_id,body,media,like_count,comment_count,created_at`;
     if (args.communityId) path += `&community_id=eq.${encodeURIComponent(String(args.communityId))}`;
     return sb(path);
+  }
+
+  if (name === "orbitx_social_members") {
+    const communityId = String(args.communityId || "").trim();
+    if (!communityId) throw new Error("communityId required");
+    const limit = Math.min(Number(args.limit) || 50, 200);
+    return sb(
+      `oxw_community_members?community_id=eq.${encodeURIComponent(communityId)}&order=joined_at.desc&limit=${limit}&select=community_id,user_id,role,joined_at`,
+    );
+  }
+
+  if (name === "orbitx_social_leave") {
+    const session = await resolveSocialUser(auth, args);
+    if (!session?.userId) {
+      throw new Error(
+        "Bearer or linked wallet required to leave a community. Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent.",
+      );
+    }
+    const communityId = String(args.communityId || "").trim();
+    if (!communityId) throw new Error("communityId required");
+    await sb(
+      `oxw_community_members?community_id=eq.${encodeURIComponent(communityId)}&user_id=eq.${encodeURIComponent(session.userId)}`,
+      { method: "DELETE", headers: { Prefer: "return=minimal" } },
+    );
+    return { ok: true, left: communityId, userId: session.userId };
   }
 
   if (name === "orbitx_social_join") {
@@ -1674,6 +2105,120 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
     return sb(
       `orbitx_nft_listings?status=eq.active&order=created_at.desc&limit=${limit}&select=*,nft:orbitx_nfts(*)`,
     );
+  }
+
+  if (name === "orbitx_nft_offers") {
+    return sb(
+      `orbitx_nft_offers?nft_id=eq.${encodeURIComponent(String(args.nftId))}&order=price_sol.desc&select=*`,
+    );
+  }
+
+  if (name === "orbitx_nft_make_offer") {
+    const buyer = String(args.buyerWallet || wallet || "").trim();
+    if (!buyer) throw new Error("buyerWallet required");
+    return sb("rpc/orbitx_nft_make_offer", {
+      method: "POST",
+      body: JSON.stringify({
+        p_nft_id: String(args.nftId),
+        p_buyer_wallet: buyer,
+        p_price_sol: Number(args.priceSol),
+        p_expires_hours: Number(args.expiresHours) || 72,
+      }),
+    });
+  }
+
+  if (name === "orbitx_nft_cancel_offer") {
+    const buyer = String(args.buyerWallet || wallet || "").trim();
+    if (!buyer) throw new Error("buyerWallet required");
+    return sb("rpc/orbitx_nft_cancel_offer", {
+      method: "POST",
+      body: JSON.stringify({ p_offer_id: String(args.offerId), p_buyer_wallet: buyer }),
+    });
+  }
+
+  if (name === "orbitx_nft_list_for_sale") {
+    const seller = String(args.sellerWallet || wallet || "").trim();
+    if (!seller) throw new Error("sellerWallet required");
+    return sb("rpc/orbitx_nft_list", {
+      method: "POST",
+      body: JSON.stringify({
+        p_nft_id: String(args.nftId),
+        p_seller_wallet: seller,
+        p_price_sol: Number(args.priceSol),
+        p_currency: args.currency === "USDC" ? "USDC" : "SOL",
+      }),
+    });
+  }
+
+  if (name === "orbitx_nft_cancel_listing") {
+    const seller = String(args.sellerWallet || wallet || "").trim();
+    if (!seller) throw new Error("sellerWallet required");
+    return sb("rpc/orbitx_nft_cancel_listing", {
+      method: "POST",
+      body: JSON.stringify({ p_nft_id: String(args.nftId), p_seller_wallet: seller }),
+    });
+  }
+
+  if (name === "orbitx_nft_auctions") {
+    const limit = Math.min(Number(args.limit) || 40, 100);
+    try {
+      await sb("rpc/orbitx_nft_close_ended_auctions", { method: "POST", body: "{}" });
+    } catch {
+      /* optional */
+    }
+    return sb(
+      `orbitx_nft_auctions?status=in.(active,ended)&order=ends_at.asc&limit=${limit}&select=*,nft:orbitx_nfts(*)`,
+    );
+  }
+
+  if (name === "orbitx_nft_create_auction") {
+    const seller = String(args.sellerWallet || wallet || "").trim();
+    if (!seller) throw new Error("sellerWallet required");
+    return sb("rpc/orbitx_nft_create_auction", {
+      method: "POST",
+      body: JSON.stringify({
+        p_nft_id: String(args.nftId),
+        p_seller_wallet: seller,
+        p_start_price_sol: Number(args.startPriceSol),
+        p_min_increment_sol: Number(args.minIncrementSol) || 0.01,
+        p_duration_hours: Number(args.durationHours) || 24,
+      }),
+    });
+  }
+
+  if (name === "orbitx_nft_place_bid") {
+    const bidder = String(args.bidderWallet || wallet || "").trim();
+    if (!bidder) throw new Error("bidderWallet required");
+    return sb("rpc/orbitx_nft_place_bid", {
+      method: "POST",
+      body: JSON.stringify({
+        p_auction_id: String(args.auctionId),
+        p_bidder_wallet: bidder,
+        p_amount_sol: Number(args.amountSol),
+      }),
+    });
+  }
+
+  if (name === "orbitx_nft_recent_sales") {
+    const limit = Math.min(Number(args.limit) || 20, 50);
+    return sb(
+      `orbitx_nft_transactions?order=created_at.desc&limit=${limit}&select=id,amount_sol,buyer_wallet,seller_wallet,created_at,tx_signature,nft:orbitx_nfts(*)`,
+    );
+  }
+
+  if (name === "orbitx_nft_sales") {
+    return sb(
+      `orbitx_nft_transactions?nft_id=eq.${encodeURIComponent(String(args.nftId))}&order=created_at.desc&select=id,amount_sol,buyer_wallet,seller_wallet,created_at,tx_signature`,
+    );
+  }
+
+  if (name === "orbitx_nft_favorite") {
+    const w = String(args.wallet || wallet || "").trim();
+    if (!w) throw new Error("wallet required");
+    return sb("rpc/orbitx_nft_toggle_favorite", {
+      method: "POST",
+      body: JSON.stringify({ p_nft: String(args.nftId), p_wallet: w }),
+    });
   }
 
   if (name === "orbitx_nft_prepare_buy") {
@@ -2002,10 +2547,19 @@ async function handleMcp(req, res, parts) {
     }
 
     if (method === "tools/call") {
-      const name = String(params?.name || "");
+      const rawName = String(params?.name || "");
+      const name = TOOL_ALIASES[rawName] || rawName;
       const args = params?.arguments || {};
       const hasWalletArg = Boolean(
-        String(args.publicKey || args.address || args.wallet || args.buyerWallet || "").trim(),
+        String(
+          args.publicKey ||
+            args.address ||
+            args.wallet ||
+            args.buyerWallet ||
+            args.sellerWallet ||
+            args.bidderWallet ||
+            "",
+        ).trim(),
       );
 
       // Never HTTP 401 on tools/call — Claude surfaces that as a persistent auth failure.
