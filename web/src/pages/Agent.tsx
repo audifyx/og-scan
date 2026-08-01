@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Loader2 } from "lucide-react";
 import { AgentDashboard } from "../components/agent/agent-dashboard";
 import { TokenGatingVerifier } from "../components/agent/token-gating-verifier";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,8 +9,9 @@ import {
   verifyAgentHold,
 } from "@/lib/agentTokenGate";
 import { isOwnerIdentity } from "@/lib/ownerDesk";
+import "../components/agent/agent-terminal.css";
 
-/** /agent — MCP hub; non-exempt users must pass the ORBITX hold block. */
+/** /agent — MCP hub; terminal UI; non-exempt users must pass ORBITX hold. */
 function AgentPage() {
   const { publicKey } = useWallet();
   const { user, profile } = useAuth();
@@ -33,7 +33,6 @@ function AgentPage() {
   );
 
   const check = useCallback(async () => {
-    // Owner email / DEF / platform wallets — no ORBITX hold required.
     if (
       isAgentHoldExempt({ wallet: walletAddress, email: user?.email }) ||
       isOwnerIdentity({ email: user?.email, wallet: walletAddress })
@@ -56,23 +55,23 @@ function AgentPage() {
 
   if (gate === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#05070d] text-white/50">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-        <span className="ml-3 text-sm">Checking ORBITX hold…</span>
+      <main className="ox-term__loading">
+        <span>checking orbitx hold</span>
+        <span className="ox-term__cursor" />
       </main>
     );
   }
 
   if (gate === "blocked") {
     return (
-      <main className="min-h-screen bg-[#05070d]">
+      <main className="ox-term">
         <TokenGatingVerifier onUnlocked={() => setGate("open")} />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#05070d]">
+    <main>
       <AgentDashboard />
     </main>
   );

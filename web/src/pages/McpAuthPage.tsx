@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Loader2, ShieldCheck, Wallet } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { approveMcpOAuth, mcpOAuthCredentials, mcpPublicUrl } from "@/lib/orbitxMcp";
 import { resolveAuthWallet } from "@/lib/agentTokenGate";
+import "@/components/agent/agent-terminal.css";
 
 /**
- * OAuth consent page opened by Claude/ChatGPT Authenticate.
- * Query: redirect_uri, state, client_id, code_challenge, code_challenge_method
+ * OAuth consent — terminal UI (Claude/ChatGPT Authenticate).
  */
 export default function McpAuthPage() {
   const [params] = useSearchParams();
@@ -84,172 +83,124 @@ export default function McpAuthPage() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#05070d] text-white/50">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+      <div className="ox-term__loading">
+        <span>loading session</span>
+        <span className="ox-term__cursor" />
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-white">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 50% at 10% -10%, rgba(52,211,153,0.14), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 0%, rgba(212,165,116,0.08), transparent 50%), linear-gradient(180deg, #070a12 0%, #05070d 45%, #05070d 100%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.035]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-
-      <div className="relative mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
-        <div className="mb-6 text-center">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-400/80">
-            OrbitX Agent
-          </p>
-          <h1 className="text-3xl font-black tracking-tight">Authorize MCP</h1>
-          <p className="mt-2 text-sm text-white/45">
-            Let {clientLabel} use your OrbitX agent — non-custodial, revoke anytime.
-          </p>
+    <div className="ox-term">
+      <div className="ox-term__inner" style={{ maxWidth: 32 * 16 }}>
+        <div className="ox-term__bar">
+          <div className="ox-term__dots" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="ox-term__bar-title">orbitx://agent/mcp-auth — tty</div>
+          <span className="ox-term__badge">oauth</span>
         </div>
 
-        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6 backdrop-blur-sm">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-400/12 text-emerald-300">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-bold">Consent</p>
-              <p className="text-[11px] text-white/35">Review connection details</p>
-            </div>
+        <h1 className="ox-term__brand">
+          Authorize MCP
+          <span className="ox-term__cursor" aria-hidden />
+        </h1>
+        <p className="ox-term__sub">
+          Let {clientLabel} use your OrbitX agent — non-custodial, revoke anytime on /agent.
+        </p>
+
+        <section className="ox-term__section">
+          <div className="ox-term__section-h">
+            <div className="ox-term__prompt">consent</div>
+            <div className="ox-term__hint">review connection</div>
           </div>
-
-          <div className="mb-5 space-y-2.5 rounded-2xl border border-white/[0.06] bg-black/35 p-4 text-sm">
-            <Row label="MCP server" value={mcpUrl} mono />
-            <Row label="Client ID" value={clientId} mono />
-            {redirectUri ? <Row label="Return to" value={redirectUri} mono small /> : null}
-            <Row
-              label="Wallet"
-              value={
-                walletAddress
-                  ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
-                  : "Not connected"
-              }
-              mono
-            />
-            {!redirectUri && (
-              <p className="pt-1 text-[11px] leading-relaxed text-amber-200/70">
-                Missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields from{" "}
-                <Link to="/agent" className="text-emerald-300 underline-offset-2 hover:underline">
-                  /agent
-                </Link>
-                .
-              </p>
-            )}
-          </div>
-
-          {!user ? (
-            <div className="mb-4 space-y-2">
-              <p className="mb-3 text-sm text-white/50">Sign in with Solana to continue.</p>
-              {pickable.slice(0, 4).map((w) => (
-                <button
-                  key={w.name}
-                  type="button"
-                  disabled={busy === w.name}
-                  onClick={() =>
-                    signInWith(w.name, { replaceEmailSession: true }).catch((e) => setError(e.message))
-                  }
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm font-semibold hover:bg-white/[0.04] disabled:opacity-50"
-                >
-                  {w.icon ? (
-                    <img src={w.icon} alt="" className="h-5 w-5 rounded" />
-                  ) : (
-                    <Wallet className="h-4 w-4" />
-                  )}
-                  {busy === w.name ? `Connecting ${w.name}…` : `Continue with ${w.name}`}
-                </button>
-              ))}
+          <div className="ox-term__body">
+            <div className="ox-term__row">
+              <div className="ox-term__label">mcp server</div>
+              <div className="ox-term__value">{mcpUrl}</div>
             </div>
-          ) : (
-            <div className="mb-3 space-y-3">
-              {!walletAddress && (
-                <p className="rounded-xl border border-amber-400/15 bg-amber-400/8 px-3 py-2 text-[11px] text-amber-100/75">
-                  Wallet optional for auth — link one later for buy/sell/claim. You can approve now.
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={submitting || !redirectUri}
-                onClick={onConfirm}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3.5 text-sm font-bold text-black hover:brightness-110 disabled:opacity-50"
-              >
-                {submitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-4 w-4" />
-                )}
-                {submitting
-                  ? "Connecting…"
-                  : walletAddress
-                    ? "Authenticate & link wallet"
-                    : "Authenticate session"}
-              </button>
+            <div className="ox-term__row">
+              <div className="ox-term__label">client id</div>
+              <div className="ox-term__value">{clientId}</div>
             </div>
-          )}
-
-          {error && (
-            <div className="mb-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {error}
-            </div>
-          )}
-
-          <p className="text-center text-[11px] leading-relaxed text-white/30">
-            Grants {clientLabel} access to OrbitX tools for your agent. Revoke keys anytime on{" "}
-            <Link to="/agent" className="text-emerald-400/90 underline-offset-2 hover:underline">
-              MCP Control
-            </Link>
-            .
-            {!redirectUri && oauth.authorizationUrl ? (
-              <span className="mt-1 block truncate font-mono text-[10px] text-white/20">
-                {oauth.authorizationUrl}
-              </span>
+            {redirectUri ? (
+              <div className="ox-term__row">
+                <div className="ox-term__label">return to</div>
+                <div className="ox-term__value">{redirectUri}</div>
+              </div>
             ) : null}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+            <div className="ox-term__row">
+              <div className="ox-term__label">wallet</div>
+              <div className="ox-term__value">
+                {walletAddress
+                  ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+                  : "not connected"}
+              </div>
+            </div>
 
-function Row({
-  label,
-  value,
-  mono,
-  small,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  small?: boolean;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-white/35">
-        {label}
-      </span>
-      <span
-        className={`max-w-[62%] text-right text-white/80 ${mono ? "break-all font-mono" : ""} ${
-          small ? "text-[10px] text-white/50" : "text-xs"
-        }`}
-      >
-        {value}
-      </span>
+            {!redirectUri && (
+              <div className="ox-term__err" style={{ marginTop: 8 }}>
+                missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields
+                from <Link to="/agent">/agent</Link>.
+              </div>
+            )}
+
+            {!user ? (
+              <div className="ox-term__flex" style={{ marginTop: 12 }}>
+                {pickable.slice(0, 4).map((w) => (
+                  <button
+                    key={w.name}
+                    type="button"
+                    className="ox-term__btn"
+                    disabled={busy === w.name}
+                    onClick={() =>
+                      signInWith(w.name, { replaceEmailSession: true }).catch((e) =>
+                        setError(e.message),
+                      )
+                    }
+                  >
+                    {busy === w.name ? "connecting…" : `continue with ${w.name}`}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ marginTop: 12 }}>
+                {!walletAddress && (
+                  <p className="ox-term__sub">
+                    wallet optional for auth — link later for buy/sell/claim
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="ox-term__btn ox-term__btn--fill"
+                  style={{ width: "100%" }}
+                  disabled={submitting || !redirectUri}
+                  onClick={onConfirm}
+                >
+                  {submitting
+                    ? "connecting…"
+                    : walletAddress
+                      ? "authenticate & link wallet"
+                      : "authenticate session"}
+                </button>
+              </div>
+            )}
+
+            {error && <div className="ox-term__err" style={{ marginTop: 12 }}>ERR {error}</div>}
+
+            <p className="ox-term__footer" style={{ marginTop: 16 }}>
+              revoke keys anytime on <Link to="/agent">/agent</Link>
+              {!redirectUri && oauth.authorizationUrl ? (
+                <span style={{ display: "block", marginTop: 6, opacity: 0.5 }}>
+                  {oauth.authorizationUrl}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
