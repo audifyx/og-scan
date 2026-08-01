@@ -416,11 +416,13 @@ export function AgentDashboard() {
         {revealedKey && (
           <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/8 px-3 py-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-              Optional Bearer API key
+              Bearer API key (fixes “not authenticated” in Claude)
             </p>
             <p className="mb-2 text-[11px] text-white/45">
-              If ChatGPT offers a custom header instead of OAuth, use{" "}
-              <code className="text-white/60">Authorization: Bearer {"<key>"}</code>
+              Claude → connector Advanced / Request headers → add{" "}
+              <code className="text-white/60">Authorization</code> ={" "}
+              <code className="text-white/60">Bearer {"<paste key>"}</code>
+              . Or click Authenticate again after approving on this site.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <code className="min-w-0 flex-1 break-all font-mono text-xs text-white/70">

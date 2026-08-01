@@ -58,10 +58,6 @@ export default function McpAuthPage() {
       setError("Sign in with your Solana wallet first.");
       return;
     }
-    if (!walletAddress) {
-      setError("Connect a Solana wallet to authorize MCP.");
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -71,7 +67,7 @@ export default function McpAuthPage() {
         client_id: clientId,
         code_challenge: codeChallenge,
         code_challenge_method: codeChallengeMethod,
-        walletAddress,
+        ...(walletAddress ? { walletAddress } : {}),
       });
       window.location.href = redirect;
     } catch (e) {
@@ -136,9 +132,9 @@ export default function McpAuthPage() {
             )}
           </div>
 
-          {!user || !walletAddress ? (
+          {!user ? (
             <div className="mb-4 space-y-2">
-              <p className="text-sm text-white/55">Sign in with Solana to continue.</p>
+              <p className="text-sm text-white/55">Sign in with Solana to authorize Claude / ChatGPT.</p>
               {pickable.slice(0, 4).map((w) => (
                 <button
                   key={w.name}
@@ -153,15 +149,22 @@ export default function McpAuthPage() {
               ))}
             </div>
           ) : (
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={onConfirm}
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-black hover:bg-emerald-300 disabled:opacity-50"
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              {submitting ? "Connecting…" : "Authenticate & link wallet"}
-            </button>
+            <div className="mb-3 space-y-2">
+              {!walletAddress && (
+                <p className="text-xs text-amber-200/70">
+                  Wallet optional for auth — link one for buy/sell/claim tools. You can still approve now.
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={onConfirm}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-black hover:bg-emerald-300 disabled:opacity-50"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {submitting ? "Connecting…" : walletAddress ? "Authenticate & link wallet" : "Authenticate session"}
+              </button>
+            </div>
           )}
 
           {error && (

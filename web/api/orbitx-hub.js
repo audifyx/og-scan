@@ -361,12 +361,41 @@ async function handleAgent(req, res, parts) {
       agent = Array.isArray(updated) ? updated[0] : agent;
     }
 
-    const code = opaque("oxc");
+    // Always mint a Bearer access token as API key (oxo_). Claude exchanges the
+    // code at /oauth/token — we accept oxo_ codes as the access_token itself so
+    // auth works even when oauth_codes/tokens tables are missing.
+    const access = opaque("oxo");
+    await sb("agent_api_keys", {
+      method: "POST",
+      body: JSON.stringify({
+        agent_id: agent.id,
+        name: `MCP ${String(body.client_id || "claude").slice(0, 24)} ${new Date().toISOString().slice(0, 16)}`,
+        key_hash: sha256(access),
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+
+    try {
+      await sb("agent_mcp_oauth_tokens", {
+        method: "POST",
+        body: JSON.stringify({
+          token_hash: sha256(access),
+          user_id: userId,
+          agent_id: agent.id,
+          wallet_address: wallet || agent.wallet_address,
+          expires_at: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+        }),
+        headers: { Prefer: "return=minimal" },
+      });
+    } catch {
+      /* optional table */
+    }
+
     try {
       await sb("agent_mcp_oauth_codes", {
         method: "POST",
         body: JSON.stringify({
-          code_hash: sha256(code),
+          code_hash: sha256(access),
           user_id: userId,
           agent_id: agent.id,
           wallet_address: wallet || agent.wallet_address,
@@ -379,26 +408,12 @@ async function handleAgent(req, res, parts) {
         headers: { Prefer: "return=minimal" },
       });
     } catch {
-      const access = opaque("oxo");
-      await sb("agent_api_keys", {
-        method: "POST",
-        body: JSON.stringify({
-          agent_id: agent.id,
-          name: `OAuth ${new Date().toISOString().slice(0, 16)}`,
-          key_hash: sha256(access),
-        }),
-        headers: { Prefer: "return=minimal" },
-      });
-      const sep = redirectUri.includes("?") ? "&" : "?";
-      return json(res, {
-        redirect: `${redirectUri}${sep}code=${encodeURIComponent(access)}&state=${encodeURIComponent(state)}`,
-        fallback: true,
-      });
+      /* optional — oxo_ still works via token endpoint passthrough */
     }
 
     const sep = redirectUri.includes("?") ? "&" : "?";
     return json(res, {
-      redirect: `${redirectUri}${sep}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+      redirect: `${redirectUri}${sep}code=${encodeURIComponent(access)}&state=${encodeURIComponent(state)}`,
     });
   }
 
@@ -412,27 +427,34 @@ async function resolveAuth(req) {
   if (!token) return null;
   const hash = sha256(token);
 
-  if (token.startsWith("oxk_") || token.startsWith("oxo_")) {
-    const keys = await sb(
-      `agent_api_keys?key_hash=eq.${encodeURIComponent(hash)}&revoked_at=is.null&select=id,agent_id`,
-    );
-    const key = Array.isArray(keys) ? keys[0] : null;
-    if (!key) return null;
-    const agents = await sb(
-      `agents?id=eq.${encodeURIComponent(key.agent_id)}&select=id,user_id,wallet_address`,
-    );
-    const agent = Array.isArray(agents) ? agents[0] : null;
-    if (!agent) return null;
+  // API keys + OAuth access tokens (oxo_ / oxk_)
+  if (token.startsWith("oxk_") || token.startsWith("oxo_") || token.startsWith("oxc_")) {
     try {
-      await sb(`agent_api_keys?id=eq.${encodeURIComponent(key.id)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ last_used_at: new Date().toISOString() }),
-        headers: { Prefer: "return=minimal" },
-      });
+      const keys = await sb(
+        `agent_api_keys?key_hash=eq.${encodeURIComponent(hash)}&revoked_at=is.null&select=id,agent_id`,
+      );
+      const key = Array.isArray(keys) ? keys[0] : null;
+      if (key) {
+        const agents = await sb(
+          `agents?id=eq.${encodeURIComponent(key.agent_id)}&select=id,user_id,wallet_address`,
+        );
+        const agent = Array.isArray(agents) ? agents[0] : null;
+        if (agent) {
+          try {
+            await sb(`agent_api_keys?id=eq.${encodeURIComponent(key.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ last_used_at: new Date().toISOString() }),
+              headers: { Prefer: "return=minimal" },
+            });
+          } catch {
+            /* ignore */
+          }
+          return { userId: agent.user_id, agentId: agent.id, walletAddress: agent.wallet_address };
+        }
+      }
     } catch {
-      /* ignore */
+      /* fall through */
     }
-    return { userId: agent.user_id, agentId: agent.id, walletAddress: agent.wallet_address };
   }
 
   try {
@@ -446,6 +468,34 @@ async function resolveAuth(req) {
   } catch {
     return null;
   }
+}
+
+/** Read-only tools that work without Bearer (Claude often lists tools before finishing OAuth). */
+const PUBLIC_TOOLS = new Set([
+  "orbitx_search",
+  "orbitx_get_token",
+  "orbitx_screen_tokens",
+  "orbitx_get_forensics",
+  "orbitx_get_safety",
+  "orbitx_crypto_scan",
+  "orbitx_get_ath",
+  "orbitx_get_chart",
+  "orbitx_get_kols",
+  "orbitx_get_traders",
+  "orbitx_get_signals",
+  "orbitx_get_launches",
+  "orbitx_launch_config",
+  "orbitx_launch_check",
+  "orbitx_platform_stats",
+  "orbitx_nft_collections",
+  "orbitx_nft_listings",
+  "orbitx_nft_comments",
+  "orbitx_social_communities",
+  "orbitx_social_feed",
+]);
+
+function wwwAuthenticate(base) {
+  return `Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="${base}/.well-known/oauth-protected-resource", scope="orbitx"`;
 }
 
 const TOOLS = [
@@ -1399,7 +1449,12 @@ async function handleMcp(req, res, parts) {
     if (!code) return json(res, { error: "invalid_request", error_description: "code required" }, 400);
 
     if (String(code).startsWith("oxo_") || String(code).startsWith("oxk_")) {
-      return json(res, { access_token: code, token_type: "bearer", expires_in: 86400 * 30 });
+      return json(res, {
+        access_token: code,
+        token_type: "bearer",
+        expires_in: 86400 * 30,
+        scope: "orbitx",
+      });
     }
 
     const hash = sha256(String(code));
@@ -1446,7 +1501,12 @@ async function handleMcp(req, res, parts) {
       });
     }
 
-    return json(res, { access_token: access, token_type: "bearer", expires_in: 86400 * 30 });
+    return json(res, {
+      access_token: access,
+      token_type: "bearer",
+      expires_in: 86400 * 30,
+      scope: "orbitx",
+    });
   }
 
   if ((!route || route === "") && req.method === "GET") {
@@ -1488,8 +1548,10 @@ async function handleMcp(req, res, parts) {
     const body = await readBody(req);
     const { id, method, params } = body;
     const sessionId = header(req, "mcp-session-id") || opaque("sess").slice(0, 24);
+    const auth = await resolveAuth(req);
 
     if (method === "initialize") {
+      // Always complete handshake so Claude can list tools; auth is enforced on tools/call.
       return json(
         res,
         {
@@ -1498,19 +1560,27 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.0.0" },
+            serverInfo: {
+              name: "OrbitX Agent MCP",
+              version: "1.0.0",
+              authenticated: Boolean(auth),
+            },
+            instructions: auth
+              ? "OrbitX MCP authenticated. Wallet-linked tools are available."
+              : `Not authenticated yet. Open ${mcpUrl}/oauth/authorize or click Authenticate in Claude, approve on orbitx.world, then retry. Or set request header Authorization: Bearer <api_key from /agent>.`,
           },
         },
         200,
-        { "Mcp-Session-Id": sessionId },
+        {
+          "Mcp-Session-Id": sessionId,
+          ...(auth ? {} : { "WWW-Authenticate": wwwAuthenticate(base) }),
+        },
       );
     }
     if (method === "notifications/initialized" || method === "ping") {
       return json(res, { jsonrpc: "2.0", id: id ?? null, result: {} });
     }
 
-    // tools/list is public so ChatGPT/Claude show the full catalog after connect.
-    // tools/call requires Bearer OAuth / API key.
     if (method === "tools/list") {
       return json(res, {
         jsonrpc: "2.0",
@@ -1521,26 +1591,40 @@ async function handleMcp(req, res, parts) {
             description: t.description,
             inputSchema: t.inputSchema,
           })),
+          _meta: {
+            authenticated: Boolean(auth),
+            authHint: auth
+              ? null
+              : "Session has no Bearer token. Authenticate in Claude or add Authorization: Bearer <oxk_/oxo_ key from https://orbitx.world/agent>",
+          },
         },
       });
     }
 
     if (method === "tools/call") {
-      const auth = await resolveAuth(req);
-      if (!auth) {
-        return json(
-          res,
-          { jsonrpc: "2.0", id: id ?? null, error: { code: -32001, message: "Authentication required" } },
-          401,
-          {
-            "WWW-Authenticate": `Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="${base}/.well-known/oauth-protected-resource"`,
-          },
-        );
-      }
       const name = String(params?.name || "");
       const args = params?.arguments || {};
+      const needsAuth = !PUBLIC_TOOLS.has(name);
+
+      if (!auth && needsAuth) {
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id: id ?? null,
+            error: {
+              code: -32001,
+              message:
+                "OrbitX MCP is not authenticated on this session. In Claude: open the OrbitX connector → Authenticate → approve + link wallet on orbitx.world. Or on /agent create an API key and set connector request header Authorization: Bearer <key>. Then retry.",
+            },
+          },
+          401,
+          { "WWW-Authenticate": wwwAuthenticate(base) },
+        );
+      }
+
       try {
-        const result = await callTool(name, args, auth, base);
+        const result = await callTool(name, args, auth || { userId: null, agentId: null, walletAddress: null }, base);
         return json(res, {
           jsonrpc: "2.0",
           id,
