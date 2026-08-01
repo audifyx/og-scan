@@ -68,7 +68,11 @@ function parseHubCoreAndAliases() {
   return { coreNames, aliases, handlers };
 }
 
-async function mcp(method, params = {}, id = 1) {
+async function sleep(ms) {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+async function mcp(method, params = {}, id = 1, attempt = 1) {
   let r;
   try {
     r = await fetch(MCP_URL, {
@@ -81,7 +85,12 @@ async function mcp(method, params = {}, id = 1) {
       body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
     });
   } catch (e) {
-    throw new Error(`fetch failed (${MCP_URL} ${method}): ${e?.cause?.code || e?.message || e}`);
+    const code = e?.cause?.code || e?.message || e;
+    if (attempt < 3) {
+      await sleep(800 * attempt);
+      return mcp(method, params, id, attempt + 1);
+    }
+    throw new Error(`fetch failed (${MCP_URL} ${method}): ${code}`);
   }
   const text = await r.text();
   let data;
