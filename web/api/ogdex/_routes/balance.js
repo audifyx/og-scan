@@ -10,7 +10,7 @@ async function rpc(method, params) {
 
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://x");
-  const owner = url.searchParams.get("owner") || "";
+  const owner = url.searchParams.get("owner") || url.searchParams.get("address") || "";
   const mint = url.searchParams.get("mint") || "";
   if (!isPubkey(owner)) return send(res, 400, { ok: false, error: "invalid owner" });
   cache(res, 5, 15);

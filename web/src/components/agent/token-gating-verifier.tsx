@@ -1,15 +1,29 @@
-import React, { useMemo, useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useWalletSignIn } from '@/hooks/useWalletSignIn';
-import { isTokenGateExemptWallet, resolveAuthWallet } from '@/lib/agentTokenGate';
+import { useMemo, useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { ExternalLink, Loader2, ShieldAlert } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import {
+  AGENT_HOLD_MINT,
+  AGENT_HOLD_MIN_USD,
+  isTokenGateExemptWallet,
+  resolveAuthWallet,
+  verifyAgentHold,
+  type HoldVerifyResult,
+} from "@/lib/agentTokenGate";
+import { linkAgentWallet } from "@/lib/orbitxMcp";
 
-export function TokenGatingVerifier() {
-  const [tokenCA] = useState('13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9');
+export function TokenGatingVerifier({
+  onUnlocked,
+}: {
+  onUnlocked?: (result: HoldVerifyResult) => void;
+}) {
   const { publicKey } = useWallet();
   const { user, profile } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [last, setLast] = useState<HoldVerifyResult | null>(null);
 
   const walletAddress = useMemo(
     () =>
@@ -35,110 +49,131 @@ export function TokenGatingVerifier() {
     setError(null);
     try {
       await signInWith(name, { replaceEmailSession: true });
-      // Parent AgentPage re-checks on auth/wallet change; force reload as fallback.
-      window.location.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect wallet');
+      setError(err instanceof Error ? err.message : "Failed to connect wallet");
     }
   };
 
-  // If DEF wallet is already resolved, don't keep showing the gate (parent should unlock).
+  const verify = async () => {
+    setChecking(true);
+    setError(null);
+    try {
+      const result = await verifyAgentHold(walletAddress);
+      setLast(result);
+      if (result.meetsRequirement || result.exempt) {
+        if (walletAddress) {
+          try {
+            await linkAgentWallet(walletAddress);
+          } catch {
+            /* link optional — hold already verified */
+          }
+        }
+        onUnlocked?.(result);
+      } else {
+        setError(result.message || "ORBITX hold requirement not met");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Verification failed");
+    } finally {
+      setChecking(false);
+    }
+  };
+
   if (isTokenGateExemptWallet(walletAddress)) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-spin">Unlocking…</div>
+      <div className="flex min-h-screen items-center justify-center bg-[#05070d] text-white/50">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
+        <span className="ml-3 text-sm">Unlocking exempt wallet…</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-4">
-      <div className="max-w-lg w-full">
-        <div className="bg-background border-2 border-destructive rounded-lg p-8 text-center">
-          <div className="mb-6">
-            <div className="w-16 h-16 bg-destructive/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0 4v2m0-14H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2h-7z" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Token Verification Required</h1>
-            <p className="text-muted-foreground">
-              You need to hold a minimum of $10 worth of ORBITX tokens to access the Agent MCP system.
-            </p>
+    <div className="relative min-h-screen overflow-hidden text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 45% at 50% -10%, rgba(245,158,11,0.14), transparent 55%), linear-gradient(180deg, #070a12 0%, #05070d 100%)",
+        }}
+      />
+      <div className="relative mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
+        <div className="rounded-3xl border border-amber-400/20 bg-white/[0.03] p-7 backdrop-blur-sm">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/15">
+            <ShieldAlert className="h-6 w-6 text-amber-300" />
           </div>
+          <h1 className="text-2xl font-black tracking-tight">Token hold required</h1>
+          <p className="mt-2 text-sm leading-relaxed text-white/45">
+            Agent MCP is gated. Hold at least ${AGENT_HOLD_MIN_USD} of ORBITX, then verify. Exempt
+            platform wallets skip this block.
+          </p>
 
-          <div className="bg-muted rounded-lg p-6 mb-6 space-y-4 text-left">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Detected wallet</p>
-              <p className="font-mono text-sm break-all text-foreground bg-background p-3 rounded">
-                {walletAddress || 'None — connect your Solana wallet below'}
+          <div className="mt-6 space-y-3">
+            <div className="rounded-2xl border border-white/[0.07] bg-black/35 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Wallet</p>
+              <p className="mt-1 break-all font-mono text-sm text-white/80">
+                {walletAddress || "None — connect below"}
               </p>
-              {short && (
-                <p className="mt-1 text-xs text-muted-foreground">Signed in as {short}</p>
+              {short && <p className="mt-1 text-xs text-white/30">{short}</p>}
+            </div>
+            <div className="rounded-2xl border border-white/[0.07] bg-black/35 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">
+                ORBITX mint
+              </p>
+              <p className="mt-1 break-all font-mono text-[11px] text-white/70">{AGENT_HOLD_MINT}</p>
+              {last && !last.exempt && (
+                <p className="mt-2 text-xs text-white/40">
+                  Holding ~${Number(last.holdingUsd || 0).toFixed(2)} ({Number(last.holdingAmount || 0).toFixed(2)}{" "}
+                  tokens)
+                </p>
               )}
             </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Required Token</p>
-              <p className="font-mono text-sm break-all text-foreground bg-background p-3 rounded">
-                {tokenCA}
-              </p>
-            </div>
-
-            <div className="border-t border-border pt-4">
-              <h3 className="font-semibold text-foreground mb-3">How to Unlock Access</h3>
-              <ol className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <span className="text-primary font-semibold">1.</span> Connect the correct Solana wallet
-                </li>
-                <li>
-                  <span className="text-primary font-semibold">2.</span> Hold at least $10 of ORBITX, or have $10+ cumulative buys
-                </li>
-                <li>
-                  <span className="text-primary font-semibold">3.</span> Tap Verify Holdings after connecting
-                </li>
-              </ol>
-            </div>
           </div>
 
-          {error && (
-            <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
+          {(error || (last && !last.meetsRequirement && last.message)) && (
+            <div className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-200">
+              {error || last?.message}
             </div>
           )}
 
-          <div className="space-y-3">
-            {pickable.slice(0, 4).map((w) => (
-              <button
-                key={w.name}
-                type="button"
-                disabled={busy === w.name}
-                onClick={() => connectWallet(w.name)}
-                className="flex w-full items-center justify-center gap-2 px-6 py-3 border border-border text-foreground rounded-lg font-semibold hover:bg-muted transition disabled:opacity-50"
-              >
-                {w.icon ? <img src={w.icon} alt="" className="h-5 w-5 rounded" /> : null}
-                {busy === w.name ? `Connecting ${w.name}…` : `Connect ${w.name}`}
-              </button>
-            ))}
+          <div className="mt-5 space-y-2">
+            {!walletAddress &&
+              pickable.slice(0, 4).map((w) => (
+                <button
+                  key={w.name}
+                  type="button"
+                  disabled={busy === w.name}
+                  onClick={() => connectWallet(w.name)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm font-semibold hover:bg-white/[0.04] disabled:opacity-50"
+                >
+                  {w.icon ? <img src={w.icon} alt="" className="h-5 w-5 rounded" /> : null}
+                  {busy === w.name ? `Connecting…` : `Connect ${w.name}`}
+                </button>
+              ))}
+            <button
+              type="button"
+              disabled={checking || !walletAddress}
+              onClick={verify}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-black disabled:opacity-50"
+            >
+              {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {checking ? "Checking holdings…" : "Verify holdings"}
+            </button>
             <a
-              href="https://jup.ag/swap/USDC-ORBITX"
+              href={`https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition text-center"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 hover:bg-amber-400/15"
             >
-              Buy ORBITX on Jupiter
+              Buy ORBITX on Jupiter <ExternalLink className="h-3.5 w-3.5" />
             </a>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full px-6 py-3 border border-border text-foreground rounded-lg font-semibold hover:bg-muted transition"
+            <a
+              href={`/ORBITX_DEX/token/${AGENT_HOLD_MINT}`}
+              className="block text-center text-xs text-white/35 hover:text-white/55"
             >
-              Verify Holdings
-            </button>
+              View ORBITX on OrbitX DEX →
+            </a>
           </div>
-
-          <p className="text-xs text-muted-foreground mt-6">
-            By accessing this system, you agree to hold and maintain the minimum token requirement. Violation may result in access revocation.
-          </p>
         </div>
       </div>
     </div>

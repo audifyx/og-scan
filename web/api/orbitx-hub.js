@@ -14,6 +14,12 @@ import {
   GEN_WALLET_TOOLS,
   generatedStats,
 } from "./orbitx/mcp-tools-catalog.js";
+import {
+  holdBlockedPayload,
+  isHoldGatedTool,
+  isTokenGateExemptWallet,
+  verifyTokenHold,
+} from "./orbitx/token-hold.js";
 
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -271,13 +277,32 @@ async function handleAgent(req, res, parts) {
     }
   }
 
+  if (route === "verify-hold" && req.method === "POST") {
+    const userId = await getUserId(req);
+    if (!userId) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const { base } = mcpUrls(req);
+    let wallet = String(body.walletAddress || body.wallet || body.publicKey || "").trim();
+    if (!wallet) {
+      const agent = await ensureAgent(userId);
+      wallet = String(agent.wallet_address || "").trim();
+    }
+    const hold = await verifyTokenHold(wallet, base);
+    return json(res, hold, hold.meetsRequirement ? 200 : 403);
+  }
+
   if (route === "bootstrap" && req.method === "POST") {
     const userId = await getUserId(req);
     if (!userId) return json(res, { error: "unauthorized" }, 401);
     const agent = await ensureAgent(userId);
+    const { base, mcpUrl } = mcpUrls(req);
+    const hold = await verifyTokenHold(agent.wallet_address, base);
     const keys = await listKeys(agent.id);
     let mintedKey = null;
-    if (keys.length === 0) mintedKey = await createKey(agent.id, "Default MCP Key");
+    // Only auto-mint a key when hold (or exempt) is satisfied.
+    if (keys.length === 0 && hold.meetsRequirement) {
+      mintedKey = await createKey(agent.id, "Default MCP Key");
+    }
     return json(res, {
       agent: mapAgent(agent),
       keys: keys.map((k) => ({
@@ -287,7 +312,8 @@ async function handleAgent(req, res, parts) {
         lastUsedAt: k.last_used_at,
       })),
       mintedKey,
-      mcpUrl: mcpUrls(req).mcpUrl,
+      mcpUrl,
+      hold,
     });
   }
 
@@ -313,6 +339,11 @@ async function handleAgent(req, res, parts) {
     const body = await readBody(req);
     const name = String(body.name || "").trim() || "MCP Key";
     const agent = await ensureAgent(userId);
+    const { base } = mcpUrls(req);
+    const hold = await verifyTokenHold(agent.wallet_address, base);
+    if (!hold.meetsRequirement) {
+      return json(res, holdBlockedPayload({ hold }), 403);
+    }
     const minted = await createKey(agent.id, name);
     return json(
       res,
@@ -321,6 +352,7 @@ async function handleAgent(req, res, parts) {
         name: minted.name,
         key: minted.key,
         message: "Save this key securely. You will not be able to see it again.",
+        hold,
       },
       201,
     );
@@ -393,6 +425,12 @@ async function handleAgent(req, res, parts) {
         }),
       });
       agent = Array.isArray(updated) ? updated[0] : agent;
+    }
+
+    const { base } = mcpUrls(req);
+    const hold = await verifyTokenHold(wallet || agent.wallet_address, base);
+    if (!hold.meetsRequirement) {
+      return json(res, holdBlockedPayload({ hold }), 403);
     }
 
     // Always mint a Bearer access token as API key (oxo_). Claude exchanges the
@@ -627,6 +665,8 @@ const SESSION_TOOLS = new Set([
 const TOOL_ALIASES = {
   orbitx_buy: "orbitx_prepare_buy",
   orbitx_sell: "orbitx_prepare_sell",
+  orbitx_buy_auto: "orbitx_prepare_buy",
+  orbitx_sell_pump: "orbitx_prepare_sell",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_coin: "orbitx_execute_launch",
   orbitx_create_token: "orbitx_execute_launch",
@@ -1076,6 +1116,34 @@ const CORE_TOOLS = [
         publicKey: { type: "string" },
         slippage: { type: "number", default: 10 },
         pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amount", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_buy_auto",
+    description: "Buy with pool=auto — alias for orbitx_prepare_buy (Phantom signUrl).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+      },
+      required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_sell_pump",
+    description: "Sell on pump pool — alias for orbitx_prepare_sell with pool=pump.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amount: { type: ["number", "string"] },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
       },
       required: ["mint", "amount", "publicKey"],
     },
@@ -1737,6 +1805,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       agentSetupUrl: "https://orbitx.world/agent",
       sessionTools: [...SESSION_TOOLS],
       launchExecutionTool: "orbitx_execute_launch",
+      tokenHold: {
+        mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        minUsd: 10,
+        required: !isTokenGateExemptWallet(session.walletAddress || wallet),
+        exempt: isTokenGateExemptWallet(session.walletAddress || wallet),
+      },
       totalTools: TOOLS.length,
     };
   }
@@ -1767,7 +1841,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     orbitx_get_balance: () => {
       if (!wallet) throw new Error("address required (or link wallet on /agent)");
       const mint = args.mint ? `&mint=${encodeURIComponent(String(args.mint))}` : "";
-      return `${base}/api/ogdex/balance?address=${encodeURIComponent(wallet)}${mint}`;
+      return `${base}/api/ogdex/balance?owner=${encodeURIComponent(wallet)}${mint}`;
     },
     orbitx_get_kols: () => `${base}/api/ogdex/kols?limit=${Number(args.limit) || 20}`,
     orbitx_get_traders: () => `${base}/api/ogdex/traders?limit=${Number(args.limit) || 20}`,
@@ -2455,19 +2529,37 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
   if (name === "orbitx_nft_prepare_buy") {
     if (!wallet) throw new Error("buyerWallet required (or link wallet on /agent)");
     const ops = await mcpOps();
-    return ops.nftEdge("build", {
+    const built = await ops.nftEdge("build", {
       mode: args.mode || "listing",
       sourceId: String(args.sourceId),
       buyerWallet: wallet,
     });
+    return {
+      ...built,
+      ok: built?.ok !== false,
+      status: "awaiting_wallet_signature",
+      requiresSignature: true,
+      openUrl: `${base}/nft`,
+      instructions: [
+        "Sign the NFT purchase with the buyer wallet (Phantom).",
+        "Then call orbitx_nft_submit_buy with pendingSaleId + signedTransactionBase64.",
+        "Do not broadcast unsigned transactions yourself.",
+      ],
+      note: "Non-custodial NFT buy. Prefer openUrl marketplace UI if signing from MCP is awkward.",
+    };
   }
 
   if (name === "orbitx_nft_submit_buy") {
     const ops = await mcpOps();
-    return ops.nftEdge("submit", {
+    const submitted = await ops.nftEdge("submit", {
       pendingSaleId: String(args.pendingSaleId),
       signedTransactionBase64: String(args.signedTransactionBase64),
     });
+    return {
+      ...submitted,
+      ok: submitted?.ok !== false,
+      note: "Purchase complete only if the signed tx confirmed on-chain.",
+    };
   }
 
   if (name === "orbitx_nft_like") {
@@ -2792,6 +2884,8 @@ async function handleMcp(req, res, parts) {
       const rawName = String(params?.name || "");
       const name = TOOL_ALIASES[rawName] || rawName;
       const args = params?.arguments || {};
+      if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
+      if (rawName === "orbitx_buy_auto" && !args.pool) args.pool = "auto";
       const auth = await enrichAuth(req, args);
       const identified = Boolean(auth?.userId);
       const hasWalletArg = Boolean(
@@ -2805,6 +2899,37 @@ async function handleMcp(req, res, parts) {
             "",
         ).trim(),
       );
+
+      // Token hold block — write/tx/media tools require ≥$10 ORBITX (exempt wallets skip).
+      if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
+        const holdWallet = String(
+          auth?.walletAddress ||
+            args.publicKey ||
+            args.address ||
+            args.wallet ||
+            args.buyerWallet ||
+            "",
+        ).trim();
+        if (!isTokenGateExemptWallet(holdWallet)) {
+          const hold = await verifyTokenHold(holdWallet, base);
+          if (!hold.meetsRequirement) {
+            const tip = holdBlockedPayload({
+              tool: name,
+              hold,
+              fix: "Hold ≥$10 ORBITX, link wallet on https://orbitx.world/agent, then retry.",
+            });
+            return json(res, {
+              jsonrpc: "2.0",
+              id,
+              result: {
+                content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+                structuredContent: tip,
+                isError: true,
+              },
+            });
+          }
+        }
+      }
 
       // Never HTTP 401 on tools/call — Claude surfaces that as a persistent auth failure.
       if (SESSION_TOOLS.has(name) && !identified && !hasWalletArg) {

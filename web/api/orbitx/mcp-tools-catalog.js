@@ -593,7 +593,7 @@ export async function dispatchGenerated(name, args, ctx) {
     case "balance": {
       if (!pk) throw new Error("address/publicKey required");
       const mintQ = args.mint ? `&mint=${encodeURIComponent(String(args.mint))}` : "";
-      return fetchJson(`${base}/api/ogdex/balance?address=${encodeURIComponent(pk)}${mintQ}`);
+      return fetchJson(`${base}/api/ogdex/balance?owner=${encodeURIComponent(pk)}${mintQ}`);
     }
     default:
       return null;

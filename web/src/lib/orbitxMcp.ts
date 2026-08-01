@@ -98,6 +98,14 @@ export type AgentBootstrap = {
   keys: Array<{ id: string; name: string; createdAt: string; lastUsedAt?: string | null }>;
   mintedKey: { id: string; name: string; key: string } | null;
   mcpUrl: string;
+  hold?: {
+    ok?: boolean;
+    meetsRequirement?: boolean;
+    exempt?: boolean;
+    holdingUsd?: number;
+    minUsd?: number;
+    message?: string;
+  };
 };
 
 async function authHeaders(): Promise<HeadersInit> {
@@ -139,7 +147,9 @@ async function agentFetch(path: string, init?: RequestInit): Promise<Record<stri
   });
   const data = await readJson(r);
   if (!r.ok) {
-    throw new Error(String(data.error || data.message || `Request failed (${r.status})`));
+    throw new Error(
+      String(data.message || data.error || `Request failed (${r.status})`),
+    );
   }
   return data;
 }

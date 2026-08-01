@@ -72,7 +72,12 @@ export default function McpAuthPage() {
       });
       window.location.href = redirect;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Authorization failed");
+      const msg = e instanceof Error ? e.message : "Authorization failed";
+      setError(
+        /token_hold|ORBITX|hold/i.test(msg)
+          ? `${msg} Open /agent to verify your ORBITX hold, then try Authenticate again.`
+          : msg,
+      );
       setSubmitting(false);
     }
   };

@@ -370,11 +370,16 @@ export function AgentDashboard() {
               <h2 className="text-sm font-bold">Identity</h2>
               <p className="text-[11px] text-white/35">Solana wallet linked to your agent</p>
             </div>
-            {exempt && (
+            {exempt ? (
               <span className="ml-auto rounded-full bg-amber-400/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
                 Exempt
               </span>
-            )}
+            ) : boot?.hold?.meetsRequirement ? (
+              <span className="ml-auto rounded-full bg-emerald-400/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                Hold OK
+                {boot.hold.holdingUsd != null ? ` · $${Number(boot.hold.holdingUsd).toFixed(0)}` : ""}
+              </span>
+            ) : null}
           </div>
 
           {linkedWallet ? (
