@@ -8,12 +8,11 @@
  *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
 import { createHash, randomBytes } from "crypto";
-import {
-  preparePumpClaim,
-  prepareRentRefund,
-  prepareBurn,
-  nftEdge,
-} from "./orbitx/mcp-ops.js";
+
+/** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
+async function mcpOps() {
+  return import("./orbitx/mcp-ops.js");
+}
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -1103,18 +1102,21 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_claim_fees") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    return preparePumpClaim(wallet);
+    const ops = await mcpOps();
+    return ops.preparePumpClaim(wallet);
   }
 
   if (name === "orbitx_rent_refund") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    return prepareRentRefund(wallet);
+    const ops = await mcpOps();
+    return ops.prepareRentRefund(wallet);
   }
 
   if (name === "orbitx_burn") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
     if (args.amount == null && args.percent == null) throw new Error("amount or percent required");
-    return prepareBurn(wallet, String(args.mint || ""), args.amount, args.percent);
+    const ops = await mcpOps();
+    return ops.prepareBurn(wallet, String(args.mint || ""), args.amount, args.percent);
   }
 
   if (name === "orbitx_social_communities") {
@@ -1210,7 +1212,8 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_nft_prepare_buy") {
     if (!wallet) throw new Error("buyerWallet required (or link wallet on /agent)");
-    return nftEdge("build", {
+    const ops = await mcpOps();
+    return ops.nftEdge("build", {
       mode: args.mode || "listing",
       sourceId: String(args.sourceId),
       buyerWallet: wallet,
@@ -1218,7 +1221,8 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
   }
 
   if (name === "orbitx_nft_submit_buy") {
-    return nftEdge("submit", {
+    const ops = await mcpOps();
+    return ops.nftEdge("submit", {
       pendingSaleId: String(args.pendingSaleId),
       signedTransactionBase64: String(args.signedTransactionBase64),
     });
