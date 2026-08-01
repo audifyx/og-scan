@@ -9,12 +9,17 @@
 
 const KIE_BASE = "https://api.kie.ai/api/v1/jobs";
 
-/** Leave headroom to serialize the MCP response before Vercel kills the function. */
+/**
+ * Leave headroom to serialize the MCP response before Vercel kills the function.
+ * Default 25s stays under the vercel.json api JS wildcard floor (30s) so we soft-return
+ * with taskId instead of opaque 504 even if /api/mcp's 120s override is slow to roll out.
+ * Set ORBITX_FN_BUDGET_MS=110000 in Vercel once maxDuration 120 is confirmed live.
+ */
 const FN_BUDGET_MS = Math.min(
-  Math.max(Number(process.env.ORBITX_FN_BUDGET_MS) || 110_000, 20_000),
+  Math.max(Number(process.env.ORBITX_FN_BUDGET_MS) || 25_000, 15_000),
   110_000,
 );
-const KIE_FETCH_TIMEOUT_MS = 20_000;
+const KIE_FETCH_TIMEOUT_MS = 15_000;
 
 const GROK_ASPECT = new Set(["2:3", "3:2", "1:1", "9:16", "16:9"]);
 const VIDEO_MODES = new Set(["fun", "normal", "spicy"]);
@@ -42,10 +47,11 @@ function requireKey() {
 }
 
 function clampWaitMs(requested) {
-  const headroom = 8_000;
+  const headroom = 4_000;
   const maxWait = Math.max(5_000, FN_BUDGET_MS - headroom);
   const raw = Number(requested);
-  const preferred = Number.isFinite(raw) && raw > 0 ? raw : 90_000;
+  // Default wait stays inside FN_BUDGET so quality mode never 504s the MCP entry.
+  const preferred = Number.isFinite(raw) && raw > 0 ? raw : maxWait;
   return Math.min(Math.max(preferred, 5_000), maxWait);
 }
 

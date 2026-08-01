@@ -1710,9 +1710,13 @@ const CORE_TOOLS = [
         wait: {
           type: "boolean",
           default: true,
-          description: "Wait up to ~90s for imageUrls; if pending, poll orbitx_media_status with taskId",
+          description:
+            "Wait briefly for imageUrls (soft-returns taskId if still generating). Poll orbitx_media_status — never treat pending as OrbitX down.",
         },
-        waitMs: { type: "number", description: "Optional wait budget ms (capped under function limit)" },
+        waitMs: {
+          type: "number",
+          description: "Optional wait budget ms (capped under function limit; default ~21s safe under 30s platform floor)",
+        },
       },
       required: ["prompt"],
     },
