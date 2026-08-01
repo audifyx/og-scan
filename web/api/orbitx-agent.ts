@@ -29,16 +29,17 @@ import {
   requireUser,
   revokeKey,
   sha256,
-} from "./orbitx-agent/_lib";
+} from "./orbitx/agent/_lib";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (handleOptions(req, res)) return;
-
-  const parts = pathParts(req, "orbitx-agent");
-  const route = parts.join("/") || "";
-
   try {
-    if (route === "health" && req.method === "GET") {
+    if (handleOptions(req, res)) return;
+
+    const parts = pathParts(req, "orbitx-agent");
+    const route = parts.join("/") || "";
+
+    // Health: /api/orbitx-agent/health or GET /api/orbitx-agent?path=health
+    if (req.method === "GET" && (route === "health" || req.query.health === "1")) {
       return json(res, { ok: true, service: "orbitx-agent" });
     }
 

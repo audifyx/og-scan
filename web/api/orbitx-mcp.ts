@@ -19,7 +19,7 @@ import {
   pathParts,
   resolveMcpAuth,
   sha256,
-} from "./orbitx-agent/_lib";
+} from "./orbitx/agent/_lib";
 
 const MCP_URL = `${PUBLIC_BASE}/api/orbitx-mcp`;
 const AUTH_PAGE = `${PUBLIC_BASE}/agent/mcp-auth`;

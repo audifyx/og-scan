@@ -1,5 +1,6 @@
 /**
  * Shared helpers for OrbitX Agent + MCP APIs.
+ * Lives under orbitx/agent/ (not api/orbitx-agent/) to avoid colliding with orbitx-agent.ts.
  */
 import { createHash, randomBytes } from "crypto";
 import type { VercelRequest } from "@vercel/node";
@@ -9,7 +10,7 @@ import {
   handleOptions,
   json,
   requireUser,
-} from "../orbitx/world/_lib";
+} from "../world/_lib";
 
 export { adminClient, bearer, handleOptions, json, requireUser };
 
@@ -187,7 +188,6 @@ export async function resolveMcpAuth(req: VercelRequest): Promise<{
   const db = adminClient();
   const hash = sha256(token);
 
-  // API keys (oxk_) and fallback oauth codes stored as keys (oxo_)
   if (token.startsWith("oxk_") || token.startsWith("oxo_")) {
     const { data: keyRow } = await db
       .from("agent_api_keys")

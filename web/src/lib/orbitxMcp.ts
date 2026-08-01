@@ -48,53 +48,64 @@ async function authHeaders(): Promise<HeadersInit> {
   };
 }
 
-export async function bootstrapAgent(): Promise<AgentBootstrap> {
+async function readJson(r: Response): Promise<Record<string, unknown>> {
+  const text = await r.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    const snippet = text.replace(/\s+/g, " ").slice(0, 180);
+    throw new Error(
+      r.ok
+        ? `Invalid JSON from server: ${snippet}`
+        : `Server error (${r.status}): ${snippet}`,
+    );
+  }
+}
+
+async function agentFetch(path: string, init?: RequestInit): Promise<Record<string, unknown>> {
   const headers = await authHeaders();
-  const r = await fetch(`${AGENT_API}/bootstrap`, { method: "POST", headers });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "Bootstrap failed");
+  const r = await fetch(`${AGENT_API}${path}`, {
+    ...init,
+    headers: { ...headers, ...(init?.headers || {}) },
+  });
+  const data = await readJson(r);
+  if (!r.ok) {
+    throw new Error(String(data.error || data.message || `Request failed (${r.status})`));
+  }
   return data;
 }
 
+export async function bootstrapAgent(): Promise<AgentBootstrap> {
+  return (await agentFetch("/bootstrap", { method: "POST" })) as unknown as AgentBootstrap;
+}
+
 export async function createAgentApiKey(name: string): Promise<{ id: string; name: string; key: string }> {
-  const headers = await authHeaders();
-  const r = await fetch(`${AGENT_API}/keys`, {
+  return (await agentFetch("/keys", {
     method: "POST",
-    headers,
     body: JSON.stringify({ name }),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "Failed to create key");
-  return data;
+  })) as unknown as { id: string; name: string; key: string };
 }
 
 export async function listAgentApiKeys(): Promise<{
   agentId: string;
   keys: Array<{ id: string; name: string; createdAt: string; lastUsedAt?: string | null }>;
 }> {
-  const headers = await authHeaders();
-  const r = await fetch(`${AGENT_API}/keys`, { headers });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "Failed to list keys");
-  return data;
+  return (await agentFetch("/keys")) as unknown as {
+    agentId: string;
+    keys: Array<{ id: string; name: string; createdAt: string; lastUsedAt?: string | null }>;
+  };
 }
 
 export async function revokeAgentApiKey(keyId: string): Promise<void> {
-  const headers = await authHeaders();
-  const r = await fetch(`${AGENT_API}/keys/${keyId}`, { method: "DELETE", headers });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || "Failed to revoke key");
+  await agentFetch(`/keys/${keyId}`, { method: "DELETE" });
 }
 
 export async function linkAgentWallet(walletAddress: string, agentId?: string): Promise<void> {
-  const headers = await authHeaders();
-  const r = await fetch(`${AGENT_API}/link-wallet`, {
+  await agentFetch("/link-wallet", {
     method: "POST",
-    headers,
     body: JSON.stringify({ walletAddress, agentId }),
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "Failed to link wallet");
 }
 
 export async function approveMcpOAuth(payload: {
@@ -105,15 +116,10 @@ export async function approveMcpOAuth(payload: {
   code_challenge_method?: string;
   walletAddress?: string;
 }): Promise<{ redirect: string }> {
-  const headers = await authHeaders();
-  const r = await fetch(`${AGENT_API}/oauth/approve`, {
+  return (await agentFetch("/oauth/approve", {
     method: "POST",
-    headers,
     body: JSON.stringify(payload),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "OAuth approve failed");
-  return data;
+  })) as unknown as { redirect: string };
 }
 
 export function shortKey(key: string): string {
