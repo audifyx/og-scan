@@ -1,8 +1,8 @@
 /** OrbitX Agent MCP client helpers — URLs, deep links, API calls. */
 
-/** Claude.ai requires a connector path ending in `/mcp` (not `/api/orbitx-mcp`). */
-export const MCP_PATH = "/mcp";
-export const MCP_PATH_ALIAS = "/api/orbitx-mcp";
+/** Claude.ai needs a URL whose last segment is `mcp` — use the real `/api/mcp` function. */
+export const MCP_PATH = "/api/mcp";
+export const MCP_PATH_ALIAS = "/mcp";
 export const AGENT_API = "/api/orbitx-agent";
 /** Public OAuth client for ChatGPT / Claude manual connector forms. */
 export const MCP_OAUTH_CLIENT_ID = "orbitx-mcp";

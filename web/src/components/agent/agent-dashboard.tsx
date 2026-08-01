@@ -359,8 +359,13 @@ export function AgentDashboard() {
               { id: "mcp", label: "MCP URL (Claude)", value: oauth.mcpUrl },
               {
                 id: "mcpAlias",
-                label: "Alias (ChatGPT ok)",
-                value: oauth.mcpUrl.replace(/\/mcp$/, "/api/orbitx-mcp"),
+                label: "Short alias",
+                value: "https://orbitx.world/mcp",
+              },
+              {
+                id: "mcpLegacy",
+                label: "Legacy alias",
+                value: "https://orbitx.world/api/orbitx-mcp",
               },
               { id: "auth", label: "Authorization URL", value: oauth.authorizationUrl },
               { id: "token", label: "Token URL", value: oauth.tokenUrl },

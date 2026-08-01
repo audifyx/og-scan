@@ -1,213 +1,119 @@
 /**
- * Standalone MCP (Model Context Protocol) endpoint for OG DEX.
- * Accessible at GET /api/mcp (tool manifest discovery)
- *               POST /api/mcp { tool, params } (tool execution)
- *
- * Any MCP-compatible AI assistant (Claude, GPT-4, custom agents) can
- * discover and call OG DEX tools from here without modifying the main router.
+ * Claude-compatible MCP entrypoint at /api/mcp (path ends with /mcp).
+ * Delegates to orbitx-hub agent MCP (Node req/res). Also keeps legacy
+ * { tool, params } OG DEX execute for older clients.
  */
+import hub from "./orbitx-hub.js";
 
-const BASE = "https://ogscan.fun";
+const BASE = "https://orbitx.world";
 
-const TOOLS = [
+const LEGACY_TOOLS = [
   {
     name: "ogdex_get_token",
-    description:
-      "Get full token data for a Solana (or EVM) token: price, market cap, holders, OG score, trust verdict, forensics summary, dev wallet, dev-sold status, first buyer, and live trades.",
+    description: "Get full token data for a Solana (or EVM) token.",
     inputSchema: {
       type: "object",
       properties: {
-        mint: { type: "string", description: "Token mint address (Solana) or contract address (EVM)" },
-        chain: {
-          type: "string",
-          enum: ["solana", "ethereum", "base", "bsc", "arbitrum", "polygon", "avalanche", "sui", "ton", "robinhood"],
-          default: "solana",
-        },
+        mint: { type: "string" },
+        chain: { type: "string", default: "solana" },
       },
       required: ["mint"],
     },
   },
   {
     name: "ogdex_screen_tokens",
-    description:
-      "Screen tokens by category. Returns a ranked list with price, volume, mcap, OG score, and trust indicators.",
+    description: "Screen tokens by category.",
     inputSchema: {
       type: "object",
       properties: {
-        type: {
-          type: "string",
-          enum: [
-            "trending", "new", "runners", "fomo", "kol", "organic",
-            "graduating", "migrated", "social", "verified",
-          ],
-          description: "Screen category",
-        },
-        interval: { type: "string", enum: ["5m", "1h", "6h", "24h"], default: "1h" },
-        limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+        type: { type: "string" },
+        interval: { type: "string", default: "1h" },
+        limit: { type: "integer", default: 20 },
         chain: { type: "string", default: "solana" },
       },
       required: ["type"],
     },
   },
   {
-    name: "ogdex_get_forensics",
-    description:
-      "Get forensic data for a token: developer wallet, dev-sold status, first buyer with exact transaction, DexScreener-paid status, bundle detection, concentration, LP lock, and safety flags.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        mint: { type: "string", description: "Token mint / contract address" },
-      },
-      required: ["mint"],
-    },
-  },
-  {
-    name: "ogdex_get_ath",
-    description:
-      "Get all-time-high price and market cap for a token. Sources: CoinGecko, GeckoTerminal, DexScreener.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        mint: { type: "string", description: "Token mint / contract address" },
-      },
-      required: ["mint"],
-    },
-  },
-  {
-    name: "ogdex_get_wallet",
-    description:
-      "Get wallet portfolio: SOL balance, token holdings with USD values, realized and unrealized PnL, win rate.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        address: { type: "string", description: "Solana wallet address" },
-      },
-      required: ["address"],
-    },
-  },
-  {
-    name: "ogdex_get_chart",
-    description:
-      "Get OHLCV candlestick data for a token. Returns open, high, low, close, volume per candle.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        mint: { type: "string" },
-        interval: { type: "string", enum: ["5m", "15m", "1h", "4h", "1d"], default: "1h" },
-        limit: { type: "integer", minimum: 1, maximum: 1000, default: 200 },
-        chain: { type: "string", default: "solana" },
-      },
-      required: ["mint"],
-    },
-  },
-  {
-    name: "ogdex_get_kols",
-    description:
-      "Get the OG DEX KOL (Key Opinion Leader) directory. Returns smart-money wallets with their labels, win rates, and recent performance.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },
-      },
-    },
-  },
-  {
     name: "ogdex_search",
-    description: "Search for tokens by name, symbol, or partial mint address.",
+    description: "Search tokens by name, symbol, or mint.",
     inputSchema: {
       type: "object",
-      properties: {
-        q: { type: "string", description: "Search query (name, symbol, or address)" },
-      },
+      properties: { q: { type: "string" } },
       required: ["q"],
     },
   },
 ];
 
-const ROUTE_MAP = {
-  ogdex_get_token: (p) => `${BASE}/api/ogdex/token?mint=${p.mint}&chain=${p.chain || "solana"}`,
+const LEGACY_ROUTES = {
+  ogdex_get_token: (p) =>
+    `${BASE}/api/ogdex/token?mint=${encodeURIComponent(p.mint)}&chain=${encodeURIComponent(p.chain || "solana")}`,
   ogdex_screen_tokens: (p) =>
-    `${BASE}/api/ogdex/screener?type=${p.type}&interval=${p.interval || "1h"}&limit=${p.limit || 20}&chain=${p.chain || "solana"}`,
-  ogdex_get_forensics: (p) => `${BASE}/api/ogdex/forensics?mint=${p.mint}`,
-  ogdex_get_ath: (p) => `${BASE}/api/ogdex/ath?mint=${p.mint}`,
-  ogdex_get_wallet: (p) => `${BASE}/api/ogdex/wallet?address=${p.address}`,
-  ogdex_get_chart: (p) =>
-    `${BASE}/api/ogdex/chart?mint=${p.mint}&interval=${p.interval || "1h"}&limit=${p.limit || 200}&chain=${p.chain || "solana"}`,
-  ogdex_get_kols: (p) => `${BASE}/api/ogdex/kols?limit=${p.limit || 20}`,
+    `${BASE}/api/ogdex/screener?type=${encodeURIComponent(p.type)}&interval=${encodeURIComponent(p.interval || "1h")}&limit=${Number(p.limit) || 20}&chain=${encodeURIComponent(p.chain || "solana")}`,
   ogdex_search: (p) => `${BASE}/api/ogdex/search?q=${encodeURIComponent(p.q)}`,
 };
 
-export default async function handler(req) {
-  const headers = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Cache-Control": "no-store",
-  };
-
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers });
+function forceMcpPath(req) {
+  try {
+    const u = new URL(req.url || "/", "http://x");
+    const existing = u.searchParams.get("path");
+    if (!existing) u.searchParams.set("path", "mcp");
+    else if (!String(existing).startsWith("mcp")) u.searchParams.set("path", `mcp/${existing}`);
+    // Preserve oauth subpaths from /api/mcp/oauth/...
+    const parts = u.pathname.split("/").filter(Boolean);
+    const mcpIdx = parts.lastIndexOf("mcp");
+    if (mcpIdx >= 0 && parts[mcpIdx + 1] && !existing) {
+      const rest = parts.slice(mcpIdx + 1).join("/");
+      if (rest) u.searchParams.set("path", `mcp/${rest}`);
+    }
+    req.url = `${u.pathname}?${u.searchParams.toString()}`;
+  } catch {
+    /* ignore */
   }
+}
 
-  if (req.method === "GET") {
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        schema_version: "v1",
-        name: "OG DEX",
-        description:
-          "On-chain data and analytics for crypto traders. Token forensics, screener, wallet PnL, KOL tracking, and AI-powered coin reads across 16 chains.",
-        base_url: BASE,
-        endpoints: {
-          manifest: `${BASE}/api/mcp`,
-          execute: `${BASE}/api/mcp`,
-        },
-        contact: { url: BASE, telegram: "https://t.me/OrbitXupdates" },
-        tools: TOOLS,
-      }),
-      { status: 200, headers }
-    );
-  }
-
+export default async function handler(req, res) {
+  // Legacy OG DEX execute: POST { tool, params } without jsonrpc
   if (req.method === "POST") {
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      return new Response(JSON.stringify({ ok: false, error: "Invalid JSON" }), { status: 400, headers });
+    let peek = req.body;
+    if (peek == null) {
+      try {
+        const chunks = [];
+        for await (const c of req) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
+        const raw = Buffer.concat(chunks).toString("utf8");
+        peek = raw ? JSON.parse(raw) : {};
+        req.body = peek;
+      } catch {
+        peek = {};
+        req.body = {};
+      }
     }
 
-    const { tool, params = {} } = body;
-    if (!tool) {
-      return new Response(JSON.stringify({ ok: false, error: "Missing 'tool' field" }), { status: 400, headers });
-    }
-
-    const known = TOOLS.find((t) => t.name === tool);
-    if (!known) {
-      return new Response(
-        JSON.stringify({ ok: false, error: `Unknown tool: ${tool}. Available tools: ${TOOLS.map((t) => t.name).join(", ")}` }),
-        { status: 400, headers }
-      );
-    }
-
-    const urlBuilder = ROUTE_MAP[tool];
-    if (!urlBuilder) {
-      return new Response(JSON.stringify({ ok: false, error: "Tool routing not implemented" }), { status: 501, headers });
-    }
-
-    try {
-      const url = urlBuilder(params);
-      const r = await fetch(url, { headers: { "User-Agent": "OG-DEX-MCP/1.0" } });
-      const data = await r.json();
-      return new Response(JSON.stringify({ ok: true, tool, result: data }), { status: 200, headers });
-    } catch (e) {
-      return new Response(
-        JSON.stringify({ ok: false, tool, error: String(e) }),
-        { status: 502, headers }
-      );
+    if (peek && typeof peek === "object" && !peek.jsonrpc && peek.tool) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Content-Type", "application/json");
+      const builder = LEGACY_ROUTES[peek.tool];
+      if (!builder) {
+        res.statusCode = 400;
+        return res.end(
+          JSON.stringify({
+            ok: false,
+            error: `Unknown legacy tool. Use JSON-RPC MCP at this URL, or tools: ${LEGACY_TOOLS.map((t) => t.name).join(", ")}`,
+          }),
+        );
+      }
+      try {
+        const r = await fetch(builder(peek.params || {}), { headers: { "User-Agent": "OrbitX-MCP/1.0" } });
+        const data = await r.json();
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ ok: true, tool: peek.tool, result: data }));
+      } catch (e) {
+        res.statusCode = 502;
+        return res.end(JSON.stringify({ ok: false, tool: peek.tool, error: String(e) }));
+      }
     }
   }
 
-  return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), { status: 405, headers });
+  forceMcpPath(req);
+  return hub(req, res);
 }

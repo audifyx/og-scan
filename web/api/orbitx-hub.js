@@ -39,11 +39,11 @@ function publicBase(req) {
 
 function mcpUrls(req) {
   const base = publicBase(req);
-  // Claude.ai custom connectors are unreliable unless the URL path ends with /mcp
-  // (see anthropics/claude-ai-mcp#423). Keep /api/orbitx-mcp as an alias.
+  // Claude.ai expects a path ending in /mcp. Prefer real function /api/mcp
+  // (rewrite-only /mcp can lose to the SPA catch-all during deploys).
   return {
     base,
-    mcpUrl: `${base}/mcp`,
+    mcpUrl: `${base}/api/mcp`,
     // HTML auth page lives on www (apex 308s) — avoid breaking OAuth redirects
     authPage: "https://www.orbitx.world/agent/mcp-auth",
   };
@@ -862,6 +862,52 @@ const TOOLS = [
     },
   },
   {
+    name: "orbitx_nft_like",
+    description: "Toggle like on an NFT (wallet-native social).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nftId: { type: "string" },
+        wallet: { type: "string" },
+      },
+      required: ["nftId"],
+    },
+  },
+  {
+    name: "orbitx_nft_comment",
+    description: "Add a comment on an NFT.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nftId: { type: "string" },
+        body: { type: "string" },
+        wallet: { type: "string" },
+      },
+      required: ["nftId", "body"],
+    },
+  },
+  {
+    name: "orbitx_nft_comments",
+    description: "List comments on an NFT.",
+    inputSchema: {
+      type: "object",
+      properties: { nftId: { type: "string" }, limit: { type: "integer", default: 50 } },
+      required: ["nftId"],
+    },
+  },
+  {
+    name: "orbitx_nft_follow",
+    description: "Toggle follow a creator wallet on the NFT social graph.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        creatorWallet: { type: "string" },
+        followerWallet: { type: "string" },
+      },
+      required: ["creatorWallet"],
+    },
+  },
+  {
     name: "orbitx_platform_stats",
     description: "OrbitX platform stats snapshot.",
     inputSchema: { type: "object", properties: {} },
@@ -1176,6 +1222,90 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
       pendingSaleId: String(args.pendingSaleId),
       signedTransactionBase64: String(args.signedTransactionBase64),
     });
+  }
+
+  if (name === "orbitx_nft_like") {
+    const w = String(args.wallet || wallet || "");
+    if (!w) throw new Error("wallet required (or link on /agent)");
+    // Prefer RPC; fall back to direct toggle via table
+    try {
+      return await sb("rpc/orbitx_nft_toggle_like", {
+        method: "POST",
+        body: JSON.stringify({ p_nft_id: String(args.nftId), p_wallet: w }),
+      });
+    } catch {
+      const existing = await sb(
+        `orbitx_nft_likes?nft_id=eq.${encodeURIComponent(String(args.nftId))}&wallet=eq.${encodeURIComponent(w)}&select=wallet`,
+      );
+      if (Array.isArray(existing) && existing[0]) {
+        await sb(
+          `orbitx_nft_likes?nft_id=eq.${encodeURIComponent(String(args.nftId))}&wallet=eq.${encodeURIComponent(w)}`,
+          { method: "DELETE", headers: { Prefer: "return=minimal" } },
+        );
+        return { liked: false };
+      }
+      await sb("orbitx_nft_likes", {
+        method: "POST",
+        body: JSON.stringify({ nft_id: String(args.nftId), wallet: w }),
+        headers: { Prefer: "return=minimal" },
+      });
+      return { liked: true };
+    }
+  }
+
+  if (name === "orbitx_nft_comment") {
+    const w = String(args.wallet || wallet || "");
+    if (!w) throw new Error("wallet required (or link on /agent)");
+    const body = String(args.body || "").trim();
+    if (!body) throw new Error("body required");
+    try {
+      return await sb("rpc/orbitx_nft_add_comment", {
+        method: "POST",
+        body: JSON.stringify({ p_nft_id: String(args.nftId), p_wallet: w, p_body: body }),
+      });
+    } catch {
+      return sb("orbitx_nft_comments", {
+        method: "POST",
+        body: JSON.stringify({ nft_id: String(args.nftId), wallet: w, body }),
+      });
+    }
+  }
+
+  if (name === "orbitx_nft_comments") {
+    const limit = Math.min(Number(args.limit) || 50, 100);
+    return sb(
+      `orbitx_nft_comments?nft_id=eq.${encodeURIComponent(String(args.nftId))}&order=created_at.desc&limit=${limit}&select=*`,
+    );
+  }
+
+  if (name === "orbitx_nft_follow") {
+    const follower = String(args.followerWallet || wallet || "");
+    const creator = String(args.creatorWallet || "");
+    if (!follower) throw new Error("followerWallet required (or link on /agent)");
+    if (!creator) throw new Error("creatorWallet required");
+    try {
+      return await sb("rpc/orbitx_nft_toggle_follow", {
+        method: "POST",
+        body: JSON.stringify({ p_follower: follower, p_creator: creator }),
+      });
+    } catch {
+      const existing = await sb(
+        `orbitx_nft_follows?follower_wallet=eq.${encodeURIComponent(follower)}&creator_wallet=eq.${encodeURIComponent(creator)}&select=follower_wallet`,
+      );
+      if (Array.isArray(existing) && existing[0]) {
+        await sb(
+          `orbitx_nft_follows?follower_wallet=eq.${encodeURIComponent(follower)}&creator_wallet=eq.${encodeURIComponent(creator)}`,
+          { method: "DELETE", headers: { Prefer: "return=minimal" } },
+        );
+        return { following: false };
+      }
+      await sb("orbitx_nft_follows", {
+        method: "POST",
+        body: JSON.stringify({ follower_wallet: follower, creator_wallet: creator }),
+        headers: { Prefer: "return=minimal" },
+      });
+      return { following: true };
+    }
   }
 
   throw new Error(`Unknown tool: ${name}`);
