@@ -39,10 +39,13 @@ function publicBase(req) {
 
 function mcpUrls(req) {
   const base = publicBase(req);
+  // Claude.ai custom connectors are unreliable unless the URL path ends with /mcp
+  // (see anthropics/claude-ai-mcp#423). Keep /api/orbitx-mcp as an alias.
   return {
     base,
-    mcpUrl: `${base}/api/orbitx-mcp`,
-    authPage: `${base}/agent/mcp-auth`,
+    mcpUrl: `${base}/mcp`,
+    // HTML auth page lives on www (apex 308s) — avoid breaking OAuth redirects
+    authPage: "https://www.orbitx.world/agent/mcp-auth",
   };
 }
 
@@ -1313,10 +1316,25 @@ async function handleMcp(req, res, parts) {
   }
 
   if ((!route || route === "") && req.method === "GET") {
+    const accept = String(header(req, "accept") || "");
+    // Streamable HTTP: Claude may open an SSE stream on GET
+    if (accept.includes("text/event-stream")) {
+      cors(res);
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.write(": orbitx-mcp connected\n\n");
+      return res.end();
+    }
     return json(res, {
       ok: true,
       name: "OrbitX Agent MCP",
       mcp_url: mcpUrl,
+      claude_url: mcpUrl,
+      aliases: [`${base}/api/orbitx-mcp`],
       auth: {
         type: "oauth2",
         client_id: "orbitx-mcp",
@@ -1335,17 +1353,23 @@ async function handleMcp(req, res, parts) {
   if ((!route || route === "") && req.method === "POST") {
     const body = await readBody(req);
     const { id, method, params } = body;
+    const sessionId = header(req, "mcp-session-id") || opaque("sess").slice(0, 24);
 
     if (method === "initialize") {
-      return json(res, {
-        jsonrpc: "2.0",
-        id,
-        result: {
-          protocolVersion: "2024-11-05",
-          capabilities: { tools: {} },
-          serverInfo: { name: "OrbitX Agent MCP", version: "1.0.0" },
+      return json(
+        res,
+        {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: "2024-11-05",
+            capabilities: { tools: {} },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.0.0" },
+          },
         },
-      });
+        200,
+        { "Mcp-Session-Id": sessionId },
+      );
     }
     if (method === "notifications/initialized" || method === "ping") {
       return json(res, { jsonrpc: "2.0", id: id ?? null, result: {} });

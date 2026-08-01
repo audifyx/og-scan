@@ -356,7 +356,12 @@ export function AgentDashboard() {
         <div className="mb-5 space-y-2">
           {(
             [
-              { id: "mcp", label: "MCP server URL", value: oauth.mcpUrl },
+              { id: "mcp", label: "MCP URL (Claude)", value: oauth.mcpUrl },
+              {
+                id: "mcpAlias",
+                label: "Alias (ChatGPT ok)",
+                value: oauth.mcpUrl.replace(/\/mcp$/, "/api/orbitx-mcp"),
+              },
               { id: "auth", label: "Authorization URL", value: oauth.authorizationUrl },
               { id: "token", label: "Token URL", value: oauth.tokenUrl },
               { id: "client", label: "Client ID", value: oauth.clientId },
@@ -451,9 +456,11 @@ export function AgentDashboard() {
           <div>
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Claude setup</h3>
             <ol className="list-decimal space-y-1.5 pl-5 text-xs text-white/45">
-              <li>Click Add to Claude (opens connectors with URL filled).</li>
-              <li>Confirm the OrbitX connector name and MCP URL.</li>
-              <li>Authenticate → link wallet on OrbitX → done.</li>
+              <li>
+                Use MCP URL ending in <code className="text-white/60">/mcp</code> (required by Claude.ai).
+              </li>
+              <li>Add custom connector → paste URL → Client ID <code className="text-white/60">orbitx-mcp</code>, secret blank.</li>
+              <li>Authenticate → link wallet on OrbitX → reconnect if tools were empty.</li>
             </ol>
           </div>
         </div>
