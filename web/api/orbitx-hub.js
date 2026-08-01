@@ -8,6 +8,12 @@
  *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
 import { createHash, randomBytes } from "crypto";
+import {
+  buildGeneratedTools,
+  dispatchGenerated,
+  GEN_WALLET_TOOLS,
+  generatedStats,
+} from "./orbitx/mcp-tools-catalog.js";
 
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -564,7 +570,7 @@ async function resolveSocialUser(auth, args) {
   return null;
 }
 
-const TOOLS = [
+const CORE_TOOLS = [
   {
     name: "orbitx_whoami",
     description:
@@ -1419,10 +1425,15 @@ const TOOLS = [
   {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category (create token, mint NFT, trade, social, intel). Call this when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (500+ generated). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
+
+const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
+const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
+const TOOLS = [...CORE_TOOLS, ..._generated];
+for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
 
 async function fetchJson(url, init) {
   const r = await fetch(url, {
@@ -1452,6 +1463,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     args.publicKey || args.address || args.buyerWallet || args.sellerWallet || args.bidderWallet || auth?.walletAddress || "",
   ).trim();
 
+  const generated = await dispatchGenerated(name, args, {
+    base,
+    fetchJson,
+    sb,
+    wallet,
+    auth,
+  });
+  if (generated !== null && generated !== undefined) return generated;
+
   if (name === "orbitx_whoami") {
     return {
       ok: true,
@@ -1464,7 +1484,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         ? "Bearer session active — social join/post/create are available."
         : "Anonymous OK for intel + community list/feed. For social join/post/create: Authenticate connector or add request header Authorization: Bearer <oxo_ key from https://orbitx.world/agent>, or pass publicKey of a wallet linked on /agent.",
       sessionTools: [...SESSION_TOOLS],
-      tools: TOOLS.map((t) => t.name),
+      totalTools: TOOLS.length,
+      toolsSample: TOOLS.slice(0, 30).map((t) => t.name),
+      noteTools: `Full catalog: ${TOOLS.length} tools. Call orbitx_tools_help or tools/list.`,
     };
   }
 
@@ -1515,88 +1537,25 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
   };
 
   if (name === "orbitx_tools_help") {
+    const byPrefix = {};
+    for (const t of TOOLS) {
+      const p = t.name.replace(/^orbitx_/, "").split("_")[0] || "other";
+      byPrefix[p] = (byPrefix[p] || 0) + 1;
+    }
     return {
       ok: true,
-      create: [
-        "orbitx_create_token",
-        "orbitx_launch_token",
-        "orbitx_create_coin",
-        "orbitx_launch_check",
-        "orbitx_launch_ipfs",
-        "orbitx_vanity_mint",
-        "orbitx_prepare_launch",
-        "orbitx_launch_record",
-      ],
-      nft: [
-        "orbitx_mint_nft",
-        "orbitx_nft_collections",
-        "orbitx_nft_items",
-        "orbitx_nft_listings",
-        "orbitx_nft_offers",
-        "orbitx_nft_make_offer",
-        "orbitx_nft_cancel_offer",
-        "orbitx_nft_list_for_sale",
-        "orbitx_nft_cancel_listing",
-        "orbitx_nft_auctions",
-        "orbitx_nft_create_auction",
-        "orbitx_nft_place_bid",
-        "orbitx_nft_recent_sales",
-        "orbitx_nft_sales",
-        "orbitx_nft_favorite",
-        "orbitx_nft_register",
-        "orbitx_nft_register_collection",
-        "orbitx_nft_prepare_buy",
-        "orbitx_nft_submit_buy",
-        "orbitx_nft_like",
-        "orbitx_nft_comment",
-        "orbitx_nft_follow",
-      ],
-      trade: [
-        "orbitx_buy",
-        "orbitx_sell",
-        "orbitx_prepare_buy",
-        "orbitx_prepare_sell",
-        "orbitx_claim_fees",
-        "orbitx_rent_refund",
-        "orbitx_burn",
-      ],
-      social: [
-        "orbitx_social_communities",
-        "orbitx_social_feed",
-        "orbitx_social_members",
-        "orbitx_social_join",
-        "orbitx_social_leave",
-        "orbitx_social_post",
-        "orbitx_social_create_community",
-      ],
-      intel: [
-        "orbitx_search",
-        "orbitx_get_token",
-        "orbitx_get_metadata",
-        "orbitx_screen_tokens",
-        "orbitx_get_forensics",
-        "orbitx_get_safety",
-        "orbitx_crypto_scan",
-        "orbitx_xray",
-        "orbitx_research",
-        "orbitx_report_url",
-        "orbitx_get_ath",
-        "orbitx_get_chart",
-        "orbitx_get_kols",
-        "orbitx_get_traders",
-        "orbitx_get_signals",
-        "orbitx_get_launches",
-        "orbitx_leaderboard",
-        "orbitx_dex_listings",
-        "orbitx_boosts",
-        "orbitx_boost_tiers",
-        "orbitx_health",
-        "orbitx_config",
-        "orbitx_open_dex",
-        "orbitx_open_alerts",
-      ],
-      note: "Create token / mint NFT / buy-sell / claim / burn / rent return openUrl or signUrl — open in browser for Phantom. Never broadcast unsigned txs.",
-      all: TOOLS.map((t) => t.name),
+      totalTools: TOOLS.length,
+      coreTools: CORE_TOOLS.length,
+      generatedTools: _generated.length,
+      generatedStats: generatedStats(),
+      categoryCounts: byPrefix,
+      create: ["orbitx_create_token", "orbitx_launch_token", "orbitx_create_token_pump", "orbitx_create_token_custom"],
+      trade: ["orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
+      nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
+      social: ["orbitx_social_communities", "orbitx_social_post", "orbitx_social_join", "orbitx_communities_top20"],
+      intel: ["orbitx_search", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
+      examples: TOOLS.slice(0, 40).map((t) => t.name),
+      note: "500+ tools. Prefer specific names like orbitx_screen_trending_1h_solana or orbitx_buy_pump. Tx tools return signUrl/openUrl for Phantom — never broadcast unsigned.",
     };
   }
 
