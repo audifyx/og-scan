@@ -20,6 +20,12 @@ async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
 }
 
+async function grokImagine() {
+  return import("./orbitx/grok-imagine.js");
+}
+
+export const config = { maxDuration: 60 };
+
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -544,6 +550,10 @@ const TOOL_ALIASES = {
   orbitx_sell: "orbitx_prepare_sell",
   orbitx_launch_token: "orbitx_create_token",
   orbitx_create_coin: "orbitx_create_token",
+  orbitx_grok_image: "orbitx_generate_image",
+  orbitx_grok_video: "orbitx_generate_video",
+  orbitx_gen_image: "orbitx_generate_image",
+  orbitx_gen_video: "orbitx_generate_video",
 };
 
 async function resolveSocialUser(auth, args) {
@@ -1423,6 +1433,91 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_generate_image",
+    description:
+      "Generate images with Grok Imagine (kie.ai). Quality mode returns ~4 images. Returns taskId — poll with orbitx_media_status. Set wait=true to block briefly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "Image prompt (max 5000 chars)" },
+        aspect_ratio: {
+          type: "string",
+          enum: ["2:3", "3:2", "1:1", "9:16", "16:9"],
+          default: "3:2",
+        },
+        enable_pro: {
+          type: "boolean",
+          default: true,
+          description: "true=quality (~4 imgs), false=standard/speed (~6 imgs)",
+        },
+        nsfw_checker: { type: "boolean", default: true },
+        wait: { type: "boolean", default: false, description: "Poll up to ~25s before returning" },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "orbitx_generate_video",
+    description:
+      "Generate a video with Grok Imagine text-to-video (kie.ai). Default 10s. Returns taskId — poll with orbitx_media_status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "Video motion prompt (max 5000 chars)" },
+        aspect_ratio: {
+          type: "string",
+          enum: ["2:3", "3:2", "1:1", "9:16", "16:9"],
+          default: "16:9",
+        },
+        mode: { type: "string", enum: ["fun", "normal", "spicy"], default: "normal" },
+        duration: { type: "number", default: 10, description: "Seconds 6–30 (default 10)" },
+        resolution: { type: "string", enum: ["480p", "720p"], default: "720p" },
+        nsfw_checker: { type: "boolean", default: true },
+        wait: { type: "boolean", default: false },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "orbitx_media_status",
+    description: "Poll Grok Imagine task status. Pass taskId from orbitx_generate_image or orbitx_generate_video.",
+    inputSchema: {
+      type: "object",
+      properties: { taskId: { type: "string" } },
+      required: ["taskId"],
+    },
+  },
+  {
+    name: "orbitx_grok_image",
+    description: "Alias for orbitx_generate_image.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string" },
+        aspect_ratio: { type: "string" },
+        enable_pro: { type: "boolean", default: true },
+        wait: { type: "boolean", default: false },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
+    name: "orbitx_grok_video",
+    description: "Alias for orbitx_generate_video.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string" },
+        aspect_ratio: { type: "string" },
+        duration: { type: "number", default: 10 },
+        mode: { type: "string" },
+        resolution: { type: "string" },
+        wait: { type: "boolean", default: false },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
     name: "orbitx_tools_help",
     description:
       "Catalog of MCP tools by category + total count (500+ generated). Call when unsure which tool to use.",
@@ -1552,10 +1647,41 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       create: ["orbitx_create_token", "orbitx_launch_token", "orbitx_create_token_pump", "orbitx_create_token_custom"],
       trade: ["orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
+      media: [
+        "orbitx_generate_image",
+        "orbitx_generate_video",
+        "orbitx_media_status",
+        "orbitx_grok_image",
+        "orbitx_grok_video",
+      ],
       social: ["orbitx_social_communities", "orbitx_social_post", "orbitx_social_join", "orbitx_communities_top20"],
       intel: ["orbitx_search", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
-      note: "500+ tools. Prefer specific names like orbitx_screen_trending_1h_solana or orbitx_buy_pump. Tx tools return signUrl/openUrl for Phantom — never broadcast unsigned.",
+      note: "500+ tools. Image/video: orbitx_generate_image → orbitx_media_status. Tx tools return signUrl/openUrl for Phantom — never broadcast unsigned.",
+    };
+  }
+
+  if (name === "orbitx_generate_image") {
+    const gi = await grokImagine();
+    return gi.generateImage(args);
+  }
+
+  if (name === "orbitx_generate_video") {
+    const gi = await grokImagine();
+    return gi.generateVideo(args);
+  }
+
+  if (name === "orbitx_media_status") {
+    const gi = await grokImagine();
+    const status = await gi.getTask(String(args.taskId || ""));
+    return {
+      ...status,
+      instructions:
+        status.state === "success"
+          ? "Use resultUrls for the media files."
+          : status.state === "fail"
+            ? `Failed: ${status.failMsg || status.failCode || "unknown"}`
+            : "Still processing — call orbitx_media_status again shortly.",
     };
   }
 
