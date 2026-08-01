@@ -1691,7 +1691,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_generate_image",
     description:
-      "Generate images via kie.ai. Tries Grok Imagine first; auto-falls back to Flux-2 if Grok is at capacity. Defaults to wait=true and returns imageUrls. Optional model: auto|grok|flux.",
+      "Generate images with Grok Imagine only (kie.ai / KIE_API_KEY). Quality mode ~4 images. Defaults to wait=true; returns imageUrls or taskId for orbitx_media_status.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1704,16 +1704,10 @@ const CORE_TOOLS = [
         enable_pro: {
           type: "boolean",
           default: true,
-          description: "Grok quality mode (~4 imgs) when provider=grok",
-        },
-        model: {
-          type: "string",
-          enum: ["auto", "grok", "flux"],
-          default: "auto",
-          description: "auto = Grok then Flux fallback",
+          description: "true = quality (~4 imgs), false = speed (~6 imgs)",
         },
         nsfw_checker: { type: "boolean", default: false },
-        wait: { type: "boolean", default: true, description: "Wait up to ~55s for imageUrls" },
+        wait: { type: "boolean", default: true, description: "Wait up to ~100s for imageUrls" },
       },
       required: ["prompt"],
     },
@@ -1958,7 +1952,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       social: ["orbitx_social_communities", "orbitx_social_post", "orbitx_social_join", "orbitx_communities_top20"],
       intel: ["orbitx_search", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
-      note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (auto Flux fallback). Tx tools return signUrl/openUrl.",
+      note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (Grok Imagine / KIE_API_KEY only). Tx tools return signUrl/openUrl.",
       mcpUrl: "https://www.orbitx.world/api/mcp",
     };
   }
@@ -1972,10 +1966,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         ok: false,
         kind: "image",
         error: e?.message || "image generation failed",
-        fix:
-          /KIE_API_KEY/i.test(String(e?.message || ""))
-            ? "Set KIE_API_KEY in Vercel env (https://kie.ai/api-key), redeploy, retry."
-            : "Retry with model=flux, or simplify the prompt.",
+        fix: /KIE_API_KEY/i.test(String(e?.message || ""))
+          ? "Set KIE_API_KEY in Vercel env (https://kie.ai/api-key), redeploy, retry."
+          : "Grok Imagine only — retry later or simplify the prompt. Poll orbitx_media_status if you have a taskId.",
       };
     }
   }
@@ -2007,7 +2000,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
           status.state === "success"
             ? "Use resultUrls / imageUrls for the media files."
             : status.state === "fail"
-              ? `Failed: ${status.failMsg || status.failCode || "unknown"}. For images, retry orbitx_generate_image with model=flux.`
+              ? `Failed: ${status.failMsg || status.failCode || "unknown"}. Retry orbitx_generate_image (Grok Imagine / kie.ai).`
               : "Still processing — call orbitx_media_status again shortly.",
       };
     } catch (e) {
