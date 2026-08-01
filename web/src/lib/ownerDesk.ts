@@ -6,6 +6,13 @@
  *   /ox-desk-m4k9q
  *   /ORBITX_DEX/ox-desk-m4k9q
  */
+import {
+  TOKEN_GATE_EXEMPT_EMAILS_BASE,
+  TOKEN_GATE_EXEMPT_WALLETS_BASE,
+  isExemptEmailInList,
+  isExemptWalletInList,
+} from "../../shared/token-gate-exempt.js";
+
 export const OWNER_DESK_PATH = "ox-desk-m4k9q";
 export const OWNER_DESK_HREF = `/${OWNER_DESK_PATH}`;
 export const OWNER_DESK_DEX_HREF = `/ORBITX_DEX/${OWNER_DESK_PATH}`;
@@ -14,21 +21,14 @@ export const OWNER_DESK_DEX_HREF = `/ORBITX_DEX/${OWNER_DESK_PATH}`;
 export const OWNER_DESK_CODE = "0129";
 
 /** Sole owner email for desk UI + owner-gated APIs. */
-export const OWNER_EMAIL = "audifyx@gmail.com";
+export const OWNER_EMAIL = TOKEN_GATE_EXEMPT_EMAILS_BASE[0] || "audifyx@gmail.com";
 export const OWNER_EMAILS = [OWNER_EMAIL] as const;
 
 /**
  * Owner Solana wallets that may unlock the desk via wallet SIWS.
- * Hardcoded platform/owner wallets always apply; extras via
- * `VITE_OWNER_WALLETS=addr1,addr2` (comma-separated).
- * Wallet sessions use `{pubkey}@wallet.orbitx.app` as email.
+ * Same allowlist as Agent MCP hold exemption (web/shared/token-gate-exempt.js).
+ * Extras via `VITE_OWNER_WALLETS=addr1,addr2` (comma-separated).
  */
-const OWNER_WALLETS_BASE = [
-  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
-  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
-  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET
-] as const;
-
 function parseOwnerWallets(): readonly string[] {
   let extras: string[] = [];
   try {
@@ -42,7 +42,7 @@ function parseOwnerWallets(): readonly string[] {
   } catch {
     extras = [];
   }
-  return [...OWNER_WALLETS_BASE, ...extras].filter((w, i, arr) => arr.indexOf(w) === i);
+  return [...TOKEN_GATE_EXEMPT_WALLETS_BASE, ...extras].filter((w, i, arr) => arr.indexOf(w) === i);
 }
 export const OWNER_WALLETS = parseOwnerWallets();
 
@@ -54,16 +54,9 @@ export function isOwnerIdentity(opts: {
   email?: string | null;
   wallet?: string | null;
 }): boolean {
-  const email = (opts.email || "").toLowerCase().trim();
-  const wallet = (opts.wallet || "").trim();
-
-  if (email && (OWNER_EMAILS as readonly string[]).includes(email)) return true;
-
-  if (wallet && OWNER_WALLETS.some((w) => w === wallet)) return true;
-
-  // Wallet SIWS sessions: {pubkey}@wallet.orbitx.app
-  const m = email.match(/^([1-9a-zA-Z]{32,44})@wallet\.orbitx\.app$/i);
-  if (m && OWNER_WALLETS.some((w) => w === m[1] || w.toLowerCase() === m[1].toLowerCase())) return true;
-
+  if (isExemptWalletInList(opts.wallet, OWNER_WALLETS as unknown as string[])) return true;
+  if (isExemptEmailInList(opts.email, OWNER_EMAILS as unknown as string[], OWNER_WALLETS as unknown as string[])) {
+    return true;
+  }
   return false;
 }

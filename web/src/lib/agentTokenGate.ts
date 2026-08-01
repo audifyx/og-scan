@@ -1,11 +1,19 @@
-/** DEF / platform wallets that skip the $10 ORBITX Agent MCP hold requirement. */
-export const TOKEN_GATE_EXEMPT_WALLETS = [
-  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
-  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
-  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET (owner — starts with j)
-] as const;
+/**
+ * Client-side Agent MCP hold helpers.
+ * Exempt list: web/shared/token-gate-exempt.js (single source of truth).
+ */
 
-export const TOKEN_GATE_EXEMPT_EMAILS = ["audifyx@gmail.com"] as const;
+import {
+  TOKEN_GATE_EXEMPT_EMAILS_BASE,
+  TOKEN_GATE_EXEMPT_WALLETS_BASE,
+  canonicalizeExemptWallet,
+  isExemptEmailInList,
+  isExemptWalletInList,
+  walletFromSiwsEmail,
+} from "../../shared/token-gate-exempt.js";
+
+export const TOKEN_GATE_EXEMPT_WALLETS = TOKEN_GATE_EXEMPT_WALLETS_BASE;
+export const TOKEN_GATE_EXEMPT_EMAILS = TOKEN_GATE_EXEMPT_EMAILS_BASE;
 
 /** Official ORBITX mint — same CA as OfficialToken / token-gating. */
 export const AGENT_HOLD_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -33,21 +41,11 @@ export function allExemptWallets(): string[] {
 }
 
 export function isTokenGateExemptWallet(wallet?: string | null): boolean {
-  const addr = (wallet || "").trim();
-  if (!addr) return false;
-  // Accept raw pubkey or SIWS email form: {pubkey}@wallet.orbitx.app
-  const bare = addr.includes("@") ? addr.split("@")[0] : addr;
-  return allExemptWallets().some((w) => w === bare || w === addr);
+  return isExemptWalletInList(wallet, allExemptWallets());
 }
 
 export function isTokenGateExemptEmail(email?: string | null): boolean {
-  const raw = (email || "").trim();
-  if (!raw) return false;
-  const e = raw.toLowerCase();
-  if ((TOKEN_GATE_EXEMPT_EMAILS as readonly string[]).includes(e)) return true;
-  // Keep original base58 casing — Solana pubkeys are case-sensitive.
-  const m = raw.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
-  return Boolean(m && isTokenGateExemptWallet(m[1]));
+  return isExemptEmailInList(email, TOKEN_GATE_EXEMPT_EMAILS as unknown as string[], allExemptWallets());
 }
 
 export function isAgentHoldExempt(opts: {
@@ -57,6 +55,13 @@ export function isAgentHoldExempt(opts: {
   return isTokenGateExemptWallet(opts.wallet) || isTokenGateExemptEmail(opts.email);
 }
 
+/** Prefer canonical allowlist spelling (survives Supabase-lowercased SIWS emails). */
+export function normalizeExemptWallet(wallet?: string | null): string | null {
+  const raw = (wallet || "").trim();
+  if (!raw) return null;
+  return canonicalizeExemptWallet(raw, allExemptWallets()) || raw;
+}
+
 /** Resolve Solana wallet from adapter + SIWS/auth identity (same sources as owner desk). */
 export function resolveAuthWallet(opts: {
   connectedPk?: string | null;
@@ -64,18 +69,17 @@ export function resolveAuthWallet(opts: {
   userMetadata?: Record<string, unknown> | null;
   profileWallet?: string | null;
 }): string | null {
-  if (opts.connectedPk) return opts.connectedPk.trim();
+  if (opts.connectedPk) return normalizeExemptWallet(opts.connectedPk);
 
   const meta = opts.userMetadata?.wallet;
-  if (typeof meta === "string" && meta.length > 20) return meta.trim();
+  if (typeof meta === "string" && meta.length > 20) return normalizeExemptWallet(meta);
 
   if (opts.profileWallet && opts.profileWallet.length > 20) {
-    return opts.profileWallet.trim();
+    return normalizeExemptWallet(opts.profileWallet);
   }
 
-  const email = (opts.email || "").trim();
-  const m = email.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
-  return m?.[1] ?? null;
+  const fromEmail = walletFromSiwsEmail(opts.email, allExemptWallets());
+  return fromEmail;
 }
 
 export type HoldVerifyResult = {
@@ -95,12 +99,13 @@ export type HoldVerifyResult = {
 };
 
 export async function verifyAgentHold(wallet?: string | null): Promise<HoldVerifyResult> {
-  if (isTokenGateExemptWallet(wallet)) {
+  const normalized = normalizeExemptWallet(wallet);
+  if (isTokenGateExemptWallet(normalized || wallet)) {
     return {
       ok: true,
       meetsRequirement: true,
       exempt: true,
-      wallet: wallet || null,
+      wallet: normalized || wallet || null,
       mint: AGENT_HOLD_MINT,
       minUsd: AGENT_HOLD_MIN_USD,
       message: "Exempt wallet",
@@ -116,7 +121,7 @@ export async function verifyAgentHold(wallet?: string | null): Promise<HoldVerif
       ok: true,
       meetsRequirement: true,
       exempt: true,
-      wallet: wallet || null,
+      wallet: normalized || walletFromSiwsEmail(email, allExemptWallets()) || wallet || null,
       mint: AGENT_HOLD_MINT,
       minUsd: AGENT_HOLD_MIN_USD,
       message: "Owner email exempt",
@@ -127,7 +132,7 @@ export async function verifyAgentHold(wallet?: string | null): Promise<HoldVerif
     return {
       ok: false,
       meetsRequirement: false,
-      wallet: wallet || null,
+      wallet: normalized || wallet || null,
       mint: AGENT_HOLD_MINT,
       minUsd: AGENT_HOLD_MIN_USD,
       error: "unauthorized",
@@ -141,14 +146,14 @@ export async function verifyAgentHold(wallet?: string | null): Promise<HoldVerif
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ walletAddress: wallet || undefined }),
+    body: JSON.stringify({ walletAddress: normalized || wallet || undefined }),
   });
   const json = (await r.json().catch(() => ({}))) as HoldVerifyResult;
   if (!r.ok && !json.error) {
     return {
       ok: false,
       meetsRequirement: false,
-      wallet: wallet || null,
+      wallet: normalized || wallet || null,
       mint: AGENT_HOLD_MINT,
       minUsd: AGENT_HOLD_MIN_USD,
       error: "hold_check_failed",

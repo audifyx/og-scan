@@ -1,19 +1,25 @@
 /**
  * Agent MCP token-hold gate — $10 ORBITX (or exempt wallet / owner email).
  * Used by orbitx-hub agent routes + MCP tools/call.
+ *
+ * Exempt list: web/shared/token-gate-exempt.js (single source of truth).
  */
+
+import {
+  TOKEN_GATE_EXEMPT_EMAILS_BASE,
+  TOKEN_GATE_EXEMPT_WALLETS_BASE,
+  canonicalizeExemptWallet,
+  isExemptEmailInList,
+  isExemptWalletInList,
+  walletFromSiwsEmail,
+} from "../../shared/token-gate-exempt.js";
 
 export const AGENT_HOLD_MINT =
   process.env.AGENT_GATE_MINT || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 export const AGENT_HOLD_MIN_USD = Number(process.env.AGENT_GATE_MIN_USD) || 10;
 
-/** Hardcoded owner / platform wallets — always skip $10 ORBITX hold. */
-export const TOKEN_GATE_EXEMPT_WALLETS_BASE = [
-  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
-  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
-  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET (owner — starts with j)
-];
+export { TOKEN_GATE_EXEMPT_WALLETS_BASE, TOKEN_GATE_EXEMPT_EMAILS_BASE, canonicalizeExemptWallet };
 
 function parseCsvEnv(...keys) {
   const out = [];
@@ -34,29 +40,17 @@ export const TOKEN_GATE_EXEMPT_WALLETS = [
   ...parseCsvEnv("AGENT_GATE_EXEMPT_WALLETS", "OWNER_WALLETS", "VITE_OWNER_WALLETS"),
 ].filter((w, i, arr) => arr.indexOf(w) === i);
 
-/** Owner emails that skip the hold (matches owner desk). */
-export const TOKEN_GATE_EXEMPT_EMAILS_BASE = ["audifyx@gmail.com"];
-
 export const TOKEN_GATE_EXEMPT_EMAILS = [
   ...TOKEN_GATE_EXEMPT_EMAILS_BASE,
   ...parseCsvEnv("AGENT_GATE_EXEMPT_EMAILS", "OWNER_EMAILS").map((e) => e.toLowerCase()),
 ].filter((e, i, arr) => arr.indexOf(e) === i);
 
 export function isTokenGateExemptWallet(wallet) {
-  const addr = String(wallet || "").trim();
-  if (!addr) return false;
-  const bare = addr.includes("@") ? addr.split("@")[0] : addr;
-  return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
+  return isExemptWalletInList(wallet, TOKEN_GATE_EXEMPT_WALLETS);
 }
 
 export function isTokenGateExemptEmail(email) {
-  const raw = String(email || "").trim();
-  if (!raw) return false;
-  const e = raw.toLowerCase();
-  if (TOKEN_GATE_EXEMPT_EMAILS.includes(e)) return true;
-  // Wallet SIWS session — keep original base58 casing (case-sensitive).
-  const m = raw.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
-  return Boolean(m && isTokenGateExemptWallet(m[1]));
+  return isExemptEmailInList(email, TOKEN_GATE_EXEMPT_EMAILS, TOKEN_GATE_EXEMPT_WALLETS);
 }
 
 export function isTokenGateExempt({ wallet, email } = {}) {
@@ -69,7 +63,17 @@ export function isTokenGateExemptAny({ wallets = [], email } = {}) {
   for (const w of wallets) {
     if (isTokenGateExemptWallet(w)) return true;
   }
+  // SIWS email may be the only identity; also try wallet extracted from it.
+  const fromEmail = walletFromSiwsEmail(email, TOKEN_GATE_EXEMPT_WALLETS);
+  if (fromEmail && isTokenGateExemptWallet(fromEmail)) return true;
   return false;
+}
+
+/** Prefer canonical allowlist spelling before writing wallet_address. */
+export function normalizeGateWallet(wallet) {
+  const raw = String(wallet || "").trim();
+  if (!raw) return "";
+  return canonicalizeExemptWallet(raw, TOKEN_GATE_EXEMPT_WALLETS) || raw;
 }
 
 export function holdBlockedPayload(extra = {}) {
@@ -139,7 +143,7 @@ async function tokenUiAmount(base, wallet, mint) {
  * }}
  */
 export async function verifyTokenHold(wallet, base = "https://orbitx.world", opts = {}) {
-  const pk = String(wallet || "").trim();
+  const pk = normalizeGateWallet(wallet);
   const email = String(opts.email || "").trim();
   const mint = AGENT_HOLD_MINT;
   const minUsd = AGENT_HOLD_MIN_USD;
@@ -151,7 +155,7 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world", opt
       ok: true,
       meetsRequirement: true,
       exempt: true,
-      wallet: pk || null,
+      wallet: pk || walletFromSiwsEmail(email, TOKEN_GATE_EXEMPT_WALLETS) || null,
       mint,
       minUsd,
       holdingAmount: 0,

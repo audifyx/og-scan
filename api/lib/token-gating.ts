@@ -1,6 +1,8 @@
 /**
  * Token Gating Service for Agent MCP Access
  * Verifies users hold $10 worth of ORBITX token or have $10+ cumulative buys
+ *
+ * Exempt list mirrors web/shared/token-gate-exempt.js (keep in sync — Node API package).
  */
 
 import { query, queryOne } from './db';
@@ -19,12 +21,24 @@ export const TOKEN_GATE_EXEMPT_WALLETS = [
 
 export const TOKEN_GATE_EXEMPT_EMAILS = ['audifyx@gmail.com'] as const;
 
-export function isTokenGateExemptWallet(wallet?: string | null): boolean {
+function bareWallet(wallet?: string | null): string {
   const addr = (wallet || '').trim();
-  if (!addr) return false;
-  // Base58 is case-sensitive; compare exact, also accept SIWS email form.
-  const bare = addr.includes('@') ? addr.split('@')[0] : addr;
-  return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
+  if (!addr) return '';
+  return addr.includes('@') ? addr.split('@')[0] : addr;
+}
+
+export function isTokenGateExemptWallet(wallet?: string | null): boolean {
+  const bare = bareWallet(wallet);
+  if (!bare) return false;
+  const addr = (wallet || '').trim();
+  // Case-insensitive vs allowlist — Supabase lowercases SIWS emails / pubkeys.
+  return TOKEN_GATE_EXEMPT_WALLETS.some(
+    (w) =>
+      w === bare ||
+      w === addr ||
+      w.toLowerCase() === bare.toLowerCase() ||
+      w.toLowerCase() === addr.toLowerCase(),
+  );
 }
 
 export function isTokenGateExemptEmail(email?: string | null): boolean {
@@ -32,7 +46,6 @@ export function isTokenGateExemptEmail(email?: string | null): boolean {
   if (!raw) return false;
   const e = raw.toLowerCase();
   if ((TOKEN_GATE_EXEMPT_EMAILS as readonly string[]).includes(e)) return true;
-  // Keep original base58 casing — Solana pubkeys are case-sensitive.
   const m = raw.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
   return Boolean(m && isTokenGateExemptWallet(m[1]));
 }

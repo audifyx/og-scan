@@ -19,6 +19,7 @@ import {
   isHoldGatedTool,
   isTokenGateExemptAny,
   isTokenGateExemptWallet,
+  normalizeGateWallet,
   verifyTokenHold,
 } from "./orbitx/token-hold.js";
 
@@ -265,7 +266,7 @@ function holdCandidateWallets(auth, args = {}) {
     args.sellerWallet,
     args.bidderWallet,
   ]
-    .map((w) => String(w || "").trim())
+    .map((w) => normalizeGateWallet(w))
     .filter(Boolean)
     .filter((w, i, arr) => arr.indexOf(w) === i);
 }
@@ -373,11 +374,11 @@ async function handleAgent(req, res, parts) {
     const body = await readBody(req);
     const { base } = mcpUrls(req);
     const agent = await ensureAgent(authUser.id);
-    let wallet = String(body.walletAddress || body.wallet || body.publicKey || "").trim();
-    if (!wallet) wallet = String(agent.wallet_address || "").trim();
+    let wallet = normalizeGateWallet(body.walletAddress || body.wallet || body.publicKey || "");
+    if (!wallet) wallet = normalizeGateWallet(agent.wallet_address || "");
     // Prefer exempt if either connected wallet OR linked agent wallet qualifies.
     if (isTokenGateExemptWallet(agent.wallet_address) && !isTokenGateExemptWallet(wallet)) {
-      wallet = String(agent.wallet_address);
+      wallet = normalizeGateWallet(agent.wallet_address);
     }
     const hold = await verifyTokenHold(wallet, base, { email: authUser.email });
     return json(res, hold, hold.meetsRequirement ? 200 : 403);
@@ -475,7 +476,7 @@ async function handleAgent(req, res, parts) {
     const userId = await getUserId(req);
     if (!userId) return json(res, { error: "unauthorized" }, 401);
     const body = await readBody(req);
-    const wallet = String(body.walletAddress || body.wallet || "").trim();
+    const wallet = normalizeGateWallet(body.walletAddress || body.wallet || "");
     if (wallet.length < 32) return json(res, { error: "walletAddress required" }, 400);
     let agent;
     if (body.agentId) {
@@ -506,7 +507,7 @@ async function handleAgent(req, res, parts) {
     const body = await readBody(req);
     const redirectUri = String(body.redirect_uri || "").trim();
     const state = body.state != null ? String(body.state) : "";
-    const wallet = String(body.walletAddress || body.wallet || "").trim() || null;
+    const wallet = normalizeGateWallet(body.walletAddress || body.wallet || "") || null;
     if (!redirectUri) return json(res, { error: "redirect_uri required" }, 400);
 
     let agent = await ensureAgent(userId);
@@ -523,11 +524,19 @@ async function handleAgent(req, res, parts) {
     }
 
     const { base } = mcpUrls(req);
-    const hold = await verifyTokenHold(wallet || agent.wallet_address, base, {
-      email: authUser.email,
-    });
-    if (!hold.meetsRequirement) {
-      return json(res, holdBlockedPayload({ hold }), 403);
+    // Exempt if connected wallet, linked agent wallet, OR owner/SIWS email qualifies.
+    if (
+      !isTokenGateExemptAny({
+        wallets: [wallet, agent.wallet_address],
+        email: authUser.email,
+      })
+    ) {
+      const hold = await verifyTokenHold(wallet || agent.wallet_address, base, {
+        email: authUser.email,
+      });
+      if (!hold.meetsRequirement) {
+        return json(res, holdBlockedPayload({ hold }), 403);
+      }
     }
 
     // Always mint a Bearer access token as API key (oxo_). Claude exchanges the
