@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { XIntegration } from './x-integration';
 import { AgentSettings } from './agent-settings';
-import { AgentAPIKeys } from './agent-api-keys';
+import { AgentApiKeys } from './agent-api-keys';
 import { AgentActivity } from './agent-activity';
-import { MCPControlPanel } from './mcp-control-panel';
+import { McpControlPanel } from './mcp-control-panel';
 
 interface Agent {
   id: string;
@@ -146,11 +146,11 @@ export function AgentDetail({ agentId }: AgentDetailProps) {
         </TabsContent>
 
         <TabsContent value="mcp" className="space-y-4">
-          <MCPControlPanel agentId={agentId} />
+          <McpControlPanel agentId={agentId} />
         </TabsContent>
 
         <TabsContent value="keys" className="space-y-4">
-          <AgentAPIKeys agentId={agentId} />
+          <AgentApiKeys agentId={agentId} />
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">

@@ -1,7 +1,6 @@
 
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -46,7 +45,6 @@ export function XIntegration({
   xConnected,
   xUsername,
 }: XIntegrationProps) {
-  const router = useRouter();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [posts, setPosts] = useState<XPost[]>([]);
