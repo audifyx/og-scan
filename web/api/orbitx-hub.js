@@ -443,26 +443,53 @@ async function resolveAuth(req) {
 const TOOLS = [
   {
     name: "orbitx_whoami",
-    description: "Return the linked OrbitX agent identity and wallet for the authenticated MCP session.",
+    description: "Return the linked OrbitX agent identity, wallet, and MCP status for this session.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
-    name: "orbitx_get_token",
-    description: "Get token data: price, market cap, holders, OG score, trust verdict.",
+    name: "orbitx_search",
+    description: "Search tokens by name, symbol, or mint address.",
     inputSchema: {
       type: "object",
-      properties: { mint: { type: "string" }, chain: { type: "string", default: "solana" } },
+      properties: { q: { type: "string", description: "Name, ticker, or mint" } },
+      required: ["q"],
+    },
+  },
+  {
+    name: "orbitx_get_token",
+    description:
+      "Full token intel: price, market cap, holders, OG score, trust verdict, forensics summary.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        chain: { type: "string", default: "solana" },
+      },
       required: ["mint"],
     },
   },
   {
     name: "orbitx_screen_tokens",
-    description: "Screen tokens by category (trending, new, runners, etc.).",
+    description: "Screen/rank tokens by category (trending, new, runners, graduating, kol, etc.).",
     inputSchema: {
       type: "object",
       properties: {
-        type: { type: "string" },
-        interval: { type: "string", default: "1h" },
+        type: {
+          type: "string",
+          enum: [
+            "trending",
+            "new",
+            "runners",
+            "fomo",
+            "kol",
+            "organic",
+            "graduating",
+            "migrated",
+            "social",
+            "verified",
+          ],
+        },
+        interval: { type: "string", enum: ["5m", "1h", "6h", "24h"], default: "1h" },
         limit: { type: "integer", default: 20 },
         chain: { type: "string", default: "solana" },
       },
@@ -471,43 +498,303 @@ const TOOLS = [
   },
   {
     name: "orbitx_get_forensics",
-    description: "Forensic data for a token.",
+    description: "Forensics: dev wallet, first buyer, bundles, concentration, LP lock, safety flags.",
     inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
   },
   {
-    name: "orbitx_get_wallet",
-    description: "Wallet portfolio: balances, PnL.",
-    inputSchema: { type: "object", properties: { address: { type: "string" } }, required: ["address"] },
+    name: "orbitx_get_safety",
+    description: "Honeypot / tradeability check — can you buy and sell this mint?",
+    inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
   },
   {
-    name: "orbitx_search",
-    description: "Search tokens by name, symbol, or mint.",
-    inputSchema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+    name: "orbitx_crypto_scan",
+    description: "One-shot aggregator: safety + forensics + token payload for a mint.",
+    inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
+  },
+  {
+    name: "orbitx_get_ath",
+    description: "All-time-high price and market cap for a token.",
+    inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
+  },
+  {
+    name: "orbitx_get_chart",
+    description: "OHLCV candlestick data for a token.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        interval: { type: "string", enum: ["5m", "15m", "1h", "4h", "1d"], default: "1h" },
+        limit: { type: "integer", default: 200 },
+        chain: { type: "string", default: "solana" },
+      },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_get_wallet",
+    description: "Wallet portfolio: SOL balance, holdings, realized/unrealized PnL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: {
+          type: "string",
+          description: "Solana wallet. Omit to use the linked agent wallet.",
+        },
+      },
+    },
+  },
+  {
+    name: "orbitx_get_swaps",
+    description: "Recent buy/sell swaps for a wallet (trade history).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "Omit to use linked agent wallet" },
+        limit: { type: "integer", default: 25 },
+      },
+    },
+  },
+  {
+    name: "orbitx_get_balance",
+    description: "Token or SOL balance for a wallet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: { type: "string" },
+        mint: { type: "string", description: "Optional token mint; omit for SOL" },
+      },
+    },
+  },
+  {
+    name: "orbitx_get_kols",
+    description: "KOL / smart-money directory with labels and performance.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+    },
+  },
+  {
+    name: "orbitx_get_traders",
+    description: "Top traders leaderboard / smart money flow.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+    },
+  },
+  {
+    name: "orbitx_get_signals",
+    description: "Live trading signals / alerts feed.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+    },
+  },
+  {
+    name: "orbitx_get_launches",
+    description: "Recently launched tokens on the OrbitX Launchpad (newly listed).",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+    },
+  },
+  {
+    name: "orbitx_launch_config",
+    description:
+      "Get launchpad fee config for a chain (fee USD, pay wallet, SOL price). Use before launching.",
+    inputSchema: {
+      type: "object",
+      properties: { chain: { type: "string", default: "solana" } },
+    },
+  },
+  {
+    name: "orbitx_prepare_launch",
+    description:
+      "Prepare a Pump.fun launch create transaction (unsigned). Returns base64 tx for the user wallet to sign. Non-custodial — OrbitX never holds keys. Requires name, symbol, metadataUri, mintPublicKey, publicKey.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        publicKey: { type: "string", description: "Creator wallet (defaults to linked agent wallet)" },
+        name: { type: "string" },
+        symbol: { type: "string" },
+        metadataUri: { type: "string", description: "IPFS metadata URI from prior upload" },
+        mintPublicKey: { type: "string", description: "New mint keypair public key" },
+        devBuySol: { type: "number", default: 0 },
+        slippage: { type: "number", default: 10 },
+        chain: { type: "string", default: "solana" },
+      },
+      required: ["name", "symbol", "metadataUri", "mintPublicKey"],
+    },
+  },
+  {
+    name: "orbitx_prepare_buy",
+    description:
+      "Build an unsigned BUY transaction (PumpPortal/Jupiter). User signs in their wallet. Non-custodial.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number", description: "SOL to spend" },
+        publicKey: { type: "string", description: "Defaults to linked agent wallet" },
+        slippage: { type: "number", default: 10 },
+        pool: {
+          type: "string",
+          enum: ["auto", "pump", "raydium", "pump-amm", "launchlab", "raydium-cpmm", "bonk"],
+          default: "auto",
+        },
+      },
+      required: ["mint", "amountSol"],
+    },
+  },
+  {
+    name: "orbitx_prepare_sell",
+    description:
+      "Build an unsigned SELL transaction. amount can be token units or a percent string like '100%'. User signs in wallet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amount: { type: ["number", "string"], description: "Token amount or '50%' / '100%'" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amount"],
+    },
+  },
+  {
+    name: "orbitx_platform_stats",
+    description: "OrbitX platform stats snapshot.",
+    inputSchema: { type: "object", properties: {} },
   },
 ];
 
+async function fetchJson(url, init) {
+  const r = await fetch(url, {
+    ...init,
+    headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(init?.headers || {}) },
+  });
+  const text = await r.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { raw: text.slice(0, 500) };
+  }
+  if (!r.ok) {
+    const err = new Error(data?.error || data?.message || `HTTP ${r.status}`);
+    err.status = r.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
 async function callTool(name, args, auth, base = FALLBACK_BASE) {
   const mcpUrl = `${base}/api/orbitx-mcp`;
+  const wallet = String(args.publicKey || args.address || auth?.walletAddress || "").trim();
+
   if (name === "orbitx_whoami") {
     return {
-      userId: auth.userId,
-      agentId: auth.agentId,
-      walletAddress: auth.walletAddress,
+      userId: auth?.userId || null,
+      agentId: auth?.agentId || null,
+      walletAddress: auth?.walletAddress || null,
       mcpUrl,
-      status: auth.walletAddress ? "connected" : "wallet_not_linked",
+      status: auth?.walletAddress ? "connected" : "wallet_not_linked",
+      tools: TOOLS.map((t) => t.name),
     };
   }
-  const routes = {
-    orbitx_get_token: `${base}/api/ogdex/token?mint=${encodeURIComponent(String(args.mint || ""))}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
-    orbitx_screen_tokens: `${base}/api/ogdex/screener?type=${encodeURIComponent(String(args.type || "trending"))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 20}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
-    orbitx_get_forensics: `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}`,
-    orbitx_get_wallet: `${base}/api/ogdex/wallet?address=${encodeURIComponent(String(args.address || ""))}`,
-    orbitx_search: `${base}/api/ogdex/search?q=${encodeURIComponent(String(args.q || ""))}`,
+
+  const get = {
+    orbitx_search: () => `${base}/api/ogdex/search?q=${encodeURIComponent(String(args.q || ""))}`,
+    orbitx_get_token: () =>
+      `${base}/api/ogdex/token?mint=${encodeURIComponent(String(args.mint || ""))}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
+    orbitx_screen_tokens: () =>
+      `${base}/api/ogdex/screener?type=${encodeURIComponent(String(args.type || "trending"))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 20}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
+    orbitx_get_forensics: () =>
+      `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_get_safety: () =>
+      `${base}/api/ogdex/safety?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_crypto_scan: () =>
+      `${base}/api/orbitx/crypto-scan?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_get_ath: () => `${base}/api/ogdex/ath?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_get_chart: () =>
+      `${base}/api/ogdex/chart?mint=${encodeURIComponent(String(args.mint || ""))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 200}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
+    orbitx_get_wallet: () => {
+      if (!wallet) throw new Error("address required (or link wallet on /agent)");
+      return `${base}/api/ogdex/wallet?address=${encodeURIComponent(wallet)}`;
+    },
+    orbitx_get_swaps: () => {
+      if (!wallet) throw new Error("address required (or link wallet on /agent)");
+      return `${base}/api/ogdex/swaps?address=${encodeURIComponent(wallet)}&limit=${Number(args.limit) || 25}`;
+    },
+    orbitx_get_balance: () => {
+      if (!wallet) throw new Error("address required (or link wallet on /agent)");
+      const mint = args.mint ? `&mint=${encodeURIComponent(String(args.mint))}` : "";
+      return `${base}/api/ogdex/balance?address=${encodeURIComponent(wallet)}${mint}`;
+    },
+    orbitx_get_kols: () => `${base}/api/ogdex/kols?limit=${Number(args.limit) || 20}`,
+    orbitx_get_traders: () => `${base}/api/ogdex/traders?limit=${Number(args.limit) || 20}`,
+    orbitx_get_signals: () => `${base}/api/ogdex/signals?limit=${Number(args.limit) || 20}`,
+    orbitx_get_launches: () => `${base}/api/ogdex/launches?limit=${Number(args.limit) || 20}`,
+    orbitx_launch_config: () =>
+      `${base}/api/ogdex/launch?config=1&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
+    orbitx_platform_stats: () => `${base}/api/ogdex/platform-stats`,
   };
-  const url = routes[name];
-  if (!url) throw new Error(`Unknown tool: ${name}`);
-  const r = await fetch(url, { headers: { "User-Agent": "OrbitX-MCP/1.0" } });
-  return r.json();
+
+  if (get[name]) return fetchJson(get[name]());
+
+  if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
+    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
+    const action = name === "orbitx_prepare_buy" ? "buy" : "sell";
+    const body = {
+      publicKey: wallet,
+      action,
+      mint: String(args.mint || ""),
+      amount: action === "buy" ? Number(args.amountSol) : args.amount,
+      denominatedInSol: action === "buy",
+      slippage: Number(args.slippage) || 10,
+      pool: args.pool || "auto",
+    };
+    const data = await fetchJson(`${base}/api/ogdex/trade`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return {
+      ...data,
+      note:
+        "Unsigned transaction. Have the user sign & send with their Solana wallet (Phantom etc). OrbitX never holds keys.",
+      action,
+      wallet,
+    };
+  }
+
+  if (name === "orbitx_prepare_launch") {
+    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
+    const data = await fetchJson(`${base}/api/ogdex/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        step: "create",
+        publicKey: wallet,
+        name: String(args.name || ""),
+        symbol: String(args.symbol || ""),
+        metadataUri: String(args.metadataUri || ""),
+        mintPublicKey: String(args.mintPublicKey || ""),
+        devBuySol: Number(args.devBuySol) || 0,
+        slippage: Number(args.slippage) || 10,
+        chain: String(args.chain || "solana"),
+      }),
+    });
+    return {
+      ...data,
+      note:
+        "Unsigned create tx. Sign with the creator wallet. Then call launch record via the OrbitX Launchpad UI if needed.",
+      wallet,
+    };
+  }
+
+  throw new Error(`Unknown tool: ${name}`);
 }
 
 async function handleMcp(req, res, parts) {
@@ -683,7 +970,23 @@ async function handleMcp(req, res, parts) {
       return json(res, { jsonrpc: "2.0", id: id ?? null, result: {} });
     }
 
-    if (method === "tools/list" || method === "tools/call") {
+    // tools/list is public so ChatGPT/Claude show the full catalog after connect.
+    // tools/call requires Bearer OAuth / API key.
+    if (method === "tools/list") {
+      return json(res, {
+        jsonrpc: "2.0",
+        id,
+        result: {
+          tools: TOOLS.map((t) => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema,
+          })),
+        },
+      });
+    }
+
+    if (method === "tools/call") {
       const auth = await resolveAuth(req);
       if (!auth) {
         return json(
@@ -694,19 +997,6 @@ async function handleMcp(req, res, parts) {
             "WWW-Authenticate": `Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="${base}/.well-known/oauth-protected-resource"`,
           },
         );
-      }
-      if (method === "tools/list") {
-        return json(res, {
-          jsonrpc: "2.0",
-          id,
-          result: {
-            tools: TOOLS.map((t) => ({
-              name: t.name,
-              description: t.description,
-              inputSchema: t.inputSchema,
-            })),
-          },
-        });
       }
       const name = String(params?.name || "");
       const args = params?.arguments || {};
