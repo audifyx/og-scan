@@ -777,7 +777,7 @@ const TOOLS = [
   {
     name: "orbitx_prepare_buy",
     description:
-      "Build unsigned BUY tx (Pump / Jupiter). Requires publicKey (buyer wallet). User signs in wallet. Non-custodial.",
+      "Prepare a BUY for Phantom signing. Returns signUrl — open it so the user signs in Phantom. Never broadcast unsigned. Purchase incomplete until Phantom confirms.",
     inputSchema: {
       type: "object",
       properties: {
@@ -796,7 +796,8 @@ const TOOLS = [
   },
   {
     name: "orbitx_prepare_sell",
-    description: "Build unsigned SELL tx. Requires publicKey. amount as tokens or '100%'.",
+    description:
+      "Prepare a SELL for Phantom signing. Returns signUrl — open it so the user signs in Phantom. amount as tokens or '100%'. Never broadcast unsigned.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1082,26 +1083,68 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
   if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
     const action = name === "orbitx_prepare_buy" ? "buy" : "sell";
+    const mint = String(args.mint || "");
+    const amount = action === "buy" ? Number(args.amountSol) : args.amount;
+    const slippage = Number(args.slippage) || 10;
+    const pool = args.pool || "auto";
     const body = {
       publicKey: wallet,
       action,
-      mint: String(args.mint || ""),
-      amount: action === "buy" ? Number(args.amountSol) : args.amount,
+      mint,
+      amount,
       denominatedInSol: action === "buy",
-      slippage: Number(args.slippage) || 10,
-      pool: args.pool || "auto",
+      slippage,
+      pool,
     };
     const data = await fetchJson(`${base}/api/ogdex/trade`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (!data?.ok || !data?.tx) {
+      return {
+        ok: false,
+        status: "prepare_failed",
+        requiresSignature: false,
+        error: data?.error || "Could not build trade",
+        action,
+        wallet,
+        mint,
+        amount,
+      };
+    }
+    const signQs = new URLSearchParams({
+      action,
+      mint,
+      amount: String(amount),
+      publicKey: wallet,
+      slippage: String(slippage),
+      pool: String(pool),
+    });
+    const signUrl = `${base}/agent/sign?${signQs.toString()}`;
+    // Do NOT return the raw base64 tx to the model — Claude may try to "buy" without Phantom.
     return {
-      ...data,
-      note:
-        "Unsigned transaction. Have the user sign & send with their Solana wallet (Phantom etc). OrbitX never holds keys.",
+      ok: true,
+      status: "awaiting_phantom_signature",
+      requiresSignature: true,
+      signUrl,
       action,
       wallet,
+      mint,
+      amount,
+      slippage,
+      pool,
+      via: data.via || null,
+      routePool: data.pool || null,
+      simulated: Boolean(data.simulated),
+      hasUnsignedTx: true,
+      instructions: [
+        "Open signUrl in the user's browser.",
+        "User connects Phantom and clicks Sign & send.",
+        "Do NOT broadcast or submit any unsigned transaction yourself.",
+        "Trade is incomplete until Phantom confirms a signature.",
+      ],
+      note: "Non-custodial. Route the user to signUrl for Phantom — never attempt an unsigned buy/sell.",
     };
   }
 

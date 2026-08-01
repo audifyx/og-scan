@@ -60,6 +60,34 @@ export function chatgptConnectUrl(): string {
   return "https://chatgpt.com/#settings/Connectors";
 }
 
+/** Browser handoff for MCP prepare_buy / prepare_sell → Phantom sign. */
+export function agentSignTradeUrl(opts: {
+  action: "buy" | "sell";
+  mint: string;
+  amount: string | number;
+  publicKey: string;
+  slippage?: number;
+  pool?: string;
+  origin?: string;
+}): string {
+  let base = (opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://orbitx.world")).replace(
+    /\/$/,
+    "",
+  );
+  if (base === "https://www.orbitx.world" || base === "http://www.orbitx.world") {
+    base = "https://orbitx.world";
+  }
+  const q = new URLSearchParams({
+    action: opts.action,
+    mint: opts.mint,
+    amount: String(opts.amount),
+    publicKey: opts.publicKey,
+    slippage: String(opts.slippage ?? 10),
+    pool: opts.pool || "auto",
+  });
+  return `${base}/agent/sign?${q.toString()}`;
+}
+
 export type AgentBootstrap = {
   agent: {
     id: string;
