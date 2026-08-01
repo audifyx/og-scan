@@ -378,21 +378,43 @@ export function AgentDashboard() {
           </div>
 
           {linkedWallet ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <code className="rounded-2xl border border-white/[0.06] bg-black/40 px-4 py-3 font-mono text-xs text-white/80">
-                {linkedWallet.slice(0, 6)}…{linkedWallet.slice(-6)}
-                <span className="mt-1 block text-[10px] text-white/30">{linkedWallet}</span>
-              </code>
-              {walletAddress && walletAddress !== boot?.agent.walletAddress && (
-                <button
-                  type="button"
-                  disabled={linking}
-                  onClick={onLinkWallet}
-                  className="rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-bold text-black disabled:opacity-50"
-                >
-                  {linking ? "Linking…" : "Link connected wallet"}
-                </button>
-              )}
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1 rounded-2xl border border-white/[0.06] bg-black/40 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="font-mono text-sm font-semibold text-white/85">
+                      {linkedWallet.slice(0, 4)}…{linkedWallet.slice(-4)}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copy("wallet", linkedWallet)}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-emerald-300/90 hover:bg-emerald-400/10"
+                    >
+                      {copied === "wallet" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      {copied === "wallet" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="mt-1 truncate font-mono text-[10px] text-white/28">{linkedWallet}</p>
+                  {boot?.agent?.id && (
+                    <p className="mt-2 text-[10px] text-white/30">
+                      Agent{" "}
+                      <span className="font-mono text-white/45">
+                        {boot.agent.id.slice(0, 8)}…
+                      </span>
+                    </p>
+                  )}
+                </div>
+                {walletAddress && walletAddress !== boot?.agent.walletAddress && (
+                  <button
+                    type="button"
+                    disabled={linking}
+                    onClick={onLinkWallet}
+                    className="shrink-0 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-bold text-black disabled:opacity-50"
+                  >
+                    {linking ? "Linking…" : "Link connected wallet"}
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-2">

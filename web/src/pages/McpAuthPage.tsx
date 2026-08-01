@@ -42,11 +42,12 @@ export default function McpAuthPage() {
     [publicKey, user?.email, user?.user_metadata, profile],
   );
 
-  const clientLabel = clientId.toLowerCase().includes("openai") || clientId.toLowerCase().includes("chatgpt")
-    ? "ChatGPT"
-    : clientId.toLowerCase().includes("anthropic") || clientId.toLowerCase().includes("claude")
-      ? "Claude"
-      : "your AI assistant";
+  const clientLabel =
+    clientId.toLowerCase().includes("openai") || clientId.toLowerCase().includes("chatgpt")
+      ? "ChatGPT"
+      : clientId.toLowerCase().includes("anthropic") || clientId.toLowerCase().includes("claude")
+        ? "Claude"
+        : "your AI assistant";
 
   const onConfirm = async () => {
     setError(null);
@@ -78,111 +79,172 @@ export default function McpAuthPage() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#05070d] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-[#05070d] text-white/50">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#05070d] text-white">
-      <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10">
-        <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-6 shadow-2xl">
+    <div className="relative min-h-screen overflow-hidden text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 50% at 10% -10%, rgba(52,211,153,0.14), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 0%, rgba(212,165,116,0.08), transparent 50%), linear-gradient(180deg, #070a12 0%, #05070d 45%, #05070d 100%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+
+      <div className="relative mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
+        <div className="mb-6 text-center">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-400/80">
+            OrbitX Agent
+          </p>
+          <h1 className="text-3xl font-black tracking-tight">Authorize MCP</h1>
+          <p className="mt-2 text-sm text-white/45">
+            Let {clientLabel} use your OrbitX agent — non-custodial, revoke anytime.
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6 backdrop-blur-sm">
           <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-400/12 text-emerald-300">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Connect OrbitX MCP</h1>
-              <p className="text-sm text-white/50">Authorize {clientLabel} to use your agent</p>
+              <p className="text-sm font-bold">Consent</p>
+              <p className="text-[11px] text-white/35">Review connection details</p>
             </div>
           </div>
 
-          <div className="mb-5 space-y-2 rounded-xl border border-white/8 bg-black/30 p-4 text-sm">
-            <div className="flex justify-between gap-3">
-              <span className="text-white/45">MCP server</span>
-              <span className="max-w-[60%] truncate font-mono text-xs text-white/80">{mcpUrl}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-white/45">Client ID</span>
-              <span className="max-w-[60%] truncate font-mono text-xs text-white/80">{clientId}</span>
-            </div>
-            {redirectUri ? (
-              <div className="flex justify-between gap-3">
-                <span className="text-white/45">Return to</span>
-                <span className="max-w-[60%] truncate font-mono text-[10px] text-white/55">{redirectUri}</span>
-              </div>
-            ) : null}
-            <div className="flex justify-between gap-3">
-              <span className="text-white/45">Wallet</span>
-              <span className="font-mono text-xs text-white/80">
-                {walletAddress
+          <div className="mb-5 space-y-2.5 rounded-2xl border border-white/[0.06] bg-black/35 p-4 text-sm">
+            <Row label="MCP server" value={mcpUrl} mono />
+            <Row label="Client ID" value={clientId} mono />
+            {redirectUri ? <Row label="Return to" value={redirectUri} mono small /> : null}
+            <Row
+              label="Wallet"
+              value={
+                walletAddress
                   ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
-                  : "Not connected"}
-              </span>
-            </div>
+                  : "Not connected"
+              }
+              mono
+            />
             {!redirectUri && (
-              <p className="pt-1 text-[11px] text-amber-200/70">
-                Missing redirect_uri — open Authenticate from ChatGPT/Claude, or paste OAuth fields from{" "}
-                <Link to="/agent" className="underline">
+              <p className="pt-1 text-[11px] leading-relaxed text-amber-200/70">
+                Missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields from{" "}
+                <Link to="/agent" className="text-emerald-300 underline-offset-2 hover:underline">
                   /agent
                 </Link>
-                : auth <code className="text-white/50">{oauth.authorizationUrl}</code>
+                .
               </p>
             )}
           </div>
 
           {!user ? (
             <div className="mb-4 space-y-2">
-              <p className="text-sm text-white/55">Sign in with Solana to authorize Claude / ChatGPT.</p>
+              <p className="mb-3 text-sm text-white/50">Sign in with Solana to continue.</p>
               {pickable.slice(0, 4).map((w) => (
                 <button
                   key={w.name}
                   type="button"
                   disabled={busy === w.name}
-                  onClick={() => signInWith(w.name, { replaceEmailSession: true }).catch((e) => setError(e.message))}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold hover:bg-white/[0.07] disabled:opacity-50"
+                  onClick={() =>
+                    signInWith(w.name, { replaceEmailSession: true }).catch((e) => setError(e.message))
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm font-semibold hover:bg-white/[0.04] disabled:opacity-50"
                 >
-                  {w.icon ? <img src={w.icon} alt="" className="h-5 w-5 rounded" /> : <Wallet className="h-4 w-4" />}
+                  {w.icon ? (
+                    <img src={w.icon} alt="" className="h-5 w-5 rounded" />
+                  ) : (
+                    <Wallet className="h-4 w-4" />
+                  )}
                   {busy === w.name ? `Connecting ${w.name}…` : `Continue with ${w.name}`}
                 </button>
               ))}
             </div>
           ) : (
-            <div className="mb-3 space-y-2">
+            <div className="mb-3 space-y-3">
               {!walletAddress && (
-                <p className="text-xs text-amber-200/70">
-                  Wallet optional for auth — link one for buy/sell/claim tools. You can still approve now.
+                <p className="rounded-xl border border-amber-400/15 bg-amber-400/8 px-3 py-2 text-[11px] text-amber-100/75">
+                  Wallet optional for auth — link one later for buy/sell/claim. You can approve now.
                 </p>
               )}
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || !redirectUri}
                 onClick={onConfirm}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-black hover:bg-emerald-300 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3.5 text-sm font-bold text-black hover:brightness-110 disabled:opacity-50"
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                {submitting ? "Connecting…" : walletAddress ? "Authenticate & link wallet" : "Authenticate session"}
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" />
+                )}
+                {submitting
+                  ? "Connecting…"
+                  : walletAddress
+                    ? "Authenticate & link wallet"
+                    : "Authenticate session"}
               </button>
             </div>
           )}
 
           {error && (
-            <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            <div className="mb-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200">
               {error}
             </div>
           )}
 
-          <p className="text-center text-xs text-white/35">
-            This grants {clientLabel} access to OrbitX intel tools for your linked wallet.
-            You can revoke API keys anytime on{" "}
+          <p className="text-center text-[11px] leading-relaxed text-white/30">
+            Grants {clientLabel} access to OrbitX tools for your agent. Revoke keys anytime on{" "}
             <Link to="/agent" className="text-emerald-400/90 underline-offset-2 hover:underline">
-              /agent
+              MCP Control
             </Link>
             .
+            {!redirectUri && oauth.authorizationUrl ? (
+              <span className="mt-1 block truncate font-mono text-[10px] text-white/20">
+                {oauth.authorizationUrl}
+              </span>
+            ) : null}
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  mono,
+  small,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  small?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-white/35">
+        {label}
+      </span>
+      <span
+        className={`max-w-[62%] text-right text-white/80 ${mono ? "break-all font-mono" : ""} ${
+          small ? "text-[10px] text-white/50" : "text-xs"
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
