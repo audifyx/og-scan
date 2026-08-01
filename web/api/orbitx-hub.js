@@ -454,14 +454,45 @@ async function handleAgent(req, res, parts) {
   return json(res, { error: "not_found", route }, 404);
 }
 
+function extractBearerToken(req) {
+  const raw = String(header(req, "authorization") || header(req, "x-orbitx-api-key") || "").trim();
+  if (!raw) return { token: null, bearerPresent: false };
+  let token = raw;
+  if (/^bearer\s+/i.test(token)) token = token.replace(/^bearer\s+/i, "").trim();
+  // Some clients double-prefix: "Bearer Bearer oxo_…"
+  if (/^bearer\s+/i.test(token)) token = token.replace(/^bearer\s+/i, "").trim();
+  if (!token) return { token: null, bearerPresent: true };
+  return { token, bearerPresent: true };
+}
+
+async function resolveAgentByWallet(wallet) {
+  const w = String(wallet || "").trim();
+  if (!w || w.length < 32) return null;
+  try {
+    const agents = await sb(
+      `agents?wallet_address=eq.${encodeURIComponent(w)}&order=updated_at.desc&limit=1&select=id,user_id,wallet_address,name`,
+    );
+    const agent = Array.isArray(agents) ? agents[0] : null;
+    if (!agent?.user_id) return null;
+    return {
+      userId: agent.user_id,
+      agentId: agent.id,
+      walletAddress: agent.wallet_address,
+      agentName: agent.name || null,
+      source: "linked_wallet",
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function resolveAuth(req) {
-  const auth = header(req, "authorization");
-  if (!auth.startsWith("Bearer ")) return null;
-  const token = auth.slice(7).trim();
+  const { token, bearerPresent } = extractBearerToken(req);
   if (!token) return null;
+
   const hash = sha256(token);
 
-  // API keys + OAuth access tokens (oxo_ / oxk_)
+  // API keys + OAuth access tokens (oxo_ / oxk_ / oxc_)
   if (token.startsWith("oxk_") || token.startsWith("oxo_") || token.startsWith("oxc_")) {
     try {
       const keys = await sb(
@@ -470,10 +501,10 @@ async function resolveAuth(req) {
       const key = Array.isArray(keys) ? keys[0] : null;
       if (key) {
         const agents = await sb(
-          `agents?id=eq.${encodeURIComponent(key.agent_id)}&select=id,user_id,wallet_address`,
+          `agents?id=eq.${encodeURIComponent(key.agent_id)}&select=id,user_id,wallet_address,name`,
         );
         const agent = Array.isArray(agents) ? agents[0] : null;
-        if (agent) {
+        if (agent?.user_id) {
           try {
             await sb(`agent_api_keys?id=eq.${encodeURIComponent(key.id)}`, {
               method: "PATCH",
@@ -483,7 +514,14 @@ async function resolveAuth(req) {
           } catch {
             /* ignore */
           }
-          return { userId: agent.user_id, agentId: agent.id, walletAddress: agent.wallet_address };
+          return {
+            userId: agent.user_id,
+            agentId: agent.id,
+            walletAddress: agent.wallet_address,
+            agentName: agent.name || null,
+            source: "bearer",
+            bearerPresent,
+          };
         }
       }
     } catch {
@@ -498,10 +536,48 @@ async function resolveAuth(req) {
     const tok = Array.isArray(toks) ? toks[0] : null;
     if (!tok) return null;
     if (new Date(tok.expires_at).getTime() < Date.now()) return null;
-    return { userId: tok.user_id, agentId: tok.agent_id, walletAddress: tok.wallet_address };
+    return {
+      userId: tok.user_id,
+      agentId: tok.agent_id,
+      walletAddress: tok.wallet_address,
+      source: "oauth_token",
+      bearerPresent,
+    };
   } catch {
     return null;
   }
+}
+
+/** Bearer first, then linked wallet from tool args (so whoami/social work without Claude sending headers). */
+async function enrichAuth(req, args = {}) {
+  const { token, bearerPresent } = extractBearerToken(req);
+  let auth = await resolveAuth(req);
+  if (auth?.userId) return { ...auth, bearerPresent, bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null };
+
+  const wallet = String(
+    args.publicKey || args.address || args.wallet || args.buyerWallet || args.sellerWallet || "",
+  ).trim();
+  if (wallet) {
+    const linked = await resolveAgentByWallet(wallet);
+    if (linked?.userId) {
+      return {
+        ...linked,
+        bearerPresent,
+        bearerInvalid: bearerPresent,
+        bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
+      };
+    }
+  }
+
+  return {
+    userId: null,
+    agentId: null,
+    walletAddress: wallet || null,
+    source: bearerPresent ? "bearer_unresolved" : wallet ? "wallet_unlinked" : "anonymous",
+    bearerPresent,
+    bearerInvalid: bearerPresent,
+    bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
+  };
 }
 
 function wwwAuthenticate(base) {
@@ -564,28 +640,24 @@ async function resolveSocialUser(auth, args) {
       walletAddress: auth.walletAddress || null,
     };
   }
-  const wallet = String(args.publicKey || args.address || args.wallet || "").trim();
-  if (!wallet) return null;
-  try {
-    const agents = await sb(
-      `agents?wallet_address=eq.${encodeURIComponent(wallet)}&order=updated_at.desc&limit=1&select=id,user_id,wallet_address`,
-    );
-    const agent = Array.isArray(agents) ? agents[0] : null;
-    if (agent?.user_id) {
-      return { userId: agent.user_id, agentId: agent.id, walletAddress: agent.wallet_address };
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
+  return resolveAgentByWallet(args.publicKey || args.address || args.wallet || "");
 }
 
 const CORE_TOOLS = [
   {
     name: "orbitx_whoami",
     description:
-      "Session status. Works anonymously. Returns whether a Bearer token is present and which tools need a publicKey arg.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      "Session identity. Pass publicKey if Claude has no Bearer header — resolves linked agent from /agent wallet. Returns userId, agentId, auth source.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        publicKey: {
+          type: "string",
+          description: "Optional Solana wallet linked on https://orbitx.world/agent",
+        },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: "orbitx_search",
@@ -1568,20 +1640,45 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
   if (generated !== null && generated !== undefined) return generated;
 
   if (name === "orbitx_whoami") {
+    const session = auth || {
+      userId: null,
+      agentId: null,
+      walletAddress: wallet || null,
+      source: "anonymous",
+      bearerPresent: false,
+    };
+    const identified = Boolean(session.userId);
+    let status = "anonymous";
+    if (identified && session.walletAddress) status = "authenticated_with_wallet";
+    else if (identified) status = "authenticated";
+    else if (session.bearerInvalid || session.source === "bearer_unresolved") status = "bearer_invalid";
+    else if (session.walletAddress || wallet) status = "wallet_unlinked";
+
     return {
       ok: true,
-      userId: auth?.userId || null,
-      agentId: auth?.agentId || null,
-      walletAddress: auth?.walletAddress || null,
+      userId: session.userId || null,
+      agentId: session.agentId || null,
+      agentName: session.agentName || null,
+      walletAddress: session.walletAddress || wallet || null,
+      authSource: session.source || "anonymous",
+      bearerPresent: Boolean(session.bearerPresent),
+      bearerTokenPrefix: session.bearerTokenPrefix || null,
       mcpUrl,
-      status: auth?.userId ? (auth.walletAddress ? "authenticated_with_wallet" : "authenticated") : "anonymous",
-      note: auth?.userId
-        ? "Bearer session active — social join/post/create are available."
-        : "Anonymous OK for intel + community list/feed. For social join/post/create: Authenticate connector or add request header Authorization: Bearer <oxo_ key from https://orbitx.world/agent>, or pass publicKey of a wallet linked on /agent.",
+      status,
+      fix:
+        status === "authenticated" || status === "authenticated_with_wallet"
+          ? null
+          : status === "bearer_invalid"
+            ? "Authorization header present but key not found. Copy a fresh oxo_ key from https://orbitx.world/agent → set connector request header Authorization: Bearer <key>. Or re-Authenticate."
+            : status === "wallet_unlinked"
+              ? "Wallet seen but not linked. Open https://orbitx.world/agent → sign in → Link wallet → Create API key, then pass that publicKey or Bearer."
+              : "Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent, or pass publicKey of a wallet linked there.",
+      note: identified
+        ? `Session OK via ${session.source}. Social join/post/create available.`
+        : "Anonymous — intel tools work. Identity required for social writes.",
+      agentSetupUrl: "https://orbitx.world/agent",
       sessionTools: [...SESSION_TOOLS],
       totalTools: TOOLS.length,
-      toolsSample: TOOLS.slice(0, 30).map((t) => t.name),
-      noteTools: `Full catalog: ${TOOLS.length} tools. Call orbitx_tools_help or tools/list.`,
     };
   }
 
@@ -2594,7 +2691,6 @@ async function handleMcp(req, res, parts) {
     const body = await readBody(req);
     const { id, method, params } = body;
     const sessionId = header(req, "mcp-session-id") || opaque("sess").slice(0, 24);
-    const auth = await resolveAuth(req);
 
     if (method === "initialize") {
       // Clean handshake only — do NOT advertise "unauthenticated" (Claude treats that as a hard error).
@@ -2635,6 +2731,8 @@ async function handleMcp(req, res, parts) {
       const rawName = String(params?.name || "");
       const name = TOOL_ALIASES[rawName] || rawName;
       const args = params?.arguments || {};
+      const auth = await enrichAuth(req, args);
+      const identified = Boolean(auth?.userId);
       const hasWalletArg = Boolean(
         String(
           args.publicKey ||
@@ -2648,7 +2746,7 @@ async function handleMcp(req, res, parts) {
       );
 
       // Never HTTP 401 on tools/call — Claude surfaces that as a persistent auth failure.
-      if (SESSION_TOOLS.has(name) && !auth && !hasWalletArg) {
+      if (SESSION_TOOLS.has(name) && !identified && !hasWalletArg) {
         const tip = {
           ok: false,
           error: "session_required",
@@ -2670,7 +2768,7 @@ async function handleMcp(req, res, parts) {
       }
 
       // Wallet tools without identity get a normal tool result explaining what to pass.
-      if (WALLET_TOOLS.has(name) && !auth && !hasWalletArg) {
+      if (WALLET_TOOLS.has(name) && !identified && !hasWalletArg && !auth?.walletAddress) {
         const tip = {
           ok: false,
           error: "wallet_required",
