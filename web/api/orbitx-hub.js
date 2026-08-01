@@ -470,38 +470,38 @@ async function resolveAuth(req) {
   }
 }
 
-/** Read-only tools that work without Bearer (Claude often lists tools before finishing OAuth). */
-const PUBLIC_TOOLS = new Set([
-  "orbitx_search",
-  "orbitx_get_token",
-  "orbitx_screen_tokens",
-  "orbitx_get_forensics",
-  "orbitx_get_safety",
-  "orbitx_crypto_scan",
-  "orbitx_get_ath",
-  "orbitx_get_chart",
-  "orbitx_get_kols",
-  "orbitx_get_traders",
-  "orbitx_get_signals",
-  "orbitx_get_launches",
-  "orbitx_launch_config",
-  "orbitx_launch_check",
-  "orbitx_platform_stats",
-  "orbitx_nft_collections",
-  "orbitx_nft_listings",
-  "orbitx_nft_comments",
-  "orbitx_social_communities",
-  "orbitx_social_feed",
-]);
-
 function wwwAuthenticate(base) {
   return `Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="${base}/.well-known/oauth-protected-resource", scope="orbitx"`;
 }
 
+/** Tools that need a wallet pubkey in args (or a linked Bearer session). */
+const WALLET_TOOLS = new Set([
+  "orbitx_get_wallet",
+  "orbitx_get_swaps",
+  "orbitx_get_balance",
+  "orbitx_prepare_buy",
+  "orbitx_prepare_sell",
+  "orbitx_prepare_launch",
+  "orbitx_launch_ipfs",
+  "orbitx_launch_record",
+  "orbitx_claim_fees",
+  "orbitx_rent_refund",
+  "orbitx_burn",
+  "orbitx_nft_prepare_buy",
+  "orbitx_nft_submit_buy",
+  "orbitx_nft_like",
+  "orbitx_nft_comment",
+  "orbitx_nft_follow",
+  "orbitx_social_join",
+  "orbitx_social_post",
+  "orbitx_social_create_community",
+]);
+
 const TOOLS = [
   {
     name: "orbitx_whoami",
-    description: "Return the linked OrbitX agent identity, wallet, and MCP status for this session.",
+    description:
+      "Session status. Works anonymously. Returns whether a Bearer token is present and which tools need a publicKey arg.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -749,13 +749,13 @@ const TOOLS = [
   {
     name: "orbitx_prepare_buy",
     description:
-      "Build unsigned BUY tx (Pump / Jupiter). User signs in wallet. Non-custodial.",
+      "Build unsigned BUY tx (Pump / Jupiter). Requires publicKey (buyer wallet). User signs in wallet. Non-custodial.",
     inputSchema: {
       type: "object",
       properties: {
         mint: { type: "string" },
         amountSol: { type: "number" },
-        publicKey: { type: "string" },
+        publicKey: { type: "string", description: "Buyer Solana wallet (required)" },
         slippage: { type: "number", default: 10 },
         pool: {
           type: "string",
@@ -763,22 +763,22 @@ const TOOLS = [
           default: "auto",
         },
       },
-      required: ["mint", "amountSol"],
+      required: ["mint", "amountSol", "publicKey"],
     },
   },
   {
     name: "orbitx_prepare_sell",
-    description: "Build unsigned SELL tx. amount as tokens or '100%'.",
+    description: "Build unsigned SELL tx. Requires publicKey. amount as tokens or '100%'.",
     inputSchema: {
       type: "object",
       properties: {
         mint: { type: "string" },
         amount: { type: ["number", "string"] },
-        publicKey: { type: "string" },
+        publicKey: { type: "string", description: "Seller Solana wallet (required)" },
         slippage: { type: "number", default: 10 },
         pool: { type: "string", default: "auto" },
       },
-      required: ["mint", "amount"],
+      required: ["mint", "amount", "publicKey"],
     },
   },
   {
@@ -990,11 +990,15 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_whoami") {
     return {
+      ok: true,
       userId: auth?.userId || null,
       agentId: auth?.agentId || null,
       walletAddress: auth?.walletAddress || null,
       mcpUrl,
-      status: auth?.walletAddress ? "connected" : "wallet_not_linked",
+      status: auth?.userId ? (auth.walletAddress ? "authenticated_with_wallet" : "authenticated") : "anonymous",
+      note: auth?.userId
+        ? "Bearer session active."
+        : "Anonymous mode OK for intel tools. For buy/sell/claim pass publicKey in tool args, or Authenticate in Claude / paste Authorization: Bearer <key> from https://orbitx.world/agent",
       tools: TOOLS.map((t) => t.name),
     };
   }
@@ -1551,7 +1555,7 @@ async function handleMcp(req, res, parts) {
     const auth = await resolveAuth(req);
 
     if (method === "initialize") {
-      // Always complete handshake so Claude can list tools; auth is enforced on tools/call.
+      // Clean handshake only — do NOT advertise "unauthenticated" (Claude treats that as a hard error).
       return json(
         res,
         {
@@ -1560,21 +1564,11 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: {
-              name: "OrbitX Agent MCP",
-              version: "1.0.0",
-              authenticated: Boolean(auth),
-            },
-            instructions: auth
-              ? "OrbitX MCP authenticated. Wallet-linked tools are available."
-              : `Not authenticated yet. Open ${mcpUrl}/oauth/authorize or click Authenticate in Claude, approve on orbitx.world, then retry. Or set request header Authorization: Bearer <api_key from /agent>.`,
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.1.0" },
           },
         },
         200,
-        {
-          "Mcp-Session-Id": sessionId,
-          ...(auth ? {} : { "WWW-Authenticate": wwwAuthenticate(base) }),
-        },
+        { "Mcp-Session-Id": sessionId },
       );
     }
     if (method === "notifications/initialized" || method === "ping") {
@@ -1591,12 +1585,6 @@ async function handleMcp(req, res, parts) {
             description: t.description,
             inputSchema: t.inputSchema,
           })),
-          _meta: {
-            authenticated: Boolean(auth),
-            authHint: auth
-              ? null
-              : "Session has no Bearer token. Authenticate in Claude or add Authorization: Bearer <oxk_/oxo_ key from https://orbitx.world/agent>",
-          },
         },
       });
     }
@@ -1604,27 +1592,39 @@ async function handleMcp(req, res, parts) {
     if (method === "tools/call") {
       const name = String(params?.name || "");
       const args = params?.arguments || {};
-      const needsAuth = !PUBLIC_TOOLS.has(name);
+      const hasWalletArg = Boolean(
+        String(args.publicKey || args.address || args.wallet || args.buyerWallet || "").trim(),
+      );
 
-      if (!auth && needsAuth) {
-        return json(
-          res,
-          {
-            jsonrpc: "2.0",
-            id: id ?? null,
-            error: {
-              code: -32001,
-              message:
-                "OrbitX MCP is not authenticated on this session. In Claude: open the OrbitX connector → Authenticate → approve + link wallet on orbitx.world. Or on /agent create an API key and set connector request header Authorization: Bearer <key>. Then retry.",
-            },
+      // Never HTTP 401 on tools/call — Claude surfaces that as a persistent auth failure.
+      // Wallet tools without identity get a normal tool result explaining what to pass.
+      if (WALLET_TOOLS.has(name) && !auth && !hasWalletArg) {
+        const tip = {
+          ok: false,
+          error: "wallet_required",
+          tool: name,
+          message:
+            "Pass publicKey (Solana wallet) in the tool arguments, or Authenticate the OrbitX connector / add header Authorization: Bearer <api_key from https://orbitx.world/agent>.",
+          example: { publicKey: "YourSolanaWalletBase58..." },
+        };
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+            structuredContent: tip,
+            isError: true,
           },
-          401,
-          { "WWW-Authenticate": wwwAuthenticate(base) },
-        );
+        });
       }
 
       try {
-        const result = await callTool(name, args, auth || { userId: null, agentId: null, walletAddress: null }, base);
+        const result = await callTool(
+          name,
+          args,
+          auth || { userId: null, agentId: null, walletAddress: null },
+          base,
+        );
         return json(res, {
           jsonrpc: "2.0",
           id,
@@ -1634,10 +1634,30 @@ async function handleMcp(req, res, parts) {
           },
         });
       } catch (e) {
+        const msg = e?.message || "tool error";
+        // Soft-fail wallet/auth errors as tool results (not JSON-RPC auth errors)
+        if (/publicKey required|address required|wallet required|unauthorized|Authentication/i.test(msg)) {
+          const tip = {
+            ok: false,
+            error: "wallet_or_auth_required",
+            tool: name,
+            message: msg,
+            fix: "Include publicKey in args, or Bearer token from https://orbitx.world/agent",
+          };
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+              structuredContent: tip,
+              isError: true,
+            },
+          });
+        }
         return json(res, {
           jsonrpc: "2.0",
           id,
-          error: { code: -32000, message: e?.message || "tool error" },
+          error: { code: -32000, message: msg },
         });
       }
     }
