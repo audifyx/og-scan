@@ -1,25 +1,38 @@
 import React, { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { AgentDashboard } from '../components/agent/agent-dashboard';
 import { TokenGatingVerifier } from '../components/agent/token-gating-verifier';
+import { isTokenGateExemptWallet } from '../lib/agentTokenGate';
 
 function AgentPage() {
+  const { publicKey } = useWallet();
+  const walletAddress = publicKey?.toBase58() ?? null;
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // DEF wallet bypasses the $10 ORBITX hold requirement
+    if (isTokenGateExemptWallet(walletAddress)) {
+      setHasAccess(true);
+      setIsLoading(false);
+      return;
+    }
+
     const verifyAccess = async () => {
       try {
         setIsLoading(true);
-        // Check if user has token access via API
-        const response = await fetch('/api/verify-access', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('agent_api_key') || ''}`,
-          },
-        });
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${localStorage.getItem('agent_api_key') || ''}`,
+        };
+        if (walletAddress) {
+          headers['x-wallet-address'] = walletAddress;
+        }
+
+        const response = await fetch('/api/verify-access', { headers });
 
         if (response.ok) {
           const data = await response.json();
-          setHasAccess(data.hasAccess);
+          setHasAccess(Boolean(data.hasAccess));
         } else {
           setHasAccess(false);
         }
@@ -32,7 +45,7 @@ function AgentPage() {
     };
 
     verifyAccess();
-  }, []);
+  }, [walletAddress]);
 
   if (isLoading) {
     return (

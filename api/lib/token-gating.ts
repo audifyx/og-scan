@@ -10,6 +10,29 @@ const TOKEN_REQUIREMENT_CA = '13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9';
 const MIN_REQUIREMENT_USD = 10.00;
 const VERIFICATION_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
 
+/** DEF / platform wallets that skip the $10 ORBITX hold requirement. */
+export const TOKEN_GATE_EXEMPT_WALLETS = [
+  '4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd',
+] as const;
+
+export function isTokenGateExemptWallet(wallet?: string | null): boolean {
+  const addr = (wallet || '').trim();
+  if (!addr) return false;
+  return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === addr);
+}
+
+function exemptAccess(): AccessVerification {
+  const now = new Date();
+  return {
+    meetsRequirement: true,
+    currentHoldingUsd: 0,
+    cumulativeBuyValueUsd: 0,
+    verifiedAt: now,
+    expiresAt: new Date(now.getTime() + VERIFICATION_CACHE_TTL),
+    exempt: true,
+  };
+}
+
 export interface TokenHolding {
   amount: number;
   valueUsd: number;
@@ -22,14 +45,39 @@ export interface AccessVerification {
   cumulativeBuyValueUsd: number;
   verifiedAt: Date;
   expiresAt: Date;
+  exempt?: boolean;
 }
 
 /**
  * Verify if a user has access to the agent MCP
- * Checks: current holdings OR cumulative buy history
+ * Checks: DEF wallet exemption, current holdings, OR cumulative buy history
  */
-export async function verifyUserAccess(userId: string): Promise<AccessVerification> {
+export async function verifyUserAccess(
+  userId: string,
+  walletAddress?: string | null,
+): Promise<AccessVerification> {
   try {
+    if (isTokenGateExemptWallet(walletAddress)) {
+      return exemptAccess();
+    }
+
+    // Resolve wallet from agents if not provided (DEF wallet check)
+    const resolvedWallet =
+      walletAddress ||
+      (
+        await queryOne<{ wallet_address: string }>(
+          `SELECT wallet_address FROM agents
+           WHERE user_id = $1 AND wallet_address IS NOT NULL AND wallet_address <> ''
+           ORDER BY updated_at DESC NULLS LAST
+           LIMIT 1`,
+          [userId],
+        )
+      )?.wallet_address;
+
+    if (isTokenGateExemptWallet(resolvedWallet)) {
+      return exemptAccess();
+    }
+
     // Check cache first
     const cached = await queryOne<AccessVerification>(
       `SELECT meets_token_requirement as "meetsRequirement", 

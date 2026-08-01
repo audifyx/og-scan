@@ -8,6 +8,10 @@ import { getUserAgents, createAgent } from '@/api/lib/agents';
 import { verifyUserAccess } from '@/api/lib/token-gating';
 import { requireApiKey, requireTokenAccess, sendError, sendSuccess } from '@/api/lib/auth';
 
+function walletFromRequest(req: NextRequest): string | null {
+  return req.headers.get('x-wallet-address') || req.nextUrl.searchParams.get('wallet') || null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireApiKey(req, {
@@ -19,8 +23,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify token access
-    const verification = await verifyUserAccess(auth.userId);
+    // Verify token access (DEF wallet exempt)
+    const verification = await verifyUserAccess(auth.userId, walletFromRequest(req));
     if (!verification.meetsRequirement) {
       return NextResponse.json({
         error: 'Insufficient token holdings. Need $10 worth of ORBITX token.',
@@ -48,8 +52,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify token access
-    const verification = await verifyUserAccess(auth.userId);
+    // Verify token access (DEF wallet exempt)
+    const verification = await verifyUserAccess(auth.userId, walletFromRequest(req));
     if (!verification.meetsRequirement) {
       return NextResponse.json({
         error: 'Insufficient token holdings. Need $10 worth of ORBITX token.',

@@ -91,9 +91,13 @@ export async function requireApiKey(req: NextApiRequest, res: NextApiResponse): 
 /**
  * Middleware: Require token gating verification
  */
-export async function requireTokenAccess(userId: string, res: NextApiResponse): Promise<boolean> {
+export async function requireTokenAccess(
+  userId: string,
+  res: NextApiResponse,
+  walletAddress?: string | null,
+): Promise<boolean> {
   try {
-    const verification = await verifyUserAccess(userId);
+    const verification = await verifyUserAccess(userId, walletAddress);
 
     if (!verification.meetsRequirement) {
       res.status(403).json({
