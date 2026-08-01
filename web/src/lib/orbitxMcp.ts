@@ -7,10 +7,13 @@ export const MCP_OAUTH_CLIENT_ID = "orbitx-mcp";
 export const MCP_OAUTH_SCOPE = "orbitx";
 
 export function mcpPublicUrl(origin?: string): string {
-  const base = (origin || (typeof window !== "undefined" ? window.location.origin : "https://orbitx.world")).replace(
+  let base = (origin || (typeof window !== "undefined" ? window.location.origin : "https://orbitx.world")).replace(
     /\/$/,
     "",
   );
+  if (base === "https://www.orbitx.world" || base === "http://www.orbitx.world") {
+    base = "https://orbitx.world";
+  }
   return `${base}${MCP_PATH}`;
 }
 

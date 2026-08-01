@@ -12,9 +12,33 @@ import { createHash, randomBytes } from "crypto";
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const PUBLIC_BASE = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL || "https://orbitx.world";
-const MCP_URL = `${PUBLIC_BASE}/api/orbitx-mcp`;
-const AUTH_PAGE = `${PUBLIC_BASE}/agent/mcp-auth`;
+const FALLBACK_BASE = "https://orbitx.world";
+
+function header(req, name) {
+  const key = name.toLowerCase();
+  const h = req.headers || {};
+  return h[key] || h[name] || "";
+}
+
+function publicBase(req) {
+  const env = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL;
+  if (env) return String(env).replace(/\/$/, "");
+  if (!req) return FALLBACK_BASE;
+  const proto = header(req, "x-forwarded-proto") || "https";
+  let host = header(req, "x-forwarded-host") || header(req, "host") || "orbitx.world";
+  host = String(host).split(",")[0].trim().replace(/:\d+$/, "");
+  if (host === "www.orbitx.world") host = "orbitx.world";
+  return `${proto}://${host}`;
+}
+
+function mcpUrls(req) {
+  const base = publicBase(req);
+  return {
+    base,
+    mcpUrl: `${base}/api/orbitx-mcp`,
+    authPage: `${base}/agent/mcp-auth`,
+  };
+}
 
 function cors(res, methods = "GET,POST,DELETE,OPTIONS") {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -40,12 +64,6 @@ function opaque(prefix) {
   return `${prefix}_${randomBytes(32).toString("hex")}`;
 }
 
-function header(req, name) {
-  const key = name.toLowerCase();
-  const h = req.headers || {};
-  return h[key] || h[name] || "";
-}
-
 function pathParts(req) {
   try {
     const u = new URL(req.url || "/", "http://x");
@@ -65,29 +83,39 @@ function pathParts(req) {
 }
 
 async function readBody(req) {
-  if (req.body != null) {
-    if (typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
-    if (typeof req.body === "string") {
-      try {
-        return JSON.parse(req.body);
-      } catch {
-        return Object.fromEntries(new URLSearchParams(req.body));
+  try {
+    if (req.body != null) {
+      if (typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
+      if (Buffer.isBuffer(req.body)) {
+        const raw = req.body.toString("utf8");
+        if (!raw) return {};
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return Object.fromEntries(new URLSearchParams(raw));
+        }
+      }
+      if (typeof req.body === "string") {
+        if (!req.body) return {};
+        try {
+          return JSON.parse(req.body);
+        } catch {
+          return Object.fromEntries(new URLSearchParams(req.body));
+        }
       }
     }
-  }
-  const chunks = [];
-  for await (const c of req) chunks.push(c);
-  const raw = Buffer.concat(chunks).toString("utf8");
-  if (!raw) return {};
-  const ct = String(header(req, "content-type"));
-  if (ct.includes("application/json")) {
+    const chunks = [];
+    for await (const c of req) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
+    const raw = Buffer.concat(chunks).toString("utf8");
+    if (!raw) return {};
     try {
       return JSON.parse(raw);
     } catch {
-      return {};
+      return Object.fromEntries(new URLSearchParams(raw));
     }
+  } catch {
+    return {};
   }
-  return Object.fromEntries(new URLSearchParams(raw));
 }
 
 function srHeaders(extra = {}) {
@@ -217,7 +245,7 @@ async function handleAgent(req, res, parts) {
         lastUsedAt: k.last_used_at,
       })),
       mintedKey,
-      mcpUrl: MCP_URL,
+      mcpUrl: mcpUrls(req).mcpUrl,
     });
   }
 
@@ -458,22 +486,23 @@ const TOOLS = [
   },
 ];
 
-async function callTool(name, args, auth) {
+async function callTool(name, args, auth, base = FALLBACK_BASE) {
+  const mcpUrl = `${base}/api/orbitx-mcp`;
   if (name === "orbitx_whoami") {
     return {
       userId: auth.userId,
       agentId: auth.agentId,
       walletAddress: auth.walletAddress,
-      mcpUrl: MCP_URL,
+      mcpUrl,
       status: auth.walletAddress ? "connected" : "wallet_not_linked",
     };
   }
   const routes = {
-    orbitx_get_token: `${PUBLIC_BASE}/api/ogdex/token?mint=${encodeURIComponent(String(args.mint || ""))}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
-    orbitx_screen_tokens: `${PUBLIC_BASE}/api/ogdex/screener?type=${encodeURIComponent(String(args.type || "trending"))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 20}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
-    orbitx_get_forensics: `${PUBLIC_BASE}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}`,
-    orbitx_get_wallet: `${PUBLIC_BASE}/api/ogdex/wallet?address=${encodeURIComponent(String(args.address || ""))}`,
-    orbitx_search: `${PUBLIC_BASE}/api/ogdex/search?q=${encodeURIComponent(String(args.q || ""))}`,
+    orbitx_get_token: `${base}/api/ogdex/token?mint=${encodeURIComponent(String(args.mint || ""))}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
+    orbitx_screen_tokens: `${base}/api/ogdex/screener?type=${encodeURIComponent(String(args.type || "trending"))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 20}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
+    orbitx_get_forensics: `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_get_wallet: `${base}/api/ogdex/wallet?address=${encodeURIComponent(String(args.address || ""))}`,
+    orbitx_search: `${base}/api/ogdex/search?q=${encodeURIComponent(String(args.q || ""))}`,
   };
   const url = routes[name];
   if (!url) throw new Error(`Unknown tool: ${name}`);
@@ -483,14 +512,15 @@ async function callTool(name, args, auth) {
 
 async function handleMcp(req, res, parts) {
   const route = parts.join("/");
+  const { base, mcpUrl, authPage } = mcpUrls(req);
 
   if (
     (route === ".well-known/oauth-protected-resource" || route === "oauth-protected-resource") &&
     req.method === "GET"
   ) {
     return json(res, {
-      resource: MCP_URL,
-      authorization_servers: [PUBLIC_BASE],
+      resource: mcpUrl,
+      authorization_servers: [base],
       scopes_supported: ["orbitx"],
       bearer_methods_supported: ["header"],
     });
@@ -501,10 +531,10 @@ async function handleMcp(req, res, parts) {
     req.method === "GET"
   ) {
     return json(res, {
-      issuer: PUBLIC_BASE,
-      authorization_endpoint: `${MCP_URL}/oauth/authorize`,
-      token_endpoint: `${MCP_URL}/oauth/token`,
-      registration_endpoint: `${MCP_URL}/oauth/register`,
+      issuer: base,
+      authorization_endpoint: `${mcpUrl}/oauth/authorize`,
+      token_endpoint: `${mcpUrl}/oauth/token`,
+      registration_endpoint: `${mcpUrl}/oauth/register`,
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code"],
       code_challenge_methods_supported: ["S256", "plain"],
@@ -552,9 +582,9 @@ async function handleMcp(req, res, parts) {
       const v = u.searchParams.get(key);
       if (v) params.set(key, v);
     }
-    params.set("mcp_url", MCP_URL);
+    params.set("mcp_url", mcpUrl);
     cors(res);
-    res.writeHead(302, { Location: `${AUTH_PAGE}?${params.toString()}` });
+    res.writeHead(302, { Location: `${authPage}?${params.toString()}` });
     return res.end();
   }
 
@@ -618,15 +648,15 @@ async function handleMcp(req, res, parts) {
     return json(res, {
       ok: true,
       name: "OrbitX Agent MCP",
-      mcp_url: MCP_URL,
+      mcp_url: mcpUrl,
       auth: {
         type: "oauth2",
         client_id: "orbitx-mcp",
         client_secret: null,
         client_secret_note: "Leave blank — public PKCE client",
-        authorization_endpoint: `${MCP_URL}/oauth/authorize`,
-        token_endpoint: `${MCP_URL}/oauth/token`,
-        registration_endpoint: `${MCP_URL}/oauth/register`,
+        authorization_endpoint: `${mcpUrl}/oauth/authorize`,
+        token_endpoint: `${mcpUrl}/oauth/token`,
+        registration_endpoint: `${mcpUrl}/oauth/register`,
         scope: "orbitx",
         token_endpoint_auth_method: "none",
       },
@@ -661,7 +691,7 @@ async function handleMcp(req, res, parts) {
           { jsonrpc: "2.0", id: id ?? null, error: { code: -32001, message: "Authentication required" } },
           401,
           {
-            "WWW-Authenticate": `Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="${PUBLIC_BASE}/.well-known/oauth-protected-resource"`,
+            "WWW-Authenticate": `Bearer FAKESECRET_g3h4i5j6k7l8m9n0o1p2="${base}/.well-known/oauth-protected-resource"`,
           },
         );
       }
@@ -681,7 +711,7 @@ async function handleMcp(req, res, parts) {
       const name = String(params?.name || "");
       const args = params?.arguments || {};
       try {
-        const result = await callTool(name, args, auth);
+        const result = await callTool(name, args, auth, base);
         return json(res, {
           jsonrpc: "2.0",
           id,
