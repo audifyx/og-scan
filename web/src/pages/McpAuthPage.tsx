@@ -4,7 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Loader2, ShieldCheck, Wallet } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
-import { approveMcpOAuth, mcpPublicUrl } from "@/lib/orbitxMcp";
+import { approveMcpOAuth, mcpOAuthCredentials, mcpPublicUrl } from "@/lib/orbitxMcp";
 import { resolveAuthWallet } from "@/lib/agentTokenGate";
 
 /**
@@ -25,6 +25,7 @@ export default function McpAuthPage() {
   const codeChallenge = params.get("code_challenge") || undefined;
   const codeChallengeMethod = params.get("code_challenge_method") || undefined;
   const mcpUrl = params.get("mcp_url") || mcpPublicUrl();
+  const oauth = useMemo(() => mcpOAuthCredentials(), []);
 
   const walletAddress = useMemo(
     () =>
@@ -107,6 +108,16 @@ export default function McpAuthPage() {
               <span className="max-w-[60%] truncate font-mono text-xs text-white/80">{mcpUrl}</span>
             </div>
             <div className="flex justify-between gap-3">
+              <span className="text-white/45">Client ID</span>
+              <span className="max-w-[60%] truncate font-mono text-xs text-white/80">{clientId}</span>
+            </div>
+            {redirectUri ? (
+              <div className="flex justify-between gap-3">
+                <span className="text-white/45">Return to</span>
+                <span className="max-w-[60%] truncate font-mono text-[10px] text-white/55">{redirectUri}</span>
+              </div>
+            ) : null}
+            <div className="flex justify-between gap-3">
               <span className="text-white/45">Wallet</span>
               <span className="font-mono text-xs text-white/80">
                 {walletAddress
@@ -114,6 +125,15 @@ export default function McpAuthPage() {
                   : "Not connected"}
               </span>
             </div>
+            {!redirectUri && (
+              <p className="pt-1 text-[11px] text-amber-200/70">
+                Missing redirect_uri — open Authenticate from ChatGPT/Claude, or paste OAuth fields from{" "}
+                <Link to="/agent" className="underline">
+                  /agent
+                </Link>
+                : auth <code className="text-white/50">{oauth.authorizationUrl}</code>
+              </p>
+            )}
           </div>
 
           {!user || !walletAddress ? (
