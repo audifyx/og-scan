@@ -1,7 +1,7 @@
 /** OrbitX Agent MCP client helpers — URLs, deep links, API calls. */
 
-export const MCP_PATH = "/api/orbitx/mcp";
-export const AGENT_API = "/api/orbitx/agent";
+export const MCP_PATH = "/api/orbitx-mcp";
+export const AGENT_API = "/api/orbitx-agent";
 
 export function mcpPublicUrl(origin?: string): string {
   const base = (origin || (typeof window !== "undefined" ? window.location.origin : "https://ogscan.fun")).replace(
