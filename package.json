@@ -1,5 +1,10 @@
 {
   "dependencies": {
-    "pg": "^8.22.0"
+    "pg": "^8.22.0",
+    "twitter-api-v2": "^1.16.0",
+    "ai": "^3.3.0",
+    "@anthropic-ai/sdk": "^0.28.0",
+    "fal-client": "^0.1.0",
+    "jose": "^5.4.1"
   }
 }
