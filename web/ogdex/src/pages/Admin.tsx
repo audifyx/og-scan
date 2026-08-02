@@ -9,7 +9,20 @@ import {
   CheckSquare, XSquare, Wallet, LayoutDashboard, List, Mail, MessageSquare, LifeBuoy, Link2, Mic,
 } from "lucide-react";
 
-const LS_KEY = "ogdex_admin_pass";
+/** Server ADMIN_PASS for API calls — never prompt in UI (desk unlock is the only gate). */
+function resolveAdminPass(): string {
+  try {
+    const fromEnv = String((import.meta as any).env?.VITE_ADMIN_PASS || "").trim();
+    if (fromEnv.length >= 8) return fromEnv;
+  } catch {
+    /* ignore */
+  }
+  try {
+    return String(localStorage.getItem("ogdex_admin_pass") || "").trim();
+  } catch {
+    return "";
+  }
+}
 
 // ─── Tab type ─────────────────────────────────────────────────────────────────
 type Tab =
@@ -64,29 +77,42 @@ const CAT_LABEL: Record<Cat, string> = { dex: "OrbitX DEX", social: "Social" };
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function Admin() {
-  const [pass, setPass]       = useState(localStorage.getItem(LS_KEY) || "");
-  const [authed, setAuthed]   = useState(false);
-  const [input, setInput]     = useState("");
+  const [pass] = useState(() => resolveAdminPass());
   const [data, setData]       = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState("");
   const [tab, setTab]         = useState<Tab>("overview");
   const [health, setHealth]   = useState<any>(null);
 
-  const load = async (p: string) => {
-    setLoading(true); setErr("");
+  const load = async (p = pass) => {
+    setLoading(true);
+    setErr("");
+    if (!p) {
+      setData(null);
+      setErr("Admin API key missing. Set VITE_ADMIN_PASS in the build env (server ADMIN_PASS stays server-only). Desk unlock code is enough for the UI gate.");
+      setLoading(false);
+      return;
+    }
     const d = await adminGet(p);
-    if (d.ok) {
-      setData(d); setAuthed(true); setPass(p);
-      localStorage.setItem(LS_KEY, p);
-      fetch("/api/ogdex/health").then(r => r.json()).then(setHealth).catch(() => {});
+    if (d?.ok) {
+      setData(d);
+      try {
+        localStorage.setItem("ogdex_admin_pass", p);
+      } catch {
+        /* ignore */
+      }
+      fetch("/api/ogdex/health").then((r) => r.json()).then(setHealth).catch(() => {});
     } else {
-      setErr("Wrong password."); setAuthed(false);
+      setData(null);
+      setErr(d?.error === "unauthorized" ? "Admin API unauthorized — check VITE_ADMIN_PASS matches server ADMIN_PASS." : "Failed to load admin data.");
     }
     setLoading(false);
   };
 
-  useEffect(() => { if (pass) load(pass); }, []);
+  useEffect(() => {
+    void load(pass);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const act = async (action: string, id?: string, extra?: any) => {
     const r = await adminAction(pass, action, id, extra);
@@ -94,24 +120,44 @@ export default function Admin() {
     return r;
   };
 
-  if (!authed) return (
-    <div className="max-w-sm mx-auto card p-6 mt-16">
-      <div className="flex items-center gap-2 font-semibold mb-4">
-        <Lock className="w-4 h-4 text-accent" /> API password
+  const lockDesk = () => {
+    try {
+      sessionStorage.removeItem("ox_desk_sess_v1");
+      sessionStorage.removeItem("orbitx_admin_unlocked");
+      localStorage.removeItem("ogdex_admin_pass");
+      window.dispatchEvent(new Event("ox-desk-unlock"));
+    } catch {
+      /* ignore */
+    }
+    window.location.reload();
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="grid place-items-center py-24 text-muted">
+        <Loader2 className="w-5 h-5 animate-spin" />
       </div>
-      <p className="text-xs text-muted mb-3">Server ADMIN_PASS (not the desk unlock code).</p>
-      <form onSubmit={(e) => { e.preventDefault(); load(input); }}>
-        <input type="password" value={input} onChange={(e) => setInput(e.target.value)}
-          placeholder="API password"
-          className="w-full bg-panel2 border border-line rounded-lg px-3 py-2.5 text-sm outline-none focus:border-accent/60"
-          autoFocus />
-        {err && <div className="text-down text-xs mt-2">{err}</div>}
-        <button className="btn bg-accent text-black font-semibold w-full mt-3">
-          {loading ? "Checking…" : "Enter"}
-        </button>
-      </form>
-    </div>
-  );
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="max-w-md mx-auto card p-6 mt-16 space-y-3">
+        <div className="flex items-center gap-2 font-semibold">
+          <AlertTriangle className="w-4 h-4 text-accent" /> Couldn’t load desk data
+        </div>
+        <p className="text-xs text-muted">{err || "Unknown error"}</p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => load(pass)} className="btn bg-accent text-black font-semibold text-xs">
+            Retry
+          </button>
+          <button type="button" onClick={lockDesk} className="btn bg-panel2 text-muted hover:text-white text-xs">
+            Lock desk
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const s = data?.stats || {};
 
@@ -123,14 +169,15 @@ export default function Admin() {
           <BarChart3 className="w-5 h-5 text-accent" /> Admin Dashboard
         </h1>
         <div className="flex items-center gap-2">
+          {err && <span className="text-[10px] text-down max-w-[12rem] truncate">{err}</span>}
           <button onClick={() => load(pass)} disabled={loading}
             className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5 text-xs">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
           <button
-            onClick={() => { localStorage.removeItem(LS_KEY); setAuthed(false); setPass(""); }}
-            className="btn bg-panel2 text-muted hover:text-white text-xs">
-            Lock
+            onClick={lockDesk}
+            className="btn bg-panel2 text-muted hover:text-white text-xs inline-flex items-center gap-1">
+            <Lock className="w-3.5 h-3.5" /> Lock desk
           </button>
         </div>
       </div>

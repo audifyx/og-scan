@@ -153,6 +153,23 @@ export async function bootstrapAgent(): Promise<AgentBootstrap> {
   return (await agentFetch("/bootstrap", { method: "POST" })) as unknown as AgentBootstrap;
 }
 
+export async function listAgents(): Promise<{
+  agents: AgentBootstrap["agent"][];
+}> {
+  return (await agentFetch("", { method: "GET" })) as unknown as {
+    agents: AgentBootstrap["agent"][];
+  };
+}
+
+export async function createAgent(name?: string, description?: string): Promise<{
+  agent: AgentBootstrap["agent"];
+}> {
+  return (await agentFetch("", {
+    method: "POST",
+    body: JSON.stringify({ name, description }),
+  })) as unknown as { agent: AgentBootstrap["agent"] };
+}
+
 export async function createAgentApiKey(name: string): Promise<{ id: string; name: string; key: string }> {
   return (await agentFetch("/keys", {
     method: "POST",

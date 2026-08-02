@@ -337,13 +337,68 @@ function mapAgent(a) {
 async function handleAgent(req, res, parts) {
   const route = parts.join("/") || "";
 
-  if (req.method === "GET" && (route === "health" || route === "")) {
+  if (req.method === "GET" && route === "health") {
     return json(res, {
       ok: true,
       service: "orbitx-agent",
       hasServiceRole: Boolean(SRK),
       hasSupabaseUrl: Boolean(SUPA_URL),
     });
+  }
+
+  // GET /api/orbitx-agent — list agents for the signed-in user
+  if (req.method === "GET" && route === "") {
+    const userId = await getUserId(req);
+    if (!userId) return json(res, { error: "unauthorized" }, 401);
+    const rows = await sb(
+      `agents?user_id=eq.${encodeURIComponent(userId)}&order=created_at.asc&select=*`,
+    );
+    const agents = Array.isArray(rows) ? rows : [];
+    if (agents.length === 0) {
+      const created = await ensureAgent(userId);
+      return json(res, { agents: [mapAgent(created)] });
+    }
+    return json(res, { agents: agents.map(mapAgent) });
+  }
+
+  // POST /api/orbitx-agent — create an agent (or return default)
+  if (req.method === "POST" && route === "") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const name = String(body.name || "").trim() || "Default";
+    const description = String(body.description || "").trim() || "OrbitX MCP agent";
+    const existing = await ensureAgent(authUser.id);
+    if (existing && (!body.name || existing.name === name)) {
+      return json(res, { agent: mapAgent(existing) }, 200);
+    }
+    try {
+      const created = await sb("agents", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: authUser.id,
+          name,
+          description,
+          status: "active",
+        }),
+      });
+      const row = Array.isArray(created) ? created[0] : created;
+      if (row?.id) {
+        try {
+          await sb("agent_settings", {
+            method: "POST",
+            body: JSON.stringify({ agent_id: row.id }),
+            headers: { Prefer: "return=minimal" },
+          });
+        } catch {
+          /* optional */
+        }
+        return json(res, { agent: mapAgent(row) }, 201);
+      }
+    } catch (e) {
+      return json(res, { error: e?.message || "Failed to create agent", agent: mapAgent(existing) }, 200);
+    }
+    return json(res, { agent: mapAgent(existing) }, 200);
   }
 
   // Public prepare for /agent/sign (claim / burn / rent) — returns unsigned txs only.

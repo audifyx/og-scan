@@ -5,10 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { approveMcpOAuth, mcpOAuthCredentials, mcpPublicUrl } from "@/lib/orbitxMcp";
 import { resolveAuthWallet } from "@/lib/agentTokenGate";
-import "@/components/agent/agent-terminal.css";
+import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 
 /**
- * OAuth consent — terminal UI (Claude/ChatGPT Authenticate).
+ * OAuth consent — Claude/ChatGPT Authenticate lands here.
  */
 export default function McpAuthPage() {
   const [params] = useSearchParams();
@@ -82,125 +82,114 @@ export default function McpAuthPage() {
   };
 
   if (authLoading) {
-    return (
-      <div className="ox-term__loading">
-        <span>loading session</span>
-        <span className="ox-term__cursor" />
-      </div>
-    );
+    return <AgentLoading label="Loading session…" />;
   }
 
   return (
-    <div className="ox-term">
-      <div className="ox-term__inner" style={{ maxWidth: 32 * 16 }}>
-        <div className="ox-term__bar">
-          <div className="ox-term__dots" aria-hidden>
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="ox-term__bar-title">orbitx://agent/mcp-auth — tty</div>
-          <span className="ox-term__badge">oauth</span>
-        </div>
-
-        <h1 className="ox-term__brand">
-          Authorize MCP
-          <span className="ox-term__cursor" aria-hidden />
-        </h1>
-        <p className="ox-term__sub">
-          Let {clientLabel} use your OrbitX agent — non-custodial, revoke anytime on /agent.
+    <AgentShell showTabs={false} statusLabel="OAuth consent" statusWarn={!redirectUri}>
+      <div className="ox-agent__hero">
+        <h1 className="ox-agent__title">Authorize MCP</h1>
+        <p className="ox-agent__lead">
+          Let {clientLabel} use your OrbitX agent. Non-custodial — revoke anytime on /agent.
         </p>
-
-        <section className="ox-term__section">
-          <div className="ox-term__section-h">
-            <div className="ox-term__prompt">consent</div>
-            <div className="ox-term__hint">review connection</div>
-          </div>
-          <div className="ox-term__body">
-            <div className="ox-term__row">
-              <div className="ox-term__label">mcp server</div>
-              <div className="ox-term__value">{mcpUrl}</div>
-            </div>
-            <div className="ox-term__row">
-              <div className="ox-term__label">client id</div>
-              <div className="ox-term__value">{clientId}</div>
-            </div>
-            {redirectUri ? (
-              <div className="ox-term__row">
-                <div className="ox-term__label">return to</div>
-                <div className="ox-term__value">{redirectUri}</div>
-              </div>
-            ) : null}
-            <div className="ox-term__row">
-              <div className="ox-term__label">wallet</div>
-              <div className="ox-term__value">
-                {walletAddress
-                  ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
-                  : "not connected"}
-              </div>
-            </div>
-
-            {!redirectUri && (
-              <div className="ox-term__err" style={{ marginTop: 8 }}>
-                missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields
-                from <Link to="/agent">/agent</Link>.
-              </div>
-            )}
-
-            {!user ? (
-              <div className="ox-term__flex" style={{ marginTop: 12 }}>
-                {pickable.slice(0, 4).map((w) => (
-                  <button
-                    key={w.name}
-                    type="button"
-                    className="ox-term__btn"
-                    disabled={busy === w.name}
-                    onClick={() =>
-                      signInWith(w.name, { replaceEmailSession: true }).catch((e) =>
-                        setError(e.message),
-                      )
-                    }
-                  >
-                    {busy === w.name ? "connecting…" : `continue with ${w.name}`}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div style={{ marginTop: 12 }}>
-                {!walletAddress && (
-                  <p className="ox-term__sub">
-                    wallet optional for auth — link later for buy/sell/claim
-                  </p>
-                )}
-                <button
-                  type="button"
-                  className="ox-term__btn ox-term__btn--fill"
-                  style={{ width: "100%" }}
-                  disabled={submitting || !redirectUri}
-                  onClick={onConfirm}
-                >
-                  {submitting
-                    ? "connecting…"
-                    : walletAddress
-                      ? "authenticate & link wallet"
-                      : "authenticate session"}
-                </button>
-              </div>
-            )}
-
-            {error && <div className="ox-term__err" style={{ marginTop: 12 }}>ERR {error}</div>}
-
-            <p className="ox-term__footer" style={{ marginTop: 16 }}>
-              revoke keys anytime on <Link to="/agent">/agent</Link>
-              {!redirectUri && oauth.authorizationUrl ? (
-                <span style={{ display: "block", marginTop: 6, opacity: 0.5 }}>
-                  {oauth.authorizationUrl}
-                </span>
-              ) : null}
-            </p>
-          </div>
-        </section>
       </div>
-    </div>
+
+      <section className="ox-agent__panel">
+        <div className="ox-agent__panel-h">
+          <h2 className="ox-agent__panel-title">Consent</h2>
+          <span className="ox-agent__panel-hint">review connection</span>
+        </div>
+        <div className="ox-agent__panel-b">
+          <div className="ox-agent__row">
+            <div className="ox-agent__label">MCP server</div>
+            <div className="ox-agent__value">{mcpUrl}</div>
+            <span />
+          </div>
+          <div className="ox-agent__row">
+            <div className="ox-agent__label">Client ID</div>
+            <div className="ox-agent__value">{clientId}</div>
+            <span />
+          </div>
+          {redirectUri ? (
+            <div className="ox-agent__row">
+              <div className="ox-agent__label">Return to</div>
+              <div className="ox-agent__value">{redirectUri}</div>
+              <span />
+            </div>
+          ) : null}
+          <div className="ox-agent__row">
+            <div className="ox-agent__label">Wallet</div>
+            <div className="ox-agent__value">
+              {walletAddress
+                ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+                : "Not connected"}
+            </div>
+            <span />
+          </div>
+
+          {!redirectUri && (
+            <div className="ox-agent__alert" style={{ marginTop: 12 }}>
+              Missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields from{" "}
+              <Link to="/agent">/agent</Link>.
+            </div>
+          )}
+
+          {!user ? (
+            <div className="ox-agent__btn-row">
+              {pickable.slice(0, 4).map((w) => (
+                <button
+                  key={w.name}
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--primary"
+                  disabled={busy === w.name}
+                  onClick={() =>
+                    signInWith(w.name, { replaceEmailSession: true }).catch((e) =>
+                      setError(e.message),
+                    )
+                  }
+                >
+                  {busy === w.name ? "Connecting…" : `Continue with ${w.name}`}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="ox-agent__btn-row">
+              {!walletAddress && (
+                <p className="ox-agent__note" style={{ width: "100%", marginTop: 0 }}>
+                  Wallet optional for auth — link later for buy/sell/claim.
+                </p>
+              )}
+              <button
+                type="button"
+                className="ox-agent__btn ox-agent__btn--primary"
+                disabled={submitting || !redirectUri}
+                onClick={onConfirm}
+              >
+                {submitting
+                  ? "Connecting…"
+                  : walletAddress
+                    ? "Authenticate & link wallet"
+                    : "Authenticate session"}
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="ox-agent__alert" style={{ marginTop: 12 }}>
+              {error}
+            </div>
+          )}
+
+          <p className="ox-agent__note">
+            Revoke keys anytime on <Link to="/agent">/agent</Link>
+            {!redirectUri && oauth.authorizationUrl ? (
+              <span style={{ display: "block", marginTop: 6, opacity: 0.6 }}>
+                {oauth.authorizationUrl}
+              </span>
+            ) : null}
+          </p>
+        </div>
+      </section>
+    </AgentShell>
   );
 }

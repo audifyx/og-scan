@@ -15,7 +15,7 @@ import {
   shortKey,
   type AgentBootstrap,
 } from "@/lib/orbitxMcp";
-import "./agent-terminal.css";
+import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -27,7 +27,7 @@ function maskSecret(value: string, kind: "key" | "header" = "key") {
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
 
-function SecretBlock({
+function SecretRow({
   label,
   value,
   emptyLabel,
@@ -43,22 +43,22 @@ function SecretBlock({
   const [visible, setVisible] = useState(false);
   const has = Boolean(value);
   return (
-    <div className="ox-term__row">
-      <div className="ox-term__label">{label}</div>
-      <div className="ox-term__value">
+    <div className="ox-agent__row">
+      <div className="ox-agent__label">{label}</div>
+      <div className="ox-agent__value">
         {!has
-          ? emptyLabel || "create an api key first"
+          ? emptyLabel || "Create an API key first"
           : visible
             ? value
             : maskSecret(value, label.toLowerCase().includes("header") ? "header" : "key")}
       </div>
       {has && (
-        <div className="ox-term__actions">
-          <button type="button" className="ox-term__btn ox-term__btn--ghost" onClick={() => setVisible((v) => !v)}>
-            {visible ? "hide" : "view"}
+        <div className="ox-agent__actions">
+          <button type="button" className="ox-agent__btn ox-agent__btn--ghost" onClick={() => setVisible((v) => !v)}>
+            {visible ? "Hide" : "View"}
           </button>
-          <button type="button" className="ox-term__btn ox-term__btn--ghost" onClick={onCopy}>
-            {copied ? "copied" : "copy"}
+          <button type="button" className="ox-agent__btn" onClick={onCopy}>
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
       )}
@@ -80,15 +80,17 @@ function FieldRow({
   copyable?: boolean;
 }) {
   return (
-    <div className="ox-term__row">
-      <div className="ox-term__label">{label}</div>
-      <div className="ox-term__value">{value}</div>
-      {copyable && onCopy && (
-        <div className="ox-term__actions">
-          <button type="button" className="ox-term__btn ox-term__btn--ghost" onClick={onCopy}>
-            {copied ? "copied" : "copy"}
+    <div className="ox-agent__row">
+      <div className="ox-agent__label">{label}</div>
+      <div className="ox-agent__value">{value}</div>
+      {copyable && onCopy ? (
+        <div className="ox-agent__actions">
+          <button type="button" className="ox-agent__btn" onClick={onCopy}>
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
+      ) : (
+        <span />
       )}
     </div>
   );
@@ -99,6 +101,7 @@ export function AgentDashboard() {
   const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
 
+  const [tab, setTab] = useState<AgentTabId>("setup");
   const [boot, setBoot] = useState<AgentBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +112,7 @@ export function AgentDashboard() {
   const [copied, setCopied] = useState<string | null>(null);
   const [chatgptGuide, setChatgptGuide] = useState(false);
   const [linking, setLinking] = useState(false);
-  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | null>("claude");
+  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt">("claude");
 
   const walletAddress = useMemo(
     () =>
@@ -194,6 +197,7 @@ export function AgentDashboard() {
       }
       const keys = await listAgentApiKeys();
       setBoot((prev) => (prev ? { ...prev, keys: keys.keys, mintedKey: minted } : prev));
+      setTab("keys");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create key");
     } finally {
@@ -224,121 +228,167 @@ export function AgentDashboard() {
     }
   };
 
-  const steps = [
-    { ok: Boolean(linkedWallet), label: "01 wallet" },
-    { ok: hasKey, label: "02 api key" },
-    { ok: hasKey && Boolean(linkedWallet), label: "03 connect" },
-  ];
-
   if (loading) {
-    return (
-      <div className="ox-term__loading">
-        <span>booting agent session</span>
-        <span className="ox-term__cursor" />
-      </div>
-    );
+    return <AgentLoading label="Booting agent session…" />;
   }
 
+  const statusLabel = exempt
+    ? "Owner exempt"
+    : boot?.hold?.meetsRequirement
+      ? "Hold verified"
+      : hasKey
+        ? "MCP ready"
+        : "Setup needed";
+
   return (
-    <div className="ox-term">
-      <div className="ox-term__inner">
-        <div className="ox-term__bar">
-          <div className="ox-term__dots" aria-hidden>
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="ox-term__bar-title">orbitx://agent/mcp — tty</div>
-          <button type="button" className="ox-term__btn ox-term__btn--ghost" onClick={refresh}>
-            refresh
-          </button>
-        </div>
-
-        <h1 className="ox-term__brand">
-          OrbitX Agent
-          <span className="ox-term__cursor" aria-hidden />
-        </h1>
-        <p className="ox-term__sub">
-          Terminal control for MCP — wire Claude or ChatGPT to trade, launch, mint, and social.
-          Non-custodial. You sign in Phantom.
+    <AgentShell
+      activeTab={tab}
+      onTabChange={setTab}
+      statusLabel={statusLabel}
+      statusWarn={!hasKey || !linkedWallet}
+      onRefresh={refresh}
+    >
+      <div className="ox-agent__hero">
+        <h1 className="ox-agent__title">OrbitX Agent</h1>
+        <p className="ox-agent__lead">
+          Connect Claude or ChatGPT to OrbitX MCP — trade, launch, mint, and social. Non-custodial;
+          you sign in your wallet.
         </p>
+        <div className="ox-agent__steps">
+          <span className={`ox-agent__chip${linkedWallet ? " is-ok" : ""}`}>
+            {linkedWallet ? "Wallet linked" : "Wallet needed"}
+          </span>
+          <span className={`ox-agent__chip${hasKey ? " is-ok" : ""}`}>
+            {hasKey ? "API key ready" : "Create API key"}
+          </span>
+          <span className={`ox-agent__chip${hasKey && linkedWallet ? " is-ok" : ""}`}>
+            {hasKey && linkedWallet ? "Ready to connect" : "Connect AI next"}
+          </span>
+          {exempt && <span className="ox-agent__chip is-accent">Exempt</span>}
+        </div>
+      </div>
 
-        <div className="ox-term__steps">
-          {steps.map((s) => (
-            <div key={s.label} className={`ox-term__step${s.ok ? " is-ok" : ""}`}>
-              {s.ok ? "[x]" : "[ ]"} {s.label}
+      {error && (
+        <div className="ox-agent__alert">
+          {error}
+          {(error.includes("agents") || error.includes("schema") || error.includes("relation")) && (
+            <div style={{ marginTop: 6, opacity: 0.85 }}>
+              Apply sql/Aug_SQL/ in Supabase if agent tables are missing.
             </div>
-          ))}
-          {exempt && <span className="ox-term__badge">exempt</span>}
-          {!exempt && boot?.hold?.meetsRequirement && (
-            <span className="ox-term__badge">
-              hold ok
-              {boot.hold.holdingUsd != null ? ` $${Number(boot.hold.holdingUsd).toFixed(0)}` : ""}
-            </span>
           )}
         </div>
+      )}
 
-        {error && (
-          <div className="ox-term__err">
-            ERR {error}
-            {(error.includes("agents") || error.includes("schema") || error.includes("relation")) && (
-              <div style={{ marginTop: 6, opacity: 0.7 }}>
-                apply sql/Aug_SQL/ in supabase if tables missing
+      {tab === "setup" && (
+        <div className="ox-agent__grid ox-agent__grid--2">
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Quick start</h2>
+              <span className="ox-agent__panel-hint">3 steps</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <ol className="ox-agent__ol">
+                <li>Link your Solana wallet</li>
+                <li>Create an API key (shown once)</li>
+                <li>Add OrbitX to Claude or ChatGPT and Authenticate</li>
+              </ol>
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => setTab("wallet")}>
+                  {linkedWallet ? "Review wallet" : "Link wallet"}
+                </button>
+                <button type="button" className="ox-agent__btn" onClick={() => setTab("keys")}>
+                  {hasKey ? "Manage keys" : "Create key"}
+                </button>
+                <button type="button" className="ox-agent__btn" onClick={() => setTab("connect")}>
+                  Connect AI
+                </button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          </section>
 
-        {/* identity */}
-        <section className="ox-term__section">
-          <div className="ox-term__section-h">
-            <div className="ox-term__prompt">identity</div>
-            <div className="ox-term__hint">linked solana wallet</div>
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">MCP endpoint</h2>
+              <span className="ox-agent__panel-hint">use www</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <FieldRow
+                label="MCP URL"
+                value={oauth.mcpUrl}
+                copied={copied === "mcp"}
+                onCopy={() => copy("mcp", oauth.mcpUrl)}
+              />
+              <p className="ox-agent__note">
+                Must end in <code>/mcp</code>. Apex redirects break connectors — always use{" "}
+                <strong>www.orbitx.world</strong>.
+              </p>
+              <div className="ox-agent__btn-row">
+                <button
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--primary"
+                  onClick={() => setTab("connect")}
+                >
+                  Open connect
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === "wallet" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Wallet</h2>
+            <span className="ox-agent__panel-hint">linked Solana identity</span>
           </div>
-          <div className="ox-term__body">
+          <div className="ox-agent__panel-b">
             {linkedWallet ? (
               <>
-                <div className="ox-term__row">
-                  <div className="ox-term__label">wallet</div>
-                  <div className="ox-term__value">{linkedWallet}</div>
-                  <div className="ox-term__actions">
+                <div className="ox-agent__row">
+                  <div className="ox-agent__label">Wallet</div>
+                  <div className="ox-agent__value">{linkedWallet}</div>
+                  <div className="ox-agent__actions">
                     <button
                       type="button"
-                      className="ox-term__btn ox-term__btn--ghost"
+                      className="ox-agent__btn"
                       onClick={() => copy("wallet", linkedWallet)}
                     >
-                      {copied === "wallet" ? "copied" : "copy"}
+                      {copied === "wallet" ? "Copied" : "Copy"}
                     </button>
                   </div>
                 </div>
                 {boot?.agent?.id && (
-                  <div className="ox-term__row">
-                    <div className="ox-term__label">agent id</div>
-                    <div className="ox-term__value">{boot.agent.id}</div>
+                  <div className="ox-agent__row">
+                    <div className="ox-agent__label">Agent ID</div>
+                    <div className="ox-agent__value">{boot.agent.id}</div>
+                    <span />
                   </div>
                 )}
                 {walletAddress && walletAddress !== boot?.agent.walletAddress && (
-                  <button
-                    type="button"
-                    className="ox-term__btn ox-term__btn--fill"
-                    disabled={linking}
-                    onClick={onLinkWallet}
-                  >
-                    {linking ? "linking…" : "link connected wallet"}
-                  </button>
+                  <div className="ox-agent__btn-row">
+                    <button
+                      type="button"
+                      className="ox-agent__btn ox-agent__btn--primary"
+                      disabled={linking}
+                      onClick={onLinkWallet}
+                    >
+                      {linking ? "Linking…" : "Link connected wallet"}
+                    </button>
+                  </div>
                 )}
               </>
             ) : (
               <>
-                <p className="ox-term__sub" style={{ marginBottom: 12 }}>
-                  no wallet linked — connect to authorize mcp actions
+                <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                  No wallet linked yet. Connect to authorize MCP actions.
                 </p>
-                <div className="ox-term__flex">
+                <div className="ox-agent__btn-row">
                   {pickable.slice(0, 4).map((w) => (
                     <button
                       key={w.name}
                       type="button"
-                      className="ox-term__btn"
+                      className="ox-agent__btn ox-agent__btn--primary"
                       disabled={busy === w.name}
                       onClick={() =>
                         signInWith(w.name, { replaceEmailSession: true })
@@ -346,7 +396,7 @@ export function AgentDashboard() {
                           .catch((e) => setError(e.message))
                       }
                     >
-                      {busy === w.name ? "connecting…" : w.name}
+                      {busy === w.name ? "Connecting…" : w.name}
                     </button>
                   ))}
                 </div>
@@ -354,114 +404,145 @@ export function AgentDashboard() {
             )}
           </div>
         </section>
+      )}
 
-        {/* keys */}
-        <section className="ox-term__section">
-          <div className="ox-term__section-h">
-            <div className="ox-term__prompt">api_key</div>
-            <div className="ox-term__hint">hidden · view to reveal</div>
+      {tab === "keys" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">API keys</h2>
+            <span className="ox-agent__panel-hint">hidden until you view</span>
           </div>
-          <div className="ox-term__body">
+          <div className="ox-agent__panel-b">
             {storedKey && (
               <>
-                <SecretBlock
-                  label="bearer token"
+                <SecretRow
+                  label="Bearer token"
                   value={storedKey}
                   copied={copied === "key"}
                   onCopy={() => copy("key", storedKey)}
                 />
-                <SecretBlock
-                  label="authorization header"
+                <SecretRow
+                  label="Auth header"
                   value={bearerHeader}
                   copied={copied === "bearerHeader"}
                   onCopy={() => copy("bearerHeader", bearerHeader)}
                 />
                 {showKeyPanel && (
-                  <p className="ox-term__sub">new key ready — view → copy → paste into connector headers</p>
+                  <p className="ox-agent__note">New key ready — view, copy, then paste into connector headers.</p>
                 )}
               </>
             )}
 
-            <div className="ox-term__flex" style={{ marginBottom: 12 }}>
+            <div className="ox-agent__btn-row" style={{ marginTop: storedKey ? "1rem" : 0 }}>
               <input
-                className="ox-term__input ox-term__grow"
+                className="ox-agent__input ox-agent__grow"
                 value={keyName}
                 onChange={(e) => setKeyName(e.target.value)}
-                placeholder="key label"
+                placeholder="Key label"
               />
               <button
                 type="button"
-                className="ox-term__btn ox-term__btn--fill"
+                className="ox-agent__btn ox-agent__btn--primary"
                 disabled={creating}
                 onClick={onCreateKey}
               >
-                {creating ? "creating…" : "create key"}
+                {creating ? "Creating…" : "Create key"}
               </button>
             </div>
 
             {(boot?.keys || []).length === 0 ? (
-              <p className="ox-term__sub">no active keys</p>
+              <p className="ox-agent__note">No active keys yet.</p>
             ) : (
-              boot?.keys.map((k) => (
-                <div key={k.id} className="ox-term__keyline">
-                  <div>
-                    <div className="ox-term__value">{k.name}</div>
-                    <div className="ox-term__hint" style={{ marginTop: 4 }}>
-                      {new Date(k.createdAt).toLocaleDateString()}
-                      {k.lastUsedAt ? ` · used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
+              <div style={{ marginTop: "1rem" }}>
+                {boot?.keys.map((k) => (
+                  <div key={k.id} className="ox-agent__keyline">
+                    <div>
+                      <div className="ox-agent__value ox-agent__value--plain">{k.name}</div>
+                      <div className="ox-agent__panel-hint" style={{ marginTop: 4 }}>
+                        {new Date(k.createdAt).toLocaleDateString()}
+                        {k.lastUsedAt ? ` · used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      className="ox-agent__btn ox-agent__btn--danger"
+                      onClick={() => onRevoke(k.id)}
+                    >
+                      Revoke
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="ox-term__btn ox-term__btn--danger"
-                    onClick={() => onRevoke(k.id)}
-                  >
-                    revoke
-                  </button>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </section>
+      )}
 
-        {/* connect */}
-        <section className="ox-term__section">
-          <div className="ox-term__section-h">
-            <div className="ox-term__prompt">connect</div>
-            <div className="ox-term__hint">claude · chatgpt</div>
+      {tab === "connect" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Connect AI</h2>
+            <span className="ox-agent__panel-hint">Claude · ChatGPT</span>
           </div>
-          <div className="ox-term__body">
-            <div className="ox-term__flex" style={{ marginBottom: 14 }}>
+          <div className="ox-agent__panel-b">
+            <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
               <button
                 type="button"
-                className="ox-term__btn ox-term__btn--fill"
-                onClick={() => window.open(claudeConnectUrl(oauth.mcpUrl), "_blank", "noopener,noreferrer")}
+                className="ox-agent__btn ox-agent__btn--primary"
+                onClick={async () => {
+                  if (storedKey) await copy("key", storedKey);
+                  setSetupOpen("claude");
+                  window.open(claudeConnectUrl(oauth.mcpUrl), "_blank", "noopener,noreferrer");
+                }}
               >
-                add to claude
+                Add to Claude
               </button>
               <button
                 type="button"
-                className="ox-term__btn"
-                onClick={() => {
+                className="ox-agent__btn"
+                onClick={async () => {
+                  const pack = [
+                    `MCP URL: ${oauth.mcpUrl}`,
+                    `Authorization URL: ${oauth.authorizationUrl}`,
+                    `Token URL: ${oauth.tokenUrl}`,
+                    `Client ID: ${oauth.clientId}`,
+                    "Client Secret: (leave blank)",
+                    `Scope: ${oauth.scope}`,
+                    storedKey ? `Bearer: ${storedKey}` : "Bearer: (create an api key first)",
+                  ].join("\n");
+                  await copy("chatgptPack", pack);
                   setChatgptGuide(true);
+                  setSetupOpen("chatgpt");
                   window.open(chatgptConnectUrl(), "_blank", "noopener,noreferrer");
                 }}
               >
-                add to chatgpt
+                Add to ChatGPT
               </button>
             </div>
 
-            <div className="ox-term__tabs">
+            {copied === "key" && setupOpen === "claude" && (
+              <p className="ox-agent__note">
+                API key copied — in Claude use Authenticate, or paste <code>Authorization: Bearer …</code> in
+                request headers.
+              </p>
+            )}
+            {copied === "chatgptPack" && (
+              <p className="ox-agent__note">
+                MCP URL + OAuth fields{storedKey ? " + Bearer" : ""} copied — paste into ChatGPT connector.
+              </p>
+            )}
+
+            <div className="ox-agent__subtabs" style={{ marginTop: "1.1rem" }}>
               {(
                 [
-                  ["claude", "claude setup"],
-                  ["chatgpt", "chatgpt setup"],
+                  ["claude", "Claude setup"],
+                  ["chatgpt", "ChatGPT setup"],
                 ] as const
               ).map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
-                  className={`ox-term__tab${setupOpen === id ? " is-on" : ""}`}
+                  className={`ox-agent__subtab${setupOpen === id ? " is-on" : ""}`}
                   onClick={() => setSetupOpen(id)}
                 >
                   {label}
@@ -469,8 +550,8 @@ export function AgentDashboard() {
               ))}
             </div>
 
-            {setupOpen === "claude" && (
-              <ol className="ox-term__ol">
+            {setupOpen === "claude" ? (
+              <ol className="ox-agent__ol">
                 <li>
                   MCP URL must end in <code>/mcp</code> — use the field below
                 </li>
@@ -478,14 +559,13 @@ export function AgentDashboard() {
                   Client ID <code>orbitx-mcp</code>, secret blank
                 </li>
                 <li>
-                  Advanced → header <code>Authorization</code> = Bearer token (view + copy above)
+                  Advanced → header <code>Authorization</code> = Bearer token from the Keys tab
                 </li>
               </ol>
-            )}
-            {setupOpen === "chatgpt" && (
-              <ol className="ox-term__ol">
+            ) : (
+              <ol className="ox-agent__ol">
                 <li>Enable Developer mode in ChatGPT settings</li>
-                <li>Create custom MCP connector with MCP URL</li>
+                <li>Create a custom MCP connector with the MCP URL</li>
                 <li>
                   OAuth: Client ID <code>orbitx-mcp</code>, secret blank, scope <code>orbitx</code>
                 </li>
@@ -493,55 +573,53 @@ export function AgentDashboard() {
               </ol>
             )}
 
-            <div className="ox-term__hint" style={{ marginBottom: 8 }}>
-              connector fields
-            </div>
-            <FieldRow label="mcp url" value={oauth.mcpUrl} copied={copied === "mcp"} onCopy={() => copy("mcp", oauth.mcpUrl)} />
+            <p className="ox-agent__panel-hint" style={{ marginBottom: 8 }}>
+              Connector fields
+            </p>
+            <FieldRow label="MCP URL" value={oauth.mcpUrl} copied={copied === "mcp"} onCopy={() => copy("mcp", oauth.mcpUrl)} />
             <FieldRow
-              label="auth url"
+              label="Auth URL"
               value={oauth.authorizationUrl}
               copied={copied === "auth"}
               onCopy={() => copy("auth", oauth.authorizationUrl)}
             />
             <FieldRow
-              label="token url"
+              label="Token URL"
               value={oauth.tokenUrl}
               copied={copied === "token"}
               onCopy={() => copy("token", oauth.tokenUrl)}
             />
             <FieldRow
-              label="client id"
+              label="Client ID"
               value={oauth.clientId}
               copied={copied === "client"}
               onCopy={() => copy("client", oauth.clientId)}
             />
-            <FieldRow label="client secret" value="(leave blank)" copyable={false} />
+            <FieldRow label="Client secret" value="(leave blank)" copyable={false} />
             <FieldRow
-              label="scope"
+              label="Scope"
               value={oauth.scope}
               copied={copied === "scope"}
               onCopy={() => copy("scope", oauth.scope)}
             />
           </div>
         </section>
-
-        <p className="ox-term__footer">keys stay local until you copy · orbitx never holds wallet keys</p>
-      </div>
+      )}
 
       {chatgptGuide && (
-        <div className="ox-term__modal" onClick={() => setChatgptGuide(false)}>
-          <div className="ox-term__modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="ox-term__prompt" style={{ marginBottom: 8 }}>
-              chatgpt oauth
-            </div>
-            <p className="ox-term__sub">paste into chatgpt · client secret stays empty</p>
+        <div className="ox-agent__modal" onClick={() => setChatgptGuide(false)}>
+          <div className="ox-agent__modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2>ChatGPT OAuth</h2>
+            <p className="ox-agent__note" style={{ marginTop: 0, marginBottom: "0.85rem" }}>
+              Paste into ChatGPT — leave client secret empty.
+            </p>
             {(
               [
-                ["mcp url", oauth.mcpUrl, "mcp"],
-                ["authorization url", oauth.authorizationUrl, "auth"],
-                ["token url", oauth.tokenUrl, "token"],
-                ["client id", oauth.clientId, "client"],
-                ["scope", oauth.scope, "scope"],
+                ["MCP URL", oauth.mcpUrl, "mcp"],
+                ["Authorization URL", oauth.authorizationUrl, "auth"],
+                ["Token URL", oauth.tokenUrl, "token"],
+                ["Client ID", oauth.clientId, "client"],
+                ["Scope", oauth.scope, "scope"],
               ] as const
             ).map(([label, value, id]) => (
               <FieldRow
@@ -552,24 +630,24 @@ export function AgentDashboard() {
                 onCopy={() => copy(id, value)}
               />
             ))}
-            <SecretBlock
-              label="bearer token"
+            <SecretRow
+              label="Bearer token"
               value={storedKey || ""}
-              emptyLabel="create an api key first"
+              emptyLabel="Create an API key first"
               copied={copied === "bearer"}
               onCopy={() => storedKey && copy("bearer", storedKey)}
             />
             <button
               type="button"
-              className="ox-term__btn ox-term__btn--fill"
-              style={{ width: "100%", marginTop: 8 }}
+              className="ox-agent__btn ox-agent__btn--primary"
+              style={{ width: "100%", marginTop: 12 }}
               onClick={() => setChatgptGuide(false)}
             >
-              done
+              Done
             </button>
           </div>
         </div>
       )}
-    </div>
+    </AgentShell>
   );
 }

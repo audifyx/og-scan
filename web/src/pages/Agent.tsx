@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { AgentDashboard } from "../components/agent/agent-dashboard";
 import { TokenGatingVerifier } from "../components/agent/token-gating-verifier";
+import { AgentLoading, AgentShell } from "../components/agent/AgentShell";
 import { useAuth } from "@/hooks/useAuth";
 import {
   isAgentHoldExempt,
@@ -9,9 +10,8 @@ import {
   verifyAgentHold,
 } from "@/lib/agentTokenGate";
 import { isOwnerIdentity } from "@/lib/ownerDesk";
-import "../components/agent/agent-terminal.css";
 
-/** /agent — MCP hub; terminal UI; non-exempt users must pass ORBITX hold. */
+/** /agent — MCP hub; non-exempt users must pass ORBITX hold. */
 function AgentPage() {
   const { publicKey } = useWallet();
   const { user, profile, loading: authLoading } = useAuth();
@@ -33,7 +33,6 @@ function AgentPage() {
   );
 
   const check = useCallback(async () => {
-    // Wait for auth before deciding — owner email exemption needs user.email.
     if (authLoading) {
       setGate("loading");
       return;
@@ -60,27 +59,18 @@ function AgentPage() {
   }, [check]);
 
   if (gate === "loading") {
-    return (
-      <main className="ox-term__loading">
-        <span>checking orbitx hold</span>
-        <span className="ox-term__cursor" />
-      </main>
-    );
+    return <AgentLoading label="Checking ORBITX hold…" />;
   }
 
   if (gate === "blocked") {
     return (
-      <main className="ox-term">
+      <AgentShell showTabs={false} statusLabel="Hold required" statusWarn>
         <TokenGatingVerifier onUnlocked={() => setGate("open")} />
-      </main>
+      </AgentShell>
     );
   }
 
-  return (
-    <main>
-      <AgentDashboard />
-    </main>
-  );
+  return <AgentDashboard />;
 }
 
 export default AgentPage;

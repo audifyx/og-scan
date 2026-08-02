@@ -11,7 +11,8 @@ import {
   type HoldVerifyResult,
 } from "@/lib/agentTokenGate";
 import { linkAgentWallet } from "@/lib/orbitxMcp";
-import "./agent-terminal.css";
+import { AgentLoading } from "./AgentShell";
+import "./agent-shell.css";
 
 export function TokenGatingVerifier({
   onUnlocked,
@@ -90,92 +91,80 @@ export function TokenGatingVerifier({
   };
 
   if (exempt) {
-    return (
-      <div className="ox-term__loading">
-        <span>unlocking exempt owner</span>
-        <span className="ox-term__cursor" />
-      </div>
-    );
+    return <AgentLoading label="Unlocking exempt owner…" />;
   }
 
   return (
-    <div className="ox-term__inner">
-      <div className="ox-term__bar">
-        <div className="ox-term__dots" aria-hidden>
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="ox-term__bar-title">orbitx://agent/gate — tty</div>
-        <span className="ox-term__badge">locked</span>
+    <>
+      <div className="ox-agent__hero">
+        <h1 className="ox-agent__title">Hold required</h1>
+        <p className="ox-agent__lead">
+          Agent MCP needs at least ${AGENT_HOLD_MIN_USD} of ORBITX. Owner and DEF wallets skip this
+          gate.
+        </p>
       </div>
 
-      <h1 className="ox-term__brand">
-        Hold required
-        <span className="ox-term__cursor" aria-hidden />
-      </h1>
-      <p className="ox-term__sub">
-        Agent MCP is gated. Hold at least ${AGENT_HOLD_MIN_USD} of ORBITX, then verify. Owner / DEF
-        wallets skip this block.
-      </p>
-
-      <section className="ox-term__section">
-        <div className="ox-term__section-h">
-          <div className="ox-term__prompt">verify_hold</div>
-          <div className="ox-term__hint">token gate</div>
+      <section className="ox-agent__panel">
+        <div className="ox-agent__panel-h">
+          <h2 className="ox-agent__panel-title">Verify hold</h2>
+          <span className="ox-agent__panel-hint">token gate</span>
         </div>
-        <div className="ox-term__body">
-          <div className="ox-term__row">
-            <div className="ox-term__label">wallet</div>
-            <div className="ox-term__value">{walletAddress || "none — connect below"}</div>
+        <div className="ox-agent__panel-b">
+          <div className="ox-agent__row">
+            <div className="ox-agent__label">Wallet</div>
+            <div className="ox-agent__value">{walletAddress || "None — connect below"}</div>
+            <span />
           </div>
-          <div className="ox-term__row">
-            <div className="ox-term__label">orbitx mint</div>
-            <div className="ox-term__value">{AGENT_HOLD_MINT}</div>
-            {last && !last.exempt && (
-              <div className="ox-term__hint" style={{ marginTop: 6 }}>
-                holding ~${Number(last.holdingUsd || 0).toFixed(2)} (
-                {Number(last.holdingAmount || 0).toFixed(2)} tokens)
-              </div>
-            )}
+          <div className="ox-agent__row">
+            <div className="ox-agent__label">ORBITX mint</div>
+            <div className="ox-agent__value">{AGENT_HOLD_MINT}</div>
+            <span />
           </div>
-
-          {(error || (last && !last.meetsRequirement && last.message)) && (
-            <div className="ox-term__err">{error || last?.message}</div>
+          {last && !last.exempt && (
+            <p className="ox-agent__note">
+              Holding ~${Number(last.holdingUsd || 0).toFixed(2)} (
+              {Number(last.holdingAmount || 0).toFixed(2)} tokens)
+            </p>
           )}
 
-          <div className="ox-term__flex">
+          {(error || (last && !last.meetsRequirement && last.message)) && (
+            <div className="ox-agent__alert" style={{ marginTop: 12 }}>
+              {error || last?.message}
+            </div>
+          )}
+
+          <div className="ox-agent__btn-row">
             {!walletAddress &&
               pickable.slice(0, 4).map((w) => (
                 <button
                   key={w.name}
                   type="button"
-                  className="ox-term__btn"
+                  className="ox-agent__btn"
                   disabled={busy === w.name}
                   onClick={() => connectWallet(w.name)}
                 >
-                  {busy === w.name ? "connecting…" : `connect ${w.name}`}
+                  {busy === w.name ? "Connecting…" : `Connect ${w.name}`}
                 </button>
               ))}
             <button
               type="button"
-              className="ox-term__btn ox-term__btn--fill"
+              className="ox-agent__btn ox-agent__btn--primary"
               disabled={checking || !walletAddress}
               onClick={verify}
             >
-              {checking ? "checking…" : "verify holdings"}
+              {checking ? "Checking…" : "Verify holdings"}
             </button>
             <a
-              className="ox-term__btn"
+              className="ox-agent__btn"
               href={`https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`}
               target="_blank"
               rel="noopener noreferrer"
             >
-              buy orbitx
+              Buy ORBITX
             </a>
           </div>
         </div>
       </section>
-    </div>
+    </>
   );
 }
