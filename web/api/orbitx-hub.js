@@ -2627,7 +2627,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         username,
         avatar_url: profile?.avatar_url || null,
         content: body,
-        post_type: "text",
+        post_type: "post",
       }),
     });
     const post = Array.isArray(created) ? created[0] : created;
@@ -2635,8 +2635,10 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       ok: true,
       post,
       platform: "/communities",
-      viewUrl: `https://www.orbitx.world/communities`,
-      note: "Posted to live community_posts — visible on /communities (not the /hq demo store).",
+      viewUrl: communityId
+        ? `https://www.orbitx.world/communities?c=${encodeURIComponent(communityId)}`
+        : "https://www.orbitx.world/communities",
+      note: "Posted to live community_posts — open /communities (not /hq demo). Join the community or open it directly to see the post.",
     };
   }
 

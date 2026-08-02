@@ -49,8 +49,51 @@ insert into ogdex_config (key, value) values
   ('og_token',          '"EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump"')
 on conflict (key) do nothing;
 
+-- Listings + boosts (MCP + desk pending queues)
+create table if not exists ogdex_listings (
+  id uuid primary key default gen_random_uuid(),
+  contract_address text not null,
+  chain text not null default 'solana',
+  tier text not null default 'standard',
+  status text not null default 'pending',
+  project_name text,
+  symbol text,
+  logo_url text,
+  banner_url text,
+  description text,
+  links jsonb default '{}'::jsonb,
+  contact text,
+  payment_tx text,
+  metadata jsonb default '{}'::jsonb,
+  featured boolean default false,
+  featured_rank integer default 0,
+  views integer default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  approved_at timestamptz
+);
+
+create table if not exists ogdex_boosts (
+  id uuid primary key default gen_random_uuid(),
+  mint text not null,
+  tier text not null,
+  payment_tx text,
+  payer_wallet text,
+  symbol text,
+  name text,
+  icon text,
+  chain text not null default 'solana',
+  status text not null default 'pending',
+  expires_at timestamptz,
+  usd_paid numeric default 0,
+  featured_rank integer default 999,
+  created_at timestamptz not null default now()
+);
+
 -- Enable RLS (admin reads via service role key in _lib.js)
 alter table ogdex_pro_wallets    enable row level security;
 alter table ogdex_banned_wallets enable row level security;
 alter table ogdex_kol_nominations enable row level security;
 alter table ogdex_config          enable row level security;
+alter table ogdex_listings        enable row level security;
+alter table ogdex_boosts          enable row level security;

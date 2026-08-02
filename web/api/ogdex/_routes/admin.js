@@ -25,7 +25,10 @@ export default async function handler(req, res) {
       dbSelect("ogdex_listings",       "status=eq.rejected&order=updated_at.desc&limit=100"),
       dbSelect("ogdex_events",         "order=created_at.desc&limit=5000"),
       dbSelect("ogdex_kol_directory",  "select=kol_id,address,name,x_handle,tags,status&order=name.asc&limit=1000").catch(() => []),
-      dbSelect("ogdex_boosts",         "order=created_at.desc&limit=200").catch(() => []),
+      dbSelect("ogdex_boosts",         "order=created_at.desc&limit=200").catch((e) => {
+        console.error("[ogdex/admin] ogdex_boosts missing/error:", e?.message || e);
+        return [];
+      }),
       dbSelect("ogdex_launches",       "order=created_at.desc&limit=200").catch(() => []),
       dbSelect("ogdex_kol_nominations","order=submitted_at.desc&limit=200").catch(() => []),
       dbSelect("ogdex_pro_wallets",    "order=granted_at.desc&limit=500").catch(() => []),
