@@ -9,20 +9,8 @@ import {
   CheckSquare, XSquare, Wallet, LayoutDashboard, List, Mail, MessageSquare, LifeBuoy, Link2, Mic,
 } from "lucide-react";
 
-/** Server ADMIN_PASS for API calls — never prompt in UI (desk unlock is the only gate). */
-function resolveAdminPass(): string {
-  try {
-    const fromEnv = String((import.meta as any).env?.VITE_ADMIN_PASS || "").trim();
-    if (fromEnv.length >= 8) return fromEnv;
-  } catch {
-    /* ignore */
-  }
-  try {
-    return String(localStorage.getItem("ogdex_admin_pass") || "").trim();
-  } catch {
-    return "";
-  }
-}
+/** Desk unlock code doubles as API credential — no VITE_ADMIN_PASS / second password. */
+const DESK_API_PASS = "0129";
 
 // ─── Tab type ─────────────────────────────────────────────────────────────────
 type Tab =
@@ -77,46 +65,35 @@ const CAT_LABEL: Record<Cat, string> = { dex: "OrbitX DEX", social: "Social" };
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function Admin() {
-  const [pass] = useState(() => resolveAdminPass());
+  const pass = DESK_API_PASS;
   const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState("");
   const [tab, setTab]         = useState<Tab>("overview");
   const [health, setHealth]   = useState<any>(null);
 
-  const load = async (p = pass) => {
+  const load = async () => {
     setLoading(true);
     setErr("");
-    if (!p) {
-      setData(null);
-      setErr("Admin API key missing. Set VITE_ADMIN_PASS in the build env (server ADMIN_PASS stays server-only). Desk unlock code is enough for the UI gate.");
-      setLoading(false);
-      return;
-    }
-    const d = await adminGet(p);
+    const d = await adminGet(pass);
     if (d?.ok) {
       setData(d);
-      try {
-        localStorage.setItem("ogdex_admin_pass", p);
-      } catch {
-        /* ignore */
-      }
       fetch("/api/ogdex/health").then((r) => r.json()).then(setHealth).catch(() => {});
     } else {
       setData(null);
-      setErr(d?.error === "unauthorized" ? "Admin API unauthorized — check VITE_ADMIN_PASS matches server ADMIN_PASS." : "Failed to load admin data.");
+      setErr(d?.error === "unauthorized" ? "Unauthorized — unlock the desk and retry." : "Failed to load admin data.");
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    void load(pass);
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const act = async (action: string, id?: string, extra?: any) => {
     const r = await adminAction(pass, action, id, extra);
-    await load(pass);
+    await load();
     return r;
   };
 
@@ -148,7 +125,7 @@ export default function Admin() {
         </div>
         <p className="text-xs text-muted">{err || "Unknown error"}</p>
         <div className="flex gap-2">
-          <button type="button" onClick={() => load(pass)} className="btn bg-accent text-black font-semibold text-xs">
+          <button type="button" onClick={() => load()} className="btn bg-accent text-black font-semibold text-xs">
             Retry
           </button>
           <button type="button" onClick={lockDesk} className="btn bg-panel2 text-muted hover:text-white text-xs">
@@ -170,7 +147,7 @@ export default function Admin() {
         </h1>
         <div className="flex items-center gap-2">
           {err && <span className="text-[10px] text-down max-w-[12rem] truncate">{err}</span>}
-          <button onClick={() => load(pass)} disabled={loading}
+          <button onClick={() => load()} disabled={loading}
             className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5 text-xs">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
