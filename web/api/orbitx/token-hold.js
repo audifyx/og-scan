@@ -12,7 +12,7 @@ export const AGENT_HOLD_MIN_USD = Number(process.env.AGENT_GATE_MIN_USD) || 10;
 export const TOKEN_GATE_EXEMPT_WALLETS = [
   "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
   "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
-  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET
+  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET (owner — starts with j)
 ];
 
 /** Owner emails that skip the hold (matches owner desk). */

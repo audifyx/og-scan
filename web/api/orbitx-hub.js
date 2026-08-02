@@ -58,11 +58,56 @@ function mcpUrls(req) {
   const base = publicBase(req);
   // Claude.ai expects a path ending in /mcp. Prefer real function /api/mcp
   // (rewrite-only /mcp can lose to the SPA catch-all during deploys).
+  // Always advertise www — apex orbitx.world 308s POST /api/mcp and breaks tools/list.
+  const mcpHost = "https://www.orbitx.world";
   return {
-    base,
-    mcpUrl: `${base}/api/mcp`,
+    base: base.includes("orbitx.world") ? mcpHost : base,
+    mcpUrl: `${mcpHost}/api/mcp`,
     // HTML auth page lives on www (apex 308s) — avoid breaking OAuth redirects
     authPage: "https://www.orbitx.world/agent/mcp-auth",
+  };
+}
+
+/** Claude / ChatGPT choke on 1000+ tools — expose CORE live tools only in tools/list. */
+function listLiveTools(cursor) {
+  const PAGE = 80;
+  if (!cursor || cursor === "core" || cursor === "0") {
+    const tools = CORE_TOOLS.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    }));
+    return {
+      tools,
+      // Hint there are more via tools_help — do not dump 1000 schemas (breaks connectors).
+      _meta: {
+        totalAvailable: TOOLS.length,
+        liveCore: CORE_TOOLS.length,
+        note: "Live callable tools listed. Call orbitx_tools_help for the full catalog; generated shortcuts still work if you know the name.",
+      },
+    };
+  }
+  // Optional paginated generated tools: cursor = "gen:0", "gen:80", …
+  const m = String(cursor).match(/^gen:(\d+)$/);
+  if (m) {
+    const offset = Number(m[1]) || 0;
+    const slice = _generated.slice(offset, offset + PAGE);
+    const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : undefined;
+    return {
+      tools: slice.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+      })),
+      nextCursor: next,
+    };
+  }
+  return {
+    tools: CORE_TOOLS.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    })),
   };
 }
 
@@ -1913,7 +1958,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       social: ["orbitx_social_communities", "orbitx_social_post", "orbitx_social_join", "orbitx_communities_top20"],
       intel: ["orbitx_search", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
-      note: "Pump.fun launch execution: orbitx_execute_launch (open openUrl → Phantom). Image/video: orbitx_generate_image → orbitx_media_status. Tx tools return signUrl/openUrl — never broadcast unsigned.",
+      note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (auto Flux fallback). Tx tools return signUrl/openUrl.",
+      mcpUrl: "https://www.orbitx.world/api/mcp",
     };
   }
 
@@ -2883,7 +2929,10 @@ async function handleMcp(req, res, parts) {
         scope: "orbitx",
         token_endpoint_auth_method: "none",
       },
-      tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
+      tools: CORE_TOOLS.map((t) => ({ name: t.name, description: t.description })),
+      toolsTotal: TOOLS.length,
+      toolsLive: CORE_TOOLS.length,
+      note: "tools/list returns live CORE tools only — full catalog via orbitx_tools_help",
     });
   }
 
@@ -2914,15 +2963,14 @@ async function handleMcp(req, res, parts) {
     }
 
     if (method === "tools/list") {
+      const cursor = params?.cursor;
+      const listed = listLiveTools(cursor);
       return json(res, {
         jsonrpc: "2.0",
         id,
         result: {
-          tools: TOOLS.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-          })),
+          tools: listed.tools,
+          ...(listed.nextCursor ? { nextCursor: listed.nextCursor } : {}),
         },
       });
     }
