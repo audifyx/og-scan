@@ -5,10 +5,11 @@ import { AgentDashboard } from "../components/agent/agent-dashboard";
 import { TokenGatingVerifier } from "../components/agent/token-gating-verifier";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  isTokenGateExemptWallet,
+  isAgentHoldExempt,
   resolveAuthWallet,
   verifyAgentHold,
 } from "@/lib/agentTokenGate";
+import { isOwnerIdentity } from "@/lib/ownerDesk";
 
 /** /agent — MCP hub; non-exempt users must pass the ORBITX hold block. */
 function AgentPage() {
@@ -32,7 +33,11 @@ function AgentPage() {
   );
 
   const check = useCallback(async () => {
-    if (isTokenGateExemptWallet(walletAddress)) {
+    // Owner email / DEF / platform wallets — no ORBITX hold required.
+    if (
+      isAgentHoldExempt({ wallet: walletAddress, email: user?.email }) ||
+      isOwnerIdentity({ email: user?.email, wallet: walletAddress })
+    ) {
       setGate("open");
       return;
     }
@@ -43,7 +48,7 @@ function AgentPage() {
     } catch {
       setGate("blocked");
     }
-  }, [walletAddress]);
+  }, [walletAddress, user?.email]);
 
   useEffect(() => {
     void check();

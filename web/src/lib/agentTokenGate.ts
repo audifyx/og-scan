@@ -1,7 +1,11 @@
 /** DEF / platform wallets that skip the $10 ORBITX Agent MCP hold requirement. */
 export const TOKEN_GATE_EXEMPT_WALLETS = [
-  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
+  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
+  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET
 ] as const;
+
+export const TOKEN_GATE_EXEMPT_EMAILS = ["audifyx@gmail.com"] as const;
 
 /** Official ORBITX mint — same CA as OfficialToken / token-gating. */
 export const AGENT_HOLD_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -13,6 +17,21 @@ export function isTokenGateExemptWallet(wallet?: string | null): boolean {
   // Accept raw pubkey or SIWS email form: {pubkey}@wallet.orbitx.app
   const bare = addr.includes("@") ? addr.split("@")[0] : addr;
   return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
+}
+
+export function isTokenGateExemptEmail(email?: string | null): boolean {
+  const e = (email || "").toLowerCase().trim();
+  if (!e) return false;
+  if ((TOKEN_GATE_EXEMPT_EMAILS as readonly string[]).includes(e)) return true;
+  const m = e.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})@wallet\.orbitx\.app$/i);
+  return Boolean(m && isTokenGateExemptWallet(m[1]));
+}
+
+export function isAgentHoldExempt(opts: {
+  wallet?: string | null;
+  email?: string | null;
+}): boolean {
+  return isTokenGateExemptWallet(opts.wallet) || isTokenGateExemptEmail(opts.email);
 }
 
 /** Resolve Solana wallet from adapter + SIWS/auth identity (same sources as owner desk). */
@@ -68,6 +87,19 @@ export async function verifyAgentHold(wallet?: string | null): Promise<HoldVerif
   const { supabase } = await import("@/lib/supabase");
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
+  const email = data.session?.user?.email || null;
+  if (isTokenGateExemptEmail(email)) {
+    return {
+      ok: true,
+      meetsRequirement: true,
+      exempt: true,
+      wallet: wallet || null,
+      mint: AGENT_HOLD_MINT,
+      minUsd: AGENT_HOLD_MIN_USD,
+      message: "Owner email exempt",
+    };
+  }
+
   if (!token) {
     return {
       ok: false,

@@ -12,7 +12,9 @@ const VERIFICATION_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
 
 /** DEF / platform wallets that skip the $10 ORBITX hold requirement. */
 export const TOKEN_GATE_EXEMPT_WALLETS = [
-  '4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd',
+  '4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd', // DEF / owner
+  '45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE', // PLATFORM_WALLET
+  'jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb', // ROUTED_FEE_WALLET
 ] as const;
 
 export function isTokenGateExemptWallet(wallet?: string | null): boolean {

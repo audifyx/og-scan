@@ -30,7 +30,7 @@ async function grokImagine() {
   return import("./orbitx/grok-imagine.js");
 }
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -174,7 +174,7 @@ async function sb(path, init = {}) {
   return data;
 }
 
-async function getUserId(req) {
+async function getAuthUser(req) {
   const auth = header(req, "authorization");
   if (!auth.startsWith("Bearer ") || !SUPA_URL || !ANON) return null;
   const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
@@ -182,6 +182,12 @@ async function getUserId(req) {
   });
   if (!r.ok) return null;
   const u = await r.json();
+  if (!u?.id) return null;
+  return { id: u.id, email: u.email || null };
+}
+
+async function getUserId(req) {
+  const u = await getAuthUser(req);
   return u?.id || null;
 }
 
@@ -278,25 +284,28 @@ async function handleAgent(req, res, parts) {
   }
 
   if (route === "verify-hold" && req.method === "POST") {
-    const userId = await getUserId(req);
-    if (!userId) return json(res, { error: "unauthorized" }, 401);
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
     const body = await readBody(req);
     const { base } = mcpUrls(req);
+    const agent = await ensureAgent(authUser.id);
     let wallet = String(body.walletAddress || body.wallet || body.publicKey || "").trim();
-    if (!wallet) {
-      const agent = await ensureAgent(userId);
-      wallet = String(agent.wallet_address || "").trim();
+    if (!wallet) wallet = String(agent.wallet_address || "").trim();
+    // Prefer exempt if either connected wallet OR linked agent wallet qualifies.
+    if (isTokenGateExemptWallet(agent.wallet_address) && !isTokenGateExemptWallet(wallet)) {
+      wallet = String(agent.wallet_address);
     }
-    const hold = await verifyTokenHold(wallet, base);
+    const hold = await verifyTokenHold(wallet, base, { email: authUser.email });
     return json(res, hold, hold.meetsRequirement ? 200 : 403);
   }
 
   if (route === "bootstrap" && req.method === "POST") {
-    const userId = await getUserId(req);
-    if (!userId) return json(res, { error: "unauthorized" }, 401);
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const userId = authUser.id;
     const agent = await ensureAgent(userId);
     const { base, mcpUrl } = mcpUrls(req);
-    const hold = await verifyTokenHold(agent.wallet_address, base);
+    const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
     const keys = await listKeys(agent.id);
     let mintedKey = null;
     // Only auto-mint a key when hold (or exempt) is satisfied.
@@ -334,13 +343,14 @@ async function handleAgent(req, res, parts) {
   }
 
   if (route === "keys" && req.method === "POST") {
-    const userId = await getUserId(req);
-    if (!userId) return json(res, { error: "unauthorized" }, 401);
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const userId = authUser.id;
     const body = await readBody(req);
     const name = String(body.name || "").trim() || "MCP Key";
     const agent = await ensureAgent(userId);
     const { base } = mcpUrls(req);
-    const hold = await verifyTokenHold(agent.wallet_address, base);
+    const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
     if (!hold.meetsRequirement) {
       return json(res, holdBlockedPayload({ hold }), 403);
     }
@@ -406,8 +416,9 @@ async function handleAgent(req, res, parts) {
   }
 
   if (route === "oauth/approve" && req.method === "POST") {
-    const userId = await getUserId(req);
-    if (!userId) return json(res, { error: "unauthorized" }, 401);
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const userId = authUser.id;
     const body = await readBody(req);
     const redirectUri = String(body.redirect_uri || "").trim();
     const state = body.state != null ? String(body.state) : "";
@@ -428,7 +439,9 @@ async function handleAgent(req, res, parts) {
     }
 
     const { base } = mcpUrls(req);
-    const hold = await verifyTokenHold(wallet || agent.wallet_address, base);
+    const hold = await verifyTokenHold(wallet || agent.wallet_address, base, {
+      email: authUser.email,
+    });
     if (!hold.meetsRequirement) {
       return json(res, holdBlockedPayload({ hold }), 403);
     }
@@ -1633,7 +1646,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_generate_image",
     description:
-      "Generate images with Grok Imagine (kie.ai). Quality mode returns ~4 images. Returns taskId — poll with orbitx_media_status. Set wait=true to block briefly.",
+      "Generate images via kie.ai. Tries Grok Imagine first; auto-falls back to Flux-2 if Grok is at capacity. Defaults to wait=true and returns imageUrls. Optional model: auto|grok|flux.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1641,15 +1654,21 @@ const CORE_TOOLS = [
         aspect_ratio: {
           type: "string",
           enum: ["2:3", "3:2", "1:1", "9:16", "16:9"],
-          default: "3:2",
+          default: "1:1",
         },
         enable_pro: {
           type: "boolean",
           default: true,
-          description: "true=quality (~4 imgs), false=standard/speed (~6 imgs)",
+          description: "Grok quality mode (~4 imgs) when provider=grok",
         },
-        nsfw_checker: { type: "boolean", default: true },
-        wait: { type: "boolean", default: false, description: "Poll up to ~25s before returning" },
+        model: {
+          type: "string",
+          enum: ["auto", "grok", "flux"],
+          default: "auto",
+          description: "auto = Grok then Flux fallback",
+        },
+        nsfw_checker: { type: "boolean", default: false },
+        wait: { type: "boolean", default: true, description: "Wait up to ~55s for imageUrls" },
       },
       required: ["prompt"],
     },
@@ -1900,26 +1919,54 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_generate_image") {
     const gi = await grokImagine();
-    return gi.generateImage(args);
+    try {
+      return await gi.generateImage(args);
+    } catch (e) {
+      return {
+        ok: false,
+        kind: "image",
+        error: e?.message || "image generation failed",
+        fix:
+          /KIE_API_KEY/i.test(String(e?.message || ""))
+            ? "Set KIE_API_KEY in Vercel env (https://kie.ai/api-key), redeploy, retry."
+            : "Retry with model=flux, or simplify the prompt.",
+      };
+    }
   }
 
   if (name === "orbitx_generate_video") {
     const gi = await grokImagine();
-    return gi.generateVideo(args);
+    try {
+      return await gi.generateVideo(args);
+    } catch (e) {
+      return {
+        ok: false,
+        kind: "video",
+        error: e?.message || "video generation failed",
+        fix: /KIE_API_KEY/i.test(String(e?.message || ""))
+          ? "Set KIE_API_KEY in Vercel env and redeploy."
+          : "Retry later — Grok video capacity may be limited.",
+      };
+    }
   }
 
   if (name === "orbitx_media_status") {
     const gi = await grokImagine();
-    const status = await gi.getTask(String(args.taskId || ""));
-    return {
-      ...status,
-      instructions:
-        status.state === "success"
-          ? "Use resultUrls for the media files."
-          : status.state === "fail"
-            ? `Failed: ${status.failMsg || status.failCode || "unknown"}`
-            : "Still processing — call orbitx_media_status again shortly.",
-    };
+    try {
+      const status = await gi.getTask(String(args.taskId || ""));
+      return {
+        ...status,
+        imageUrls: status.imageUrls || status.resultUrls || [],
+        instructions:
+          status.state === "success"
+            ? "Use resultUrls / imageUrls for the media files."
+            : status.state === "fail"
+              ? `Failed: ${status.failMsg || status.failCode || "unknown"}. For images, retry orbitx_generate_image with model=flux.`
+              : "Still processing — call orbitx_media_status again shortly.",
+      };
+    } catch (e) {
+      return { ok: false, error: e?.message || "status check failed", taskId: args.taskId || null };
+    }
   }
 
   if (name === "orbitx_report_url") {

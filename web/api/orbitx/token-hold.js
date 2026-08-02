@@ -8,15 +8,34 @@ export const AGENT_HOLD_MINT =
 
 export const AGENT_HOLD_MIN_USD = Number(process.env.AGENT_GATE_MIN_USD) || 10;
 
+/** DEF + platform / owner fee wallets — skip $10 ORBITX hold. */
 export const TOKEN_GATE_EXEMPT_WALLETS = [
-  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
+  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET
+  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb", // ROUTED_FEE_WALLET
 ];
+
+/** Owner emails that skip the hold (matches owner desk). */
+export const TOKEN_GATE_EXEMPT_EMAILS = ["audifyx@gmail.com"];
 
 export function isTokenGateExemptWallet(wallet) {
   const addr = String(wallet || "").trim();
   if (!addr) return false;
   const bare = addr.includes("@") ? addr.split("@")[0] : addr;
   return TOKEN_GATE_EXEMPT_WALLETS.some((w) => w === bare || w === addr);
+}
+
+export function isTokenGateExemptEmail(email) {
+  const e = String(email || "").toLowerCase().trim();
+  if (!e) return false;
+  if (TOKEN_GATE_EXEMPT_EMAILS.includes(e)) return true;
+  // Wallet SIWS session for an exempt pubkey
+  const m = e.match(/^([1-9a-hj-np-za-km-z]{32,44})@wallet\.orbitx\.app$/i);
+  return Boolean(m && isTokenGateExemptWallet(m[1]));
+}
+
+export function isTokenGateExempt({ wallet, email } = {}) {
+  return isTokenGateExemptWallet(wallet) || isTokenGateExemptEmail(email);
 }
 
 export function holdBlockedPayload(extra = {}) {
@@ -85,14 +104,15 @@ async function tokenUiAmount(base, wallet, mint) {
  *   message?: string,
  * }}
  */
-export async function verifyTokenHold(wallet, base = "https://orbitx.world") {
+export async function verifyTokenHold(wallet, base = "https://orbitx.world", opts = {}) {
   const pk = String(wallet || "").trim();
+  const email = String(opts.email || "").trim();
   const mint = AGENT_HOLD_MINT;
   const minUsd = AGENT_HOLD_MIN_USD;
   const holdUrl = `https://orbitx.world/ORBITX_DEX/token/${mint}`;
   const buyUrl = `https://jup.ag/swap/SOL-${mint}`;
 
-  if (isTokenGateExemptWallet(pk)) {
+  if (isTokenGateExempt({ wallet: pk, email })) {
     return {
       ok: true,
       meetsRequirement: true,
@@ -105,7 +125,7 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world") {
       holdingUsd: 0,
       holdUrl,
       buyUrl,
-      message: "Exempt wallet — hold requirement skipped.",
+      message: "Owner/DEF exempt — hold requirement skipped.",
     };
   }
 
@@ -191,10 +211,6 @@ export const HOLD_GATED_TOOLS = new Set([
   "orbitx_rent_refund",
   "orbitx_burn",
   "orbitx_mint_nft",
-  "orbitx_generate_image",
-  "orbitx_generate_video",
-  "orbitx_grok_image",
-  "orbitx_grok_video",
   "orbitx_social_join",
   "orbitx_social_post",
   "orbitx_social_create_community",
@@ -218,9 +234,10 @@ export const HOLD_GATED_TOOLS = new Set([
 ]);
 
 export function isHoldGatedTool(name) {
+  // Media (image/video) is not hold-gated — API keys already require hold to mint.
+  if (/^orbitx_(generate_|grok_|gen_|media_)/.test(name)) return false;
   if (HOLD_GATED_TOOLS.has(name)) return true;
   if (/^orbitx_(buy|sell)_/.test(name)) return true;
   if (/^orbitx_create_token_/.test(name)) return true;
-  if (/^orbitx_generate_/.test(name)) return true;
   return false;
 }
