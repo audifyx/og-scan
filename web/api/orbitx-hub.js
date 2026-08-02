@@ -823,13 +823,28 @@ const WALLET_TOOLS = new Set([
   "orbitx_nft_favorite",
 ]);
 
-/** Community write tools — need Bearer userId (or publicKey of a wallet linked on /agent). */
+/** Community / listing write tools — need Bearer userId (or publicKey of a wallet linked on /agent). */
 const SESSION_TOOLS = new Set([
   "orbitx_social_join",
   "orbitx_social_post",
   "orbitx_social_create_community",
   "orbitx_social_leave",
+  "orbitx_submit_listing",
+  "orbitx_request_boost",
 ]);
+
+async function getProfileForUser(userId) {
+  const id = String(userId || "").trim();
+  if (!id) return null;
+  try {
+    const rows = await sb(
+      `profiles?user_id=eq.${encodeURIComponent(id)}&select=username,display_name,avatar_url&limit=1`,
+    );
+    return Array.isArray(rows) ? rows[0] : null;
+  } catch {
+    return null;
+  }
+}
 
 const TOOL_ALIASES = {
   orbitx_buy: "orbitx_prepare_buy",
@@ -837,6 +852,11 @@ const TOOL_ALIASES = {
   orbitx_buy_auto: "orbitx_prepare_buy",
   orbitx_sell_pump: "orbitx_prepare_sell",
   orbitx_launch_token: "orbitx_execute_launch",
+  orbitx_create_community: "orbitx_social_create_community",
+  orbitx_post_community: "orbitx_social_post",
+  orbitx_list_token: "orbitx_submit_listing",
+  orbitx_boost_token: "orbitx_request_boost",
+  orbitx_request_listing: "orbitx_submit_listing",
   orbitx_create_coin: "orbitx_execute_launch",
   orbitx_create_token: "orbitx_execute_launch",
   orbitx_prepare_launch: "orbitx_execute_launch",
@@ -1353,7 +1373,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_social_communities",
-    description: "List OrbitX World communities (public/unlisted).",
+    description: "List live OrbitX communities from /communities (active communities table).",
     inputSchema: {
       type: "object",
       properties: { limit: { type: "integer", default: 30 } },
@@ -1361,7 +1381,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_social_feed",
-    description: "Fetch community social feed posts (optional communityId filter).",
+    description: "Fetch live community_posts feed (optional communityId). Same posts as /communities.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1373,7 +1393,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_social_join",
     description:
-      "Join an OrbitX World community via MCP. Requires Authorization: Bearer <oxo_ key from https://orbitx.world/agent> OR publicKey of a wallet linked on /agent. Not the /hq localStorage feed.",
+      "Join a live OrbitX community (/communities). Writes to community_members. Requires Bearer oxo_ key or linked publicKey from /agent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1386,7 +1406,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_social_post",
     description:
-      "Create a post in an OrbitX World community via MCP. Requires Bearer oxo_ key from https://orbitx.world/agent (connector request header) OR publicKey of a wallet linked on /agent.",
+      "Post to a live OrbitX community feed (/communities). Writes community_posts. Requires Bearer oxo_ key or linked publicKey.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1400,17 +1420,54 @@ const CORE_TOOLS = [
   {
     name: "orbitx_social_create_community",
     description:
-      "Create an OrbitX World community via MCP. Requires Bearer oxo_ key or publicKey of a wallet linked on /agent.",
+      "Create a live OrbitX community on /communities (same table as the website + admin). Requires Bearer oxo_ key or linked publicKey. slug optional.",
     inputSchema: {
       type: "object",
       properties: {
         name: { type: "string" },
-        slug: { type: "string" },
+        slug: { type: "string", description: "Optional; unused by platform UI" },
         description: { type: "string" },
         visibility: { type: "string", enum: ["public", "unlisted", "private"], default: "public" },
         publicKey: { type: "string", description: "Linked Solana wallet if no Bearer" },
       },
-      required: ["name", "slug"],
+      required: ["name"],
+    },
+  },
+  {
+    name: "orbitx_submit_listing",
+    description:
+      "Submit a token listing request to OG DEX admin (status=pending). Appears in owner desk Listings → Pending.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string", description: "Token mint / contract address" },
+        contract_address: { type: "string" },
+        symbol: { type: "string" },
+        project_name: { type: "string" },
+        description: { type: "string" },
+        chain: { type: "string", default: "solana" },
+        tier: { type: "string", enum: ["standard", "express"], default: "standard" },
+        contact: { type: "string" },
+        publicKey: { type: "string" },
+      },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_request_boost",
+    description:
+      "Request a token boost (status=pending). Appears in owner desk Boosts for admin approve.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        tier: { type: "string", enum: ["6h", "24h"], default: "24h" },
+        symbol: { type: "string" },
+        name: { type: "string" },
+        chain: { type: "string", default: "solana" },
+        publicKey: { type: "string" },
+      },
+      required: ["mint"],
     },
   },
   {
@@ -2077,7 +2134,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         "orbitx_grok_image",
         "orbitx_grok_video",
       ],
-      social: ["orbitx_social_communities", "orbitx_social_post", "orbitx_social_join", "orbitx_communities_top20"],
+      social: [
+        "orbitx_social_communities",
+        "orbitx_social_create_community",
+        "orbitx_social_post",
+        "orbitx_social_join",
+        "orbitx_submit_listing",
+        "orbitx_request_boost",
+      ],
       intel: ["orbitx_search", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
       note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (Grok Imagine / KIE_API_KEY only). Tx tools return signUrl/openUrl.",
@@ -2456,14 +2520,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
 
   if (name === "orbitx_social_communities") {
     const limit = Math.min(Number(args.limit) || 30, 100);
+    // Live platform table used by /communities + admin CommunityManagement
     return sb(
-      `oxw_communities?visibility=in.(public,unlisted)&order=member_count.desc&limit=${limit}&select=id,slug,name,description,visibility,member_count,avatar_url,created_at`,
+      `communities?is_active=eq.true&order=member_count.desc&limit=${limit}&select=id,name,description,privacy,category,member_count,avatar_url,icon,created_at,invite_code`,
     );
   }
 
   if (name === "orbitx_social_feed") {
     const limit = Math.min(Number(args.limit) || 40, 100);
-    let path = `oxw_community_posts?deleted_at=is.null&order=created_at.desc&limit=${limit}&select=id,community_id,author_id,body,media,like_count,comment_count,created_at`;
+    let path = `community_posts?order=created_at.desc&limit=${limit}&select=id,community_id,user_id,username,avatar_url,content,image_url,likes_count,replies_count,post_type,created_at`;
     if (args.communityId) path += `&community_id=eq.${encodeURIComponent(String(args.communityId))}`;
     return sb(path);
   }
@@ -2473,7 +2538,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     if (!communityId) throw new Error("communityId required");
     const limit = Math.min(Number(args.limit) || 50, 200);
     return sb(
-      `oxw_community_members?community_id=eq.${encodeURIComponent(communityId)}&order=joined_at.desc&limit=${limit}&select=community_id,user_id,role,joined_at`,
+      `community_members?community_id=eq.${encodeURIComponent(communityId)}&order=joined_at.desc&limit=${limit}&select=id,community_id,user_id,role,joined_at`,
     );
   }
 
@@ -2487,10 +2552,23 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     const communityId = String(args.communityId || "").trim();
     if (!communityId) throw new Error("communityId required");
     await sb(
-      `oxw_community_members?community_id=eq.${encodeURIComponent(communityId)}&user_id=eq.${encodeURIComponent(session.userId)}`,
+      `community_members?community_id=eq.${encodeURIComponent(communityId)}&user_id=eq.${encodeURIComponent(session.userId)}`,
       { method: "DELETE", headers: { Prefer: "return=minimal" } },
     );
-    return { ok: true, left: communityId, userId: session.userId };
+    try {
+      const rows = await sb(`communities?id=eq.${encodeURIComponent(communityId)}&select=member_count`);
+      const c = Array.isArray(rows) ? rows[0] : null;
+      if (c) {
+        await sb(`communities?id=eq.${encodeURIComponent(communityId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ member_count: Math.max(0, Number(c.member_count || 1) - 1) }),
+          headers: { Prefer: "return=minimal" },
+        });
+      }
+    } catch {
+      /* best-effort */
+    }
+    return { ok: true, left: communityId, userId: session.userId, platform: "/communities" };
   }
 
   if (name === "orbitx_social_join") {
@@ -2500,15 +2578,31 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         "Bearer or linked wallet required for community join. Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent, or pass publicKey of a wallet linked there.",
       );
     }
-    return sb("oxw_community_members", {
+    const communityId = String(args.communityId || "").trim();
+    if (!communityId) throw new Error("communityId required");
+    const joined = await sb("community_members", {
       method: "POST",
       body: JSON.stringify({
-        community_id: String(args.communityId),
+        community_id: communityId,
         user_id: session.userId,
         role: "member",
       }),
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     });
+    try {
+      const rows = await sb(`communities?id=eq.${encodeURIComponent(communityId)}&select=member_count`);
+      const c = Array.isArray(rows) ? rows[0] : null;
+      if (c) {
+        await sb(`communities?id=eq.${encodeURIComponent(communityId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ member_count: Number(c.member_count || 0) + 1 }),
+          headers: { Prefer: "return=minimal" },
+        });
+      }
+    } catch {
+      /* best-effort */
+    }
+    return { ok: true, joined: Array.isArray(joined) ? joined[0] : joined, platform: "/communities" };
   }
 
   if (name === "orbitx_social_post") {
@@ -2518,17 +2612,32 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         "Bearer or linked wallet required for community post. Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent (connector request header), or pass publicKey of a wallet linked there.",
       );
     }
-    const body = String(args.body || "").trim();
+    const communityId = String(args.communityId || "").trim();
+    const body = String(args.body || args.content || "").trim();
+    if (!communityId) throw new Error("communityId required");
     if (body.length < 1) throw new Error("body required");
-    return sb("oxw_community_posts", {
+    const profile = await getProfileForUser(session.userId);
+    const username =
+      profile?.username || profile?.display_name || session.walletAddress?.slice(0, 8) || "agent";
+    const created = await sb("community_posts", {
       method: "POST",
       body: JSON.stringify({
-        community_id: String(args.communityId),
-        author_id: session.userId,
-        body,
-        media: [],
+        community_id: communityId,
+        user_id: session.userId,
+        username,
+        avatar_url: profile?.avatar_url || null,
+        content: body,
+        post_type: "text",
       }),
     });
+    const post = Array.isArray(created) ? created[0] : created;
+    return {
+      ok: true,
+      post,
+      platform: "/communities",
+      viewUrl: `https://www.orbitx.world/communities`,
+      note: "Posted to live community_posts — visible on /communities (not the /hq demo store).",
+    };
   }
 
   if (name === "orbitx_social_create_community") {
@@ -2539,38 +2648,120 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       );
     }
     const nameStr = String(args.name || "").trim();
-    const slug = String(args.slug || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-");
-    if (!nameStr || !slug) throw new Error("name and slug required");
-    const created = await sb("oxw_communities", {
+    if (!nameStr) throw new Error("name required");
+    const privacy =
+      args.visibility === "private" || args.visibility === "unlisted" ? "private" : "public";
+    const inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const profile = await getProfileForUser(session.userId);
+    const created = await sb("communities", {
       method: "POST",
       body: JSON.stringify({
         name: nameStr,
-        slug,
-        description: String(args.description || ""),
-        owner_id: session.userId,
-        visibility: ["public", "unlisted", "private"].includes(args.visibility)
-          ? args.visibility
-          : "public",
+        description: String(args.description || "").trim() || null,
+        privacy,
+        category: String(args.category || "general"),
+        created_by: session.userId,
+        creator_name: profile?.username || profile?.display_name || null,
+        creator_avatar: profile?.avatar_url || null,
+        invite_code: inviteCode,
+        is_active: true,
+        member_count: 1,
       }),
     });
     const community = Array.isArray(created) ? created[0] : created;
+    if (!community?.id) throw new Error("Failed to create community on platform");
     try {
-      await sb("oxw_community_members", {
+      await sb("community_members", {
         method: "POST",
         body: JSON.stringify({
           community_id: community.id,
           user_id: session.userId,
-          role: "owner",
+          role: "creator",
         }),
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       });
     } catch {
       /* membership optional if trigger handles it */
     }
-    return community;
+    return {
+      ok: true,
+      community,
+      platform: "/communities",
+      viewUrl: `https://www.orbitx.world/communities`,
+      note: "Created on live communities table — shows on /communities and admin Communities.",
+    };
+  }
+
+  if (name === "orbitx_submit_listing") {
+    const session = await resolveSocialUser(auth, args);
+    const mint = String(args.mint || args.contract_address || "").trim();
+    if (!mint) throw new Error("mint / contract_address required");
+    const tier = args.tier === "express" ? "express" : "standard";
+    const chain = String(args.chain || "solana").toLowerCase();
+    const row = {
+      contract_address: mint,
+      chain,
+      tier,
+      status: "pending",
+      project_name: String(args.project_name || args.name || "").trim() || null,
+      symbol: String(args.symbol || "").trim() || null,
+      description: String(args.description || "").trim() || null,
+      contact: String(args.contact || session?.walletAddress || "").trim() || null,
+      links: {},
+      metadata: {
+        source: "mcp",
+        requestedBy: session?.userId || null,
+        wallet: session?.walletAddress || args.publicKey || null,
+      },
+    };
+    const ins = await sb("ogdex_listings", {
+      method: "POST",
+      body: JSON.stringify(row),
+    });
+    const listing = Array.isArray(ins) ? ins[0] : ins;
+    return {
+      ok: true,
+      listing,
+      status: "pending",
+      adminTab: "listings",
+      note: "Pending listing created — approve in owner desk → Listings → Pending.",
+    };
+  }
+
+  if (name === "orbitx_request_boost") {
+    const session = await resolveSocialUser(auth, args);
+    const mint = String(args.mint || "").trim();
+    if (!mint) throw new Error("mint required");
+    const tierId = args.tier === "6h" ? "6h" : "24h";
+    const hours = tierId === "6h" ? 6 : 24;
+    const usd = tierId === "6h" ? 20 : 60;
+    const expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+    const row = {
+      mint,
+      tier: tierId,
+      payment_tx: `mcp-request:${Date.now()}`,
+      payer_wallet: session?.walletAddress || String(args.publicKey || "").trim() || null,
+      symbol: String(args.symbol || "").trim() || null,
+      name: String(args.name || args.project_name || "").trim() || null,
+      icon: null,
+      chain: String(args.chain || "solana").toLowerCase(),
+      status: "pending",
+      expires_at: expiresAt,
+      usd_paid: usd,
+      featured_rank: 999,
+    };
+    const ins = await sb("ogdex_boosts", {
+      method: "POST",
+      body: JSON.stringify(row),
+    });
+    const boost = Array.isArray(ins) ? ins[0] : ins;
+    return {
+      ok: true,
+      boost,
+      status: "pending",
+      adminTab: "boosts",
+      note: "Pending boost request — approve in owner desk → Boosts.",
+    };
   }
 
   if (name === "orbitx_nft_collections") {

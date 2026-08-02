@@ -249,13 +249,13 @@ export function buildGeneratedTools() {
     push(
       tool(`orbitx_communities_top${limit}`, `Public communities (limit ${limit}).`, { type: "object", properties: {} }, {
         kind: "sb",
-        path: `oxw_communities?visibility=in.(public,unlisted)&order=member_count.desc&limit=${limit}&select=id,slug,name,description,visibility,member_count,avatar_url,created_at`,
+        path: `communities?is_active=eq.true&order=member_count.desc&limit=${limit}&select=id,name,description,privacy,category,member_count,avatar_url,icon,created_at`,
       }),
     );
     push(
       tool(`orbitx_social_feed_top${limit}`, `Community feed (limit ${limit}).`, { type: "object", properties: {} }, {
         kind: "sb",
-        path: `oxw_community_posts?deleted_at=is.null&order=created_at.desc&limit=${limit}&select=id,community_id,author_id,body,media,like_count,comment_count,created_at`,
+        path: `community_posts?order=created_at.desc&limit=${limit}&select=id,community_id,user_id,username,avatar_url,content,image_url,likes_count,replies_count,post_type,created_at`,
       }),
     );
   }

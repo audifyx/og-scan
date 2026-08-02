@@ -253,6 +253,8 @@ export const HOLD_GATED_TOOLS = new Set([
   "orbitx_social_post",
   "orbitx_social_create_community",
   "orbitx_social_leave",
+  "orbitx_submit_listing",
+  "orbitx_request_boost",
   "orbitx_nft_prepare_buy",
   "orbitx_nft_submit_buy",
   "orbitx_nft_like",
