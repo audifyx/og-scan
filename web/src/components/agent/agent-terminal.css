@@ -1,0 +1,394 @@
+/* OrbitX Agent — black/white terminal shell */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
+
+.ox-term {
+  --term-bg: #000000;
+  --term-fg: #f2f2f2;
+  --term-dim: #7a7a7a;
+  --term-mute: #4a4a4a;
+  --term-line: #2a2a2a;
+  --term-panel: #0a0a0a;
+  --term-invert: #ffffff;
+  --term-font: "IBM Plex Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  min-height: 100vh;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-family: var(--term-font);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.ox-term::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.015) 2px,
+    rgba(255, 255, 255, 0.015) 4px
+  );
+  z-index: 1;
+}
+
+.ox-term__inner {
+  position: relative;
+  z-index: 2;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.75rem 1.1rem 3rem;
+}
+
+@media (min-width: 640px) {
+  .ox-term__inner {
+    padding: 2.5rem 1.5rem 4rem;
+  }
+}
+
+.ox-term__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--term-line);
+  background: var(--term-panel);
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.ox-term__dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.ox-term__dots span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1px solid var(--term-dim);
+  border-radius: 999px;
+}
+
+.ox-term__bar-title {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--term-dim);
+}
+
+.ox-term__brand {
+  margin: 1.5rem 0 0.35rem;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ox-term__cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.15em;
+  background: var(--term-fg);
+  vertical-align: -0.1em;
+  animation: ox-term-blink 1.05s steps(1) infinite;
+}
+
+@keyframes ox-term-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ox-term__sub {
+  color: var(--term-dim);
+  font-size: 12px;
+  line-height: 1.55;
+  max-width: 36rem;
+  margin-bottom: 1.5rem;
+}
+
+.ox-term__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.ox-term__step {
+  border: 1px solid var(--term-line);
+  padding: 0.3rem 0.55rem;
+  font-size: 11px;
+  color: var(--term-mute);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ox-term__step.is-ok {
+  border-color: var(--term-fg);
+  color: var(--term-fg);
+}
+
+.ox-term__section {
+  border: 1px solid var(--term-line);
+  background: var(--term-panel);
+  margin-bottom: 1rem;
+}
+
+.ox-term__section-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--term-line);
+  padding: 0.65rem 0.9rem;
+}
+
+.ox-term__prompt {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.ox-term__prompt::before {
+  content: "> ";
+  color: var(--term-dim);
+}
+
+.ox-term__hint {
+  font-size: 10px;
+  color: var(--term-mute);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ox-term__body {
+  padding: 0.9rem;
+}
+
+.ox-term__row {
+  border: 1px solid var(--term-line);
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #000;
+}
+
+.ox-term__label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--term-mute);
+  margin-bottom: 0.35rem;
+}
+
+.ox-term__value {
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+  color: var(--term-fg);
+}
+
+.ox-term__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.ox-term__btn {
+  appearance: none;
+  border: 1px solid var(--term-fg);
+  background: transparent;
+  color: var(--term-fg);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ox-term__btn:hover:not(:disabled) {
+  background: var(--term-invert);
+  color: #000;
+}
+
+.ox-term__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ox-term__btn--fill {
+  background: var(--term-invert);
+  color: #000;
+}
+
+.ox-term__btn--fill:hover:not(:disabled) {
+  background: #d8d8d8;
+}
+
+.ox-term__btn--ghost {
+  border-color: var(--term-line);
+  color: var(--term-dim);
+}
+
+.ox-term__btn--ghost:hover:not(:disabled) {
+  border-color: var(--term-fg);
+  color: var(--term-fg);
+  background: transparent;
+}
+
+.ox-term__btn--danger {
+  border-color: var(--term-line);
+  color: var(--term-dim);
+}
+
+.ox-term__btn--danger:hover:not(:disabled) {
+  border-color: #fff;
+  color: #000;
+  background: #fff;
+}
+
+.ox-term__input {
+  width: 100%;
+  border: 1px solid var(--term-line);
+  background: #000;
+  color: var(--term-fg);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 0.65rem 0.75rem;
+  outline: none;
+}
+
+.ox-term__input:focus {
+  border-color: var(--term-fg);
+}
+
+.ox-term__input::placeholder {
+  color: var(--term-mute);
+}
+
+.ox-term__err {
+  border: 1px solid #fff;
+  background: #111;
+  color: #fff;
+  padding: 0.75rem 0.9rem;
+  font-size: 12px;
+  margin-bottom: 1rem;
+}
+
+.ox-term__tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--term-line);
+  padding-bottom: 0.5rem;
+}
+
+.ox-term__tab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--term-mute);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+
+.ox-term__tab.is-on {
+  border-color: var(--term-fg);
+  color: var(--term-fg);
+}
+
+.ox-term__ol {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+  color: var(--term-dim);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.ox-term__ol code {
+  color: var(--term-fg);
+}
+
+.ox-term__footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--term-mute);
+}
+
+.ox-term__badge {
+  border: 1px solid var(--term-fg);
+  padding: 0.15rem 0.4rem;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ox-term__modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.ox-term__modal-card {
+  width: 100%;
+  max-width: 28rem;
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--term-fg);
+  background: #000;
+  padding: 1.1rem;
+}
+
+.ox-term__flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ox-term__grow {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.ox-term__keyline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--term-line);
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.45rem;
+  background: #000;
+}
+
+.ox-term__loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: #000;
+  color: #7a7a7a;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
