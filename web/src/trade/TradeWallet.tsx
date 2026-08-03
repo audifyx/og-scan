@@ -7,6 +7,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Copy, Check, ExternalLink, Loader2, Wallet } from "lucide-react";
 import { fetchSwaps, fetchWallet } from "./tradeApi";
 import { fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
+import { pushRecentWallet } from "./tradeRecent";
 
 type Tab = "holdings" | "pnl" | "trades";
 
@@ -24,6 +25,7 @@ export default function TradeWallet() {
 
   useEffect(() => {
     if (!address) return;
+    pushRecentWallet(address);
     let on = true;
     setLoading(true);
     Promise.all([fetchWallet(address), fetchSwaps(address, 40)]).then(([w, s]) => {
@@ -91,7 +93,11 @@ export default function TradeWallet() {
     <div className="flex h-full flex-col overflow-hidden bg-black">
       <div className="shrink-0 border-b border-white/10 px-3 py-3">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1.5 text-white/50 hover:bg-white/10">
+          <button
+            type="button"
+            onClick={() => navigate("/trade/portfolio")}
+            className="rounded-full p-1.5 text-white/50 hover:bg-white/10"
+          >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="min-w-0 flex-1">

@@ -140,16 +140,22 @@ export default function TradeProfile() {
           </div>
 
           <Link
-            to="/trade/desk"
+            to={`/trade/wallet/${addr}`}
             className="flex h-12 items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
           >
-            Open trade desk
+            Open my portfolio
           </Link>
           <Link
-            to="/trade/leaderboard"
+            to="/trade/portfolio"
             className="flex h-12 items-center justify-center rounded-2xl border border-white/15 text-sm font-semibold text-white"
           >
-            Trader leaderboard
+            Portfolio hub · wallets & holders
+          </Link>
+          <Link
+            to="/trade/desk"
+            className="flex h-12 items-center justify-center rounded-2xl border border-white/15 text-sm font-semibold text-white"
+          >
+            Open trade desk
           </Link>
           <Link to="/profile" className="block text-center text-[11px] text-white/35 hover:text-white">
             OrbitX account profile →

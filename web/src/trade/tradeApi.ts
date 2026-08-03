@@ -141,6 +141,11 @@ export async function fetchTopTraders(mint: string) {
   return j(`/api/ogdex/traders?mint=${encodeURIComponent(mint)}`);
 }
 
+/** Top holders (+ traders) for a mint via ogdex traders route */
+export async function fetchTopHolders(mint: string) {
+  return fetchTopTraders(mint);
+}
+
 /** Lightweight market movers for notifications / signals feed */
 export async function fetchMarketSignals(): Promise<MarketCoin[]> {
   const [trending, fomo, runners] = await Promise.all([

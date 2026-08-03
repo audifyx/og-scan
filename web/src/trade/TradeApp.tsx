@@ -1,10 +1,10 @@
 /**
  * OrbitX Trade App — mobile + desktop shell.
- * Tabs: Home · Trade · Board · Profile (+ header notifications)
+ * Tabs: Home · Trade · Port · More · Profile (+ header notifications)
  */
 
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { Home, CandlestickChart, Trophy, User, Bell, LayoutGrid } from "lucide-react";
+import { Home, CandlestickChart, Briefcase, User, Bell, LayoutGrid } from "lucide-react";
 
 const LAST_MINT_KEY = "orbitx.trade.lastMint";
 
@@ -21,7 +21,7 @@ function tradeDeskTo(): string {
 const TABS = [
   { id: "home", to: "/trade", end: true, label: "Home", icon: Home },
   { id: "trade", to: "/trade/desk", end: false, label: "Trade", icon: CandlestickChart, dynamic: true },
-  { id: "board", to: "/trade/leaderboard", end: false, label: "Board", icon: Trophy },
+  { id: "port", to: "/trade/portfolio", end: false, label: "Port", icon: Briefcase },
   { id: "more", to: "/trade/more", end: false, label: "More", icon: LayoutGrid },
   { id: "profile", to: "/trade/profile", end: false, label: "Profile", icon: User },
 ] as const;
@@ -32,12 +32,17 @@ function tabActive(pathname: string, id: string) {
       pathname === "/trade" ||
       pathname === "/trade/home" ||
       pathname.startsWith("/trade/token/") ||
-      pathname.startsWith("/trade/wallet/") ||
       pathname.startsWith("/trade/notifications")
     );
   }
   if (id === "trade") return pathname.startsWith("/trade/desk");
-  if (id === "board") return pathname.startsWith("/trade/leaderboard");
+  if (id === "port") {
+    return (
+      pathname.startsWith("/trade/portfolio") ||
+      pathname.startsWith("/trade/wallet/") ||
+      pathname.startsWith("/trade/leaderboard")
+    );
+  }
   if (id === "more") return pathname.startsWith("/trade/more");
   if (id === "profile") return pathname.startsWith("/trade/profile");
   return false;
@@ -45,6 +50,7 @@ function tabActive(pathname: string, id: string) {
 
 function titleFor(pathname: string): string {
   if (pathname.startsWith("/trade/desk")) return "Trade";
+  if (pathname.startsWith("/trade/portfolio")) return "Portfolio";
   if (pathname.startsWith("/trade/leaderboard")) return "Leaderboard";
   if (pathname.startsWith("/trade/more")) return "More";
   if (pathname.startsWith("/trade/profile")) return "Profile";
