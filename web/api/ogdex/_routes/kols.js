@@ -230,7 +230,7 @@ async function pnlRefresh(res, sp) {
     const kols = await dbSelect("kol_profiles", `select=id,wallet_address&order=name.asc&offset=${offset}&limit=${batch}`);
     let n = 0;
     for (const k of kols) {
-      try { const r = await computePnl(k.wallet_address, 40); await dbUpdate("kol_profiles", `id=eq.${eqFilter(k.id)}`, { pnl: Math.round(r.realizedPnlUsd * 100) / 100, win_rate: r.winRate }); n++; } catch {}
+      try { const r = await computePnl(k.wallet_address, { sigLimit: 40 }); await dbUpdate("kol_profiles", `id=eq.${eqFilter(k.id)}`, { pnl: Math.round(r.realizedPnlUsd * 100) / 100, win_rate: r.winRate }); n++; } catch {}
     }
     return send(res, 200, { ok: true, updated: n, offset, batch });
   } catch (e) { return send(res, 200, { ok: false, error: String(e?.message || e) }); }

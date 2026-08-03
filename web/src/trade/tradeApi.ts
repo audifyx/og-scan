@@ -159,11 +159,52 @@ export type LeaderEntry = {
   totalSwaps?: number;
 };
 
+export type WalletTrade = {
+  txHash?: string | null;
+  side?: "buy" | "sell" | string;
+  mint?: string;
+  tokenAmount?: number;
+  solAmount?: number;
+  time?: number;
+  usd?: number | null;
+  name?: string | null;
+  symbol?: string | null;
+  image?: string | null;
+};
+
+export type WalletPnlToken = {
+  mint: string;
+  symbol?: string | null;
+  name?: string | null;
+  image?: string | null;
+  realizedUsd?: number | null;
+  unrealizedUsd?: number | null;
+  unrealizedPct?: number | null;
+  totalUsd?: number | null;
+  closedTrades?: number;
+  wins?: number;
+  losses?: number;
+  winRate?: number | null;
+  open?: boolean;
+  holding?: boolean;
+  holdingAmount?: number;
+  holdingUsd?: number;
+  tokens?: number;
+  pctSupply?: number | null;
+  avgCostUsd?: number | null;
+  costUsd?: number | null;
+  boughtUsd?: number | null;
+  boughtSol?: number | null;
+  curPriceUsd?: number | null;
+  curValueUsd?: number | null;
+  noTradeHistory?: boolean;
+};
+
 export async function fetchWallet(address: string) {
   return j(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);
 }
 
-export async function fetchSwaps(address: string, limit = 40) {
+export async function fetchSwaps(address: string, limit = 80) {
   return j(`/api/ogdex/swaps?address=${encodeURIComponent(address)}&limit=${limit}`);
 }
 

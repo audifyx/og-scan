@@ -18,7 +18,7 @@ import {
   Plus,
 } from "lucide-react";
 import { fetchTopHolders, fetchWallet, searchCoins, type MarketCoin } from "./tradeApi";
-import { fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
+import { fmtPct, fmtPnl, fmtUsd, shortAddr } from "./tradeFmt";
 import {
   addWatchWallet,
   getWatchlist,
@@ -224,7 +224,7 @@ export default function TradePortfolio() {
                       <RefreshCw className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2">
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div className="rounded-2xl bg-black/40 px-3 py-2.5">
                       <p className="text-[9px] text-white/30">SOL</p>
                       <p className="font-mono text-sm font-bold">
@@ -239,13 +239,43 @@ export default function TradePortfolio() {
                       <p className="text-[9px] text-white/30">Realized</p>
                       <p
                         className={`font-mono text-sm font-bold ${
-                          (mine?.pnl?.realizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                          mine?.pnl?.realizedPnlUsd == null
+                            ? "text-white/50"
+                            : mine.pnl.realizedPnlUsd >= 0
+                              ? "text-emerald-400"
+                              : "text-red-400"
                         }`}
                       >
-                        {fmtUsd(mine?.pnl?.realizedPnlUsd)}
+                        {fmtPnl(mine?.pnl?.realizedPnlUsd)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
+                      <p className="text-[9px] text-white/30">Unrealized</p>
+                      <p
+                        className={`font-mono text-sm font-bold ${
+                          mine?.pnl?.unrealizedPnlUsd == null
+                            ? "text-white/50"
+                            : mine.pnl.unrealizedPnlUsd >= 0
+                              ? "text-emerald-400"
+                              : "text-red-400"
+                        }`}
+                      >
+                        {fmtPnl(mine?.pnl?.unrealizedPnlUsd)}
                       </p>
                     </div>
                   </div>
+                  {(mine?.pnl?.winRate != null || mine?.pnl?.closedTrades != null) && (
+                    <p className="mt-2 text-[11px] text-white/40">
+                      {mine?.pnl?.winRate != null
+                        ? `WR ${Number(mine.pnl.winRate) > 1 ? Number(mine.pnl.winRate).toFixed(0) : (Number(mine.pnl.winRate) * 100).toFixed(0)}%`
+                        : "WR —"}
+                      {" · "}
+                      {mine?.pnl?.closedTrades ?? 0} closed
+                      {mine?.pnl?.wins != null || mine?.pnl?.losses != null
+                        ? ` · ${mine?.pnl?.wins ?? "—"}W / ${mine?.pnl?.losses ?? "—"}L`
+                        : ""}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => openWallet(myAddr)}
@@ -361,6 +391,16 @@ export default function TradePortfolio() {
                           </p>
                           <p className="mt-0.5 font-mono text-[10px] text-white/35">{shortAddr(w.address, 8)}</p>
                           <p className="mt-1 font-mono text-sm font-semibold">{fmtUsd(snap?.totalUsd)}</p>
+                          {snap?.pnl && (
+                            <p className="mt-1 font-mono text-[10px] text-white/40">
+                              R {fmtPnl(snap.pnl.realizedPnlUsd)}
+                              {" · "}
+                              U {fmtPnl(snap.pnl.unrealizedPnlUsd)}
+                              {snap.pnl.winRate != null
+                                ? ` · WR ${Number(snap.pnl.winRate) > 1 ? Number(snap.pnl.winRate).toFixed(0) : (Number(snap.pnl.winRate) * 100).toFixed(0)}%`
+                                : ""}
+                            </p>
+                          )}
                         </button>
                         <button
                           type="button"

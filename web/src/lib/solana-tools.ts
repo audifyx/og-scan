@@ -253,6 +253,11 @@ export async function getWalletPnL(walletAddress: string) {
           solPrice,
           realizedPnlUsd: Number(pnl.realizedPnlUsd) || 0,
           unrealizedPnlUsd: Number(pnl.unrealizedPnlUsd) || 0,
+          wins: pnl.wins != null ? Number(pnl.wins) : undefined,
+          losses: pnl.losses != null ? Number(pnl.losses) : undefined,
+          closedTrades: trades,
+          perToken: Array.isArray(pnl.perToken) ? pnl.perToken : [],
+          trades: Array.isArray(d.trades) ? d.trades : [],
           address: d.address || walletAddress,
           holdings: Array.isArray(d.holdings) ? d.holdings : [],
         };

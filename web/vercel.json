@@ -255,6 +255,9 @@
     "api/orbitx-hub.js": {
       "maxDuration": 120
     },
+    "api/ogdex.js": {
+      "maxDuration": 60
+    },
     "api/**/*.js": {
       "maxDuration": 30
     },

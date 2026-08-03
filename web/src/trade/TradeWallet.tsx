@@ -2,22 +2,59 @@
  * /trade/wallet/:address — portfolio view (holdings, PnL, recent swaps).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Copy, Check, ExternalLink, Loader2, Wallet, RefreshCw } from "lucide-react";
-import { fetchSwaps, fetchWallet } from "./tradeApi";
-import { fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
+import { fetchSwaps, fetchWallet, type WalletPnlToken, type WalletTrade } from "./tradeApi";
+import { fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
 import { pushRecentWallet } from "./tradeRecent";
 
 type Tab = "holdings" | "pnl" | "trades";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+const display = { fontFamily: '"Bricolage Grotesque", system-ui' } as const;
+
+function wrLabel(wr: number | null | undefined): string | null {
+  if (wr == null || !Number.isFinite(Number(wr))) return null;
+  const n = Number(wr);
+  return `${n > 1 ? n.toFixed(0) : (n * 100).toFixed(0)}%`;
+}
+
+function TokenAvatar({ image, symbol, mint }: { image?: string | null; symbol?: string | null; mint?: string }) {
+  if (image) {
+    return <img src={image} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover" />;
+  }
+  return (
+    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-[10px] font-bold">
+      {(symbol || shortAddr(mint || "", 2) || "?").slice(0, 2)}
+    </div>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: "up" | "down" | "plain";
+}) {
+  const color =
+    tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : "text-white";
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+      <p className="text-[9px] uppercase tracking-wider text-white/30">{label}</p>
+      <p className={`mt-0.5 font-mono text-xs font-semibold ${color}`}>{value}</p>
+    </div>
+  );
+}
 
 export default function TradeWallet() {
   const { address = "" } = useParams();
   const navigate = useNavigate();
   const [d, setD] = useState<any>(null);
-  const [trades, setTrades] = useState<any[]>([]);
+  const [trades, setTrades] = useState<WalletTrade[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("holdings");
@@ -28,11 +65,23 @@ export default function TradeWallet() {
     if (!address) return;
     pushRecentWallet(address);
     setLoading(true);
-    Promise.all([fetchWallet(address), fetchSwaps(address, 40)]).then(([w, s]) => {
-      setD(w);
-      setTrades(Array.isArray(s?.trades) ? s.trades : []);
-      setLoading(false);
-    });
+    fetchWallet(address)
+      .then(async (w) => {
+        setD(w);
+        const embedded = Array.isArray(w?.trades) ? (w.trades as WalletTrade[]) : [];
+        if (embedded.length) {
+          setTrades(embedded);
+          return;
+        }
+        // Fallback when wallet response has no tape (older deploy / pnl failed).
+        const s = await fetchSwaps(address, 80);
+        setTrades(Array.isArray(s?.trades) ? s.trades : []);
+      })
+      .catch(() => {
+        setD({ ok: false, error: "Could not load wallet" });
+        setTrades([]);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -53,10 +102,10 @@ export default function TradeWallet() {
       isSol: true,
       change24h: null as number | null,
       unpriced: false,
+      pctSupply: null as number | null,
     };
     const list = [sol, ...(d.holdings || [])];
     if (!hideDust) return list;
-    // Keep SOL + unpriced balances; only drop priced dust under $0.01
     return list.filter((h: any) => {
       if (h.isSol) return true;
       if (h.unpriced || !(h.priceUsd > 0) || !(h.usdValue > 0)) return true;
@@ -66,10 +115,32 @@ export default function TradeWallet() {
 
   const pnl = d?.pnl;
   const wins =
-    pnl?.winRate != null && pnl?.closedTrades
-      ? Math.round((Number(pnl.winRate) > 1 ? Number(pnl.winRate) / 100 : Number(pnl.winRate)) * pnl.closedTrades)
-      : null;
-  const losses = wins != null ? Math.max(0, (pnl?.closedTrades || 0) - wins) : null;
+    pnl?.wins != null
+      ? Number(pnl.wins)
+      : pnl?.winRate != null && pnl?.closedTrades
+        ? Math.round(
+            (Number(pnl.winRate) > 1 ? Number(pnl.winRate) / 100 : Number(pnl.winRate)) *
+              pnl.closedTrades,
+          )
+        : null;
+  const losses =
+    pnl?.losses != null
+      ? Number(pnl.losses)
+      : wins != null
+        ? Math.max(0, (pnl?.closedTrades || 0) - wins)
+        : null;
+
+  const pnlRows: WalletPnlToken[] = useMemo(() => {
+    const rows = Array.isArray(pnl?.perToken) ? [...pnl.perToken] : [];
+    return rows.filter(
+      (p) =>
+        (p.closedTrades || 0) > 0 ||
+        p.open ||
+        p.holding ||
+        (p.holdingAmount || 0) > 0 ||
+        p.noTradeHistory,
+    );
+  }, [pnl]);
 
   const copy = () => {
     navigator.clipboard.writeText(address);
@@ -94,7 +165,7 @@ export default function TradeWallet() {
         <button
           type="button"
           onClick={() => navigate("/trade/portfolio")}
-          className="text-sm underline text-white/60"
+          className="text-sm text-white/60 underline"
         >
           Back to portfolio
         </button>
@@ -102,13 +173,18 @@ export default function TradeWallet() {
     );
   }
 
+  const realized = pnl?.realizedPnlUsd;
+  const unrealized = pnl?.unrealizedPnlUsd;
+  const wr = wrLabel(pnl?.winRate);
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#050505]">
       <div className="relative shrink-0 border-b border-white/[0.06] px-3 pb-3 pt-2">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
-            background: "radial-gradient(ellipse 70% 80% at 50% -40%, rgba(255,255,255,0.07), transparent 60%)",
+            background:
+              "radial-gradient(ellipse 70% 80% at 50% -40%, rgba(255,255,255,0.07), transparent 60%)",
           }}
         />
         <div className="relative flex items-center gap-2">
@@ -120,13 +196,23 @@ export default function TradeWallet() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">Wallet</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+              Wallet
+            </p>
             <p className="font-mono text-sm font-semibold">{shortAddr(address, 6)}</p>
           </div>
-          <button type="button" onClick={load} className="rounded-full border border-white/10 p-2 text-white/45">
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-full border border-white/10 p-2 text-white/45"
+          >
             <RefreshCw className="h-4 w-4" />
           </button>
-          <button type="button" onClick={copy} className="rounded-full border border-white/10 p-2 text-white/45">
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded-full border border-white/10 p-2 text-white/45"
+          >
             {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
           </button>
           <a
@@ -139,52 +225,51 @@ export default function TradeWallet() {
           </a>
         </div>
 
-        <p className="relative mt-4 px-1 font-mono text-[36px] font-black leading-none tracking-tight">
+        <p
+          className="relative mt-4 px-1 text-[36px] font-black leading-none tracking-tight"
+          style={display}
+        >
           {fmtUsd(d.totalUsd)}
         </p>
         <div className="relative mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-white/40">
           <span>{(d.sol || 0).toFixed(3)} SOL</span>
           <span>·</span>
           <span>{d.tokenCount ?? Math.max(0, holdings.length - 1)} tokens</span>
-          {pnl?.winRate != null && (
+          {wr && (
             <>
               <span>·</span>
-              <span>
-                WR {Number(pnl.winRate) > 1 ? Number(pnl.winRate).toFixed(0) : (Number(pnl.winRate) * 100).toFixed(0)}%
-              </span>
+              <span>WR {wr}</span>
+            </>
+          )}
+          {pnl?.closedTrades != null && (
+            <>
+              <span>·</span>
+              <span>{pnl.closedTrades} closed</span>
             </>
           )}
         </div>
 
         <div className="relative mt-3 grid grid-cols-3 gap-2">
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
-            <p className="text-[9px] text-white/30">Realized</p>
-            <p
-              className={`font-mono text-xs font-semibold ${
-                (pnl?.realizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
-              }`}
-            >
-              {fmtUsd(pnl?.realizedPnlUsd)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
-            <p className="text-[9px] text-white/30">Unrealized</p>
-            <p
-              className={`font-mono text-xs font-semibold ${
-                (pnl?.unrealizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
-              }`}
-            >
-              {fmtUsd(pnl?.unrealizedPnlUsd)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
-            <p className="text-[9px] text-white/30">W / L</p>
-            <p className="font-mono text-xs font-semibold">
-              <span className="text-emerald-400">{wins ?? "—"}</span>
-              <span className="text-white/20"> / </span>
-              <span className="text-red-400">{losses ?? "—"}</span>
-            </p>
-          </div>
+          <StatCell
+            label="Realized"
+            value={fmtPnl(realized)}
+            tone={realized == null ? "plain" : realized >= 0 ? "up" : "down"}
+          />
+          <StatCell
+            label="Unrealized"
+            value={fmtPnl(unrealized)}
+            tone={unrealized == null ? "plain" : unrealized >= 0 ? "up" : "down"}
+          />
+          <StatCell
+            label="W / L"
+            value={
+              <>
+                <span className="text-emerald-400">{wins ?? "—"}</span>
+                <span className="text-white/20"> / </span>
+                <span className="text-red-400">{losses ?? "—"}</span>
+              </>
+            }
+          />
         </div>
       </div>
 
@@ -193,7 +278,7 @@ export default function TradeWallet() {
           [
             ["holdings", "Holdings"],
             ["pnl", "PnL"],
-            ["trades", "Trades"],
+            ["trades", `Trades${trades.length ? ` · ${trades.length}` : ""}`],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button
@@ -238,18 +323,18 @@ export default function TradeWallet() {
                   }}
                   className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
                 >
-                  {h.image ? (
-                    <img src={h.image} alt="" className="h-10 w-10 rounded-xl object-cover" />
-                  ) : (
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-[10px] font-bold">
-                      {(h.symbol || "?").slice(0, 2)}
-                    </div>
-                  )}
+                  <TokenAvatar image={h.image} symbol={h.symbol} mint={h.mint} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-bold">{h.symbol || shortAddr(h.mint, 4)}</p>
-                    <p className="font-mono text-[10px] text-white/35">
-                      {Number(h.uiAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                    <p className="truncate text-[14px] font-bold">
+                      {h.symbol || shortAddr(h.mint, 4)}
+                    </p>
+                    <p className="truncate text-[10px] text-white/35">
+                      {h.name || shortAddr(h.mint, 6)}
                       {h.unpriced ? " · no quote" : ""}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] text-white/45">
+                      {fmtTok(h.uiAmount, 6)}
+                      {h.pctSupply != null ? ` · ${Number(h.pctSupply).toFixed(3)}% supply` : ""}
                     </p>
                   </div>
                   <div className="text-right">
@@ -257,7 +342,11 @@ export default function TradeWallet() {
                       {h.unpriced || (!(h.usdValue > 0) && !h.isSol) ? "—" : fmtUsd(h.usdValue)}
                     </p>
                     {h.change24h != null && (
-                      <p className={`font-mono text-[10px] ${h.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      <p
+                        className={`font-mono text-[10px] ${
+                          h.change24h >= 0 ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
                         {fmtPct(h.change24h)}
                       </p>
                     )}
@@ -269,68 +358,198 @@ export default function TradeWallet() {
         )}
 
         {tab === "pnl" && (
-          <div className="space-y-1.5">
-            {!pnl?.perToken?.length ? (
-              <p className="py-12 text-center text-xs text-white/35">No closed PnL rows</p>
+          <div className="space-y-2">
+            <p className="px-0.5 text-[10px] text-white/30">
+              Per-token PnL from recent SOL-leg swaps · cost basis when computable
+            </p>
+            {!pnlRows.length ? (
+              <p className="py-12 text-center text-xs text-white/35">
+                No PnL rows yet — need more swap history on this wallet
+              </p>
             ) : (
-              pnl.perToken.map((p: any) => (
-                <button
-                  key={p.mint}
-                  type="button"
-                  onClick={() => navigate(`/trade/token/${p.mint}`)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left"
-                >
-                  <div>
-                    <p className="text-sm font-bold">{p.symbol || shortAddr(p.mint, 4)}</p>
-                    <p className="text-[10px] text-white/35">
-                      {p.closedTrades ?? 0} closed
-                      {p.winRate != null
-                        ? ` · WR ${Number(p.winRate) > 1 ? Number(p.winRate).toFixed(0) : (Number(p.winRate) * 100).toFixed(0)}%`
-                        : ""}
-                    </p>
-                  </div>
-                  <p
-                    className={`font-mono text-sm font-semibold ${
-                      (p.totalUsd || p.realizedUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
-                    }`}
+              pnlRows.map((p) => {
+                const pWins =
+                  p.wins != null
+                    ? p.wins
+                    : p.winRate != null && p.closedTrades
+                      ? Math.round(
+                          (Number(p.winRate) > 1
+                            ? Number(p.winRate) / 100
+                            : Number(p.winRate)) * p.closedTrades,
+                        )
+                      : null;
+                const pLosses =
+                  p.losses != null
+                    ? p.losses
+                    : pWins != null
+                      ? Math.max(0, (p.closedTrades || 0) - pWins)
+                      : null;
+                const holdAmt = p.holdingAmount ?? p.tokens ?? 0;
+                const isHolding = !!p.holding || holdAmt > 1e-9;
+                const uTone =
+                  p.unrealizedUsd == null
+                    ? "text-white/50"
+                    : p.unrealizedUsd >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400";
+                const rTone =
+                  (p.closedTrades || 0) > 0
+                    ? (p.realizedUsd || 0) >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400"
+                    : "text-white/40";
+
+                return (
+                  <button
+                    key={p.mint}
+                    type="button"
+                    onClick={() => navigate(`/trade/token/${p.mint}`)}
+                    className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
                   >
-                    {fmtUsd(p.totalUsd ?? p.realizedUsd)}
-                  </p>
-                </button>
-              ))
+                    <div className="flex items-start gap-3">
+                      <TokenAvatar image={p.image} symbol={p.symbol} mint={p.mint} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold">
+                              {p.symbol || shortAddr(p.mint, 4)}
+                            </p>
+                            <p className="truncate text-[10px] text-white/35">
+                              {p.name || shortAddr(p.mint, 6)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-mono text-sm font-semibold ${rTone}`}>
+                              {(p.closedTrades || 0) > 0 || p.unrealizedUsd != null
+                                ? fmtPnl(p.totalUsd ?? p.realizedUsd)
+                                : "—"}
+                            </p>
+                            <p className="text-[9px] uppercase tracking-wider text-white/30">
+                              {isHolding ? "Holding" : "Closed"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px]">
+                          <div>
+                            <span className="text-white/30">W / L </span>
+                            <span className="font-mono text-emerald-400">{pWins ?? "—"}</span>
+                            <span className="text-white/20"> / </span>
+                            <span className="font-mono text-red-400">{pLosses ?? "—"}</span>
+                            {wrLabel(p.winRate) && (
+                              <span className="text-white/30"> · {wrLabel(p.winRate)}</span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-white/30">Bought </span>
+                            <span className="font-mono">
+                              {p.boughtUsd != null ? fmtUsd(p.boughtUsd) : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-white/30">Hold </span>
+                            <span className="font-mono">
+                              {isHolding
+                                ? `${fmtTok(holdAmt, 4)} · ${
+                                    p.holdingUsd != null && p.holdingUsd > 0
+                                      ? fmtUsd(p.holdingUsd)
+                                      : p.curValueUsd != null && p.curValueUsd > 0
+                                        ? fmtUsd(p.curValueUsd)
+                                        : "—"
+                                  }`
+                                : "No"}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-white/30">Supply </span>
+                            <span className="font-mono">
+                              {p.pctSupply != null ? `${Number(p.pctSupply).toFixed(3)}%` : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-white/30">Cost </span>
+                            <span className="font-mono">
+                              {p.costUsd != null
+                                ? fmtUsd(p.costUsd)
+                                : p.avgCostUsd != null && holdAmt > 0
+                                  ? fmtUsd(p.avgCostUsd * holdAmt)
+                                  : "—"}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-white/30">uPnL </span>
+                            <span className={`font-mono ${uTone}`}>
+                              {fmtPnl(p.unrealizedUsd)}
+                              {p.unrealizedPct != null ? ` (${fmtPct(p.unrealizedPct)})` : ""}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         )}
 
         {tab === "trades" && (
           <div className="space-y-1.5">
+            <p className="px-0.5 text-[10px] text-white/30">
+              All recent buy/sell swaps detected on-chain (SOL-leg)
+            </p>
             {!trades.length ? (
-              <p className="py-12 text-center text-xs text-white/35">No recent swaps</p>
+              <p className="py-12 text-center text-xs text-white/35">
+                No recent swaps found for this wallet
+              </p>
             ) : (
-              trades.map((tr: any, i: number) => (
+              trades.map((tr, i) => (
                 <button
-                  key={tr.txHash || i}
+                  key={tr.txHash || `${tr.mint}-${tr.time}-${i}`}
                   type="button"
                   onClick={() => tr.mint && navigate(`/trade/token/${tr.mint}`)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
                 >
-                  <div>
-                    <p className={`text-xs font-bold ${tr.side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
-                      {(tr.side || "swap").toUpperCase()} {tr.symbol || shortAddr(tr.mint || "", 4)}
-                    </p>
-                    <p className="font-mono text-[10px] text-white/30">
-                      {tr.solAmount != null ? `${Number(tr.solAmount).toFixed(3)} SOL` : ""}
+                  <TokenAvatar image={tr.image} symbol={tr.symbol} mint={tr.mint} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                          tr.side === "buy"
+                            ? "bg-emerald-400/15 text-emerald-400"
+                            : tr.side === "sell"
+                              ? "bg-red-400/15 text-red-400"
+                              : "bg-white/10 text-white/50"
+                        }`}
+                      >
+                        {tr.side || "swap"}
+                      </span>
+                      <p className="truncate text-sm font-bold">
+                        {tr.symbol || shortAddr(tr.mint || "", 4)}
+                      </p>
+                    </div>
+                    <p className="mt-0.5 font-mono text-[10px] text-white/35">
+                      {tr.tokenAmount != null ? `${fmtTok(tr.tokenAmount, 4)} tok` : ""}
+                      {tr.solAmount != null ? ` · ${Number(tr.solAmount).toFixed(3)} SOL` : ""}
                       {tr.txHash ? ` · ${shortAddr(tr.txHash, 4)}` : ""}
                     </p>
                   </div>
-                  <p className="font-mono text-xs">{fmtUsd(tr.usd)}</p>
+                  <div className="text-right">
+                    <p className="font-mono text-xs font-semibold">
+                      {tr.usd != null ? fmtUsd(tr.usd) : "—"}
+                    </p>
+                    <p className="font-mono text-[10px] text-white/30">{timeAgo(tr.time)}</p>
+                  </div>
                 </button>
               ))
             )}
           </div>
         )}
 
-        <Link to="/trade/portfolio" className="mt-4 block text-center text-[11px] text-white/30 hover:text-white/50">
+        <Link
+          to="/trade/portfolio"
+          className="mt-4 block text-center text-[11px] text-white/30 hover:text-white/50"
+        >
           ← Portfolio hub
         </Link>
       </div>

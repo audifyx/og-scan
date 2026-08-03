@@ -18,63 +18,77 @@ async function rpc(method, params) {
 
 async function jupPrices(ids) {
   const out = {};
-  for (let i = 0; i < ids.length; i += 100) {
-    const chunk = ids.slice(i, i + 100);
-    try {
-      const r = await fetch(`${JUP}/price/v3?ids=${chunk.join(",")}`);
-      if (r.ok) Object.assign(out, await r.json());
-    } catch {}
-  }
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const r = await fetch(`${JUP}/price/v3?ids=${chunk.join(",")}`);
+        if (r.ok) Object.assign(out, await r.json());
+      } catch {}
+    }),
+  );
   return out;
 }
 
 /** DexScreener price + meta backfill for mints Jupiter doesn't price. */
 async function dexBackfill(mints) {
   const out = {};
-  for (let i = 0; i < mints.length; i += 30) {
-    const chunk = mints.slice(i, i + 30);
-    try {
-      const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`);
-      if (!r.ok) continue;
-      const pairs = await r.json();
-      for (const p of pairs || []) {
-        const mint = p?.baseToken?.address;
-        if (!mint || out[mint]) continue;
-        out[mint] = {
-          usdPrice: Number(p.priceUsd) || 0,
-          priceChange24h: p.priceChange?.h24 != null ? Number(p.priceChange.h24) : null,
-          name: p.baseToken?.name || null,
-          symbol: p.baseToken?.symbol || null,
-          image: p.info?.imageUrl || null,
-          mcap: Number(p.marketCap || p.fdv) || null,
-        };
-      }
-    } catch {}
-  }
+  const chunks = [];
+  for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`);
+        if (!r.ok) return;
+        const pairs = await r.json();
+        for (const p of pairs || []) {
+          const mint = p?.baseToken?.address;
+          if (!mint || out[mint]) continue;
+          out[mint] = {
+            usdPrice: Number(p.priceUsd) || 0,
+            priceChange24h: p.priceChange?.h24 != null ? Number(p.priceChange.h24) : null,
+            name: p.baseToken?.name || null,
+            symbol: p.baseToken?.symbol || null,
+            image: p.info?.imageUrl || null,
+            mcap: Number(p.marketCap || p.fdv) || null,
+          };
+        }
+      } catch {}
+    }),
+  );
   return out;
 }
 
 async function gtMeta(mints) {
   const out = {};
-  for (let i = 0; i < mints.length; i += 30) {
-    const chunk = mints.slice(i, i + 30);
-    try {
-      const r = await fetch(`${GT}/networks/solana/tokens/multi/${chunk.join(",")}`, {
-        headers: { Accept: "application/json;version=20230302" },
-      });
-      if (!r.ok) continue;
-      const d = await r.json();
-      for (const t of d?.data || []) {
-        const a = t.attributes || {};
-        out[a.address] = {
-          name: a.name,
-          symbol: a.symbol,
-          image: a.image_url && a.image_url !== "missing.png" ? a.image_url : null,
-          mcap: Number(a.market_cap_usd) || Number(a.fdv_usd) || null,
-        };
-      }
-    } catch {}
-  }
+  if (!mints.length) return out;
+  const chunks = [];
+  for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+  // Cap parallel GT calls — 4 at a time keeps us under rate limits while staying fast.
+  let idx = 0;
+  const workers = Array.from({ length: Math.min(4, chunks.length) }, async () => {
+    while (idx < chunks.length) {
+      const chunk = chunks[idx++];
+      try {
+        const r = await fetch(`${GT}/networks/solana/tokens/multi/${chunk.join(",")}`, {
+          headers: { Accept: "application/json;version=20230302" },
+        });
+        if (!r.ok) continue;
+        const d = await r.json();
+        for (const t of d?.data || []) {
+          const a = t.attributes || {};
+          out[a.address] = {
+            name: a.name,
+            symbol: a.symbol,
+            image: a.image_url && a.image_url !== "missing.png" ? a.image_url : null,
+            mcap: Number(a.market_cap_usd) || Number(a.fdv_usd) || null,
+          };
+        }
+      } catch {}
+    }
+  });
+  await Promise.all(workers);
   return out;
 }
 
@@ -92,19 +106,36 @@ function tokenUiAmount(info) {
   }
 }
 
+function pctSupply(uiAmount, usdValue, mcap, priceUsd) {
+  if (mcap > 0 && usdValue > 0) return (usdValue / mcap) * 100;
+  if (mcap > 0 && priceUsd > 0 && uiAmount > 0) return ((uiAmount * priceUsd) / mcap) * 100;
+  return null;
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://x");
   const address = (url.searchParams.get("address") || "").trim();
   if (!isAddr(address)) return send(res, 400, { ok: false, error: "valid wallet address required" });
   cache(res, 15, 45);
   try {
+    // Holdings + PnL in parallel. PnL uses capped sig history so we stay under
+    // the ~30s serverless budget (previously 504'd on large wallets).
     const [lamports, accs1, accs2, pnl] = await Promise.all([
       rpc("getBalance", [address, { commitment: "confirmed" }]).catch(() => null),
-      rpc("getTokenAccountsByOwner", [address, { programId: TOKEN_PROGRAM }, { encoding: "jsonParsed" }]).catch(() => null),
-      rpc("getTokenAccountsByOwner", [address, { programId: TOKEN_2022 }, { encoding: "jsonParsed" }]).catch(() => null),
-      computePnl(address).catch(() => null),
+      rpc("getTokenAccountsByOwner", [
+        address,
+        { programId: TOKEN_PROGRAM },
+        { encoding: "jsonParsed" },
+      ]).catch(() => null),
+      rpc("getTokenAccountsByOwner", [
+        address,
+        { programId: TOKEN_2022 },
+        { encoding: "jsonParsed" },
+      ]).catch(() => null),
+      computePnl(address, { sigLimit: 50 }).catch(() => null),
     ]);
-    const sol = lamports == null ? 0 : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
+    const sol =
+      lamports == null ? 0 : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
     const raw = [...(accs1?.value || []), ...(accs2?.value || [])];
 
     const byMint = {};
@@ -115,70 +146,96 @@ export default async function handler(req, res) {
       const ui = tokenUiAmount(info);
       if (!(ui > 0)) continue;
       const m = info.mint;
-      byMint[m] = byMint[m] || { mint: m, uiAmount: 0, decimals: Number(info.tokenAmount?.decimals || 0) };
+      byMint[m] = byMint[m] || {
+        mint: m,
+        uiAmount: 0,
+        decimals: Number(info.tokenAmount?.decimals || 0),
+      };
       byMint[m].uiAmount += ui;
     }
     const mints = Object.keys(byMint);
 
     const posMints = (pnl?.positions || []).map((p) => p.mint).filter(Boolean);
+    const pnlMints = (pnl?.perToken || []).map((p) => p.mint).filter(Boolean);
     const allPriceIds = [...new Set([SOL_MINT, ...mints, ...posMints])];
     const prices = await jupPrices(allPriceIds);
-    const solPrice = Number(prices[SOL_MINT]?.usdPrice) || 0;
+    const solPrice = Number(prices[SOL_MINT]?.usdPrice) || Number(pnl?.solPrice) || 0;
 
-    // Backfill prices for mints Jupiter missed (common for fresh memecoins).
-    const missing = mints.filter((m) => !(Number(prices[m]?.usdPrice) > 0));
+    // Backfill prices for mints Jupiter missed — prioritize largest balances.
+    const missing = mints
+      .filter((m) => !(Number(prices[m]?.usdPrice) > 0))
+      .sort((a, b) => (byMint[b].uiAmount || 0) - (byMint[a].uiAmount || 0))
+      .slice(0, 90);
     const dex = missing.length ? await dexBackfill(missing) : {};
 
-    let holdings = mints.map((m) => {
-      const jupPx = Number(prices[m]?.usdPrice) || 0;
-      const dexRow = dex[m];
-      const price = jupPx || Number(dexRow?.usdPrice) || 0;
-      const change24h =
-        prices[m]?.priceChange24h ?? dexRow?.priceChange24h ?? null;
-      return {
-        ...byMint[m],
-        priceUsd: price || null,
-        usdValue: price ? byMint[m].uiAmount * price : 0,
-        change24h,
-        name: dexRow?.name || null,
-        symbol: dexRow?.symbol || null,
-        image: dexRow?.image || null,
-        mcap: dexRow?.mcap ?? null,
-        unpriced: !(price > 0),
-      };
-    }).sort((a, b) => {
-      // Priced first by USD, then unpriced by balance size
-      if ((b.usdValue || 0) !== (a.usdValue || 0)) return (b.usdValue || 0) - (a.usdValue || 0);
-      return (b.uiAmount || 0) - (a.uiAmount || 0);
-    });
+    let holdings = mints
+      .map((m) => {
+        const jupPx = Number(prices[m]?.usdPrice) || 0;
+        const dexRow = dex[m];
+        const price = jupPx || Number(dexRow?.usdPrice) || 0;
+        const change24h = prices[m]?.priceChange24h ?? dexRow?.priceChange24h ?? null;
+        const usdValue = price ? byMint[m].uiAmount * price : 0;
+        const mcap = dexRow?.mcap ?? null;
+        return {
+          ...byMint[m],
+          priceUsd: price || null,
+          usdValue,
+          change24h,
+          name: dexRow?.name || null,
+          symbol: dexRow?.symbol || null,
+          image: dexRow?.image || null,
+          mcap,
+          pctSupply: pctSupply(byMint[m].uiAmount, usdValue, mcap, price),
+          unpriced: !(price > 0),
+        };
+      })
+      .sort((a, b) => {
+        if ((b.usdValue || 0) !== (a.usdValue || 0)) return (b.usdValue || 0) - (a.usdValue || 0);
+        return (b.uiAmount || 0) - (a.uiAmount || 0);
+      });
 
-    // Enrich metadata for ALL holdings (chunked) — not just top 60.
-    const meta = await gtMeta(holdings.map((h) => h.mint));
+    // Enrich metadata for top holdings + all PnL mints (not every dust mint —
+    // fetching hundreds of GT chunks was the main 504 cause).
+    const metaTargets = [
+      ...new Set([
+        ...holdings.slice(0, 80).map((h) => h.mint),
+        ...pnlMints,
+        ...holdings.filter((h) => h.unpriced && h.uiAmount > 0).slice(0, 40).map((h) => h.mint),
+      ]),
+    ];
+    const meta = await gtMeta(metaTargets);
     holdings = holdings.map((h) => {
       const md = meta[h.mint] || {};
+      const mcap = h.mcap ?? md.mcap ?? null;
+      const usdValue = h.usdValue || 0;
       return {
         ...h,
         name: h.name || md.name || null,
         symbol: h.symbol || md.symbol || null,
         image: h.image || md.image || null,
-        mcap: h.mcap ?? md.mcap ?? null,
+        mcap,
+        pctSupply: h.pctSupply ?? pctSupply(h.uiAmount, usdValue, mcap, h.priceUsd),
       };
     });
 
+    const holdByMint = {};
+    for (const h of holdings) holdByMint[h.mint] = h;
+
+    let trades = [];
     if (pnl && pnl.positions) {
-      const metaByMint = {};
-      for (const h of holdings) metaByMint[h.mint] = { symbol: h.symbol, name: h.name, image: h.image };
       const enrich = (x) => {
-        const m = metaByMint[x.mint];
-        if (m) {
-          x.symbol = m.symbol;
-          x.name = m.name;
-          x.image = m.image;
-        }
+        const h = holdByMint[x.mint];
+        const md = meta[x.mint] || {};
+        x.symbol = h?.symbol || md.symbol || x.symbol || null;
+        x.name = h?.name || md.name || x.name || null;
+        x.image = h?.image || md.image || x.image || null;
+        x.mcap = h?.mcap ?? md.mcap ?? x.mcap ?? null;
       };
       (pnl.positions || []).forEach(enrich);
       (pnl.perToken || []).forEach(enrich);
-      let unrealUsd = 0, unrealSol = 0;
+
+      let unrealUsd = 0,
+        unrealSol = 0;
       const sp = pnl.solPrice || solPrice;
       const px = (m) => Number(prices[m]?.usdPrice) || Number(dex[m]?.usdPrice) || 0;
       for (const p of pnl.positions) {
@@ -192,19 +249,96 @@ export default async function handler(req, res) {
         }
       }
       for (const t of pnl.perToken || []) {
-        if (!t.open) continue;
-        const cur = px(t.mint);
-        if (cur > 0) {
-          t.curPriceUsd = cur;
-          t.curValueUsd = t.tokens * cur;
-          t.unrealizedUsd = t.curValueUsd - (t.avgCostUsd || 0) * t.tokens;
-          t.totalUsd = (t.realizedUsd || 0) + (t.unrealizedUsd || 0);
+        const h = holdByMint[t.mint];
+        const holdingAmt = h ? h.uiAmount : 0;
+        const holdingUsd = h ? h.usdValue || 0 : 0;
+        t.holding = holdingAmt > 0;
+        t.holdingAmount = holdingAmt || 0;
+        t.holdingUsd = holdingAmt > 0 ? holdingUsd : 0;
+        // Prefer live chain balance for "how much they hold"
+        if (holdingAmt > 0) {
+          t.tokens = holdingAmt;
+          t.curValueUsd = holdingUsd || t.curValueUsd;
+          if (h?.priceUsd > 0) t.curPriceUsd = h.priceUsd;
         }
+        t.pctSupply =
+          h?.pctSupply ??
+          pctSupply(holdingAmt, holdingUsd, t.mcap || h?.mcap, t.curPriceUsd || h?.priceUsd);
+
+        if (t.open || holdingAmt > 0) {
+          const cur = t.curPriceUsd || px(t.mint);
+          if (cur > 0 && t.avgCostUsd != null && t.tokens > 0) {
+            t.curPriceUsd = cur;
+            t.curValueUsd = t.tokens * cur;
+            const cost = (t.avgCostUsd || 0) * t.tokens;
+            t.costUsd = t.costUsd ?? cost;
+            t.unrealizedUsd = t.curValueUsd - cost;
+            t.unrealizedPct = cost > 0 ? (t.unrealizedUsd / cost) * 100 : null;
+          }
+        }
+        t.totalUsd = (t.realizedUsd || 0) + (t.unrealizedUsd || 0);
       }
       pnl.perToken && pnl.perToken.sort((a, b) => (b.totalUsd || 0) - (a.totalUsd || 0));
       pnl.unrealizedPnlUsd = unrealUsd;
       pnl.unrealizedPnlSol = unrealSol;
       pnl.totalPnlUsd = (pnl.realizedPnlUsd || 0) + unrealUsd;
+
+      // Embed trade tape (enriched) so the UI doesn't need a second /swaps call.
+      const spUsd = sp || solPrice;
+      trades = (pnl.swaps || []).map((s) => {
+        const h = holdByMint[s.mint];
+        const md = meta[s.mint] || {};
+        return {
+          ...s,
+          usd: spUsd ? s.solAmount * spUsd : null,
+          name: h?.name || md.name || null,
+          symbol: h?.symbol || md.symbol || null,
+          image: h?.image || md.image || null,
+        };
+      });
+      // Drop raw swaps from pnl payload (already in top-level trades)
+      delete pnl.swaps;
+    }
+
+    // Append holdings that never appeared in recent swap PnL so the PnL tab
+    // can still show currently-held coins with cost/PnL as "—".
+    if (pnl) {
+      const seen = new Set((pnl.perToken || []).map((t) => t.mint));
+      const extras = [];
+      for (const h of holdings) {
+        if (seen.has(h.mint)) continue;
+        if (!(h.usdValue > 0.01) && h.unpriced) continue;
+        extras.push({
+          mint: h.mint,
+          symbol: h.symbol,
+          name: h.name,
+          image: h.image,
+          mcap: h.mcap,
+          realizedUsd: 0,
+          realizedSol: 0,
+          unrealizedUsd: null,
+          unrealizedPct: null,
+          totalUsd: null,
+          closedTrades: 0,
+          wins: 0,
+          losses: 0,
+          winRate: null,
+          open: false,
+          tokens: h.uiAmount,
+          holding: true,
+          holdingAmount: h.uiAmount,
+          holdingUsd: h.usdValue || 0,
+          pctSupply: h.pctSupply,
+          avgCostUsd: null,
+          costUsd: null,
+          boughtUsd: null,
+          boughtSol: null,
+          curPriceUsd: h.priceUsd,
+          curValueUsd: h.usdValue || 0,
+          noTradeHistory: true,
+        });
+      }
+      pnl.perToken = [...(pnl.perToken || []), ...extras];
     }
 
     const tokenUsd = holdings.reduce((s, h) => s + (h.usdValue || 0), 0);
@@ -219,6 +353,8 @@ export default async function handler(req, res) {
       tokenCount: holdings.length,
       holdings,
       pnl,
+      trades,
+      tradeCount: trades.length,
     });
   } catch (e) {
     return send(res, 200, { ok: false, error: String(e?.message || e) });

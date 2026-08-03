@@ -21,6 +21,31 @@ export function shortAddr(a: string, n = 4): string {
   return `${a.slice(0, n)}…${a.slice(-n)}`;
 }
 
+export function fmtTok(n?: number | null, digits = 4): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+export function timeAgo(ts?: number | null): string {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return "—";
+  const ms = ts < 1e12 ? ts * 1000 : ts;
+  const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
+  if (sec < 86400 * 30) return `${Math.floor(sec / 86400)}d`;
+  return `${Math.floor(sec / (86400 * 30))}mo`;
+}
+
+/** Signed USD for PnL — null/undefined → "—", never invent $0. */
+export function fmtPnl(n?: number | null): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const s = n > 0 ? "+" : "";
+  return s + fmtUsd(n);
+}
+
 export function dexChartUrl(ref: string, interval = "15"): string {
   const q = new URLSearchParams({
     embed: "1",
