@@ -17,7 +17,7 @@ export const TOKEN_GATE_EXEMPT_EMAILS = TOKEN_GATE_EXEMPT_EMAILS_BASE;
 
 /** Official ORBITX mint — same CA as OfficialToken / token-gating. */
 export const AGENT_HOLD_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
-export const AGENT_HOLD_MIN_USD = 10;
+export const AGENT_HOLD_MIN_USD = 5;
 
 function envOwnerWallets(): string[] {
   try {

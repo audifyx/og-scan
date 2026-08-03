@@ -101,7 +101,7 @@ export async function requireTokenAccess(
 
     if (!verification.meetsRequirement) {
       res.status(403).json({
-        error: 'Insufficient token holdings. Need $10 worth of ORBITX token or $10+ cumulative buys.',
+        error: 'Insufficient token holdings. Need $5 worth of ORBITX token or $5+ cumulative buys.',
         currentHolding: verification.currentHoldingUsd,
         cumulativeBuys: verification.cumulativeBuyValueUsd,
       });

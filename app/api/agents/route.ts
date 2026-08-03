@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const verification = await verifyUserAccess(auth.userId, walletFromRequest(req));
     if (!verification.meetsRequirement) {
       return NextResponse.json({
-        error: 'Insufficient token holdings. Need $10 worth of ORBITX token.',
+        error: 'Insufficient token holdings. Need $5 worth of ORBITX token.',
         currentHolding: verification.currentHoldingUsd,
         cumulativeBuys: verification.cumulativeBuyValueUsd,
       }, { status: 403 });
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     const verification = await verifyUserAccess(auth.userId, walletFromRequest(req));
     if (!verification.meetsRequirement) {
       return NextResponse.json({
-        error: 'Insufficient token holdings. Need $10 worth of ORBITX token.',
+        error: 'Insufficient token holdings. Need $5 worth of ORBITX token.',
       }, { status: 403 });
     }
 

@@ -1,5 +1,5 @@
 /**
- * Single source of truth for Agent MCP $10 ORBITX hold exemptions.
+ * Single source of truth for Agent MCP ORBITX hold exemptions.
  * Imported by server (web/api/orbitx/token-hold.js) and client (agentTokenGate / ownerDesk).
  *
  * IMPORTANT: Supabase Auth lowercases emails. SIWS sessions store
@@ -8,7 +8,7 @@
  * then canonicalize back to the spelling in this list before persistence.
  */
 
-/** Canonical owner / platform wallets — always skip $10 ORBITX hold. */
+/** Canonical owner / platform wallets — always skip ORBITX hold. */
 export const TOKEN_GATE_EXEMPT_WALLETS_BASE = [
   "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd", // DEF / owner
   "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE", // PLATFORM_WALLET

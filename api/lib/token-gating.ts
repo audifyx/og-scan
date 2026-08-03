@@ -1,6 +1,6 @@
 /**
  * Token Gating Service for Agent MCP Access
- * Verifies users hold $10 worth of ORBITX token or have $10+ cumulative buys
+ * Verifies users hold $5 worth of ORBITX token or have $5+ cumulative buys
  *
  * Exempt list mirrors web/shared/token-gate-exempt.js (keep in sync — Node API package).
  */
@@ -9,10 +9,10 @@ import { query, queryOne } from './db';
 import * as crypto from 'crypto';
 
 const TOKEN_REQUIREMENT_CA = '13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9';
-const MIN_REQUIREMENT_USD = 10.00;
+const MIN_REQUIREMENT_USD = 5.00;
 const VERIFICATION_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
 
-/** DEF / platform wallets that skip the $10 ORBITX hold requirement. */
+/** DEF / platform wallets that skip the ORBITX hold requirement. */
 export const TOKEN_GATE_EXEMPT_WALLETS = [
   '4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd', // DEF / owner
   '45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE', // PLATFORM_WALLET

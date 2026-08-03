@@ -1,5 +1,5 @@
 /**
- * Agent MCP token-hold gate — $10 ORBITX (or exempt wallet / owner email).
+ * Agent MCP token-hold gate — $5 ORBITX (or exempt wallet / owner email).
  * Used by orbitx-hub agent routes + MCP tools/call.
  *
  * Exempt list: web/shared/token-gate-exempt.js (single source of truth).
@@ -17,7 +17,7 @@ import {
 export const AGENT_HOLD_MINT =
   process.env.AGENT_GATE_MINT || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
-export const AGENT_HOLD_MIN_USD = Number(process.env.AGENT_GATE_MIN_USD) || 10;
+export const AGENT_HOLD_MIN_USD = Number(process.env.AGENT_GATE_MIN_USD) || 5;
 
 export { TOKEN_GATE_EXEMPT_WALLETS_BASE, TOKEN_GATE_EXEMPT_EMAILS_BASE, canonicalizeExemptWallet };
 

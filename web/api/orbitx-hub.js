@@ -2050,7 +2050,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       launchExecutionTool: "orbitx_execute_launch",
       tokenHold: {
         mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-        minUsd: 10,
+        minUsd: 5,
         required: !holdExempt,
         exempt: holdExempt,
       },
@@ -3326,7 +3326,7 @@ async function handleMcp(req, res, parts) {
         ).trim(),
       );
 
-      // Token hold block — write/tx tools require ≥$10 ORBITX.
+      // Token hold block — write/tx tools require ≥$5 ORBITX.
       // Owner wallets + audifyx@gmail.com (resolved from API-key userId) skip entirely.
       if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
         const candidates = holdCandidateWallets(auth, args);
@@ -3338,7 +3338,7 @@ async function handleMcp(req, res, parts) {
             const tip = holdBlockedPayload({
               tool: name,
               hold,
-              fix: "Hold ≥$10 ORBITX, link wallet on https://orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
+              fix: "Hold ≥$5 ORBITX, link wallet on https://orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
             });
             return json(res, {
               jsonrpc: "2.0",
