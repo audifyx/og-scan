@@ -56,6 +56,7 @@ import TerminalHome from "./pages/orbitx/TerminalHome";
 import TerminalTrade from "./pages/orbitx/TerminalTrade";
 import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
 import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
+import Trade from "./pages/Trade";
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
 const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
@@ -347,6 +348,10 @@ const App = () => (
               <Route path="collection/:id" element={<Suspense fallback={null}><NftCollectionPage /></Suspense>} />
               <Route path="coin/:nftId" element={<Suspense fallback={null}><NftCoinTrade /></Suspense>} />
             </Route>
+
+            {/* ── OrbitX Trade Terminal (Phantom connect + DEX markets) ── */}
+            <Route path="/trade" element={<Trade />} />
+            <Route path="/trade/:mint" element={<Trade />} />
 
             <Route path="/terminal" element={<LaunchpadTerminal />}>
               <Route index element={<TerminalHome />} />

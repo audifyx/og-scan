@@ -121,6 +121,7 @@ const Glyph = {
 
 const ALL_APPS: App[] = [
   { key: "dex", name: "OrbitX DEX", caption: "Scanner & Trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(135deg, #1A6CFF, #0037A3)", glyph: Glyph.dex },
+  { key: "trade", name: "Trade Terminal", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(135deg, #AB9FF2, #6B5FD4)", glyph: Glyph.dex },
   { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
@@ -138,7 +139,7 @@ const APP_BY_KEY = Object.fromEntries(ALL_APPS.map((a) => [a.key, a])) as Record
 type HubSection = { id: string; title: string; subtitle: string; keys: string[] };
 
 const APP_SECTIONS: HubSection[] = [
-  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "scanner", "launchpad"] },
+  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "trade", "scanner", "launchpad"] },
   { id: "intel", title: "Intelligence", subtitle: "Track wallets, PnL, and AI", keys: ["koltracker", "pnltracker", "ai"] },
   { id: "social", title: "Social", subtitle: "Feed, spaces, and community", keys: ["social"] },
   { id: "play", title: "Play & Earn", subtitle: "Games, markets, NFTs, tasks", keys: ["gaming", "predict", "nft", "bagwork"] },
@@ -147,6 +148,7 @@ const APP_SECTIONS: HubSection[] = [
 const QUICK_ACTIONS = [
   { label: "Scan token", href: "/orbitx-scanner", tone: "#14E0C8" },
   { label: "Open DEX", href: "/ORBITX_DEX", tone: "#2F80FF" },
+  { label: "Trade", href: "/trade", tone: "#AB9FF2" },
   { label: "Launch", href: "/orbitxlaunch", tone: "#FFC53D" },
   { label: "Social feed", href: "/orbitx-social", tone: "#9945FF" },
 ];

@@ -2,17 +2,17 @@
  * TradingTerminal — Phantom-style 3-panel trading terminal for OrbitX.
  *
  * Layout:
- *   Left   (280 px)  Token list with search + trending/positions tabs
- *   Center (flex-1)  Token header → Chart → Trades / My Trades / Positions / Top Traders
- *   Right  (320 px)  5m stats → Buy/Sell swap → Token Info
+ *   Left   (280 px)  DEX market list (screener) + search + positions
+ *   Center (flex-1)  Token header → Chart → Trades / My Trades / Positions
+ *   Right  (320 px)  Stats → Buy/Sell with Phantom connect + sign
  *
- * All data is fetched natively — no embeds. Chart uses lightweight-charts.
- * Chart + Trades use GeckoTerminal (CORS-friendly) with DexScreener pool address.
- * Swaps open Phantom's native swap UI via deep link.
+ * Markets: /api/ogdex/screener (same as DEX home).
+ * Trades: POST /api/ogdex/trade → VersionedTransaction → wallet signAndSend.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { VersionedTransaction } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
   ArrowUpRight, ArrowDownLeft, Check,
@@ -34,6 +34,10 @@ import {
   type TokenAsset,
 } from "@/lib/solana-api";
 import { CandlestickChart, type CandleDataPoint } from "./CandlestickChart";
+
+export type TradeTerminalProps = {
+  initialMint?: string | null;
+};
 
 /* ═══════════════════════════════════════════════════════════════════
    Types
@@ -105,8 +109,49 @@ const DEFAULT_MINTS: { mint: string; symbol: string; name: string }[] = [
   { mint: "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5", symbol: "MEW", name: "cat in a dogs world" },
 ];
 
-const SIDEBAR_TABS = ["Trending", "Positions", "Following"] as const;
+const SIDEBAR_TABS = ["Trending", "New", "Pump", "Listed", "Positions"] as const;
 type SidebarTab = (typeof SIDEBAR_TABS)[number];
+
+const MARKET_TAB_API: Record<Exclude<SidebarTab, "Positions">, { type: string; interval: string }> = {
+  Trending: { type: "trending", interval: "1h" },
+  New: { type: "new", interval: "1h" },
+  Pump: { type: "unbonded", interval: "1h" },
+  Listed: { type: "listed", interval: "1h" },
+};
+
+async function fetchOgdexMarkets(tab: Exclude<SidebarTab, "Positions">): Promise<TokenListItem[]> {
+  const { type, interval } = MARKET_TAB_API[tab];
+  try {
+    const r = await fetch(`/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=${interval}&limit=80&chain=solana`);
+    const d = await r.json();
+    const rows: any[] = Array.isArray(d?.rows) ? d.rows : [];
+    return rows
+      .map((row) => {
+        const mint = String(row.mint || "").trim();
+        if (!mint) return null;
+        return {
+          mint,
+          symbol: row.symbol || "???",
+          name: row.name || row.symbol || "",
+          image: row.icon || undefined,
+          price: Number(row.priceUsd) || 0,
+          mcap: Number(row.mcap || row.fdv) || 0,
+          change24h: Number(row.change24h ?? row.change1h) || 0,
+          volume24h: Number(row.volume) || 0,
+          liquidity: Number(row.liquidity) || 0,
+          pairAddress: row.firstPool?.id || row.poolAddress || undefined,
+          volume5m: 0,
+          buys5m: Number(row.numBuys) || 0,
+          sells5m: Number(row.numSells) || 0,
+          buyVol5m: Number(row.buyVolume) || 0,
+          sellVol5m: Number(row.sellVolume) || 0,
+        } as TokenListItem;
+      })
+      .filter(Boolean) as TokenListItem[];
+  } catch {
+    return [];
+  }
+}
 
 const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders"] as const;
 type BottomTab = (typeof BOTTOM_TABS)[number];
@@ -219,15 +264,8 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
   return def;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Phantom Swap Deep Link
-   ═══════════════════════════════════════════════════════════════════ */
-
-function openPhantomSwap(inputMint: string, outputMint: string) {
-  // Phantom universal link opens the swap screen directly in Phantom
-  const url = `https://phantom.app/ul/swap/${inputMint}/${outputMint}?ref=ogscan`;
-  window.open(url, "_blank");
-}
+const BUY_PRESETS = [0.1, 0.25, 0.5, 1];
+const SELL_PRESETS = [25, 50, 75, 100];
 
 /* ═══════════════════════════════════════════════════════════════════
    Formatting
@@ -275,13 +313,13 @@ function fmtNum(n: number): string {
    Component
    ═══════════════════════════════════════════════════════════════════ */
 
-export const TradingTerminal = () => {
-  const { publicKey, connected, wallets, select, connect, disconnect } = useWallet();
+export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
+  const { publicKey, connected, wallets, select, connect, disconnect, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
   /* ── State ──────────────────────────────────────────────── */
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
-  const [selectedMint, setSelectedMint] = useState<string>(DEFAULT_MINTS[0].mint);
+  const [selectedMint, setSelectedMint] = useState<string>(initialMint || DEFAULT_MINTS[0].mint);
   const [selectedToken, setSelectedToken] = useState<TokenListItem | null>(null);
   const [chartData, setChartData] = useState<CandleDataPoint[]>([]);
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
@@ -291,6 +329,13 @@ export const TradingTerminal = () => {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("Trending");
   const [bottomTab, setBottomTab] = useState<BottomTab>("Trades");
   const [swapMode, setSwapMode] = useState<"buy" | "sell">("buy");
+  const [buyAmt, setBuyAmt] = useState("0.25");
+  const [sellPct, setSellPct] = useState(50);
+  const [slippage, setSlippage] = useState(10);
+  const [tradeBusy, setTradeBusy] = useState(false);
+  const [tradeStage, setTradeStage] = useState("");
+  const [tradeErr, setTradeErr] = useState("");
+  const [tradeSig, setTradeSig] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<JupTokenInfo[]>([]);
   const [searching, setSearching] = useState(false);
@@ -313,21 +358,35 @@ export const TradingTerminal = () => {
     return () => ro.disconnect();
   }, []);
 
-  /* ── Load trending tokens on mount ──────────────────────── */
+  /* ── Load DEX markets (same screener as ORBITX_DEX home) ── */
   useEffect(() => {
+    if (sidebarTab === "Positions") return;
     let cancelled = false;
     (async () => {
       setLoadingTokens(true);
-      const results = await Promise.all(DEFAULT_MINTS.map((t) => fetchDexPair(t.mint)));
+      let list = await fetchOgdexMarkets(sidebarTab);
+      if (!list.length) {
+        const fallback = await Promise.all(DEFAULT_MINTS.map((t) => fetchDexPair(t.mint)));
+        list = fallback.filter(Boolean) as TokenListItem[];
+      }
       if (cancelled) return;
-      const valid = results.filter(Boolean) as TokenListItem[];
-      valid.sort((a, b) => b.volume24h - a.volume24h);
-      setTokens(valid);
+      setTokens(list);
       setLoadingTokens(false);
-      if (valid.length > 0) setSelectedMint(valid[0].mint);
+      if (initialMint && list.some((t) => t.mint === initialMint)) {
+        setSelectedMint(initialMint);
+      } else if (list.length && !list.some((t) => t.mint === selectedMint)) {
+        setSelectedMint(list[0].mint);
+      }
     })();
-    return () => { cancelled = true; };
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarTab]);
+
+  useEffect(() => {
+    if (initialMint) setSelectedMint(initialMint);
+  }, [initialMint]);
 
   /* ── Load selected token data ───────────────────────────── */
   useEffect(() => {
@@ -432,15 +491,80 @@ export const TradingTerminal = () => {
     toast({ title: "Address copied" });
   }, [selectedMint]);
 
-  /** Open Phantom native swap */
-  const handleSwap = useCallback(() => {
+  /** Connect Phantom (or picker) then build + sign trade via /api/ogdex/trade */
+  const handleSwap = useCallback(async () => {
     if (!selectedMint) return;
-    if (swapMode === "buy") {
-      openPhantomSwap(SOL_MINT, selectedMint);
-    } else {
-      openPhantomSwap(selectedMint, SOL_MINT);
+    setTradeErr("");
+    setTradeSig("");
+    if (!connected || !publicKey) {
+      setShowWalletPicker(true);
+      return;
     }
-  }, [selectedMint, swapMode]);
+    if (swapMode === "buy") {
+      const n = Number(buyAmt);
+      if (!Number.isFinite(n) || n <= 0) {
+        setTradeErr("Enter a valid SOL amount");
+        return;
+      }
+    }
+    setTradeBusy(true);
+    try {
+      setTradeStage("Building transaction…");
+      const amount = swapMode === "buy" ? Number(buyAmt) : `${sellPct}%`;
+      const r = await fetch("/api/ogdex/trade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicKey: publicKey.toBase58(),
+          action: swapMode,
+          mint: selectedMint,
+          amount,
+          denominatedInSol: swapMode === "buy" ? "true" : "false",
+          slippage,
+          priorityFee: 0.0003,
+          pool: "auto",
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d?.ok || !d?.tx) throw new Error(d?.error || "Could not build transaction");
+      setTradeStage("Confirm in Phantom…");
+      const bytes = Uint8Array.from(atob(d.tx), (c) => c.charCodeAt(0));
+      const tx = VersionedTransaction.deserialize(bytes);
+      const sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
+      setTradeStage("Confirming on-chain…");
+      await connection.confirmTransaction(sig, "confirmed");
+      setTradeSig(sig);
+      toast({ title: "Trade confirmed", description: `${sig.slice(0, 8)}…` });
+      if (publicKey) {
+        try {
+          const assets = await getAssets(publicKey.toString());
+          setPositions(
+            (assets.items || []).filter(
+              (a: TokenAsset) => a.interface === "FungibleToken" || a.interface === "FungibleAsset",
+            ),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch (e: any) {
+      const m = String(e?.message || e || "Trade failed");
+      setTradeErr(/reject|cancel/i.test(m) ? "Cancelled in Phantom" : m);
+    } finally {
+      setTradeBusy(false);
+      setTradeStage("");
+    }
+  }, [
+    selectedMint,
+    connected,
+    publicKey,
+    swapMode,
+    buyAmt,
+    sellPct,
+    slippage,
+    sendTransaction,
+    connection,
+  ]);
 
   const selectSearchResult = useCallback(
     (token: JupTokenInfo) => {
@@ -472,6 +596,146 @@ export const TradingTerminal = () => {
 
   /* ── Derived ────────────────────────────────────────────── */
   const t = selectedToken;
+
+  const SwapPanel = () => (
+    <div className="p-4 space-y-3 border-b border-white/[0.07]">
+      <div className="flex rounded-lg overflow-hidden border border-white/[0.07]">
+        <button
+          type="button"
+          onClick={() => setSwapMode("buy")}
+          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+            swapMode === "buy"
+              ? "bg-green-500/20 text-green-400 border-b-2 border-green-400"
+              : "text-white/40 hover:text-white/60"
+          }`}
+        >
+          Buy
+        </button>
+        <button
+          type="button"
+          onClick={() => setSwapMode("sell")}
+          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+            swapMode === "sell"
+              ? "bg-red-500/20 text-red-400 border-b-2 border-red-400"
+              : "text-white/40 hover:text-white/60"
+          }`}
+        >
+          Sell
+        </button>
+      </div>
+
+      {swapMode === "buy" ? (
+        <div className="space-y-2">
+          <label className="text-[10px] text-white/35 uppercase tracking-wide">Amount (SOL)</label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={buyAmt}
+            onChange={(e) => setBuyAmt(e.target.value)}
+            className="h-10 text-sm font-mono bg-white/[0.04] border-white/[0.07]"
+            placeholder="0.25"
+          />
+          <div className="flex gap-1.5">
+            {BUY_PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setBuyAmt(String(p))}
+                className={`flex-1 py-1.5 rounded-md text-[11px] font-mono border transition-colors ${
+                  buyAmt === String(p)
+                    ? "border-[#ab9ff2]/50 bg-[#ab9ff2]/15 text-white"
+                    : "border-white/[0.07] text-white/45 hover:text-white/70"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <label className="text-[10px] text-white/35 uppercase tracking-wide">Sell %</label>
+          <div className="flex gap-1.5">
+            {SELL_PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setSellPct(p)}
+                className={`flex-1 py-1.5 rounded-md text-[11px] font-mono border transition-colors ${
+                  sellPct === p
+                    ? "border-red-400/50 bg-red-500/15 text-red-300"
+                    : "border-white/[0.07] text-white/45 hover:text-white/70"
+                }`}
+              >
+                {p}%
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <label className="text-[10px] text-white/35 uppercase tracking-wide shrink-0">Slippage</label>
+        <Input
+          type="number"
+          min="0.1"
+          max="50"
+          step="0.5"
+          value={slippage}
+          onChange={(e) => setSlippage(Number(e.target.value) || 10)}
+          className="h-8 text-xs font-mono bg-white/[0.04] border-white/[0.07] w-20"
+        />
+        <span className="text-[10px] text-white/30">%</span>
+      </div>
+
+      <Button
+        type="button"
+        onClick={() => void handleSwap()}
+        disabled={tradeBusy || !selectedMint}
+        className={`w-full h-12 rounded-xl font-semibold text-sm disabled:opacity-60 ${
+          swapMode === "buy"
+            ? "bg-green-500 hover:bg-green-600 text-black"
+            : "bg-red-500 hover:bg-red-600 text-white"
+        }`}
+      >
+        {tradeBusy ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            {tradeStage || "Working…"}
+          </>
+        ) : !connected ? (
+          <>
+            <Wallet className="h-4 w-4 mr-2" />
+            Connect Phantom
+          </>
+        ) : swapMode === "buy" ? (
+          <>
+            <ArrowDownLeft className="h-4 w-4 mr-2" />
+            Buy {t?.symbol || "token"}
+          </>
+        ) : (
+          <>
+            <ArrowUpRight className="h-4 w-4 mr-2" />
+            Sell {sellPct}% {t?.symbol || "token"}
+          </>
+        )}
+      </Button>
+
+      {tradeErr && <p className="text-[11px] text-red-400 text-center">{tradeErr}</p>}
+      {tradeSig && (
+        <a
+          href={`https://solscan.io/tx/${tradeSig}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1 text-[11px] text-[#ab9ff2] hover:underline"
+        >
+          Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+      <p className="text-[10px] text-white/25 text-center">Sign with Phantom · OrbitX trade API</p>
+    </div>
+  );
 
   /* ═══════════════════════════════════════════════════════════════
      Wallet Picker Overlay
@@ -535,17 +799,17 @@ export const TradingTerminal = () => {
   return (
     <>
     <WalletPickerOverlay />
-    <div className="flex flex-col lg:flex-row min-h-[calc(100vh-68px)] lg:h-[calc(100vh-0px)] overflow-y-auto lg:overflow-hidden bg-[#0a0a14]">
+    <div className="flex h-full min-h-[calc(100vh-68px)] flex-col overflow-y-auto bg-[#0a0a14] lg:min-h-0 lg:flex-row lg:overflow-hidden">
 
       {/* ═══════════════ LEFT SIDEBAR ═══════════════ */}
       <aside className="hidden lg:flex flex-col w-[280px] min-w-[280px] border-r border-white/[0.07] bg-[#0d0d1a]">
         {/* Sidebar tabs */}
-        <div className="flex border-b border-white/[0.07]">
+        <div className="flex overflow-x-auto border-b border-white/[0.07] scrollbar-none">
           {SIDEBAR_TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setSidebarTab(tab)}
-              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+              className={`shrink-0 px-2.5 py-2.5 text-[10px] font-medium transition-colors ${
                 sidebarTab === tab
                   ? "text-white border-b-2 border-[#ab9ff2]"
                   : "text-white/40 hover:text-white/60"
@@ -975,49 +1239,7 @@ export const TradingTerminal = () => {
           </div>
         )}
 
-        {/* Swap panel — opens Phantom */}
-        <div className="p-4 space-y-3 border-b border-white/[0.07]">
-          <div className="flex rounded-lg overflow-hidden border border-white/[0.07]">
-            <button
-              onClick={() => setSwapMode("buy")}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                swapMode === "buy"
-                  ? "bg-green-500/20 text-green-400 border-b-2 border-green-400"
-                  : "text-white/40 hover:text-white/60"
-              }`}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => setSwapMode("sell")}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                swapMode === "sell"
-                  ? "bg-red-500/20 text-red-400 border-b-2 border-red-400"
-                  : "text-white/40 hover:text-white/60"
-              }`}
-            >
-              Sell
-            </button>
-          </div>
-
-          <Button
-            onClick={handleSwap}
-            className={`w-full h-12 rounded-xl font-semibold text-sm ${
-              swapMode === "buy"
-                ? "bg-green-500 hover:bg-green-600 text-black"
-                : "bg-red-500 hover:bg-red-600 text-white"
-            }`}
-          >
-            {swapMode === "buy" ? (
-              <ArrowDownLeft className="h-4 w-4 mr-2" />
-            ) : (
-              <ArrowUpRight className="h-4 w-4 mr-2" />
-            )}
-            {swapMode === "buy" ? `Buy ${t?.symbol || ""} on Phantom` : `Sell ${t?.symbol || ""} on Phantom`}
-          </Button>
-
-          <p className="text-[10px] text-white/25 text-center">Opens Phantom swap · $0 platform fee</p>
-        </div>
+        <SwapPanel />
 
         {/* Token Info */}
         <div className="p-4 flex-1 overflow-y-auto">
@@ -1089,48 +1311,7 @@ export const TradingTerminal = () => {
           </div>
         )}
 
-        {/* Swap panel — Phantom deep link */}
-        <div className="p-4 space-y-3 border-b border-white/[0.07]">
-          <div className="flex rounded-lg overflow-hidden border border-white/[0.07]">
-            <button
-              onClick={() => setSwapMode("buy")}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                swapMode === "buy"
-                  ? "bg-green-500/20 text-green-400 border-b-2 border-green-400"
-                  : "text-white/40 hover:text-white/60"
-              }`}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => setSwapMode("sell")}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                swapMode === "sell"
-                  ? "bg-red-500/20 text-red-400 border-b-2 border-red-400"
-                  : "text-white/40 hover:text-white/60"
-              }`}
-            >
-              Sell
-            </button>
-          </div>
-
-          <Button
-            onClick={handleSwap}
-            className={`w-full h-12 rounded-xl font-semibold text-sm ${
-              swapMode === "buy"
-                ? "bg-green-500 hover:bg-green-600 text-black"
-                : "bg-red-500 hover:bg-red-600 text-white"
-            }`}
-          >
-            {swapMode === "buy" ? (
-              <ArrowDownLeft className="h-4 w-4 mr-2" />
-            ) : (
-              <ArrowUpRight className="h-4 w-4 mr-2" />
-            )}
-            {swapMode === "buy" ? `Buy ${t?.symbol || ""} on Phantom` : `Sell ${t?.symbol || ""} on Phantom`}
-          </Button>
-          <p className="text-[10px] text-white/25 text-center">Opens Phantom swap · $0 platform fee</p>
-        </div>
+        <SwapPanel />
 
         {/* Token Info on mobile */}
         {security && (
