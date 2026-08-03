@@ -5,7 +5,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Copy, Check, ExternalLink, Loader2, Wallet, RefreshCw } from "lucide-react";
-import { fetchSwaps, fetchWallet, type WalletPnlToken, type WalletTrade } from "./tradeApi";
+import {
+  fetchSwaps,
+  fetchWallet,
+  mergeHoldingPnl,
+  normalizePnlToken,
+  type WalletPnlToken,
+  type WalletTrade,
+} from "./tradeApi";
 import { fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
 import { pushRecentWallet } from "./tradeRecent";
 
@@ -89,6 +96,15 @@ export default function TradeWallet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
+  const pnlByMint = useMemo(() => {
+    const map = new Map<string, WalletPnlToken>();
+    for (const raw of d?.pnl?.perToken || []) {
+      const row = normalizePnlToken(raw);
+      if (row) map.set(row.mint, row);
+    }
+    return map;
+  }, [d]);
+
   const holdings = useMemo(() => {
     if (!d?.ok) return [];
     const sol = {
@@ -103,15 +119,20 @@ export default function TradeWallet() {
       change24h: null as number | null,
       unpriced: false,
       pctSupply: null as number | null,
+      costUsd: null as number | null,
+      potUsd: d.solUsd as number | null,
+      unrealizedUsd: null as number | null,
+      unrealizedPct: null as number | null,
     };
-    const list = [sol, ...(d.holdings || [])];
+    const tokens = (d.holdings || []).map((h: any) => mergeHoldingPnl(h, pnlByMint));
+    const list = [sol, ...tokens];
     if (!hideDust) return list;
     return list.filter((h: any) => {
       if (h.isSol) return true;
       if (h.unpriced || !(h.priceUsd > 0) || !(h.usdValue > 0)) return true;
       return h.usdValue >= 0.01;
     });
-  }, [d, hideDust]);
+  }, [d, hideDust, pnlByMint]);
 
   const pnl = d?.pnl;
   const wins =
@@ -131,15 +152,18 @@ export default function TradeWallet() {
         : null;
 
   const pnlRows: WalletPnlToken[] = useMemo(() => {
-    const rows = Array.isArray(pnl?.perToken) ? [...pnl.perToken] : [];
-    return rows.filter(
-      (p) =>
-        (p.closedTrades || 0) > 0 ||
-        p.open ||
-        p.holding ||
-        (p.holdingAmount || 0) > 0 ||
-        p.noTradeHistory,
-    );
+    const rows = Array.isArray(pnl?.perToken) ? pnl.perToken : [];
+    return rows
+      .map((r: any) => normalizePnlToken(r))
+      .filter((p): p is WalletPnlToken => !!p)
+      .filter(
+        (p) =>
+          (p.closedTrades || 0) > 0 ||
+          p.open ||
+          p.holding ||
+          (p.holdingAmount || 0) > 0 ||
+          p.noTradeHistory,
+      );
   }, [pnl]);
 
   const copy = () => {
@@ -336,12 +360,32 @@ export default function TradeWallet() {
                       {fmtTok(h.uiAmount, 6)}
                       {h.pctSupply != null ? ` · ${Number(h.pctSupply).toFixed(3)}% supply` : ""}
                     </p>
+                    {!h.isSol && (
+                      <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                        Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
+                        {" · "}Pot{" "}
+                        {h.potUsd != null && h.potUsd > 0
+                          ? fmtUsd(h.potUsd)
+                          : h.usdValue > 0
+                            ? fmtUsd(h.usdValue)
+                            : "—"}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-mono text-[13px] font-semibold">
                       {h.unpriced || (!(h.usdValue > 0) && !h.isSol) ? "—" : fmtUsd(h.usdValue)}
                     </p>
-                    {h.change24h != null && (
+                    {!h.isSol && h.unrealizedUsd != null ? (
+                      <p
+                        className={`font-mono text-[10px] ${
+                          h.unrealizedUsd >= 0 ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        {fmtPnl(h.unrealizedUsd)}
+                        {h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""}
+                      </p>
+                    ) : h.change24h != null ? (
                       <p
                         className={`font-mono text-[10px] ${
                           h.change24h >= 0 ? "text-emerald-400" : "text-red-400"
@@ -349,7 +393,7 @@ export default function TradeWallet() {
                       >
                         {fmtPct(h.change24h)}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </button>
               ))}
@@ -386,10 +430,24 @@ export default function TradeWallet() {
                       : null;
                 const holdAmt = p.holdingAmount ?? p.tokens ?? 0;
                 const isHolding = !!p.holding || holdAmt > 1e-9;
+                const pot =
+                  p.potUsd ??
+                  (isHolding
+                    ? p.holdingUsd ?? p.curValueUsd ?? null
+                    : p.curValueUsd ?? null);
+                const cost =
+                  p.costUsd ??
+                  (p.avgCostUsd != null && holdAmt > 0 ? p.avgCostUsd * holdAmt : null);
+                const uPnl =
+                  p.unrealizedUsd ??
+                  (pot != null && cost != null ? pot - cost : null);
+                const uPct =
+                  p.unrealizedPct ??
+                  (uPnl != null && cost != null && cost > 0 ? (uPnl / cost) * 100 : null);
                 const uTone =
-                  p.unrealizedUsd == null
+                  uPnl == null
                     ? "text-white/50"
-                    : p.unrealizedUsd >= 0
+                    : uPnl >= 0
                       ? "text-emerald-400"
                       : "text-red-400";
                 const rTone =
@@ -420,8 +478,13 @@ export default function TradeWallet() {
                           </div>
                           <div className="text-right">
                             <p className={`font-mono text-sm font-semibold ${rTone}`}>
-                              {(p.closedTrades || 0) > 0 || p.unrealizedUsd != null
-                                ? fmtPnl(p.totalUsd ?? p.realizedUsd)
+                              {(p.closedTrades || 0) > 0 || uPnl != null
+                                ? fmtPnl(
+                                    p.totalUsd ??
+                                      (p.realizedUsd != null || uPnl != null
+                                        ? (p.realizedUsd || 0) + (uPnl || 0)
+                                        : null),
+                                  )
                                 : "—"}
                             </p>
                             <p className="text-[9px] uppercase tracking-wider text-white/30">
@@ -453,34 +516,42 @@ export default function TradeWallet() {
                                 ? `${fmtTok(holdAmt, 4)} · ${
                                     p.holdingUsd != null && p.holdingUsd > 0
                                       ? fmtUsd(p.holdingUsd)
-                                      : p.curValueUsd != null && p.curValueUsd > 0
-                                        ? fmtUsd(p.curValueUsd)
+                                      : pot != null && pot > 0
+                                        ? fmtUsd(pot)
                                         : "—"
                                   }`
                                 : "No"}
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-white/30">Supply </span>
+                            <span className="text-white/30">Pot </span>
                             <span className="font-mono">
-                              {p.pctSupply != null ? `${Number(p.pctSupply).toFixed(3)}%` : "—"}
+                              {pot != null && pot > 0 ? fmtUsd(pot) : "—"}
                             </span>
                           </div>
                           <div>
                             <span className="text-white/30">Cost </span>
                             <span className="font-mono">
-                              {p.costUsd != null
-                                ? fmtUsd(p.costUsd)
-                                : p.avgCostUsd != null && holdAmt > 0
-                                  ? fmtUsd(p.avgCostUsd * holdAmt)
-                                  : "—"}
+                              {cost != null ? fmtUsd(cost) : "—"}
                             </span>
                           </div>
                           <div className="text-right">
                             <span className="text-white/30">uPnL </span>
                             <span className={`font-mono ${uTone}`}>
-                              {fmtPnl(p.unrealizedUsd)}
-                              {p.unrealizedPct != null ? ` (${fmtPct(p.unrealizedPct)})` : ""}
+                              {fmtPnl(uPnl)}
+                              {uPct != null ? ` (${fmtPct(uPct)})` : ""}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-white/30">Realized </span>
+                            <span className={`font-mono ${rTone}`}>
+                              {(p.closedTrades || 0) > 0 ? fmtPnl(p.realizedUsd) : "—"}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-white/30">Supply </span>
+                            <span className="font-mono">
+                              {p.pctSupply != null ? `${Number(p.pctSupply).toFixed(3)}%` : "—"}
                             </span>
                           </div>
                         </div>

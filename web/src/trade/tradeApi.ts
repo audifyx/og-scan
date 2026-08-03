@@ -218,6 +218,8 @@ export type WalletPnlToken = {
   holding?: boolean;
   holdingAmount?: number;
   holdingUsd?: number;
+  /** Mark-to-market position value (held bag / "pot"). */
+  potUsd?: number | null;
   tokens?: number;
   pctSupply?: number | null;
   avgCostUsd?: number | null;
@@ -227,7 +229,129 @@ export type WalletPnlToken = {
   curPriceUsd?: number | null;
   curValueUsd?: number | null;
   noTradeHistory?: boolean;
+  sells?: number;
+  buys?: number;
 };
+
+function numOrNull(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Normalize wallet / PnL token rows across API aliases so the UI never blanks
+ * on cost vs costUsd, uPnl vs unrealizedUsd, pot vs holdingUsd, etc.
+ */
+export function normalizePnlToken(raw: any): WalletPnlToken | null {
+  if (!raw || typeof raw !== "object") return null;
+  const mint = String(raw.mint || "").trim();
+  if (!mint) return null;
+
+  const holdingAmount = numOrNull(raw.holdingAmount ?? raw.tokens ?? raw.uiAmount) ?? 0;
+  const holdingFlag = raw.holding === true || holdingAmount > 1e-12;
+  const holdingUsd =
+    numOrNull(raw.holdingUsd ?? raw.usdValue ?? raw.curValueUsd ?? raw.potUsd) ??
+    (holdingFlag ? 0 : null);
+  const avgCostUsd = numOrNull(raw.avgCostUsd ?? raw.avgCost);
+  let costUsd = numOrNull(raw.costUsd ?? raw.cost ?? raw.costBasisUsd);
+  if (costUsd == null && avgCostUsd != null && holdingAmount > 0) {
+    costUsd = avgCostUsd * holdingAmount;
+  }
+  const boughtUsd = numOrNull(raw.boughtUsd ?? raw.buyUsd ?? raw.totalBoughtUsd);
+  const sells = numOrNull(raw.sells) ?? 0;
+  if (costUsd == null && holdingFlag && sells === 0 && boughtUsd != null && boughtUsd > 0) {
+    costUsd = boughtUsd;
+  }
+
+  const potUsd =
+    numOrNull(raw.potUsd ?? raw.positionUsd ?? raw.curValueUsd ?? raw.holdingUsd) ??
+    (holdingFlag && holdingUsd != null && holdingUsd > 0 ? holdingUsd : null);
+
+  let unrealizedUsd = numOrNull(
+    raw.unrealizedUsd ?? raw.unrealizedPnlUsd ?? raw.uPnl ?? raw.unrealized,
+  );
+  let unrealizedPct = numOrNull(raw.unrealizedPct ?? raw.unrealizedPnlPct ?? raw.uPnlPct);
+  if (unrealizedUsd == null && potUsd != null && costUsd != null) {
+    unrealizedUsd = potUsd - costUsd;
+  }
+  if (unrealizedPct == null && unrealizedUsd != null && costUsd != null && costUsd > 0) {
+    unrealizedPct = (unrealizedUsd / costUsd) * 100;
+  }
+
+  const realizedUsd = numOrNull(raw.realizedUsd ?? raw.realizedPnlUsd ?? raw.realized);
+  const totalUsdRaw = numOrNull(raw.totalUsd ?? raw.netUsd);
+  const curValueUsd = numOrNull(raw.curValueUsd) ?? potUsd;
+  const totalUsd =
+    totalUsdRaw ??
+    (realizedUsd != null || unrealizedUsd != null
+      ? (realizedUsd || 0) + (unrealizedUsd || 0)
+      : null);
+
+  return {
+    mint,
+    symbol: raw.symbol ?? null,
+    name: raw.name ?? null,
+    image: raw.image ?? null,
+    realizedUsd,
+    unrealizedUsd,
+    unrealizedPct,
+    totalUsd,
+    closedTrades: numOrNull(raw.closedTrades) ?? undefined,
+    wins: numOrNull(raw.wins) ?? undefined,
+    losses: numOrNull(raw.losses) ?? undefined,
+    winRate: numOrNull(raw.winRate),
+    open: !!raw.open,
+    holding: holdingFlag,
+    holdingAmount,
+    holdingUsd: holdingUsd ?? undefined,
+    potUsd,
+    tokens: numOrNull(raw.tokens) ?? holdingAmount,
+    pctSupply: numOrNull(raw.pctSupply),
+    avgCostUsd:
+      avgCostUsd ??
+      (costUsd != null && holdingAmount > 0 ? costUsd / holdingAmount : null),
+    costUsd,
+    boughtUsd,
+    boughtSol: numOrNull(raw.boughtSol),
+    curPriceUsd: numOrNull(raw.curPriceUsd ?? raw.priceUsd),
+    curValueUsd,
+    noTradeHistory: !!raw.noTradeHistory,
+    sells,
+    buys: numOrNull(raw.buys) ?? undefined,
+  };
+}
+
+/** Merge holdings + perToken so Mine/Track rows can show cost / pot / uPnL. */
+export function mergeHoldingPnl(holding: any, pnlByMint: Map<string, WalletPnlToken>) {
+  const mint = String(holding?.mint || "");
+  const p = pnlByMint.get(mint);
+  const uiAmount = numOrNull(holding?.uiAmount) ?? 0;
+  const usdValue = numOrNull(holding?.usdValue) ?? 0;
+  const costUsd =
+    p?.costUsd ??
+    (p?.avgCostUsd != null && uiAmount > 0 ? p.avgCostUsd * uiAmount : null);
+  const potUsd = usdValue > 0 ? usdValue : p?.potUsd ?? null;
+  let unrealizedUsd = p?.unrealizedUsd ?? null;
+  let unrealizedPct = p?.unrealizedPct ?? null;
+  if (unrealizedUsd == null && potUsd != null && costUsd != null) {
+    unrealizedUsd = potUsd - costUsd;
+  }
+  if (unrealizedPct == null && unrealizedUsd != null && costUsd != null && costUsd > 0) {
+    unrealizedPct = (unrealizedUsd / costUsd) * 100;
+  }
+  return {
+    ...holding,
+    costUsd,
+    potUsd,
+    boughtUsd: p?.boughtUsd ?? null,
+    unrealizedUsd,
+    unrealizedPct,
+    realizedUsd: p?.realizedUsd ?? null,
+    holdingAmount: uiAmount,
+    holdingUsd: usdValue,
+  };
+}
 
 export async function fetchWallet(address: string) {
   return j(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);

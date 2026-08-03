@@ -61,6 +61,7 @@ export interface PnlPerToken {
   mint: string; realizedUsd: number; realizedSol: number; unrealizedUsd: number | null; totalUsd: number | null;
   closedTrades: number; wins?: number; losses?: number; winRate: number | null; open: boolean; tokens: number;
   avgCostUsd: number | null; costUsd?: number | null; boughtUsd?: number | null; boughtSol?: number | null;
+  potUsd?: number | null;
   curPriceUsd: number | null; curValueUsd: number | null; unrealizedPct?: number | null;
   holding?: boolean; holdingAmount?: number; holdingUsd?: number; pctSupply?: number | null;
   symbol?: string | null; name?: string | null; image?: string | null; mcap?: number | null; noTradeHistory?: boolean;

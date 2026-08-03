@@ -157,8 +157,10 @@ export async function computePnl(address, opts = {}) {
       open,
       tokens: open ? p.tokens : 0,
       avgCostUsd,
+      // Remaining cost basis for open bags; null when fully closed in-window.
       costUsd: open ? costUsd : null,
       costSol: open ? costSol : null,
+      potUsd: open ? curValueUsd : null,
       boughtSol: p.boughtSol,
       boughtUsd: p.boughtSol * sp,
       soldSol: p.soldSol,
