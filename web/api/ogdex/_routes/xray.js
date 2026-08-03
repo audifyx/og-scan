@@ -77,7 +77,13 @@ export default async function handler(req, res) {
       ? pct1(realHolders.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0))
       : null;
     const whales      = realHolders.filter(h => (h.pct || 0) >= 1).length;
-    const totalHolders = safety.totalHolders ?? intel?.holderCount ?? null;
+    const sampleLen = Array.isArray(holders) ? holders.length : 0;
+    const rawIntelHc = intel?.holderCount;
+    const intelTotal =
+      rawIntelHc != null && !(sampleLen > 0 && rawIntelHc === sampleLen && rawIntelHc <= 100)
+        ? rawIntelHc
+        : null;
+    const totalHolders = safety.totalHolders ?? intelTotal ?? null;
 
     // ── Dev ────────────────────────────────────────────────────────
     const dev    = safety.creator || null;

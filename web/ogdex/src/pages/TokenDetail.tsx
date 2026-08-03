@@ -32,6 +32,11 @@ import {
    Shared micro-components
 ───────────────────────────────────────────── */
 
+function numOrNull(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function symbolToRgb(sym: string, offset: number): string {
   let h = 0;
   for (let i = 0; i < sym.length; i++) h = (h * 31 + sym.charCodeAt(i)) >>> 0;
@@ -159,17 +164,30 @@ export default function TokenDetail() {
   const holders: any[] = (intel.holders && intel.holders.length) ? intel.holders : (topData?.holders || []);
   const trades: any[] = intel.trades || [];
   const whales = holders.filter((h) => h.label === "whale").length;
+  // Total holder count — never the truncated top-holders sample length.
+  const sampleLen = holders.length;
+  const rawIntelHc = numOrNull(intel?.holderCount ?? topData?.holderCount);
+  const intelTotal =
+    rawIntelHc != null && !(sampleLen > 0 && rawIntelHc === sampleLen && rawIntelHc <= 100)
+      ? rawIntelHc
+      : null;
+  const totalHolders =
+    numOrNull(meta.holderCount) ??
+    numOrNull(t.holderCount) ??
+    numOrNull(safety?.totalHolders) ??
+    intelTotal;
   const score = d.score?.total ?? meta.organicScore;
   const scoreColor = score == null ? "text-muted" : score >= 70 ? "text-up" : score >= 45 ? "text-accent" : "text-down";
   const copy = () => { navigator.clipboard.writeText(mint); setCopied(true); setTimeout(() => setCopied(false), 1200); };
 
   const evm = (meta.chain || chainParam) !== "solana" && !isSol;
   const secUnavail = !!(d.flags?.securityUnavailable || meta.securityUnavailable);
+  const holdersTab = totalHolders != null ? `Holders (${fmtNum(totalHolders)})` : "Holders";
   const TABS: [string, string][] = evm
     ? [
         ["overview",   "Overview"],
         ["chat",       "✨ Ask AI"],
-        ["holders",    `Holders${holders.length ? ` (${holders.length})` : ""}`],
+        ["holders",    holdersTab],
         ["trades",     `Live Trades${trades.length ? ` (${trades.length})` : ""}`],
       ]
     : [
@@ -178,7 +196,7 @@ export default function TokenDetail() {
         ["predictive", "Predictive"],
         ["smartmoney", "Smart Money"],
         ["kolwhale",   "KOL & Whale"],
-        ["holders",    `Holders${holders.length ? ` (${holders.length})` : ""}`],
+        ["holders",    holdersTab],
         ["trades",     `Live Trades${trades.length ? ` (${trades.length})` : ""}`],
         ["xray",       "🩻 Risk X-ray"],
         ["forensics",  "Forensics"],
@@ -322,7 +340,7 @@ export default function TokenDetail() {
           <StatPill label="Market Cap"  value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
           <StatPill label="Volume 24h"  value={t.volume != null ? "$" + compact(t.volume) : "—"} />
           <StatPill label="Liquidity"   value={t.liquidity != null ? "$" + compact(t.liquidity) : "—"} />
-          <StatPill label="Holders"     value={fmtNum(meta.holderCount ?? t.holderCount ?? safety?.totalHolders)} />
+          <StatPill label="Holders"     value={fmtNum(totalHolders)} />
           <StatPill label="FDV"         value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
           {athMcap != null && <StatPill label="ATH MCap" value={fmtUsd(athMcap, { compact: true })} sub={fromAthPct != null ? (fromAthPct >= 0 ? "+" : "") + fromAthPct.toFixed(0) + "% ATH" : undefined} />}
           <StatPill label="OrbitX Score"    value={score != null ? Math.round(score) + "/100" : "—"} accent={score != null && score >= 60} />
@@ -392,7 +410,7 @@ export default function TokenDetail() {
         {tab === "predictive" && <PredictiveIntel d={d} />}
         {tab === "smartmoney" && <CapitalFlow d={d} />}
         {tab === "kolwhale"   && <KolWhaleActivity d={d} dir={dir} holders={holders} />}
-        {tab === "holders"    && <HoldersAndTraders holders={holders} topData={topData} topLoading={topLoading} price={price} dir={dir} safety={safety} />}
+        {tab === "holders"    && <HoldersAndTraders holders={holders} topData={topData} topLoading={topLoading} price={price} dir={dir} safety={safety} totalHolders={totalHolders} />}
         {tab === "trades"     && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint, chainParam).then(setD)} />}
         {tab === "xray"       && <RiskXray x={xray} loading={xrayLoading} />}
         {tab === "forensics"  && <><DevOrigin f={forensics} loading={forLoading} /><Forensics d={d} meta={meta} safety={safety} /></>}
@@ -577,9 +595,9 @@ function Pnl({ v, compact: isCompact }: { v: number | null | undefined; compact?
 /* ─────────────────────────────────────────────
    Combined Holders + Traders (tabbed)
 ───────────────────────────────────────────── */
-function HoldersAndTraders({ holders, topData, topLoading, price, dir = {}, safety }: {
-  holders: any[]; topData: { holders: TokenHolder[]; traders: TopTrader[] } | null;
-  topLoading: boolean; price?: number; dir?: Record<string, KolDirEntry>; safety: any;
+function HoldersAndTraders({ holders, topData, topLoading, price, dir = {}, safety, totalHolders }: {
+  holders: any[]; topData: { holders: TokenHolder[]; traders: TopTrader[]; holderCount?: number | null } | null;
+  topLoading: boolean; price?: number; dir?: Record<string, KolDirEntry>; safety: any; totalHolders?: number | null;
 }) {
   const [sub, setSub] = useState<"holders" | "traders">("holders");
   const enrichedHolders: TokenHolder[] = topData?.holders?.length ? topData.holders : holders.map((h, i) => ({
@@ -590,6 +608,10 @@ function HoldersAndTraders({ holders, topData, topLoading, price, dir = {}, safe
   const maxPct = Math.max(...enrichedHolders.map((h) => h.pct || 0), 1);
   const kolHolders = enrichedHolders.filter((h) => dir[h.owner]);
   const kolPct = kolHolders.reduce((s, h) => s + (h.pct || 0), 0);
+  const total = totalHolders ?? numOrNull(topData?.holderCount) ?? numOrNull(safety?.totalHolders);
+  const holdersSubLabel = total != null
+    ? `Holders (${fmtNum(total)})`
+    : `Top ${enrichedHolders.length || "—"}`;
 
   return (
     <div className="space-y-3">
@@ -597,7 +619,7 @@ function HoldersAndTraders({ holders, topData, topLoading, price, dir = {}, safe
 
       {/* Sub-tab switcher */}
       <div className="flex gap-1 bg-panel2/60 rounded-full p-1 w-fit">
-        {([["holders", "holders", `Holders (${enrichedHolders.length})`],
+        {([["holders", "holders", holdersSubLabel],
            ["traders", "traders", `Traders (${traders.length || "—"})`]] as [string, string, string][]).map(([k, , lbl]) => (
           <button key={k} onClick={() => setSub(k as "holders" | "traders")}
             className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${sub === k ? "bg-accent text-white shadow" : "text-muted hover:text-white"}`}>
@@ -623,6 +645,7 @@ function HoldersAndTraders({ holders, topData, topLoading, price, dir = {}, safe
           <div className="card overflow-hidden">
             <div className="px-4 py-3 border-b border-line text-sm font-semibold flex items-center gap-2">
               <Users className="w-4 h-4 text-accent" /> Top {enrichedHolders.length} Holders
+              {total != null && <span className="text-muted font-normal text-xs">· {fmtNum(total)} total</span>}
               <span className="text-muted font-normal text-xs ml-1">by balance · PnL enriched where available</span>
             </div>
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">

@@ -28,6 +28,16 @@ export function fmtTok(n?: number | null, digits = 4): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: digits });
 }
 
+/** Compact integer counts (holders, traders, txns). */
+export function fmtNum(n?: number | null): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (a >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  return Math.round(n).toLocaleString();
+}
+
 export function timeAgo(ts?: number | null): string {
   if (ts == null || !Number.isFinite(ts) || ts <= 0) return "—";
   const ms = ts < 1e12 ? ts * 1000 : ts;

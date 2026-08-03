@@ -73,13 +73,26 @@ async function fetchPrice(mint) {
   } catch { return null; } finally { clearTimeout(id); }
 }
 
+/** Jupiter v2 total holder count — never confuse with top-holders list length. */
+async function fetchHolderCount(mint) {
+  const ctl = new AbortController();
+  const id = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(`${JUP}/tokens/v2/search?query=${encodeURIComponent(mint)}`, { signal: ctl.signal });
+    if (!r.ok) return null;
+    const arr = await r.json();
+    const t = Array.isArray(arr) ? (arr.find((x) => (x.id || x.mint) === mint) || arr[0]) : null;
+    return num(t?.holderCount);
+  } catch { return null; } finally { clearTimeout(id); }
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://x");
   const mint = (url.searchParams.get("mint") || "").trim();
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
   cache(res, 60, 600);
   try {
-    const price = await fetchPrice(mint);
+    const [price, holderCount] = await Promise.all([fetchPrice(mint), fetchHolderCount(mint)]);
     const [holdersRes, traders] = await Promise.all([
       getLabeledHolders(mint, price),
       fetchTraders(mint),
@@ -121,8 +134,13 @@ export default async function handler(req, res) {
     };
     for (const t of traders) withPnl(t, t.holdingUsd);
     for (const h of holders) withPnl(h, h.usdValue);
-    return send(res, 200, { ok: true, mint, holders, traders, holdersSource: holdersRes.source, holdersStale: holdersRes.stale });
+    return send(res, 200, {
+      ok: true, mint, holders, traders,
+      holderCount, // total from Jupiter — distinct from holders.length (top-N sample)
+      topHoldersCount: holders.length,
+      holdersSource: holdersRes.source, holdersStale: holdersRes.stale,
+    });
   } catch (e) {
-    return send(res, 200, { ok: false, mint, holders: [], traders: [], error: String(e?.message || e) });
+    return send(res, 200, { ok: false, mint, holders: [], traders: [], holderCount: null, error: String(e?.message || e) });
   }
 }

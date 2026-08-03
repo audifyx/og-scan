@@ -136,7 +136,15 @@ export default async function handler(req, res) {
       launchpad: (safety.launchpad && typeof safety.launchpad === "object" ? safety.launchpad.name : safety.launchpad) || (pump ? "pump.fun" : null),
       isPumpFun: !!pump || !!safety.isPumpFun,
       bondingComplete: pump ? !!pump.complete : null,
-      concentration: { top10Pct, whales, totalHolders: safety.totalHolders ?? intel?.holderCount ?? null },
+      concentration: {
+        top10Pct, whales,
+        // Prefer Rugcheck / intel totals — never the top-N sample length.
+        totalHolders: safety.totalHolders ??
+          (intel?.holderCount != null &&
+           !(Array.isArray(intel?.holders) && intel.holderCount === intel.holders.length && intel.holderCount <= 100)
+            ? intel.holderCount
+            : null),
+      },
       safetyFlags: {
         mintRenounced: safety.mintAuthorityRenounced ?? null,
         freezeRenounced: safety.freezeAuthorityRenounced ?? null,

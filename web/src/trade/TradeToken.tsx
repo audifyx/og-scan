@@ -9,7 +9,7 @@ import {
   Globe, Send, MessageCircle, FileDown, Flame, AlertTriangle, BarChart2,
 } from "lucide-react";
 import { askCoinChat, fetchTokenBundle, fetchTokenOnly } from "./tradeApi";
-import { dexChartUrl, fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
+import { dexChartUrl, fmtNum, fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
 
 type TabId =
   | "overview"
@@ -110,6 +110,7 @@ export default function TradeToken() {
   const [safetyApi, setSafetyApi] = useState<any>(null);
   const [traders, setTraders] = useState<any[]>([]);
   const [holders, setHolders] = useState<any[]>([]);
+  const [holderCountTotal, setHolderCountTotal] = useState<number | null>(null);
   const [pool, setPool] = useState<string | null>(null);
   const [forensics, setForensics] = useState<any>(null);
   const [ath, setAth] = useState<any>(null);
@@ -128,6 +129,10 @@ export default function TradeToken() {
       setSafetyApi(b.safety);
       setTraders(Array.isArray(b.traders?.traders) ? b.traders.traders : []);
       setHolders(Array.isArray(b.traders?.holders) ? b.traders.holders : []);
+      {
+        const hc = Number(b.holderCount ?? b.traders?.holderCount ?? b.token?.meta?.holderCount ?? b.token?.token?.holderCount);
+        setHolderCountTotal(Number.isFinite(hc) && hc > 0 ? hc : null);
+      }
       setPool(b.chart?.pool || null);
       setForensics(b.forensics);
       setAth(b.ath);
@@ -190,6 +195,16 @@ export default function TradeToken() {
     : intel.trades || t.recentTrades || [];
   const holderList = (holders.length ? holders : intel.holders || []) as any[];
   const whales = holderList.filter((h) => h.label === "whale").length;
+  // Total holders — never the truncated top-holders list length.
+  const totalHolders =
+    holderCountTotal ??
+    (meta.holderCount != null ? Number(meta.holderCount) : null) ??
+    (t.holderCount != null ? Number(t.holderCount) : null) ??
+    (safety?.totalHolders != null ? Number(safety.totalHolders) : null) ??
+    (intel?.holderCount != null &&
+    !(holderList.length > 0 && Number(intel.holderCount) === holderList.length && Number(intel.holderCount) <= 100)
+      ? Number(intel.holderCount)
+      : null);
   const socials = meta.socials || {};
   const website = socials.website || meta.website || d?.raw?.info?.websites?.[0]?.url;
   const twitter = socials.twitter || meta.twitter;
@@ -203,7 +218,7 @@ export default function TradeToken() {
     () =>
       [
         ["overview", "Overview"],
-        ["holders", `Holders${holderList.length ? ` (${holderList.length})` : ""}`],
+        ["holders", totalHolders != null ? `Holders (${fmtNum(totalHolders)})` : "Holders"],
         ["traders", `Traders${traders.length ? ` (${traders.length})` : ""}`],
         ["trades", `Trades${trades.length ? ` (${trades.length})` : ""}`],
         ["safety", "Safety"],
@@ -212,7 +227,7 @@ export default function TradeToken() {
         ["ath", "ATH"],
         ["ai", "Ask AI"],
       ] as [TabId, string][],
-    [holderList.length, traders.length, trades.length],
+    [totalHolders, traders.length, trades.length],
   );
 
   const copy = () => {
@@ -353,7 +368,7 @@ export default function TradeToken() {
           <Stat label="Volume 24h" value={fmtUsd(vol)} />
           <Stat label="Liquidity" value={fmtUsd(liq)} />
           <Stat label="FDV" value={fmtUsd(fdv || mcap)} />
-          <Stat label="Holders" value={cell(meta.holderCount ?? t.holderCount ?? safety?.totalHolders)} />
+          <Stat label="Holders" value={fmtNum(totalHolders)} />
           <Stat label="OrbitX Score" value={score != null ? `${Math.round(Number(score))}/100` : "—"} />
           <Stat label="Token Age" value={meta.ageDays != null ? `${meta.ageDays}d` : "—"} />
           <Stat label="Whales" value={String(whales)} />
@@ -447,7 +462,7 @@ export default function TradeToken() {
                 ["FDV", fmtUsd(fdv || mcap)],
                 ["Volume", fmtUsd(vol)],
                 ["Liquidity", fmtUsd(liq)],
-                ["Holders", meta.holderCount ?? t.holderCount],
+                ["Holders", totalHolders != null ? fmtNum(totalHolders) : "—"],
                 ["Age (days)", meta.ageDays],
                 ["Launchpad", meta.launchpad || (meta.isPumpFun ? "pump.fun" : null)],
                 ["Momentum", d?.momentumLabel ?? d?.momentum],
@@ -472,7 +487,8 @@ export default function TradeToken() {
                   rows={[
                     ["Whales", whales],
                     ["Trades cached", trades.length],
-                    ["Holders cached", holderList.length],
+                    ["Top holders shown", holderList.length],
+                    ["Total holders", totalHolders != null ? fmtNum(totalHolders) : "—"],
                     ["Safety risk", intel.safety?.riskScore ?? safety?.riskScore],
                   ]}
                 />
@@ -492,7 +508,13 @@ export default function TradeToken() {
         {tab === "holders" && (
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-              <Users className="h-3.5 w-3.5" /> Top holders
+              <Users className="h-3.5 w-3.5" />
+              Top holders
+              {totalHolders != null && (
+                <span className="font-normal normal-case tracking-normal text-white/35">
+                  · {fmtNum(totalHolders)} total
+                </span>
+              )}
             </h3>
             {!holderList.length ? (
               <div className="space-y-2 py-6 text-center">
@@ -635,7 +657,7 @@ export default function TradeToken() {
                 ["Rugged", safety?.rugged],
                 ["Risk score", safety?.riskScore],
                 ["Top 10 %", safety?.top10HoldersPercent ?? safety?.top10Pct],
-                ["Total holders", safety?.totalHolders],
+                ["Total holders", totalHolders != null ? fmtNum(totalHolders) : safety?.totalHolders],
                 ["Note", safetyApi?.note || safety?.note],
               ]}
             />

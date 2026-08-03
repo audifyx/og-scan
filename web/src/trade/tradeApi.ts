@@ -20,6 +20,19 @@ function poolId(row: any): string | undefined {
   return s.includes("_") ? s.split("_").pop() : s;
 }
 
+/** Total holder count only — never array length of a top-holders sample. */
+function pickHolderCount(row: any): number | undefined {
+  if (!row || typeof row !== "object") return undefined;
+  const candidates = [row.holderCount, row.numHolders, row.holder_count, row.totalHolders];
+  // `holders` is sometimes the total (number) and sometimes a top-N array — only accept a number.
+  if (typeof row.holders === "number") candidates.push(row.holders);
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return undefined;
+}
+
 export function mapCoinRow(row: any): MarketCoin | null {
   const mint = String(row?.mint || row?.contract_address || "").trim();
   if (!mint) return null;
@@ -35,7 +48,7 @@ export function mapCoinRow(row: any): MarketCoin | null {
     volume24h: Number(row.volume) || 0,
     liquidity: Number(row.liquidity) || 0,
     pairAddress: poolId(row),
-    holders: row.holderCount != null ? Number(row.holderCount) : undefined,
+    holders: pickHolderCount(row),
   };
 }
 
@@ -86,7 +99,8 @@ export async function fetchTokenBundle(mint: string) {
     j(`/api/ogdex/research?mint=${m}`),
   ]);
 
-  // Normalize nested holders/traders/trades from whichever payload has them
+  // Normalize nested holders/traders/trades from whichever payload has them.
+  // `holders` here is the top-N sample list; total count is `holderCount`.
   const intel = token?.intel || {};
   const holders =
     (Array.isArray(traders?.holders) && traders.holders.length ? traders.holders : null) ||
@@ -105,16 +119,31 @@ export async function fetchTokenBundle(mint: string) {
     (Array.isArray(token?.recentTrades) ? token.recentTrades : []) ||
     [];
 
+  const sampleLen = holders.length;
+  const rawIntel = Number(traders?.holderCount ?? intel?.holderCount ?? token?.meta?.holderCount ?? token?.token?.holderCount);
+  const holderCount =
+    Number.isFinite(rawIntel) && rawIntel > 0 && !(sampleLen > 0 && rawIntel === sampleLen && rawIntel <= 100)
+      ? rawIntel
+      : Number(token?.meta?.holderCount ?? token?.token?.holderCount ?? intel?.safety?.totalHolders) || undefined;
+
   return {
     token,
     safety,
-    traders: { ...(traders || {}), holders, traders: traderList, ok: traders?.ok ?? true },
+    traders: {
+      ...(traders || {}),
+      holders,
+      traders: traderList,
+      holderCount: holderCount ?? traders?.holderCount ?? null,
+      topHoldersCount: sampleLen,
+      ok: traders?.ok ?? true,
+    },
     chart,
     forensics,
     ath,
     xray,
     research,
     tradeTape,
+    holderCount: holderCount ?? null,
   };
 }
 

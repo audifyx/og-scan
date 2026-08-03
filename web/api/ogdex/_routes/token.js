@@ -251,20 +251,7 @@ export default async function handler(req, res) {
     // Fallback to OG Scan's stored ATH mcap if GeckoTerminal had no history.
     if (athMcap == null && scanMeta?.athMcap) athMcap = num(scanMeta.athMcap);
 
-    // 5. Compose meta (frontend reads socials/banner/chain/age from here).
-    const meta = {
-      ...(scanMeta || {}),
-      chain: "solana",
-      socials: { ...(scanMeta?.socials || {}), ...links.socials },
-      banner: scanMeta?.banner || links.banner,
-      ageDays: scanMeta?.ageDays ?? token?.ageDays ?? null,
-      createdAt: scanMeta?.createdAt ?? token?.createdAt ?? null,
-      holderCount: scanMeta?.holderCount ?? token?.holderCount ?? intel?.holderCount ?? null,
-      pairDexId: best?.dexId || scanMeta?.pairDexId || null,
-      athPrice, athMcap,
-    };
-
-    // 6. Mapped pair list.
+    // 5. Mapped pair list.
     const pairsMapped = pairs.slice(0, 5).map((p) => ({
       dex: p.dexId, address: p.pairAddress, priceUsd: num(p.priceUsd),
       liquidity: num(p.liquidity?.usd), volume24h: num(p.volume?.h24), change24h: num(p.priceChange?.h24),
@@ -273,10 +260,11 @@ export default async function handler(req, res) {
 
     // Backfill top holders if the intel function returned none (e.g. its
     // Birdeye source is down / Helius index overloaded). Uses the resilient
-    // largest-accounts helper so whales / holder-count / holders tab keep working.
+    // largest-accounts helper so the holders *list* / whales tab keep working.
+    // NOTE: this sample length is NOT a total holder count.
     let intelOut = intel?.ok ? intel : null;
     if (!intelOut?.holders?.length) {
-      const hp = meta.priceUsd ?? token?.priceUsd ?? null;
+      const hp = token?.priceUsd ?? null;
       const hb = await Promise.race([
         getLabeledHolders(mint, hp).catch(() => ({ holders: [] })),
         new Promise((r) => setTimeout(() => r({ holders: [] }), 6500)),
@@ -285,6 +273,39 @@ export default async function handler(req, res) {
         intelOut = { ...(intelOut || { ok: true }), ok: true, holders: hb.holders, holdersBackfilled: true, holdersSource: hb.source };
       }
     }
+
+    // Authoritative total holder count (never top-N sample length).
+    // Jupiter → scan meta → Rugcheck safety → intel total (sanitized).
+    const sampleLen = Array.isArray(intelOut?.holders) ? intelOut.holders.length : 0;
+    const rawIntelCount = num(intelOut?.holderCount);
+    const intelTotal =
+      rawIntelCount != null && !(sampleLen > 0 && rawIntelCount === sampleLen && rawIntelCount <= 100)
+        ? rawIntelCount
+        : null;
+    const holderCount =
+      num(token?.holderCount) ??
+      num(scanMeta?.holderCount) ??
+      num(intelOut?.safety?.totalHolders) ??
+      num(intel?.safety?.totalHolders) ??
+      intelTotal ??
+      null;
+    if (token && token.holderCount == null && holderCount != null) token.holderCount = holderCount;
+    if (intelOut && (intelOut.holderCount == null || (sampleLen > 0 && intelOut.holderCount === sampleLen))) {
+      intelOut = { ...intelOut, holderCount };
+    }
+
+    // 6. Compose meta (frontend reads socials/banner/chain/age from here).
+    const meta = {
+      ...(scanMeta || {}),
+      chain: "solana",
+      socials: { ...(scanMeta?.socials || {}), ...links.socials },
+      banner: scanMeta?.banner || links.banner,
+      ageDays: scanMeta?.ageDays ?? token?.ageDays ?? null,
+      createdAt: scanMeta?.createdAt ?? token?.createdAt ?? null,
+      holderCount,
+      pairDexId: best?.dexId || scanMeta?.pairDexId || null,
+      athPrice, athMcap,
+    };
 
     return send(res, 200, {
       mint,

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Search, X } from "lucide-react";
 import { fetchScreener, searchCoins, type MarketCoin } from "./tradeApi";
-import { fmtPct, fmtUsd } from "./tradeFmt";
+import { fmtNum, fmtPct, fmtUsd } from "./tradeFmt";
 import "./trade-home.css";
 
 type Cat = "discover" | "pump" | "curated";
@@ -275,6 +275,9 @@ export default function TradeHome() {
                     <span>{fmtUsd(c.price)}</span>
                     <span className="th__chip">Vol {fmtUsd(c.volume24h)}</span>
                     {c.liquidity > 0 && <span className="th__chip">Liq {fmtUsd(c.liquidity)}</span>}
+                    {c.holders != null && c.holders > 0 && (
+                      <span className="th__chip">H {fmtNum(c.holders)}</span>
+                    )}
                   </div>
                 </div>
                 <div className="th__stats">

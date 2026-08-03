@@ -333,6 +333,12 @@ export interface TopTrader {
   realizedPnl: number | null; unrealizedPnl: number | null; netPnl: number | null;
   isHolder: boolean; holdingPct: number | null; holdingAmount: number | null; holdingUsd?: number | null;
 }
-export interface TopTradersData { ok: boolean; mint: string; holders: TokenHolder[]; traders: TopTrader[]; error?: string; }
+export interface TopTradersData {
+  ok: boolean; mint: string; holders: TokenHolder[]; traders: TopTrader[];
+  /** Authoritative total holder count (Jupiter) — not holders.length */
+  holderCount?: number | null;
+  topHoldersCount?: number | null;
+  error?: string;
+}
 export const getTopTraders = (mint: string) => j<TopTradersData>(`/api/ogdex/traders?mint=${mint}`);
 

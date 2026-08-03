@@ -109,17 +109,28 @@ async function heliusTokenSupply(mint: string) {
     return { supply: num(v.uiAmount) ?? (num(v.amount) != null && num(v.decimals) != null ? Number(v.amount) / 10 ** Number(v.decimals) : null), decimals: num(v.decimals) };
   } catch { return { supply: null, decimals: null }; }
 }
+async function birdeyeOverview(mint: string) {
+  try {
+    const r = await fetch(`https://public-api.birdeye.so/defi/token_overview?address=${mint}`, { headers: beHeaders });
+    if (!r.ok) return null;
+    return (await r.json())?.data || null;
+  } catch { return null; }
+}
+
 async function tokenSupply(mint: string) {
   // True on-chain total supply (matches Jupiter / Solscan) — Birdeye "supply" is
   // circulating and understates the denominator, inflating holder %.
-  const h = await heliusTokenSupply(mint);
-  if (h.supply) return { supply: h.supply, decimals: h.decimals, holders: null };
-  try {
-    const r = await fetch(`https://public-api.birdeye.so/defi/token_overview?address=${mint}`, { headers: beHeaders });
-    if (!r.ok) return { supply: null, decimals: h.decimals, holders: null };
-    const d = (await r.json())?.data || {};
-    return { supply: num(d.supply) ?? num(d.totalSupply), decimals: num(d.decimals) ?? h.decimals, holders: num(d.holder) };
-  } catch { return { supply: null, decimals: h.decimals, holders: null }; }
+  // Holder *count* still comes from Birdeye overview / Rugcheck — never from the
+  // truncated top-holders sample length.
+  const [h, overview] = await Promise.all([heliusTokenSupply(mint), birdeyeOverview(mint)]);
+  const beHolders = num(overview?.holder) ?? num(overview?.holders) ?? num(overview?.holderCount);
+  if (h.supply) return { supply: h.supply, decimals: h.decimals, holders: beHolders };
+  if (!overview) return { supply: null, decimals: h.decimals, holders: beHolders };
+  return {
+    supply: num(overview.supply) ?? num(overview.totalSupply),
+    decimals: num(overview.decimals) ?? h.decimals,
+    holders: beHolders,
+  };
 }
 
 let _tradesDebug: any = null;
@@ -351,9 +362,18 @@ serve(async (req) => {
       publicLabel: PUBLIC_LABELS[t.owner] ? { name: PUBLIC_LABELS[t.owner].name, kind: PUBLIC_LABELS[t.owner].kind } : null,
     }));
 
+    // Total holder count ≠ length of the top-N sample (Birdeye/Helius return ≤100).
+    // Prefer Rugcheck totalHolders, then Birdeye overview `holder`.
+    const holderCount =
+      num(safety?.totalHolders) ??
+      num(overview.holders) ??
+      null;
+
     return json({
       ok: true, mint, totalSupply,
-      holders: ranked, holderCount: ranked.length,
+      holders: ranked,
+      holderCount,
+      topHoldersCount: ranked.length,
       trades: tradesEnriched, tradeCount: tradesEnriched.length,
       kolHolders, whaleHolders,
       kolHolderCount: kolHolders.length, whaleCount: whaleHolders.length,
