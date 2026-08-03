@@ -39,17 +39,24 @@ export function mapCoinRow(row: any): MarketCoin | null {
   };
 }
 
+async function j(url: string): Promise<any> {
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchScreener(type: string, limit = 200): Promise<MarketCoin[]> {
   try {
     if (type === "listed") {
-      const r = await fetch("/api/ogdex/listings");
-      const d = await r.json();
+      const d = await j("/api/ogdex/listings");
       return (Array.isArray(d?.rows) ? d.rows : []).map(mapCoinRow).filter(Boolean) as MarketCoin[];
     }
-    const r = await fetch(
+    const d = await j(
       `/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=1h&limit=${limit}&chain=solana`,
     );
-    const d = await r.json();
     return (Array.isArray(d?.rows) ? d.rows : []).map(mapCoinRow).filter(Boolean) as MarketCoin[];
   } catch {
     return [];
@@ -58,22 +65,55 @@ export async function fetchScreener(type: string, limit = 200): Promise<MarketCo
 
 export async function searchCoins(q: string): Promise<MarketCoin[]> {
   try {
-    const r = await fetch(`/api/ogdex/search?q=${encodeURIComponent(q)}`);
-    const d = await r.json();
+    const d = await j(`/api/ogdex/search?q=${encodeURIComponent(q)}`);
     return (Array.isArray(d?.rows) ? d.rows : []).map(mapCoinRow).filter(Boolean) as MarketCoin[];
   } catch {
     return [];
   }
 }
 
-export async function fetchTokenDetail(mint: string) {
-  const [tokenRes, safetyRes, tradersRes, chartRes] = await Promise.all([
-    fetch(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
-    fetch(`/api/ogdex/safety?mint=${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
-    fetch(`/api/ogdex/traders?mint=${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
-    fetch(`/api/ogdex/chart?mint=${encodeURIComponent(mint)}&interval=1h&limit=1`).then((r) => r.json()).catch(() => null),
+/** Same data sources as OGDex TokenDetail */
+export async function fetchTokenBundle(mint: string) {
+  const m = encodeURIComponent(mint);
+  const [token, safety, traders, chart, forensics, ath, xray, research] = await Promise.all([
+    j(`/api/ogdex/token?mint=${m}`),
+    j(`/api/ogdex/safety?mint=${m}`),
+    j(`/api/ogdex/traders?mint=${m}`),
+    j(`/api/ogdex/chart?mint=${m}&interval=1h&limit=1`),
+    j(`/api/ogdex/forensics?mint=${m}`),
+    j(`/api/ogdex/ath?mint=${m}`),
+    j(`/api/ogdex/xray?mint=${m}`),
+    j(`/api/ogdex/research?mint=${m}`),
   ]);
-  return { tokenRes, safetyRes, tradersRes, chartRes };
+  return { token, safety, traders, chart, forensics, ath, xray, research };
+}
+
+export async function fetchTokenOnly(mint: string) {
+  return j(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`);
+}
+
+export async function askCoinChat(mint: string, messages: { role: string; content: string }[], context: any) {
+  try {
+    const r = await fetch("/api/ogdex/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mint, messages, context }),
+    });
+    return await r.json();
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+}
+
+/** @deprecated use fetchTokenBundle */
+export async function fetchTokenDetail(mint: string) {
+  const b = await fetchTokenBundle(mint);
+  return {
+    tokenRes: b.token,
+    safetyRes: b.safety,
+    tradersRes: b.traders,
+    chartRes: b.chart,
+  };
 }
 
 export type LeaderEntry = {
@@ -91,8 +131,7 @@ export type LeaderEntry = {
 
 export async function fetchLeaderboard(): Promise<LeaderEntry[]> {
   try {
-    const r = await fetch("/api/ogdex/leaderboard");
-    const d = await r.json();
+    const d = await j("/api/ogdex/leaderboard");
     if (!d?.ok || !Array.isArray(d.entries)) return [];
     return d.entries.map((e: any, i: number) => ({
       rank: e.rank || i + 1,

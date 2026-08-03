@@ -1,10 +1,62 @@
-import { useEffect, useState } from "react";
+/**
+ * /trade/token/:mint — full DEX coin data (same APIs as ORBITX_DEX TokenDetail).
+ */
+
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Copy, Check, ExternalLink, Loader2, Shield, Users, Activity,
+  Globe, Send, MessageCircle, FileDown, Flame, AlertTriangle, BarChart2,
 } from "lucide-react";
-import { fetchTokenDetail } from "./tradeApi";
+import { askCoinChat, fetchTokenBundle, fetchTokenOnly } from "./tradeApi";
 import { dexChartUrl, fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
+
+type TabId =
+  | "overview"
+  | "holders"
+  | "traders"
+  | "trades"
+  | "safety"
+  | "xray"
+  | "forensics"
+  | "ath"
+  | "ai";
+
+function cell(v: any): string {
+  if (v == null || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
+  return String(v);
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
+  return (
+    <div className="min-w-[96px] shrink-0 rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5">
+      <p className="text-[9px] uppercase tracking-wider text-white/30">{label}</p>
+      <p
+        className={`font-mono text-sm font-semibold ${
+          tone === "up" ? "text-green-400" : tone === "down" ? "text-red-400" : "text-white"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ChangePill({ label, v }: { label: string; v?: number | null }) {
+  if (v == null || !Number.isFinite(v)) return null;
+  const pos = v >= 0;
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[11px] font-bold ${
+        pos ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400"
+      }`}
+    >
+      {label} {fmtPct(v)}
+    </span>
+  );
+}
 
 function DexChart({ refId }: { refId: string }) {
   const [ready, setReady] = useState(false);
@@ -16,7 +68,7 @@ function DexChart({ refId }: { refId: string }) {
     return () => window.clearTimeout(t);
   }, [refId]);
   return (
-    <div className="relative mx-4 mt-4 overflow-hidden rounded-xl border border-white/10 bg-black" style={{ height: 360 }}>
+    <div className="relative mx-4 mt-3 overflow-hidden rounded-xl border border-white/10 bg-black" style={{ height: 360 }}>
       {(!mount || !ready) && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
           <Loader2 className="h-6 w-6 animate-spin text-white/30" />
@@ -37,16 +89,37 @@ function DexChart({ refId }: { refId: string }) {
   );
 }
 
+function KvGrid({ rows }: { rows: [string, any][] }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {rows.map(([label, val]) => (
+        <div key={label} className="rounded-lg bg-black/50 px-2.5 py-2">
+          <p className="text-[9px] text-white/30">{label}</p>
+          <p className="break-all font-mono text-xs text-white/90">{cell(val)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TradeToken() {
   const { mint = "" } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [safety, setSafety] = useState<any>(null);
+  const [tab, setTab] = useState<TabId>("overview");
+  const [d, setD] = useState<any>(null);
+  const [safetyApi, setSafetyApi] = useState<any>(null);
   const [traders, setTraders] = useState<any[]>([]);
   const [holders, setHolders] = useState<any[]>([]);
   const [pool, setPool] = useState<string | null>(null);
+  const [forensics, setForensics] = useState<any>(null);
+  const [ath, setAth] = useState<any>(null);
+  const [xray, setXray] = useState<any>(null);
+  const [research, setResearch] = useState<any>(null);
+  const [aiQ, setAiQ] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsgs, setAiMsgs] = useState<{ role: string; content: string }[]>([]);
 
   useEffect(() => {
     if (!mint) return;
@@ -57,13 +130,19 @@ export default function TradeToken() {
     }
     let on = true;
     setLoading(true);
-    fetchTokenDetail(mint).then(({ tokenRes, safetyRes, tradersRes, chartRes }) => {
+    setTab("overview");
+    setAiMsgs([]);
+    fetchTokenBundle(mint).then((b) => {
       if (!on) return;
-      setData(tokenRes);
-      setSafety(safetyRes?.ok ? safetyRes : safetyRes?.safety || safetyRes);
-      setTraders(Array.isArray(tradersRes?.traders) ? tradersRes.traders : []);
-      setHolders(Array.isArray(tradersRes?.holders) ? tradersRes.holders : []);
-      setPool(chartRes?.pool || null);
+      setD(b.token);
+      setSafetyApi(b.safety);
+      setTraders(Array.isArray(b.traders?.traders) ? b.traders.traders : []);
+      setHolders(Array.isArray(b.traders?.holders) ? b.traders.holders : []);
+      setPool(b.chart?.pool || null);
+      setForensics(b.forensics);
+      setAth(b.ath?.ok ? b.ath : b.ath);
+      setXray(b.xray);
+      setResearch(b.research);
       setLoading(false);
     });
     return () => {
@@ -71,31 +150,79 @@ export default function TradeToken() {
     };
   }, [mint]);
 
-  const tok = data?.token || data?.meta || {};
-  const symbol = tok.symbol || data?.raw?.baseToken?.symbol || "???";
-  const name = tok.name || data?.raw?.baseToken?.name || "";
-  const icon = tok.icon || tok.image || data?.raw?.info?.imageUrl;
-  const price = Number(tok.priceUsd ?? tok.price ?? data?.raw?.priceUsd) || 0;
-  const mcap = Number(tok.mcap ?? tok.fdv ?? data?.raw?.marketCap) || 0;
-  const fdv = Number(tok.fdv ?? data?.raw?.fdv) || 0;
-  const vol = Number(tok.volume ?? tok.volume24h ?? data?.raw?.volume?.h24) || 0;
-  const liq = Number(tok.liquidity ?? data?.raw?.liquidity?.usd) || 0;
-  const ch24 = Number(tok.change24h ?? data?.raw?.priceChange?.h24) || 0;
-  const ch1h = Number(tok.change1h ?? data?.raw?.priceChange?.h1) || 0;
-  const ch5m = Number(tok.change5m ?? data?.raw?.priceChange?.m5) || 0;
-  const verdict = data?.verdict || data?.score?.verdict;
-  const momentum = data?.momentumLabel || data?.momentum;
-  const chartRef = pool || tok.pairAddress || mint;
-  const links = tok.links || data?.raw?.info?.socials || [];
-  const website = tok.website || data?.raw?.info?.websites?.[0]?.url;
-  const twitter =
-    tok.twitter ||
-    (Array.isArray(links) ? links.find((s: any) => /twitter|x\.com/i.test(s?.url || s?.type || ""))?.url : null);
+  // Live refresh like DEX
+  useEffect(() => {
+    if (!mint) return;
+    const id = window.setInterval(() => {
+      fetchTokenOnly(mint).then((x) => x && setD(x));
+    }, 12000);
+    return () => window.clearInterval(id);
+  }, [mint]);
+
+  const t: any = d?.token || {};
+  const meta: any = d?.meta || {};
+  const intel: any = d?.intel || {};
+  const safety = d?.safety || intel.safety || safetyApi || null;
+  const symbol = t.symbol || meta.symbol || shortAddr(mint, 4);
+  const name = t.name || meta.name || "";
+  const icon = t.icon || meta.icon || meta.image || d?.raw?.info?.imageUrl;
+  const price = Number(t.priceUsd ?? meta.priceUsd ?? d?.raw?.priceUsd) || 0;
+  const mcap = Number(t.mcap ?? meta.mcap ?? d?.raw?.marketCap) || 0;
+  const fdv = Number(t.fdv ?? meta.fdv) || 0;
+  const vol = Number(t.volume ?? t.volume24h) || 0;
+  const liq = Number(t.liquidity) || 0;
+  const ch24 = Number(t.change24h ?? meta.priceChange24h) || 0;
+  const ch1h = t.change1h != null ? Number(t.change1h) : null;
+  const ch5m = t.change5m != null ? Number(t.change5m) : null;
+  const ch6h = t.change6h != null ? Number(t.change6h) : null;
+  const score = d?.score?.total ?? meta.organicScore;
+  const verdict = d?.verdict;
+  const verified = t.isVerified || meta.isVerifiedJup || d?.flags?.isVerified;
+  const chartRef = pool || t.pairAddress || mint;
+  const trades: any[] = intel.trades || t.recentTrades || [];
+  const holderList = (intel.holders?.length ? intel.holders : holders) as any[];
+  const whales = holderList.filter((h) => h.label === "whale").length;
+  const socials = meta.socials || {};
+  const website = socials.website || meta.website || d?.raw?.info?.websites?.[0]?.url;
+  const twitter = socials.twitter || meta.twitter;
+  const telegram = socials.telegram || meta.telegram;
+  const discord = socials.discord;
+  const buyVol = Number(t.buyVolume) || 0;
+  const sellVol = Number(t.sellVolume) || 0;
+  const buyPct = buyVol + sellVol > 0 ? Math.round((buyVol / (buyVol + sellVol)) * 100) : null;
+
+  const tabs = useMemo(
+    () =>
+      [
+        ["overview", "Overview"],
+        ["holders", `Holders${holderList.length ? ` (${holderList.length})` : ""}`],
+        ["traders", `Traders${traders.length ? ` (${traders.length})` : ""}`],
+        ["trades", `Trades${trades.length ? ` (${trades.length})` : ""}`],
+        ["safety", "Safety"],
+        ["xray", "X-ray"],
+        ["forensics", "Forensics"],
+        ["ath", "ATH"],
+        ["ai", "Ask AI"],
+      ] as [TabId, string][],
+    [holderList.length, traders.length, trades.length],
+  );
 
   const copy = () => {
     navigator.clipboard.writeText(mint);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const askAi = async () => {
+    const q = aiQ.trim();
+    if (!q || aiBusy) return;
+    setAiBusy(true);
+    const next = [...aiMsgs, { role: "user", content: q }];
+    setAiMsgs(next);
+    setAiQ("");
+    const res = await askCoinChat(mint, next, { token: t, meta, safety, ath, forensics, xray });
+    setAiMsgs([...next, { role: "assistant", content: res?.answer || res?.error || "No answer" }]);
+    setAiBusy(false);
   };
 
   if (loading) {
@@ -106,27 +233,40 @@ export default function TradeToken() {
     );
   }
 
+  if (!d || (!d.token && !d.meta)) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-black px-6 text-center">
+        <p className="text-sm text-white/40">No token found for this address</p>
+        <button type="button" onClick={() => navigate("/trade")} className="text-sm text-white underline">
+          Back to markets
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full overflow-y-auto bg-black">
+    <div className="h-full overflow-y-auto bg-black pb-24">
+      {/* Sticky header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-black/95 px-3 py-3 backdrop-blur">
         <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">{symbol}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-sm font-bold">{symbol}</p>
+            {verified && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-white/70">✓</span>}
+          </div>
           <p className="truncate text-[11px] text-white/35">{name}</p>
         </div>
-        <Link
-          to={`/trade/desk/${mint}`}
-          className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black"
-        >
+        <Link to={`/trade/desk/${mint}`} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">
           Trade
         </Link>
       </div>
 
+      {/* Hero */}
       <div className="flex items-start gap-3 px-4 py-4">
         {icon ? (
-          <img src={icon} alt="" className="h-14 w-14 rounded-2xl object-cover" />
+          <img src={icon} alt="" className="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/10" />
         ) : (
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-lg font-bold">
             {symbol.slice(0, 2)}
@@ -134,162 +274,487 @@ export default function TradeToken() {
         )}
         <div className="min-w-0 flex-1">
           <p className="font-mono text-2xl font-bold">{fmtUsd(price)}</p>
-          <p className={`font-mono text-sm ${ch24 >= 0 ? "text-green-400" : "text-red-400"}`}>
-            24h {fmtPct(ch24)} · 1h {fmtPct(ch1h)} · 5m {fmtPct(ch5m)}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={copy} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 font-mono text-[10px] text-white/50">
-              {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-              {shortAddr(mint, 6)}
-            </button>
-            <a href={`https://solscan.io/token/${mint}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-white/40 hover:text-white">
-              Solscan <ExternalLink className="h-3 w-3" />
-            </a>
-            <a href={`https://dexscreener.com/solana/${chartRef}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-white/40 hover:text-white">
-              DexScreener <ExternalLink className="h-3 w-3" />
-            </a>
-            {website && (
-              <a href={website} target="_blank" rel="noreferrer" className="text-[10px] text-white/40 hover:text-white">Web</a>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <ChangePill label="5m" v={ch5m} />
+            <ChangePill label="1h" v={ch1h} />
+            <ChangePill label="6h" v={ch6h} />
+            <ChangePill label="24h" v={ch24} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {verdict && <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-bold">{verdict}</span>}
+            {meta.isPumpFun && <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-[10px]">pump.fun</span>}
+            {score != null && (
+              <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-bold">
+                OG {Math.round(Number(score))}/100
+              </span>
             )}
-            {twitter && (
-              <a href={twitter} target="_blank" rel="noreferrer" className="text-[10px] text-white/40 hover:text-white">X</a>
-            )}
+            {(t.tags || []).slice(0, 3).map((tg: string) => (
+              <span key={tg} className="rounded-lg border border-white/10 px-2 py-0.5 text-[10px] text-white/40 capitalize">
+                {tg}
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-4">
-        {[
-          ["MCap", fmtUsd(mcap)],
-          ["FDV", fmtUsd(fdv || mcap)],
-          ["Volume", fmtUsd(vol)],
-          ["Liquidity", fmtUsd(liq)],
-        ].map(([label, val]) => (
-          <div key={label} className="rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5">
-            <p className="text-[9px] uppercase tracking-wider text-white/30">{label}</p>
-            <p className="font-mono text-sm font-semibold">{val}</p>
-          </div>
-        ))}
+      {(meta.description || meta.bio) && (
+        <p className="px-4 pb-2 text-[12px] leading-relaxed text-white/45">{meta.description || meta.bio}</p>
+      )}
+
+      {/* Links */}
+      <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+        <button type="button" onClick={copy} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 font-mono text-[10px] text-white/50">
+          {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+          {shortAddr(mint, 6)}
+        </button>
+        {website && (
+          <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+            <Globe className="h-3 w-3" /> Web
+          </a>
+        )}
+        {twitter && (
+          <a href={twitter} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+            X
+          </a>
+        )}
+        {telegram && (
+          <a href={telegram} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+            <Send className="h-3 w-3" /> TG
+          </a>
+        )}
+        {discord && (
+          <a href={discord} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+            <MessageCircle className="h-3 w-3" /> Discord
+          </a>
+        )}
+        <a href={`https://solscan.io/token/${mint}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+          Solscan <ExternalLink className="h-3 w-3" />
+        </a>
+        <a href={`https://dexscreener.com/solana/${chartRef}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+          DexScreener <ExternalLink className="h-3 w-3" />
+        </a>
+        <a href={`/api/ogdex/report?mint=${mint}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[10px] text-white/50 hover:text-white">
+          <FileDown className="h-3 w-3" /> Report
+        </a>
       </div>
 
-      {(verdict || momentum) && (
-        <div className="mx-4 mt-3 flex gap-2">
-          {verdict && (
-            <span className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold">
-              Verdict: {String(verdict)}
-            </span>
+      {/* Stats strip — same fields as DEX */}
+      <div className="overflow-x-auto px-4 pb-2 no-scrollbar">
+        <div className="flex w-max gap-2">
+          <Stat label="Market Cap" value={fmtUsd(mcap)} />
+          <Stat label="Volume 24h" value={fmtUsd(vol)} />
+          <Stat label="Liquidity" value={fmtUsd(liq)} />
+          <Stat label="FDV" value={fmtUsd(fdv || mcap)} />
+          <Stat label="Holders" value={cell(meta.holderCount ?? t.holderCount ?? safety?.totalHolders)} />
+          <Stat label="OrbitX Score" value={score != null ? `${Math.round(Number(score))}/100` : "—"} />
+          <Stat label="Token Age" value={meta.ageDays != null ? `${meta.ageDays}d` : "—"} />
+          <Stat label="Whales" value={String(whales)} />
+          <Stat label="Risk" value={cell(safety?.riskScore ?? safetyApi?.riskScore)} />
+          <Stat label="Buys 24h" value={cell(t.numBuys)} tone="up" />
+          <Stat label="Sells 24h" value={cell(t.numSells)} tone="down" />
+          <Stat label="Traders" value={cell(t.numTraders)} />
+          <Stat
+            label="Net buyers"
+            value={t.netBuyers != null ? `${t.netBuyers >= 0 ? "+" : ""}${t.netBuyers}` : "—"}
+            tone={(t.netBuyers ?? 0) >= 0 ? "up" : "down"}
+          />
+          {ath?.athMcap != null && <Stat label="ATH MCap" value={fmtUsd(ath.athMcap)} />}
+          {ath?.fromAthPct != null && (
+            <Stat label="From ATH" value={fmtPct(ath.fromAthPct)} tone={ath.fromAthPct >= 0 ? "up" : "down"} />
           )}
-          {momentum != null && (
-            <span className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold">
-              Momentum: {String(momentum)}
-            </span>
+          {buyPct != null && (
+            <div className="min-w-[130px] shrink-0 rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5">
+              <p className="text-[9px] uppercase tracking-wider text-white/30">Buy pressure</p>
+              <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-red-500/30">
+                <div className="h-full bg-green-400" style={{ width: `${buyPct}%` }} />
+              </div>
+              <div className="mt-1 flex justify-between font-mono text-[9px]">
+                <span className="text-green-400">{buyPct}%</span>
+                <span className="text-red-400">{100 - buyPct}%</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tradeability (safety API) */}
+      {safetyApi && (
+        <div className="mx-4 mb-2 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5 text-[11px]">
+          <span className="font-semibold text-white/50">Tradeability</span>
+          <span className={safetyApi.canBuy ? "text-green-400" : "text-red-400"}>Buy {safetyApi.canBuy ? "OK" : "BLOCK"}</span>
+          <span className={safetyApi.canSell ? "text-green-400" : "text-red-400"}>Sell {safetyApi.canSell ? "OK" : "BLOCK"}</span>
+          {safetyApi.verdict && <span className="text-white/70">{safetyApi.verdict}</span>}
+          {safetyApi.roundTripLossPct != null && (
+            <span className="text-white/40">Round-trip loss {Number(safetyApi.roundTripLossPct).toFixed(2)}%</span>
           )}
         </div>
       )}
 
       <DexChart refId={chartRef} />
 
-      {/* Safety */}
-      <section className="mx-4 mt-4 rounded-xl border border-white/10 bg-[#050505] p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-          <Shield className="h-3.5 w-3.5" /> Safety
-        </h3>
-        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-          {[
-            ["Mintable", safety?.mintable ?? safety?.safety?.mintable],
-            ["Freezable", safety?.freezable ?? safety?.safety?.freezable],
-            ["LP burned", safety?.lpBurned ?? safety?.safety?.lpBurned],
-            ["Top 10", safety?.top10HoldersPercent ?? safety?.safety?.top10],
-            ["Score", safety?.score ?? data?.score?.total ?? data?.score],
-            ["Risk", safety?.risk ?? data?.flags?.risk],
-          ].map(([label, val]) => (
-            <div key={String(label)} className="rounded-lg bg-black/50 px-2.5 py-2">
-              <p className="text-[9px] text-white/30">{label}</p>
-              <p className="font-mono text-xs">
-                {val == null || val === ""
-                  ? "—"
-                  : typeof val === "boolean"
-                    ? val
-                      ? "Yes"
-                      : "No"
-                    : typeof val === "number"
-                      ? Number.isInteger(val)
-                        ? String(val)
-                        : `${val.toFixed?.(1) ?? val}%`
-                      : String(val)}
-              </p>
-            </div>
+      {/* Tabs */}
+      <div className="sticky top-[52px] z-[9] mt-3 border-y border-white/10 bg-black/95 backdrop-blur">
+        <div className="flex gap-1 overflow-x-auto px-2 py-2 no-scrollbar">
+          {tabs.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`shrink-0 rounded-xl px-3.5 py-2 text-[11px] font-bold uppercase tracking-wide ${
+                tab === id ? "bg-white text-black" : "text-white/40 hover:bg-white/5 hover:text-white/70"
+              }`}
+            >
+              {label}
+            </button>
           ))}
         </div>
-      </section>
+      </div>
 
-      {/* Top traders */}
-      <section className="mx-4 mt-4 rounded-xl border border-white/10 bg-[#050505] p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-          <Activity className="h-3.5 w-3.5" /> Top traders
-        </h3>
-        {!traders.length ? (
-          <p className="text-xs text-white/30">No trader data yet</p>
-        ) : (
+      <div className="mx-4 mt-3 mb-4 rounded-xl border border-white/10 bg-[#050505] p-4">
+        {tab === "overview" && (
+          <div className="space-y-4">
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <BarChart2 className="h-3.5 w-3.5" /> Overview
+            </h3>
+            <KvGrid
+              rows={[
+                ["Symbol", symbol],
+                ["Name", name],
+                ["Price", fmtUsd(price)],
+                ["MCap", fmtUsd(mcap)],
+                ["FDV", fmtUsd(fdv || mcap)],
+                ["Volume", fmtUsd(vol)],
+                ["Liquidity", fmtUsd(liq)],
+                ["Holders", meta.holderCount ?? t.holderCount],
+                ["Age (days)", meta.ageDays],
+                ["Launchpad", meta.launchpad || (meta.isPumpFun ? "pump.fun" : null)],
+                ["Momentum", d?.momentumLabel ?? d?.momentum],
+                ["Verdict", verdict],
+                ["Score", score],
+                ["Chain", meta.chain || "solana"],
+                ["Pair", t.pairAddress || pool],
+                ["Decimals", t.decimals ?? meta.decimals],
+                ["Supply", t.supply ?? meta.supply],
+              ]}
+            />
+            {d?.flags && (
+              <>
+                <h4 className="text-[11px] font-semibold text-white/40">Flags</h4>
+                <KvGrid rows={Object.entries(d.flags).map(([k, v]) => [k, v] as [string, any])} />
+              </>
+            )}
+            {intel && Object.keys(intel).length > 0 && (
+              <>
+                <h4 className="text-[11px] font-semibold text-white/40">Intel summary</h4>
+                <KvGrid
+                  rows={[
+                    ["Whales", whales],
+                    ["Trades cached", trades.length],
+                    ["Holders cached", holderList.length],
+                    ["Safety risk", intel.safety?.riskScore ?? safety?.riskScore],
+                  ]}
+                />
+              </>
+            )}
+            {research && (
+              <>
+                <h4 className="text-[11px] font-semibold text-white/40">Research</h4>
+                <pre className="max-h-64 overflow-auto rounded-lg bg-black/60 p-2 font-mono text-[10px] text-white/50">
+                  {JSON.stringify(research, null, 2).slice(0, 4000)}
+                </pre>
+              </>
+            )}
+          </div>
+        )}
+
+        {tab === "holders" && (
           <div className="space-y-2">
-            {traders.slice(0, 12).map((t: any, i: number) => {
-              const addr = t.owner || t.address || t.wallet;
-              const pnl = t.pnlUsd ?? t.pnl ?? t.realizedPnlUsd;
-              const wins = t.buys ?? t.wins;
-              const loses = t.sells ?? t.losses;
-              return (
-                <a
-                  key={addr || i}
-                  href={`https://solscan.io/account/${addr}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
-                >
-                  <div>
-                    <p className="font-mono text-xs">#{i + 1} {shortAddr(addr || "", 5)}</p>
-                    <p className="text-[10px] text-white/30">
-                      {wins != null || loses != null ? `${wins ?? "—"}B / ${loses ?? "—"}S` : "—"}
+            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <Users className="h-3.5 w-3.5" /> Top holders
+            </h3>
+            {!holderList.length ? (
+              <p className="text-xs text-white/30">No holder data</p>
+            ) : (
+              holderList.slice(0, 40).map((h: any, i: number) => {
+                const addr = h.owner || h.address;
+                return (
+                  <a
+                    key={addr || i}
+                    href={`https://solscan.io/account/${addr}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
+                  >
+                    <div>
+                      <p className="font-mono text-xs">
+                        #{h.rank || i + 1} {shortAddr(addr || "", 5)}
+                        {h.label ? <span className="ml-1 text-white/30">· {h.label}</span> : null}
+                      </p>
+                      <p className="text-[10px] text-white/30">
+                        {h.buys != null || h.sells != null ? `${h.buys ?? 0}B / ${h.sells ?? 0}S` : ""}
+                        {h.netPnl != null ? ` · PnL ${fmtUsd(h.netPnl)}` : ""}
+                      </p>
+                    </div>
+                    <div className="text-right font-mono text-xs">
+                      <p>{h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "—"}</p>
+                      <p className="text-white/40">{fmtUsd(h.usdValue ?? h.holdingUsd ?? h.usd)}</p>
+                    </div>
+                  </a>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {tab === "traders" && (
+          <div className="space-y-2">
+            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <Activity className="h-3.5 w-3.5" /> Top traders
+            </h3>
+            {!traders.length ? (
+              <p className="text-xs text-white/30">No trader data</p>
+            ) : (
+              traders.slice(0, 40).map((tr: any, i: number) => {
+                const addr = tr.owner || tr.address;
+                const pnl = tr.netPnl ?? tr.realizedPnl ?? tr.pnlUsd ?? tr.pnl;
+                return (
+                  <a
+                    key={addr || i}
+                    href={`https://solscan.io/account/${addr}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
+                  >
+                    <div>
+                      <p className="font-mono text-xs">
+                        #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
+                      </p>
+                      <p className="text-[10px] text-white/30">
+                        {tr.buys ?? 0}B / {tr.sells ?? 0}S · vol {fmtUsd(tr.volume ?? tr.buyVol)}
+                      </p>
+                    </div>
+                    <p className={`font-mono text-xs ${(Number(pnl) || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {pnl != null ? fmtUsd(Number(pnl)) : "—"}
                     </p>
-                  </div>
-                  <p className={`font-mono text-xs ${(Number(pnl) || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {pnl != null ? fmtUsd(Number(pnl)) : "—"}
-                  </p>
-                </a>
-              );
-            })}
+                  </a>
+                );
+              })
+            )}
           </div>
         )}
-      </section>
 
-      {/* Holders */}
-      <section className="mx-4 mt-4 mb-6 rounded-xl border border-white/10 bg-[#050505] p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-          <Users className="h-3.5 w-3.5" /> Top holders
-        </h3>
-        {!holders.length ? (
-          <p className="text-xs text-white/30">No holder data yet</p>
-        ) : (
+        {tab === "trades" && (
           <div className="space-y-2">
-            {holders.slice(0, 10).map((h: any, i: number) => {
-              const addr = h.owner || h.address;
-              const pct = h.pct ?? h.percent ?? h.share;
-              return (
-                <div key={addr || i} className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2">
-                  <p className="font-mono text-xs">#{i + 1} {shortAddr(addr || "", 5)}</p>
-                  <p className="font-mono text-xs text-white/70">
-                    {pct != null ? `${Number(pct).toFixed(2)}%` : fmtUsd(h.holdingUsd ?? h.usd)}
-                  </p>
+            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <Flame className="h-3.5 w-3.5" /> Live trades
+            </h3>
+            {!trades.length ? (
+              <p className="text-xs text-white/30">No recent trades in token payload — open DexScreener for tape</p>
+            ) : (
+              trades.slice(0, 50).map((tr: any, i: number) => (
+                <div key={tr.txHash || i} className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2">
+                  <div>
+                    <p className={`text-xs font-bold ${tr.side === "buy" || tr.kind === "buy" ? "text-green-400" : "text-red-400"}`}>
+                      {(tr.side || tr.kind || "trade").toUpperCase()}
+                    </p>
+                    <p className="font-mono text-[10px] text-white/30">{shortAddr(tr.wallet || tr.owner || tr.txHash || "", 5)}</p>
+                  </div>
+                  <div className="text-right font-mono text-xs">
+                    <p>{fmtUsd(tr.usd ?? tr.value ?? tr.amountUsd)}</p>
+                    <p className="text-white/30">{tr.amount != null ? Number(tr.amount).toFixed(2) : ""}</p>
+                  </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         )}
-      </section>
 
-      <div className="sticky bottom-[calc(4.25rem+env(safe-area-inset-bottom))] border-t border-white/10 bg-black/95 p-3 backdrop-blur">
+        {tab === "safety" && (
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <Shield className="h-3.5 w-3.5" /> Safety
+            </h3>
+            <KvGrid
+              rows={[
+                ["Can buy", safetyApi?.canBuy],
+                ["Can sell", safetyApi?.canSell],
+                ["Verdict", safetyApi?.verdict ?? safety?.verdict],
+                ["Tone", safetyApi?.tone],
+                ["Round-trip loss %", safetyApi?.roundTripLossPct],
+                ["Buy impact %", safetyApi?.buyImpactPct],
+                ["Sell impact %", safetyApi?.sellImpactPct],
+                ["Mint renounced", safety?.mintRenounced ?? safety?.mintable === false],
+                ["Freeze renounced", safety?.freezeRenounced ?? safety?.freezable === false],
+                ["LP locked %", safety?.lpLockedPct ?? safety?.lpBurned],
+                ["Rugged", safety?.rugged],
+                ["Risk score", safety?.riskScore],
+                ["Top 10 %", safety?.top10HoldersPercent ?? safety?.top10Pct],
+                ["Total holders", safety?.totalHolders],
+                ["Note", safetyApi?.note || safety?.note],
+              ]}
+            />
+          </div>
+        )}
+
+        {tab === "xray" && (
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <AlertTriangle className="h-3.5 w-3.5" /> Risk X-ray
+            </h3>
+            {!xray?.ok && !xray?.verdict ? (
+              <p className="text-xs text-white/30">{xray?.error || "X-ray unavailable"}</p>
+            ) : (
+              <>
+                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                  <p className="text-sm font-bold">{xray.verdict}</p>
+                  <p className="mt-1 text-xs text-white/50">{xray.summary}</p>
+                  <p className="mt-1 font-mono text-[11px] text-white/40">Score {xray.score} · {xray.tone}</p>
+                </div>
+                {Array.isArray(xray.flags) && xray.flags.length > 0 && (
+                  <div className="space-y-1">
+                    {xray.flags.map((f: any, i: number) => (
+                      <p key={i} className="text-[11px] text-white/60">
+                        <span className="font-bold uppercase text-white/40">{f.level}</span> — {f.text}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <KvGrid
+                  rows={[
+                    ["Snipers %", xray.snipers?.pct],
+                    ["Sniper count", xray.snipers?.count],
+                    ["Bundles %", xray.bundles?.pct],
+                    ["Bundle count", xray.bundles?.count],
+                    ["Insiders %", xray.insiders?.pct],
+                    ["Insider count", xray.insiders?.count],
+                    ["Top 10 %", xray.concentration?.top10Pct],
+                    ["Whales", xray.concentration?.whales],
+                    ["Dev wallet", xray.dev?.wallet],
+                    ["Dev %", xray.dev?.pct],
+                    ["Dev sold", xray.dev?.sold],
+                    ["Mint renounced", xray.safety?.mintRenounced],
+                    ["Freeze renounced", xray.safety?.freezeRenounced],
+                    ["LP locked %", xray.safety?.lpLockedPct],
+                    ["Risk score", xray.safety?.riskScore],
+                  ]}
+                />
+                {Array.isArray(xray.earlyBuyers) && xray.earlyBuyers.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold text-white/40">Early buyers</p>
+                    {xray.earlyBuyers.slice(0, 15).map((b: any) => (
+                      <a
+                        key={b.wallet}
+                        href={`https://solscan.io/account/${b.wallet}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex justify-between rounded bg-black/40 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5"
+                      >
+                        <span>
+                          #{b.rank} {shortAddr(b.wallet, 4)}
+                          {b.sniper ? " · sniper" : ""}
+                          {b.bundled ? " · bundled" : ""}
+                        </span>
+                        <span>{b.solSpent?.toFixed?.(2)} SOL</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {tab === "forensics" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Forensics</h3>
+            {!forensics ? (
+              <p className="text-xs text-white/30">Forensics unavailable</p>
+            ) : (
+              <>
+                <KvGrid
+                  rows={[
+                    ["Launchpad", forensics.launchpad],
+                    ["Pump.fun", forensics.isPumpFun],
+                    ["Bonding complete", forensics.bondingComplete],
+                    ["Top 10 %", forensics.concentration?.top10Pct],
+                    ["Whales", forensics.concentration?.whales],
+                    ["Holders", forensics.concentration?.totalHolders],
+                    ["Mint renounced", forensics.safetyFlags?.mintRenounced],
+                    ["Freeze renounced", forensics.safetyFlags?.freezeRenounced],
+                    ["LP locked %", forensics.safetyFlags?.lpLockedPct],
+                    ["Rugged", forensics.safetyFlags?.rugged],
+                    ["Risk score", forensics.safetyFlags?.riskScore],
+                    ["Error", forensics.error],
+                  ]}
+                />
+                <pre className="max-h-72 overflow-auto rounded-lg bg-black/60 p-2 font-mono text-[10px] text-white/40">
+                  {JSON.stringify(forensics, null, 2).slice(0, 6000)}
+                </pre>
+              </>
+            )}
+          </div>
+        )}
+
+        {tab === "ath" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">All-time high</h3>
+            {!ath?.ok && ath?.athPrice == null ? (
+              <p className="text-xs text-white/30">{ath?.error || "ATH data unavailable"}</p>
+            ) : (
+              <KvGrid
+                rows={[
+                  ["ATH price", ath.athPrice != null ? fmtUsd(ath.athPrice) : null],
+                  ["ATH mcap", ath.athMcap != null ? fmtUsd(ath.athMcap) : null],
+                  ["From ATH %", ath.fromAthPct],
+                  ["ATH date", ath.athDate],
+                  ["Source", ath.source],
+                ]}
+              />
+            )}
+          </div>
+        )}
+
+        {tab === "ai" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Ask AI about this coin</h3>
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {!aiMsgs.length && <p className="text-xs text-white/30">Ask about risk, narrative, holders, or trade setup.</p>}
+              {aiMsgs.map((m, i) => (
+                <div
+                  key={i}
+                  className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
+                    m.role === "user" ? "bg-white text-black" : "bg-black/50 text-white/80"
+                  }`}
+                >
+                  {m.content}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={aiQ}
+                onChange={(e) => setAiQ(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void askAi()}
+                placeholder="Is this safe to ape?"
+                className="h-10 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 text-sm outline-none focus:border-white/30"
+              />
+              <button
+                type="button"
+                disabled={aiBusy || !aiQ.trim()}
+                onClick={() => void askAi()}
+                className="h-10 rounded-xl bg-white px-4 text-xs font-bold text-black disabled:opacity-40"
+              >
+                {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ask"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] inset-x-0 z-40 border-t border-white/10 bg-black/95 p-3 backdrop-blur">
         <Link
           to={`/trade/desk/${mint}`}
-          className="flex h-12 items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+          className="mx-auto flex h-12 max-w-lg items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
         >
           Trade {symbol}
         </Link>
