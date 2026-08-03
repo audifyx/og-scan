@@ -16,7 +16,7 @@ import { VersionedTransaction } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
   ArrowUpRight, ArrowDownLeft, Check,
-  Wallet, Activity, Star, X, Loader2, Users,
+  Wallet, Activity, X, Loader2, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,10 +33,9 @@ import {
   getAssets,
   type TokenAsset,
 } from "@/lib/solana-api";
-import { CandlestickChart, type CandleDataPoint } from "./CandlestickChart";
-
 export type TradeTerminalProps = {
   initialMint?: string | null;
+  onMintChange?: (mint: string) => void;
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -87,11 +86,11 @@ interface TokenSecurity {
 
 type Timeframe = "15m" | "1H" | "4H" | "1D";
 
-const TIMEFRAME_CONFIG: Record<Timeframe, { geckoBase: string; aggregate: number; limit: number; label: string }> = {
-  "15m": { geckoBase: "minute", aggregate: 15, limit: 96,  label: "15m" },
-  "1H":  { geckoBase: "hour",   aggregate: 1,  limit: 168, label: "1H" },
-  "4H":  { geckoBase: "hour",   aggregate: 4,  limit: 180, label: "4H" },
-  "1D":  { geckoBase: "day",    aggregate: 1,  limit: 90,  label: "1D" },
+const TIMEFRAME_CONFIG: Record<Timeframe, { geckoBase: string; aggregate: number; limit: number; label: string; dexInterval: string }> = {
+  "15m": { geckoBase: "minute", aggregate: 15, limit: 96,  label: "15m", dexInterval: "15" },
+  "1H":  { geckoBase: "hour",   aggregate: 1,  limit: 168, label: "1H",  dexInterval: "60" },
+  "4H":  { geckoBase: "hour",   aggregate: 4,  limit: 180, label: "4H",  dexInterval: "240" },
+  "1D":  { geckoBase: "day",    aggregate: 1,  limit: 90,  label: "1D",  dexInterval: "1D" },
 };
 
 const DEFAULT_MINTS: { mint: string; symbol: string; name: string }[] = [
@@ -109,48 +108,119 @@ const DEFAULT_MINTS: { mint: string; symbol: string; name: string }[] = [
   { mint: "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5", symbol: "MEW", name: "cat in a dogs world" },
 ];
 
-const SIDEBAR_TABS = ["Trending", "New", "Pump", "Listed", "Positions"] as const;
-type SidebarTab = (typeof SIDEBAR_TABS)[number];
+/** Same market universe as ORBITX_DEX Screener (minus social feed). */
+type MarketCategory = "discover" | "pumpfun" | "curated" | "wallet";
+type MarketTab =
+  | "trending" | "runners" | "new" | "fomo" | "jupiter"
+  | "unbonded" | "migrated" | "moonshot" | "newpairs"
+  | "og" | "kols" | "celebrity" | "organic" | "listed"
+  | "positions";
 
-const MARKET_TAB_API: Record<Exclude<SidebarTab, "Positions">, { type: string; interval: string }> = {
-  Trending: { type: "trending", interval: "1h" },
-  New: { type: "new", interval: "1h" },
-  Pump: { type: "unbonded", interval: "1h" },
-  Listed: { type: "listed", interval: "1h" },
+const MARKET_CATEGORIES: { id: MarketCategory; label: string }[] = [
+  { id: "discover", label: "Discover" },
+  { id: "pumpfun", label: "Pump" },
+  { id: "curated", label: "Curated" },
+  { id: "wallet", label: "Wallet" },
+];
+
+const TABS_BY_CATEGORY: Record<MarketCategory, { id: MarketTab; label: string }[]> = {
+  discover: [
+    { id: "trending", label: "Trending" },
+    { id: "runners", label: "Runners" },
+    { id: "new", label: "New" },
+    { id: "fomo", label: "FOMO" },
+    { id: "jupiter", label: "Jupiter" },
+  ],
+  pumpfun: [
+    { id: "unbonded", label: "Unbonded" },
+    { id: "migrated", label: "Migrated" },
+    { id: "moonshot", label: "Moonshot" },
+    { id: "newpairs", label: "New Pairs" },
+  ],
+  curated: [
+    { id: "og", label: "OG" },
+    { id: "kols", label: "KOLs" },
+    { id: "celebrity", label: "Celeb" },
+    { id: "organic", label: "Organic" },
+    { id: "listed", label: "Listed" },
+  ],
+  wallet: [
+    { id: "positions", label: "Positions" },
+  ],
 };
 
-async function fetchOgdexMarkets(tab: Exclude<SidebarTab, "Positions">): Promise<TokenListItem[]> {
-  const { type, interval } = MARKET_TAB_API[tab];
+const DEFAULT_TAB: Record<MarketCategory, MarketTab> = {
+  discover: "trending",
+  pumpfun: "unbonded",
+  curated: "og",
+  wallet: "positions",
+};
+
+const SCREEN_INTERVAL = "1h";
+const SCREEN_LIMIT = 200;
+
+function mapScreenerRow(row: any): TokenListItem | null {
+  const mint = String(row.mint || row.contract_address || "").trim();
+  if (!mint) return null;
+  const poolRaw = row.firstPool?.id || row.poolAddress || row.pairAddress || "";
+  const pairAddress = String(poolRaw).includes("_")
+    ? String(poolRaw).split("_").pop()
+    : String(poolRaw || "") || undefined;
+  return {
+    mint,
+    symbol: row.symbol || "???",
+    name: row.name || row.symbol || "",
+    image: row.icon || row.image_url || undefined,
+    price: Number(row.priceUsd || row.price_usd) || 0,
+    mcap: Number(row.mcap || row.fdv || row.market_cap) || 0,
+    change24h: Number(row.change24h ?? row.change1h ?? row.change5m) || 0,
+    volume24h: Number(row.volume) || 0,
+    liquidity: Number(row.liquidity) || 0,
+    pairAddress: pairAddress || undefined,
+    volume5m: Number(row.volume5m) || 0,
+    buys5m: Number(row.numBuys) || 0,
+    sells5m: Number(row.numSells) || 0,
+    buyVol5m: Number(row.buyVolume) || 0,
+    sellVol5m: Number(row.sellVolume) || 0,
+  };
+}
+
+async function fetchOgdexMarkets(type: Exclude<MarketTab, "positions">): Promise<TokenListItem[]> {
   try {
-    const r = await fetch(`/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=${interval}&limit=80&chain=solana`);
+    // Community listings use a separate endpoint (same as DEX home "Listed" tab)
+    if (type === "listed") {
+      const r = await fetch("/api/ogdex/listings");
+      const d = await r.json();
+      const rows: any[] = Array.isArray(d?.rows) ? d.rows : [];
+      return rows.map(mapScreenerRow).filter(Boolean) as TokenListItem[];
+    }
+    const r = await fetch(
+      `/api/ogdex/screener?type=${encodeURIComponent(type)}&interval=${SCREEN_INTERVAL}&limit=${SCREEN_LIMIT}&chain=solana`,
+    );
     const d = await r.json();
     const rows: any[] = Array.isArray(d?.rows) ? d.rows : [];
-    return rows
-      .map((row) => {
-        const mint = String(row.mint || "").trim();
-        if (!mint) return null;
-        return {
-          mint,
-          symbol: row.symbol || "???",
-          name: row.name || row.symbol || "",
-          image: row.icon || undefined,
-          price: Number(row.priceUsd) || 0,
-          mcap: Number(row.mcap || row.fdv) || 0,
-          change24h: Number(row.change24h ?? row.change1h) || 0,
-          volume24h: Number(row.volume) || 0,
-          liquidity: Number(row.liquidity) || 0,
-          pairAddress: row.firstPool?.id || row.poolAddress || undefined,
-          volume5m: 0,
-          buys5m: Number(row.numBuys) || 0,
-          sells5m: Number(row.numSells) || 0,
-          buyVol5m: Number(row.buyVolume) || 0,
-          sellVol5m: Number(row.sellVolume) || 0,
-        } as TokenListItem;
-      })
-      .filter(Boolean) as TokenListItem[];
+    return rows.map(mapScreenerRow).filter(Boolean) as TokenListItem[];
   } catch {
     return [];
   }
+}
+
+function dexScreenerEmbedUrl(ref: string, interval: string): string {
+  const q = new URLSearchParams({
+    embed: "1",
+    loadChartSettings: "0",
+    trades: "0",
+    tabs: "0",
+    info: "0",
+    chartLeftToolbar: "0",
+    chartDefaultOnMobile: "1",
+    chartTheme: "dark",
+    theme: "dark",
+    chartStyle: "1",
+    chartType: "usd",
+    interval,
+  });
+  return `https://dexscreener.com/solana/${ref}?${q.toString()}`;
 }
 
 const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders"] as const;
@@ -191,24 +261,6 @@ async function fetchDexPair(mint: string): Promise<TokenListItem | null> {
       sellVol5m: totalTxns5m > 0 ? ((pair.volume?.m5 || 0) * (txns5m.sells || 0)) / totalTxns5m : 0,
     };
   } catch { return null; }
-}
-
-async function fetchGeckoOhlcv(
-  poolAddress: string,
-  tokenMint: string,
-  timeframe: Timeframe,
-): Promise<CandleDataPoint[]> {
-  const cfg = TIMEFRAME_CONFIG[timeframe];
-  const url = `${GECKO_BASE}/networks/solana/pools/${poolAddress}/ohlcv/${cfg.geckoBase}?aggregate=${cfg.aggregate}&limit=${cfg.limit}&currency=usd&token=${tokenMint}`;
-  try {
-    const r = await fetch(url);
-    if (!r.ok) return [];
-    const d = await r.json();
-    const items: number[][] = d?.data?.attributes?.ohlcv_list ?? [];
-    return items
-      .map(([ts, o, h, l, c, v]) => ({ time: ts, open: o, high: h, low: l, close: c, volume: v }))
-      .sort((a, b) => a.time - b.time);
-  } catch { return []; }
 }
 
 async function fetchGeckoTrades(poolAddress: string, tokenSymbol: string): Promise<TradeEntry[]> {
@@ -313,7 +365,7 @@ function fmtNum(n: number): string {
    Component
    ═══════════════════════════════════════════════════════════════════ */
 
-export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
+export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProps = {}) => {
   const { publicKey, connected, wallets, select, connect, disconnect, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
@@ -321,12 +373,11 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [selectedMint, setSelectedMint] = useState<string>(initialMint || DEFAULT_MINTS[0].mint);
   const [selectedToken, setSelectedToken] = useState<TokenListItem | null>(null);
-  const [chartData, setChartData] = useState<CandleDataPoint[]>([]);
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
-  const [priceMode, setPriceMode] = useState<"price" | "mcap">("price");
   const [trades, setTrades] = useState<TradeEntry[]>([]);
   const [security, setSecurity] = useState<TokenSecurity | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("Trending");
+  const [marketCategory, setMarketCategory] = useState<MarketCategory>("discover");
+  const [marketTab, setMarketTab] = useState<MarketTab>("trending");
   const [bottomTab, setBottomTab] = useState<BottomTab>("Trades");
   const [swapMode, setSwapMode] = useState<"buy" | "sell">("buy");
   const [buyAmt, setBuyAmt] = useState("0.25");
@@ -339,32 +390,19 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<JupTokenInfo[]>([]);
   const [searching, setSearching] = useState(false);
-  const [loadingChart, setLoadingChart] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
   const [loadingTokens, setLoadingTokens] = useState(true);
   const [copied, setCopied] = useState(false);
   const [positions, setPositions] = useState<TokenAsset[]>([]);
   const [showWalletPicker, setShowWalletPicker] = useState(false);
 
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [chartHeight, setChartHeight] = useState(400);
-
-  /* ── Chart container resize ─────────────────────────────── */
+  /* ── Load DEX markets (full screener tabs, up to 200) ── */
   useEffect(() => {
-    const el = chartContainerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setChartHeight(el.clientHeight));
-    ro.observe(el);
-    setChartHeight(el.clientHeight);
-    return () => ro.disconnect();
-  }, []);
-
-  /* ── Load DEX markets (same screener as ORBITX_DEX home) ── */
-  useEffect(() => {
-    if (sidebarTab === "Positions") return;
+    if (marketTab === "positions") return;
     let cancelled = false;
     (async () => {
       setLoadingTokens(true);
-      let list = await fetchOgdexMarkets(sidebarTab);
+      let list = await fetchOgdexMarkets(marketTab);
       if (!list.length) {
         const fallback = await Promise.all(DEFAULT_MINTS.map((t) => fetchDexPair(t.mint)));
         list = fallback.filter(Boolean) as TokenListItem[];
@@ -382,7 +420,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarTab]);
+  }, [marketTab]);
 
   useEffect(() => {
     if (initialMint) setSelectedMint(initialMint);
@@ -392,29 +430,20 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
   useEffect(() => {
     if (!selectedMint) return;
     let cancelled = false;
+    setChartReady(false);
     (async () => {
       const pair = await fetchDexPair(selectedMint);
       if (cancelled) return;
       if (pair) setSelectedToken(pair);
+      else {
+        const fromList = tokens.find((t) => t.mint === selectedMint);
+        if (fromList) setSelectedToken(fromList);
+      }
       fetchSecurity(selectedMint).then((s) => { if (!cancelled) setSecurity(s); });
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMint]);
-
-  /* ── Load chart data from GeckoTerminal ─────────────────── */
-  useEffect(() => {
-    if (!selectedToken?.pairAddress) return;
-    let cancelled = false;
-    (async () => {
-      setLoadingChart(true);
-      try {
-        const candles = await fetchGeckoOhlcv(selectedToken.pairAddress!, selectedMint, timeframe);
-        if (!cancelled) setChartData(candles);
-      } catch { if (!cancelled) setChartData([]); }
-      if (!cancelled) setLoadingChart(false);
-    })();
-    return () => { cancelled = true; };
-  }, [selectedToken?.pairAddress, selectedMint, timeframe]);
 
   /* ── Load trades from GeckoTerminal ─────────────────────── */
   useEffect(() => {
@@ -479,10 +508,11 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
     setSearchQuery("");
     setSearchResults([]);
     setTrades([]);
-    setChartData([]);
     setSecurity(null);
     setSelectedToken(null);
-  }, []);
+    setChartReady(false);
+    onMintChange?.(mint);
+  }, [onMintChange]);
 
   const copyMint = useCallback(() => {
     navigator.clipboard.writeText(selectedMint);
@@ -586,16 +616,13 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
     [selectToken]
   );
 
-  const refreshChart = useCallback(() => {
-    if (!selectedToken?.pairAddress) return;
-    setLoadingChart(true);
-    fetchGeckoOhlcv(selectedToken.pairAddress, selectedMint, timeframe)
-      .then(setChartData)
-      .finally(() => setLoadingChart(false));
-  }, [selectedToken?.pairAddress, selectedMint, timeframe]);
-
   /* ── Derived ────────────────────────────────────────────── */
   const t = selectedToken;
+  const chartRef = t?.pairAddress || selectedMint;
+  const dexChartSrc = chartRef
+    ? dexScreenerEmbedUrl(chartRef, TIMEFRAME_CONFIG[timeframe].dexInterval)
+    : "";
+  const marketSubTabs = TABS_BY_CATEGORY[marketCategory];
 
   const SwapPanel = () => (
     <div className="p-4 space-y-3 border-b border-white/[0.07]">
@@ -644,7 +671,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 onClick={() => setBuyAmt(String(p))}
                 className={`flex-1 py-1.5 rounded-md text-[11px] font-mono border transition-colors ${
                   buyAmt === String(p)
-                    ? "border-[#ab9ff2]/50 bg-[#ab9ff2]/15 text-white"
+                    ? "border-[#ffffff]/50 bg-[#ffffff]/15 text-white"
                     : "border-white/[0.07] text-white/45 hover:text-white/70"
                 }`}
               >
@@ -728,7 +755,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
           href={`https://solscan.io/tx/${tradeSig}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1 text-[11px] text-[#ab9ff2] hover:underline"
+          className="flex items-center justify-center gap-1 text-[11px] text-[#ffffff] hover:underline"
         >
           Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
         </a>
@@ -746,7 +773,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
         onClick={() => setShowWalletPicker(false)}>
-        <div className="bg-[#13132a] border border-white/[0.1] rounded-2xl p-6 w-[340px] max-w-[90vw] space-y-4"
+        <div className="bg-[#111111] border border-white/[0.1] rounded-2xl p-6 w-[340px] max-w-[90vw] space-y-4"
           onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold">Connect Wallet</h3>
@@ -766,11 +793,11 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                     setShowWalletPicker(false);
                   }, 150);
                 }}
-                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] hover:border-[#ab9ff2]/40 transition-all group"
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] hover:border-[#ffffff]/40 transition-all group"
               >
                 {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-8 h-8 rounded-lg" />}
                 <span className="font-semibold text-sm">{w.adapter.name}</span>
-                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ab9ff2] transition-colors">
+                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ffffff] transition-colors">
                   Connect →
                 </span>
               </button>
@@ -780,7 +807,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 <Wallet className="h-8 w-8 text-white/15 mx-auto mb-2" />
                 <p className="text-sm text-white/40 mb-2">No wallet detected</p>
                 <a href="https://phantom.app" target="_blank" rel="noopener noreferrer"
-                  className="text-[#ab9ff2] text-xs underline">
+                  className="text-[#ffffff] text-xs underline">
                   Install Phantom →
                 </a>
               </div>
@@ -799,25 +826,52 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
   return (
     <>
     <WalletPickerOverlay />
-    <div className="flex h-full min-h-[calc(100vh-68px)] flex-col overflow-y-auto bg-[#0a0a14] lg:min-h-0 lg:flex-row lg:overflow-hidden">
+    <div className="flex h-full min-h-[calc(100vh-68px)] flex-col overflow-y-auto bg-black lg:min-h-0 lg:flex-row lg:overflow-hidden">
 
       {/* ═══════════════ LEFT SIDEBAR ═══════════════ */}
-      <aside className="hidden lg:flex flex-col w-[280px] min-w-[280px] border-r border-white/[0.07] bg-[#0d0d1a]">
-        {/* Sidebar tabs */}
-        <div className="flex overflow-x-auto border-b border-white/[0.07] scrollbar-none">
-          {SIDEBAR_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setSidebarTab(tab)}
-              className={`shrink-0 px-2.5 py-2.5 text-[10px] font-medium transition-colors ${
-                sidebarTab === tab
-                  ? "text-white border-b-2 border-[#ab9ff2]"
-                  : "text-white/40 hover:text-white/60"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+      <aside className="hidden lg:flex flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[#050505]">
+        {/* Category + market tabs (full DEX universe) */}
+        <div className="border-b border-white/10">
+          <div className="flex overflow-x-auto scrollbar-none">
+            {MARKET_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setMarketCategory(cat.id);
+                  setMarketTab(DEFAULT_TAB[cat.id]);
+                }}
+                className={`shrink-0 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                  marketCategory === cat.id
+                    ? "text-white border-b-2 border-white"
+                    : "text-white/35 hover:text-white/60"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex overflow-x-auto scrollbar-none bg-black/40">
+            {marketSubTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMarketTab(tab.id)}
+                className={`shrink-0 px-2.5 py-2 text-[10px] font-medium transition-colors ${
+                  marketTab === tab.id
+                    ? "text-white border-b border-white"
+                    : "text-white/40 hover:text-white/65"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {marketTab !== "positions" && (
+            <p className="px-3 py-1 text-[9px] text-white/25 font-mono">
+              {loadingTokens ? "Loading…" : `${tokens.length} tokens`}
+            </p>
+          )}
         </div>
 
         {/* Search */}
@@ -841,7 +895,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
 
         {/* Search results overlay */}
         {searchResults.length > 0 && (
-          <div className="border-b border-white/[0.07] bg-[#111128] max-h-[300px] overflow-y-auto">
+          <div className="border-b border-white/[0.07] bg-[#0a0a0a] max-h-[300px] overflow-y-auto">
             {searchResults.map((sr) => (
               <button
                 key={(sr as any).address || sr.id}
@@ -867,14 +921,14 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-5 w-5 animate-spin text-white/30" />
             </div>
-          ) : sidebarTab === "Trending" ? (
+          ) : marketTab !== "positions" ? (
             tokens.map((token) => (
               <button
                 key={token.mint}
                 onClick={() => selectToken(token.mint)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors text-left ${
                   selectedMint === token.mint
-                    ? "bg-[#ab9ff2]/10 border-l-2 border-[#ab9ff2]"
+                    ? "bg-white/10 border-l-2 border-white"
                     : "hover:bg-white/[0.04] border-l-2 border-transparent"
                 }`}
               >
@@ -882,12 +936,17 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                   <img src={token.image} alt="" className="w-7 h-7 rounded-full shrink-0"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#ab9ff2] to-[#6c63ff] flex items-center justify-center text-[10px] font-bold shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-[10px] font-bold shrink-0">
                     {token.symbol.slice(0, 2)}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold truncate">{token.symbol}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold truncate">{token.symbol}</p>
+                    {token.volume24h > 0 && (
+                      <span className="text-[9px] text-white/25 font-mono shrink-0">{fmtMcap(token.volume24h)}</span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-white/30 truncate">{token.name}</p>
                 </div>
                 <div className="text-right shrink-0">
@@ -902,7 +961,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 </div>
               </button>
             ))
-          ) : sidebarTab === "Positions" ? (
+          ) : marketTab === "positions" ? (
             connected && positions.length > 0 ? (
               positions.slice(0, 30).map((pos) => {
                 const sym = pos.content?.metadata?.symbol || "???";
@@ -913,7 +972,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                     key={pos.id}
                     onClick={() => selectToken(pos.id)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/[0.04] transition-colors text-left ${
-                      selectedMint === pos.id ? "bg-[#ab9ff2]/10 border-l-2 border-[#ab9ff2]" : "border-l-2 border-transparent"
+                      selectedMint === pos.id ? "bg-white/10 border-l-2 border-white" : "border-l-2 border-transparent"
                     }`}
                   >
                     {img ? (
@@ -933,17 +992,12 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 <Wallet className="h-8 w-8 text-white/20 mb-3" />
                 <p className="text-xs text-white/40">{connected ? "No token positions" : "Connect wallet to view positions"}</p>
                 {!connected && (
-                  <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ab9ff2] text-black text-xs">
+                  <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-black text-xs">
                     Connect
                   </Button>
                 )}
               </div>
             )
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-              <Star className="h-8 w-8 text-white/20 mb-3" />
-              <p className="text-xs text-white/40">Follow tokens to track them here</p>
-            </div>
           )}
         </ScrollArea>
       </aside>
@@ -952,7 +1006,38 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:overflow-hidden">
 
         {/* Mobile token selector */}
-        <div className="lg:hidden border-b border-white/[0.07] bg-[#0d0d1a]">
+        <div className="lg:hidden border-b border-white/10 bg-[#050505]">
+          <div className="flex overflow-x-auto scrollbar-none border-b border-white/10">
+            {MARKET_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setMarketCategory(cat.id);
+                  setMarketTab(DEFAULT_TAB[cat.id]);
+                }}
+                className={`shrink-0 px-3 py-2 text-[10px] font-semibold uppercase ${
+                  marketCategory === cat.id ? "text-white border-b border-white" : "text-white/35"
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex overflow-x-auto scrollbar-none px-1 py-1 gap-0.5">
+            {marketSubTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMarketTab(tab.id)}
+                className={`shrink-0 px-2 py-1 text-[10px] rounded ${
+                  marketTab === tab.id ? "bg-white text-black" : "text-white/40"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <div className="p-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
@@ -960,11 +1045,11 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 placeholder="Search token…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 text-xs bg-white/[0.04] border-white/[0.07] rounded-lg"
+                className="pl-8 h-8 text-xs bg-white/[0.04] border-white/10 rounded-lg"
               />
             </div>
             {searchResults.length > 0 && (
-              <div className="mt-1 bg-[#111128] rounded-lg border border-white/[0.07] max-h-[200px] overflow-y-auto">
+              <div className="mt-1 bg-[#0a0a0a] rounded-lg border border-white/[0.07] max-h-[200px] overflow-y-auto">
                 {searchResults.map((sr) => (
                   <button
                     key={(sr as any).address || sr.id}
@@ -982,12 +1067,12 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
             )}
           </div>
           <div className="flex gap-1.5 px-2 pb-2 overflow-x-auto no-scrollbar">
-            {tokens.slice(0, 10).map((tk) => (
+            {tokens.slice(0, 40).map((tk) => (
               <button
                 key={tk.mint}
                 onClick={() => selectToken(tk.mint)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
-                  selectedMint === tk.mint ? "bg-[#ab9ff2]/20 text-[#ab9ff2]" : "bg-white/[0.05] text-white/50"
+                  selectedMint === tk.mint ? "bg-[#ffffff]/20 text-[#ffffff]" : "bg-white/[0.05] text-white/50"
                 }`}
               >
                 {tk.image && <img src={tk.image} className="w-4 h-4 rounded-full" alt="" />}
@@ -999,11 +1084,11 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
 
         {/* Token header — improved with token image, name, price, stats */}
         {t && (
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[#0d0d1a]/80 flex-wrap">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[#050505]/80 flex-wrap">
             {t.image ? (
               <img src={t.image} alt="" className="w-9 h-9 rounded-full ring-2 ring-white/[0.08]" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#ab9ff2] to-[#6c63ff] flex items-center justify-center text-xs font-bold ring-2 ring-white/[0.08]">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#ffffff] to-[#404040] flex items-center justify-center text-xs font-bold ring-2 ring-white/[0.08]">
                 {t.symbol.slice(0, 2)}
               </div>
             )}
@@ -1015,8 +1100,16 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                   {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
                 <a href={`https://solscan.io/token/${selectedMint}`} target="_blank" rel="noopener noreferrer"
-                  className="text-white/25 hover:text-white/50 transition-colors">
+                  className="text-white/25 hover:text-white/50 transition-colors" title="Solscan">
                   <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+                <a
+                  href={`https://dexscreener.com/solana/${t.pairAddress || selectedMint}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-white/35 hover:text-white transition-colors font-medium"
+                >
+                  DX
                 </a>
               </div>
               <div className="flex items-center gap-3 mt-0.5">
@@ -1037,7 +1130,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
               </div>
               <div className="text-right hidden md:block">
                 <span className="text-[10px] text-white/30">Liq</span>
-                <p className="text-sm font-semibold font-mono text-[#ab9ff2]">{fmtMcap(t.liquidity)}</p>
+                <p className="text-sm font-semibold font-mono text-[#ffffff]">{fmtMcap(t.liquidity)}</p>
               </div>
               {/* Wallet status */}
               {connected ? (
@@ -1047,7 +1140,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 </button>
               ) : (
                 <Button size="sm" onClick={() => setShowWalletPicker(true)}
-                  className="bg-[#ab9ff2] hover:bg-[#9b8fe2] text-black text-xs font-semibold rounded-lg">
+                  className="bg-[#ffffff] hover:bg-[#e5e5e5] text-black text-xs font-semibold rounded-lg">
                   <Wallet className="h-3.5 w-3.5 mr-1.5" />
                   Connect
                 </Button>
@@ -1056,65 +1149,70 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
           </div>
         )}
 
-        {/* Chart controls */}
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/[0.07] bg-[#0a0a14]">
+        {/* Chart controls — DexScreener embed */}
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/10 bg-black">
           {(Object.keys(TIMEFRAME_CONFIG) as Timeframe[]).map((tf) => (
             <button
               key={tf}
-              onClick={() => setTimeframe(tf)}
+              type="button"
+              onClick={() => { setTimeframe(tf); setChartReady(false); }}
               className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                 timeframe === tf
-                  ? "bg-[#ab9ff2]/20 text-[#ab9ff2]"
+                  ? "bg-white text-black"
                   : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
               }`}
             >
               {TIMEFRAME_CONFIG[tf].label}
             </button>
           ))}
-          <div className="w-px h-4 bg-white/[0.07] mx-1" />
-          <button
-            onClick={() => setPriceMode("price")}
-            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-              priceMode === "price" ? "text-white underline underline-offset-4" : "text-white/35 hover:text-white/60"
-            }`}
-          >
-            Price
-          </button>
-          <span className="text-white/15 text-[11px]">/</span>
-          <button
-            onClick={() => setPriceMode("mcap")}
-            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-              priceMode === "mcap" ? "text-white underline underline-offset-4" : "text-white/35 hover:text-white/60"
-            }`}
-          >
-            MCap
-          </button>
           <div className="flex-1" />
-          <button onClick={refreshChart} className="text-white/25 hover:text-white/50 transition-colors p-1">
-            <RefreshCw className={`h-3.5 w-3.5 ${loadingChart ? "animate-spin" : ""}`} />
+          {chartRef && (
+            <a
+              href={`https://dexscreener.com/solana/${chartRef}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] text-white/35 hover:text-white transition-colors"
+            >
+              DexScreener <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => setChartReady(false)}
+            className="text-white/25 hover:text-white/50 transition-colors p-1"
+            title="Reload chart"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        {/* Chart area */}
-        <div ref={chartContainerRef} className="flex-1 min-h-[300px] h-[350px] lg:h-auto relative">
-          {loadingChart && chartData.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#ab9ff2]/40" />
+        {/* DexScreener chart */}
+        <div className="relative min-h-[320px] h-[380px] flex-1 lg:h-auto bg-black">
+          {!chartReady && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
+              <Loader2 className="h-6 w-6 animate-spin text-white/30" />
             </div>
-          ) : chartData.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <Loader2 className="h-6 w-6 animate-spin text-white/20 mx-auto mb-2" />
-                <p className="text-white/20 text-sm">Loading chart…</p>
-              </div>
-            </div>
+          )}
+          {dexChartSrc ? (
+            <iframe
+              key={`${chartRef}-${timeframe}`}
+              title="DexScreener chart"
+              src={dexChartSrc}
+              className="absolute inset-0 h-full w-full border-0"
+              style={{ colorScheme: "dark" }}
+              allow="clipboard-write"
+              loading="lazy"
+              onLoad={() => setChartReady(true)}
+            />
           ) : (
-            <CandlestickChart data={chartData} height={chartHeight} />
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-white/30">
+              Select a token to load chart
+            </div>
           )}
         </div>
 
         {/* Bottom tabs: Trades / My Trades / Positions / Top Traders */}
-        <div className="border-t border-white/[0.07] bg-[#0d0d1a] flex flex-col min-h-[250px] lg:min-h-[200px] lg:max-h-[280px]">
+        <div className="border-t border-white/[0.07] bg-[#050505] flex flex-col min-h-[250px] lg:min-h-[200px] lg:max-h-[280px]">
           <div className="flex border-b border-white/[0.07]">
             {BOTTOM_TABS.map((tab) => (
               <button
@@ -1122,7 +1220,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 onClick={() => setBottomTab(tab)}
                 className={`px-4 py-2 text-xs font-medium transition-colors ${
                   bottomTab === tab
-                    ? "text-white border-b-2 border-[#ab9ff2]"
+                    ? "text-white border-b-2 border-[#ffffff]"
                     : "text-white/35 hover:text-white/60"
                 }`}
               >
@@ -1134,7 +1232,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
           <ScrollArea className="flex-1">
             {bottomTab === "Trades" && (
               <>
-                <div className="grid grid-cols-6 gap-2 px-3 py-1.5 text-[10px] text-white/25 font-medium border-b border-white/[0.05] sticky top-0 bg-[#0d0d1a]">
+                <div className="grid grid-cols-6 gap-2 px-3 py-1.5 text-[10px] text-white/25 font-medium border-b border-white/[0.05] sticky top-0 bg-[#050505]">
                   <span>Time</span><span>Type</span><span>Price</span><span>Amount</span><span>Value</span><span>Wallet</span>
                 </div>
                 {trades.length === 0 ? (
@@ -1153,7 +1251,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                       <span className="text-white/50 font-mono">{fmtNum(trade.amount)}</span>
                       <span className="text-white/50 font-mono">${fmtNum(trade.value)}</span>
                       <a href={`https://solscan.io/account/${trade.wallet}`} target="_blank" rel="noopener noreferrer"
-                        className="text-white/30 font-mono hover:text-[#ab9ff2] transition-colors truncate">
+                        className="text-white/30 font-mono hover:text-[#ffffff] transition-colors truncate">
                         {shortAddr(trade.wallet, 4)}
                       </a>
                     </div>
@@ -1167,7 +1265,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                 <Activity className="h-6 w-6 text-white/15 mb-2" />
                 <p className="text-xs text-white/30">{connected ? "Your trades for this token will appear here" : "Connect wallet to see your trades"}</p>
                 {!connected && (
-                  <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ab9ff2] text-black text-xs">Connect</Button>
+                  <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ffffff] text-black text-xs">Connect</Button>
                 )}
               </div>
             )}
@@ -1199,7 +1297,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
                   <Wallet className="h-6 w-6 text-white/15 mb-2" />
                   <p className="text-xs text-white/30">{connected ? "No positions found" : "Connect wallet to view positions"}</p>
                   {!connected && (
-                    <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ab9ff2] text-black text-xs">Connect</Button>
+                    <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ffffff] text-black text-xs">Connect</Button>
                   )}
                 </div>
               )
@@ -1216,7 +1314,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
       </div>
 
       {/* ═══════════════ RIGHT SIDEBAR (Desktop) ═══════════════ */}
-      <aside className="hidden lg:flex flex-col w-[320px] min-w-[320px] border-l border-white/[0.07] bg-[#0d0d1a]">
+      <aside className="hidden lg:flex flex-col w-[320px] min-w-[320px] border-l border-white/[0.07] bg-[#050505]">
         {/* 5m stats bar */}
         {t && (
           <div className="grid grid-cols-3 border-b border-white/[0.07]">
@@ -1292,7 +1390,7 @@ export const TradingTerminal = ({ initialMint }: TradeTerminalProps = {}) => {
       </aside>
 
       {/* ═══════════════ MOBILE SWAP & INFO SECTION ═══════════════ */}
-      <div className="lg:hidden bg-[#0d0d1a] border-t border-white/[0.07]">
+      <div className="lg:hidden bg-[#050505] border-t border-white/[0.07]">
         {/* 5m stats */}
         {t && (
           <div className="grid grid-cols-3 border-b border-white/[0.07]">

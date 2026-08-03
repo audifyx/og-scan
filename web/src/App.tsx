@@ -56,7 +56,17 @@ import TerminalHome from "./pages/orbitx/TerminalHome";
 import TerminalTrade from "./pages/orbitx/TerminalTrade";
 import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
 import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
-import Trade from "./pages/Trade";
+import TradeApp from "./trade/TradeApp";
+import TradeHome from "./trade/TradeHome";
+import TradeDeskPage from "./trade/TradeDeskPage";
+import TradeToken from "./trade/TradeToken";
+import TradeLeaderboard from "./trade/TradeLeaderboard";
+import TradeProfile from "./trade/TradeProfile";
+
+function TradeMintRedirect() {
+  const { mint } = useParams<{ mint: string }>();
+  return <Navigate to={`/trade/token/${mint || ""}`} replace />;
+}
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
 const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
@@ -349,9 +359,17 @@ const App = () => (
               <Route path="coin/:nftId" element={<Suspense fallback={null}><NftCoinTrade /></Suspense>} />
             </Route>
 
-            {/* ── OrbitX Trade Terminal (Phantom connect + DEX markets) ── */}
-            <Route path="/trade" element={<Trade />} />
-            <Route path="/trade/:mint" element={<Trade />} />
+            {/* ── OrbitX Trade App (Home · Trade · Leaderboard · Profile) ── */}
+            <Route path="/trade" element={<TradeApp />}>
+              <Route index element={<TradeHome />} />
+              <Route path="home" element={<TradeHome />} />
+              <Route path="desk" element={<TradeDeskPage />} />
+              <Route path="desk/:mint" element={<TradeDeskPage />} />
+              <Route path="leaderboard" element={<TradeLeaderboard />} />
+              <Route path="profile" element={<TradeProfile />} />
+              <Route path="token/:mint" element={<TradeToken />} />
+              <Route path=":mint" element={<TradeMintRedirect />} />
+            </Route>
 
             <Route path="/terminal" element={<LaunchpadTerminal />}>
               <Route index element={<TerminalHome />} />
