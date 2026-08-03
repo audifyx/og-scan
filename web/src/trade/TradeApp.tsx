@@ -1,10 +1,10 @@
 /**
  * OrbitX Trade App — mobile + desktop shell.
- * Tabs: Home · Trade · Board · Profile
+ * Tabs: Home · Trade · Board · Profile (+ header notifications)
  */
 
-import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Home, CandlestickChart, Trophy, User } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Home, CandlestickChart, Trophy, User, Bell } from "lucide-react";
 
 const LAST_MINT_KEY = "orbitx.trade.lastMint";
 
@@ -27,7 +27,13 @@ const TABS = [
 
 function tabActive(pathname: string, id: string) {
   if (id === "home") {
-    return pathname === "/trade" || pathname === "/trade/home" || pathname.startsWith("/trade/token/");
+    return (
+      pathname === "/trade" ||
+      pathname === "/trade/home" ||
+      pathname.startsWith("/trade/token/") ||
+      pathname.startsWith("/trade/wallet/") ||
+      pathname.startsWith("/trade/notifications")
+    );
   }
   if (id === "trade") return pathname.startsWith("/trade/desk");
   if (id === "board") return pathname.startsWith("/trade/leaderboard");
@@ -40,6 +46,8 @@ function titleFor(pathname: string): string {
   if (pathname.startsWith("/trade/leaderboard")) return "Leaderboard";
   if (pathname.startsWith("/trade/profile")) return "Profile";
   if (pathname.startsWith("/trade/token/")) return "Coin";
+  if (pathname.startsWith("/trade/wallet/")) return "Wallet";
+  if (pathname.startsWith("/trade/notifications")) return "Alerts";
   return "Markets";
 }
 
@@ -47,6 +55,7 @@ export default function TradeApp() {
   const { pathname } = useLocation();
   const title = titleFor(pathname);
   const hideTopChrome = pathname.startsWith("/trade/desk");
+  const notifActive = pathname.startsWith("/trade/notifications");
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
@@ -57,14 +66,19 @@ export default function TradeApp() {
             <span className="h-3 w-px bg-white/15" />
             <span className="text-[12px] font-medium text-white/45">{title}</span>
           </div>
+          <Link
+            to="/trade/notifications"
+            className={`rounded-full p-2 transition-colors ${
+              notifActive ? "bg-white text-black" : "text-white/45 hover:bg-white/10 hover:text-white"
+            }`}
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+          </Link>
         </header>
       )}
 
-      <main
-        className={`min-h-0 flex-1 overflow-hidden ${
-          hideTopChrome ? "pb-[calc(4.25rem+env(safe-area-inset-bottom))]" : "pb-[calc(4.25rem+env(safe-area-inset-bottom))]"
-        }`}
-      >
+      <main className="min-h-0 flex-1 overflow-hidden pb-[calc(4.25rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
 

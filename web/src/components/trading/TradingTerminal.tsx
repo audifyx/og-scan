@@ -382,6 +382,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [marketCategory, setMarketCategory] = useState<MarketCategory>("discover");
   const [marketTab, setMarketTab] = useState<MarketTab>("trending");
   const [bottomTab, setBottomTab] = useState<BottomTab>("Trades");
+  const [myTrades, setMyTrades] = useState<any[]>([]);
+  const [myTradesLoading, setMyTradesLoading] = useState(false);
+  const [topTraders, setTopTraders] = useState<any[]>([]);
+  const [topTradersLoading, setTopTradersLoading] = useState(false);
   const [swapMode, setSwapMode] = useState<"buy" | "sell">("buy");
   const [buyAmt, setBuyAmt] = useState("0.25");
   const [sellPct, setSellPct] = useState(50);
@@ -503,6 +507,59 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       } catch { setPositions([]); }
     })();
   }, [publicKey]);
+
+  /* ── My Trades (wallet swaps) ───────────────────────────── */
+  useEffect(() => {
+    if (bottomTab !== "My Trades" || !publicKey) {
+      if (!publicKey) setMyTrades([]);
+      return;
+    }
+    let on = true;
+    setMyTradesLoading(true);
+    fetch(`/api/ogdex/swaps?address=${encodeURIComponent(publicKey.toBase58())}&limit=50`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!on) return;
+        const list = Array.isArray(d?.trades) ? d.trades : [];
+        const filtered = selectedMint
+          ? list.filter((t: any) => !t.mint || t.mint === selectedMint)
+          : list;
+        setMyTrades(filtered.length ? filtered : list);
+        setMyTradesLoading(false);
+      })
+      .catch(() => {
+        if (on) {
+          setMyTrades([]);
+          setMyTradesLoading(false);
+        }
+      });
+    return () => {
+      on = false;
+    };
+  }, [bottomTab, publicKey, selectedMint]);
+
+  /* ── Top traders for selected mint ──────────────────────── */
+  useEffect(() => {
+    if (bottomTab !== "Top Traders" || !selectedMint) return;
+    let on = true;
+    setTopTradersLoading(true);
+    fetch(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!on) return;
+        setTopTraders(Array.isArray(d?.traders) ? d.traders : []);
+        setTopTradersLoading(false);
+      })
+      .catch(() => {
+        if (on) {
+          setTopTraders([]);
+          setTopTradersLoading(false);
+        }
+      });
+    return () => {
+      on = false;
+    };
+  }, [bottomTab, selectedMint]);
 
   /* ── Search debounce ────────────────────────────────────── */
   useEffect(() => {
@@ -842,7 +899,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   return (
     <>
     <WalletPickerOverlay />
-    <div className="flex h-full min-h-[calc(100vh-68px)] flex-col overflow-y-auto bg-black lg:min-h-0 lg:flex-row lg:overflow-hidden">
+    <div className={`flex h-full min-h-0 bg-black ${deskMode ? "flex-col overflow-y-auto overscroll-contain lg:flex-row lg:overflow-hidden" : "min-h-[calc(100vh-68px)] flex-col overflow-y-auto lg:min-h-0 lg:flex-row lg:overflow-hidden"}`}>
 
       {/* ═══════════════ LEFT SIDEBAR (hidden in desk mode) ═══════════════ */}
       <aside className={`${deskMode ? "hidden" : "hidden lg:flex"} flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[#050505]`}>
@@ -1019,7 +1076,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       </aside>
 
       {/* ═══════════════ CENTER PANEL ═══════════════ */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:overflow-hidden">
+      <div className={`flex min-w-0 flex-col ${deskMode ? "min-h-[85vh] lg:min-h-0 lg:flex-1 lg:overflow-hidden" : "min-h-0 flex-1 overflow-hidden"}`}>
 
         {/* Mobile market browser — only in full mode */}
         {!deskMode && (
@@ -1172,7 +1229,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </div>
 
         {/* DexScreener chart — delayed mount so swap UI paints first */}
-        <div className="relative min-h-[320px] h-[380px] flex-1 lg:h-auto bg-black">
+        <div className="relative min-h-[180px] flex-1 bg-black lg:min-h-[240px]">
           {(!mountChart || !chartReady) && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
               <Loader2 className="h-6 w-6 animate-spin text-white/30" />
@@ -1197,15 +1254,16 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </div>
 
         {/* Bottom tabs: Trades / My Trades / Positions / Top Traders */}
-        <div className="border-t border-white/[0.07] bg-[#050505] flex flex-col min-h-[250px] lg:min-h-[200px] lg:max-h-[280px]">
-          <div className="flex border-b border-white/[0.07]">
+        <div className="flex h-[240px] shrink-0 flex-col border-t border-white/10 bg-[#050505] sm:h-[260px]">
+          <div className="flex shrink-0 overflow-x-auto border-b border-white/10">
             {BOTTOM_TABS.map((tab) => (
               <button
                 key={tab}
+                type="button"
                 onClick={() => setBottomTab(tab)}
-                className={`px-4 py-2 text-xs font-medium transition-colors ${
+                className={`shrink-0 px-3 py-2.5 text-xs font-medium transition-colors sm:px-4 ${
                   bottomTab === tab
-                    ? "text-white border-b-2 border-[#ffffff]"
+                    ? "border-b-2 border-white text-white"
                     : "text-white/35 hover:text-white/60"
                 }`}
               >
@@ -1214,29 +1272,33 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             ))}
           </div>
 
-          <ScrollArea className="flex-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {bottomTab === "Trades" && (
               <>
-                <div className="grid grid-cols-6 gap-2 px-3 py-1.5 text-[10px] text-white/25 font-medium border-b border-white/[0.05] sticky top-0 bg-[#050505]">
+                <div className="sticky top-0 grid grid-cols-6 gap-2 border-b border-white/[0.05] bg-[#050505] px-3 py-1.5 text-[10px] font-medium text-white/25">
                   <span>Time</span><span>Type</span><span>Price</span><span>Amount</span><span>Value</span><span>Wallet</span>
                 </div>
                 {trades.length === 0 ? (
-                  <div className="flex items-center justify-center py-8 text-white/20 text-xs">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading trades…
+                  <div className="flex items-center justify-center py-8 text-xs text-white/20">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading trades…
                   </div>
                 ) : (
                   trades.map((trade, i) => (
-                    <div key={trade.txHash + i}
-                      className="grid grid-cols-6 gap-2 px-3 py-1.5 text-[11px] hover:bg-white/[0.03] transition-colors items-center">
-                      <span className="text-white/40 font-mono">{fmtAgo(trade.time)}</span>
+                    <div
+                      key={trade.txHash + i}
+                      className="grid grid-cols-6 items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-white/[0.03]"
+                    >
+                      <span className="font-mono text-white/40">{fmtAgo(trade.time)}</span>
                       <span className={`font-semibold ${trade.side === "buy" ? "text-green-400" : "text-red-400"}`}>
                         {trade.side === "buy" ? "Buy" : "Sell"}
                       </span>
-                      <span className="text-white/60 font-mono">{fmtPrice(trade.priceUsd)}</span>
-                      <span className="text-white/50 font-mono">{fmtNum(trade.amount)}</span>
-                      <span className="text-white/50 font-mono">${fmtNum(trade.value)}</span>
-                      <a href={`https://solscan.io/account/${trade.wallet}`} target="_blank" rel="noopener noreferrer"
-                        className="text-white/30 font-mono hover:text-[#ffffff] transition-colors truncate">
+                      <span className="font-mono text-white/60">{fmtPrice(trade.priceUsd)}</span>
+                      <span className="font-mono text-white/50">{fmtNum(trade.amount)}</span>
+                      <span className="font-mono text-white/50">${fmtNum(trade.value)}</span>
+                      <a
+                        href={`/trade/wallet/${trade.wallet}`}
+                        className="truncate font-mono text-white/30 hover:text-white"
+                      >
                         {shortAddr(trade.wallet, 4)}
                       </a>
                     </div>
@@ -1246,55 +1308,121 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             )}
 
             {bottomTab === "My Trades" && (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Activity className="h-6 w-6 text-white/15 mb-2" />
-                <p className="text-xs text-white/30">{connected ? "Your trades for this token will appear here" : "Connect wallet to see your trades"}</p>
-                {!connected && (
-                  <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ffffff] text-black text-xs">Connect</Button>
-                )}
-              </div>
+              !connected ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Activity className="mb-2 h-6 w-6 text-white/15" />
+                  <p className="text-xs text-white/30">Connect wallet to see your trades</p>
+                  <Button size="sm" type="button" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-xs text-black">
+                    Connect
+                  </Button>
+                </div>
+              ) : myTradesLoading ? (
+                <div className="flex items-center justify-center py-8 text-xs text-white/30">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading your swaps…
+                </div>
+              ) : myTrades.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <p className="text-xs text-white/30">No recent swaps found for this wallet</p>
+                </div>
+              ) : (
+                myTrades.map((tr: any, i: number) => (
+                  <a
+                    key={tr.txHash || i}
+                    href={tr.mint ? `/trade/token/${tr.mint}` : `https://solscan.io/tx/${tr.txHash}`}
+                    className="flex items-center justify-between border-b border-white/[0.05] px-3 py-2.5 hover:bg-white/[0.04]"
+                  >
+                    <div>
+                      <p className={`text-xs font-bold ${tr.side === "buy" ? "text-green-400" : "text-red-400"}`}>
+                        {(tr.side || "swap").toUpperCase()} {tr.symbol || shortAddr(tr.mint || "", 4)}
+                      </p>
+                      <p className="font-mono text-[10px] text-white/30">
+                        {tr.solAmount != null ? `${Number(tr.solAmount).toFixed(3)} SOL` : ""}
+                      </p>
+                    </div>
+                    <p className="font-mono text-xs text-white/70">
+                      {tr.usd != null ? `$${Number(tr.usd).toFixed(2)}` : "—"}
+                    </p>
+                  </a>
+                ))
+              )
             )}
 
             {bottomTab === "Positions" && (
               connected && positions.length > 0 ? (
                 <>
-                  <div className="grid grid-cols-4 gap-2 px-3 py-1.5 text-[10px] text-white/25 font-medium border-b border-white/[0.05]">
+                  <div className="sticky top-0 grid grid-cols-4 gap-2 border-b border-white/[0.05] bg-[#050505] px-3 py-1.5 text-[10px] font-medium text-white/25">
                     <span>Token</span><span>Balance</span><span>Price</span><span>Value</span>
                   </div>
-                  {positions.slice(0, 20).map((pos) => {
+                  {positions.slice(0, 40).map((pos) => {
                     const sym = pos.content?.metadata?.symbol || "???";
                     const bal = (pos.token_info?.balance || 0) / Math.pow(10, pos.token_info?.decimals || 0);
                     const price = pos.token_info?.price_info?.price_per_token || 0;
                     const val = pos.token_info?.price_info?.total_price || 0;
                     return (
-                      <button key={pos.id} onClick={() => selectToken(pos.id)}
-                        className="w-full grid grid-cols-4 gap-2 px-3 py-2 text-[11px] hover:bg-white/[0.04] transition-colors text-left">
-                        <span className="font-semibold truncate">{sym}</span>
-                        <span className="text-white/50 font-mono">{fmtNum(bal)}</span>
-                        <span className="text-white/50 font-mono">{fmtPrice(price)}</span>
-                        <span className="text-white/70 font-mono">{val > 0 ? `$${val.toFixed(2)}` : "—"}</span>
+                      <button
+                        key={pos.id}
+                        type="button"
+                        onClick={() => selectToken(pos.id)}
+                        className="grid w-full grid-cols-4 gap-2 px-3 py-2 text-left text-[11px] hover:bg-white/[0.04]"
+                      >
+                        <span className="truncate font-semibold">{sym}</span>
+                        <span className="font-mono text-white/50">{fmtNum(bal)}</span>
+                        <span className="font-mono text-white/50">{fmtPrice(price)}</span>
+                        <span className="font-mono text-white/70">{val > 0 ? `$${val.toFixed(2)}` : "—"}</span>
                       </button>
                     );
                   })}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <Wallet className="h-6 w-6 text-white/15 mb-2" />
+                  <Wallet className="mb-2 h-6 w-6 text-white/15" />
                   <p className="text-xs text-white/30">{connected ? "No positions found" : "Connect wallet to view positions"}</p>
                   {!connected && (
-                    <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-[#ffffff] text-black text-xs">Connect</Button>
+                    <Button size="sm" type="button" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-xs text-black">
+                      Connect
+                    </Button>
                   )}
                 </div>
               )
             )}
 
             {bottomTab === "Top Traders" && (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Users className="h-6 w-6 text-white/15 mb-2" />
-                <p className="text-xs text-white/30">Top traders analysis coming soon</p>
-              </div>
+              topTradersLoading ? (
+                <div className="flex items-center justify-center py-8 text-xs text-white/30">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading traders…
+                </div>
+              ) : topTraders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Users className="mb-2 h-6 w-6 text-white/15" />
+                  <p className="text-xs text-white/30">No top trader data yet</p>
+                </div>
+              ) : (
+                topTraders.slice(0, 40).map((tr: any, i: number) => {
+                  const addr = tr.owner || tr.address;
+                  const pnl = tr.netPnl ?? tr.realizedPnl ?? tr.pnlUsd;
+                  return (
+                    <a
+                      key={addr || i}
+                      href={`/trade/wallet/${addr}`}
+                      className="flex items-center justify-between border-b border-white/[0.05] px-3 py-2.5 hover:bg-white/[0.04]"
+                    >
+                      <div>
+                        <p className="font-mono text-xs">
+                          #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
+                        </p>
+                        <p className="text-[10px] text-white/30">
+                          {tr.buys ?? 0}B / {tr.sells ?? 0}S
+                        </p>
+                      </div>
+                      <p className={`font-mono text-xs ${(Number(pnl) || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {pnl != null ? `${Number(pnl) < 0 ? "-" : ""}$${Math.abs(Number(pnl)).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                      </p>
+                    </a>
+                  );
+                })
+              )
             )}
-          </ScrollArea>
+          </div>
         </div>
       </div>
 

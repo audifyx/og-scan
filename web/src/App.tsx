@@ -62,6 +62,8 @@ import TradeDeskPage from "./trade/TradeDeskPage";
 import TradeToken from "./trade/TradeToken";
 import TradeLeaderboard from "./trade/TradeLeaderboard";
 import TradeProfile from "./trade/TradeProfile";
+import TradeWallet from "./trade/TradeWallet";
+import TradeNotifications from "./trade/TradeNotifications";
 
 function TradeMintRedirect() {
   const { mint } = useParams<{ mint: string }>();
@@ -368,6 +370,8 @@ const App = () => (
               <Route path="leaderboard" element={<TradeLeaderboard />} />
               <Route path="profile" element={<TradeProfile />} />
               <Route path="token/:mint" element={<TradeToken />} />
+              <Route path="wallet/:address" element={<TradeWallet />} />
+              <Route path="notifications" element={<TradeNotifications />} />
               <Route path=":mint" element={<TradeMintRedirect />} />
             </Route>
 

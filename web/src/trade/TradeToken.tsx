@@ -245,7 +245,7 @@ export default function TradeToken() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-black pb-24">
+    <div className="h-full overflow-y-auto overscroll-contain bg-black pb-28">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-black/95 px-3 py-3 backdrop-blur">
         <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white">
@@ -478,11 +478,9 @@ export default function TradeToken() {
               holderList.slice(0, 40).map((h: any, i: number) => {
                 const addr = h.owner || h.address;
                 return (
-                  <a
+                  <Link
                     key={addr || i}
-                    href={`https://solscan.io/account/${addr}`}
-                    target="_blank"
-                    rel="noreferrer"
+                    to={`/trade/wallet/${addr}`}
                     className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
                   >
                     <div>
@@ -491,15 +489,17 @@ export default function TradeToken() {
                         {h.label ? <span className="ml-1 text-white/30">· {h.label}</span> : null}
                       </p>
                       <p className="text-[10px] text-white/30">
-                        {h.buys != null || h.sells != null ? `${h.buys ?? 0}B / ${h.sells ?? 0}S` : ""}
+                        amt {h.uiAmount != null ? Number(h.uiAmount).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+                        {h.buys != null || h.sells != null ? ` · ${h.buys ?? 0}B / ${h.sells ?? 0}S` : ""}
                         {h.netPnl != null ? ` · PnL ${fmtUsd(h.netPnl)}` : ""}
+                        {h.realizedPnl != null ? ` · R ${fmtUsd(h.realizedPnl)}` : ""}
                       </p>
                     </div>
                     <div className="text-right font-mono text-xs">
                       <p>{h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "—"}</p>
                       <p className="text-white/40">{fmtUsd(h.usdValue ?? h.holdingUsd ?? h.usd)}</p>
                     </div>
-                  </a>
+                  </Link>
                 );
               })
             )}
@@ -518,25 +518,25 @@ export default function TradeToken() {
                 const addr = tr.owner || tr.address;
                 const pnl = tr.netPnl ?? tr.realizedPnl ?? tr.pnlUsd ?? tr.pnl;
                 return (
-                  <a
+                  <Link
                     key={addr || i}
-                    href={`https://solscan.io/account/${addr}`}
-                    target="_blank"
-                    rel="noreferrer"
+                    to={`/trade/wallet/${addr}`}
                     className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
                   >
                     <div>
                       <p className="font-mono text-xs">
                         #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
+                        {tr.isHolder ? <span className="ml-1 text-white/30">· holder</span> : null}
                       </p>
                       <p className="text-[10px] text-white/30">
                         {tr.buys ?? 0}B / {tr.sells ?? 0}S · vol {fmtUsd(tr.volume ?? tr.buyVol)}
+                        {tr.holdingPct != null ? ` · hold ${Number(tr.holdingPct).toFixed(2)}%` : ""}
                       </p>
                     </div>
                     <p className={`font-mono text-xs ${(Number(pnl) || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
                       {pnl != null ? fmtUsd(Number(pnl)) : "—"}
                     </p>
-                  </a>
+                  </Link>
                 );
               })
             )}
@@ -642,11 +642,9 @@ export default function TradeToken() {
                   <div className="space-y-1">
                     <p className="text-[11px] font-semibold text-white/40">Early buyers</p>
                     {xray.earlyBuyers.slice(0, 15).map((b: any) => (
-                      <a
+                      <Link
                         key={b.wallet}
-                        href={`https://solscan.io/account/${b.wallet}`}
-                        target="_blank"
-                        rel="noreferrer"
+                        to={`/trade/wallet/${b.wallet}`}
                         className="flex justify-between rounded bg-black/40 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5"
                       >
                         <span>
@@ -655,7 +653,7 @@ export default function TradeToken() {
                           {b.bundled ? " · bundled" : ""}
                         </span>
                         <span>{b.solSpent?.toFixed?.(2)} SOL</span>
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 )}

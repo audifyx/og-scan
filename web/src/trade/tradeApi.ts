@@ -129,6 +129,34 @@ export type LeaderEntry = {
   totalSwaps?: number;
 };
 
+export async function fetchWallet(address: string) {
+  return j(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);
+}
+
+export async function fetchSwaps(address: string, limit = 40) {
+  return j(`/api/ogdex/swaps?address=${encodeURIComponent(address)}&limit=${limit}`);
+}
+
+export async function fetchTopTraders(mint: string) {
+  return j(`/api/ogdex/traders?mint=${encodeURIComponent(mint)}`);
+}
+
+/** Lightweight market movers for notifications / signals feed */
+export async function fetchMarketSignals(): Promise<MarketCoin[]> {
+  const [trending, fomo, runners] = await Promise.all([
+    fetchScreener("trending", 30),
+    fetchScreener("fomo", 20),
+    fetchScreener("runners", 20),
+  ]);
+  const map = new Map<string, MarketCoin>();
+  for (const c of [...fomo, ...runners, ...trending]) {
+    if (!map.has(c.mint)) map.set(c.mint, c);
+  }
+  return [...map.values()]
+    .sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h))
+    .slice(0, 40);
+}
+
 export async function fetchLeaderboard(): Promise<LeaderEntry[]> {
   try {
     const d = await j("/api/ogdex/leaderboard");

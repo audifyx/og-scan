@@ -60,7 +60,7 @@ export default function TradeDeskPage() {
   }
 
   return (
-    <div className="h-full min-h-0">
+    <div className="h-full min-h-0 overflow-hidden">
       <TradingTerminal initialMint={mint} onMintChange={onMintChange} mode="desk" />
     </div>
   );
