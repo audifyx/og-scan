@@ -4,7 +4,7 @@
  */
 
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { Home, CandlestickChart, Trophy, User, Bell } from "lucide-react";
+import { Home, CandlestickChart, Trophy, User, Bell, LayoutGrid } from "lucide-react";
 
 const LAST_MINT_KEY = "orbitx.trade.lastMint";
 
@@ -22,6 +22,7 @@ const TABS = [
   { id: "home", to: "/trade", end: true, label: "Home", icon: Home },
   { id: "trade", to: "/trade/desk", end: false, label: "Trade", icon: CandlestickChart, dynamic: true },
   { id: "board", to: "/trade/leaderboard", end: false, label: "Board", icon: Trophy },
+  { id: "more", to: "/trade/more", end: false, label: "More", icon: LayoutGrid },
   { id: "profile", to: "/trade/profile", end: false, label: "Profile", icon: User },
 ] as const;
 
@@ -37,6 +38,7 @@ function tabActive(pathname: string, id: string) {
   }
   if (id === "trade") return pathname.startsWith("/trade/desk");
   if (id === "board") return pathname.startsWith("/trade/leaderboard");
+  if (id === "more") return pathname.startsWith("/trade/more");
   if (id === "profile") return pathname.startsWith("/trade/profile");
   return false;
 }
@@ -44,6 +46,7 @@ function tabActive(pathname: string, id: string) {
 function titleFor(pathname: string): string {
   if (pathname.startsWith("/trade/desk")) return "Trade";
   if (pathname.startsWith("/trade/leaderboard")) return "Leaderboard";
+  if (pathname.startsWith("/trade/more")) return "More";
   if (pathname.startsWith("/trade/profile")) return "Profile";
   if (pathname.startsWith("/trade/token/")) return "Coin";
   if (pathname.startsWith("/trade/wallet/")) return "Wallet";
