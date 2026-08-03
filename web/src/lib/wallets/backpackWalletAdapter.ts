@@ -221,7 +221,9 @@ export class BackpackWalletAdapter extends BaseMessageSignerWalletAdapter {
       const wallet = this._wallet;
       if (!wallet?.signTransaction) throw new WalletNotConnectedError();
       try {
-        return (await wallet.signTransaction(transaction)) || transaction;
+        const signed = await wallet.signTransaction(transaction);
+        if (!signed) throw new Error("Backpack wallet returned no signed transaction");
+        return signed;
       } catch (error) {
         throw new WalletSignTransactionError(error instanceof Error ? error.message : String(error), error);
       }
@@ -236,7 +238,9 @@ export class BackpackWalletAdapter extends BaseMessageSignerWalletAdapter {
       const wallet = this._wallet;
       if (!wallet?.signAllTransactions) throw new WalletNotConnectedError();
       try {
-        return (await wallet.signAllTransactions(transactions)) || transactions;
+        const signed = await wallet.signAllTransactions(transactions);
+        if (!signed?.length) throw new Error("Backpack wallet returned no signed transactions");
+        return signed;
       } catch (error) {
         throw new WalletSignTransactionError(error instanceof Error ? error.message : String(error), error);
       }

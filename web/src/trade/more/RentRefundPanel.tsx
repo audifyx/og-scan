@@ -8,12 +8,13 @@ import {
   buildCloseAccountsTransactions,
   type EmptyTokenAccount,
 } from "@/lib/orbitx/rescue";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function RentRefundPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, wallets, select, connect } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
   const [accounts, setAccounts] = useState<EmptyTokenAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -42,7 +43,7 @@ export default function RentRefundPanel() {
   }, [connection, publicKey]);
 
   const reclaim = async () => {
-    if (!publicKey || !signTransaction || !accounts.length) return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !accounts.length) return;
     setClaiming(true);
     try {
       const txs = buildCloseAccountsTransactions(publicKey, accounts);
@@ -51,8 +52,7 @@ export default function RentRefundPanel() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        const signed = await signTransaction(tx);
-        last = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+        last = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
         await connection.confirmTransaction({ signature: last, blockhash, lastValidBlockHeight }, "confirmed");
       }
       setSig(last);

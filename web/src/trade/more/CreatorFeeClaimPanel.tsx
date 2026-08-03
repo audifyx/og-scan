@@ -13,12 +13,13 @@ import {
   type CustomClaimable,
 } from "@/lib/orbitx/claim";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function CreatorFeeClaimPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, wallets, select, connect } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
   const [pumpSol, setPumpSol] = useState<number | null>(null);
   const [pumpLoading, setPumpLoading] = useState(false);
   const [pumpClaiming, setPumpClaiming] = useState(false);
@@ -71,7 +72,7 @@ export default function CreatorFeeClaimPanel() {
   }, [connected, publicKey, refreshPump, refreshTokens]);
 
   const claimPump = async () => {
-    if (!publicKey || !signTransaction) return;
+    if (!publicKey || !(sendTransaction || signTransaction)) return;
     setPumpClaiming(true);
     try {
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
@@ -79,8 +80,7 @@ export default function CreatorFeeClaimPanel() {
         toast.error("Nothing to claim");
         return;
       }
-      const signed = await signTransaction(plan.tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, plan.tx);
       await connection.confirmTransaction(sig, "confirmed");
       setPumpSig(sig);
       toast.success(
@@ -98,7 +98,7 @@ export default function CreatorFeeClaimPanel() {
 
   const claimCustom = async (t: OrbitxToken) => {
     const info = claimables[t.mint_address];
-    if (!publicKey || !signTransaction || !info || info === "loading" || info === "error") return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !info || info === "loading" || info === "error") return;
     if (info.withdrawAuthority && info.withdrawAuthority !== publicKey.toBase58()) {
       toast.error("Only the fee authority can claim");
       return;
@@ -111,17 +111,12 @@ export default function CreatorFeeClaimPanel() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        const signed = await signTransaction(tx);
-        lastSig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+        lastSig = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
-        const signedSwap = await signTransaction(plan.tx);
-        lastSig = await connection.sendRawTransaction(signedSwap.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
+        lastSig = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, plan.tx);
         await connection.confirmTransaction(lastSig, "confirmed");
         toast.success(`${t.ticker} claimed → ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
       } catch {

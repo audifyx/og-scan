@@ -11,13 +11,14 @@ import {
   fetchBurnTokenMeta,
   type BurnableToken,
 } from "@/lib/orbitx/rescue";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const PRESETS = [10, 25, 50, 75, 100];
 
 export default function TokenBurnerPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, wallets, select, connect } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
   const [tokens, setTokens] = useState<BurnableToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<string>("");
@@ -74,7 +75,7 @@ export default function TokenBurnerPanel() {
   })();
 
   const burn = async () => {
-    if (!publicKey || !signTransaction || !token || amountRaw <= BigInt(0)) return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !token || amountRaw <= BigInt(0)) return;
     if (amountRaw > token.balanceRaw) {
       toast.error("Amount exceeds balance");
       return;
@@ -85,8 +86,7 @@ export default function TokenBurnerPanel() {
       tx.feePayer = publicKey;
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
-      const signed = await signTransaction(tx);
-      const s = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const s = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
       await connection.confirmTransaction({ signature: s, blockhash, lastValidBlockHeight }, "confirmed");
       setSig(s);
       const rentNote =

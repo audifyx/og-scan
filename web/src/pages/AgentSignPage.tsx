@@ -74,6 +74,13 @@ export default function AgentSignPage() {
 
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
+    // Prefer sendTransaction (signAndSend) — same path as TradingTerminal.
+    if (sendTransaction) {
+      return sendTransaction(tx as VersionedTransaction, connection, {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+    }
     if (signTransaction) {
       const signed = await signTransaction(tx as VersionedTransaction);
       const raw =
@@ -81,12 +88,6 @@ export default function AgentSignPage() {
           ? signed.serialize()
           : (signed as Transaction).serialize();
       return connection.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
-    }
-    if (sendTransaction) {
-      return sendTransaction(tx as VersionedTransaction, connection, {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
     }
     throw new Error("This wallet cannot sign here — open in Phantom.");
   };

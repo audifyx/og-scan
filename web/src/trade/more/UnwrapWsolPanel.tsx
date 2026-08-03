@@ -7,12 +7,13 @@ import {
   buildUnwrapTransactions,
   type NativeSolAccount,
 } from "@/lib/orbitx/rescue";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function UnwrapWsolPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, wallets, select, connect } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
   const [accounts, setAccounts] = useState<NativeSolAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -41,7 +42,7 @@ export default function UnwrapWsolPanel() {
   }, [connection, publicKey]);
 
   const unwrap = async () => {
-    if (!publicKey || !signTransaction || !accounts.length) return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !accounts.length) return;
     setBusy(true);
     try {
       const txs = buildUnwrapTransactions(publicKey, accounts);
@@ -50,8 +51,7 @@ export default function UnwrapWsolPanel() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        const signed = await signTransaction(tx);
-        last = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+        last = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
         await connection.confirmTransaction({ signature: last, blockhash, lastValidBlockHeight }, "confirmed");
       }
       setSig(last);

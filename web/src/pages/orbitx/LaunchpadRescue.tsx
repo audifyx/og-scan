@@ -32,6 +32,7 @@ import {
   type EmptyTokenAccount, type BurnableToken, type NativeSolAccount, type BurnTokenMeta,
 } from "@/lib/orbitx/rescue";
 import { getPumpClaimableSol, buildPumpClaimTransaction } from "@/lib/orbitx/claim";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 import { supabase } from "@/lib/supabase";
 import { Panel, useSolUsd } from "./lpx";
 import { TabHero } from "./TabHero";
@@ -337,8 +338,9 @@ interface OmniScan {
 }
 
 export default function LaunchpadRescue() {
-  const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
+  const { connected, publicKey, connect, wallets, select, signTransaction, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const walletSend = { sendTransaction, signTransaction };
   const solUsd = useSolUsd();
   const [tab, setTab] = useState("scanner");
 
@@ -413,7 +415,7 @@ export default function LaunchpadRescue() {
   const omniClaimableTxCount = omni ? (omni.rent.length > 0 ? 1 : 0) + (omni.native.length > 0 ? 1 : 0) + (omniPumpSol > 0.000005 ? 1 : 0) : 0;
 
   const claimAll = async () => {
-    if (!publicKey || !signTransaction || !omni || omniTotalSol <= 0) return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !omni || omniTotalSol <= 0) return;
     setClaimingAll(true);
     try {
       const balanceBefore = await connection.getBalance(publicKey);
@@ -425,8 +427,7 @@ export default function LaunchpadRescue() {
           tx.feePayer = publicKey;
           const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
           tx.recentBlockhash = blockhash;
-          const signed = await signTransaction(tx);
-          const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+          const sig = await sendWalletTransaction(connection, walletSend, tx);
           await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
           sigs.push(sig);
         }
@@ -438,8 +439,7 @@ export default function LaunchpadRescue() {
           tx.feePayer = publicKey;
           const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
           tx.recentBlockhash = blockhash;
-          const signed = await signTransaction(tx);
-          const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+          const sig = await sendWalletTransaction(connection, walletSend, tx);
           await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
           sigs.push(sig);
         }
@@ -449,8 +449,7 @@ export default function LaunchpadRescue() {
         setClaimMsg("Collecting pump.fun creator fees…");
         try {
           const vtx = await buildPumpClaimTransaction(publicKey);
-          const signed = await signTransaction(vtx);
-          const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+          const sig = await sendWalletTransaction(connection, walletSend, vtx);
           await connection.confirmTransaction(sig, "confirmed");
           sigs.push(sig);
         } catch (e) {
@@ -506,7 +505,7 @@ export default function LaunchpadRescue() {
   }, [connection, publicKey]);
 
   const claimRent = async () => {
-    if (!publicKey || !signTransaction || emptyAccounts.length === 0) return;
+    if (!publicKey || !(sendTransaction || signTransaction) || emptyAccounts.length === 0) return;
     setRefunding(true);
     try {
       const claimedSol = totalReclaimableSol(emptyAccounts);
@@ -517,8 +516,7 @@ export default function LaunchpadRescue() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        const signed = await signTransaction(tx);
-        const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+        const sig = await sendWalletTransaction(connection, walletSend, tx);
         await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
         sigs.push(sig);
       }
@@ -530,8 +528,7 @@ export default function LaunchpadRescue() {
         if (swapLamports > 0) {
           const { swapTransactionB64 } = await buildSolToUsdcSwapTransaction(publicKey, swapLamports);
           const vtx = VersionedTransaction.deserialize(Buffer.from(swapTransactionB64, "base64"));
-          const signedVtx = signAllTransactions ? (await signAllTransactions([vtx]))[0] : vtx;
-          const sig = await connection.sendRawTransaction(signedVtx.serialize(), { skipPreflight: false, maxRetries: 3 });
+          const sig = await sendWalletTransaction(connection, walletSend, vtx);
           await connection.confirmTransaction(sig, "confirmed");
           sigs.push(sig);
           swapped = true;
@@ -599,7 +596,7 @@ export default function LaunchpadRescue() {
     : null;
 
   const executeBurn = async () => {
-    if (!publicKey || !signTransaction || !selectedToken || !burnAmountRaw || burnAmountRaw <= BigInt(0)) return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !selectedToken || !burnAmountRaw || burnAmountRaw <= BigInt(0)) return;
     if (burnAmountRaw > selectedToken.balanceRaw) {
       toast.error("You don't hold that many tokens");
       return;
@@ -610,8 +607,7 @@ export default function LaunchpadRescue() {
       tx.feePayer = publicKey;
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await sendWalletTransaction(connection, walletSend, tx);
       await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
 
       const divisor = 10 ** selectedToken.decimals;

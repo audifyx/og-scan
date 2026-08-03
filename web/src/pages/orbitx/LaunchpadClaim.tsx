@@ -16,14 +16,16 @@ import {
 } from "@/lib/orbitx/claim";
 import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function LaunchpadClaim() {
-  const { connected, publicKey, connect, wallets, select, signTransaction } = useWallet();
+  const { connected, publicKey, connect, wallets, select, signTransaction, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const walletSend = { sendTransaction, signTransaction };
 
   const [pumpSol, setPumpSol] = useState<number | null>(null);
   const [pumpLoading, setPumpLoading] = useState(false);
@@ -85,13 +87,12 @@ export default function LaunchpadClaim() {
   }, [connected, publicKey, refreshPump, refreshTokens]);
 
   const claimPump = async () => {
-    if (!publicKey || !signTransaction) return;
+    if (!publicKey || !(sendTransaction || signTransaction)) return;
     setPumpClaiming(true);
     try {
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
       if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
-      const signed = await signTransaction(plan.tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await sendWalletTransaction(connection, walletSend, plan.tx);
       await connection.confirmTransaction(sig, "confirmed");
       setPumpSig(sig);
       const netSol = plan.netLamports / LAMPORTS_PER_SOL;
@@ -108,8 +109,7 @@ export default function LaunchpadClaim() {
           try {
             const buySol = buyLamports / LAMPORTS_PER_SOL;
             const buyTx = await buildPumpBuyTransaction(publicKey, mint, buySol);
-            const signedBuy = await signTransaction(buyTx);
-            const buySig = await connection.sendRawTransaction(signedBuy.serialize(), { skipPreflight: false, maxRetries: 3 });
+            const buySig = await sendWalletTransaction(connection, walletSend, buyTx);
             await connection.confirmTransaction(buySig, "confirmed");
             toast.success(`Bought back ${buySol.toFixed(4)} SOL of your coin`);
           } catch (e) {
@@ -129,7 +129,7 @@ export default function LaunchpadClaim() {
 
   const claimCustom = async (t: OrbitxToken) => {
     const info = claimables[t.mint_address];
-    if (!publicKey || !signTransaction || !info || info === "loading" || info === "error") return;
+    if (!publicKey || !(sendTransaction || signTransaction) || !info || info === "loading" || info === "error") return;
     if (info.withdrawAuthority && info.withdrawAuthority !== publicKey.toBase58()) {
       toast.error("Only the fee authority wallet can claim this token's fees");
       return;
@@ -142,14 +142,12 @@ export default function LaunchpadClaim() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        const signed = await signTransaction(tx);
-        lastSig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+        lastSig = await sendWalletTransaction(connection, walletSend, tx);
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
-        const signedSwap = await signTransaction(plan.tx);
-        const swapSig = await connection.sendRawTransaction(signedSwap.serialize(), { skipPreflight: false, maxRetries: 3 });
+        const swapSig = await sendWalletTransaction(connection, walletSend, plan.tx);
         await connection.confirmTransaction(swapSig, "confirmed");
         lastSig = swapSig;
         toast.success(`${t.ticker} fees claimed & swapped to ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);

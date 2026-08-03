@@ -203,7 +203,10 @@ export async function appendSolTransferToVersionedTx(
     if (res.value) alts.push(res.value);
   }
   const msg = TransactionMessage.decompile(vtx.message, { addressLookupTableAccounts: alts });
+  // Keep fee payer as the connected wallet so Phantom/Jupiter only need one signature.
+  msg.payerKey = from;
   msg.instructions.push(SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports: Math.floor(lamports) }));
+  // Fresh unsigned v0 message — caller must sign (do not reuse prior partial sigs).
   return new VersionedTransaction(msg.compileToV0Message(alts));
 }
 
