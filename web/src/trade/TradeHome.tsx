@@ -127,12 +127,10 @@ export default function TradeHome() {
             <h1 className="th__title">Markets</h1>
             <p className="th__subtitle">
               {loading || searching
-                ? "Syncing live feeds…"
+                ? "Syncing…"
                 : searchingMode
-                  ? `${list.length} search results`
-                  : `${list.length} coins · ${CATS.find((c) => c.id === cat)?.label} · ${
-                      subTabs.find((t) => t.id === tab)?.label
-                    }`}
+                  ? `${list.length} results`
+                  : `${list.length} coins in ${subTabs.find((t) => t.id === tab)?.label || "feed"}`}
             </p>
           </div>
           <div className="th__live" aria-live="polite">
@@ -142,26 +140,58 @@ export default function TradeHome() {
         </div>
 
         {featured.length > 0 && (
-          <div className="th__featured">
-            {featured.map((c, i) => (
-              <button
-                key={c.mint}
-                type="button"
-                className={`th__feat ${i === 0 ? "th__feat--hero" : "th__feat--side"}`}
-                onClick={() => openCoin(c.mint)}
-              >
-                <CoinLogo coin={c} size="feat" />
-                <div className="min-w-0 flex-1">
-                  <p className="th__feat-label">{i === 0 ? "Lead mover" : `#${i + 1} in feed`}</p>
-                  <p className="th__feat-sym truncate">{c.symbol}</p>
-                  <p className="th__feat-meta">
-                    {fmtUsd(c.price)} · mcap {fmtUsd(c.mcap)}
-                  </p>
+          <section className="th__spotlight" aria-label="Top in feed">
+            {/* Mobile: single compact lead row */}
+            <button
+              type="button"
+              className="th__spot-mobile"
+              onClick={() => openCoin(featured[0].mint)}
+            >
+              <CoinLogo coin={featured[0]} size="feat" />
+              <div className="th__spot-mobile-body">
+                <div className="th__spot-mobile-top">
+                  <span className="th__spot-tag">Lead</span>
+                  <span className={`th__chg ${chgClass(featured[0].change24h)}`}>
+                    {fmtPct(featured[0].change24h)}
+                  </span>
                 </div>
-                <span className={`th__chg ${chgClass(c.change24h)}`}>{fmtPct(c.change24h)}</span>
-              </button>
-            ))}
-          </div>
+                <p className="th__spot-sym">{featured[0].symbol}</p>
+                <p className="th__spot-meta">
+                  {fmtUsd(featured[0].price)}
+                  <span className="th__spot-dot">·</span>
+                  MCap {fmtUsd(featured[0].mcap)}
+                </p>
+              </div>
+            </button>
+
+            {/* Desktop / tablet: equal professional tiles */}
+            <div className="th__spot-desk">
+              {featured.map((c, i) => (
+                <button
+                  key={c.mint}
+                  type="button"
+                  className="th__spot-tile"
+                  onClick={() => openCoin(c.mint)}
+                >
+                  <div className="th__spot-tile-head">
+                    <span className="th__spot-tag">{i === 0 ? "Lead" : `Top ${i + 1}`}</span>
+                    <span className={`th__chg ${chgClass(c.change24h)}`}>{fmtPct(c.change24h)}</span>
+                  </div>
+                  <div className="th__spot-tile-row">
+                    <CoinLogo coin={c} size="feat" />
+                    <div className="min-w-0">
+                      <p className="th__spot-sym truncate">{c.symbol}</p>
+                      <p className="th__spot-meta truncate">{c.name}</p>
+                    </div>
+                  </div>
+                  <div className="th__spot-tile-foot">
+                    <span>{fmtUsd(c.price)}</span>
+                    <span>MCap {fmtUsd(c.mcap)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
 
         <div className="th__cats" role="tablist" aria-label="Market categories">
