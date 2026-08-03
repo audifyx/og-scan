@@ -16,8 +16,15 @@ import { VersionedTransaction } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
   ArrowUpRight, ArrowDownLeft, Check,
-  Wallet, Activity, X, Loader2, Users,
+  Wallet, Activity, X, Loader2, Users, Bell,
 } from "lucide-react";
+import {
+  ALERT_KINDS,
+  createPriceAlert,
+  fetchAlerts,
+  removeAlert,
+  type AlertKind,
+} from "@/trade/tradeAlerts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -368,7 +375,7 @@ function fmtNum(n: number): string {
    ═══════════════════════════════════════════════════════════════════ */
 
 export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: TradeTerminalProps = {}) => {
-  const { publicKey, connected, wallets, select, connect, disconnect, sendTransaction } = useWallet();
+  const { publicKey, connected, wallets, select, connect, disconnect, sendTransaction, signMessage } = useWallet();
   const { connection } = useConnection();
   const deskMode = mode === "desk";
 
@@ -390,6 +397,17 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [buyAmt, setBuyAmt] = useState("0.25");
   const [sellPct, setSellPct] = useState(50);
   const [slippage, setSlippage] = useState(10);
+  const [orderMode, setOrderMode] = useState<"market" | AlertKind>("market");
+  const [alertPrice, setAlertPrice] = useState("");
+  const [alertChan, setAlertChan] = useState<"telegram" | "webhook">(
+    () => (typeof localStorage !== "undefined" && (localStorage.getItem("ogdex.alertChan") as any)) || "telegram",
+  );
+  const [alertTarget, setAlertTarget] = useState(
+    () => (typeof localStorage !== "undefined" && localStorage.getItem("ogdex.alertTarget")) || "",
+  );
+  const [alertBusy, setAlertBusy] = useState(false);
+  const [alertMsg, setAlertMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mintAlerts, setMintAlerts] = useState<any[]>([]);
   const [tradeBusy, setTradeBusy] = useState(false);
   const [tradeStage, setTradeStage] = useState("");
   const [tradeErr, setTradeErr] = useState("");
@@ -696,144 +714,396 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     ? dexScreenerEmbedUrl(chartRef, TIMEFRAME_CONFIG[timeframe].dexInterval)
     : "";
   const marketSubTabs = TABS_BY_CATEGORY[marketCategory];
+  const curPrice = t?.price || 0;
+
+  const refreshMintAlerts = useCallback(async () => {
+    if (!publicKey || !signMessage || !selectedMint) {
+      setMintAlerts([]);
+      return;
+    }
+    try {
+      const d = await fetchAlerts(publicKey.toBase58(), signMessage);
+      const list = Array.isArray(d?.alerts) ? d.alerts : [];
+      setMintAlerts(list.filter((a: any) => a.mint === selectedMint));
+    } catch {
+      /* ignore */
+    }
+  }, [publicKey, signMessage, selectedMint]);
+
+  useEffect(() => {
+    if (orderMode !== "market") void refreshMintAlerts();
+  }, [orderMode, refreshMintAlerts]);
+
+  useEffect(() => {
+    if (!curPrice || alertPrice) return;
+    if (orderMode === "market") return;
+    setAlertPrice(
+      curPrice < 0.01 ? curPrice.toPrecision(4) : curPrice.toFixed(curPrice < 1 ? 6 : 4),
+    );
+  }, [orderMode, curPrice]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCreateAlert = useCallback(async () => {
+    setAlertMsg(null);
+    if (!connected || !publicKey || !signMessage) {
+      setShowWalletPicker(true);
+      return;
+    }
+    if (orderMode === "market") return;
+    const v = Number(alertPrice);
+    if (!Number.isFinite(v) || v <= 0) {
+      setAlertMsg({ ok: false, text: "Enter a target price in USD" });
+      return;
+    }
+    const tgt = alertTarget.trim();
+    if (alertChan === "telegram" ? !/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(tgt) : !/^https?:\/\//i.test(tgt)) {
+      setAlertMsg({
+        ok: false,
+        text: alertChan === "telegram" ? "Enter Telegram chat ID or @channel" : "Enter https:// webhook URL",
+      });
+      return;
+    }
+    setAlertBusy(true);
+    try {
+      localStorage.setItem("ogdex.alertChan", alertChan);
+      localStorage.setItem("ogdex.alertTarget", tgt);
+      const d = await createPriceAlert({
+        wallet: publicKey.toBase58(),
+        signMessage,
+        mint: selectedMint,
+        symbol: t?.symbol,
+        kind: orderMode,
+        valueUsd: v,
+        channel: alertChan,
+        target: tgt,
+      });
+      if (!d?.ok) throw new Error(d?.error || "Could not create alert");
+      setAlertMsg({ ok: true, text: `${ALERT_KINDS[orderMode].label} set at $${v}` });
+      toast({ title: "Alert created", description: `${ALERT_KINDS[orderMode].label} @ $${v}` });
+      void refreshMintAlerts();
+    } catch (e: any) {
+      const m = String(e?.message || e || "Failed");
+      setAlertMsg({ ok: false, text: /reject|cancel/i.test(m) ? "Sign cancelled in Phantom" : m });
+    } finally {
+      setAlertBusy(false);
+    }
+  }, [
+    connected,
+    publicKey,
+    signMessage,
+    orderMode,
+    alertPrice,
+    alertTarget,
+    alertChan,
+    selectedMint,
+    t?.symbol,
+    refreshMintAlerts,
+  ]);
 
   const SwapPanel = () => (
-    <div className="p-4 space-y-3 border-b border-white/[0.07]">
-      <div className="flex rounded-lg overflow-hidden border border-white/[0.07]">
-        <button
-          type="button"
-          onClick={() => setSwapMode("buy")}
-          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-            swapMode === "buy"
-              ? "bg-green-500/20 text-green-400 border-b-2 border-green-400"
-              : "text-white/40 hover:text-white/60"
-          }`}
-        >
-          Buy
-        </button>
-        <button
-          type="button"
-          onClick={() => setSwapMode("sell")}
-          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-            swapMode === "sell"
-              ? "bg-red-500/20 text-red-400 border-b-2 border-red-400"
-              : "text-white/40 hover:text-white/60"
-          }`}
-        >
-          Sell
-        </button>
+    <div className="space-y-3 border-b border-white/[0.07] p-4">
+      {/* Order type */}
+      <div className="grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+        {(
+          [
+            ["market", "Market"],
+            ["limit", "Limit"],
+            ["tp", "TP"],
+            ["stop", "Stop"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              setOrderMode(id);
+              setAlertMsg(null);
+              if (id !== "market" && curPrice && !alertPrice) {
+                setAlertPrice(
+                  curPrice < 0.01 ? curPrice.toPrecision(4) : curPrice.toFixed(curPrice < 1 ? 6 : 4),
+                );
+              }
+              if (id === "limit") setSwapMode("buy");
+              if (id === "tp" || id === "stop") setSwapMode("sell");
+            }}
+            className={`rounded-lg py-2 text-[11px] font-bold transition-colors ${
+              orderMode === id ? "bg-white text-black" : "text-white/40 hover:text-white/70"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {swapMode === "buy" ? (
-        <div className="space-y-2">
-          <label className="text-[10px] text-white/35 uppercase tracking-wide">Amount (SOL)</label>
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={buyAmt}
-            onChange={(e) => setBuyAmt(e.target.value)}
-            className="h-10 text-sm font-mono bg-white/[0.04] border-white/[0.07]"
-            placeholder="0.25"
-          />
-          <div className="flex gap-1.5">
-            {BUY_PRESETS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setBuyAmt(String(p))}
-                className={`flex-1 py-1.5 rounded-md text-[11px] font-mono border transition-colors ${
-                  buyAmt === String(p)
-                    ? "border-[#ffffff]/50 bg-[#ffffff]/15 text-white"
-                    : "border-white/[0.07] text-white/45 hover:text-white/70"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+      {orderMode === "market" ? (
+        <>
+          <div className="flex overflow-hidden rounded-lg border border-white/[0.07]">
+            <button
+              type="button"
+              onClick={() => setSwapMode("buy")}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                swapMode === "buy"
+                  ? "border-b-2 border-green-400 bg-green-500/20 text-green-400"
+                  : "text-white/40 hover:text-white/60"
+              }`}
+            >
+              Buy
+            </button>
+            <button
+              type="button"
+              onClick={() => setSwapMode("sell")}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                swapMode === "sell"
+                  ? "border-b-2 border-red-400 bg-red-500/20 text-red-400"
+                  : "text-white/40 hover:text-white/60"
+              }`}
+            >
+              Sell
+            </button>
           </div>
-        </div>
+
+          {swapMode === "buy" ? (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wide text-white/35">Amount (SOL)</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={buyAmt}
+                onChange={(e) => setBuyAmt(e.target.value)}
+                className="h-10 border-white/[0.07] bg-white/[0.04] font-mono text-sm"
+                placeholder="0.25"
+              />
+              <div className="flex gap-1.5">
+                {BUY_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setBuyAmt(String(p))}
+                    className={`flex-1 rounded-md border py-1.5 font-mono text-[11px] transition-colors ${
+                      buyAmt === String(p)
+                        ? "border-white/50 bg-white/15 text-white"
+                        : "border-white/[0.07] text-white/45 hover:text-white/70"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wide text-white/35">Sell %</label>
+              <div className="flex gap-1.5">
+                {SELL_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setSellPct(p)}
+                    className={`flex-1 rounded-md border py-1.5 font-mono text-[11px] transition-colors ${
+                      sellPct === p
+                        ? "border-red-400/50 bg-red-500/15 text-red-300"
+                        : "border-white/[0.07] text-white/45 hover:text-white/70"
+                    }`}
+                  >
+                    {p}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <label className="shrink-0 text-[10px] uppercase tracking-wide text-white/35">Slippage</label>
+            <Input
+              type="number"
+              min="0.1"
+              max="50"
+              step="0.5"
+              value={slippage}
+              onChange={(e) => setSlippage(Number(e.target.value) || 10)}
+              className="h-8 w-20 border-white/[0.07] bg-white/[0.04] font-mono text-xs"
+            />
+            <span className="text-[10px] text-white/30">%</span>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => void handleSwap()}
+            disabled={tradeBusy || !selectedMint}
+            className={`h-12 w-full rounded-xl text-sm font-semibold disabled:opacity-60 ${
+              swapMode === "buy"
+                ? "bg-green-500 text-black hover:bg-green-600"
+                : "bg-red-500 text-white hover:bg-red-600"
+            }`}
+          >
+            {tradeBusy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {tradeStage || "Working…"}
+              </>
+            ) : !connected ? (
+              <>
+                <Wallet className="mr-2 h-4 w-4" />
+                Connect Phantom
+              </>
+            ) : swapMode === "buy" ? (
+              <>
+                <ArrowDownLeft className="mr-2 h-4 w-4" />
+                Buy {t?.symbol || "token"}
+              </>
+            ) : (
+              <>
+                <ArrowUpRight className="mr-2 h-4 w-4" />
+                Sell {sellPct}% {t?.symbol || "token"}
+              </>
+            )}
+          </Button>
+
+          {tradeErr && <p className="text-center text-[11px] text-red-400">{tradeErr}</p>}
+          {tradeSig && (
+            <a
+              href={`https://solscan.io/tx/${tradeSig}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1 text-[11px] text-white hover:underline"
+            >
+              Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          <p className="text-center text-[10px] text-white/25">Market · sign in Phantom</p>
+        </>
       ) : (
-        <div className="space-y-2">
-          <label className="text-[10px] text-white/35 uppercase tracking-wide">Sell %</label>
-          <div className="flex gap-1.5">
-            {SELL_PRESETS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setSellPct(p)}
-                className={`flex-1 py-1.5 rounded-md text-[11px] font-mono border transition-colors ${
-                  sellPct === p
-                    ? "border-red-400/50 bg-red-500/15 text-red-300"
-                    : "border-white/[0.07] text-white/45 hover:text-white/70"
-                }`}
-              >
-                {p}%
-              </button>
-            ))}
+        <>
+          <p className="text-[11px] leading-relaxed text-white/45">{ALERT_KINDS[orderMode].help}</p>
+          <div>
+            <label className="text-[10px] uppercase tracking-wide text-white/35">Target price (USD)</label>
+            <Input
+              value={alertPrice}
+              onChange={(e) => setAlertPrice(e.target.value.replace(/[^0-9.]/g, ""))}
+              className="mt-1 h-10 border-white/10 bg-white/[0.04] font-mono text-sm"
+              placeholder="0.0"
+              inputMode="decimal"
+            />
+            {curPrice > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <span className="text-[10px] text-white/30">
+                  Now ${curPrice < 0.01 ? curPrice.toPrecision(4) : curPrice.toFixed(curPrice < 1 ? 6 : 4)}
+                </span>
+                {(orderMode === "limit" || orderMode === "stop"
+                  ? [-5, -10, -20]
+                  : [5, 10, 25]
+                ).map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => {
+                      const p = curPrice * (1 + pct / 100);
+                      setAlertPrice(p < 0.01 ? p.toPrecision(4) : p.toFixed(p < 1 ? 6 : 4));
+                    }}
+                    className="rounded border border-white/10 px-2 py-0.5 font-mono text-[10px] text-white/45 hover:text-white"
+                  >
+                    {pct > 0 ? "+" : ""}
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+
+          <div className="grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1">
+            <button
+              type="button"
+              onClick={() => setAlertChan("telegram")}
+              className={`rounded-md py-2 text-[11px] font-semibold ${
+                alertChan === "telegram" ? "bg-white text-black" : "text-white/40"
+              }`}
+            >
+              Telegram
+            </button>
+            <button
+              type="button"
+              onClick={() => setAlertChan("webhook")}
+              className={`rounded-md py-2 text-[11px] font-semibold ${
+                alertChan === "webhook" ? "bg-white text-black" : "text-white/40"
+              }`}
+            >
+              Webhook
+            </button>
+          </div>
+          <Input
+            value={alertTarget}
+            onChange={(e) => setAlertTarget(e.target.value)}
+            placeholder={alertChan === "telegram" ? "Telegram chat ID or @channel" : "https://discord/webhook…"}
+            className="h-10 border-white/10 bg-white/[0.04] text-sm"
+          />
+
+          <Button
+            type="button"
+            onClick={() => void handleCreateAlert()}
+            disabled={alertBusy || !selectedMint}
+            className="h-12 w-full rounded-xl bg-white text-sm font-bold text-black hover:bg-white/90 disabled:opacity-60"
+          >
+            {alertBusy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sign to save…
+              </>
+            ) : !connected ? (
+              <>
+                <Wallet className="mr-2 h-4 w-4" />
+                Connect Phantom
+              </>
+            ) : (
+              <>
+                <Bell className="mr-2 h-4 w-4" />
+                Set {ALERT_KINDS[orderMode].label}
+              </>
+            )}
+          </Button>
+
+          {alertMsg && (
+            <p className={`text-center text-[11px] ${alertMsg.ok ? "text-green-400" : "text-red-400"}`}>
+              {alertMsg.text}
+            </p>
+          )}
+          <p className="text-center text-[10px] leading-relaxed text-white/25">
+            Notify-only · Phantom must sign the alert · you still place the trade when it fires
+          </p>
+
+          {mintAlerts.length > 0 && (
+            <div className="space-y-1.5 rounded-xl border border-white/10 bg-black/40 p-2">
+              <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                Active on this coin
+              </p>
+              {mintAlerts.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between rounded-lg bg-white/[0.04] px-2.5 py-2 text-[11px]"
+                >
+                  <div>
+                    <p className="font-semibold text-white/80">
+                      {a.type === "price_above" ? "Above" : "Below"} ${a.value}
+                    </p>
+                    <p className="text-[10px] text-white/30">{a.channel}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-white/35 hover:text-red-400"
+                    onClick={() => {
+                      if (!publicKey || !signMessage) return;
+                      void removeAlert(publicKey.toBase58(), signMessage, a.id).then(() =>
+                        refreshMintAlerts(),
+                      );
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
-
-      <div className="flex items-center gap-2">
-        <label className="text-[10px] text-white/35 uppercase tracking-wide shrink-0">Slippage</label>
-        <Input
-          type="number"
-          min="0.1"
-          max="50"
-          step="0.5"
-          value={slippage}
-          onChange={(e) => setSlippage(Number(e.target.value) || 10)}
-          className="h-8 text-xs font-mono bg-white/[0.04] border-white/[0.07] w-20"
-        />
-        <span className="text-[10px] text-white/30">%</span>
-      </div>
-
-      <Button
-        type="button"
-        onClick={() => void handleSwap()}
-        disabled={tradeBusy || !selectedMint}
-        className={`w-full h-12 rounded-xl font-semibold text-sm disabled:opacity-60 ${
-          swapMode === "buy"
-            ? "bg-green-500 hover:bg-green-600 text-black"
-            : "bg-red-500 hover:bg-red-600 text-white"
-        }`}
-      >
-        {tradeBusy ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            {tradeStage || "Working…"}
-          </>
-        ) : !connected ? (
-          <>
-            <Wallet className="h-4 w-4 mr-2" />
-            Connect Phantom
-          </>
-        ) : swapMode === "buy" ? (
-          <>
-            <ArrowDownLeft className="h-4 w-4 mr-2" />
-            Buy {t?.symbol || "token"}
-          </>
-        ) : (
-          <>
-            <ArrowUpRight className="h-4 w-4 mr-2" />
-            Sell {sellPct}% {t?.symbol || "token"}
-          </>
-        )}
-      </Button>
-
-      {tradeErr && <p className="text-[11px] text-red-400 text-center">{tradeErr}</p>}
-      {tradeSig && (
-        <a
-          href={`https://solscan.io/tx/${tradeSig}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1 text-[11px] text-[#ffffff] hover:underline"
-        >
-          Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
-        </a>
-      )}
-      <p className="text-[10px] text-white/25 text-center">Sign with Phantom · OrbitX trade API</p>
     </div>
   );
 
