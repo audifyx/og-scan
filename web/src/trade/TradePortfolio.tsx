@@ -55,9 +55,11 @@ export default function TradePortfolio() {
     setMineLoading(true);
     try {
       const w = await fetchWallet(myAddr);
-      setMine(w);
+      setMine(w?.ok ? w : { ok: false, error: w?.error || "Could not load wallet", totalUsd: 0, holdings: [] });
       pushRecentWallet(myAddr);
       setRecent(getRecentWallets());
+    } catch {
+      setMine({ ok: false, error: "Could not load wallet", totalUsd: 0, holdings: [] });
     } finally {
       setMineLoading(false);
     }

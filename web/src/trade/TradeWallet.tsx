@@ -82,8 +82,13 @@ export default function TradeWallet() {
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-black px-6 text-center">
         <Wallet className="h-8 w-8 text-white/20" />
         <p className="text-sm text-white/40">{d?.error || "Could not load wallet"}</p>
-        <button type="button" onClick={() => navigate(-1)} className="text-sm underline text-white/60">
-          Back
+        <p className="max-w-xs font-mono text-[10px] text-white/25 break-all">{address}</p>
+        <button
+          type="button"
+          onClick={() => navigate("/trade/portfolio")}
+          className="text-sm underline text-white/60"
+        >
+          Back to portfolio
         </button>
       </div>
     );

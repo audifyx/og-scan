@@ -49,8 +49,16 @@ export const ProfitCurveGenerator = () => {
     setLoading(true);
     setPnlData(null);
     try {
-      const { data } = await solanaTracker("getWalletPnL", { walletAddress });
-      setPnlData(data || { totalPnL: 0, winRate: "0", tradeCount: 0, bestTrade: 0, worstTrade: 0, avgTrade: 0 });
+      const { data, error } = await solanaTracker("getWalletPnL", { walletAddress });
+      if (error) throw new Error(error.message || "PnL failed");
+      setPnlData({
+        totalPnL: Number(data?.totalPnL ?? data?.estimatedPnL ?? data?.netUsd) || 0,
+        winRate: String(data?.winRate ?? "0"),
+        tradeCount: Number(data?.tradeCount ?? data?.swapCount) || 0,
+        bestTrade: Number(data?.bestTrade) || 0,
+        worstTrade: Number(data?.worstTrade) || 0,
+        avgTrade: Number(data?.avgTrade) || 0,
+      });
       toast({ title: "Profit curve generated" });
     } catch {
       toast({ title: "Failed to generate curve", variant: "destructive" });

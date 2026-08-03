@@ -196,39 +196,108 @@ export async function getWalletOverview(walletAddress: string) {
 }
 
 /* ───────── action: getWalletPnL ─────────────────────────────────────── */
+/** Unified wallet analyze payload for WalletProfiler / ProfitCurve / Tools. */
 export async function getWalletPnL(walletAddress: string) {
+  const empty = {
+    currentValue: 0,
+    solBalance: 0,
+    tokenCount: 0,
+    tradeCount: 0,
+    estimatedPnL: 0,
+    winRate: "0",
+    totalPnL: 0,
+    bestTrade: 0,
+    worstTrade: 0,
+    avgTrade: 0,
+    totalInSol: 0,
+    totalOutSol: 0,
+    netSol: 0,
+    netUsd: 0,
+    swapCount: 0,
+    transactionCount: 0,
+    solPrice: 0,
+    realizedPnlUsd: 0,
+    unrealizedPnlUsd: 0,
+    address: walletAddress,
+    holdings: [] as any[],
+  };
+
   try {
+    // Prefer server ogdex wallet (realized/unrealized PnL + holdings).
+    try {
+      const r = await fetch(`/api/ogdex/wallet?address=${encodeURIComponent(walletAddress)}`);
+      const d = await r.json();
+      if (d?.ok) {
+        const pnl = d.pnl || {};
+        const wrRaw = pnl.winRate != null ? Number(pnl.winRate) : null;
+        const winRate = wrRaw == null ? 0 : wrRaw > 1 ? wrRaw : wrRaw * 100;
+        const totalPnL = Number(pnl.totalPnlUsd ?? pnl.realizedPnlUsd) || 0;
+        const trades = Number(pnl.closedTrades ?? pnl.totalSwaps) || 0;
+        const solPrice = Number(d.solPrice) || 0;
+        return {
+          ...empty,
+          currentValue: Number(d.totalUsd) || 0,
+          solBalance: Number(d.sol) || 0,
+          tokenCount: Number(d.tokenCount) || (d.holdings?.length ?? 0),
+          tradeCount: trades,
+          estimatedPnL: totalPnL,
+          winRate: String(Math.round(winRate)),
+          totalPnL,
+          bestTrade: Number(pnl.bestTradeUsd) || 0,
+          worstTrade: Number(pnl.worstTradeUsd) || 0,
+          avgTrade: trades > 0 ? totalPnL / trades : Number(pnl.avgTradeUsd) || 0,
+          netUsd: totalPnL,
+          netSol: solPrice > 0 ? totalPnL / solPrice : 0,
+          swapCount: trades,
+          transactionCount: trades,
+          solPrice,
+          realizedPnlUsd: Number(pnl.realizedPnlUsd) || 0,
+          unrealizedPnlUsd: Number(pnl.unrealizedPnlUsd) || 0,
+          address: d.address || walletAddress,
+          holdings: Array.isArray(d.holdings) ? d.holdings : [],
+        };
+      }
+    } catch {
+      /* fall through to Helius transfer estimate */
+    }
+
     const txs = await heliusTxs(walletAddress, 100);
-
-    // Compute basic PnL from native transfers
-    let totalIn = 0, totalOut = 0, swapCount = 0, txCount = txs.length;
-
+    let totalIn = 0, totalOut = 0, swapCount = 0;
     for (const tx of txs) {
       const type = tx.type || "";
       if (type === "SWAP" || type.includes("SWAP")) swapCount++;
-
       for (const nt of tx.nativeTransfers || []) {
         if (nt.toUserAccount === walletAddress) totalIn += nt.amount / 1e9;
         if (nt.fromUserAccount === walletAddress) totalOut += nt.amount / 1e9;
       }
     }
-
+    const overview = await getWalletOverview(walletAddress);
     const priceMap = await jupPrice([SOL_MINT]);
-    const solPrice = priceMap[SOL_MINT]?.usdPrice ?? 0;
+    const solPrice = priceMap[SOL_MINT]?.usdPrice ?? overview.solPrice ?? 0;
     const netSol = totalIn - totalOut;
-
+    const netUsd = netSol * solPrice;
     return {
+      ...empty,
+      currentValue: overview.totalValueUsd || 0,
+      solBalance: overview.sol || 0,
+      tokenCount: overview.tokenCount || 0,
+      tradeCount: swapCount,
+      estimatedPnL: netUsd,
+      winRate: "0",
+      totalPnL: netUsd,
+      avgTrade: swapCount > 0 ? netUsd / swapCount : 0,
       totalInSol: totalIn,
       totalOutSol: totalOut,
       netSol,
-      netUsd: netSol * solPrice,
+      netUsd,
       swapCount,
-      transactionCount: txCount,
+      transactionCount: txs.length,
       solPrice,
+      holdings: overview.tokens || [],
     };
   } catch (e) {
     console.error("getWalletPnL error:", e);
-    return { totalInSol: 0, totalOutSol: 0, netSol: 0, netUsd: 0, swapCount: 0, transactionCount: 0, solPrice: 0 };
+    return empty;
   }
 }
 
