@@ -961,7 +961,7 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
                 </div>
               </button>
             ))
-          ) : marketTab === "positions" ? (
+          ) : (
             connected && positions.length > 0 ? (
               positions.slice(0, 30).map((pos) => {
                 const sym = pos.content?.metadata?.symbol || "???";
