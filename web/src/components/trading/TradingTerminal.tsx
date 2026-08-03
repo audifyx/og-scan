@@ -25,6 +25,7 @@ import {
   removeAlert,
   type AlertKind,
 } from "@/trade/tradeAlerts";
+import { getBuyPresets, getSellPresets, saveBuyPresets } from "@/trade/tradePresets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -325,9 +326,6 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
   return def;
 }
 
-const BUY_PRESETS = [0.1, 0.25, 0.5, 1];
-const SELL_PRESETS = [25, 50, 75, 100];
-
 /* ═══════════════════════════════════════════════════════════════════
    Formatting
    ═══════════════════════════════════════════════════════════════════ */
@@ -395,6 +393,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [topTradersLoading, setTopTradersLoading] = useState(false);
   const [swapMode, setSwapMode] = useState<"buy" | "sell">("buy");
   const [buyAmt, setBuyAmt] = useState("0.25");
+  const [buyPresets, setBuyPresets] = useState<number[]>(() => getBuyPresets());
+  const [sellPresets] = useState<number[]>(() => getSellPresets());
+  const [editPresetsOpen, setEditPresetsOpen] = useState(false);
+  const [presetDraft, setPresetDraft] = useState("");
   const [sellPct, setSellPct] = useState(50);
   const [slippage, setSlippage] = useState(10);
   const [orderMode, setOrderMode] = useState<"market" | AlertKind>("market");
@@ -863,46 +865,89 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
           {swapMode === "buy" ? (
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-wide text-white/35">Amount (SOL)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] uppercase tracking-wide text-white/35">Amount (SOL)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPresetDraft(buyPresets.join(", "));
+                    setEditPresetsOpen((v) => !v);
+                  }}
+                  className="text-[10px] font-semibold text-white/40 underline hover:text-white/70"
+                >
+                  {editPresetsOpen ? "Close" : "Edit presets"}
+                </button>
+              </div>
               <Input
                 type="number"
                 min="0"
                 step="0.01"
                 value={buyAmt}
                 onChange={(e) => setBuyAmt(e.target.value)}
-                className="h-10 border-white/[0.07] bg-white/[0.04] font-mono text-sm"
+                className="h-11 border-white/[0.1] bg-white/[0.05] font-mono text-base font-semibold"
                 placeholder="0.25"
               />
-              <div className="flex gap-1.5">
-                {BUY_PRESETS.map((p) => (
+              <div className="grid grid-cols-4 gap-2">
+                {buyPresets.map((p) => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => setBuyAmt(String(p))}
-                    className={`flex-1 rounded-md border py-1.5 font-mono text-[11px] transition-colors ${
+                    className={`rounded-xl border py-2.5 font-mono text-[12px] font-bold transition-colors ${
                       buyAmt === String(p)
-                        ? "border-white/50 bg-white/15 text-white"
-                        : "border-white/[0.07] text-white/45 hover:text-white/70"
+                        ? "border-white bg-white text-black"
+                        : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25 hover:text-white"
                     }`}
                   >
                     {p}
                   </button>
                 ))}
               </div>
+              {editPresetsOpen && (
+                <div className="rounded-xl border border-white/10 bg-black/50 p-2.5 space-y-2">
+                  <p className="text-[10px] text-white/40">Comma-separated SOL amounts (2–6)</p>
+                  <Input
+                    value={presetDraft}
+                    onChange={(e) => setPresetDraft(e.target.value)}
+                    placeholder="0.05, 0.1, 0.25, 0.5, 1"
+                    className="h-9 border-white/10 bg-white/[0.04] font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nums = presetDraft
+                        .split(/[,\s]+/)
+                        .map((s) => Number(s.trim()))
+                        .filter((n) => Number.isFinite(n) && n > 0);
+                      if (nums.length < 2) {
+                        toast({ title: "Need at least 2 amounts", variant: "destructive" });
+                        return;
+                      }
+                      saveBuyPresets(nums);
+                      setBuyPresets(getBuyPresets());
+                      setEditPresetsOpen(false);
+                      toast({ title: "Buy presets saved" });
+                    }}
+                    className="h-9 w-full rounded-lg bg-white text-xs font-bold text-black"
+                  >
+                    Save presets
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-wide text-white/35">Sell %</label>
-              <div className="flex gap-1.5">
-                {SELL_PRESETS.map((p) => (
+              <div className="grid grid-cols-4 gap-2">
+                {sellPresets.map((p) => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => setSellPct(p)}
-                    className={`flex-1 rounded-md border py-1.5 font-mono text-[11px] transition-colors ${
+                    className={`rounded-xl border py-2.5 font-mono text-[12px] font-bold transition-colors ${
                       sellPct === p
-                        ? "border-red-400/50 bg-red-500/15 text-red-300"
-                        : "border-white/[0.07] text-white/45 hover:text-white/70"
+                        ? "border-red-400 bg-red-500/20 text-red-300"
+                        : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/25"
                     }`}
                   >
                     {p}%

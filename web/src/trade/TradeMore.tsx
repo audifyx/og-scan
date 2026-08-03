@@ -57,6 +57,17 @@ export default function TradeMore() {
     });
   }, [query, cat]);
 
+  const byCategory = useMemo(() => {
+    const map = new Map<string, TradeTool[]>();
+    for (const t of filtered) {
+      if (t.featured) continue;
+      const list = map.get(t.category) || [];
+      list.push(t);
+      map.set(t.category, list);
+    }
+    return TOOL_CATEGORIES.map((c) => ({ cat: c, tools: map.get(c) || [] })).filter((g) => g.tools.length);
+  }, [filtered]);
+
   const openTool = (tool: TradeTool) => {
     if (tool.kind === "link" && tool.href) {
       navigate(tool.href);
@@ -65,15 +76,13 @@ export default function TradeMore() {
     setParams({ tool: tool.id });
   };
 
-  const closeTool = () => setParams({});
-
   if (active) {
     return (
-      <div className="flex h-full flex-col overflow-hidden bg-black">
+      <div className="flex h-full flex-col overflow-hidden bg-[#060606]">
         <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2.5">
           <button
             type="button"
-            onClick={closeTool}
+            onClick={() => setParams({})}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 px-3 text-xs text-white/70"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> More
@@ -96,11 +105,13 @@ export default function TradeMore() {
   const featured = TRADE_TOOLS.filter((t) => t.featured);
 
   return (
-    <div className="h-full overflow-y-auto bg-black px-3 pb-6 pt-4">
+    <div className="h-full overflow-y-auto bg-[#060606] px-4 pb-8 pt-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-base font-bold">More</h1>
-          <p className="mt-0.5 text-xs text-white/40">{TOOL_COUNT} advanced tools & features</p>
+          <h1 className="text-[26px] font-black tracking-tight" style={{ fontFamily: '"Bricolage Grotesque", system-ui' }}>
+            More
+          </h1>
+          <p className="mt-0.5 text-[12px] text-white/40">{TOOL_COUNT} tools · structured by category</p>
         </div>
         <Wrench className="h-5 w-5 text-white/25" />
       </div>
@@ -113,7 +124,7 @@ export default function TradeMore() {
               key={t.id}
               type="button"
               onClick={() => openTool(t)}
-              className="rounded-2xl border border-white/15 bg-[#0a0a0a] p-4 text-left transition hover:border-white/35 hover:bg-white/[0.04]"
+              className="rounded-2xl border border-white/12 bg-white/[0.03] p-4 text-left transition hover:border-white/25 hover:bg-white/[0.05]"
             >
               <Icon className="h-5 w-5 text-white" />
               <div className="mt-2 text-sm font-bold">{t.name}</div>
@@ -129,18 +140,18 @@ export default function TradeMore() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tools…"
-          className="h-11 w-full rounded-2xl border border-white/10 bg-[#050505] pl-10 pr-3 text-sm outline-none focus:border-white/30"
+          className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-10 pr-3 text-sm outline-none focus:border-white/25"
         />
       </div>
 
-      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {["All", ...TOOL_CATEGORIES].map((c) => (
           <button
             key={c}
             type="button"
             onClick={() => setCat(c)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-              cat === c ? "bg-white text-black" : "border border-white/10 text-white/50"
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-semibold ${
+              cat === c ? "bg-white text-black" : "border border-white/10 text-white/45"
             }`}
           >
             {c}
@@ -148,32 +159,38 @@ export default function TradeMore() {
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {filtered.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => openTool(t)}
-            className="rounded-2xl border border-white/10 bg-[#050505] p-3 text-left transition hover:border-white/25"
-          >
-            <div className="flex items-start justify-between gap-1">
-              <span className="text-[11px] font-medium text-white/35">{t.category}</span>
-              {t.kind === "link" ? <ExternalLink className="h-3 w-3 shrink-0 text-white/25" /> : null}
+      <div className="mt-5 space-y-6">
+        {byCategory.map((g) => (
+          <section key={g.cat}>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/35">
+              {g.cat}
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
+              {g.tools.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => openTool(t)}
+                  className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3 text-left transition hover:border-white/20"
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-[13px] font-bold leading-tight">{t.name}</span>
+                    {t.kind === "link" ? <ExternalLink className="h-3 w-3 shrink-0 text-white/25" /> : null}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/40">{t.description}</p>
+                </button>
+              ))}
             </div>
-            <div className="mt-1 text-[13px] font-bold leading-tight">{t.name}</div>
-            <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/40">{t.description}</div>
-          </button>
+          </section>
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <p className="mt-10 text-center text-sm text-white/35">No tools match</p>
-      )}
+      {!filtered.length && <p className="mt-10 text-center text-sm text-white/35">No tools match</p>}
 
-      <p className="mt-6 text-center text-[10px] text-white/25">
-        Need the full rescue suite?{" "}
-        <Link to="/orbitxlaunch/rescue" className="underline hover:text-white/50">
-          Open Rescue Console
+      <p className="mt-8 text-center text-[10px] text-white/25">
+        Full rescue suite →{" "}
+        <Link to="/orbitxlaunch/rescue" className="underline hover:text-white/45">
+          Rescue Console
         </Link>
       </p>
     </div>

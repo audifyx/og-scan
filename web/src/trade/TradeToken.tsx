@@ -63,9 +63,7 @@ function DexChart({ refId }: { refId: string }) {
   const [mount, setMount] = useState(false);
   useEffect(() => {
     setReady(false);
-    setMount(false);
-    const t = window.setTimeout(() => setMount(true), 100);
-    return () => window.clearTimeout(t);
+    setMount(true);
   }, [refId]);
   return (
     <div className="relative mx-4 mt-3 overflow-hidden rounded-xl border border-white/10 bg-black" style={{ height: 360 }}>
@@ -117,9 +115,28 @@ export default function TradeToken() {
   const [ath, setAth] = useState<any>(null);
   const [xray, setXray] = useState<any>(null);
   const [research, setResearch] = useState<any>(null);
+  const [tradeTape, setTradeTape] = useState<any[]>([]);
   const [aiQ, setAiQ] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsgs, setAiMsgs] = useState<{ role: string; content: string }[]>([]);
+  const [tabLoading, setTabLoading] = useState(false);
+
+  const loadBundle = (m: string) => {
+    setLoading(true);
+    return fetchTokenBundle(m).then((b) => {
+      setD(b.token);
+      setSafetyApi(b.safety);
+      setTraders(Array.isArray(b.traders?.traders) ? b.traders.traders : []);
+      setHolders(Array.isArray(b.traders?.holders) ? b.traders.holders : []);
+      setPool(b.chart?.pool || null);
+      setForensics(b.forensics);
+      setAth(b.ath);
+      setXray(b.xray);
+      setResearch(b.research);
+      setTradeTape(Array.isArray(b.tradeTape) ? b.tradeTape : []);
+      setLoading(false);
+    });
+  };
 
   useEffect(() => {
     if (!mint) return;
@@ -129,21 +146,10 @@ export default function TradeToken() {
       /* ignore */
     }
     let on = true;
-    setLoading(true);
     setTab("overview");
     setAiMsgs([]);
-    fetchTokenBundle(mint).then((b) => {
+    loadBundle(mint).then(() => {
       if (!on) return;
-      setD(b.token);
-      setSafetyApi(b.safety);
-      setTraders(Array.isArray(b.traders?.traders) ? b.traders.traders : []);
-      setHolders(Array.isArray(b.traders?.holders) ? b.traders.holders : []);
-      setPool(b.chart?.pool || null);
-      setForensics(b.forensics);
-      setAth(b.ath?.ok ? b.ath : b.ath);
-      setXray(b.xray);
-      setResearch(b.research);
-      setLoading(false);
     });
     return () => {
       on = false;
@@ -179,8 +185,10 @@ export default function TradeToken() {
   const verdict = d?.verdict;
   const verified = t.isVerified || meta.isVerifiedJup || d?.flags?.isVerified;
   const chartRef = pool || t.pairAddress || mint;
-  const trades: any[] = intel.trades || t.recentTrades || [];
-  const holderList = (intel.holders?.length ? intel.holders : holders) as any[];
+  const trades: any[] = tradeTape.length
+    ? tradeTape
+    : intel.trades || t.recentTrades || [];
+  const holderList = (holders.length ? holders : intel.holders || []) as any[];
   const whales = holderList.filter((h) => h.label === "whale").length;
   const socials = meta.socials || {};
   const website = socials.website || meta.website || d?.raw?.info?.websites?.[0]?.url;
@@ -393,15 +401,15 @@ export default function TradeToken() {
       <DexChart refId={chartRef} />
 
       {/* Tabs */}
-      <div className="sticky top-[52px] z-[9] mt-3 border-y border-white/10 bg-black/95 backdrop-blur">
-        <div className="flex gap-1 overflow-x-auto px-2 py-2 no-scrollbar">
+      <div className="sticky top-0 z-[9] mt-3 border-y border-white/10 bg-[#060606]/95 backdrop-blur">
+        <div className="flex gap-1.5 overflow-x-auto px-3 py-2.5 no-scrollbar">
           {tabs.map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`shrink-0 rounded-xl px-3.5 py-2 text-[11px] font-bold uppercase tracking-wide ${
-                tab === id ? "bg-white text-black" : "text-white/40 hover:bg-white/5 hover:text-white/70"
+              className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-bold tracking-wide transition-colors ${
+                tab === id ? "bg-white text-black" : "bg-white/[0.04] text-white/40 hover:text-white/70"
               }`}
             >
               {label}
@@ -410,7 +418,21 @@ export default function TradeToken() {
         </div>
       </div>
 
-      <div className="mx-4 mt-3 mb-4 rounded-xl border border-white/10 bg-[#050505] p-4">
+      <div className="mx-3 mt-3 mb-28 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">{tab}</p>
+          <button
+            type="button"
+            disabled={tabLoading}
+            onClick={() => {
+              setTabLoading(true);
+              void loadBundle(mint).finally(() => setTabLoading(false));
+            }}
+            className="text-[10px] font-semibold text-white/40 underline hover:text-white/70"
+          >
+            {tabLoading ? "Refreshing…" : "Refresh data"}
+          </button>
+        </div>
         {tab === "overview" && (
           <div className="space-y-4">
             <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
@@ -473,7 +495,19 @@ export default function TradeToken() {
               <Users className="h-3.5 w-3.5" /> Top holders
             </h3>
             {!holderList.length ? (
-              <p className="text-xs text-white/30">No holder data</p>
+              <div className="space-y-2 py-6 text-center">
+                <p className="text-xs text-white/35">No holder data yet</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTabLoading(true);
+                    void loadBundle(mint).finally(() => setTabLoading(false));
+                  }}
+                  className="text-[11px] font-semibold text-white underline"
+                >
+                  Reload holders
+                </button>
+              </div>
             ) : (
               holderList.slice(0, 40).map((h: any, i: number) => {
                 const addr = h.owner || h.address;
@@ -512,7 +546,19 @@ export default function TradeToken() {
               <Activity className="h-3.5 w-3.5" /> Top traders
             </h3>
             {!traders.length ? (
-              <p className="text-xs text-white/30">No trader data</p>
+              <div className="space-y-2 py-6 text-center">
+                <p className="text-xs text-white/35">No trader data yet</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTabLoading(true);
+                    void loadBundle(mint).finally(() => setTabLoading(false));
+                  }}
+                  className="text-[11px] font-semibold text-white underline"
+                >
+                  Reload traders
+                </button>
+              </div>
             ) : (
               traders.slice(0, 40).map((tr: any, i: number) => {
                 const addr = tr.owner || tr.address;
@@ -749,10 +795,10 @@ export default function TradeToken() {
         )}
       </div>
 
-      <div className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] inset-x-0 z-40 border-t border-white/10 bg-black/95 p-3 backdrop-blur">
+      <div className="fixed bottom-[calc(5.35rem+env(safe-area-inset-bottom))] inset-x-0 z-40 px-3">
         <Link
           to={`/trade/desk/${mint}`}
-          className="mx-auto flex h-12 max-w-lg items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+          className="mx-auto flex h-12 max-w-lg items-center justify-center rounded-2xl bg-white text-sm font-bold text-black shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
         >
           Trade {symbol}
         </Link>

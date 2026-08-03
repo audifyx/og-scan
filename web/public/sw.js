@@ -3,11 +3,12 @@
  * Provides offline caching, background sync, rich Web Push notifications, and PWA install support.
  */
 
-const CACHE_NAME = "orbitx-v22";
+const CACHE_NAME = "orbitx-v23";
 self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
 const STATIC_ASSETS = [
   "/",
   "/app",
+  "/trade",
   "/Orbitxcity",
   "/manifest.json",
   "/icon-192x192.png",

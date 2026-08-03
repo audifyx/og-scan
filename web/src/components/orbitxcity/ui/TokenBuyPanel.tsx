@@ -10,15 +10,15 @@ import { fmtPct, fmtUsd, shortMint } from "@/lib/orbitxcity/marketData";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { Link } from "react-router-dom";
-
-const PRESETS = [0.1, 0.25, 0.5, 1];
+import { getBuyPresets } from "@/trade/tradePresets";
 
 /** Real Jupiter buy flow for an in-world token (billboard / marketplace). */
 export function TokenBuyPanel() {
   const { selectedMint } = useCity();
   const { connection } = useConnection();
   const { publicKey, connected, signTransaction, sendTransaction, wallet, connect, connecting } = useWallet();
-  const [amount, setAmount] = useState("0.1");
+  const [presets] = useState(() => getBuyPresets());
+  const [amount, setAmount] = useState(() => String(getBuyPresets()[0] ?? 0.1));
   const [quote, setQuote] = useState<JupQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [buying, setBuying] = useState(false);
@@ -218,7 +218,7 @@ export function TokenBuyPanel() {
       )}
 
       <div className="oxc-buy-presets">
-        {PRESETS.map((p) => (
+        {presets.map((p) => (
           <button key={p} type="button" className={`oxc-btn ghost compact ${amount === String(p) ? "active-preset" : ""}`} onClick={() => setAmount(String(p))}>
             {p} SOL
           </button>

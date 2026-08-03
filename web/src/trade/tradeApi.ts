@@ -72,7 +72,7 @@ export async function searchCoins(q: string): Promise<MarketCoin[]> {
   }
 }
 
-/** Same data sources as OGDex TokenDetail */
+/** Same data sources as OGDex TokenDetail — resilient parallel fetch */
 export async function fetchTokenBundle(mint: string) {
   const m = encodeURIComponent(mint);
   const [token, safety, traders, chart, forensics, ath, xray, research] = await Promise.all([
@@ -85,7 +85,37 @@ export async function fetchTokenBundle(mint: string) {
     j(`/api/ogdex/xray?mint=${m}`),
     j(`/api/ogdex/research?mint=${m}`),
   ]);
-  return { token, safety, traders, chart, forensics, ath, xray, research };
+
+  // Normalize nested holders/traders/trades from whichever payload has them
+  const intel = token?.intel || {};
+  const holders =
+    (Array.isArray(traders?.holders) && traders.holders.length ? traders.holders : null) ||
+    (Array.isArray(intel.holders) && intel.holders.length ? intel.holders : null) ||
+    (Array.isArray(token?.holders) && token.holders.length ? token.holders : []) ||
+    [];
+  const traderList =
+    (Array.isArray(traders?.traders) && traders.traders.length ? traders.traders : null) ||
+    (Array.isArray(intel.traders) && intel.traders.length ? intel.traders : []) ||
+    [];
+  const tradeTape =
+    (Array.isArray(intel.trades) && intel.trades.length ? intel.trades : null) ||
+    (Array.isArray(token?.token?.recentTrades) && token.token.recentTrades.length
+      ? token.token.recentTrades
+      : null) ||
+    (Array.isArray(token?.recentTrades) ? token.recentTrades : []) ||
+    [];
+
+  return {
+    token,
+    safety,
+    traders: { ...(traders || {}), holders, traders: traderList, ok: traders?.ok ?? true },
+    chart,
+    forensics,
+    ath,
+    xray,
+    research,
+    tradeTape,
+  };
 }
 
 export async function fetchTokenOnly(mint: string) {
