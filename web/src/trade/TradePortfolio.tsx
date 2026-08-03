@@ -16,7 +16,9 @@ import {
   Trophy,
   RefreshCw,
   Plus,
+  KeyRound,
 } from "lucide-react";
+import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
 import {
   fetchTopHolders,
   fetchWallet,
@@ -53,6 +55,7 @@ function pnlTone(n: number | null | undefined): string {
 export default function TradePortfolio() {
   const navigate = useNavigate();
   const { publicKey, connected, wallets, select, connect } = useWallet();
+  const { wallets: localWallets, defaultWallet, mode: tradeMode } = useLocalTradingWallets();
   const myAddr = publicKey?.toBase58();
 
   const [tab, setTab] = useState<HubTab>("mine");
@@ -233,6 +236,24 @@ export default function TradePortfolio() {
         <p className="tp__kicker">OrbitX Trade</p>
         <h1 className="tp__title">Portfolio</h1>
         <p className="tp__sub">Holdings, tracked wallets, and top holders</p>
+
+        <Link
+          to="/trade/wallets"
+          className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
+        >
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/10">
+            <KeyRound className="h-4 w-4 text-white/55" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold">Trading wallets</p>
+            <p className="truncate text-[11px] text-white/40">
+              {localWallets.length
+                ? `${localWallets.length} local · default ${defaultWallet ? shortAddr(defaultWallet.publicKey, 4) : "—"} · ${tradeMode === "local" ? "local mode" : "connected mode"}`
+                : "Import / export keys · set default for Trade"}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+        </Link>
 
         <div className="tp__tabs" role="tablist">
           {(

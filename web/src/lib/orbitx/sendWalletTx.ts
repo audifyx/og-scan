@@ -5,9 +5,12 @@
  * TradingTerminal. Manual `signTransaction` + `sendRawTransaction` can return an
  * unsigned tx from some adapters, which then throws:
  * "Signature verification failed. Missing signature for public key …" on serialize.
+ *
+ * Local trading wallets: pass a Keypair to `sendWithKeypair` (partialSign / sign + sendRaw).
  */
 import {
   Connection,
+  Keypair,
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -37,6 +40,25 @@ function serializeSigned(signed: Transaction | VersionedTransaction): Uint8Array
     );
   }
   return signed.serialize();
+}
+
+/** Sign with a local Keypair and broadcast (no extension wallet). */
+export async function sendWithKeypair(
+  connection: Connection,
+  keypair: Keypair,
+  tx: Transaction | VersionedTransaction,
+  options?: WalletSendOptions,
+): Promise<string> {
+  const opts = {
+    skipPreflight: options?.skipPreflight ?? false,
+    maxRetries: options?.maxRetries ?? 3,
+  };
+  if (tx instanceof VersionedTransaction) {
+    tx.sign([keypair]);
+    return connection.sendRawTransaction(tx.serialize(), opts);
+  }
+  tx.partialSign(keypair);
+  return connection.sendRawTransaction(serializeSigned(tx), opts);
 }
 
 /** Sign and broadcast one legacy or versioned transaction. */

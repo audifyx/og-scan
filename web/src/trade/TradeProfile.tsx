@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Copy, Check, LogOut, Wallet, ExternalLink, Loader2, User } from "lucide-react";
+import { Copy, Check, LogOut, Wallet, ExternalLink, Loader2, User, KeyRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
 import { shortAddr, fmtUsd } from "./tradeFmt";
 
 export default function TradeProfile() {
   const { publicKey, connected, wallets, select, connect, disconnect } = useWallet();
   const { connection } = useConnection();
   const { profile, user, loading: authLoading } = useAuth();
+  const { wallets: localWallets, defaultWallet, mode: tradeMode } = useLocalTradingWallets();
   const [sol, setSol] = useState<number | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -141,7 +143,35 @@ export default function TradeProfile() {
         </div>
       </div>
 
-      {/* Wallet */}
+      {/* Local trading wallets — separate from login / Phantom */}
+      <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10">
+            <KeyRound className="h-5 w-5 text-white/50" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Trading wallets</p>
+            <p className="mt-0.5 text-[11px] text-white/40">
+              {localWallets.length
+                ? `${localWallets.length} local · ${tradeMode === "local" ? "signing local" : "connected mode"}`
+                : "Import keys to trade with several wallets"}
+            </p>
+            {defaultWallet && (
+              <p className="mt-1 font-mono text-[11px] text-white/55">
+                Default {shortAddr(defaultWallet.publicKey, 4)}
+              </p>
+            )}
+          </div>
+        </div>
+        <Link
+          to="/trade/wallets"
+          className="mt-3 flex h-11 items-center justify-center rounded-2xl border border-white/15 text-xs font-semibold"
+        >
+          Manage · Import / Export
+        </Link>
+      </div>
+
+      {/* Connected wallet (Phantom) */}
       {!connected || !addr ? (
         <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center">
           <Wallet className="mx-auto h-9 w-9 text-white/25" />

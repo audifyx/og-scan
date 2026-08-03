@@ -45,7 +45,9 @@ function tabActive(pathname: string, id: string) {
     );
   }
   if (id === "more") return pathname.startsWith("/trade/more");
-  if (id === "profile") return pathname.startsWith("/trade/profile");
+  if (id === "profile") {
+    return pathname.startsWith("/trade/profile") || pathname.startsWith("/trade/wallets");
+  }
   return false;
 }
 
@@ -55,6 +57,7 @@ function titleFor(pathname: string): string {
   if (pathname.startsWith("/trade/leaderboard")) return "Leaderboard";
   if (pathname.startsWith("/trade/more")) return "More";
   if (pathname.startsWith("/trade/profile")) return "You";
+  if (pathname.startsWith("/trade/wallets")) return "Wallets";
   if (pathname.startsWith("/trade/token/")) return "Coin";
   if (pathname.startsWith("/trade/wallet/")) return "Wallet";
   if (pathname.startsWith("/trade/notifications")) return "Alerts";
