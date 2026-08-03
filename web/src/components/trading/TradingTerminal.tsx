@@ -36,6 +36,8 @@ import {
 export type TradeTerminalProps = {
   initialMint?: string | null;
   onMintChange?: (mint: string) => void;
+  /** desk = chart + trade only (no market browser chrome) */
+  mode?: "full" | "desk";
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -365,9 +367,10 @@ function fmtNum(n: number): string {
    Component
    ═══════════════════════════════════════════════════════════════════ */
 
-export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProps = {}) => {
+export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: TradeTerminalProps = {}) => {
   const { publicKey, connected, wallets, select, connect, disconnect, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const deskMode = mode === "desk";
 
   /* ── State ──────────────────────────────────────────────── */
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
@@ -391,13 +394,18 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
   const [searchResults, setSearchResults] = useState<JupTokenInfo[]>([]);
   const [searching, setSearching] = useState(false);
   const [chartReady, setChartReady] = useState(false);
-  const [loadingTokens, setLoadingTokens] = useState(true);
+  const [mountChart, setMountChart] = useState(false);
+  const [loadingTokens, setLoadingTokens] = useState(!deskMode);
   const [copied, setCopied] = useState(false);
   const [positions, setPositions] = useState<TokenAsset[]>([]);
   const [showWalletPicker, setShowWalletPicker] = useState(false);
 
-  /* ── Load DEX markets (full screener tabs, up to 200) ── */
+  /* ── Load DEX markets (skip in desk mode — trade a selected mint only) ── */
   useEffect(() => {
+    if (deskMode) {
+      setLoadingTokens(false);
+      return;
+    }
     if (marketTab === "positions") return;
     let cancelled = false;
     (async () => {
@@ -420,7 +428,15 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marketTab]);
+  }, [marketTab, deskMode]);
+
+  /* Paint UI first, then mount DexScreener iframe (feels faster) */
+  useEffect(() => {
+    setMountChart(false);
+    setChartReady(false);
+    const t = window.setTimeout(() => setMountChart(true), 80);
+    return () => window.clearTimeout(t);
+  }, [selectedMint, timeframe]);
 
   useEffect(() => {
     if (initialMint) setSelectedMint(initialMint);
@@ -828,8 +844,8 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
     <WalletPickerOverlay />
     <div className="flex h-full min-h-[calc(100vh-68px)] flex-col overflow-y-auto bg-black lg:min-h-0 lg:flex-row lg:overflow-hidden">
 
-      {/* ═══════════════ LEFT SIDEBAR ═══════════════ */}
-      <aside className="hidden lg:flex flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[#050505]">
+      {/* ═══════════════ LEFT SIDEBAR (hidden in desk mode) ═══════════════ */}
+      <aside className={`${deskMode ? "hidden" : "hidden lg:flex"} flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[#050505]`}>
         {/* Category + market tabs (full DEX universe) */}
         <div className="border-b border-white/10">
           <div className="flex overflow-x-auto scrollbar-none">
@@ -1005,39 +1021,9 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
       {/* ═══════════════ CENTER PANEL ═══════════════ */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:overflow-hidden">
 
-        {/* Mobile token selector */}
+        {/* Mobile market browser — only in full mode */}
+        {!deskMode && (
         <div className="lg:hidden border-b border-white/10 bg-[#050505]">
-          <div className="flex overflow-x-auto scrollbar-none border-b border-white/10">
-            {MARKET_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => {
-                  setMarketCategory(cat.id);
-                  setMarketTab(DEFAULT_TAB[cat.id]);
-                }}
-                className={`shrink-0 px-3 py-2 text-[10px] font-semibold uppercase ${
-                  marketCategory === cat.id ? "text-white border-b border-white" : "text-white/35"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex overflow-x-auto scrollbar-none px-1 py-1 gap-0.5">
-            {marketSubTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setMarketTab(tab.id)}
-                className={`shrink-0 px-2 py-1 text-[10px] rounded ${
-                  marketTab === tab.id ? "bg-white text-black" : "text-white/40"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
           <div className="p-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
@@ -1066,25 +1052,20 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
               </div>
             )}
           </div>
-          <div className="flex gap-1.5 px-2 pb-2 overflow-x-auto no-scrollbar">
-            {tokens.slice(0, 40).map((tk) => (
-              <button
-                key={tk.mint}
-                onClick={() => selectToken(tk.mint)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors ${
-                  selectedMint === tk.mint ? "bg-[#ffffff]/20 text-[#ffffff]" : "bg-white/[0.05] text-white/50"
-                }`}
-              >
-                {tk.image && <img src={tk.image} className="w-4 h-4 rounded-full" alt="" />}
-                {tk.symbol}
-              </button>
-            ))}
-          </div>
         </div>
+        )}
 
-        {/* Token header — improved with token image, name, price, stats */}
+        {/* Token header */}
         {t && (
           <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[#050505]/80 flex-wrap">
+            {deskMode && (
+              <a
+                href={`/trade/token/${selectedMint}`}
+                className="mr-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white"
+              >
+                ← Coin
+              </a>
+            )}
             {t.image ? (
               <img src={t.image} alt="" className="w-9 h-9 rounded-full ring-2 ring-white/[0.08]" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
@@ -1178,7 +1159,11 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
           )}
           <button
             type="button"
-            onClick={() => setChartReady(false)}
+            onClick={() => {
+              setMountChart(false);
+              setChartReady(false);
+              window.setTimeout(() => setMountChart(true), 50);
+            }}
             className="text-white/25 hover:text-white/50 transition-colors p-1"
             title="Reload chart"
           >
@@ -1186,14 +1171,15 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
           </button>
         </div>
 
-        {/* DexScreener chart */}
+        {/* DexScreener chart — delayed mount so swap UI paints first */}
         <div className="relative min-h-[320px] h-[380px] flex-1 lg:h-auto bg-black">
-          {!chartReady && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
+          {(!mountChart || !chartReady) && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
               <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+              <p className="text-[11px] text-white/30">Loading chart…</p>
             </div>
           )}
-          {dexChartSrc ? (
+          {mountChart && dexChartSrc ? (
             <iframe
               key={`${chartRef}-${timeframe}`}
               title="DexScreener chart"
@@ -1201,14 +1187,13 @@ export const TradingTerminal = ({ initialMint, onMintChange }: TradeTerminalProp
               className="absolute inset-0 h-full w-full border-0"
               style={{ colorScheme: "dark" }}
               allow="clipboard-write"
-              loading="lazy"
               onLoad={() => setChartReady(true)}
             />
-          ) : (
+          ) : !dexChartSrc ? (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-white/30">
               Select a token to load chart
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Bottom tabs: Trades / My Trades / Positions / Top Traders */}

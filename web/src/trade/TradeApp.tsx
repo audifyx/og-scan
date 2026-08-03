@@ -1,48 +1,70 @@
 /**
- * OrbitX Trade App — mobile + desktop app shell with bottom tabs.
- * Tabs: Home · Trade · Leaderboard · Profile
+ * OrbitX Trade App — mobile + desktop shell.
+ * Tabs: Home · Trade · Board · Profile
  */
 
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Home, CandlestickChart, Trophy, User } from "lucide-react";
 
+const LAST_MINT_KEY = "orbitx.trade.lastMint";
+
+function tradeDeskTo(): string {
+  try {
+    const m = sessionStorage.getItem(LAST_MINT_KEY);
+    if (m && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m)) return `/trade/desk/${m}`;
+  } catch {
+    /* ignore */
+  }
+  return "/trade/desk";
+}
+
 const TABS = [
-  { to: "/trade", end: true, label: "Home", icon: Home },
-  { to: "/trade/desk", end: false, label: "Trade", icon: CandlestickChart },
-  { to: "/trade/leaderboard", end: false, label: "Board", icon: Trophy },
-  { to: "/trade/profile", end: false, label: "Profile", icon: User },
+  { id: "home", to: "/trade", end: true, label: "Home", icon: Home },
+  { id: "trade", to: "/trade/desk", end: false, label: "Trade", icon: CandlestickChart, dynamic: true },
+  { id: "board", to: "/trade/leaderboard", end: false, label: "Board", icon: Trophy },
+  { id: "profile", to: "/trade/profile", end: false, label: "Profile", icon: User },
 ] as const;
 
-function tabActive(pathname: string, to: string, end?: boolean) {
-  if (to === "/trade") {
-    return (
-      pathname === "/trade" ||
-      pathname === "/trade/home" ||
-      pathname.startsWith("/trade/token/")
-    );
+function tabActive(pathname: string, id: string) {
+  if (id === "home") {
+    return pathname === "/trade" || pathname === "/trade/home" || pathname.startsWith("/trade/token/");
   }
-  if (to === "/trade/desk") return pathname.startsWith("/trade/desk") || /^\/trade\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pathname);
-  return end ? pathname === to : pathname.startsWith(to);
+  if (id === "trade") return pathname.startsWith("/trade/desk");
+  if (id === "board") return pathname.startsWith("/trade/leaderboard");
+  if (id === "profile") return pathname.startsWith("/trade/profile");
+  return false;
+}
+
+function titleFor(pathname: string): string {
+  if (pathname.startsWith("/trade/desk")) return "Trade";
+  if (pathname.startsWith("/trade/leaderboard")) return "Leaderboard";
+  if (pathname.startsWith("/trade/profile")) return "Profile";
+  if (pathname.startsWith("/trade/token/")) return "Coin";
+  return "Markets";
 }
 
 export default function TradeApp() {
   const { pathname } = useLocation();
+  const title = titleFor(pathname);
+  const hideTopChrome = pathname.startsWith("/trade/desk");
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-[#050505] px-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold tracking-tight">OrbitX</span>
-          <span className="rounded border border-white/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/45">
-            Trade
-          </span>
-        </div>
-        <a href="/ORBITX_DEX" className="text-[11px] text-white/35 transition-colors hover:text-white">
-          Full DEX →
-        </a>
-      </header>
+      {!hideTopChrome && (
+        <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 bg-black/90 px-4 backdrop-blur">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[15px] font-bold tracking-tight">OrbitX</span>
+            <span className="h-3 w-px bg-white/15" />
+            <span className="text-[12px] font-medium text-white/45">{title}</span>
+          </div>
+        </header>
+      )}
 
-      <main className="min-h-0 flex-1 overflow-hidden pb-[calc(4.25rem+env(safe-area-inset-bottom))]">
+      <main
+        className={`min-h-0 flex-1 overflow-hidden ${
+          hideTopChrome ? "pb-[calc(4.25rem+env(safe-area-inset-bottom))]" : "pb-[calc(4.25rem+env(safe-area-inset-bottom))]"
+        }`}
+      >
         <Outlet />
       </main>
 
@@ -50,15 +72,17 @@ export default function TradeApp() {
         className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black/95 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto flex h-[4.25rem] max-w-lg items-stretch justify-around px-2">
-          {TABS.map(({ to, end, label, icon: Icon }) => {
-            const active = tabActive(pathname, to, end);
+        <div className="mx-auto flex h-[4.25rem] max-w-lg items-stretch justify-around px-1">
+          {TABS.map((tab) => {
+            const { id, end, label, icon: Icon } = tab;
+            const to = "dynamic" in tab && tab.dynamic ? tradeDeskTo() : tab.to;
+            const active = tabActive(pathname, id);
             return (
               <NavLink
-                key={to}
+                key={id}
                 to={to}
                 end={end}
-                className="flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1"
+                className="flex min-w-[64px] flex-1 flex-col items-center justify-center gap-0.5"
               >
                 <span
                   className={`flex h-9 w-14 items-center justify-center rounded-full transition-colors ${

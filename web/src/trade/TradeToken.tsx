@@ -6,6 +6,37 @@ import {
 import { fetchTokenDetail } from "./tradeApi";
 import { dexChartUrl, fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
 
+function DexChart({ refId }: { refId: string }) {
+  const [ready, setReady] = useState(false);
+  const [mount, setMount] = useState(false);
+  useEffect(() => {
+    setReady(false);
+    setMount(false);
+    const t = window.setTimeout(() => setMount(true), 100);
+    return () => window.clearTimeout(t);
+  }, [refId]);
+  return (
+    <div className="relative mx-4 mt-4 overflow-hidden rounded-xl border border-white/10 bg-black" style={{ height: 360 }}>
+      {(!mount || !ready) && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
+          <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+          <p className="text-[11px] text-white/30">Loading chart…</p>
+        </div>
+      )}
+      {mount && (
+        <iframe
+          title="DexScreener"
+          src={dexChartUrl(refId)}
+          className="h-full w-full border-0"
+          style={{ colorScheme: "dark" }}
+          allow="clipboard-write"
+          onLoad={() => setReady(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function TradeToken() {
   const { mint = "" } = useParams();
   const navigate = useNavigate();
@@ -19,6 +50,11 @@ export default function TradeToken() {
 
   useEffect(() => {
     if (!mint) return;
+    try {
+      sessionStorage.setItem("orbitx.trade.lastMint", mint);
+    } catch {
+      /* ignore */
+    }
     let on = true;
     setLoading(true);
     fetchTokenDetail(mint).then(({ tokenRes, safetyRes, tradersRes, chartRes }) => {
@@ -151,15 +187,7 @@ export default function TradeToken() {
         </div>
       )}
 
-      <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-white/10 bg-black" style={{ height: 360 }}>
-        <iframe
-          title="DexScreener"
-          src={dexChartUrl(chartRef)}
-          className="h-full w-full border-0"
-          style={{ colorScheme: "dark" }}
-          allow="clipboard-write"
-        />
-      </div>
+      <DexChart refId={chartRef} />
 
       {/* Safety */}
       <section className="mx-4 mt-4 rounded-xl border border-white/10 bg-[#050505] p-4">
