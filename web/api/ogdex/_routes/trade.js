@@ -1,10 +1,10 @@
 /**
  * OG DEX — non-custodial trade transaction builder.
  * Builds candidate buy/sell transactions (PumpPortal across venues, then the
- * Jupiter aggregator) and SIMULATES each one, returning only a transaction that
- * actually executes. This prevents Phantom's "Failed to simulate" on txs that
- * built but route to the wrong pool / have no liquidity. The user's Phantom
- * wallet signs and sends; OG DEX never holds keys or funds.
+ * Jupiter aggregator). Prefers a simulation-passing route, but ALWAYS returns a
+ * built transaction when one exists so Phantom/Jupiter can open for signing —
+ * never dead-end with "transaction would fail" when a tx was constructed.
+ * The user's wallet signs and sends; OG DEX never holds keys or funds.
  */
 import { send, readBody, callFn, jup } from "../_lib.js";
 
@@ -113,8 +113,9 @@ export default async function handler(req, res) {
   }
 
   let lastErr = "Could not build a working trade";
-  let firstUnknown = null;   // built but simulation couldn't run (RPC) -> last resort
-  let sawSimFail = false;    // at least one candidate definitively failed simulation
+  let firstBuilt = null;     // any constructed tx — hand to wallet as last resort
+  let firstUnknown = null;   // built but simulation couldn't run (RPC)
+  let firstSimFail = null;   // built but sim erred — still return so wallet can try
 
   // Candidate builders: PumpPortal venues (best for bonding-curve buys), then Jupiter.
   const pools = [...new Set([reqPool, "auto", "pump", "pump-amm", "raydium", "bonk", "raydium-cpmm", "launchlab"])];
@@ -125,17 +126,29 @@ export default async function handler(req, res) {
     const out = await b.run();
     if (out.error) { lastErr = out.error; continue; }
     if (!out.tx) continue;
+    const payload = { ok: true, tx: out.tx, via: b.via, pool: b.pool || null };
+    if (!firstBuilt) firstBuilt = { ...payload, simulated: false };
     const sim = await simulate(out.tx);
     if (sim.ok && !sim.unknown) {
-      // Definitive pass — safe to hand to Phantom.
-      return send(res, 200, { ok: true, tx: out.tx, via: b.via, pool: b.pool, simulated: true });
+      // Definitive pass — best case for Phantom.
+      return send(res, 200, { ...payload, simulated: true });
     }
-    if (sim.unknown) { if (!firstUnknown) firstUnknown = { ok: true, tx: out.tx, via: b.via, pool: b.pool, simulated: false }; }
-    else { sawSimFail = true; lastErr = "transaction would fail (no liquidity on this route or insufficient SOL for amount + fees)"; }
+    if (sim.unknown) {
+      if (!firstUnknown) firstUnknown = { ...payload, simulated: false };
+    } else if (!firstSimFail) {
+      firstSimFail = {
+        ...payload,
+        simulated: false,
+        warning: "Route simulation flagged a risk — confirm carefully in your wallet",
+      };
+      lastErr = "simulation flagged route (wallet may still succeed)";
+    }
   }
 
-  // No candidate passed simulation. Only fall back to an unverified tx when the
-  // simulation RPC itself never worked (so we don't hand Phantom a known-bad tx).
-  if (firstUnknown && !sawSimFail) return send(res, 200, firstUnknown);
+  // Prefer unknown (RPC flake) → sim-fail candidate → any built tx.
+  // Never block the wallet prompt when we have a transaction to sign.
+  if (firstUnknown) return send(res, 200, firstUnknown);
+  if (firstSimFail) return send(res, 200, firstSimFail);
+  if (firstBuilt) return send(res, 200, firstBuilt);
   return send(res, 200, { ok: false, error: lastErr });
 }

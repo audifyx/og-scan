@@ -1,8 +1,9 @@
 /**
- * /trade/portfolio — My portfolio + wallet tracking + holders.
+ * /trade/portfolio — Mine · Track · Holders
+ * Premium layout aligned with Trade Home (Bricolage, #060606).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -14,11 +15,18 @@ import {
   Trash2,
   Trophy,
   RefreshCw,
-  Star,
   Plus,
 } from "lucide-react";
-import { fetchTopHolders, fetchWallet, searchCoins, type MarketCoin } from "./tradeApi";
-import { fmtPct, fmtPnl, fmtUsd, shortAddr } from "./tradeFmt";
+import {
+  fetchTopHolders,
+  fetchWallet,
+  mergeHoldingPnl,
+  normalizePnlToken,
+  searchCoins,
+  type MarketCoin,
+  type WalletPnlToken,
+} from "./tradeApi";
+import { fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr } from "./tradeFmt";
 import {
   addWatchWallet,
   getWatchlist,
@@ -27,8 +35,20 @@ import {
   type WatchedWallet,
 } from "./tradeWatchlist";
 import { getRecentWallets, pushRecentWallet, clearRecentWallets } from "./tradeRecent";
+import "./trade-portfolio.css";
 
 type HubTab = "mine" | "track" | "holders";
+
+function wrLabel(wr: number | null | undefined): string {
+  if (wr == null || !Number.isFinite(Number(wr))) return "—";
+  const n = Number(wr);
+  return `${n > 1 ? n.toFixed(0) : (n * 100).toFixed(0)}%`;
+}
+
+function pnlTone(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "tp__muted";
+  return n >= 0 ? "tp__up" : "tp__down";
+}
 
 export default function TradePortfolio() {
   const navigate = useNavigate();
@@ -38,8 +58,11 @@ export default function TradePortfolio() {
   const [tab, setTab] = useState<HubTab>("mine");
   const [mine, setMine] = useState<any>(null);
   const [mineLoading, setMineLoading] = useState(false);
+  const [mineErr, setMineErr] = useState("");
   const [watch, setWatch] = useState<WatchedWallet[]>(() => getWatchlist());
   const [watchSnap, setWatchSnap] = useState<Record<string, any>>({});
+  const [watchErr, setWatchErr] = useState("");
+  const [watchLoading, setWatchLoading] = useState(false);
   const [trackInput, setTrackInput] = useState("");
   const [trackLabel, setTrackLabel] = useState("");
   const [recent, setRecent] = useState(() => getRecentWallets());
@@ -48,8 +71,9 @@ export default function TradePortfolio() {
   const [holderQ, setHolderQ] = useState("");
   const [mintHits, setMintHits] = useState<MarketCoin[]>([]);
   const [holders, setHolders] = useState<any[]>([]);
-  const [holderMeta, setHolderMeta] = useState<{ symbol?: string }>({});
+  const [holderMeta, setHolderMeta] = useState<{ symbol?: string; holderCount?: number | null }>({});
   const [holdersLoading, setHoldersLoading] = useState(false);
+  const [holdersErr, setHoldersErr] = useState("");
 
   const connectPhantom = () => {
     const phantom = wallets.find((w) => w.adapter.name === "Phantom");
@@ -60,16 +84,24 @@ export default function TradePortfolio() {
   const loadMine = useCallback(async () => {
     if (!myAddr) {
       setMine(null);
+      setMineErr("");
       return;
     }
     setMineLoading(true);
+    setMineErr("");
     try {
       const w = await fetchWallet(myAddr);
-      setMine(w?.ok ? w : { ok: false, error: w?.error || "Load failed", holdings: [] });
+      if (!w?.ok) {
+        setMine({ ok: false, holdings: [] });
+        setMineErr(w?.error || "Could not load portfolio");
+      } else {
+        setMine(w);
+      }
       pushRecentWallet(myAddr);
       setRecent(getRecentWallets());
     } catch {
-      setMine({ ok: false, error: "Load failed", holdings: [] });
+      setMine({ ok: false, holdings: [] });
+      setMineErr("Portfolio API failed — try again");
     } finally {
       setMineLoading(false);
     }
@@ -78,18 +110,33 @@ export default function TradePortfolio() {
   const refreshWatch = useCallback(async () => {
     const list = getWatchlist();
     setWatch(list);
+    if (!list.length) {
+      setWatchSnap({});
+      setWatchErr("");
+      return;
+    }
+    setWatchLoading(true);
+    setWatchErr("");
     const snaps: Record<string, any> = {};
+    let fails = 0;
     await Promise.all(
       list.slice(0, 12).map(async (w) => {
         try {
           const d = await fetchWallet(w.address);
           if (d?.ok) snaps[w.address] = d;
+          else fails += 1;
         } catch {
-          /* ignore */
+          fails += 1;
         }
       }),
     );
     setWatchSnap(snaps);
+    if (fails > 0 && Object.keys(snaps).length === 0) {
+      setWatchErr("Could not load watchlist wallets — API may be unavailable");
+    } else if (fails > 0) {
+      setWatchErr(`${fails} wallet${fails === 1 ? "" : "s"} failed to refresh`);
+    }
+    setWatchLoading(false);
   }, []);
 
   useEffect(() => {
@@ -139,29 +186,55 @@ export default function TradePortfolio() {
     if (!isSolAddr(mint)) return;
     setHolderMint(mint);
     setHoldersLoading(true);
+    setHoldersErr("");
     try {
       const d = await fetchTopHolders(mint);
+      if (d?.ok === false) {
+        setHolders([]);
+        setHoldersErr(d?.error || "Could not load holders");
+        setHolderMeta({});
+        return;
+      }
       setHolders(Array.isArray(d?.holders) ? d.holders : []);
-      setHolderMeta({ symbol: d?.symbol || mintHits.find((c) => c.mint === mint)?.symbol });
+      const hc = Number(d?.holderCount ?? d?.numHolders);
+      setHolderMeta({
+        symbol: d?.symbol || mintHits.find((c) => c.mint === mint)?.symbol,
+        holderCount: Number.isFinite(hc) && hc > 0 ? hc : null,
+      });
+      if (!Array.isArray(d?.holders) || !d.holders.length) {
+        setHoldersErr("No holder data returned for this mint");
+      }
+    } catch {
+      setHolders([]);
+      setHoldersErr("Holders API failed — try again");
     } finally {
       setHoldersLoading(false);
     }
   };
 
-  const holdings: any[] = Array.isArray(mine?.holdings) ? mine.holdings : [];
+  const pnlByMint = useMemo(() => {
+    const map = new Map<string, WalletPnlToken>();
+    for (const raw of mine?.pnl?.perToken || []) {
+      const row = normalizePnlToken(raw);
+      if (row) map.set(row.mint, row);
+    }
+    return map;
+  }, [mine]);
+
+  const holdings = useMemo(() => {
+    const list = Array.isArray(mine?.holdings) ? mine.holdings : [];
+    return list.map((h: any) => mergeHoldingPnl(h, pnlByMint));
+  }, [mine, pnlByMint]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#060606]">
-      <div className="relative shrink-0 px-4 pt-3 pb-2">
-        <h1
-          className="text-[26px] font-black tracking-tight"
-          style={{ fontFamily: '"Bricolage Grotesque", system-ui' }}
-        >
-          Portfolio
-        </h1>
-        <p className="mt-0.5 text-[12px] text-white/40">My bag · tracked wallets · holders</p>
+    <div className="tp">
+      <div className="tp__glow" />
+      <div className="tp__top">
+        <p className="tp__kicker">OrbitX Trade</p>
+        <h1 className="tp__title">Portfolio</h1>
+        <p className="tp__sub">Holdings, tracked wallets, and top holders</p>
 
-        <div className="mt-3 flex gap-1.5 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+        <div className="tp__tabs" role="tablist">
           {(
             [
               ["mine", "Mine"],
@@ -172,10 +245,10 @@ export default function TradePortfolio() {
             <button
               key={id}
               type="button"
+              role="tab"
+              aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold ${
-                tab === id ? "bg-white text-black" : "text-white/40"
-              }`}
+              className={`tp__tab${tab === id ? " tp__tab--on" : ""}`}
             >
               {label}
             </button>
@@ -183,92 +256,58 @@ export default function TradePortfolio() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2">
+      <div className="tp__body">
         {tab === "mine" && (
-          <div className="space-y-3">
+          <div>
             {!connected || !myAddr ? (
-              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
-                <Wallet className="mx-auto h-10 w-10 text-white/30" />
-                <p className="mt-3 text-sm text-white/55">Connect Phantom for your portfolio</p>
-                <button
-                  type="button"
-                  onClick={connectPhantom}
-                  className="mt-5 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
-                >
+              <div className="tp__empty">
+                <Wallet className="mx-auto mb-3 h-9 w-9 opacity-40" />
+                <p>Connect Phantom to see your bag and PnL</p>
+                <button type="button" onClick={connectPhantom} className="tp__btn mt-5">
                   Connect Phantom
                 </button>
               </div>
             ) : mineLoading ? (
-              <div className="flex justify-center py-16">
+              <div className="flex justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin text-white/30" />
               </div>
             ) : (
               <>
-                {!mine?.ok && (
-                  <p className="rounded-xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">
-                    {mine?.error || "Could not load portfolio"} — API may be unavailable locally.
-                  </p>
-                )}
-                <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.07] to-transparent p-5">
-                  <div className="flex items-start justify-between">
+                {mineErr && <div className="tp__err">{mineErr}</div>}
+
+                <div>
+                  <p className="tp__label">Net worth</p>
+                  <p className="tp__hero-val mt-2">{fmtUsd(mine?.totalUsd)}</p>
+                  <p className="mt-2 font-mono text-[11px] text-white/35">{shortAddr(myAddr, 6)}</p>
+
+                  <div className="tp__metrics">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Net worth</p>
-                      <p className="mt-1 font-mono text-[34px] font-black leading-none">{fmtUsd(mine?.totalUsd)}</p>
-                      <p className="mt-2 font-mono text-xs text-white/40">{shortAddr(myAddr, 6)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void loadMine()}
-                      className="rounded-full border border-white/10 p-2 text-white/45"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
-                      <p className="text-[9px] text-white/30">SOL</p>
-                      <p className="font-mono text-sm font-bold">
+                      <p className="tp__label">SOL</p>
+                      <p className="tp__metric-val">
                         {mine?.sol != null ? Number(mine.sol).toFixed(3) : "—"}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
-                      <p className="text-[9px] text-white/30">Tokens</p>
-                      <p className="font-mono text-sm font-bold">{mine?.tokenCount ?? holdings.length}</p>
+                    <div>
+                      <p className="tp__label">Tokens</p>
+                      <p className="tp__metric-val">{mine?.tokenCount ?? holdings.length}</p>
                     </div>
-                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
-                      <p className="text-[9px] text-white/30">Realized</p>
-                      <p
-                        className={`font-mono text-sm font-bold ${
-                          mine?.pnl?.realizedPnlUsd == null
-                            ? "text-white/50"
-                            : mine.pnl.realizedPnlUsd >= 0
-                              ? "text-emerald-400"
-                              : "text-red-400"
-                        }`}
-                      >
+                    <div>
+                      <p className="tp__label">Realized</p>
+                      <p className={`tp__metric-val ${pnlTone(mine?.pnl?.realizedPnlUsd)}`}>
                         {fmtPnl(mine?.pnl?.realizedPnlUsd)}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
-                      <p className="text-[9px] text-white/30">Unrealized</p>
-                      <p
-                        className={`font-mono text-sm font-bold ${
-                          mine?.pnl?.unrealizedPnlUsd == null
-                            ? "text-white/50"
-                            : mine.pnl.unrealizedPnlUsd >= 0
-                              ? "text-emerald-400"
-                              : "text-red-400"
-                        }`}
-                      >
+                    <div>
+                      <p className="tp__label">Unrealized</p>
+                      <p className={`tp__metric-val ${pnlTone(mine?.pnl?.unrealizedPnlUsd)}`}>
                         {fmtPnl(mine?.pnl?.unrealizedPnlUsd)}
                       </p>
                     </div>
                   </div>
+
                   {(mine?.pnl?.winRate != null || mine?.pnl?.closedTrades != null) && (
-                    <p className="mt-2 text-[11px] text-white/40">
-                      {mine?.pnl?.winRate != null
-                        ? `WR ${Number(mine.pnl.winRate) > 1 ? Number(mine.pnl.winRate).toFixed(0) : (Number(mine.pnl.winRate) * 100).toFixed(0)}%`
-                        : "WR —"}
+                    <p className="mt-3 text-[12px] text-white/40">
+                      WR {wrLabel(mine?.pnl?.winRate)}
                       {" · "}
                       {mine?.pnl?.closedTrades ?? 0} closed
                       {mine?.pnl?.wins != null || mine?.pnl?.losses != null
@@ -276,129 +315,155 @@ export default function TradePortfolio() {
                         : ""}
                     </p>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => openWallet(myAddr)}
-                    className="mt-4 flex h-11 w-full items-center justify-center gap-1 rounded-2xl bg-white text-sm font-bold text-black"
-                  >
-                    Full wallet view <ChevronRight className="h-4 w-4" />
-                  </button>
+
+                  <div className="mt-5 flex gap-2">
+                    <button type="button" onClick={() => openWallet(myAddr)} className="tp__btn">
+                      Full wallet <ChevronRight className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void loadMine()}
+                      className="tp__icon-btn shrink-0"
+                      aria-label="Refresh"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/35">
-                  Holdings · {holdings.length}
-                </p>
-                <div className="space-y-1.5">
-                  {holdings.map((h: any) => (
-                    <Link
-                      key={h.mint}
-                      to={`/trade/token/${h.mint}`}
-                      className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3 py-3"
-                    >
-                      {h.image ? (
-                        <img src={h.image} alt="" className="h-10 w-10 rounded-xl object-cover" />
-                      ) : (
-                        <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-[10px] font-bold">
-                          {(h.symbol || "?").slice(0, 2)}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold">{h.symbol || shortAddr(h.mint, 4)}</p>
-                        <p className="font-mono text-[10px] text-white/35">
-                          {Number(h.uiAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                          {h.unpriced ? " · unpriced" : ""}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono text-[13px] font-semibold">
-                          {h.unpriced || !(h.usdValue > 0) ? "—" : fmtUsd(h.usdValue)}
-                        </p>
-                        {h.change24h != null && (
-                          <p className={`font-mono text-[10px] ${h.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {fmtPct(h.change24h)}
-                          </p>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <section className="tp__section">
+                  <div className="tp__section-head">
+                    <h2 className="tp__section-title">Holdings</h2>
+                    <span className="text-[11px] text-white/35">{holdings.length}</span>
+                  </div>
+                  {!holdings.length ? (
+                    <p className="tp__empty py-8">No token holdings found</p>
+                  ) : (
+                    <div>
+                      {holdings.map((h: any) => (
+                        <Link key={h.mint} to={`/trade/token/${h.mint}`} className="tp__row">
+                          {h.image ? (
+                            <img src={h.image} alt="" className="tp__avatar" />
+                          ) : (
+                            <div className="tp__avatar-fb">{(h.symbol || "?").slice(0, 2)}</div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-bold">
+                              {h.symbol || shortAddr(h.mint, 4)}
+                            </p>
+                            <p className="font-mono text-[11px] text-white/35">
+                              {fmtTok(h.uiAmount, 4)}
+                              {h.unpriced ? " · unpriced" : ""}
+                            </p>
+                            <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                              Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
+                              {" · "}Pot {h.potUsd != null && h.potUsd > 0 ? fmtUsd(h.potUsd) : "—"}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-mono text-[13px] font-semibold">
+                              {h.unpriced || !(h.usdValue > 0) ? "—" : fmtUsd(h.usdValue)}
+                            </p>
+                            <p className={`font-mono text-[11px] ${pnlTone(h.unrealizedUsd)}`}>
+                              {h.unrealizedUsd != null
+                                ? `${fmtPnl(h.unrealizedUsd)}${
+                                    h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""
+                                  }`
+                                : h.change24h != null
+                                  ? fmtPct(h.change24h)
+                                  : "uPnL —"}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <Link to="/trade/leaderboard" className="tp__btn tp__btn--ghost mt-6">
+                  <Trophy className="h-4 w-4" /> Trader board
+                </Link>
               </>
             )}
-            <Link
-              to="/trade/leaderboard"
-              className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/12 text-sm font-semibold"
-            >
-              <Trophy className="h-4 w-4" /> Trader board
-            </Link>
           </div>
         )}
 
         {tab === "track" && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/35">
-                Track a wallet
-              </p>
-              <input
-                value={trackInput}
-                onChange={(e) => setTrackInput(e.target.value)}
-                placeholder="Paste Solana address"
-                className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 font-mono text-sm outline-none focus:border-white/25"
-              />
-              <input
-                value={trackLabel}
-                onChange={(e) => setTrackLabel(e.target.value)}
-                placeholder="Optional label (e.g. Whale)"
-                className="h-10 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none focus:border-white/25"
-              />
-              <button
-                type="button"
-                disabled={!isSolAddr(trackInput.trim())}
-                onClick={addTrack}
-                className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-white text-sm font-bold text-black disabled:opacity-40"
-              >
-                <Plus className="h-4 w-4" /> Add to watchlist
-              </button>
-            </div>
+          <div>
+            <section>
+              <p className="tp__label">Add wallet</p>
+              <div className="mt-3 space-y-2">
+                <input
+                  value={trackInput}
+                  onChange={(e) => setTrackInput(e.target.value)}
+                  placeholder="Paste Solana address"
+                  className="tp__input tp__input--mono"
+                />
+                <input
+                  value={trackLabel}
+                  onChange={(e) => setTrackLabel(e.target.value)}
+                  placeholder="Optional label (e.g. Whale)"
+                  className="tp__input"
+                />
+                <button
+                  type="button"
+                  disabled={!isSolAddr(trackInput.trim())}
+                  onClick={addTrack}
+                  className="tp__btn"
+                >
+                  <Plus className="h-4 w-4" /> Track wallet
+                </button>
+              </div>
+            </section>
 
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/35">
-                Watching · {watch.length}
-              </p>
-              <button type="button" onClick={() => void refreshWatch()} className="text-[10px] text-white/40 underline">
-                Refresh
-              </button>
-            </div>
-
-            {!watch.length ? (
-              <p className="py-10 text-center text-xs text-white/30">
-                No tracked wallets yet — paste an address above
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {watch.map((w) => {
-                  const snap = watchSnap[w.address];
-                  return (
-                    <div
-                      key={w.address}
-                      className="rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3 py-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <button type="button" onClick={() => openWallet(w.address)} className="min-w-0 text-left">
-                          <p className="flex items-center gap-1.5 text-sm font-bold">
-                            <Star className="h-3.5 w-3.5 text-white/40" />
-                            {w.label || shortAddr(w.address, 6)}
+            <section className="tp__section">
+              <div className="tp__section-head">
+                <h2 className="tp__section-title">Watchlist</h2>
+                <button
+                  type="button"
+                  onClick={() => void refreshWatch()}
+                  className="text-[11px] text-white/40 underline"
+                >
+                  {watchLoading ? "Refreshing…" : "Refresh"}
+                </button>
+              </div>
+              {watchErr && <div className="tp__err">{watchErr}</div>}
+              {!watch.length ? (
+                <p className="tp__empty py-8">No tracked wallets — paste an address above</p>
+              ) : (
+                <div>
+                  {watch.map((w) => {
+                    const snap = watchSnap[w.address];
+                    return (
+                      <div key={w.address} className="tp__row">
+                        <button
+                          type="button"
+                          onClick={() => openWallet(w.address)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="text-[14px] font-bold">{w.label || shortAddr(w.address, 6)}</p>
+                          <p className="mt-0.5 font-mono text-[11px] text-white/35">
+                            {shortAddr(w.address, 8)}
                           </p>
-                          <p className="mt-0.5 font-mono text-[10px] text-white/35">{shortAddr(w.address, 8)}</p>
-                          <p className="mt-1 font-mono text-sm font-semibold">{fmtUsd(snap?.totalUsd)}</p>
-                          {snap?.pnl && (
-                            <p className="mt-1 font-mono text-[10px] text-white/40">
-                              R {fmtPnl(snap.pnl.realizedPnlUsd)}
+                          <p className="mt-1.5 font-mono text-[15px] font-bold">
+                            {snap ? fmtUsd(snap.totalUsd) : watchLoading ? "…" : "—"}
+                          </p>
+                          {snap && (
+                            <p className="mt-1 font-mono text-[11px] text-white/40">
+                              {snap.tokenCount ?? snap.holdings?.length ?? 0} tok
                               {" · "}
-                              U {fmtPnl(snap.pnl.unrealizedPnlUsd)}
-                              {snap.pnl.winRate != null
-                                ? ` · WR ${Number(snap.pnl.winRate) > 1 ? Number(snap.pnl.winRate).toFixed(0) : (Number(snap.pnl.winRate) * 100).toFixed(0)}%`
+                              R{" "}
+                              <span className={pnlTone(snap.pnl?.realizedPnlUsd)}>
+                                {fmtPnl(snap.pnl?.realizedPnlUsd)}
+                              </span>
+                              {" · "}U{" "}
+                              <span className={pnlTone(snap.pnl?.unrealizedPnlUsd)}>
+                                {fmtPnl(snap.pnl?.unrealizedPnlUsd)}
+                              </span>
+                              {snap.pnl?.winRate != null
+                                ? ` · WR ${wrLabel(snap.pnl.winRate)}`
                                 : ""}
+                              {snap.tradeCount != null ? ` · ${snap.tradeCount} swaps` : ""}
                             </p>
                           )}
                         </button>
@@ -408,102 +473,116 @@ export default function TradePortfolio() {
                             removeWatchWallet(w.address);
                             setWatch(getWatchlist());
                           }}
-                          className="rounded-full border border-white/10 p-2 text-white/35"
+                          className="tp__icon-btn"
+                          aria-label="Remove"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
             {recent.length > 0 && (
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[10px] uppercase tracking-wider text-white/35">Recent lookups</p>
+              <section className="tp__section">
+                <div className="tp__section-head">
+                  <h2 className="tp__section-title">Recent</h2>
                   <button
                     type="button"
                     onClick={() => {
                       clearRecentWallets();
                       setRecent([]);
                     }}
-                    className="text-[10px] text-white/35"
+                    className="text-[11px] text-white/35"
                   >
                     Clear
                   </button>
                 </div>
-                <div className="space-y-1">
-                  {recent.slice(0, 8).map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      onClick={() => openWallet(a)}
-                      className="flex w-full items-center justify-between rounded-xl border border-white/[0.06] px-3 py-2.5 text-left"
-                    >
-                      <span className="font-mono text-xs">{shortAddr(a, 6)}</span>
-                      <ChevronRight className="h-4 w-4 text-white/25" />
-                    </button>
-                  ))}
-                </div>
-              </div>
+                {recent.slice(0, 8).map((a) => (
+                  <button key={a} type="button" onClick={() => openWallet(a)} className="tp__row">
+                    <span className="font-mono text-[13px]">{shortAddr(a, 6)}</span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-white/25" />
+                  </button>
+                ))}
+              </section>
             )}
           </div>
         )}
 
         {tab === "holders" && (
-          <div className="space-y-4">
+          <div>
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
               <input
                 value={holderQ}
                 onChange={(e) => setHolderQ(e.target.value)}
                 placeholder="Search coin or paste mint…"
-                className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-10 pr-3 text-sm outline-none focus:border-white/25"
+                className="tp__input pl-10"
+                style={{ paddingLeft: 40 }}
               />
             </div>
             {isSolAddr(holderQ.trim()) && (
               <button
                 type="button"
                 onClick={() => void loadHolders(holderQ.trim())}
-                className="h-10 w-full rounded-xl border border-white/15 text-xs font-bold"
+                className="tp__btn tp__btn--ghost mt-3"
               >
                 Load holders
               </button>
             )}
-            {mintHits.map((c) => (
-              <button
-                key={c.mint}
-                type="button"
-                onClick={() => {
-                  setHolderQ(c.symbol);
-                  void loadHolders(c.mint);
-                }}
-                className="flex w-full items-center gap-2 rounded-xl border border-white/[0.07] px-3 py-2 text-left"
-              >
-                {c.image ? (
-                  <img src={c.image} alt="" className="h-7 w-7 rounded-lg" />
-                ) : (
-                  <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/10 text-[9px] font-bold">
-                    {c.symbol.slice(0, 2)}
-                  </div>
-                )}
-                <span className="text-xs font-bold">{c.symbol}</span>
-              </button>
-            ))}
+
+            {mintHits.length > 0 && (
+              <section className="tp__section">
+                <h2 className="tp__section-title mb-1">Matches</h2>
+                {mintHits.map((c) => (
+                  <button
+                    key={c.mint}
+                    type="button"
+                    onClick={() => {
+                      setHolderQ(c.symbol);
+                      void loadHolders(c.mint);
+                    }}
+                    className="tp__row"
+                  >
+                    {c.image ? (
+                      <img src={c.image} alt="" className="tp__avatar" style={{ width: 32, height: 32 }} />
+                    ) : (
+                      <div className="tp__avatar-fb" style={{ width: 32, height: 32, fontSize: 9 }}>
+                        {c.symbol.slice(0, 2)}
+                      </div>
+                    )}
+                    <span className="text-[13px] font-bold">${c.symbol}</span>
+                    <span className="ml-auto font-mono text-[11px] text-white/30">
+                      {shortAddr(c.mint, 4)}
+                    </span>
+                  </button>
+                ))}
+              </section>
+            )}
+
             {holderMint && (
-              <div>
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-white/55">
-                  <Users className="h-3.5 w-3.5" /> Top holders
-                  {holderMeta.symbol ? ` · $${holderMeta.symbol}` : ""}
-                </p>
+              <section className="tp__section">
+                <div className="tp__section-head">
+                  <h2 className="tp__section-title flex items-center gap-1.5">
+                    <Users className="h-4 w-4 opacity-50" />
+                    Top holders
+                    {holderMeta.symbol ? ` · $${holderMeta.symbol}` : ""}
+                  </h2>
+                  {holderMeta.holderCount != null && (
+                    <span className="font-mono text-[11px] text-white/35">
+                      {holderMeta.holderCount.toLocaleString()} total
+                    </span>
+                  )}
+                </div>
+                {holdersErr && <div className="tp__err">{holdersErr}</div>}
                 {holdersLoading ? (
-                  <div className="flex justify-center py-10">
+                  <div className="flex justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin text-white/30" />
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div>
                     {holders.slice(0, 40).map((h: any, i: number) => {
                       const addr = h.owner || h.address;
                       return (
@@ -511,18 +590,21 @@ export default function TradePortfolio() {
                           key={addr || i}
                           type="button"
                           onClick={() => addr && openWallet(addr)}
-                          className="flex w-full items-center justify-between rounded-xl border border-white/[0.07] px-3 py-2.5 text-left"
+                          className="tp__row"
                         >
-                          <span className="font-mono text-xs">
-                            #{h.rank || i + 1} {shortAddr(addr || "", 5)}
+                          <span className="font-mono text-[12px] text-white/40">
+                            #{h.rank || i + 1}
                           </span>
-                          <span className="font-mono text-xs">{h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "—"}</span>
+                          <span className="font-mono text-[13px]">{shortAddr(addr || "", 5)}</span>
+                          <span className="ml-auto font-mono text-[12px]">
+                            {h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "—"}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
                 )}
-              </div>
+              </section>
             )}
           </div>
         )}

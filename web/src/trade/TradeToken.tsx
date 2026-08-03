@@ -4,12 +4,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import {
   ArrowLeft, Copy, Check, ExternalLink, Loader2, Shield, Users, Activity,
-  Globe, Send, MessageCircle, FileDown, Flame, AlertTriangle, BarChart2,
+  Globe, Send, MessageCircle, FileDown, Flame, AlertTriangle, BarChart2, Wallet,
 } from "lucide-react";
-import { askCoinChat, fetchTokenBundle, fetchTokenOnly } from "./tradeApi";
-import { dexChartUrl, fmtNum, fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
+import { askCoinChat, fetchTokenBundle, fetchTokenOnly, fetchWallet } from "./tradeApi";
+import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr } from "./tradeFmt";
 
 type TabId =
   | "overview"
@@ -103,6 +105,8 @@ function KvGrid({ rows }: { rows: [string, any][] }) {
 export default function TradeToken() {
   const { mint = "" } = useParams();
   const navigate = useNavigate();
+  const { publicKey, connected, wallets, select, connect } = useWallet();
+  const { connection } = useConnection();
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<TabId>("overview");
@@ -121,6 +125,11 @@ export default function TradeToken() {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsgs, setAiMsgs] = useState<{ role: string; content: string }[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
+  const [posAmount, setPosAmount] = useState(0);
+  const [posWorth, setPosWorth] = useState<number | null>(null);
+  const [posUnreal, setPosUnreal] = useState<number | null>(null);
+  const [posUnrealPct, setPosUnrealPct] = useState<number | null>(null);
+  const [posCost, setPosCost] = useState<number | null>(null);
 
   const loadBundle = (m: string) => {
     setLoading(true);
@@ -169,6 +178,93 @@ export default function TradeToken() {
     }, 12000);
     return () => window.clearInterval(id);
   }, [mint]);
+
+  /* Compact live position for this mint (token page strip) */
+  useEffect(() => {
+    if (!mint || !publicKey) {
+      setPosAmount(0);
+      setPosWorth(null);
+      setPosUnreal(null);
+      setPosUnrealPct(null);
+      setPosCost(null);
+      return;
+    }
+    let on = true;
+    let costUsd: number | null = null;
+    let avgCost: number | null = null;
+
+    const refreshCost = async () => {
+      try {
+        const w = await fetchWallet(publicKey.toBase58());
+        if (!on || !w?.ok) return;
+        const tokens: any[] = Array.isArray(w?.pnl?.tokens)
+          ? w.pnl.tokens
+          : Array.isArray(w?.tokens)
+            ? w.tokens
+            : [];
+        const row = tokens.find((x: any) => x.mint === mint);
+        costUsd = row?.costUsd != null ? Number(row.costUsd) : null;
+        avgCost = row?.avgCostUsd != null ? Number(row.avgCostUsd) : null;
+        if (costUsd != null) setPosCost(costUsd);
+        else if (avgCost != null) setPosCost(null);
+      } catch {
+        /* keep */
+      }
+    };
+
+    const tick = async () => {
+      try {
+        const accs = await connection.getParsedTokenAccountsByOwner(publicKey, {
+          mint: new PublicKey(mint),
+        });
+        let amount = 0;
+        for (const a of accs.value) {
+          const ui = Number(a.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+          if (Number.isFinite(ui)) amount += ui;
+        }
+        if (!on) return;
+        setPosAmount(amount);
+        const px =
+          Number(
+            (d?.token || {}).priceUsd ??
+              (d?.meta || {}).priceUsd ??
+              d?.raw?.priceUsd,
+          ) || 0;
+        const worth = px > 0 ? amount * px : amount > 0 ? null : 0;
+        setPosWorth(worth);
+        let c = costUsd;
+        if (c == null && avgCost != null && amount > 0) c = avgCost * amount;
+        if (worth != null && c != null && c > 0) {
+          const u = worth - c;
+          setPosUnreal(u);
+          setPosUnrealPct((u / c) * 100);
+          setPosCost(c);
+        } else {
+          setPosUnreal(null);
+          setPosUnrealPct(null);
+        }
+      } catch {
+        if (on) setPosAmount(0);
+      }
+    };
+
+    void refreshCost().then(() => tick());
+    const balIv = window.setInterval(() => void tick(), 1000);
+    const costIv = window.setInterval(() => void refreshCost(), 12_000);
+    return () => {
+      on = false;
+      window.clearInterval(balIv);
+      window.clearInterval(costIv);
+    };
+  }, [mint, publicKey, connection, d]);
+
+  const connectWallet = () => {
+    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
+    const jup = wallets.find((w) => /jupiter/i.test(w.adapter.name));
+    const pick = phantom || jup || wallets[0];
+    if (pick) select(pick.adapter.name as any);
+    setTimeout(() => connect().catch(() => {}), 120);
+  };
 
   const t: any = d?.token || {};
   const meta: any = d?.meta || {};
@@ -268,7 +364,7 @@ export default function TradeToken() {
   }
 
   return (
-    <div className="h-full overflow-y-auto overscroll-contain bg-black pb-28">
+    <div className="h-full overflow-y-auto overscroll-contain bg-black pb-44">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-black/95 px-3 py-3 backdrop-blur">
         <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white">
@@ -818,12 +914,73 @@ export default function TradeToken() {
       </div>
 
       <div className="fixed bottom-[calc(5.35rem+env(safe-area-inset-bottom))] inset-x-0 z-40 px-3">
-        <Link
-          to={`/trade/desk/${mint}`}
-          className="mx-auto flex h-12 max-w-lg items-center justify-center rounded-2xl bg-white text-sm font-bold text-black shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
-        >
-          Trade {symbol}
-        </Link>
+        <div className="mx-auto max-w-lg space-y-2">
+          {/* Always-visible position strip above Trade CTA */}
+          <div className="rounded-2xl border border-white/15 bg-[#0a0a0a]/95 px-3 py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.5)] backdrop-blur">
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                Your position
+              </p>
+              {connected && publicKey ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400/90">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                  Live
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={connectWallet}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-white/70 underline"
+                >
+                  <Wallet className="h-3 w-3" /> Connect
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <p className="text-[8px] uppercase tracking-wider text-white/30">Hold</p>
+                <p className="font-mono text-[11px] font-bold">
+                  {connected ? fmtTok(posAmount) : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[8px] uppercase tracking-wider text-white/30">Worth</p>
+                <p className="font-mono text-[11px] font-bold">
+                  {connected ? (posWorth != null ? fmtUsd(posWorth) : "—") : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[8px] uppercase tracking-wider text-white/30">PnL</p>
+                <p
+                  className={`font-mono text-[11px] font-bold ${
+                    posUnreal == null
+                      ? "text-white/40"
+                      : posUnreal >= 0
+                        ? "text-emerald-400"
+                        : "text-red-400"
+                  }`}
+                >
+                  {connected && posUnreal != null ? fmtPnl(posUnreal) : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[8px] uppercase tracking-wider text-white/30">Cost</p>
+                <p className="font-mono text-[11px] font-bold text-white/70">
+                  {connected && posCost != null ? fmtUsd(posCost) : "—"}
+                  {connected && posUnrealPct != null ? (
+                    <span className="ml-0.5 text-[9px] opacity-70">{fmtPct(posUnrealPct)}</span>
+                  ) : null}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Link
+            to={`/trade/desk/${mint}`}
+            className="flex h-12 items-center justify-center rounded-2xl bg-white text-sm font-bold text-black shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+          >
+            Trade {symbol}
+          </Link>
+        </div>
       </div>
     </div>
   );

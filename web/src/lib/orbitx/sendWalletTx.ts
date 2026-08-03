@@ -21,6 +21,12 @@ export type WalletSendCaps = {
   signTransaction?: <T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>;
 };
 
+export type WalletSendOptions = {
+  /** When true, skip RPC preflight so the wallet prompt opens immediately. */
+  skipPreflight?: boolean;
+  maxRetries?: number;
+};
+
 function serializeSigned(signed: Transaction | VersionedTransaction): Uint8Array {
   if (signed instanceof VersionedTransaction) return signed.serialize();
   const sigs = signed.signatures ?? [];
@@ -38,16 +44,18 @@ export async function sendWalletTransaction(
   connection: Connection,
   wallet: WalletSendCaps,
   tx: Transaction | VersionedTransaction,
+  options?: WalletSendOptions,
 ): Promise<string> {
+  const opts = {
+    skipPreflight: options?.skipPreflight ?? false,
+    maxRetries: options?.maxRetries ?? 3,
+  };
   if (wallet.sendTransaction) {
-    return wallet.sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
+    return wallet.sendTransaction(tx, connection, opts);
   }
   if (wallet.signTransaction) {
     const signed = await wallet.signTransaction(tx);
-    return connection.sendRawTransaction(serializeSigned(signed), {
-      skipPreflight: false,
-      maxRetries: 3,
-    });
+    return connection.sendRawTransaction(serializeSigned(signed), opts);
   }
   throw new Error("This wallet can't sign here — connect Phantom or Jupiter");
 }

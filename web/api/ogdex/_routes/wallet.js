@@ -132,7 +132,7 @@ export default async function handler(req, res) {
         { programId: TOKEN_2022 },
         { encoding: "jsonParsed" },
       ]).catch(() => null),
-      computePnl(address, { sigLimit: 50 }).catch(() => null),
+      computePnl(address, { sigLimit: 80 }).catch(() => null),
     ]);
     const sol =
       lamports == null ? 0 : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
@@ -234,20 +234,21 @@ export default async function handler(req, res) {
       (pnl.positions || []).forEach(enrich);
       (pnl.perToken || []).forEach(enrich);
 
-      let unrealUsd = 0,
-        unrealSol = 0;
       const sp = pnl.solPrice || solPrice;
       const px = (m) => Number(prices[m]?.usdPrice) || Number(dex[m]?.usdPrice) || 0;
-      for (const p of pnl.positions) {
+
+      // Refresh open positions with live prices (swap-history remainder).
+      for (const p of pnl.positions || []) {
         const cur = px(p.mint);
-        if (cur > 0) {
+        if (cur > 0 && p.tokens > 0) {
           p.curPriceUsd = cur;
           p.curValueUsd = p.tokens * cur;
           p.unrealizedUsd = p.curValueUsd - (p.costUsd || 0);
-          unrealUsd += p.unrealizedUsd;
-          if (sp > 0) unrealSol += p.curValueUsd / sp - (p.costSol || 0);
+          p.unrealizedPct =
+            p.costUsd > 0 ? (p.unrealizedUsd / p.costUsd) * 100 : null;
         }
       }
+
       for (const t of pnl.perToken || []) {
         const h = holdByMint[t.mint];
         const holdingAmt = h ? h.uiAmount : 0;
@@ -255,28 +256,82 @@ export default async function handler(req, res) {
         t.holding = holdingAmt > 0;
         t.holdingAmount = holdingAmt || 0;
         t.holdingUsd = holdingAmt > 0 ? holdingUsd : 0;
-        // Prefer live chain balance for "how much they hold"
+
+        // Prefer live chain balance for size / mark.
         if (holdingAmt > 0) {
           t.tokens = holdingAmt;
           t.curValueUsd = holdingUsd || t.curValueUsd;
           if (h?.priceUsd > 0) t.curPriceUsd = h.priceUsd;
         }
-        t.pctSupply =
-          h?.pctSupply ??
-          pctSupply(holdingAmt, holdingUsd, t.mcap || h?.mcap, t.curPriceUsd || h?.priceUsd);
 
-        if (t.open || holdingAmt > 0) {
-          const cur = t.curPriceUsd || px(t.mint);
-          if (cur > 0 && t.avgCostUsd != null && t.tokens > 0) {
-            t.curPriceUsd = cur;
-            t.curValueUsd = t.tokens * cur;
-            const cost = (t.avgCostUsd || 0) * t.tokens;
-            t.costUsd = t.costUsd ?? cost;
-            t.unrealizedUsd = t.curValueUsd - cost;
-            t.unrealizedPct = cost > 0 ? (t.unrealizedUsd / cost) * 100 : null;
+        const posTokens =
+          holdingAmt > 0 ? holdingAmt : t.open && t.tokens > 0 ? t.tokens : 0;
+        const cur = (h?.priceUsd > 0 ? h.priceUsd : null) || t.curPriceUsd || px(t.mint) || 0;
+
+        // Cost basis: rescale avg cost to current size; fall back to boughtUsd
+        // when the window shows only buys (still fully held).
+        let costUsd = null;
+        if (t.avgCostUsd != null && posTokens > 0) {
+          costUsd = t.avgCostUsd * posTokens;
+        } else if (t.costUsd != null && t.open && posTokens > 0) {
+          costUsd = t.costUsd;
+        } else if (
+          holdingAmt > 0 &&
+          (t.sells || 0) === 0 &&
+          t.boughtUsd != null &&
+          t.boughtUsd > 0
+        ) {
+          costUsd = t.boughtUsd;
+          t.avgCostUsd = holdingAmt > 0 ? costUsd / holdingAmt : t.avgCostUsd;
+        }
+        if (costUsd != null) {
+          t.costUsd = costUsd;
+          if (sp > 0) t.costSol = costUsd / sp;
+        }
+
+        if (cur > 0 && posTokens > 0) {
+          t.curPriceUsd = cur;
+          t.curValueUsd = posTokens * cur;
+          if (holdingAmt > 0) t.holdingUsd = t.curValueUsd;
+          if (t.costUsd != null) {
+            t.unrealizedUsd = t.curValueUsd - t.costUsd;
+            t.unrealizedPct =
+              t.costUsd > 0 ? (t.unrealizedUsd / t.costUsd) * 100 : null;
           }
         }
-        t.totalUsd = (t.realizedUsd || 0) + (t.unrealizedUsd || 0);
+
+        // "Pot" = mark-to-market position value (held bag).
+        t.potUsd =
+          holdingAmt > 0
+            ? t.holdingUsd || t.curValueUsd || null
+            : t.open
+              ? t.curValueUsd ?? null
+              : null;
+
+        t.pctSupply =
+          h?.pctSupply ??
+          pctSupply(
+            holdingAmt || posTokens,
+            t.holdingUsd || t.curValueUsd || 0,
+            t.mcap || h?.mcap,
+            t.curPriceUsd || h?.priceUsd,
+          );
+
+        const u = t.unrealizedUsd;
+        t.totalUsd =
+          (t.realizedUsd || 0) + (u != null && Number.isFinite(u) ? u : 0);
+      }
+
+      // Aggregates from enriched per-token rows (not stale swap-only positions).
+      let unrealUsd = 0;
+      let unrealSol = 0;
+      for (const t of pnl.perToken || []) {
+        if (t.unrealizedUsd == null || !Number.isFinite(t.unrealizedUsd)) continue;
+        if (!(t.holding || t.open)) continue;
+        unrealUsd += t.unrealizedUsd;
+        if (sp > 0 && t.curValueUsd != null) {
+          unrealSol += t.curValueUsd / sp - (t.costSol || 0);
+        }
       }
       pnl.perToken && pnl.perToken.sort((a, b) => (b.totalUsd || 0) - (a.totalUsd || 0));
       pnl.unrealizedPnlUsd = unrealUsd;
@@ -318,7 +373,7 @@ export default async function handler(req, res) {
           realizedSol: 0,
           unrealizedUsd: null,
           unrealizedPct: null,
-          totalUsd: null,
+          totalUsd: h.usdValue || 0,
           closedTrades: 0,
           wins: 0,
           losses: 0,
@@ -328,6 +383,7 @@ export default async function handler(req, res) {
           holding: true,
           holdingAmount: h.uiAmount,
           holdingUsd: h.usdValue || 0,
+          potUsd: h.usdValue || 0,
           pctSupply: h.pctSupply,
           avgCostUsd: null,
           costUsd: null,

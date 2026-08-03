@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
   ArrowUpRight, ArrowDownLeft, Check,
@@ -26,12 +26,16 @@ import {
   type AlertKind,
 } from "@/trade/tradeAlerts";
 import { getBuyPresets, getSellPresets, saveBuyPresets } from "@/trade/tradePresets";
+import { fetchWallet } from "@/trade/tradeApi";
+import { fmtPct, fmtPnl, fmtTok, fmtUsd } from "@/trade/tradeFmt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import {
   jupSearchToken,
+  jupQuote,
+  jupSwapTransaction,
   HELIUS_RPC,
   SOL_MINT,
   shortAddr,
@@ -41,6 +45,7 @@ import {
   getAssets,
   type TokenAsset,
 } from "@/lib/solana-api";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 export type TradeTerminalProps = {
   initialMint?: string | null;
   onMintChange?: (mint: string) => void;
@@ -372,8 +377,29 @@ function fmtNum(n: number): string {
    Component
    ═══════════════════════════════════════════════════════════════════ */
 
+type LivePosition = {
+  amount: number;
+  worthUsd: number | null;
+  costUsd: number | null;
+  boughtUsd: number | null;
+  avgCostUsd: number | null;
+  unrealizedUsd: number | null;
+  unrealizedPct: number | null;
+  updatedAt: number;
+};
+
 export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: TradeTerminalProps = {}) => {
-  const { publicKey, connected, wallets, select, connect, disconnect, sendTransaction, signMessage } = useWallet();
+  const {
+    publicKey,
+    connected,
+    wallets,
+    select,
+    connect,
+    disconnect,
+    sendTransaction,
+    signTransaction,
+    signMessage,
+  } = useWallet();
   const { connection } = useConnection();
   const deskMode = mode === "desk";
 
@@ -423,6 +449,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [copied, setCopied] = useState(false);
   const [positions, setPositions] = useState<TokenAsset[]>([]);
   const [showWalletPicker, setShowWalletPicker] = useState(false);
+  const [livePos, setLivePos] = useState<LivePosition | null>(null);
+  const [livePosLoading, setLivePosLoading] = useState(false);
+  const costCacheRef = useRef<{
+    mint: string;
+    avgCostUsd: number | null;
+    costUsd: number | null;
+    boughtUsd: number | null;
+  } | null>(null);
 
   /* ── Load DEX markets (skip in desk mode — trade a selected mint only) ── */
   useEffect(() => {
@@ -528,6 +562,88 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     })();
   }, [publicKey]);
 
+  /* ── Live position for selected mint (~1s balance + price) ─ */
+  useEffect(() => {
+    if (!publicKey || !selectedMint) {
+      setLivePos(null);
+      setLivePosLoading(false);
+      costCacheRef.current = null;
+      return;
+    }
+    let on = true;
+    setLivePosLoading(true);
+
+    const refreshCost = async () => {
+      try {
+        const w = await fetchWallet(publicKey.toBase58());
+        if (!on || !w?.ok) return;
+        const tokens: any[] = Array.isArray(w?.pnl?.tokens)
+          ? w.pnl.tokens
+          : Array.isArray(w?.tokens)
+            ? w.tokens
+            : [];
+        const row = tokens.find((t: any) => t.mint === selectedMint);
+        costCacheRef.current = {
+          mint: selectedMint,
+          avgCostUsd: row?.avgCostUsd != null ? Number(row.avgCostUsd) : null,
+          costUsd: row?.costUsd != null ? Number(row.costUsd) : null,
+          boughtUsd: row?.boughtUsd != null ? Number(row.boughtUsd) : null,
+        };
+      } catch {
+        /* keep prior cache */
+      }
+    };
+
+    const tick = async () => {
+      try {
+        const mintPk = new PublicKey(selectedMint);
+        const accs = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: mintPk });
+        let amount = 0;
+        for (const a of accs.value) {
+          const ui = Number(a.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+          if (Number.isFinite(ui)) amount += ui;
+        }
+        const price = Number(selectedToken?.price) || 0;
+        const worthUsd = price > 0 && amount > 0 ? amount * price : amount > 0 && price <= 0 ? null : 0;
+        const cache = costCacheRef.current?.mint === selectedMint ? costCacheRef.current : null;
+        let costUsd = cache?.costUsd ?? null;
+        if (costUsd == null && cache?.avgCostUsd != null && amount > 0) {
+          costUsd = cache.avgCostUsd * amount;
+        }
+        let unrealizedUsd: number | null = null;
+        let unrealizedPct: number | null = null;
+        if (worthUsd != null && costUsd != null && costUsd > 0) {
+          unrealizedUsd = worthUsd - costUsd;
+          unrealizedPct = (unrealizedUsd / costUsd) * 100;
+        }
+        if (!on) return;
+        setLivePos({
+          amount,
+          worthUsd,
+          costUsd,
+          boughtUsd: cache?.boughtUsd ?? null,
+          avgCostUsd: cache?.avgCostUsd ?? null,
+          unrealizedUsd,
+          unrealizedPct,
+          updatedAt: Date.now(),
+        });
+      } catch {
+        if (on) setLivePos(null);
+      } finally {
+        if (on) setLivePosLoading(false);
+      }
+    };
+
+    void refreshCost().then(() => tick());
+    const balIv = window.setInterval(() => void tick(), 1000);
+    const costIv = window.setInterval(() => void refreshCost(), 12_000);
+    return () => {
+      on = false;
+      window.clearInterval(balIv);
+      window.clearInterval(costIv);
+    };
+  }, [publicKey, selectedMint, selectedToken?.price, connection]);
+
   /* ── My Trades (wallet swaps) ───────────────────────────── */
   useEffect(() => {
     if (bottomTab !== "My Trades" || !publicKey) {
@@ -614,13 +730,41 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     toast({ title: "Address copied" });
   }, [selectedMint]);
 
-  /** Connect Phantom (or picker) then build + sign trade via /api/ogdex/trade */
+  /** Build Jupiter swap tx client-side when the trade API can't return one. */
+  const buildJupiterTx = useCallback(async (): Promise<string> => {
+    if (!publicKey || !selectedMint) throw new Error("Wallet / mint missing");
+    const slippageBps = Math.min(Math.max(Math.round((Number(slippage) || 10) * 100), 50), 5000);
+    if (swapMode === "buy") {
+      const lamports = Math.floor(Number(buyAmt) * 1e9);
+      if (!Number.isFinite(lamports) || lamports <= 0) throw new Error("Enter a valid SOL amount");
+      const q = await jupQuote(SOL_MINT, selectedMint, String(lamports), slippageBps);
+      return jupSwapTransaction(q, publicKey.toBase58());
+    }
+    const mintPk = new PublicKey(selectedMint);
+    const accs = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: mintPk });
+    let raw = 0n;
+    for (const a of accs.value) {
+      const amt = a.account?.data?.parsed?.info?.tokenAmount?.amount;
+      if (amt) raw += BigInt(amt);
+    }
+    if (raw <= 0n) throw new Error("No balance to sell");
+    const amount = (raw * BigInt(Math.round(sellPct))) / 100n;
+    if (amount <= 0n) throw new Error("Sell amount too small");
+    const q = await jupQuote(selectedMint, SOL_MINT, amount.toString(), slippageBps);
+    return jupSwapTransaction(q, publicKey.toBase58());
+  }, [publicKey, selectedMint, swapMode, buyAmt, sellPct, slippage, connection]);
+
+  /** Connect Phantom (or picker) then build + sign trade — wallet opens immediately. */
   const handleSwap = useCallback(async () => {
     if (!selectedMint) return;
     setTradeErr("");
     setTradeSig("");
     if (!connected || !publicKey) {
       setShowWalletPicker(true);
+      return;
+    }
+    if (!sendTransaction && !signTransaction) {
+      setTradeErr("This wallet can't sign here — reconnect Phantom or Jupiter");
       return;
     }
     if (swapMode === "buy") {
@@ -634,30 +778,60 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     try {
       setTradeStage("Building transaction…");
       const amount = swapMode === "buy" ? Number(buyAmt) : `${sellPct}%`;
-      const r = await fetch("/api/ogdex/trade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicKey: publicKey.toBase58(),
-          action: swapMode,
-          mint: selectedMint,
-          amount,
-          denominatedInSol: swapMode === "buy" ? "true" : "false",
-          slippage,
-          priorityFee: 0.0003,
-          pool: "auto",
-        }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d?.ok || !d?.tx) throw new Error(d?.error || "Could not build transaction");
-      setTradeStage("Confirm in Phantom…");
-      const bytes = Uint8Array.from(atob(d.tx), (c) => c.charCodeAt(0));
+      let txB64 = "";
+      let skipPreflight = true;
+      let warning = "";
+
+      try {
+        const r = await fetch("/api/ogdex/trade", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicKey: publicKey.toBase58(),
+            action: swapMode,
+            mint: selectedMint,
+            amount,
+            denominatedInSol: swapMode === "buy" ? "true" : "false",
+            slippage,
+            priorityFee: 0.0003,
+            pool: "auto",
+          }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (d?.ok && d?.tx) {
+          txB64 = d.tx;
+          // Prefer opening the wallet immediately; only tighten preflight when sim passed.
+          skipPreflight = d.simulated !== true;
+          if (typeof d.warning === "string") warning = d.warning;
+        } else {
+          throw new Error(d?.error || "Could not build transaction");
+        }
+      } catch (apiErr: any) {
+        setTradeStage("Building via Jupiter…");
+        try {
+          txB64 = await buildJupiterTx();
+          skipPreflight = true;
+        } catch {
+          throw new Error(String(apiErr?.message || apiErr || "Could not build transaction"));
+        }
+      }
+
+      setTradeStage("Confirm in wallet…");
+      const bytes = Uint8Array.from(atob(txB64), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(bytes);
-      const sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
+      const sig = await sendWalletTransaction(
+        connection,
+        { sendTransaction: sendTransaction ?? undefined, signTransaction: signTransaction ?? undefined },
+        tx,
+        { skipPreflight, maxRetries: 3 },
+      );
       setTradeStage("Confirming on-chain…");
       await connection.confirmTransaction(sig, "confirmed");
       setTradeSig(sig);
-      toast({ title: "Trade confirmed", description: `${sig.slice(0, 8)}…` });
+      toast({
+        title: "Trade confirmed",
+        description: warning ? `${sig.slice(0, 8)}… · ${warning}` : `${sig.slice(0, 8)}…`,
+      });
       if (publicKey) {
         try {
           const assets = await getAssets(publicKey.toString());
@@ -672,7 +846,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       }
     } catch (e: any) {
       const m = String(e?.message || e || "Trade failed");
-      setTradeErr(/reject|cancel/i.test(m) ? "Cancelled in Phantom" : m);
+      setTradeErr(/reject|cancel/i.test(m) ? "Cancelled in wallet" : m);
     } finally {
       setTradeBusy(false);
       setTradeStage("");
@@ -686,7 +860,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     sellPct,
     slippage,
     sendTransaction,
+    signTransaction,
     connection,
+    buildJupiterTx,
   ]);
 
   const selectSearchResult = useCallback(
@@ -971,6 +1147,109 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <span className="text-[10px] text-white/30">%</span>
           </div>
 
+          {/* Your position — always visible above Buy/Sell */}
+          <div className="rounded-xl border border-white/15 bg-gradient-to-b from-white/[0.08] to-transparent px-3 py-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">
+                Your position
+              </p>
+              {connected && publicKey ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400/90">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  </span>
+                  Live
+                  {livePosLoading && !livePos ? "…" : ""}
+                </span>
+              ) : (
+                <span className="text-[10px] text-white/35">Connect to track</span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-white/30">Holding</p>
+                <p className="font-mono text-[13px] font-bold tabular-nums">
+                  {connected && publicKey
+                    ? livePos
+                      ? fmtTok(livePos.amount)
+                      : livePosLoading
+                        ? "…"
+                        : "0"
+                    : "—"}
+                  <span className="ml-1 text-[10px] font-medium text-white/35">
+                    {t?.symbol || ""}
+                  </span>
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] uppercase tracking-wider text-white/30">Worth</p>
+                <p className="font-mono text-[13px] font-bold tabular-nums">
+                  {connected && publicKey
+                    ? livePos
+                      ? livePos.worthUsd != null
+                        ? fmtUsd(livePos.worthUsd)
+                        : "—"
+                      : livePosLoading
+                        ? "…"
+                        : "$0"
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-wider text-white/30">Unrealized</p>
+                <p
+                  className={`font-mono text-[12px] font-semibold tabular-nums ${
+                    !connected || livePos?.unrealizedUsd == null
+                      ? "text-white/40"
+                      : livePos.unrealizedUsd >= 0
+                        ? "text-emerald-400"
+                        : "text-red-400"
+                  }`}
+                >
+                  {connected && publicKey && livePos?.unrealizedUsd != null ? (
+                    <>
+                      {fmtPnl(livePos.unrealizedUsd)}
+                      {livePos.unrealizedPct != null ? (
+                        <span className="ml-1 text-[10px] opacity-80">
+                          ({fmtPct(livePos.unrealizedPct)})
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] uppercase tracking-wider text-white/30">
+                  {livePos?.boughtUsd != null ? "Bought" : "Cost basis"}
+                </p>
+                <p className="font-mono text-[12px] font-semibold tabular-nums text-white/70">
+                  {connected && publicKey
+                    ? livePos?.boughtUsd != null
+                      ? fmtUsd(livePos.boughtUsd)
+                      : livePos?.costUsd != null
+                        ? fmtUsd(livePos.costUsd)
+                        : livePos?.avgCostUsd != null
+                          ? `${fmtUsd(livePos.avgCostUsd)}/tok`
+                          : "—"
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            {!connected || !publicKey ? (
+              <button
+                type="button"
+                onClick={() => setShowWalletPicker(true)}
+                className="mt-3 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] text-[11px] font-bold text-white/85 hover:bg-white/10"
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                Connect Phantom / Jupiter
+              </button>
+            ) : null}
+          </div>
+
           <Button
             type="button"
             onClick={() => void handleSwap()}
@@ -1015,7 +1294,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
             </a>
           )}
-          <p className="text-center text-[10px] text-white/25">Market · sign in Phantom</p>
+          <p className="text-center text-[10px] text-white/25">Market · sign in wallet</p>
         </>
       ) : (
         <>
