@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Copy, Check, ExternalLink, Loader2, Wallet } from "lucide-react";
+import { ArrowLeft, Copy, Check, ExternalLink, Loader2, Wallet, RefreshCw } from "lucide-react";
 import { fetchSwaps, fetchWallet } from "./tradeApi";
 import { fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
 import { pushRecentWallet } from "./tradeRecent";
@@ -21,22 +21,23 @@ export default function TradeWallet() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<Tab>("holdings");
-  const [hideDust, setHideDust] = useState(true);
+  /** Only hide priced dust under $0.01 — never hide unpriced balances. */
+  const [hideDust, setHideDust] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
     if (!address) return;
     pushRecentWallet(address);
-    let on = true;
     setLoading(true);
     Promise.all([fetchWallet(address), fetchSwaps(address, 40)]).then(([w, s]) => {
-      if (!on) return;
       setD(w);
       setTrades(Array.isArray(s?.trades) ? s.trades : []);
       setLoading(false);
     });
-    return () => {
-      on = false;
-    };
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
   const holdings = useMemo(() => {
@@ -51,9 +52,16 @@ export default function TradeWallet() {
       image: null as string | null,
       isSol: true,
       change24h: null as number | null,
+      unpriced: false,
     };
     const list = [sol, ...(d.holdings || [])];
-    return hideDust ? list.filter((h: any) => (h.usdValue || 0) >= 0.01 || h.isSol) : list;
+    if (!hideDust) return list;
+    // Keep SOL + unpriced balances; only drop priced dust under $0.01
+    return list.filter((h: any) => {
+      if (h.isSol) return true;
+      if (h.unpriced || !(h.priceUsd > 0) || !(h.usdValue > 0)) return true;
+      return h.usdValue >= 0.01;
+    });
   }, [d, hideDust]);
 
   const pnl = d?.pnl;
@@ -71,7 +79,7 @@ export default function TradeWallet() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-black">
+      <div className="flex h-full items-center justify-center bg-[#050505]">
         <Loader2 className="h-7 w-7 animate-spin text-white/30" />
       </div>
     );
@@ -79,10 +87,10 @@ export default function TradeWallet() {
 
   if (!d?.ok) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-black px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#050505] px-6 text-center">
         <Wallet className="h-8 w-8 text-white/20" />
         <p className="text-sm text-white/40">{d?.error || "Could not load wallet"}</p>
-        <p className="max-w-xs font-mono text-[10px] text-white/25 break-all">{address}</p>
+        <p className="max-w-xs break-all font-mono text-[10px] text-white/25">{address}</p>
         <button
           type="button"
           onClick={() => navigate("/trade/portfolio")}
@@ -95,32 +103,49 @@ export default function TradeWallet() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-black">
-      <div className="shrink-0 border-b border-white/10 px-3 py-3">
-        <div className="flex items-center gap-3">
+    <div className="flex h-full flex-col overflow-hidden bg-[#050505]">
+      <div className="relative shrink-0 border-b border-white/[0.06] px-3 pb-3 pt-2">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: "radial-gradient(ellipse 70% 80% at 50% -40%, rgba(255,255,255,0.07), transparent 60%)",
+          }}
+        />
+        <div className="relative flex items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/trade/portfolio")}
-            className="rounded-full p-1.5 text-white/50 hover:bg-white/10"
+            className="rounded-full bg-white/[0.06] p-2 text-white/55 hover:bg-white/10"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-wider text-white/35">Portfolio</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">Wallet</p>
             <p className="font-mono text-sm font-semibold">{shortAddr(address, 6)}</p>
           </div>
-          <button type="button" onClick={copy} className="rounded-full border border-white/10 p-2 text-white/50">
-            {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+          <button type="button" onClick={load} className="rounded-full border border-white/10 p-2 text-white/45">
+            <RefreshCw className="h-4 w-4" />
           </button>
-          <a href={`https://solscan.io/account/${address}`} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 p-2 text-white/50">
+          <button type="button" onClick={copy} className="rounded-full border border-white/10 p-2 text-white/45">
+            {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+          </button>
+          <a
+            href={`https://solscan.io/account/${address}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-white/10 p-2 text-white/45"
+          >
             <ExternalLink className="h-4 w-4" />
           </a>
         </div>
-        <p className="mt-3 px-1 font-mono text-3xl font-bold">{fmtUsd(d.totalUsd)}</p>
-        <div className="mt-2 flex flex-wrap gap-2 px-1 text-[11px] text-white/40">
+
+        <p className="relative mt-4 px-1 font-mono text-[36px] font-black leading-none tracking-tight">
+          {fmtUsd(d.totalUsd)}
+        </p>
+        <div className="relative mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-white/40">
           <span>{(d.sol || 0).toFixed(3)} SOL</span>
           <span>·</span>
-          <span>{d.tokenCount ?? holdings.length} tokens</span>
+          <span>{d.tokenCount ?? Math.max(0, holdings.length - 1)} tokens</span>
           {pnl?.winRate != null && (
             <>
               <span>·</span>
@@ -130,23 +155,32 @@ export default function TradeWallet() {
             </>
           )}
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-white/10 bg-[#050505] px-3 py-2">
+
+        <div className="relative mt-3 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
             <p className="text-[9px] text-white/30">Realized</p>
-            <p className={`font-mono text-xs font-semibold ${(pnl?.realizedPnlUsd || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+            <p
+              className={`font-mono text-xs font-semibold ${
+                (pnl?.realizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
+              }`}
+            >
               {fmtUsd(pnl?.realizedPnlUsd)}
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-[#050505] px-3 py-2">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
             <p className="text-[9px] text-white/30">Unrealized</p>
-            <p className={`font-mono text-xs font-semibold ${(pnl?.unrealizedPnlUsd || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+            <p
+              className={`font-mono text-xs font-semibold ${
+                (pnl?.unrealizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
+              }`}
+            >
               {fmtUsd(pnl?.unrealizedPnlUsd)}
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-[#050505] px-3 py-2">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
             <p className="text-[9px] text-white/30">W / L</p>
             <p className="font-mono text-xs font-semibold">
-              <span className="text-green-400">{wins ?? "—"}</span>
+              <span className="text-emerald-400">{wins ?? "—"}</span>
               <span className="text-white/20"> / </span>
               <span className="text-red-400">{losses ?? "—"}</span>
             </p>
@@ -154,7 +188,7 @@ export default function TradeWallet() {
         </div>
       </div>
 
-      <div className="flex shrink-0 gap-1 border-b border-white/10 px-2 py-2">
+      <div className="flex shrink-0 gap-1 px-3 py-2">
         {(
           [
             ["holdings", "Holdings"],
@@ -167,7 +201,7 @@ export default function TradeWallet() {
             type="button"
             onClick={() => setTab(id)}
             className={`flex-1 rounded-xl py-2.5 text-xs font-bold ${
-              tab === id ? "bg-white text-black" : "text-white/40"
+              tab === id ? "bg-white text-black" : "bg-white/[0.03] text-white/40"
             }`}
           >
             {label}
@@ -175,57 +209,67 @@ export default function TradeWallet() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {tab === "holdings" && (
           <>
-            <div className="flex items-center justify-between px-4 py-2">
-              <p className="text-[10px] text-white/30">{holdings.length} assets</p>
+            <div className="mb-2 flex items-center justify-between px-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/35">
+                {holdings.length} assets
+                {d.tokenCount != null && d.tokenCount + 1 !== holdings.length
+                  ? ` · ${d.tokenCount} tokens on-chain`
+                  : ""}
+              </p>
               <button
                 type="button"
                 onClick={() => setHideDust((v) => !v)}
-                className="text-[10px] text-white/40 underline"
+                className="text-[10px] font-medium text-white/40 underline"
               >
-                {hideDust ? "Show dust" : "Hide dust"}
+                {hideDust ? "Show dust" : "Hide dust <$0.01"}
               </button>
             </div>
-            {holdings.map((h: any) => (
-              <button
-                key={h.mint}
-                type="button"
-                onClick={() => {
-                  if (h.isSol || h.mint === SOL_MINT) return;
-                  navigate(`/trade/token/${h.mint}`);
-                }}
-                className="flex w-full items-center gap-3 border-b border-white/[0.05] px-4 py-3 text-left hover:bg-white/[0.04]"
-              >
-                {h.image ? (
-                  <img src={h.image} alt="" className="h-10 w-10 rounded-full object-cover" />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">
-                    {(h.symbol || "?").slice(0, 2)}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold">{h.symbol || "???"}</p>
-                  <p className="font-mono text-[10px] text-white/35">
-                    {Number(h.uiAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-sm font-semibold">{fmtUsd(h.usdValue)}</p>
-                  {h.change24h != null && (
-                    <p className={`font-mono text-[10px] ${h.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {fmtPct(h.change24h)}
-                    </p>
+            <div className="space-y-1.5">
+              {holdings.map((h: any) => (
+                <button
+                  key={h.mint}
+                  type="button"
+                  onClick={() => {
+                    if (h.isSol || h.mint === SOL_MINT) return;
+                    navigate(`/trade/token/${h.mint}`);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
+                >
+                  {h.image ? (
+                    <img src={h.image} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                  ) : (
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-[10px] font-bold">
+                      {(h.symbol || "?").slice(0, 2)}
+                    </div>
                   )}
-                </div>
-              </button>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-bold">{h.symbol || shortAddr(h.mint, 4)}</p>
+                    <p className="font-mono text-[10px] text-white/35">
+                      {Number(h.uiAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                      {h.unpriced ? " · no quote" : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[13px] font-semibold">
+                      {h.unpriced || (!(h.usdValue > 0) && !h.isSol) ? "—" : fmtUsd(h.usdValue)}
+                    </p>
+                    {h.change24h != null && (
+                      <p className={`font-mono text-[10px] ${h.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {fmtPct(h.change24h)}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
           </>
         )}
 
         {tab === "pnl" && (
-          <div className="space-y-2 p-4">
+          <div className="space-y-1.5">
             {!pnl?.perToken?.length ? (
               <p className="py-12 text-center text-xs text-white/35">No closed PnL rows</p>
             ) : (
@@ -234,16 +278,22 @@ export default function TradeWallet() {
                   key={p.mint}
                   type="button"
                   onClick={() => navigate(`/trade/token/${p.mint}`)}
-                  className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#050505] px-3 py-3 text-left hover:bg-white/[0.04]"
+                  className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left"
                 >
                   <div>
                     <p className="text-sm font-bold">{p.symbol || shortAddr(p.mint, 4)}</p>
                     <p className="text-[10px] text-white/35">
                       {p.closedTrades ?? 0} closed
-                      {p.winRate != null ? ` · WR ${Number(p.winRate) > 1 ? Number(p.winRate).toFixed(0) : (Number(p.winRate) * 100).toFixed(0)}%` : ""}
+                      {p.winRate != null
+                        ? ` · WR ${Number(p.winRate) > 1 ? Number(p.winRate).toFixed(0) : (Number(p.winRate) * 100).toFixed(0)}%`
+                        : ""}
                     </p>
                   </div>
-                  <p className={`font-mono text-sm font-semibold ${(p.totalUsd || p.realizedUsd || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  <p
+                    className={`font-mono text-sm font-semibold ${
+                      (p.totalUsd || p.realizedUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                    }`}
+                  >
                     {fmtUsd(p.totalUsd ?? p.realizedUsd)}
                   </p>
                 </button>
@@ -253,7 +303,7 @@ export default function TradeWallet() {
         )}
 
         {tab === "trades" && (
-          <div className="p-2">
+          <div className="space-y-1.5">
             {!trades.length ? (
               <p className="py-12 text-center text-xs text-white/35">No recent swaps</p>
             ) : (
@@ -262,10 +312,10 @@ export default function TradeWallet() {
                   key={tr.txHash || i}
                   type="button"
                   onClick={() => tr.mint && navigate(`/trade/token/${tr.mint}`)}
-                  className="flex w-full items-center justify-between border-b border-white/[0.05] px-3 py-3 text-left hover:bg-white/[0.04]"
+                  className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left"
                 >
                   <div>
-                    <p className={`text-xs font-bold ${tr.side === "buy" ? "text-green-400" : "text-red-400"}`}>
+                    <p className={`text-xs font-bold ${tr.side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
                       {(tr.side || "swap").toUpperCase()} {tr.symbol || shortAddr(tr.mint || "", 4)}
                     </p>
                     <p className="font-mono text-[10px] text-white/30">
@@ -279,6 +329,10 @@ export default function TradeWallet() {
             )}
           </div>
         )}
+
+        <Link to="/trade/portfolio" className="mt-4 block text-center text-[11px] text-white/30 hover:text-white/50">
+          ← Portfolio hub
+        </Link>
       </div>
     </div>
   );

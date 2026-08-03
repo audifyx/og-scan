@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
-  Briefcase,
   Search,
   Users,
   Wallet,
@@ -14,6 +13,7 @@ import {
   ChevronRight,
   Trash2,
   Trophy,
+  RefreshCw,
 } from "lucide-react";
 import { fetchTopHolders, fetchWallet, searchCoins, type MarketCoin } from "./tradeApi";
 import { fmtPct, fmtUsd, shortAddr } from "./tradeFmt";
@@ -117,50 +117,56 @@ export default function TradePortfolio() {
     }
   };
 
+  const holdings: any[] = Array.isArray(mine?.holdings) ? mine.holdings : [];
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-black">
-      <div className="shrink-0 border-b border-white/10 px-4 pt-4 pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-base font-bold">Portfolio</h1>
-            <p className="mt-0.5 text-xs text-white/40">Your bag · any wallet · top holders</p>
-          </div>
-          <Briefcase className="h-5 w-5 text-white/25" />
-        </div>
-        <div className="mt-3 flex gap-1">
+    <div className="flex h-full flex-col overflow-hidden bg-[#050505]">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-64"
+        style={{
+          background: "radial-gradient(ellipse 80% 60% at 50% -20%, rgba(255,255,255,0.07), transparent 60%)",
+        }}
+      />
+
+      <div className="relative shrink-0 px-4 pt-3 pb-2">
+        <h1 className="text-[26px] font-black tracking-tight">Portfolio</h1>
+        <p className="mt-0.5 text-[12px] text-white/40">Your bag · any wallet · top holders</p>
+
+        <div className="mt-3 flex gap-1 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
           {(
             [
-              ["mine", "Mine", Wallet],
-              ["lookup", "Wallets", Search],
-              ["holders", "Holders", Users],
-            ] as [HubTab, string, typeof Wallet][]
-          ).map(([id, label, Icon]) => (
+              ["mine", "Mine"],
+              ["lookup", "Wallets"],
+              ["holders", "Holders"],
+            ] as [HubTab, string][]
+          ).map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold ${
-                tab === id ? "bg-white text-black" : "text-white/40"
+              className={`flex-1 rounded-xl py-2.5 text-[12px] font-bold transition-all ${
+                tab === id ? "bg-white text-black shadow-sm" : "text-white/40"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-2">
         {tab === "mine" && (
           <div className="space-y-3">
             {!connected || !myAddr ? (
-              <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
-                <Wallet className="mx-auto h-9 w-9 text-white/25" />
-                <p className="mt-3 text-sm text-white/55">Connect Phantom to view your portfolio</p>
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center">
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/10">
+                  <Wallet className="h-7 w-7 text-white/50" />
+                </div>
+                <p className="mt-4 text-sm text-white/55">Connect Phantom to view your full portfolio</p>
                 <button
                   type="button"
                   onClick={connectPhantom}
-                  className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
+                  className="mt-5 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
                 >
                   Connect Phantom
                 </button>
@@ -171,89 +177,104 @@ export default function TradePortfolio() {
               </div>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={() => openWallet(myAddr)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#050505] p-4 text-left transition hover:border-white/25"
-                >
-                  <p className="text-[10px] uppercase tracking-wider text-white/35">My wallet</p>
-                  <p className="mt-1 font-mono text-sm font-semibold">{shortAddr(myAddr, 6)}</p>
-                  <p className="mt-3 font-mono text-3xl font-bold">{fmtUsd(mine?.totalUsd)}</p>
-                  <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-white/40">
-                    <span>{mine?.sol != null ? `${Number(mine.sol).toFixed(3)} SOL` : "—"}</span>
-                    <span>{mine?.tokenCount ?? mine?.holdings?.length ?? 0} tokens</span>
-                    {mine?.pnl?.winRate != null && (
-                      <span>
-                        WR{" "}
-                        {Number(mine.pnl.winRate) > 1
-                          ? Number(mine.pnl.winRate).toFixed(0)
-                          : (Number(mine.pnl.winRate) * 100).toFixed(0)}
-                        %
-                      </span>
-                    )}
+                <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-white/[0.02] p-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">Net worth</p>
+                      <p className="mt-1 font-mono text-[34px] font-black tracking-tight leading-none">
+                        {fmtUsd(mine?.totalUsd)}
+                      </p>
+                      <p className="mt-2 font-mono text-[12px] text-white/40">{shortAddr(myAddr, 6)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void loadMine()}
+                      className="rounded-full border border-white/10 p-2 text-white/45 hover:bg-white/5"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-black/50 px-3 py-2">
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
+                      <p className="text-[9px] text-white/30">SOL</p>
+                      <p className="font-mono text-sm font-bold">
+                        {mine?.sol != null ? Number(mine.sol).toFixed(3) : "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
+                      <p className="text-[9px] text-white/30">Tokens</p>
+                      <p className="font-mono text-sm font-bold">{mine?.tokenCount ?? holdings.length}</p>
+                    </div>
+                    <div className="rounded-2xl bg-black/40 px-3 py-2.5">
                       <p className="text-[9px] text-white/30">Realized</p>
                       <p
-                        className={`font-mono text-xs font-semibold ${
-                          (mine?.pnl?.realizedPnlUsd || 0) >= 0 ? "text-green-400" : "text-red-400"
+                        className={`font-mono text-sm font-bold ${
+                          (mine?.pnl?.realizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
                         }`}
                       >
                         {fmtUsd(mine?.pnl?.realizedPnlUsd)}
                       </p>
                     </div>
-                    <div className="rounded-xl bg-black/50 px-3 py-2">
-                      <p className="text-[9px] text-white/30">Unrealized</p>
-                      <p
-                        className={`font-mono text-xs font-semibold ${
-                          (mine?.pnl?.unrealizedPnlUsd || 0) >= 0 ? "text-green-400" : "text-red-400"
-                        }`}
-                      >
-                        {fmtUsd(mine?.pnl?.unrealizedPnlUsd)}
-                      </p>
-                    </div>
                   </div>
-                  <p className="mt-3 flex items-center gap-1 text-xs text-white/50">
-                    Open full portfolio <ChevronRight className="h-3.5 w-3.5" />
-                  </p>
-                </button>
-
-                {(mine?.holdings || []).slice(0, 8).map((h: any) => (
-                  <Link
-                    key={h.mint}
-                    to={`/trade/token/${h.mint}`}
-                    className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5 hover:bg-white/[0.04]"
+                  <button
+                    type="button"
+                    onClick={() => openWallet(myAddr)}
+                    className="mt-4 flex h-11 w-full items-center justify-center gap-1 rounded-2xl bg-white text-sm font-bold text-black"
                   >
-                    {h.image ? (
-                      <img src={h.image} alt="" className="h-9 w-9 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">
-                        {(h.symbol || "?").slice(0, 2)}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold">{h.symbol || "???"}</p>
-                      <p className="font-mono text-[10px] text-white/35">
-                        {Number(h.uiAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-sm font-semibold">{fmtUsd(h.usdValue)}</p>
-                      {h.change24h != null && (
-                        <p className={`font-mono text-[10px] ${h.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                          {fmtPct(h.change24h)}
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                ))}
+                    Open full wallet <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between px-0.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-white/35">
+                    All holdings · {holdings.length}
+                  </p>
+                </div>
+
+                {!holdings.length ? (
+                  <p className="py-10 text-center text-xs text-white/30">No SPL balances found</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {holdings.map((h: any) => (
+                      <Link
+                        key={h.mint}
+                        to={`/trade/token/${h.mint}`}
+                        className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 hover:bg-white/[0.05]"
+                      >
+                        {h.image ? (
+                          <img src={h.image} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                        ) : (
+                          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-[10px] font-bold">
+                            {(h.symbol || "?").slice(0, 2)}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] font-bold">{h.symbol || shortAddr(h.mint, 4)}</p>
+                          <p className="font-mono text-[10px] text-white/35">
+                            {Number(h.uiAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                            {h.unpriced ? " · unpriced" : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono text-[13px] font-semibold">
+                            {h.unpriced || !(h.usdValue > 0) ? "—" : fmtUsd(h.usdValue)}
+                          </p>
+                          {h.change24h != null && (
+                            <p className={`font-mono text-[10px] ${h.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                              {fmtPct(h.change24h)}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
             <Link
               to="/trade/leaderboard"
-              className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/15 text-sm font-semibold"
+              className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/12 text-sm font-semibold"
             >
               <Trophy className="h-4 w-4" /> Trader board
             </Link>
@@ -263,14 +284,13 @@ export default function TradePortfolio() {
         {tab === "lookup" && (
           <div className="space-y-4">
             <form onSubmit={submitLookup} className="space-y-2">
-              <label className="text-[10px] uppercase tracking-wider text-white/35">Wallet address</label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Paste any Solana wallet…"
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-[#050505] pl-10 pr-3 font-mono text-sm outline-none focus:border-white/30"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-3 font-mono text-sm outline-none focus:border-white/30"
                 />
               </div>
               <button
@@ -286,7 +306,7 @@ export default function TradePortfolio() {
               <button
                 type="button"
                 onClick={() => openWallet(myAddr)}
-                className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#050505] px-3 py-3 text-left"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left"
               >
                 <div>
                   <p className="text-[10px] text-white/35">Connected</p>
@@ -298,7 +318,7 @@ export default function TradePortfolio() {
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-wider text-white/35">Recent wallets</p>
+                <p className="text-[10px] uppercase tracking-wider text-white/35">Recent</p>
                 {recent.length > 0 && (
                   <button
                     type="button"
@@ -306,7 +326,7 @@ export default function TradePortfolio() {
                       clearRecentWallets();
                       setRecent([]);
                     }}
-                    className="inline-flex items-center gap-1 text-[10px] text-white/35 hover:text-white/60"
+                    className="inline-flex items-center gap-1 text-[10px] text-white/35"
                   >
                     <Trash2 className="h-3 w-3" /> Clear
                   </button>
@@ -321,7 +341,7 @@ export default function TradePortfolio() {
                       key={a}
                       type="button"
                       onClick={() => openWallet(a)}
-                      className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#050505] px-3 py-3 text-left hover:bg-white/[0.04]"
+                      className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left"
                     >
                       <span className="font-mono text-xs">{shortAddr(a, 6)}</span>
                       <ChevronRight className="h-4 w-4 text-white/30" />
@@ -336,14 +356,13 @@ export default function TradePortfolio() {
         {tab === "holders" && (
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-white/35">Token mint or ticker</label>
-              <div className="relative mt-1">
+              <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
                 <input
                   value={holderQ}
                   onChange={(e) => setHolderQ(e.target.value)}
                   placeholder="Search coin or paste mint…"
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-[#050505] pl-10 pr-3 text-sm outline-none focus:border-white/30"
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-3 text-sm outline-none focus:border-white/30"
                 />
               </div>
               {isSolAddr(holderQ.trim()) && (
@@ -365,12 +384,12 @@ export default function TradePortfolio() {
                         setHolderQ(c.symbol);
                         void loadHolders(c.mint);
                       }}
-                      className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-[#050505] px-3 py-2 text-left hover:bg-white/[0.04]"
+                      className="flex w-full items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left"
                     >
                       {c.image ? (
-                        <img src={c.image} alt="" className="h-7 w-7 rounded-full" />
+                        <img src={c.image} alt="" className="h-7 w-7 rounded-lg" />
                       ) : (
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold">
+                        <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/10 text-[9px] font-bold">
                           {c.symbol.slice(0, 2)}
                         </div>
                       )}
@@ -378,7 +397,6 @@ export default function TradePortfolio() {
                         <p className="text-xs font-bold">{c.symbol}</p>
                         <p className="truncate font-mono text-[10px] text-white/35">{shortAddr(c.mint, 4)}</p>
                       </div>
-                      <p className="font-mono text-[10px] text-white/40">{fmtUsd(c.mcap)}</p>
                     </button>
                   ))}
                 </div>
@@ -388,12 +406,12 @@ export default function TradePortfolio() {
             {holderMint && (
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-white/60">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-white/60">
+                    <Users className="h-3.5 w-3.5" />
                     Top holders{holderMeta.symbol ? ` · $${holderMeta.symbol}` : ""}
-                    {holderMeta.stale ? " · cached" : ""}
                   </p>
                   <Link to={`/trade/token/${holderMint}`} className="text-[10px] text-white/40 underline">
-                    Token page
+                    Token
                   </Link>
                 </div>
                 {holdersLoading ? (
@@ -411,7 +429,7 @@ export default function TradePortfolio() {
                           key={addr || i}
                           type="button"
                           onClick={() => addr && openWallet(addr)}
-                          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5 text-left hover:bg-white/[0.04]"
+                          className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left"
                         >
                           <div>
                             <p className="font-mono text-xs">

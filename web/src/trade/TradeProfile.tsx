@@ -62,9 +62,9 @@ export default function TradeProfile() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-black px-4 py-6">
-      <h1 className="text-base font-bold">Profile</h1>
-      <p className="mt-1 text-xs text-white/40">Wallet, balances, and your trade desk</p>
+    <div className="h-full overflow-y-auto bg-[#050505] px-4 py-4">
+      <h1 className="text-[26px] font-black tracking-tight">You</h1>
+      <p className="mt-0.5 text-[12px] text-white/40">Wallet, balances, and shortcuts</p>
 
       {!connected || !addr ? (
         <div className="mt-8 rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">

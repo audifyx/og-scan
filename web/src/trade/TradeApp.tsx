@@ -1,6 +1,6 @@
 /**
  * OrbitX Trade App — mobile + desktop shell.
- * Tabs: Home · Trade · Port · More · Profile (+ header notifications)
+ * Tabs: Home · Trade · Port · More · Profile
  */
 
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
@@ -23,7 +23,7 @@ const TABS = [
   { id: "trade", to: "/trade/desk", end: false, label: "Trade", icon: CandlestickChart, dynamic: true },
   { id: "port", to: "/trade/portfolio", end: false, label: "Port", icon: Briefcase },
   { id: "more", to: "/trade/more", end: false, label: "More", icon: LayoutGrid },
-  { id: "profile", to: "/trade/profile", end: false, label: "Profile", icon: User },
+  { id: "profile", to: "/trade/profile", end: false, label: "You", icon: User },
 ] as const;
 
 function tabActive(pathname: string, id: string) {
@@ -53,7 +53,7 @@ function titleFor(pathname: string): string {
   if (pathname.startsWith("/trade/portfolio")) return "Portfolio";
   if (pathname.startsWith("/trade/leaderboard")) return "Leaderboard";
   if (pathname.startsWith("/trade/more")) return "More";
-  if (pathname.startsWith("/trade/profile")) return "Profile";
+  if (pathname.startsWith("/trade/profile")) return "You";
   if (pathname.startsWith("/trade/token/")) return "Coin";
   if (pathname.startsWith("/trade/wallet/")) return "Wallet";
   if (pathname.startsWith("/trade/notifications")) return "Alerts";
@@ -67,18 +67,29 @@ export default function TradeApp() {
   const notifActive = pathname.startsWith("/trade/notifications");
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#050505] text-white antialiased">
       {!hideTopChrome && (
-        <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 bg-black/90 px-4 backdrop-blur">
-          <div className="flex items-center gap-2.5">
-            <span className="text-[15px] font-bold tracking-tight">OrbitX</span>
-            <span className="h-3 w-px bg-white/15" />
-            <span className="text-[12px] font-medium text-white/45">{title}</span>
+        <header className="relative z-20 flex h-12 shrink-0 items-center justify-between px-4">
+          <div
+            className="pointer-events-none absolute inset-0 border-b border-white/[0.06]"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(5,5,5,0.92) 100%)",
+            }}
+          />
+          <div className="relative flex items-center gap-2.5">
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[11px] font-black tracking-tighter text-black">
+              OX
+            </div>
+            <div className="leading-none">
+              <p className="text-[13px] font-bold tracking-tight">OrbitX</p>
+              <p className="mt-0.5 text-[10px] font-medium text-white/40">{title}</p>
+            </div>
           </div>
           <Link
             to="/trade/notifications"
-            className={`rounded-full p-2 transition-colors ${
-              notifActive ? "bg-white text-black" : "text-white/45 hover:bg-white/10 hover:text-white"
+            className={`relative rounded-full p-2.5 transition-colors ${
+              notifActive ? "bg-white text-black" : "bg-white/[0.06] text-white/55 hover:bg-white/10 hover:text-white"
             }`}
             aria-label="Notifications"
           >
@@ -87,15 +98,15 @@ export default function TradeApp() {
         </header>
       )}
 
-      <main className="min-h-0 flex-1 overflow-hidden pb-[calc(4.25rem+env(safe-area-inset-bottom))]">
+      <main className="min-h-0 flex-1 overflow-hidden pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black/95 backdrop-blur-md"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="fixed inset-x-0 bottom-0 z-50 px-3"
+        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="mx-auto flex h-[4.25rem] max-w-lg items-stretch justify-around px-1">
+        <div className="mx-auto flex h-[4.1rem] max-w-lg items-stretch justify-around rounded-[1.35rem] border border-white/[0.08] bg-black/80 px-1 shadow-[0_12px_40px_rgba(0,0,0,0.65)] backdrop-blur-xl">
           {TABS.map((tab) => {
             const { id, end, label, icon: Icon } = tab;
             const to = "dynamic" in tab && tab.dynamic ? tradeDeskTo() : tab.to;
@@ -105,16 +116,23 @@ export default function TradeApp() {
                 key={id}
                 to={to}
                 end={end}
-                className="flex min-w-[64px] flex-1 flex-col items-center justify-center gap-0.5"
+                className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5"
               >
+                {active && (
+                  <span className="absolute inset-x-2 top-1.5 h-[2px] rounded-full bg-white" />
+                )}
                 <span
-                  className={`flex h-9 w-14 items-center justify-center rounded-full transition-colors ${
-                    active ? "bg-white text-black" : "text-white/40"
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all ${
+                    active ? "bg-white text-black scale-105" : "text-white/35"
                   }`}
                 >
-                  <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.8} />
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.5 : 1.75} />
                 </span>
-                <span className={`text-[10px] font-medium ${active ? "text-white" : "text-white/35"}`}>
+                <span
+                  className={`text-[10px] font-semibold tracking-wide ${
+                    active ? "text-white" : "text-white/30"
+                  }`}
+                >
                   {label}
                 </span>
               </NavLink>
