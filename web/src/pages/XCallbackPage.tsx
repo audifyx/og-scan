@@ -62,7 +62,7 @@ export function XCallbackPage() {
         setStatus("success");
         // Small delay so user sees success state, then redirect
         setTimeout(() => {
-          const returnTo = sessionStorage.getItem("x_return_to") || "/settings?tab=connections";
+          const returnTo = sessionStorage.getItem("x_return_to") || "/x";
           sessionStorage.removeItem("x_return_to");
           navigate(returnTo);
         }, 1200);

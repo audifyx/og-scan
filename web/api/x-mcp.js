@@ -688,6 +688,124 @@ async function handleAgent(req, res, parts) {
     });
   }
 
+  // X account OAuth2 PKCE code exchange — uses Vercel TWITTER_* env (not Supabase secrets).
+  if (route === "oauth/callback" && req.method === "POST") {
+    const body = await readBody(req);
+    const code = String(body.code || "").trim();
+    const verifier = String(body.verifier || "").trim();
+    const redirectUri = String(body.redirectUri || body.redirect_uri || "").trim();
+    if (!code || !verifier || !redirectUri) {
+      return json(res, { error: "Missing code, verifier, or redirectUri" }, 400);
+    }
+    if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) {
+      return json(
+        res,
+        {
+          error:
+            "TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET missing on Vercel. Add both, redeploy, then Connect X again.",
+        },
+        503,
+      );
+    }
+
+    const basic = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString("base64");
+    const tokenRes = await fetch("https://api.twitter.com/2/oauth2/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${basic}`,
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: verifier,
+        client_id: TWITTER_CLIENT_ID,
+      }),
+    });
+    if (!tokenRes.ok) {
+      const err = await tokenRes.json().catch(() => ({}));
+      return json(
+        res,
+        {
+          error: "Token exchange failed",
+          details: err,
+          hint: "Check X app callback URL is exactly https://www.orbitx.world/x-callback and Client ID/Secret match Vercel.",
+        },
+        502,
+      );
+    }
+    const tokens = await tokenRes.json();
+    const access_token = tokens.access_token;
+    const refresh_token = tokens.refresh_token ?? null;
+    const expires_in = tokens.expires_in ?? 7200;
+
+    let twitterId = "";
+    let twitterUsername = "";
+    let twitterName = "";
+    let twitterAvatar = "";
+    try {
+      const userRes = await fetch(
+        "https://api.twitter.com/2/users/me?user.fields=profile_image_url,name,username",
+        { headers: { Authorization: `Bearer ${access_token}` } },
+      );
+      if (userRes.ok) {
+        const ud = await userRes.json();
+        twitterId = ud.data?.id ?? "";
+        twitterUsername = ud.data?.username ?? "";
+        twitterName = ud.data?.name ?? "";
+        twitterAvatar = String(ud.data?.profile_image_url || "").replace("_normal", "");
+      }
+    } catch {
+      /* optional */
+    }
+
+    const authUser = await getAuthUser(req);
+    if (authUser?.id) {
+      const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
+      const patch = {
+        twitter_access_token: access_token,
+        twitter_refresh_token: refresh_token,
+        twitter_token_expires_at: expiresAt,
+        twitter_id: twitterId || null,
+        twitter_username: twitterUsername || null,
+        twitter_name: twitterName || null,
+        twitter_avatar: twitterAvatar || null,
+      };
+      try {
+        await sb(`profiles?user_id=eq.${encodeURIComponent(authUser.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+          headers: { Prefer: "return=minimal" },
+        });
+      } catch {
+        // Retry without optional columns some schemas lack
+        await sb(`profiles?user_id=eq.${encodeURIComponent(authUser.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            twitter_access_token: access_token,
+            twitter_refresh_token: refresh_token,
+            twitter_token_expires_at: expiresAt,
+            twitter_id: twitterId || null,
+            twitter_username: twitterUsername || null,
+          }),
+          headers: { Prefer: "return=minimal" },
+        });
+      }
+    }
+
+    return json(res, {
+      access_token,
+      refresh_token,
+      expires_in,
+      twitter_id: twitterId,
+      twitter_username: twitterUsername,
+      twitter_name: twitterName,
+      twitter_avatar: twitterAvatar,
+      saved: Boolean(authUser?.id),
+    });
+  }
+
   return json(res, { error: "not_found", route }, 404);
 }
 

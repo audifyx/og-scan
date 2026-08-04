@@ -5,25 +5,43 @@
  * Flow:
  *  1. xStartLogin()  — generates PKCE verifier, redirects user to Twitter OAuth
  *  2. /x-callback    — Twitter redirects back with code; XCallbackPage calls xExchangeCode()
- *  3. xExchangeCode() — exchanges code for access_token; saves via Supabase edge function
+ *  3. xExchangeCode() — exchanges code via Vercel /api/x/agent/oauth/callback (TWITTER_* env)
  */
 
-const TWITTER_OAUTH_URL = "https://twitter.com/i/oauth2/authorize";
-const TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
+const TWITTER_OAUTH_URL = "https://x.com/i/oauth2/authorize";
 
 const LS_VERIFIER = "x_pkce_verifier";
 const LS_STATE = "x_pkce_state";
+const LS_REDIRECT = "x_pkce_redirect";
 
-// Public OAuth 2.0 Client ID (safe to expose — only used for PKCE redirect, not secret operations)
+// Public OAuth 2.0 Client ID (safe to expose — PKCE only)
 export const X_CLIENT_ID = import.meta.env.VITE_TWITTER_CLIENT_ID || "VEttdDM5YUtpMGJsbURCSmhBMEg6MTpjaQ";
-export const X_CALLBACK_URL = `${window.location.origin}/x-callback`;
-export const X_SCOPES = "tweet.write tweet.read like.read users.read follows.read space.read offline.access";
 
-// ── PKCE helpers ─────────────────────────────────────────────────────────────
+/** Always www in prod — apex 308 + mismatched redirect_uri breaks X OAuth. */
+export function xCallbackUrl(): string {
+  if (typeof window === "undefined") return "https://www.orbitx.world/x-callback";
+  const host = window.location.hostname;
+  if (host === "orbitx.world" || host === "www.orbitx.world") {
+    return "https://www.orbitx.world/x-callback";
+  }
+  if (host === "ogscan.fun" || host === "www.ogscan.fun") {
+    return "https://www.ogscan.fun/x-callback";
+  }
+  return `${window.location.origin}/x-callback`;
+}
+
+/** @deprecated use xCallbackUrl() — kept for Settings imports */
+export const X_CALLBACK_URL =
+  typeof window !== "undefined" ? xCallbackUrl() : "https://www.orbitx.world/x-callback";
+
+/** Minimal scopes for posting — space.read/follows often fail on free X apps. */
+export const X_SCOPES = "tweet.write tweet.read users.read offline.access";
 
 function base64urlEncode(buffer: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
 }
 
 async function sha256(plain: string): Promise<ArrayBuffer> {
@@ -37,29 +55,27 @@ function randomString(len = 64): string {
   return base64urlEncode(arr.buffer).slice(0, len);
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
 /**
  * Starts the Twitter OAuth 2.0 PKCE flow.
- * Redirects the user to Twitter — call from Settings → Connections tab.
  */
 export async function xStartLogin(): Promise<void> {
   if (!X_CLIENT_ID) {
-    console.warn("[xAuth] VITE_TWITTER_CLIENT_ID not set");
-    return;
+    throw new Error("VITE_TWITTER_CLIENT_ID is not set. Add it in Vercel and redeploy.");
   }
   const verifier = randomString(64);
   const state = randomString(32);
   const challenge = base64urlEncode(await sha256(verifier));
+  const redirectUri = xCallbackUrl();
 
   localStorage.setItem(LS_VERIFIER, verifier);
   localStorage.setItem(LS_STATE, state);
+  localStorage.setItem(LS_REDIRECT, redirectUri);
   sessionStorage.setItem("x_return_to", window.location.pathname + window.location.search);
 
   const params = new URLSearchParams({
     response_type: "code",
     client_id: X_CLIENT_ID,
-    redirect_uri: X_CALLBACK_URL,
+    redirect_uri: redirectUri,
     scope: X_SCOPES,
     state,
     code_challenge: challenge,
@@ -70,11 +86,13 @@ export async function xStartLogin(): Promise<void> {
 }
 
 /**
- * Exchanges the authorization code for tokens.
- * Call this from XCallbackPage after Twitter redirects back.
- * Returns { access_token, refresh_token, expires_in } or throws on error.
+ * Exchanges the authorization code for tokens via Vercel (TWITTER_* env).
  */
-export async function xExchangeCode(code: string, returnedState: string, authToken?: string): Promise<{
+export async function xExchangeCode(
+  code: string,
+  returnedState: string,
+  authToken?: string,
+): Promise<{
   access_token: string;
   refresh_token: string;
   expires_in: number;
@@ -85,33 +103,51 @@ export async function xExchangeCode(code: string, returnedState: string, authTok
 }> {
   const verifier = localStorage.getItem(LS_VERIFIER);
   const savedState = localStorage.getItem(LS_STATE);
+  const redirectUri = localStorage.getItem(LS_REDIRECT) || xCallbackUrl();
 
   if (!verifier) throw new Error("PKCE verifier missing — please try connecting again.");
   if (returnedState !== savedState) throw new Error("State mismatch — possible CSRF. Please try again.");
 
-  // Token exchange happens via Supabase edge function (server-side, hides client_secret)
-  // Must include user's JWT so the function can save tokens to the right profile row
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-oauth-callback`, {
+  // Prefer Vercel function so TWITTER_CLIENT_* from Vercel env work.
+  let res = await fetch("/api/x/agent/oauth/callback", {
     method: "POST",
     headers,
-    body: JSON.stringify({ code, verifier, redirectUri: X_CALLBACK_URL }),
+    body: JSON.stringify({ code, verifier, redirectUri }),
   });
+
+  // Fallback to legacy Supabase edge function
+  if (res.status === 404 || res.status === 405) {
+    const supa = import.meta.env.VITE_SUPABASE_URL;
+    if (supa) {
+      res = await fetch(`${supa}/functions/v1/x-oauth-callback`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ code, verifier, redirectUri }),
+      });
+    }
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Token exchange failed (${res.status})`);
+    const detail =
+      typeof err.details === "object"
+        ? JSON.stringify(err.details)
+        : err.details || err.hint || "";
+    throw new Error(
+      [err.error || `Token exchange failed (${res.status})`, detail].filter(Boolean).join(" — "),
+    );
   }
 
   const data = await res.json();
   localStorage.removeItem(LS_VERIFIER);
   localStorage.removeItem(LS_STATE);
+  localStorage.removeItem(LS_REDIRECT);
   return data;
 }
 
-/** Returns stored X connection info from localStorage (set after successful auth). */
 export interface XUser {
   twitterId: string;
   username: string;
@@ -123,14 +159,18 @@ export function xGetStoredUser(): XUser | null {
   try {
     const raw = localStorage.getItem("x_user");
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function xSetStoredUser(user: XUser | null): void {
   try {
     if (user) localStorage.setItem("x_user", JSON.stringify(user));
     else localStorage.removeItem("x_user");
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 }
 
 export function xIsConnected(): boolean {

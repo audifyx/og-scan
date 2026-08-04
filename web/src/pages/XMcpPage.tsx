@@ -337,9 +337,10 @@ export default function XMcpPage() {
                 <button
                   type="button"
                   className="ox-agent__btn ox-agent__btn--primary"
-                  onClick={() => setTab("wallet")}
+                  disabled={connectingX}
+                  onClick={() => (xConnected ? setTab("wallet") : onConnectX())}
                 >
-                  {xConnected ? "Review X" : "Connect X"}
+                  {connectingX ? "Redirecting…" : xConnected ? "Review X" : "Connect X"}
                 </button>
                 <button type="button" className="ox-agent__btn" onClick={() => setTab("keys")}>
                   {hasKey ? "Manage keys" : "Create key"}
@@ -443,8 +444,9 @@ export default function XMcpPage() {
                   </button>
                 </div>
                 <p className="ox-agent__note">
-                  Set <code>TWITTER_CLIENT_ID</code> / <code>TWITTER_CLIENT_SECRET</code> in Vercel (and{" "}
-                  <code>VITE_TWITTER_CLIENT_ID</code> for the login button).
+                  Add <code>TWITTER_CLIENT_ID</code>, <code>TWITTER_CLIENT_SECRET</code>, and{" "}
+                  <code>VITE_TWITTER_CLIENT_ID</code> in Vercel, then redeploy. X callback URL must be{" "}
+                  <code>https://www.orbitx.world/x-callback</code>.
                 </p>
               </>
             )}
