@@ -65,6 +65,10 @@ export type XMcpBootstrap = {
     twitterId: string | null;
     displayName: string | null;
     avatar: string | null;
+    scopes?: string | null;
+    hasTweetWrite?: boolean;
+    hasDmWrite?: boolean;
+    requestedScopes?: string;
   };
 };
 
@@ -128,6 +132,10 @@ export async function listXMcpApiKeys(): Promise<{
 
 export async function revokeXMcpApiKey(keyId: string): Promise<void> {
   await xAgentFetch(`/keys/${keyId}`, { method: "DELETE" });
+}
+
+export async function disconnectXAccount(): Promise<void> {
+  await xAgentFetch("/disconnect", { method: "POST" });
 }
 
 export async function approveXMcpOAuth(payload: {

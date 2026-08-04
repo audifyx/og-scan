@@ -452,10 +452,40 @@ async function resolveAuth(req) {
 }
 
 async function getXProfile(userId) {
-  const rows = await sb(
-    `profiles?user_id=eq.${encodeURIComponent(userId)}&select=twitter_access_token,twitter_refresh_token,twitter_token_expires_at,twitter_id,twitter_username,twitter_name,twitter_avatar,username&limit=1`,
+  try {
+    const rows = await sb(
+      `profiles?user_id=eq.${encodeURIComponent(userId)}&select=twitter_access_token,twitter_refresh_token,twitter_token_expires_at,twitter_id,twitter_username,twitter_name,twitter_avatar,twitter_oauth_scopes,username&limit=1`,
+    );
+    return Array.isArray(rows) ? rows[0] : null;
+  } catch {
+    const rows = await sb(
+      `profiles?user_id=eq.${encodeURIComponent(userId)}&select=twitter_access_token,twitter_refresh_token,twitter_token_expires_at,twitter_id,twitter_username,twitter_name,twitter_avatar,username&limit=1`,
+    );
+    return Array.isArray(rows) ? rows[0] : null;
+  }
+}
+
+function parseScopeSet(scopeStr) {
+  return new Set(
+    String(scopeStr || "")
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
   );
-  return Array.isArray(rows) ? rows[0] : null;
+}
+
+function xScopeInfo(profileOrScope) {
+  const scopeStr =
+    typeof profileOrScope === "string"
+      ? profileOrScope
+      : profileOrScope?.twitter_oauth_scopes || "";
+  const scopes = parseScopeSet(scopeStr);
+  return {
+    scopes: scopeStr || null,
+    hasTweetWrite: scopes.has("tweet.write"),
+    hasDmWrite: scopes.has("dm.write"),
+    requestedScopes: X_OAUTH_SCOPES,
+  };
 }
 
 async function refreshOAuth2Token(refreshToken) {
@@ -514,20 +544,32 @@ async function resolveUserAccessToken(userId) {
       };
     }
     accessToken = refreshed.access_token;
-    await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        twitter_access_token: refreshed.access_token,
-        twitter_refresh_token: refreshed.refresh_token ?? refreshToken,
-        twitter_token_expires_at: new Date(
-          Date.now() + (refreshed.expires_in || 7200) * 1000,
-        ).toISOString(),
-      }),
-      headers: { Prefer: "return=minimal" },
-    });
+    const refreshPatch = {
+      twitter_access_token: refreshed.access_token,
+      twitter_refresh_token: refreshed.refresh_token ?? refreshToken,
+      twitter_token_expires_at: new Date(
+        Date.now() + (refreshed.expires_in || 7200) * 1000,
+      ).toISOString(),
+    };
+    if (refreshed.scope) refreshPatch.twitter_oauth_scopes = String(refreshed.scope);
+    try {
+      await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(refreshPatch),
+        headers: { Prefer: "return=minimal" },
+      });
+    } catch {
+      delete refreshPatch.twitter_oauth_scopes;
+      await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(refreshPatch),
+        headers: { Prefer: "return=minimal" },
+      });
+    }
+    if (refreshed.scope) profile.twitter_oauth_scopes = String(refreshed.scope);
   }
 
-  return { ok: true, accessToken, profile };
+  return { ok: true, accessToken, profile, ...xScopeInfo(profile) };
 }
 
 async function uploadImageOAuth1a(imageUrl) {
@@ -639,6 +681,11 @@ async function callTool(name, args, auth) {
   if (name === "x_connection_status") {
     const profile = await getXProfile(auth.userId);
     const connected = Boolean(profile?.twitter_access_token);
+    const scope = xScopeInfo(profile);
+    const warn =
+      connected && scope.scopes && !scope.hasTweetWrite
+        ? "Token is missing tweet.write — revoke OrbitX at x.com/settings/connected_apps, then Reconnect X on /x while signed in."
+        : null;
     return {
       ok: true,
       connected,
@@ -646,10 +693,14 @@ async function callTool(name, args, auth) {
       twitterId: profile?.twitter_id || null,
       displayName: profile?.twitter_name || null,
       avatar: profile?.twitter_avatar || null,
-      fixUrl: connected ? null : "https://orbitx.world/x",
-      message: connected
-        ? `Connected as @${profile.twitter_username || "user"}`
-        : "X not connected — open /x and Connect X",
+      ...scope,
+      warn,
+      fixUrl: "https://orbitx.world/x",
+      message: !connected
+        ? "X not connected — open /x and Connect X"
+        : warn
+          ? warn
+          : `Connected as @${profile.twitter_username || "user"}`,
     };
   }
 
@@ -699,6 +750,19 @@ async function callTool(name, args, auth) {
       }
     }
 
+    const scope = xScopeInfo(resolved.profile);
+    if (scope.scopes && !scope.hasTweetWrite) {
+      return {
+        ok: false,
+        error: "tweet_write_missing",
+        message:
+          "This X token does not include tweet.write (portal checkbox alone is not enough — the OAuth token must list it).",
+        ...scope,
+        fixUrl: "https://orbitx.world/x",
+        tip: "1) Sign in on orbitx.world/x  2) Revoke OrbitX at x.com/settings/connected_apps  3) Reconnect X  4) Confirm x_connection_status shows hasTweetWrite: true",
+      };
+    }
+
     try {
       const posted = await libPostTweet(resolved.accessToken, {
         text: tweetText,
@@ -706,10 +770,27 @@ async function callTool(name, args, auth) {
         replyToTweetId: replyId || undefined,
         quoteTweetId: quoteId || undefined,
       });
+      if (!posted.ok && (posted.status === 403 || posted.error === "tweet_forbidden")) {
+        return {
+          ...posted,
+          username: resolved.profile?.twitter_username || null,
+          text: tweetText,
+          ...scope,
+          tip: [
+            "403 from X usually means the saved token lacks tweet.write or app permissions are wrong.",
+            "Do this in order:",
+            "1) developer.x.com → your app → User auth → permissions = Read and write and Direct message",
+            "2) x.com/settings/connected_apps → revoke OrbitX",
+            "3) Sign in at https://www.orbitx.world/x (wallet session required)",
+            "4) Reconnect X, then ask Claude for x_connection_status",
+          ].join(" "),
+        };
+      }
       return {
         ...posted,
         username: resolved.profile?.twitter_username || null,
         text: tweetText,
+        ...scope,
       };
     } catch (e) {
       return {
@@ -717,7 +798,8 @@ async function callTool(name, args, auth) {
         error: "tweet_error",
         message: e?.message || "Post failed",
         fixUrl: "https://orbitx.world/x",
-        tip: "Reconnect X on /x so the token includes tweet.write (scope order: tweet.write first).",
+        ...scope,
+        tip: "Reconnect X on /x while signed in so profiles.twitter_access_token is updated for Claude.",
       };
     }
   }
@@ -993,6 +1075,7 @@ async function handleAgent(req, res, parts) {
         twitterId: profile?.twitter_id || null,
         displayName: profile?.twitter_name || null,
         avatar: profile?.twitter_avatar || null,
+        ...xScopeInfo(profile),
       },
     });
   }
@@ -1008,7 +1091,36 @@ async function handleAgent(req, res, parts) {
       displayName: profile?.twitter_name || null,
       avatar: profile?.twitter_avatar || null,
       mcpUrl: MCP_URL,
+      ...xScopeInfo(profile),
     });
+  }
+
+  if (route === "disconnect" && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      await sb(`profiles?user_id=eq.${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          twitter_access_token: null,
+          twitter_refresh_token: null,
+          twitter_token_expires_at: null,
+          twitter_oauth_scopes: null,
+        }),
+        headers: { Prefer: "return=minimal" },
+      });
+    } catch {
+      await sb(`profiles?user_id=eq.${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          twitter_access_token: null,
+          twitter_refresh_token: null,
+          twitter_token_expires_at: null,
+        }),
+        headers: { Prefer: "return=minimal" },
+      });
+    }
+    return json(res, { ok: true });
   }
 
   if (route === "keys" && req.method === "GET") {
@@ -1448,6 +1560,8 @@ async function handleAgent(req, res, parts) {
       state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
+      // Encourage a fresh consent screen so tweet.write is re-granted after scope changes.
+      force_login: "true",
     });
     return json(res, {
       authorizeUrl: `https://x.com/i/oauth2/authorize?${params.toString()}`,
@@ -1508,6 +1622,23 @@ async function handleAgent(req, res, parts) {
     const access_token = tokens.access_token;
     const refresh_token = tokens.refresh_token ?? null;
     const expires_in = tokens.expires_in ?? 7200;
+    const grantedScope = String(tokens.scope || "").trim();
+    const scopeInfo = xScopeInfo(grantedScope);
+
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) {
+      return json(
+        res,
+        {
+          error:
+            "Sign in to OrbitX before connecting X. Without a session, tokens are not saved and Claude MCP cannot post.",
+          fixUrl: "https://www.orbitx.world/x",
+          scope: grantedScope || null,
+          ...scopeInfo,
+        },
+        401,
+      );
+    }
 
     let twitterId = "";
     let twitterUsername = "";
@@ -1529,8 +1660,7 @@ async function handleAgent(req, res, parts) {
       /* optional */
     }
 
-    const authUser = await getAuthUser(req);
-    if (authUser?.id) {
+    {
       const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
       const patch = {
         twitter_access_token: access_token,
@@ -1540,6 +1670,7 @@ async function handleAgent(req, res, parts) {
         twitter_username: twitterUsername || null,
         twitter_name: twitterName || null,
         twitter_avatar: twitterAvatar || null,
+        twitter_oauth_scopes: grantedScope || null,
       };
       try {
         await sb(`profiles?user_id=eq.${encodeURIComponent(authUser.id)}`, {
@@ -1549,15 +1680,12 @@ async function handleAgent(req, res, parts) {
         });
       } catch {
         // Retry without optional columns some schemas lack
+        delete patch.twitter_oauth_scopes;
+        delete patch.twitter_avatar;
+        delete patch.twitter_name;
         await sb(`profiles?user_id=eq.${encodeURIComponent(authUser.id)}`, {
           method: "PATCH",
-          body: JSON.stringify({
-            twitter_access_token: access_token,
-            twitter_refresh_token: refresh_token,
-            twitter_token_expires_at: expiresAt,
-            twitter_id: twitterId || null,
-            twitter_username: twitterUsername || null,
-          }),
+          body: JSON.stringify(patch),
           headers: { Prefer: "return=minimal" },
         });
       }
@@ -1567,6 +1695,8 @@ async function handleAgent(req, res, parts) {
       access_token,
       refresh_token,
       expires_in,
+      scope: grantedScope || null,
+      ...scopeInfo,
       twitter_id: twitterId,
       twitter_username: twitterUsername,
       twitter_name: twitterName,

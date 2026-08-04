@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
-import { xGetStoredUser, xStartLogin, type XUser } from "@/lib/xAuth";
+import { xGetStoredUser, xSetStoredUser, xStartLogin, type XUser } from "@/lib/xAuth";
 import {
   approveXAgentQueueItem,
   bootstrapXMcp,
   cancelXAgentQueueItem,
   createXMcpApiKey,
+  disconnectXAccount,
   fetchXAgent,
   fetchXDmInbox,
   generateXAgentPost,
@@ -603,11 +604,30 @@ export default function XMcpPage() {
                     <span />
                   </div>
                 )}
-                <p className="ox-agent__note">
-                  If <code>x_post</code> fails but DMs work, Reconnect X so the token gets{" "}
-                  <code>tweet.write</code> again (scope order fixed). Portal permissions must be{" "}
-                  <strong>Read and write and Direct message</strong>.
-                </p>
+                {boot?.x?.scopes != null && boot.x.hasTweetWrite === false && (
+                  <div className="ox-agent__alert" style={{ marginBottom: 12 }}>
+                    Saved token scopes are missing <code>tweet.write</code>
+                    {boot.x.scopes ? `: ${boot.x.scopes}` : ""}. Portal checkboxes are not enough —
+                    revoke OrbitX at{" "}
+                    <a href="https://x.com/settings/connected_apps" target="_blank" rel="noreferrer">
+                      x.com/settings/connected_apps
+                    </a>
+                    , stay signed in here, then Reconnect.
+                  </div>
+                )}
+                {boot?.x?.hasTweetWrite === true && (
+                  <p className="ox-agent__note">
+                    Token includes <code>tweet.write</code>
+                    {boot.x.hasDmWrite ? " + dm.write" : ""}. Claude should be able to post.
+                  </p>
+                )}
+                {boot?.x?.scopes == null && (
+                  <p className="ox-agent__note">
+                    Scope metadata unknown (reconnect once to record it). If Claude gets 403 on{" "}
+                    <code>x_post</code>: revoke OrbitX on X → Reconnect here while signed in → ask
+                    Claude for <code>x_connection_status</code>.
+                  </p>
+                )}
                 <div className="ox-agent__btn-row">
                   <button
                     type="button"
@@ -616,6 +636,23 @@ export default function XMcpPage() {
                     onClick={onConnectX}
                   >
                     {connectingX ? "Redirecting…" : "Reconnect X (fix posting)"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ox-agent__btn ox-agent__btn--danger"
+                    disabled={connectingX}
+                    onClick={async () => {
+                      try {
+                        await disconnectXAccount();
+                        xSetStoredUser(null);
+                        window.dispatchEvent(new CustomEvent("x-auth-changed"));
+                        await refresh();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Disconnect failed");
+                      }
+                    }}
+                  >
+                    Clear X token
                   </button>
                 </div>
 

@@ -92,6 +92,9 @@ export async function xExchangeCode(
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  scope?: string | null;
+  scopes?: string | null;
+  hasTweetWrite?: boolean;
   twitter_id?: string;
   twitter_username?: string;
   twitter_name?: string;
