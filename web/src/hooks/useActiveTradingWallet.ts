@@ -76,23 +76,35 @@ export function useActiveTradingWallet() {
     return localActive ? `Local ${shortAddr(address)}` : `Ext ${shortAddr(address)}`;
   }, [address, localActive]);
 
+  /** Connect a specific extension by name (Phantom / Jupiter / Solflare). No auto-fallback. */
+  const connectNamedWallet = useCallback(
+    async (name: string) => {
+      setMode("connected");
+      try {
+        await connectSolanaWallet({
+          wallets,
+          select,
+          connect,
+          preferredName: name,
+        });
+        toast.success(`${name} connected`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err || "Could not connect wallet");
+        toast.error(msg);
+        throw err;
+      }
+    },
+    [wallets, select, connect, setMode],
+  );
+
+  /**
+   * @deprecated Prefer Trade wallet picker (`useTradeWalletPicker`) so the user
+   * chooses Phantom / Jupiter / Solflare. Kept for non-Trade call sites; connects
+   * Phantom only (no Solflare fallback).
+   */
   const connectPhantom = useCallback(async () => {
-    // Connecting an extension implies Connected mode for Trade signing/identity.
-    setMode("connected");
-    try {
-      await connectSolanaWallet({
-        wallets,
-        select,
-        connect,
-        preferredName: "Phantom",
-      });
-      toast.success("Wallet connected");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err || "Could not connect wallet");
-      toast.error(msg);
-      throw err;
-    }
-  }, [wallets, select, connect, setMode]);
+    return connectNamedWallet("Phantom");
+  }, [connectNamedWallet]);
 
   const sendTx = useCallback(
     async (
@@ -144,6 +156,7 @@ export function useActiveTradingWallet() {
     adapterPublicKey: adapterPk,
     sendTx,
     loadDefaultKeypair,
+    connectNamedWallet,
     connectPhantom,
     signingSource: (localActive ? "local" : "connected") as "local" | "connected",
   };

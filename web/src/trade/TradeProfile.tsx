@@ -5,6 +5,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Copy, Check, LogOut, Wallet, ExternalLink, Loader2, User, KeyRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "./TradeWalletPicker";
 import { shortAddr, fmtUsd } from "./tradeFmt";
 
 export default function TradeProfile() {
@@ -18,8 +19,8 @@ export default function TradeProfile() {
     localWallets,
     defaultWallet,
     mode: tradeMode,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
   const [sol, setSol] = useState<number | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -187,8 +188,9 @@ export default function TradeProfile() {
           <p className="mt-3 text-sm text-white/55">
             {localActive
               ? "Set a default local trading wallet"
-              : "Connect Phantom for balances & trading"}
+              : "Connect a wallet for balances & trading"}
           </p>
+          {picker}
           {localActive ? (
             <Link
               to="/trade/wallets"
@@ -199,10 +201,10 @@ export default function TradeProfile() {
           ) : (
             <button
               type="button"
-              onClick={() => void connectPhantom().catch(() => {})}
+              onClick={openPicker}
               className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
             >
-              Connect Phantom
+              Connect wallet
             </button>
           )}
         </div>

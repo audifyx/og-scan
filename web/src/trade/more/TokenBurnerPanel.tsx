@@ -13,6 +13,7 @@ import {
   type BurnableToken,
 } from "@/lib/orbitx/rescue";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "../TradeWalletPicker";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const PRESETS = [10, 25, 50, 75, 100];
@@ -26,8 +27,8 @@ export default function TokenBurnerPanel() {
     label,
     shortAddress,
     sendTx,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
   const [tokens, setTokens] = useState<BurnableToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<string>("");
@@ -112,7 +113,7 @@ export default function TokenBurnerPanel() {
         <p className="mt-3 text-sm text-white/55">
           {localActive
             ? "Set a default local trading wallet to burn tokens"
-            : "Connect Phantom to burn tokens from your wallet"}
+            : "Connect a wallet to burn tokens from your wallet"}
         </p>
         {localActive ? (
           <Link
@@ -122,13 +123,16 @@ export default function TokenBurnerPanel() {
             Manage wallets
           </Link>
         ) : (
-          <button
-            type="button"
-            onClick={() => void connectPhantom()}
-            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Connect Phantom
-          </button>
+          <>
+            {picker}
+            <button
+              type="button"
+              onClick={openPicker}
+              className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+            >
+              Connect wallet
+            </button>
+          </>
         )}
       </div>
     );

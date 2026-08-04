@@ -28,7 +28,7 @@ import {
 } from "@/trade/tradeAlerts";
 import { getBuyPresets, getSellPresets, saveBuyPresets } from "@/trade/tradePresets";
 import { fetchWallet, findWalletPnlToken } from "@/trade/tradeApi";
-import { fmtPct, fmtPnl, fmtTok, fmtUsd } from "@/trade/tradeFmt";
+import { fmtPnl, fmtTok, fmtUsd } from "@/trade/tradeFmt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";

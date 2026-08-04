@@ -23,9 +23,12 @@ export function findConnectableWallet(
   wallets: readonly WalletLike[],
   preferredName?: string,
 ): WalletLike | null {
+  // When the user (or UI) names a wallet, connect ONLY that adapter — never
+  // silently fall through to Solflare / whatever else happens to be installed.
   if (preferredName) {
     const named = wallets.find((w) => w.adapter.name === preferredName);
     if (named && isReady(String(named.readyState))) return named;
+    return null;
   }
   for (const name of PREFERRED) {
     const hit = wallets.find((w) => w.adapter.name === name && isReady(String(w.readyState)));

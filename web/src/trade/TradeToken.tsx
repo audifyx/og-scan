@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "./TradeWalletPicker";
 import { PublicKey } from "@solana/web3.js";
 import {
   ArrowLeft, Copy, Check, ExternalLink, Loader2, Shield, Users, Activity,
@@ -118,8 +119,8 @@ export default function TradeToken() {
     localActive,
     label: activeLabel,
     shortAddress,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
   const { connection } = useConnection();
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -308,10 +309,7 @@ export default function TradeToken() {
     };
   }, [mint, publicKey, connection, d]);
 
-  const connectWallet = () => {
-    // Always attempt Phantom connect — connectPhantom switches to Connected mode.
-    void connectPhantom().catch(() => {});
-  };
+  const connectWallet = () => openPicker();
 
   const t: any = d?.token || {};
   const meta: any = d?.meta || {};
@@ -412,6 +410,7 @@ export default function TradeToken() {
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain bg-black pb-44">
+      {picker}
       {/* Sticky header */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-black/95 px-3 py-3 backdrop-blur">
         <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white">
@@ -986,7 +985,7 @@ export default function TradeToken() {
                   onClick={connectWallet}
                   className="inline-flex items-center gap-1 text-[10px] font-bold text-white/70 underline"
                 >
-                  <Wallet className="h-3 w-3" /> Connect
+                  <Wallet className="h-3 w-3" /> Connect wallet
                 </button>
               )}
             </div>

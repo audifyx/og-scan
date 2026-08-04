@@ -15,6 +15,7 @@ import {
 } from "@/lib/orbitx/claim";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "../TradeWalletPicker";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -27,8 +28,8 @@ export default function CreatorFeeClaimPanel() {
     label,
     shortAddress,
     sendTx,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
   const [pumpSol, setPumpSol] = useState<number | null>(null);
   const [pumpLoading, setPumpLoading] = useState(false);
   const [pumpClaiming, setPumpClaiming] = useState(false);
@@ -151,13 +152,16 @@ export default function CreatorFeeClaimPanel() {
             Manage wallets
           </Link>
         ) : (
-          <button
-            type="button"
-            onClick={() => void connectPhantom()}
-            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Connect Phantom
-          </button>
+          <>
+            {picker}
+            <button
+              type="button"
+              onClick={openPicker}
+              className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+            >
+              Connect wallet
+            </button>
+          </>
         )}
       </div>
     );

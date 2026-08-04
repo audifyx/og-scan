@@ -9,6 +9,7 @@ import {
   type NativeSolAccount,
 } from "@/lib/orbitx/rescue";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "../TradeWalletPicker";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -21,8 +22,8 @@ export default function UnwrapWsolPanel() {
     label,
     shortAddress,
     sendTx,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
   const [accounts, setAccounts] = useState<NativeSolAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,7 +78,7 @@ export default function UnwrapWsolPanel() {
         <p className="mt-3 text-sm text-white/55">
           {localActive
             ? "Set a default local trading wallet to unwrap wSOL"
-            : "Connect Phantom to unwrap wSOL"}
+            : "Connect a wallet to unwrap wSOL"}
         </p>
         {localActive ? (
           <Link
@@ -87,13 +88,16 @@ export default function UnwrapWsolPanel() {
             Manage wallets
           </Link>
         ) : (
-          <button
-            type="button"
-            onClick={() => void connectPhantom()}
-            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Connect Phantom
-          </button>
+          <>
+            {picker}
+            <button
+              type="button"
+              onClick={openPicker}
+              className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+            >
+              Connect wallet
+            </button>
+          </>
         )}
       </div>
     );

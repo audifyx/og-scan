@@ -10,6 +10,7 @@ import {
   type EmptyTokenAccount,
 } from "@/lib/orbitx/rescue";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "../TradeWalletPicker";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -22,8 +23,8 @@ export default function RentRefundPanel() {
     label,
     shortAddress,
     sendTx,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
   const [accounts, setAccounts] = useState<EmptyTokenAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -78,7 +79,7 @@ export default function RentRefundPanel() {
         <p className="mt-3 text-sm text-white/55">
           {localActive
             ? "Set a default local trading wallet to reclaim rent"
-            : "Connect Phantom to scan empty ATAs and reclaim rent"}
+            : "Connect a wallet to scan empty ATAs and reclaim rent"}
         </p>
         {localActive ? (
           <Link
@@ -88,13 +89,16 @@ export default function RentRefundPanel() {
             Manage wallets
           </Link>
         ) : (
-          <button
-            type="button"
-            onClick={() => void connectPhantom()}
-            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Connect Phantom
-          </button>
+          <>
+            {picker}
+            <button
+              type="button"
+              onClick={openPicker}
+              className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+            >
+              Connect wallet
+            </button>
+          </>
         )}
       </div>
     );

@@ -31,6 +31,16 @@ describe("connectSolanaWallet", () => {
     expect(findConnectableWallet(wallets)?.adapter.name).toBe("Phantom");
   });
 
+  it("does not fall through to Solflare when preferred wallet is missing", () => {
+    const wallets = [
+      mockWallet("Phantom", WalletReadyState.NotDetected),
+      mockWallet("Jupiter", WalletReadyState.NotDetected),
+      mockWallet("Solflare", WalletReadyState.Installed),
+    ];
+    expect(findConnectableWallet(wallets, "Phantom")).toBeNull();
+    expect(findConnectableWallet(wallets, "Solflare")?.adapter.name).toBe("Solflare");
+  });
+
   it("throws a clear install hint when nothing is ready", async () => {
     const wallets = [mockWallet("Phantom", WalletReadyState.NotDetected)];
     await expect(

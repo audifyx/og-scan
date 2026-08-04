@@ -18,6 +18,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { useTradeWalletPicker } from "./TradeWalletPicker";
 import {
   extractWalletPnlTokens,
   fetchTopHolders,
@@ -62,8 +63,8 @@ export default function TradePortfolio() {
     localWallets,
     defaultWallet,
     mode: tradeMode,
-    connectPhantom,
   } = useActiveTradingWallet();
+  const { openPicker, picker } = useTradeWalletPicker();
 
   const [tab, setTab] = useState<HubTab>("mine");
   const [mine, setMine] = useState<any>(null);
@@ -287,15 +288,16 @@ export default function TradePortfolio() {
                 <p>
                   {localActive
                     ? "Set a default local trading wallet to see holdings"
-                    : "Connect Phantom to see your bag and PnL"}
+                    : "Connect a wallet to see your bag and PnL"}
                 </p>
+                {picker}
                 {localActive ? (
                   <Link to="/trade/wallets" className="tp__btn mt-5 inline-flex items-center justify-center">
                     Manage wallets
                   </Link>
                 ) : (
-                  <button type="button" onClick={() => void connectPhantom()} className="tp__btn mt-5">
-                    Connect Phantom
+                  <button type="button" onClick={openPicker} className="tp__btn mt-5">
+                    Connect wallet
                   </button>
                 )}
               </div>
