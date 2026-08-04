@@ -1,7 +1,6 @@
 import { FC, ReactNode, useCallback, useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletError, WalletNotReadyError } from "@solana/wallet-adapter-base";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import {
   LedgerWalletAdapter,
   SolflareWalletAdapter,
@@ -10,6 +9,7 @@ import {
 import { HELIUS_RPC } from "@/lib/og";
 import { BackpackWalletAdapter } from "@/lib/wallets/backpackWalletAdapter";
 import { JupiterWalletAdapter } from "@/lib/wallets/jupiterWalletAdapter";
+import { PhantomWalletAdapter } from "@/lib/wallets/phantomWalletAdapter";
 
 interface Props {
   children: ReactNode;
@@ -23,14 +23,22 @@ interface Props {
  */
 export const SolanaWalletProvider: FC<Props> = ({ children }) => {
   const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new JupiterWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new BackpackWalletAdapter(),
-      new TorusWalletAdapter(),
-      new LedgerWalletAdapter(),
-    ],
+    () => {
+      // Debug: Log wallet detection
+      if (typeof window !== "undefined") {
+        const phantom = (window as any).phantom?.solana || (window as any).solana;
+        console.log("[wallet] Phantom detected:", !!phantom, phantom?.isPhantom);
+        console.log("[wallet] Jupiter detected:", !!(window as any).jupiter?.solana, (window as any).jupiter?.solana?.isJupiter);
+      }
+      return [
+        new PhantomWalletAdapter(),
+        new JupiterWalletAdapter(),
+        new SolflareWalletAdapter(),
+        new BackpackWalletAdapter(),
+        new TorusWalletAdapter(),
+        new LedgerWalletAdapter(),
+      ];
+    },
     [],
   );
 
