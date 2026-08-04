@@ -291,20 +291,62 @@ const TOOLS = [
     annotations: { title: "Cancel queue item", readOnlyHint: false, openWorldHint: false },
   },
   {
+    name: "x_auth_link",
+    description:
+      "Start OrbitX authentication for this chat (best for Grok). Returns a clickable URL. When the user says they want to authenticate / connect / log in to OrbitX, call this tool and send them the url. After they finish in the browser, call x_auth_status with the same authCode, then pass authCode on every later x_* tool call.",
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "Auth link", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "x_auth_status",
+    description:
+      "Check whether the user finished OrbitX link-auth. Pass authCode from x_auth_link. When status is completed, keep using that authCode on subsequent tools.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        authCode: {
+          type: "string",
+          description: "Code returned by x_auth_link",
+        },
+      },
+      required: ["authCode"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Auth status", readOnlyHint: true, openWorldHint: false },
+  },
+  {
     name: "x_help",
-    description: "How to connect OrbitX X MCP + agent mode to Claude or ChatGPT.",
+    description: "How to connect OrbitX X MCP + agent mode to Claude, ChatGPT, or Grok (including link-auth).",
     inputSchema: EMPTY_OBJECT_SCHEMA,
     annotations: { title: "Help", readOnlyHint: true, openWorldHint: false },
   },
 ];
 
+const AUTH_CODE_PROP = {
+  type: "string",
+  description:
+    "OrbitX link-auth code from x_auth_link. After the user authenticates via the link, pass this on every x_* tool call (required for Grok).",
+};
+
 function listToolsForMcp() {
-  return TOOLS.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema,
-    ...(t.annotations ? { annotations: t.annotations } : {}),
-  }));
+  return TOOLS.map((t) => {
+    const base = t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : EMPTY_OBJECT_SCHEMA;
+    const props = { ...(base.properties || {}) };
+    if (t.name !== "x_auth_link" && t.name !== "x_auth_status" && !props.authCode) {
+      props.authCode = AUTH_CODE_PROP;
+    }
+    return {
+      name: t.name,
+      description: t.description,
+      inputSchema: {
+        ...base,
+        type: "object",
+        properties: props,
+        additionalProperties: false,
+      },
+      ...(t.annotations ? { annotations: t.annotations } : {}),
+    };
+  });
 }
 
 function header(req, name) {
@@ -494,63 +536,270 @@ function extractBearerToken(req) {
   return { token, bearerPresent: true };
 }
 
-async function resolveAuth(req) {
-  const { token, bearerPresent } = extractBearerToken(req);
-  if (!token) return null;
-  const hash = sha256(token);
-
-  if (token.startsWith("oxk_") || token.startsWith("oxo_") || token.startsWith("oxc_") || token.startsWith("oxx_")) {
-    try {
-      const keys = await sb(
-        `agent_api_keys?key_hash=eq.${encodeURIComponent(hash)}&revoked_at=is.null&select=id,agent_id`,
+async function resolveLinkAuth({ authCode, mcpSessionId } = {}) {
+  const code = String(authCode || "").trim();
+  const sessionId = String(mcpSessionId || "").trim();
+  try {
+    if (code) {
+      const rows = await sb(
+        `mcp_link_sessions?code=eq.${encodeURIComponent(code)}&mcp_kind=eq.x&select=*&limit=1`,
       );
-      const key = Array.isArray(keys) ? keys[0] : null;
-      if (key) {
-        const agents = await sb(
-          `agents?id=eq.${encodeURIComponent(key.agent_id)}&select=id,user_id,wallet_address,name`,
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (row && row.status === "completed" && row.user_id) {
+        if (new Date(row.expires_at).getTime() < Date.now()) return null;
+        return {
+          userId: row.user_id,
+          agentId: row.agent_id,
+          walletAddress: row.wallet_address,
+          source: "link_auth",
+          authCode: code,
+          bearerPresent: false,
+        };
+      }
+    }
+    if (sessionId) {
+      const rows = await sb(
+        `mcp_link_sessions?mcp_session_id=eq.${encodeURIComponent(sessionId)}&mcp_kind=eq.x&status=eq.completed&order=completed_at.desc&select=*&limit=1`,
+      );
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
+        return {
+          userId: row.user_id,
+          agentId: row.agent_id,
+          walletAddress: row.wallet_address,
+          source: "link_session",
+          authCode: row.code,
+          bearerPresent: false,
+        };
+      }
+    }
+  } catch {
+    /* table may not exist yet */
+  }
+  return null;
+}
+
+async function resolveAuth(req, opts = {}) {
+  const { token, bearerPresent } = extractBearerToken(req);
+  if (token) {
+    const hash = sha256(token);
+
+    if (token.startsWith("oxk_") || token.startsWith("oxo_") || token.startsWith("oxc_") || token.startsWith("oxx_")) {
+      try {
+        const keys = await sb(
+          `agent_api_keys?key_hash=eq.${encodeURIComponent(hash)}&revoked_at=is.null&select=id,agent_id`,
         );
-        const agent = Array.isArray(agents) ? agents[0] : null;
-        if (agent?.user_id) {
-          try {
-            await sb(`agent_api_keys?id=eq.${encodeURIComponent(key.id)}`, {
-              method: "PATCH",
-              body: JSON.stringify({ last_used_at: new Date().toISOString() }),
-              headers: { Prefer: "return=minimal" },
-            });
-          } catch {
-            /* ignore */
+        const key = Array.isArray(keys) ? keys[0] : null;
+        if (key) {
+          const agents = await sb(
+            `agents?id=eq.${encodeURIComponent(key.agent_id)}&select=id,user_id,wallet_address,name`,
+          );
+          const agent = Array.isArray(agents) ? agents[0] : null;
+          if (agent?.user_id) {
+            try {
+              await sb(`agent_api_keys?id=eq.${encodeURIComponent(key.id)}`, {
+                method: "PATCH",
+                body: JSON.stringify({ last_used_at: new Date().toISOString() }),
+                headers: { Prefer: "return=minimal" },
+              });
+            } catch {
+              /* ignore */
+            }
+            return {
+              userId: agent.user_id,
+              agentId: agent.id,
+              walletAddress: agent.wallet_address,
+              source: "bearer",
+              bearerPresent,
+            };
           }
-          return {
-            userId: agent.user_id,
-            agentId: agent.id,
-            walletAddress: agent.wallet_address,
-            source: "bearer",
-            bearerPresent,
-          };
         }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    try {
+      const toks = await sb(
+        `agent_mcp_oauth_tokens?token_hash=eq.${encodeURIComponent(hash)}&revoked_at=is.null&select=*`,
+      );
+      const tok = Array.isArray(toks) ? toks[0] : null;
+      if (tok && new Date(tok.expires_at).getTime() >= Date.now()) {
+        return {
+          userId: tok.user_id,
+          agentId: tok.agent_id,
+          walletAddress: tok.wallet_address,
+          source: "oauth_token",
+          bearerPresent,
+        };
       }
     } catch {
       /* fall through */
     }
   }
 
+  const link = await resolveLinkAuth({
+    authCode: opts.authCode,
+    mcpSessionId: opts.mcpSessionId || header(req, "mcp-session-id"),
+  });
+  return link;
+}
+
+async function createLinkAuthSession(req) {
+  const code = opaque("oxlink");
+  let sessionId = String(header(req, "mcp-session-id") || "").trim();
+  if (!sessionId) sessionId = opaque("sess").slice(0, 24);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   try {
-    const toks = await sb(
-      `agent_mcp_oauth_tokens?token_hash=eq.${encodeURIComponent(hash)}&revoked_at=is.null&select=*`,
-    );
-    const tok = Array.isArray(toks) ? toks[0] : null;
-    if (!tok) return null;
-    if (new Date(tok.expires_at).getTime() < Date.now()) return null;
+    await sb("mcp_link_sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        code,
+        mcp_kind: "x",
+        mcp_session_id: sessionId,
+        status: "pending",
+        expires_at: expiresAt,
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch (e) {
     return {
-      userId: tok.user_id,
-      agentId: tok.agent_id,
-      walletAddress: tok.wallet_address,
-      source: "oauth_token",
-      bearerPresent,
+      ok: false,
+      error: "link_auth_unavailable",
+      message:
+        e?.message ||
+        "Link auth table missing — apply sql/Aug_SQL/09_mcp_link_auth.sql in Supabase, then retry.",
     };
-  } catch {
-    return null;
   }
+  const url = `${MCP_HOST}/x/link-auth?code=${encodeURIComponent(code)}`;
+  return {
+    ok: true,
+    url,
+    openUrl: url,
+    authCode: code,
+    mcpSessionId: sessionId,
+    expiresInMinutes: 15,
+    expiresAt,
+    message:
+      "Send the user this clickable link. Ask them to open it, sign in with their OrbitX Solana wallet, and tap Authorize Grok. When they say they finished, call x_auth_status with this authCode. Then pass authCode on every later x_* tool call in this chat.",
+  };
+}
+
+async function getLinkAuthStatus(authCode) {
+  const code = String(authCode || "").trim();
+  if (!code) return { ok: false, error: "authCode_required", status: "unknown" };
+  try {
+    const rows = await sb(
+      `mcp_link_sessions?code=eq.${encodeURIComponent(code)}&mcp_kind=eq.x&select=code,status,expires_at,completed_at,user_id&limit=1`,
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return { ok: false, error: "not_found", status: "unknown", authCode: code };
+    const expired = new Date(row.expires_at).getTime() < Date.now();
+    if (expired && row.status === "pending") {
+      return {
+        ok: true,
+        status: "expired",
+        authCode: code,
+        message: "Link expired. Call x_auth_link again and send the user a fresh URL.",
+      };
+    }
+    if (row.status === "completed" && row.user_id) {
+      return {
+        ok: true,
+        status: "completed",
+        authenticated: true,
+        authCode: code,
+        completedAt: row.completed_at,
+        message:
+          "OrbitX linked. Pass this authCode on every subsequent x_* tool call (x_post, x_dm, …).",
+      };
+    }
+    return {
+      ok: true,
+      status: "pending",
+      authenticated: false,
+      authCode: code,
+      url: `${MCP_HOST}/x/link-auth?code=${encodeURIComponent(code)}`,
+      message: "Still waiting — ask the user to open the link and tap Authorize Grok.",
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: "link_auth_unavailable",
+      message: e?.message || "Link auth unavailable",
+    };
+  }
+}
+
+async function completeLinkAuthSession({ code, userId }) {
+  const authCode = String(code || "").trim();
+  if (!authCode) throw new Error("code required");
+  if (!userId) throw new Error("unauthorized");
+
+  const rows = await sb(
+    `mcp_link_sessions?code=eq.${encodeURIComponent(authCode)}&mcp_kind=eq.x&select=*&limit=1`,
+  );
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) throw new Error("Invalid or unknown link code");
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(authCode)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "expired" }),
+      headers: { Prefer: "return=minimal" },
+    });
+    throw new Error("This link expired. Ask Grok for a new auth link.");
+  }
+  if (row.status === "completed" && row.user_id === userId) {
+    return { ok: true, status: "completed", authCode, already: true };
+  }
+  if (row.status === "completed") {
+    throw new Error("This link was already used by another account.");
+  }
+
+  const agent = await ensureAgent(userId);
+  const access = opaque("oxx");
+  await sb("agent_api_keys", {
+    method: "POST",
+    body: JSON.stringify({
+      agent_id: agent.id,
+      name: `Grok link ${new Date().toISOString().slice(0, 16)}`,
+      key_hash: sha256(access),
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+  try {
+    await sb("agent_mcp_oauth_tokens", {
+      method: "POST",
+      body: JSON.stringify({
+        token_hash: sha256(access),
+        user_id: userId,
+        agent_id: agent.id,
+        wallet_address: agent.wallet_address,
+        expires_at: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* optional */
+  }
+
+  // Keep link usable for the chat (7 days) after approve — Grok passes authCode in tool args.
+  const linkExpires = new Date(Date.now() + 7 * 86400 * 1000).toISOString();
+  await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(authCode)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status: "completed",
+      user_id: userId,
+      agent_id: agent.id,
+      wallet_address: agent.wallet_address,
+      access_token_hash: sha256(access),
+      completed_at: new Date().toISOString(),
+      expires_at: linkExpires,
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+
+  return { ok: true, status: "completed", authCode };
 }
 
 async function getXProfile(userId) {
@@ -741,7 +990,7 @@ async function uploadImageOAuth1a(imageUrl) {
 }
 
 
-async function callTool(name, args, auth) {
+async function callTool(name, args, auth, req = null) {
   const a = args && typeof args === "object" ? args : {};
 
   // ChatGPT connector protocol — exact tool names "search" / "fetch"
@@ -816,6 +1065,14 @@ async function callTool(name, args, auth) {
     };
   }
 
+  if (name === "x_auth_link") {
+    return createLinkAuthSession(req);
+  }
+
+  if (name === "x_auth_status") {
+    return getLinkAuthStatus(a.authCode || auth?.authCode);
+  }
+
   if (name === "x_help") {
     return {
       ok: true,
@@ -827,8 +1084,8 @@ async function callTool(name, args, auth) {
       steps: [
         "Open https://orbitx.world/x and sign in",
         "Connect X (Reconnect after scope upgrades for DMs)",
-        "Create an API key (Claude/ChatGPT), or for Grok just paste the MCP URL",
-        "Grok: grok.com/connectors → Custom → MCP URL only → Authenticate (OrbitX OAuth popup)",
+        "Grok (easiest): ask Grok to authenticate → it calls x_auth_link → open the URL → Authorize → tell Grok you're done",
+        "Claude/ChatGPT: connector OAuth or Bearer key from /x",
         "Train the agent (persona + knowledge) on /x Agent tab",
         "Use x_dm / x_dm_inbox for DMs (Reconnect X after enabling dm.read/dm.write)",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
@@ -838,10 +1095,10 @@ async function callTool(name, args, auth) {
         inbox: "x_dm_inbox",
         tip: "Ask: Send a DM to @handle saying … — Claude will call x_dm.",
       },
-      note: "Modes: auto (generate+post) or approve (draft queue). AI: NVIDIA NIM. Grok only needs the MCP URL — OAuth is discovered automatically. Separate from OrbitX Agent MCP (/api/mcp).",
+      note: "Grok: call x_auth_link and send the user the url. After they approve, pass authCode on every tool. Separate from Agent MCP (/api/mcp).",
       clients: ["claude", "chatgpt", "grok"],
       grokSetup:
-        "https://grok.com/connectors → New Connector → Custom → paste MCP URL only → Authenticate on OrbitX /x/mcp-auth",
+        "User says authenticate → x_auth_link → clickable /x/link-auth URL → Authorize → x_auth_status → pass authCode on later tools",
       env: ["NVIDIA_API_KEY", "TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "CRON_SECRET"],
     };
   }
@@ -851,8 +1108,9 @@ async function callTool(name, args, auth) {
       ok: false,
       error: "session_required",
       message:
-        "Authenticate the OrbitX X MCP connector, or set Authorization: Bearer <key from https://orbitx.world/x>.",
+        "Not authenticated. For Grok: call x_auth_link and send the user the URL. After they approve, call x_auth_status then pass authCode on tools. Or use connector Authenticate / Bearer key from https://orbitx.world/x.",
       fixUrl: "https://orbitx.world/x",
+      hintTool: "x_auth_link",
     };
   }
 
@@ -1344,6 +1602,24 @@ async function handleAgent(req, res, parts) {
       headers: { Prefer: "return=minimal" },
     });
     return json(res, { ok: true });
+  }
+
+  if (route === "link/approve" && req.method === "POST") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    try {
+      const out = await completeLinkAuthSession({ code: body.code, userId: authUser.id });
+      return json(res, out);
+    } catch (e) {
+      return json(res, { error: e?.message || "link_approve_failed" }, 400);
+    }
+  }
+
+  if (route === "link/status" && req.method === "GET") {
+    const u = new URL(req.url || "/", "http://x");
+    const code = u.searchParams.get("code") || "";
+    return json(res, await getLinkAuthStatus(code));
   }
 
   if (route === "oauth/approve" && req.method === "POST") {
@@ -2038,7 +2314,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: "OrbitX X MCP", version: "1.2.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X and run the NVIDIA agent. ChatGPT: use search/fetch, then x_post / x_dm. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — post/DM on X and run the NVIDIA agent. If the user asks to authenticate / connect / log in to OrbitX (especially in Grok), call x_auth_link and send them the url as a clickable link. After they finish, call x_auth_status, then pass authCode on every later x_* tool. ChatGPT: search/fetch then x_post / x_dm. Setup: https://www.orbitx.world/x",
           },
         },
         200,
@@ -2061,27 +2337,58 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/call") {
       const name = String(params?.name || "");
-      const args = params?.arguments || {};
-      const auth = await resolveAuth(req);
-      // Public discovery tools stay open; everything else 401s so Grok can start OAuth
-      // from WWW-Authenticate (Grok UI only has MCP URL — no manual OAuth fields).
-      const publicTools = new Set(["search", "fetch", "x_help"]);
+      const rawArgs = params?.arguments && typeof params.arguments === "object" ? params.arguments : {};
+      const args = { ...rawArgs };
+      const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+      delete args.authCode;
+      delete args.orbitxAuthCode;
+      const inboundSession = String(header(req, "mcp-session-id") || "").trim();
+      const auth = await resolveAuth(req, { authCode, mcpSessionId: inboundSession || undefined });
+      // Public tools stay open (incl. link-auth). Other tools: allow link authCode without HTTP 401
+      // so Grok can work after the user clicks the custom OrbitX link (Grok won't store Bearer headers).
+      const publicTools = new Set(["search", "fetch", "x_help", "x_auth_link", "x_auth_status"]);
       if (!auth?.userId && !publicTools.has(name)) {
+        // Soft tip when they already have an authCode pending — avoid hard 401 loop in Grok chat.
+        if (authCode) {
+          const tip = {
+            ok: false,
+            error: "session_required",
+            message:
+              "authCode is not authorized yet. Ask the user to finish the OrbitX link, then call x_auth_status.",
+            authCode,
+            hintTool: "x_auth_status",
+          };
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+              structuredContent: tip,
+              isError: true,
+            },
+          });
+        }
         return mcpUnauthorized(res, id);
       }
 
       try {
-        const result = await callTool(name, args, auth || { userId: null });
+        const result = await callTool(name, args, auth || { userId: null, authCode }, req);
         const isError = result && result.ok === false;
-        return json(res, {
-          jsonrpc: "2.0",
-          id,
-          result: {
-            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            structuredContent: result,
-            ...(isError ? { isError: true } : {}),
+        const outSession = result?.mcpSessionId || inboundSession || undefined;
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              structuredContent: result,
+              ...(isError ? { isError: true } : {}),
+            },
           },
-        });
+          200,
+          outSession ? { "Mcp-Session-Id": outSession } : {},
+        );
       } catch (e) {
         const tip = {
           ok: false,

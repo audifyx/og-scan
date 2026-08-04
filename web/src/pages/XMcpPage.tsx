@@ -1216,20 +1216,20 @@ export default function XMcpPage() {
                 <li>
                   Open <code>grok.com/connectors</code> → New Connector → Custom
                 </li>
-                <li>Paste only the MCP URL below (Grok has no OAuth fields)</li>
-                <li>Save / enable — Grok discovers OAuth from that URL</li>
+                <li>Paste only the MCP URL below</li>
                 <li>
-                  When Grok opens Authenticate, approve on OrbitX <code>/x/mcp-auth</code> (signed in)
+                  In chat say: <em>authenticate my OrbitX account</em>
                 </li>
+                <li>Grok sends a link → open it → Authorize Grok → tell Grok you&apos;re done</li>
               </ol>
             )}
             {copied === "grokMcp" && setupOpen === "grok" && (
-              <p className="xh__note">MCP URL copied — paste that one field into Grok, then Authenticate.</p>
+              <p className="xh__note">MCP URL copied — after connecting, ask Grok to authenticate for a link.</p>
             )}
             <p className="xh__note">
               {setupOpen === "grok"
-                ? "Auth still required — Grok pulls OAuth from the MCP server (no manual client ID / token URL)."
-                : "Tools: search/fetch, x_post, x_dm, x_agent_run, … Claude/ChatGPT use OAuth fields; Grok only needs the MCP link + Authenticate."}
+                ? "Best path: ask Grok to authenticate — it calls x_auth_link and gives you a clickable OrbitX URL."
+                : "Tools: search/fetch, x_post, x_dm, x_agent_run, … Claude/ChatGPT use OAuth fields; Grok uses MCP URL + chat auth link."}
             </p>
             <FieldRow
               label="MCP URL"
