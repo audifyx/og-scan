@@ -688,6 +688,31 @@ async function handleAgent(req, res, parts) {
     });
   }
 
+  // Public setup diagnostics (no secrets) — helps match X developer portal.
+  if (route === "oauth/config" && req.method === "GET") {
+    const configured = Boolean(TWITTER_CLIENT_ID && TWITTER_CLIENT_SECRET);
+    return json(res, {
+      configured,
+      hasClientId: Boolean(TWITTER_CLIENT_ID),
+      hasClientSecret: Boolean(TWITTER_CLIENT_SECRET),
+      clientId: TWITTER_CLIENT_ID || null,
+      callbackUrl: "https://www.orbitx.world/x-callback",
+      websiteUrl: "https://www.orbitx.world",
+      scopes: "tweet.write tweet.read users.read offline.access",
+      appTypeRequired: "Web App, Automated App or Bot",
+      permissionsRequired: "Read and write",
+      checklist: [
+        "Open developer.x.com → the app whose Client ID matches below",
+        "User authentication settings → On",
+        "App permissions → Read and write (not Read-only)",
+        "Type of App → Web App, Automated App or Bot",
+        "Callback URI → https://www.orbitx.world/x-callback (exact, no trailing slash)",
+        "Website URL → https://www.orbitx.world",
+        "Save → wait ~1 min → retry Connect X on www.orbitx.world/x",
+      ],
+    });
+  }
+
   // Build authorize URL server-side so TWITTER_CLIENT_ID from Vercel is used
   // (VITE_* is easy to miss and gets baked at build time).
   if (route === "oauth/start" && req.method === "POST") {

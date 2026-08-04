@@ -115,6 +115,14 @@ export default function XMcpPage() {
   const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt">("claude");
   const [xLocal, setXLocal] = useState<XUser | null>(() => xGetStoredUser());
   const [connectingX, setConnectingX] = useState(false);
+  const [xOauthConfig, setXOauthConfig] = useState<{
+    configured?: boolean;
+    hasClientId?: boolean;
+    hasClientSecret?: boolean;
+    clientId?: string | null;
+    callbackUrl?: string;
+    checklist?: string[];
+  } | null>(null);
 
   const oauth = useMemo(() => xMcpOAuthCredentials(), []);
   const xConnected = Boolean(boot?.x?.connected || xLocal?.username);
@@ -173,6 +181,13 @@ export default function XMcpPage() {
     const onX = () => setXLocal(xGetStoredUser());
     window.addEventListener("x-auth-changed", onX);
     return () => window.removeEventListener("x-auth-changed", onX);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/x/agent/oauth/config")
+      .then((r) => r.json())
+      .then((d) => setXOauthConfig(d))
+      .catch(() => setXOauthConfig({ configured: false }));
   }, []);
 
   const copy = async (label: string, value: string) => {
@@ -392,6 +407,64 @@ export default function XMcpPage() {
             <span className="ox-agent__panel-hint">OAuth 2.0 PKCE</span>
           </div>
           <div className="ox-agent__panel-b">
+            
+                {!xConnected && xOauthConfig && (
+                  <div className="ox-agent__alert" style={{ marginTop: 12, marginBottom: 12 }}>
+                    <div style={{ marginBottom: 8, fontWeight: 600 }}>
+                      {xOauthConfig.configured
+                        ? "Vercel keys detected — match this Client ID in the X portal"
+                        : "Missing TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET on Vercel (Production)"}
+                    </div>
+                    {xOauthConfig.clientId ? (
+                      <div className="ox-agent__row" style={{ marginBottom: 8 }}>
+                        <div className="ox-agent__label">Client ID</div>
+                        <div className="ox-agent__value" style={{ wordBreak: "break-all" }}>
+                          {xOauthConfig.clientId}
+                        </div>
+                        <div className="ox-agent__actions">
+                          <button
+                            type="button"
+                            className="ox-agent__btn"
+                            onClick={() => copy("clientId", xOauthConfig.clientId || "")}
+                          >
+                            {copied === "clientId" ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="ox-agent__row" style={{ marginBottom: 8 }}>
+                      <div className="ox-agent__label">Callback</div>
+                      <div className="ox-agent__value">
+                        {xOauthConfig.callbackUrl || "https://www.orbitx.world/x-callback"}
+                      </div>
+                      <div className="ox-agent__actions">
+                        <button
+                          type="button"
+                          className="ox-agent__btn"
+                          onClick={() =>
+                            copy(
+                              "callback",
+                              xOauthConfig.callbackUrl || "https://www.orbitx.world/x-callback",
+                            )
+                          }
+                        >
+                          {copied === "callback" ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+                    <ol className="ox-agent__ol" style={{ marginTop: 8 }}>
+                      {(xOauthConfig.checklist || []).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ol>
+                    <p className="ox-agent__note" style={{ marginBottom: 0 }}>
+                      X error “weren't able to give access” almost always means callback / app type /
+                      permissions don't match this Client ID. App must be <strong>Read and write</strong>,
+                      type <strong>Web App</strong>.
+                    </p>
+                  </div>
+                )}
+
             {xConnected ? (
               <>
                 <div className="ox-agent__row">
