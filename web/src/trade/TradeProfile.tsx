@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useTradeWalletPicker } from "./TradeWalletPicker";
 import { shortAddr, fmtUsd } from "./tradeFmt";
+import "./trade-profile.css";
 
 export default function TradeProfile() {
   const { publicKey, connected, disconnect } = useWallet();
@@ -78,237 +79,146 @@ export default function TradeProfile() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-[#060606] px-4 py-4">
-      <h1
-        className="text-[26px] font-black tracking-tight"
-        style={{ fontFamily: '"Bricolage Grotesque", system-ui' }}
-      >
-        You
-      </h1>
-      <p className="mt-0.5 text-[12px] text-white/40">OrbitX identity · wallet · shortcuts</p>
+    <div className="tp">
+      <div className="tp__top">
+        <h1 className="tp__title">You</h1>
+        <p className="tp__subtitle">Profile · Wallets · Settings</p>
+      </div>
 
-      {/* OrbitX account */}
-      <div className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="flex items-center gap-3">
-          {avatar ? (
-            <img src={avatar} alt="" className="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/15" />
-          ) : (
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10">
-              <User className="h-7 w-7 text-white/40" />
+      <div className="tp__content">
+        {/* OrbitX account */}
+        <section className="tp__section tp__section--identity">
+          <div className="tp__avatar-row">
+            {avatar ? (
+              <img src={avatar} alt="" className="tp__avatar" />
+            ) : (
+              <div className="tp__avatar-fallback">
+                <User className="h-6 w-6" />
+              </div>
+            )}
+            <div className="tp__identity-info">
+              {authLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-white/30" />
+              ) : username ? (
+                <>
+                  <p className="tp__username">@{username}</p>
+                  <p className="tp__identity-label">
+                    {profile?.verified || profile?.is_official_account ? "Verified" : "OrbitX account"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="tp__username">Not signed in</p>
+                  <p className="tp__identity-label">Sign in to get started</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {profile && (
+            <div className="tp__stats-grid">
+              <div className="tp__stat-card">
+                <span className="tp__stat-label">Level</span>
+                <p className="tp__stat-value">{profile.current_level ?? "—"}</p>
+              </div>
+              <div className="tp__stat-card">
+                <span className="tp__stat-label">Streak</span>
+                <p className="tp__stat-value">{profile.daily_streak ?? "—"}</p>
+              </div>
+              <div className="tp__stat-card">
+                <span className="tp__stat-label">Rep</span>
+                <p className="tp__stat-value">{profile.reputation_score ?? "—"}</p>
+              </div>
             </div>
           )}
-          <div className="min-w-0 flex-1">
-            {authLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-white/30" />
-            ) : username ? (
-              <>
-                <p className="truncate text-lg font-bold tracking-tight">@{username}</p>
-                <p className="mt-0.5 text-[11px] text-white/40">
-                  {profile?.verified || profile?.is_official_account ? "Verified · " : ""}
-                  OrbitX account
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-white/70">Not signed in</p>
-                <p className="mt-0.5 text-[11px] text-white/40">Sign in to show username & avatar</p>
-              </>
-            )}
-          </div>
-        </div>
 
-        {profile && (
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-black/40 px-2 py-2">
-              <p className="text-[9px] text-white/30">Level</p>
-              <p className="font-mono text-sm font-bold">{profile.current_level ?? "—"}</p>
-            </div>
-            <div className="rounded-xl bg-black/40 px-2 py-2">
-              <p className="text-[9px] text-white/30">Streak</p>
-              <p className="font-mono text-sm font-bold">{profile.daily_streak ?? "—"}</p>
-            </div>
-            <div className="rounded-xl bg-black/40 px-2 py-2">
-              <p className="text-[9px] text-white/30">Rep</p>
-              <p className="font-mono text-sm font-bold">{profile.reputation_score ?? "—"}</p>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-3 flex gap-2">
           {user ? (
-            <Link
-              to="/profile"
-              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-white/12 text-xs font-semibold"
-            >
+            <Link to="/profile" className="tp__btn tp__btn--secondary">
               Edit profile
             </Link>
           ) : (
-            <Link
-              to="/auth"
-              className="flex h-10 flex-1 items-center justify-center rounded-xl bg-white text-xs font-bold text-black"
-            >
+            <Link to="/auth" className="tp__btn tp__btn--primary">
               Sign in to OrbitX
             </Link>
           )}
-        </div>
-      </div>
+        </section>
 
-      {/* Local trading wallets — separate from login / Phantom */}
-      <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10">
-            <KeyRound className="h-5 w-5 text-white/50" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Trading wallets</p>
-            <p className="mt-0.5 text-[11px] text-white/40">
-              {localWallets.length
-                ? `${localWallets.length} local · ${tradeMode === "local" ? "signing local" : "connected mode"}`
-                : "Import keys to trade with several wallets"}
-            </p>
-            {defaultWallet && (
-              <p className="mt-1 font-mono text-[11px] text-white/55">
-                Default {shortAddr(defaultWallet.publicKey, 4)}
-              </p>
-            )}
-          </div>
-        </div>
-        <Link
-          to="/trade/wallets"
-          className="mt-3 flex h-11 items-center justify-center rounded-2xl border border-white/15 text-xs font-semibold"
-        >
-          Manage · Import / Export
-        </Link>
-      </div>
-
-      {/* Active trading wallet (Local default or Phantom) */}
-      {!addr ? (
-        <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center">
-          <Wallet className="mx-auto h-9 w-9 text-white/25" />
-          <p className="mt-3 text-sm text-white/55">
-            {localActive
-              ? "Set a default local trading wallet"
-              : "Connect a wallet for balances & trading"}
+        {/* Local trading wallets */}
+        <section className="tp__section">
+          <h3 className="tp__section-title">Trading wallets</h3>
+          <p className="tp__section-desc">
+            {localWallets.length
+              ? `${localWallets.length} wallet${localWallets.length !== 1 ? "s" : ""}`
+              : "Import keys to trade"}
           </p>
-          {picker}
-          {localActive ? (
-            <Link
-              to="/trade/wallets"
-              className="mt-4 flex h-12 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
-            >
-              Manage wallets
-            </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={openPicker}
-              className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
-            >
-              Connect wallet
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="mt-3 space-y-3">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-center justify-between">
+          <Link to="/trade/wallets" className="tp__btn tp__btn--secondary">
+            Manage
+          </Link>
+        </section>
+
+        {/* Active wallet balance */}
+        {addr && (
+          <section className="tp__section">
+            <h3 className="tp__section-title">Balance</h3>
+            <div className="tp__balance-row">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30">
-                  {activeLabel || (localActive ? "Local trading wallet" : "Wallet")}
+                <p className="tp__balance-label">SOL</p>
+                <p className="tp__balance-value">
+                  {loadingBal ? "—" : sol != null ? sol.toFixed(3) : "—"}
                 </p>
-                <p className="mt-1 font-mono text-sm font-semibold">{shortAddr(addr, 6)}</p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={copy}
-                  className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"
-                >
-                  {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+              <div>
+                <p className="tp__balance-label">Portfolio</p>
+                <p className="tp__balance-value">{fmtUsd(walletData?.totalUsd)}</p>
+              </div>
+            </div>
+            {addr && (
+              <div className="tp__actions">
+                <button type="button" onClick={copy} className="tp__action-btn" title="Copy address">
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </button>
-                {connected && !localActive ? (
-                  <button
-                    type="button"
-                    onClick={() => disconnect()}
-                    className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"
-                  >
+                {connected && !localActive && (
+                  <button type="button" onClick={() => disconnect()} className="tp__action-btn" title="Disconnect">
                     <LogOut className="h-4 w-4" />
                   </button>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-black/50 px-3 py-2.5">
-                <p className="text-[9px] text-white/30">SOL</p>
-                <p className="font-mono text-lg font-bold">
-                  {loadingBal ? <Loader2 className="h-4 w-4 animate-spin" /> : sol != null ? sol.toFixed(3) : "—"}
-                </p>
-              </div>
-              <div className="rounded-xl bg-black/50 px-3 py-2.5">
-                <p className="text-[9px] text-white/30">Portfolio</p>
-                <p className="font-mono text-lg font-bold">{fmtUsd(walletData?.totalUsd)}</p>
-              </div>
-            </div>
-            {walletData?.pnl && (
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-[9px] text-white/30">Realized</p>
-                  <p
-                    className={`font-mono text-xs ${
-                      (walletData.pnl.realizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
-                    }`}
-                  >
-                    {fmtUsd(walletData.pnl.realizedPnlUsd)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-white/30">Win rate</p>
-                  <p className="font-mono text-xs">
-                    {walletData.pnl.winRate != null
-                      ? `${
-                          Number(walletData.pnl.winRate) > 1
-                            ? Number(walletData.pnl.winRate).toFixed(0)
-                            : (Number(walletData.pnl.winRate) * 100).toFixed(0)
-                        }%`
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-white/30">Closed</p>
-                  <p className="font-mono text-xs">{walletData.pnl.closedTrades ?? "—"}</p>
-                </div>
+                )}
+                <a
+                  href={`https://solscan.io/account/${addr}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tp__action-btn"
+                  title="View on Solscan"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
               </div>
             )}
-            <a
-              href={`https://solscan.io/account/${addr}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
-            >
-              Solscan <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
+          </section>
+        )}
 
-          <Link
-            to={`/trade/wallet/${addr}`}
-            className="flex h-12 items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Open my portfolio
-          </Link>
-          <Link
-            to="/trade/portfolio"
-            className="flex h-12 items-center justify-center rounded-2xl border border-white/15 text-sm font-semibold"
-          >
-            Portfolio hub · track wallets
-          </Link>
-          <Link
-            to="/trade/desk"
-            className="flex h-12 items-center justify-center rounded-2xl border border-white/15 text-sm font-semibold"
-          >
-            Trade desk
-          </Link>
-        </div>
-      )}
+        {/* Quick actions */}
+        <section className="tp__section">
+          <div className="tp__action-grid">
+            {!addr ? (
+              <>
+                {picker}
+                <button type="button" onClick={openPicker} className="tp__btn tp__btn--primary">
+                  {localActive ? "Manage wallets" : "Connect wallet"}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to={`/trade/wallet/${addr}`} className="tp__btn tp__btn--primary">
+                  My Portfolio
+                </Link>
+                <Link to="/trade/desk" className="tp__btn tp__btn--secondary">
+                  Trade Desk
+                </Link>
+              </>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

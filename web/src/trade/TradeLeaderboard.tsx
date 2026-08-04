@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Loader2, Trophy, ExternalLink } from "lucide-react";
 import { fetchLeaderboard, type LeaderEntry } from "./tradeApi";
 import { fmtUsd, shortAddr } from "./tradeFmt";
+import "./trade-leaderboard.css";
 
 export default function TradeLeaderboard() {
   const [rows, setRows] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [timeframe, setTimeframe] = useState("24h");
 
   useEffect(() => {
     let on = true;
@@ -29,84 +31,103 @@ export default function TradeLeaderboard() {
   }, []);
 
   return (
-    <div className="flex h-full flex-col bg-black">
-      <div className="border-b border-white/10 px-4 py-4">
-        <div className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-white" />
-          <h1 className="text-base font-bold">Trader leaderboard</h1>
+    <div className="tl">
+      <div className="tl__top">
+        <div className="tl__header">
+          <h1 className="tl__title">Leaderboard</h1>
+          <p className="tl__subtitle">Top traders by realized PnL</p>
         </div>
-        <p className="mt-1 text-[12px] text-white/40">
-          Tracked wallets ranked by realized PnL, win rate, and closed trades
-        </p>
+        
+        <div className="tl__filters">
+          {["24h", "7d", "30d", "All"].map((tf) => (
+            <button
+              key={tf}
+              type="button"
+              className={`tl__filter ${timeframe === tf ? "tl__filter--on" : ""}`}
+              onClick={() => setTimeframe(tf)}
+            >
+              {tf}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-1 border-b border-white/10 px-3 py-2 font-mono text-[9px] uppercase tracking-wider text-white/30">
-        <span>#</span>
-        <span className="col-span-2">Trader</span>
-        <span className="text-right">W/L</span>
-        <span className="text-right">PnL</span>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="tl__list">
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+          <div className="tl__loading">
+            <Loader2 className="tl__spin" />
+            <p>Loading leaderboard…</p>
           </div>
         ) : !rows.length ? (
-          <p className="px-4 py-16 text-center text-sm text-white/35">{err || "No data"}</p>
+          <div className="tl__empty">
+            <p>{err || "No data"}</p>
+          </div>
         ) : (
-          rows.map((e) => {
-            // API winRate is 0–100
-            const wr = e.winRate != null ? e.winRate / 100 : 0;
-            const wins = Math.round(wr * (e.closedTrades || 0));
-            const losses = Math.max(0, (e.closedTrades || 0) - wins);
-            return (
-              <a
-                key={e.address}
-                href={`https://solscan.io/account/${e.address}`}
-                target="_blank"
-                rel="noreferrer"
-                className="grid grid-cols-5 items-center gap-1 border-b border-white/[0.06] px-3 py-3 hover:bg-white/[0.04]"
-              >
-                <span className="font-mono text-xs text-white/40">{e.rank}</span>
-                <div className="col-span-2 flex min-w-0 items-center gap-2">
-                  {e.avatar ? (
-                    <img src={e.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">
-                      {(e.name || e.address).slice(0, 2).toUpperCase()}
+          <div className="tl__rows">
+            {rows.map((e, idx) => {
+              const wr = e.winRate != null ? e.winRate / 100 : 0;
+              const wins = Math.round(wr * (e.closedTrades || 0));
+              const losses = Math.max(0, (e.closedTrades || 0) - wins);
+              const isProfitable = e.realizedPnlUsd >= 0;
+              
+              return (
+                <a
+                  key={e.address}
+                  href={`https://solscan.io/account/${e.address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="tl__row"
+                >
+                  <div className="tl__rank-badge">{idx + 1}</div>
+                  
+                  <div className="tl__trader">
+                    {e.avatar ? (
+                      <img src={e.avatar} alt="" className="tl__avatar" />
+                    ) : (
+                      <div className="tl__avatar-fallback">
+                        {(e.name || e.address).slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="tl__trader-info">
+                      <p className="tl__name">{e.name || shortAddr(e.address)}</p>
+                      <p className="tl__handle">
+                        {e.twitter ? `@${e.twitter}` : shortAddr(e.address, 4)}
+                      </p>
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold">{e.name || shortAddr(e.address)}</p>
-                    <p className="truncate font-mono text-[10px] text-white/30">
-                      {e.twitter ? `@${e.twitter}` : shortAddr(e.address, 4)}
-                    </p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-[11px]">
-                    <span className="text-green-400">{wins}</span>
-                    <span className="text-white/20">/</span>
-                    <span className="text-red-400">{losses}</span>
-                  </p>
-                  <p className="font-mono text-[9px] text-white/30">
-                    {e.winRate != null ? `${Number(e.winRate).toFixed(0)}%` : "—"}
-                  </p>
-                </div>
-                <div className="flex items-center justify-end gap-1">
-                  <p
-                    className={`font-mono text-xs font-semibold ${
-                      e.realizedPnlUsd >= 0 ? "text-green-400" : "text-red-400"
-                    }`}
-                  >
-                    {fmtUsd(e.realizedPnlUsd)}
-                  </p>
-                  <ExternalLink className="h-3 w-3 text-white/20" />
-                </div>
-              </a>
-            );
-          })
+                  
+                  <div className="tl__stats">
+                    <div className="tl__stat">
+                      <span className="tl__stat-label">W/L</span>
+                      <p className="tl__stat-value">
+                        <span className="tl__win">{wins}</span>
+                        <span className="tl__sep">/</span>
+                        <span className="tl__loss">{losses}</span>
+                      </p>
+                    </div>
+                    
+                    <div className="tl__stat">
+                      <span className="tl__stat-label">Win%</span>
+                      <p className="tl__stat-value">
+                        {e.winRate != null ? `${Number(e.winRate).toFixed(0)}%` : "—"}
+                      </p>
+                    </div>
+                    
+                    <div className="tl__stat">
+                      <span className="tl__stat-label">PnL</span>
+                      <p className={`tl__stat-value ${isProfitable ? "tl__stat-gain" : "tl__stat-loss"}`}>
+                        {fmtUsd(e.realizedPnlUsd)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="tl__link">
+                    <ExternalLink className="h-4 w-4" />
+                  </div>
+                </a>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
