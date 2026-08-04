@@ -93,9 +93,10 @@ export default function TradeNotifications() {
                     {fmtPct(c.change24h)}
                   </span>
                 </div>
+                <p className="truncate text-[12px] text-white/50">{c.name || "—"}</p>
                 <p className="mt-0.5 text-[12px] text-white/55">{reasonFor(c)}</p>
                 <p className="mt-1 font-mono text-[10px] text-white/30">
-                  MCap {fmtUsd(c.mcap)} · Vol {fmtUsd(c.volume24h)}
+                  MCap {fmtUsd(c.mcap)} · Vol {fmtUsd(c.volume24h)} · Price {fmtUsd(c.price)}
                 </p>
               </div>
             </button>

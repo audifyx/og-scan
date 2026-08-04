@@ -273,13 +273,18 @@ export default function TradeHome() {
                     <span className="th__name">{c.name}</span>
                   </div>
                   <div className="th__row2">
-                    <span>{fmtUsd(c.price)}</span>
+                    <span className="th__price">{fmtUsd(c.price)}</span>
                     <span className="th__chip">Vol {fmtUsd(c.volume24h)}</span>
                     {c.liquidity > 0 && <span className="th__chip">Liq {fmtUsd(c.liquidity)}</span>}
                     {c.holders != null && c.holders > 0 && (
                       <span className="th__chip">H {fmtNum(c.holders)}</span>
                     )}
                   </div>
+                  {c.supply > 0 && (
+                    <div className="th__row3">
+                      <span className="th__supply">Supply {fmtNum(c.supply)}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="th__stats">
                   <p className="th__mcap">{fmtUsd(c.mcap)}</p>
