@@ -291,3 +291,38 @@ export async function enqueueXAgentItem(payload: {
     body: JSON.stringify(payload),
   })) as unknown as { item: XAgentQueueItem };
 }
+
+export async function sendXDm(payload: {
+  text: string;
+  username?: string;
+  recipientId?: string;
+}): Promise<{ ok: boolean; dmEventId?: string | null; message?: string; error?: string }> {
+  return (await xAgentFetch("/dm", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })) as unknown as { ok: boolean; dmEventId?: string | null; message?: string; error?: string };
+}
+
+export async function fetchXDmInbox(): Promise<{
+  ok: boolean;
+  events?: Array<{
+    id: string;
+    text: string;
+    senderUsername?: string | null;
+    createdAt?: string;
+  }>;
+  message?: string;
+  error?: string;
+}> {
+  return (await xAgentFetch("/dm/inbox")) as unknown as {
+    ok: boolean;
+    events?: Array<{
+      id: string;
+      text: string;
+      senderUsername?: string | null;
+      createdAt?: string;
+    }>;
+    message?: string;
+    error?: string;
+  };
+}

@@ -8,10 +8,12 @@ import {
   cancelXAgentQueueItem,
   createXMcpApiKey,
   fetchXAgent,
+  fetchXDmInbox,
   generateXAgentPost,
   listXAgentQueue,
   listXMcpApiKeys,
   revokeXMcpApiKey,
+  sendXDm,
   shortXKey,
   trainXAgent,
   upsertXAgent,
@@ -142,6 +144,10 @@ export default function XMcpPage() {
   const [trainContent, setTrainContent] = useState("");
   const [genHint, setGenHint] = useState("");
   const [topicsText, setTopicsText] = useState("");
+  const [dmUser, setDmUser] = useState("");
+  const [dmText, setDmText] = useState("");
+  const [dmBusy, setDmBusy] = useState(false);
+  const [dmNote, setDmNote] = useState<string | null>(null);
 
   const oauth = useMemo(() => xMcpOAuthCredentials(), []);
   const xConnected = Boolean(boot?.x?.connected || xLocal?.username);
@@ -371,6 +377,49 @@ export default function XMcpPage() {
     }
   };
 
+  const onSendDm = async () => {
+    const username = dmUser.replace(/^@/, "").trim();
+    const text = dmText.trim();
+    if (!username || !text) {
+      setDmNote("Enter @username and message");
+      return;
+    }
+    setDmBusy(true);
+    setDmNote(null);
+    setError(null);
+    try {
+      const res = await sendXDm({ username, text });
+      if (!res.ok) {
+        setDmNote(res.message || res.error || "DM failed — Reconnect X for dm.write");
+      } else {
+        setDmNote(res.dmEventId ? `Sent (${res.dmEventId})` : "Sent");
+        setDmText("");
+      }
+    } catch (e) {
+      setDmNote(e instanceof Error ? e.message : "DM failed");
+    } finally {
+      setDmBusy(false);
+    }
+  };
+
+  const onLoadDmInbox = async () => {
+    setDmBusy(true);
+    setDmNote(null);
+    try {
+      const res = await fetchXDmInbox();
+      if (!res.ok) {
+        setDmNote(res.message || res.error || "Inbox unavailable — need dm.read + Reconnect X");
+      } else {
+        const n = res.events?.length ?? 0;
+        setDmNote(n ? `${n} recent DM event(s) loaded — use MCP x_dm_inbox for full list` : "Inbox empty");
+      }
+    } catch (e) {
+      setDmNote(e instanceof Error ? e.message : "Inbox failed");
+    } finally {
+      setDmBusy(false);
+    }
+  };
+
   if (authLoading || (user && loading)) {
     return <AgentLoading label="Loading X MCP…" />;
   }
@@ -569,6 +618,52 @@ export default function XMcpPage() {
                     {connectingX ? "Redirecting…" : "Reconnect X for DMs"}
                   </button>
                 </div>
+
+                <hr style={{ border: 0, borderTop: "1px solid rgba(255,255,255,0.08)", margin: "1.25rem 0" }} />
+                <h3 className="ox-agent__panel-title" style={{ fontSize: "1rem", marginBottom: 8 }}>
+                  Send DM
+                </h3>
+                <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                  MCP tools: <code>x_dm</code> (send), <code>x_dm_inbox</code> (read). Needs dm.write / dm.read
+                  after Reconnect.
+                </p>
+                <label className="ox-agent__label" htmlFor="x-dm-user">
+                  To @username
+                </label>
+                <input
+                  id="x-dm-user"
+                  className="ox-agent__input"
+                  style={{ width: "100%", marginBottom: 8 }}
+                  value={dmUser}
+                  onChange={(e) => setDmUser(e.target.value)}
+                  placeholder="handle"
+                />
+                <label className="ox-agent__label" htmlFor="x-dm-text">
+                  Message
+                </label>
+                <textarea
+                  id="x-dm-text"
+                  className="ox-agent__input"
+                  rows={3}
+                  style={{ width: "100%", marginBottom: 10, resize: "vertical" }}
+                  value={dmText}
+                  onChange={(e) => setDmText(e.target.value)}
+                  placeholder="DM text…"
+                />
+                <div className="ox-agent__btn-row">
+                  <button
+                    type="button"
+                    className="ox-agent__btn ox-agent__btn--primary"
+                    disabled={dmBusy}
+                    onClick={onSendDm}
+                  >
+                    {dmBusy ? "Sending…" : "Send DM"}
+                  </button>
+                  <button type="button" className="ox-agent__btn" disabled={dmBusy} onClick={onLoadDmInbox}>
+                    Check inbox
+                  </button>
+                </div>
+                {dmNote && <p className="ox-agent__note">{dmNote}</p>}
               </>
             ) : (
               <>
@@ -1053,8 +1148,8 @@ export default function XMcpPage() {
                   Advanced → header <code>Authorization</code> = Bearer token above
                 </li>
                 <li>
-                  Tools: <code>x_post</code>, <code>x_quote</code>, <code>x_reply</code>, <code>x_dm</code>,{" "}
-                  <code>x_agent_run</code>, <code>x_agent_train</code>, <code>x_agent_schedule</code>, …
+                  Tools: <code>x_dm</code>, <code>x_dm_inbox</code>, <code>x_post</code>, <code>x_quote</code>,{" "}
+                  <code>x_reply</code>, <code>x_agent_run</code>, <code>x_agent_train</code>, …
                 </li>
               </ol>
             ) : (

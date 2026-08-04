@@ -166,6 +166,50 @@ export async function sendDmOAuth2(accessToken, { recipientId, text }) {
   };
 }
 
+/** List recent DM events (requires dm.read). Graceful on free-tier 403. */
+export async function listDmEventsOAuth2(accessToken, { maxResults = 20 } = {}) {
+  const limit = Math.min(100, Math.max(1, Number(maxResults) || 20));
+  const params = new URLSearchParams({
+    max_results: String(limit),
+    "dm_event.fields": "id,text,event_type,dm_conversation_id,created_at,sender_id,participant_ids",
+    expansions: "sender_id",
+    "user.fields": "id,name,username",
+  });
+  const res = await fetch(`https://api.twitter.com/2/dm_events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.detail || err?.title || JSON.stringify(err);
+    if (res.status === 403) {
+      return {
+        ok: false,
+        error: "dm_forbidden",
+        message:
+          "X rejected DM read (403). Free apps often lack DM access — upgrade X API (Basic/Pro), enable dm.read, Reconnect X on /x.",
+        details: err,
+      };
+    }
+    return { ok: false, error: "dm_list_failed", message: `DM inbox failed: ${msg}`, details: err };
+  }
+  const data = await res.json();
+  const users = {};
+  for (const u of data?.includes?.users || []) {
+    if (u?.id) users[u.id] = u;
+  }
+  const events = (Array.isArray(data?.data) ? data.data : []).map((ev) => ({
+    id: ev.id,
+    text: ev.text || "",
+    eventType: ev.event_type,
+    conversationId: ev.dm_conversation_id,
+    createdAt: ev.created_at,
+    senderId: ev.sender_id,
+    senderUsername: users[ev.sender_id]?.username || null,
+    participantIds: ev.participant_ids || [],
+  }));
+  return { ok: true, events, meta: data?.meta || null };
+}
+
 export function mapAgentRow(row) {
   if (!row) return null;
   return {

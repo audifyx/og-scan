@@ -19,6 +19,7 @@ import {
   postTweetOAuth2 as libPostTweet,
   lookupXUser,
   sendDmOAuth2,
+  listDmEventsOAuth2,
   mapAgentRow,
   mapQueueRow,
   ensureXAgent,
@@ -94,15 +95,32 @@ const TOOLS = [
   {
     name: "x_dm",
     description:
-      "Send a DM by username or recipient user id. Requires dm.write (X API Basic/Pro). Returns a clear upgrade message on 403.",
+      "Send a direct message on X. Pass username (e.g. elonmusk) or recipientId, plus text. Requires dm.write scope and X API Basic/Pro — on free tier returns a clear upgrade message instead of crashing. User must Reconnect X on https://orbitx.world/x after enabling DM scopes.",
     inputSchema: {
       type: "object",
       properties: {
-        text: { type: "string" },
-        username: { type: "string" },
-        recipientId: { type: "string" },
+        text: { type: "string", description: "DM body (required)" },
+        username: {
+          type: "string",
+          description: "Recipient @handle without @ (preferred). Resolved via users/by/username.",
+        },
+        recipientId: {
+          type: "string",
+          description: "Recipient X user id (numeric string). Use if username unknown.",
+        },
       },
       required: ["text"],
+    },
+  },
+  {
+    name: "x_dm_inbox",
+    description:
+      "List recent X DM events for the connected account (dm.read). Returns upgrade message on 403 free tier.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        maxResults: { type: "number", description: "1–100, default 20" },
+      },
     },
   },
   {
@@ -595,8 +613,14 @@ async function callTool(name, args, auth) {
         "Connect X (Reconnect after scope upgrades for DMs)",
         "Create an API key, then Add to Claude or ChatGPT",
         "Train the agent (persona + knowledge) on /x Agent tab",
+        "Use x_dm / x_dm_inbox for DMs (Reconnect X after enabling dm.read/dm.write)",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
       ],
+      dm: {
+        send: "x_dm",
+        inbox: "x_dm_inbox",
+        tip: "Ask: Send a DM to @handle saying … — Claude will call x_dm.",
+      },
       note: "Modes: auto (generate+post) or approve (draft queue). AI: NVIDIA NIM. Separate from OrbitX Agent MCP (/api/mcp).",
       env: ["NVIDIA_API_KEY", "TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "CRON_SECRET"],
     };
@@ -680,15 +704,53 @@ async function callTool(name, args, auth) {
     if (!text) return { ok: false, error: "text_required", message: "text is required" };
     let recipientId = String(a.recipientId || a.recipient_id || "").trim();
     const username = String(a.username || "").replace(/^@/, "").trim();
-    if (!recipientId && username) {
-      const u = await lookupXUser(resolved.accessToken, username);
-      if (!u?.id) return { ok: false, error: "user_not_found", message: `No X user @${username}` };
-      recipientId = u.id;
+    try {
+      if (!recipientId && username) {
+        const u = await lookupXUser(resolved.accessToken, username);
+        if (!u?.id) return { ok: false, error: "user_not_found", message: `No X user @${username}` };
+        recipientId = u.id;
+      }
+      if (!recipientId) {
+        return {
+          ok: false,
+          error: "recipient_required",
+          message: "Pass username (preferred) or recipientId with the DM text.",
+        };
+      }
+      const dm = await sendDmOAuth2(resolved.accessToken, { recipientId, text });
+      return {
+        ...dm,
+        username: username || null,
+        recipientId,
+        tip: dm.ok
+          ? null
+          : "If 403: enable DM permissions in X developer portal, upgrade API tier if needed, then Reconnect X on /x.",
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "dm_error",
+        message: e?.message || "DM failed",
+        fixUrl: "https://orbitx.world/x",
+      };
     }
-    if (!recipientId) {
-      return { ok: false, error: "recipient_required", message: "username or recipientId is required" };
+  }
+
+  if (name === "x_dm_inbox") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    try {
+      return await listDmEventsOAuth2(resolved.accessToken, {
+        maxResults: a.maxResults ?? a.max_results ?? 20,
+      });
+    } catch (e) {
+      return {
+        ok: false,
+        error: "dm_inbox_error",
+        message: e?.message || "DM inbox failed",
+        fixUrl: "https://orbitx.world/x",
+      };
     }
-    return sendDmOAuth2(resolved.accessToken, { recipientId, text });
   }
 
   if (name === "x_agent_status") {
@@ -1008,6 +1070,44 @@ async function handleAgent(req, res, parts) {
     return json(res, {
       redirect: `${redirectUri}${sep}code=${encodeURIComponent(access)}&state=${encodeURIComponent(state)}`,
     });
+  }
+
+  // ── Direct messages (UI) ────────────────────────────────────────────────
+  if (route === "dm" && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const text = String(body.text || "").trim();
+    if (!text) return json(res, { error: "text is required" }, 400);
+    let recipientId = String(body.recipientId || body.recipient_id || "").trim();
+    const username = String(body.username || "").replace(/^@/, "").trim();
+    try {
+      const resolved = await resolveUserAccessToken(user.id);
+      if (!resolved.ok) return json(res, resolved, 400);
+      if (!recipientId && username) {
+        const u = await lookupXUser(resolved.accessToken, username);
+        if (!u?.id) return json(res, { error: `No X user @${username}` }, 404);
+        recipientId = u.id;
+      }
+      if (!recipientId) return json(res, { error: "username or recipientId required" }, 400);
+      const dm = await sendDmOAuth2(resolved.accessToken, { recipientId, text });
+      return json(res, { ...dm, username: username || null, recipientId }, dm.ok ? 200 : 403);
+    } catch (e) {
+      return json(res, { error: e?.message || "dm_failed" }, 500);
+    }
+  }
+
+  if (route === "dm/inbox" && req.method === "GET") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const resolved = await resolveUserAccessToken(user.id);
+      if (!resolved.ok) return json(res, resolved, 400);
+      const inbox = await listDmEventsOAuth2(resolved.accessToken, { maxResults: 20 });
+      return json(res, inbox, inbox.ok ? 200 : 403);
+    } catch (e) {
+      return json(res, { error: e?.message || "dm_inbox_failed" }, 500);
+    }
   }
 
   // ── X Agent (NVIDIA) + queue + cron ─────────────────────────────────────
@@ -1596,7 +1696,7 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX X MCP", version: "1.0.0" },
+            serverInfo: { name: "OrbitX X MCP", version: "1.1.0" },
           },
         },
         200,
