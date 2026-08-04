@@ -1,10 +1,59 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { XrayReport, short } from "../lib/api";
 import {
   ExternalLink, ZoomIn, ZoomOut, Maximize2, Crosshair, Search,
   Play, Pause, Download, Copy, Check, Focus, Layers, Clock,
   Network, Sparkles, Pin, X, Minimize2,
 } from "lucide-react";
+
+/** Minimal X-ray shape needed by the bubble graph (from /api/ogdex/xray). */
+export interface XrayReport {
+  ok: boolean;
+  mint?: string;
+  traced?: boolean;
+  verdict?: string;
+  tone?: "red" | "yellow" | "green";
+  score?: number;
+  summary?: string;
+  earlyBuyers?: Array<{
+    wallet: string;
+    tokenAmount?: number;
+    solSpent?: number;
+    txHash?: string | null;
+    slot?: number;
+    time?: number;
+    funder?: string | null;
+    rank?: number;
+  }>;
+  snipers?: {
+    pct?: number | null;
+    count?: number | null;
+    wallets?: Array<{
+      wallet: string;
+      solSpent?: number;
+      secondsAfterLaunch?: number | null;
+      txHash?: string | null;
+      bundled?: boolean;
+    }>;
+  };
+  bundles?: {
+    pct?: number | null;
+    count?: number | null;
+    clusters?: Array<{ slot: number; size?: number; wallets: string[] }>;
+  };
+  insiders?: {
+    pct?: number | null;
+    count?: number | null;
+    clusters?: Array<{ funder: string; size?: number; wallets: string[] }>;
+  };
+  concentration?: { top10Pct?: number | null; whales?: number; totalHolders?: number | null };
+  dev?: { wallet?: string; pct?: number | null; sold?: boolean | null } | null;
+  note?: string | null;
+}
+
+function short(addr?: string | null): string {
+  if (!addr) return "—";
+  return addr.slice(0, 4) + "…" + addr.slice(-4);
+}
 
 type RiskTag = "insider" | "bundle" | "sniper" | "clean" | "dev";
 type LayoutMode = "force" | "radial" | "timeline" | "cluster";

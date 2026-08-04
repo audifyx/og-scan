@@ -39,6 +39,7 @@ import research from "./ogdex/_routes/research.js";
 import platformStats from "./ogdex/_routes/platform-stats.js";
 import traders from "./ogdex/_routes/traders.js";
 import waitlist from "./ogdex/_routes/waitlist.js";
+import mcp from "./ogdex/_routes/mcp.js";
 
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
@@ -48,10 +49,11 @@ const ROUTES = {
   "platform-stats": platformStats,
   traders,
   waitlist,
+  mcp,
 };
 
 const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt"]);
-const LIMITS = { chat: 12, forensics: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30 };
+const LIMITS = { chat: 12, forensics: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
 /** Soft API keys get a higher cap — never unlimited. */

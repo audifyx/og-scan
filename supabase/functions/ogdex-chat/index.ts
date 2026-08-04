@@ -105,6 +105,9 @@ type LlmOut = { answer: string; sources: { title: string; url: string }[]; provi
 
 const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") || "";
 const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+// xAI Grok — OpenAI-compatible API; requires XAI_API_KEY (Bearer auth)
+const XAI_API_KEY = Deno.env.get("XAI_API_KEY") || Deno.env.get("GROK_API_KEY") || "";
+const XAI_MODEL = Deno.env.get("XAI_MODEL") || Deno.env.get("GROK_MODEL") || "grok-2-latest";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
@@ -146,6 +149,8 @@ async function callGemini(sys: string, messages: Msg[], web: WebResult[]): Promi
 async function callAnyProvider(sys: string, messages: Msg[], web: WebResult[]): Promise<LlmOut> {
   const attempts: (() => Promise<LlmOut>)[] = [
     () => callOpenAiCompat(NVIDIA_BASE_URL, NVIDIA_API_KEY, NVIDIA_MODEL, "nvidia", sys, messages, web),
+    // Grok (xAI) — skipped automatically when XAI_API_KEY / GROK_API_KEY is unset
+    () => callOpenAiCompat("https://api.x.ai/v1", XAI_API_KEY, XAI_MODEL, "grok", sys, messages, web),
     () => callOpenAiCompat("https://api.groq.com/openai/v1", GROQ_API_KEY, GROQ_MODEL, "groq", sys, messages, web),
     () => callGemini(sys, messages, web),
     () => callOpenAiCompat("https://openrouter.ai/api/v1", OPENROUTER_API_KEY, OPENROUTER_MODEL, "openrouter", sys, messages, web,

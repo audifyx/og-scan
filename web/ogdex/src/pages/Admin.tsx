@@ -736,7 +736,7 @@ function ConfigTab({ data, act }: any) {
   const toggles: { key: string; label: string; desc: string; val: boolean; set: (v: boolean) => void }[] = [
     { key: "pro_gate_enabled",  label: "Pro Gate",    desc: "Require 10K OG for Pro features",       val: proEnabled,      set: setProEnabled },
     { key: "screener_enabled",  label: "Screener",    desc: "Token screener visible to all users",   val: screenerEnabled, set: setScreenerEnabled },
-    { key: "mcp_enabled",       label: "MCP API",     desc: "Public AI/MCP endpoint at /api/mcp",    val: mcpEnabled,      set: setMcpEnabled },
+    { key: "mcp_enabled",       label: "MCP API",     desc: "AI/MCP at /api/mcp and /api/ogdex/mcp (POST may require ORBITX_DEX_API_KEYS)",    val: mcpEnabled,      set: setMcpEnabled },
     { key: "widget_enabled",    label: "Widget",      desc: "Embeddable token widget (widget.js)",   val: widgetEnabled,   set: setWidgetEnabled },
     { key: "maintenance_mode",  label: "Maintenance", desc: "Show maintenance page to all visitors", val: maintenanceMode, set: setMaintenanceMode },
     { key: "spaces_auto_end",   label: "Auto-end Spaces", desc: "End a live Space if the host is gone 20 min", val: spacesAutoEnd, set: setSpacesAutoEnd },

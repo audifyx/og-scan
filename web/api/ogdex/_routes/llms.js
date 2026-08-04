@@ -56,8 +56,10 @@ Brand: https://ogscan.fun  ·  Token page pattern: https://ogscan.fun/ORBITX_DEX
   Returns a base64 transaction the USER signs in their own wallet (Phantom). OG DEX never holds funds or keys and adds no platform fee.
 
 ## Notes for agents / MCP
-- To build an MCP server or LLM tool: import ${BASE}/openapi.json — it is a complete OpenAPI 3.1 document that most MCP/codegen frameworks (e.g. openapi-mcp, Claude Actions, custom GPTs) convert into callable tools automatically.
-- Prefer /token for a single coin overview, /xray for risk, /forensics for dev origin, /wallet + /swaps for a trader, /screener + /signals for discovery.
+- Ready-made MCP: GET ${BASE.replace("/api/ogdex","")}/api/mcp or GET ${BASE}/mcp for the tool manifest; POST the same URL with { "tool", "params" } to execute.
+- When the host sets ORBITX_DEX_API_KEYS, POST execute requires Authorization: Bearer <key> or x-ogdex-key. GET manifest stays public.
+- Or import ${BASE}/openapi.json into an OpenAPI→MCP bridge (openapi-mcp, Claude Actions, custom GPTs).
+- Prefer /token for a single coin overview, /xray for risk (+ bubble-map inputs), /forensics for dev origin, /wallet + /swaps for a trader, /screener + /signals for discovery.
 - Endpoints are cached; do not poll faster than a few seconds. Heavy traces (/xray, /forensics) are immutable and cached for ~24h.
 `;
 

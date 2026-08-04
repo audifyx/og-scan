@@ -1,24 +1,27 @@
 /**
- * TradingTerminal — Phantom-style 3-panel trading terminal for OrbitX.
+ * TradingTerminal ? Phantom-style 3-panel trading terminal for OrbitX.
  *
  * Layout:
  *   Left   (280 px)  DEX market list (screener) + search + positions
- *   Center (flex-1)  Token header → Chart → Trades / My Trades / Positions
- *   Right  (320 px)  Stats → Buy/Sell with Phantom connect + sign
+ *   Center (flex-1)  Token header ? Chart ? Trades / My Trades / Positions
+ *   Right  (320 px)  Stats ? Buy/Sell with Phantom connect + sign
  *
  * Markets: /api/ogdex/screener (same as DEX home).
- * Trades: POST /api/ogdex/trade → VersionedTransaction → wallet signAndSend.
+ * Trades: POST /api/ogdex/trade ? VersionedTransaction ? wallet signAndSend.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
   ArrowUpRight, ArrowDownLeft, Check,
-  Wallet, Activity, X, Loader2, Users, Bell, KeyRound,
+  Wallet, Activity, X, Loader2, Users, Bell, KeyRound, Crosshair,
 } from "lucide-react";
+import type { XrayReport } from "./BubbleMap";
+
+const BubbleMap = lazy(() => import("./BubbleMap"));
 import {
   ALERT_KINDS,
   createPriceAlert,
@@ -58,9 +61,9 @@ export type TradeTerminalProps = {
   mode?: "full" | "desk";
 };
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????
    Types
-   ═══════════════════════════════════════════════════════════════════ */
+   ??????????????????????????????????????????????????????????????????? */
 
 interface TokenListItem {
   mint: string;
@@ -100,9 +103,9 @@ interface TokenSecurity {
   mutable: boolean | null;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????
    Constants
-   ═══════════════════════════════════════════════════════════════════ */
+   ??????????????????????????????????????????????????????????????????? */
 
 type Timeframe = "15m" | "1H" | "4H" | "1D";
 
@@ -243,14 +246,14 @@ function dexScreenerEmbedUrl(ref: string, interval: string): string {
   return `https://dexscreener.com/solana/${ref}?${q.toString()}`;
 }
 
-const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders"] as const;
+const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders", "Clusters"] as const;
 type BottomTab = (typeof BOTTOM_TABS)[number];
 
 const GECKO_BASE = "https://api.geckoterminal.com/api/v2";
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????
    API Helpers
-   ═══════════════════════════════════════════════════════════════════ */
+   ??????????????????????????????????????????????????????????????????? */
 
 async function fetchDexPair(mint: string): Promise<TokenListItem | null> {
   try {
@@ -308,7 +311,7 @@ async function fetchGeckoTrades(poolAddress: string, tokenSymbol: string): Promi
 async function fetchSecurity(mint: string): Promise<TokenSecurity> {
   const def: TokenSecurity = {
     top10HoldersPercent: null, devHoldersPercent: null,
-    lpBurned: "—", mintable: null, freezable: null, mutable: null,
+    lpBurned: "?", mintable: null, freezable: null, mutable: null,
   };
   try {
     const [mintRes, holderRes] = await Promise.all([
@@ -336,9 +339,18 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
   return def;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Formatting
-   ═══════════════════════════════════════════════════════════════════ */
+async function fetchXray(mint: string): Promise<XrayReport | null> {
+  try {
+    const r = await fetch(`/api/ogdex/xray?mint=${encodeURIComponent(mint)}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.ok ? (j as XrayReport) : null;
+  } catch {
+    return null;
+  }
+}
+
+/* Formatting helpers */
 
 function fmtPrice(p: number): string {
   if (p === 0) return "$0";
@@ -378,9 +390,9 @@ function fmtNum(n: number): string {
   return n.toExponential(2);
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ???????????????????????????????????????????????????????????????????
    Component
-   ═══════════════════════════════════════════════════════════════════ */
+   ??????????????????????????????????????????????????????????????????? */
 
 type LivePosition = {
   amount: number;
@@ -415,13 +427,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     signMessage,
   } = useActiveTradingWallet();
 
-  /* ── State ──────────────────────────────────────────────── */
+  /* ?? State ???????????????????????????????????????????????? */
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [selectedMint, setSelectedMint] = useState<string>(initialMint || DEFAULT_MINTS[0].mint);
   const [selectedToken, setSelectedToken] = useState<TokenListItem | null>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
   const [trades, setTrades] = useState<TradeEntry[]>([]);
   const [security, setSecurity] = useState<TokenSecurity | null>(null);
+  const [xray, setXray] = useState<XrayReport | null>(null);
+  const [loadingXray, setLoadingXray] = useState(false);
   const [marketCategory, setMarketCategory] = useState<MarketCategory>("discover");
   const [marketTab, setMarketTab] = useState<MarketTab>("trending");
   const [bottomTab, setBottomTab] = useState<BottomTab>("Trades");
@@ -459,7 +473,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [mountChart, setMountChart] = useState(false);
   const [loadingTokens, setLoadingTokens] = useState(!deskMode);
   const [copied, setCopied] = useState(false);
-  /** Prefetched Jupiter quote — reused on Buy/Sell click when still fresh. */
+  /** Prefetched Jupiter quote ? reused on Buy/Sell click when still fresh. */
   const quoteCacheRef = useRef<{
     key: string;
     quote: JupQuote;
@@ -486,7 +500,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     unrealizedPct: number | null;
   } | null>(null);
 
-  /* ── Load DEX markets (skip in desk mode — trade a selected mint only) ── */
+  /* ?? Load DEX markets (skip in desk mode ? trade a selected mint only) ?? */
   useEffect(() => {
     if (deskMode) {
       setLoadingTokens(false);
@@ -528,7 +542,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     if (initialMint) setSelectedMint(initialMint);
   }, [initialMint]);
 
-  /* ── Load selected token data ───────────────────────────── */
+  /* ?? Load selected token data ????????????????????????????? */
   useEffect(() => {
     if (!selectedMint) return;
     let cancelled = false;
@@ -547,7 +561,33 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMint]);
 
-  /* ── Load trades from GeckoTerminal ─────────────────────── */
+  /* Risk X-ray + bubble map inputs */
+  useEffect(() => {
+    if (!selectedMint) return;
+    let cancelled = false;
+    setLoadingXray(true);
+    setXray(null);
+    fetchXray(selectedMint).then((report) => {
+      if (cancelled) return;
+      setXray(report);
+      setLoadingXray(false);
+      if (!report) return;
+      setSecurity((prev) => ({
+        ...(prev || {
+          top10HoldersPercent: null, lpBurned: "—",
+          mintable: null, freezable: null, mutable: null,
+          snipersHoldersPercent: null, bundlersHoldersPercent: null, devHoldersPercent: null,
+        }),
+        devHoldersPercent: report.dev?.pct ?? prev?.devHoldersPercent ?? null,
+        snipersHoldersPercent: report.snipers?.pct ?? null,
+        bundlersHoldersPercent: report.bundles?.pct ?? null,
+      }));
+    });
+    return () => { cancelled = true; };
+  }, [selectedMint]);
+
+
+  /* ?? Load trades from GeckoTerminal ??????????????????????? */
   useEffect(() => {
     if (!selectedToken?.pairAddress) return;
     let cancelled = false;
@@ -557,7 +597,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     return () => { cancelled = true; };
   }, [selectedToken?.pairAddress, selectedToken?.symbol]);
 
-  /* ── Auto-refresh trades every 8s ───────────────────────── */
+  /* ?? Auto-refresh trades every 8s ????????????????????????? */
   useEffect(() => {
     if (!selectedToken?.pairAddress) return;
     const iv = setInterval(() => {
@@ -566,7 +606,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     return () => clearInterval(iv);
   }, [selectedToken?.pairAddress, selectedToken?.symbol]);
 
-  /* ── Auto-refresh pair data every 15s ───────────────────── */
+  /* ?? Auto-refresh pair data every 15s ????????????????????? */
   useEffect(() => {
     if (!selectedMint) return;
     const iv = setInterval(() => {
@@ -575,7 +615,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     return () => clearInterval(iv);
   }, [selectedMint]);
 
-  /* ── Load positions for active trading wallet ───────────── */
+  /* ?? Load positions for active trading wallet ????????????? */
   useEffect(() => {
     if (!tradePk) { setPositions([]); return; }
     (async () => {
@@ -590,7 +630,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     })();
   }, [tradePk]);
 
-  /* ── Live position for selected mint (~1s balance + price) ─ */
+  /* ?? Live position for selected mint (~1s balance + price) ? */
   useEffect(() => {
     if (!tradePk || !selectedMint) {
       setLivePos(null);
@@ -605,7 +645,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       try {
         const w = await fetchWallet(tradePk.toBase58());
         if (!on || !w?.ok) return;
-        // Must read pnl.perToken (API shape) — pnl.tokens was always empty.
+        // Must read pnl.perToken (API shape) ? pnl.tokens was always empty.
         const row = findWalletPnlToken(w, selectedMint);
         // Also pull mark from holdings if PnL row missing (no recent swaps).
         const hold = Array.isArray(w?.holdings)
@@ -650,7 +690,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             if (Number.isFinite(ui)) amount += ui;
           }
         } catch {
-          /* RPC blip — fall back to wallet cache / previous */
+          /* RPC blip ? fall back to wallet cache / previous */
         }
         const cache = costCacheRef.current?.mint === selectedMint ? costCacheRef.current : null;
         // If chain read failed/empty but wallet API knows the bag, use that.
@@ -711,7 +751,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           return next;
         });
       } catch {
-        // Keep last good snapshot on transient errors (don't flash "—").
+        // Keep last good snapshot on transient errors (don't flash "?").
         if (on) setLivePosLoading(false);
       } finally {
         if (on) setLivePosLoading(false);
@@ -728,7 +768,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     };
   }, [tradePk, selectedMint, selectedToken?.price, connection]);
 
-  /* ── My Trades (wallet swaps) ───────────────────────────── */
+  /* ?? My Trades (wallet swaps) ????????????????????????????? */
   useEffect(() => {
     if (bottomTab !== "My Trades" || !tradePk) {
       if (!tradePk) setMyTrades([]);
@@ -758,7 +798,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     };
   }, [bottomTab, tradePk, selectedMint]);
 
-  /* ── Top traders for selected mint ──────────────────────── */
+  /* ?? Top traders for selected mint ???????????????????????? */
   useEffect(() => {
     if (bottomTab !== "Top Traders" || !selectedMint) return;
     let on = true;
@@ -781,7 +821,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     };
   }, [bottomTab, selectedMint]);
 
-  /* ── Search debounce ────────────────────────────────────── */
+  /* ?? Search debounce ?????????????????????????????????????? */
   useEffect(() => {
     if (searchQuery.length < 2) { setSearchResults([]); return; }
     setSearching(true);
@@ -795,7 +835,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  /* ── Handlers ───────────────────────────────────────────── */
+  /* ?? Handlers ????????????????????????????????????????????? */
   const selectToken = useCallback((mint: string) => {
     setSelectedMint(mint);
     setSearchQuery("");
@@ -925,7 +965,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         const key = quoteKey();
         if (key) quoteCacheRef.current = { key, quote: q, at: Date.now() };
       } catch {
-        // Fallback: SOL USD / token USD ≈ tokens received
+        // Fallback: SOL USD / token USD ? tokens received
         try {
           const prices = await jupPrice([SOL_MINT, selectedMint]);
           const solPx = Number(prices[SOL_MINT]?.usdPrice) || 0;
@@ -974,28 +1014,28 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     return q;
   }, [tradePk, selectedMint, quoteKey, slippage, swapMode, buyAmt, sellPct, resolveSellRaw]);
 
-  /** Build Jupiter swap tx from a (prefetched) quote — never open jup.ag. */
+  /** Build Jupiter swap tx from a (prefetched) quote ? never open jup.ag. */
   const buildJupiterTx = useCallback(async (quote?: JupQuote): Promise<string> => {
     if (!tradePk) throw new Error("Wallet missing");
     const q = quote || (await getFreshQuote());
     return jupSwapTransaction(q, tradePk.toBase58());
   }, [tradePk, getFreshQuote]);
 
-  /** Build + sign trade — Phantom/Jupiter when connected mode; local keypair when local mode. */
+  /** Build + sign trade ? Phantom/Jupiter when connected mode; local keypair when local mode. */
   const handleSwap = useCallback(async () => {
     if (!selectedMint) return;
     setTradeErr("");
     setTradeSig("");
     if (!tradeReady || !tradePk) {
       if (localActive) {
-        setTradeErr("Import a trading wallet and set a default — or switch to Connected wallet");
+        setTradeErr("Import a trading wallet and set a default ? or switch to Connected wallet");
         return;
       }
       setShowWalletPicker(true);
       return;
     }
     if (!localActive && !sendTransaction && !signTransaction) {
-      setTradeErr("This wallet can't sign here — reconnect Phantom or Jupiter");
+      setTradeErr("This wallet can't sign here ? reconnect Phantom or Jupiter");
       return;
     }
     if (swapMode === "buy") {
@@ -1007,8 +1047,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     }
     setTradeBusy(true);
     try {
-      // Show wallet stage early — build races underneath so the popup feels immediate.
-      setTradeStage(localActive ? "Building & signing…" : "Confirm in wallet…");
+      // Show wallet stage early ? build races underneath so the popup feels immediate.
+      setTradeStage(localActive ? "Building & signing?" : "Confirm in wallet?");
       const amount = swapMode === "buy" ? Number(buyAmt) : `${sellPct}%`;
       const pk58 = tradePk.toBase58();
 
@@ -1026,7 +1066,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
       // Race: server trade builder (no sim for extension) vs client Jupiter from prefetch.
       const apiBuild = (async (): Promise<{ tx: string; skipPreflight: boolean; warning: string }> => {
-        // Start API immediately with warm quote — don't wait on a cold quote fetch.
+        // Start API immediately with warm quote ? don't wait on a cold quote fetch.
         const r = await fetch("/api/ogdex/trade", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1081,21 +1121,21 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
       const bytes = Uint8Array.from(atob(built.tx), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(bytes);
-      setTradeStage(localActive ? "Signing locally…" : "Confirm in wallet…");
+      setTradeStage(localActive ? "Signing locally?" : "Confirm in wallet?");
       const sig = await sendActiveTx(connection, tx, {
         skipPreflight: built.skipPreflight,
         maxRetries: 3,
       });
 
-      // Success staging as soon as we have a signature — confirm in background.
+      // Success staging as soon as we have a signature ? confirm in background.
       setTradeSig(sig);
       setTradeBusy(false);
-      setTradeStage("Submitted…");
+      setTradeStage("Submitted?");
       toast({
         title: "Trade submitted",
         description: built.warning
-          ? `${sig.slice(0, 8)}… · ${built.warning}`
-          : `${sig.slice(0, 8)}… · confirming on-chain`,
+          ? `${sig.slice(0, 8)}? ? ${built.warning}`
+          : `${sig.slice(0, 8)}? ? confirming on-chain`,
       });
 
       void (async () => {
@@ -1104,14 +1144,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           setTradeStage("");
           toast({
             title: "Trade confirmed",
-            description: `${sig.slice(0, 8)}…`,
+            description: `${sig.slice(0, 8)}?`,
           });
         } catch {
           setTradeStage("");
-          // Signature was broadcast — don't fake failure; explorer may still land.
+          // Signature was broadcast ? don't fake failure; explorer may still land.
           toast({
             title: "Trade submitted",
-            description: `${sig.slice(0, 8)}… · confirmation slow — check explorer`,
+            description: `${sig.slice(0, 8)}? ? confirmation slow ? check explorer`,
           });
         }
         if (tradePk) {
@@ -1137,8 +1177,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       }
     } finally {
       setTradeBusy(false);
-      // Keep "Submitted…" briefly when background confirm is running; clear otherwise.
-      setTradeStage((prev) => (prev === "Submitted…" ? prev : ""));
+      // Keep "Submitted?" briefly when background confirm is running; clear otherwise.
+      setTradeStage((prev) => (prev === "Submitted?" ? prev : ""));
     }
   }, [
     selectedMint,
@@ -1178,7 +1218,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     [selectToken]
   );
 
-  /* ── Derived ────────────────────────────────────────────── */
+  /* ?? Derived ?????????????????????????????????????????????? */
   const t = selectedToken;
   const chartRef = t?.pairAddress || selectedMint;
   const dexChartSrc = chartRef
@@ -1257,11 +1297,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       if (!d?.ok) throw new Error(d?.error || "Could not create alert");
       setAlertMsg({
         ok: true,
-        text: `${ALERT_KINDS[orderMode].label} armed @ $${v} → ${alertChan}`,
+        text: `${ALERT_KINDS[orderMode].label} armed @ $${v} ? ${alertChan}`,
       });
       toast({
         title: "Price alert armed",
-        description: `${ALERT_KINDS[orderMode].label} @ $${v} · ${alertChan}`,
+        description: `${ALERT_KINDS[orderMode].label} @ $${v} ? ${alertChan}`,
       });
       void refreshMintAlerts();
     } catch (e: any) {
@@ -1289,7 +1329,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
   // IMPORTANT: render as a function call ({renderSwapPanel()}), NOT <SwapPanel />.
   // Defining a component inside this parent recreates its type every render and
-  // remounts all inputs (focus lost after one keystroke) — worse with livePos polls.
+  // remounts all inputs (focus lost after one keystroke) ? worse with livePos polls.
   const renderSwapPanel = () => (
     <div className="space-y-3 border-b border-white/[0.07] p-4">
       {/* Order type */}
@@ -1319,7 +1359,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             className={`rounded-lg py-2 text-[11px] font-bold transition-colors ${
               orderMode === id ? "bg-white text-black" : "text-white/40 hover:text-white/70"
             }`}
-            title={id === "market" ? "Instant swap" : "Price alert · Telegram / webhook"}
+            title={id === "market" ? "Instant swap" : "Price alert ? Telegram / webhook"}
           >
             {label}
           </button>
@@ -1381,10 +1421,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 <span className="text-[10px] uppercase tracking-wide text-white/35">You receive</span>
                 <span className="font-mono text-[12px] font-semibold tabular-nums text-white/80">
                   {buyReceiveLoading && buyReceiveUi == null
-                    ? "…"
+                    ? "?"
                     : buyReceiveUi != null
-                      ? `≈ ${fmtTok(buyReceiveUi, buyReceiveUi >= 1000 ? 2 : 4)} ${selectedToken?.symbol || "tokens"}`
-                      : "—"}
+                      ? `? ${fmtTok(buyReceiveUi, buyReceiveUi >= 1000 ? 2 : 4)} ${selectedToken?.symbol || "tokens"}`
+                      : "?"}
                 </span>
               </div>
               <div className="grid grid-cols-4 gap-2">
@@ -1405,7 +1445,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </div>
               {editPresetsOpen && (
                 <div className="rounded-xl border border-white/10 bg-black/50 p-2.5 space-y-2">
-                  <p className="text-[10px] text-white/40">Comma-separated SOL amounts (2–6)</p>
+                  <p className="text-[10px] text-white/40">Comma-separated SOL amounts (2?6)</p>
                   <Input
                     value={presetDraft}
                     onChange={(e) => setPresetDraft(e.target.value)}
@@ -1471,10 +1511,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <span className="text-[10px] text-white/30">%</span>
           </div>
 
-          {/* Active trading identity — Local default keypair vs Phantom */}
+          {/* Active trading identity ? Local default keypair vs Phantom */}
           <ActiveTradingWalletChip />
 
-          {/* Your position — always visible above Buy/Sell */}
+          {/* Your position ? always visible above Buy/Sell */}
           <div className="rounded-xl border border-white/15 bg-gradient-to-b from-white/[0.08] to-transparent px-3 py-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/50">
@@ -1487,7 +1527,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   </span>
                   Live
-                  {livePosLoading && !livePos ? "…" : ""}
+                  {livePosLoading && !livePos ? "?" : ""}
                 </span>
               ) : (
                 <span className="text-[10px] text-white/35">
@@ -1503,9 +1543,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     ? livePos
                       ? fmtTok(livePos.amount)
                       : livePosLoading
-                        ? "…"
+                        ? "?"
                         : "0"
-                    : "—"}
+                    : "?"}
                   <span className="ml-1 text-[10px] font-medium text-white/35">
                     {t?.symbol || ""}
                   </span>
@@ -1518,11 +1558,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     ? livePos
                       ? livePos.worthUsd != null
                         ? fmtUsd(livePos.worthUsd)
-                        : "—"
+                        : "?"
                       : livePosLoading
-                        ? "…"
+                        ? "?"
                         : "$0"
-                    : "—"}
+                    : "?"}
                 </p>
               </div>
               <div>
@@ -1546,7 +1586,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       ) : null}
                     </>
                   ) : (
-                    "—"
+                    "?"
                   )}
                 </p>
               </div>
@@ -1562,8 +1602,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                         ? fmtUsd(livePos.costUsd)
                         : livePos?.avgCostUsd != null
                           ? `${fmtUsd(livePos.avgCostUsd)}/tok`
-                          : "—"
-                    : "—"}
+                          : "?"
+                    : "?"}
                 </p>
               </div>
             </div>
@@ -1602,7 +1642,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             {tradeBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {tradeStage || "Working…"}
+                {tradeStage || "Working?"}
               </>
             ) : !tradeReady ? (
               localActive ? (
@@ -1637,18 +1677,18 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-1 text-[11px] text-white hover:underline"
             >
-              Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
+              Confirmed {tradeSig.slice(0, 8)}? <ExternalLink className="h-3 w-3" />
             </a>
           )}
           <p className="text-center text-[10px] text-white/25">
-            {localActive ? "Market · signs with local default wallet" : "Market · confirm in connected wallet"}
+            {localActive ? "Market ? signs with local default wallet" : "Market ? confirm in connected wallet"}
           </p>
         </>
       ) : (
         <>
           <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2.5">
             <p className="text-[11px] font-semibold text-amber-100/90">
-              {ALERT_KINDS[orderMode].short} · price alert trigger
+              {ALERT_KINDS[orderMode].short} ? price alert trigger
             </p>
             <p className="mt-1 text-[11px] leading-relaxed text-white/45">
               {ALERT_KINDS[orderMode].help}
@@ -1716,13 +1756,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             placeholder={
               alertChan === "telegram"
                 ? "Chat ID (from @userinfobot) or @channel"
-                : "https://discord.com/api/webhooks/…"
+                : "https://discord.com/api/webhooks/?"
             }
             className="h-10 border-white/10 bg-white/[0.04] text-sm"
           />
           {alertChan === "telegram" && (
             <p className="text-[10px] leading-relaxed text-white/30">
-              Open @Theogsupportbot → Start, then paste your numeric chat ID from @userinfobot.
+              Open @Theogsupportbot ? Start, then paste your numeric chat ID from @userinfobot.
             </p>
           )}
 
@@ -1735,7 +1775,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             {alertBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing alert…
+                Signing alert?
               </>
             ) : !tradeReady ? (
               localActive ? (
@@ -1763,7 +1803,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             </p>
           )}
           <p className="text-center text-[10px] leading-relaxed text-white/25">
-            Notify-only · checked every minute · you place the trade when it fires
+            Notify-only ? checked every minute ? you place the trade when it fires
           </p>
 
           {mintAlerts.length > 0 && (
@@ -1812,13 +1852,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     </div>
   );
 
-  /* ═══════════════════════════════════════════════════════════════
+  /* ???????????????????????????????????????????????????????????????
      Wallet Picker Overlay
-     ═══════════════════════════════════════════════════════════════ */
-  // Same as swap panel — call as {renderWalletPickerOverlay()}, never as a JSX tag.
+     ??????????????????????????????????????????????????????????????? */
+  // Same as swap panel ? call as {renderWalletPickerOverlay()}, never as a JSX tag.
   const renderWalletPickerOverlay = () => {
     if (!showWalletPicker) return null;
-    // Always list Phantom / Jupiter / Solflare. User chooses — never auto-pick Solflare.
+    // Always list Phantom / Jupiter / Solflare. User chooses ? never auto-pick Solflare.
     // Not-installed rows toast a soft hint; never open adapter.url / jup.ag / solflare.com.
     const known = ["Phantom", "Jupiter", "Solflare"] as const;
     const rows = known.map((name) => {
@@ -1864,7 +1904,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-xs text-white/40">Choose Phantom, Jupiter, or Solflare. Trades sign in-app — we never open wallet marketing sites.</p>
+          <p className="text-xs text-white/40">Choose Phantom, Jupiter, or Solflare. Trades sign in-app ? we never open wallet marketing sites.</p>
           <div className="space-y-2">
             {rows.map((w) => (
               <button
@@ -1889,16 +1929,16 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     );
   };
 
-  /* ═══════════════════════════════════════════════════════════════
+  /* ???????????????????????????????????????????????????????????????
      RENDER
-     ═══════════════════════════════════════════════════════════════ */
+     ??????????????????????????????????????????????????????????????? */
 
   return (
     <>
     {renderWalletPickerOverlay()}
     <div className={`flex h-full min-h-0 bg-black ${deskMode ? "flex-col overflow-y-auto overscroll-contain lg:flex-row lg:overflow-hidden" : "min-h-[calc(100vh-68px)] flex-col overflow-y-auto lg:min-h-0 lg:flex-row lg:overflow-hidden"}`}>
 
-      {/* ═══════════════ LEFT SIDEBAR (hidden in desk mode) ═══════════════ */}
+      {/* ??????????????? LEFT SIDEBAR (hidden in desk mode) ??????????????? */}
       <aside className={`${deskMode ? "hidden" : "hidden lg:flex"} flex-col w-[300px] min-w-[300px] border-r border-white/10 bg-[#050505]`}>
         {/* Category + market tabs (full DEX universe) */}
         <div className="border-b border-white/10">
@@ -1939,7 +1979,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
           {marketTab !== "positions" && (
             <p className="px-3 py-1 text-[9px] text-white/25 font-mono">
-              {loadingTokens ? "Loading…" : `${tokens.length} tokens`}
+              {loadingTokens ? "Loading?" : `${tokens.length} tokens`}
             </p>
           )}
         </div>
@@ -1949,7 +1989,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
             <Input
-              placeholder="Search token or paste address…"
+              placeholder="Search token or paste address?"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 h-8 text-xs bg-white/[0.04] border-white/[0.07] rounded-lg placeholder:text-white/20"
@@ -2021,12 +2061,12 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 </div>
                 <div className="text-right shrink-0">
                   <p className={`text-xs font-mono ${token.mcap > 0 ? "text-white/80" : "text-white/30"}`}>
-                    {token.mcap > 0 ? fmtMcap(token.mcap) : "—"}
+                    {token.mcap > 0 ? fmtMcap(token.mcap) : "?"}
                   </p>
                   <p className={`text-[10px] font-mono ${
                     token.change24h > 0 ? "text-green-400" : token.change24h < 0 ? "text-red-400" : "text-white/30"
                   }`}>
-                    {token.change24h !== 0 ? fmtPct(token.change24h) : "—"}
+                    {token.change24h !== 0 ? fmtPct(token.change24h) : "?"}
                   </p>
                 </div>
               </button>
@@ -2053,7 +2093,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold truncate">{sym}</p>
                     </div>
-                    <p className="text-xs text-white/60 font-mono">{val > 0 ? `$${val.toFixed(2)}` : "—"}</p>
+                    <p className="text-xs text-white/60 font-mono">{val > 0 ? `$${val.toFixed(2)}` : "?"}</p>
                   </button>
                 );
               })
@@ -2085,17 +2125,17 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </ScrollArea>
       </aside>
 
-      {/* ═══════════════ CENTER PANEL ═══════════════ */}
+      {/* ??????????????? CENTER PANEL ??????????????? */}
       <div className={`flex min-w-0 flex-col ${deskMode ? "min-h-[85vh] lg:min-h-0 lg:flex-1 lg:overflow-hidden" : "min-h-0 flex-1 overflow-hidden"}`}>
 
-        {/* Mobile market browser — only in full mode */}
+        {/* Mobile market browser ? only in full mode */}
         {!deskMode && (
         <div className="lg:hidden border-b border-white/10 bg-[#050505]">
           <div className="p-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
               <Input
-                placeholder="Search token…"
+                placeholder="Search token?"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-8 h-8 text-xs bg-white/[0.04] border-white/10 rounded-lg"
@@ -2130,7 +2170,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 href={`/trade/token/${selectedMint}`}
                 className="mr-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white"
               >
-                ← Coin
+                ? Coin
               </a>
             )}
             {t.image ? (
@@ -2180,7 +2220,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 <span className="text-[10px] text-white/30">Liq</span>
                 <p className="text-sm font-semibold font-mono text-[#ffffff]">{fmtMcap(t.liquidity)}</p>
               </div>
-              {/* Wallet status — active trading identity */}
+              {/* Wallet status ? active trading identity */}
               {tradeReady && tradePk ? (
                 localActive ? (
                   <Link
@@ -2221,7 +2261,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
         )}
 
-        {/* Chart controls — DexScreener embed */}
+        {/* Chart controls ? DexScreener embed */}
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/10 bg-black">
           {(Object.keys(TIMEFRAME_CONFIG) as Timeframe[]).map((tf) => (
             <button
@@ -2262,12 +2302,12 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </button>
         </div>
 
-        {/* DexScreener chart — delayed mount so swap UI paints first */}
+        {/* DexScreener chart ? delayed mount so swap UI paints first */}
         <div className="relative min-h-[180px] flex-1 bg-black lg:min-h-[240px]">
           {(!mountChart || !chartReady) && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
               <Loader2 className="h-6 w-6 animate-spin text-white/30" />
-              <p className="text-[11px] text-white/30">Loading chart…</p>
+              <p className="text-[11px] text-white/30">Loading chart?</p>
             </div>
           )}
           {mountChart && dexChartSrc ? (
@@ -2288,7 +2328,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </div>
 
         {/* Bottom tabs: Trades / My Trades / Positions / Top Traders */}
-        <div className="flex h-[240px] shrink-0 flex-col border-t border-white/10 bg-[#050505] sm:h-[260px]">
+        <div
+          className={`flex shrink-0 flex-col border-t border-white/10 bg-[#050505] ${
+            bottomTab === "Clusters"
+              ? "min-h-[520px] sm:min-h-[640px]"
+              : "h-[240px] sm:h-[260px]"
+          }`}
+        >
           <div className="flex shrink-0 overflow-x-auto border-b border-white/10">
             {BOTTOM_TABS.map((tab) => (
               <button
@@ -2301,7 +2347,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     : "text-white/35 hover:text-white/60"
                 }`}
               >
-                {tab}
+                {tab === "Clusters" ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Crosshair className="h-3 w-3" /> Clusters
+                  </span>
+                ) : (
+                  tab
+                )}
               </button>
             ))}
           </div>
@@ -2314,7 +2366,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 </div>
                 {trades.length === 0 ? (
                   <div className="flex items-center justify-center py-8 text-xs text-white/20">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading trades…
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading trades?
                   </div>
                 ) : (
                   trades.map((trade, i) => (
@@ -2360,7 +2412,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 </div>
               ) : myTradesLoading ? (
                 <div className="flex items-center justify-center py-8 text-xs text-white/30">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading your swaps…
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading your swaps?
                 </div>
               ) : myTrades.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -2382,7 +2434,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       </p>
                     </div>
                     <p className="font-mono text-xs text-white/70">
-                      {tr.usd != null ? `$${Number(tr.usd).toFixed(2)}` : "—"}
+                      {tr.usd != null ? `$${Number(tr.usd).toFixed(2)}` : "?"}
                     </p>
                   </a>
                 ))
@@ -2410,7 +2462,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                         <span className="truncate font-semibold">{sym}</span>
                         <span className="font-mono text-white/50">{fmtNum(bal)}</span>
                         <span className="font-mono text-white/50">{fmtPrice(price)}</span>
-                        <span className="font-mono text-white/70">{val > 0 ? `$${val.toFixed(2)}` : "—"}</span>
+                        <span className="font-mono text-white/70">{val > 0 ? `$${val.toFixed(2)}` : "?"}</span>
                       </button>
                     );
                   })}
@@ -2444,7 +2496,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             {bottomTab === "Top Traders" && (
               topTradersLoading ? (
                 <div className="flex items-center justify-center py-8 text-xs text-white/30">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading traders…
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading traders?
                 </div>
               ) : topTraders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -2470,18 +2522,46 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                         </p>
                       </div>
                       <p className={`font-mono text-xs ${(Number(pnl) || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {pnl != null ? `${Number(pnl) < 0 ? "-" : ""}$${Math.abs(Number(pnl)).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                        {pnl != null ? `${Number(pnl) < 0 ? "-" : ""}$${Math.abs(Number(pnl)).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "?"}
                       </p>
                     </a>
                   );
                 })
               )
             )}
+            {bottomTab === "Clusters" && (
+              <div className="p-3">
+                {loadingXray ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Loader2 className="mb-2 h-6 w-6 animate-spin text-white/20" />
+                    <p className="text-xs text-white/30">Tracing early buyers & clusters…</p>
+                  </div>
+                ) : xray?.traced && (xray.earlyBuyers?.length || 0) > 0 ? (
+                  <Suspense
+                    fallback={
+                      <div className="flex items-center justify-center py-12 text-xs text-white/25">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading bubble map…
+                      </div>
+                    }
+                  >
+                    <BubbleMap report={xray} />
+                  </Suspense>
+                ) : (
+                  <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                    <Crosshair className="mb-2 h-6 w-6 text-white/15" />
+                    <p className="text-xs text-white/30">
+                      {xray?.note || "No early-buyer graph for this mint yet — try a newer launch or wait for X-ray to finish indexing."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         </div>
       </div>
 
-      {/* ═══════════════ RIGHT SIDEBAR (Desktop) ═══════════════ */}
+      {/* ??????????????? RIGHT SIDEBAR (Desktop) ??????????????? */}
       <aside className="hidden lg:flex flex-col w-[320px] min-w-[320px] border-l border-white/[0.07] bg-[#050505]">
         {/* 5m stats bar */}
         {t && (
@@ -2493,13 +2573,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <div className="p-3 text-center border-r border-white/[0.05]">
               <p className="text-[10px] text-white/30">Buys</p>
               <p className="text-xs font-bold font-mono text-green-400">
-                {t.buys5m} <span className="text-white/30">·</span> {fmtMcap(t.buyVol5m)}
+                {t.buys5m} <span className="text-white/30">?</span> {fmtMcap(t.buyVol5m)}
               </p>
             </div>
             <div className="p-3 text-center">
               <p className="text-[10px] text-white/30">Sells</p>
               <p className="text-xs font-bold font-mono text-red-400">
-                {t.sells5m} <span className="text-white/30">·</span> {fmtMcap(t.sellVol5m)}
+                {t.sells5m} <span className="text-white/30">?</span> {fmtMcap(t.sellVol5m)}
               </p>
             </div>
           </div>
@@ -2518,34 +2598,34 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <div className="grid grid-cols-3 gap-3">
               <InfoCell
                 label="Top 10 H"
-                value={security.top10HoldersPercent != null ? `${security.top10HoldersPercent.toFixed(1)}%` : "—"}
+                value={security.top10HoldersPercent != null ? `${security.top10HoldersPercent.toFixed(1)}%` : "?"}
                 color={
                   security.top10HoldersPercent == null ? "neutral" :
                   security.top10HoldersPercent < 30 ? "good" :
                   security.top10HoldersPercent < 60 ? "warn" : "bad"
                 }
               />
-              <InfoCell label="Dev H" value={security.devHoldersPercent != null ? `${security.devHoldersPercent.toFixed(1)}%` : "—"} color="neutral" />
-              <InfoCell label="Snipers H" value="—" color="neutral" />
-              <InfoCell label="Bundler H" value="—" color="neutral" />
+              <InfoCell label="Dev H" value={security.devHoldersPercent != null ? `${security.devHoldersPercent.toFixed(1)}%` : "?"} color="neutral" />
+              <InfoCell label="Snipers H" value="?" color="neutral" />
+              <InfoCell label="Bundler H" value="?" color="neutral" />
               <InfoCell
                 label="LP Burned"
                 value={security.lpBurned}
-                color={security.lpBurned === "100%" ? "good" : security.lpBurned === "—" ? "neutral" : "warn"}
+                color={security.lpBurned === "100%" ? "good" : security.lpBurned === "?" ? "neutral" : "warn"}
               />
               <InfoCell
                 label="Mutable"
-                value={security.mutable == null ? "—" : security.mutable ? "Enabled" : "Disabled"}
+                value={security.mutable == null ? "?" : security.mutable ? "Enabled" : "Disabled"}
                 color={security.mutable == null ? "neutral" : security.mutable ? "bad" : "good"}
               />
               <InfoCell
                 label="Mintable"
-                value={security.mintable == null ? "—" : security.mintable ? "Enabled" : "Disabled"}
+                value={security.mintable == null ? "?" : security.mintable ? "Enabled" : "Disabled"}
                 color={security.mintable == null ? "neutral" : security.mintable ? "bad" : "good"}
               />
               <InfoCell
                 label="Freezable"
-                value={security.freezable == null ? "—" : security.freezable ? "Enabled" : "Disabled"}
+                value={security.freezable == null ? "?" : security.freezable ? "Enabled" : "Disabled"}
                 color={security.freezable == null ? "neutral" : security.freezable ? "bad" : "good"}
               />
             </div>
@@ -2557,7 +2637,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </div>
       </aside>
 
-      {/* ═══════════════ MOBILE SWAP & INFO SECTION ═══════════════ */}
+      {/* ??????????????? MOBILE SWAP & INFO SECTION ??????????????? */}
       <div className="lg:hidden bg-[#050505] border-t border-white/[0.07]">
         {/* 5m stats */}
         {t && (
@@ -2589,22 +2669,22 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <div className="grid grid-cols-4 gap-3">
               <InfoCell
                 label="Top 10 H"
-                value={security.top10HoldersPercent != null ? `${security.top10HoldersPercent.toFixed(1)}%` : "—"}
+                value={security.top10HoldersPercent != null ? `${security.top10HoldersPercent.toFixed(1)}%` : "?"}
                 color={
                   security.top10HoldersPercent == null ? "neutral" :
                   security.top10HoldersPercent < 30 ? "good" :
                   security.top10HoldersPercent < 60 ? "warn" : "bad"
                 }
               />
-              <InfoCell label="Dev H" value={security.devHoldersPercent != null ? `${security.devHoldersPercent.toFixed(1)}%` : "—"} color="neutral" />
+              <InfoCell label="Dev H" value={security.devHoldersPercent != null ? `${security.devHoldersPercent.toFixed(1)}%` : "?"} color="neutral" />
               <InfoCell
                 label="Mintable"
-                value={security.mintable == null ? "—" : security.mintable ? "Yes" : "No"}
+                value={security.mintable == null ? "?" : security.mintable ? "Yes" : "No"}
                 color={security.mintable == null ? "neutral" : security.mintable ? "bad" : "good"}
               />
               <InfoCell
                 label="Freezable"
-                value={security.freezable == null ? "—" : security.freezable ? "Yes" : "No"}
+                value={security.freezable == null ? "?" : security.freezable ? "Yes" : "No"}
                 color={security.freezable == null ? "neutral" : security.freezable ? "bad" : "good"}
               />
             </div>
@@ -2619,7 +2699,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   );
 };
 
-/* ── Sub-component: Info cell ──────────────────────────── */
+/* ?? Sub-component: Info cell ???????????????????????????? */
 function InfoCell({ label, value, color }: { label: string; value: string; color: "good" | "warn" | "bad" | "neutral" }) {
   const clr =
     color === "good" ? "text-green-400" :
