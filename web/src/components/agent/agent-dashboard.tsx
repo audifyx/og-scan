@@ -595,11 +595,11 @@ export function AgentDashboard() {
                 <li>
                   Open <code>grok.com/connectors</code> → New Connector → Custom
                 </li>
-                <li>Paste only the MCP URL (Grok has no OAuth section)</li>
-                <li>Save / enable — Grok discovers OAuth from that URL</li>
+                <li>Paste only the MCP URL below</li>
                 <li>
-                  When Grok opens Authenticate, approve on OrbitX <code>/agent/mcp-auth</code>
+                  In chat say: <em>authenticate my OrbitX account</em>
                 </li>
+                <li>Grok sends a link → open it → Authorize Grok → tell Grok you&apos;re done</li>
               </ol>
             )}
 

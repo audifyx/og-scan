@@ -170,6 +170,7 @@ import McpAuthPage from "./pages/McpAuthPage";
 import XMcpPage from "./pages/XMcpPage";
 import XMcpAuthPage from "./pages/XMcpAuthPage";
 import XMcpLinkAuthPage from "./pages/XMcpLinkAuthPage";
+import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
 import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
@@ -627,6 +628,7 @@ const App = () => (
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
             <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
+            <Route path="/agent/link-auth" element={<AgentLinkAuthPage />} />
             <Route path="/agent/sign" element={<AgentSignPage />} />
             <Route path="/agent/create-token" element={<AgentCreateTokenPage />} />
             <Route path="/agent/nft-mint" element={<AgentNftMintPage />} />

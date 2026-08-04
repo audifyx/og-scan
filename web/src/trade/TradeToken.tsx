@@ -20,10 +20,12 @@ import {
   findWalletPnlToken,
 } from "./tradeApi";
 import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
+import { BubbleMap } from "./BubbleMap";
 
 type TabId =
   | "overview"
   | "holders"
+  | "bubbles"
   | "traders"
   | "trades"
   | "safety"
@@ -360,6 +362,7 @@ export default function TradeToken() {
       [
         ["overview", "Overview"],
         ["holders", totalHolders != null ? `Holders (${fmtNum(totalHolders)})` : "Holders"],
+        ["bubbles", "Bubbles"],
         ["traders", `Traders${traders.length ? ` (${traders.length})` : ""}`],
         ["trades", `Trades${trades.length ? ` (${trades.length})` : ""}`],
         ["safety", "Safety"],
@@ -657,6 +660,16 @@ export default function TradeToken() {
                 </pre>
               </>
             )}
+          </div>
+        )}
+
+        {tab === "bubbles" && (
+          <div className="space-y-2">
+            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              <BarChart2 className="h-3.5 w-3.5" />
+              Bubble map
+            </h3>
+            <BubbleMap address={mint} chain={meta.chain || "solana"} height={440} />
           </div>
         )}
 

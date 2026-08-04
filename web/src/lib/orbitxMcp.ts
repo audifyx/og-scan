@@ -217,6 +217,33 @@ export async function approveMcpOAuth(payload: {
   })) as unknown as { redirect: string };
 }
 
+/** Complete a Grok clickable link-auth session for Agent MCP. */
+export async function approveMcpLinkAuth(
+  code: string,
+  walletAddress?: string,
+): Promise<{ ok: boolean; status: string; authCode: string }> {
+  return (await agentFetch("/link/approve", {
+    method: "POST",
+    body: JSON.stringify({ code, walletAddress }),
+  })) as unknown as { ok: boolean; status: string; authCode: string };
+}
+
+export async function getMcpLinkStatus(code: string): Promise<{
+  ok?: boolean;
+  status?: string;
+  authenticated?: boolean;
+  message?: string;
+}> {
+  const r = await fetch(`${AGENT_API}/link/status?code=${encodeURIComponent(code)}`, {
+    headers: { Accept: "application/json" },
+  });
+  const data = await readJson(r);
+  if (!r.ok) {
+    throw new Error(String(data.message || data.error || `Request failed (${r.status})`));
+  }
+  return data as { ok?: boolean; status?: string; authenticated?: boolean; message?: string };
+}
+
 export function shortKey(key: string): string {
   if (key.length < 16) return key;
   return `${key.slice(0, 10)}…${key.slice(-6)}`;
