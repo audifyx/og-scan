@@ -27,7 +27,7 @@ import {
   type AlertKind,
 } from "@/trade/tradeAlerts";
 import { getBuyPresets, getSellPresets, saveBuyPresets } from "@/trade/tradePresets";
-import { fetchWallet } from "@/trade/tradeApi";
+import { fetchWallet, findWalletPnlToken } from "@/trade/tradeApi";
 import { fmtPct, fmtPnl, fmtTok, fmtUsd } from "@/trade/tradeFmt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,7 @@ import {
   SOL_MINT,
   shortAddr,
   type JupTokenInfo,
+  type JupQuote,
 } from "@/lib/og";
 import {
   getAssets,
@@ -457,6 +458,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [mountChart, setMountChart] = useState(false);
   const [loadingTokens, setLoadingTokens] = useState(!deskMode);
   const [copied, setCopied] = useState(false);
+  /** Prefetched Jupiter quote — reused on Buy/Sell click when still fresh. */
+  const quoteCacheRef = useRef<{
+    key: string;
+    quote: JupQuote;
+    at: number;
+  } | null>(null);
+  const sellBalRef = useRef<{ mint: string; owner: string; raw: bigint; at: number } | null>(null);
   const [positions, setPositions] = useState<TokenAsset[]>([]);
   const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [livePos, setLivePos] = useState<LivePosition | null>(null);
@@ -466,6 +474,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     avgCostUsd: number | null;
     costUsd: number | null;
     boughtUsd: number | null;
+    curPriceUsd: number | null;
+    holdingAmount: number | null;
+    holdingUsd: number | null;
+    unrealizedUsd: number | null;
+    unrealizedPct: number | null;
   } | null>(null);
 
   /* ── Load DEX markets (skip in desk mode — trade a selected mint only) ── */
@@ -587,17 +600,34 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       try {
         const w = await fetchWallet(tradePk.toBase58());
         if (!on || !w?.ok) return;
-        const tokens: any[] = Array.isArray(w?.pnl?.tokens)
-          ? w.pnl.tokens
-          : Array.isArray(w?.tokens)
-            ? w.tokens
-            : [];
-        const row = tokens.find((t: any) => t.mint === selectedMint);
+        // Must read pnl.perToken (API shape) — pnl.tokens was always empty.
+        const row = findWalletPnlToken(w, selectedMint);
+        // Also pull mark from holdings if PnL row missing (no recent swaps).
+        const hold = Array.isArray(w?.holdings)
+          ? w.holdings.find((h: any) => h?.mint === selectedMint)
+          : null;
+        const holdAmt =
+          hold?.uiAmount != null && Number.isFinite(Number(hold.uiAmount))
+            ? Number(hold.uiAmount)
+            : null;
+        const holdUsd =
+          hold?.usdValue != null && Number.isFinite(Number(hold.usdValue))
+            ? Number(hold.usdValue)
+            : null;
+        const holdPx =
+          hold?.priceUsd != null && Number.isFinite(Number(hold.priceUsd))
+            ? Number(hold.priceUsd)
+            : null;
         costCacheRef.current = {
           mint: selectedMint,
-          avgCostUsd: row?.avgCostUsd != null ? Number(row.avgCostUsd) : null,
-          costUsd: row?.costUsd != null ? Number(row.costUsd) : null,
-          boughtUsd: row?.boughtUsd != null ? Number(row.boughtUsd) : null,
+          avgCostUsd: row?.avgCostUsd ?? null,
+          costUsd: row?.costUsd ?? null,
+          boughtUsd: row?.boughtUsd ?? null,
+          curPriceUsd: row?.curPriceUsd ?? holdPx,
+          holdingAmount: row?.holdingAmount ?? holdAmt,
+          holdingUsd: row?.holdingUsd ?? row?.potUsd ?? holdUsd,
+          unrealizedUsd: row?.unrealizedUsd ?? null,
+          unrealizedPct: row?.unrealizedPct ?? null,
         };
       } catch {
         /* keep prior cache */
@@ -607,15 +637,32 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     const tick = async () => {
       try {
         const mintPk = new PublicKey(selectedMint);
-        const accs = await connection.getParsedTokenAccountsByOwner(tradePk, { mint: mintPk });
         let amount = 0;
-        for (const a of accs.value) {
-          const ui = Number(a.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
-          if (Number.isFinite(ui)) amount += ui;
+        try {
+          const accs = await connection.getParsedTokenAccountsByOwner(tradePk, { mint: mintPk });
+          for (const a of accs.value) {
+            const ui = Number(a.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+            if (Number.isFinite(ui)) amount += ui;
+          }
+        } catch {
+          /* RPC blip — fall back to wallet cache / previous */
         }
-        const price = Number(selectedToken?.price) || 0;
-        const worthUsd = price > 0 && amount > 0 ? amount * price : amount > 0 && price <= 0 ? null : 0;
         const cache = costCacheRef.current?.mint === selectedMint ? costCacheRef.current : null;
+        // If chain read failed/empty but wallet API knows the bag, use that.
+        if (!(amount > 0) && cache?.holdingAmount != null && cache.holdingAmount > 0) {
+          amount = cache.holdingAmount;
+        }
+        const deskPrice = Number(selectedToken?.price) || 0;
+        const cachePrice = cache?.curPriceUsd != null && cache.curPriceUsd > 0 ? cache.curPriceUsd : 0;
+        const price = deskPrice > 0 ? deskPrice : cachePrice;
+        let worthUsd: number | null =
+          price > 0 && amount > 0
+            ? amount * price
+            : amount > 0
+              ? cache?.holdingUsd != null && cache.holdingUsd > 0
+                ? cache.holdingUsd
+                : null
+              : 0;
         let costUsd = cache?.costUsd ?? null;
         if (costUsd == null && cache?.avgCostUsd != null && amount > 0) {
           costUsd = cache.avgCostUsd * amount;
@@ -625,6 +672,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         if (worthUsd != null && costUsd != null && costUsd > 0) {
           unrealizedUsd = worthUsd - costUsd;
           unrealizedPct = (unrealizedUsd / costUsd) * 100;
+        } else if (cache?.unrealizedUsd != null && Number.isFinite(cache.unrealizedUsd)) {
+          // Prefer live mark when we have both; else show API unrealized.
+          unrealizedUsd = cache.unrealizedUsd;
+          unrealizedPct = cache.unrealizedPct;
         }
         if (!on) return;
         // Bail out when numbers are unchanged so 1s polling doesn't thrash the tree
@@ -655,7 +706,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           return next;
         });
       } catch {
-        if (on) setLivePos(null);
+        // Keep last good snapshot on transient errors (don't flash "—").
+        if (on) setLivePosLoading(false);
       } finally {
         if (on) setLivePosLoading(false);
       }
@@ -757,15 +809,23 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     toast({ title: "Address copied" });
   }, [selectedMint]);
 
-  /** Build Jupiter swap tx client-side when the trade API can't return one. */
-  const buildJupiterTx = useCallback(async (): Promise<string> => {
-    if (!tradePk || !selectedMint) throw new Error("Wallet / mint missing");
+  const quoteKey = useCallback(() => {
+    if (!selectedMint || !tradePk) return "";
     const slippageBps = Math.min(Math.max(Math.round((Number(slippage) || 10) * 100), 50), 5000);
     if (swapMode === "buy") {
       const lamports = Math.floor(Number(buyAmt) * 1e9);
-      if (!Number.isFinite(lamports) || lamports <= 0) throw new Error("Enter a valid SOL amount");
-      const q = await jupQuote(SOL_MINT, selectedMint, String(lamports), slippageBps);
-      return jupSwapTransaction(q, tradePk.toBase58());
+      if (!Number.isFinite(lamports) || lamports <= 0) return "";
+      return `buy:${selectedMint}:${lamports}:${slippageBps}:${tradePk.toBase58()}`;
+    }
+    return `sell:${selectedMint}:${sellPct}:${slippageBps}:${tradePk.toBase58()}`;
+  }, [selectedMint, tradePk, slippage, swapMode, buyAmt, sellPct]);
+
+  const resolveSellRaw = useCallback(async (): Promise<bigint> => {
+    if (!tradePk || !selectedMint) throw new Error("Wallet / mint missing");
+    const owner = tradePk.toBase58();
+    const cached = sellBalRef.current;
+    if (cached && cached.mint === selectedMint && cached.owner === owner && Date.now() - cached.at < 15_000) {
+      return cached.raw;
     }
     const mintPk = new PublicKey(selectedMint);
     const accs = await connection.getParsedTokenAccountsByOwner(tradePk, { mint: mintPk });
@@ -774,12 +834,75 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       const amt = a.account?.data?.parsed?.info?.tokenAmount?.amount;
       if (amt) raw += BigInt(amt);
     }
-    if (raw <= 0n) throw new Error("No balance to sell");
-    const amount = (raw * BigInt(Math.round(sellPct))) / 100n;
-    if (amount <= 0n) throw new Error("Sell amount too small");
-    const q = await jupQuote(selectedMint, SOL_MINT, amount.toString(), slippageBps);
+    sellBalRef.current = { mint: selectedMint, owner, raw, at: Date.now() };
+    return raw;
+  }, [tradePk, selectedMint, connection]);
+
+  /** Prefetch Jupiter quote while amount/presets change so Buy isn't quote-bound. */
+  useEffect(() => {
+    const key = quoteKey();
+    if (!key || !tradePk || !selectedMint) return;
+    const hit = quoteCacheRef.current;
+    if (hit && hit.key === key && Date.now() - hit.at < 25_000) return;
+
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      try {
+        const slippageBps = Math.min(Math.max(Math.round((Number(slippage) || 10) * 100), 50), 5000);
+        let q: JupQuote;
+        if (swapMode === "buy") {
+          const lamports = Math.floor(Number(buyAmt) * 1e9);
+          if (!Number.isFinite(lamports) || lamports <= 0) return;
+          q = await jupQuote(SOL_MINT, selectedMint, String(lamports), slippageBps);
+        } else {
+          const raw = await resolveSellRaw();
+          if (raw <= 0n) return;
+          const amount = (raw * BigInt(Math.round(sellPct))) / 100n;
+          if (amount <= 0n) return;
+          q = await jupQuote(selectedMint, SOL_MINT, amount.toString(), slippageBps);
+        }
+        if (cancelled) return;
+        quoteCacheRef.current = { key, quote: q, at: Date.now() };
+      } catch {
+        /* prefetch is best-effort */
+      }
+    }, 180);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [quoteKey, tradePk, selectedMint, swapMode, buyAmt, sellPct, slippage, resolveSellRaw]);
+
+  const getFreshQuote = useCallback(async (): Promise<JupQuote> => {
+    if (!tradePk || !selectedMint) throw new Error("Wallet / mint missing");
+    const key = quoteKey();
+    const hit = quoteCacheRef.current;
+    if (hit && hit.key === key && Date.now() - hit.at < 25_000 && hit.quote?.outAmount) {
+      return hit.quote;
+    }
+    const slippageBps = Math.min(Math.max(Math.round((Number(slippage) || 10) * 100), 50), 5000);
+    let q: JupQuote;
+    if (swapMode === "buy") {
+      const lamports = Math.floor(Number(buyAmt) * 1e9);
+      if (!Number.isFinite(lamports) || lamports <= 0) throw new Error("Enter a valid SOL amount");
+      q = await jupQuote(SOL_MINT, selectedMint, String(lamports), slippageBps);
+    } else {
+      const raw = await resolveSellRaw();
+      if (raw <= 0n) throw new Error("No balance to sell");
+      const amount = (raw * BigInt(Math.round(sellPct))) / 100n;
+      if (amount <= 0n) throw new Error("Sell amount too small");
+      q = await jupQuote(selectedMint, SOL_MINT, amount.toString(), slippageBps);
+    }
+    quoteCacheRef.current = { key, quote: q, at: Date.now() };
+    return q;
+  }, [tradePk, selectedMint, quoteKey, slippage, swapMode, buyAmt, sellPct, resolveSellRaw]);
+
+  /** Build Jupiter swap tx from a (prefetched) quote — never open jup.ag. */
+  const buildJupiterTx = useCallback(async (quote?: JupQuote): Promise<string> => {
+    if (!tradePk) throw new Error("Wallet missing");
+    const q = quote || (await getFreshQuote());
     return jupSwapTransaction(q, tradePk.toBase58());
-  }, [tradePk, selectedMint, swapMode, buyAmt, sellPct, slippage, connection]);
+  }, [tradePk, getFreshQuote]);
 
   /** Build + sign trade — Phantom/Jupiter when connected mode; local keypair when local mode. */
   const handleSwap = useCallback(async () => {
@@ -807,18 +930,31 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     }
     setTradeBusy(true);
     try {
-      setTradeStage("Building transaction…");
+      // Show wallet stage early — build races underneath so the popup feels immediate.
+      setTradeStage(localActive ? "Building & signing…" : "Confirm in wallet…");
       const amount = swapMode === "buy" ? Number(buyAmt) : `${sellPct}%`;
-      let txB64 = "";
-      let skipPreflight = true;
-      let warning = "";
+      const pk58 = tradePk.toBase58();
 
-      try {
+      // Reuse warm prefetch immediately; refresh in parallel for Jupiter path.
+      const key = quoteKey();
+      const warm =
+        quoteCacheRef.current &&
+        quoteCacheRef.current.key === key &&
+        Date.now() - quoteCacheRef.current.at < 25_000
+          ? quoteCacheRef.current.quote
+          : null;
+      const quotePromise = warm
+        ? Promise.resolve(warm)
+        : getFreshQuote().catch(() => null);
+
+      // Race: server trade builder (no sim for extension) vs client Jupiter from prefetch.
+      const apiBuild = (async (): Promise<{ tx: string; skipPreflight: boolean; warning: string }> => {
+        // Start API immediately with warm quote — don't wait on a cold quote fetch.
         const r = await fetch("/api/ogdex/trade", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            publicKey: tradePk.toBase58(),
+            publicKey: pk58,
             action: swapMode,
             mint: selectedMint,
             amount,
@@ -826,57 +962,95 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             slippage,
             priorityFee: 0.0003,
             pool: "auto",
+            // Local keypair: one server sim. Extension wallets simulate themselves.
+            simulate: localActive,
+            ...(warm ? { quoteResponse: warm } : {}),
           }),
         });
         const d = await r.json().catch(() => ({}));
-        if (d?.ok && d?.tx) {
-          txB64 = d.tx;
-          // Prefer opening the wallet immediately; only tighten preflight when sim passed.
-          skipPreflight = d.simulated !== true;
-          if (typeof d.warning === "string") warning = d.warning;
-        } else {
-          throw new Error(d?.error || "Could not build transaction");
-        }
-      } catch (apiErr: any) {
-        // In-app Jupiter quote/swap API fallback — never open jup.ag website.
-        setTradeStage("Building via Jupiter…");
-        try {
-          txB64 = await buildJupiterTx();
-          skipPreflight = true;
-        } catch (jupErr: any) {
-          const apiMsg = String(apiErr?.message || apiErr || "");
-          const jupMsg = String(jupErr?.message || jupErr || "");
-          throw new Error(
-            jupMsg && jupMsg !== apiMsg
-              ? `${apiMsg || "Trade API failed"}; Jupiter quote failed: ${jupMsg}`
-              : apiMsg || jupMsg || "Could not build transaction",
-          );
-        }
-      }
+        if (!d?.ok || !d?.tx) throw new Error(d?.error || "Could not build transaction");
+        return {
+          tx: d.tx as string,
+          // Local: skip preflight only if server already simulated. Extension: skip.
+          skipPreflight: localActive ? d.simulated === true : true,
+          warning: typeof d.warning === "string" ? d.warning : "",
+        };
+      })();
 
-      const bytes = Uint8Array.from(atob(txB64), (c) => c.charCodeAt(0));
+      const jupBuild = (async (): Promise<{ tx: string; skipPreflight: boolean; warning: string }> => {
+        const quote = await quotePromise;
+        const tx = await buildJupiterTx(quote || undefined);
+        return { tx, skipPreflight: !localActive, warning: "" };
+      })();
+
+      const built = await Promise.any([apiBuild, jupBuild]).catch(async () => {
+        // Both rejected — surface the API error (or Jupiter) for the user.
+        try {
+          return await apiBuild;
+        } catch (apiErr: any) {
+          try {
+            return await jupBuild;
+          } catch (jupErr: any) {
+            const apiMsg = String(apiErr?.message || apiErr || "");
+            const jupMsg = String(jupErr?.message || jupErr || "");
+            throw new Error(
+              jupMsg && jupMsg !== apiMsg
+                ? `${apiMsg || "Trade API failed"}; Jupiter quote failed: ${jupMsg}`
+                : apiMsg || jupMsg || "Could not build transaction",
+            );
+          }
+        }
+      });
+
+      const bytes = Uint8Array.from(atob(built.tx), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(bytes);
       setTradeStage(localActive ? "Signing locally…" : "Confirm in wallet…");
-      const sig = await sendActiveTx(connection, tx, { skipPreflight, maxRetries: 3 });
-      setTradeStage("Confirming on-chain…");
-      await connection.confirmTransaction(sig, "confirmed");
-      setTradeSig(sig);
-      toast({
-        title: "Trade confirmed",
-        description: warning ? `${sig.slice(0, 8)}… · ${warning}` : `${sig.slice(0, 8)}…`,
+      const sig = await sendActiveTx(connection, tx, {
+        skipPreflight: built.skipPreflight,
+        maxRetries: 3,
       });
-      if (tradePk) {
+
+      // Success staging as soon as we have a signature — confirm in background.
+      setTradeSig(sig);
+      setTradeBusy(false);
+      setTradeStage("Submitted…");
+      toast({
+        title: "Trade submitted",
+        description: built.warning
+          ? `${sig.slice(0, 8)}… · ${built.warning}`
+          : `${sig.slice(0, 8)}… · confirming on-chain`,
+      });
+
+      void (async () => {
         try {
-          const assets = await getAssets(tradePk.toString());
-          setPositions(
-            (assets.items || []).filter(
-              (a: TokenAsset) => a.interface === "FungibleToken" || a.interface === "FungibleAsset",
-            ),
-          );
+          await connection.confirmTransaction(sig, "confirmed");
+          setTradeStage("");
+          toast({
+            title: "Trade confirmed",
+            description: `${sig.slice(0, 8)}…`,
+          });
         } catch {
-          /* ignore */
+          setTradeStage("");
+          // Signature was broadcast — don't fake failure; explorer may still land.
+          toast({
+            title: "Trade submitted",
+            description: `${sig.slice(0, 8)}… · confirmation slow — check explorer`,
+          });
         }
-      }
+        if (tradePk) {
+          try {
+            const assets = await getAssets(tradePk.toString());
+            setPositions(
+              (assets.items || []).filter(
+                (a: TokenAsset) => a.interface === "FungibleToken" || a.interface === "FungibleAsset",
+              ),
+            );
+          } catch {
+            /* ignore */
+          }
+        }
+      })();
+      return;
     } catch (e: any) {
       const m = String(e?.message || e || "Trade failed");
       const friendly = /reject|cancel/i.test(m) ? "Cancelled in wallet" : m;
@@ -886,7 +1060,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       }
     } finally {
       setTradeBusy(false);
-      setTradeStage("");
+      // Keep "Submitted…" briefly when background confirm is running; clear otherwise.
+      setTradeStage((prev) => (prev === "Submitted…" ? prev : ""));
     }
   }, [
     selectedMint,
@@ -902,6 +1077,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     signTransaction,
     connection,
     buildJupiterTx,
+    getFreshQuote,
+    quoteKey,
   ]);
 
   const selectSearchResult = useCallback(

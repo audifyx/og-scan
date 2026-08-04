@@ -11,7 +11,13 @@ import {
   ArrowLeft, Copy, Check, ExternalLink, Loader2, Shield, Users, Activity,
   Globe, Send, MessageCircle, FileDown, Flame, AlertTriangle, BarChart2, Wallet,
 } from "lucide-react";
-import { askCoinChat, fetchTokenBundle, fetchTokenOnly, fetchWallet } from "./tradeApi";
+import {
+  askCoinChat,
+  fetchTokenBundle,
+  fetchTokenOnly,
+  fetchWallet,
+  findWalletPnlToken,
+} from "./tradeApi";
 import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr } from "./tradeFmt";
 
 type TabId =
@@ -200,21 +206,33 @@ export default function TradeToken() {
     let on = true;
     let costUsd: number | null = null;
     let avgCost: number | null = null;
+    let cachePx: number | null = null;
+    let cacheHoldAmt: number | null = null;
+    let cacheHoldUsd: number | null = null;
+    let cacheUnreal: number | null = null;
+    let cacheUnrealPct: number | null = null;
 
     const refreshCost = async () => {
       try {
         const w = await fetchWallet(publicKey.toBase58());
         if (!on || !w?.ok) return;
-        const tokens: any[] = Array.isArray(w?.pnl?.tokens)
-          ? w.pnl.tokens
-          : Array.isArray(w?.tokens)
-            ? w.tokens
-            : [];
-        const row = tokens.find((x: any) => x.mint === mint);
-        costUsd = row?.costUsd != null ? Number(row.costUsd) : null;
-        avgCost = row?.avgCostUsd != null ? Number(row.avgCostUsd) : null;
+        const row = findWalletPnlToken(w, mint);
+        const hold = Array.isArray(w?.holdings)
+          ? w.holdings.find((h: any) => h?.mint === mint)
+          : null;
+        costUsd = row?.costUsd ?? null;
+        avgCost = row?.avgCostUsd ?? null;
+        cachePx = row?.curPriceUsd ?? (hold?.priceUsd != null ? Number(hold.priceUsd) : null);
+        cacheHoldAmt =
+          row?.holdingAmount ??
+          (hold?.uiAmount != null ? Number(hold.uiAmount) : null);
+        cacheHoldUsd =
+          row?.holdingUsd ??
+          row?.potUsd ??
+          (hold?.usdValue != null ? Number(hold.usdValue) : null);
+        cacheUnreal = row?.unrealizedUsd ?? null;
+        cacheUnrealPct = row?.unrealizedPct ?? null;
         if (costUsd != null) setPosCost(costUsd);
-        else if (avgCost != null) setPosCost(null);
       } catch {
         /* keep */
       }
@@ -222,22 +240,37 @@ export default function TradeToken() {
 
     const tick = async () => {
       try {
-        const accs = await connection.getParsedTokenAccountsByOwner(publicKey, {
-          mint: new PublicKey(mint),
-        });
         let amount = 0;
-        for (const a of accs.value) {
-          const ui = Number(a.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
-          if (Number.isFinite(ui)) amount += ui;
+        try {
+          const accs = await connection.getParsedTokenAccountsByOwner(publicKey, {
+            mint: new PublicKey(mint),
+          });
+          for (const a of accs.value) {
+            const ui = Number(a.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+            if (Number.isFinite(ui)) amount += ui;
+          }
+        } catch {
+          /* RPC blip */
+        }
+        if (!(amount > 0) && cacheHoldAmt != null && cacheHoldAmt > 0) {
+          amount = cacheHoldAmt;
         }
         if (!on) return;
-        const px =
+        const pagePx =
           Number(
             (d?.token || {}).priceUsd ??
               (d?.meta || {}).priceUsd ??
               d?.raw?.priceUsd,
           ) || 0;
-        const worth = px > 0 ? amount * px : amount > 0 ? null : 0;
+        const px = pagePx > 0 ? pagePx : cachePx && cachePx > 0 ? cachePx : 0;
+        const worth =
+          px > 0 && amount > 0
+            ? amount * px
+            : amount > 0
+              ? cacheHoldUsd != null && cacheHoldUsd > 0
+                ? cacheHoldUsd
+                : null
+              : 0;
         let c = costUsd;
         if (c == null && avgCost != null && amount > 0) c = avgCost * amount;
         // Skip identical ticks so 1s polling doesn't re-render while typing.
@@ -249,12 +282,19 @@ export default function TradeToken() {
           setPosUnreal((prev) => (prev === u ? prev : u));
           setPosUnrealPct((prev) => (prev === pct ? prev : pct));
           setPosCost((prev) => (prev === c ? prev : c));
+        } else if (cacheUnreal != null && Number.isFinite(cacheUnreal)) {
+          setPosUnreal((prev) => (prev === cacheUnreal ? prev : cacheUnreal));
+          setPosUnrealPct((prev) =>
+            prev === cacheUnrealPct ? prev : cacheUnrealPct,
+          );
+          if (c != null) setPosCost((prev) => (prev === c ? prev : c));
         } else {
           setPosUnreal((prev) => (prev == null ? prev : null));
           setPosUnrealPct((prev) => (prev == null ? prev : null));
+          if (c != null) setPosCost((prev) => (prev === c ? prev : c));
         }
       } catch {
-        if (on) setPosAmount(0);
+        /* keep last good amount */
       }
     };
 

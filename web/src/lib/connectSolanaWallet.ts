@@ -57,7 +57,7 @@ export async function connectSolanaWallet(opts: {
   const adapter = pick.adapter;
   opts.select(adapter.name as WalletName);
   // Allow WalletProvider to adopt the selected adapter before context.connect().
-  await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 40));
 
   if (!adapter.connected) {
     try {

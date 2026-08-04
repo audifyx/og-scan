@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Copy, Check, ExternalLink, Loader2, Wallet, RefreshCw } from "lucide-react";
 import {
+  extractWalletPnlTokens,
   fetchSwaps,
   fetchWallet,
   mergeHoldingPnl,
@@ -98,7 +99,7 @@ export default function TradeWallet() {
 
   const pnlByMint = useMemo(() => {
     const map = new Map<string, WalletPnlToken>();
-    for (const raw of d?.pnl?.perToken || []) {
+    for (const raw of extractWalletPnlTokens(d)) {
       const row = normalizePnlToken(raw);
       if (row) map.set(row.mint, row);
     }
@@ -152,8 +153,7 @@ export default function TradeWallet() {
         : null;
 
   const pnlRows: WalletPnlToken[] = useMemo(() => {
-    const rows = Array.isArray(pnl?.perToken) ? pnl.perToken : [];
-    return rows
+    return extractWalletPnlTokens(d)
       .map((r: any) => normalizePnlToken(r))
       .filter((p): p is WalletPnlToken => !!p)
       .filter(
@@ -164,7 +164,7 @@ export default function TradeWallet() {
           (p.holdingAmount || 0) > 0 ||
           p.noTradeHistory,
       );
-  }, [pnl]);
+  }, [d]);
 
   const copy = () => {
     navigator.clipboard.writeText(address);

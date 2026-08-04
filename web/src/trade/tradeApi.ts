@@ -240,6 +240,32 @@ function numOrNull(v: unknown): number | null {
 }
 
 /**
+ * Wallet API returns PnL rows under `pnl.perToken` (current). Older shapes used
+ * `pnl.tokens` / top-level `tokens` / `pnl.positions` — check all so the desk
+ * never blanks cost / unrealized when the payload is present.
+ */
+export function extractWalletPnlTokens(w: any): any[] {
+  if (!w || typeof w !== "object") return [];
+  if (Array.isArray(w?.pnl?.perToken) && w.pnl.perToken.length) return w.pnl.perToken;
+  if (Array.isArray(w?.pnl?.tokens) && w.pnl.tokens.length) return w.pnl.tokens;
+  if (Array.isArray(w?.tokens) && w.tokens.length) return w.tokens;
+  if (Array.isArray(w?.pnl?.positions) && w.pnl.positions.length) return w.pnl.positions;
+  if (Array.isArray(w?.pnl?.perToken)) return w.pnl.perToken;
+  if (Array.isArray(w?.pnl?.tokens)) return w.pnl.tokens;
+  if (Array.isArray(w?.tokens)) return w.tokens;
+  if (Array.isArray(w?.pnl?.positions)) return w.pnl.positions;
+  return [];
+}
+
+/** Find + normalize a single mint row from a /wallet response. */
+export function findWalletPnlToken(w: any, mint: string): WalletPnlToken | null {
+  const m = String(mint || "").trim();
+  if (!m) return null;
+  const raw = extractWalletPnlTokens(w).find((t) => String(t?.mint || "") === m);
+  return raw ? normalizePnlToken(raw) : null;
+}
+
+/**
  * Normalize wallet / PnL token rows across API aliases so the UI never blanks
  * on cost vs costUsd, uPnl vs unrealizedUsd, pot vs holdingUsd, etc.
  */

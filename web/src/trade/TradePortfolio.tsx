@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import {
+  extractWalletPnlTokens,
   fetchTopHolders,
   fetchWallet,
   mergeHoldingPnl,
@@ -217,7 +218,7 @@ export default function TradePortfolio() {
 
   const pnlByMint = useMemo(() => {
     const map = new Map<string, WalletPnlToken>();
-    for (const raw of mine?.pnl?.perToken || []) {
+    for (const raw of extractWalletPnlTokens(mine)) {
       const row = normalizePnlToken(raw);
       if (row) map.set(row.mint, row);
     }
