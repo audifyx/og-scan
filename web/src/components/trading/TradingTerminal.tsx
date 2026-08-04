@@ -983,23 +983,23 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         return { tx, skipPreflight: !localActive, warning: "" };
       })();
 
-      const built = await Promise.any([apiBuild, jupBuild]).catch(async () => {
-        // Both rejected — surface the API error (or Jupiter) for the user.
-        try {
-          return await apiBuild;
-        } catch (apiErr: any) {
-          try {
-            return await jupBuild;
-          } catch (jupErr: any) {
-            const apiMsg = String(apiErr?.message || apiErr || "");
-            const jupMsg = String(jupErr?.message || jupErr || "");
-            throw new Error(
-              jupMsg && jupMsg !== apiMsg
-                ? `${apiMsg || "Trade API failed"}; Jupiter quote failed: ${jupMsg}`
-                : apiMsg || jupMsg || "Could not build transaction",
-            );
-          }
-        }
+      type BuiltTx = { tx: string; skipPreflight: boolean; warning: string };
+      let apiFail: unknown = null;
+      let jupFail: unknown = null;
+      const built = await new Promise<BuiltTx>((resolve, reject) => {
+        let left = 2;
+        const onFail = () => {
+          if (--left > 0) return;
+          const apiMsg = String((apiFail as any)?.message || apiFail || "");
+          const jupMsg = String((jupFail as any)?.message || jupFail || "");
+          reject(new Error(
+            jupMsg && jupMsg !== apiMsg
+              ? `${apiMsg || "Trade API failed"}; Jupiter quote failed: ${jupMsg}`
+              : apiMsg || jupMsg || "Could not build transaction",
+          ));
+        };
+        apiBuild.then(resolve, (e) => { apiFail = e; onFail(); });
+        jupBuild.then(resolve, (e) => { jupFail = e; onFail(); });
       });
 
       const bytes = Uint8Array.from(atob(built.tx), (c) => c.charCodeAt(0));
@@ -1478,7 +1478,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   className="mt-3 flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] text-[11px] font-bold text-white/85 hover:bg-white/10"
                 >
                   <Wallet className="h-3.5 w-3.5" />
-                  Connect Phantom / Jupiter
+                  Connect wallet
                 </button>
               )
             ) : null}
@@ -1508,7 +1508,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               ) : (
                 <>
                   <Wallet className="mr-2 h-4 w-4" />
-                  Connect Phantom
+                  Connect wallet
                 </>
               )
             ) : swapMode === "buy" ? (
@@ -1618,7 +1618,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             ) : !connected ? (
               <>
                 <Wallet className="mr-2 h-4 w-4" />
-                Connect Phantom
+                Connect wallet
               </>
             ) : (
               <>
@@ -1680,15 +1680,23 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   // Same as swap panel — call as {renderWalletPickerOverlay()}, never as a JSX tag.
   const renderWalletPickerOverlay = () => {
     if (!showWalletPicker) return null;
-    // Prefer Installed/Loadable. Still list known wallets when NotDetected so the
-    // user gets an install toast — never auto-open adapter.url / jup.ag.
+    // Always list Phantom / Jupiter / Solflare. User chooses — never auto-pick Solflare.
+    // Not-installed rows toast a soft hint; never open adapter.url / jup.ag / solflare.com.
     const known = ["Phantom", "Jupiter", "Solflare"] as const;
-    const available = wallets.filter((w) => {
-      if (!known.includes(w.adapter.name as (typeof known)[number])) return false;
-      const rs = String(w.readyState);
-      return rs === "Installed" || rs === "Loadable";
+    const rows = known.map((name) => {
+      const hit = wallets.find((w) => w.adapter.name === name);
+      const rs = hit ? String(hit.readyState) : "NotDetected";
+      const ready = rs === "Installed" || rs === "Loadable";
+      return { name, icon: hit?.adapter.icon, ready };
     });
-    const connectOne = async (name: string) => {
+    const connectOne = async (name: string, ready: boolean) => {
+      if (!ready) {
+        toast({
+          title: `${name} not installed`,
+          description: phantomInstallHint(name),
+        });
+        return;
+      }
       setWalletMode("connected");
       setShowWalletPicker(false);
       try {
@@ -1713,49 +1721,29 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         <div className="bg-[#111111] border border-white/[0.1] rounded-2xl p-6 w-[340px] max-w-[90vw] space-y-4"
           onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold">Connect Wallet</h3>
+            <h3 className="text-lg font-bold">Connect wallet</h3>
             <button type="button" onClick={() => setShowWalletPicker(false)} className="text-white/30 hover:text-white/60">
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-xs text-white/40">Select a wallet to connect to OrbitX. Trades sign in-app — we never open jup.ag.</p>
+          <p className="text-xs text-white/40">Choose Phantom, Jupiter, or Solflare. Trades sign in-app — we never open wallet marketing sites.</p>
           <div className="space-y-2">
-            {available.map((w) => (
+            {rows.map((w) => (
               <button
-                key={w.adapter.name}
+                key={w.name}
                 type="button"
-                onClick={() => void connectOne(w.adapter.name)}
+                onClick={() => void connectOne(w.name, w.ready)}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] hover:border-[#ffffff]/40 transition-all group"
               >
-                {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-8 h-8 rounded-lg" />}
-                <span className="font-semibold text-sm">{w.adapter.name}</span>
-                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ffffff] transition-colors">
-                  Connect →
+                {w.icon ? <img src={w.icon} alt={w.name} className="w-8 h-8 rounded-lg" /> : <Wallet className="w-8 h-8 text-white/40" />}
+                <span className="font-semibold text-sm">{w.name}</span>
+                <span className={`ml-auto text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                  w.ready ? "text-emerald-400/80" : "text-white/35"
+                }`}>
+                  {w.ready ? "Detected" : "Not installed"}
                 </span>
               </button>
             ))}
-            {available.length === 0 && (
-              <div className="text-center py-6 space-y-3">
-                <Wallet className="h-8 w-8 text-white/15 mx-auto mb-2" />
-                <p className="text-sm text-white/40">No wallet extension detected</p>
-                <p className="text-[11px] text-white/30 px-2">
-                  Install Phantom (or Solflare), then refresh this page. OrbitX will not redirect you to swap sites.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    toast({
-                      title: "Phantom not detected",
-                      description: phantomInstallHint("Phantom"),
-                      variant: "destructive",
-                    });
-                  }}
-                  className="w-full rounded-xl bg-white px-4 py-3 text-sm font-bold text-black"
-                >
-                  Connect Phantom
-                </button>
-              </div>
-            )}
           </div>
           <p className="text-[10px] text-white/20 text-center">Your keys never leave your wallet.</p>
         </div>
@@ -1943,7 +1931,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 </p>
                 {!tradeReady && !localActive && (
                   <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-black text-xs">
-                    Connect
+                    Connect wallet
                   </Button>
                 )}
                 {!tradeReady && localActive && (
@@ -2088,7 +2076,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 <Button size="sm" onClick={() => setShowWalletPicker(true)}
                   className="bg-[#ffffff] hover:bg-[#e5e5e5] text-black text-xs font-semibold rounded-lg">
                   <Wallet className="h-3.5 w-3.5 mr-1.5" />
-                  Connect
+                  Connect wallet
                 </Button>
               )}
             </div>
@@ -2228,7 +2216,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     </Link>
                   ) : (
                     <Button size="sm" type="button" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-xs text-black">
-                      Connect
+                      Connect wallet
                     </Button>
                   )}
                 </div>
@@ -2301,7 +2289,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   </p>
                   {!tradeReady && !localActive && (
                     <Button size="sm" type="button" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-xs text-black">
-                      Connect
+                      Connect wallet
                     </Button>
                   )}
                   {!tradeReady && localActive && (
