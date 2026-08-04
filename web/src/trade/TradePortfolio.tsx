@@ -387,6 +387,9 @@ export default function TradePortfolio() {
                             <p className="truncate text-[14px] font-bold">
                               {h.symbol || shortAddr(h.mint, 4)}
                             </p>
+                            <p className="truncate text-[12px] text-white/50">
+                              {h.name || "—"}
+                            </p>
                             <p className="font-mono text-[11px] text-white/35">
                               {fmtTok(h.uiAmount, 4)}
                               {h.unpriced ? " · unpriced" : ""}
