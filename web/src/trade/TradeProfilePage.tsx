@@ -13,7 +13,6 @@ import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useTradeWalletPicker } from "./TradeWalletPicker";
 import {
   fetchWallet,
-  type WalletData,
 } from "./tradeApi";
 import { fmtPct, fmtTok, fmtUsd, shortAddr } from "./tradeFmt";
 import "./trade-profile-page.css";
@@ -38,7 +37,7 @@ export default function TradeProfilePage() {
   const [sol, setSol] = useState<number | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [walletData, setWalletData] = useState<any>(null);
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
 
   // Show active trading wallet; fall back to Phantom
