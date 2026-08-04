@@ -23,6 +23,9 @@ import {
 import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
 
 const BubbleMap = lazy(() => import("./BubbleMap").then((m) => ({ default: m.BubbleMap })));
+const BubbleMapPreview = lazy(() =>
+  import("./BubbleMap").then((m) => ({ default: m.BubbleMapPreview })),
+);
 
 type TabId =
   | "overview"
@@ -675,6 +678,20 @@ export default function TradeToken() {
                 />
               </>
             )}
+            <Suspense
+              fallback={
+                <div className="flex h-36 items-center justify-center rounded-xl border border-white/10 bg-black/40">
+                  <Loader2 className="h-4 w-4 animate-spin text-white/30" />
+                </div>
+              }
+            >
+              <BubbleMapPreview
+                xray={xray}
+                holders={holderList}
+                holderCount={totalHolders}
+                onOpen={() => setTab("bubbles")}
+              />
+            </Suspense>
             {research && (
               <>
                 <h4 className="text-[11px] font-semibold text-white/40">Research</h4>

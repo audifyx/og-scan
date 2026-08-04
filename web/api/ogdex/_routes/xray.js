@@ -194,14 +194,14 @@ export default async function handler(req, res) {
       bundles: {
         pct:      bundlePct,
         count:    c.bundles ?? null,
-        clusters: bundles.slice(0, 10).map(b => ({ slot: b.slot, size: b.size, wallets: b.wallets })),
+        clusters: bundles.slice(0, 20).map(b => ({ slot: b.slot, size: b.size, wallets: b.wallets })),
       },
       insiders: {
         pct:      insiderPct,
         count:    c.insiders ?? null,
-        clusters: insiderClusters.slice(0, 10).map(cl => ({ funder: cl.funder, size: cl.size, wallets: cl.wallets })),
+        clusters: insiderClusters.slice(0, 20).map(cl => ({ funder: cl.funder, size: cl.size, wallets: cl.wallets })),
       },
-      earlyBuyers: earlyBuyers.slice(0, 30),
+      earlyBuyers: earlyBuyers.slice(0, 80),
       concentration: {
         top10Pct:     top10Pct,          // real wallets only — LP excluded
         lpSupplyPct:  lpSupplyPct,       // LP vault share — NOT a holder

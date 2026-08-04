@@ -13,11 +13,11 @@ import {
   type MutableRefObject,
 } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { OrbitControls, Html, Stars, ContactShadows, Line } from "@react-three/drei";
+import { OrbitControls, Html, Stars, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import {
-  ExternalLink, Loader2, Maximize2, Minimize2, Crosshair, RefreshCw, Users,
+  ExternalLink, Loader2, Maximize2, Minimize2, Crosshair, RefreshCw, Users, Search, Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { shortAddr } from "./tradeFmt";
@@ -258,7 +258,7 @@ export function buildBubbleGraph(
       const sb = (b.pct || 0) * 1000 + (b.solSpent || 0) * 10 + (b.tokens || 0);
       return sb - sa;
     })
-    .slice(0, 120);
+    .slice(0, 160);
 
   const maxPct = Math.max(...rows.map((r) => r.pct || 0), 0.01);
   const maxSol = Math.max(...rows.map((r) => r.solSpent || 0), 0.01);
@@ -334,31 +334,58 @@ export function buildBubbleGraph(
   return { nodes, links, stats };
 }
 
-function LinkLines({
+/** GPU line buffer updated in-place — no React re-renders per frame. */
+function ClusterLinks({
   links,
   positions,
 }: {
   links: BubbleLink[];
   positions: MutableRefObject<THREE.Vector3[]>;
 }) {
+  const geom = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const n = Math.max(1, links.length);
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 6), 3));
+    const cols = new Float32Array(n * 6);
+    const c = new THREE.Color();
+    links.forEach((L, i) => {
+      c.set(L.color);
+      cols[i * 6] = c.r;
+      cols[i * 6 + 1] = c.g;
+      cols[i * 6 + 2] = c.b;
+      cols[i * 6 + 3] = c.r;
+      cols[i * 6 + 4] = c.g;
+      cols[i * 6 + 5] = c.b;
+    });
+    g.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+    g.setDrawRange(0, links.length * 2);
+    return g;
+  }, [links]);
+
+  useFrame(() => {
+    const attr = geom.getAttribute("position") as THREE.BufferAttribute;
+    const arr = attr.array as Float32Array;
+    const pos = positions.current;
+    let k = 0;
+    for (const L of links) {
+      const a = pos[L.a];
+      const b = pos[L.b];
+      if (!a || !b) continue;
+      arr[k++] = a.x;
+      arr[k++] = a.y;
+      arr[k++] = a.z;
+      arr[k++] = b.x;
+      arr[k++] = b.y;
+      arr[k++] = b.z;
+    }
+    attr.needsUpdate = true;
+  });
+
+  if (!links.length) return null;
   return (
-    <group>
-      {links.slice(0, 80).map((L, i) => {
-        const a = positions.current[L.a];
-        const b = positions.current[L.b];
-        if (!a || !b) return null;
-        return (
-          <Line
-            key={`l-${i}`}
-            points={[a.clone(), b.clone()]}
-            color={L.color}
-            transparent
-            opacity={0.32}
-            lineWidth={1}
-          />
-        );
-      })}
-    </group>
+    <lineSegments geometry={geom}>
+      <lineBasicMaterial vertexColors transparent opacity={0.38} depthWrite={false} />
+    </lineSegments>
   );
 }
 
@@ -368,18 +395,19 @@ function ForceSim({
   filter,
   selected,
   onSelect,
+  quality,
 }: {
   nodes: BubbleNode[];
   links: BubbleLink[];
   filter: Tag | "all";
   selected: string | null;
   onSelect: (wallet: string | null) => void;
+  quality: "high" | "perf";
 }) {
   const meshRefs = useRef<(THREE.Mesh | null)[]>([]);
   const positions = useRef(nodes.map((n) => n.pos.clone()));
   const velocities = useRef(nodes.map((n) => n.vel.clone()));
-  const tick = useRef(0);
-  const [, bump] = useState(0);
+  const seg = quality === "high" ? 28 : 16;
 
   useEffect(() => {
     positions.current = nodes.map((n) => n.pos.clone());
@@ -400,8 +428,10 @@ function ForceSim({
       vel[i].z -= pos[i].z * 0.012 * t * 60;
     }
 
+    // Spatial pair loop — skip every other j on perf mode for large graphs
+    const stepJ = quality === "perf" && n > 80 ? 2 : 1;
     for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
+      for (let j = i + 1; j < n; j += stepJ) {
         const dx = pos[i].x - pos[j].x;
         const dy = pos[i].y - pos[j].y;
         const dz = pos[i].z - pos[j].z;
@@ -446,14 +476,11 @@ function ForceSim({
       const m = meshRefs.current[i];
       if (m) m.position.copy(pos[i]);
     }
-
-    tick.current += 1;
-    if (tick.current % 3 === 0) bump((x) => (x + 1) % 1000);
   });
 
   return (
     <group>
-      <LinkLines links={links} positions={positions} />
+      <ClusterLinks links={links} positions={positions} />
       {nodes.map((n, i) => {
         const dim = filter !== "all" && n.tag !== filter && !(filter === "whale" && n.pct >= 1);
         const isSel = selected === n.wallet;
@@ -477,7 +504,7 @@ function ForceSim({
               document.body.style.cursor = "default";
             }}
           >
-            <sphereGeometry args={[1, 28, 28]} />
+            <sphereGeometry args={[1, seg, seg]} />
             <meshStandardMaterial
               color={n.color}
               emissive={n.color}
@@ -508,12 +535,14 @@ function Scene({
   filter,
   selected,
   onSelect,
+  quality,
 }: {
   nodes: BubbleNode[];
   links: BubbleLink[];
   filter: Tag | "all";
   selected: string | null;
   onSelect: (w: string | null) => void;
+  quality: "high" | "perf";
 }) {
   return (
     <>
@@ -522,9 +551,20 @@ function Scene({
       <pointLight position={[8, 10, 6]} intensity={1.2} color="#a5f3fc" />
       <pointLight position={[-8, -4, -6]} intensity={0.7} color="#c084fc" />
       <spotLight position={[0, 12, 0]} intensity={0.5} angle={0.6} penumbra={0.8} />
-      <Stars radius={60} depth={40} count={1200} factor={3} saturation={0} fade speed={0.4} />
-      <ForceSim nodes={nodes} links={links} filter={filter} selected={selected} onSelect={onSelect} />
-      <ContactShadows position={[0, -6.2, 0]} opacity={0.35} scale={28} blur={2.5} far={12} />
+      {quality === "high" && (
+        <Stars radius={60} depth={40} count={900} factor={3} saturation={0} fade speed={0.4} />
+      )}
+      <ForceSim
+        nodes={nodes}
+        links={links}
+        filter={filter}
+        selected={selected}
+        onSelect={onSelect}
+        quality={quality}
+      />
+      {quality === "high" && (
+        <ContactShadows position={[0, -6.2, 0]} opacity={0.35} scale={28} blur={2.5} far={12} />
+      )}
       <OrbitControls
         makeDefault
         enablePan
@@ -535,10 +575,12 @@ function Scene({
         autoRotate
         autoRotateSpeed={0.45}
       />
-      <EffectComposer multisampling={0}>
-        <Bloom luminanceThreshold={0.35} luminanceSmoothing={0.7} intensity={0.85} mipmapBlur />
-        <Vignette eskil={false} offset={0.15} darkness={0.55} />
-      </EffectComposer>
+      {quality === "high" && (
+        <EffectComposer multisampling={0}>
+          <Bloom luminanceThreshold={0.35} luminanceSmoothing={0.7} intensity={0.85} mipmapBlur />
+          <Vignette eskil={false} offset={0.15} darkness={0.55} />
+        </EffectComposer>
+      )}
     </>
   );
 }
@@ -559,6 +601,76 @@ function externalBubblemapsUrl(address: string, chain = "solana") {
           ? "bsc"
           : raw;
   return `https://iframe.bubblemaps.io/map?chain=${encodeURIComponent(chainId)}&address=${encodeURIComponent(address)}&partnerId=${encodeURIComponent(PARTNER)}`;
+}
+
+export function BubbleMapPreview({
+  xray,
+  holders,
+  holderCount,
+  onOpen,
+}: {
+  xray?: BubbleXray | null;
+  holders?: BubbleHolder[] | null;
+  holderCount?: number | null;
+  onOpen: () => void;
+}) {
+  const graph = useMemo(() => buildBubbleGraph(xray, holders), [xray, holders]);
+  const top = graph.nodes.slice(0, 18);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group w-full overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-[#0a0a12] to-[#050508] text-left transition hover:border-cyan-400/30"
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/55">
+          <Sparkles className="h-3.5 w-3.5 text-cyan-300/80" />
+          3D bubble map
+        </div>
+        <span className="text-[10px] text-cyan-300/70 group-hover:text-cyan-200">Open full map →</span>
+      </div>
+      <div className="relative h-36 px-3 py-3">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.08),transparent_65%)]" />
+        <div className="relative flex h-full flex-wrap content-center items-center justify-center gap-1.5">
+          {top.length ? (
+            top.map((n) => (
+              <span
+                key={n.id}
+                title={`${n.label} ${n.pct ? n.pct.toFixed(1) + "%" : ""}`}
+                className="rounded-full shadow-[0_0_12px_rgba(0,0,0,0.45)]"
+                style={{
+                  width: 10 + Math.min(28, n.size * 14),
+                  height: 10 + Math.min(28, n.size * 14),
+                  background: n.color,
+                  opacity: 0.9,
+                }}
+              />
+            ))
+          ) : (
+            <span className="text-[11px] text-white/35">Pulling cluster data…</span>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-2 border-t border-white/10 px-3 py-2 text-[10px]">
+        <div>
+          <p className="text-white/30">Nodes</p>
+          <p className="font-mono text-white/80">{graph.stats.nodes}</p>
+        </div>
+        <div>
+          <p className="text-white/30">Links</p>
+          <p className="font-mono text-white/80">{graph.stats.links}</p>
+        </div>
+        <div>
+          <p className="text-white/30">Holders</p>
+          <p className="font-mono text-white/80">{holderCount ?? graph.stats.holders ?? "—"}</p>
+        </div>
+        <div>
+          <p className="text-white/30">Score</p>
+          <p className="font-mono text-white/80">{graph.stats.score ?? "—"}</p>
+        </div>
+      </div>
+    </button>
+  );
 }
 
 export function BubbleMap({
@@ -583,11 +695,25 @@ export function BubbleMap({
   const [filter, setFilter] = useState<Tag | "all">("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [quality, setQuality] = useState<"high" | "perf">(() => {
+    if (typeof window === "undefined") return "high";
+    return window.matchMedia("(max-width: 768px)").matches || window.devicePixelRatio > 2 ? "perf" : "high";
+  });
   const graph = useMemo(() => buildBubbleGraph(xray, holders), [xray, holders]);
   const selectedNode = graph.nodes.find((n) => n.wallet === selected) || null;
   const ext = address ? externalBubblemapsUrl(address, chain) : "";
 
   const onSelect = useCallback((w: string | null) => setSelected(w), []);
+
+  const runSearch = useCallback(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return;
+    const hit = graph.nodes.find(
+      (n) => n.wallet.toLowerCase().includes(q) || n.label.toLowerCase().includes(q),
+    );
+    if (hit) setSelected(hit.wallet);
+  }, [search, graph.nodes]);
 
   if (!address) {
     return <p className="py-10 text-center text-xs text-white/35">No token address for map</p>;
@@ -620,7 +746,30 @@ export function BubbleMap({
             </button>
           ))}
         </div>
+        <form
+          className="flex min-w-[140px] flex-1 items-center gap-1 rounded-md border border-white/10 bg-black/40 px-2 py-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            runSearch();
+          }}
+        >
+          <Search className="h-3 w-3 shrink-0 text-white/35" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Find wallet…"
+            className="w-full bg-transparent text-[11px] text-white/80 outline-none placeholder:text-white/30"
+          />
+        </form>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setQuality((q) => (q === "high" ? "perf" : "high"))}
+            className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-white/50 hover:text-white"
+            title="Toggle render quality"
+          >
+            {quality === "high" ? "HQ" : "Perf"}
+          </button>
           {onRefresh && (
             <button
               type="button"
@@ -695,9 +844,9 @@ export function BubbleMap({
             }
           >
             <Canvas
-              dpr={[1, 1.75]}
+              dpr={quality === "high" ? [1, 1.75] : [1, 1.25]}
               camera={{ position: [0, 2.5, 11], fov: 50, near: 0.1, far: 200 }}
-              gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+              gl={{ antialias: quality === "high", alpha: false, powerPreference: "high-performance" }}
               onPointerMissed={() => setSelected(null)}
             >
               <Scene
@@ -706,6 +855,7 @@ export function BubbleMap({
                 filter={filter}
                 selected={selected}
                 onSelect={onSelect}
+                quality={quality}
               />
             </Canvas>
           </Suspense>
