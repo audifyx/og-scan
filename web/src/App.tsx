@@ -167,6 +167,8 @@ import InstallApp from "./pages/InstallApp";
 import AgentPage from "./pages/Agent";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
+import XMcpPage from "./pages/XMcpPage";
+import XMcpAuthPage from "./pages/XMcpAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
 import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
@@ -619,6 +621,8 @@ const App = () => (
             <Route path="/intelligence-admin" element={<NotFound />} />
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
+            <Route path="/x" element={<ProtectedRoute><XMcpPage /></ProtectedRoute>} />
+            <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
             <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
             <Route path="/agent/sign" element={<AgentSignPage />} />

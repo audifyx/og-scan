@@ -19,6 +19,22 @@
       "destination": "/api/mcp?path=mcp/$1"
     },
     {
+      "source": "/api/x/mcp/(.*)",
+      "destination": "/api/x-mcp?path=mcp/$1"
+    },
+    {
+      "source": "/api/x/mcp",
+      "destination": "/api/x-mcp?path=mcp"
+    },
+    {
+      "source": "/api/x/agent/(.*)",
+      "destination": "/api/x-mcp?path=agent/$1"
+    },
+    {
+      "source": "/api/x/agent",
+      "destination": "/api/x-mcp?path=agent"
+    },
+    {
       "source": "/api/orbitx-world/(.*)",
       "destination": "/api/orbitx-world?path=$1"
     },
@@ -70,7 +86,6 @@
       "source": "/mcp/.well-known/oauth-authorization-server",
       "destination": "/api/orbitx-hub?path=mcp/.well-known/oauth-authorization-server"
     },
-
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
@@ -263,6 +278,9 @@
     },
     "api/kol.ts": {
       "maxDuration": 30
+    },
+    "api/x-mcp.js": {
+      "maxDuration": 60
     }
   },
   "crons": [

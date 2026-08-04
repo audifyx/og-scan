@@ -4,7 +4,7 @@ import "./agent-shell.css";
 
 export type AgentTabId = "setup" | "wallet" | "keys" | "connect";
 
-const TABS: { id: AgentTabId; label: string }[] = [
+const DEFAULT_TABS: { id: AgentTabId; label: string }[] = [
   { id: "setup", label: "Setup" },
   { id: "wallet", label: "Wallet" },
   { id: "keys", label: "API Keys" },
@@ -18,6 +18,12 @@ type Props = {
   statusWarn?: boolean;
   showTabs?: boolean;
   onRefresh?: () => void;
+  brandHref?: string;
+  brandSub?: string;
+  footerBrand?: string;
+  footerNote?: string;
+  mcpUrl?: string;
+  tabs?: { id: AgentTabId; label: string }[];
   children: ReactNode;
 };
 
@@ -28,6 +34,12 @@ export function AgentShell({
   statusWarn = false,
   showTabs = true,
   onRefresh,
+  brandHref = "/agent",
+  brandSub = "Agent",
+  footerBrand = "OrbitX Agent MCP",
+  footerNote = "Non-custodial — keys stay on your device until you copy them. You sign every tx in your wallet.",
+  mcpUrl = "https://www.orbitx.world/api/mcp",
+  tabs = DEFAULT_TABS,
   children,
 }: Props) {
   return (
@@ -35,11 +47,11 @@ export function AgentShell({
       <header className="ox-agent__header">
         <div className="ox-agent__header-inner">
           <div className="ox-agent__header-row">
-            <Link to="/agent" className="ox-agent__brand">
+            <Link to={brandHref} className="ox-agent__brand">
               <div className="ox-agent__brand-mark">
                 Orbit<span>X</span>
               </div>
-              <div className="ox-agent__brand-sub">Agent</div>
+              <div className="ox-agent__brand-sub">{brandSub}</div>
             </Link>
 
             <div className="ox-agent__header-actions">
@@ -60,7 +72,7 @@ export function AgentShell({
 
           {showTabs && onTabChange && (
             <nav className="ox-agent__tabs" aria-label="Agent sections">
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -79,18 +91,17 @@ export function AgentShell({
 
       <footer className="ox-agent__footer">
         <div className="ox-agent__footer-inner">
-          <div className="ox-agent__footer-brand">OrbitX Agent MCP</div>
+          <div className="ox-agent__footer-brand">{footerBrand}</div>
           <div className="ox-agent__footer-links">
             <Link to="/agent">Agent</Link>
-            <a href="https://www.orbitx.world/api/mcp" target="_blank" rel="noopener noreferrer">
+            <Link to="/x">X MCP</Link>
+            <a href={mcpUrl} target="_blank" rel="noopener noreferrer">
               MCP URL
             </a>
             <Link to="/Orbitxcity">City</Link>
             <Link to="/auth">Account</Link>
           </div>
-          <p className="ox-agent__footer-note">
-            Non-custodial — keys stay on your device until you copy them. You sign every tx in your wallet.
-          </p>
+          <p className="ox-agent__footer-note">{footerNote}</p>
         </div>
       </footer>
     </div>
