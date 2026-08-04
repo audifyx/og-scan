@@ -834,12 +834,19 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           throw new Error(d?.error || "Could not build transaction");
         }
       } catch (apiErr: any) {
+        // In-app Jupiter quote/swap API fallback — never open jup.ag website.
         setTradeStage("Building via Jupiter…");
         try {
           txB64 = await buildJupiterTx();
           skipPreflight = true;
-        } catch {
-          throw new Error(String(apiErr?.message || apiErr || "Could not build transaction"));
+        } catch (jupErr: any) {
+          const apiMsg = String(apiErr?.message || apiErr || "");
+          const jupMsg = String(jupErr?.message || jupErr || "");
+          throw new Error(
+            jupMsg && jupMsg !== apiMsg
+              ? `${apiMsg || "Trade API failed"}; Jupiter quote failed: ${jupMsg}`
+              : apiMsg || jupMsg || "Could not build transaction",
+          );
         }
       }
 
@@ -885,7 +892,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       }
     } catch (e: any) {
       const m = String(e?.message || e || "Trade failed");
-      setTradeErr(/reject|cancel/i.test(m) ? "Cancelled in wallet" : m);
+      const friendly = /reject|cancel/i.test(m) ? "Cancelled in wallet" : m;
+      setTradeErr(friendly);
+      if (!/reject|cancel/i.test(m)) {
+        toast({ title: "Trade failed", description: friendly, variant: "destructive" });
+      }
     } finally {
       setTradeBusy(false);
       setTradeStage("");
@@ -1535,7 +1546,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
      ═══════════════════════════════════════════════════════════════ */
   const WalletPickerOverlay = () => {
     if (!showWalletPicker) return null;
-    const available = wallets.filter((w) => ["Phantom", "Solflare"].includes(w.adapter.name));
+    // Only Installed/Loadable — never call connect() on NotDetected (WalletProvider
+    // used to window.open adapter.url → jup.ag for Jupiter).
+    const available = wallets.filter((w) => {
+      const name = w.adapter.name;
+      if (!["Phantom", "Jupiter", "Solflare"].includes(name)) return false;
+      const rs = String(w.readyState);
+      return rs === "Installed" || rs === "Loadable";
+    });
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
         onClick={() => setShowWalletPicker(false)}>
@@ -1547,15 +1565,22 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-xs text-white/40">Select a wallet to connect to OrbitX.</p>
+          <p className="text-xs text-white/40">Select a wallet to connect to OrbitX. Trades sign in-app — we never open jup.ag.</p>
           <div className="space-y-2">
             {available.map((w) => (
               <button
                 key={w.adapter.name}
+                type="button"
                 onClick={() => {
                   select(w.adapter.name as any);
                   setTimeout(() => {
-                    connect().catch(() => {});
+                    connect().catch((err) => {
+                      toast({
+                        title: "Could not connect",
+                        description: String((err as Error)?.message || err || "Try again or install the wallet"),
+                        variant: "destructive",
+                      });
+                    });
                     setShowWalletPicker(false);
                   }, 150);
                 }}
@@ -1569,12 +1594,16 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </button>
             ))}
             {available.length === 0 && (
-              <div className="text-center py-6">
+              <div className="text-center py-6 space-y-2">
                 <Wallet className="h-8 w-8 text-white/15 mx-auto mb-2" />
                 <p className="text-sm text-white/40 mb-2">No wallet detected</p>
                 <a href="https://phantom.app" target="_blank" rel="noopener noreferrer"
-                  className="text-[#ffffff] text-xs underline">
+                  className="block text-[#ffffff] text-xs underline">
                   Install Phantom →
+                </a>
+                <a href="https://jup.ag/mobile" target="_blank" rel="noopener noreferrer"
+                  className="block text-[#ffffff] text-xs underline">
+                  Install Jupiter →
                 </a>
               </div>
             )}

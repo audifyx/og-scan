@@ -58,7 +58,8 @@ function normalizeSignature(result: Uint8Array | { signature: Uint8Array }): Uin
 
 export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
   name = JupiterWalletName;
-  url = "https://jup.ag";
+  /** Install / mobile page — never the jup.ag swap site (avoids trade→website confusion). */
+  url = "https://jup.ag/mobile";
   icon = "https://jup.ag/favicon.ico";
   supportedTransactionVersions: ReadonlySet<TransactionVersion> | null = new Set(["legacy", 0]);
 

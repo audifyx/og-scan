@@ -259,10 +259,17 @@ export default function TradeToken() {
   }, [mint, publicKey, connection, d]);
 
   const connectWallet = () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    const jup = wallets.find((w) => /jupiter/i.test(w.adapter.name));
-    const pick = phantom || jup || wallets[0];
-    if (pick) select(pick.adapter.name as any);
+    const ready = (w: (typeof wallets)[number]) => {
+      const rs = String(w.readyState);
+      return rs === "Installed" || rs === "Loadable";
+    };
+    // Only connect detected extensions — Never select NotDetected Jupiter
+    // (WalletProvider used to window.open https://jup.ag on WalletNotReadyError).
+    const phantom = wallets.find((w) => w.adapter.name === "Phantom" && ready(w));
+    const jup = wallets.find((w) => /jupiter/i.test(w.adapter.name) && ready(w));
+    const pick = phantom || jup || wallets.find(ready);
+    if (!pick) return;
+    select(pick.adapter.name as any);
     setTimeout(() => connect().catch(() => {}), 120);
   };
 
