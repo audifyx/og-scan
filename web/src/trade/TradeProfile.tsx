@@ -1,22 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { Copy, Check, LogOut, Wallet, ExternalLink, Loader2, User, KeyRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { shortAddr, fmtUsd } from "./tradeFmt";
 
 export default function TradeProfile() {
   const { publicKey, connected, wallets, select, connect, disconnect } = useWallet();
   const { connection } = useConnection();
   const { profile, user, loading: authLoading } = useAuth();
-  const { wallets: localWallets, defaultWallet, mode: tradeMode } = useLocalTradingWallets();
+  const {
+    address: activeAddr,
+    localActive,
+    label: activeLabel,
+    localWallets,
+    defaultWallet,
+    mode: tradeMode,
+  } = useActiveTradingWallet();
   const [sol, setSol] = useState<number | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [walletData, setWalletData] = useState<any>(null);
 
-  const addr = publicKey?.toBase58();
+  /** Show active trading wallet balance when Local mode; else Phantom. */
+  const addr = activeAddr || publicKey?.toBase58();
   const username = profile?.username || profile?.display_name || null;
   const avatar = profile?.avatar_url || null;
 
@@ -28,8 +37,15 @@ export default function TradeProfile() {
     }
     let on = true;
     setLoadingBal(true);
+    let pk: PublicKey;
+    try {
+      pk = new PublicKey(addr);
+    } catch {
+      setLoadingBal(false);
+      return;
+    }
     connection
-      .getBalance(publicKey!)
+      .getBalance(pk)
       .then((lamports) => {
         if (on) setSol(lamports / 1e9);
       })
@@ -50,7 +66,7 @@ export default function TradeProfile() {
     return () => {
       on = false;
     };
-  }, [addr, connection, publicKey]);
+  }, [addr, connection]);
 
   const connectPhantom = async () => {
     const phantom = wallets.find((w) => w.adapter.name === "Phantom");
@@ -171,25 +187,40 @@ export default function TradeProfile() {
         </Link>
       </div>
 
-      {/* Connected wallet (Phantom) */}
-      {!connected || !addr ? (
+      {/* Active trading wallet (Local default or Phantom) */}
+      {!addr ? (
         <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center">
           <Wallet className="mx-auto h-9 w-9 text-white/25" />
-          <p className="mt-3 text-sm text-white/55">Connect Phantom for balances & trading</p>
-          <button
-            type="button"
-            onClick={() => void connectPhantom()}
-            className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Connect Phantom
-          </button>
+          <p className="mt-3 text-sm text-white/55">
+            {localActive
+              ? "Set a default local trading wallet"
+              : "Connect Phantom for balances & trading"}
+          </p>
+          {localActive ? (
+            <Link
+              to="/trade/wallets"
+              className="mt-4 flex h-12 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+            >
+              Manage wallets
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void connectPhantom()}
+              className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
+            >
+              Connect Phantom
+            </button>
+          )}
         </div>
       ) : (
         <div className="mt-3 space-y-3">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30">Wallet</p>
+                <p className="text-[10px] uppercase tracking-wider text-white/30">
+                  {activeLabel || (localActive ? "Local trading wallet" : "Wallet")}
+                </p>
                 <p className="mt-1 font-mono text-sm font-semibold">{shortAddr(addr, 6)}</p>
               </div>
               <div className="flex gap-2">
@@ -200,13 +231,15 @@ export default function TradeProfile() {
                 >
                   {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => disconnect()}
-                  className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
+                {connected && !localActive ? (
+                  <button
+                    type="button"
+                    onClick={() => disconnect()}
+                    className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">

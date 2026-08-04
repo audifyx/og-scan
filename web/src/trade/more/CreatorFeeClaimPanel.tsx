@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Link } from "react-router-dom";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Loader2, RefreshCw, HandCoins, ExternalLink, Rocket } from "lucide-react";
 import { toast } from "sonner";
@@ -13,13 +14,21 @@ import {
   type CustomClaimable,
 } from "@/lib/orbitx/claim";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
-import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function CreatorFeeClaimPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
+  const {
+    publicKey,
+    ready,
+    localActive,
+    label,
+    shortAddress,
+    sendTx,
+    connectPhantom,
+  } = useActiveTradingWallet();
   const [pumpSol, setPumpSol] = useState<number | null>(null);
   const [pumpLoading, setPumpLoading] = useState(false);
   const [pumpClaiming, setPumpClaiming] = useState(false);
@@ -27,14 +36,6 @@ export default function CreatorFeeClaimPanel() {
   const [tokens, setTokens] = useState<OrbitxToken[]>([]);
   const [claimables, setClaimables] = useState<Record<string, CustomClaimable | "loading" | "error">>({});
   const [claiming, setClaiming] = useState<Record<string, boolean>>({});
-
-  const connectPhantom = async () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name as any);
-    setTimeout(() => {
-      connect().catch(() => {});
-    }, 120);
-  };
 
   const refreshPump = useCallback(async () => {
     if (!publicKey) return;
@@ -65,14 +66,14 @@ export default function CreatorFeeClaimPanel() {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    if (connected && publicKey) {
+    if (ready && publicKey) {
       void refreshPump();
       void refreshTokens();
     }
-  }, [connected, publicKey, refreshPump, refreshTokens]);
+  }, [ready, publicKey, refreshPump, refreshTokens]);
 
   const claimPump = async () => {
-    if (!publicKey || !(sendTransaction || signTransaction)) return;
+    if (!publicKey || !ready) return;
     setPumpClaiming(true);
     try {
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
@@ -80,7 +81,7 @@ export default function CreatorFeeClaimPanel() {
         toast.error("Nothing to claim");
         return;
       }
-      const sig = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, plan.tx);
+      const sig = await sendTx(connection, plan.tx);
       await connection.confirmTransaction(sig, "confirmed");
       setPumpSig(sig);
       toast.success(
@@ -98,7 +99,7 @@ export default function CreatorFeeClaimPanel() {
 
   const claimCustom = async (t: OrbitxToken) => {
     const info = claimables[t.mint_address];
-    if (!publicKey || !(sendTransaction || signTransaction) || !info || info === "loading" || info === "error") return;
+    if (!publicKey || !ready || !info || info === "loading" || info === "error") return;
     if (info.withdrawAuthority && info.withdrawAuthority !== publicKey.toBase58()) {
       toast.error("Only the fee authority can claim");
       return;
@@ -111,12 +112,12 @@ export default function CreatorFeeClaimPanel() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        lastSig = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
+        lastSig = await sendTx(connection, tx);
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
-        lastSig = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, plan.tx);
+        lastSig = await sendTx(connection, plan.tx);
         await connection.confirmTransaction(lastSig, "confirmed");
         toast.success(`${t.ticker} claimed → ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
       } catch {
@@ -133,18 +134,31 @@ export default function CreatorFeeClaimPanel() {
     }
   };
 
-  if (!connected || !publicKey) {
+  if (!ready || !publicKey) {
     return (
       <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
         <HandCoins className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">Connect the wallet you launched with to claim creator fees</p>
-        <button
-          type="button"
-          onClick={() => void connectPhantom()}
-          className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-        >
-          Connect Phantom
-        </button>
+        <p className="mt-3 text-sm text-white/55">
+          {localActive
+            ? "Set a default local trading wallet to claim creator fees"
+            : "Connect the wallet you launched with to claim creator fees"}
+        </p>
+        {localActive ? (
+          <Link
+            to="/trade/wallets"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Manage wallets
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void connectPhantom()}
+            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Connect Phantom
+          </button>
+        )}
       </div>
     );
   }
@@ -154,23 +168,32 @@ export default function CreatorFeeClaimPanel() {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/10 bg-[#050505] p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Rocket className="h-4 w-4 text-white/70" />
             <span className="text-sm font-bold">Pump.fun creator fees</span>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              void refreshPump();
-              void refreshTokens();
-            }}
-            className="rounded-full border border-white/15 p-2 text-white/60"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${pumpLoading ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            {shortAddress ? (
+              <span className="rounded-full border border-white/12 px-2 py-0.5 font-mono text-[10px] text-white/50">
+                {label || shortAddress}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                void refreshPump();
+                void refreshTokens();
+              }}
+              className="rounded-full border border-white/15 p-2 text-white/60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${pumpLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
-        <p className="mt-2 text-xs text-white/40">One claim collects fees across all pump coins this wallet created.</p>
+        <p className="mt-2 text-xs text-white/40">
+          One claim collects fees across all pump coins this wallet created.
+        </p>
         <div className="mt-3 text-2xl font-bold">
           {pumpLoading ? "…" : pumpSol != null ? `${pumpSol.toFixed(4)} SOL` : "—"}
         </div>

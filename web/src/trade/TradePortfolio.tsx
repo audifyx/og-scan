@@ -5,7 +5,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useWallet } from "@solana/wallet-adapter-react";
 import {
   Search,
   Users,
@@ -18,7 +17,7 @@ import {
   Plus,
   KeyRound,
 } from "lucide-react";
-import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import {
   fetchTopHolders,
   fetchWallet,
@@ -54,9 +53,16 @@ function pnlTone(n: number | null | undefined): string {
 
 export default function TradePortfolio() {
   const navigate = useNavigate();
-  const { publicKey, connected, wallets, select, connect } = useWallet();
-  const { wallets: localWallets, defaultWallet, mode: tradeMode } = useLocalTradingWallets();
-  const myAddr = publicKey?.toBase58();
+  const {
+    address: myAddr,
+    ready,
+    localActive,
+    label: activeLabel,
+    localWallets,
+    defaultWallet,
+    mode: tradeMode,
+    connectPhantom,
+  } = useActiveTradingWallet();
 
   const [tab, setTab] = useState<HubTab>("mine");
   const [mine, setMine] = useState<any>(null);
@@ -77,12 +83,6 @@ export default function TradePortfolio() {
   const [holderMeta, setHolderMeta] = useState<{ symbol?: string; holderCount?: number | null }>({});
   const [holdersLoading, setHoldersLoading] = useState(false);
   const [holdersErr, setHoldersErr] = useState("");
-
-  const connectPhantom = () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name as any);
-    setTimeout(() => connect().catch(() => {}), 120);
-  };
 
   const loadMine = useCallback(async () => {
     if (!myAddr) {
@@ -143,8 +143,8 @@ export default function TradePortfolio() {
   }, []);
 
   useEffect(() => {
-    if (tab === "mine" && myAddr) void loadMine();
-  }, [tab, myAddr, loadMine]);
+    if (tab === "mine" && ready && myAddr) void loadMine();
+  }, [tab, ready, myAddr, loadMine]);
 
   useEffect(() => {
     if (tab === "track") void refreshWatch();
@@ -280,13 +280,23 @@ export default function TradePortfolio() {
       <div className="tp__body">
         {tab === "mine" && (
           <div>
-            {!connected || !myAddr ? (
+            {!ready || !myAddr ? (
               <div className="tp__empty">
                 <Wallet className="mx-auto mb-3 h-9 w-9 opacity-40" />
-                <p>Connect Phantom to see your bag and PnL</p>
-                <button type="button" onClick={connectPhantom} className="tp__btn mt-5">
-                  Connect Phantom
-                </button>
+                <p>
+                  {localActive
+                    ? "Set a default local trading wallet to see holdings"
+                    : "Connect Phantom to see your bag and PnL"}
+                </p>
+                {localActive ? (
+                  <Link to="/trade/wallets" className="tp__btn mt-5 inline-flex items-center justify-center">
+                    Manage wallets
+                  </Link>
+                ) : (
+                  <button type="button" onClick={() => void connectPhantom()} className="tp__btn mt-5">
+                    Connect Phantom
+                  </button>
+                )}
               </div>
             ) : mineLoading ? (
               <div className="flex justify-center py-20">
@@ -299,7 +309,9 @@ export default function TradePortfolio() {
                 <div>
                   <p className="tp__label">Net worth</p>
                   <p className="tp__hero-val mt-2">{fmtUsd(mine?.totalUsd)}</p>
-                  <p className="mt-2 font-mono text-[11px] text-white/35">{shortAddr(myAddr, 6)}</p>
+                  <p className="mt-2 font-mono text-[11px] text-white/35">
+                    {activeLabel || shortAddr(myAddr, 6)}
+                  </p>
 
                   <div className="tp__metrics">
                     <div>

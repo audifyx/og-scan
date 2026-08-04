@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Link } from "react-router-dom";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { Loader2, RefreshCw, Flame, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -11,14 +12,22 @@ import {
   fetchBurnTokenMeta,
   type BurnableToken,
 } from "@/lib/orbitx/rescue";
-import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const PRESETS = [10, 25, 50, 75, 100];
 
 export default function TokenBurnerPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
+  const {
+    publicKey,
+    ready,
+    localActive,
+    label,
+    shortAddress,
+    sendTx,
+    connectPhantom,
+  } = useActiveTradingWallet();
   const [tokens, setTokens] = useState<BurnableToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<string>("");
@@ -27,14 +36,6 @@ export default function TokenBurnerPanel() {
   const [busy, setBusy] = useState(false);
   const [sig, setSig] = useState("");
   const [meta, setMeta] = useState<Record<string, { symbol: string }>>({});
-
-  const connectPhantom = async () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name as any);
-    setTimeout(() => {
-      connect().catch(() => {});
-    }, 120);
-  };
 
   const scan = useCallback(async () => {
     if (!publicKey) return;
@@ -75,7 +76,7 @@ export default function TokenBurnerPanel() {
   })();
 
   const burn = async () => {
-    if (!publicKey || !(sendTransaction || signTransaction) || !token || amountRaw <= BigInt(0)) return;
+    if (!publicKey || !ready || !token || amountRaw <= BigInt(0)) return;
     if (amountRaw > token.balanceRaw) {
       toast.error("Amount exceeds balance");
       return;
@@ -86,7 +87,7 @@ export default function TokenBurnerPanel() {
       tx.feePayer = publicKey;
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
-      const s = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
+      const s = await sendTx(connection, tx);
       await connection.confirmTransaction({ signature: s, blockhash, lastValidBlockHeight }, "confirmed");
       setSig(s);
       const rentNote =
@@ -104,18 +105,31 @@ export default function TokenBurnerPanel() {
     }
   };
 
-  if (!connected || !publicKey) {
+  if (!ready || !publicKey) {
     return (
       <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
         <Flame className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">Connect Phantom to burn tokens from your wallet</p>
-        <button
-          type="button"
-          onClick={() => void connectPhantom()}
-          className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-        >
-          Connect Phantom
-        </button>
+        <p className="mt-3 text-sm text-white/55">
+          {localActive
+            ? "Set a default local trading wallet to burn tokens"
+            : "Connect Phantom to burn tokens from your wallet"}
+        </p>
+        {localActive ? (
+          <Link
+            to="/trade/wallets"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Manage wallets
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void connectPhantom()}
+            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Connect Phantom
+          </button>
+        )}
       </div>
     );
   }
@@ -127,7 +141,12 @@ export default function TokenBurnerPanel() {
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/10 bg-[#050505] p-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-bold">Token Burner</span>
+          <div>
+            <span className="text-sm font-bold">Token Burner</span>
+            {shortAddress ? (
+              <div className="mt-0.5 font-mono text-[10px] text-white/40">{label || shortAddress}</div>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => void scan()}

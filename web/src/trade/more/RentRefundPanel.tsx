@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Link } from "react-router-dom";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { Loader2, RefreshCw, Coins, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -8,25 +9,25 @@ import {
   buildCloseAccountsTransactions,
   type EmptyTokenAccount,
 } from "@/lib/orbitx/rescue";
-import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function RentRefundPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
+  const {
+    publicKey,
+    ready,
+    localActive,
+    label,
+    shortAddress,
+    sendTx,
+    connectPhantom,
+  } = useActiveTradingWallet();
   const [accounts, setAccounts] = useState<EmptyTokenAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [sig, setSig] = useState("");
-
-  const connectPhantom = async () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name as any);
-    setTimeout(() => {
-      connect().catch(() => {});
-    }, 120);
-  };
 
   const scan = useCallback(async () => {
     if (!publicKey) return;
@@ -43,7 +44,7 @@ export default function RentRefundPanel() {
   }, [connection, publicKey]);
 
   const reclaim = async () => {
-    if (!publicKey || !(sendTransaction || signTransaction) || !accounts.length) return;
+    if (!publicKey || !ready || !accounts.length) return;
     setClaiming(true);
     try {
       const txs = buildCloseAccountsTransactions(publicKey, accounts);
@@ -52,7 +53,7 @@ export default function RentRefundPanel() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        last = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
+        last = await sendTx(connection, tx);
         await connection.confirmTransaction({ signature: last, blockhash, lastValidBlockHeight }, "confirmed");
       }
       setSig(last);
@@ -70,18 +71,31 @@ export default function RentRefundPanel() {
 
   const sol = totalReclaimableSol(accounts);
 
-  if (!connected || !publicKey) {
+  if (!ready || !publicKey) {
     return (
       <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
         <Coins className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">Connect Phantom to scan empty ATAs and reclaim rent</p>
-        <button
-          type="button"
-          onClick={() => void connectPhantom()}
-          className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-        >
-          Connect Phantom
-        </button>
+        <p className="mt-3 text-sm text-white/55">
+          {localActive
+            ? "Set a default local trading wallet to reclaim rent"
+            : "Connect Phantom to scan empty ATAs and reclaim rent"}
+        </p>
+        {localActive ? (
+          <Link
+            to="/trade/wallets"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Manage wallets
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void connectPhantom()}
+            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Connect Phantom
+          </button>
+        )}
       </div>
     );
   }
@@ -92,7 +106,8 @@ export default function RentRefundPanel() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-white/35">Wallet</div>
-            <div className="font-mono text-sm">{short(publicKey.toBase58())}</div>
+            <div className="font-mono text-sm">{shortAddress || short(publicKey.toBase58())}</div>
+            {label ? <div className="mt-0.5 text-[10px] text-white/40">{label}</div> : null}
           </div>
           <button
             type="button"

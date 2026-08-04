@@ -46,8 +46,7 @@ import {
   getAssets,
   type TokenAsset,
 } from "@/lib/solana-api";
-import { sendWalletTransaction, sendWithKeypair } from "@/lib/orbitx/sendWalletTx";
-import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 export type TradeTerminalProps = {
   initialMint?: string | null;
   onMintChange?: (mint: string) => void;
@@ -405,26 +404,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const { connection } = useConnection();
   const deskMode = mode === "desk";
   const {
-    mode: walletMode,
     setMode: setWalletMode,
     defaultWallet: localDefault,
-    loadDefaultKeypair,
-  } = useLocalTradingWallets();
-
-  /** Active trading identity: connected Phantom/Jupiter OR default local key wallet. */
-  const tradePk = useMemo(() => {
-    if (walletMode === "local" && localDefault?.publicKey) {
-      try {
-        return new PublicKey(localDefault.publicKey);
-      } catch {
-        return null;
-      }
-    }
-    return publicKey;
-  }, [walletMode, localDefault, publicKey]);
-
-  const localActive = walletMode === "local";
-  const tradeReady = localActive ? Boolean(tradePk) : Boolean(connected && publicKey);
+    publicKey: tradePk,
+    localActive,
+    ready: tradeReady,
+    sendTx: sendActiveTx,
+  } = useActiveTradingWallet();
 
   /* ── State ──────────────────────────────────────────────── */
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
@@ -852,25 +838,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
       const bytes = Uint8Array.from(atob(txB64), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(bytes);
-      let sig: string;
-      if (localActive) {
-        setTradeStage("Signing locally…");
-        const kp = await loadDefaultKeypair();
-        if (!kp) throw new Error("No default local trading wallet");
-        try {
-          sig = await sendWithKeypair(connection, kp, tx, { skipPreflight, maxRetries: 3 });
-        } finally {
-          kp.secretKey.fill(0);
-        }
-      } else {
-        setTradeStage("Confirm in wallet…");
-        sig = await sendWalletTransaction(
-          connection,
-          { sendTransaction: sendTransaction ?? undefined, signTransaction: signTransaction ?? undefined },
-          tx,
-          { skipPreflight, maxRetries: 3 },
-        );
-      }
+      setTradeStage(localActive ? "Signing locally…" : "Confirm in wallet…");
+      const sig = await sendActiveTx(connection, tx, { skipPreflight, maxRetries: 3 });
       setTradeStage("Confirming on-chain…");
       await connection.confirmTransaction(sig, "confirmed");
       setTradeSig(sig);
@@ -906,7 +875,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     tradeReady,
     tradePk,
     localActive,
-    loadDefaultKeypair,
+    sendActiveTx,
     swapMode,
     buyAmt,
     sellPct,
@@ -1892,12 +1861,36 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 <span className="text-[10px] text-white/30">Liq</span>
                 <p className="text-sm font-semibold font-mono text-[#ffffff]">{fmtMcap(t.liquidity)}</p>
               </div>
-              {/* Wallet status */}
-              {connected ? (
-                <button onClick={() => disconnect()} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.07] hover:bg-white/[0.08] transition-colors">
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <span className="text-[11px] text-white/60 font-mono">{shortAddr(publicKey!.toString(), 4)}</span>
-                </button>
+              {/* Wallet status — active trading identity */}
+              {tradeReady && tradePk ? (
+                localActive ? (
+                  <Link
+                    to="/trade/wallets"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.07] hover:bg-white/[0.08] transition-colors"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-green-400" />
+                    <span className="text-[11px] text-white/60 font-mono">
+                      Local {shortAddr(tradePk.toBase58(), 4)}
+                    </span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => disconnect()}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.07] hover:bg-white/[0.08] transition-colors"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-green-400" />
+                    <span className="text-[11px] text-white/60 font-mono">
+                      {shortAddr(tradePk.toBase58(), 4)}
+                    </span>
+                  </button>
+                )
+              ) : localActive ? (
+                <Link to="/trade/wallets">
+                  <Button size="sm" className="bg-[#ffffff] hover:bg-[#e5e5e5] text-black text-xs font-semibold rounded-lg">
+                    <KeyRound className="h-3.5 w-3.5 mr-1.5" />
+                    Set local
+                  </Button>
+                </Link>
               ) : (
                 <Button size="sm" onClick={() => setShowWalletPicker(true)}
                   className="bg-[#ffffff] hover:bg-[#e5e5e5] text-black text-xs font-semibold rounded-lg">

@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Link } from "react-router-dom";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { Loader2, RefreshCw, Droplets, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -7,25 +8,25 @@ import {
   buildUnwrapTransactions,
   type NativeSolAccount,
 } from "@/lib/orbitx/rescue";
-import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function UnwrapWsolPanel() {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction, sendTransaction, wallets, select, connect } = useWallet();
+  const {
+    publicKey,
+    ready,
+    localActive,
+    label,
+    shortAddress,
+    sendTx,
+    connectPhantom,
+  } = useActiveTradingWallet();
   const [accounts, setAccounts] = useState<NativeSolAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sig, setSig] = useState("");
-
-  const connectPhantom = async () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name as any);
-    setTimeout(() => {
-      connect().catch(() => {});
-    }, 120);
-  };
 
   const scan = useCallback(async () => {
     if (!publicKey) return;
@@ -42,7 +43,7 @@ export default function UnwrapWsolPanel() {
   }, [connection, publicKey]);
 
   const unwrap = async () => {
-    if (!publicKey || !(sendTransaction || signTransaction) || !accounts.length) return;
+    if (!publicKey || !ready || !accounts.length) return;
     setBusy(true);
     try {
       const txs = buildUnwrapTransactions(publicKey, accounts);
@@ -51,7 +52,7 @@ export default function UnwrapWsolPanel() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        last = await sendWalletTransaction(connection, { sendTransaction, signTransaction }, tx);
+        last = await sendTx(connection, tx);
         await connection.confirmTransaction({ signature: last, blockhash, lastValidBlockHeight }, "confirmed");
       }
       setSig(last);
@@ -69,18 +70,31 @@ export default function UnwrapWsolPanel() {
 
   const total = accounts.reduce((s, a) => s + a.lamports, 0) / 1e9;
 
-  if (!connected || !publicKey) {
+  if (!ready || !publicKey) {
     return (
       <div className="rounded-2xl border border-white/10 bg-[#050505] p-6 text-center">
         <Droplets className="mx-auto h-8 w-8 text-white/30" />
-        <p className="mt-3 text-sm text-white/55">Connect Phantom to unwrap wSOL</p>
-        <button
-          type="button"
-          onClick={() => void connectPhantom()}
-          className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-        >
-          Connect Phantom
-        </button>
+        <p className="mt-3 text-sm text-white/55">
+          {localActive
+            ? "Set a default local trading wallet to unwrap wSOL"
+            : "Connect Phantom to unwrap wSOL"}
+        </p>
+        {localActive ? (
+          <Link
+            to="/trade/wallets"
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Manage wallets
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void connectPhantom()}
+            className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
+          >
+            Connect Phantom
+          </button>
+        )}
       </div>
     );
   }
@@ -91,6 +105,9 @@ export default function UnwrapWsolPanel() {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-white/35">wSOL accounts</div>
           <div className="text-xl font-bold">{accounts.length}</div>
+          {shortAddress ? (
+            <div className="mt-0.5 font-mono text-[10px] text-white/40">{label || shortAddress}</div>
+          ) : null}
         </div>
         <button
           type="button"

@@ -2,7 +2,7 @@
  * Orbitx Launchpad — CLAIM CREATOR FEES (both lanes, in-app, non-custodial).
  */
 import { useState, useCallback, useEffect } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
@@ -16,16 +16,23 @@ import {
 } from "@/lib/orbitx/claim";
 import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
-import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function LaunchpadClaim() {
-  const { connected, publicKey, connect, wallets, select, signTransaction, sendTransaction } = useWallet();
   const { connection } = useConnection();
-  const walletSend = { sendTransaction, signTransaction };
+  const {
+    publicKey,
+    ready,
+    localActive,
+    label,
+    shortAddress,
+    sendTx,
+    connectPhantom,
+  } = useActiveTradingWallet();
 
   const [pumpSol, setPumpSol] = useState<number | null>(null);
   const [pumpLoading, setPumpLoading] = useState(false);
@@ -39,14 +46,6 @@ export default function LaunchpadClaim() {
   const [claimables, setClaimables] = useState<Record<string, CustomClaimable | "loading" | "error">>({});
   const [claiming, setClaiming] = useState<Record<string, boolean>>({});
   const [claimSigs, setClaimSigs] = useState<Record<string, string>>({});
-
-  const handleConnect = async () => {
-    try {
-      if (!wallets.length) return toast.error("No Solana wallet found — install Phantom");
-      select(wallets[0].adapter.name);
-      await connect();
-    } catch { /* user closed modal */ }
-  };
 
   const refreshPump = useCallback(async () => {
     if (!publicKey) return;
@@ -83,16 +82,16 @@ export default function LaunchpadClaim() {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    if (connected && publicKey) { refreshPump(); refreshTokens(); }
-  }, [connected, publicKey, refreshPump, refreshTokens]);
+    if (ready && publicKey) { refreshPump(); refreshTokens(); }
+  }, [ready, publicKey, refreshPump, refreshTokens]);
 
   const claimPump = async () => {
-    if (!publicKey || !(sendTransaction || signTransaction)) return;
+    if (!publicKey || !ready) return;
     setPumpClaiming(true);
     try {
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
       if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
-      const sig = await sendWalletTransaction(connection, walletSend, plan.tx);
+      const sig = await sendTx(connection, plan.tx);
       await connection.confirmTransaction(sig, "confirmed");
       setPumpSig(sig);
       const netSol = plan.netLamports / LAMPORTS_PER_SOL;
@@ -109,7 +108,7 @@ export default function LaunchpadClaim() {
           try {
             const buySol = buyLamports / LAMPORTS_PER_SOL;
             const buyTx = await buildPumpBuyTransaction(publicKey, mint, buySol);
-            const buySig = await sendWalletTransaction(connection, walletSend, buyTx);
+            const buySig = await sendTx(connection, buyTx);
             await connection.confirmTransaction(buySig, "confirmed");
             toast.success(`Bought back ${buySol.toFixed(4)} SOL of your coin`);
           } catch (e) {
@@ -129,7 +128,7 @@ export default function LaunchpadClaim() {
 
   const claimCustom = async (t: OrbitxToken) => {
     const info = claimables[t.mint_address];
-    if (!publicKey || !(sendTransaction || signTransaction) || !info || info === "loading" || info === "error") return;
+    if (!publicKey || !ready || !info || info === "loading" || info === "error") return;
     if (info.withdrawAuthority && info.withdrawAuthority !== publicKey.toBase58()) {
       toast.error("Only the fee authority wallet can claim this token's fees");
       return;
@@ -142,12 +141,12 @@ export default function LaunchpadClaim() {
         tx.feePayer = publicKey;
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
-        lastSig = await sendWalletTransaction(connection, walletSend, tx);
+        lastSig = await sendTx(connection, tx);
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
-        const swapSig = await sendWalletTransaction(connection, walletSend, plan.tx);
+        const swapSig = await sendTx(connection, plan.tx);
         await connection.confirmTransaction(swapSig, "confirmed");
         lastSig = swapSig;
         toast.success(`${t.ticker} fees claimed & swapped to ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
@@ -179,13 +178,25 @@ export default function LaunchpadClaim() {
         title="Claim your creator fees"
         subtitle={`Same wallet you launched with. ${(CREATOR_FEE_BPS / 100).toFixed(2)}% on every buy & sell — you keep ${TRADE_FEE_CREATOR_SHARE_PCT}%, platform ${TRADE_FEE_PLATFORM_SHARE_PCT}%.`}
         actions={
-          !connected ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.16)] px-3 py-1.5 text-xs text-[#A8B0BC]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
+          !ready ? (
+            localActive ? (
+              <Link to="/trade/wallets" className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.16)] px-3 py-1.5 text-xs text-[#A8B0BC]">
+                <Wallet className="h-3.5 w-3.5" /> Set default wallet
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void connectPhantom()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.16)] px-3 py-1.5 text-xs text-[#A8B0BC]"
+              >
+                <Wallet className="h-3.5 w-3.5" /> Connect Phantom
+              </button>
+            )
           ) : (
             <div className="flex items-center gap-2">
               <span className="ox-wallet-chip">
                 <span className="ox-wallet-dot" />
-                <span className="pf-mono text-[11px] font-bold text-white">{publicKey ? short(publicKey.toBase58()) : ""}</span>
+                <span className="pf-mono text-[11px] font-bold text-white">{label || shortAddress || ""}</span>
               </span>
               <button type="button" className="ox-btn !px-2.5" onClick={() => { refreshPump(); refreshTokens(); }}>
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -195,7 +206,7 @@ export default function LaunchpadClaim() {
         }
       />
 
-      {connected && (
+      {ready && (
         <>
           <div className="ox-claim-card">
             <div className="mb-3 flex items-center justify-between">
