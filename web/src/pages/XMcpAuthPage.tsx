@@ -6,7 +6,7 @@ import { approveXMcpOAuth, xMcpOAuthCredentials, xMcpPublicUrl } from "@/lib/xMc
 import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 
 /**
- * OAuth consent for OrbitX X MCP — Claude/ChatGPT Authenticate lands here.
+ * OAuth consent for OrbitX X MCP — Claude / ChatGPT / Grok Authenticate lands here.
  */
 export default function XMcpAuthPage() {
   const [params] = useSearchParams();
@@ -23,12 +23,15 @@ export default function XMcpAuthPage() {
   const mcpUrl = params.get("mcp_url") || xMcpPublicUrl();
   const oauth = useMemo(() => xMcpOAuthCredentials(), []);
 
+  const cid = clientId.toLowerCase();
   const clientLabel =
-    clientId.toLowerCase().includes("openai") || clientId.toLowerCase().includes("chatgpt")
+    cid.includes("openai") || cid.includes("chatgpt")
       ? "ChatGPT"
-      : clientId.toLowerCase().includes("anthropic") || clientId.toLowerCase().includes("claude")
+      : cid.includes("anthropic") || cid.includes("claude")
         ? "Claude"
-        : "your AI assistant";
+        : cid.includes("grok") || cid.includes("xai") || cid.includes("x.ai")
+          ? "Grok"
+          : "your AI assistant";
 
   const onConfirm = async () => {
     setError(null);
@@ -104,7 +107,7 @@ export default function XMcpAuthPage() {
 
           {!redirectUri && (
             <div className="ox-agent__alert" style={{ marginTop: 12 }}>
-              Missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields from{" "}
+              Missing redirect_uri — open Authenticate from Grok/Claude/ChatGPT, or copy OAuth fields from{" "}
               <Link to="/x">/x</Link>.
             </div>
           )}

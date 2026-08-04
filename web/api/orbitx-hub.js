@@ -3095,7 +3095,8 @@ async function handleMcp(req, res, parts) {
   ) {
     return json(res, {
       resource: mcpUrl,
-      authorization_servers: [base],
+      // Prefer MCP URL as AS so path-based discovery (Grok) does not collide with X MCP.
+      authorization_servers: [mcpUrl],
       scopes_supported: ["orbitx"],
       bearer_methods_supported: ["header"],
     });
@@ -3106,7 +3107,7 @@ async function handleMcp(req, res, parts) {
     req.method === "GET"
   ) {
     return json(res, {
-      issuer: base,
+      issuer: mcpUrl,
       authorization_endpoint: `${mcpUrl}/oauth/authorize`,
       token_endpoint: `${mcpUrl}/oauth/token`,
       registration_endpoint: `${mcpUrl}/oauth/register`,

@@ -49,6 +49,11 @@ export function xChatgptConnectUrl(): string {
   return "https://chatgpt.com/#settings/Connectors";
 }
 
+/** Grok custom MCP connectors — paste MCP URL only (no OAuth form; Grok discovers auth). */
+export function xGrokConnectUrl(): string {
+  return "https://grok.com/connectors";
+}
+
 export type XMcpBootstrap = {
   agent: {
     id: string;

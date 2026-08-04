@@ -8,7 +8,7 @@ import { resolveAuthWallet } from "@/lib/agentTokenGate";
 import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 
 /**
- * OAuth consent — Claude/ChatGPT Authenticate lands here.
+ * OAuth consent — Claude / ChatGPT / Grok Authenticate lands here.
  */
 export default function McpAuthPage() {
   const [params] = useSearchParams();
@@ -41,12 +41,15 @@ export default function McpAuthPage() {
     [publicKey, user?.email, user?.user_metadata, profile],
   );
 
+  const cid = clientId.toLowerCase();
   const clientLabel =
-    clientId.toLowerCase().includes("openai") || clientId.toLowerCase().includes("chatgpt")
+    cid.includes("openai") || cid.includes("chatgpt")
       ? "ChatGPT"
-      : clientId.toLowerCase().includes("anthropic") || clientId.toLowerCase().includes("claude")
+      : cid.includes("anthropic") || cid.includes("claude")
         ? "Claude"
-        : "your AI assistant";
+        : cid.includes("grok") || cid.includes("xai") || cid.includes("x.ai")
+          ? "Grok"
+          : "your AI assistant";
 
   const onConfirm = async () => {
     setError(null);
@@ -129,7 +132,7 @@ export default function McpAuthPage() {
 
           {!redirectUri && (
             <div className="ox-agent__alert" style={{ marginTop: 12 }}>
-              Missing redirect_uri — open Authenticate from ChatGPT/Claude, or copy OAuth fields from{" "}
+              Missing redirect_uri — open Authenticate from Grok/Claude/ChatGPT, or copy OAuth fields from{" "}
               <Link to="/agent">/agent</Link>.
             </div>
           )}

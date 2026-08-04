@@ -332,6 +332,28 @@ function json(res, data, status = 200, extra = {}) {
   res.end(JSON.stringify(data));
 }
 
+/** Grok/Claude URL-only clients discover OAuth from this header + well-known PRM. */
+function wwwAuthenticateHeader() {
+  return `Bearer realm="OrbitX X MCP", resource_metadata="${MCP_URL}/.well-known/oauth-protected-resource", scope="${SCOPE}"`;
+}
+
+function mcpUnauthorized(res, id) {
+  return json(
+    res,
+    {
+      jsonrpc: "2.0",
+      id: id ?? null,
+      error: {
+        code: -32001,
+        message:
+          "Unauthorized. Complete Authenticate in Grok/Claude/ChatGPT (OrbitX OAuth), or send Authorization: Bearer <key from https://orbitx.world/x>.",
+      },
+    },
+    401,
+    { "WWW-Authenticate": wwwAuthenticateHeader() },
+  );
+}
+
 function sha256(input) {
   return createHash("sha256").update(input).digest("hex");
 }
@@ -805,7 +827,8 @@ async function callTool(name, args, auth) {
       steps: [
         "Open https://orbitx.world/x and sign in",
         "Connect X (Reconnect after scope upgrades for DMs)",
-        "Create an API key, then Add to Claude or ChatGPT",
+        "Create an API key (Claude/ChatGPT), or for Grok just paste the MCP URL",
+        "Grok: grok.com/connectors → Custom → MCP URL only → Authenticate (OrbitX OAuth popup)",
         "Train the agent (persona + knowledge) on /x Agent tab",
         "Use x_dm / x_dm_inbox for DMs (Reconnect X after enabling dm.read/dm.write)",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
@@ -815,7 +838,10 @@ async function callTool(name, args, auth) {
         inbox: "x_dm_inbox",
         tip: "Ask: Send a DM to @handle saying … — Claude will call x_dm.",
       },
-      note: "Modes: auto (generate+post) or approve (draft queue). AI: NVIDIA NIM. Separate from OrbitX Agent MCP (/api/mcp).",
+      note: "Modes: auto (generate+post) or approve (draft queue). AI: NVIDIA NIM. Grok only needs the MCP URL — OAuth is discovered automatically. Separate from OrbitX Agent MCP (/api/mcp).",
+      clients: ["claude", "chatgpt", "grok"],
+      grokSetup:
+        "https://grok.com/connectors → New Connector → Custom → paste MCP URL only → Authenticate on OrbitX /x/mcp-auth",
       env: ["NVIDIA_API_KEY", "TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "CRON_SECRET"],
     };
   }
@@ -1867,9 +1893,10 @@ async function handleMcp(req, res, parts) {
     (route === ".well-known/oauth-protected-resource" || route === "oauth-protected-resource") &&
     req.method === "GET"
   ) {
+    // Issuer = MCP_URL so Grok (URL-only) does not fall through to Agent MCP at /.well-known/*
     return json(res, {
       resource: MCP_URL,
-      authorization_servers: [MCP_HOST],
+      authorization_servers: [MCP_URL],
       scopes_supported: [SCOPE],
       bearer_methods_supported: ["header"],
     });
@@ -1880,7 +1907,7 @@ async function handleMcp(req, res, parts) {
     req.method === "GET"
   ) {
     return json(res, {
-      issuer: MCP_HOST,
+      issuer: MCP_URL,
       authorization_endpoint: `${MCP_URL}/oauth/authorize`,
       token_endpoint: `${MCP_URL}/oauth/token`,
       registration_endpoint: `${MCP_URL}/oauth/register`,
@@ -2036,6 +2063,12 @@ async function handleMcp(req, res, parts) {
       const name = String(params?.name || "");
       const args = params?.arguments || {};
       const auth = await resolveAuth(req);
+      // Public discovery tools stay open; everything else 401s so Grok can start OAuth
+      // from WWW-Authenticate (Grok UI only has MCP URL — no manual OAuth fields).
+      const publicTools = new Set(["search", "fetch", "x_help"]);
+      if (!auth?.userId && !publicTools.has(name)) {
+        return mcpUnauthorized(res, id);
+      }
 
       try {
         const result = await callTool(name, args, auth || { userId: null });

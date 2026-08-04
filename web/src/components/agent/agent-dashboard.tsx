@@ -7,6 +7,7 @@ import {
   bootstrapAgent,
   chatgptConnectUrl,
   claudeConnectUrl,
+  grokConnectUrl,
   createAgentApiKey,
   linkAgentWallet,
   listAgentApiKeys,
@@ -110,9 +111,9 @@ export function AgentDashboard() {
   const [storedKey, setStoredKey] = useState<string | null>(null);
   const [showKeyPanel, setShowKeyPanel] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [chatgptGuide, setChatgptGuide] = useState(false);
+  const [oauthGuide, setOauthGuide] = useState<"chatgpt" | "grok" | null>(null);
   const [linking, setLinking] = useState(false);
-  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt">("claude");
+  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | "grok">("claude");
 
   const walletAddress = useMemo(
     () =>
@@ -482,7 +483,7 @@ export function AgentDashboard() {
         <section className="ox-agent__panel">
           <div className="ox-agent__panel-h">
             <h2 className="ox-agent__panel-title">Connect AI</h2>
-            <span className="ox-agent__panel-hint">Claude · ChatGPT</span>
+            <span className="ox-agent__panel-hint">Claude · ChatGPT · Grok</span>
           </div>
           <div className="ox-agent__panel-b">
             <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
@@ -511,12 +512,24 @@ export function AgentDashboard() {
                     storedKey ? `Bearer: ${storedKey}` : "Bearer: (create an api key first)",
                   ].join("\n");
                   await copy("chatgptPack", pack);
-                  setChatgptGuide(true);
+                  setOauthGuide("chatgpt");
                   setSetupOpen("chatgpt");
                   window.open(chatgptConnectUrl(), "_blank", "noopener,noreferrer");
                 }}
               >
                 Add to ChatGPT
+              </button>
+              <button
+                type="button"
+                className="ox-agent__btn"
+                onClick={async () => {
+                  await copy("grokMcp", oauth.mcpUrl);
+                  setOauthGuide(null);
+                  setSetupOpen("grok");
+                  window.open(grokConnectUrl(), "_blank", "noopener,noreferrer");
+                }}
+              >
+                Add to Grok
               </button>
             </div>
 
@@ -531,12 +544,16 @@ export function AgentDashboard() {
                 MCP URL + OAuth fields{storedKey ? " + Bearer" : ""} copied — paste into ChatGPT connector.
               </p>
             )}
+            {copied === "grokMcp" && setupOpen === "grok" && (
+              <p className="ox-agent__note">MCP URL copied — paste that one field into Grok (no OAuth section).</p>
+            )}
 
             <div className="ox-agent__subtabs" style={{ marginTop: "1.1rem" }}>
               {(
                 [
                   ["claude", "Claude setup"],
                   ["chatgpt", "ChatGPT setup"],
+                  ["grok", "Grok setup"],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -550,7 +567,7 @@ export function AgentDashboard() {
               ))}
             </div>
 
-            {setupOpen === "claude" ? (
+            {setupOpen === "claude" && (
               <ol className="ox-agent__ol">
                 <li>
                   MCP URL must end in <code>/mcp</code> — use the field below
@@ -562,7 +579,8 @@ export function AgentDashboard() {
                   Advanced → header <code>Authorization</code> = Bearer token from the Keys tab
                 </li>
               </ol>
-            ) : (
+            )}
+            {setupOpen === "chatgpt" && (
               <ol className="ox-agent__ol">
                 <li>Enable Developer mode in ChatGPT settings</li>
                 <li>Create a custom MCP connector with the MCP URL</li>
@@ -572,42 +590,63 @@ export function AgentDashboard() {
                 <li>Authenticate → approve on OrbitX</li>
               </ol>
             )}
+            {setupOpen === "grok" && (
+              <ol className="ox-agent__ol">
+                <li>
+                  Open <code>grok.com/connectors</code> → New Connector → Custom
+                </li>
+                <li>Paste only the MCP URL (Grok has no OAuth section)</li>
+                <li>Save / enable — Grok discovers OAuth from that URL</li>
+                <li>
+                  When Grok opens Authenticate, approve on OrbitX <code>/agent/mcp-auth</code>
+                </li>
+              </ol>
+            )}
 
             <p className="ox-agent__panel-hint" style={{ marginBottom: 8 }}>
-              Connector fields
+              {setupOpen === "grok" ? "Grok field" : "Connector fields"}
             </p>
-            <FieldRow label="MCP URL" value={oauth.mcpUrl} copied={copied === "mcp"} onCopy={() => copy("mcp", oauth.mcpUrl)} />
             <FieldRow
-              label="Auth URL"
-              value={oauth.authorizationUrl}
-              copied={copied === "auth"}
-              onCopy={() => copy("auth", oauth.authorizationUrl)}
+              label="MCP URL"
+              value={oauth.mcpUrl}
+              copied={copied === "mcp" || copied === "grokMcp"}
+              onCopy={() => copy("mcp", oauth.mcpUrl)}
             />
-            <FieldRow
-              label="Token URL"
-              value={oauth.tokenUrl}
-              copied={copied === "token"}
-              onCopy={() => copy("token", oauth.tokenUrl)}
-            />
-            <FieldRow
-              label="Client ID"
-              value={oauth.clientId}
-              copied={copied === "client"}
-              onCopy={() => copy("client", oauth.clientId)}
-            />
-            <FieldRow label="Client secret" value="(leave blank)" copyable={false} />
-            <FieldRow
-              label="Scope"
-              value={oauth.scope}
-              copied={copied === "scope"}
-              onCopy={() => copy("scope", oauth.scope)}
-            />
+            {setupOpen !== "grok" && (
+              <>
+                <FieldRow
+                  label="Auth URL"
+                  value={oauth.authorizationUrl}
+                  copied={copied === "auth"}
+                  onCopy={() => copy("auth", oauth.authorizationUrl)}
+                />
+                <FieldRow
+                  label="Token URL"
+                  value={oauth.tokenUrl}
+                  copied={copied === "token"}
+                  onCopy={() => copy("token", oauth.tokenUrl)}
+                />
+                <FieldRow
+                  label="Client ID"
+                  value={oauth.clientId}
+                  copied={copied === "client"}
+                  onCopy={() => copy("client", oauth.clientId)}
+                />
+                <FieldRow label="Client secret" value="(leave blank)" copyable={false} />
+                <FieldRow
+                  label="Scope"
+                  value={oauth.scope}
+                  copied={copied === "scope"}
+                  onCopy={() => copy("scope", oauth.scope)}
+                />
+              </>
+            )}
           </div>
         </section>
       )}
 
-      {chatgptGuide && (
-        <div className="ox-agent__modal" onClick={() => setChatgptGuide(false)}>
+      {oauthGuide === "chatgpt" && (
+        <div className="ox-agent__modal" onClick={() => setOauthGuide(null)}>
           <div className="ox-agent__modal-card" onClick={(e) => e.stopPropagation()}>
             <h2>ChatGPT OAuth</h2>
             <p className="ox-agent__note" style={{ marginTop: 0, marginBottom: "0.85rem" }}>
@@ -641,7 +680,7 @@ export function AgentDashboard() {
               type="button"
               className="ox-agent__btn ox-agent__btn--primary"
               style={{ width: "100%", marginTop: 12 }}
-              onClick={() => setChatgptGuide(false)}
+              onClick={() => setOauthGuide(null)}
             >
               Done
             </button>

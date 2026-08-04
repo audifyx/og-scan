@@ -55,6 +55,11 @@ export function chatgptConnectUrl(): string {
   return "https://chatgpt.com/#settings/Connectors";
 }
 
+/** Grok custom MCP connectors — paste MCP URL only (no OAuth form; Grok discovers auth). */
+export function grokConnectUrl(): string {
+  return "https://grok.com/connectors";
+}
+
 /** Browser handoff for MCP prepare_buy / prepare_sell → Phantom sign. */
 export function agentSignTradeUrl(opts: {
   action: "buy" | "sell";

@@ -21,6 +21,7 @@ import {
   upsertXAgent,
   xChatgptConnectUrl,
   xClaudeConnectUrl,
+  xGrokConnectUrl,
   xMcpOAuthCredentials,
   type XAgentConfig,
   type XAgentKnowledge,
@@ -225,8 +226,8 @@ export default function XMcpPage() {
   const [storedKey, setStoredKey] = useState<string | null>(null);
   const [showKeyPanel, setShowKeyPanel] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const [chatgptGuide, setChatgptGuide] = useState(false);
-  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt">("claude");
+  const [oauthGuide, setOauthGuide] = useState<"chatgpt" | "grok" | null>(null);
+  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | "grok">("claude");
   const [xLocal, setXLocal] = useState<XUser | null>(() => xGetStoredUser());
   const [connectingX, setConnectingX] = useState(false);
   const [xAgent, setXAgent] = useState<XAgentConfig | null>(null);
@@ -548,11 +549,11 @@ export default function XMcpPage() {
       <div className="xh__aside-card">
         <h2>MCP</h2>
         <p className="xh__note" style={{ marginTop: 0 }}>
-          Post, quote, reply, DM, and run your NVIDIA agent from Claude or ChatGPT.
+          Post, quote, reply, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok.
         </p>
         <div className="xh__btn-row">
           <button type="button" className="xh__btn xh__btn--primary" onClick={() => setTab("connect")}>
-            Wire Claude
+            Wire AI
           </button>
           <button type="button" className="xh__btn" onClick={() => copy("mcp", oauth.mcpUrl)}>
             {copied === "mcp" ? "Copied" : "Copy URL"}
@@ -1158,67 +1159,119 @@ export default function XMcpPage() {
                     storedKey ? `Bearer: ${storedKey}` : "Bearer: (create an api key first)",
                   ].join("\n");
                   await copy("chatgptPack", pack);
-                  setChatgptGuide(true);
+                  setOauthGuide("chatgpt");
                   setSetupOpen("chatgpt");
                   window.open(xChatgptConnectUrl(), "_blank", "noopener,noreferrer");
                 }}
               >
                 Add to ChatGPT
               </button>
+              <button
+                type="button"
+                className="xh__btn xh__btn--ox"
+                onClick={async () => {
+                  await copy("grokMcp", oauth.mcpUrl);
+                  setOauthGuide(null);
+                  setSetupOpen("grok");
+                  window.open(xGrokConnectUrl(), "_blank", "noopener,noreferrer");
+                }}
+              >
+                Add to Grok
+              </button>
             </div>
             <div className="xh__chip-row" style={{ marginTop: 12 }}>
-              <button
-                type="button"
-                className={`xh__chip${setupOpen === "claude" ? " is-ok" : ""}`}
-                onClick={() => setSetupOpen("claude")}
-              >
-                Claude
-              </button>
-              <button
-                type="button"
-                className={`xh__chip${setupOpen === "chatgpt" ? " is-ok" : ""}`}
-                onClick={() => setSetupOpen("chatgpt")}
-              >
-                ChatGPT
-              </button>
+              {(
+                [
+                  ["claude", "Claude"],
+                  ["chatgpt", "ChatGPT"],
+                  ["grok", "Grok"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`xh__chip${setupOpen === id ? " is-ok" : ""}`}
+                  onClick={() => setSetupOpen(id)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+            {setupOpen === "claude" && (
+              <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
+                <li>MCP URL must end in /mcp</li>
+                <li>Client ID orbitx-x-mcp, secret blank</li>
+                <li>Authenticate → approve on /x/mcp-auth</li>
+              </ol>
+            )}
+            {setupOpen === "chatgpt" && (
+              <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
+                <li>Developer Mode on (Apps & Connectors → Advanced)</li>
+                <li>Custom connector with MCP URL + OAuth fields</li>
+                <li>Authenticate → approve on OrbitX /x</li>
+              </ol>
+            )}
+            {setupOpen === "grok" && (
+              <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
+                <li>
+                  Open <code>grok.com/connectors</code> → New Connector → Custom
+                </li>
+                <li>Paste only the MCP URL below (Grok has no OAuth fields)</li>
+                <li>Save / enable — Grok discovers OAuth from that URL</li>
+                <li>
+                  When Grok opens Authenticate, approve on OrbitX <code>/x/mcp-auth</code> (signed in)
+                </li>
+              </ol>
+            )}
+            {copied === "grokMcp" && setupOpen === "grok" && (
+              <p className="xh__note">MCP URL copied — paste that one field into Grok, then Authenticate.</p>
+            )}
             <p className="xh__note">
-              ChatGPT needs Developer Mode (Settings → Apps & Connectors → Advanced). Tools include{" "}
-              <code>search</code>/<code>fetch</code> (required by ChatGPT) plus x_post, x_dm, x_agent_run, …
-              Enable the connector in the chat + menu after adding it.
+              {setupOpen === "grok"
+                ? "Auth still required — Grok pulls OAuth from the MCP server (no manual client ID / token URL)."
+                : "Tools: search/fetch, x_post, x_dm, x_agent_run, … Claude/ChatGPT use OAuth fields; Grok only needs the MCP link + Authenticate."}
             </p>
-            <FieldRow label="MCP URL" value={oauth.mcpUrl} copied={copied === "mcp"} onCopy={() => copy("mcp", oauth.mcpUrl)} />
             <FieldRow
-              label="Auth URL"
-              value={oauth.authorizationUrl}
-              copied={copied === "auth"}
-              onCopy={() => copy("auth", oauth.authorizationUrl)}
+              label="MCP URL"
+              value={oauth.mcpUrl}
+              copied={copied === "mcp" || copied === "grokMcp"}
+              onCopy={() => copy("mcp", oauth.mcpUrl)}
             />
-            <FieldRow
-              label="Token URL"
-              value={oauth.tokenUrl}
-              copied={copied === "token"}
-              onCopy={() => copy("token", oauth.tokenUrl)}
-            />
-            <FieldRow
-              label="Client ID"
-              value={oauth.clientId}
-              copied={copied === "client"}
-              onCopy={() => copy("client", oauth.clientId)}
-            />
-            <FieldRow label="Client secret" value="(leave blank)" copyable={false} />
-            <FieldRow
-              label="Scope"
-              value={oauth.scope}
-              copied={copied === "scope"}
-              onCopy={() => copy("scope", oauth.scope)}
-            />
+            {setupOpen !== "grok" && (
+              <>
+                <FieldRow
+                  label="Auth URL"
+                  value={oauth.authorizationUrl}
+                  copied={copied === "auth"}
+                  onCopy={() => copy("auth", oauth.authorizationUrl)}
+                />
+                <FieldRow
+                  label="Token URL"
+                  value={oauth.tokenUrl}
+                  copied={copied === "token"}
+                  onCopy={() => copy("token", oauth.tokenUrl)}
+                />
+                <FieldRow
+                  label="Client ID"
+                  value={oauth.clientId}
+                  copied={copied === "client"}
+                  onCopy={() => copy("client", oauth.clientId)}
+                />
+                <FieldRow label="Client secret" value="(leave blank)" copyable={false} />
+                <FieldRow
+                  label="Scope"
+                  value={oauth.scope}
+                  copied={copied === "scope"}
+                  onCopy={() => copy("scope", oauth.scope)}
+                />
+              </>
+            )}
           </div>
         </>
       )}
 
-      {chatgptGuide && (
-        <div className="xh__modal" onClick={() => setChatgptGuide(false)}>
+      {oauthGuide === "chatgpt" && (
+        <div className="xh__modal" onClick={() => setOauthGuide(null)}>
           <div className="xh__modal-card" onClick={(e) => e.stopPropagation()}>
             <h2>ChatGPT · X MCP</h2>
             <p className="xh__note" style={{ marginTop: 0 }}>
@@ -1246,7 +1299,7 @@ export default function XMcpPage() {
               type="button"
               className="xh__btn xh__btn--primary"
               style={{ width: "100%", marginTop: 12 }}
-              onClick={() => setChatgptGuide(false)}
+              onClick={() => setOauthGuide(null)}
             >
               Done
             </button>
