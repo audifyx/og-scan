@@ -48,6 +48,7 @@ import {
 } from "@/lib/solana-api";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
+import ActiveTradingWalletChip from "@/trade/ActiveTradingWalletChip";
 export type TradeTerminalProps = {
   initialMint?: string | null;
   onMintChange?: (mint: string) => void;
@@ -406,7 +407,6 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const deskMode = mode === "desk";
   const {
     setMode: setWalletMode,
-    defaultWallet: localDefault,
     publicKey: tradePk,
     localActive,
     ready: tradeReady,
@@ -1189,44 +1189,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <span className="text-[10px] text-white/30">%</span>
           </div>
 
-          {/* Wallet mode: Connected (Phantom) vs Local trading keys */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-1">
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => setWalletMode("connected")}
-                className={`rounded-lg py-1.5 text-[10px] font-semibold ${
-                  !localActive ? "bg-white text-black" : "text-white/45 hover:text-white/70"
-                }`}
-              >
-                Connected
-              </button>
-              <button
-                type="button"
-                onClick={() => setWalletMode("local")}
-                className={`rounded-lg py-1.5 text-[10px] font-semibold ${
-                  localActive ? "bg-white text-black" : "text-white/45 hover:text-white/70"
-                }`}
-              >
-                Local wallets
-              </button>
-            </div>
-            <div className="mt-1.5 flex items-center justify-between px-1.5 pb-0.5">
-              <p className="truncate font-mono text-[10px] text-white/40">
-                {localActive
-                  ? localDefault
-                    ? `Local ${shortAddr(localDefault.publicKey, 4)}`
-                    : "No default local wallet"
-                  : connected && publicKey
-                    ? `Ext ${shortAddr(publicKey.toBase58(), 4)}`
-                    : "Not connected"}
-              </p>
-              <Link to="/trade/wallets" className="inline-flex items-center gap-1 text-[10px] text-white/45 hover:text-white">
-                <KeyRound className="h-3 w-3" />
-                Manage
-              </Link>
-            </div>
-          </div>
+          {/* Active trading identity — Local default keypair vs Phantom */}
+          <ActiveTradingWalletChip />
 
           {/* Your position — always visible above Buy/Sell */}
           <div className="rounded-xl border border-white/15 bg-gradient-to-b from-white/[0.08] to-transparent px-3 py-3">

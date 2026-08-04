@@ -195,8 +195,8 @@ export default function TradeWalletManager() {
         </div>
         <p className="mt-2 px-2 pb-1 text-[10px] leading-relaxed text-white/35">
           {mode === "local"
-            ? "Buy/Sell signs with your default imported key in this browser."
-            : "Buy/Sell uses Phantom / Jupiter (extension). Local wallets stay available for later."}
+            ? "Trade, claim, burn, rent & unwrap all sign with your default local key — not Phantom."
+            : "Connected mode uses Phantom / Jupiter. Import or set a default local wallet to switch into Local mode automatically."}
         </p>
       </div>
 
