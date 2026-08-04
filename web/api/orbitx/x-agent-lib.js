@@ -215,17 +215,137 @@ export async function listDmEventsOAuth2(accessToken, { maxResults = 20 } = {}) 
   for (const u of data?.includes?.users || []) {
     if (u?.id) users[u.id] = u;
   }
-  const events = (Array.isArray(data?.data) ? data.data : []).map((ev) => ({
-    id: ev.id,
-    text: ev.text || "",
-    eventType: ev.event_type,
-    conversationId: ev.dm_conversation_id,
-    createdAt: ev.created_at,
-    senderId: ev.sender_id,
-    senderUsername: users[ev.sender_id]?.username || null,
-    participantIds: ev.participant_ids || [],
-  }));
+  const events = (Array.isArray(data?.data) ? data.data : []).map((ev) => {
+    const participantIds = ev.participant_ids || [];
+    return {
+      id: ev.id,
+      text: ev.text || "",
+      eventType: ev.event_type,
+      conversationId: ev.dm_conversation_id,
+      createdAt: ev.created_at,
+      senderId: ev.sender_id,
+      senderUsername: users[ev.sender_id]?.username || null,
+      participantIds,
+      isGroup: participantIds.length > 2,
+    };
+  });
   return { ok: true, events, meta: data?.meta || null };
+}
+
+/** Send a message into an existing DM / group conversation. */
+export async function sendDmConversationOAuth2(accessToken, { conversationId, text }) {
+  const cid = String(conversationId || "").trim();
+  const bodyText = String(text || "").trim();
+  if (!cid) throw new Error("conversationId required");
+  if (!bodyText) throw new Error("text required");
+
+  const res = await fetch(
+    `https://api.twitter.com/2/dm_conversations/${encodeURIComponent(cid)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text: bodyText.slice(0, 10000) }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.detail || err?.title || JSON.stringify(err);
+    if (res.status === 403) {
+      return {
+        ok: false,
+        error: "dm_forbidden",
+        message:
+          "X rejected group/DM send (403). Upgrade X API (Basic/Pro), enable dm.write, Reconnect X on /x.",
+        details: err,
+      };
+    }
+    return { ok: false, error: "dm_failed", message: `DM conversation failed: ${msg}`, details: err };
+  }
+  const data = await res.json();
+  return {
+    ok: true,
+    dmEventId: data?.data?.dm_event_id || data?.data?.id || null,
+    conversationId: cid,
+    data,
+  };
+}
+
+/** Authenticated user id/username (users.read). */
+export async function getXMe(accessToken) {
+  const res = await fetch("https://api.twitter.com/2/users/me?user.fields=username,name", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return {
+      ok: false,
+      error: "me_failed",
+      message: err?.detail || err?.title || `users/me failed (${res.status})`,
+    };
+  }
+  const data = await res.json();
+  return { ok: true, user: data?.data || null };
+}
+
+/** Recent mentions of the authenticated user. */
+export async function listMentionsOAuth2(accessToken, userId, { maxResults = 10, sinceId } = {}) {
+  const uid = String(userId || "").trim();
+  if (!uid) {
+    return { ok: false, error: "user_id_required", message: "X user id required for mentions" };
+  }
+  const limit = Math.min(100, Math.max(5, Number(maxResults) || 10));
+  const params = new URLSearchParams({
+    max_results: String(limit),
+    "tweet.fields": "created_at,author_id,conversation_id,in_reply_to_user_id,text",
+    expansions: "author_id",
+    "user.fields": "id,name,username",
+  });
+  if (sinceId) params.set("since_id", String(sinceId));
+
+  const res = await fetch(
+    `https://api.twitter.com/2/users/${encodeURIComponent(uid)}/mentions?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.detail || err?.title || JSON.stringify(err);
+    if (res.status === 403) {
+      return {
+        ok: false,
+        error: "mentions_forbidden",
+        message:
+          "X rejected mentions read (403). Needs tweet.read + Basic/Pro access for /users/:id/mentions.",
+        details: err,
+      };
+    }
+    if (res.status === 429) {
+      return {
+        ok: false,
+        error: "mentions_rate_limited",
+        message: "X mentions rate limit — will retry on next cron tick.",
+        details: err,
+      };
+    }
+    return { ok: false, error: "mentions_failed", message: `Mentions failed: ${msg}`, details: err };
+  }
+  const data = await res.json();
+  const users = {};
+  for (const u of data?.includes?.users || []) {
+    if (u?.id) users[u.id] = u;
+  }
+  const mentions = (Array.isArray(data?.data) ? data.data : []).map((t) => ({
+    id: t.id,
+    text: t.text || "",
+    authorId: t.author_id,
+    authorUsername: users[t.author_id]?.username || null,
+    authorName: users[t.author_id]?.name || null,
+    conversationId: t.conversation_id || null,
+    createdAt: t.created_at || null,
+  }));
+  return { ok: true, mentions, meta: data?.meta || null };
 }
 
 export function mapAgentRow(row) {
@@ -242,6 +362,13 @@ export function mapAgentRow(row) {
     postingWindows: row.posting_windows || [],
     topics: row.topics || [],
     maxPostsPerDay: row.max_posts_per_day ?? 5,
+    autoReplyMentions: Boolean(row.auto_reply_mentions),
+    autoReplyDms: Boolean(row.auto_reply_dms),
+    autoReplyGroupDms: Boolean(row.auto_reply_group_dms),
+    maxRepliesPerDay: row.max_replies_per_day ?? 30,
+    lastMentionSinceId: row.last_mention_since_id || null,
+    lastDmSinceId: row.last_dm_since_id || null,
+    lastReplyPollAt: row.last_reply_poll_at || null,
     lastAutoRunAt: row.last_auto_run_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -364,9 +491,339 @@ export async function countPostsToday(sb, userId) {
   const start = new Date();
   start.setUTCHours(0, 0, 0, 0);
   const rows = await sb(
-    `x_agent_queue?user_id=eq.${encodeURIComponent(userId)}&status=eq.posted&updated_at=gte.${encodeURIComponent(start.toISOString())}&select=id`,
+    `x_agent_queue?user_id=eq.${encodeURIComponent(userId)}&status=eq.posted&kind=eq.post&updated_at=gte.${encodeURIComponent(start.toISOString())}&select=id`,
   );
   return Array.isArray(rows) ? rows.length : 0;
+}
+
+export async function countRepliesToday(sb, userId) {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const rows = await sb(
+    `x_agent_queue?user_id=eq.${encodeURIComponent(userId)}&status=eq.posted&kind=in.(reply,dm)&updated_at=gte.${encodeURIComponent(start.toISOString())}&select=id`,
+  );
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
+export async function generateAgentReply(sb, agentRow, ctx) {
+  const knowledge = await listKnowledge(sb, agentRow.id);
+  const knowledgeBlock = knowledge
+    .slice(0, 10)
+    .map((k) => `### ${k.title}\n${k.content}`)
+    .join("\n\n")
+    .slice(0, 5000);
+  const kind = ctx?.kind === "dm" || ctx?.kind === "group_dm" ? ctx.kind : "mention";
+  const from = ctx?.fromUsername ? `@${String(ctx.fromUsername).replace(/^@/, "")}` : "someone";
+  const incoming = String(ctx?.text || "").trim().slice(0, 800);
+  const system = [
+    "You reply on X (Twitter) as the account owner / brand voice.",
+    'Return ONLY valid JSON: {"text":"...","skip":false}',
+    "text max 240 characters. No hashtag spam. No markdown. Be helpful and on-brand.",
+    "Set skip:true if the message is spam, scam, abuse, or needs no reply.",
+    kind === "group_dm"
+      ? "This is a group DM — keep it brief and natural for a chat."
+      : kind === "dm"
+        ? "This is a 1:1 DM — be conversational."
+        : "This is a public mention/reply — keep it public-safe.",
+    agentRow.persona ? `Persona:\n${agentRow.persona}` : "",
+    agentRow.voice_notes ? `Voice notes:\n${agentRow.voice_notes}` : "",
+    knowledgeBlock ? `Training knowledge:\n${knowledgeBlock}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const user = `Incoming ${kind} from ${from}:\n"""${incoming}"""\nWrite the reply.`;
+
+  const ai = await nvidiaChat({
+    system,
+    user,
+    model: agentRow.model,
+    maxTokens: 320,
+    temperature: 0.7,
+  });
+  if (!ai.ok) return ai;
+
+  let parsed = null;
+  const raw = String(ai.content || "").trim();
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    parsed = JSON.parse(m ? m[0] : raw);
+  } catch {
+    parsed = { text: raw.replace(/^```json\s*|```$/g, "").trim(), skip: false };
+  }
+  if (parsed?.skip === true) {
+    return { ok: true, skip: true, text: "", model: ai.model };
+  }
+  const text = String(parsed?.text || "").trim().slice(0, 280);
+  if (!text) {
+    return { ok: false, error: "empty_generation", message: "Model returned empty reply", raw: ai.content };
+  }
+  return { ok: true, skip: false, text, model: ai.model };
+}
+
+async function wasHandled(sb, userId, sourceKind, sourceId) {
+  const rows = await sb(
+    `x_agent_handled?user_id=eq.${encodeURIComponent(userId)}&source_kind=eq.${encodeURIComponent(sourceKind)}&source_id=eq.${encodeURIComponent(sourceId)}&limit=1&select=id`,
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+async function markHandled(sb, { userId, agentId, sourceKind, sourceId, queueId }) {
+  try {
+    await sb("x_agent_handled", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: userId,
+        agent_id: agentId,
+        source_kind: sourceKind,
+        source_id: sourceId,
+        queue_id: queueId || null,
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* unique race — ignore */
+  }
+}
+
+async function enqueueOrSendReply(sb, agent, resolveToken, uploadImage, item) {
+  const status = agent.mode === "auto" ? "approved" : "pending";
+  const created = await sb("x_agent_queue", {
+    method: "POST",
+    body: JSON.stringify({
+      agent_id: agent.id,
+      user_id: agent.user_id,
+      kind: item.kind,
+      payload: item.payload,
+      status,
+      scheduled_for: status === "approved" ? new Date().toISOString() : null,
+      source: "agent",
+    }),
+  });
+  const row = Array.isArray(created) ? created[0] : created;
+  if (!row) return { ok: false, error: "queue_create_failed" };
+  if (status === "approved") {
+    const exec = await executeQueueItem(sb, row, resolveToken, uploadImage);
+    return { ok: exec.ok !== false, queued: false, item: row, exec };
+  }
+  return { ok: true, queued: true, item: row };
+}
+
+/**
+ * Poll mentions + DMs / group DMs and draft or auto-send replies.
+ * resolveToken(userId) => { ok, accessToken, profile }
+ */
+export async function processAutoReplies(sb, resolveToken, uploadImage, { forceUserId } = {}) {
+  let agents;
+  if (forceUserId) {
+    const one = await ensureXAgent(sb, forceUserId);
+    agents = one ? [one] : [];
+  } else {
+    const rows = await sb(
+      `x_agents?enabled=eq.true&or=(auto_reply_mentions.eq.true,auto_reply_dms.eq.true,auto_reply_group_dms.eq.true)&select=*&limit=20`,
+    );
+    agents = Array.isArray(rows) ? rows : [];
+  }
+
+  const results = [];
+  const nowIso = new Date().toISOString();
+
+  for (const agent of agents) {
+    if (!agent.auto_reply_mentions && !agent.auto_reply_dms && !agent.auto_reply_group_dms) {
+      results.push({
+        agentId: agent.id,
+        ok: true,
+        skipped: "auto_reply_off",
+        message: "Enable autoReplyMentions / autoReplyDms / autoReplyGroupDms first.",
+      });
+      continue;
+    }
+    if (agent.last_reply_poll_at && !forceUserId) {
+      const elapsed = Date.now() - new Date(agent.last_reply_poll_at).getTime();
+      if (elapsed < 90 * 1000) continue; // avoid hammering X between cron minutes
+    }
+
+    const resolved = await resolveToken(agent.user_id);
+    if (!resolved.ok) {
+      results.push({ agentId: agent.id, ok: false, ...resolved });
+      continue;
+    }
+
+    let twitterId = resolved.profile?.twitter_id || null;
+    if (!twitterId) {
+      const me = await getXMe(resolved.accessToken);
+      twitterId = me?.user?.id || null;
+    }
+    if (!twitterId && agent.auto_reply_mentions) {
+      results.push({
+        agentId: agent.id,
+        ok: false,
+        error: "missing_twitter_id",
+        message: "Connect X again so twitter_id is stored for mentions.",
+      });
+      continue;
+    }
+
+    const repliedToday = await countRepliesToday(sb, agent.user_id);
+    const maxReplies = Math.max(0, Math.min(200, Number(agent.max_replies_per_day) || 30));
+    let budget = Math.max(0, maxReplies - repliedToday);
+    if (budget <= 0) {
+      results.push({ agentId: agent.id, ok: true, skipped: "daily_reply_cap" });
+      await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ last_reply_poll_at: nowIso, updated_at: nowIso }),
+        headers: { Prefer: "return=minimal" },
+      });
+      continue;
+    }
+
+    const agentResults = { agentId: agent.id, mentions: [], dms: [] };
+    let newestMentionId = agent.last_mention_since_id || null;
+    let newestDmId = agent.last_dm_since_id || null;
+
+    if (agent.auto_reply_mentions && twitterId && budget > 0) {
+      const ment = await listMentionsOAuth2(resolved.accessToken, twitterId, {
+        maxResults: 10,
+        sinceId: agent.last_mention_since_id || undefined,
+      });
+      if (!ment.ok) {
+        agentResults.mentions.push(ment);
+      } else {
+        // API returns newest-first
+        for (const m of ment.mentions.slice(0, 5)) {
+          try {
+            if (!newestMentionId || BigInt(m.id) > BigInt(newestMentionId)) newestMentionId = m.id;
+          } catch {
+            newestMentionId = m.id;
+          }
+          if (m.authorId && String(m.authorId) === String(twitterId)) continue;
+          if (await wasHandled(sb, agent.user_id, "mention", m.id)) continue;
+          if (budget <= 0) break;
+
+          const draft = await generateAgentReply(sb, agent, {
+            kind: "mention",
+            fromUsername: m.authorUsername,
+            text: m.text,
+          });
+          if (!draft.ok) {
+            agentResults.mentions.push({ sourceId: m.id, ...draft });
+            continue;
+          }
+          if (draft.skip) {
+            await markHandled(sb, {
+              userId: agent.user_id,
+              agentId: agent.id,
+              sourceKind: "mention",
+              sourceId: m.id,
+            });
+            agentResults.mentions.push({ sourceId: m.id, skipped: true });
+            continue;
+          }
+
+          const sent = await enqueueOrSendReply(sb, agent, resolveToken, uploadImage, {
+            kind: "reply",
+            payload: {
+              text: draft.text,
+              replyToTweetId: m.id,
+              reply_to: m.id,
+              mentionFrom: m.authorUsername,
+              sourceMentionId: m.id,
+            },
+          });
+          await markHandled(sb, {
+            userId: agent.user_id,
+            agentId: agent.id,
+            sourceKind: "mention",
+            sourceId: m.id,
+            queueId: sent.item?.id,
+          });
+          if (sent.ok) budget -= 1;
+          agentResults.mentions.push({ sourceId: m.id, ...sent, text: draft.text });
+        }
+      }
+    }
+
+    if ((agent.auto_reply_dms || agent.auto_reply_group_dms) && budget > 0) {
+      const inbox = await listDmEventsOAuth2(resolved.accessToken, { maxResults: 20 });
+      if (!inbox.ok) {
+        agentResults.dms.push(inbox);
+      } else {
+        for (const ev of inbox.events.slice(0, 8)) {
+          try {
+            if (!newestDmId || (ev.id && BigInt(ev.id) > BigInt(newestDmId))) newestDmId = ev.id;
+          } catch {
+            newestDmId = ev.id;
+          }
+          if (!ev.text || !ev.conversationId) continue;
+          if (ev.senderId && twitterId && String(ev.senderId) === String(twitterId)) continue;
+          const isGroup = Boolean(ev.isGroup);
+          const sourceKind = isGroup ? "group_dm" : "dm";
+          if (isGroup && !agent.auto_reply_group_dms) continue;
+          if (!isGroup && !agent.auto_reply_dms) continue;
+          if (await wasHandled(sb, agent.user_id, sourceKind, ev.id)) continue;
+          if (budget <= 0) break;
+
+          const draft = await generateAgentReply(sb, agent, {
+            kind: sourceKind,
+            fromUsername: ev.senderUsername,
+            text: ev.text,
+          });
+          if (!draft.ok) {
+            agentResults.dms.push({ sourceId: ev.id, ...draft });
+            continue;
+          }
+          if (draft.skip) {
+            await markHandled(sb, {
+              userId: agent.user_id,
+              agentId: agent.id,
+              sourceKind,
+              sourceId: ev.id,
+            });
+            agentResults.dms.push({ sourceId: ev.id, skipped: true });
+            continue;
+          }
+
+          const sent = await enqueueOrSendReply(sb, agent, resolveToken, uploadImage, {
+            kind: "dm",
+            payload: {
+              text: draft.text,
+              dmConversationId: ev.conversationId,
+              conversationId: ev.conversationId,
+              dmRecipientId: isGroup ? null : ev.senderId,
+              isGroup,
+              sourceDmEventId: ev.id,
+              username: ev.senderUsername,
+            },
+          });
+          await markHandled(sb, {
+            userId: agent.user_id,
+            agentId: agent.id,
+            sourceKind,
+            sourceId: ev.id,
+            queueId: sent.item?.id,
+          });
+          if (sent.ok) budget -= 1;
+          agentResults.dms.push({ sourceId: ev.id, sourceKind, ...sent, text: draft.text });
+        }
+      }
+    }
+
+    const patch = {
+      last_reply_poll_at: nowIso,
+      updated_at: nowIso,
+    };
+    if (newestMentionId) patch.last_mention_since_id = newestMentionId;
+    if (newestDmId) patch.last_dm_since_id = newestDmId;
+    await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+      headers: { Prefer: "return=minimal" },
+    });
+
+    results.push({ ok: true, ...agentResults });
+  }
+
+  return { ok: true, agents: results.length, results };
 }
 
 /**
@@ -393,16 +850,25 @@ export async function executeQueueItem(sb, item, resolveToken, uploadImage) {
 
   try {
     if (kind === "dm") {
-      let recipientId = payload.dmRecipientId || payload.recipientId;
-      if (!recipientId && payload.username) {
-        const u = await lookupXUser(resolved.accessToken, payload.username);
-        if (!u?.id) throw new Error("Could not resolve username for DM");
-        recipientId = u.id;
+      const conversationId = payload.dmConversationId || payload.conversationId || null;
+      let dm;
+      if (conversationId) {
+        dm = await sendDmConversationOAuth2(resolved.accessToken, {
+          conversationId,
+          text: payload.text,
+        });
+      } else {
+        let recipientId = payload.dmRecipientId || payload.recipientId;
+        if (!recipientId && payload.username) {
+          const u = await lookupXUser(resolved.accessToken, payload.username);
+          if (!u?.id) throw new Error("Could not resolve username for DM");
+          recipientId = u.id;
+        }
+        dm = await sendDmOAuth2(resolved.accessToken, {
+          recipientId,
+          text: payload.text,
+        });
       }
-      const dm = await sendDmOAuth2(resolved.accessToken, {
-        recipientId,
-        text: payload.text,
-      });
       if (!dm.ok) {
         await sb(`x_agent_queue?id=eq.${encodeURIComponent(item.id)}`, {
           method: "PATCH",
@@ -537,5 +1003,18 @@ export async function runCronTick(sb, resolveToken, uploadImage) {
     }
   }
 
-  return { ok: true, processed: results.length, results };
+  // Auto-reply: mentions + DMs / group DMs for agents with toggles on
+  let autoReplies = { ok: true, agents: 0, results: [] };
+  try {
+    autoReplies = await processAutoReplies(sb, resolveToken, uploadImage);
+  } catch (e) {
+    autoReplies = { ok: false, error: e?.message || String(e), agents: 0, results: [] };
+  }
+
+  return {
+    ok: true,
+    processed: results.length,
+    results,
+    autoReplies,
+  };
 }

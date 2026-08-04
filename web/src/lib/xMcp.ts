@@ -198,7 +198,12 @@ export type XAgentConfig = {
   postingWindows: Array<{ startHour?: number; endHour?: number }>;
   topics: string[];
   maxPostsPerDay: number;
+  autoReplyMentions?: boolean;
+  autoReplyDms?: boolean;
+  autoReplyGroupDms?: boolean;
+  maxRepliesPerDay?: number;
   lastAutoRunAt?: string | null;
+  lastReplyPollAt?: string | null;
 };
 
 export type XAgentKnowledge = {
@@ -246,6 +251,10 @@ export async function upsertXAgent(
     enabled: boolean;
     topics: string[];
     maxPostsPerDay: number;
+    autoReplyMentions: boolean;
+    autoReplyDms: boolean;
+    autoReplyGroupDms: boolean;
+    maxRepliesPerDay: number;
     postingWindows: Array<{ startHour?: number; endHour?: number }>;
     timezone: string;
   }>,
@@ -254,6 +263,19 @@ export async function upsertXAgent(
     method: "POST",
     body: JSON.stringify(patch),
   })) as unknown as { agent: XAgentConfig };
+}
+
+/** Manually poll mentions + DMs and draft/auto-send replies. */
+export async function pollXAgentReplies(): Promise<{
+  ok?: boolean;
+  agents?: number;
+  results?: unknown[];
+  error?: string;
+}> {
+  return (await xAgentFetch("/x-agents/poll-replies", {
+    method: "POST",
+    body: JSON.stringify({}),
+  })) as unknown as { ok?: boolean; agents?: number; results?: unknown[]; error?: string };
 }
 
 export async function trainXAgent(payload: {

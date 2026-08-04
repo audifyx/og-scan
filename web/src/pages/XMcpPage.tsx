@@ -14,6 +14,7 @@ import {
   generateXAgentPost,
   listXAgentQueue,
   listXMcpApiKeys,
+  pollXAgentReplies,
   revokeXMcpApiKey,
   sendXDm,
   shortXKey,
@@ -396,6 +397,10 @@ export default function XMcpPage() {
         enabled: xAgent.enabled,
         topics,
         maxPostsPerDay: xAgent.maxPostsPerDay,
+        autoReplyMentions: Boolean(xAgent.autoReplyMentions),
+        autoReplyDms: Boolean(xAgent.autoReplyDms),
+        autoReplyGroupDms: Boolean(xAgent.autoReplyGroupDms),
+        maxRepliesPerDay: xAgent.maxRepliesPerDay ?? 30,
         postingWindows: xAgent.postingWindows,
         timezone: xAgent.timezone,
       });
@@ -947,9 +952,77 @@ export default function XMcpPage() {
                     Enabled
                   </label>
                 </div>
+                <div className="xh__card-title" style={{ margin: "16px 0 8px" }}>
+                  Auto-reply
+                </div>
+                <p style={{ marginBottom: 10, fontSize: 12, color: "var(--xh-muted)" }}>
+                  Trained agent answers mentions, DMs, and group chats. Approve mode queues drafts; Auto
+                  posts/sends. Needs X API access for mentions/DMs.
+                </p>
+                <div className="xh__btn-row">
+                  <label className="xh__check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(xAgent.autoReplyMentions)}
+                      onChange={(e) => setXAgent({ ...xAgent, autoReplyMentions: e.target.checked })}
+                    />{" "}
+                    Mentions / replies
+                  </label>
+                  <label className="xh__check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(xAgent.autoReplyDms)}
+                      onChange={(e) => setXAgent({ ...xAgent, autoReplyDms: e.target.checked })}
+                    />{" "}
+                    1:1 DMs
+                  </label>
+                  <label className="xh__check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(xAgent.autoReplyGroupDms)}
+                      onChange={(e) => setXAgent({ ...xAgent, autoReplyGroupDms: e.target.checked })}
+                    />{" "}
+                    Group DMs
+                  </label>
+                  <label className="xh__check">
+                    Max replies/day{" "}
+                    <input
+                      className="xh__input"
+                      type="number"
+                      min={0}
+                      max={200}
+                      style={{ width: 72 }}
+                      value={xAgent.maxRepliesPerDay ?? 30}
+                      onChange={(e) =>
+                        setXAgent({
+                          ...xAgent,
+                          maxRepliesPerDay: Math.max(0, Math.min(200, Number(e.target.value) || 0)),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
                 <div className="xh__btn-row">
                   <button type="button" className="xh__btn xh__btn--primary" disabled={agentBusy} onClick={onSaveAgent}>
                     {agentBusy ? "Saving…" : "Save agent"}
+                  </button>
+                  <button
+                    type="button"
+                    className="xh__btn"
+                    disabled={agentBusy}
+                    onClick={async () => {
+                      setAgentBusy(true);
+                      setError(null);
+                      try {
+                        await pollXAgentReplies();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Poll failed");
+                      } finally {
+                        setAgentBusy(false);
+                      }
+                    }}
+                  >
+                    Poll replies now
                   </button>
                 </div>
               </>

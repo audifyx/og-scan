@@ -19,7 +19,10 @@ import {
   postTweetOAuth2 as libPostTweet,
   lookupXUser,
   sendDmOAuth2,
+  sendDmConversationOAuth2,
   listDmEventsOAuth2,
+  listMentionsOAuth2,
+  getXMe,
   mapAgentRow,
   mapQueueRow,
   ensureXAgent,
@@ -27,6 +30,7 @@ import {
   generateAgentPost,
   executeQueueItem,
   runCronTick,
+  processAutoReplies,
 } from "./orbitx/x-agent-lib.js";
 
 export const config = { maxDuration: 60 };
@@ -157,7 +161,8 @@ const TOOLS = [
   },
   {
     name: "x_dm_inbox",
-    description: "List recent X DM events (dm.read). Returns upgrade message on 403 free tier.",
+    description:
+      "List recent X DM events including group chats (dm.read). Events with isGroup=true are group DMs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -168,6 +173,37 @@ const TOOLS = [
     annotations: { title: "DM inbox", readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "x_dm_group",
+    description:
+      "Reply in an X group DM (or any DM conversation) by conversationId from x_dm_inbox.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        conversationId: {
+          type: "string",
+          description: "dm_conversation_id from x_dm_inbox",
+        },
+        text: { type: "string", description: "Message body" },
+      },
+      required: ["conversationId", "text"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Group DM", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_mentions",
+    description: "List recent mentions of the connected X account (tweet.read; Basic/Pro often required).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        maxResults: { type: "integer", description: "5–100, default 10" },
+        sinceId: { type: "string", description: "Only mentions newer than this tweet id" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Mentions", readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "x_connection_status",
     description: "Check whether the authenticated MCP user has an X account linked on OrbitX (/x).",
     inputSchema: EMPTY_OBJECT_SCHEMA,
@@ -175,14 +211,15 @@ const TOOLS = [
   },
   {
     name: "x_agent_status",
-    description: "Get the user's X agent config (persona, mode, model, enabled).",
+    description:
+      "Get the user's X agent config (persona, mode, auto-reply toggles, model, enabled).",
     inputSchema: EMPTY_OBJECT_SCHEMA,
     annotations: { title: "Agent status", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_agent_upsert",
     description:
-      "Create or update the X agent (persona, mode auto|approve, model, topics, schedule windows).",
+      "Create or update the X agent (persona, mode auto|approve, auto-reply toggles for mentions/DMs/group DMs, model, topics, schedule windows).",
     inputSchema: {
       type: "object",
       properties: {
@@ -194,6 +231,19 @@ const TOOLS = [
         enabled: { type: "boolean" },
         topics: { type: "array", items: { type: "string" } },
         maxPostsPerDay: { type: "integer" },
+        autoReplyMentions: {
+          type: "boolean",
+          description: "Auto-draft/send replies when people mention or reply to the account",
+        },
+        autoReplyDms: {
+          type: "boolean",
+          description: "Auto-draft/send replies to 1:1 DMs",
+        },
+        autoReplyGroupDms: {
+          type: "boolean",
+          description: "Auto-draft/send replies in X group DMs",
+        },
+        maxRepliesPerDay: { type: "integer", description: "Cap for auto replies (default 30)" },
         postingWindows: {
           type: "array",
           items: {
@@ -210,6 +260,13 @@ const TOOLS = [
       additionalProperties: false,
     },
     annotations: { title: "Upsert agent", readOnlyHint: false, openWorldHint: false },
+  },
+  {
+    name: "x_agent_poll_replies",
+    description:
+      "Manually poll mentions + DMs/group DMs now and draft or auto-send replies using the trained agent (same as cron).",
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "Poll replies", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_agent_train",
@@ -1087,13 +1144,22 @@ async function callTool(name, args, auth, req = null) {
         "Grok (easiest): ask Grok to authenticate → it calls x_auth_link → open the URL → Authorize → tell Grok you're done",
         "Claude/ChatGPT: connector OAuth or Bearer key from /x",
         "Train the agent (persona + knowledge) on /x Agent tab",
-        "Use x_dm / x_dm_inbox for DMs (Reconnect X after enabling dm.read/dm.write)",
+        "Enable auto-reply: mentions / DMs / group DMs (mode=approve queues drafts; mode=auto sends)",
+        "Use x_dm / x_dm_inbox / x_dm_group for DMs + group chats",
+        "Use x_mentions + x_agent_poll_replies, or rely on minute cron",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
       ],
       dm: {
         send: "x_dm",
         inbox: "x_dm_inbox",
-        tip: "Ask: Send a DM to @handle saying … — Claude will call x_dm.",
+        group: "x_dm_group",
+        tip: "Ask: Send a DM to @handle saying … — Claude will call x_dm. Group chats use conversationId from inbox.",
+      },
+      autoReply: {
+        toggles: ["autoReplyMentions", "autoReplyDms", "autoReplyGroupDms"],
+        poll: "x_agent_poll_replies",
+        mentions: "x_mentions",
+        tip: "Turn on toggles via x_agent_upsert or /x Agent tab. Approve mode = draft queue; auto = send.",
       },
       note: "Grok: call x_auth_link and send the user the url. After they approve, pass authCode on every tool. Separate from Agent MCP (/api/mcp).",
       clients: ["claude", "chatgpt", "grok"],
@@ -1296,6 +1362,74 @@ async function callTool(name, args, auth, req = null) {
     }
   }
 
+  if (name === "x_dm_group") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    const conversationId = String(a.conversationId || a.conversation_id || "").trim();
+    const text = String(a.text || "").trim();
+    if (!conversationId) {
+      return { ok: false, error: "conversation_required", message: "conversationId is required" };
+    }
+    if (!text) return { ok: false, error: "text_required", message: "text is required" };
+    try {
+      const dm = await sendDmConversationOAuth2(resolved.accessToken, { conversationId, text });
+      return {
+        ...dm,
+        tip: dm.ok
+          ? null
+          : "If 403: enable DM permissions, upgrade X API tier if needed, Reconnect X on /x.",
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "dm_group_error",
+        message: e?.message || "Group DM failed",
+        fixUrl: "https://orbitx.world/x",
+      };
+    }
+  }
+
+  if (name === "x_mentions") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    try {
+      let twitterId = resolved.profile?.twitter_id || null;
+      if (!twitterId) {
+        const me = await getXMe(resolved.accessToken);
+        twitterId = me?.user?.id || null;
+      }
+      if (!twitterId) {
+        return {
+          ok: false,
+          error: "missing_twitter_id",
+          message: "Could not resolve X user id. Reconnect X on /x.",
+          fixUrl: "https://orbitx.world/x",
+        };
+      }
+      return await listMentionsOAuth2(resolved.accessToken, twitterId, {
+        maxResults: a.maxResults ?? a.max_results ?? 10,
+        sinceId: a.sinceId || a.since_id || undefined,
+      });
+    } catch (e) {
+      return {
+        ok: false,
+        error: "mentions_error",
+        message: e?.message || "Mentions failed",
+        fixUrl: "https://orbitx.world/x",
+      };
+    }
+  }
+
+  if (name === "x_agent_poll_replies") {
+    try {
+      return await processAutoReplies(sb, resolveUserAccessToken, uploadImageOAuth1a, {
+        forceUserId: auth.userId,
+      });
+    } catch (e) {
+      return { ok: false, error: "poll_failed", message: e?.message || "Poll failed" };
+    }
+  }
+
   if (name === "x_agent_status") {
     const agent = await ensureXAgent(sb, auth.userId);
     const knowledge = await listKnowledge(sb, agent.id);
@@ -1321,6 +1455,21 @@ async function callTool(name, args, auth, req = null) {
     if (Array.isArray(a.topics)) patch.topics = a.topics.map((t) => String(t)).slice(0, 40);
     if (a.maxPostsPerDay != null || a.max_posts_per_day != null) {
       patch.max_posts_per_day = Math.max(0, Math.min(48, Number(a.maxPostsPerDay ?? a.max_posts_per_day) || 0));
+    }
+    if (typeof a.autoReplyMentions === "boolean" || typeof a.auto_reply_mentions === "boolean") {
+      patch.auto_reply_mentions = Boolean(a.autoReplyMentions ?? a.auto_reply_mentions);
+    }
+    if (typeof a.autoReplyDms === "boolean" || typeof a.auto_reply_dms === "boolean") {
+      patch.auto_reply_dms = Boolean(a.autoReplyDms ?? a.auto_reply_dms);
+    }
+    if (typeof a.autoReplyGroupDms === "boolean" || typeof a.auto_reply_group_dms === "boolean") {
+      patch.auto_reply_group_dms = Boolean(a.autoReplyGroupDms ?? a.auto_reply_group_dms);
+    }
+    if (a.maxRepliesPerDay != null || a.max_replies_per_day != null) {
+      patch.max_replies_per_day = Math.max(
+        0,
+        Math.min(200, Number(a.maxRepliesPerDay ?? a.max_replies_per_day) || 0),
+      );
     }
     if (Array.isArray(a.postingWindows) || Array.isArray(a.posting_windows)) {
       patch.posting_windows = a.postingWindows || a.posting_windows;
@@ -1761,6 +1910,24 @@ async function handleAgent(req, res, parts) {
           Math.min(48, Number(body.maxPostsPerDay ?? body.max_posts_per_day) || 0),
         );
       }
+      if (typeof body.autoReplyMentions === "boolean" || typeof body.auto_reply_mentions === "boolean") {
+        patch.auto_reply_mentions = Boolean(body.autoReplyMentions ?? body.auto_reply_mentions);
+      }
+      if (typeof body.autoReplyDms === "boolean" || typeof body.auto_reply_dms === "boolean") {
+        patch.auto_reply_dms = Boolean(body.autoReplyDms ?? body.auto_reply_dms);
+      }
+      if (
+        typeof body.autoReplyGroupDms === "boolean" ||
+        typeof body.auto_reply_group_dms === "boolean"
+      ) {
+        patch.auto_reply_group_dms = Boolean(body.autoReplyGroupDms ?? body.auto_reply_group_dms);
+      }
+      if (body.maxRepliesPerDay != null || body.max_replies_per_day != null) {
+        patch.max_replies_per_day = Math.max(
+          0,
+          Math.min(200, Number(body.maxRepliesPerDay ?? body.max_replies_per_day) || 0),
+        );
+      }
       if (Array.isArray(body.postingWindows) || Array.isArray(body.posting_windows)) {
         patch.posting_windows = body.postingWindows || body.posting_windows;
       }
@@ -1773,6 +1940,38 @@ async function handleAgent(req, res, parts) {
       return json(res, { agent: mapAgentRow(row) });
     }
     return json(res, { error: "method_not_allowed" }, 405);
+  }
+
+  if ((route === "x-agents/poll-replies" || route === "agents/poll-replies") && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const result = await processAutoReplies(sb, resolveUserAccessToken, uploadImageOAuth1a, {
+        forceUserId: user.id,
+      });
+      return json(res, result);
+    } catch (e) {
+      return json(res, { error: e?.message || "poll_failed" }, 500);
+    }
+  }
+
+  if ((route === "mentions" || route === "x-mentions") && req.method === "GET") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const resolved = await resolveUserAccessToken(user.id);
+    if (!resolved.ok) return json(res, resolved, 400);
+    try {
+      let twitterId = resolved.profile?.twitter_id || null;
+      if (!twitterId) {
+        const me = await getXMe(resolved.accessToken);
+        twitterId = me?.user?.id || null;
+      }
+      if (!twitterId) return json(res, { error: "missing_twitter_id" }, 400);
+      const ment = await listMentionsOAuth2(resolved.accessToken, twitterId, { maxResults: 15 });
+      return json(res, ment, ment.ok ? 200 : 403);
+    } catch (e) {
+      return json(res, { error: e?.message || "mentions_failed" }, 500);
+    }
   }
 
   if ((route === "x-agents/train" || route === "agents/train") && req.method === "POST") {
@@ -2348,7 +2547,7 @@ async function handleMcp(req, res, parts) {
       // so Grok can work after the user clicks the custom OrbitX link (Grok won't store Bearer headers).
       const publicTools = new Set(["search", "fetch", "x_help", "x_auth_link", "x_auth_status"]);
       if (!auth?.userId && !publicTools.has(name)) {
-        // Soft tip when they already have an authCode pending — avoid hard 401 loop in Grok chat.
+        // Grok (and chat UIs) often ignore HTTP 401 — return a soft error with a fresh clickable auth link.
         if (authCode) {
           const tip = {
             ok: false,
@@ -2357,6 +2556,7 @@ async function handleMcp(req, res, parts) {
               "authCode is not authorized yet. Ask the user to finish the OrbitX link, then call x_auth_status.",
             authCode,
             hintTool: "x_auth_status",
+            url: `${MCP_HOST}/x/link-auth?code=${encodeURIComponent(authCode)}`,
           };
           return json(res, {
             jsonrpc: "2.0",
@@ -2368,7 +2568,33 @@ async function handleMcp(req, res, parts) {
             },
           });
         }
-        return mcpUnauthorized(res, id);
+        const link = await createLinkAuthSession(req);
+        const tip = {
+          ok: false,
+          error: "auth_required",
+          tool: name,
+          message:
+            "OrbitX auth required. Send the user the url below as a clickable link. When they say they finished, call x_auth_status with authCode, then retry this tool with authCode.",
+          hintTool: "x_auth_link",
+          ...link,
+        };
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+              structuredContent: tip,
+              isError: true,
+            },
+          },
+          200,
+          {
+            "WWW-Authenticate": wwwAuthenticateHeader(),
+            ...(link?.mcpSessionId ? { "Mcp-Session-Id": link.mcpSessionId } : {}),
+          },
+        );
       }
 
       try {
