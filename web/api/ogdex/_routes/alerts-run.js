@@ -37,15 +37,26 @@ async function recentSwaps(address, cache) {
     return (cache[address] = swaps);
   } catch { return (cache[address] = []); }
 }
+function kindLabel(a) {
+  if (a.kind === "limit") return "Limit buy";
+  if (a.kind === "tp") return "Take profit";
+  if (a.kind === "stop") return "Stop loss";
+  return a.type === "price_above" ? "Price above" : a.type === "price_below" ? "Price below" : String(a.type || "Alert").replace(/_/g, " ");
+}
+
+function tradeDeskUrl(mint) {
+  return `https://ogscan.fun/trade/desk/${mint}`;
+}
+
 async function deliverWalletTrade(a, swap) {
   const who = a.label || a.watch.slice(0, 6);
   const verb = swap.side === "buy" ? "bought" : "sold";
-  const text = `\u{1F440} ORBITX_DEX: ${who} ${verb} ${swap.solAmount.toFixed(3)} SOL of ${swap.mint.slice(0, 6)}\nWallet https://ogscan.fun/ORBITX_DEX/wallet/${a.watch}\nToken https://ogscan.fun/ORBITX_DEX/token/${swap.mint}`;
+  const text = `\u{1F440} OrbitX Trade: ${who} ${verb} ${swap.solAmount.toFixed(3)} SOL of ${swap.mint.slice(0, 6)}\nWallet https://ogscan.fun/trade/wallet/${a.watch}\nToken https://ogscan.fun/trade/token/${swap.mint}`;
   if (a.channel === "telegram") {
     if (!TG_TOKEN) return false;
     try { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: a.target, text }) }); const d = await r.json().catch(() => ({})); return !!d.ok; } catch { return false; }
   }
-  const msg = { source: "ORBITX_DEX Alerts", kind: "wallet_trade", watch: a.watch, label: a.label, side: swap.side, mint: swap.mint, solAmount: swap.solAmount, txHash: swap.txHash, url: `https://ogscan.fun/ORBITX_DEX/token/${swap.mint}`, text, content: text };
+  const msg = { source: "OrbitX Trade Alerts", kind: "wallet_trade", watch: a.watch, label: a.label, side: swap.side, mint: swap.mint, solAmount: swap.solAmount, txHash: swap.txHash, url: `https://ogscan.fun/trade/token/${swap.mint}`, text, content: text };
   try {
     if (!(await safeFetchWebhook(a.target, msg))) return false;
     return true;
@@ -61,7 +72,11 @@ function triggered(a, price) {
 }
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 async function deliver(a, price) {
-  const human = `\u{1F514} ORBITX_DEX: ${a.symbol || a.mint.slice(0,6)} hit ${a.type.replace("_"," ")} ${a.value}${a.type.startsWith("pct")?"%":""} \u2014 now $${price}\nhttps://ogscan.fun/ORBITX_DEX/token/${a.mint}`;
+  const label = kindLabel(a);
+  const sym = a.symbol || a.mint.slice(0, 6);
+  const suffix = a.type?.startsWith("pct") ? "%" : "";
+  const desk = tradeDeskUrl(a.mint);
+  const human = `\u{1F514} OrbitX Trade · ${label}\n${sym} target $${a.value}${suffix} — now $${price}\nTrade: ${desk}`;
   if (a.channel === "telegram") {
     if (!TG_TOKEN) return false;
     try {
@@ -74,11 +89,17 @@ async function deliver(a, price) {
     } catch { return false; }
   }
   const msg = {
-    source: "ORBITX_DEX Alerts", mint: a.mint, symbol: a.symbol, type: a.type, target: a.value,
-    price, url: `https://ogscan.fun/ORBITX_DEX/token/${a.mint}`,
-    text: `🔔 ${a.symbol || a.mint.slice(0,6)} ${a.type.replace("_"," ")} ${a.value}${a.type.startsWith("pct")?"%":""} — now $${price}`,
-    // common webhook shapes (Discord/Slack accept "content"/"text")
-    content: `🔔 ORBITX_DEX: ${a.symbol || a.mint.slice(0,6)} hit ${a.type.replace("_"," ")} ${a.value}${a.type.startsWith("pct")?"%":""} — now $${price}. https://ogscan.fun/ORBITX_DEX/token/${a.mint}`,
+    source: "OrbitX Trade Alerts",
+    mint: a.mint,
+    symbol: a.symbol,
+    kind: a.kind || null,
+    type: a.type,
+    target: a.value,
+    price,
+    url: desk,
+    text: `🔔 ${sym} ${label} $${a.value}${suffix} — now $${price}`,
+    // Discord/Slack-friendly shapes
+    content: `🔔 OrbitX Trade · ${label}: ${sym} hit $${a.value}${suffix} — now $${price}. ${desk}`,
   };
   try {
     return await safeFetchWebhook(a.target, msg);

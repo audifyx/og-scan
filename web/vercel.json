@@ -271,6 +271,10 @@
       "schedule": "0 13 * * *"
     },
     {
+      "path": "/api/ogdex/alerts-run",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/predictions/api/cron/resolve",
       "schedule": "0 8 * * *"
     }

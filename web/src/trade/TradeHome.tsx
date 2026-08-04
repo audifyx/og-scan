@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, RefreshCw, Search, X } from "lucide-react";
 import { fetchScreener, searchCoins, type MarketCoin } from "./tradeApi";
 import { fmtNum, fmtPct, fmtUsd } from "./tradeFmt";
+import TokenAvatar from "./TokenAvatar";
 import "./trade-home.css";
 
 type Cat = "discover" | "pump" | "curated";
@@ -51,12 +52,17 @@ function pctClass(n: number) {
 }
 
 function CoinLogo({ coin, size = "card" }: { coin: MarketCoin; size?: "card" | "feat" }) {
-  const cls = size === "feat" ? "th__feat-img" : "th__logo";
-  const fallback = size === "feat" ? "th__feat-fallback" : "th__logo-fallback";
-  if (coin.image) {
-    return <img src={coin.image} alt="" className={cls} loading="lazy" />;
-  }
-  return <div className={fallback}>{(coin.symbol || "?").slice(0, 2)}</div>;
+  const px = size === "feat" ? 44 : 36;
+  return (
+    <TokenAvatar
+      image={coin.image}
+      symbol={coin.symbol}
+      mint={coin.mint}
+      size={px}
+      className={size === "feat" ? "th__feat-img" : "th__logo"}
+      fallbackClassName={size === "feat" ? "th__feat-fallback" : "th__logo-fallback"}
+    />
+  );
 }
 
 export default function TradeHome() {
@@ -65,9 +71,11 @@ export default function TradeHome() {
   const [tab, setTab] = useState("trending");
   const [coins, setCoins] = useState<MarketCoin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState("");
   const [q, setQ] = useState("");
   const [results, setResults] = useState<MarketCoin[]>([]);
   const [searching, setSearching] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     setTab(TABS[cat][0].id);
@@ -76,15 +84,19 @@ export default function TradeHome() {
   useEffect(() => {
     let on = true;
     setLoading(true);
+    setLoadErr("");
     fetchScreener(tab, 200).then((rows) => {
       if (!on) return;
       setCoins(rows);
       setLoading(false);
+      if (!rows.length) {
+        setLoadErr("No coins returned — feed may be unavailable");
+      }
     });
     return () => {
       on = false;
     };
-  }, [tab]);
+  }, [tab, reloadTick]);
 
   useEffect(() => {
     if (q.trim().length < 2) {
@@ -104,7 +116,7 @@ export default function TradeHome() {
   const searchingMode = q.trim().length >= 2;
   const list = searchingMode ? results : coins;
   const subTabs = TABS[cat];
-  const featured = !searchingMode ? coins.slice(0, 3) : [];
+  const featured = !searchingMode && !loading ? coins.slice(0, 3) : [];
 
   const openCoin = (mint: string) => {
     try {
@@ -114,6 +126,9 @@ export default function TradeHome() {
     }
     navigate(`/trade/token/${mint}`);
   };
+
+  const displaySym = (c: MarketCoin) => c.symbol?.trim() || c.mint.slice(0, 4);
+  const displayName = (c: MarketCoin) => c.name?.trim() || "Unknown token";
 
   return (
     <div className="th">
@@ -141,7 +156,6 @@ export default function TradeHome() {
 
         {featured.length > 0 && (
           <section className="th__spotlight" aria-label="Top in feed">
-            {/* Mobile: single compact lead row */}
             <button
               type="button"
               className="th__spot-mobile"
@@ -155,7 +169,7 @@ export default function TradeHome() {
                     {fmtPct(featured[0].change24h)}
                   </span>
                 </div>
-                <p className="th__spot-sym">{featured[0].symbol}</p>
+                <p className="th__spot-sym">{displaySym(featured[0])}</p>
                 <p className="th__spot-meta">
                   {fmtUsd(featured[0].price)}
                   <span className="th__spot-dot">·</span>
@@ -164,7 +178,6 @@ export default function TradeHome() {
               </div>
             </button>
 
-            {/* Desktop / tablet: equal professional tiles */}
             <div className="th__spot-desk">
               {featured.map((c, i) => (
                 <button
@@ -180,8 +193,8 @@ export default function TradeHome() {
                   <div className="th__spot-tile-row">
                     <CoinLogo coin={c} size="feat" />
                     <div className="min-w-0">
-                      <p className="th__spot-sym truncate">{c.symbol}</p>
-                      <p className="th__spot-meta truncate">{c.name}</p>
+                      <p className="th__spot-sym truncate">{displaySym(c)}</p>
+                      <p className="th__spot-meta truncate">{displayName(c)}</p>
                     </div>
                   </div>
                   <div className="th__spot-tile-foot">
@@ -258,7 +271,24 @@ export default function TradeHome() {
           </div>
         ) : !list.length ? (
           <div className="th__empty">
-            <p>{searchingMode ? "No matches for that search" : "No coins in this feed"}</p>
+            <p className="th__empty-title">
+              {searchingMode ? "No matches" : "Feed empty"}
+            </p>
+            <p className="th__empty-copy">
+              {searchingMode
+                ? "Try another ticker or paste a mint address"
+                : loadErr || "No coins in this feed right now"}
+            </p>
+            {!searchingMode && (
+              <button
+                type="button"
+                className="th__retry"
+                onClick={() => setReloadTick((n) => n + 1)}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Retry feed
+              </button>
+            )}
           </div>
         ) : (
           <div className="th__cards">
@@ -268,16 +298,16 @@ export default function TradeHome() {
                 <CoinLogo coin={c} />
                 <div className="th__main">
                   <div className="th__row1">
-                    <span className="th__sym">{c.symbol}</span>
-                    <span className="th__name">{c.name}</span>
+                    <span className="th__sym">{displaySym(c)}</span>
+                    <span className="th__name">{displayName(c)}</span>
                   </div>
                   <div className="th__row2">
                     <span>{fmtUsd(c.price)}</span>
                     <span className="th__chip">Vol {fmtUsd(c.volume24h)}</span>
                     {c.liquidity > 0 && <span className="th__chip">Liq {fmtUsd(c.liquidity)}</span>}
-                    {c.holders != null && c.holders > 0 && (
+                    {c.holders != null && c.holders > 0 ? (
                       <span className="th__chip">H {fmtNum(c.holders)}</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 <div className="th__stats">

@@ -38,9 +38,13 @@ import {
   type WatchedWallet,
 } from "./tradeWatchlist";
 import { getRecentWallets, pushRecentWallet, clearRecentWallets } from "./tradeRecent";
+import TokenAvatar from "./TokenAvatar";
+import ActiveTradingWalletChip from "./ActiveTradingWalletChip";
 import "./trade-portfolio.css";
 
 type HubTab = "mine" | "track" | "holders";
+
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 function wrLabel(wr: number | null | undefined): string {
   if (wr == null || !Number.isFinite(Number(wr))) return "—";
@@ -227,9 +231,32 @@ export default function TradePortfolio() {
   }, [mine]);
 
   const holdings = useMemo(() => {
-    const list = Array.isArray(mine?.holdings) ? mine.holdings : [];
-    return list.map((h: any) => mergeHoldingPnl(h, pnlByMint));
+    if (!mine?.ok) return [];
+    const sol = {
+      mint: SOL_MINT,
+      symbol: "SOL",
+      name: "Solana",
+      uiAmount: mine.sol,
+      usdValue: mine.solUsd,
+      image: null as string | null,
+      isSol: true,
+      unpriced: false,
+      costUsd: null as number | null,
+      potUsd: (mine.solUsd as number) ?? null,
+      unrealizedUsd: null as number | null,
+      unrealizedPct: null as number | null,
+      change24h: null as number | null,
+    };
+    const tokens = (Array.isArray(mine?.holdings) ? mine.holdings : []).map((h: any) =>
+      mergeHoldingPnl(h, pnlByMint),
+    );
+    return [sol, ...tokens];
   }, [mine, pnlByMint]);
+
+  const tokenLabel = (h: any) =>
+    (h.symbol && String(h.symbol).trim()) || shortAddr(h.mint || "", 4);
+  const tokenName = (h: any) =>
+    (h.name && String(h.name).trim()) || (h.isSol ? "Solana" : "Token");
 
   return (
     <div className="tp">
@@ -309,7 +336,10 @@ export default function TradePortfolio() {
               <>
                 {mineErr && <div className="tp__err">{mineErr}</div>}
 
-                <div>
+                <div className="tp__panel">
+                  <div className="mb-3">
+                    <ActiveTradingWalletChip />
+                  </div>
                   <p className="tp__label">Net worth</p>
                   <p className="tp__hero-val mt-2">{fmtUsd(mine?.totalUsd)}</p>
                   <p className="mt-2 font-mono text-[11px] text-white/35">
@@ -325,7 +355,9 @@ export default function TradePortfolio() {
                     </div>
                     <div>
                       <p className="tp__label">Tokens</p>
-                      <p className="tp__metric-val">{mine?.tokenCount ?? holdings.length}</p>
+                      <p className="tp__metric-val">
+                        {mine?.tokenCount ?? Math.max(0, holdings.length - 1)}
+                      </p>
                     </div>
                     <div>
                       <p className="tp__label">Realized</p>
@@ -352,7 +384,7 @@ export default function TradePortfolio() {
                     </p>
                   )}
 
-                  <div className="mt-5 flex gap-2">
+                  <div className="mt-5 flex gap-2 pb-2">
                     <button type="button" onClick={() => openWallet(myAddr)} className="tp__btn">
                       Full wallet <ChevronRight className="h-4 w-4" />
                     </button>
@@ -375,39 +407,50 @@ export default function TradePortfolio() {
                   {!holdings.length ? (
                     <p className="tp__empty py-8">No token holdings found</p>
                   ) : (
-                    <div>
+                    <div className="tp__panel tp__holdings">
                       {holdings.map((h: any) => (
-                        <Link key={h.mint} to={`/trade/token/${h.mint}`} className="tp__row">
-                          {h.image ? (
-                            <img src={h.image} alt="" className="tp__avatar" />
-                          ) : (
-                            <div className="tp__avatar-fb">{(h.symbol || "?").slice(0, 2)}</div>
-                          )}
+                        <Link
+                          key={h.mint}
+                          to={h.isSol ? `/trade/wallet/${myAddr}` : `/trade/token/${h.mint}`}
+                          className="tp__row"
+                        >
+                          <TokenAvatar
+                            image={h.image}
+                            symbol={tokenLabel(h)}
+                            mint={h.mint}
+                            size={40}
+                            className="tp__avatar"
+                            fallbackClassName="tp__avatar-fb"
+                          />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[14px] font-bold">
-                              {h.symbol || shortAddr(h.mint, 4)}
-                            </p>
-                            <p className="font-mono text-[11px] text-white/35">
+                            <p className="truncate text-[14px] font-bold">{tokenLabel(h)}</p>
+                            <p className="tp__row-name">{tokenName(h)}</p>
+                            <p className="mt-0.5 font-mono text-[11px] text-white/35">
                               {fmtTok(h.uiAmount, 4)}
                               {h.unpriced ? " · unpriced" : ""}
                             </p>
-                            <p className="mt-0.5 font-mono text-[10px] text-white/30">
-                              Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
-                              {" · "}Pot {h.potUsd != null && h.potUsd > 0 ? fmtUsd(h.potUsd) : "—"}
-                            </p>
+                            {!h.isSol && (
+                              <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                                Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
+                                {" · "}Pot{" "}
+                                {h.potUsd != null && h.potUsd > 0 ? fmtUsd(h.potUsd) : "—"}
+                              </p>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="font-mono text-[13px] font-semibold">
                               {h.unpriced || !(h.usdValue > 0) ? "—" : fmtUsd(h.usdValue)}
                             </p>
                             <p className={`font-mono text-[11px] ${pnlTone(h.unrealizedUsd)}`}>
-                              {h.unrealizedUsd != null
-                                ? `${fmtPnl(h.unrealizedUsd)}${
-                                    h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""
-                                  }`
-                                : h.change24h != null
-                                  ? fmtPct(h.change24h)
-                                  : "uPnL —"}
+                              {h.isSol
+                                ? "Native"
+                                : h.unrealizedUsd != null
+                                  ? `${fmtPnl(h.unrealizedUsd)}${
+                                      h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""
+                                    }`
+                                  : h.change24h != null
+                                    ? fmtPct(h.change24h)
+                                    : "uPnL —"}
                             </p>
                           </div>
                         </Link>
@@ -470,6 +513,9 @@ export default function TradePortfolio() {
                 <div>
                   {watch.map((w) => {
                     const snap = watchSnap[w.address];
+                    const topHoldings = Array.isArray(snap?.holdings)
+                      ? snap.holdings.slice(0, 3)
+                      : [];
                     return (
                       <div key={w.address} className="tp__row">
                         <button
@@ -501,6 +547,21 @@ export default function TradePortfolio() {
                                 : ""}
                               {snap.tradeCount != null ? ` · ${snap.tradeCount} swaps` : ""}
                             </p>
+                          )}
+                          {topHoldings.length > 0 && (
+                            <div className="tp__watch-preview">
+                              {topHoldings.map((h: any) => (
+                                <span key={h.mint} className="tp__watch-chip">
+                                  <TokenAvatar
+                                    image={h.image}
+                                    symbol={h.symbol}
+                                    mint={h.mint}
+                                    size={16}
+                                  />
+                                  {(h.symbol || shortAddr(h.mint, 3)).slice(0, 8)}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </button>
                         <button
@@ -577,19 +638,20 @@ export default function TradePortfolio() {
                     key={c.mint}
                     type="button"
                     onClick={() => {
-                      setHolderQ(c.symbol);
+                      setHolderQ(c.symbol || c.mint);
                       void loadHolders(c.mint);
                     }}
                     className="tp__row"
                   >
-                    {c.image ? (
-                      <img src={c.image} alt="" className="tp__avatar" style={{ width: 32, height: 32 }} />
-                    ) : (
-                      <div className="tp__avatar-fb" style={{ width: 32, height: 32, fontSize: 9 }}>
-                        {c.symbol.slice(0, 2)}
-                      </div>
-                    )}
-                    <span className="text-[13px] font-bold">${c.symbol}</span>
+                    <TokenAvatar image={c.image} symbol={c.symbol} mint={c.mint} size={32} />
+                    <div className="min-w-0 text-left">
+                      <p className="truncate text-[13px] font-bold">
+                        ${(c.symbol || shortAddr(c.mint, 4)).trim()}
+                      </p>
+                      <p className="truncate text-[11px] text-white/35">
+                        {(c.name || "Token").trim()}
+                      </p>
+                    </div>
                     <span className="ml-auto font-mono text-[11px] text-white/30">
                       {shortAddr(c.mint, 4)}
                     </span>

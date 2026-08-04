@@ -402,7 +402,6 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     disconnect,
     sendTransaction,
     signTransaction,
-    signMessage,
   } = useWallet();
   const { connection } = useConnection();
   const deskMode = mode === "desk";
@@ -412,6 +411,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     localActive,
     ready: tradeReady,
     sendTx: sendActiveTx,
+    signMessage,
   } = useActiveTradingWallet();
 
   /* ── State ──────────────────────────────────────────────── */
@@ -1111,18 +1111,18 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const curPrice = t?.price || 0;
 
   const refreshMintAlerts = useCallback(async () => {
-    if (!publicKey || !signMessage || !selectedMint) {
+    if (!tradePk || !signMessage || !selectedMint) {
       setMintAlerts([]);
       return;
     }
     try {
-      const d = await fetchAlerts(publicKey.toBase58(), signMessage);
+      const d = await fetchAlerts(tradePk.toBase58(), signMessage);
       const list = Array.isArray(d?.alerts) ? d.alerts : [];
-      setMintAlerts(list.filter((a: any) => a.mint === selectedMint));
+      setMintAlerts(list.filter((a: any) => a.mint === selectedMint && a.enabled !== false));
     } catch {
       /* ignore */
     }
-  }, [publicKey, signMessage, selectedMint]);
+  }, [tradePk, signMessage, selectedMint]);
 
   useEffect(() => {
     if (orderMode !== "market") void refreshMintAlerts();
@@ -1138,8 +1138,12 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
   const handleCreateAlert = useCallback(async () => {
     setAlertMsg(null);
-    if (!connected || !publicKey || !signMessage) {
-      setShowWalletPicker(true);
+    if (!tradeReady || !tradePk || !signMessage) {
+      if (localActive) {
+        setAlertMsg({ ok: false, text: "Set a default local wallet in Trading wallets" });
+      } else {
+        setShowWalletPicker(true);
+      }
       return;
     }
     if (orderMode === "market") return;
@@ -1149,10 +1153,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       return;
     }
     const tgt = alertTarget.trim();
-    if (alertChan === "telegram" ? !/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(tgt) : !/^https?:\/\//i.test(tgt)) {
+    if (alertChan === "telegram" ? !/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(tgt) : !/^https:\/\//i.test(tgt)) {
       setAlertMsg({
         ok: false,
-        text: alertChan === "telegram" ? "Enter Telegram chat ID or @channel" : "Enter https:// webhook URL",
+        text:
+          alertChan === "telegram"
+            ? "Enter Telegram chat ID or @channel"
+            : "Enter a public https:// webhook URL",
       });
       return;
     }
@@ -1161,7 +1168,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       localStorage.setItem("ogdex.alertChan", alertChan);
       localStorage.setItem("ogdex.alertTarget", tgt);
       const d = await createPriceAlert({
-        wallet: publicKey.toBase58(),
+        wallet: tradePk.toBase58(),
         signMessage,
         mint: selectedMint,
         symbol: t?.symbol,
@@ -1171,18 +1178,28 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         target: tgt,
       });
       if (!d?.ok) throw new Error(d?.error || "Could not create alert");
-      setAlertMsg({ ok: true, text: `${ALERT_KINDS[orderMode].label} set at $${v}` });
-      toast({ title: "Alert created", description: `${ALERT_KINDS[orderMode].label} @ $${v}` });
+      setAlertMsg({
+        ok: true,
+        text: `${ALERT_KINDS[orderMode].label} armed @ $${v} → ${alertChan}`,
+      });
+      toast({
+        title: "Price alert armed",
+        description: `${ALERT_KINDS[orderMode].label} @ $${v} · ${alertChan}`,
+      });
       void refreshMintAlerts();
     } catch (e: any) {
       const m = String(e?.message || e || "Failed");
-      setAlertMsg({ ok: false, text: /reject|cancel/i.test(m) ? "Sign cancelled in Phantom" : m });
+      setAlertMsg({
+        ok: false,
+        text: /reject|cancel/i.test(m) ? "Signature cancelled" : m,
+      });
     } finally {
       setAlertBusy(false);
     }
   }, [
-    connected,
-    publicKey,
+    tradeReady,
+    tradePk,
+    localActive,
     signMessage,
     orderMode,
     alertPrice,
@@ -1225,6 +1242,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             className={`rounded-lg py-2 text-[11px] font-bold transition-colors ${
               orderMode === id ? "bg-white text-black" : "text-white/40 hover:text-white/70"
             }`}
+            title={id === "market" ? "Instant swap" : "Price alert · Telegram / webhook"}
           >
             {label}
           </button>
@@ -1541,7 +1559,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         </>
       ) : (
         <>
-          <p className="text-[11px] leading-relaxed text-white/45">{ALERT_KINDS[orderMode].help}</p>
+          <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2.5">
+            <p className="text-[11px] font-semibold text-amber-100/90">
+              {ALERT_KINDS[orderMode].short} · price alert trigger
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-white/45">
+              {ALERT_KINDS[orderMode].help}
+            </p>
+          </div>
+          <ActiveTradingWalletChip />
           <div>
             <label className="text-[10px] uppercase tracking-wide text-white/35">Target price (USD)</label>
             <Input
@@ -1600,9 +1626,18 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           <Input
             value={alertTarget}
             onChange={(e) => setAlertTarget(e.target.value)}
-            placeholder={alertChan === "telegram" ? "Telegram chat ID or @channel" : "https://discord/webhook…"}
+            placeholder={
+              alertChan === "telegram"
+                ? "Chat ID (from @userinfobot) or @channel"
+                : "https://discord.com/api/webhooks/…"
+            }
             className="h-10 border-white/10 bg-white/[0.04] text-sm"
           />
+          {alertChan === "telegram" && (
+            <p className="text-[10px] leading-relaxed text-white/30">
+              Open @Theogsupportbot → Start, then paste your numeric chat ID from @userinfobot.
+            </p>
+          )}
 
           <Button
             type="button"
@@ -1613,17 +1648,24 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             {alertBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sign to save…
+                Signing alert…
               </>
-            ) : !connected ? (
-              <>
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect wallet
-              </>
+            ) : !tradeReady ? (
+              localActive ? (
+                <>
+                  <KeyRound className="mr-2 h-4 w-4" />
+                  Set local wallet
+                </>
+              ) : (
+                <>
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Connect wallet
+                </>
+              )
             ) : (
               <>
                 <Bell className="mr-2 h-4 w-4" />
-                Set {ALERT_KINDS[orderMode].label}
+                Arm {ALERT_KINDS[orderMode].label}
               </>
             )}
           </Button>
@@ -1634,7 +1676,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             </p>
           )}
           <p className="text-center text-[10px] leading-relaxed text-white/25">
-            Notify-only · Phantom must sign the alert · you still place the trade when it fires
+            Notify-only · checked every minute · you place the trade when it fires
           </p>
 
           {mintAlerts.length > 0 && (
@@ -1649,7 +1691,16 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 >
                   <div>
                     <p className="font-semibold text-white/80">
-                      {a.type === "price_above" ? "Above" : "Below"} ${a.value}
+                      {a.kind === "limit"
+                        ? "Limit"
+                        : a.kind === "tp"
+                          ? "TP"
+                          : a.kind === "stop"
+                            ? "Stop"
+                            : a.type === "price_above"
+                              ? "Above"
+                              : "Below"}{" "}
+                      ${a.value}
                     </p>
                     <p className="text-[10px] text-white/30">{a.channel}</p>
                   </div>
@@ -1657,8 +1708,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                     type="button"
                     className="text-white/35 hover:text-red-400"
                     onClick={() => {
-                      if (!publicKey || !signMessage) return;
-                      void removeAlert(publicKey.toBase58(), signMessage, a.id).then(() =>
+                      if (!tradePk || !signMessage) return;
+                      void removeAlert(tradePk.toBase58(), signMessage, a.id).then(() =>
                         refreshMintAlerts(),
                       );
                     }}

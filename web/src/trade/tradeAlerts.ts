@@ -1,6 +1,7 @@
 /**
- * Wallet-proof alerts for limit / take-profit / stop-loss (same API as OGDex).
- * Notify-only — never auto-executes trades.
+ * Wallet-proof price alerts for Limit / Take-profit / Stop-loss.
+ * Notify-only via Telegram or webhook — never auto-executes trades.
+ * Delivery runs on Vercel cron → `/api/ogdex/alerts-run`.
  */
 
 type WalletProof = { wallet: string; ts: number; sig: string };
@@ -50,21 +51,24 @@ export type AlertKind = "limit" | "tp" | "stop";
 
 export const ALERT_KINDS: Record<
   AlertKind,
-  { label: string; help: string; type: "price_below" | "price_above" }
+  { label: string; help: string; type: "price_below" | "price_above"; short: string }
 > = {
   limit: {
-    label: "Limit buy",
-    help: "Notify when price drops to or below your target — then open Trade and buy.",
+    label: "Limit buy alert",
+    short: "Limit",
+    help: "Price alert: notify when the price drops to or below your target. You still place the buy yourself.",
     type: "price_below",
   },
   tp: {
-    label: "Take profit",
-    help: "Notify when price rises to or above your target — then sell.",
+    label: "Take-profit alert",
+    short: "TP",
+    help: "Price alert: notify when the price rises to or above your target. You still place the sell yourself.",
     type: "price_above",
   },
   stop: {
-    label: "Stop loss",
-    help: "Notify when price falls to or below your target — then cut losses.",
+    label: "Stop-loss alert",
+    short: "Stop",
+    help: "Price alert: notify when the price falls to or below your target. You still cut the position yourself.",
     type: "price_below",
   },
 };
@@ -90,6 +94,7 @@ export async function createPriceAlert(opts: {
       alert: {
         mint: opts.mint,
         symbol: opts.symbol || null,
+        kind: opts.kind,
         type: ALERT_KINDS[opts.kind].type,
         value: opts.valueUsd,
         channel: opts.channel,

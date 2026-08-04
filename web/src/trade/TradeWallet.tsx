@@ -16,6 +16,8 @@ import {
 } from "./tradeApi";
 import { fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
 import { pushRecentWallet } from "./tradeRecent";
+import TokenAvatar from "./TokenAvatar";
+import "./trade-portfolio.css";
 
 type Tab = "holdings" | "pnl" | "trades";
 
@@ -26,17 +28,6 @@ function wrLabel(wr: number | null | undefined): string | null {
   if (wr == null || !Number.isFinite(Number(wr))) return null;
   const n = Number(wr);
   return `${n > 1 ? n.toFixed(0) : (n * 100).toFixed(0)}%`;
-}
-
-function TokenAvatar({ image, symbol, mint }: { image?: string | null; symbol?: string | null; mint?: string }) {
-  if (image) {
-    return <img src={image} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover" />;
-  }
-  return (
-    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-[10px] font-bold">
-      {(symbol || shortAddr(mint || "", 2) || "?").slice(0, 2)}
-    </div>
-  );
 }
 
 function StatCell({
@@ -174,7 +165,7 @@ export default function TradeWallet() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#050505]">
+      <div className="tp flex h-full items-center justify-center">
         <Loader2 className="h-7 w-7 animate-spin text-white/30" />
       </div>
     );
@@ -182,7 +173,7 @@ export default function TradeWallet() {
 
   if (!d?.ok) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#050505] px-6 text-center">
+      <div className="tp flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <Wallet className="h-8 w-8 text-white/20" />
         <p className="text-sm text-white/40">{d?.error || "Could not load wallet"}</p>
         <p className="max-w-xs break-all font-mono text-[10px] text-white/25">{address}</p>
@@ -202,7 +193,7 @@ export default function TradeWallet() {
   const wr = wrLabel(pnl?.winRate);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#050505]">
+    <div className="tp flex h-full flex-col overflow-hidden">
       <div className="relative shrink-0 border-b border-white/[0.06] px-3 pb-3 pt-2">
         <div
           className="pointer-events-none absolute inset-0"

@@ -366,8 +366,20 @@ export function mergeHoldingPnl(holding: any, pnlByMint: Map<string, WalletPnlTo
   if (unrealizedPct == null && unrealizedUsd != null && costUsd != null && costUsd > 0) {
     unrealizedPct = (unrealizedUsd / costUsd) * 100;
   }
+  const symbol =
+    (holding?.symbol && String(holding.symbol).trim()) ||
+    (p?.symbol && String(p.symbol).trim()) ||
+    null;
+  const name =
+    (holding?.name && String(holding.name).trim()) ||
+    (p?.name && String(p.name).trim()) ||
+    null;
+  const image = holding?.image || p?.image || null;
   return {
     ...holding,
+    symbol: symbol || holding?.symbol || null,
+    name: name || holding?.name || null,
+    image,
     costUsd,
     potUsd,
     boughtUsd: p?.boughtUsd ?? null,

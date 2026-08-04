@@ -70,11 +70,13 @@ export default async function handler(req, res) {
       };
     } else {
       if (!isAddr(a.mint)) return send(res, 400, { ok: false, error: "invalid mint" });
+      const kind = ["limit", "tp", "stop"].includes(a.kind) ? a.kind : null;
       const refPrice = await priceOf(a.mint);
       alert = {
         id: Math.random().toString(36).slice(2, 10),
         mint: a.mint,
         symbol: a.symbol || null,
+        kind,
         type: a.type,
         value: Number(a.value) || 0,
         channel,

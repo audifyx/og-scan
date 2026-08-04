@@ -15,6 +15,7 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { ed25519 } from "@noble/curves/ed25519";
 import { toast } from "sonner";
 import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
 import {
@@ -38,6 +39,7 @@ export function useActiveTradingWallet() {
     connected,
     signTransaction,
     sendTransaction,
+    signMessage: adapterSignMessage,
     wallets,
     select,
     connect,
@@ -141,6 +143,32 @@ export function useActiveTradingWallet() {
     [sendTransaction, signTransaction],
   );
 
+  /** Sign an arbitrary message for wallet-proof APIs (alerts CRUD). */
+  const signMessage = useCallback(
+    async (message: Uint8Array): Promise<Uint8Array> => {
+      const useLocal = getTradingWalletMode() === "local";
+      if (useLocal) {
+        const kp = await loadDefaultLocalKeypair();
+        if (!kp) {
+          throw new Error("No default local trading wallet — set one in Trading wallets");
+        }
+        try {
+          // Solana secretKey is 64 bytes (seed||pubkey); ed25519.sign wants 32-byte seed.
+          const seed = kp.secretKey.slice(0, 32);
+          return ed25519.sign(message, seed);
+        } finally {
+          kp.secretKey.fill(0);
+        }
+      }
+      if (!adapterSignMessage) {
+        throw new Error("This wallet can't sign messages — connect Phantom, Jupiter, or Solflare");
+      }
+      const raw = await adapterSignMessage(message);
+      return raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+    },
+    [adapterSignMessage],
+  );
+
   return {
     mode,
     setMode,
@@ -155,6 +183,7 @@ export function useActiveTradingWallet() {
     connected,
     adapterPublicKey: adapterPk,
     sendTx,
+    signMessage,
     loadDefaultKeypair,
     connectNamedWallet,
     connectPhantom,
