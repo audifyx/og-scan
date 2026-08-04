@@ -106,7 +106,7 @@ export default function TokenDetail() {
   const [xray, setXray] = useState<XrayReport | null>(null);
   const [xrayLoading, setXrayLoading] = useState(false);
   const [ath, setAth] = useState<AthData | null>(null);
-  const [topData, setTopData] = useState<{ holders: TokenHolder[]; traders: TopTrader[] } | null>(null);
+  const [topData, setTopData] = useState<{ holders: TokenHolder[]; traders: TopTrader[]; trades?: any[]; holderCount?: number | null } | null>(null);
   const [topLoading, setTopLoading] = useState(false);
   const [dir, setDir] = useState<Record<string, KolDirEntry>>({});
 
@@ -116,7 +116,9 @@ export default function TokenDetail() {
   useEffect(() => {
     if (!isSol) return;
     let on = true; setTopData(null); setTopLoading(true);
-    getTopTraders(mint).then((x) => { if (on && x?.ok) setTopData({ holders: x.holders, traders: x.traders }); }).catch(() => {}).finally(() => { if (on) setTopLoading(false); });
+    getTopTraders(mint).then((x) => {
+      if (on && x?.ok) setTopData({ holders: x.holders, traders: x.traders, trades: x.trades || [], holderCount: x.holderCount ?? null });
+    }).catch(() => {}).finally(() => { if (on) setTopLoading(false); });
     return () => { on = false; };
   }, [mint, isSol]);
   useEffect(() => { if (!isSol) return; let on = true; setXrayLoading(true); getXray(mint).then((x) => { if (on) { setXray(x); setXrayLoading(false); } }).catch(() => { if (on) setXrayLoading(false); }); return () => { on = false; }; }, [mint, isSol]);
@@ -162,7 +164,10 @@ export default function TokenDetail() {
   const fromAthPct = ath?.fromAthPct ?? null;
   const verified = t.isVerified || meta.isVerifiedJup || d.flags?.isVerified;
   const holders: any[] = (intel.holders && intel.holders.length) ? intel.holders : (topData?.holders || []);
-  const trades: any[] = intel.trades || [];
+  // Prefer token intel tape; fall back to /traders GeckoTerminal tape when INTEL_FN is empty.
+  const trades: any[] = (intel.trades && intel.trades.length)
+    ? intel.trades
+    : (topData?.trades?.length ? topData.trades : []);
   const whales = holders.filter((h) => h.label === "whale").length;
   // Total holder count — never the truncated top-holders sample length.
   const sampleLen = holders.length;
@@ -800,25 +805,31 @@ function TradesTable({ trades, mint, dir = {}, onRefresh }: { trades: any[]; min
             <th className="text-left px-4 py-2">DEX</th>
           </tr></thead>
           <tbody>
-            {trades.map((tr, i) => (
-              <tr key={i} className="border-b border-line/40 last:border-0 hover:bg-panel2/40 transition-colors">
+            {trades.map((tr, i) => {
+              const side = String(tr.side || tr.kind || "").toLowerCase();
+              const usd = tr.volumeUsd ?? tr.usd ?? tr.amountUsd;
+              const amt = tr.tokenAmount ?? tr.amount;
+              const owner = tr.owner || tr.wallet;
+              return (
+              <tr key={tr.txHash || i} className="border-b border-line/40 last:border-0 hover:bg-panel2/40 transition-colors">
                 <td className="px-4 py-2 text-muted text-xs">{timeAgo(tr.time)} ago</td>
-                <td className={`px-2 py-2 font-bold text-xs ${tr.side === "buy" ? "text-up" : "text-down"}`}>{tr.side?.toUpperCase()}</td>
+                <td className={`px-2 py-2 font-bold text-xs ${side === "buy" ? "text-up" : "text-down"}`}>{(side || "trade").toUpperCase()}</td>
                 <td className="px-2 py-2 text-right tabular-nums text-xs">{fmtUsd(tr.priceUsd)}</td>
-                <td className="px-2 py-2 text-right tabular-nums text-xs">{compact(tr.tokenAmount)}</td>
-                <td className="px-2 py-2 text-right tabular-nums text-xs">{fmtUsd(tr.volumeUsd, { compact: true })}</td>
-                <td className="px-2 py-2 text-xs">{tr.owner ? <WalletLink address={tr.owner} icon={false} /> : "—"}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-xs">{compact(amt)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-xs">{fmtUsd(usd, { compact: true })}</td>
+                <td className="px-2 py-2 text-xs">{owner ? <WalletLink address={owner} icon={false} /> : "—"}</td>
                 <td className="px-2 py-2 text-xs">
-                  {dir[tr.owner] ? <span className="pill bg-accent/15 text-accent text-[9px]">{dir[tr.owner].name}</span>
-                    : getWalletLabel(tr.owner) ? <span className={`pill text-[9px] ${labelKindClass(getWalletLabel(tr.owner)!.kind)}`}>{getWalletLabel(tr.owner)!.name}</span>
-                    : (tr.volumeUsd >= 1000 ? <span className="pill bg-yellow-400/15 text-yellow-300 text-[9px]">whale</span> : <span className="text-muted/40 text-xs">—</span>)}
+                  {dir[owner] ? <span className="pill bg-accent/15 text-accent text-[9px]">{dir[owner].name}</span>
+                    : getWalletLabel(owner) ? <span className={`pill text-[9px] ${labelKindClass(getWalletLabel(owner)!.kind)}`}>{getWalletLabel(owner)!.name}</span>
+                    : (usd >= 1000 ? <span className="pill bg-yellow-400/15 text-yellow-300 text-[9px]">whale</span> : <span className="text-muted/40 text-xs">—</span>)}
                 </td>
                 <td className="px-4 py-2 text-muted text-xs">
                   {tr.dex || "—"}
                   {tr.txHash && <a href={`https://solscan.io/tx/${tr.txHash}`} target="_blank" rel="noreferrer" className="ml-1.5 text-accent/70 hover:text-accent"><ExternalLink className="w-3 h-3 inline" /></a>}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

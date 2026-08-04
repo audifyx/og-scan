@@ -274,6 +274,32 @@ export default async function handler(req, res) {
       }
     }
 
+    // Live trades fallback when INTEL_FN is down / Birdeye empty — same
+    // GeckoTerminal path EVM already uses so Solana Live Trades isn't blank.
+    if (!intelOut?.trades?.length) {
+      const pool = best?.pairAddress || token?.firstPool?.id || null;
+      if (pool) {
+        const gtTrades = await evmTrades("solana", pool, mint, 100).catch(() => []);
+        if (gtTrades?.length) {
+          const normalized = gtTrades.map((tr) => ({
+            ...tr,
+            kind: tr.side,
+            usd: tr.volumeUsd,
+            amountUsd: tr.volumeUsd,
+            amount: tr.tokenAmount,
+            wallet: tr.owner,
+            time: tr.time
+              ? (typeof tr.time === "number"
+                ? (tr.time < 1e12 ? tr.time * 1000 : tr.time)
+                : new Date(tr.time).getTime())
+              : null,
+            dex: tr.dex || "geckoterminal",
+          }));
+          intelOut = { ...(intelOut || { ok: true }), ok: true, trades: normalized, tradesSource: "geckoterminal" };
+        }
+      }
+    }
+
     // Authoritative total holder count (never top-N sample length).
     // Jupiter → scan meta → Rugcheck safety → intel total (sanitized).
     const sampleLen = Array.isArray(intelOut?.holders) ? intelOut.holders.length : 0;

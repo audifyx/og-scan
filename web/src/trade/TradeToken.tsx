@@ -19,7 +19,7 @@ import {
   fetchWallet,
   findWalletPnlToken,
 } from "./tradeApi";
-import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr } from "./tradeFmt";
+import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
 
 type TabId =
   | "overview"
@@ -675,6 +675,9 @@ export default function TradeToken() {
             ) : (
               holderList.slice(0, 40).map((h: any, i: number) => {
                 const addr = h.owner || h.address;
+                const bought = h.boughtUsd ?? h.bought ?? h.buyVol;
+                const sold = h.soldUsd ?? h.sold ?? h.sellVol;
+                const pnl = h.netPnl ?? h.pnl;
                 return (
                   <Link
                     key={addr || i}
@@ -687,15 +690,18 @@ export default function TradeToken() {
                         {h.label ? <span className="ml-1 text-white/30">· {h.label}</span> : null}
                       </p>
                       <p className="text-[10px] text-white/30">
-                        amt {h.uiAmount != null ? Number(h.uiAmount).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
-                        {h.buys != null || h.sells != null ? ` · ${h.buys ?? 0}B / ${h.sells ?? 0}S` : ""}
-                        {h.netPnl != null ? ` · PnL ${fmtUsd(h.netPnl)}` : ""}
-                        {h.realizedPnl != null ? ` · R ${fmtUsd(h.realizedPnl)}` : ""}
+                        {h.uiAmount != null ? fmtTok(Number(h.uiAmount)) : "—"}
+                        {bought != null ? ` · bought ${fmtUsd(bought)}` : ""}
+                        {sold != null ? ` · sold ${fmtUsd(sold)}` : ""}
+                        {h.buys != null || h.sells != null ? ` · ${h.buys ?? 0}B/${h.sells ?? 0}S` : ""}
                       </p>
                     </div>
                     <div className="text-right font-mono text-xs">
                       <p>{h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "—"}</p>
                       <p className="text-white/40">{fmtUsd(h.usdValue ?? h.holdingUsd ?? h.usd)}</p>
+                      {pnl != null && (
+                        <p className={Number(pnl) >= 0 ? "text-green-400" : "text-red-400"}>{fmtPnl(Number(pnl))}</p>
+                      )}
                     </div>
                   </Link>
                 );
@@ -708,6 +714,9 @@ export default function TradeToken() {
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Activity className="h-3.5 w-3.5" /> Top traders
+              <span className="font-normal normal-case tracking-normal text-white/35">
+                · bought · sold · holding · PnL
+              </span>
             </h3>
             {!traders.length ? (
               <div className="space-y-2 py-6 text-center">
@@ -724,31 +733,78 @@ export default function TradeToken() {
                 </button>
               </div>
             ) : (
-              traders.slice(0, 40).map((tr: any, i: number) => {
-                const addr = tr.owner || tr.address;
-                const pnl = tr.netPnl ?? tr.realizedPnl ?? tr.pnlUsd ?? tr.pnl;
-                return (
-                  <Link
-                    key={addr || i}
-                    to={`/trade/wallet/${addr}`}
-                    className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
-                  >
-                    <div>
-                      <p className="font-mono text-xs">
-                        #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
-                        {tr.isHolder ? <span className="ml-1 text-white/30">· holder</span> : null}
-                      </p>
-                      <p className="text-[10px] text-white/30">
-                        {tr.buys ?? 0}B / {tr.sells ?? 0}S · vol {fmtUsd(tr.volume ?? tr.buyVol)}
-                        {tr.holdingPct != null ? ` · hold ${Number(tr.holdingPct).toFixed(2)}%` : ""}
-                      </p>
-                    </div>
-                    <p className={`font-mono text-xs ${(Number(pnl) || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {pnl != null ? fmtUsd(Number(pnl)) : "—"}
-                    </p>
-                  </Link>
-                );
-              })
+              <>
+                <div className="hidden grid-cols-[2fr_repeat(6,1fr)] gap-1 px-2.5 text-[9px] uppercase tracking-wider text-white/25 sm:grid">
+                  <span>Wallet</span>
+                  <span className="text-right">Bought</span>
+                  <span className="text-right">Sold</span>
+                  <span className="text-right">Holding</span>
+                  <span className="text-right">Value</span>
+                  <span className="text-right">Realized</span>
+                  <span className="text-right">Net PnL</span>
+                </div>
+                {traders.slice(0, 50).map((tr: any, i: number) => {
+                  const addr = tr.owner || tr.address || tr.wallet;
+                  const bought = tr.boughtUsd ?? tr.bought ?? tr.buyVol;
+                  const sold = tr.soldUsd ?? tr.sold ?? tr.sellVol;
+                  const holdAmt = tr.holdingAmount ?? tr.holding ?? tr.uiAmount;
+                  const holdUsd = tr.holdingUsd ?? tr.usdValue;
+                  const realized = tr.realizedPnl ?? tr.realized;
+                  const unrealized = tr.unrealizedPnl ?? tr.unrealized;
+                  const pnl = tr.netPnl ?? tr.pnlUsd ?? tr.pnl ?? realized;
+                  return (
+                    <Link
+                      key={addr || i}
+                      to={`/trade/wallet/${addr}`}
+                      className="block rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
+                    >
+                      <div className="flex items-start justify-between gap-2 sm:grid sm:grid-cols-[2fr_repeat(6,1fr)] sm:items-center">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs">
+                            #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
+                            {tr.isHolder ? <span className="ml-1 text-white/30">· holder</span> : null}
+                          </p>
+                          <p className="text-[10px] text-white/30">
+                            {tr.buys ?? 0}B / {tr.sells ?? 0}S
+                            {tr.volume != null ? ` · vol ${fmtUsd(tr.volume)}` : ""}
+                            {tr.holdingPct != null ? ` · ${Number(tr.holdingPct).toFixed(2)}%` : ""}
+                          </p>
+                          <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] sm:hidden">
+                            <span className="text-green-400/90">Buy {fmtUsd(bought)}</span>
+                            <span className="text-red-400/90">Sell {fmtUsd(sold)}</span>
+                            <span className="text-white/50">Hold {fmtUsd(holdUsd)}</span>
+                          </div>
+                        </div>
+                        <p className="hidden text-right font-mono text-[11px] text-green-400 sm:block">{fmtUsd(bought)}</p>
+                        <p className="hidden text-right font-mono text-[11px] text-red-400 sm:block">{fmtUsd(sold)}</p>
+                        <p className="hidden text-right font-mono text-[11px] text-white/70 sm:block">
+                          {holdAmt != null ? fmtTok(Number(holdAmt)) : "—"}
+                        </p>
+                        <p className="hidden text-right font-mono text-[11px] text-white/70 sm:block">{fmtUsd(holdUsd)}</p>
+                        <p
+                          className={`hidden text-right font-mono text-[11px] sm:block ${
+                            realized == null ? "text-white/30" : Number(realized) >= 0 ? "text-green-400" : "text-red-400"
+                          }`}
+                        >
+                          {realized != null ? fmtPnl(Number(realized)) : "—"}
+                        </p>
+                        <div className="shrink-0 text-right sm:contents">
+                          <p
+                            className={`font-mono text-xs ${
+                              pnl == null ? "text-white/30" : Number(pnl) >= 0 ? "text-green-400" : "text-red-400"
+                            }`}
+                          >
+                            {pnl != null ? fmtPnl(Number(pnl)) : "—"}
+                          </p>
+                          {unrealized != null && (
+                            <p className="text-[9px] text-white/30 sm:hidden">U {fmtPnl(Number(unrealized))}</p>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
@@ -757,24 +813,85 @@ export default function TradeToken() {
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Flame className="h-3.5 w-3.5" /> Live trades
+              {trades.length ? (
+                <span className="font-normal normal-case tracking-normal text-white/35">· {trades.length}</span>
+              ) : null}
             </h3>
             {!trades.length ? (
-              <p className="text-xs text-white/30">No recent trades in token payload — open DexScreener for tape</p>
+              <div className="space-y-2 py-6 text-center">
+                <p className="text-xs text-white/35">No recent trades yet</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTabLoading(true);
+                    void loadBundle(mint).finally(() => setTabLoading(false));
+                  }}
+                  className="text-[11px] font-semibold text-white underline"
+                >
+                  Reload trades
+                </button>
+              </div>
             ) : (
-              trades.slice(0, 50).map((tr: any, i: number) => (
-                <div key={tr.txHash || i} className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2">
-                  <div>
-                    <p className={`text-xs font-bold ${tr.side === "buy" || tr.kind === "buy" ? "text-green-400" : "text-red-400"}`}>
-                      {(tr.side || tr.kind || "trade").toUpperCase()}
-                    </p>
-                    <p className="font-mono text-[10px] text-white/30">{shortAddr(tr.wallet || tr.owner || tr.txHash || "", 5)}</p>
-                  </div>
-                  <div className="text-right font-mono text-xs">
-                    <p>{fmtUsd(tr.usd ?? tr.value ?? tr.amountUsd)}</p>
-                    <p className="text-white/30">{tr.amount != null ? Number(tr.amount).toFixed(2) : ""}</p>
-                  </div>
+              <>
+                <div className="hidden grid-cols-[72px_52px_1fr_1fr_1.2fr_40px] gap-1 px-2.5 text-[9px] uppercase tracking-wider text-white/25 sm:grid">
+                  <span>Time</span>
+                  <span>Side</span>
+                  <span className="text-right">Amount</span>
+                  <span className="text-right">USD</span>
+                  <span>Trader</span>
+                  <span />
                 </div>
-              ))
+                {trades.slice(0, 80).map((tr: any, i: number) => {
+                  const side = String(tr.side || tr.kind || "trade").toLowerCase();
+                  const isBuy = side === "buy";
+                  const usd = tr.usd ?? tr.volumeUsd ?? tr.value ?? tr.amountUsd;
+                  const amt = tr.amount ?? tr.tokenAmount;
+                  const addr = tr.wallet || tr.owner || "";
+                  const tx = tr.txHash || tr.tx_hash || tr.signature;
+                  let ts = tr.time ?? tr.ts ?? tr.timestamp;
+                  if (typeof ts === "string") ts = new Date(ts).getTime();
+                  return (
+                    <div
+                      key={tx || `${addr}-${ts}-${i}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-black/40 px-2.5 py-2 sm:grid sm:grid-cols-[72px_52px_1fr_1fr_1.2fr_40px]"
+                    >
+                      <p className="text-[10px] text-white/35">{timeAgo(typeof ts === "number" ? ts : null)}</p>
+                      <p className={`text-xs font-bold ${isBuy ? "text-green-400" : side === "sell" ? "text-red-400" : "text-white/50"}`}>
+                        {side.toUpperCase()}
+                      </p>
+                      <div className="min-w-0 sm:contents">
+                        <p className="text-right font-mono text-[11px] text-white/80">
+                          {amt != null ? fmtTok(Number(amt)) : "—"}
+                        </p>
+                        <p className="text-right font-mono text-xs">{fmtUsd(usd)}</p>
+                        {addr ? (
+                          <Link
+                            to={`/trade/wallet/${addr}`}
+                            className="font-mono text-[10px] text-white/45 hover:text-white"
+                          >
+                            {shortAddr(addr, 5)}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-[10px] text-white/25">—</span>
+                        )}
+                      </div>
+                      {tx ? (
+                        <a
+                          href={`https://solscan.io/tx/${tx}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex justify-end text-white/30 hover:text-white"
+                          aria-label="View transaction"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         )}

@@ -336,6 +336,13 @@ export interface TopTrader {
 }
 export interface TopTradersData {
   ok: boolean; mint: string; holders: TokenHolder[]; traders: TopTrader[];
+  /** Recent buy/sell tape from GeckoTerminal (same window as trader agg). */
+  trades?: Array<{
+    side?: string; kind?: string; time?: number | null; volumeUsd?: number | null;
+    usd?: number | null; tokenAmount?: number | null; amount?: number | null;
+    priceUsd?: number | null; owner?: string | null; wallet?: string | null; txHash?: string | null;
+  }>;
+  tradeCount?: number;
   /** Authoritative total holder count (Jupiter) — not holders.length */
   holderCount?: number | null;
   topHoldersCount?: number | null;

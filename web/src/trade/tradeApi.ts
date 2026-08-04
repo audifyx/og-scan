@@ -107,17 +107,21 @@ export async function fetchTokenBundle(mint: string) {
     (Array.isArray(intel.holders) && intel.holders.length ? intel.holders : null) ||
     (Array.isArray(token?.holders) && token.holders.length ? token.holders : []) ||
     [];
-  const traderList =
+  const traderList = (
     (Array.isArray(traders?.traders) && traders.traders.length ? traders.traders : null) ||
     (Array.isArray(intel.traders) && intel.traders.length ? intel.traders : []) ||
-    [];
-  const tradeTape =
+    []
+  ).map(normalizeTraderRow);
+  // Prefer token intel tape, then traders API tape (GT), then token.recentTrades.
+  const rawTape =
     (Array.isArray(intel.trades) && intel.trades.length ? intel.trades : null) ||
+    (Array.isArray(traders?.trades) && traders.trades.length ? traders.trades : null) ||
     (Array.isArray(token?.token?.recentTrades) && token.token.recentTrades.length
       ? token.token.recentTrades
       : null) ||
     (Array.isArray(token?.recentTrades) ? token.recentTrades : []) ||
     [];
+  const tradeTape = rawTape.map(normalizeTradeRow).filter((t) => t.side || t.usd != null || t.txHash);
 
   const sampleLen = holders.length;
   const rawIntel = Number(traders?.holderCount ?? intel?.holderCount ?? token?.meta?.holderCount ?? token?.token?.holderCount);
@@ -133,6 +137,7 @@ export async function fetchTokenBundle(mint: string) {
       ...(traders || {}),
       holders,
       traders: traderList,
+      trades: tradeTape,
       holderCount: holderCount ?? traders?.holderCount ?? null,
       topHoldersCount: sampleLen,
       ok: traders?.ok ?? true,
@@ -237,6 +242,68 @@ function numOrNull(v: unknown): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Map API trader keys → UI-stable fields (bought/sold/holding/pnl aliases). */
+function normalizeTraderRow(raw: any) {
+  if (!raw || typeof raw !== "object") return raw;
+  const buyVol = numOrNull(raw.buyVol ?? raw.boughtUsd ?? raw.bought ?? raw.buyUsd);
+  const sellVol = numOrNull(raw.sellVol ?? raw.soldUsd ?? raw.sold ?? raw.sellUsd);
+  const holdingAmount = numOrNull(raw.holdingAmount ?? raw.holding ?? raw.uiAmount ?? raw.tokens);
+  const holdingUsd = numOrNull(raw.holdingUsd ?? raw.usdValue ?? raw.holdUsd);
+  const netPnl = numOrNull(raw.netPnl ?? raw.pnl ?? raw.pnlUsd);
+  return {
+    ...raw,
+    owner: raw.owner || raw.address || raw.wallet || raw.trader,
+    buyVol,
+    sellVol,
+    boughtUsd: buyVol,
+    bought: buyVol,
+    soldUsd: sellVol,
+    sold: sellVol,
+    volume: numOrNull(raw.volume) ?? ((buyVol ?? 0) + (sellVol ?? 0) || null),
+    holdingAmount,
+    holding: holdingAmount,
+    holdingUsd,
+    holdingPct: numOrNull(raw.holdingPct ?? raw.pct),
+    realizedPnl: numOrNull(raw.realizedPnl ?? raw.realized),
+    unrealizedPnl: numOrNull(raw.unrealizedPnl ?? raw.unrealized),
+    netPnl,
+    pnl: netPnl,
+    buys: numOrNull(raw.buys ?? raw.buyCount),
+    sells: numOrNull(raw.sells ?? raw.sellCount),
+  };
+}
+
+/** Map API trade tape keys → UI-stable fields (volumeUsd/tokenAmount aliases). */
+function normalizeTradeRow(raw: any) {
+  if (!raw || typeof raw !== "object") return raw;
+  const side = String(raw.side || raw.kind || raw.type || "").toLowerCase();
+  const usd = numOrNull(raw.volumeUsd ?? raw.usd ?? raw.value ?? raw.amountUsd ?? raw.volume_in_usd);
+  const amount = numOrNull(raw.tokenAmount ?? raw.amount ?? raw.token_amount ?? raw.qty);
+  let time = raw.time ?? raw.ts ?? raw.timestamp ?? raw.block_timestamp ?? null;
+  if (typeof time === "string") {
+    const ms = new Date(time).getTime();
+    time = Number.isFinite(ms) ? ms : null;
+  } else if (typeof time === "number" && time > 0 && time < 1e12) {
+    time = time * 1000;
+  }
+  const owner = raw.owner || raw.wallet || raw.trader || raw.tx_from_address || null;
+  return {
+    ...raw,
+    side: side === "sell" || side === "buy" ? side : side || "trade",
+    kind: side === "sell" || side === "buy" ? side : raw.kind,
+    usd,
+    volumeUsd: usd,
+    amountUsd: usd,
+    amount,
+    tokenAmount: amount,
+    priceUsd: numOrNull(raw.priceUsd ?? raw.price),
+    owner,
+    wallet: owner,
+    txHash: raw.txHash || raw.tx_hash || raw.signature || null,
+    time,
+  };
 }
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
