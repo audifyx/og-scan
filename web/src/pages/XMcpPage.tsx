@@ -130,6 +130,8 @@ function HubShell({
   title,
   xHandle,
   xConnected,
+  hasKey,
+  agentOn,
   avatarUrl,
   onRefresh,
   onCompose,
@@ -141,6 +143,8 @@ function HubShell({
   title: string;
   xHandle: string | null;
   xConnected: boolean;
+  hasKey?: boolean;
+  agentOn?: boolean;
   avatarUrl?: string | null;
   onRefresh?: () => void;
   onCompose?: () => void;
@@ -180,7 +184,7 @@ function HubShell({
           <div className="xh__left-foot">
             <div className="xh__avatar-row">
               <div className="xh__avatar">
-                {avatarUrl ? <img src={avatarUrl} alt="" /> : initial}
+                {avatarUrl ? <img src={avatarUrl} alt="" decoding="async" /> : initial}
               </div>
               <div className="xh__avatar-meta">
                 <div className="xh__avatar-name">{xConnected ? `@${xHandle}` : "Not connected"}</div>
@@ -204,6 +208,13 @@ function HubShell({
               </Link>
             </div>
           </header>
+          <div className="xh__mobile-status" aria-label="Status">
+            <span className={`xh__chip${xConnected ? " is-ok" : " is-warn"}`}>
+              {xConnected ? `@${xHandle}` : "X off"}
+            </span>
+            <span className={`xh__chip${hasKey ? " is-ok" : ""}`}>{hasKey ? "Key" : "No key"}</span>
+            <span className={`xh__chip${agentOn ? " is-ok" : ""}`}>{agentOn ? "Agent on" : "Agent off"}</span>
+          </div>
           {children}
         </main>
 
@@ -303,7 +314,8 @@ export default function XMcpPage() {
           /* ignore */
         }
       }
-      await Promise.allSettled([refreshAgent(), refreshQueue()]);
+      // Don't block the shell on secondary loads
+      void Promise.allSettled([refreshAgent(), refreshQueue()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load X MCP");
     } finally {
@@ -323,6 +335,16 @@ export default function XMcpPage() {
     void refresh();
   }, [refresh]);
 
+  // Hard cap: never leave mobile users on the spinner forever
+  useEffect(() => {
+    if (!loading && !authLoading) return;
+    const t = window.setTimeout(() => {
+      setLoading(false);
+      setError((prev) => prev || "Taking longer than usual — tap refresh or continue.");
+    }, 14000);
+    return () => window.clearTimeout(t);
+  }, [loading, authLoading]);
+
   useEffect(() => {
     const onX = () => setXLocal(xGetStoredUser());
     window.addEventListener("x-auth-changed", onX);
@@ -331,9 +353,24 @@ export default function XMcpPage() {
 
   const copy = async (label: string, value: string) => {
     if (!value) return;
-    await navigator.clipboard.writeText(value);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 1600);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(label);
+      setTimeout(() => setCopied(null), 1600);
+    } catch {
+      setError("Copy failed — long-press to select instead");
+    }
   };
 
   const onConnectX = async () => {
@@ -568,12 +605,14 @@ export default function XMcpPage() {
     </>
   );
 
-  if (authLoading || (user && loading)) {
+  // Show the shell as soon as auth resolves; bootstrap may still finish in background
+  if (authLoading && !user) {
     return (
       <div className="xh__loading">
         <div>
           <div className="xh__spinner" />
-          Loading X Hub…
+          <div>Opening X Hub…</div>
+          <p>If this stalls, refresh the page.</p>
         </div>
       </div>
     );
@@ -587,6 +626,8 @@ export default function XMcpPage() {
         title="OrbitX · X"
         xHandle={null}
         xConnected={false}
+        hasKey={false}
+        agentOn={false}
         onCompose={() => undefined}
         aside={
           <div className="xh__aside-card">
@@ -619,6 +660,13 @@ export default function XMcpPage() {
               </button>
             ))}
           </div>
+          <p className="xh__note">
+            Or{" "}
+            <Link to="/auth?next=/x" style={{ color: "var(--xh-accent)", fontWeight: 700 }}>
+              sign in with email
+            </Link>
+            .
+          </p>
           {error && <div className="xh__alert">{error}</div>}
         </div>
       </HubShell>
@@ -632,11 +680,21 @@ export default function XMcpPage() {
       title={title}
       xHandle={xHandle}
       xConnected={xConnected}
+      hasKey={hasKey}
+      agentOn={Boolean(xAgent?.enabled)}
       avatarUrl={avatarUrl}
       onRefresh={refresh}
       onCompose={() => setTab("home")}
       aside={aside}
     >
+      {loading && (
+        <div className="xh__section-pad" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="xh__spinner" style={{ margin: 0 }} />
+          <span className="xh__note" style={{ margin: 0 }}>
+            Syncing account…
+          </span>
+        </div>
+      )}
       {error && <div className="xh__alert">{error}</div>}
 
       {tab === "home" && (

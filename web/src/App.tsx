@@ -623,7 +623,8 @@ const App = () => (
             <Route path="/intelligence-admin" element={<NotFound />} />
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
-            <Route path="/x" element={<ProtectedRoute><XMcpPage /></ProtectedRoute>} />
+            {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
+            <Route path="/x" element={<XMcpPage />} />
             <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />

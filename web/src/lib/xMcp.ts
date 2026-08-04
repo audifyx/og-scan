@@ -101,21 +101,37 @@ async function readJson(r: Response): Promise<Record<string, unknown>> {
   }
 }
 
-async function xAgentFetch(path: string, init?: RequestInit): Promise<Record<string, unknown>> {
+async function xAgentFetch(
+  path: string,
+  init?: RequestInit & { timeoutMs?: number },
+): Promise<Record<string, unknown>> {
   const headers = await authHeaders();
-  const r = await fetch(`${X_AGENT_API}${path}`, {
-    ...init,
-    headers: { ...headers, ...(init?.headers || {}) },
-  });
-  const data = await readJson(r);
-  if (!r.ok) {
-    throw new Error(String(data.message || data.error || `Request failed (${r.status})`));
+  const { timeoutMs = 15000, ...fetchInit } = init || {};
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${X_AGENT_API}${path}`, {
+      ...fetchInit,
+      signal: fetchInit.signal || ctrl.signal,
+      headers: { ...headers, ...(fetchInit.headers || {}) },
+    });
+    const data = await readJson(r);
+    if (!r.ok) {
+      throw new Error(String(data.message || data.error || `Request failed (${r.status})`));
+    }
+    return data;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("Request timed out — check connection and retry");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return data;
 }
 
 export async function bootstrapXMcp(): Promise<XMcpBootstrap> {
-  return (await xAgentFetch("/bootstrap", { method: "POST" })) as unknown as XMcpBootstrap;
+  return (await xAgentFetch("/bootstrap", { method: "POST", timeoutMs: 12000 })) as unknown as XMcpBootstrap;
 }
 
 export async function createXMcpApiKey(name: string): Promise<{ id: string; name: string; key: string }> {
