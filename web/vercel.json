@@ -278,9 +278,6 @@
     },
     "api/kol.ts": {
       "maxDuration": 30
-    },
-    "api/x-mcp.js": {
-      "maxDuration": 60
     }
   },
   "crons": [
