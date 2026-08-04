@@ -657,11 +657,20 @@ async function callTool(name, args, auth) {
     const resolved = await resolveUserAccessToken(auth.userId);
     if (!resolved.ok) return resolved;
 
-    const quoteId = name === "x_quote" ? String(a.quoteTweetId || a.quote_tweet_id || "").trim() : "";
+    const rawText = String(a.text || a.tweet || a.content || "").trim();
+    if (!rawText) {
+      return { ok: false, error: "text_required", message: "text is required" };
+    }
+
+    // Only attach quote/reply when the tool explicitly needs them (avoid stray null/empty fields).
+    const quoteId =
+      name === "x_quote" ? String(a.quoteTweetId || a.quote_tweet_id || "").trim() : "";
     const replyId =
       name === "x_reply"
         ? String(a.replyToTweetId || a.reply_to_tweet_id || "").trim()
-        : String(a.replyToTweetId || a.reply_to_tweet_id || "").trim();
+        : name === "x_post"
+          ? String(a.replyToTweetId || a.reply_to_tweet_id || "").trim()
+          : "";
     if (name === "x_quote" && !quoteId) {
       return { ok: false, error: "quote_tweet_id_required", message: "quoteTweetId is required" };
     }
@@ -669,11 +678,17 @@ async function callTool(name, args, auth) {
       return { ok: false, error: "reply_to_required", message: "replyToTweetId is required" };
     }
 
-    const tweetText = libBuildTweetText(a.text, a.linkUrl);
+    let tweetText;
+    try {
+      tweetText = libBuildTweetText(rawText, a.linkUrl || a.link_url || "");
+    } catch (e) {
+      return { ok: false, error: "text_invalid", message: e?.message || "Invalid tweet text" };
+    }
+
     let mediaId = null;
-    if (a.imageUrl) {
+    if (a.imageUrl || a.image_url) {
       try {
-        mediaId = await uploadImageOAuth1a(String(a.imageUrl));
+        mediaId = await uploadImageOAuth1a(String(a.imageUrl || a.image_url));
       } catch (e) {
         return {
           ok: false,
@@ -684,17 +699,27 @@ async function callTool(name, args, auth) {
       }
     }
 
-    const posted = await libPostTweet(resolved.accessToken, {
-      text: tweetText,
-      mediaId,
-      replyToTweetId: replyId || null,
-      quoteTweetId: quoteId || null,
-    });
-    return {
-      ...posted,
-      username: resolved.profile?.twitter_username || null,
-      text: tweetText,
-    };
+    try {
+      const posted = await libPostTweet(resolved.accessToken, {
+        text: tweetText,
+        mediaId: mediaId || undefined,
+        replyToTweetId: replyId || undefined,
+        quoteTweetId: quoteId || undefined,
+      });
+      return {
+        ...posted,
+        username: resolved.profile?.twitter_username || null,
+        text: tweetText,
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: "tweet_error",
+        message: e?.message || "Post failed",
+        fixUrl: "https://orbitx.world/x",
+        tip: "Reconnect X on /x so the token includes tweet.write (scope order: tweet.write first).",
+      };
+    }
   }
 
   if (name === "x_dm") {
@@ -866,6 +891,7 @@ async function callTool(name, args, auth) {
       const resolved = await resolveUserAccessToken(auth.userId);
       if (!resolved.ok) return resolved;
       const posted = await libPostTweet(resolved.accessToken, { text: draft.text });
+      if (!posted.ok) return { ...posted, draft };
       const created = await sb("x_agent_queue", {
         method: "POST",
         body: JSON.stringify({
@@ -1241,6 +1267,7 @@ async function handleAgent(req, res, parts) {
         const resolved = await resolveUserAccessToken(user.id);
         if (!resolved.ok) return json(res, resolved, 400);
         const posted = await libPostTweet(resolved.accessToken, { text: draft.text });
+        if (!posted.ok) return json(res, { ...posted, draft }, posted.status === 429 ? 429 : 400);
         const created = await sb("x_agent_queue", {
           method: "POST",
           body: JSON.stringify({

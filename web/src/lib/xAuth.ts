@@ -30,7 +30,7 @@ export const X_CALLBACK_URL =
   typeof window !== "undefined" ? xCallbackUrl() : "https://www.orbitx.world/x-callback";
 
 export const X_SCOPES =
-  "tweet.read tweet.write users.read offline.access dm.read dm.write like.read";
+  "tweet.write tweet.read users.read offline.access dm.read dm.write like.read";
 
 function base64urlEncode(buffer: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buffer)))

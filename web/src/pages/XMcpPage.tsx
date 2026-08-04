@@ -604,9 +604,9 @@ export default function XMcpPage() {
                   </div>
                 )}
                 <p className="ox-agent__note">
-                  MCP tools post as this account. After a scope upgrade (DMs), use{" "}
-                  <strong>Reconnect X</strong> so new tokens include <code>dm.read</code> /{" "}
-                  <code>dm.write</code>.
+                  If <code>x_post</code> fails but DMs work, Reconnect X so the token gets{" "}
+                  <code>tweet.write</code> again (scope order fixed). Portal permissions must be{" "}
+                  <strong>Read and write and Direct message</strong>.
                 </p>
                 <div className="ox-agent__btn-row">
                   <button
@@ -615,7 +615,7 @@ export default function XMcpPage() {
                     disabled={connectingX}
                     onClick={onConnectX}
                   >
-                    {connectingX ? "Redirecting…" : "Reconnect X for DMs"}
+                    {connectingX ? "Redirecting…" : "Reconnect X (fix posting)"}
                   </button>
                 </div>
 

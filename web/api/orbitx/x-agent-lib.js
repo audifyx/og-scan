@@ -3,8 +3,10 @@
  * Used by web/api/x-mcp.js
  */
 
+// Order matters for X OAuth — keep tweet.write early (same as the previously working set),
+// then append DM scopes. Reconnect X after changing this string.
 export const X_OAUTH_SCOPES =
-  "tweet.read tweet.write users.read offline.access dm.read dm.write like.read";
+  "tweet.write tweet.read users.read offline.access dm.read dm.write like.read";
 
 export const NIM_MODELS = [
   { id: "meta/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
@@ -78,11 +80,18 @@ export function buildTweetText(rawText, linkUrl) {
 }
 
 export async function postTweetOAuth2(accessToken, opts) {
-  const { text, mediaId, replyToTweetId, quoteTweetId } = opts;
+  const text = String(opts?.text || "").trim();
+  if (!text) {
+    return { ok: false, error: "text_required", message: "Tweet text is required" };
+  }
+  const mediaId = opts?.mediaId ? String(opts.mediaId) : "";
+  const replyToTweetId = opts?.replyToTweetId ? String(opts.replyToTweetId).trim() : "";
+  const quoteTweetId = opts?.quoteTweetId ? String(opts.quoteTweetId).trim() : "";
+
   const body = { text };
   if (mediaId) body.media = { media_ids: [mediaId] };
-  if (replyToTweetId) body.reply = { in_reply_to_tweet_id: String(replyToTweetId) };
-  if (quoteTweetId) body.quote_tweet_id = String(quoteTweetId);
+  if (replyToTweetId) body.reply = { in_reply_to_tweet_id: replyToTweetId };
+  if (quoteTweetId) body.quote_tweet_id = quoteTweetId;
 
   const res = await fetch("https://api.twitter.com/2/tweets", {
     method: "POST",
@@ -94,14 +103,23 @@ export async function postTweetOAuth2(accessToken, opts) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const msg = err?.detail || err?.title || JSON.stringify(err);
+    const msg = err?.detail || err?.title || err?.errors?.[0]?.message || JSON.stringify(err);
     const status = res.status;
-    if (status === 403) {
-      throw new Error(
-        `Twitter API forbidden (403): ${msg}. Reconnect X on /x with Read and write permissions.`,
-      );
-    }
-    throw new Error(`Twitter API: ${msg}`);
+    const tip =
+      status === 403
+        ? "Reconnect X on /x (tweet.write must be granted). In X portal: App permissions = Read and write and Direct message."
+        : status === 429
+          ? "X rate limit / monthly post cap hit. Wait or upgrade X API tier."
+          : null;
+    return {
+      ok: false,
+      error: status === 403 ? "tweet_forbidden" : "tweet_failed",
+      status,
+      message: `Twitter API (${status}): ${msg}`,
+      tip,
+      details: err,
+      fixUrl: "https://orbitx.world/x",
+    };
   }
   const data = await res.json();
   const tweetId = data?.data?.id || null;
@@ -422,9 +440,21 @@ export async function executeQueueItem(sb, item, resolveToken, uploadImage) {
     const posted = await postTweetOAuth2(resolved.accessToken, {
       text,
       mediaId,
-      replyToTweetId: payload.replyToTweetId || payload.reply_to || null,
-      quoteTweetId: payload.quoteTweetId || payload.quote_tweet_id || null,
+      replyToTweetId: payload.replyToTweetId || payload.reply_to || undefined,
+      quoteTweetId: payload.quoteTweetId || payload.quote_tweet_id || undefined,
     });
+    if (!posted.ok) {
+      await sb(`x_agent_queue?id=eq.${encodeURIComponent(item.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "failed",
+          error: posted.message || posted.error,
+          updated_at: new Date().toISOString(),
+        }),
+        headers: { Prefer: "return=minimal" },
+      });
+      return posted;
+    }
     await sb(`x_agent_queue?id=eq.${encodeURIComponent(item.id)}`, {
       method: "PATCH",
       body: JSON.stringify({
