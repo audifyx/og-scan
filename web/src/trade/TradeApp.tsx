@@ -103,10 +103,15 @@ export default function TradeApp() {
             const to = "dynamic" in tab && tab.dynamic ? tradeDeskTo() : tab.to;
             const active = tabActive(pathname, id);
             return (
-              <NavLink key={id} to={to} end={end} className="tx-dock__item">
-                {active && <span className="tx-dock__rail" />}
+              <NavLink
+                key={id}
+                to={to}
+                end={end}
+                className="tx-dock__item"
+                aria-current={active ? "page" : undefined}
+              >
                 <span className={`tx-dock__icon ${active ? "tx-dock__icon--on" : ""}`}>
-                  <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.5 : 1.75} />
+                  <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.4 : 1.7} />
                 </span>
                 <span className={`tx-dock__label ${active ? "tx-dock__label--on" : ""}`}>{label}</span>
               </NavLink>

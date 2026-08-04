@@ -54,16 +54,20 @@ export function useLocalTradingWallets() {
     },
     importWallet: async (secret: string, label?: string) => {
       const meta = await importLocalTradingWallet(secret, label);
+      // Importing a trading key implies Local mode — otherwise claim/trade keep using Phantom.
+      setTradingWalletMode("local");
       refresh();
       return meta;
     },
     createWallet: async (label?: string) => {
       const meta = await createLocalTradingWallet(label);
+      setTradingWalletMode("local");
       refresh();
       return meta;
     },
     setDefault: (id: string) => {
       setDefaultLocalWallet(id);
+      setTradingWalletMode("local");
       refresh();
     },
     rename: (id: string, label: string) => {

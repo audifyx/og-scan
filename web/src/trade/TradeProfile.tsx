@@ -8,7 +8,7 @@ import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { shortAddr, fmtUsd } from "./tradeFmt";
 
 export default function TradeProfile() {
-  const { publicKey, connected, wallets, select, connect, disconnect } = useWallet();
+  const { publicKey, connected, disconnect } = useWallet();
   const { connection } = useConnection();
   const { profile, user, loading: authLoading } = useAuth();
   const {
@@ -18,6 +18,7 @@ export default function TradeProfile() {
     localWallets,
     defaultWallet,
     mode: tradeMode,
+    connectPhantom,
   } = useActiveTradingWallet();
   const [sol, setSol] = useState<number | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
@@ -67,14 +68,6 @@ export default function TradeProfile() {
       on = false;
     };
   }, [addr, connection]);
-
-  const connectPhantom = async () => {
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name as any);
-    setTimeout(() => {
-      connect().catch(() => {});
-    }, 120);
-  };
 
   const copy = () => {
     if (!addr) return;
@@ -206,7 +199,7 @@ export default function TradeProfile() {
           ) : (
             <button
               type="button"
-              onClick={() => void connectPhantom()}
+              onClick={() => void connectPhantom().catch(() => {})}
               className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black"
             >
               Connect Phantom

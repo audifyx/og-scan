@@ -47,6 +47,7 @@ import {
   type TokenAsset,
 } from "@/lib/solana-api";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
 export type TradeTerminalProps = {
   initialMint?: string | null;
   onMintChange?: (mint: string) => void;
@@ -626,15 +627,32 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           unrealizedPct = (unrealizedUsd / costUsd) * 100;
         }
         if (!on) return;
-        setLivePos({
-          amount,
-          worthUsd,
-          costUsd,
-          boughtUsd: cache?.boughtUsd ?? null,
-          avgCostUsd: cache?.avgCostUsd ?? null,
-          unrealizedUsd,
-          unrealizedPct,
-          updatedAt: Date.now(),
+        // Bail out when numbers are unchanged so 1s polling doesn't thrash the tree
+        // (critical: never remount input panels on ticker ticks).
+        setLivePos((prev) => {
+          const next = {
+            amount,
+            worthUsd,
+            costUsd,
+            boughtUsd: cache?.boughtUsd ?? null,
+            avgCostUsd: cache?.avgCostUsd ?? null,
+            unrealizedUsd,
+            unrealizedPct,
+            updatedAt: Date.now(),
+          };
+          if (
+            prev &&
+            prev.amount === next.amount &&
+            prev.worthUsd === next.worthUsd &&
+            prev.costUsd === next.costUsd &&
+            prev.boughtUsd === next.boughtUsd &&
+            prev.avgCostUsd === next.avgCostUsd &&
+            prev.unrealizedUsd === next.unrealizedUsd &&
+            prev.unrealizedPct === next.unrealizedPct
+          ) {
+            return prev;
+          }
+          return next;
         });
       } catch {
         if (on) setLivePos(null);
@@ -998,7 +1016,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     refreshMintAlerts,
   ]);
 
-  const SwapPanel = () => (
+  // IMPORTANT: render as a function call ({renderSwapPanel()}), NOT <SwapPanel />.
+  // Defining a component inside this parent recreates its type every render and
+  // remounts all inputs (focus lost after one keystroke) — worse with livePos polls.
+  const renderSwapPanel = () => (
     <div className="space-y-3 border-b border-white/[0.07] p-4">
       {/* Order type */}
       <div className="grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
@@ -1373,7 +1394,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               Confirmed {tradeSig.slice(0, 8)}… <ExternalLink className="h-3 w-3" />
             </a>
           )}
-          <p className="text-center text-[10px] text-white/25">Market · sign in wallet</p>
+          <p className="text-center text-[10px] text-white/25">
+            {localActive ? "Market · signs with local default wallet" : "Market · confirm in connected wallet"}
+          </p>
         </>
       ) : (
         <>
@@ -1513,16 +1536,36 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   /* ═══════════════════════════════════════════════════════════════
      Wallet Picker Overlay
      ═══════════════════════════════════════════════════════════════ */
-  const WalletPickerOverlay = () => {
+  // Same as swap panel — call as {renderWalletPickerOverlay()}, never as a JSX tag.
+  const renderWalletPickerOverlay = () => {
     if (!showWalletPicker) return null;
-    // Only Installed/Loadable — never call connect() on NotDetected (WalletProvider
-    // used to window.open adapter.url → jup.ag for Jupiter).
+    // Prefer Installed/Loadable. Still list known wallets when NotDetected so the
+    // user gets an install toast — never auto-open adapter.url / jup.ag.
+    const known = ["Phantom", "Jupiter", "Solflare"] as const;
     const available = wallets.filter((w) => {
-      const name = w.adapter.name;
-      if (!["Phantom", "Jupiter", "Solflare"].includes(name)) return false;
+      if (!known.includes(w.adapter.name as (typeof known)[number])) return false;
       const rs = String(w.readyState);
       return rs === "Installed" || rs === "Loadable";
     });
+    const connectOne = async (name: string) => {
+      setWalletMode("connected");
+      setShowWalletPicker(false);
+      try {
+        await connectSolanaWallet({
+          wallets,
+          select,
+          connect,
+          preferredName: name,
+        });
+        toast({ title: "Wallet connected", description: name });
+      } catch (err) {
+        toast({
+          title: "Could not connect",
+          description: String((err as Error)?.message || err || phantomInstallHint(name)),
+          variant: "destructive",
+        });
+      }
+    };
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
         onClick={() => setShowWalletPicker(false)}>
@@ -1530,7 +1573,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold">Connect Wallet</h3>
-            <button onClick={() => setShowWalletPicker(false)} className="text-white/30 hover:text-white/60">
+            <button type="button" onClick={() => setShowWalletPicker(false)} className="text-white/30 hover:text-white/60">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -1540,19 +1583,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               <button
                 key={w.adapter.name}
                 type="button"
-                onClick={() => {
-                  select(w.adapter.name as any);
-                  setTimeout(() => {
-                    connect().catch((err) => {
-                      toast({
-                        title: "Could not connect",
-                        description: String((err as Error)?.message || err || "Try again or install the wallet"),
-                        variant: "destructive",
-                      });
-                    });
-                    setShowWalletPicker(false);
-                  }, 150);
-                }}
+                onClick={() => void connectOne(w.adapter.name)}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] hover:border-[#ffffff]/40 transition-all group"
               >
                 {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-8 h-8 rounded-lg" />}
@@ -1563,17 +1594,25 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </button>
             ))}
             {available.length === 0 && (
-              <div className="text-center py-6 space-y-2">
+              <div className="text-center py-6 space-y-3">
                 <Wallet className="h-8 w-8 text-white/15 mx-auto mb-2" />
-                <p className="text-sm text-white/40 mb-2">No wallet detected</p>
-                <a href="https://phantom.app" target="_blank" rel="noopener noreferrer"
-                  className="block text-[#ffffff] text-xs underline">
-                  Install Phantom →
-                </a>
-                <a href="https://jup.ag/mobile" target="_blank" rel="noopener noreferrer"
-                  className="block text-[#ffffff] text-xs underline">
-                  Install Jupiter →
-                </a>
+                <p className="text-sm text-white/40">No wallet extension detected</p>
+                <p className="text-[11px] text-white/30 px-2">
+                  Install Phantom (or Solflare), then refresh this page. OrbitX will not redirect you to swap sites.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast({
+                      title: "Phantom not detected",
+                      description: phantomInstallHint("Phantom"),
+                      variant: "destructive",
+                    });
+                  }}
+                  className="w-full rounded-xl bg-white px-4 py-3 text-sm font-bold text-black"
+                >
+                  Connect Phantom
+                </button>
               </div>
             )}
           </div>
@@ -1589,7 +1628,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
   return (
     <>
-    <WalletPickerOverlay />
+    {renderWalletPickerOverlay()}
     <div className={`flex h-full min-h-0 bg-black ${deskMode ? "flex-col overflow-y-auto overscroll-contain lg:flex-row lg:overflow-hidden" : "min-h-[calc(100vh-68px)] flex-col overflow-y-auto lg:min-h-0 lg:flex-row lg:overflow-hidden"}`}>
 
       {/* ═══════════════ LEFT SIDEBAR (hidden in desk mode) ═══════════════ */}
@@ -1726,7 +1765,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </button>
             ))
           ) : (
-            connected && positions.length > 0 ? (
+            tradeReady && positions.length > 0 ? (
               positions.slice(0, 30).map((pos) => {
                 const sym = pos.content?.metadata?.symbol || "???";
                 const img = pos.content?.links?.image;
@@ -1754,11 +1793,24 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                 <Wallet className="h-8 w-8 text-white/20 mb-3" />
-                <p className="text-xs text-white/40">{connected ? "No token positions" : "Connect wallet to view positions"}</p>
-                {!connected && (
+                <p className="text-xs text-white/40">
+                  {tradeReady
+                    ? "No token positions"
+                    : localActive
+                      ? "Set a local trading wallet to view positions"
+                      : "Connect wallet to view positions"}
+                </p>
+                {!tradeReady && !localActive && (
                   <Button size="sm" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-black text-xs">
                     Connect
                   </Button>
+                )}
+                {!tradeReady && localActive && (
+                  <Link to="/trade/wallets">
+                    <Button size="sm" className="mt-3 bg-white text-black text-xs">
+                      Manage wallets
+                    </Button>
+                  </Link>
                 )}
               </div>
             )
@@ -2071,7 +2123,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             )}
 
             {bottomTab === "Positions" && (
-              connected && positions.length > 0 ? (
+              tradeReady && positions.length > 0 ? (
                 <>
                   <div className="sticky top-0 grid grid-cols-4 gap-2 border-b border-white/[0.05] bg-[#050505] px-3 py-1.5 text-[10px] font-medium text-white/25">
                     <span>Token</span><span>Balance</span><span>Price</span><span>Value</span>
@@ -2099,11 +2151,24 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Wallet className="mb-2 h-6 w-6 text-white/15" />
-                  <p className="text-xs text-white/30">{connected ? "No positions found" : "Connect wallet to view positions"}</p>
-                  {!connected && (
+                  <p className="text-xs text-white/30">
+                    {tradeReady
+                      ? "No positions found"
+                      : localActive
+                        ? "Set a local trading wallet to view positions"
+                        : "Connect wallet to view positions"}
+                  </p>
+                  {!tradeReady && !localActive && (
                     <Button size="sm" type="button" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-xs text-black">
                       Connect
                     </Button>
+                  )}
+                  {!tradeReady && localActive && (
+                    <Link to="/trade/wallets">
+                      <Button size="sm" type="button" className="mt-3 bg-white text-xs text-black">
+                        Manage wallets
+                      </Button>
+                    </Link>
                   )}
                 </div>
               )
@@ -2173,7 +2238,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
         )}
 
-        <SwapPanel />
+        {renderSwapPanel()}
 
         {/* Token Info */}
         <div className="p-4 flex-1 overflow-y-auto">
@@ -2245,7 +2310,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
         )}
 
-        <SwapPanel />
+        {renderSwapPanel()}
 
         {/* Token Info on mobile */}
         {security && (

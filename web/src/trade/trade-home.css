@@ -1,13 +1,14 @@
 /* OrbitX Trade Home — scoped redesign */
 
 .th {
-  --th-bg: #060606;
-  --th-ink: #f4f4f2;
-  --th-muted: rgba(244, 244, 242, 0.42);
-  --th-faint: rgba(244, 244, 242, 0.18);
-  --th-line: rgba(244, 244, 242, 0.09);
-  --th-card: rgba(255, 255, 255, 0.035);
-  --th-card-hover: rgba(255, 255, 255, 0.07);
+  --th-bg: #07090c;
+  --th-ink: #f2f5f8;
+  --th-muted: rgba(210, 220, 232, 0.48);
+  --th-faint: rgba(210, 220, 232, 0.2);
+  --th-line: rgba(180, 210, 230, 0.12);
+  --th-card: rgba(255, 255, 255, 0.04);
+  --th-card-hover: rgba(255, 255, 255, 0.075);
+  --th-accent: #7ec8c4;
   --th-up: #3dd68c;
   --th-down: #ff6b6b;
   --th-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -31,8 +32,8 @@
   inset: 0 0 auto 0;
   height: 340px;
   background:
-    radial-gradient(ellipse 90% 70% at 12% -10%, rgba(255, 255, 255, 0.11), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 92% 8%, rgba(180, 180, 180, 0.08), transparent 50%),
+    radial-gradient(ellipse 90% 70% at 12% -10%, rgba(126, 200, 196, 0.12), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 92% 8%, rgba(158, 182, 212, 0.1), transparent 50%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 70%);
 }
 

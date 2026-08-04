@@ -35,6 +35,8 @@ export const SolanaWalletProvider: FC<Props> = ({ children }) => {
   );
 
   const onError = useCallback((error: WalletError) => {
+    // Critical: do NOT window.open(adapter.url). Default WalletProvider does that
+    // on WalletNotReadyError (was yanking users to jup.ag). Toast/UI handles UX.
     if (error instanceof WalletNotReadyError) {
       console.warn(
         "[wallet]",

@@ -1,11 +1,12 @@
 /* OrbitX Trade Portfolio — matches trade-home language */
 
 .tp {
-  --tp-bg: #060606;
-  --tp-ink: #f4f4f2;
-  --tp-muted: rgba(244, 244, 242, 0.42);
-  --tp-faint: rgba(244, 244, 242, 0.18);
-  --tp-line: rgba(244, 244, 242, 0.09);
+  --tp-bg: #07090c;
+  --tp-ink: #f2f5f8;
+  --tp-muted: rgba(210, 220, 232, 0.48);
+  --tp-faint: rgba(210, 220, 232, 0.2);
+  --tp-line: rgba(180, 210, 230, 0.12);
+  --tp-accent: #7ec8c4;
   --tp-up: #3dd68c;
   --tp-down: #ff6b6b;
   --tp-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -29,8 +30,8 @@
   inset: 0 0 auto 0;
   height: 280px;
   background:
-    radial-gradient(ellipse 85% 65% at 10% -8%, rgba(255, 255, 255, 0.1), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 95% 6%, rgba(180, 180, 180, 0.07), transparent 50%),
+    radial-gradient(ellipse 85% 65% at 10% -8%, rgba(126, 200, 196, 0.11), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 95% 6%, rgba(158, 182, 212, 0.09), transparent 50%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 70%);
 }
 

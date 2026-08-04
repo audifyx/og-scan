@@ -4,7 +4,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { PublicKey } from "@solana/web3.js";
 import {
   ArrowLeft, Copy, Check, ExternalLink, Loader2, Shield, Users, Activity,
@@ -105,7 +106,14 @@ function KvGrid({ rows }: { rows: [string, any][] }) {
 export default function TradeToken() {
   const { mint = "" } = useParams();
   const navigate = useNavigate();
-  const { publicKey, connected, wallets, select, connect } = useWallet();
+  const {
+    publicKey,
+    ready: tradeReady,
+    localActive,
+    label: activeLabel,
+    shortAddress,
+    connectPhantom,
+  } = useActiveTradingWallet();
   const { connection } = useConnection();
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -223,7 +231,6 @@ export default function TradeToken() {
           if (Number.isFinite(ui)) amount += ui;
         }
         if (!on) return;
-        setPosAmount(amount);
         const px =
           Number(
             (d?.token || {}).priceUsd ??
@@ -231,17 +238,20 @@ export default function TradeToken() {
               d?.raw?.priceUsd,
           ) || 0;
         const worth = px > 0 ? amount * px : amount > 0 ? null : 0;
-        setPosWorth(worth);
         let c = costUsd;
         if (c == null && avgCost != null && amount > 0) c = avgCost * amount;
+        // Skip identical ticks so 1s polling doesn't re-render while typing.
+        setPosAmount((prev) => (prev === amount ? prev : amount));
+        setPosWorth((prev) => (prev === worth ? prev : worth));
         if (worth != null && c != null && c > 0) {
           const u = worth - c;
-          setPosUnreal(u);
-          setPosUnrealPct((u / c) * 100);
-          setPosCost(c);
+          const pct = (u / c) * 100;
+          setPosUnreal((prev) => (prev === u ? prev : u));
+          setPosUnrealPct((prev) => (prev === pct ? prev : pct));
+          setPosCost((prev) => (prev === c ? prev : c));
         } else {
-          setPosUnreal(null);
-          setPosUnrealPct(null);
+          setPosUnreal((prev) => (prev == null ? prev : null));
+          setPosUnrealPct((prev) => (prev == null ? prev : null));
         }
       } catch {
         if (on) setPosAmount(0);
@@ -259,18 +269,8 @@ export default function TradeToken() {
   }, [mint, publicKey, connection, d]);
 
   const connectWallet = () => {
-    const ready = (w: (typeof wallets)[number]) => {
-      const rs = String(w.readyState);
-      return rs === "Installed" || rs === "Loadable";
-    };
-    // Only connect detected extensions — Never select NotDetected Jupiter
-    // (WalletProvider used to window.open https://jup.ag on WalletNotReadyError).
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom" && ready(w));
-    const jup = wallets.find((w) => /jupiter/i.test(w.adapter.name) && ready(w));
-    const pick = phantom || jup || wallets.find(ready);
-    if (!pick) return;
-    select(pick.adapter.name as any);
-    setTimeout(() => connect().catch(() => {}), 120);
+    // Always attempt Phantom connect — connectPhantom switches to Connected mode.
+    void connectPhantom().catch(() => {});
   };
 
   const t: any = d?.token || {};
@@ -928,11 +928,18 @@ export default function TradeToken() {
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
                 Your position
               </p>
-              {connected && publicKey ? (
+              {tradeReady && publicKey ? (
                 <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400/90">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                  Live
+                  {activeLabel || shortAddress || "Live"}
                 </span>
+              ) : localActive ? (
+                <Link
+                  to="/trade/wallets"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-white/70 underline"
+                >
+                  <Wallet className="h-3 w-3" /> Set local
+                </Link>
               ) : (
                 <button
                   type="button"
@@ -947,13 +954,13 @@ export default function TradeToken() {
               <div>
                 <p className="text-[8px] uppercase tracking-wider text-white/30">Hold</p>
                 <p className="font-mono text-[11px] font-bold">
-                  {connected ? fmtTok(posAmount) : "—"}
+                  {tradeReady ? fmtTok(posAmount) : "—"}
                 </p>
               </div>
               <div>
                 <p className="text-[8px] uppercase tracking-wider text-white/30">Worth</p>
                 <p className="font-mono text-[11px] font-bold">
-                  {connected ? (posWorth != null ? fmtUsd(posWorth) : "—") : "—"}
+                  {tradeReady ? (posWorth != null ? fmtUsd(posWorth) : "—") : "—"}
                 </p>
               </div>
               <div>
@@ -967,14 +974,14 @@ export default function TradeToken() {
                         : "text-red-400"
                   }`}
                 >
-                  {connected && posUnreal != null ? fmtPnl(posUnreal) : "—"}
+                  {tradeReady && posUnreal != null ? fmtPnl(posUnreal) : "—"}
                 </p>
               </div>
               <div>
                 <p className="text-[8px] uppercase tracking-wider text-white/30">Cost</p>
                 <p className="font-mono text-[11px] font-bold text-white/70">
-                  {connected && posCost != null ? fmtUsd(posCost) : "—"}
-                  {connected && posUnrealPct != null ? (
+                  {tradeReady && posCost != null ? fmtUsd(posCost) : "—"}
+                  {tradeReady && posUnrealPct != null ? (
                     <span className="ml-0.5 text-[9px] opacity-70">{fmtPct(posUnrealPct)}</span>
                   ) : null}
                 </p>
