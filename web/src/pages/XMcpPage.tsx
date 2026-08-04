@@ -1183,7 +1183,9 @@ export default function XMcpPage() {
               </button>
             </div>
             <p className="xh__note">
-              Tools: x_dm, x_dm_inbox, x_post, x_quote, x_reply, x_agent_run, x_agent_train, …
+              ChatGPT needs Developer Mode (Settings → Apps & Connectors → Advanced). Tools include{" "}
+              <code>search</code>/<code>fetch</code> (required by ChatGPT) plus x_post, x_dm, x_agent_run, …
+              Enable the connector in the chat + menu after adding it.
             </p>
             <FieldRow label="MCP URL" value={oauth.mcpUrl} copied={copied === "mcp"} onCopy={() => copy("mcp", oauth.mcpUrl)} />
             <FieldRow

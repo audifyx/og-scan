@@ -48,7 +48,42 @@ const AUTH_PAGE = `${MCP_HOST}/x/mcp-auth`;
 const CLIENT_ID = "orbitx-x-mcp";
 const SCOPE = "x-post";
 
+const EMPTY_OBJECT_SCHEMA = {
+  type: "object",
+  properties: {},
+  additionalProperties: false,
+};
+
 const TOOLS = [
+  // ChatGPT custom connectors expect search + fetch (exact names) or they show "no tools".
+  {
+    name: "search",
+    description:
+      "Search OrbitX X MCP capabilities and recent queue/status. Query examples: help, status, queue, post, dm, agent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Search", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "fetch",
+    description:
+      "Fetch a document by id from search results (help, status, queue, tool:<name>).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Document id from search" },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Fetch", readOnlyHint: true, openWorldHint: false },
+  },
   {
     name: "x_post",
     description:
@@ -65,7 +100,9 @@ const TOOLS = [
         replyToTweetId: { type: "string", description: "Optional tweet id to reply to" },
       },
       required: ["text"],
+      additionalProperties: false,
     },
+    annotations: { title: "Post to X", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_quote",
@@ -78,7 +115,9 @@ const TOOLS = [
         linkUrl: { type: "string" },
       },
       required: ["text", "quoteTweetId"],
+      additionalProperties: false,
     },
+    annotations: { title: "Quote tweet", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_reply",
@@ -90,48 +129,55 @@ const TOOLS = [
         replyToTweetId: { type: "string" },
       },
       required: ["text", "replyToTweetId"],
+      additionalProperties: false,
     },
+    annotations: { title: "Reply", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_dm",
     description:
-      "Send a direct message on X. Pass username (e.g. elonmusk) or recipientId, plus text. Requires dm.write scope and X API Basic/Pro — on free tier returns a clear upgrade message instead of crashing. User must Reconnect X on https://orbitx.world/x after enabling DM scopes.",
+      "Send a direct message on X. Pass username or recipientId, plus text. Requires dm.write. Free tier may 403 with a clear upgrade message.",
     inputSchema: {
       type: "object",
       properties: {
         text: { type: "string", description: "DM body (required)" },
         username: {
           type: "string",
-          description: "Recipient @handle without @ (preferred). Resolved via users/by/username.",
+          description: "Recipient handle without @ (preferred).",
         },
         recipientId: {
           type: "string",
-          description: "Recipient X user id (numeric string). Use if username unknown.",
+          description: "Recipient X user id (numeric string).",
         },
       },
       required: ["text"],
+      additionalProperties: false,
     },
+    annotations: { title: "Send DM", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_dm_inbox",
-    description:
-      "List recent X DM events for the connected account (dm.read). Returns upgrade message on 403 free tier.",
+    description: "List recent X DM events (dm.read). Returns upgrade message on 403 free tier.",
     inputSchema: {
       type: "object",
       properties: {
-        maxResults: { type: "number", description: "1–100, default 20" },
+        maxResults: { type: "integer", description: "1–100, default 20" },
       },
+      additionalProperties: false,
     },
+    annotations: { title: "DM inbox", readOnlyHint: true, openWorldHint: true },
   },
   {
     name: "x_connection_status",
     description: "Check whether the authenticated MCP user has an X account linked on OrbitX (/x).",
-    inputSchema: { type: "object", properties: {} },
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "Connection status", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_agent_status",
     description: "Get the user's X agent config (persona, mode, model, enabled).",
-    inputSchema: { type: "object", properties: {} },
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "Agent status", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_agent_upsert",
@@ -147,11 +193,23 @@ const TOOLS = [
         mode: { type: "string", enum: ["auto", "approve"] },
         enabled: { type: "boolean" },
         topics: { type: "array", items: { type: "string" } },
-        maxPostsPerDay: { type: "number" },
-        postingWindows: { type: "array" },
+        maxPostsPerDay: { type: "integer" },
+        postingWindows: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              startHour: { type: "integer" },
+              endHour: { type: "integer" },
+            },
+            additionalProperties: true,
+          },
+        },
         timezone: { type: "string" },
       },
+      additionalProperties: false,
     },
+    annotations: { title: "Upsert agent", readOnlyHint: false, openWorldHint: false },
   },
   {
     name: "x_agent_train",
@@ -164,7 +222,9 @@ const TOOLS = [
         title: { type: "string" },
         content: { type: "string" },
       },
+      additionalProperties: false,
     },
+    annotations: { title: "Train agent", readOnlyHint: false, openWorldHint: false },
   },
   {
     name: "x_agent_schedule",
@@ -183,7 +243,9 @@ const TOOLS = [
         autoApprove: { type: "boolean" },
       },
       required: ["text"],
+      additionalProperties: false,
     },
+    annotations: { title: "Schedule", readOnlyHint: false, openWorldHint: false },
   },
   {
     name: "x_agent_run",
@@ -192,15 +254,19 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: { hint: { type: "string" }, forcePost: { type: "boolean" } },
+      additionalProperties: false,
     },
+    annotations: { title: "Run agent", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_agent_list_queue",
     description: "List recent queue items (drafts/scheduled/posted).",
     inputSchema: {
       type: "object",
-      properties: { status: { type: "string" }, limit: { type: "number" } },
+      properties: { status: { type: "string" }, limit: { type: "integer" } },
+      additionalProperties: false,
     },
+    annotations: { title: "List queue", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_agent_approve",
@@ -209,7 +275,9 @@ const TOOLS = [
       type: "object",
       properties: { id: { type: "string" }, postNow: { type: "boolean" } },
       required: ["id"],
+      additionalProperties: false,
     },
+    annotations: { title: "Approve queue item", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_agent_cancel",
@@ -218,14 +286,26 @@ const TOOLS = [
       type: "object",
       properties: { id: { type: "string" } },
       required: ["id"],
+      additionalProperties: false,
     },
+    annotations: { title: "Cancel queue item", readOnlyHint: false, openWorldHint: false },
   },
   {
     name: "x_help",
     description: "How to connect OrbitX X MCP + agent mode to Claude or ChatGPT.",
-    inputSchema: { type: "object", properties: {} },
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "Help", readOnlyHint: true, openWorldHint: false },
   },
 ];
+
+function listToolsForMcp() {
+  return TOOLS.map((t) => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: t.inputSchema,
+    ...(t.annotations ? { annotations: t.annotations } : {}),
+  }));
+}
 
 function header(req, name) {
   const key = name.toLowerCase();
@@ -641,6 +721,78 @@ async function uploadImageOAuth1a(imageUrl) {
 
 async function callTool(name, args, auth) {
   const a = args && typeof args === "object" ? args : {};
+
+  // ChatGPT connector protocol — exact tool names "search" / "fetch"
+  if (name === "search") {
+    const q = String(a.query || "").trim().toLowerCase();
+    const catalog = TOOLS.filter((t) => t.name !== "search" && t.name !== "fetch").map((t) => ({
+      id: `tool:${t.name}`,
+      title: t.name,
+      url: "https://www.orbitx.world/x",
+      text: t.description,
+    }));
+    const docs = [
+      {
+        id: "help",
+        title: "OrbitX X MCP help",
+        url: "https://www.orbitx.world/x",
+        text: "Connect X on /x, mint an oxx_ key, add MCP URL https://www.orbitx.world/api/x/mcp. Tools: x_post, x_dm, x_agent_run, …",
+      },
+      {
+        id: "status",
+        title: "X connection status",
+        url: "https://www.orbitx.world/x",
+        text: "Use x_connection_status to see if X is linked and whether tweet.write is present.",
+      },
+      {
+        id: "queue",
+        title: "Agent queue",
+        url: "https://www.orbitx.world/x",
+        text: "Use x_agent_list_queue / x_agent_approve for drafts.",
+      },
+      ...catalog,
+    ];
+    const results = q
+      ? docs.filter(
+          (d) =>
+            d.id.includes(q) ||
+            d.title.toLowerCase().includes(q) ||
+            d.text.toLowerCase().includes(q),
+        )
+      : docs.slice(0, 12);
+    return { results: results.length ? results : docs.slice(0, 8) };
+  }
+
+  if (name === "fetch") {
+    const id = String(a.id || "").trim();
+    if (!id) return { ok: false, error: "id_required", message: "id is required" };
+    if (id.startsWith("tool:")) {
+      const toolName = id.slice("tool:".length);
+      const t = TOOLS.find((x) => x.name === toolName);
+      if (!t) return { id, title: "Not found", text: `Unknown tool ${toolName}`, url: "https://www.orbitx.world/x" };
+      return {
+        id,
+        title: t.name,
+        url: "https://www.orbitx.world/x",
+        text: `${t.description}\n\nSchema: ${JSON.stringify(t.inputSchema)}`,
+      };
+    }
+    if (id === "help") {
+      return callTool("x_help", {}, auth);
+    }
+    if (id === "status") {
+      return callTool("x_connection_status", {}, auth);
+    }
+    if (id === "queue") {
+      return callTool("x_agent_list_queue", { limit: 10 }, auth);
+    }
+    return {
+      id,
+      title: id,
+      url: "https://www.orbitx.world/x",
+      text: "Unknown id. Try help, status, queue, or tool:x_post.",
+    };
+  }
 
   if (name === "x_help") {
     return {
@@ -1834,8 +1986,8 @@ async function handleMcp(req, res, parts) {
         scope: SCOPE,
         token_endpoint_auth_method: "none",
       },
-      tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
-      note: "Separate from OrbitX Agent MCP. Posts to the user's linked X account.",
+      tools: listToolsForMcp().map((t) => ({ name: t.name, description: t.description })),
+      note: "Separate from OrbitX Agent MCP. Includes ChatGPT search/fetch + X tools.",
     });
   }
 
@@ -1845,15 +1997,21 @@ async function handleMcp(req, res, parts) {
     const sessionId = header(req, "mcp-session-id") || opaque("sess").slice(0, 24);
 
     if (method === "initialize") {
+      const requested = String(params?.protocolVersion || "2024-11-05");
+      const protocolVersion = ["2025-03-26", "2024-11-05"].includes(requested)
+        ? requested
+        : "2024-11-05";
       return json(
         res,
         {
           jsonrpc: "2.0",
           id,
           result: {
-            protocolVersion: "2024-11-05",
-            capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX X MCP", version: "1.1.0" },
+            protocolVersion,
+            capabilities: { tools: { listChanged: false } },
+            serverInfo: { name: "OrbitX X MCP", version: "1.2.0" },
+            instructions:
+              "OrbitX X MCP — post/DM on X and run the NVIDIA agent. ChatGPT: use search/fetch, then x_post / x_dm. Setup: https://www.orbitx.world/x",
           },
         },
         200,
@@ -1869,11 +2027,7 @@ async function handleMcp(req, res, parts) {
         jsonrpc: "2.0",
         id,
         result: {
-          tools: TOOLS.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-          })),
+          tools: listToolsForMcp(),
         },
       });
     }
