@@ -31,9 +31,10 @@ async function jupPrices(ids) {
   return out;
 }
 
-/** DexScreener price + meta backfill for mints Jupiter doesn't price. */
+/** DexScreener price + meta. Used for unpriced mints AND meta-only backfill. */
 async function dexBackfill(mints) {
   const out = {};
+  if (!mints?.length) return out;
   const chunks = [];
   for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
   await Promise.all(
@@ -58,6 +59,66 @@ async function dexBackfill(mints) {
     }),
   );
   return out;
+}
+
+/** Jupiter token search — reliable symbol/name/icon for known mints. */
+async function jupMeta(mints) {
+  const out = {};
+  if (!mints?.length) return out;
+  // Search is per-query; batch with limited concurrency.
+  let idx = 0;
+  const workers = Array.from({ length: Math.min(6, mints.length) }, async () => {
+    while (idx < mints.length) {
+      const mint = mints[idx++];
+      try {
+        const r = await fetch(`${JUP}/tokens/v2/search?query=${encodeURIComponent(mint)}`);
+        if (!r.ok) continue;
+        const rows = await r.json();
+        const hit = Array.isArray(rows)
+          ? rows.find((t) => t?.id === mint || t?.address === mint)
+          : null;
+        if (!hit) continue;
+        out[mint] = {
+          name: hit.name || null,
+          symbol: hit.symbol || null,
+          image: hit.icon || hit.logoURI || hit.logo || null,
+        };
+      } catch {}
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+function needsMeta(row) {
+  const sym = row?.symbol != null ? String(row.symbol).trim() : "";
+  const name = row?.name != null ? String(row.name).trim() : "";
+  const img = row?.image != null ? String(row.image).trim() : "";
+  // Reject mint-as-symbol (some upstreams echo the CA).
+  const symOk = sym && !isAddr(sym);
+  return !symOk || !name || !img;
+}
+
+function mergeMeta(target, src) {
+  if (!src) return target;
+  const curSym = target.symbol != null ? String(target.symbol).trim() : "";
+  const curName = target.name != null ? String(target.name).trim() : "";
+  const sym = src.symbol != null ? String(src.symbol).trim() : "";
+  const name = src.name != null ? String(src.name).trim() : "";
+  const img =
+    src.image || src.icon || src.logoURI || src.logoUri || src.logo || src.imageUrl || null;
+  const goodSym = (s) => s && !isAddr(s);
+  const goodName = (s) => s && !isAddr(s);
+  return {
+    ...target,
+    name: goodName(curName) ? curName : goodName(name) ? name : null,
+    symbol: goodSym(curSym) ? curSym : goodSym(sym) ? sym : null,
+    image:
+      target.image ||
+      (img && String(img).trim() && String(img).trim() !== "missing.png" ? img : null) ||
+      null,
+    mcap: target.mcap ?? src.mcap ?? null,
+  };
 }
 
 async function gtMeta(mints) {
@@ -162,11 +223,11 @@ export default async function handler(req, res) {
     const solPrice = Number(prices[SOL_MINT]?.usdPrice) || Number(pnl?.solPrice) || 0;
 
     // Backfill prices for mints Jupiter missed — prioritize largest balances.
-    const missing = mints
+    const missingPrice = mints
       .filter((m) => !(Number(prices[m]?.usdPrice) > 0))
       .sort((a, b) => (byMint[b].uiAmount || 0) - (byMint[a].uiAmount || 0))
       .slice(0, 90);
-    const dex = missing.length ? await dexBackfill(missing) : {};
+    const dex = missingPrice.length ? await dexBackfill(missingPrice) : {};
 
     let holdings = mints
       .map((m) => {
@@ -176,7 +237,7 @@ export default async function handler(req, res) {
         const change24h = prices[m]?.priceChange24h ?? dexRow?.priceChange24h ?? null;
         const usdValue = price ? byMint[m].uiAmount * price : 0;
         const mcap = dexRow?.mcap ?? null;
-        return {
+        const row = {
           ...byMint[m],
           priceUsd: price || null,
           usdValue,
@@ -188,33 +249,67 @@ export default async function handler(req, res) {
           pctSupply: pctSupply(byMint[m].uiAmount, usdValue, mcap, price),
           unpriced: !(price > 0),
         };
+        // Normalize: never keep a mint string as the display symbol.
+        if (row.symbol && isAddr(String(row.symbol))) row.symbol = null;
+        return row;
       })
       .sort((a, b) => {
         if ((b.usdValue || 0) !== (a.usdValue || 0)) return (b.usdValue || 0) - (a.usdValue || 0);
         return (b.uiAmount || 0) - (a.uiAmount || 0);
       });
 
-    // Enrich metadata for top holdings + all PnL mints (not every dust mint —
-    // fetching hundreds of GT chunks was the main 504 cause).
+    // CRITICAL: Jupiter-priced tokens never hit dexBackfill above, so they
+    // arrive with null name/symbol/image. Meta-backfill ALL holdings that still
+    // need labels/icons (not only top-N / unpriced), then GT + Jupiter search.
+    const metaNeed = holdings.filter(needsMeta).map((h) => h.mint);
+    const dexMetaNeed = metaNeed.filter((m) => !dex[m]).slice(0, 150);
+    if (dexMetaNeed.length) {
+      const moreDex = await dexBackfill(dexMetaNeed);
+      Object.assign(dex, moreDex);
+    }
+    // Apply Dex rows for meta (+ price if Jupiter missed) on every holding.
+    holdings = holdings.map((h) => {
+      const drow = dex[h.mint];
+      let next = mergeMeta(h, drow);
+      if (drow && !(next.priceUsd > 0) && Number(drow.usdPrice) > 0) {
+        const price = Number(drow.usdPrice);
+        const usdValue = next.uiAmount * price;
+        next = {
+          ...next,
+          priceUsd: price,
+          usdValue,
+          change24h: next.change24h ?? drow.priceChange24h ?? null,
+          unpriced: false,
+          pctSupply: pctSupply(next.uiAmount, usdValue, next.mcap ?? drow.mcap, price),
+        };
+      }
+      return next;
+    });
+
+    const stillNeed = holdings.filter(needsMeta).map((h) => h.mint);
     const metaTargets = [
       ...new Set([
-        ...holdings.slice(0, 80).map((h) => h.mint),
+        ...stillNeed.slice(0, 120),
         ...pnlMints,
-        ...holdings.filter((h) => h.unpriced && h.uiAmount > 0).slice(0, 40).map((h) => h.mint),
+        ...holdings.slice(0, 80).map((h) => h.mint),
       ]),
     ];
-    const meta = await gtMeta(metaTargets);
+    const [gt, jup] = await Promise.all([
+      gtMeta(metaTargets),
+      jupMeta(stillNeed.slice(0, 60)),
+    ]);
+    const meta = { ...gt };
+    for (const [m, row] of Object.entries(jup)) {
+      meta[m] = mergeMeta(meta[m] || {}, row);
+    }
     holdings = holdings.map((h) => {
-      const md = meta[h.mint] || {};
-      const mcap = h.mcap ?? md.mcap ?? null;
-      const usdValue = h.usdValue || 0;
+      const merged = mergeMeta(h, meta[h.mint]);
+      const mcap = merged.mcap ?? null;
+      const usdValue = merged.usdValue || 0;
       return {
-        ...h,
-        name: h.name || md.name || null,
-        symbol: h.symbol || md.symbol || null,
-        image: h.image || md.image || null,
+        ...merged,
         mcap,
-        pctSupply: h.pctSupply ?? pctSupply(h.uiAmount, usdValue, mcap, h.priceUsd),
+        pctSupply: merged.pctSupply ?? pctSupply(merged.uiAmount, usdValue, mcap, merged.priceUsd),
       };
     });
 
@@ -226,10 +321,14 @@ export default async function handler(req, res) {
       const enrich = (x) => {
         const h = holdByMint[x.mint];
         const md = meta[x.mint] || {};
-        x.symbol = h?.symbol || md.symbol || x.symbol || null;
-        x.name = h?.name || md.name || x.name || null;
-        x.image = h?.image || md.image || x.image || null;
-        x.mcap = h?.mcap ?? md.mcap ?? x.mcap ?? null;
+        const merged = mergeMeta(
+          { symbol: x.symbol, name: x.name, image: x.image, mcap: x.mcap },
+          mergeMeta(h || {}, md),
+        );
+        x.symbol = merged.symbol;
+        x.name = merged.name;
+        x.image = merged.image;
+        x.mcap = merged.mcap ?? x.mcap ?? null;
       };
       (pnl.positions || []).forEach(enrich);
       (pnl.perToken || []).forEach(enrich);

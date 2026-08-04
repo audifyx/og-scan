@@ -11,6 +11,9 @@ import {
   fetchWallet,
   mergeHoldingPnl,
   normalizePnlToken,
+  pickTokenImage,
+  pickTokenName,
+  pickTokenSymbol,
   type WalletPnlToken,
   type WalletTrade,
 } from "./tradeApi";
@@ -328,66 +331,87 @@ export default function TradeWallet() {
               </button>
             </div>
             <div className="space-y-1.5">
-              {holdings.map((h: any) => (
-                <button
-                  key={h.mint}
-                  type="button"
-                  onClick={() => {
-                    if (h.isSol || h.mint === SOL_MINT) return;
-                    navigate(`/trade/token/${h.mint}`);
-                  }}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
-                >
-                  <TokenAvatar image={h.image} symbol={h.symbol} mint={h.mint} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-bold">
-                      {h.symbol || shortAddr(h.mint, 4)}
-                    </p>
-                    <p className="truncate text-[10px] text-white/35">
-                      {h.name || shortAddr(h.mint, 6)}
-                      {h.unpriced ? " · no quote" : ""}
-                    </p>
-                    <p className="mt-0.5 font-mono text-[10px] text-white/45">
-                      {fmtTok(h.uiAmount, 6)}
-                      {h.pctSupply != null ? ` · ${Number(h.pctSupply).toFixed(3)}% supply` : ""}
-                    </p>
-                    {!h.isSol && (
-                      <p className="mt-0.5 font-mono text-[10px] text-white/30">
-                        Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
-                        {" · "}Pot{" "}
-                        {h.potUsd != null && h.potUsd > 0
-                          ? fmtUsd(h.potUsd)
-                          : h.usdValue > 0
-                            ? fmtUsd(h.usdValue)
-                            : "—"}
+              {holdings.map((h: any) => {
+                const sym = pickTokenSymbol(h) || (h.isSol ? "SOL" : shortAddr(h.mint, 4));
+                const name = pickTokenName(h) || (h.isSol ? "Solana" : "Token");
+                const img = pickTokenImage(h);
+                return (
+                  <button
+                    key={h.mint}
+                    type="button"
+                    onClick={() => {
+                      if (h.isSol || h.mint === SOL_MINT) return;
+                      navigate(`/trade/token/${h.mint}`);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
+                  >
+                    <TokenAvatar image={img} symbol={sym} mint={h.mint} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-bold">{sym}</p>
+                      <p className="truncate text-[10px] text-white/35">
+                        {name}
+                        {h.unpriced ? " · no quote" : ""}
                       </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-mono text-[13px] font-semibold">
-                      {h.unpriced || (!(h.usdValue > 0) && !h.isSol) ? "—" : fmtUsd(h.usdValue)}
-                    </p>
-                    {!h.isSol && h.unrealizedUsd != null ? (
-                      <p
-                        className={`font-mono text-[10px] ${
-                          h.unrealizedUsd >= 0 ? "text-emerald-400" : "text-red-400"
-                        }`}
-                      >
-                        {fmtPnl(h.unrealizedUsd)}
-                        {h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""}
+                      {!h.isSol && (
+                        <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                          {shortAddr(h.mint, 4)}
+                        </p>
+                      )}
+                      <p className="mt-0.5 font-mono text-[10px] text-white/45">
+                        {fmtTok(h.uiAmount, 6)}
+                        {h.pctSupply != null ? ` · ${Number(h.pctSupply).toFixed(3)}% supply` : ""}
                       </p>
-                    ) : h.change24h != null ? (
-                      <p
-                        className={`font-mono text-[10px] ${
-                          h.change24h >= 0 ? "text-emerald-400" : "text-red-400"
-                        }`}
-                      >
-                        {fmtPct(h.change24h)}
+                      {!h.isSol && (
+                        <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                          Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
+                          {" · "}Bought{" "}
+                          {h.boughtUsd != null ? fmtUsd(h.boughtUsd) : "—"}
+                          {" · "}Pot{" "}
+                          {h.potUsd != null && h.potUsd > 0
+                            ? fmtUsd(h.potUsd)
+                            : h.usdValue > 0
+                              ? fmtUsd(h.usdValue)
+                              : "—"}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-[13px] font-semibold">
+                        {h.unpriced || (!(h.usdValue > 0) && !h.isSol) ? "—" : fmtUsd(h.usdValue)}
                       </p>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
+                      {!h.isSol && h.unrealizedUsd != null ? (
+                        <p
+                          className={`font-mono text-[10px] ${
+                            h.unrealizedUsd >= 0 ? "text-emerald-400" : "text-red-400"
+                          }`}
+                        >
+                          u {fmtPnl(h.unrealizedUsd)}
+                          {h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""}
+                        </p>
+                      ) : h.change24h != null ? (
+                        <p
+                          className={`font-mono text-[10px] ${
+                            h.change24h >= 0 ? "text-emerald-400" : "text-red-400"
+                          }`}
+                        >
+                          {fmtPct(h.change24h)}
+                        </p>
+                      ) : !h.isSol ? (
+                        <p className="font-mono text-[10px] text-white/35">uPnL —</p>
+                      ) : null}
+                      {!h.isSol && h.realizedUsd != null && (
+                        <p
+                          className={`font-mono text-[10px] ${
+                            h.realizedUsd >= 0 ? "text-emerald-400" : "text-red-400"
+                          }`}
+                        >
+                          r {fmtPnl(h.realizedUsd)}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
@@ -456,15 +480,22 @@ export default function TradeWallet() {
                     className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
                   >
                     <div className="flex items-start gap-3">
-                      <TokenAvatar image={p.image} symbol={p.symbol} mint={p.mint} />
+                      <TokenAvatar
+                        image={pickTokenImage(p)}
+                        symbol={pickTokenSymbol(p) || shortAddr(p.mint, 4)}
+                        mint={p.mint}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold">
-                              {p.symbol || shortAddr(p.mint, 4)}
+                              {pickTokenSymbol(p) || shortAddr(p.mint, 4)}
                             </p>
                             <p className="truncate text-[10px] text-white/35">
-                              {p.name || shortAddr(p.mint, 6)}
+                              {pickTokenName(p) || "Token"}
+                            </p>
+                            <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                              {shortAddr(p.mint, 4)}
                             </p>
                           </div>
                           <div className="text-right">
@@ -572,7 +603,11 @@ export default function TradeWallet() {
                   onClick={() => tr.mint && navigate(`/trade/token/${tr.mint}`)}
                   className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
                 >
-                  <TokenAvatar image={tr.image} symbol={tr.symbol} mint={tr.mint} />
+                  <TokenAvatar
+                    image={pickTokenImage(tr)}
+                    symbol={pickTokenSymbol(tr) || shortAddr(tr.mint || "", 4)}
+                    mint={tr.mint}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span
@@ -587,7 +622,7 @@ export default function TradeWallet() {
                         {tr.side || "swap"}
                       </span>
                       <p className="truncate text-sm font-bold">
-                        {tr.symbol || shortAddr(tr.mint || "", 4)}
+                        {pickTokenSymbol(tr) || shortAddr(tr.mint || "", 4)}
                       </p>
                     </div>
                     <p className="mt-0.5 font-mono text-[10px] text-white/35">

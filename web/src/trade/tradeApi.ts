@@ -239,6 +239,184 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+/** True when a string looks like a Solana mint/address (never use as token title). */
+export function looksLikeMint(s: string | null | undefined): boolean {
+  return !!s && MINT_RE.test(String(s).trim());
+}
+
+/** Pick logo from common API aliases (image / icon / logoURI / …). */
+export function pickTokenImage(raw: any): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const v =
+    raw.image ??
+    raw.icon ??
+    raw.logoURI ??
+    raw.logoUri ??
+    raw.logo ??
+    raw.imageUrl ??
+    raw.image_url ??
+    raw.info?.imageUrl;
+  const s = v != null ? String(v).trim() : "";
+  if (!s || s === "missing.png") return null;
+  return s;
+}
+
+/** Display symbol — never a raw mint / CA. */
+export function pickTokenSymbol(raw: any): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw.symbol != null ? String(raw.symbol).trim() : "";
+  if (!s || looksLikeMint(s)) return null;
+  return s;
+}
+
+export function pickTokenName(raw: any): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const n = raw.name != null ? String(raw.name).trim() : "";
+  if (!n || looksLikeMint(n)) return null;
+  return n;
+}
+
+function holdingNeedsMeta(h: any): boolean {
+  return !pickTokenSymbol(h) || !pickTokenName(h) || !pickTokenImage(h);
+}
+
+/** Client-side DexScreener meta backfill when wallet API omits name/icon. */
+async function dexMetaClient(mints: string[]): Promise<Record<string, { name: string | null; symbol: string | null; image: string | null; usdPrice?: number; mcap?: number | null }>> {
+  const out: Record<string, any> = {};
+  if (!mints.length) return out;
+  const chunks: string[][] = [];
+  for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`);
+        if (!r.ok) return;
+        const pairs = await r.json();
+        for (const p of pairs || []) {
+          const mint = p?.baseToken?.address;
+          if (!mint || out[mint]) continue;
+          out[mint] = {
+            name: p.baseToken?.name || null,
+            symbol: p.baseToken?.symbol || null,
+            image: p.info?.imageUrl || null,
+            usdPrice: Number(p.priceUsd) || 0,
+            mcap: Number(p.marketCap || p.fdv) || null,
+          };
+        }
+      } catch {
+        /* ignore */
+      }
+    }),
+  );
+  return out;
+}
+
+/** Same-origin fallback for stubborn mints DexScreener missed. */
+async function tokenMetaClient(mints: string[]): Promise<Record<string, { name: string | null; symbol: string | null; image: string | null }>> {
+  const out: Record<string, any> = {};
+  await Promise.all(
+    mints.slice(0, 24).map(async (mint) => {
+      try {
+        const d = await j(`/api/ogdex/token?mint=${encodeURIComponent(mint)}`);
+        const t = d?.token || d?.meta || d;
+        if (!t) return;
+        out[mint] = {
+          name: pickTokenName(t) || pickTokenName(d?.meta) || null,
+          symbol: pickTokenSymbol(t) || pickTokenSymbol(d?.meta) || null,
+          image: pickTokenImage(t) || pickTokenImage(d?.meta) || null,
+        };
+      } catch {
+        /* ignore */
+      }
+    }),
+  );
+  return out;
+}
+
+function patchRowMeta(row: any, md: any) {
+  if (!row || !md) return row;
+  const symbol = pickTokenSymbol(row) || pickTokenSymbol(md);
+  const name = pickTokenName(row) || pickTokenName(md);
+  const image = pickTokenImage(row) || pickTokenImage(md);
+  row.symbol = symbol;
+  row.name = name;
+  row.image = image;
+  if (md.mcap != null && row.mcap == null) row.mcap = md.mcap;
+  if (!(Number(row.usdValue) > 0) && Number(md.usdPrice) > 0 && Number(row.uiAmount) > 0) {
+    row.priceUsd = Number(md.usdPrice);
+    row.usdValue = Number(row.uiAmount) * Number(md.usdPrice);
+    row.unpriced = false;
+  }
+  return row;
+}
+
+/**
+ * Ensure every holding / perToken row has name·symbol·image when publicly
+ * available. Runs after /wallet so Jupiter-priced bags aren't titled with CA.
+ */
+export async function enrichWalletMeta(w: any): Promise<any> {
+  if (!w?.ok) return w;
+  const holdings = Array.isArray(w.holdings) ? w.holdings : [];
+  const pnlRows = extractWalletPnlTokens(w);
+  const need = [
+    ...new Set([
+      ...holdings.filter(holdingNeedsMeta).map((h: any) => String(h.mint || "")),
+      ...pnlRows.filter(holdingNeedsMeta).map((h: any) => String(h.mint || "")),
+    ]),
+  ].filter((m) => m && looksLikeMint(m));
+
+  if (!need.length) {
+    // Still normalize field aliases on present rows.
+    for (const h of holdings) {
+      h.symbol = pickTokenSymbol(h);
+      h.name = pickTokenName(h);
+      h.image = pickTokenImage(h);
+    }
+    for (const t of pnlRows) {
+      t.symbol = pickTokenSymbol(t);
+      t.name = pickTokenName(t);
+      t.image = pickTokenImage(t);
+    }
+    return w;
+  }
+
+  const dex = await dexMetaClient(need.slice(0, 120));
+  for (const h of holdings) if (dex[h.mint]) patchRowMeta(h, dex[h.mint]);
+  for (const t of pnlRows) if (dex[t.mint]) patchRowMeta(t, dex[t.mint]);
+
+  const still = need.filter((m) => {
+    const h = holdings.find((x: any) => x.mint === m) || pnlRows.find((x: any) => x.mint === m);
+    return h && holdingNeedsMeta(h);
+  });
+  if (still.length) {
+    const tok = await tokenMetaClient(still);
+    for (const h of holdings) if (tok[h.mint]) patchRowMeta(h, tok[h.mint]);
+    for (const t of pnlRows) if (tok[t.mint]) patchRowMeta(t, tok[t.mint]);
+  }
+
+  for (const h of holdings) {
+    h.symbol = pickTokenSymbol(h);
+    h.name = pickTokenName(h);
+    h.image = pickTokenImage(h);
+  }
+  for (const t of pnlRows) {
+    t.symbol = pickTokenSymbol(t);
+    t.name = pickTokenName(t);
+    t.image = pickTokenImage(t);
+  }
+  if (Array.isArray(w.trades)) {
+    for (const tr of w.trades) {
+      const md = dex[tr.mint] || {};
+      tr.symbol = pickTokenSymbol(tr) || pickTokenSymbol(md);
+      tr.name = pickTokenName(tr) || pickTokenName(md);
+      tr.image = pickTokenImage(tr) || pickTokenImage(md);
+    }
+  }
+  return w;
+}
+
 /**
  * Wallet API returns PnL rows under `pnl.perToken` (current). Older shapes used
  * `pnl.tokens` / top-level `tokens` / `pnl.positions` — check all so the desk
@@ -316,9 +494,9 @@ export function normalizePnlToken(raw: any): WalletPnlToken | null {
 
   return {
     mint,
-    symbol: raw.symbol ?? null,
-    name: raw.name ?? null,
-    image: raw.image ?? null,
+    symbol: pickTokenSymbol(raw),
+    name: pickTokenName(raw),
+    image: pickTokenImage(raw),
     realizedUsd,
     unrealizedUsd,
     unrealizedPct,
@@ -366,19 +544,13 @@ export function mergeHoldingPnl(holding: any, pnlByMint: Map<string, WalletPnlTo
   if (unrealizedPct == null && unrealizedUsd != null && costUsd != null && costUsd > 0) {
     unrealizedPct = (unrealizedUsd / costUsd) * 100;
   }
-  const symbol =
-    (holding?.symbol && String(holding.symbol).trim()) ||
-    (p?.symbol && String(p.symbol).trim()) ||
-    null;
-  const name =
-    (holding?.name && String(holding.name).trim()) ||
-    (p?.name && String(p.name).trim()) ||
-    null;
-  const image = holding?.image || p?.image || null;
+  const symbol = pickTokenSymbol(holding) || pickTokenSymbol(p) || null;
+  const name = pickTokenName(holding) || pickTokenName(p) || null;
+  const image = pickTokenImage(holding) || pickTokenImage(p) || null;
   return {
     ...holding,
-    symbol: symbol || holding?.symbol || null,
-    name: name || holding?.name || null,
+    symbol,
+    name,
     image,
     costUsd,
     potUsd,
@@ -392,7 +564,12 @@ export function mergeHoldingPnl(holding: any, pnlByMint: Map<string, WalletPnlTo
 }
 
 export async function fetchWallet(address: string) {
-  return j(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);
+  const w = await j(`/api/ogdex/wallet?address=${encodeURIComponent(address)}`);
+  try {
+    return await enrichWalletMeta(w);
+  } catch {
+    return w;
+  }
 }
 
 export async function fetchSwaps(address: string, limit = 80) {

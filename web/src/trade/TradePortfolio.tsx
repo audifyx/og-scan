@@ -25,6 +25,9 @@ import {
   fetchWallet,
   mergeHoldingPnl,
   normalizePnlToken,
+  pickTokenImage,
+  pickTokenName,
+  pickTokenSymbol,
   searchCoins,
   type MarketCoin,
   type WalletPnlToken,
@@ -253,10 +256,12 @@ export default function TradePortfolio() {
     return [sol, ...tokens];
   }, [mine, pnlByMint]);
 
+  /** Never title a row with a raw mint — shortAddr only as fallback label. */
   const tokenLabel = (h: any) =>
-    (h.symbol && String(h.symbol).trim()) || shortAddr(h.mint || "", 4);
+    pickTokenSymbol(h) || (h.isSol ? "SOL" : shortAddr(h.mint || "", 4));
   const tokenName = (h: any) =>
-    (h.name && String(h.name).trim()) || (h.isSol ? "Solana" : "Token");
+    pickTokenName(h) || (h.isSol ? "Solana" : "Token");
+  const tokenImage = (h: any) => pickTokenImage(h);
 
   return (
     <div className="tp">
@@ -415,7 +420,7 @@ export default function TradePortfolio() {
                           className="tp__row"
                         >
                           <TokenAvatar
-                            image={h.image}
+                            image={tokenImage(h)}
                             symbol={tokenLabel(h)}
                             mint={h.mint}
                             size={40}
@@ -425,6 +430,11 @@ export default function TradePortfolio() {
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[14px] font-bold">{tokenLabel(h)}</p>
                             <p className="tp__row-name">{tokenName(h)}</p>
+                            {!h.isSol && (
+                              <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                                {shortAddr(h.mint || "", 4)}
+                              </p>
+                            )}
                             <p className="mt-0.5 font-mono text-[11px] text-white/35">
                               {fmtTok(h.uiAmount, 4)}
                               {h.unpriced ? " · unpriced" : ""}
@@ -432,6 +442,8 @@ export default function TradePortfolio() {
                             {!h.isSol && (
                               <p className="mt-0.5 font-mono text-[10px] text-white/30">
                                 Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
+                                {" · "}Bought{" "}
+                                {h.boughtUsd != null ? fmtUsd(h.boughtUsd) : "—"}
                                 {" · "}Pot{" "}
                                 {h.potUsd != null && h.potUsd > 0 ? fmtUsd(h.potUsd) : "—"}
                               </p>
@@ -445,13 +457,18 @@ export default function TradePortfolio() {
                               {h.isSol
                                 ? "Native"
                                 : h.unrealizedUsd != null
-                                  ? `${fmtPnl(h.unrealizedUsd)}${
+                                  ? `u ${fmtPnl(h.unrealizedUsd)}${
                                       h.unrealizedPct != null ? ` ${fmtPct(h.unrealizedPct)}` : ""
                                     }`
                                   : h.change24h != null
                                     ? fmtPct(h.change24h)
                                     : "uPnL —"}
                             </p>
+                            {!h.isSol && h.realizedUsd != null && (
+                              <p className={`font-mono text-[10px] ${pnlTone(h.realizedUsd)}`}>
+                                r {fmtPnl(h.realizedUsd)}
+                              </p>
+                            )}
                           </div>
                         </Link>
                       ))}
@@ -550,17 +567,21 @@ export default function TradePortfolio() {
                           )}
                           {topHoldings.length > 0 && (
                             <div className="tp__watch-preview">
-                              {topHoldings.map((h: any) => (
-                                <span key={h.mint} className="tp__watch-chip">
-                                  <TokenAvatar
-                                    image={h.image}
-                                    symbol={h.symbol}
-                                    mint={h.mint}
-                                    size={16}
-                                  />
-                                  {(h.symbol || shortAddr(h.mint, 3)).slice(0, 8)}
-                                </span>
-                              ))}
+                              {topHoldings.map((h: any) => {
+                                const sym =
+                                  pickTokenSymbol(h) || shortAddr(h.mint || "", 3);
+                                return (
+                                  <span key={h.mint} className="tp__watch-chip">
+                                    <TokenAvatar
+                                      image={pickTokenImage(h)}
+                                      symbol={sym}
+                                      mint={h.mint}
+                                      size={16}
+                                    />
+                                    {sym.slice(0, 8)}
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
                         </button>
