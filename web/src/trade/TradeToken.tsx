@@ -2,7 +2,7 @@
  * /trade/token/:mint — full DEX coin data (same APIs as ORBITX_DEX TokenDetail).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
@@ -14,13 +14,15 @@ import {
 } from "lucide-react";
 import {
   askCoinChat,
+  fetchBubbleMapData,
   fetchTokenBundle,
   fetchTokenOnly,
   fetchWallet,
   findWalletPnlToken,
 } from "./tradeApi";
 import { dexChartUrl, fmtNum, fmtPct, fmtPnl, fmtTok, fmtUsd, shortAddr, timeAgo } from "./tradeFmt";
-import { BubbleMap } from "./BubbleMap";
+
+const BubbleMap = lazy(() => import("./BubbleMap").then((m) => ({ default: m.BubbleMap })));
 
 type TabId =
   | "overview"
@@ -142,6 +144,7 @@ export default function TradeToken() {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsgs, setAiMsgs] = useState<{ role: string; content: string }[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
+  const [bubbleBusy, setBubbleBusy] = useState(false);
   const [posAmount, setPosAmount] = useState(0);
   const [posWorth, setPosWorth] = useState<number | null>(null);
   const [posUnreal, setPosUnreal] = useState<number | null>(null);
@@ -195,6 +198,26 @@ export default function TradeToken() {
     }, 12000);
     return () => window.clearInterval(id);
   }, [mint]);
+
+  const refreshBubbleData = useCallback(async () => {
+    if (!mint) return;
+    setBubbleBusy(true);
+    try {
+      const b = await fetchBubbleMapData(mint);
+      if (b.xray) setXray(b.xray);
+      if (b.holders?.length) setHolders(b.holders);
+      if (b.holderCount != null) setHolderCountTotal(b.holderCount);
+      if (b.traders?.length) setTraders(b.traders);
+    } finally {
+      setBubbleBusy(false);
+    }
+  }, [mint]);
+
+  // Pull full xray + holders when Bubbles tab opens
+  useEffect(() => {
+    if (tab !== "bubbles" || !mint) return;
+    void refreshBubbleData();
+  }, [tab, mint, refreshBubbleData]);
 
   /* Compact live position for this mint (token page strip) */
   useEffect(() => {
@@ -664,12 +687,41 @@ export default function TradeToken() {
         )}
 
         {tab === "bubbles" && (
-          <div className="space-y-2">
-            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-              <BarChart2 className="h-3.5 w-3.5" />
-              Bubble map
-            </h3>
-            <BubbleMap address={mint} chain={meta.chain || "solana"} height={440} />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+                  <BarChart2 className="h-3.5 w-3.5" />
+                  3D bubble map
+                </h3>
+                <p className="mt-1 text-[11px] text-white/35">
+                  Live holder clusters from X-ray + top holders — drag to orbit, scroll to zoom, click a bubble for wallet detail.
+                </p>
+              </div>
+              {bubbleBusy && (
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-white/40">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Pulling holders &amp; x-ray…
+                </span>
+              )}
+            </div>
+            <Suspense
+              fallback={
+                <div className="flex h-[640px] items-center justify-center rounded-xl border border-white/10 bg-black">
+                  <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+                </div>
+              }
+            >
+              <BubbleMap
+                address={mint}
+                chain={meta.chain || "solana"}
+                xray={xray}
+                holders={holderList}
+                holderCount={totalHolders}
+                height={680}
+                onRefresh={refreshBubbleData}
+                refreshing={bubbleBusy}
+              />
+            </Suspense>
           </div>
         )}
 

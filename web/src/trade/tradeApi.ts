@@ -703,6 +703,38 @@ export async function fetchTopHolders(mint: string) {
   return fetchTopTraders(mint);
 }
 
+/** Fresh xray + holders for the /trade 3D bubble map */
+export async function fetchBubbleMapData(mint: string): Promise<{
+  xray: any;
+  holders: any[];
+  holderCount: number | null;
+  traders: any[];
+}> {
+  const m = encodeURIComponent(mint);
+  const [xray, traders] = await Promise.all([
+    j(`/api/ogdex/xray?mint=${m}`),
+    j(`/api/ogdex/traders?mint=${m}`),
+  ]);
+  const holders = (
+    (Array.isArray(traders?.holders) && traders.holders.length ? traders.holders : null) ||
+    []
+  )
+    .map(normalizeHolderRow)
+    .filter(Boolean);
+  const sampleLen = holders.length;
+  const raw = Number(traders?.holderCount);
+  const holderCount =
+    Number.isFinite(raw) && raw > 0 && !(sampleLen > 0 && raw === sampleLen && raw <= 100)
+      ? raw
+      : null;
+  return {
+    xray,
+    holders,
+    holderCount,
+    traders: Array.isArray(traders?.traders) ? traders.traders.map(normalizeTraderRow) : [],
+  };
+}
+
 /** Lightweight market movers for notifications / signals feed */
 export async function fetchMarketSignals(): Promise<MarketCoin[]> {
   const [trending, fomo, runners] = await Promise.all([
