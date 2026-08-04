@@ -444,9 +444,9 @@ export default function XMcpPage() {
                   </button>
                 </div>
                 <p className="ox-agent__note">
-                  Add <code>TWITTER_CLIENT_ID</code>, <code>TWITTER_CLIENT_SECRET</code>, and{" "}
-                  <code>VITE_TWITTER_CLIENT_ID</code> in Vercel, then redeploy. X callback URL must be{" "}
-                  <code>https://www.orbitx.world/x-callback</code>.
+                  In Vercel set <code>TWITTER_CLIENT_ID</code> + <code>TWITTER_CLIENT_SECRET</code> (Production), redeploy.
+                  In the X developer portal → User authentication: OAuth 2.0 on, App type Web App, permissions Read and
+                  write, callback exactly <code>https://www.orbitx.world/x-callback</code>.
                 </p>
               </>
             )}

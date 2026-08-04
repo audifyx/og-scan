@@ -688,6 +688,54 @@ async function handleAgent(req, res, parts) {
     });
   }
 
+  // Build authorize URL server-side so TWITTER_CLIENT_ID from Vercel is used
+  // (VITE_* is easy to miss and gets baked at build time).
+  if (route === "oauth/start" && req.method === "POST") {
+    if (!TWITTER_CLIENT_ID) {
+      return json(
+        res,
+        {
+          error:
+            "TWITTER_CLIENT_ID missing on Vercel. Add TWITTER_CLIENT_ID + TWITTER_CLIENT_SECRET, redeploy, then Connect X again.",
+        },
+        503,
+      );
+    }
+    const body = await readBody(req);
+    const redirectUri = String(body.redirectUri || body.redirect_uri || "").trim();
+    const codeChallenge = String(body.codeChallenge || body.code_challenge || "").trim();
+    const state = String(body.state || "").trim();
+    if (!redirectUri || !codeChallenge || !state) {
+      return json(res, { error: "Missing redirectUri, codeChallenge, or state" }, 400);
+    }
+    const allowed = [
+      "https://www.orbitx.world/x-callback",
+      "https://orbitx.world/x-callback",
+      "https://www.ogscan.fun/x-callback",
+      "https://ogscan.fun/x-callback",
+    ];
+    const isLocal =
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/x-callback$/.test(redirectUri);
+    if (!allowed.includes(redirectUri) && !isLocal) {
+      return json(res, { error: "redirectUri not allowed", redirectUri }, 400);
+    }
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: TWITTER_CLIENT_ID,
+      redirect_uri: redirectUri,
+      scope: "tweet.write tweet.read users.read offline.access",
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    });
+    return json(res, {
+      authorizeUrl: `https://x.com/i/oauth2/authorize?${params.toString()}`,
+      clientId: TWITTER_CLIENT_ID,
+      redirectUri,
+      scope: "tweet.write tweet.read users.read offline.access",
+    });
+  }
+
   // X account OAuth2 PKCE code exchange — uses Vercel TWITTER_* env (not Supabase secrets).
   if (route === "oauth/callback" && req.method === "POST") {
     const body = await readBody(req);

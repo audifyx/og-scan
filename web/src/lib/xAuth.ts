@@ -1,23 +1,18 @@
 /**
  * xAuth — Twitter OAuth 2.0 PKCE helpers for OrbitX.
- * Used for connecting X account with tweet.write scope so users can cross-post.
  *
- * Flow:
- *  1. xStartLogin()  — generates PKCE verifier, redirects user to Twitter OAuth
- *  2. /x-callback    — Twitter redirects back with code; XCallbackPage calls xExchangeCode()
- *  3. xExchangeCode() — exchanges code via Vercel /api/x/agent/oauth/callback (TWITTER_* env)
+ * Authorize URL is built on the server (/api/x/agent/oauth/start) so
+ * Vercel TWITTER_CLIENT_ID is used — no VITE_ client id required.
  */
-
-const TWITTER_OAUTH_URL = "https://x.com/i/oauth2/authorize";
 
 const LS_VERIFIER = "x_pkce_verifier";
 const LS_STATE = "x_pkce_state";
 const LS_REDIRECT = "x_pkce_redirect";
 
-// Public OAuth 2.0 Client ID (safe to expose — PKCE only)
-export const X_CLIENT_ID = import.meta.env.VITE_TWITTER_CLIENT_ID || "VEttdDM5YUtpMGJsbURCSmhBMEg6MTpjaQ";
+/** @deprecated — server oauth/start uses TWITTER_CLIENT_ID from Vercel */
+export const X_CLIENT_ID = import.meta.env.VITE_TWITTER_CLIENT_ID || "";
 
-/** Always www in prod — apex 308 + mismatched redirect_uri breaks X OAuth. */
+/** Always www in prod — apex vs www mismatch breaks X OAuth. */
 export function xCallbackUrl(): string {
   if (typeof window === "undefined") return "https://www.orbitx.world/x-callback";
   const host = window.location.hostname;
@@ -30,11 +25,10 @@ export function xCallbackUrl(): string {
   return `${window.location.origin}/x-callback`;
 }
 
-/** @deprecated use xCallbackUrl() — kept for Settings imports */
+/** @deprecated use xCallbackUrl() */
 export const X_CALLBACK_URL =
   typeof window !== "undefined" ? xCallbackUrl() : "https://www.orbitx.world/x-callback";
 
-/** Minimal scopes for posting — space.read/follows often fail on free X apps. */
 export const X_SCOPES = "tweet.write tweet.read users.read offline.access";
 
 function base64urlEncode(buffer: ArrayBuffer): string {
@@ -45,8 +39,7 @@ function base64urlEncode(buffer: ArrayBuffer): string {
 }
 
 async function sha256(plain: string): Promise<ArrayBuffer> {
-  const encoder = new TextEncoder();
-  return crypto.subtle.digest("SHA-256", encoder.encode(plain));
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(plain));
 }
 
 function randomString(len = 64): string {
@@ -55,13 +48,8 @@ function randomString(len = 64): string {
   return base64urlEncode(arr.buffer).slice(0, len);
 }
 
-/**
- * Starts the Twitter OAuth 2.0 PKCE flow.
- */
+/** Starts X OAuth — server builds authorize URL with Vercel TWITTER_CLIENT_ID. */
 export async function xStartLogin(): Promise<void> {
-  if (!X_CLIENT_ID) {
-    throw new Error("VITE_TWITTER_CLIENT_ID is not set. Add it in Vercel and redeploy.");
-  }
   const verifier = randomString(64);
   const state = randomString(32);
   const challenge = base64urlEncode(await sha256(verifier));
@@ -72,22 +60,29 @@ export async function xStartLogin(): Promise<void> {
   localStorage.setItem(LS_REDIRECT, redirectUri);
   sessionStorage.setItem("x_return_to", window.location.pathname + window.location.search);
 
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: X_CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: X_SCOPES,
-    state,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
+  const res = await fetch("/api/x/agent/oauth/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      redirectUri,
+      codeChallenge: challenge,
+      state,
+    }),
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.authorizeUrl) {
+    throw new Error(
+      String(
+        data.error ||
+          data.message ||
+          `Could not start X login (${res.status}). Add TWITTER_CLIENT_ID + TWITTER_CLIENT_SECRET on Vercel and redeploy.`,
+      ),
+    );
+  }
 
-  window.location.href = `${TWITTER_OAUTH_URL}?${params.toString()}`;
+  window.location.href = String(data.authorizeUrl);
 }
 
-/**
- * Exchanges the authorization code for tokens via Vercel (TWITTER_* env).
- */
 export async function xExchangeCode(
   code: string,
   returnedState: string,
@@ -111,14 +106,12 @@ export async function xExchangeCode(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-  // Prefer Vercel function so TWITTER_CLIENT_* from Vercel env work.
   let res = await fetch("/api/x/agent/oauth/callback", {
     method: "POST",
     headers,
     body: JSON.stringify({ code, verifier, redirectUri }),
   });
 
-  // Fallback to legacy Supabase edge function
   if (res.status === 404 || res.status === 405) {
     const supa = import.meta.env.VITE_SUPABASE_URL;
     if (supa) {
