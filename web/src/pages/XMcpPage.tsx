@@ -1,18 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { xGetStoredUser, xStartLogin, type XUser } from "@/lib/xAuth";
 import {
+  approveXAgentQueueItem,
   bootstrapXMcp,
+  cancelXAgentQueueItem,
   createXMcpApiKey,
+  fetchXAgent,
+  generateXAgentPost,
+  listXAgentQueue,
   listXMcpApiKeys,
   revokeXMcpApiKey,
   shortXKey,
+  trainXAgent,
+  upsertXAgent,
   xChatgptConnectUrl,
   xClaudeConnectUrl,
   xMcpOAuthCredentials,
+  type XAgentConfig,
+  type XAgentKnowledge,
+  type XAgentQueueItem,
   type XMcpBootstrap,
+  type XNimModel,
 } from "@/lib/xMcp";
 import { AgentLoading, AgentShell, type AgentTabId } from "@/components/agent/AgentShell";
 
@@ -102,7 +112,7 @@ export default function XMcpPage() {
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
 
-  const [tab, setTab] = useState<AgentTabId>("setup");
+  const [tab, setTab] = useState<AgentTabId>("wallet");
   const [boot, setBoot] = useState<XMcpBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,12 +133,44 @@ export default function XMcpPage() {
     callbackUrl?: string;
     checklist?: string[];
   } | null>(null);
+  const [xAgent, setXAgent] = useState<XAgentConfig | null>(null);
+  const [knowledge, setKnowledge] = useState<XAgentKnowledge[]>([]);
+  const [models, setModels] = useState<XNimModel[]>([]);
+  const [queue, setQueue] = useState<XAgentQueueItem[]>([]);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [trainTitle, setTrainTitle] = useState("Note");
+  const [trainContent, setTrainContent] = useState("");
+  const [genHint, setGenHint] = useState("");
+  const [topicsText, setTopicsText] = useState("");
 
   const oauth = useMemo(() => xMcpOAuthCredentials(), []);
   const xConnected = Boolean(boot?.x?.connected || xLocal?.username);
   const xHandle = boot?.x?.username || xLocal?.username || null;
   const hasKey = Boolean(storedKey || (boot?.keys?.length ?? 0) > 0);
   const bearerHeader = storedKey ? `Bearer ${storedKey}` : "";
+
+  const refreshAgent = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await fetchXAgent();
+      setXAgent(data.agent);
+      setKnowledge(data.knowledge || []);
+      setModels(data.models || []);
+      setTopicsText((data.agent.topics || []).join(", "));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load X agent");
+    }
+  }, [user]);
+
+  const refreshQueue = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await listXAgentQueue();
+      setQueue(data.items || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load queue");
+    }
+  }, [user]);
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -158,12 +200,13 @@ export default function XMcpPage() {
           /* ignore */
         }
       }
+      await Promise.allSettled([refreshAgent(), refreshQueue()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load X MCP");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, refreshAgent, refreshQueue]);
 
   useEffect(() => {
     try {
@@ -222,7 +265,7 @@ export default function XMcpPage() {
       }
       const keys = await listXMcpApiKeys();
       setBoot((prev) => (prev ? { ...prev, keys: keys.keys, mintedKey: minted } : prev));
-      setTab("keys");
+      setTab("connect");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create key");
     } finally {
@@ -236,6 +279,95 @@ export default function XMcpPage() {
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to revoke");
+    }
+  };
+
+  const onSaveAgent = async () => {
+    if (!xAgent) return;
+    setAgentBusy(true);
+    setError(null);
+    try {
+      const topics = topicsText
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 40);
+      const { agent } = await upsertXAgent({
+        name: xAgent.name,
+        persona: xAgent.persona,
+        voiceNotes: xAgent.voiceNotes,
+        model: xAgent.model,
+        mode: xAgent.mode,
+        enabled: xAgent.enabled,
+        topics,
+        maxPostsPerDay: xAgent.maxPostsPerDay,
+        postingWindows: xAgent.postingWindows,
+        timezone: xAgent.timezone,
+      });
+      setXAgent(agent);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save agent");
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const onTrain = async () => {
+    const content = trainContent.trim();
+    if (!content) return;
+    setAgentBusy(true);
+    setError(null);
+    try {
+      const res = await trainXAgent({ title: trainTitle.trim() || "Note", content });
+      setXAgent(res.agent);
+      setKnowledge(res.knowledgeList || []);
+      setTrainContent("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to train");
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const onGenerate = async (postNow = false) => {
+    setAgentBusy(true);
+    setError(null);
+    try {
+      const res = await generateXAgentPost({ hint: genHint.trim() || undefined, postNow });
+      if (res.error || res.message) {
+        setError(res.message || res.error || "Generate failed");
+      }
+      await refreshQueue();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Generate failed");
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const onApproveQueue = async (id: string) => {
+    setAgentBusy(true);
+    setError(null);
+    try {
+      await approveXAgentQueueItem(id);
+      await refreshQueue();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Approve failed");
+    } finally {
+      setAgentBusy(false);
+    }
+  };
+
+  const onCancelQueue = async (id: string) => {
+    setAgentBusy(true);
+    setError(null);
+    try {
+      await cancelXAgentQueueItem(id);
+      await refreshQueue();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Cancel failed");
+    } finally {
+      setAgentBusy(false);
     }
   };
 
@@ -306,99 +438,34 @@ export default function XMcpPage() {
       brandHref="/x"
       brandSub="X MCP"
       footerBrand="OrbitX X MCP"
-      footerNote="Connect X, mint a key, then add this MCP to Claude or ChatGPT to post tweets."
+      footerNote="Connect X, train an agent, mint a key, then post via Claude/ChatGPT MCP or the Queue."
       mcpUrl="https://www.orbitx.world/api/x/mcp"
       tabs={[
-        { id: "setup", label: "Setup" },
         { id: "wallet", label: "X account" },
-        { id: "keys", label: "API Keys" },
+        { id: "agent", label: "Agent" },
+        { id: "queue", label: "Queue" },
         { id: "connect", label: "Connect" },
       ]}
     >
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">OrbitX · X</h1>
         <p className="ox-agent__lead">
-          Post on X from Claude or ChatGPT through a dedicated MCP connector — separate from Agent MCP.
+          X MCP agent — post, quote, reply, DM, and schedule NVIDIA-trained drafts from Claude or ChatGPT.
         </p>
         <div className="ox-agent__steps">
           <span className={`ox-agent__chip${xConnected ? " is-ok" : ""}`}>
             {xConnected ? `@${xHandle}` : "Connect X"}
           </span>
+          <span className={`ox-agent__chip${xAgent?.enabled ? " is-ok" : ""}`}>
+            {xAgent?.enabled ? `Agent ${xAgent.mode}` : "Train agent"}
+          </span>
           <span className={`ox-agent__chip${hasKey ? " is-ok" : ""}`}>
             {hasKey ? "API key ready" : "Create API key"}
-          </span>
-          <span className={`ox-agent__chip${xConnected && hasKey ? " is-ok" : ""}`}>
-            {xConnected && hasKey ? "Ready for AI" : "Connect AI next"}
           </span>
         </div>
       </div>
 
       {error && <div className="ox-agent__alert">{error}</div>}
-
-      {tab === "setup" && (
-        <div className="ox-agent__grid ox-agent__grid--2">
-          <section className="ox-agent__panel">
-            <div className="ox-agent__panel-h">
-              <h2 className="ox-agent__panel-title">Quick start</h2>
-              <span className="ox-agent__panel-hint">3 steps</span>
-            </div>
-            <div className="ox-agent__panel-b">
-              <ol className="ox-agent__ol">
-                <li>Connect your X account (tweet.write)</li>
-                <li>Create an API key (shown once)</li>
-                <li>Add OrbitX X to Claude or ChatGPT and Authenticate</li>
-              </ol>
-              <div className="ox-agent__btn-row">
-                <button
-                  type="button"
-                  className="ox-agent__btn ox-agent__btn--primary"
-                  disabled={connectingX}
-                  onClick={() => (xConnected ? setTab("wallet") : onConnectX())}
-                >
-                  {connectingX ? "Redirecting…" : xConnected ? "Review X" : "Connect X"}
-                </button>
-                <button type="button" className="ox-agent__btn" onClick={() => setTab("keys")}>
-                  {hasKey ? "Manage keys" : "Create key"}
-                </button>
-                <button type="button" className="ox-agent__btn" onClick={() => setTab("connect")}>
-                  Connect AI
-                </button>
-              </div>
-              <p className="ox-agent__note">
-                Agent trading MCP stays on <Link to="/agent">/agent</Link>. This page is X posting only.
-              </p>
-            </div>
-          </section>
-
-          <section className="ox-agent__panel">
-            <div className="ox-agent__panel-h">
-              <h2 className="ox-agent__panel-title">MCP endpoint</h2>
-              <span className="ox-agent__panel-hint">use www</span>
-            </div>
-            <div className="ox-agent__panel-b">
-              <FieldRow
-                label="MCP URL"
-                value={oauth.mcpUrl}
-                copied={copied === "mcp"}
-                onCopy={() => copy("mcp", oauth.mcpUrl)}
-              />
-              <p className="ox-agent__note">
-                Must end in <code>/mcp</code>. Tools: <code>x_post</code>, <code>x_connection_status</code>,{" "}
-                <code>x_help</code>.
-              </p>
-              <div className="ox-agent__btn-row">
-                <button
-                  type="button"
-                  className="ox-agent__btn ox-agent__btn--primary"
-                  onClick={() => setTab("connect")}
-                >
-                  Open connect
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
 
       {tab === "wallet" && (
         <section className="ox-agent__panel">
@@ -488,23 +555,25 @@ export default function XMcpPage() {
                   </div>
                 )}
                 <p className="ox-agent__note">
-                  MCP <code>x_post</code> tweets as this account. Reconnect if tokens expire.
+                  MCP tools post as this account. After a scope upgrade (DMs), use{" "}
+                  <strong>Reconnect X</strong> so new tokens include <code>dm.read</code> /{" "}
+                  <code>dm.write</code>.
                 </p>
                 <div className="ox-agent__btn-row">
                   <button
                     type="button"
-                    className="ox-agent__btn"
+                    className="ox-agent__btn ox-agent__btn--primary"
                     disabled={connectingX}
                     onClick={onConnectX}
                   >
-                    {connectingX ? "Redirecting…" : "Reconnect X"}
+                    {connectingX ? "Redirecting…" : "Reconnect X for DMs"}
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <p className="ox-agent__note" style={{ marginTop: 0 }}>
-                  Connect X with tweet.write so Claude/ChatGPT can post through this MCP.
+                  Connect X with tweet + DM scopes so Claude/ChatGPT can post and message through this MCP.
                 </p>
                 <div className="ox-agent__btn-row">
                   <button
@@ -527,7 +596,310 @@ export default function XMcpPage() {
         </section>
       )}
 
-      {tab === "keys" && (
+      {tab === "agent" && (
+        <div className="ox-agent__grid ox-agent__grid--2">
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Agent</h2>
+              <span className="ox-agent__panel-hint">NVIDIA NIM</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              {!xAgent ? (
+                <p className="ox-agent__note">Loading agent…</p>
+              ) : (
+                <>
+                  <label className="ox-agent__label" htmlFor="xa-name">
+                    Name
+                  </label>
+                  <input
+                    id="xa-name"
+                    className="ox-agent__input"
+                    style={{ width: "100%", marginBottom: 10 }}
+                    value={xAgent.name}
+                    onChange={(e) => setXAgent({ ...xAgent, name: e.target.value })}
+                  />
+                  <label className="ox-agent__label" htmlFor="xa-persona">
+                    Persona
+                  </label>
+                  <textarea
+                    id="xa-persona"
+                    className="ox-agent__input"
+                    rows={5}
+                    style={{ width: "100%", marginBottom: 10, resize: "vertical" }}
+                    value={xAgent.persona}
+                    onChange={(e) => setXAgent({ ...xAgent, persona: e.target.value })}
+                    placeholder="System voice / persona for generated posts"
+                  />
+                  <label className="ox-agent__label" htmlFor="xa-voice">
+                    Voice notes
+                  </label>
+                  <textarea
+                    id="xa-voice"
+                    className="ox-agent__input"
+                    rows={2}
+                    style={{ width: "100%", marginBottom: 10, resize: "vertical" }}
+                    value={xAgent.voiceNotes}
+                    onChange={(e) => setXAgent({ ...xAgent, voiceNotes: e.target.value })}
+                  />
+                  <label className="ox-agent__label" htmlFor="xa-model">
+                    Model
+                  </label>
+                  <select
+                    id="xa-model"
+                    className="ox-agent__input"
+                    style={{ width: "100%", marginBottom: 10 }}
+                    value={xAgent.model}
+                    onChange={(e) => setXAgent({ ...xAgent, model: e.target.value })}
+                  >
+                    {(models.length ? models : [{ id: xAgent.model, label: xAgent.model }]).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="ox-agent__label" htmlFor="xa-topics">
+                    Topics (comma-separated)
+                  </label>
+                  <input
+                    id="xa-topics"
+                    className="ox-agent__input"
+                    style={{ width: "100%", marginBottom: 10 }}
+                    value={topicsText}
+                    onChange={(e) => setTopicsText(e.target.value)}
+                  />
+                  <div className="ox-agent__btn-row" style={{ marginBottom: 10 }}>
+                    <label className="ox-agent__note" style={{ margin: 0 }}>
+                      Mode{" "}
+                      <select
+                        className="ox-agent__input"
+                        value={xAgent.mode}
+                        onChange={(e) =>
+                          setXAgent({
+                            ...xAgent,
+                            mode: e.target.value === "auto" ? "auto" : "approve",
+                          })
+                        }
+                      >
+                        <option value="approve">Approve first</option>
+                        <option value="auto">Auto post</option>
+                      </select>
+                    </label>
+                    <label className="ox-agent__note" style={{ margin: 0 }}>
+                      Max/day{" "}
+                      <input
+                        className="ox-agent__input"
+                        type="number"
+                        min={0}
+                        max={48}
+                        style={{ width: 72 }}
+                        value={xAgent.maxPostsPerDay}
+                        onChange={(e) =>
+                          setXAgent({
+                            ...xAgent,
+                            maxPostsPerDay: Math.max(0, Math.min(48, Number(e.target.value) || 0)),
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="ox-agent__note" style={{ margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={xAgent.enabled}
+                        onChange={(e) => setXAgent({ ...xAgent, enabled: e.target.checked })}
+                      />{" "}
+                      Enabled (cron)
+                    </label>
+                  </div>
+                  <p className="ox-agent__note">
+                    <code>approve</code> drafts to Queue · <code>auto</code> generates and posts in windows
+                    (cron every minute). Needs <code>NVIDIA_API_KEY</code> on Vercel.
+                  </p>
+                  <div className="ox-agent__btn-row">
+                    <button
+                      type="button"
+                      className="ox-agent__btn ox-agent__btn--primary"
+                      disabled={agentBusy}
+                      onClick={onSaveAgent}
+                    >
+                      {agentBusy ? "Saving…" : "Save agent"}
+                    </button>
+                    <button type="button" className="ox-agent__btn" disabled={connectingX} onClick={onConnectX}>
+                      Reconnect X for DMs
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Train & generate</h2>
+              <span className="ox-agent__panel-hint">knowledge</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <label className="ox-agent__label" htmlFor="xa-ktitle">
+                Knowledge title
+              </label>
+              <input
+                id="xa-ktitle"
+                className="ox-agent__input"
+                style={{ width: "100%", marginBottom: 8 }}
+                value={trainTitle}
+                onChange={(e) => setTrainTitle(e.target.value)}
+              />
+              <label className="ox-agent__label" htmlFor="xa-kbody">
+                Content
+              </label>
+              <textarea
+                id="xa-kbody"
+                className="ox-agent__input"
+                rows={4}
+                style={{ width: "100%", marginBottom: 10, resize: "vertical" }}
+                value={trainContent}
+                onChange={(e) => setTrainContent(e.target.value)}
+                placeholder="Facts, product points, voice examples…"
+              />
+              <div className="ox-agent__btn-row">
+                <button
+                  type="button"
+                  className="ox-agent__btn"
+                  disabled={agentBusy || !trainContent.trim()}
+                  onClick={onTrain}
+                >
+                  Add knowledge
+                </button>
+              </div>
+              {knowledge.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  {knowledge.slice(0, 8).map((k) => (
+                    <div key={k.id} className="ox-agent__keyline">
+                      <div>
+                        <div className="ox-agent__value ox-agent__value--plain">{k.title}</div>
+                        <div className="ox-agent__panel-hint" style={{ marginTop: 4 }}>
+                          {k.content.slice(0, 120)}
+                          {k.content.length > 120 ? "…" : ""}
+                        </div>
+                      </div>
+                      <span />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <hr style={{ border: 0, borderTop: "1px solid rgba(255,255,255,0.08)", margin: "1rem 0" }} />
+              <label className="ox-agent__label" htmlFor="xa-hint">
+                Generate hint (optional)
+              </label>
+              <input
+                id="xa-hint"
+                className="ox-agent__input"
+                style={{ width: "100%", marginBottom: 10 }}
+                value={genHint}
+                onChange={(e) => setGenHint(e.target.value)}
+                placeholder="e.g. market open vibe"
+              />
+              <div className="ox-agent__btn-row">
+                <button
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--primary"
+                  disabled={agentBusy}
+                  onClick={() => onGenerate(false)}
+                >
+                  {agentBusy ? "Working…" : "Generate now"}
+                </button>
+                <button
+                  type="button"
+                  className="ox-agent__btn"
+                  disabled={agentBusy || !xConnected}
+                  onClick={() => onGenerate(true)}
+                >
+                  Generate + post
+                </button>
+                <button type="button" className="ox-agent__btn" onClick={() => setTab("queue")}>
+                  Open queue
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === "queue" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Queue</h2>
+            <span className="ox-agent__panel-hint">drafts · scheduled</span>
+          </div>
+          <div className="ox-agent__panel-b">
+            <div className="ox-agent__btn-row" style={{ marginTop: 0, marginBottom: 12 }}>
+              <button type="button" className="ox-agent__btn" disabled={agentBusy} onClick={() => refreshQueue()}>
+                Refresh
+              </button>
+              <button type="button" className="ox-agent__btn" onClick={() => setTab("agent")}>
+                Back to agent
+              </button>
+            </div>
+            {queue.length === 0 ? (
+              <p className="ox-agent__note">No queue items yet. Generate from Agent or schedule via MCP.</p>
+            ) : (
+              queue.map((item) => {
+                const text = String(item.payload?.text || "");
+                const canAct = ["pending", "scheduled", "approved"].includes(item.status);
+                return (
+                  <div key={item.id} className="ox-agent__keyline" style={{ alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="ox-agent__panel-hint">
+                        {item.status} · {item.kind}
+                        {item.scheduledFor ? ` · ${new Date(item.scheduledFor).toLocaleString()}` : ""}
+                        {item.source ? ` · ${item.source}` : ""}
+                      </div>
+                      <div className="ox-agent__value ox-agent__value--plain" style={{ whiteSpace: "pre-wrap" }}>
+                        {text || "(empty)"}
+                      </div>
+                      {item.postedTweetId && (
+                        <a
+                          className="ox-agent__note"
+                          href={`https://x.com/i/web/status/${item.postedTweetId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Posted {item.postedTweetId}
+                        </a>
+                      )}
+                      {item.error && <div className="ox-agent__alert" style={{ marginTop: 8 }}>{item.error}</div>}
+                    </div>
+                    <div className="ox-agent__actions" style={{ flexDirection: "column", gap: 6 }}>
+                      {canAct && (
+                        <button
+                          type="button"
+                          className="ox-agent__btn ox-agent__btn--primary"
+                          disabled={agentBusy}
+                          onClick={() => onApproveQueue(item.id)}
+                        >
+                          Post now
+                        </button>
+                      )}
+                      {canAct && (
+                        <button
+                          type="button"
+                          className="ox-agent__btn ox-agent__btn--danger"
+                          disabled={agentBusy}
+                          onClick={() => onCancelQueue(item.id)}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+      )}
+
+      {tab === "connect" && (
+        <>
         <section className="ox-agent__panel">
           <div className="ox-agent__panel-h">
             <h2 className="ox-agent__panel-title">API keys</h2>
@@ -553,7 +925,6 @@ export default function XMcpPage() {
                 )}
               </>
             )}
-
             <div className="ox-agent__btn-row" style={{ marginTop: storedKey ? "1rem" : 0 }}>
               <input
                 className="ox-agent__input ox-agent__grow"
@@ -570,10 +941,7 @@ export default function XMcpPage() {
                 {creating ? "Creating…" : "Create key"}
               </button>
             </div>
-
-            {(boot?.keys || []).length === 0 ? (
-              <p className="ox-agent__note">No active keys yet.</p>
-            ) : (
+            {(boot?.keys || []).length > 0 && (
               <div style={{ marginTop: "1rem" }}>
                 {boot?.keys.map((k) => (
                   <div key={k.id} className="ox-agent__keyline">
@@ -597,9 +965,6 @@ export default function XMcpPage() {
             )}
           </div>
         </section>
-      )}
-
-      {tab === "connect" && (
         <section className="ox-agent__panel">
           <div className="ox-agent__panel-h">
             <h2 className="ox-agent__panel-title">Connect AI</h2>
@@ -608,7 +973,7 @@ export default function XMcpPage() {
           <div className="ox-agent__panel-b">
             {!xConnected && (
               <div className="ox-agent__alert" style={{ marginBottom: 12 }}>
-                Connect X first — without it, <code>x_post</code> will fail.
+                Connect X first — without it, posting tools will fail.
               </div>
             )}
             <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
@@ -685,10 +1050,11 @@ export default function XMcpPage() {
                   Client ID <code>orbitx-x-mcp</code>, secret blank
                 </li>
                 <li>
-                  Advanced → header <code>Authorization</code> = Bearer token from the Keys tab
+                  Advanced → header <code>Authorization</code> = Bearer token above
                 </li>
                 <li>
-                  Ask Claude to call <code>x_post</code> with your tweet text
+                  Tools: <code>x_post</code>, <code>x_quote</code>, <code>x_reply</code>, <code>x_dm</code>,{" "}
+                  <code>x_agent_run</code>, <code>x_agent_train</code>, <code>x_agent_schedule</code>, …
                 </li>
               </ol>
             ) : (
@@ -731,8 +1097,14 @@ export default function XMcpPage() {
               copied={copied === "scope"}
               onCopy={() => copy("scope", oauth.scope)}
             />
+            <p className="ox-agent__note">
+              Env on Vercel (<code>rork-og-meme-coin-tracker</code>): <code>TWITTER_CLIENT_ID</code>,{" "}
+              <code>TWITTER_CLIENT_SECRET</code>, <code>NVIDIA_API_KEY</code>, optional{" "}
+              <code>NVIDIA_MODEL</code>, <code>CRON_SECRET</code>. Reconnect X after scope changes.
+            </p>
           </div>
         </section>
+        </>
       )}
 
       {chatgptGuide && (

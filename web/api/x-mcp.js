@@ -11,6 +11,22 @@
  *                   TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET
  */
 import { createHash, createHmac, randomBytes } from "crypto";
+import {
+  X_OAUTH_SCOPES,
+  NIM_MODELS,
+  DEFAULT_NIM_MODEL,
+  buildTweetText as libBuildTweetText,
+  postTweetOAuth2 as libPostTweet,
+  lookupXUser,
+  sendDmOAuth2,
+  mapAgentRow,
+  mapQueueRow,
+  ensureXAgent,
+  listKnowledge,
+  generateAgentPost,
+  executeQueueItem,
+  runCronTick,
+} from "./orbitx/x-agent-lib.js";
 
 export const config = { maxDuration: 60 };
 
@@ -35,7 +51,7 @@ const TOOLS = [
   {
     name: "x_post",
     description:
-      "Post a tweet on the authenticated user's X account. Requires Bearer key from https://orbitx.world/x and an X account connected on that page. Max ~280 chars (links count ~23).",
+      "Post a tweet on the authenticated user's X account. Requires Bearer key from https://orbitx.world/x and an X account connected on that page.",
     inputSchema: {
       type: "object",
       properties: {
@@ -45,23 +61,150 @@ const TOOLS = [
           type: "string",
           description: "Optional image URL to attach (needs app media credentials on server)",
         },
-        replyToTweetId: {
-          type: "string",
-          description: "Optional tweet id to reply to",
-        },
+        replyToTweetId: { type: "string", description: "Optional tweet id to reply to" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "x_quote",
+    description: "Quote an existing tweet by id with new text.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        quoteTweetId: { type: "string", description: "Tweet id to quote" },
+        linkUrl: { type: "string" },
+      },
+      required: ["text", "quoteTweetId"],
+    },
+  },
+  {
+    name: "x_reply",
+    description: "Reply to a tweet by id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        replyToTweetId: { type: "string" },
+      },
+      required: ["text", "replyToTweetId"],
+    },
+  },
+  {
+    name: "x_dm",
+    description:
+      "Send a DM by username or recipient user id. Requires dm.write (X API Basic/Pro). Returns a clear upgrade message on 403.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        username: { type: "string" },
+        recipientId: { type: "string" },
       },
       required: ["text"],
     },
   },
   {
     name: "x_connection_status",
-    description:
-      "Check whether the authenticated MCP user has an X account linked on OrbitX (/x).",
+    description: "Check whether the authenticated MCP user has an X account linked on OrbitX (/x).",
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "x_agent_status",
+    description: "Get the user's X agent config (persona, mode, model, enabled).",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "x_agent_upsert",
+    description:
+      "Create or update the X agent (persona, mode auto|approve, model, topics, schedule windows).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        persona: { type: "string" },
+        voiceNotes: { type: "string" },
+        model: { type: "string" },
+        mode: { type: "string", enum: ["auto", "approve"] },
+        enabled: { type: "boolean" },
+        topics: { type: "array", items: { type: "string" } },
+        maxPostsPerDay: { type: "number" },
+        postingWindows: { type: "array" },
+        timezone: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "x_agent_train",
+    description: "Add training knowledge or set persona/voice for the X agent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        persona: { type: "string" },
+        voiceNotes: { type: "string" },
+        title: { type: "string" },
+        content: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "x_agent_schedule",
+    description: "Enqueue a post/quote/reply/dm for later (or pending approval).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["post", "quote", "reply", "dm"] },
+        text: { type: "string" },
+        scheduledFor: { type: "string" },
+        quoteTweetId: { type: "string" },
+        replyToTweetId: { type: "string" },
+        username: { type: "string" },
+        recipientId: { type: "string" },
+        linkUrl: { type: "string" },
+        autoApprove: { type: "boolean" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "x_agent_run",
+    description:
+      "Generate a post with NVIDIA NIM now; posts if mode=auto (or forcePost) else queues for approval.",
+    inputSchema: {
+      type: "object",
+      properties: { hint: { type: "string" }, forcePost: { type: "boolean" } },
+    },
+  },
+  {
+    name: "x_agent_list_queue",
+    description: "List recent queue items (drafts/scheduled/posted).",
+    inputSchema: {
+      type: "object",
+      properties: { status: { type: "string" }, limit: { type: "number" } },
+    },
+  },
+  {
+    name: "x_agent_approve",
+    description: "Approve a queue item and post it (postNow default true).",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" }, postNow: { type: "boolean" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "x_agent_cancel",
+    description: "Cancel a pending/scheduled queue item.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+    },
+  },
+  {
     name: "x_help",
-    description: "How to connect OrbitX X MCP to Claude or ChatGPT and post tweets.",
+    description: "How to connect OrbitX X MCP + agent mode to Claude or ChatGPT.",
     inputSchema: { type: "object", properties: {} },
   },
 ];
@@ -435,46 +578,10 @@ async function uploadImageOAuth1a(imageUrl) {
   return mediaId;
 }
 
-async function postTweetOAuth2(accessToken, text, mediaId, replyToTweetId) {
-  const body = { text };
-  if (mediaId) body.media = { media_ids: [mediaId] };
-  if (replyToTweetId) body.reply = { in_reply_to_tweet_id: String(replyToTweetId) };
-
-  const res = await fetch("https://api.twitter.com/2/tweets", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = err?.detail || err?.title || JSON.stringify(err);
-    throw new Error(`Twitter API: ${msg}`);
-  }
-  const data = await res.json();
-  const tweetId = data?.data?.id || null;
-  return {
-    ok: true,
-    tweetId,
-    tweetUrl: tweetId ? `https://x.com/i/web/status/${tweetId}` : null,
-  };
-}
-
-function buildTweetText(rawText, linkUrl) {
-  const text = String(rawText || "").trim();
-  if (!text) throw new Error("text required");
-  const links = [];
-  if (linkUrl) links.push(String(linkUrl).trim());
-  const reserved = links.length * 24 + (links.length ? links.length : 0);
-  const maxBody = Math.max(50, 280 - reserved);
-  let out = text.slice(0, maxBody);
-  if (links.length) out = `${out}\n${links.join("\n")}`;
-  return out;
-}
 
 async function callTool(name, args, auth) {
+  const a = args && typeof args === "object" ? args : {};
+
   if (name === "x_help") {
     return {
       ok: true,
@@ -485,12 +592,13 @@ async function callTool(name, args, auth) {
       tools: TOOLS.map((t) => t.name),
       steps: [
         "Open https://orbitx.world/x and sign in",
-        "Connect your X account (tweet.write)",
+        "Connect X (Reconnect after scope upgrades for DMs)",
         "Create an API key, then Add to Claude or ChatGPT",
-        "Authenticate → approve on /x/mcp-auth",
-        "Ask the AI to call x_post with your tweet text",
+        "Train the agent (persona + knowledge) on /x Agent tab",
+        "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
       ],
-      note: "Separate from OrbitX Agent MCP (/api/mcp). This connector only posts to X.",
+      note: "Modes: auto (generate+post) or approve (draft queue). AI: NVIDIA NIM. Separate from OrbitX Agent MCP (/api/mcp).",
+      env: ["NVIDIA_API_KEY", "TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "CRON_SECRET"],
     };
   }
 
@@ -521,15 +629,27 @@ async function callTool(name, args, auth) {
     };
   }
 
-  if (name === "x_post") {
+  if (name === "x_post" || name === "x_quote" || name === "x_reply") {
     const resolved = await resolveUserAccessToken(auth.userId);
     if (!resolved.ok) return resolved;
 
-    const tweetText = buildTweetText(args.text, args.linkUrl);
+    const quoteId = name === "x_quote" ? String(a.quoteTweetId || a.quote_tweet_id || "").trim() : "";
+    const replyId =
+      name === "x_reply"
+        ? String(a.replyToTweetId || a.reply_to_tweet_id || "").trim()
+        : String(a.replyToTweetId || a.reply_to_tweet_id || "").trim();
+    if (name === "x_quote" && !quoteId) {
+      return { ok: false, error: "quote_tweet_id_required", message: "quoteTweetId is required" };
+    }
+    if (name === "x_reply" && !replyId) {
+      return { ok: false, error: "reply_to_required", message: "replyToTweetId is required" };
+    }
+
+    const tweetText = libBuildTweetText(a.text, a.linkUrl);
     let mediaId = null;
-    if (args.imageUrl) {
+    if (a.imageUrl) {
       try {
-        mediaId = await uploadImageOAuth1a(String(args.imageUrl));
+        mediaId = await uploadImageOAuth1a(String(a.imageUrl));
       } catch (e) {
         return {
           ok: false,
@@ -540,12 +660,12 @@ async function callTool(name, args, auth) {
       }
     }
 
-    const posted = await postTweetOAuth2(
-      resolved.accessToken,
-      tweetText,
+    const posted = await libPostTweet(resolved.accessToken, {
+      text: tweetText,
       mediaId,
-      args.replyToTweetId || null,
-    );
+      replyToTweetId: replyId || null,
+      quoteTweetId: quoteId || null,
+    });
     return {
       ...posted,
       username: resolved.profile?.twitter_username || null,
@@ -553,9 +673,211 @@ async function callTool(name, args, auth) {
     };
   }
 
+  if (name === "x_dm") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    const text = String(a.text || "").trim();
+    if (!text) return { ok: false, error: "text_required", message: "text is required" };
+    let recipientId = String(a.recipientId || a.recipient_id || "").trim();
+    const username = String(a.username || "").replace(/^@/, "").trim();
+    if (!recipientId && username) {
+      const u = await lookupXUser(resolved.accessToken, username);
+      if (!u?.id) return { ok: false, error: "user_not_found", message: `No X user @${username}` };
+      recipientId = u.id;
+    }
+    if (!recipientId) {
+      return { ok: false, error: "recipient_required", message: "username or recipientId is required" };
+    }
+    return sendDmOAuth2(resolved.accessToken, { recipientId, text });
+  }
+
+  if (name === "x_agent_status") {
+    const agent = await ensureXAgent(sb, auth.userId);
+    const knowledge = await listKnowledge(sb, agent.id);
+    return {
+      ok: true,
+      agent: mapAgentRow(agent),
+      knowledgeCount: knowledge.length,
+      models: NIM_MODELS,
+    };
+  }
+
+  if (name === "x_agent_upsert") {
+    const agent = await ensureXAgent(sb, auth.userId);
+    const patch = { updated_at: new Date().toISOString() };
+    if (a.name != null) patch.name = String(a.name).slice(0, 80);
+    if (a.persona != null) patch.persona = String(a.persona).slice(0, 8000);
+    if (a.voiceNotes != null || a.voice_notes != null) {
+      patch.voice_notes = String(a.voiceNotes ?? a.voice_notes).slice(0, 4000);
+    }
+    if (a.model != null) patch.model = String(a.model);
+    if (a.mode === "auto" || a.mode === "approve") patch.mode = a.mode;
+    if (typeof a.enabled === "boolean") patch.enabled = a.enabled;
+    if (Array.isArray(a.topics)) patch.topics = a.topics.map((t) => String(t)).slice(0, 40);
+    if (a.maxPostsPerDay != null || a.max_posts_per_day != null) {
+      patch.max_posts_per_day = Math.max(0, Math.min(48, Number(a.maxPostsPerDay ?? a.max_posts_per_day) || 0));
+    }
+    if (Array.isArray(a.postingWindows) || Array.isArray(a.posting_windows)) {
+      patch.posting_windows = a.postingWindows || a.posting_windows;
+    }
+    if (a.timezone != null) patch.timezone = String(a.timezone).slice(0, 64);
+    const updated = await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+    const row = Array.isArray(updated) ? updated[0] : updated;
+    return { ok: true, agent: mapAgentRow(row) };
+  }
+
+  if (name === "x_agent_train") {
+    const agent = await ensureXAgent(sb, auth.userId);
+    const patch = { updated_at: new Date().toISOString() };
+    if (a.persona != null) patch.persona = String(a.persona).slice(0, 8000);
+    if (a.voiceNotes != null || a.voice_notes != null) {
+      patch.voice_notes = String(a.voiceNotes ?? a.voice_notes).slice(0, 4000);
+    }
+    if (Object.keys(patch).length > 1) {
+      await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+        headers: { Prefer: "return=minimal" },
+      });
+    }
+    let knowledge = null;
+    const content = String(a.content || "").trim();
+    if (content) {
+      const created = await sb("x_agent_knowledge", {
+        method: "POST",
+        body: JSON.stringify({
+          agent_id: agent.id,
+          user_id: auth.userId,
+          title: String(a.title || "Note").slice(0, 120),
+          content: content.slice(0, 12000),
+        }),
+      });
+      knowledge = Array.isArray(created) ? created[0] : created;
+    }
+    const fresh = await ensureXAgent(sb, auth.userId);
+    return { ok: true, agent: mapAgentRow(fresh), knowledge };
+  }
+
+  if (name === "x_agent_schedule") {
+    const agent = await ensureXAgent(sb, auth.userId);
+    const text = String(a.text || "").trim();
+    if (!text) return { ok: false, error: "text_required", message: "text is required" };
+    const kind = ["post", "quote", "reply", "dm"].includes(a.kind) ? a.kind : "post";
+    const scheduledFor = a.scheduledFor || a.scheduled_for || null;
+    const autoApprove = Boolean(a.autoApprove ?? a.auto_approve);
+    const status = scheduledFor ? "scheduled" : autoApprove || agent.mode === "auto" ? "approved" : "pending";
+    const created = await sb("x_agent_queue", {
+      method: "POST",
+      body: JSON.stringify({
+        agent_id: agent.id,
+        user_id: auth.userId,
+        kind,
+        payload: {
+          text,
+          quote_tweet_id: a.quoteTweetId || a.quote_tweet_id || null,
+          quoteTweetId: a.quoteTweetId || a.quote_tweet_id || null,
+          reply_to: a.replyToTweetId || a.reply_to_tweet_id || null,
+          replyToTweetId: a.replyToTweetId || a.reply_to_tweet_id || null,
+          dmRecipientId: a.recipientId || a.recipient_id || null,
+          username: a.username || null,
+          linkUrl: a.linkUrl || a.link_url || null,
+        },
+        status,
+        scheduled_for: scheduledFor,
+        source: "mcp",
+      }),
+    });
+    const row = Array.isArray(created) ? created[0] : created;
+    return { ok: true, item: mapQueueRow(row) };
+  }
+
+  if (name === "x_agent_run") {
+    const agent = await ensureXAgent(sb, auth.userId);
+    const draft = await generateAgentPost(sb, agent, a.hint ? String(a.hint) : null);
+    if (!draft.ok) return draft;
+    const forcePost = Boolean(a.forcePost ?? a.force_post);
+    const shouldPost = forcePost || agent.mode === "auto";
+    if (shouldPost) {
+      const resolved = await resolveUserAccessToken(auth.userId);
+      if (!resolved.ok) return resolved;
+      const posted = await libPostTweet(resolved.accessToken, { text: draft.text });
+      const created = await sb("x_agent_queue", {
+        method: "POST",
+        body: JSON.stringify({
+          agent_id: agent.id,
+          user_id: auth.userId,
+          kind: draft.kind || "post",
+          payload: { text: draft.text },
+          status: "posted",
+          posted_tweet_id: posted.tweetId,
+          source: "mcp",
+        }),
+      });
+      const row = Array.isArray(created) ? created[0] : created;
+      return { ok: true, posted: true, tweet: posted, item: mapQueueRow(row), draft };
+    }
+    const created = await sb("x_agent_queue", {
+      method: "POST",
+      body: JSON.stringify({
+        agent_id: agent.id,
+        user_id: auth.userId,
+        kind: draft.kind || "post",
+        payload: { text: draft.text },
+        status: "pending",
+        source: "mcp",
+      }),
+    });
+    const row = Array.isArray(created) ? created[0] : created;
+    return { ok: true, posted: false, item: mapQueueRow(row), draft };
+  }
+
+  if (name === "x_agent_list_queue") {
+    const limit = Math.min(50, Math.max(1, Number(a.limit) || 20));
+    let q = `x_agent_queue?user_id=eq.${encodeURIComponent(auth.userId)}&order=created_at.desc&limit=${limit}&select=*`;
+    if (a.status) q += `&status=eq.${encodeURIComponent(String(a.status))}`;
+    const rows = await sb(q);
+    return { ok: true, items: (Array.isArray(rows) ? rows : []).map(mapQueueRow) };
+  }
+
+  if (name === "x_agent_approve") {
+    const id = String(a.id || "").trim();
+    if (!id) return { ok: false, error: "id_required", message: "id is required" };
+    const rows = await sb(
+      `x_agent_queue?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(auth.userId)}&limit=1&select=*`,
+    );
+    const item = Array.isArray(rows) ? rows[0] : null;
+    if (!item) return { ok: false, error: "not_found", message: "Queue item not found" };
+    const postNow = a.postNow !== false && a.post_now !== false;
+    if (postNow) {
+      return executeQueueItem(sb, item, resolveUserAccessToken, uploadImageOAuth1a);
+    }
+    const updated = await sb(`x_agent_queue?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "approved", updated_at: new Date().toISOString() }),
+    });
+    const row = Array.isArray(updated) ? updated[0] : updated;
+    return { ok: true, item: mapQueueRow(row) };
+  }
+
+  if (name === "x_agent_cancel") {
+    const id = String(a.id || "").trim();
+    if (!id) return { ok: false, error: "id_required", message: "id is required" };
+    const updated = await sb(
+      `x_agent_queue?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(auth.userId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status: "cancelled", updated_at: new Date().toISOString() }),
+      },
+    );
+    const row = Array.isArray(updated) ? updated[0] : updated;
+    return { ok: true, item: mapQueueRow(row) };
+  }
+
   throw new Error(`Unknown tool: ${name}`);
 }
-
 async function handleAgent(req, res, parts) {
   const route = parts.slice(1).join("/");
 
@@ -688,6 +1010,252 @@ async function handleAgent(req, res, parts) {
     });
   }
 
+  // ── X Agent (NVIDIA) + queue + cron ─────────────────────────────────────
+  if (route === "cron") {
+    if (req.method !== "GET" && req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
+    const cronSecret = process.env.CRON_SECRET || "";
+    const authz = String(header(req, "authorization") || "");
+    const vercelCron = String(header(req, "x-vercel-cron") || "");
+    const ok =
+      (cronSecret && authz === `Bearer ${cronSecret}`) ||
+      Boolean(vercelCron) ||
+      (!cronSecret && process.env.VERCEL !== "1");
+    if (!ok) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const result = await runCronTick(sb, resolveUserAccessToken, uploadImageOAuth1a);
+      return json(res, result);
+    } catch (e) {
+      return json(res, { error: e?.message || "cron_failed" }, 500);
+    }
+  }
+
+  if (route === "models" && req.method === "GET") {
+    return json(res, { models: NIM_MODELS, defaultModel: DEFAULT_NIM_MODEL });
+  }
+
+  if (route === "x-agents" || route === "agents") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    if (req.method === "GET") {
+      const agent = await ensureXAgent(sb, user.id);
+      const knowledge = await listKnowledge(sb, agent.id);
+      return json(res, {
+        agent: mapAgentRow(agent),
+        knowledge: knowledge.map((k) => ({
+          id: k.id,
+          title: k.title,
+          content: k.content,
+          createdAt: k.created_at,
+        })),
+        models: NIM_MODELS,
+      });
+    }
+    if (req.method === "POST" || req.method === "PATCH") {
+      const body = await readBody(req);
+      const agent = await ensureXAgent(sb, user.id);
+      const patch = { updated_at: new Date().toISOString() };
+      if (body.name != null) patch.name = String(body.name).slice(0, 80);
+      if (body.persona != null) patch.persona = String(body.persona).slice(0, 8000);
+      if (body.voiceNotes != null || body.voice_notes != null) {
+        patch.voice_notes = String(body.voiceNotes ?? body.voice_notes).slice(0, 4000);
+      }
+      if (body.model != null) patch.model = String(body.model);
+      if (body.mode === "auto" || body.mode === "approve") patch.mode = body.mode;
+      if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
+      if (Array.isArray(body.topics)) patch.topics = body.topics.map((t) => String(t)).slice(0, 40);
+      if (body.maxPostsPerDay != null || body.max_posts_per_day != null) {
+        patch.max_posts_per_day = Math.max(
+          0,
+          Math.min(48, Number(body.maxPostsPerDay ?? body.max_posts_per_day) || 0),
+        );
+      }
+      if (Array.isArray(body.postingWindows) || Array.isArray(body.posting_windows)) {
+        patch.posting_windows = body.postingWindows || body.posting_windows;
+      }
+      if (body.timezone != null) patch.timezone = String(body.timezone).slice(0, 64);
+      const updated = await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+      const row = Array.isArray(updated) ? updated[0] : updated;
+      return json(res, { agent: mapAgentRow(row) });
+    }
+    return json(res, { error: "method_not_allowed" }, 405);
+  }
+
+  if ((route === "x-agents/train" || route === "agents/train") && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const agent = await ensureXAgent(sb, user.id);
+    const patch = { updated_at: new Date().toISOString() };
+    if (body.persona != null) patch.persona = String(body.persona).slice(0, 8000);
+    if (body.voiceNotes != null || body.voice_notes != null) {
+      patch.voice_notes = String(body.voiceNotes ?? body.voice_notes).slice(0, 4000);
+    }
+    if (Object.keys(patch).length > 1) {
+      await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+        headers: { Prefer: "return=minimal" },
+      });
+    }
+    let knowledge = null;
+    const content = String(body.content || "").trim();
+    if (content) {
+      const created = await sb("x_agent_knowledge", {
+        method: "POST",
+        body: JSON.stringify({
+          agent_id: agent.id,
+          user_id: user.id,
+          title: String(body.title || "Note").slice(0, 120),
+          content: content.slice(0, 12000),
+        }),
+      });
+      knowledge = Array.isArray(created) ? created[0] : created;
+    }
+    const fresh = await ensureXAgent(sb, user.id);
+    const all = await listKnowledge(sb, agent.id);
+    return json(res, {
+      agent: mapAgentRow(fresh),
+      knowledge,
+      knowledgeList: all.map((k) => ({
+        id: k.id,
+        title: k.title,
+        content: k.content,
+        createdAt: k.created_at,
+      })),
+    });
+  }
+
+  if ((route === "x-agents/generate" || route === "agents/generate") && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const agent = await ensureXAgent(sb, user.id);
+    try {
+      const draft = await generateAgentPost(sb, agent, body.hint ? String(body.hint) : null);
+      if (!draft.ok) return json(res, draft, 500);
+      const postNow = Boolean(body.postNow || body.post_now);
+      if (postNow) {
+        const resolved = await resolveUserAccessToken(user.id);
+        if (!resolved.ok) return json(res, resolved, 400);
+        const posted = await libPostTweet(resolved.accessToken, { text: draft.text });
+        const created = await sb("x_agent_queue", {
+          method: "POST",
+          body: JSON.stringify({
+            agent_id: agent.id,
+            user_id: user.id,
+            kind: draft.kind || "post",
+            payload: { text: draft.text },
+            status: "posted",
+            posted_tweet_id: posted.tweetId,
+            source: "ui",
+          }),
+        });
+        const row = Array.isArray(created) ? created[0] : created;
+        return json(res, { ok: true, posted: true, tweet: posted, item: mapQueueRow(row), draft });
+      }
+      const created = await sb("x_agent_queue", {
+        method: "POST",
+        body: JSON.stringify({
+          agent_id: agent.id,
+          user_id: user.id,
+          kind: draft.kind || "post",
+          payload: { text: draft.text },
+          status: agent.mode === "auto" ? "approved" : "pending",
+          source: "ui",
+        }),
+      });
+      const row = Array.isArray(created) ? created[0] : created;
+      return json(res, { ok: true, posted: false, item: mapQueueRow(row), draft });
+    } catch (e) {
+      return json(res, { error: e?.message || "generate_failed" }, 500);
+    }
+  }
+
+  if (route === "queue") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    if (req.method === "GET") {
+      const url = new URL(req.url || "/", "http://local");
+      const qStatus = String(url.searchParams.get("status") || "").trim();
+      let q = `x_agent_queue?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50&select=*`;
+      if (qStatus) q += `&status=eq.${encodeURIComponent(qStatus)}`;
+      const rows = await sb(q);
+      return json(res, { items: (Array.isArray(rows) ? rows : []).map(mapQueueRow) });
+    }
+    if (req.method === "POST") {
+      const body = await readBody(req);
+      const agent = await ensureXAgent(sb, user.id);
+      const text = String(body.text || body.payload?.text || "").trim();
+      if (!text) return json(res, { error: "text is required" }, 400);
+      const kind = ["post", "quote", "reply", "dm"].includes(body.kind) ? body.kind : "post";
+      const scheduledFor = body.scheduledFor || body.scheduled_for || null;
+      const created = await sb("x_agent_queue", {
+        method: "POST",
+        body: JSON.stringify({
+          agent_id: agent.id,
+          user_id: user.id,
+          kind,
+          payload: body.payload || {
+            text,
+            quoteTweetId: body.quoteTweetId || null,
+            replyToTweetId: body.replyToTweetId || null,
+            dmRecipientId: body.recipientId || null,
+            username: body.username || null,
+            linkUrl: body.linkUrl || null,
+          },
+          status: scheduledFor ? "scheduled" : body.status || "pending",
+          scheduled_for: scheduledFor,
+          source: "ui",
+        }),
+      });
+      const row = Array.isArray(created) ? created[0] : created;
+      return json(res, { item: mapQueueRow(row) });
+    }
+    return json(res, { error: "method_not_allowed" }, 405);
+  }
+
+  {
+    const approveMatch = route.match(/^queue\/([^/]+)\/approve$/);
+    if (approveMatch && req.method === "POST") {
+      const user = await getAuthUser(req);
+      if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+      const id = approveMatch[1];
+      const rows = await sb(
+        `x_agent_queue?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(user.id)}&limit=1&select=*`,
+      );
+      const item = Array.isArray(rows) ? rows[0] : null;
+      if (!item) return json(res, { error: "not_found" }, 404);
+      try {
+        const result = await executeQueueItem(sb, item, resolveUserAccessToken, uploadImageOAuth1a);
+        return json(res, { ok: true, result });
+      } catch (e) {
+        return json(res, { error: e?.message || "approve_failed" }, 500);
+      }
+    }
+  }
+
+  {
+    const delMatch = route.match(/^queue\/([^/]+)$/);
+    if (delMatch && req.method === "DELETE") {
+      const user = await getAuthUser(req);
+      if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+      const id = delMatch[1];
+      await sb(
+        `x_agent_queue?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(user.id)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status: "cancelled", updated_at: new Date().toISOString() }),
+          headers: { Prefer: "return=minimal" },
+        },
+      );
+      return json(res, { ok: true });
+    }
+  }
+
+
   // Public setup diagnostics (no secrets) — helps match X developer portal.
   if (route === "oauth/config" && req.method === "GET") {
     const configured = Boolean(TWITTER_CLIENT_ID && TWITTER_CLIENT_SECRET);
@@ -698,13 +1266,14 @@ async function handleAgent(req, res, parts) {
       clientId: TWITTER_CLIENT_ID || null,
       callbackUrl: "https://www.orbitx.world/x-callback",
       websiteUrl: "https://www.orbitx.world",
-      scopes: "tweet.write tweet.read users.read offline.access",
+      scopes: X_OAUTH_SCOPES,
       appTypeRequired: "Web App, Automated App or Bot",
-      permissionsRequired: "Read and write",
+      permissionsRequired: "Read and write (+ DM read/write if available)",
       checklist: [
         "Open developer.x.com → the app whose Client ID matches below",
         "User authentication settings → On",
-        "App permissions → Read and write (not Read-only)",
+        "App permissions → Read and write + DM permissions if available",
+        "Reconnect X after changing scopes (needed for DMs)",
         "Type of App → Web App, Automated App or Bot",
         "Callback URI → https://www.orbitx.world/x-callback (exact, no trailing slash)",
         "Website URL → https://www.orbitx.world",
@@ -748,7 +1317,7 @@ async function handleAgent(req, res, parts) {
       response_type: "code",
       client_id: TWITTER_CLIENT_ID,
       redirect_uri: redirectUri,
-      scope: "tweet.write tweet.read users.read offline.access",
+      scope: X_OAUTH_SCOPES,
       state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
@@ -757,7 +1326,7 @@ async function handleAgent(req, res, parts) {
       authorizeUrl: `https://x.com/i/oauth2/authorize?${params.toString()}`,
       clientId: TWITTER_CLIENT_ID,
       redirectUri,
-      scope: "tweet.write tweet.read users.read offline.access",
+      scope: X_OAUTH_SCOPES,
     });
   }
 

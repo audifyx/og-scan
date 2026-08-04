@@ -147,3 +147,147 @@ export function shortXKey(key: string): string {
   if (key.length < 16) return key;
   return `${key.slice(0, 10)}…${key.slice(-6)}`;
 }
+
+export type XAgentConfig = {
+  id: string;
+  name: string;
+  persona: string;
+  voiceNotes: string;
+  model: string;
+  mode: "auto" | "approve";
+  enabled: boolean;
+  timezone: string;
+  postingWindows: Array<{ startHour?: number; endHour?: number }>;
+  topics: string[];
+  maxPostsPerDay: number;
+  lastAutoRunAt?: string | null;
+};
+
+export type XAgentKnowledge = {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+};
+
+export type XAgentQueueItem = {
+  id: string;
+  agentId: string | null;
+  kind: string;
+  payload: Record<string, unknown>;
+  status: string;
+  scheduledFor?: string | null;
+  postedTweetId?: string | null;
+  error?: string | null;
+  source?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type XNimModel = { id: string; label: string };
+
+export async function fetchXAgent(): Promise<{
+  agent: XAgentConfig;
+  knowledge: XAgentKnowledge[];
+  models: XNimModel[];
+}> {
+  return (await xAgentFetch("/x-agents")) as unknown as {
+    agent: XAgentConfig;
+    knowledge: XAgentKnowledge[];
+    models: XNimModel[];
+  };
+}
+
+export async function upsertXAgent(
+  patch: Partial<{
+    name: string;
+    persona: string;
+    voiceNotes: string;
+    model: string;
+    mode: "auto" | "approve";
+    enabled: boolean;
+    topics: string[];
+    maxPostsPerDay: number;
+    postingWindows: Array<{ startHour?: number; endHour?: number }>;
+    timezone: string;
+  }>,
+): Promise<{ agent: XAgentConfig }> {
+  return (await xAgentFetch("/x-agents", {
+    method: "POST",
+    body: JSON.stringify(patch),
+  })) as unknown as { agent: XAgentConfig };
+}
+
+export async function trainXAgent(payload: {
+  persona?: string;
+  voiceNotes?: string;
+  title?: string;
+  content?: string;
+}): Promise<{
+  agent: XAgentConfig;
+  knowledge: unknown;
+  knowledgeList: XAgentKnowledge[];
+}> {
+  return (await xAgentFetch("/x-agents/train", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })) as unknown as {
+    agent: XAgentConfig;
+    knowledge: unknown;
+    knowledgeList: XAgentKnowledge[];
+  };
+}
+
+export async function generateXAgentPost(payload?: {
+  hint?: string;
+  postNow?: boolean;
+}): Promise<{
+  ok: boolean;
+  posted: boolean;
+  draft?: { text: string; kind?: string; model?: string };
+  item?: XAgentQueueItem;
+  tweet?: { tweetId?: string; tweetUrl?: string };
+  error?: string;
+  message?: string;
+}> {
+  return (await xAgentFetch("/x-agents/generate", {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  })) as unknown as {
+    ok: boolean;
+    posted: boolean;
+    draft?: { text: string; kind?: string; model?: string };
+    item?: XAgentQueueItem;
+    tweet?: { tweetId?: string; tweetUrl?: string };
+    error?: string;
+    message?: string;
+  };
+}
+
+export async function listXAgentQueue(status?: string): Promise<{ items: XAgentQueueItem[] }> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return (await xAgentFetch(`/queue${q}`)) as unknown as { items: XAgentQueueItem[] };
+}
+
+export async function approveXAgentQueueItem(id: string): Promise<{ ok: boolean; result?: unknown }> {
+  return (await xAgentFetch(`/queue/${id}/approve`, { method: "POST" })) as unknown as {
+    ok: boolean;
+    result?: unknown;
+  };
+}
+
+export async function cancelXAgentQueueItem(id: string): Promise<void> {
+  await xAgentFetch(`/queue/${id}`, { method: "DELETE" });
+}
+
+export async function enqueueXAgentItem(payload: {
+  text: string;
+  kind?: string;
+  scheduledFor?: string;
+  status?: string;
+}): Promise<{ item: XAgentQueueItem }> {
+  return (await xAgentFetch("/queue", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })) as unknown as { item: XAgentQueueItem };
+}

@@ -292,6 +292,10 @@
     {
       "path": "/predictions/api/cron/resolve",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/x-mcp?path=agent/cron",
+      "schedule": "* * * * *"
     }
   ]
 }

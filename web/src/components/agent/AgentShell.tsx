@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import "./agent-shell.css";
 
-export type AgentTabId = "setup" | "wallet" | "keys" | "connect";
+export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";
 
 const DEFAULT_TABS: { id: AgentTabId; label: string }[] = [
   { id: "setup", label: "Setup" },
