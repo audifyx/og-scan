@@ -36,6 +36,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   jupSearchToken,
   jupQuote,
+  jupPrice,
   jupSwapTransaction,
   HELIUS_RPC,
   SOL_MINT,
@@ -465,6 +466,10 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     at: number;
   } | null>(null);
   const sellBalRef = useRef<{ mint: string; owner: string; raw: bigint; at: number } | null>(null);
+  const mintDecimalsRef = useRef<Record<string, number>>({});
+  /** Estimated tokens received for current buy SOL amount. */
+  const [buyReceiveUi, setBuyReceiveUi] = useState<number | null>(null);
+  const [buyReceiveLoading, setBuyReceiveLoading] = useState(false);
   const [positions, setPositions] = useState<TokenAsset[]>([]);
   const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [livePos, setLivePos] = useState<LivePosition | null>(null);
@@ -872,6 +877,78 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       clearTimeout(t);
     };
   }, [quoteKey, tradePk, selectedMint, swapMode, buyAmt, sellPct, slippage, resolveSellRaw]);
+
+  /** Live "you receive" token qty under buy SOL amount (quote + price fallback). */
+  useEffect(() => {
+    if (swapMode !== "buy" || !selectedMint) {
+      setBuyReceiveUi(null);
+      setBuyReceiveLoading(false);
+      return;
+    }
+    const sol = Number(buyAmt);
+    if (!Number.isFinite(sol) || sol <= 0) {
+      setBuyReceiveUi(null);
+      setBuyReceiveLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBuyReceiveLoading(true);
+    const t = window.setTimeout(async () => {
+      const lamports = Math.floor(sol * 1e9);
+      const slippageBps = Math.min(Math.max(Math.round((Number(slippage) || 10) * 100), 50), 5000);
+
+      const resolveDecimals = async (): Promise<number> => {
+        const cached = mintDecimalsRef.current[selectedMint];
+        if (typeof cached === "number") return cached;
+        try {
+          const info = await connection.getParsedAccountInfo(new PublicKey(selectedMint));
+          const d = (info.value?.data as { parsed?: { info?: { decimals?: number } } } | undefined)?.parsed
+            ?.info?.decimals;
+          if (typeof d === "number") {
+            mintDecimalsRef.current[selectedMint] = d;
+            return d;
+          }
+        } catch {
+          /* default below */
+        }
+        return 6;
+      };
+
+      try {
+        const q = await jupQuote(SOL_MINT, selectedMint, String(lamports), slippageBps);
+        const decimals = await resolveDecimals();
+        if (cancelled) return;
+        const ui = Number(q.outAmount) / 10 ** decimals;
+        setBuyReceiveUi(Number.isFinite(ui) ? ui : null);
+        // Warm trade cache when wallet is ready
+        const key = quoteKey();
+        if (key) quoteCacheRef.current = { key, quote: q, at: Date.now() };
+      } catch {
+        // Fallback: SOL USD / token USD ≈ tokens received
+        try {
+          const prices = await jupPrice([SOL_MINT, selectedMint]);
+          const solPx = Number(prices[SOL_MINT]?.usdPrice) || 0;
+          const tokPx =
+            Number(prices[selectedMint]?.usdPrice) || Number(selectedToken?.price) || 0;
+          if (!cancelled && solPx > 0 && tokPx > 0) {
+            setBuyReceiveUi((sol * solPx) / tokPx);
+          } else if (!cancelled) {
+            setBuyReceiveUi(null);
+          }
+        } catch {
+          if (!cancelled) setBuyReceiveUi(null);
+        }
+      } finally {
+        if (!cancelled) setBuyReceiveLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [swapMode, buyAmt, selectedMint, selectedToken?.price, slippage, connection, quoteKey]);
 
   const getFreshQuote = useCallback(async (): Promise<JupQuote> => {
     if (!tradePk || !selectedMint) throw new Error("Wallet / mint missing");
@@ -1300,6 +1377,16 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 className="h-11 border-white/[0.1] bg-white/[0.05] font-mono text-base font-semibold"
                 placeholder="0.25"
               />
+              <div className="flex items-center justify-between gap-2 px-0.5">
+                <span className="text-[10px] uppercase tracking-wide text-white/35">You receive</span>
+                <span className="font-mono text-[12px] font-semibold tabular-nums text-white/80">
+                  {buyReceiveLoading && buyReceiveUi == null
+                    ? "…"
+                    : buyReceiveUi != null
+                      ? `≈ ${fmtTok(buyReceiveUi, buyReceiveUi >= 1000 ? 2 : 4)} ${selectedToken?.symbol || "tokens"}`
+                      : "—"}
+                </span>
+              </div>
               <div className="grid grid-cols-4 gap-2">
                 {buyPresets.map((p) => (
                   <button
