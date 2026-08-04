@@ -1,16 +1,16 @@
 /* OrbitX Trade Home — scoped redesign */
 
 .th {
-  --th-bg: #07090c;
-  --th-ink: #f2f5f8;
-  --th-muted: rgba(210, 220, 232, 0.48);
-  --th-faint: rgba(210, 220, 232, 0.2);
-  --th-line: rgba(180, 210, 230, 0.12);
-  --th-card: rgba(255, 255, 255, 0.04);
-  --th-card-hover: rgba(255, 255, 255, 0.075);
-  --th-accent: #7ec8c4;
-  --th-up: #3dd68c;
-  --th-down: #ff6b6b;
+  --th-bg: #05080c;
+  --th-ink: #e8f0f8;
+  --th-muted: rgba(200, 220, 236, 0.52);
+  --th-faint: rgba(200, 220, 236, 0.2);
+  --th-line: rgba(61, 231, 255, 0.14);
+  --th-card: rgba(61, 231, 255, 0.04);
+  --th-card-hover: rgba(61, 231, 255, 0.09);
+  --th-accent: #3de7ff;
+  --th-up: #17ff4d;
+  --th-down: #ff4d5e;
   --th-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --th-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --th-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -32,8 +32,8 @@
   inset: 0 0 auto 0;
   height: 340px;
   background:
-    radial-gradient(ellipse 90% 70% at 12% -10%, rgba(126, 200, 196, 0.12), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 92% 8%, rgba(158, 182, 212, 0.1), transparent 50%),
+    radial-gradient(ellipse 90% 70% at 12% -10%, rgba(61, 231, 255, 0.14), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 92% 8%, rgba(46, 230, 197, 0.1), transparent 50%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 70%);
 }
 
@@ -95,14 +95,14 @@
   margin-top: 2px;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(61, 231, 255, 0.28);
+  background: rgba(61, 231, 255, 0.08);
   font-family: var(--th-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(244, 244, 242, 0.65);
+  color: rgba(61, 231, 255, 0.9);
 }
 
 .th__live-dot {
@@ -110,7 +110,13 @@
   height: 6px;
   border-radius: 999px;
   background: var(--th-up);
-  box-shadow: 0 0 0 2px rgba(61, 214, 140, 0.18);
+  box-shadow: 0 0 0 3px rgba(23, 255, 77, 0.22);
+  animation: th-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes th-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
 }
 
 /* Spotlight — mobile = one compact row; desktop = 3 equal tiles */

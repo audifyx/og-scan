@@ -28,23 +28,30 @@ export async function evmTrades(gtNet, pool, mint, limit = 100) {
   try {
     const raw = await fetch(
       `${GT}/networks/${gtNet}/pools/${pool}/trades?trade_volume_in_usd_greater_than=0`,
-      { headers: GT_HDR }
+      { headers: { ...GT_HDR, "User-Agent": "OrbitXDEX/1.0" } }
     ).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const rows = raw?.data || [];
-    const base = String(mint).toLowerCase();
+    const base = String(mint || "").toLowerCase();
     return rows.slice(0, limit).map((t) => {
       const a = t.attributes || {};
-      const toIsBase = String(a.to_token_address || "").toLowerCase() === base;
+      const from = String(a.from_token_address || "").toLowerCase();
+      const to = String(a.to_token_address || "").toLowerCase();
+      let side;
+      if (base && to === base) side = "buy";
+      else if (base && from === base) side = "sell";
+      else side = a.kind === "sell" ? "sell" : "buy";
+      const useTo = base ? to === base : side === "buy";
       return {
         time:        a.block_timestamp || null,
-        side:        a.kind === "sell" ? "sell" : "buy",
-        priceUsd:    n(toIsBase ? a.price_to_in_usd : a.price_from_in_usd),
-        tokenAmount: n(toIsBase ? a.to_token_amount : a.from_token_amount),
+        side,
+        priceUsd:    n(useTo ? a.price_to_in_usd : a.price_from_in_usd),
+        tokenAmount: n(useTo ? a.to_token_amount : a.from_token_amount),
         volumeUsd:   n(a.volume_in_usd),
         owner:       a.tx_from_address || null,
         txHash:      a.tx_hash || null,
+        dex:         "geckoterminal",
       };
-    }).filter((x) => x.volumeUsd != null);
+    }).filter((x) => x.volumeUsd != null || x.tokenAmount != null);
   } catch { return []; }
 }
 

@@ -276,26 +276,33 @@ export default async function handler(req, res) {
 
     // Live trades fallback when INTEL_FN is down / Birdeye empty — same
     // GeckoTerminal path EVM already uses so Solana Live Trades isn't blank.
+    // Never pass the mint itself as a "pool" (Jupiter firstPool.id sometimes is the CA).
     if (!intelOut?.trades?.length) {
-      const pool = best?.pairAddress || token?.firstPool?.id || null;
-      if (pool) {
-        const gtTrades = await evmTrades("solana", pool, mint, 100).catch(() => []);
+      const rawPool = best?.pairAddress || token?.firstPool?.id || null;
+      const poolId = rawPool && String(rawPool).includes("_") ? String(rawPool).split("_").pop() : rawPool;
+      const pool = poolId && poolId !== mint ? poolId : null;
+      const tryPools = [pool, ...(pairs || []).map((p) => p.pairAddress)].filter(Boolean);
+      const uniq = [...new Set(tryPools)].slice(0, 2);
+      for (const p of uniq) {
+        const gtTrades = await evmTrades("solana", p, mint, 100).catch(() => []);
         if (gtTrades?.length) {
-          const normalized = gtTrades.map((tr) => ({
-            ...tr,
-            kind: tr.side,
-            usd: tr.volumeUsd,
-            amountUsd: tr.volumeUsd,
-            amount: tr.tokenAmount,
-            wallet: tr.owner,
-            time: tr.time
-              ? (typeof tr.time === "number"
-                ? (tr.time < 1e12 ? tr.time * 1000 : tr.time)
-                : new Date(tr.time).getTime())
-              : null,
-            dex: tr.dex || "geckoterminal",
-          }));
+          const normalized = gtTrades.map((tr) => {
+            let time = tr.time;
+            if (typeof time === "string") time = new Date(time).getTime();
+            else if (typeof time === "number" && time > 0 && time < 1e12) time = time * 1000;
+            return {
+              ...tr,
+              kind: tr.side,
+              usd: tr.volumeUsd,
+              amountUsd: tr.volumeUsd,
+              amount: tr.tokenAmount,
+              wallet: tr.owner,
+              time: Number.isFinite(time) ? time : null,
+              dex: tr.dex || "geckoterminal",
+            };
+          });
           intelOut = { ...(intelOut || { ok: true }), ok: true, trades: normalized, tradesSource: "geckoterminal" };
+          break;
         }
       }
     }

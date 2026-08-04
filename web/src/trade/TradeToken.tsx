@@ -391,17 +391,17 @@ export default function TradeToken() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-black">
-        <Loader2 className="h-7 w-7 animate-spin text-white/30" />
+      <div className="flex h-full items-center justify-center bg-[#05080c]">
+        <Loader2 className="h-7 w-7 animate-spin text-[#3de7ff]/60" />
       </div>
     );
   }
 
   if (!d || (!d.token && !d.meta)) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-black px-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#05080c] px-6 text-center">
         <p className="text-sm text-white/40">No token found for this address</p>
-        <button type="button" onClick={() => navigate("/trade")} className="text-sm text-white underline">
+        <button type="button" onClick={() => navigate("/trade")} className="text-sm text-[#3de7ff] underline">
           Back to markets
         </button>
       </div>
@@ -409,21 +409,34 @@ export default function TradeToken() {
   }
 
   return (
-    <div className="h-full overflow-y-auto overscroll-contain bg-black pb-44">
+    <div
+      className="h-full overflow-y-auto overscroll-contain pb-44"
+      style={{
+        background:
+          "radial-gradient(ellipse 80% 40% at 50% -8%, rgba(61,231,255,0.1), transparent 55%), #05080c",
+      }}
+    >
       {picker}
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-black/95 px-3 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-[rgba(61,231,255,0.14)] bg-[#05080c]/92 px-3 py-3 backdrop-blur">
         <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p className="truncate text-sm font-bold">{symbol}</p>
-            {verified && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-white/70">✓</span>}
+            {verified && <span className="rounded bg-[#3de7ff]/15 px-1.5 py-0.5 text-[9px] font-bold text-[#3de7ff]">✓</span>}
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#17ff4d]/12 px-1.5 py-0.5 text-[9px] font-semibold text-[#17ff4d]">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#17ff4d]" />
+              Live
+            </span>
           </div>
           <p className="truncate text-[11px] text-white/35">{name}</p>
         </div>
-        <Link to={`/trade/desk/${mint}`} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">
+        <Link
+          to={`/trade/desk/${mint}`}
+          className="rounded-full bg-gradient-to-br from-[#3de7ff] to-[#2ee6c5] px-4 py-2 text-xs font-bold text-[#041016] shadow-[0_0_18px_rgba(61,231,255,0.28)]"
+        >
           Trade
         </Link>
       </div>
@@ -674,33 +687,36 @@ export default function TradeToken() {
               </div>
             ) : (
               holderList.slice(0, 40).map((h: any, i: number) => {
-                const addr = h.owner || h.address;
+                const addr = h.owner || h.address || h.wallet;
+                const amt = h.uiAmount ?? h.amount ?? h.holdingAmount ?? h.tokens;
+                const val = h.usdValue ?? h.holdingUsd ?? h.usd ?? h.value;
                 const bought = h.boughtUsd ?? h.bought ?? h.buyVol;
                 const sold = h.soldUsd ?? h.sold ?? h.sellVol;
                 const pnl = h.netPnl ?? h.pnl;
+                const pct = h.pct ?? h.percentage ?? h.holdingPct;
                 return (
                   <Link
                     key={addr || i}
                     to={`/trade/wallet/${addr}`}
-                    className="flex items-center justify-between rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
+                    className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.03] px-2.5 py-2 hover:border-[rgba(61,231,255,0.2)] hover:bg-[rgba(61,231,255,0.06)]"
                   >
                     <div>
                       <p className="font-mono text-xs">
                         #{h.rank || i + 1} {shortAddr(addr || "", 5)}
-                        {h.label ? <span className="ml-1 text-white/30">· {h.label}</span> : null}
+                        {h.label ? <span className="ml-1 text-[#3de7ff]/70">· {h.label}</span> : null}
                       </p>
                       <p className="text-[10px] text-white/30">
-                        {h.uiAmount != null ? fmtTok(Number(h.uiAmount)) : "—"}
+                        {amt != null ? fmtTok(Number(amt)) : "—"}
                         {bought != null ? ` · bought ${fmtUsd(bought)}` : ""}
                         {sold != null ? ` · sold ${fmtUsd(sold)}` : ""}
                         {h.buys != null || h.sells != null ? ` · ${h.buys ?? 0}B/${h.sells ?? 0}S` : ""}
                       </p>
                     </div>
                     <div className="text-right font-mono text-xs">
-                      <p>{h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "—"}</p>
-                      <p className="text-white/40">{fmtUsd(h.usdValue ?? h.holdingUsd ?? h.usd)}</p>
+                      <p>{pct != null ? `${Number(pct).toFixed(2)}%` : "—"}</p>
+                      <p className="text-white/40">{fmtUsd(val)}</p>
                       {pnl != null && (
-                        <p className={Number(pnl) >= 0 ? "text-green-400" : "text-red-400"}>{fmtPnl(Number(pnl))}</p>
+                        <p className={Number(pnl) >= 0 ? "text-[#17ff4d]" : "text-[#ff4d5e]"}>{fmtPnl(Number(pnl))}</p>
                       )}
                     </div>
                   </Link>
@@ -812,10 +828,11 @@ export default function TradeToken() {
         {tab === "trades" && (
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
-              <Flame className="h-3.5 w-3.5" /> Live trades
-              {trades.length ? (
-                <span className="font-normal normal-case tracking-normal text-white/35">· {trades.length}</span>
-              ) : null}
+              <Flame className="h-3.5 w-3.5 text-[#3de7ff]" /> Live trades
+              <span className="inline-flex items-center gap-1 font-normal normal-case tracking-normal text-[#17ff4d]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#17ff4d]" />
+                {trades.length ? `${trades.length}` : "—"}
+              </span>
             </h3>
             {!trades.length ? (
               <div className="space-y-2 py-6 text-center">

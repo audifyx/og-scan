@@ -102,26 +102,24 @@ export async function fetchTokenBundle(mint: string) {
   // Normalize nested holders/traders/trades from whichever payload has them.
   // `holders` here is the top-N sample list; total count is `holderCount`.
   const intel = token?.intel || {};
-  const holders =
+  const holders = (
     (Array.isArray(traders?.holders) && traders.holders.length ? traders.holders : null) ||
     (Array.isArray(intel.holders) && intel.holders.length ? intel.holders : null) ||
     (Array.isArray(token?.holders) && token.holders.length ? token.holders : []) ||
-    [];
+    []
+  ).map(normalizeHolderRow).filter(Boolean);
   const traderList = (
     (Array.isArray(traders?.traders) && traders.traders.length ? traders.traders : null) ||
     (Array.isArray(intel.traders) && intel.traders.length ? intel.traders : []) ||
     []
   ).map(normalizeTraderRow);
-  // Prefer token intel tape, then traders API tape (GT), then token.recentTrades.
-  const rawTape =
-    (Array.isArray(intel.trades) && intel.trades.length ? intel.trades : null) ||
-    (Array.isArray(traders?.trades) && traders.trades.length ? traders.trades : null) ||
-    (Array.isArray(token?.token?.recentTrades) && token.token.recentTrades.length
-      ? token.token.recentTrades
-      : null) ||
-    (Array.isArray(token?.recentTrades) ? token.recentTrades : []) ||
-    [];
-  const tradeTape = rawTape.map(normalizeTradeRow).filter((t) => t.side || t.usd != null || t.txHash);
+  // Merge tapes from all sources (CDN may briefly cache empty GT responses).
+  const tradeTape = mergeTradeTapes([
+    intel.trades,
+    traders?.trades,
+    token?.token?.recentTrades,
+    token?.recentTrades,
+  ]);
 
   const sampleLen = holders.length;
   const rawIntel = Number(traders?.holderCount ?? intel?.holderCount ?? token?.meta?.holderCount ?? token?.token?.holderCount);
@@ -242,6 +240,59 @@ function numOrNull(v: unknown): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Merge + dedupe trade tapes from intel / traders / recentTrades. */
+function mergeTradeTapes(sources: Array<any[] | null | undefined>): any[] {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  for (const src of sources) {
+    if (!Array.isArray(src) || !src.length) continue;
+    for (const raw of src) {
+      const t = normalizeTradeRow(raw);
+      if (!t || (t.usd == null && t.tokenAmount == null && !t.txHash && !t.owner)) continue;
+      const key =
+        (t.txHash && String(t.txHash)) ||
+        `${t.owner || ""}|${t.time || ""}|${t.side || ""}|${t.usd ?? ""}|${t.tokenAmount ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(t);
+    }
+  }
+  out.sort((a, b) => (Number(b.time) || 0) - (Number(a.time) || 0));
+  return out;
+}
+
+/** Map API holder keys → UI-stable fields (amount/value/bought/sold). */
+function normalizeHolderRow(raw: any) {
+  if (!raw || typeof raw !== "object") return null;
+  const owner = raw.owner || raw.address || raw.wallet || raw.tokenAccount;
+  if (!owner) return null;
+  const uiAmount = numOrNull(raw.uiAmount ?? raw.amount ?? raw.balance ?? raw.holdingAmount ?? raw.tokens) ?? 0;
+  const usdValue = numOrNull(raw.usdValue ?? raw.holdingUsd ?? raw.usd ?? raw.value);
+  const buyVol = numOrNull(raw.buyVol ?? raw.boughtUsd ?? raw.bought ?? raw.buyUsd);
+  const sellVol = numOrNull(raw.sellVol ?? raw.soldUsd ?? raw.sold ?? raw.sellUsd);
+  const netPnl = numOrNull(raw.netPnl ?? raw.pnl ?? raw.pnlUsd);
+  return {
+    ...raw,
+    owner,
+    uiAmount,
+    amount: uiAmount,
+    pct: numOrNull(raw.pct ?? raw.percentage ?? raw.percent ?? raw.holdingPct),
+    usdValue,
+    holdingUsd: usdValue,
+    buyVol,
+    sellVol,
+    boughtUsd: buyVol,
+    bought: buyVol,
+    soldUsd: sellVol,
+    sold: sellVol,
+    realizedPnl: numOrNull(raw.realizedPnl ?? raw.realized),
+    unrealizedPnl: numOrNull(raw.unrealizedPnl ?? raw.unrealized),
+    netPnl,
+    pnl: netPnl,
+    label: raw.label || null,
+  };
 }
 
 /** Map API trader keys → UI-stable fields (bought/sold/holding/pnl aliases). */

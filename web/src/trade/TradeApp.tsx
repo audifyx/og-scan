@@ -76,7 +76,14 @@ export default function TradeApp() {
         <header className="tx-header">
           <div className="tx-header__bg" />
           <div className="tx-header__brand">
-            <div className="tx-header__mark">OX</div>
+            <img
+              src="/favicon.png"
+              alt="OrbitX"
+              width={30}
+              height={30}
+              className="tx-header__mark"
+              decoding="async"
+            />
             <div>
               <p className="tx-header__name">OrbitX</p>
               <p className="tx-header__sub">{title}</p>
