@@ -79,8 +79,14 @@ export type XMcpBootstrap = {
 
 async function authHeaders(): Promise<HeadersInit> {
   const { supabase } = await import("@/lib/supabase");
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const sessionPromise = supabase.auth.getSession();
+  const timed = await Promise.race([
+    sessionPromise,
+    new Promise<never>((_, rej) =>
+      setTimeout(() => rej(new Error("Auth session timed out — refresh and sign in again")), 8000),
+    ),
+  ]);
+  const token = timed.data.session?.access_token;
   if (!token) throw new Error("Not signed in");
   return {
     Authorization: `Bearer ${token}`,
