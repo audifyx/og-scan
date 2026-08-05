@@ -5,7 +5,7 @@
  *   1. Flat $1.50 Orbitx launch fee -> PLATFORM_WALLET (same fee as pump lane)
  *   2. Create mint account (TransferFeeConfig + MetadataPointer extensions)
  *   3. TransferFeeConfig: 0.45% on every buy/sell — OrbitX trading fee
- *      (75% creator / 25% platform at claim time)
+ *      (87% creator / 13% platform at claim time)
  *      pump.fun charges on its bonding curve. Fees accrue on-chain, withheld
  *      per token account, and are claimable ONLY by the creator wallet
  *      (withdraw-withheld authority) at /orbitxlaunch/claim.

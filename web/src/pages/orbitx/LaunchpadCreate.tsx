@@ -851,7 +851,7 @@ export default function LaunchpadCreate() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <Badge className={launched.flagged ? "border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]" : "border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 text-[hsl(var(--og-lime))]"}>
-                0.45% creator fee (75% you / 25% platform) → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
+                0.45% creator fee (87% you / 13% platform) → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
               </Badge>
               {launched.poolId && <Badge className="border-[hsl(var(--og-cyan))]/40 bg-[hsl(var(--og-cyan))]/10 text-[hsl(var(--og-cyan))]">Raydium pool live</Badge>}
               {launched.lpBurned && <Badge className="border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]">LP burned</Badge>}

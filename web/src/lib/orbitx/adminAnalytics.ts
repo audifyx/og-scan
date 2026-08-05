@@ -1,7 +1,7 @@
 // OrbitX Launchpad admin analytics — derived from the token registry + live
 // on-chain wallet balances/inflows. No mock data.
 import { HELIUS_RPC, HELIUS_API_KEY } from "@/lib/og";
-import { PLATFORM_WALLET } from "@/lib/platformFee";
+import { PLATFORM_WALLET, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { ROUTED_FEE_WALLET } from "./feeRouting";
 import type { OrbitxToken } from "./registry";
 
@@ -137,7 +137,7 @@ export interface FeeWallet {
 
 export async function fetchFeeWallets(): Promise<FeeWallet[]> {
   const defs = [
-    { label: "Routed revenue (25% of trade fees)", wallet: ROUTED_FEE_WALLET },
+    { label: `Routed revenue (${TRADE_FEE_PLATFORM_SHARE_PCT}% of trade fees)`, wallet: ROUTED_FEE_WALLET },
     { label: "Platform (launch + swap fees)", wallet: PLATFORM_WALLET },
   ];
   return Promise.all(

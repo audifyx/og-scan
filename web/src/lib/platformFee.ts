@@ -5,11 +5,11 @@
      routed to the platform wallet's ATA via Jupiter's feeAccount.
    - Trading fee: 0.45% per buy/sell on OrbitX-launched tokens.
      Of every $1 of trading fees claimed:
-       · $0.25 (25%) → admin (ROUTED_FEE_WALLET, claimable on Launchpad Admin)
-       · $0.75 (75%) → token creator (Claim Fees page)
+       · $0.13 (13%) → admin (ROUTED_FEE_WALLET, claimable on Launchpad Admin)
+       · $0.87 (87%) → token creator (Claim Fees page)
      Custom lane: enforced on-chain via Token-2022 transfer-fee (see token22.ts).
      Pump lane: pump.fun accrues creator fees to the vault; OrbitX skims the
-     25% platform share at claim time (see feeRouting.ts). */
+     13% platform share at claim time (see feeRouting.ts). */
 import { PublicKey } from "@solana/web3.js";
 
 export const PLATFORM_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
@@ -28,10 +28,10 @@ export const CREATOR_FEE_BPS = 45;
 
 /**
  * How claimed trading fees split (must sum to 100).
- * Example: $1 of fees → $0.25 admin dashboard, $0.75 creator.
+ * Example: $1 of fees → $0.13 admin dashboard, $0.87 creator.
  */
-export const TRADE_FEE_PLATFORM_SHARE_PCT = 25;
-export const TRADE_FEE_CREATOR_SHARE_PCT = 75;
+export const TRADE_FEE_PLATFORM_SHARE_PCT = 13;
+export const TRADE_FEE_CREATOR_SHARE_PCT = 87;
 
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");

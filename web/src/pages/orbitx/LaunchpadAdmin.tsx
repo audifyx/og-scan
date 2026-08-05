@@ -23,6 +23,7 @@ import {
   PLATFORM_FEE_SOURCES,
 } from "@/lib/orbitx/platformFeeClaim";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
+import { TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { useSolUsd } from "./lpx";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
@@ -148,7 +149,7 @@ function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
           <div>
             <div className="text-sm font-bold text-foreground">Claim platform fees</div>
             <div className="text-[11px] text-muted-foreground">
-              25% of trade fees from launchpad tokens (of every $1: $0.25 here · $0.75 to creators). Connect a fee wallet, then sweep SOL to your payout address.
+              {TRADE_FEE_PLATFORM_SHARE_PCT}% of trade fees from launchpad tokens (of every $1: ${(TRADE_FEE_PLATFORM_SHARE_PCT / 100).toFixed(2)} here · ${(TRADE_FEE_CREATOR_SHARE_PCT / 100).toFixed(2)} to creators). Connect a fee wallet, then sweep SOL to your payout address.
             </div>
           </div>
         </div>

@@ -11,7 +11,7 @@ import {
   LAMPORTS_PER_SOL,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
-import { PLATFORM_WALLET } from "@/lib/platformFee";
+import { PLATFORM_WALLET, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { ROUTED_FEE_WALLET } from "./feeRouting";
 import { getPumpClaimableSol, buildPumpClaimTransaction } from "./claim";
 
@@ -20,7 +20,11 @@ export const FEE_WALLET_RESERVE_LAMPORTS = 5_000_000; // 0.005 SOL
 
 export const PLATFORM_FEE_SOURCES = [
   { id: "platform", label: "Platform (launch + swap fees)", wallet: PLATFORM_WALLET },
-  { id: "routed", label: "Routed revenue (25% of trade fees)", wallet: ROUTED_FEE_WALLET },
+  {
+    id: "routed",
+    label: `Routed revenue (${TRADE_FEE_PLATFORM_SHARE_PCT}% of trade fees)`,
+    wallet: ROUTED_FEE_WALLET,
+  },
 ] as const;
 
 export type PlatformFeeSourceId = (typeof PLATFORM_FEE_SOURCES)[number]["id"];

@@ -110,7 +110,7 @@ export const LAUNCH_PROVIDERS: LaunchProviderDef[] = [
   {
     id: "orbitx-token22", name: "OrbitX Custom · Token-2022", chains: ["solana"], status: "live",
     api: "on-chain — tx built in your browser (keyless)",
-    desc: "Your own mint with on-chain 0.45% creator fee (75% you / 25% platform), revocable authorities, optional Raydium pool and OBX vanity address.",
+    desc: "Your own mint with on-chain 0.45% creator fee (87% you / 13% platform), revocable authorities, optional Raydium pool and OBX vanity address.",
     route: "/orbitxlaunch/create/custom",
   },
   {
