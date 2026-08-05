@@ -843,3 +843,276 @@
   color: var(--xh-muted);
   font-size: 0.9rem;
 }
+
+/* MCP Matrix — CSS 3D capability map */
+.xh-matrix {
+  display: grid;
+  gap: 1rem;
+}
+
+.xh-matrix__intro h2 {
+  margin: 0.15rem 0 0.4rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.xh-matrix__intro p {
+  margin: 0;
+  color: var(--xh-muted);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.xh-matrix__kicker {
+  color: var(--xh-ox);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.xh-matrix__signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+}
+
+.xh-matrix__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.xh-matrix__filter {
+  border: 1px solid var(--xh-line);
+  background: transparent;
+  color: var(--xh-muted);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.xh-matrix__filter.is-on {
+  color: #fff;
+  background: rgba(29, 155, 240, 0.18);
+  border-color: rgba(29, 155, 240, 0.55);
+}
+
+.xh-matrix__stage {
+  position: relative;
+  height: min(360px, 58vw);
+  border: 1px solid var(--xh-line);
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(29, 155, 240, 0.16), transparent 55%),
+    radial-gradient(ellipse at 70% 80%, rgba(94, 234, 212, 0.1), transparent 45%),
+    linear-gradient(180deg, #05080c, #000);
+  perspective: 900px;
+}
+
+.xh-matrix__orbit {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: xh-matrix-spin 28s linear infinite;
+}
+
+.xh-matrix__core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px;
+  height: 72px;
+  margin: -36px 0 0 -36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, #1d9bf0, #052033 70%);
+  box-shadow: 0 0 40px rgba(29, 155, 240, 0.45);
+  transform: translateZ(60px);
+  z-index: 2;
+}
+
+.xh-matrix__core span {
+  font-weight: 900;
+  font-size: 1.4rem;
+  letter-spacing: -0.04em;
+}
+
+.xh-matrix__core small {
+  position: absolute;
+  bottom: 10px;
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.xh-matrix__node {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 14, 18, 0.82);
+  color: var(--xh-text);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  animation: xh-matrix-float 4.5s ease-in-out infinite;
+}
+
+.xh-matrix__node em {
+  font-style: normal;
+}
+
+.xh-matrix__node.is-active,
+.xh-matrix__node:hover {
+  border-color: var(--xh-accent);
+  background: rgba(29, 155, 240, 0.2);
+  box-shadow: 0 0 18px rgba(29, 155, 240, 0.35);
+  z-index: 3;
+}
+
+.xh-matrix__node--dm {
+  border-color: rgba(94, 234, 212, 0.35);
+}
+.xh-matrix__node--agent {
+  border-color: rgba(250, 204, 21, 0.35);
+}
+.xh-matrix__node--auth {
+  border-color: rgba(244, 33, 46, 0.35);
+}
+
+.xh-matrix__detail {
+  border: 1px solid var(--xh-line);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.xh-matrix__detail-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.xh-matrix__detail-top code,
+.xh-matrix__detail p code,
+.xh-matrix__row-name {
+  font-family: var(--xh-mono);
+  font-size: 0.78rem;
+}
+
+.xh-matrix__detail h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.xh-matrix__detail p {
+  margin: 0 0 0.55rem;
+  color: var(--xh-muted);
+  line-height: 1.4;
+}
+
+.xh-matrix__menu {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 280px;
+  overflow: auto;
+  border-top: 1px solid var(--xh-line);
+  padding-top: 0.5rem;
+}
+
+.xh-matrix__row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0.5rem 0.4rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.xh-matrix__row:hover,
+.xh-matrix__row.is-active {
+  background: var(--xh-hover);
+}
+
+.xh-matrix__row-title {
+  color: var(--xh-muted);
+  font-size: 0.82rem;
+}
+
+.xh-matrix__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--xh-accent);
+}
+
+.xh-matrix__dot--dm {
+  background: var(--xh-ox);
+}
+.xh-matrix__dot--agent {
+  background: #facc15;
+}
+.xh-matrix__dot--auth {
+  background: var(--xh-danger);
+}
+.xh-matrix__dot--meta {
+  background: var(--xh-muted);
+}
+
+@keyframes xh-matrix-spin {
+  from {
+    transform: rotateY(0deg) rotateX(12deg);
+  }
+  to {
+    transform: rotateY(360deg) rotateX(12deg);
+  }
+}
+
+@keyframes xh-matrix-float {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xh-matrix__orbit,
+  .xh-matrix__node {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .xh-matrix__stage {
+    height: 280px;
+  }
+  .xh-matrix__node {
+    font-size: 0.65rem;
+    padding: 0.28rem 0.5rem;
+  }
+}

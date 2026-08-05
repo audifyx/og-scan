@@ -30,9 +30,10 @@ import {
   type XMcpBootstrap,
   type XNimModel,
 } from "@/lib/xMcp";
+import XMcpMatrix from "@/components/x/XMcpMatrix";
 import "./x-hub.css";
 
-type HubTab = "home" | "account" | "agent" | "queue" | "connect" | "messages";
+type HubTab = "home" | "account" | "agent" | "queue" | "connect" | "messages" | "matrix";
 
 const NAV: { id: HubTab; label: string; ico: string }[] = [
   { id: "home", label: "Home", ico: "⌂" },
@@ -40,6 +41,7 @@ const NAV: { id: HubTab; label: string; ico: string }[] = [
   { id: "messages", label: "Messages", ico: "✉" },
   { id: "agent", label: "Agent", ico: "✦" },
   { id: "queue", label: "Queue", ico: "☰" },
+  { id: "matrix", label: "Matrix", ico: "◈" },
   { id: "connect", label: "Connect", ico: "⬡" },
 ];
 
@@ -563,7 +565,9 @@ export default function XMcpPage() {
             ? "Agent"
             : tab === "queue"
               ? "Queue"
-              : "Connect";
+              : tab === "matrix"
+                ? "Matrix"
+                : "Connect";
 
   const aside = (
     <>
@@ -826,18 +830,28 @@ export default function XMcpPage() {
               </div>
               {boot?.x?.scopes != null && boot.x.hasTweetWrite === false && (
                 <div className="xh__alert">
-                  Token is missing tweet.write. Revoke OrbitX at x.com/settings/connected_apps, stay signed in, then
-                  Reconnect.
+                  No write permission on this token (missing tweet.write). Revoke OrbitX at x.com/settings/connected_apps,
+                  stay signed in here, then Reconnect once. Tokens now refresh automatically — you should not need to
+                  re-auth every session.
                 </div>
               )}
               {boot?.x?.hasTweetWrite === true && (
                 <p className="xh__note">
-                  Token includes tweet.write{boot.x.hasDmWrite ? " + dm.write" : ""}.
+                  Write OK: tweet.write{boot.x.hasDmWrite ? " + dm.write" : ""}. Refresh is automatic — reconnect only if
+                  posting fails with 403.
                 </p>
               )}
+              {boot?.x?.scopes ? (
+                <p className="xh__note" style={{ fontFamily: "var(--xh-mono)", fontSize: "0.75rem" }}>
+                  Granted: {boot.x.scopes}
+                </p>
+              ) : null}
               <div className="xh__btn-row">
                 <button type="button" className="xh__btn xh__btn--primary" disabled={connectingX} onClick={onConnectX}>
                   {connectingX ? "Redirecting…" : "Reconnect X"}
+                </button>
+                <button type="button" className="xh__btn" onClick={() => setTab("matrix")}>
+                  Open Matrix
                 </button>
                 <button
                   type="button"
@@ -1203,6 +1217,17 @@ export default function XMcpPage() {
               );
             })
           )}
+        </div>
+      )}
+
+      {tab === "matrix" && (
+        <div className="xh__section-pad">
+          <XMcpMatrix
+            xConnected={xConnected}
+            hasTweetWrite={boot?.x?.hasTweetWrite}
+            hasDmWrite={boot?.x?.hasDmWrite}
+            hasKey={hasKey}
+          />
         </div>
       )}
 

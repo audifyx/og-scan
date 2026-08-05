@@ -31,6 +31,7 @@ import {
   executeQueueItem,
   runCronTick,
   processAutoReplies,
+  patchXAgent,
 } from "./orbitx/x-agent-lib.js";
 
 export const config = { maxDuration: 60 };
@@ -540,6 +541,8 @@ async function sb(path, init = {}) {
   if (!r.ok) {
     const err = new Error(data?.message || data?.error || data?.raw || text || r.statusText);
     err.status = r.status;
+    err.code = data?.code || null;
+    err.details = data?.details || null;
     throw err;
   }
   return data;
@@ -593,6 +596,24 @@ function extractBearerToken(req) {
   return { token, bearerPresent: true };
 }
 
+const LINK_AUTH_TTL_MS = 365 * 86400 * 1000; // authorize once — stay linked for a year
+const LINK_AUTH_SLIDE_MS = 30 * 86400 * 1000; // extend when under 30 days left
+
+async function touchLinkAuthExpiry(row) {
+  if (!row?.code) return;
+  const left = new Date(row.expires_at).getTime() - Date.now();
+  if (left > LINK_AUTH_SLIDE_MS) return;
+  try {
+    await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(row.code)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ expires_at: new Date(Date.now() + LINK_AUTH_TTL_MS).toISOString() }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
+
 async function resolveLinkAuth({ authCode, mcpSessionId } = {}) {
   const code = String(authCode || "").trim();
   const sessionId = String(mcpSessionId || "").trim();
@@ -604,6 +625,7 @@ async function resolveLinkAuth({ authCode, mcpSessionId } = {}) {
       const row = Array.isArray(rows) ? rows[0] : null;
       if (row && row.status === "completed" && row.user_id) {
         if (new Date(row.expires_at).getTime() < Date.now()) return null;
+        await touchLinkAuthExpiry(row);
         return {
           userId: row.user_id,
           agentId: row.agent_id,
@@ -620,6 +642,7 @@ async function resolveLinkAuth({ authCode, mcpSessionId } = {}) {
       );
       const row = Array.isArray(rows) ? rows[0] : null;
       if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
+        await touchLinkAuthExpiry(row);
         return {
           userId: row.user_id,
           agentId: row.agent_id,
@@ -840,8 +863,9 @@ async function completeLinkAuthSession({ code, userId }) {
     /* optional */
   }
 
-  // Keep link usable for the chat (7 days) after approve — Grok passes authCode in tool args.
-  const linkExpires = new Date(Date.now() + 7 * 86400 * 1000).toISOString();
+  // Keep link usable for a year after approve — Grok/Claude pass authCode in tool args.
+  // Sliding expiry on each successful resolve keeps "auth once" sessions alive.
+  const linkExpires = new Date(Date.now() + LINK_AUTH_TTL_MS).toISOString();
   await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(authCode)}`, {
     method: "PATCH",
     body: JSON.stringify({
@@ -897,7 +921,9 @@ function xScopeInfo(profileOrScope) {
 }
 
 async function refreshOAuth2Token(refreshToken) {
-  if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) return null;
+  if (!TWITTER_CLIENT_ID || !TWITTER_CLIENT_SECRET) {
+    return { ok: false, error: "missing_client_credentials" };
+  }
   const basic = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString("base64");
   const res = await fetch("https://api.twitter.com/2/oauth2/token", {
     method: "POST",
@@ -911,11 +937,70 @@ async function refreshOAuth2Token(refreshToken) {
       client_id: TWITTER_CLIENT_ID,
     }),
   });
-  if (!res.ok) return null;
-  return res.json();
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { raw: text };
+  }
+  if (!res.ok) {
+    console.error("[x-mcp] X token refresh failed", res.status, String(text).slice(0, 400));
+    return {
+      ok: false,
+      status: res.status,
+      error: data?.error || "refresh_failed",
+      message: data?.error_description || data?.error || text || res.statusText,
+    };
+  }
+  return { ok: true, ...data };
 }
 
-async function resolveUserAccessToken(userId) {
+function shouldKeepExistingScopes(prevScopeStr, nextScopeStr) {
+  const prev = xScopeInfo(prevScopeStr);
+  const next = xScopeInfo(nextScopeStr);
+  // Never downgrade a token that already has tweet.write / dm.write.
+  if (prev.hasTweetWrite && !next.hasTweetWrite) return true;
+  if (prev.hasDmWrite && !next.hasDmWrite) return true;
+  return false;
+}
+
+async function persistRefreshedXToken(userId, profile, refreshed, refreshToken) {
+  const refreshPatch = {
+    twitter_access_token: refreshed.access_token,
+    twitter_refresh_token: refreshed.refresh_token ?? refreshToken,
+    twitter_token_expires_at: new Date(
+      Date.now() + (refreshed.expires_in || 7200) * 1000,
+    ).toISOString(),
+  };
+  if (
+    refreshed.scope &&
+    !shouldKeepExistingScopes(profile.twitter_oauth_scopes, refreshed.scope)
+  ) {
+    refreshPatch.twitter_oauth_scopes = String(refreshed.scope);
+    profile.twitter_oauth_scopes = String(refreshed.scope);
+  }
+  try {
+    await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(refreshPatch),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    delete refreshPatch.twitter_oauth_scopes;
+    await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(refreshPatch),
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+  profile.twitter_access_token = refreshed.access_token;
+  profile.twitter_refresh_token = refreshPatch.twitter_refresh_token;
+  profile.twitter_token_expires_at = refreshPatch.twitter_token_expires_at;
+  return refreshed.access_token;
+}
+
+async function resolveUserAccessToken(userId, { forceRefresh = false } = {}) {
   const profile = await getXProfile(userId);
   if (!profile?.twitter_access_token) {
     return {
@@ -928,8 +1013,16 @@ async function resolveUserAccessToken(userId) {
   }
 
   let accessToken = profile.twitter_access_token;
-  const expiresAt = profile.twitter_token_expires_at;
-  if (expiresAt && new Date(expiresAt) < new Date()) {
+  const expiresAt = profile.twitter_token_expires_at
+    ? new Date(profile.twitter_token_expires_at).getTime()
+    : null;
+  const skewMs = 10 * 60 * 1000; // refresh 10 min before hard expiry
+  // Do not auto-refresh when expires_at is null (avoids concurrent refresh-token races).
+  // Missing expiry is handled by 401 → forceRefresh retries on post/DM paths.
+  const needsRefresh =
+    forceRefresh || (expiresAt != null && expiresAt < Date.now() + skewMs);
+
+  if (needsRefresh) {
     const refreshToken = profile.twitter_refresh_token;
     if (!refreshToken) {
       return {
@@ -941,40 +1034,18 @@ async function resolveUserAccessToken(userId) {
       };
     }
     const refreshed = await refreshOAuth2Token(refreshToken);
-    if (!refreshed?.access_token) {
+    if (!refreshed?.ok || !refreshed.access_token) {
       return {
         ok: false,
         error: "x_refresh_failed",
         message:
-          "Could not refresh X token. Check TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET on Vercel, then reconnect on /x.",
+          refreshed?.message ||
+          "Could not refresh X token. Reconnect X on https://orbitx.world/x (one-time).",
         fixUrl: "https://orbitx.world/x",
         profile,
       };
     }
-    accessToken = refreshed.access_token;
-    const refreshPatch = {
-      twitter_access_token: refreshed.access_token,
-      twitter_refresh_token: refreshed.refresh_token ?? refreshToken,
-      twitter_token_expires_at: new Date(
-        Date.now() + (refreshed.expires_in || 7200) * 1000,
-      ).toISOString(),
-    };
-    if (refreshed.scope) refreshPatch.twitter_oauth_scopes = String(refreshed.scope);
-    try {
-      await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
-        method: "PATCH",
-        body: JSON.stringify(refreshPatch),
-        headers: { Prefer: "return=minimal" },
-      });
-    } catch {
-      delete refreshPatch.twitter_oauth_scopes;
-      await sb(`profiles?user_id=eq.${encodeURIComponent(userId)}`, {
-        method: "PATCH",
-        body: JSON.stringify(refreshPatch),
-        headers: { Prefer: "return=minimal" },
-      });
-    }
-    if (refreshed.scope) profile.twitter_oauth_scopes = String(refreshed.scope);
+    accessToken = await persistRefreshedXToken(userId, profile, refreshed, refreshToken);
   }
 
   return { ok: true, accessToken, profile, ...xScopeInfo(profile) };
@@ -1252,7 +1323,7 @@ async function callTool(name, args, auth, req = null) {
       }
     }
 
-    const scope = xScopeInfo(resolved.profile);
+    let scope = xScopeInfo(resolved.profile);
     if (scope.scopes && !scope.hasTweetWrite) {
       return {
         ok: false,
@@ -1266,12 +1337,27 @@ async function callTool(name, args, auth, req = null) {
     }
 
     try {
-      const posted = await libPostTweet(resolved.accessToken, {
+      let accessToken = resolved.accessToken;
+      let posted = await libPostTweet(accessToken, {
         text: tweetText,
         mediaId: mediaId || undefined,
         replyToTweetId: replyId || undefined,
         quoteTweetId: quoteId || undefined,
       });
+      // Silent AT expiry → force refresh once and retry (avoids "works then doesn't").
+      if (!posted.ok && posted.status === 401) {
+        const retryAuth = await resolveUserAccessToken(auth.userId, { forceRefresh: true });
+        if (retryAuth.ok) {
+          accessToken = retryAuth.accessToken;
+          scope = xScopeInfo(retryAuth.profile);
+          posted = await libPostTweet(accessToken, {
+            text: tweetText,
+            mediaId: mediaId || undefined,
+            replyToTweetId: replyId || undefined,
+            quoteTweetId: quoteId || undefined,
+          });
+        }
+      }
       if (!posted.ok && (posted.status === 403 || posted.error === "tweet_forbidden")) {
         return {
           ...posted,
@@ -1475,11 +1561,7 @@ async function callTool(name, args, auth, req = null) {
       patch.posting_windows = a.postingWindows || a.posting_windows;
     }
     if (a.timezone != null) patch.timezone = String(a.timezone).slice(0, 64);
-    const updated = await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-    });
-    const row = Array.isArray(updated) ? updated[0] : updated;
+    const row = await patchXAgent(sb, agent, patch);
     return { ok: true, agent: mapAgentRow(row) };
   }
 
@@ -1932,12 +2014,13 @@ async function handleAgent(req, res, parts) {
         patch.posting_windows = body.postingWindows || body.posting_windows;
       }
       if (body.timezone != null) patch.timezone = String(body.timezone).slice(0, 64);
-      const updated = await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
-        method: "PATCH",
-        body: JSON.stringify(patch),
-      });
-      const row = Array.isArray(updated) ? updated[0] : updated;
-      return json(res, { agent: mapAgentRow(row) });
+      try {
+        const row = await patchXAgent(sb, agent, patch);
+        return json(res, { agent: mapAgentRow(row) });
+      } catch (e) {
+        console.error("[x-mcp] x-agents save failed", e);
+        return json(res, { error: e?.message || "save_failed" }, 500);
+      }
     }
     return json(res, { error: "method_not_allowed" }, 405);
   }
@@ -1951,6 +2034,7 @@ async function handleAgent(req, res, parts) {
       });
       return json(res, result);
     } catch (e) {
+      console.error("[x-mcp] poll-replies failed", e);
       return json(res, { error: e?.message || "poll_failed" }, 500);
     }
   }
@@ -2278,6 +2362,22 @@ async function handleAgent(req, res, parts) {
     const grantedScope = String(tokens.scope || "").trim();
     const scopeInfo = xScopeInfo(grantedScope);
 
+    // Refuse to persist a read-only token — that causes "no write permissions" forever.
+    if (grantedScope && !scopeInfo.hasTweetWrite) {
+      return json(
+        res,
+        {
+          error: "tweet_write_missing",
+          message:
+            "X did not grant tweet.write. In developer.x.com set App permissions to Read and write and Direct message, revoke OrbitX at x.com/settings/connected_apps, then Connect X again.",
+          scope: grantedScope,
+          ...scopeInfo,
+          fixUrl: "https://www.orbitx.world/x",
+        },
+        403,
+      );
+    }
+
     const authUser = await getAuthUser(req);
     if (!authUser?.id) {
       return json(
@@ -2387,7 +2487,7 @@ async function handleMcp(req, res, parts) {
       token_endpoint: `${MCP_URL}/oauth/token`,
       registration_endpoint: `${MCP_URL}/oauth/register`,
       response_types_supported: ["code"],
-      grant_types_supported: ["authorization_code"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256", "plain"],
       token_endpoint_auth_methods_supported: ["none"],
       scopes_supported: [SCOPE],
@@ -2409,7 +2509,7 @@ async function handleMcp(req, res, parts) {
         client_secret_expires_at: 0,
         redirect_uris: Array.isArray(body.redirect_uris) ? body.redirect_uris : [],
         token_endpoint_auth_method: "none",
-        grant_types: ["authorization_code"],
+        grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
         client_name: body.client_name || "X MCP Connector",
       },
@@ -2440,18 +2540,26 @@ async function handleMcp(req, res, parts) {
 
   if (route === "oauth/token" && req.method === "POST") {
     const body = await readBody(req);
-    const code = body.code;
-    if (!code) return json(res, { error: "invalid_request", error_description: "code required" }, 400);
+    const grantType = String(body.grant_type || "authorization_code").trim();
+    const code = body.code || body.refresh_token;
+    if (!code) {
+      return json(res, { error: "invalid_request", error_description: "code or refresh_token required" }, 400);
+    }
 
-    if (
-      String(code).startsWith("oxo_") ||
-      String(code).startsWith("oxk_") ||
-      String(code).startsWith("oxx_")
-    ) {
+    const token = String(code);
+    const isApiKey =
+      token.startsWith("oxo_") ||
+      token.startsWith("oxk_") ||
+      token.startsWith("oxx_") ||
+      token.startsWith("oxc_");
+
+    if (isApiKey && (grantType === "authorization_code" || grantType === "refresh_token")) {
+      // Long-lived MCP bearer — connectors can refresh without forcing the user to re-auth.
       return json(res, {
-        access_token: code,
+        access_token: token,
+        refresh_token: token,
         token_type: "bearer",
-        expires_in: 86400 * 30,
+        expires_in: 86400 * 365,
         scope: SCOPE,
       });
     }

@@ -168,13 +168,20 @@ export async function sendDmOAuth2(accessToken, { recipientId, text }) {
     if (res.status === 403) {
       return {
         ok: false,
+        status: 403,
         error: "dm_forbidden",
         message:
           "X rejected DM (403). Free apps often lack DM access — upgrade X API (Basic/Pro), enable dm.write, Reconnect X on /x.",
         details: err,
       };
     }
-    return { ok: false, error: "dm_failed", message: `DM failed: ${msg}`, details: err };
+    return {
+      ok: false,
+      status: res.status,
+      error: "dm_failed",
+      message: `DM failed: ${msg}`,
+      details: err,
+    };
   }
   const data = await res.json();
   return {
@@ -256,13 +263,20 @@ export async function sendDmConversationOAuth2(accessToken, { conversationId, te
     if (res.status === 403) {
       return {
         ok: false,
+        status: 403,
         error: "dm_forbidden",
         message:
           "X rejected group/DM send (403). Upgrade X API (Basic/Pro), enable dm.write, Reconnect X on /x.",
         details: err,
       };
     }
-    return { ok: false, error: "dm_failed", message: `DM conversation failed: ${msg}`, details: err };
+    return {
+      ok: false,
+      status: res.status,
+      error: "dm_failed",
+      message: `DM conversation failed: ${msg}`,
+      details: err,
+    };
   }
   const data = await res.json();
   return {
@@ -348,6 +362,148 @@ export async function listMentionsOAuth2(accessToken, userId, { maxResults = 10,
   return { ok: true, mentions, meta: data?.meta || null };
 }
 
+/** Reserved knowledge title used when auto-reply columns are not migrated yet. */
+export const AUTO_REPLY_SETTINGS_TITLE = "__orbitx_settings__";
+const HANDLED_TITLE_PREFIX = "__orbitx_handled__:";
+
+const AUTO_REPLY_COLUMNS = [
+  "auto_reply_mentions",
+  "auto_reply_dms",
+  "auto_reply_group_dms",
+  "max_replies_per_day",
+  "last_mention_since_id",
+  "last_dm_since_id",
+  "last_reply_poll_at",
+];
+
+export function isMissingSchemaError(err) {
+  const msg = String(err?.message || err || "");
+  const code = String(err?.code || "");
+  return (
+    /Could not find the .+ column/i.test(msg) ||
+    /column .+ does not exist/i.test(msg) ||
+    /Could not find the table/i.test(msg) ||
+    /relation .+ does not exist/i.test(msg) ||
+    /schema cache/i.test(msg) ||
+    code === "PGRST204" ||
+    code === "42P01" ||
+    code === "42703"
+  );
+}
+
+function splitAutoReplyPatch(patch) {
+  const core = { ...patch };
+  const auto = {};
+  for (const key of AUTO_REPLY_COLUMNS) {
+    if (Object.prototype.hasOwnProperty.call(core, key)) {
+      auto[key] = core[key];
+      delete core[key];
+    }
+  }
+  return { core, auto };
+}
+
+async function loadAutoReplyFallback(sb, agentId) {
+  try {
+    const rows = await sb(
+      `x_agent_knowledge?agent_id=eq.${encodeURIComponent(agentId)}&title=eq.${encodeURIComponent(AUTO_REPLY_SETTINGS_TITLE)}&order=created_at.desc&limit=1&select=id,content`,
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row?.content) return { id: null, settings: {} };
+    try {
+      const parsed = JSON.parse(row.content);
+      return { id: row.id, settings: parsed && typeof parsed === "object" ? parsed : {} };
+    } catch {
+      return { id: row.id, settings: {} };
+    }
+  } catch {
+    return { id: null, settings: {} };
+  }
+}
+
+async function saveAutoReplyFallback(sb, agent, autoFields) {
+  if (!agent?.id || !agent?.user_id) return;
+  const { id, settings } = await loadAutoReplyFallback(sb, agent.id);
+  const next = { ...settings, ...autoFields };
+  const content = JSON.stringify(next);
+  if (id) {
+    await sb(`x_agent_knowledge?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+      headers: { Prefer: "return=minimal" },
+    });
+    return;
+  }
+  await sb("x_agent_knowledge", {
+    method: "POST",
+    body: JSON.stringify({
+      agent_id: agent.id,
+      user_id: agent.user_id,
+      title: AUTO_REPLY_SETTINGS_TITLE,
+      content,
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+}
+
+/** Apply agent patch; persist auto-reply fields via knowledge fallback if columns missing. */
+export async function patchXAgent(sb, agent, patch) {
+  const agentId = agent?.id || agent;
+  const base = typeof agent === "object" && agent ? agent : { id: agentId };
+  try {
+    const updated = await sb(`x_agents?id=eq.${encodeURIComponent(agentId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+    return Array.isArray(updated) ? updated[0] : updated;
+  } catch (e) {
+    if (!isMissingSchemaError(e)) throw e;
+    const { core, auto } = splitAutoReplyPatch(patch);
+    if (Object.keys(auto).length) {
+      await saveAutoReplyFallback(sb, base, auto);
+    }
+    if (Object.keys(core).length === 0) {
+      return hydrateAutoReplyAgent(sb, base);
+    }
+    try {
+      const updated = await sb(`x_agents?id=eq.${encodeURIComponent(agentId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(core),
+      });
+      const row = Array.isArray(updated) ? updated[0] : updated;
+      return hydrateAutoReplyAgent(sb, row || base);
+    } catch (e2) {
+      if (!isMissingSchemaError(e2)) throw e2;
+      // Still failing (e.g. only auto fields) — return hydrated base.
+      return hydrateAutoReplyAgent(sb, { ...base, ...core });
+    }
+  }
+}
+
+/** Merge auto-reply settings from columns or knowledge fallback. */
+export async function hydrateAutoReplyAgent(sb, agent) {
+  if (!agent) return agent;
+  const hasCol =
+    typeof agent.auto_reply_mentions === "boolean" ||
+    typeof agent.auto_reply_dms === "boolean" ||
+    typeof agent.auto_reply_group_dms === "boolean" ||
+    agent.max_replies_per_day != null ||
+    agent.last_reply_poll_at != null;
+  if (hasCol) return agent;
+  const { settings } = await loadAutoReplyFallback(sb, agent.id);
+  if (!settings || !Object.keys(settings).length) return agent;
+  return {
+    ...agent,
+    auto_reply_mentions: Boolean(settings.auto_reply_mentions),
+    auto_reply_dms: Boolean(settings.auto_reply_dms),
+    auto_reply_group_dms: Boolean(settings.auto_reply_group_dms),
+    max_replies_per_day: settings.max_replies_per_day ?? agent.max_replies_per_day ?? 30,
+    last_mention_since_id: settings.last_mention_since_id ?? agent.last_mention_since_id ?? null,
+    last_dm_since_id: settings.last_dm_since_id ?? agent.last_dm_since_id ?? null,
+    last_reply_poll_at: settings.last_reply_poll_at ?? agent.last_reply_poll_at ?? null,
+  };
+}
+
 export function mapAgentRow(row) {
   if (!row) return null;
   return {
@@ -396,7 +552,9 @@ export async function ensureXAgent(sb, userId) {
   const existing = await sb(
     `x_agents?user_id=eq.${encodeURIComponent(userId)}&order=created_at.asc&limit=1&select=*`,
   );
-  if (Array.isArray(existing) && existing[0]) return existing[0];
+  if (Array.isArray(existing) && existing[0]) {
+    return hydrateAutoReplyAgent(sb, existing[0]);
+  }
   const created = await sb("x_agents", {
     method: "POST",
     body: JSON.stringify({
@@ -409,14 +567,17 @@ export async function ensureXAgent(sb, userId) {
       enabled: false,
     }),
   });
-  return Array.isArray(created) ? created[0] : created;
+  const row = Array.isArray(created) ? created[0] : created;
+  return hydrateAutoReplyAgent(sb, row);
 }
 
 export async function listKnowledge(sb, agentId) {
   const rows = await sb(
     `x_agent_knowledge?agent_id=eq.${encodeURIComponent(agentId)}&order=created_at.desc&limit=40&select=*`,
   );
-  return Array.isArray(rows) ? rows : [];
+  return (Array.isArray(rows) ? rows : []).filter(
+    (k) => !String(k.title || "").startsWith("__orbitx_"),
+  );
 }
 
 export async function generateAgentPost(sb, agentRow, hint) {
@@ -562,10 +723,33 @@ export async function generateAgentReply(sb, agentRow, ctx) {
 }
 
 async function wasHandled(sb, userId, sourceKind, sourceId) {
-  const rows = await sb(
-    `x_agent_handled?user_id=eq.${encodeURIComponent(userId)}&source_kind=eq.${encodeURIComponent(sourceKind)}&source_id=eq.${encodeURIComponent(sourceId)}&limit=1&select=id`,
-  );
-  return Array.isArray(rows) && rows.length > 0;
+  try {
+    const rows = await sb(
+      `x_agent_handled?user_id=eq.${encodeURIComponent(userId)}&source_kind=eq.${encodeURIComponent(sourceKind)}&source_id=eq.${encodeURIComponent(sourceId)}&limit=1&select=id`,
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) {
+    if (!isMissingSchemaError(e)) throw e;
+  }
+  // Fallback when x_agent_handled migration is not applied yet.
+  const title = `${HANDLED_TITLE_PREFIX}${sourceKind}:${sourceId}`;
+  try {
+    const rows = await sb(
+      `x_agent_knowledge?user_id=eq.${encodeURIComponent(userId)}&title=eq.${encodeURIComponent(title)}&limit=1&select=id`,
+    );
+    if (Array.isArray(rows) && rows.length > 0) return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const key = sourceKind === "mention" ? "sourceMentionId" : "sourceDmEventId";
+    const rows = await sb(
+      `x_agent_queue?user_id=eq.${encodeURIComponent(userId)}&payload->>${key}=eq.${encodeURIComponent(sourceId)}&limit=1&select=id`,
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function markHandled(sb, { userId, agentId, sourceKind, sourceId, queueId }) {
@@ -581,8 +765,26 @@ async function markHandled(sb, { userId, agentId, sourceKind, sourceId, queueId 
       }),
       headers: { Prefer: "return=minimal" },
     });
+    return;
+  } catch (e) {
+    if (!isMissingSchemaError(e)) {
+      /* unique race — ignore */
+      return;
+    }
+  }
+  try {
+    await sb("x_agent_knowledge", {
+      method: "POST",
+      body: JSON.stringify({
+        agent_id: agentId,
+        user_id: userId,
+        title: `${HANDLED_TITLE_PREFIX}${sourceKind}:${sourceId}`,
+        content: JSON.stringify({ queueId: queueId || null, at: new Date().toISOString() }),
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
   } catch {
-    /* unique race — ignore */
+    /* ignore duplicates / races */
   }
 }
 
@@ -619,16 +821,31 @@ export async function processAutoReplies(sb, resolveToken, uploadImage, { forceU
     const one = await ensureXAgent(sb, forceUserId);
     agents = one ? [one] : [];
   } else {
-    const rows = await sb(
-      `x_agents?enabled=eq.true&or=(auto_reply_mentions.eq.true,auto_reply_dms.eq.true,auto_reply_group_dms.eq.true)&select=*&limit=20`,
-    );
-    agents = Array.isArray(rows) ? rows : [];
+    try {
+      const rows = await sb(
+        `x_agents?enabled=eq.true&or=(auto_reply_mentions.eq.true,auto_reply_dms.eq.true,auto_reply_group_dms.eq.true)&select=*&limit=20`,
+      );
+      agents = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      if (!isMissingSchemaError(e)) throw e;
+      const rows = await sb(`x_agents?enabled=eq.true&select=*&limit=40`);
+      const list = Array.isArray(rows) ? rows : [];
+      agents = [];
+      for (const row of list) {
+        agents.push(await hydrateAutoReplyAgent(sb, row));
+      }
+      agents = agents.filter(
+        (a) => a.auto_reply_mentions || a.auto_reply_dms || a.auto_reply_group_dms,
+      );
+    }
   }
 
   const results = [];
   const nowIso = new Date().toISOString();
 
-  for (const agent of agents) {
+  for (let agent of agents) {
+    try {
+    agent = await hydrateAutoReplyAgent(sb, agent);
     if (!agent.auto_reply_mentions && !agent.auto_reply_dms && !agent.auto_reply_group_dms) {
       results.push({
         agentId: agent.id,
@@ -669,11 +886,7 @@ export async function processAutoReplies(sb, resolveToken, uploadImage, { forceU
     let budget = Math.max(0, maxReplies - repliedToday);
     if (budget <= 0) {
       results.push({ agentId: agent.id, ok: true, skipped: "daily_reply_cap" });
-      await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ last_reply_poll_at: nowIso, updated_at: nowIso }),
-        headers: { Prefer: "return=minimal" },
-      });
+      await patchXAgent(sb, agent, { last_reply_poll_at: nowIso, updated_at: nowIso });
       continue;
     }
 
@@ -730,14 +943,17 @@ export async function processAutoReplies(sb, resolveToken, uploadImage, { forceU
               sourceMentionId: m.id,
             },
           });
-          await markHandled(sb, {
-            userId: agent.user_id,
-            agentId: agent.id,
-            sourceKind: "mention",
-            sourceId: m.id,
-            queueId: sent.item?.id,
-          });
-          if (sent.ok) budget -= 1;
+          // Only mark handled on success — failed sends must be retryable.
+          if (sent.ok) {
+            await markHandled(sb, {
+              userId: agent.user_id,
+              agentId: agent.id,
+              sourceKind: "mention",
+              sourceId: m.id,
+              queueId: sent.item?.id,
+            });
+            budget -= 1;
+          }
           agentResults.mentions.push({ sourceId: m.id, ...sent, text: draft.text });
         }
       }
@@ -795,14 +1011,16 @@ export async function processAutoReplies(sb, resolveToken, uploadImage, { forceU
               username: ev.senderUsername,
             },
           });
-          await markHandled(sb, {
-            userId: agent.user_id,
-            agentId: agent.id,
-            sourceKind,
-            sourceId: ev.id,
-            queueId: sent.item?.id,
-          });
-          if (sent.ok) budget -= 1;
+          if (sent.ok) {
+            await markHandled(sb, {
+              userId: agent.user_id,
+              agentId: agent.id,
+              sourceKind,
+              sourceId: ev.id,
+              queueId: sent.item?.id,
+            });
+            budget -= 1;
+          }
           agentResults.dms.push({ sourceId: ev.id, sourceKind, ...sent, text: draft.text });
         }
       }
@@ -814,13 +1032,17 @@ export async function processAutoReplies(sb, resolveToken, uploadImage, { forceU
     };
     if (newestMentionId) patch.last_mention_since_id = newestMentionId;
     if (newestDmId) patch.last_dm_since_id = newestDmId;
-    await sb(`x_agents?id=eq.${encodeURIComponent(agent.id)}`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-      headers: { Prefer: "return=minimal" },
-    });
+    await patchXAgent(sb, agent, patch);
 
     results.push({ ok: true, ...agentResults });
+    } catch (e) {
+      results.push({
+        agentId: agent?.id,
+        ok: false,
+        error: "poll_agent_failed",
+        message: e?.message || "poll failed",
+      });
+    }
   }
 
   return { ok: true, agents: results.length, results };
@@ -831,7 +1053,7 @@ export async function processAutoReplies(sb, resolveToken, uploadImage, { forceU
  * resolveToken(userId) => { ok, accessToken, profile }
  */
 export async function executeQueueItem(sb, item, resolveToken, uploadImage) {
-  const resolved = await resolveToken(item.user_id);
+  let resolved = await resolveToken(item.user_id);
   if (!resolved.ok) {
     await sb(`x_agent_queue?id=eq.${encodeURIComponent(item.id)}`, {
       method: "PATCH",
@@ -851,23 +1073,31 @@ export async function executeQueueItem(sb, item, resolveToken, uploadImage) {
   try {
     if (kind === "dm") {
       const conversationId = payload.dmConversationId || payload.conversationId || null;
-      let dm;
-      if (conversationId) {
-        dm = await sendDmConversationOAuth2(resolved.accessToken, {
-          conversationId,
-          text: payload.text,
-        });
-      } else {
+      const sendDm = async (accessToken) => {
+        if (conversationId) {
+          return sendDmConversationOAuth2(accessToken, {
+            conversationId,
+            text: payload.text,
+          });
+        }
         let recipientId = payload.dmRecipientId || payload.recipientId;
         if (!recipientId && payload.username) {
-          const u = await lookupXUser(resolved.accessToken, payload.username);
+          const u = await lookupXUser(accessToken, payload.username);
           if (!u?.id) throw new Error("Could not resolve username for DM");
           recipientId = u.id;
         }
-        dm = await sendDmOAuth2(resolved.accessToken, {
+        return sendDmOAuth2(accessToken, {
           recipientId,
           text: payload.text,
         });
+      };
+      let dm = await sendDm(resolved.accessToken);
+      if (!dm.ok && dm.status === 401) {
+        const retry = await resolveToken(item.user_id, { forceRefresh: true });
+        if (retry.ok) {
+          resolved = retry;
+          dm = await sendDm(retry.accessToken);
+        }
       }
       if (!dm.ok) {
         await sb(`x_agent_queue?id=eq.${encodeURIComponent(item.id)}`, {
@@ -903,12 +1133,23 @@ export async function executeQueueItem(sb, item, resolveToken, uploadImage) {
         /* continue without media */
       }
     }
-    const posted = await postTweetOAuth2(resolved.accessToken, {
+    let posted = await postTweetOAuth2(resolved.accessToken, {
       text,
       mediaId,
       replyToTweetId: payload.replyToTweetId || payload.reply_to || undefined,
       quoteTweetId: payload.quoteTweetId || payload.quote_tweet_id || undefined,
     });
+    if (!posted.ok && posted.status === 401) {
+      const retry = await resolveToken(item.user_id, { forceRefresh: true });
+      if (retry.ok) {
+        posted = await postTweetOAuth2(retry.accessToken, {
+          text,
+          mediaId,
+          replyToTweetId: payload.replyToTweetId || payload.reply_to || undefined,
+          quoteTweetId: payload.quoteTweetId || payload.quote_tweet_id || undefined,
+        });
+      }
+    }
     if (!posted.ok) {
       await sb(`x_agent_queue?id=eq.${encodeURIComponent(item.id)}`, {
         method: "PATCH",
