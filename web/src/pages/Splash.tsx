@@ -349,10 +349,7 @@ function CaBar({ id }: { id?: string }) {
             <strong className="sp-ca-name">OrbitX token</strong>
           </div>
         </div>
-        <code className="sp-ca-addr sp-ca-addr--soon">Coming soon</code>
-        <div className="sp-ca-actions">
-          <span className="sp-ca-soon-badge">Soon</span>
-        </div>
+        <code className="sp-ca-addr">13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9</code>
       </div>
     </section>
   );
