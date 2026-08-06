@@ -966,22 +966,6 @@ const css = `
   letter-spacing: 0.01em;
   word-break: break-all;
 }
-.sp-ca-addr--soon {
-  font-family: var(--font-display);
-  font-size: clamp(16px, 2.2vw, 22px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #fff;
-}
-.sp-ca-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.sp-ca-soon-badge {
-  font-family: var(--font-mono);
-  font-size: 10px; font-weight: 700;
-  letter-spacing: 0.16em; text-transform: uppercase;
-  color: #0a0a0a;
-  padding: 10px 14px; border-radius: 10px;
-  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
-}
 @media(max-width:640px) {
   .sp-ca-inner { flex-direction: column; align-items: stretch; }
   .sp-ca-actions { margin-left: 0; }
