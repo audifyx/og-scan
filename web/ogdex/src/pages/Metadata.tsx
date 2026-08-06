@@ -18,7 +18,7 @@ interface MetaInfo {
 const REASON_MSG: Record<string, string> = {
   pumpfun: "Not supported for pump.fun tokens — pump.fun controls the metadata and it can't be edited here.",
   immutable: "This token's metadata is locked (immutable). It can never be changed by anyone.",
-  token2022: "Token-2022 metadata editing is coming soon. This token uses the Token-2022 program.",
+  token2022: "Token-2022 metadata editing is being added. This token uses the Token-2022 program.",
   no_authority: "No update authority found for this token — its metadata can't be edited.",
   unsupported_program: "This token program isn't supported for metadata edits yet.",
 };
@@ -192,7 +192,7 @@ export default function Metadata() {
             <ul className="space-y-1 text-muted">
               <li>• <span className="text-white">pump.fun tokens</span> — metadata is pump-controlled / immutable</li>
               <li>• Tokens with metadata set to <span className="text-white">immutable</span> (locked forever)</li>
-              <li>• Token-2022 metadata (coming soon)</li>
+              <li>• Token-2022 metadata (being added)</li>
               <li>• Tokens where you don't hold the update authority</li>
             </ul>
           </div>

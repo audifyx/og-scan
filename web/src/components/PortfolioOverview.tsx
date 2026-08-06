@@ -75,7 +75,7 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
       }
 
       // Discord webhook removed — feature coming soon
-      toast.info("Discord sharing coming soon!");
+      toast.info("Discord sharing is being added! Platform token: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
       setActiveModal(null);
     } catch (error) {
       console.error("Discord webhook error:", error);

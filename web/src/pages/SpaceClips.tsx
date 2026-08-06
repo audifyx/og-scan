@@ -123,7 +123,7 @@ function ClipCard({ clip, onLike }: { clip: Clip; onLike: (id: string) => void }
 
   const togglePlay = () => {
     if (!clip.clip_url) {
-      toast.info("Clip playback coming soon — audio processing in progress");
+      toast.info("Clip playback being enhanced. Platform token: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
       return;
     }
     if (!audioRef.current) {

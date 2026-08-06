@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { Rocket, ArrowRight, ShieldCheck, Zap, Sparkles, ExternalLink } from "lucide-react";
+import { Rocket, ArrowRight, ShieldCheck, Zap, Sparkles, ExternalLink, Crown } from "lucide-react";
 import { PageHero, DexPanel } from "../components/PageShell";
 import { VANITY_SUFFIX } from "../lib/vanity-mint";
+import { PLATFORM_TOKEN_MINT, PLATFORM_TOKEN_SYMBOL, PLATFORM_TOKEN_NAME } from "../lib/constants";
 
 /**
  * Launchpad tab — gateway to the real OrbitX Launchpad at /orbitxlaunch.
@@ -28,6 +29,23 @@ export default function Launchpad() {
           </Link>
         </div>
       </PageHero>
+
+      {/* Official Platform Token Banner */}
+      <DexPanel className="border-violet-500/40 bg-gradient-to-r from-violet-500/10 to-indigo-500/10">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-5 w-5 text-violet-400" />
+              <span className="font-display font-bold text-violet-300">Official Platform Token</span>
+            </div>
+            <p className="mt-1 text-sm text-[var(--ox-silver)]">{PLATFORM_TOKEN_NAME} ({PLATFORM_TOKEN_SYMBOL}) — Featured on all decks and the trade app.</p>
+            <p className="mt-2 text-xs font-mono text-white/60 break-all">{PLATFORM_TOKEN_MINT}</p>
+            <Link to={`/token/${PLATFORM_TOKEN_MINT}`} className="dex-btn dex-btn--blue mt-3 inline-flex">
+              View Token <ExternalLink className="h-3.5 w-3.5 ml-1 opacity-70" />
+            </Link>
+          </div>
+        </div>
+      </DexPanel>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <DexPanel>

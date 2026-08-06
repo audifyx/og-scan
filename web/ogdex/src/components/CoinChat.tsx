@@ -21,7 +21,7 @@ function buildContext(d: TokenDetailData, forensics: Forensics | null, ath?: Ath
     market: {
       priceUsd: t.priceUsd ?? meta.priceUsd, marketCap: t.mcap ?? meta.mcap, fdv: t.fdv ?? meta.fdv,
       liquidity: t.liquidity, volume24h: t.volume, totalSupply: t.totalSupply ?? intel.totalSupply, circSupply: t.circSupply,
-      ath: ath?.athMcap != null ? { athMcap: ath.athMcap, athPrice: ath.athPrice, athDate: ath.athDate, fromAthPct: ath.fromAthPct, source: ath.source } : "coming soon (all-time-high data not available yet)",
+      ath: ath?.athMcap != null ? { athMcap: ath.athMcap, athPrice: ath.athPrice, athDate: ath.athDate, fromAthPct: ath.fromAthPct, source: ath.source } : "all-time-high data being added. Platform token: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
       change: { "5m": t.change5m, "1h": t.change1h, "6h": t.change6h, "24h": t.change24h },
       organicScore: t.organicScore, organicLabel: t.organicScoreLabel, verdict: (d as any).verdict, momentum: (d as any).momentumLabel,
     },

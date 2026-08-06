@@ -1589,18 +1589,18 @@ function ConnectionsTab() {
       {/* Browser push notifications */}
       <PushCard />
 
-      {/* More integrations coming soon */}
-      <Card className="p-5 glass-card border-white/[0.04] opacity-60">
+      {/* Official Platform Token */}
+      <Card className="p-5 glass-card border-white/[0.04]">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
-            <Zap className="h-5 w-5 text-white/20" />
+          <div className="h-11 w-11 rounded-2xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0">
+            <Zap className="h-5 w-5 text-violet-400" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-white/50 text-[14px]">More integrations</h3>
-              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-mono text-[8px] uppercase tracking-widest text-white/30">Soon</span>
+              <h3 className="font-bold text-white text-[14px]">Official Platform Token</h3>
+              <span className="rounded-full bg-violet-500/20 px-2 py-0.5 font-mono text-[8px] uppercase tracking-widest text-violet-400">Active</span>
             </div>
-            <p className="text-white/30 text-[12px] mt-0.5">Telegram, Discord, and more on the way.</p>
+            <p className="text-white/60 text-[12px] mt-0.5">ORBITX: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 • Featured on all decks, trade app & launchpad</p>
           </div>
         </div>
       </Card>

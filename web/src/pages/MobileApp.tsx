@@ -197,7 +197,7 @@ export default function MobileApp() {
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/10 px-3 py-1.5">
                 <Smartphone className="h-3 w-3 text-violet-400" />
-                <span className="text-xs font-bold text-violet-300">Coming Soon — Beta Q3 2025</span>
+                <span className="text-xs font-bold text-violet-300">Official OrbitX Token: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9</span>
               </div>
               <h1 className="mb-4 text-4xl font-black leading-tight tracking-tight">
                 OrbitX

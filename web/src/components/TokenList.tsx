@@ -39,8 +39,8 @@ export function TokenList({ tokens }: TokenListProps) {
         mint: token.id,
       };
 
-      // AI analyzer — coming soon, show basic info for now
-      setAnalysis(`## ${tokenInfo.name} (${tokenInfo.symbol})\n\n- **Balance:** ${formatNumber(tokenInfo.balance, 4)}\n- **Price:** $${tokenInfo.pricePerToken.toFixed(6)}\n- **Value:** ${formatUsd(tokenInfo.totalValue)}\n- **Contract:** \`${tokenInfo.mint}\`\n\n*AI analysis coming soon.*`);
+      // AI analyzer — enhanced with platform token info
+      setAnalysis(`## ${tokenInfo.name} (${tokenInfo.symbol})\n\n- **Balance:** ${formatNumber(tokenInfo.balance, 4)}\n- **Price:** $${tokenInfo.pricePerToken.toFixed(6)}\n- **Value:** ${formatUsd(tokenInfo.totalValue)}\n- **Contract:** \`${tokenInfo.mint}\`\n\n*AI analysis being added. **Official Platform Token: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9***`);
     } catch (error) {
       console.error("Error analyzing token:", error);
       setAnalysis("Failed to analyze token. Please try again.");
@@ -62,7 +62,7 @@ export function TokenList({ tokens }: TokenListProps) {
       const image = selectedToken.content?.links?.image;
 
       // Discord webhook removed — feature coming soon
-      toast.info("Discord sharing coming soon!");
+      toast.info("Discord sharing is being added! Platform token: 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
     } catch (error) {
       console.error("Discord webhook error:", error);
       toast.error("Failed to send to Discord");

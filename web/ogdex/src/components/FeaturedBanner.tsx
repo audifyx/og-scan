@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fmtUsd, short } from "../lib/api";
-import { Zap, Star, ChevronRight } from "lucide-react";
+import { Zap, Star, ChevronRight, Crown } from "lucide-react";
 import TokenLogo from "./TokenLogo";
 import { imgProxy } from "../lib/img";
+import { PLATFORM_TOKEN_MINT, PLATFORM_TOKEN_SYMBOL } from "../lib/constants";
 
 interface Boost {
   id: string; mint: string; symbol?: string; name?: string; icon?: string;
@@ -111,6 +112,30 @@ export default function FeaturedBanner() {
 
   return (
     <div className="mb-5 space-y-3">
+      {/* ── Official Platform Token ───────────────────────────────── */}
+      <div className="card border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+          <Crown className="w-4 h-4 text-violet-400 shrink-0" />
+          <span className="text-xs font-semibold text-violet-400 tracking-wide uppercase">Official Platform Token</span>
+        </div>
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => nav(`/token/${PLATFORM_TOKEN_MINT}`)}
+            className="w-full flex items-center gap-3 rounded-lg border border-violet-500/40 bg-violet-500/15 p-3 hover:bg-violet-500/25 transition-all group"
+          >
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-violet-400 to-indigo-600 flex items-center justify-center text-white font-bold">
+              Ⓞ
+            </div>
+            <div className="flex-1 text-left">
+              <div className="text-sm font-bold text-white">{PLATFORM_TOKEN_SYMBOL}</div>
+              <div className="text-xs text-white/60 font-mono">{short(PLATFORM_TOKEN_MINT)}</div>
+            </div>
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-violet-500/30 text-violet-300">FEATURED</span>
+            <ChevronRight className="w-4 h-4 text-white/40 group-hover:text-white/60 transition-colors" />
+          </button>
+        </div>
+      </div>
+
       {/* ── Boost Reel ─────────────────────────────────────────────── */}
       {hasBoosts && (
         <div className="card border border-accent/20 overflow-hidden">
