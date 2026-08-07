@@ -3,6 +3,7 @@
 // Table `orbitx_tokens` enforces unique CA / name / ticker at the DB level and
 // exposes an `orbitx_vamp_check` RPC for look-alike (vamp) detection.
 import { supabase } from "@/lib/supabase";
+import { OGSCAN_TOKEN_MINT, OGSCAN_TOKEN_NAME, OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 
 export type FeeRoute = "creator" | "orbitx_buyback" | "og";
 
@@ -43,13 +44,42 @@ export async function listTokens(kind: FeedKind = "new", limit = 60): Promise<Or
   return ((data ?? []) as OrbitxToken[]).filter((t) => !t.is_hidden);
 }
 
-/** Featured tokens (admin-curated) for the public spotlight rail. */
+/** Featured tokens (admin-curated) for the public spotlight rail.
+ *  Official $ORBITX is always pinned first. */
 export async function listFeatured(limit = 12): Promise<OrbitxToken[]> {
-  const { data, error } = await supabase
-    .from("orbitx_tokens").select("*").eq("is_featured", true)
-    .order("created_at", { ascending: false }).limit(limit);
-  if (error) return [];
-  return ((data ?? []) as OrbitxToken[]).filter((t) => !t.is_hidden);
+  const [{ data, error }, official] = await Promise.all([
+    supabase
+      .from("orbitx_tokens").select("*").eq("is_featured", true)
+      .order("created_at", { ascending: false }).limit(limit),
+    getToken(OGSCAN_TOKEN_MINT).catch(() => null),
+  ]);
+  const rows = error ? [] : ((data ?? []) as OrbitxToken[]).filter((t) => !t.is_hidden);
+  const pinned: OrbitxToken = official
+    ? { ...official, is_featured: true }
+    : {
+        id: "official-orbitx",
+        mint_address: OGSCAN_TOKEN_MINT,
+        name: OGSCAN_TOKEN_NAME,
+        ticker: OGSCAN_TOKEN_SYMBOL,
+        creator_wallet: "",
+        decimals: 6,
+        supply: 0,
+        dex: "pumpfun",
+        lp_pool_address: null,
+        graduated_at: null,
+        lp_signature: null,
+        mint_signature: null,
+        metadata_uri: null,
+        logo_url: "/og-icon.svg",
+        is_vamp: false,
+        fee_route: "orbitx_buyback",
+        cluster: "mainnet-beta",
+        launch_type: "pump",
+        created_at: new Date(0).toISOString(),
+        is_featured: true,
+      };
+  const rest = rows.filter((t) => t.mint_address !== OGSCAN_TOKEN_MINT);
+  return [pinned, ...rest].slice(0, limit);
 }
 
 export async function getToken(mint: string): Promise<OrbitxToken | null> {

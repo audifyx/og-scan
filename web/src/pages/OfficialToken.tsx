@@ -12,15 +12,22 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo.png";
+import {
+  OGSCAN_DEXSCREENER_URL,
+  OGSCAN_JUPITER_URL,
+  OGSCAN_PUMPFUN_URL,
+  OGSCAN_TOKEN_MINT,
+  OGSCAN_TOKEN_SYMBOL,
+} from "@/lib/og";
 
-const CONTRACT_ADDRESS = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const CONTRACT_ADDRESS = OGSCAN_TOKEN_MINT;
 
 const LINKS = {
-  pumpFun: "https://join.pump.fun/HSag/494el64d",
-  telegram: "https://t.me/soltoolsv2",
-  promo: "https://soltoolsv2promo.lovable.app/",
-  community: "https://twitter.com/i/communities/2007536315483685053",
-  dex: `https://dexscreener.com/solana/${CONTRACT_ADDRESS}`,
+  pumpFun: OGSCAN_PUMPFUN_URL,
+  jupiter: OGSCAN_JUPITER_URL,
+  telegram: "https://t.me/ogscan",
+  community: "https://x.com/orbitx_wrldbackup",
+  dex: OGSCAN_DEXSCREENER_URL,
 };
 
 const FEE_BREAKDOWN = [
@@ -69,7 +76,7 @@ const OfficialToken = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="Official Token" description="$SOLTOOLS — Powering the Platform">
+      <PageHeader title="Official Token" description={`$${OGSCAN_TOKEN_SYMBOL} — Powering the Platform`}>
         <Badge className="bg-primary/20 text-primary border-primary/30 gap-1.5">
           <Zap className="h-3.5 w-3.5" /> Live
         </Badge>
@@ -89,7 +96,7 @@ const OfficialToken = () => {
                 </div>
                 <div className="text-center sm:text-left flex-1">
                   <h1 className="text-3xl font-bold gradient-text font-display mb-1">OrbitX Token</h1>
-                  <p className="text-xl text-muted-foreground mb-3">$SOLTOOLS</p>
+                  <p className="text-xl text-muted-foreground mb-3">${OGSCAN_TOKEN_SYMBOL}</p>
                   <button onClick={copyCA} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:border-primary/30 transition-all text-sm font-mono">
                     <span className="text-muted-foreground">{CONTRACT_ADDRESS.slice(0, 8)}...{CONTRACT_ADDRESS.slice(-6)}</span>
                     {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
@@ -135,7 +142,7 @@ const OfficialToken = () => {
               <a href={LINKS.community} target="_blank" rel="noopener noreferrer"><Users className="h-4 w-4" /> Community</a>
             </Button>
             <Button asChild variant="outline" className="gap-2 h-12 rounded-2xl">
-              <a href={LINKS.promo} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4" /> Promo Site</a>
+              <a href={LINKS.jupiter} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4" /> Buy on Jupiter</a>
             </Button>
           </div>
 
@@ -160,7 +167,7 @@ const OfficialToken = () => {
                 <span className="text-foreground font-semibold">OrbitX</span> is the ultimate all-in-one Solana toolkit — tracking, analytics, sniping, social trading, and more — completely <span className="text-primary font-semibold">FREE FOREVER</span>.
               </p>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                The $SOLTOOLS token powers the ecosystem. Transaction fees fund platform development, community growth, and token buybacks — keeping the platform free while rewarding holders.
+                The $ORBITX token powers the ecosystem. Transaction fees fund platform development, community growth, and token buybacks — keeping the platform free while rewarding holders.
               </p>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 {[
@@ -266,9 +273,9 @@ const OfficialToken = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { q: "Is OrbitX really free?", a: "Yes! OrbitX is completely free forever. The $SOLTOOLS token funds platform development through transaction fees." },
+                { q: "Is OrbitX really free?", a: "Yes! OrbitX is completely free forever. The $ORBITX token funds platform development through transaction fees." },
                 { q: "Is the platform really free?", a: "Yes. Every tool on OrbitX is free to use. We don't believe in paywalls or restricting access to the intelligence you need to trade safely." },
-                { q: "What is the $SOLTOOLS token?", a: "It's the utility token that powers the OrbitX ecosystem. Transaction fees are used to fund development, marketing, and buybacks." },
+                { q: "What is the $ORBITX token?", a: "It's the utility token that powers the OrbitX ecosystem. Transaction fees are used to fund development, marketing, and buybacks." },
                 { q: "How do I get started?", a: "Simply create an account, and you'll have instant access to 30+ Solana trading tools, social lobbies, and analytics." },
                 { q: "Is my data safe?", a: "Yes. We use enterprise-grade encryption and never store private keys. Your wallet address is used only for read-only tracking." },
               ].map((faq, i) => (
@@ -282,7 +289,7 @@ const OfficialToken = () => {
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2 justify-center pb-4">
-            {["#Solana", "#CryptoTools", "#FreeForever", "#BlockchainHustle", "#SOLTOOLS"].map(tag => (
+            {["#Solana", "#CryptoTools", "#FreeForever", "#BlockchainHustle", "#ORBITX"].map(tag => (
               <Badge key={tag} variant="outline" className="text-xs bg-primary/5 border-primary/20">{tag}</Badge>
             ))}
           </div>

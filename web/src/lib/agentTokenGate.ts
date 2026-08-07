@@ -11,12 +11,13 @@ import {
   isExemptWalletInList,
   walletFromSiwsEmail,
 } from "../../shared/token-gate-exempt.js";
+import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 
 export const TOKEN_GATE_EXEMPT_WALLETS = TOKEN_GATE_EXEMPT_WALLETS_BASE;
 export const TOKEN_GATE_EXEMPT_EMAILS = TOKEN_GATE_EXEMPT_EMAILS_BASE;
 
 /** Official ORBITX mint — same CA as OfficialToken / token-gating. */
-export const AGENT_HOLD_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+export const AGENT_HOLD_MINT = OGSCAN_TOKEN_MINT;
 export const AGENT_HOLD_MIN_USD = 5;
 
 function envOwnerWallets(): string[] {

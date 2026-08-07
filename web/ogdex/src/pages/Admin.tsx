@@ -570,7 +570,7 @@ function ProTab({ data, act }: any) {
         </div>
         <p className="text-xs text-muted mb-3">
           Wallets listed here get Pro access regardless of OG token balance (manual override).
-          OG token: <code className="text-accent text-[10px]">EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump</code> · Threshold: 10,000 OG
+          ORBITX: <code className="text-accent text-[10px]">13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9</code> · Threshold: 10,000 ORBITX
         </p>
         <div className="flex gap-2 mb-2">
           <input value={addr} onChange={e => setAddr(e.target.value)}

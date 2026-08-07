@@ -46,7 +46,7 @@ export const MobileMenu = () => {
             <Zap className="h-4 w-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold text-sm font-display tracking-[0.2em] gradient-text">SOLTOOLS</h1>
+            <h1 className="font-bold text-sm font-display tracking-[0.2em] gradient-text">ORBITX</h1>
             <div className="flex items-center gap-1.5">
               <Badge className="bg-primary/10 text-primary border-primary/20 text-[8px] font-mono tracking-wider h-4 px-1.5">CODEX</Badge>
               <span className="text-[9px] text-muted-foreground/50 font-mono">v3.0</span>

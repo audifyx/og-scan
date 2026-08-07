@@ -18,7 +18,7 @@ import { fmtCompactUsd } from "./lpx";
 import TokenAnalytics from "./TokenAnalytics";
 import TokenChat from "./TokenChat";
 import { orbitScore } from "./orbitScore";
-import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
+import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { toast } from "sonner";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
@@ -26,7 +26,7 @@ import {
   Globe, Twitter, Send, Wallet, RefreshCw,
 } from "lucide-react";
 
-const OFFICIAL_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const OFFICIAL_MINT = OGSCAN_TOKEN_MINT;
 
 /* ═══════════════ live market fetch (DexScreener) — richer than the
    Home board needs: pair age, buy/sell counts, socials, website ═══════════════ */

@@ -7,11 +7,12 @@ import { MobileNav } from "@/components/MobileNavV2";
 import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
 import { ADMIN_APPS } from "@/lib/adminApps";
 import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
+import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
 const VERSION = "v2.0";
-const ORBITX_CA = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const ORBITX_CA = OGSCAN_TOKEN_MINT;
 
 const wgTimeAgo = (iso: string) => {
   const sec = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));

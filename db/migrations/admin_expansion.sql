@@ -46,7 +46,7 @@ insert into ogdex_config (key, value) values
   ('mcp_enabled',       'true'),
   ('widget_enabled',    'true'),
   ('maintenance_mode',  'false'),
-  ('og_token',          '"EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump"')
+  ('og_token',          '"13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9"')
 on conflict (key) do nothing;
 
 -- Listings + boosts (MCP + desk pending queues)
@@ -97,3 +97,35 @@ alter table ogdex_kol_nominations enable row level security;
 alter table ogdex_config          enable row level security;
 alter table ogdex_listings        enable row level security;
 alter table ogdex_boosts          enable row level security;
+
+-- Pin official $ORBITX as featured listing (skip if already present)
+insert into ogdex_listings (
+  contract_address, chain, project_name, symbol, logo_url, description,
+  status, featured, featured_rank, tier, approved_at
+)
+select
+  '13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9',
+  'solana',
+  'ORBITX',
+  'ORBITX',
+  '/og-icon.svg',
+  'Official OrbitX platform token',
+  'approved',
+  true,
+  9999,
+  'express',
+  now()
+where not exists (
+  select 1 from ogdex_listings
+  where contract_address = '13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9'
+);
+
+-- Ensure existing official row stays featured at top rank
+update ogdex_listings
+set featured = true,
+    featured_rank = greatest(coalesce(featured_rank, 0), 9999),
+    status = 'approved',
+    project_name = coalesce(nullif(project_name, ''), 'ORBITX'),
+    symbol = coalesce(nullif(symbol, ''), 'ORBITX'),
+    updated_at = now()
+where contract_address = '13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9';

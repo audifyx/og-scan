@@ -31,7 +31,7 @@ const POPULAR_TOKENS = [
   { address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", name: "Bonk" },
   { address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", name: "Jupiter" },
   { address: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr", symbol: "POPCAT", name: "Popcat" },
-  { address: "JDkRjxdLjbyQyyy8m1tqCG29WRENxDdiyKUXU93Npump", symbol: "SOLTOOLS", name: "OrbitX" },
+  { address: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", symbol: "ORBITX", name: "ORBITX" },
 ];
 
 export const PriceAlerts = () => {

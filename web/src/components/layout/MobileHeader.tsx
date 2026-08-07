@@ -38,7 +38,7 @@ export const MobileHeader = () => {
               <Zap className="h-3.5 w-3.5 text-primary-foreground" strokeWidth={2.5} />
             </div>
             <span className="font-display font-bold tracking-[0.2em] text-[11px] text-foreground">
-              SOLTOOLS
+              ORBITX
             </span>
           </NavLink>
 

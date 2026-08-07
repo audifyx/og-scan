@@ -4,8 +4,8 @@ import { ShieldCheck, Zap, ExternalLink, Loader2 } from "lucide-react";
 import { useWallet } from "../lib/wallet";
 import { fmtUsd, compact } from "../lib/api";
 
-const OG_MINT = "EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump";
-const PRO_THRESHOLD = 10_000; // minimum OG tokens for Pro
+const OG_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const PRO_THRESHOLD = 10_000; // minimum ORBITX tokens for Pro
 
 interface ProState {
   checked: boolean;
@@ -59,7 +59,7 @@ export default function ProGate({ children, feature }: ProGateProps) {
         <div className="text-base font-black text-white mb-1">Pro Feature</div>
         <p className="text-xs text-muted">
           {feature ? `${feature} requires` : "This feature requires"} holding{" "}
-          <span className="text-accent font-bold">{compact(PRO_THRESHOLD)} OG tokens</span>.
+          <span className="text-accent font-bold">{compact(PRO_THRESHOLD)} $ORBITX</span>.
           {address && balance > 0 && (
             <> You currently hold <span className="text-white font-semibold">{compact(balance)}</span>.</>
           )}
@@ -77,17 +77,17 @@ export default function ProGate({ children, feature }: ProGateProps) {
             target="_blank" rel="noreferrer"
             className="btn bg-accent text-black font-bold inline-flex items-center gap-1.5"
           >
-            <Zap className="w-4 h-4" /> Get OG Tokens
+            <Zap className="w-4 h-4" /> Get $ORBITX
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
-          <Link to="/token/EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump"
+          <Link to={`/token/${OG_MINT}`}
             className="btn bg-panel2 text-muted hover:text-white text-xs">
-            View OG Token
+            View $ORBITX
           </Link>
         </div>
       )}
       <p className="text-[10px] text-muted/50">
-        OG token gate is non-custodial. Your tokens stay in your wallet — we only verify your balance.
+        $ORBITX gate is non-custodial. Your tokens stay in your wallet — we only verify your balance.
       </p>
     </div>
   );

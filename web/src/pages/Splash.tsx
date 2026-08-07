@@ -2,6 +2,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
+import {
+  OGSCAN_DEXSCREENER_URL,
+  OGSCAN_JUPITER_URL,
+  OGSCAN_TOKEN_MINT,
+  OGSCAN_TOKEN_NAME,
+  OGSCAN_TOKEN_SYMBOL,
+  shortAddr,
+} from "@/lib/og";
 
 /* ── Data ───────────────────────────────────────────────────────── */
 
@@ -22,6 +30,8 @@ const LINKS = {
   terms: "/terms",
   whitepaper: "/whitepaper",
   roadmap: "/roadmap",
+  dex: OGSCAN_DEXSCREENER_URL,
+  jupiter: OGSCAN_JUPITER_URL,
 };
 
 const HERO_PLANES = [
@@ -338,20 +348,82 @@ function ProductSlideshow({ showcase, reverse }: { showcase: ProductShowcase; re
   );
 }
 
+function formatTokenPrice(priceUsd: number | null) {
+  if (priceUsd == null || !Number.isFinite(priceUsd) || priceUsd <= 0) return "—";
+  if (priceUsd < 0.0001) return `$${priceUsd.toExponential(2)}`;
+  if (priceUsd < 1) return `$${priceUsd.toFixed(6)}`;
+  return `$${priceUsd.toFixed(2)}`;
+}
+
 function CaBar({ id }: { id?: string }) {
+  const [copied, setCopied] = useState(false);
+  const [priceUsd, setPriceUsd] = useState<number | null>(null);
+  const [change24h, setChange24h] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${OGSCAN_TOKEN_MINT}`);
+        const data = await res.json();
+        const pair = Array.isArray(data) ? data[0] : data?.pairs?.[0];
+        if (!alive || !pair) return;
+        const px = Number(pair.priceUsd);
+        setPriceUsd(Number.isFinite(px) ? px : null);
+        const ch = Number(pair.priceChange?.h24);
+        setChange24h(Number.isFinite(ch) ? ch : null);
+      } catch {
+        /* keep placeholders */
+      }
+    };
+    load();
+    const t = setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  const copyCa = async () => {
+    try {
+      await navigator.clipboard.writeText(OGSCAN_TOKEN_MINT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <section id={id} className="sp-ca reveal" aria-label="Official contract address">
       <div className="sp-ca-inner">
         <div className="sp-ca-meta">
           <img src="/ogscan-our-coin-logo.webp" alt="" width={40} height={40} className="sp-ca-logo" />
           <div>
-            <span className="sp-ca-kicker">Official CA</span>
-            <strong className="sp-ca-name">OrbitX token</strong>
+            <span className="sp-ca-kicker">Official CA · ${OGSCAN_TOKEN_SYMBOL}</span>
+            <strong className="sp-ca-name">{OGSCAN_TOKEN_NAME}</strong>
+            <span className="sp-ca-price">
+              {formatTokenPrice(priceUsd)}
+              {change24h != null && (
+                <em className={change24h >= 0 ? "up" : "down"}>
+                  {change24h >= 0 ? "+" : ""}
+                  {change24h.toFixed(1)}%
+                </em>
+              )}
+            </span>
           </div>
         </div>
-        <code className="sp-ca-addr sp-ca-addr--soon">Coming soon</code>
+        <code className="sp-ca-addr" title={OGSCAN_TOKEN_MINT}>{OGSCAN_TOKEN_MINT}</code>
         <div className="sp-ca-actions">
-          <span className="sp-ca-soon-badge">Soon</span>
+          <button type="button" className="sp-ca-btn" onClick={copyCa}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <a className="sp-ca-btn sp-ca-btn--gold" href={LINKS.jupiter} target="_blank" rel="noreferrer">
+            Buy
+          </a>
+          <a className="sp-ca-btn" href={LINKS.dex} target="_blank" rel="noreferrer">
+            Chart
+          </a>
         </div>
       </div>
     </section>
@@ -680,7 +752,11 @@ export default function Splash() {
             </div>
             <div>
               <h4>Token</h4>
-              <span className="sp-foot-ca">CA · Coming soon</span>
+              <span className="sp-foot-ca" title={OGSCAN_TOKEN_MINT}>
+                ${OGSCAN_TOKEN_SYMBOL} · {shortAddr(OGSCAN_TOKEN_MINT, 4)}
+              </span>
+              <a href={LINKS.jupiter} target="_blank" rel="noreferrer">Buy on Jupiter</a>
+              <a href={LINKS.dex} target="_blank" rel="noreferrer">DexScreener</a>
               <a href={LINKS.degen} target="_blank" rel="noreferrer">Degen Tower</a>
             </div>
             <div>
@@ -700,7 +776,9 @@ export default function Splash() {
         </div>
         <div className="sp-foot-bottom">
           <span>© {new Date().getFullYear()} {BRAND}. Building in public.</span>
-          <span className="sp-foot-mint">CA · Coming soon</span>
+          <span className="sp-foot-mint" title={OGSCAN_TOKEN_MINT}>
+            CA · {OGSCAN_TOKEN_MINT}
+          </span>
         </div>
       </footer>
     </div>
@@ -960,6 +1038,18 @@ const css = `
   font-family: var(--font-display);
   font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
 }
+.sp-ca-price {
+  display: flex; align-items: center; gap: 8px; margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px; color: var(--ink); letter-spacing: 0.02em;
+}
+.sp-ca-price em {
+  font-style: normal;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.sp-ca-price em.up { color: #4ade80; }
+.sp-ca-price em.down { color: #f87171; }
 .sp-ca-addr {
   flex: 1;
   min-width: 0;
@@ -969,22 +1059,26 @@ const css = `
   letter-spacing: 0.01em;
   word-break: break-all;
 }
-.sp-ca-addr--soon {
-  font-family: var(--font-display);
-  font-size: clamp(16px, 2.2vw, 22px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #fff;
-}
-.sp-ca-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.sp-ca-soon-badge {
+.sp-ca-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.sp-ca-btn {
   font-family: var(--font-mono);
   font-size: 10px; font-weight: 700;
-  letter-spacing: 0.16em; text-transform: uppercase;
-  color: #0a0a0a;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink);
   padding: 10px 14px; border-radius: 10px;
+  border: 1px solid var(--line-bright);
+  background: rgba(255,255,255,0.04);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color .2s ease, background .2s ease, color .2s ease;
+}
+.sp-ca-btn:hover { border-color: rgba(212,175,55,0.45); color: #fff; background: rgba(212,175,55,0.08); }
+.sp-ca-btn--gold {
+  color: #0a0a0a;
+  border-color: transparent;
   background: linear-gradient(180deg, var(--gold-hi), var(--gold));
 }
+.sp-ca-btn--gold:hover { color: #0a0a0a; border-color: transparent; filter: brightness(1.06); }
 @media(max-width:640px) {
   .sp-ca-inner { flex-direction: column; align-items: stretch; }
   .sp-ca-actions { margin-left: 0; }
