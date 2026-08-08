@@ -118,6 +118,7 @@ import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
 import SupportCenter from "./pages/SupportCenter";
 import SupportPage from "./pages/SupportPage";
+import VampPortal from "./pages/VampPortal";
 import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -281,6 +282,7 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/vamp" element={<VampPortal />} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
             <Route path="/roadmap" element={<PlatformRoadmap />} />
             <Route path="/predictions/*" element={<PredictionsRedirect />} />
