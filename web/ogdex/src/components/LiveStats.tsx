@@ -65,16 +65,16 @@ export default function LiveStats() {
 
   return (
     // md:hidden — on desktop the stats live inline in the nav; this bar is mobile-only
-    <div className="md:hidden border-b border-line bg-panel/30">
-      <div className="max-w-[1500px] mx-auto px-4 py-1.5 overflow-x-auto">
-        <div className="flex items-center gap-4 min-w-max">
+    <div className="md:hidden border-b border-line bg-panel/40">
+      <div className="max-w-[1600px] mx-auto px-4 py-2 overflow-x-auto">
+        <div className="flex items-center gap-4 min-w-max term text-[11px]">
           {items.map((stat) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.label} className="flex items-center gap-1.5 text-xs shrink-0">
+              <div key={stat.label} className="flex items-center gap-1.5 shrink-0">
                 <Icon className={`w-3 h-3 ${stat.color}`} />
-                <span className="text-muted">{stat.label}:</span>
-                <span className={`font-semibold ${stat.color}`}>{stat.value}</span>
+                <span className="text-white/60">{stat.label}:</span>
+                <span className={`font-bold ${stat.color}`}>{stat.value}</span>
               </div>
             );
           })}

@@ -1,27 +1,41 @@
 /* OrbitX NFT Marketplace — black / metal chrome (gold · blue · silver) */
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 
 .obx-mkt {
   --mkt-bg: #050505;
   --mkt-panel: #0a0a0a;
   --mkt-panel-2: #111111;
-  --mkt-line: rgba(168, 176, 188, 0.16);
-  --mkt-line-bright: rgba(168, 176, 188, 0.3);
-  --mkt-ink: #f4f5f7;
-  --mkt-muted: #9aa3b2;
+  --mkt-line: rgba(255, 255, 255, 0.12);
+  --mkt-line-bright: rgba(255, 255, 255, 0.22);
+  --mkt-ink: #ffffff;
+  --mkt-muted: rgba(255, 255, 255, 0.72);
+  --mkt-dim: rgba(255, 255, 255, 0.52);
   --mkt-gold: #D4AF37;
   --mkt-gold-hi: #F0C75E;
   --mkt-blue: #3B82F6;
   --mkt-blue-hi: #60A5FA;
-  --mkt-silver: #A8B0BC;
+  --mkt-silver: rgba(255, 255, 255, 0.82);
   --mkt-red: #ff4d6d;
   --mkt-up: #60A5FA;
   --og-lime: var(--mkt-blue-hi);
   --og-gold: var(--mkt-gold);
   --og-cyan: var(--mkt-blue-hi);
   --og-blood: var(--mkt-red);
-  --font-display: "Bricolage Grotesque", "Syne", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", "Manrope", system-ui, sans-serif;
+  --font-display: "Syne", "Manrope", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Explore route (/nft/explore → LaunchpadNftHub) token bridge */
+  --pf-bg: 0 0% 2%;
+  --pf-bg-2: 0 0% 5%;
+  --pf-ink: 0 0% 100%;
+  --pf-muted: 0 0% 100%;
+  --pf-border: 0 0% 100% / 0.16;
+  --pf-green: 217 91% 60%;
+  --pf-green-dark: 217 91% 48%;
+  --pf-red: 356 84% 62%;
+  --pf-gold: 43 65% 52%;
+  --pf-blue: 217 91% 60%;
 
   position: relative;
   min-height: 100vh;
@@ -29,9 +43,54 @@
   background: var(--mkt-bg);
   color: var(--mkt-ink);
   font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/* White copy only — no grey body text */
+.obx-mkt .text-muted-foreground,
+.obx-mkt .text-gray-300,
+.obx-mkt .text-gray-400,
+.obx-mkt .text-gray-500,
+.obx-mkt .text-zinc-400,
+.obx-mkt .text-zinc-500,
+.obx-mkt .text-slate-400,
+.obx-mkt .text-slate-500,
+.obx-mkt [class*="text-white/"] {
+  color: var(--mkt-muted) !important;
+}
+.obx-mkt ::placeholder,
+.obx-mkt input::placeholder,
+.obx-mkt textarea::placeholder {
+  color: rgba(255, 255, 255, 0.55) !important;
+  opacity: 1 !important;
+}
+
+/* Typography scale */
+.obx-mkt h1,
+.obx-mkt h2,
+.obx-mkt h3,
+.obx-mkt .mkt-section-title,
+.obx-mkt .mkt-hero-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  color: #fff;
+}
+.obx-mkt .mkt-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mkt-gold-hi);
+}
+.obx-mkt .mkt-dim { color: var(--mkt-dim); }
+.obx-mkt .mkt-muted { color: var(--mkt-muted); }
+.obx-mkt .mkt-mono { font-family: var(--font-mono); }
 
 .obx-mkt::before {
   content: "";
@@ -67,13 +126,30 @@
   top: 0;
   z-index: 30;
   border-bottom: 1px solid var(--mkt-line);
-  background: rgba(5, 5, 5, 0.92);
+  background:
+    linear-gradient(180deg, rgba(12, 12, 12, 0.96), rgba(5, 5, 5, 0.92));
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   backdrop-filter: blur(20px) saturate(140%);
-  box-shadow: 0 12px 40px -28px rgba(0, 0, 0, 0.85);
+  box-shadow:
+    0 1px 0 rgba(212, 175, 55, 0.12),
+    0 12px 40px -28px rgba(0, 0, 0, 0.85);
+}
+.obx-mkt .mkt-shell-header::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 8%,
+    rgba(212, 175, 55, 0.45) 35%,
+    rgba(96, 165, 250, 0.28) 65%,
+    transparent 92%
+  );
+  pointer-events: none;
 }
 .obx-mkt .mkt-shell-top {
-  border-bottom: 1px solid rgba(168, 176, 188, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .obx-mkt .mkt-shell-inner {
   margin: 0 auto;
@@ -121,7 +197,7 @@
   font-weight: 700;
   letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--mkt-silver);
+  color: var(--mkt-muted);
 }
 
 .obx-mkt .mkt-search {
@@ -144,7 +220,7 @@
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.obx-mkt .mkt-search input::placeholder { color: rgba(168, 176, 188, 0.55); }
+.obx-mkt .mkt-search input::placeholder { color: rgba(255, 255, 255, 0.5); }
 .obx-mkt .mkt-search input:focus {
   border-color: rgba(212, 175, 55, 0.45);
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
@@ -158,15 +234,15 @@
 
 /* Tabs — pill groups */
 .obx-mkt .mkt-tabbar {
-  border-top: 1px solid rgba(168, 176, 188, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   background: linear-gradient(180deg, #0a0a0a, #060606);
-  padding: 10px 0 12px;
+  padding: 10px 16px 12px;
 }
 .obx-mkt .mkt-tab-rail {
   margin: 0 auto;
   display: flex;
-  width: 100%;
-  max-width: 1440px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
   align-items: center;
   gap: 4px;
   overflow-x: auto;
@@ -175,9 +251,14 @@
   border-radius: 14px;
   border: 1px solid var(--mkt-line);
   background: linear-gradient(180deg, rgba(18, 18, 18, 0.95), rgba(8, 8, 8, 0.98));
-  width: fit-content;
-  max-width: calc(100% - 32px);
-  margin-left: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+@media (max-width: 640px) {
+  .obx-mkt .mkt-tab-rail {
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+  }
 }
 .obx-mkt .mkt-tab-rail::-webkit-scrollbar { display: none; }
 .obx-mkt .mkt-tab {
@@ -193,10 +274,10 @@
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--mkt-silver);
+  color: var(--mkt-muted);
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
-.obx-mkt .mkt-tab:hover { color: #fff; background: rgba(255, 255, 255, 0.04); }
+.obx-mkt .mkt-tab:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
 .obx-mkt .mkt-tab.active {
   color: #0a0a0a;
   background: linear-gradient(180deg, var(--mkt-gold-hi), var(--mkt-gold));
@@ -207,8 +288,8 @@
 
 /* Category chips */
 .obx-mkt .mkt-cat-bar {
-  border-top: 1px solid rgba(168, 176, 188, 0.1);
-  background: rgba(7, 7, 7, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(7, 7, 7, 0.88);
 }
 .obx-mkt .mkt-rail { scrollbar-width: none; }
 .obx-mkt .mkt-rail::-webkit-scrollbar { display: none; }
@@ -294,8 +375,6 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .obx-mkt .mkt-hairline { border-color: var(--mkt-line); }
-.obx-mkt .mkt-muted { color: var(--mkt-muted); }
-.obx-mkt .mkt-mono { font-family: var(--font-mono); }
 .obx-mkt .mkt-row { transition: background 0.12s; }
 .obx-mkt .mkt-row:hover { background: rgba(255, 255, 255, 0.03); }
 
@@ -305,7 +384,10 @@
   margin: 0 auto;
   width: 100%;
   max-width: 1440px;
-  padding: 24px 16px 64px;
+  padding: 28px 16px 64px;
+}
+@media (max-width: 640px) {
+  .obx-mkt .mkt-main { padding-top: 20px; }
 }
 
 /* ── Media ── */
@@ -444,7 +526,7 @@
 .obx-mkt .mkt-nft-card__sub {
   margin-top: 3px;
   font-size: 11px;
-  color: var(--mkt-muted);
+  color: var(--mkt-dim);
 }
 .obx-mkt .mkt-nft-card__stats {
   display: flex;
@@ -452,7 +534,7 @@
   margin-top: 7px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--mkt-muted);
+  color: var(--mkt-dim);
 }
 .obx-mkt .mkt-nft-card__stats span {
   display: inline-flex;
@@ -531,7 +613,7 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--mkt-muted);
+  color: var(--mkt-dim);
 }
 .obx-mkt .mkt-col-card__stats {
   display: flex;
@@ -545,7 +627,7 @@
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--mkt-muted);
+  color: var(--mkt-dim);
   margin-bottom: 3px;
 }
 .obx-mkt .mkt-col-card__stats .value {
@@ -571,7 +653,7 @@
 .obx-mkt .mkt-rarity--legendary { color: #F0C75E; border-color: rgba(212, 175, 55, 0.4); background: rgba(212, 175, 55, 0.1); }
 .obx-mkt .mkt-rarity--epic { color: #60A5FA; border-color: rgba(96, 165, 250, 0.4); background: rgba(59, 130, 246, 0.1); }
 .obx-mkt .mkt-rarity--rare { color: #A8B0BC; border-color: rgba(168, 176, 188, 0.35); background: rgba(168, 176, 188, 0.08); }
-.obx-mkt .mkt-rarity--common { color: var(--mkt-muted); border-color: var(--mkt-line); background: rgba(255, 255, 255, 0.03); }
+.obx-mkt .mkt-rarity--common { color: var(--mkt-dim); border-color: var(--mkt-line); background: rgba(255, 255, 255, 0.03); }
 
 /* Drop / generic cards */
 .obx-mkt .mkt-card,
@@ -668,8 +750,8 @@
 .obx-mkt .mkt-hero-desc {
   margin: 8px 0 0;
   max-width: 46ch;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--mkt-muted);
 }
 .obx-mkt .mkt-hero-stats {
@@ -683,7 +765,7 @@
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--mkt-muted);
+  color: var(--mkt-dim);
 }
 .obx-mkt .mkt-hero-stat-value {
   margin-top: 3px;
@@ -714,11 +796,19 @@
 .obx-mkt .mkt-marquee {
   overflow: hidden;
   border-bottom: 1px solid var(--mkt-line);
-  background: rgba(8, 8, 8, 0.9);
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.95), rgba(6, 6, 6, 0.92));
+}
+.obx-mkt .mkt-marquee-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mkt-gold-hi);
 }
 .obx-mkt .mkt-marquee-track {
   display: inline-flex;
-  gap: 2rem;
+  gap: 2.25rem;
   white-space: nowrap;
   animation: mkt-scroll 32s linear infinite;
 }
@@ -739,13 +829,24 @@
 }
 .obx-mkt .mkt-section-title {
   font-family: var(--font-display);
-  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+.obx-mkt .mkt-section-title::after {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 2px;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--mkt-gold-hi), rgba(96, 165, 250, 0.45), transparent);
 }
 .obx-mkt .mkt-section-sub {
-  margin-top: 4px;
-  font-size: 13px;
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--mkt-muted);
 }
 .obx-mkt .mkt-empty {
@@ -760,7 +861,7 @@
   border: 1px dashed var(--mkt-line);
   color: var(--mkt-muted);
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .obx-mkt .mkt-footer {
@@ -773,8 +874,17 @@
   color: var(--mkt-muted);
   transition: color 0.12s, background 0.12s;
 }
-.obx-mkt .mkt-nav:hover { color: #fff; background: rgba(255, 255, 255, 0.04); }
+.obx-mkt .mkt-nav:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+.obx-mkt .mkt-footer-link {
+  color: rgba(255, 255, 255, 0.88);
+  transition: color 0.15s ease;
+}
 .obx-mkt .mkt-footer-link:hover { color: var(--mkt-gold-hi) !important; }
+.obx-mkt .mkt-footer-desc {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--mkt-muted);
+}
 
 .obx-mkt .mkt-tabbtn {
   display: inline-flex;
@@ -798,6 +908,72 @@
 
 .obx-mkt .mkt-vol { color: var(--mkt-gold-hi) !important; }
 .obx-mkt .mkt-verified-icon { color: var(--mkt-gold-hi) !important; }
+
+/* Currency toggle in header */
+.obx-mkt .mkt-currency-toggle {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--mkt-line);
+  background: linear-gradient(180deg, rgba(16, 16, 16, 0.95), rgba(8, 8, 8, 0.98));
+  padding: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.obx-mkt .mkt-currency-toggle button {
+  border-radius: 7px;
+  padding: 5px 9px;
+  color: var(--mkt-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.obx-mkt .mkt-currency-toggle button:hover { color: #fff; }
+.obx-mkt .mkt-currency-toggle button.is-on {
+  background: linear-gradient(180deg, var(--mkt-gold-hi), var(--mkt-gold));
+  color: #0a0a0a;
+  box-shadow: 0 4px 12px -6px rgba(212, 175, 55, 0.65);
+}
+
+/* Explore route — LaunchpadNftHub inside marketplace shell */
+.obx-mkt .pf-mono { font-family: var(--font-mono); }
+.obx-mkt .pf-card {
+  background: linear-gradient(180deg, rgba(14, 14, 14, 0.95), rgba(8, 8, 8, 0.98));
+  border: 1px solid var(--mkt-line);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.obx-mkt .pf-card.group:hover,
+.obx-mkt a.pf-card:hover {
+  border-color: rgba(212, 175, 55, 0.42);
+  box-shadow: 0 14px 36px -20px rgba(212, 175, 55, 0.32);
+}
+.obx-mkt .pf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(240, 199, 94, 0.45);
+  background: linear-gradient(180deg, var(--mkt-gold-hi), var(--mkt-gold));
+  color: #0a0a0a;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  box-shadow: 0 8px 24px -10px rgba(212, 175, 55, 0.65);
+  transition: filter 0.15s, transform 0.15s;
+}
+.obx-mkt .pf-btn:hover { filter: brightness(1.06); }
+.obx-mkt .pf-btn:active { transform: translateY(1px); }
+.obx-mkt .mkt-main h1 {
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  letter-spacing: -0.04em;
+}
+.obx-mkt .mkt-main > div > p:first-of-type,
+.obx-mkt .mkt-main .max-w-2xl.text-sm {
+  color: var(--mkt-muted);
+  line-height: 1.6;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .obx-mkt .mkt-marquee-track,

@@ -32,7 +32,7 @@ export function CommandHero({
             {Icon && <Icon className="h-7 w-7 text-[var(--ox-gold-hi)] shrink-0" strokeWidth={2.2} />}
             {title}
           </h1>
-          {sub && <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[var(--ox-silver)]">{sub}</p>}
+          {sub && <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-white/70 font-medium">{sub}</p>}
           {children}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
@@ -51,7 +51,7 @@ export function StatDeck({ items }: { items: { label: string; value: React.React
         <div key={s.label} className="rounded-xl border border-line bg-panel/80 px-3 py-2.5 backdrop-blur-sm">
           <div className="term-label mb-0.5 truncate">{s.label}</div>
           <div className={`term text-lg font-bold tabular leading-none ${toneCls(s.tone)}`}>{s.value}</div>
-          {s.sub != null && <div className="term text-[9px] text-faint mt-1 truncate">{s.sub}</div>}
+          {s.sub != null && <div className="term text-[9px] text-white/45 mt-1 truncate">{s.sub}</div>}
         </div>
       ))}
     </div>

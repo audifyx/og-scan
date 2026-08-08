@@ -1,0 +1,180 @@
+/**
+ * OrbitX Social — X-style shell typography & polish
+ * Syne display + Manrope body · black/metal/teal · bright white copy
+ */
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+.ox-x-social {
+  --oxs-font-display: "Syne", "Manrope", system-ui, sans-serif;
+  --oxs-font-body: "Manrope", system-ui, sans-serif;
+  --oxs-font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --oxs-bg: #000000;
+  --oxs-surface: #0c0e12;
+  --oxs-surface-2: #14171c;
+  --oxs-border: rgba(255, 255, 255, 0.1);
+  --oxs-border-strong: rgba(255, 255, 255, 0.16);
+
+  --oxs-text: #ffffff;
+  --oxs-text-muted: rgba(255, 255, 255, 0.72);
+  --oxs-text-subtle: rgba(255, 255, 255, 0.55);
+
+  --oxs-accent: #2ee6c5;
+  --oxs-accent-hi: #5eead4;
+  --oxs-accent-dim: rgba(46, 230, 197, 0.14);
+  --oxs-accent-hover: #26c9ad;
+  --oxs-metal: #3b82f6;
+
+  font-family: var(--oxs-font-body);
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.012em;
+  color: var(--oxs-text);
+}
+
+/* Display / headings — Syne */
+.ox-x-social .font-black,
+.ox-x-social [class*="text-[19px]"],
+.ox-x-social [class*="text-[20px]"],
+.ox-x-social [class*="text-[24px]"],
+.ox-x-social [class*="text-[17px]"][class*="font-black"] {
+  font-family: var(--oxs-font-display);
+  letter-spacing: -0.03em;
+}
+
+/* Nav labels at xl */
+.ox-x-social header .hidden.xl\:block {
+  font-family: var(--oxs-font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Post body — bright white, comfortable line height */
+.ox-x-social article [class*="text-[15px]"][class*="leading-snug"],
+.ox-x-social .whitespace-pre-wrap[class*="text-[15px]"] {
+  color: #ffffff;
+  line-height: 1.55;
+  font-weight: 450;
+}
+
+/* Composer input */
+.ox-x-social textarea {
+  font-family: var(--oxs-font-body);
+  font-weight: 500;
+}
+.ox-x-social textarea[class*="text-[20px]"] {
+  font-family: var(--oxs-font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Mint addresses */
+.ox-x-social .font-mono {
+  font-family: var(--oxs-font-mono);
+}
+
+/* Brighten muted Tailwind opacity utilities — no grey hex */
+.ox-x-social .text-white\/90 { color: #ffffff !important; }
+.ox-x-social .text-white\/80 { color: rgba(255, 255, 255, 0.92) !important; }
+.ox-x-social .text-white\/70 { color: rgba(255, 255, 255, 0.88) !important; }
+.ox-x-social .text-white\/60 { color: rgba(255, 255, 255, 0.82) !important; }
+.ox-x-social .text-white\/50 { color: var(--oxs-text-muted) !important; }
+.ox-x-social .text-white\/45 { color: var(--oxs-text-muted) !important; }
+.ox-x-social .text-white\/40 { color: var(--oxs-text-muted) !important; }
+.ox-x-social .text-white\/35 { color: var(--oxs-text-muted) !important; }
+.ox-x-social .text-white\/30 { color: var(--oxs-text-subtle) !important; }
+.ox-x-social .text-white\/25 { color: var(--oxs-text-subtle) !important; }
+
+.ox-x-social ::placeholder,
+.ox-x-social .placeholder\:text-white\/35::placeholder,
+.ox-x-social .placeholder\:text-white\/30::placeholder {
+  color: rgba(255, 255, 255, 0.48) !important;
+}
+
+/* Feed card polish */
+.ox-x-social article.group\/post {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+.ox-x-social article.group\/post:hover {
+  background: rgba(255, 255, 255, 0.028);
+}
+
+/* Section titles in feed inserts */
+.ox-x-social section [class*="text-[18px]"][class*="font-black"] {
+  font-family: var(--oxs-font-display);
+  letter-spacing: -0.025em;
+}
+
+/* Right rail cards — metal glass */
+.ox-x-social aside .x-rise.rounded-2xl {
+  border-color: var(--oxs-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Sticky headers */
+.ox-x-social .sticky.top-0.z-10 {
+  border-bottom-color: var(--oxs-border);
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+
+/* Nav active state */
+.ox-x-social header button[class*="font-black"] .hidden.xl\:block,
+.ox-x-social header button[class*="font-medium"] .hidden.xl\:block {
+  font-size: 1.125rem;
+}
+
+/* ── Animations (moved from inline) ── */
+@keyframes xFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.x-fade-in { animation: xFadeIn 0.28s ease both; }
+
+@keyframes xLikePop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.45); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.x-like-pop { animation: xLikePop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes xTick {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.x-marquee { overflow: hidden; position: relative; }
+.x-marquee-track { display: flex; width: max-content; animation: xTick 36s linear infinite; }
+.x-marquee:hover .x-marquee-track { animation-play-state: paused; }
+
+.x-tilt {
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.x-tilt:hover {
+  transform: translateY(-3px);
+  border-color: rgba(46, 230, 197, 0.4);
+}
+
+@keyframes xRise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.x-rise { animation: xRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes xShim {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.x-shim {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 37%,
+    rgba(255, 255, 255, 0.04) 63%
+  );
+  background-size: 200% 100%;
+  animation: xShim 1.4s ease infinite;
+}

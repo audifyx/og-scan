@@ -35,11 +35,18 @@ export function PriceText({ sol, dp, className = "" }: { sol?: number | null; dp
 export function CurrencyToggle() {
   const { unit, setUnit } = useCurrency();
   return (
-    <div className="flex items-center rounded-lg border mkt-hairline bg-[hsl(var(--mkt-panel-2))] p-0.5 text-[11px] font-bold">
+    <>
       {(["SOL", "USD"] as const).map((u) => (
-        <button key={u} onClick={() => setUnit(u)}
-          className={`rounded-md px-2 py-1 ${unit === u ? "bg-[hsl(var(--og-cyan))] text-black" : "mkt-muted"}`}>{u}</button>
+        <button
+          key={u}
+          type="button"
+          onClick={() => setUnit(u)}
+          className={unit === u ? "is-on" : ""}
+          aria-pressed={unit === u}
+        >
+          {u}
+        </button>
       ))}
-    </div>
+    </>
   );
 }

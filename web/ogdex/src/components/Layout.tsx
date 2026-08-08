@@ -92,15 +92,15 @@ function FooterCol({ title, links, external }: { title: string; links: { to?: st
         {links.map((l) => (
           <li key={l.label}>
             {external && l.href ? (
-              <a href={l.href} className="inline-flex items-center gap-1 text-[13px] text-[var(--ox-silver)] hover:text-[var(--ox-gold-hi)]">
+              <a href={l.href} className="inline-flex items-center gap-1 text-[13px] text-white/65 hover:text-[var(--ox-gold-hi)] transition-colors">
                 {l.label} <ChevronRight className="h-3 w-3 opacity-50" />
               </a>
             ) : l.href ? (
-              <a href={l.href} className="inline-flex items-center gap-1 text-[13px] text-[var(--ox-silver)] hover:text-[var(--ox-gold-hi)]">
+              <a href={l.href} className="inline-flex items-center gap-1 text-[13px] text-white/65 hover:text-[var(--ox-gold-hi)] transition-colors">
                 {l.label} <ChevronRight className="h-3 w-3 opacity-50" />
               </a>
             ) : (
-              <Link to={l.to!} className="inline-flex items-center gap-1 text-[13px] text-[var(--ox-silver)] hover:text-[var(--ox-gold-hi)]">
+              <Link to={l.to!} className="inline-flex items-center gap-1 text-[13px] text-white/65 hover:text-[var(--ox-gold-hi)] transition-colors">
                 {l.label} <ChevronRight className="h-3 w-3 opacity-50" />
               </Link>
             )}
@@ -137,15 +137,15 @@ export default function Layout() {
   return (
     <div className="dex-shell">
       <SharedAtmosphere />
-      <div className="sticky top-0 z-30">
+      <div className="dex-sticky-chrome">
         <div className="brand-hairline" />
         <header className="dex-shell-header">
           <div className="max-w-[1600px] mx-auto px-4 md:px-5 h-14 flex items-center gap-4">
             <Link to="/"><Brand /></Link>
 
-            <div className="hidden lg:flex items-center gap-3.5 ml-2 pl-4 border-l term text-[10px]" style={{ borderColor: "var(--ox-silver-dim)", color: "var(--ox-silver)" }}>
+            <div className="hidden lg:flex items-center gap-3.5 ml-2 pl-4 border-l term text-[10px] font-semibold" style={{ borderColor: "var(--ox-silver-dim)", color: "var(--ox-text-dim)" }}>
               <span>USERS <span className="text-[var(--ox-blue-hi)] font-bold">{pstats.activeUsers}</span></span>
-              <span>TOKENS <span className="text-white/80 font-semibold">{pstats.tokenCount}</span></span>
+              <span>TOKENS <span className="text-white font-semibold">{pstats.tokenCount}</span></span>
               <span>VOL <span className="text-[var(--ox-gold-hi)] font-bold">{pstats.volume}</span></span>
             </div>
 
@@ -161,7 +161,7 @@ export default function Layout() {
                   setWatchPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
                   setWatchOpen((o) => !o);
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[var(--ox-silver)] hover:text-white transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white/70 hover:text-white transition-all"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--ox-silver-dim)" }}
               >
                 <Star className="w-3.5 h-3.5" />
@@ -188,7 +188,7 @@ export default function Layout() {
                       <Wallet className="w-3.5 h-3.5 text-[var(--ox-blue-hi)]" /> {short(w)}
                     </Link>
                   )) : (
-                    <div className="px-2 py-3 text-xs text-[var(--ox-silver)]">No watched wallets yet.</div>
+                    <div className="px-2 py-3 text-xs text-white/55">No watched wallets yet.</div>
                   )}
                 </div>,
                 document.body,
@@ -233,16 +233,16 @@ export default function Layout() {
         </div>
 
         <div className="hidden md:block dex-status-strip">
-          <div className="max-w-[1600px] mx-auto px-5 h-7 flex items-center gap-4 term text-[10px]" style={{ color: "var(--ox-silver)" }}>
+          <div className="max-w-[1600px] mx-auto px-5 h-7 flex items-center gap-4 term text-[10px] font-semibold text-white/65">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--ox-blue)]" style={{ boxShadow: "0 0 8px var(--ox-blue)" }} />
               <span style={{ color: "var(--ox-blue-hi)", letterSpacing: "0.14em" }}>LIVE</span>
             </span>
             <span>SOLANA MAINNET</span>
-            <span className="hidden lg:inline">TOKENS <span className="text-white/70">{pstats.tokenCount}</span></span>
+            <span className="hidden lg:inline">TOKENS <span className="text-white">{pstats.tokenCount}</span></span>
             <span className="hidden xl:inline">VOL <span className="text-[var(--ox-gold-hi)]">{pstats.volume}</span></span>
             <span className="flex-1" />
-            <span className="term" style={{ letterSpacing: "0.06em" }}>orbitx@terminal</span>
+            <span className="term text-white/55" style={{ letterSpacing: "0.06em" }}>orbitx@terminal</span>
           </div>
         </div>
       </div>
@@ -261,7 +261,7 @@ export default function Layout() {
           <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
               <Brand />
-              <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-[var(--ox-silver)]">
+              <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-white/65">
                 OrbitX Terminal — metal desk for discovery, pulse, scanner, and wallet intel on Solana.
               </p>
               <div className="mt-4 flex gap-2">
@@ -274,7 +274,7 @@ export default function Layout() {
             <FooterCol title="Resources" links={FOOTER_RESOURCES} />
             <FooterCol title="OrbitX" links={FOOTER_ECOSYSTEM} external />
           </div>
-          <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[var(--ox-silver)]/70 border-t" style={{ borderColor: "rgba(192,198,210,0.08)" }}>
+          <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-white/45 border-t" style={{ borderColor: "rgba(192,198,210,0.08)" }}>
             <span>© {new Date().getFullYear()} OrbitX Terminal</span>
             <div className="flex gap-4">
               <a href="/whitepaper" className="hover:text-[var(--ox-gold-hi)]">Whitepaper</a>

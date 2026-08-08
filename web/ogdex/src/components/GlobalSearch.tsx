@@ -101,19 +101,18 @@ export default function GlobalSearch() {
       {/* Desktop trigger — inline in header */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="hidden md:flex items-center gap-2 w-56 lg:w-72 pl-3 pr-4 py-2 rounded-xl text-sm text-[#A8B3C2] transition-all"
-        style={{ background: "rgba(0,255,163,0.06)", border: "1.5px solid rgba(0,255,163,0.18)" }}
+        className="dex-search-trigger hidden md:flex w-56 lg:w-72 pl-3 pr-4 py-2 text-sm"
       >
-        <Search className="w-3.5 h-3.5 shrink-0" />
+        <Search className="w-3.5 h-3.5 shrink-0 text-[var(--ox-blue-hi)]" />
         <span className="flex-1 text-left">Search tokens, wallets…</span>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.07)", color: "#A8B3C2" }}>⌘K</span>
+        <span className="term text-[10px] font-bold px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/55">⌘K</span>
       </button>
 
       {/* Mobile trigger — icon only */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-[#A8B3C2] hover:text-white transition-colors"
-        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+        className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-white/70 hover:text-white transition-colors"
+        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--ox-silver-dim)" }}
         aria-label="Search"
       >
         <Search className="w-4 h-4" />
@@ -121,13 +120,13 @@ export default function GlobalSearch() {
 
       {/* ── Full-screen modal overlay ── */}
       {open && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}>
-          <div ref={overlayRef} className="w-full max-w-2xl mx-4 mt-[10vh]">
+        <div className="fixed inset-0 z-[100] flex flex-col items-center" style={{ background: "rgba(0,0,0,0.78)", backdropFilter: "blur(8px)" }}>
+          <div ref={overlayRef} className="w-full max-w-2xl mx-4 mt-[12vh]">
 
             {/* Search input */}
             <div className="relative flex items-center rounded-2xl overflow-hidden"
-              style={{ background: "#0B0C0C", border: "1.5px solid rgba(0,255,163,0.4)", boxShadow: "0 0 40px rgba(0,255,163,0.2)" }}>
-              <Search className="w-5 h-5 absolute left-4 text-[#00FFA3] pointer-events-none" />
+              style={{ background: "#0a0a0a", border: "1.5px solid rgba(96, 165, 250, 0.45)", boxShadow: "0 0 40px rgba(59, 130, 246, 0.15)" }}>
+              <Search className="w-5 h-5 absolute left-4 text-[var(--ox-blue-hi)] pointer-events-none" />
               <input
                 ref={inputRef}
                 value={q}
@@ -136,23 +135,23 @@ export default function GlobalSearch() {
                 placeholder="Search token name, symbol, or paste address…"
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full bg-transparent pl-12 pr-12 py-4 text-white text-base outline-none placeholder-[#A8B3C2]"
+                className="inp !border-0 !rounded-none !bg-transparent !shadow-none pl-12 pr-12 py-4 text-base"
               />
-              {loading && <Loader2 className="w-4 h-4 absolute right-10 text-[#00FFA3] animate-spin" />}
-              <button onClick={close} className="absolute right-3 p-1.5 rounded-lg text-[#A8B3C2] hover:text-white hover:bg-white/10 transition-all">
+              {loading && <Loader2 className="w-4 h-4 absolute right-10 text-[var(--ox-blue-hi)] animate-spin" />}
+              <button onClick={close} className="absolute right-3 p-1.5 rounded-lg text-white/55 hover:text-white hover:bg-white/10 transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Results dropdown */}
             {(results.length > 0 || (q.trim() && !loading)) && (
-              <div className="mt-2 rounded-2xl overflow-hidden"
-                style={{ background: "#0B0C0C", border: "1px solid rgba(0,255,163,0.18)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+              <div className="mt-2 rounded-2xl overflow-hidden dex-panel !p-0"
+                style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
 
                 {results.length > 0 ? (
                   <>
-                    <div className="px-4 py-2 border-b" style={{ borderColor: "rgba(0,255,163,0.1)" }}>
-                      <span className="text-[10px] uppercase tracking-widest text-[#A8B3C2] font-bold">Tokens</span>
+                    <div className="px-4 py-2 border-b border-line">
+                      <span className="term-label !text-[var(--ox-gold-hi)]">Tokens</span>
                     </div>
                     <div>
                       {results.map((r, i) => {
@@ -164,37 +163,37 @@ export default function GlobalSearch() {
                             onClick={() => go(r)}
                             onMouseEnter={() => setCursor(i)}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/5"
-                            style={cursor === i ? { background: "rgba(0,255,163,0.1)" } : {}}
+                            style={cursor === i ? { background: "rgba(59, 130, 246, 0.1)" } : {}}
                           >
                             {/* Icon */}
                             <div className="w-9 h-9 rounded-full shrink-0 overflow-hidden flex items-center justify-center"
-                              style={{ background: "rgba(0,255,163,0.12)" }}>
+                              style={{ background: "rgba(59, 130, 246, 0.12)" }}>
                               {r.icon
                                 ? <img src={r.icon} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                                : <TrendingUp className="w-4 h-4 text-[#00FFA3]" />}
+                                : <TrendingUp className="w-4 h-4 text-[var(--ox-blue-hi)]" />}
                             </div>
 
                             {/* Name + symbol */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold text-white text-sm truncate">{r.symbol || r.name || r.mint.slice(0, 8)}</span>
-                                {r.name && r.symbol && <span className="text-xs text-[#A8B3C2] truncate">{r.name}</span>}
+                                {r.name && r.symbol && <span className="text-xs text-white/55 truncate">{r.name}</span>}
                               </div>
-                              <div className="text-[10px] text-[#A8B3C2] font-mono truncate">{r.mint.slice(0, 8)}…{r.mint.slice(-4)}</div>
+                              <div className="text-[10px] text-white/45 font-mono truncate">{r.mint.slice(0, 8)}…{r.mint.slice(-4)}</div>
                             </div>
 
                             {/* Price + change */}
                             <div className="text-right shrink-0">
-                              {r.priceUsd != null && <div className="text-sm font-semibold text-white">{fmtUsd(r.priceUsd)}</div>}
+                              {r.priceUsd != null && <div className="term text-sm font-semibold text-white">{fmtUsd(r.priceUsd)}</div>}
                               {r.change24h != null && (
-                                <div className={`text-[11px] font-bold ${isUp ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
+                                <div className={`text-[11px] font-bold ${isUp ? "text-up" : "text-down"}`}>
                                   {isUp ? "+" : ""}{pct.toFixed(2)}%
                                 </div>
                               )}
-                              {r.mcap != null && <div className="text-[10px] text-[#A8B3C2]">MCap {compact(r.mcap)}</div>}
+                              {r.mcap != null && <div className="text-[10px] text-white/45">MCap {compact(r.mcap)}</div>}
                             </div>
 
-                            <ArrowRight className="w-3.5 h-3.5 text-[#A8B3C2] shrink-0 ml-1" />
+                            <ArrowRight className="w-3.5 h-3.5 text-white/40 shrink-0 ml-1" />
                           </button>
                         );
                       })}
@@ -202,10 +201,10 @@ export default function GlobalSearch() {
 
                     {/* Wallet lookup shortcut if typed value looks like an address */}
                     {addr && (
-                      <div className="border-t px-4 py-2" style={{ borderColor: "rgba(0,255,163,0.1)" }}>
+                      <div className="border-t border-line px-4 py-2">
                         <button
                           onClick={() => { nav(`/wallet/${q.trim()}`); close(); }}
-                          className="flex items-center gap-2 text-xs text-[#A8B3C2] hover:text-white transition-colors"
+                          className="flex items-center gap-2 text-xs text-white/60 hover:text-white transition-colors"
                         >
                           <Wallet2 className="w-3.5 h-3.5" />
                           View as wallet instead
@@ -214,19 +213,19 @@ export default function GlobalSearch() {
                     )}
                   </>
                 ) : (
-                  <div className="px-4 py-6 text-center text-sm text-[#A8B3C2]">
+                  <div className="px-4 py-6 text-center text-sm text-white/60">
                     No results for <span className="text-white font-semibold">"{q}"</span>
                     {isAddr(q.trim()) && (
                       <div className="mt-2 flex gap-2 justify-center">
-                        <button onClick={() => { nav(`/token/${q.trim()}`); close(); }} className="px-3 py-1 rounded-lg text-xs font-bold" style={{ background: "rgba(0,255,163,0.15)", color: "#00FFA3" }}>Open as Token</button>
-                        <button onClick={() => { nav(`/wallet/${q.trim()}`); close(); }} className="px-3 py-1 rounded-lg text-xs font-bold" style={{ background: "rgba(255,255,255,0.07)", color: "#A8B3C2" }}>Open as Wallet</button>
+                        <button onClick={() => { nav(`/token/${q.trim()}`); close(); }} className="dex-btn dex-btn--blue !py-1.5 !text-xs">Open as Token</button>
+                        <button onClick={() => { nav(`/wallet/${q.trim()}`); close(); }} className="dex-btn dex-btn--ghost !py-1.5 !text-xs">Open as Wallet</button>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Footer hint */}
-                <div className="px-4 py-2 border-t flex items-center gap-3 text-[10px] text-[#A8B3C2]" style={{ borderColor: "rgba(0,255,163,0.1)" }}>
+                <div className="px-4 py-2 border-t border-line flex items-center gap-3 term-label !tracking-widest !text-white/40">
                   <span>↑↓ navigate</span>
                   <span>↵ open</span>
                   <span>Esc close</span>

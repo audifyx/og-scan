@@ -14,8 +14,8 @@ export default {
         term:    "#60A5FA",
         up:      "#60A5FA",
         down:    "#ff4d6d",
-        muted:   "#A8B0BC",
-        faint:   "#66707E",
+        muted:   "rgba(255, 255, 255, 0.65)",
+        faint:   "rgba(255, 255, 255, 0.42)",
       },
       fontFamily: {
         sans:    ["Manrope", "system-ui", "sans-serif"],

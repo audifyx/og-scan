@@ -4,6 +4,7 @@
  */
 import { lazy, Suspense } from "react";
 import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
+import "@/components/social-x/x-social.css";
 
 const XSocialApp = lazy(() => import("@/components/social-x/XSocialApp"));
 
@@ -17,7 +18,7 @@ export default function SocialAppPage() {
       </div>
       <Suspense
         fallback={
-          <div className="flex h-full items-center justify-center text-sm text-white/40">
+          <div className="flex h-full items-center justify-center text-sm font-medium text-white/70">
             Loading social…
           </div>
         }

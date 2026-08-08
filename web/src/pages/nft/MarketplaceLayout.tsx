@@ -58,7 +58,7 @@ function WalletLogin() {
         <span className="mkt-wallet-dot" />
         <div className="leading-none text-left">
           <div className="mkt-mono text-[11px] font-bold text-white">{shortAddr(addr)}</div>
-          <div className="mkt-mono mt-0.5 text-[9px] uppercase tracking-widest mkt-muted">
+          <div className="mkt-mono mt-0.5 text-[9px] uppercase tracking-widest mkt-dim">
             {sol != null ? `${sol.toFixed(2)} SOL` : "linked"}
           </div>
         </div>
@@ -82,7 +82,7 @@ function LiveSalesTicker() {
           <span key={i} className="inline-flex items-center gap-2 text-[12px]">
             <Sparkles className="h-3 w-3 text-[var(--mkt-gold-hi)]" />
             <span className="font-semibold text-white">{s.nft?.name ?? "NFT"}</span>
-            <span className="mkt-muted">sold for</span>
+            <span className="mkt-dim">sold for</span>
             <span className="mkt-mono font-bold mkt-marquee-price">{fmtSol(s.amount_sol)}</span>
           </span>
         ))}
@@ -162,7 +162,9 @@ export default function MarketplaceLayout() {
               <div className="mkt-shell-actions">
                 <PlatformLinks />
                 <PlatformThemeButton compact />
-                <CurrencyToggle />
+                <div className="mkt-currency-toggle">
+                  <CurrencyToggle />
+                </div>
                 <Link to="/nft/create" className="mkt-btn hidden sm:inline-flex">
                   <PlusCircle className="h-4 w-4" /> Create
                 </Link>
@@ -207,7 +209,7 @@ export default function MarketplaceLayout() {
                 </div>
                 <span className="mkt-brand-name text-[15px]">Orbit<span>X</span> Market</span>
               </div>
-              <p className="text-[12px] mkt-muted leading-relaxed">
+              <p className="mkt-footer-desc">
                 Wallet-native NFT desk on Solana — mint, trade, and earn creator fees in-app.
               </p>
               <div className="mt-3 flex items-center gap-2">
@@ -221,9 +223,9 @@ export default function MarketplaceLayout() {
             <FooterCol title="Company" links={[["App Hub", "/app"], ["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Agent MCP", "/agent"], ["X MCP", "/x"], ["Social", "/orbitx-social"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
           </div>
           <div className="border-t mkt-hairline">
-            <div className="mx-auto flex w-full max-w-[1440px] flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] mkt-muted sm:flex-row">
-              <span>© {year} OrbitX. All rights reserved.</span>
-              <span className="inline-flex items-center gap-1.5">
+            <div className="mx-auto flex w-full max-w-[1440px] flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] sm:flex-row">
+              <span className="mkt-dim">© {year} OrbitX. All rights reserved.</span>
+              <span className="inline-flex items-center gap-1.5 mkt-muted">
                 <ShieldCheck className="h-3.5 w-3.5 mkt-verified-icon" /> Verified badges · duplicate &amp; scam detection built in
               </span>
             </div>
@@ -237,11 +239,11 @@ export default function MarketplaceLayout() {
 function FooterCol({ title, links }: { title: string; links: [string, string][] }) {
   return (
     <div>
-      <div className="mb-3 mkt-mono text-[10px] font-bold uppercase tracking-[0.14em] mkt-muted">{title}</div>
+      <div className="mb-3 mkt-eyebrow">{title}</div>
       <ul className="space-y-1.5">
         {links.map(([label, to]) => (
           <li key={to}>
-            <Link to={to} className="mkt-footer-link group inline-flex items-center gap-1 text-[13px] text-white/75">
+            <Link to={to} className="mkt-footer-link group inline-flex items-center gap-1 text-[13px]">
               {label} <ChevronRight className="h-3 w-3 opacity-0 transition group-hover:opacity-100" />
             </Link>
           </li>

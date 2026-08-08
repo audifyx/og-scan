@@ -187,8 +187,8 @@ export default function Screener() {
         <div className="dex-panel flex flex-wrap items-center gap-3">
           <Search className="h-5 w-5 text-accent shrink-0" />
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted">Search results</div>
-            <h2 className="text-lg font-black text-white">"{q}"</h2>
+            <div className="term-label !text-[var(--ox-gold-hi)]">Search results</div>
+            <h2 className="font-display text-lg font-black text-white">"{q}"</h2>
           </div>
           <span className="ml-auto pill bg-panel2 text-muted text-xs">{rows.length} matches</span>
         </div>
@@ -217,16 +217,15 @@ export default function Screener() {
                 const active = t.id === tab;
                 return (
                   <button key={t.id} type="button" onClick={() => switchTab(t.id)} title={t.desc}
-                    className={`relative flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-all
-                      ${active ? "border-[var(--ox-gold)]/50 bg-[var(--ox-gold)]/10 text-white" : "border-line text-muted hover:text-white hover:border-white/20"}`}>
-                    <Icon className={`w-3.5 h-3.5 ${active ? "text-[var(--ox-gold-hi)]" : ""}`} />
+                    className={`dex-feed-tab ${active ? "dex-feed-tab--on" : ""}`}>
+                    <Icon className="w-3.5 h-3.5" />
                     {t.label}
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-line/60">
+            <div className="dex-control-rail">
               {!cur?.noInterval && !isMultichain && (
                 <div className="dex-tab-segment-wrap">
                   {INTERVALS.map((iv) => (
@@ -263,13 +262,13 @@ export default function Screener() {
 
               {!isSocial && tab !== "listed" && <ViewToggle mode={layout} onChange={setLayout} />}
               <LiveRefresh onClick={load} loading={loading} />
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted">
-                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <span className="h-1.5 w-1.5 rounded-full bg-up animate-pulse" />}
+              <span className="dex-live-pill">
+                {loading ? <Loader2 className="h-3 w-3 animate-spin text-[var(--ox-blue-hi)]" /> : <span className="h-1.5 w-1.5 rounded-full bg-up animate-pulse" />}
                 {loading ? "syncing…" : tab === "listed" ? `${listings.length} listed` : isMultichain ? `${rows.length} · ${CHAINS.find((c) => c.id === chain)?.label}` : `${rows.length} tokens`}
               </span>
             </div>
 
-            {cur?.desc && <p className="text-[11px] text-muted/70">{cur.desc}</p>}
+            {cur?.desc && <p className="text-[11px] text-white/50 font-medium">{cur.desc}</p>}
           </div>
 
           {/* Market pulse for token feeds */}
