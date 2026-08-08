@@ -14,7 +14,7 @@ import {
   getCustomClaimable, buildCustomClaimTransactions, type CustomClaimable,
   buildPumpClaimWithSkim, buildPumpBuyTransaction, buildCustomSwapToSolWithSkim,
 } from "@/lib/orbitx/claim";
-import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
+import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -233,7 +233,7 @@ export default function LaunchpadClaim() {
                 <span className="pf-mono text-white">{bpsToPct(DEFAULT_ROUTED_FEE_BPS)}%</span>
               </div>
               <p className="text-[11px] leading-relaxed text-[#A8B0BC]/80">
-                Of every $1 in fees: ${((TRADE_FEE_CREATOR_SHARE_PCT) / 100).toFixed(2)} to you · ${((TRADE_FEE_PLATFORM_SHARE_PCT) / 100).toFixed(2)} to OrbitX (claimable on Admin Desk).
+                Of every $1 in fees: ${tradeFeeSharePerDollar(TRADE_FEE_CREATOR_SHARE_PCT)} to you · ${tradeFeeSharePerDollar(TRADE_FEE_PLATFORM_SHARE_PCT)} to OrbitX (claimable on Admin Desk).
               </p>
               <label className="mt-3 flex cursor-pointer items-center gap-2">
                 <input type="checkbox" checked={autoBuyback} onChange={(e) => setAutoBuyback(e.target.checked)} className="h-4 w-4 accent-[#F0C75E]" />

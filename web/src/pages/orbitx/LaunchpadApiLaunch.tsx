@@ -228,7 +228,7 @@ export default function LaunchpadApiLaunch() {
           </div>
           <div className="ox-panel pf-card flex flex-col p-6">
             <div className="mb-2 flex items-center gap-2"><Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" /><span className="font-display text-base font-black">CUSTOM LANE</span><StatusChip status="live" /></div>
-            <p className="mb-4 flex-1 text-sm text-muted-foreground">Your own Token-2022 mint — on-chain 0.45% creator fee (87% you / 13% platform), revocable authorities, optional Raydium pool, OBX vanity grind.</p>
+            <p className="mb-4 flex-1 text-sm text-muted-foreground">Your own Token-2022 mint — on-chain 0.45% creator fee (98.7% you / 1.3% platform), revocable authorities, optional Raydium pool, OBX vanity grind.</p>
             <Link to="/orbitxlaunch/create/custom" className="ox-btn w-full !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))] hover:!bg-[hsl(var(--og-lime))]/15">Deploy custom <ArrowRight className="h-4 w-4" /></Link>
           </div>
         </div>

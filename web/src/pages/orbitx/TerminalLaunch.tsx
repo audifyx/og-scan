@@ -161,7 +161,7 @@ export default function TerminalLaunch() {
             {/* Fee Info */}
             <div className="bg-black/50 border border-amber-500/20 rounded p-3 text-xs text-amber-300">
               <AlertCircle className="w-4 h-4 inline mr-2" />
-              ${BASE_LAUNCH_FEE_USD.toFixed(2)} launch fee • 0.45% trade fee (87% creator / 13% platform)
+              ${BASE_LAUNCH_FEE_USD.toFixed(2)} launch fee • 0.45% trade fee (98.7% creator / 1.3% platform)
             </div>
           </div>
         )}

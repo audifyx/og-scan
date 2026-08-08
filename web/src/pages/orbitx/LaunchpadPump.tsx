@@ -26,7 +26,7 @@ import {
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft, CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
+import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft, CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { registerToken, checkAntiVamp, recordReferralEarning } from "@/lib/orbitx/registry";
 import { setCollectionCoin } from "@/lib/orbitx/nftRegistry";
 import {
@@ -1324,7 +1324,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity mint (grind your own prefix, or fall back to a server vanity search).<br />{isLaunchFeePromoActive() ? <>Launch fee: <span className="font-bold text-[hsl(var(--og-lime))]">FREE for a limited time</span> (normally ${BASE_LAUNCH_FEE_USD.toFixed(2)}) — you only pay the standard network fee (~0.02 SOL).</> : <>A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).</>}<br />OrbitX trade fee on launchpad tokens: {(CREATOR_FEE_BPS / 100).toFixed(2)}% on every buy/sell. Of every $1 in fees: ${(TRADE_FEE_CREATOR_SHARE_PCT / 100).toFixed(2)} to you (claim in-app) · ${(TRADE_FEE_PLATFORM_SHARE_PCT / 100).toFixed(2)} to OrbitX (Admin Desk).
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity mint (grind your own prefix, or fall back to a server vanity search).<br />{isLaunchFeePromoActive() ? <>Launch fee: <span className="font-bold text-[hsl(var(--og-lime))]">FREE for a limited time</span> (normally ${BASE_LAUNCH_FEE_USD.toFixed(2)}) — you only pay the standard network fee (~0.02 SOL).</> : <>A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).</>}<br />OrbitX trade fee on launchpad tokens: {(CREATOR_FEE_BPS / 100).toFixed(2)}% on every buy/sell. Of every $1 in fees: ${tradeFeeSharePerDollar(TRADE_FEE_CREATOR_SHARE_PCT)} to you (claim in-app) · ${tradeFeeSharePerDollar(TRADE_FEE_PLATFORM_SHARE_PCT)} to OrbitX (Admin Desk).
             </p>
           </div>
         )}
