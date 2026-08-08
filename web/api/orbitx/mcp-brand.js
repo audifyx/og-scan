@@ -58,7 +58,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `Setup · ${ORBITX_HOST}/agent`,
     `MCP URL · ${ORBITX_HOST}/api/mcp`,
     ``,
-    `_Buy credits: say “buy 5000 credits” (or SOL amount) → orbitx_credits_buy → open sign link → SOL to desk wallet → credits apply._`,
+    `_Buy credits: say “buy 5000 credits” → orbitx_credits_buy → Phantom → desk wallet. Advanced usage: orbitx_credits_usage (24h/7d/30d)._`,
     `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Say “confirm” / “auto” → Phantom auto-prompt._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
@@ -116,7 +116,7 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     `Usage / shop · ${ORBITX_HOST}/shop`,
     `MCP URL · ${ORBITX_HOST}/api/x/mcp`,
     ``,
-    `_Buy credits: say “I want to buy credits” → AI asks how much SOL → pay → credits appear. Advanced usage: ask Claude/Grok or open /shop._`,
+    `_Buy credits: say “buy credits” → amount → Phantom → desk wallet. Advanced usage: ask Grok “advanced usage” (period analytics + runway) or open /shop._`,
     `_Tip: Mint a chat auth message on the /x dashboard — paste into Grok / Claude / ChatGPT to stay linked without opening a site._`,
   ].join("\n");
 }
