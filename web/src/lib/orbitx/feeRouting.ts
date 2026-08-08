@@ -2,8 +2,8 @@
  * OrbitX fee routing — platform revenue-share taken at CLAIM time.
  *
  * Trading fee on OrbitX launches is 0.45% (CREATOR_FEE_BPS). Of every $1 claimed:
- *   · $0.013 (1.3%) → ROUTED_FEE_WALLET (admin dashboard claim)
- *   · $0.987 (98.7%) → token creator
+ *   · $0.014 (1.4%) → ROUTED_FEE_WALLET (platform fee)
+ *   · $0.986 (98.6%) → token creator
  *
  * WHY claim-time (and not per-trade): on the pump lane, pump.fun credits 100%
  * of creator fees to the creator-vault PDA; we can't intercept individual
@@ -19,11 +19,11 @@
  * redeploy.
  */
 import { PublicKey } from "@solana/web3.js";
-import { TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
+import { PLATFORM_FEE_WALLET, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 
 /** Destination for routed platform-revenue-share fees (separate from the
  *  launch/swap PLATFORM_WALLET). */
-export const ROUTED_FEE_WALLET = "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb";
+export const ROUTED_FEE_WALLET = PLATFORM_FEE_WALLET;
 
 /** Platform share skimmed from each claim, in basis points.
  *  130 = 1.3% → matches TRADE_FEE_PLATFORM_SHARE_PCT. */

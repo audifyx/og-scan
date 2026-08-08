@@ -30,6 +30,7 @@ import {
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
 } from "lucide-react";
 import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, BASE_LAUNCH_FEE_USD, type FeeBreakdown } from "@/lib/orbitx/fee";
+import { PLATFORM_FEE_PERCENT, PLATFORM_FEE_WALLET } from "@/lib/platformFee";
 import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
@@ -994,7 +995,8 @@ export default function LaunchpadCreate() {
                 {fee && fee.poolFeeSol > 0 && (
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">DEX pool creation</span><span className="font-mono">{fee.poolFeeSol.toFixed(3)} SOL</span></div>
                 )}
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Orbitx fee {isLaunchFeePromoActive() ? <><s className="opacity-50">{fmtUsd(BASE_LAUNCH_FEE_USD)}</s> <span className="font-bold text-[hsl(var(--og-lime))]">FREE</span></> : <>({fmtUsd(ORBITX_FEE_USD)})</>}</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.orbitxFeeSol.toFixed(4) : "…"} SOL</span></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Orbitx launch fee {isLaunchFeePromoActive() ? <><s className="opacity-50">{fmtUsd(BASE_LAUNCH_FEE_USD)}</s> <span className="font-bold text-[hsl(var(--og-lime))]">FREE</span></> : <>({fmtUsd(ORBITX_FEE_USD)})</>}</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.orbitxFeeSol.toFixed(4) : "…"} SOL</span></div>
+                <div className="rounded-lg border border-[hsl(var(--og-gold))]/20 bg-[hsl(var(--og-gold))]/5 p-2 text-[10px] leading-4 text-muted-foreground"><span className="font-semibold text-foreground">Platform fee — {PLATFORM_FEE_PERCENT.toFixed(1)}%</span> is disclosed before signing and routed to <span className="font-mono text-[9px] text-foreground">{PLATFORM_FEE_WALLET}</span>.</div>
                 {fee && fee.liquiditySol > 0 && (
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidity you seed <span className="text-[9px] opacity-70">(your capital)</span></span><span className="font-mono">{fee.liquiditySol.toFixed(3)} SOL</span></div>
                 )}

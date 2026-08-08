@@ -12,8 +12,12 @@
      1.3% platform share at claim time (see feeRouting.ts). */
 import { PublicKey } from "@solana/web3.js";
 
-export const PLATFORM_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
-export const PLATFORM_FEE_BPS = 95;           // 0.95% swap fee — pump.fun protocol-fee rate
+/** Canonical destination for every OrbitX platform fee. */
+export const PLATFORM_FEE_WALLET = "4qD4UBf9y9wRM51qHYccucAJadB24PRSEku7JWpXV6wu";
+/** @deprecated Use PLATFORM_FEE_WALLET. */
+export const PLATFORM_WALLET = PLATFORM_FEE_WALLET;
+export const PLATFORM_FEE_BPS = 140;           // 1.4% platform fee
+export const PLATFORM_FEE_PERCENT = PLATFORM_FEE_BPS / 100;
 export const PLATFORM_FEE_ENABLED = true;     // kill-switch if a fee account issue arises
 /* Launch fee — $0.90 flat on pump + custom lanes (paid in SOL at launch). */
 export const BASE_LAUNCH_FEE_USD = 0.9;
@@ -30,8 +34,8 @@ export const CREATOR_FEE_BPS = 45;
  * How claimed trading fees split (must sum to 100).
  * Example: $1 of fees → $0.013 admin dashboard, $0.987 creator.
  */
-export const TRADE_FEE_PLATFORM_SHARE_PCT = 1.3;
-export const TRADE_FEE_CREATOR_SHARE_PCT = 98.7;
+export const TRADE_FEE_PLATFORM_SHARE_PCT = 1.4;
+export const TRADE_FEE_CREATOR_SHARE_PCT = 98.6;
 
 /** Dollars from every $1 of fees for a share percent (1.3 → "0.013"). */
 export function tradeFeeSharePerDollar(pct: number): string {
