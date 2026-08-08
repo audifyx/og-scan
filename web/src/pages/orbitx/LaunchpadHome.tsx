@@ -49,7 +49,7 @@ function BoardColumn({
       </header>
       <div className="ox-board-col-body">
         {!items.length ? (
-          <div className="px-2 py-10 text-center text-xs text-white/40">{empty}</div>
+          <div className="px-2 py-10 text-center text-xs text-white">{empty}</div>
         ) : (
           items.map((t) => (
             <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />
@@ -226,7 +226,7 @@ export default function LaunchpadHome() {
           type="button"
           onClick={() => setHideVamps((v) => !v)}
           className={`ox-nav-pill inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide ${
-            hideVamps ? "ox-nav-pill--on" : "text-[#A8B0BC] hover:border-white/25 hover:text-white"
+            hideVamps ? "ox-nav-pill--on" : "text-white hover:border-white/25 hover:text-white"
           }`}
           title="Hide vamp / clone tokens"
         >
@@ -269,7 +269,7 @@ export default function LaunchpadHome() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-20 text-sm text-[#A8B0BC]">
+        <div className="flex items-center justify-center gap-2 py-20 text-sm text-white">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading coins…
         </div>
       ) : showTriBoard ? (
@@ -303,7 +303,7 @@ export default function LaunchpadHome() {
         <div className="ox-feed-empty">
           <Eye className="mx-auto mb-3 h-10 w-10 opacity-40" />
           <div className="text-base font-bold">No coins found</div>
-          <p className="mt-1 text-sm text-[#A8B0BC]">Adjust filters or create the first one.</p>
+          <p className="mt-1 text-sm text-white">Adjust filters or create the first one.</p>
           <Link to="/orbitxlaunch/create" className="pf-btn mt-5 inline-flex">
             <Plus className="h-4 w-4" /> Create coin
           </Link>

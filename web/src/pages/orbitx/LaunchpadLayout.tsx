@@ -174,7 +174,7 @@ function WalletConsole() {
       <span className="ox-wallet-dot" />
       <div className="leading-none">
         <div className="pf-mono text-[11px] font-bold text-white">{shortAddr(addr)}</div>
-        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-white/45">
+        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-white">
           {sol != null ? `${sol.toFixed(3)} SOL` : "linked"}
         </div>
       </div>
@@ -205,7 +205,7 @@ function EvmWalletButton() {
       <span className="ox-wallet-dot" style={{ background: "#627EEA", boxShadow: "0 0 8px #627EEA" }} />
       <div className="leading-none">
         <div className="pf-mono text-[11px] font-bold text-white">{shortAddr(shown)}</div>
-        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-white/45">EVM</div>
+        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-white">EVM</div>
       </div>
       <button type="button" onClick={disconnect} className="ox-wallet-exit">Unlink</button>
     </div>

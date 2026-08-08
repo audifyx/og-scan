@@ -12,8 +12,8 @@
   --pf-bg: 0 0% 2%;
   --pf-bg-2: 0 0% 5%;
   --pf-ink: 0 0% 100%;
-  --pf-muted: 216 12% 68%;
-  --pf-border: 216 12% 28%;
+  --pf-muted: 0 0% 100%;         /* never grey — white only */
+  --pf-border: 0 0% 100% / 0.18;
   --pf-green: 217 91% 60%;       /* blue = "up" */
   --pf-green-dark: 217 91% 48%;
   --pf-red: 356 84% 62%;
@@ -27,8 +27,9 @@
   --ox-gold-hi: #F0C75E;
   --ox-blue: #3B82F6;
   --ox-blue-hi: #60A5FA;
-  --ox-silver: #A8B0BC;
-  --ox-silver-dim: rgba(192, 198, 210, 0.16);
+  /* Text is white — no grey/silver body copy on launchpad */
+  --ox-silver: #ffffff;
+  --ox-silver-dim: rgba(255, 255, 255, 0.16);
   --ox-black: #050505;
   --ox-black-2: #0a0a0a;
 
@@ -37,6 +38,35 @@
   color: #fff;
   isolation: isolate;
   font-family: var(--ox-font-body);
+}
+
+/* Force white copy — kill grey / muted utility classes inside launchpad */
+.lp-classic .text-muted-foreground,
+.lp-classic .text-gray-300,
+.lp-classic .text-gray-400,
+.lp-classic .text-gray-500,
+.lp-classic .text-gray-600,
+.lp-classic .text-zinc-300,
+.lp-classic .text-zinc-400,
+.lp-classic .text-zinc-500,
+.lp-classic .text-slate-300,
+.lp-classic .text-slate-400,
+.lp-classic .text-slate-500,
+.lp-classic .text-neutral-300,
+.lp-classic .text-neutral-400,
+.lp-classic .text-neutral-500,
+.lp-classic [class*="text-white/"],
+.lp-classic [class*="text-[#A8"],
+.lp-classic [class*="text-[#a8"],
+.lp-classic [class*="text-[#B0"],
+.lp-classic [class*="text-[#C0"] {
+  color: #fff !important;
+}
+.lp-classic ::placeholder,
+.lp-classic input::placeholder,
+.lp-classic textarea::placeholder {
+  color: rgba(255, 255, 255, 0.75) !important;
+  opacity: 1 !important;
 }
 
 .lp-classic::before {
@@ -475,11 +505,6 @@
   min-width: 0;
   overflow: hidden;
 }
-.lp-classic .ox-shell-actions {
-  min-width: 0;
-  flex-shrink: 1;
-  overflow: hidden;
-}
 .lp-classic .ox-platform-links--compact {
   max-width: min(360px, 32vw);
   overflow-x: auto;
@@ -555,7 +580,7 @@
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(168, 176, 188, 0.55);
+  color: #fff;
 }
 .lp-classic .ox-tab-group-items {
   display: inline-flex;

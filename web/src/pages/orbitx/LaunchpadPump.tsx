@@ -77,7 +77,7 @@ function VanityStatChip({ label, value, tone = "gold" }: { label: string; value:
     "hsl(var(--og-gold))";
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
-      <div className="font-mono text-[9px] uppercase tracking-widest text-white/35">{label}</div>
+      <div className="font-mono text-[9px] uppercase tracking-widest text-white">{label}</div>
       <div className="mt-0.5 font-mono text-sm font-bold" style={{ color: toneHsl }}>{value}</div>
     </div>
   );
@@ -264,7 +264,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
         <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <button onClick={() => navigate("/trading-hub")} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white">
+              <button onClick={() => navigate("/trading-hub")} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white hover:text-white">
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <div className="inline-flex items-center gap-2 rounded-lg border border-[rgba(59,130,246,0.35)] bg-[rgba(59,130,246,0.08)] px-4 py-1.5">
@@ -275,7 +275,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
             <h1 className="font-display text-2xl font-black text-white md:text-3xl">
               Launched <span className="text-[#F0C75E]">tokens</span>
             </h1>
-            <p className="mt-1 text-sm text-[#A8B0BC]">
+            <p className="mt-1 text-sm text-white">
               Every token deployed through the OrbitX pump lane — live-priced via DexScreener
             </p>
           </div>
@@ -302,7 +302,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Search launched tokens"
-                className="h-11 border-white/[0.08] bg-white/[0.03] pl-10 text-white placeholder:text-white/20 focus:border-[hsl(var(--og-cyan))]/40"
+                className="h-11 border-white/[0.08] bg-white/[0.03] pl-10 text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40"
               />
             </div>
           </div>
@@ -337,9 +337,9 @@ function EmptyState({ onCreateClick, hasSearch }: { onCreateClick: () => void; h
   if (hasSearch) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Search className="h-12 w-12 text-white/10 mb-4" />
-        <h3 className="text-lg font-bold text-white/50">No tokens found</h3>
-        <p className="text-sm text-white/25 mt-1">Try a different search term</p>
+        <Search className="h-12 w-12 text-white mb-4" />
+        <h3 className="text-lg font-bold text-white">No tokens found</h3>
+        <p className="text-sm text-white mt-1">Try a different search term</p>
       </div>
     );
   }
@@ -350,7 +350,7 @@ function EmptyState({ onCreateClick, hasSearch }: { onCreateClick: () => void; h
         <Rocket className="h-12 w-12 text-[hsl(var(--og-cyan))]/30" />
       </div>
       <h3 className="text-xl font-black text-white mb-2">No tokens launched yet</h3>
-      <p className="text-sm text-white/35 max-w-sm mb-6">
+      <p className="text-sm text-white max-w-sm mb-6">
         Create your first token on pump.fun directly from OrbitX. It only takes a few seconds.
       </p>
       <button
@@ -411,18 +411,18 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
 
             {/* Contract address */}
             <div className="flex items-center gap-1.5 mt-1">
-              <code className="text-[10px] text-white/30 font-mono">
+              <code className="text-[10px] text-white font-mono">
                 {token.mintAddress.slice(0, 6)}…{token.mintAddress.slice(-4)}
               </code>
-              <button onClick={copyAddress} className="text-white/20 hover:text-white/50 transition-colors">
+              <button onClick={copyAddress} className="text-white hover:text-white transition-colors">
                 {copied ? <CheckCircle className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
 
             {/* Age */}
             <div className="flex items-center gap-1 mt-1">
-              <Clock className="h-3 w-3 text-white/15" />
-              <span className="text-[10px] text-white/25">
+              <Clock className="h-3 w-3 text-white" />
+              <span className="text-[10px] text-white">
                 {formatDistanceToNow(new Date(token.launchedAt), { addSuffix: true })}
               </span>
             </div>
@@ -439,7 +439,7 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
                 </div>
               </>
             ) : (
-              <span className="text-xs text-white/15">Loading…</span>
+              <span className="text-xs text-white">Loading…</span>
             )}
           </div>
         </div>
@@ -448,23 +448,23 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
         {live && (
           <div className="grid grid-cols-3 gap-3 mb-4 rounded-lg bg-white/[0.02] border border-white/[0.04] p-3">
             <div>
-              <p className="text-[9px] text-white/25 uppercase tracking-widest mb-0.5">Market Cap</p>
-              <p className="text-xs font-bold text-white/70">{fmtUsd(live.marketCap)}</p>
+              <p className="text-[9px] text-white uppercase tracking-widest mb-0.5">Market Cap</p>
+              <p className="text-xs font-bold text-white">{fmtUsd(live.marketCap)}</p>
             </div>
             <div>
-              <p className="text-[9px] text-white/25 uppercase tracking-widest mb-0.5">Volume 24h</p>
-              <p className="text-xs font-bold text-white/70">{fmtUsd(live.volume24h)}</p>
+              <p className="text-[9px] text-white uppercase tracking-widest mb-0.5">Volume 24h</p>
+              <p className="text-xs font-bold text-white">{fmtUsd(live.volume24h)}</p>
             </div>
             <div>
-              <p className="text-[9px] text-white/25 uppercase tracking-widest mb-0.5">Liquidity</p>
-              <p className="text-xs font-bold text-white/70">{fmtUsd(live.liquidity)}</p>
+              <p className="text-[9px] text-white uppercase tracking-widest mb-0.5">Liquidity</p>
+              <p className="text-xs font-bold text-white">{fmtUsd(live.liquidity)}</p>
             </div>
           </div>
         )}
 
         {/* Description */}
         {token.description && (
-          <p className="text-[11px] text-white/30 line-clamp-2 mb-3 leading-relaxed">{token.description}</p>
+          <p className="text-[11px] text-white line-clamp-2 mb-3 leading-relaxed">{token.description}</p>
         )}
 
         {/* Bottom row: socials + links */}
@@ -473,19 +473,19 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
           <div className="flex items-center gap-2">
             {token.twitter && (
               <a href={token.twitter} target="_blank" rel="noopener noreferrer"
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.06] text-white/25 hover:text-white/60 hover:border-white/10 transition-colors">
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.06] text-white hover:text-white hover:border-white/10 transition-colors">
                 <Twitter className="h-3.5 w-3.5" />
               </a>
             )}
             {token.telegram && (
               <a href={token.telegram} target="_blank" rel="noopener noreferrer"
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.06] text-white/25 hover:text-white/60 hover:border-white/10 transition-colors">
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.06] text-white hover:text-white hover:border-white/10 transition-colors">
                 <Send className="h-3.5 w-3.5" />
               </a>
             )}
             {token.website && (
               <a href={token.website} target="_blank" rel="noopener noreferrer"
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.06] text-white/25 hover:text-white/60 hover:border-white/10 transition-colors">
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.03] border border-white/[0.06] text-white hover:text-white hover:border-white/10 transition-colors">
                 <Globe className="h-3.5 w-3.5" />
               </a>
             )}
@@ -505,7 +505,7 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
               href={`https://solscan.io/token/${token.mintAddress}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-1.5 text-[10px] font-bold text-white/30 hover:text-white/60 hover:border-white/10 transition-all uppercase tracking-wider"
+              className="flex items-center gap-1.5 rounded-lg bg-white/[0.02] border border-white/[0.06] px-3 py-1.5 text-[10px] font-bold text-white hover:text-white hover:border-white/10 transition-all uppercase tracking-wider"
             >
               Solscan <ExternalLink className="h-3 w-3" />
             </a>
@@ -963,7 +963,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
         {/* Back button + Header */}
         <div className="mb-8">
-          <button onClick={onBack} className="mb-4 flex items-center gap-1.5 text-sm text-[#A8B0BC] transition-colors hover:text-white">
+          <button onClick={onBack} className="mb-4 flex items-center gap-1.5 text-sm text-white transition-colors hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Back to Launched Tokens
           </button>
           <div className="ox-tab-hero mb-2">
@@ -973,7 +973,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               <h1 className="mt-1 font-display text-2xl font-black text-white md:text-3xl">
                 Launch on <span className="text-[#F0C75E]">Pump.fun</span>
               </h1>
-              <p className="mx-auto mt-2 max-w-md text-sm text-[#A8B0BC]">
+              <p className="mx-auto mt-2 max-w-md text-sm text-white">
                 {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[#F0C75E]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details, optionally grind a custom vanity mint, then deploy.</> : <>Fill in the details, optionally grind a custom vanity mint, then launch.</>}
               </p>
             </div>
@@ -989,23 +989,23 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <CheckCircle className="h-10 w-10 text-[#F0C75E]" />
               </div>
               <h2 className="font-display text-2xl font-black text-[#F0C75E] mb-2">Deployment complete</h2>
-              <p className="text-sm text-[#A8B0BC] mb-6">Your token is now live on pump.fun</p>
+              <p className="text-sm text-white mb-6">Your token is now live on pump.fun</p>
 
               <div className="mb-4 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-                <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Contract Address</p>
+                <p className="text-[10px] text-white uppercase tracking-widest mb-1">Contract Address</p>
                 <div className="flex items-center gap-2 justify-center">
                   <code className="text-sm text-[hsl(var(--og-cyan))] font-mono break-all">{mintAddress}</code>
-                  <button onClick={() => copyToClipboard(mintAddress, "Address")} className="text-white/30 hover:text-white transition-colors">
+                  <button onClick={() => copyToClipboard(mintAddress, "Address")} className="text-white hover:text-white transition-colors">
                     <Copy className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
 
               <div className="mb-6 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
-                <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Transaction</p>
+                <p className="text-[10px] text-white uppercase tracking-widest mb-1">Transaction</p>
                 <div className="flex items-center gap-2 justify-center">
-                  <code className="text-xs text-white/60 font-mono">{txSignature.slice(0, 20)}…{txSignature.slice(-8)}</code>
-                  <button onClick={() => copyToClipboard(txSignature, "Signature")} className="text-white/30 hover:text-white transition-colors">
+                  <code className="text-xs text-white font-mono">{txSignature.slice(0, 20)}…{txSignature.slice(-8)}</code>
+                  <button onClick={() => copyToClipboard(txSignature, "Signature")} className="text-white hover:text-white transition-colors">
                     <Copy className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1041,7 +1041,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
               <h2 className="text-xl font-black text-white mb-2">Launch Failed</h2>
               <p className="text-sm text-red-400/80 mb-6 font-mono break-all max-w-md mx-auto">{errorMsg}</p>
-              <Button onClick={() => setStep("form")} variant="outline" className="border-white/10 text-white/60 hover:text-white">
+              <Button onClick={() => setStep("form")} variant="outline" className="border-white/10 text-white hover:text-white">
                 ← Try Again
               </Button>
             </CardContent>
@@ -1058,7 +1058,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               <h2 className="text-xl font-black text-white mb-2">
                 {step === "uploading" ? "Uploading…" : step === "signing" ? "Sign Transaction" : "Broadcasting…"}
               </h2>
-              <p className="text-sm text-white/50">{statusMsg}</p>
+              <p className="text-sm text-white">{statusMsg}</p>
 
               <div className="mt-8 flex items-center justify-center gap-2">
                 {STEP_LABELS.map((label, i) => {
@@ -1070,15 +1070,15 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                       <div className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${
                         isDone ? "bg-green-500/20 text-green-400 border border-green-500/30" :
                         isActive ? "bg-[hsl(var(--og-cyan))]/20 text-[hsl(var(--og-cyan))] border border-[hsl(var(--og-cyan))]/30 animate-pulse" :
-                        "bg-white/[0.03] text-white/20 border border-white/[0.06]"
+                        "bg-white/[0.03] text-white border border-white/[0.06]"
                       }`}>
                         {isDone ? "✓" : i + 1}
                       </div>
-                      <span className={`text-[10px] uppercase tracking-widest ${isDone ? "text-green-400/60" : isActive ? "text-[hsl(var(--og-cyan))]/80" : "text-white/20"}`}>
+                      <span className={`text-[10px] uppercase tracking-widest ${isDone ? "text-green-400/60" : isActive ? "text-[hsl(var(--og-cyan))]/80" : "text-white"}`}>
                         {label}
                       </span>
                       {i < STEP_LABELS.length - 1 && (
-                        <ArrowRight className={`h-3 w-3 ${i < currentIdx ? "text-green-500/30" : "text-white/10"}`} />
+                        <ArrowRight className={`h-3 w-3 ${i < currentIdx ? "text-green-500/30" : "text-white"}`} />
                       )}
                     </div>
                   );
@@ -1096,7 +1096,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <Sparkles className="h-5 w-5 text-[hsl(var(--pf-green))] flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-black text-[hsl(var(--pf-green))]">Filled from your NFT</div>
-                  <div className="mt-1 text-sm text-white/80">
+                  <div className="mt-1 text-sm text-white">
                     Name, ticker, description, and logo were pasted automatically. Review, then launch when ready — no need to re-enter anything.
                   </div>
                 </div>
@@ -1107,7 +1107,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-black uppercase tracking-wide text-[hsl(var(--og-blood))]">🚫 OrbitX Anti-Vamp Protection — Launch Blocked</div>
-                  <div className="text-sm text-white/90 mt-1">
+                  <div className="text-sm text-white mt-1">
                     This name or ticker collides with an existing token
                     {blockedMatch?.name ? <> — too close to <strong>{blockedMatch.name}</strong>{blockedMatch.ticker && blockedMatch.ticker !== "—" ? <> (${blockedMatch.ticker})</> : null}</> : null}.
                     Change the name or ticker to continue.
@@ -1116,7 +1116,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
             )}
             {checkError && !nameTaken && (
-              <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white/80">
+              <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white">
                 Anti-vamp verification is degraded — you can still launch. Soft matches may route creator fees to OBX buybacks.
               </div>
             )}
@@ -1130,7 +1130,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
                 {/* Image upload */}
                 <div>
-                  <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Logo *</Label>
+                  <Label className="text-xs text-white uppercase tracking-widest mb-2 block">Logo *</Label>
                   <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={handleImageSelect} disabled={nameTaken} />
                   {imagePreview ? (
                     <div className="relative inline-block">
@@ -1140,24 +1140,24 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => fileInputRef.current?.click()} disabled={nameTaken} className="flex h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] text-white/20 hover:border-[hsl(var(--og-cyan))]/30 hover:text-[hsl(var(--og-cyan))]/60 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                    <button onClick={() => fileInputRef.current?.click()} disabled={nameTaken} className="flex h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] text-white hover:border-[hsl(var(--og-cyan))]/30 hover:text-[hsl(var(--og-cyan))]/60 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                       <div className="text-center"><Upload className="h-5 w-5 mx-auto mb-1" /><span className="text-[9px] uppercase tracking-widest">Upload</span></div>
                     </button>
                   )}
-                  <p className="text-[10px] text-white/20 mt-1.5">PNG, JPG, GIF, or WebP · Max 5 MB</p>
+                  <p className="text-[10px] text-white mt-1.5">PNG, JPG, GIF, or WebP · Max 5 MB</p>
                 </div>
 
                 {/* Name + Symbol */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">Token Name * {checkingName && <Loader2 className="h-3.5 w-3.5 animate-spin text-[hsl(var(--og-gold))]" />}</Label>
+                    <Label className="text-xs text-white uppercase tracking-widest mb-2 flex items-center gap-1.5">Token Name * {checkingName && <Loader2 className="h-3.5 w-3.5 animate-spin text-[hsl(var(--og-gold))]" />}</Label>
                     <Input placeholder="e.g. Doge Coin" value={form.name} onChange={(e) => updateField("name", e.target.value)} maxLength={32}
-                      className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
+                      className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
                   </div>
                   <div>
-                    <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Ticker *</Label>
+                    <Label className="text-xs text-white uppercase tracking-widest mb-2 block">Ticker *</Label>
                     <Input placeholder="e.g. DOGE" value={form.symbol} onChange={(e) => updateField("symbol", e.target.value.toUpperCase())} maxLength={10}
-                      className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 uppercase ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
+                      className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 uppercase ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
                   </div>
                 </div>
                 {nameTaken && blockedMatch?.name && (
@@ -1172,10 +1172,10 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
                 {/* Description */}
                 <div>
-                  <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Description</Label>
+                  <Label className="text-xs text-white uppercase tracking-widest mb-2 block">Description</Label>
                   <Textarea placeholder="What's your token about? (optional)" value={form.description} onChange={(e) => updateField("description", e.target.value)} maxLength={500} rows={3} disabled={nameTaken}
-                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 resize-none disabled:opacity-40" />
-                  <p className="text-[10px] text-white/15 text-right mt-1">{form.description.length}/500</p>
+                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 resize-none disabled:opacity-40" />
+                  <p className="text-[10px] text-white text-right mt-1">{form.description.length}/500</p>
                 </div>
               </CardContent>
             </Card>
@@ -1186,23 +1186,23 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <div className="flex items-center gap-2 mb-1">
                   <Globe className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">Socials</h3>
-                  <Badge className="bg-white/[0.04] text-white/25 border-white/[0.06] text-[9px]">Optional</Badge>
+                  <Badge className="bg-white/[0.04] text-white border-white/[0.06] text-[9px]">Optional</Badge>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <Twitter className="h-4 w-4 text-white/20 shrink-0" />
+                    <Twitter className="h-4 w-4 text-white shrink-0" />
                     <Input placeholder="https://x.com/yourtoken" value={form.twitter} onChange={(e) => updateField("twitter", e.target.value)} disabled={nameTaken}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
+                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <Send className="h-4 w-4 text-white/20 shrink-0" />
+                    <Send className="h-4 w-4 text-white shrink-0" />
                     <Input placeholder="https://t.me/yourgroup" value={form.telegram} onChange={(e) => updateField("telegram", e.target.value)} disabled={nameTaken}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
+                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
                   </div>
                   <div className="flex items-center gap-3">
-                    <Globe className="h-4 w-4 text-white/20 shrink-0" />
+                    <Globe className="h-4 w-4 text-white shrink-0" />
                     <Input placeholder="https://yourtoken.com" value={form.website} onChange={(e) => updateField("website", e.target.value)} disabled={nameTaken}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
+                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
                   </div>
                 </div>
               </CardContent>
@@ -1214,13 +1214,13 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <div className="flex items-center gap-2 mb-1">
                   <Zap className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">Initial Buy</h3>
-                  <Badge className="bg-white/[0.04] text-white/25 border-white/[0.06] text-[9px]">Optional</Badge>
+                  <Badge className="bg-white/[0.04] text-white border-white/[0.06] text-[9px]">Optional</Badge>
                 </div>
                 <div>
-                  <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Dev Buy (SOL)</Label>
+                  <Label className="text-xs text-white uppercase tracking-widest mb-2 block">Dev Buy (SOL)</Label>
                   <Input type="number" min="0" step="0.01" placeholder="0" value={form.devBuySol} onChange={(e) => updateField("devBuySol", e.target.value)} disabled={nameTaken}
-                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 max-w-[200px] disabled:opacity-40" />
-                  <p className="text-[10px] text-white/20 mt-1.5 flex items-center gap-1">
+                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 max-w-[200px] disabled:opacity-40" />
+                  <p className="text-[10px] text-white mt-1.5 flex items-center gap-1">
                     <Info className="h-3 w-3" /> Buy your own token at launch. Set 0 for no initial buy.
                   </p>
                 </div>
@@ -1235,16 +1235,16 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">Vanity Mint Address</h3>
                   <Badge className="bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))] border-[hsl(var(--og-gold))]/25 text-[9px]">Custom</Badge>
                 </div>
-                <div className="flex items-start gap-2 rounded-xl border border-[hsl(var(--og-cyan))]/30 bg-[hsl(var(--og-cyan))]/10 p-3 text-xs text-white/55">
+                <div className="flex items-start gap-2 rounded-xl border border-[hsl(var(--og-cyan))]/30 bg-[hsl(var(--og-cyan))]/10 p-3 text-xs text-white">
                   <Info className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--og-cyan))]" />
                   <span>
-                    <b className="text-white/85">Same as Custom launches:</b> grind a mint that <b className="text-white/85">starts with</b> your prefix in-browser.
+                    <b className="text-white">Same as Custom launches:</b> grind a mint that <b className="text-white">starts with</b> your prefix in-browser.
                     A 3-char prefix like <span className="font-mono text-[hsl(var(--og-gold))]">OBX</span> is realistic. Longer prefixes get ~29× harder per character.
                     If you skip grinding, launch falls back to a server vanity search for <span className="font-mono">…{vanityPrefix.trim().toLowerCase() || "obx"}</span>.
                   </span>
                 </div>
                 <div>
-                  <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Desired prefix</Label>
+                  <Label className="text-xs text-white uppercase tracking-widest mb-2 block">Desired prefix</Label>
                   <Input
                     value={vanityPrefix}
                     maxLength={8}
@@ -1255,7 +1255,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                       foundKpRef.current = null;
                       setFoundKey(null);
                     }}
-                    className="bg-white/[0.03] border-white/[0.08] text-white font-mono uppercase placeholder:text-white/15 focus:border-[hsl(var(--og-gold))]/40 max-w-[220px] disabled:opacity-40"
+                    className="bg-white/[0.03] border-white/[0.08] text-white font-mono uppercase placeholder:text-white focus:border-[hsl(var(--og-gold))]/40 max-w-[220px] disabled:opacity-40"
                     placeholder="OBX"
                   />
                 </div>
@@ -1289,7 +1289,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                     </Button>
                   )}
                   {attempts > 0 && (
-                    <span className="font-mono text-xs text-white/40">
+                    <span className="font-mono text-xs text-white">
                       {attempts.toLocaleString()} tries{rate ? ` · ${rate.toLocaleString()}/s` : ""}
                     </span>
                   )}
@@ -1300,11 +1300,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                       <CheckCircle2 className="h-4 w-4" /> Match found — will be used on launch
                     </div>
                     <div className="flex items-center gap-2">
-                      <code className="truncate font-mono text-xs text-white/80">{foundKey}</code>
+                      <code className="truncate font-mono text-xs text-white">{foundKey}</code>
                       <button
                         type="button"
                         onClick={() => { void navigator.clipboard.writeText(foundKey); toast.success("Copied"); }}
-                        className="text-white/40 hover:text-white"
+                        className="text-white hover:text-white"
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </button>
@@ -1322,14 +1322,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             ) : (
               <button onClick={handleLaunch} disabled={!canLaunch}
                 className={`w-full flex items-center justify-center gap-3 rounded-xl px-6 py-4 text-base font-black transition-all ${
-                  canLaunch ? "lp-cta font-display uppercase tracking-wider" : "bg-white/[0.04] text-white/20 cursor-not-allowed"
+                  canLaunch ? "lp-cta font-display uppercase tracking-wider" : "bg-white/[0.04] text-white cursor-not-allowed"
                 }`}>
                 <Rocket className="h-5 w-5" />
                 {!form.name.trim() || !form.symbol.trim() ? "Fill in token details" : !imageFile ? "Upload a logo" : `Launch ${form.symbol.trim()} 🚀`}
               </button>
             )}
 
-  <p className="text-center text-[10px] text-white/15 leading-relaxed">
+  <p className="text-center text-[10px] text-white leading-relaxed">
 By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity mint (grind your own prefix, or fall back to a server vanity search).<br />{isLaunchFeePromoActive() ? <>Launch fee: <span className="font-bold text-[hsl(var(--og-lime))]">FREE for a limited time</span> (normally ${BASE_LAUNCH_FEE_USD.toFixed(2)}) — you only pay the standard network fee (~0.02 SOL).</> : <>A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).</>}<br />OrbitX trade fee on launchpad tokens: {(CREATOR_FEE_BPS / 100).toFixed(2)}% on every buy/sell. Of every $1 in fees: ${tradeFeeSharePerDollar(TRADE_FEE_CREATOR_SHARE_PCT)} to you (claim in-app) · ${tradeFeeSharePerDollar(TRADE_FEE_PLATFORM_SHARE_PCT)} to OrbitX (Admin Desk).
             </p>
           </div>
