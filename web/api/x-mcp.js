@@ -39,25 +39,22 @@ import {
   xMenuPayload,
 } from "./orbitx/mcp-brand.js";
 import {
-  quoteCredits,
-  buildBuyTransaction,
-  getCreditsBalance,
-  getCreditsUsage,
-  confirmCreditsPurchase,
-  creditsBuyPrompt,
-  prepareCreditsMcpPurchase,
-  PLATFORM_CREDITS_WALLET,
-  CREDITS_PER_SOL,
-  MIN_SOL,
-  MAX_SOL,
-} from "./orbitx/x-credits.js";
-import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
   prepareBuyOrbitx,
   saveTradeIntent,
   loadLatestTradeIntent,
 } from "./orbitx/buy-orbitx.js";
+
+/** Lazy — x-credits must not load at cold start (Solana deps can 500 the whole MCP). */
+async function xCredits() {
+  return import("./orbitx/x-credits.js");
+}
+
+const CREDITS_PER_SOL = 10_000;
+const MIN_SOL = 0.001;
+const MAX_SOL = 100;
+const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 
 export const config = { maxDuration: 60 };
 
@@ -1583,10 +1580,11 @@ async function callTool(rawName, args, auth, req = null) {
   }
 
   if (name === "x_credits_buy") {
+    const xc = await xCredits();
     const askOnly =
       a.askOnly === true ||
       (a.solAmount == null && a.credits == null && a.amount == null && a.sol == null);
-    if (askOnly) return creditsBuyPrompt();
+    if (askOnly) return xc.creditsBuyPrompt();
     let wallet = String(a.publicKey || a.wallet || a.from || "").trim();
     if (!wallet) {
       try {
@@ -1596,7 +1594,7 @@ async function callTool(rawName, args, auth, req = null) {
         /* ignore */
       }
     }
-    const prepared = prepareCreditsMcpPurchase({
+    const prepared = xc.prepareCreditsMcpPurchase({
       base: MCP_HOST,
       wallet,
       solAmount: a.solAmount ?? a.sol,
@@ -1606,7 +1604,7 @@ async function callTool(rawName, args, auth, req = null) {
     });
     if (prepared.ok && wallet) {
       try {
-        const built = await buildBuyTransaction({
+        const built = await xc.buildBuyTransaction({
           fromPubkey: wallet,
           solAmount: prepared.solAmount,
         });
@@ -1627,7 +1625,8 @@ async function callTool(rawName, args, auth, req = null) {
       return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
     }
     try {
-      return await confirmCreditsPurchase(sb, auth.userId, signature);
+      const xc = await xCredits();
+      return await xc.confirmCreditsPurchase(sb, auth.userId, signature);
     } catch (e) {
       return {
         ok: false,
@@ -1639,7 +1638,8 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_credits_balance") {
     try {
-      return await getCreditsBalance(sb, auth.userId);
+      const xc = await xCredits();
+      return await xc.getCreditsBalance(sb, auth.userId);
     } catch (e) {
       return { ok: false, error: "balance_failed", message: e?.message || "balance unavailable" };
     }
@@ -1647,7 +1647,8 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_credits_usage") {
     try {
-      return await getCreditsUsage(sb, auth.userId, { limit: a.limit });
+      const xc = await xCredits();
+      return await xc.getCreditsUsage(sb, auth.userId, { limit: a.limit });
     } catch (e) {
       return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
     }
@@ -2461,7 +2462,8 @@ async function handleAgent(req, res, parts) {
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
     if (req.method !== "GET") return json(res, { error: "method_not_allowed" }, 405);
     try {
-      return json(res, await getCreditsBalance(sb, user.id));
+      const xc = await xCredits();
+      return json(res, await xc.getCreditsBalance(sb, user.id));
     } catch (e) {
       return json(res, { error: e?.message || "credits_failed" }, 500);
     }
@@ -2473,7 +2475,8 @@ async function handleAgent(req, res, parts) {
     const u = new URL(req.url || "/", "http://x");
     const limit = Number(u.searchParams.get("limit") || 40);
     try {
-      return json(res, await getCreditsUsage(sb, user.id, { limit }));
+      const xc = await xCredits();
+      return json(res, await xc.getCreditsUsage(sb, user.id, { limit }));
     } catch (e) {
       return json(res, { error: e?.message || "usage_failed" }, 500);
     }
@@ -2482,6 +2485,7 @@ async function handleAgent(req, res, parts) {
   if (route === "credits/quote" && (req.method === "GET" || req.method === "POST")) {
     const user = await getAuthUser(req);
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const xc = await xCredits();
     let solAmount;
     if (req.method === "GET") {
       const u = new URL(req.url || "/", "http://x");
@@ -2490,7 +2494,7 @@ async function handleAgent(req, res, parts) {
       const body = await readBody(req);
       solAmount = Number(body.solAmount ?? body.sol ?? 0);
     }
-    return json(res, quoteCredits(solAmount));
+    return json(res, xc.quoteCredits(solAmount));
   }
 
   if (route === "credits/buy" && req.method === "POST") {
@@ -2500,10 +2504,11 @@ async function handleAgent(req, res, parts) {
     const solAmount = Number(body.solAmount ?? body.sol ?? 0);
     const publicKey = String(body.publicKey || body.wallet || "").trim();
     try {
+      const xc = await xCredits();
       if (publicKey) {
-        return json(res, await buildBuyTransaction({ fromPubkey: publicKey, solAmount }));
+        return json(res, await xc.buildBuyTransaction({ fromPubkey: publicKey, solAmount }));
       }
-      return json(res, quoteCredits(solAmount));
+      return json(res, xc.quoteCredits(solAmount));
     } catch (e) {
       return json(res, { error: e?.message || "buy_setup_failed" }, 500);
     }
@@ -2516,7 +2521,8 @@ async function handleAgent(req, res, parts) {
     const signature = String(body.signature || body.txSignature || body.tx_signature || "").trim();
     if (!signature) return json(res, { error: "signature_required" }, 400);
     try {
-      const out = await confirmCreditsPurchase(sb, user.id, signature);
+      const xc = await xCredits();
+      const out = await xc.confirmCreditsPurchase(sb, user.id, signature);
       return json(res, out, out.ok ? 200 : 400);
     } catch (e) {
       return json(res, { error: e?.message || "confirm_failed" }, 500);

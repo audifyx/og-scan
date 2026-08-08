@@ -35,20 +35,17 @@ import {
   loadLatestTradeIntent,
   getChatTradeAuto,
 } from "./orbitx/buy-orbitx.js";
-import {
-  creditsBuyPrompt,
-  prepareCreditsMcpPurchase,
-  confirmCreditsPurchase,
-  getCreditsBalance,
-  getCreditsUsage,
-  PLATFORM_CREDITS_WALLET,
-  CREDITS_PER_SOL,
-} from "./orbitx/x-credits.js";
-
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
 }
+
+/** Lazy — credits module (may pull Solana) must not crash MCP cold start. */
+async function xCredits() {
+  return import("./orbitx/x-credits.js");
+}
+
+const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 
 async function grokImagine() {
   return import("./orbitx/grok-imagine.js");
@@ -481,7 +478,8 @@ async function handleAgent(req, res, parts) {
       );
     }
     try {
-      const out = await confirmCreditsPurchase(sb, userId, signature);
+      const xc = await xCredits();
+      const out = await xc.confirmCreditsPurchase(sb, userId, signature);
       return json(res, out, out.ok ? 200 : 400);
     } catch (e) {
       return json(res, { ok: false, error: e?.message || "confirm_failed" }, 500);
@@ -492,7 +490,8 @@ async function handleAgent(req, res, parts) {
     const authUser = await getAuthUser(req);
     if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
     try {
-      return json(res, await getCreditsBalance(sb, authUser.id));
+      const xc = await xCredits();
+      return json(res, await xc.getCreditsBalance(sb, authUser.id));
     } catch (e) {
       return json(res, { error: e?.message || "credits_failed" }, 500);
     }
@@ -503,7 +502,8 @@ async function handleAgent(req, res, parts) {
     if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
     const u = new URL(req.url || "/", "http://x");
     try {
-      return json(res, await getCreditsUsage(sb, authUser.id, { limit: Number(u.searchParams.get("limit") || 40) }));
+      const xc = await xCredits();
+      return json(res, await xc.getCreditsUsage(sb, authUser.id, { limit: Number(u.searchParams.get("limit") || 40) }));
     } catch (e) {
       return json(res, { error: e?.message || "usage_failed" }, 500);
     }
@@ -3063,11 +3063,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   }
 
   if (name === "orbitx_credits_buy") {
+    const xc = await xCredits();
     const askOnly =
       args.askOnly === true ||
       (args.solAmount == null && args.credits == null && args.amount == null && args.sol == null);
-    if (askOnly) return creditsBuyPrompt();
-    const out = prepareCreditsMcpPurchase({
+    if (askOnly) return xc.creditsBuyPrompt();
+    return xc.prepareCreditsMcpPurchase({
       base,
       wallet,
       solAmount: args.solAmount ?? args.sol,
@@ -3075,7 +3076,6 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       amount: args.amount,
       confirmMode: args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || "sign",
     });
-    return out;
   }
 
   if (name === "orbitx_credits_confirm") {
@@ -3091,7 +3091,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
     }
     try {
-      return await confirmCreditsPurchase(sb, auth.userId, signature);
+      const xc = await xCredits();
+      return await xc.confirmCreditsPurchase(sb, auth.userId, signature);
     } catch (e) {
       return {
         ok: false,
@@ -3107,7 +3108,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       return { ok: false, error: "session_required", message: "Authenticate to view credits balance" };
     }
     try {
-      return await getCreditsBalance(sb, auth.userId);
+      const xc = await xCredits();
+      return await xc.getCreditsBalance(sb, auth.userId);
     } catch (e) {
       return { ok: false, error: "balance_failed", message: e?.message || "balance unavailable" };
     }
@@ -3118,7 +3120,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       return { ok: false, error: "session_required", message: "Authenticate to view credits usage" };
     }
     try {
-      return await getCreditsUsage(sb, auth.userId, { limit: args.limit });
+      const xc = await xCredits();
+      return await xc.getCreditsUsage(sb, auth.userId, { limit: args.limit });
     } catch (e) {
       return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
     }
