@@ -10,6 +10,7 @@ import { useWallet } from "../lib/wallet";
 import LiveStats, { fetchPlatformStats } from "./LiveStats";
 import InstallPWA from "./InstallPWA";
 import GlobalSearch from "./GlobalSearch";
+import { SharedAtmosphere, DexThemeButton } from "./SharedAtmosphere";
 
 function Brand() {
   return (
@@ -64,10 +65,23 @@ const FOOTER_RESOURCES = [
   { href: "/privacy", label: "Privacy" },
 ];
 const FOOTER_ECOSYSTEM = [
-  { href: "/orbitxlaunch", label: "OrbitX Launchpad" },
-  { href: "/bagwork", label: "Bagwork" },
-  { href: "/Orbitxcity", label: "OrbitX City" },
   { href: "/app", label: "App Hub" },
+  { href: "/orbitxlaunch", label: "OrbitX Launchpad" },
+  { href: "/nft", label: "NFT Market" },
+  { href: "/agent", label: "Agent MCP" },
+  { href: "/x", label: "X MCP" },
+  { href: "/orbitx-social", label: "Social" },
+  { href: "/Orbitxcity", label: "OrbitX City" },
+];
+
+const PLATFORM_DOCK = [
+  { href: "/app", label: "Hub", ico: "⌂" },
+  { href: "/ORBITX_DEX/", label: "DEX", ico: "◈", on: true },
+  { href: "/orbitxlaunch", label: "Launch", ico: "🚀" },
+  { href: "/nft", label: "NFT", ico: "🖼" },
+  { href: "/orbitx-social", label: "Social", ico: "◉" },
+  { href: "/agent", label: "Agent", ico: "✦" },
+  { href: "/x", label: "X", ico: "✕" },
 ];
 
 function FooterCol({ title, links, external }: { title: string; links: { to?: string; href?: string; label: string }[]; external?: boolean }) {
@@ -122,6 +136,7 @@ export default function Layout() {
 
   return (
     <div className="dex-shell">
+      <SharedAtmosphere />
       <div className="sticky top-0 z-30">
         <div className="brand-hairline" />
         <header className="dex-shell-header">
@@ -193,7 +208,11 @@ export default function Layout() {
               </button>
             )}
 
+            <DexThemeButton />
             <InstallPWA />
+            <a href="/app" className="dex-store-btn hidden sm:inline-flex !no-underline">
+              Hub
+            </a>
             <Link to="/store" className="dex-store-btn hidden sm:inline-flex">
               <ShoppingBag className="w-3.5 h-3.5" /> Store
             </Link>
@@ -266,6 +285,15 @@ export default function Layout() {
           </div>
         </div>
       </footer>
+
+      <nav className="dex-platform-dock" aria-label="OrbitX platforms">
+        {PLATFORM_DOCK.map((l) => (
+          <a key={l.href} href={l.href} className={l.on ? "is-on" : undefined}>
+            <span aria-hidden>{l.ico}</span>
+            {l.label}
+          </a>
+        ))}
+      </nav>
     </div>
   );
 }

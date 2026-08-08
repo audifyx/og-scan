@@ -11,11 +11,11 @@ import {
   type WidgetConfig,
 } from "@/components/AIWidgetPanel";
 import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
-import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { ADMIN_APPS } from "@/lib/adminApps";
 import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
+import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
 import "./hub-ios.css";
 
 const ORBITX_CA = OGSCAN_TOKEN_MINT;
@@ -224,15 +224,7 @@ export default function Hub() {
   const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
-  const [bgMode, setBgMode] = useState<BgMode>(() => readBgMode());
-  const [bgOpen, setBgOpen] = useState(false);
-  const [wallpaper, setWallpaper] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(WALLPAPER_KEY);
-    } catch {
-      return null;
-    }
-  });
+  const { openTheme, themeOpen, closeTheme } = useOrbitAtmosphere();
 
   const showAdminApps = useMemo(() => isOwnerIdentity({ email: user?.email }), [user?.email]);
   const searchableApps = useMemo(
@@ -300,8 +292,8 @@ export default function Hub() {
           setPanelOpen(false);
           return;
         }
-        if (bgOpen) {
-          setBgOpen(false);
+        if (themeOpen) {
+          closeTheme();
           return;
         }
         if (canBack) pop();
@@ -309,7 +301,7 @@ export default function Hub() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canBack, pop, spotOpen, panelOpen, bgOpen]);
+  }, [canBack, pop, spotOpen, panelOpen, themeOpen, closeTheme]);
 
   useEffect(() => {
     let on = true;
@@ -420,37 +412,6 @@ export default function Hub() {
       window.location.assign("/auth");
     }
   };
-
-  const applyBgMode = useCallback((m: BgMode) => {
-    setBgMode(m);
-    try {
-      localStorage.setItem(BG_KEY, m);
-    } catch {
-      /* noop */
-    }
-  }, []);
-
-  const applyWallpaper = useCallback(
-    (dataUrl: string | null) => {
-      setWallpaper(dataUrl);
-      try {
-        if (dataUrl) {
-          localStorage.setItem(WALLPAPER_KEY, dataUrl);
-          localStorage.setItem(BG_KEY, "custom");
-          setBgMode("custom");
-        } else {
-          localStorage.removeItem(WALLPAPER_KEY);
-          if (bgMode === "custom") {
-            setBgMode("nebula");
-            localStorage.setItem(BG_KEY, "nebula");
-          }
-        }
-      } catch {
-        /* noop */
-      }
-    },
-    [bgMode],
-  );
 
   const greet = (() => {
     const h = now.getHours();
@@ -655,7 +616,28 @@ export default function Hub() {
         <Link to="/settings" className="ios-row">
           <span className="ios-row__meta">
             <span className="ios-row__title">Settings</span>
-            <span className="ios-row__cap">Preferences</span>
+            <span className="ios-row__cap">Preferences & color themes</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <a href="/ORBITX_DEX" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">OrbitX DEX</span>
+            <span className="ios-row__cap">Terminal & scanner</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </a>
+        <Link to="/orbitxlaunch" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Launchpad</span>
+            <span className="ios-row__cap">Create & trade coins</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/nft" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">NFT Market</span>
+            <span className="ios-row__cap">Mint & trade</span>
           </span>
           <span className="ios-row__chev">›</span>
         </Link>
@@ -670,6 +652,13 @@ export default function Hub() {
           <span className="ios-row__meta">
             <span className="ios-row__title">X MCP</span>
             <span className="ios-row__cap">Post & agent on X</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/orbitx-social" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Social</span>
+            <span className="ios-row__cap">Feed & spaces</span>
           </span>
           <span className="ios-row__chev">›</span>
         </Link>
@@ -767,9 +756,9 @@ export default function Hub() {
     body = (
       <>
         <h2 className="ios-large-title">Wallpaper</h2>
-        <p className="ios-subhead">Atmosphere behind your hub.</p>
-        <button type="button" className="ios-btn ios-btn--primary" style={{ width: "100%" }} onClick={() => setBgOpen(true)}>
-          Customize background
+        <p className="ios-subhead">Applies across Hub, DEX, Launchpad, NFT, Agent, X, and more.</p>
+        <button type="button" className="ios-btn ios-btn--primary" style={{ width: "100%" }} onClick={openTheme}>
+          Customize platform theme
         </button>
       </>
     );
@@ -779,7 +768,6 @@ export default function Hub() {
     <div className="ios-hub">
       <style>{aiWidgetCSS}</style>
       <div className="ios-hub__atmosphere" aria-hidden />
-      <BackgroundFX mode={bgMode} wallpaper={wallpaper} />
 
       <div className="ios-hub__stage">
         <div className="ios-stack">
@@ -789,9 +777,14 @@ export default function Hub() {
               canBack={canBack}
               onBack={pop}
               trail={
-                <button type="button" className="ios-nav__btn" onClick={() => setSpotOpen(true)} aria-label="Search">
-                  ⌕
-                </button>
+                <>
+                  <button type="button" className="ios-nav__btn" onClick={openTheme} aria-label="Theme">
+                    🎨
+                  </button>
+                  <button type="button" className="ios-nav__btn" onClick={() => setSpotOpen(true)} aria-label="Search">
+                    ⌕
+                  </button>
+                </>
               }
             />
             <div className="ios-body">{body}</div>
@@ -881,15 +874,6 @@ export default function Hub() {
           setWidgets={setCustomWidgets}
         />
       )}
-
-      <BgCustomizeModal
-        open={bgOpen}
-        mode={bgMode}
-        hasWallpaper={!!wallpaper}
-        onClose={() => setBgOpen(false)}
-        onMode={applyBgMode}
-        onWallpaper={applyWallpaper}
-      />
     </div>
   );
 }

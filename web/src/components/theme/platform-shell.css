@@ -1,0 +1,217 @@
+/* Shared OrbitX atmosphere + iOS-style platform chrome */
+
+.ox-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ox-atmosphere__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(7, 9, 12, 0.28) 0%,
+    rgba(7, 9, 12, 0.55) 55%,
+    rgba(5, 6, 8, 0.72) 100%
+  );
+}
+
+/* Let platform shells sit above the FX layer */
+.lp-classic,
+.obx-mkt,
+.ox-agent,
+.oxc-root,
+.ios-hub,
+.ox-platform-surface {
+  position: relative;
+  z-index: 1;
+}
+
+/* Soften opaque shell fills so Hub theme shows through */
+.lp-classic {
+  background: transparent !important;
+}
+.lp-classic::before {
+  opacity: 0.55;
+  background:
+    linear-gradient(180deg, rgba(5, 5, 5, 0.55), rgba(5, 5, 5, 0.72)),
+    radial-gradient(900px 500px at 12% -8%, rgba(59, 130, 246, 0.1), transparent 55%),
+    radial-gradient(800px 480px at 92% 0%, rgba(212, 175, 55, 0.08), transparent 55%) !important;
+}
+
+.obx-mkt {
+  background: transparent !important;
+}
+.obx-mkt::before {
+  opacity: 0.5;
+}
+
+.ox-agent {
+  background: transparent !important;
+}
+.ox-agent__atmosphere {
+  opacity: 0.35;
+}
+
+.oxc-root {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(46, 230, 197, 0.05), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(240, 180, 41, 0.04), transparent 50%),
+    linear-gradient(180deg, rgba(5, 8, 12, 0.55) 0%, rgba(7, 11, 16, 0.62) 40%, rgba(6, 10, 15, 0.72) 100%) !important;
+}
+
+.ios-hub__atmosphere {
+  opacity: 0.25;
+}
+
+/* Theme button */
+.ox-theme-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 16, 22, 0.72);
+  color: rgba(255, 255, 255, 0.88);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(14px) saturate(140%);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.ox-theme-btn:hover {
+  border-color: rgba(94, 234, 212, 0.45);
+  background: rgba(18, 26, 34, 0.88);
+}
+.ox-theme-btn:active {
+  transform: scale(0.97);
+}
+.ox-theme-btn__mode {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(94, 234, 212, 0.95);
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+@media (max-width: 640px) {
+  .ox-theme-btn__label,
+  .ox-theme-btn__mode {
+    display: none;
+  }
+  .ox-theme-btn {
+    min-width: 36px;
+    justify-content: center;
+    padding: 0.35rem;
+  }
+}
+
+/* Desktop platform link chips */
+.ox-platform-links {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+@media (min-width: 1100px) {
+  .ox-platform-links {
+    display: inline-flex;
+  }
+}
+.ox-platform-links__a {
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.ox-platform-links__a:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.ox-platform-links__a.is-on {
+  color: #5eead4;
+  border-color: rgba(94, 234, 212, 0.35);
+  background: rgba(94, 234, 212, 0.08);
+}
+
+/* iOS-style bottom dock */
+.ox-platform-dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  gap: 0.1rem;
+  max-width: min(560px, calc(100vw - 16px));
+  width: max-content;
+  padding: 0.35rem 0.4rem;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 16, 22, 0.78);
+  backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.ox-platform-dock__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-width: 52px;
+  padding: 0.35rem 0.4rem 0.3rem;
+  border-radius: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.ox-platform-dock__ico {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.ox-platform-dock__item.is-on {
+  color: #5eead4;
+  background: rgba(94, 234, 212, 0.1);
+}
+.ox-platform-dock__item:active {
+  transform: scale(0.96);
+}
+
+/* Room for dock on mobile platform pages */
+@media (max-width: 900px) {
+  .lp-classic,
+  .obx-mkt,
+  .oxc-root {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+  .ox-agent--dash .ox-agent__dock {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 901px) {
+  .ox-platform-dock {
+    display: none;
+  }
+}
