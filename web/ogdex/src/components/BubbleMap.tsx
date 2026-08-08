@@ -1,14 +1,92 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { XrayReport, short } from "../lib/api";
 import {
   ExternalLink, ZoomIn, ZoomOut, Maximize2, Crosshair, Search,
   Play, Pause, Download, Copy, Check, Focus, Layers, Clock,
   Network, Sparkles, Pin, X, Minimize2,
 } from "lucide-react";
 
+/** Minimal X-ray shape needed by the bubble graph (from /api/ogdex/xray). */
+export interface XrayReport {
+  ok: boolean;
+  mint?: string;
+  traced?: boolean;
+  verdict?: string;
+  tone?: "red" | "yellow" | "green";
+  score?: number;
+  summary?: string;
+  earlyBuyers?: Array<{
+    wallet: string;
+    tokenAmount?: number;
+    solSpent?: number;
+    txHash?: string | null;
+    slot?: number;
+    time?: number;
+    funder?: string | null;
+    rank?: number;
+  }>;
+  snipers?: {
+    pct?: number | null;
+    count?: number | null;
+    wallets?: Array<{
+      wallet: string;
+      solSpent?: number;
+      secondsAfterLaunch?: number | null;
+      txHash?: string | null;
+      bundled?: boolean;
+    }>;
+  };
+  bundles?: {
+    pct?: number | null;
+    count?: number | null;
+    clusters?: Array<{ slot: number; size?: number; wallets: string[] }>;
+  };
+  insiders?: {
+    pct?: number | null;
+    count?: number | null;
+    clusters?: Array<{ funder: string; size?: number; wallets: string[] }>;
+  };
+  concentration?: { top10Pct?: number | null; whales?: number; totalHolders?: number | null };
+  dev?: { wallet?: string; pct?: number | null; sold?: boolean | null } | null;
+  note?: string | null;
+}
+
+/** Optional top-holder rows merged into the graph (from /traders or largest accounts). */
+export type BubbleHolder = {
+  owner?: string;
+  wallet?: string;
+  address?: string;
+  pct?: number | null;
+  uiAmount?: number;
+  amount?: number;
+  usdValue?: number | null;
+};
+
+export type BubbleMapProps = {
+  report: XrayReport;
+  holders?: BubbleHolder[] | null;
+  holderCount?: number | null;
+  /** Preferred canvas height (ResizeObserver still adapts width). */
+  height?: number;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  /** In-app wallet profile path, e.g. (w) => `/trade/wallet/${w}` */
+  walletHref?: (wallet: string) => string;
+  className?: string;
+};
+
+function short(addr?: string | null): string {
+  if (!addr) return "—";
+  return addr.slice(0, 4) + "…" + addr.slice(-4);
+}
+
+function holderWallet(h: BubbleHolder): string | null {
+  const w = h.owner || h.wallet || h.address;
+  return w && typeof w === "string" ? w : null;
+}
+
 type RiskTag = "insider" | "bundle" | "sniper" | "clean" | "dev";
 type LayoutMode = "force" | "radial" | "timeline" | "cluster";
-type SizeMode = "sol" | "tokens" | "equal";
+type SizeMode = "sol" | "tokens" | "equal" | "pct";
 type FilterTag = RiskTag | "all" | "whale" | "linked";
 
 interface RichBuyer {
@@ -110,7 +188,7 @@ function gini(values: number[]): number {
   return sum > 0 ? num / (n * sum) : 0;
 }
 
-function enrichBuyers(x: XrayReport): RichBuyer[] {
+function enrichBuyers(x: XrayReport, holders?: BubbleHolder[] | null): RichBuyer[] {
   const sniperMap = new Map((x.snipers?.wallets || []).map((w) => [w.wallet, w]));
   const bundleSet = new Set((x.bundles?.clusters || []).flatMap((c) => c.wallets));
   const insiderSet = new Set((x.insiders?.clusters || []).flatMap((c) => c.wallets));
@@ -127,15 +205,34 @@ function enrichBuyers(x: XrayReport): RichBuyer[] {
   const times = (x.earlyBuyers || []).map((b) => b.time || 0).filter(Boolean);
   const firstTime = times.length ? Math.min(...times) : 0;
   const devWallet = x.dev?.wallet || null;
+  const byWallet = new Map<string, RichBuyer>();
 
-  const raw: RichBuyer[] = (x.earlyBuyers || []).map((b) => {
+  const upsert = (row: RichBuyer) => {
+    const prev = byWallet.get(row.wallet);
+    if (!prev) {
+      byWallet.set(row.wallet, row);
+      return;
+    }
+    prev.tokenAmount = Math.max(prev.tokenAmount, row.tokenAmount);
+    prev.solSpent = Math.max(prev.solSpent, row.solSpent);
+    prev.txHash = prev.txHash || row.txHash;
+    prev.slot = prev.slot || row.slot;
+    prev.time = prev.time || row.time;
+    prev.secondsAfterLaunch = prev.secondsAfterLaunch ?? row.secondsAfterLaunch;
+    prev.funder = prev.funder || row.funder;
+    prev.degree = Math.max(prev.degree, row.degree);
+    if (prev.tag === "clean" && row.tag !== "clean") prev.tag = row.tag;
+    if (row.sharePct > prev.sharePct) prev.sharePct = row.sharePct;
+  };
+
+  for (const b of x.earlyBuyers || []) {
     const tag: RiskTag =
       devWallet && b.wallet === devWallet ? "dev" :
       insiderSet.has(b.wallet) ? "insider" :
       bundleSet.has(b.wallet) ? "bundle" :
       sniperMap.has(b.wallet) ? "sniper" : "clean";
     const snap = sniperMap.get(b.wallet);
-    return {
+    upsert({
       wallet: b.wallet,
       tokenAmount: b.tokenAmount ?? 0,
       solSpent: b.solSpent ?? snap?.solSpent ?? 0,
@@ -148,29 +245,67 @@ function enrichBuyers(x: XrayReport): RichBuyer[] {
       degree: degree.get(b.wallet) || 0,
       whaleRank: null,
       sharePct: 0,
-    };
-  });
+    });
+  }
 
   for (const s of x.snipers?.wallets || []) {
-    if (raw.some((b) => b.wallet === s.wallet)) continue;
-    raw.push({
+    upsert({
       wallet: s.wallet, tokenAmount: 0, solSpent: s.solSpent ?? 0, txHash: s.txHash ?? null,
       slot: 0, time: 0, tag: bundleSet.has(s.wallet) ? "bundle" : "sniper",
       secondsAfterLaunch: s.secondsAfterLaunch ?? null, funder: funderOf.get(s.wallet) ?? null,
       degree: degree.get(s.wallet) || 0, whaleRank: null, sharePct: 0,
     });
   }
-  if (devWallet && !raw.some((b) => b.wallet === devWallet)) {
-    raw.unshift({
+  if (devWallet) {
+    upsert({
       wallet: devWallet, tokenAmount: 0, solSpent: 0, txHash: null, slot: 0, time: firstTime || 0,
       tag: "dev", secondsAfterLaunch: 0, funder: null, degree: degree.get(devWallet) || 0, whaleRank: null, sharePct: 0,
     });
   }
 
-  const totalSol = raw.reduce((s, b) => s + b.solSpent, 0) || 1;
-  [...raw].sort((a, b) => b.solSpent - a.solSpent).forEach((b, i) => { if (i < 5 && b.solSpent > 0) b.whaleRank = i + 1; });
-  for (const b of raw) b.sharePct = (b.solSpent / totalSol) * 100;
-  return raw.slice(0, 100);
+  // Merge current top holders so the map works even when x-ray early-buyer trace is thin.
+  for (const h of holders || []) {
+    const w = holderWallet(h);
+    if (!w) continue;
+    const pct = Number(h.pct) || 0;
+    const tokens = Number(h.uiAmount ?? h.amount) || 0;
+    const tag: RiskTag =
+      devWallet && w === devWallet ? "dev" :
+      insiderSet.has(w) ? "insider" :
+      bundleSet.has(w) ? "bundle" :
+      sniperMap.has(w) ? "sniper" : "clean";
+    upsert({
+      wallet: w,
+      tokenAmount: tokens,
+      solSpent: 0,
+      txHash: null,
+      slot: 0,
+      time: 0,
+      tag,
+      secondsAfterLaunch: null,
+      funder: funderOf.get(w) ?? null,
+      degree: degree.get(w) || 0,
+      whaleRank: null,
+      sharePct: pct,
+    });
+  }
+
+  const raw = [...byWallet.values()];
+  const totalSol = raw.reduce((s, b) => s + b.solSpent, 0);
+  const ranked = [...raw].sort((a, b) => {
+    const sa = a.sharePct || a.solSpent || a.tokenAmount;
+    const sb = b.sharePct || b.solSpent || b.tokenAmount;
+    return sb - sa;
+  });
+  ranked.forEach((b, i) => {
+    if (i < 8 && (b.sharePct >= 0.5 || b.solSpent > 0 || b.tokenAmount > 0)) b.whaleRank = i + 1;
+  });
+  if (totalSol > 0) {
+    for (const b of raw) {
+      if (!b.sharePct) b.sharePct = (b.solSpent / totalSol) * 100;
+    }
+  }
+  return ranked.slice(0, 160);
 }
 
 function computeAnalytics(buyers: RichBuyer[], report: XrayReport) {
@@ -193,20 +328,31 @@ function computeAnalytics(buyers: RichBuyer[], report: XrayReport) {
   };
 }
 
-function nodeRadius(b: RichBuyer, sizeMode: SizeMode, maxSol: number, maxTok: number): number {
+function nodeRadius(b: RichBuyer, sizeMode: SizeMode, maxSol: number, maxTok: number, maxPct: number): number {
   if (sizeMode === "equal") return 14;
   const szSol = b.solSpent ? Math.sqrt(b.solSpent / maxSol) : 0;
   const szTok = b.tokenAmount ? Math.sqrt(b.tokenAmount / maxTok) : 0;
-  const sz = sizeMode === "tokens" ? szTok : Math.max(szSol, szTok * 0.6);
-  return 9 + 24 * Math.max(0.15, sz);
+  const szPct = b.sharePct ? Math.sqrt(b.sharePct / maxPct) : 0;
+  const sz =
+    sizeMode === "tokens" ? Math.max(szTok, szPct * 0.5) :
+    sizeMode === "pct" ? Math.max(szPct, szTok * 0.45, szSol * 0.35) :
+    Math.max(szSol, szTok * 0.6, szPct * 0.55);
+  return 9 + 26 * Math.max(0.12, sz);
 }
 
-function buildGraph(report: XrayReport, W: number, H: number, sizeMode: SizeMode): Graph | null {
-  const buyers = enrichBuyers(report);
+function buildGraph(
+  report: XrayReport,
+  W: number,
+  H: number,
+  sizeMode: SizeMode,
+  holders?: BubbleHolder[] | null,
+): Graph | null {
+  const buyers = enrichBuyers(report, holders);
   if (!buyers.length) return null;
 
   const maxSol = Math.max(...buyers.map((b) => b.solSpent), 0.001);
   const maxTok = Math.max(...buyers.map((b) => b.tokenAmount), 0.001);
+  const maxPct = Math.max(...buyers.map((b) => b.sharePct), 0.001);
   const rand = rng(buyers.length * 97 + 13);
   const nodes: Node[] = [];
   const idx: Record<string, number> = {};
@@ -224,15 +370,16 @@ function buildGraph(report: XrayReport, W: number, H: number, sizeMode: SizeMode
   };
 
   for (const b of buyers) {
-    const r = nodeRadius(b, sizeMode, maxSol, maxTok);
+    const r = nodeRadius(b, sizeMode, maxSol, maxTok, maxPct);
     const isDev = b.tag === "dev";
+    const isWhale = b.whaleRank != null && b.tag === "clean";
     push({
       id: isDev ? "dev:" + b.wallet : "w:" + b.wallet,
       kind: isDev ? "dev" : "wallet",
       wallet: b.wallet,
       label: isDev ? "DEV " + short(b.wallet) : short(b.wallet),
       r, baseR: r,
-      color: isDev ? C.dev : C[b.tag],
+      color: isDev ? C.dev : isWhale ? C.whale : C[b.tag],
       tag: b.tag,
       solSpent: b.solSpent, tokenAmount: b.tokenAmount,
       txHash: b.txHash, slot: b.slot,
@@ -701,7 +848,16 @@ const FILTER_BTNS: { id: FilterTag; label: string; color: string }[] = [
 
 const TONE_COL: Record<string, string> = { red: "#FF5C5C", yellow: "#ffd60a", green: "#2dd4bf" };
 
-export default function BubbleMap({ report }: { report: XrayReport }) {
+export default function BubbleMap({
+  report,
+  holders = null,
+  holderCount = null,
+  height,
+  onRefresh,
+  refreshing,
+  walletHref,
+  className,
+}: BubbleMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
@@ -714,7 +870,7 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
   const dprRef = useRef(1);
 
   const [layout, setLayout] = useState<LayoutMode>("force");
-  const [sizeMode, setSizeMode] = useState<SizeMode>("sol");
+  const [sizeMode, setSizeMode] = useState<SizeMode>(holders?.length ? "pct" : "sol");
   const [filter, setFilter] = useState<FilterTag>("all");
   const [showHulls, setShowHulls] = useState(true);
   const [timelineGate, setTimelineGate] = useState<number | null>(null);
@@ -723,7 +879,7 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [dims, setDims] = useState({ W: 760, H: 480 });
+  const [dims, setDims] = useState({ W: 760, H: height || 480 });
 
   const layoutRef = useRef(layout);
   const filterRef = useRef(filter);
@@ -738,7 +894,7 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
   selectedRef.current = selectedIdx;
   showHullsRef.current = showHulls;
 
-  const buyers = useMemo(() => enrichBuyers(report), [report]);
+  const buyers = useMemo(() => enrichBuyers(report, holders), [report, holders]);
   const analytics = useMemo(() => computeAnalytics(buyers, report), [buyers, report]);
 
   const filterCounts = useMemo(() => ({
@@ -753,12 +909,12 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
   }), [buyers]);
 
   const maxR = useMemo(() => {
-    const g = buildGraph(report, dims.W, dims.H, sizeMode);
+    const g = buildGraph(report, dims.W, dims.H, sizeMode, holders);
     return g ? Math.max(...g.nodes.map((n) => n.baseR)) * 1.2 + 12 : 40;
-  }, [report, dims.W, dims.H, sizeMode]);
+  }, [report, holders, dims.W, dims.H, sizeMode]);
 
   useEffect(() => {
-    const g = buildGraph(report, dims.W, dims.H, sizeMode);
+    const g = buildGraph(report, dims.W, dims.H, sizeMode, holders);
     if (g) applyLayoutTargets(g, layout, dims.W, dims.H, analytics.maxSec);
     graphRef.current = g;
     pinnedRef.current = new Set();
@@ -766,7 +922,7 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
     stateRef.current.zoom = 1;
     stateRef.current.panX = 0;
     stateRef.current.panY = 0;
-  }, [report, dims.W, dims.H, sizeMode, layout, analytics.maxSec]);
+  }, [report, holders, dims.W, dims.H, sizeMode, layout, analytics.maxSec]);
 
   useEffect(() => {
     const g = graphRef.current;
@@ -777,11 +933,14 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
     if (!containerRef.current) return;
     const ro = new ResizeObserver((e) => {
       const w = e[0].contentRect.width;
-      if (w > 10) setDims({ W: Math.floor(w), H: Math.max(380, Math.min(560, Math.floor(w * 0.58))) });
+      if (w > 10) {
+        const autoH = Math.max(380, Math.min(640, Math.floor(w * 0.58)));
+        setDims({ W: Math.floor(w), H: height ? Math.max(360, height) : autoH });
+      }
     });
     ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [height]);
 
   useEffect(() => {
     if (!playing) return;
@@ -1011,15 +1170,25 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
 
   if (!buyers.length) {
     return (
-      <div className="rounded-2xl p-8 text-center text-white/40 text-sm"
+      <div className={`rounded-2xl p-8 text-center text-white/40 text-sm ${className || ""}`}
         style={{ background: "rgba(8,10,20,0.6)", border: "1px solid rgba(34,211,238,0.12)" }}>
-        No early buyer data to visualize.
+        <p>{report.note || "No early-buyer or holder graph for this mint yet."}</p>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="mt-3 rounded-lg border border-cyan-400/30 px-3 py-1.5 text-[11px] font-bold text-cyan-300/90 hover:bg-cyan-400/10 disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "Refresh x-ray & holders"}
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${className || ""}`}>
       {/* Header */}
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1030,14 +1199,18 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
             </div>
             <div>
               <div className="text-sm font-bold text-white/85 leading-tight">Wallet Relationship Bubble Map</div>
-              <div className="text-[11px] text-white/30 mt-0.5">Advanced graph · up to 100 buyers · click select · double-click Solscan</div>
+              <div className="text-[11px] text-white/30 mt-0.5">
+                Advanced graph · up to 160 wallets · x-ray + holders
+                {holderCount != null ? ` · ${holderCount.toLocaleString()} holders` : ""}
+                {" "}· click select · double-click Solscan
+              </div>
             </div>
           </div>
           <div className="flex gap-1 flex-wrap">
             {LAYOUT_BTNS.map(({ id, label, I }) => {
               const on = layout === id;
               return (
-                <button key={id} onClick={() => setLayout(id)}
+                <button key={id} type="button" onClick={() => setLayout(id)}
                   className="text-[10px] px-2 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all"
                   style={{
                     background: on ? "rgba(34,211,238,0.15)" : "rgba(255,255,255,0.03)",
@@ -1053,9 +1226,10 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
               style={{ border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.55)" }}>
               <option value="sol">Size: SOL</option>
               <option value="tokens">Size: Tokens</option>
+              <option value="pct">Size: Share %</option>
               <option value="equal">Size: Equal</option>
             </select>
-            <button onClick={() => setShowHulls((v) => !v)}
+            <button type="button" onClick={() => setShowHulls((v) => !v)}
               className="text-[10px] px-2 py-1.5 rounded-lg font-bold"
               style={{
                 background: showHulls ? "rgba(255,255,255,0.06)" : "transparent",
@@ -1064,6 +1238,17 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
               }}>
               Hulls
             </button>
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing}
+                className="text-[10px] px-2 py-1.5 rounded-lg font-bold disabled:opacity-50"
+                style={{ border: "1px solid rgba(34,211,238,0.3)", color: C.accent }}
+              >
+                {refreshing ? "…" : "Refresh"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1091,7 +1276,8 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
       {/* Analytics strip */}
       <div className="flex flex-wrap gap-2 text-[10px] font-mono px-1">
         {[
-          { l: "Buyers", v: analytics.buyerCount },
+          { l: "Wallets", v: analytics.buyerCount },
+          { l: "Holders", v: holderCount != null ? holderCount.toLocaleString() : "—" },
           { l: "SOL", v: analytics.totalSol.toFixed(2) },
           { l: "Risk SOL", v: analytics.riskSolPct.toFixed(0) + "%" },
           { l: "Gini", v: analytics.gini.toFixed(2) },
@@ -1099,6 +1285,7 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
           { l: "Clusters", v: analytics.clusterCount },
           { l: "Sniper", v: analytics.sniperPct != null ? analytics.sniperPct.toFixed(0) + "%" : "—" },
           { l: "Bundle", v: analytics.bundlePct != null ? analytics.bundlePct.toFixed(0) + "%" : "—" },
+          { l: "Top10", v: report.concentration?.top10Pct != null ? report.concentration.top10Pct.toFixed(0) + "%" : "—" },
         ].map(({ l, v }) => (
           <span key={l} className="px-2 py-1 rounded-lg"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)" }}>
@@ -1237,7 +1424,14 @@ export default function BubbleMap({ report }: { report: XrayReport }) {
                       style={{ border: "1px solid rgba(34,211,238,0.25)", color: C.accent }}>
                       <ExternalLink className="w-3 h-3" /> Solscan
                     </a>
-                    <button onClick={() => selectedIdx != null && togglePin(selectedIdx)}
+                    {walletHref && (
+                      <a href={walletHref(selected.wallet)}
+                        className="text-[10px] px-2 py-1 rounded flex items-center gap-1"
+                        style={{ border: "1px solid rgba(240,171,252,0.35)", color: C.whale }}>
+                        Profile
+                      </a>
+                    )}
+                    <button type="button" onClick={() => selectedIdx != null && togglePin(selectedIdx)}
                       className="text-[10px] px-2 py-1 rounded flex items-center gap-1"
                       style={{
                         border: `1px solid ${selected.pinned ? C.accent + "66" : "rgba(255,255,255,0.1)"}`,

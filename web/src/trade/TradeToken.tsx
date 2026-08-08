@@ -709,10 +709,10 @@ export default function TradeToken() {
               <div>
                 <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
                   <BarChart2 className="h-3.5 w-3.5" />
-                  3D bubble map
+                  Advanced bubble map
                 </h3>
                 <p className="mt-1 text-[11px] text-white/35">
-                  Live holder clusters from X-ray + top holders — drag to orbit, scroll to zoom, click a bubble for wallet detail.
+                  Same engine as OrbitX DEX — force / radial / timeline layouts, hulls, filters, PNG export. Drag to pan, scroll to zoom.
                 </p>
               </div>
               {bubbleBusy && (

@@ -775,11 +775,7 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
       <Reveal k={section}>
         {section==="overview"  && <OverviewSection x={x} buyers={buyers} />}
         {section==="timeline"  && <TimelineSection x={x} buyers={buyers} />}
-        {section==="map"       && (
-          x.traced && buyers.length > 0
-            ? <BubbleMap report={x} />
-            : <EmptyState msg="No trace data available for this token." />
-        )}
+        {section==="map"       && <BubbleMap report={x} />}
         {section==="snipers"   && <SnipersSection   x={x} buyers={buyers} />}
         {section==="bundles"   && <BundlesSection   x={x} buyers={buyers} />}
         {section==="insiders"  && <InsidersSection  x={x} />}

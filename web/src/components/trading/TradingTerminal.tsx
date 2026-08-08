@@ -19,7 +19,7 @@ import {
   ArrowUpRight, ArrowDownLeft, Check,
   Wallet, Activity, X, Loader2, Users, Bell, KeyRound, Crosshair,
 } from "lucide-react";
-import type { XrayReport } from "./BubbleMap";
+import type { BubbleHolder, XrayReport } from "./BubbleMap";
 
 const BubbleMap = lazy(() => import("./BubbleMap"));
 import {
@@ -435,6 +435,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const [trades, setTrades] = useState<TradeEntry[]>([]);
   const [security, setSecurity] = useState<TokenSecurity | null>(null);
   const [xray, setXray] = useState<XrayReport | null>(null);
+  const [clusterHolders, setClusterHolders] = useState<BubbleHolder[]>([]);
+  const [clusterHolderCount, setClusterHolderCount] = useState<number | null>(null);
   const [loadingXray, setLoadingXray] = useState(false);
   const [marketCategory, setMarketCategory] = useState<MarketCategory>("discover");
   const [marketTab, setMarketTab] = useState<MarketTab>("trending");
@@ -561,15 +563,34 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMint]);
 
-  /* Risk X-ray + bubble map inputs */
+  /* Risk X-ray + bubble map inputs (holders from traders route) */
   useEffect(() => {
     if (!selectedMint) return;
     let cancelled = false;
     setLoadingXray(true);
     setXray(null);
-    fetchXray(selectedMint).then((report) => {
+    setClusterHolders([]);
+    setClusterHolderCount(null);
+    Promise.all([
+      fetchXray(selectedMint),
+      fetch(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`)
+        .then((r) => r.json())
+        .catch(() => null),
+    ]).then(([report, traders]) => {
       if (cancelled) return;
       setXray(report);
+      const rows = Array.isArray(traders?.holders)
+        ? traders.holders.map((h: any) => ({
+            owner: h.owner || h.wallet || h.address,
+            wallet: h.wallet || h.owner || h.address,
+            pct: h.pct != null ? Number(h.pct) : null,
+            uiAmount: h.uiAmount != null ? Number(h.uiAmount) : h.amount != null ? Number(h.amount) : undefined,
+            usdValue: h.usdValue != null ? Number(h.usdValue) : null,
+          })).filter((h: BubbleHolder) => h.owner || h.wallet)
+        : [];
+      setClusterHolders(rows);
+      const rawCount = Number(traders?.holderCount);
+      setClusterHolderCount(Number.isFinite(rawCount) && rawCount > 0 ? rawCount : null);
       setLoadingXray(false);
       if (!report) return;
       setSecurity((prev) => ({
@@ -581,6 +602,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         devHoldersPercent: report.dev?.pct ?? prev?.devHoldersPercent ?? null,
         snipersHoldersPercent: report.snipers?.pct ?? null,
         bundlersHoldersPercent: report.bundles?.pct ?? null,
+        top10HoldersPercent: report.concentration?.top10Pct ?? prev?.top10HoldersPercent ?? null,
       }));
     });
     return () => { cancelled = true; };
@@ -2534,9 +2556,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 {loadingXray ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Loader2 className="mb-2 h-6 w-6 animate-spin text-white/20" />
-                    <p className="text-xs text-white/30">Tracing early buyers & clusters…</p>
+                    <p className="text-xs text-white/30">Tracing early buyers, holders & clusters…</p>
                   </div>
-                ) : xray?.traced && (xray.earlyBuyers?.length || 0) > 0 ? (
+                ) : xray || clusterHolders.length > 0 ? (
                   <Suspense
                     fallback={
                       <div className="flex items-center justify-center py-12 text-xs text-white/25">
@@ -2544,13 +2566,41 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       </div>
                     }
                   >
-                    <BubbleMap report={xray} />
+                    <BubbleMap
+                      report={xray || { ok: true, mint: selectedMint, earlyBuyers: [] }}
+                      holders={clusterHolders}
+                      holderCount={clusterHolderCount}
+                      height={520}
+                      walletHref={(w) => `/trade/wallet/${w}`}
+                      onRefresh={() => {
+                        setLoadingXray(true);
+                        Promise.all([
+                          fetchXray(selectedMint),
+                          fetch(`/api/ogdex/traders?mint=${encodeURIComponent(selectedMint)}`).then((r) => r.json()).catch(() => null),
+                        ]).then(([report, traders]) => {
+                          setXray(report);
+                          const rows = Array.isArray(traders?.holders)
+                            ? traders.holders.map((h: any) => ({
+                                owner: h.owner || h.wallet || h.address,
+                                wallet: h.wallet || h.owner || h.address,
+                                pct: h.pct != null ? Number(h.pct) : null,
+                                uiAmount: h.uiAmount != null ? Number(h.uiAmount) : undefined,
+                              })).filter((h: BubbleHolder) => h.owner || h.wallet)
+                            : [];
+                          setClusterHolders(rows);
+                          const rawCount = Number(traders?.holderCount);
+                          setClusterHolderCount(Number.isFinite(rawCount) && rawCount > 0 ? rawCount : null);
+                          setLoadingXray(false);
+                        });
+                      }}
+                      refreshing={loadingXray}
+                    />
                   </Suspense>
                 ) : (
                   <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
                     <Crosshair className="mb-2 h-6 w-6 text-white/15" />
                     <p className="text-xs text-white/30">
-                      {xray?.note || "No early-buyer graph for this mint yet — try a newer launch or wait for X-ray to finish indexing."}
+                      {xray?.note || "No early-buyer or holder graph for this mint yet — try a newer launch or wait for X-ray to finish indexing."}
                     </p>
                   </div>
                 )}
