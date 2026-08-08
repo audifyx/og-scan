@@ -34,6 +34,7 @@ import {
 } from "@/lib/xMcp";
 import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
 import XMcpMatrix from "@/components/x/XMcpMatrix";
+import XMcpCreditsPanel from "@/components/x/XMcpCreditsPanel";
 import "./x-hub.css";
 
 /** Same 4-tab shell structure as /agent — X MCP content. */
@@ -615,9 +616,12 @@ export default function XMcpPage() {
                 {xAgent?.enabled ? "Agent on" : "Agent off"}
               </span>
             </div>
-          </div>
+  </div>
 
-          <div className="ox-agent__subtabs">
+  <XMcpCreditsPanel />
+  
+  <div className="ox-agent__subtabs">
+
             {(
               [
                 ["post", "Post"],
