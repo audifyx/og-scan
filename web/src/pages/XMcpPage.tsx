@@ -385,7 +385,32 @@ export default function XMcpPage() {
     }
   };
 
+  const postCredits = useMemo(() => {
+    const max = Math.max(0, Number(xAgent?.maxPostsPerDay ?? 5) || 0);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const used = queue.filter((q) => {
+      const st = String(q.status || "").toLowerCase();
+      if (st !== "posted" && st !== "done" && st !== "published") return false;
+      const ts = q.updatedAt || q.createdAt;
+      if (!ts) return false;
+      return new Date(ts).getTime() >= start.getTime();
+    }).length;
+    const remaining = Math.max(0, max - used);
+    return { max, used, remaining, pct: max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0 };
+  }, [queue, xAgent?.maxPostsPerDay]);
+
+  const replyCredits = useMemo(() => {
+    const max = Math.max(0, Number(xAgent?.maxRepliesPerDay ?? 30) || 0);
+    return { max, used: 0, remaining: max };
+  }, [xAgent?.maxRepliesPerDay]);
+
   const onGenerate = async (postNow = false) => {
+    if (postNow && postCredits.remaining <= 0) {
+      setError("No post credits left today — raise Max posts/day in Agent settings, or wait until tomorrow.");
+      setHomeSub("agent");
+      return;
+    }
     setAgentBusy(true);
     setError(null);
     try {
@@ -597,6 +622,17 @@ export default function XMcpPage() {
               </button>
               <button
                 type="button"
+                className={`ox-agent__kpi${postCredits.remaining > 0 ? " is-ok" : ""}`}
+                onClick={() => goHomeSub("agent")}
+                title="Daily post credits"
+              >
+                <span className="ox-agent__kpi-k">Credits</span>
+                <span className="ox-agent__kpi-v">
+                  {postCredits.remaining}/{postCredits.max}
+                </span>
+              </button>
+              <button
+                type="button"
                 className={`ox-agent__kpi${xAgent?.enabled ? " is-ok" : ""}`}
                 onClick={() => goHomeSub("agent")}
               >
@@ -604,6 +640,34 @@ export default function XMcpPage() {
                 <span className="ox-agent__kpi-v">{xAgent?.enabled ? "On" : "Setup"}</span>
               </button>
             </div>
+
+            <section className="ox-agent__panel ox-x-credits">
+              <div className="ox-agent__panel-h">
+                <h2 className="ox-agent__panel-title">Credits</h2>
+                <span className="ox-agent__panel-hint">resets daily</span>
+              </div>
+              <div className="ox-agent__panel-b">
+                <div className="ox-x-credits__row">
+                  <div>
+                    <div className="ox-agent__label">Post credits</div>
+                    <div className="ox-agent__value" style={{ fontSize: "1.35rem", fontWeight: 750 }}>
+                      {postCredits.remaining}
+                      <span style={{ opacity: 0.45, fontSize: "0.9rem", fontWeight: 600 }}>
+                        {" "}
+                        / {postCredits.max} left today
+                      </span>
+                    </div>
+                  </div>
+                  <div className="ox-x-credits__bar" aria-hidden>
+                    <span style={{ width: `${postCredits.pct}%` }} />
+                  </div>
+                </div>
+                <p className="ox-agent__note" style={{ marginTop: "0.65rem", marginBottom: 0 }}>
+                  Used {postCredits.used} post{postCredits.used === 1 ? "" : "s"} today · reply cap{" "}
+                  {replyCredits.max}/day · change limits in Agent settings.
+                </p>
+              </div>
+            </section>
             <div className="ox-agent__steps">
               <span className={`ox-agent__chip${xConnected ? " is-ok" : ""}`}>
                 {xConnected ? `@${xHandle}` : "X needed"}

@@ -322,7 +322,7 @@ export default function LaunchpadLayout() {
       window.removeEventListener("resize", apply);
       document.documentElement.style.removeProperty("--ox-lp-header-h");
     };
-  }, [title, canBack]);
+  }, [title, isRoot]);
 
   const rail = (
     <>

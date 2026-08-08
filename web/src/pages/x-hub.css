@@ -1316,6 +1316,28 @@
   }
 }
 
+/* Daily credits card on /x */
+.ox-x-credits__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.ox-x-credits__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ox-x-credits__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2ee6c5, #5eead4);
+  transition: width 0.25s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .xh-matrix__orbit,
   .xh-matrix__node {
