@@ -1,28 +1,26 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, writeWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import {
+  AIWidgetPanel,
+  MobileWidgetGrid,
+  aiWidgetCSS,
+  readWidgets,
+  writeWidgets,
+  type WidgetConfig,
+} from "@/components/AIWidgetPanel";
 import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
-import { MobileNav } from "@/components/MobileNavV2";
 import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { ADMIN_APPS } from "@/lib/adminApps";
 import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
+import "./hub-ios.css";
 
-const BRAND = "OrbitX";
-const OS_NAME = "OrbitX";
-const VERSION = "v2.0";
 const ORBITX_CA = OGSCAN_TOKEN_MINT;
 
-const wgTimeAgo = (iso: string) => {
-  const sec = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (sec < 60) return `${sec}s`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
-  return `${Math.floor(sec / 86400)}d`;
-};
-
-type App = {
+type AppItem = {
   key: string;
   name: string;
   caption: string;
@@ -30,12 +28,8 @@ type App = {
   external?: boolean;
   tone: string;
   iconBg: string;
-  glyph: JSX.Element;
+  glyph: ReactNode;
 };
-
-const OrbitLogo = ({ size = 48, className = "" }: { size?: number; className?: string }) => (
-  <img src="/icon-192x192.png" width={size} height={size} alt="OrbitX" className={className} style={{ objectFit: "contain" }} />
-);
 
 const Glyph = {
   dex: (
@@ -60,7 +54,6 @@ const Glyph = {
       <circle cx="30" cy="30" r="3" fill="currentColor" />
       <circle cx="30" cy="18" r="3" fill="currentColor" />
       <circle cx="18" cy="30" r="3.5" fill="currentColor" />
-      <circle cx="24" cy="24" r="3" fill="currentColor" />
     </svg>
   ),
   scanner: (
@@ -83,79 +76,65 @@ const Glyph = {
     <svg viewBox="0 0 48 48" fill="none">
       <path d="M18 40V16l6-6 6 6v24" stroke="currentColor" strokeWidth="3.5" strokeLinejoin="round" />
       <path d="M12 40h24" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-      <path d="M24 10v6M21 22h6M21 30h6" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
     </svg>
   ),
-  profile: (
+  agent: (
     <svg viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="18" r="7" stroke="currentColor" strokeWidth="3" />
-      <path d="M10 40c0-7.732 6.268-14 14-14s14 6.268 14 14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <rect x="10" y="12" width="28" height="24" rx="6" stroke="currentColor" strokeWidth="3.5" />
+      <path d="M18 22h12M18 28h8" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
     </svg>
   ),
-  settings: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.48-.41h-3.84a.49.49 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94 0 .32.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.07.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z" />
-    </svg>
-  ),
-  logout: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
+  x: (
+    <svg viewBox="0 0 48 48" fill="none">
+      <path d="M14 14l20 20M34 14L14 34" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
     </svg>
   ),
   koltracker: (
     <svg viewBox="0 0 48 48" fill="none">
       <path d="M24 8c-5 0-9 4-9 9v6l-3 6h24l-3-6v-6c0-5-4-9-9-9z" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M20 34a4 4 0 008 0" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-      <circle cx="35" cy="12" r="5" fill="currentColor" />
     </svg>
   ),
   launchpad: (
     <svg viewBox="0 0 48 48" fill="none">
       <path d="M24 6c6 3 10 9 10 17 0 5-2 9-4 12l-6 7-6-7c-2-3-4-7-4-12 0-8 4-14 10-17z" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="24" cy="20" r="4" stroke="currentColor" strokeWidth="3.5" />
-      <path d="M16 30l-5 5 3 8 6-6M32 30l5 5-3 8-6-6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity=".8" />
     </svg>
   ),
 };
 
-const ALL_APPS: App[] = [
+const ALL_APPS: AppItem[] = [
   { key: "dex", name: "OrbitX DEX", caption: "Scanner & Trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(135deg, #1A6CFF, #0037A3)", glyph: Glyph.dex },
   { key: "trade", name: "Trade Terminal", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(135deg, #AB9FF2, #6B5FD4)", glyph: Glyph.dex },
   { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
-  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
-  { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
-  { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#9945FF", iconBg: "linear-gradient(135deg, #8A2BE2, #4B0082)", glyph: Glyph.social },
+  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <span style={{ fontSize: 20 }}>📈</span> },
+  { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
+  { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #5EEAD4, #0D9488)", glyph: Glyph.agent },
+  { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(135deg, #3F3F46, #18181B)", glyph: Glyph.x },
+  { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(135deg, #8B5CF6, #5B21B6)", glyph: Glyph.social },
   { key: "gaming", name: "Gaming", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "predict", name: "Predictions", caption: "Trade YES/NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
-  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <div style={{ fontSize: "20px" }}>🖼️</div> },
-  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)", glyph: <div style={{ fontSize: "20px" }}>💼</div> },
+  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <span style={{ fontSize: 20 }}>🖼</span> },
+  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)", glyph: <span style={{ fontSize: 20 }}>💼</span> },
 ];
 
-const APP_BY_KEY = Object.fromEntries(ALL_APPS.map((a) => [a.key, a])) as Record<string, App>;
+const APP_BY_KEY = Object.fromEntries(ALL_APPS.map((a) => [a.key, a])) as Record<string, AppItem>;
 
 type HubSection = { id: string; title: string; subtitle: string; keys: string[] };
 
 const APP_SECTIONS: HubSection[] = [
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "trade", "scanner", "launchpad"] },
   { id: "intel", title: "Intelligence", subtitle: "Track wallets, PnL, and AI", keys: ["koltracker", "pnltracker", "ai"] },
+  { id: "mcp", title: "AI Connectors", subtitle: "Agent + X MCP for chat AIs", keys: ["agent", "xmcp"] },
   { id: "social", title: "Social", subtitle: "Feed, spaces, and community", keys: ["social"] },
   { id: "play", title: "Play & Earn", subtitle: "Games, markets, NFTs, tasks", keys: ["gaming", "predict", "nft", "bagwork"] },
 ];
 
-const QUICK_ACTIONS = [
-  { label: "Scan token", href: "/orbitx-scanner", tone: "#14E0C8" },
-  { label: "Open DEX", href: "/ORBITX_DEX", tone: "#2F80FF" },
-  { label: "Trade", href: "/trade", tone: "#AB9FF2" },
-  { label: "Launch", href: "/orbitxlaunch", tone: "#FFC53D" },
-  { label: "Social feed", href: "/orbitx-social", tone: "#9945FF" },
-];
+const QUICK_KEYS = ["scanner", "dex", "trade", "agent", "xmcp", "social"];
 
-/** Owner-only admin apps for /app (audifyx@gmail.com). */
-const OWNER_ADMIN_APPS: App[] = ADMIN_APPS.map((a) => ({
+const OWNER_ADMIN_APPS: AppItem[] = ADMIN_APPS.map((a) => ({
   key: `admin-${a.key}`,
   name: a.label,
   caption: a.caption,
@@ -163,61 +142,130 @@ const OWNER_ADMIN_APPS: App[] = ADMIN_APPS.map((a) => ({
   external: a.to.startsWith("http") || a.to.startsWith("/ORBITX_DEX"),
   tone: a.tone,
   iconBg: a.iconBg,
-  glyph: <div style={{ fontSize: "18px" }}>{a.emoji || "🛡️"}</div>,
+  glyph: <span style={{ fontSize: 18 }}>{a.emoji || "🛡"}</span>,
 }));
 
-const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [
-  { key: "profile", name: "Profile", href: "/profile", action: "profile", tone: "#2F80FF", glyph: Glyph.profile },
-  { key: "wallpaper", name: "Wallpaper", action: "wallpaper", tone: "#FFC53D", glyph: <div style={{fontSize:"18px"}}>🎨</div> },
-  { key: "settings", name: "Settings", href: "/settings", action: "settings", tone: "#9945FF", glyph: Glyph.settings },
-  { key: "logout", name: "Log Out", action: "logout", tone: "#FF5B6B", glyph: Glyph.logout },
+type TabId = "home" | "apps" | "activity" | "account";
+
+type Frame =
+  | { id: "root" }
+  | { id: "section"; sectionId: string }
+  | { id: "app"; appKey: string }
+  | { id: "widgets" }
+  | { id: "wallpaper" };
+
+const TABS: { id: TabId; label: string; ico: string }[] = [
+  { id: "home", label: "Home", ico: "⌂" },
+  { id: "apps", label: "Apps", ico: "▦" },
+  { id: "activity", label: "Activity", ico: "◎" },
+  { id: "account", label: "Account", ico: "☺" },
 ];
 
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+function NavBar({
+  title,
+  canBack,
+  onBack,
+  trail,
+}: {
+  title: string;
+  canBack: boolean;
+  onBack: () => void;
+  trail?: ReactNode;
+}) {
+  return (
+    <header className="ios-nav">
+      {canBack ? (
+        <button type="button" className="ios-nav__back" onClick={onBack}>
+          <span className="ios-nav__back-ico" aria-hidden>
+            ‹
+          </span>
+          Back
+        </button>
+      ) : (
+        <span />
+      )}
+      <h1 className="ios-nav__title">{title}</h1>
+      <div className="ios-nav__trail">{trail}</div>
+    </header>
+  );
+}
+
 export default function Hub() {
-  const [booted, setBooted] = useState(false);
-  const [launching, setLaunching] = useState<App | null>(null);
-  const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const now = useClock();
+  const { signOut, profile, user } = useAuth();
+  const [tab, setTab] = useState<TabId>("home");
+  const [stacks, setStacks] = useState<Record<TabId, Frame[]>>({
+    home: [{ id: "root" }],
+    apps: [{ id: "root" }],
+    activity: [{ id: "root" }],
+    account: [{ id: "root" }],
+  });
+  const [navDir, setNavDir] = useState<"push" | "pop">("push");
+  const [spotOpen, setSpotOpen] = useState(false);
   const [spotQ, setSpotQ] = useState("");
+  const [launching, setLaunching] = useState<AppItem | null>(null);
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [solChange, setSolChange] = useState<number | null>(null);
   const [orbitxPrice, setOrbitxPrice] = useState<number | null>(null);
   const [orbitxChange, setOrbitxChange] = useState<number | null>(null);
-  const [caCopiedHub, setCaCopiedHub] = useState(false);
-  const [showChainBanner, setShowChainBanner] = useState(() => {
-    try { return localStorage.getItem("og_banner_robinhood_v1") !== "1"; } catch { return true; }
-  });
-  const dismissChainBanner = useCallback(() => {
-    setShowChainBanner(false);
-    try { localStorage.setItem("og_banner_robinhood_v1", "1"); } catch {}
-  }, []);
+  const [caCopied, setCaCopied] = useState(false);
   const [trending, setTrending] = useState<{ mint: string; symbol: string; priceUsd: number | null; change24h: number | null }[]>([]);
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
+  const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
-  const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
-  const desktopRef = useRef<HTMLDivElement>(null);
   const [bgMode, setBgMode] = useState<BgMode>(() => readBgMode());
   const [bgOpen, setBgOpen] = useState(false);
-  const [wallpaper, setWallpaper] = useState<string | null>(() => { try { return localStorage.getItem(WALLPAPER_KEY); } catch { return null; } });
-  const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
-  const now = useClock();
-  const { signOut, profile, user } = useAuth();
-  const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
+  const [wallpaper, setWallpaper] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(WALLPAPER_KEY);
+    } catch {
+      return null;
+    }
+  });
 
-  // Strict owner gate for /app admin icons — audifyx@gmail.com (or owner wallet SIWS).
-  const showAdminApps = useMemo(
-    () => isOwnerIdentity({ email: user?.email }),
-    [user?.email],
-  );
+  const showAdminApps = useMemo(() => isOwnerIdentity({ email: user?.email }), [user?.email]);
   const searchableApps = useMemo(
     () => (showAdminApps ? [...ALL_APPS, ...OWNER_ADMIN_APPS] : ALL_APPS),
     [showAdminApps],
   );
 
-  // Restore the user's saved widgets from their account on load
-  // widgets persist across refresh + devices. First cloud load wins; if the
-  // account has none yet but this device has local widgets, seed the cloud.
+  const stack = stacks[tab];
+  const top = stack[stack.length - 1] || { id: "root" as const };
+  const canBack = stack.length > 1;
+
+  const push = useCallback(
+    (frame: Frame) => {
+      setNavDir("push");
+      setStacks((prev) => ({ ...prev, [tab]: [...prev[tab], frame] }));
+    },
+    [tab],
+  );
+
+  const pop = useCallback(() => {
+    setNavDir("pop");
+    setStacks((prev) => {
+      const cur = prev[tab];
+      if (cur.length <= 1) return prev;
+      return { ...prev, [tab]: cur.slice(0, -1) };
+    });
+  }, [tab]);
+
+  const switchTab = (id: TabId) => {
+    setNavDir("push");
+    setTab(id);
+  };
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -231,26 +279,38 @@ export default function Hub() {
         if (local.length > 0) await saveWidgetsToCloud(local);
       }
     })();
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => setBooted(true), 150);
-    return () => clearTimeout(t);
-  }, []);
-
-  /* Cmd/Ctrl+K spotlight */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSpotlightOpen((v) => !v); setSpotQ(""); }
-      if (e.key === "Escape") { setSpotlightOpen(false); setPanelOpen(false); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSpotOpen((v) => !v);
+        setSpotQ("");
+      }
+      if (e.key === "Escape") {
+        if (spotOpen) {
+          setSpotOpen(false);
+          return;
+        }
+        if (panelOpen) {
+          setPanelOpen(false);
+          return;
+        }
+        if (bgOpen) {
+          setBgOpen(false);
+          return;
+        }
+        if (canBack) pop();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [canBack, pop, spotOpen, panelOpen, bgOpen]);
 
-  /* Live SOL price in the menu bar */
   useEffect(() => {
     let on = true;
     const fetchPrice = () =>
@@ -264,13 +324,15 @@ export default function Hub() {
         .catch(() => {});
     fetchPrice();
     const iv = setInterval(fetchPrice, 60_000);
-    return () => { on = false; clearInterval(iv); };
+    return () => {
+      on = false;
+      clearInterval(iv);
+    };
   }, []);
 
-  /* Live $ORBITX price + CA chip */
   useEffect(() => {
     let on = true;
-    const fetchOrbitxPrice = () =>
+    const fetchOrbitx = () =>
       fetch(`https://api.dexscreener.com/latest/dex/tokens/${ORBITX_CA}`)
         .then((r) => r.json())
         .then((j) => {
@@ -281,375 +343,544 @@ export default function Hub() {
           setOrbitxChange(pair.priceChange?.h24 != null ? Number(pair.priceChange.h24) : null);
         })
         .catch(() => {});
-    fetchOrbitxPrice();
-    const iv = setInterval(fetchOrbitxPrice, 30_000);
-    return () => { on = false; clearInterval(iv); };
+    fetchOrbitx();
+    const iv = setInterval(fetchOrbitx, 30_000);
+    return () => {
+      on = false;
+      clearInterval(iv);
+    };
   }, []);
 
-  const copyOrbitxCA = useCallback(() => {
-    navigator.clipboard.writeText(ORBITX_CA).catch(() => {});
-    setCaCopiedHub(true);
-    setTimeout(() => setCaCopiedHub(false), 1600);
-  }, []);
-
-  /* Widgets: trending tokens + latest community posts (best-effort) */
   useEffect(() => {
     let on = true;
     const fetchTrending = () =>
       fetch("/api/ogdex/screener?type=trending&interval=24h&limit=6")
         .then((r) => r.json())
-        .then((d) => { if (on && d?.rows) setTrending(d.rows.filter((x: any) => x.symbol).slice(0, 5)); })
+        .then((d) => {
+          if (on && d?.rows) setTrending(d.rows.filter((x: { symbol?: string }) => x.symbol).slice(0, 5));
+        })
         .catch(() => {});
     const fetchPosts = () =>
-      supabase.from("social_messages")
+      supabase
+        .from("social_messages")
         .select("id,username,content,created_at")
-        .eq("channel", "social-general").order("created_at", { ascending: false }).limit(3)
-        .then(({ data }) => { if (on && data) setLatestPosts(data as any); });
+        .eq("channel", "social-general")
+        .order("created_at", { ascending: false })
+        .limit(5)
+        .then(({ data }) => {
+          if (on && data) setLatestPosts(data as typeof latestPosts);
+        });
     fetchTrending();
     fetchPosts();
-    const iv = setInterval(() => { fetchTrending(); fetchPosts(); }, 60_000);
-    return () => { on = false; clearInterval(iv); };
-  }, []);
-
-  /* Mouse parallax on the wallpaper */
-  useEffect(() => {
-    let raf = 0;
-    const onMove = (e: MouseEvent) => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const el = desktopRef.current;
-        if (!el) return;
-        const nx = (e.clientX / window.innerWidth - 0.5) * 2;
-        const ny = (e.clientY / window.innerHeight - 0.5) * 2;
-        el.style.setProperty("--par-x", `${nx * -9}px`);
-        el.style.setProperty("--par-y", `${ny * -6}px`);
-      });
+    const iv = setInterval(() => {
+      fetchTrending();
+      fetchPosts();
+    }, 60_000);
+    return () => {
+      on = false;
+      clearInterval(iv);
     };
-    window.addEventListener("mousemove", onMove);
-    return () => { window.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
   }, []);
 
-  /* Fear & Greed for the stat chips */
   useEffect(() => {
     let on = true;
     fetch("https://api.alternative.me/fng/")
       .then((r) => r.json())
-      .then((d) => { if (on && d?.data?.[0]) setFng({ v: Number(d.data[0].value), label: d.data[0].value_classification }); })
+      .then((d) => {
+        if (on && d?.data?.[0]) setFng({ v: Number(d.data[0].value), label: d.data[0].value_classification });
+      })
       .catch(() => {});
-    return () => { on = false; };
+    return () => {
+      on = false;
+    };
   }, []);
 
-  /* Background customization */
+  const copyCA = () => {
+    navigator.clipboard.writeText(ORBITX_CA).catch(() => {});
+    setCaCopied(true);
+    setTimeout(() => setCaCopied(false), 1600);
+  };
+
+  const openAppHref = useCallback((app: AppItem) => {
+    setLaunching(app);
+    window.setTimeout(() => {
+      if (app.external) {
+        window.open(app.href, "_blank", "noopener");
+        setLaunching(null);
+      } else {
+        window.location.assign(app.href);
+      }
+    }, 420);
+  }, []);
+
+  const logout = async () => {
+    try {
+      await signOut();
+    } finally {
+      window.location.assign("/auth");
+    }
+  };
+
   const applyBgMode = useCallback((m: BgMode) => {
     setBgMode(m);
-    try { localStorage.setItem(BG_KEY, m); } catch { /* noop */ }
-  }, []);
-  const applyWallpaper = useCallback((dataUrl: string | null) => {
-    setWallpaper(dataUrl);
     try {
-      if (dataUrl) { localStorage.setItem(WALLPAPER_KEY, dataUrl); localStorage.setItem(BG_KEY, "custom"); setBgMode("custom"); }
-      else { localStorage.removeItem(WALLPAPER_KEY); if (bgMode === "custom") { setBgMode("nebula"); localStorage.setItem(BG_KEY, "nebula"); } }
-    } catch { /* noop */ }
-  }, [bgMode]);
+      localStorage.setItem(BG_KEY, m);
+    } catch {
+      /* noop */
+    }
+  }, []);
 
-  /* Wallpaper picker (shared by dock + context menu) */
-  const openApp = useCallback((app: App | typeof CENTER_TABS[0]) => {
-    if (launching) return;
-    setLaunching(app as App);
-    window.setTimeout(() => {
-      if ("action" in app) {
-        if (app.action === "logout") logout();
-        else if (app.action === "wallpaper") {
-          setBgOpen(true);
-          setLaunching(null);
-        }
-        else window.location.assign(app.href || "/settings");
-      } else {
-        if (app.external) {
-          window.open(app.href, "_blank", "noopener");
-          setLaunching(null);
+  const applyWallpaper = useCallback(
+    (dataUrl: string | null) => {
+      setWallpaper(dataUrl);
+      try {
+        if (dataUrl) {
+          localStorage.setItem(WALLPAPER_KEY, dataUrl);
+          localStorage.setItem(BG_KEY, "custom");
+          setBgMode("custom");
         } else {
-          window.location.assign(app.href);
+          localStorage.removeItem(WALLPAPER_KEY);
+          if (bgMode === "custom") {
+            setBgMode("nebula");
+            localStorage.setItem(BG_KEY, "nebula");
+          }
         }
+      } catch {
+        /* noop */
       }
-    }, 700);
-  }, [launching, logout]);
-
-  const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-  const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-
-  const renderAppCard = (app: App, delayMs: number) => (
-    <button
-      key={app.key}
-      className="hub-app-card"
-      style={{ animationDelay: `${delayMs}ms`, "--app-tone": app.tone } as React.CSSProperties}
-      onClick={() => openApp(app)}
-      disabled={!!launching}
-      title={app.caption}
-    >
-      <div className="hub-app-icon mac-icon" style={{ background: app.iconBg }}>
-        <div className="mac-icon-gloss" />
-        <div className="mac-icon-glyph hub-app-glyph">{app.glyph}</div>
-      </div>
-      <span className="hub-app-name">{app.name}</span>
-      <span className="hub-app-cap">{app.caption}</span>
-      {app.external && <span className="hub-app-ext">↗</span>}
-    </button>
+    },
+    [bgMode],
   );
 
-  return (
-    <div className="mac-os">
-      <style>{css + aiWidgetCSS}</style>
+  const greet = (() => {
+    const h = now.getHours();
+    const part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    return profile?.username ? `${part}, ${profile.username}` : part;
+  })();
 
-      {/* ── DESKTOP ── */}
-      <div
-        ref={desktopRef}
-        className={`desktop ${booted ? "desktop-ready" : ""}`}
-        onClick={() => setCtxMenu(null)}
-        onContextMenu={(e) => {
-          if ((e.target as HTMLElement).closest(".mac-dock-container, .menu-bar")) return;
-          e.preventDefault();
-          setCtxMenu({ x: Math.min(e.clientX, window.innerWidth - 230), y: Math.min(e.clientY, window.innerHeight - 220) });
-        }}
-      >
-        <BackgroundFX mode={bgMode} wallpaper={wallpaper} />
+  const navTitle = (() => {
+    if (top.id === "app") return APP_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "App";
+    if (top.id === "section") return APP_SECTIONS.find((s) => s.id === top.sectionId)?.title || "Apps";
+    if (top.id === "widgets") return "Widgets";
+    if (top.id === "wallpaper") return "Wallpaper";
+    return TABS.find((t) => t.id === tab)?.label || "OrbitX";
+  })();
 
-        {/* macOS Menu Bar */}
-        <header className="menu-bar">
-          <div className="mb-left">
-            <button className="mb-apple-icon">
-              <OrbitLogo size={16} className="opacity-90" />
-            </button>
-            <nav className="mb-menus">
-              <span className="mb-app-name">{OS_NAME}</span>
-              <span>File</span>
-              <span>Edit</span>
-              <span>View</span>
-              <span>Window</span>
-              <span>Help</span>
-            </nav>
-          </div>
-          <div className="mb-right">
-            {orbitxPrice != null && (
-              <button className="mb-sol mb-orbitx" title="Click to copy contract address" onClick={copyOrbitxCA}>
-                <span className="mb-sol-dot" style={{ background: "#9945FF" }} /> $ORBITX ${orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)}
-                {orbitxChange != null && (
-                  <b style={{ color: orbitxChange >= 0 ? "#34d399" : "#fb7185", marginLeft: 2 }}>
-                    {orbitxChange >= 0 ? "+" : ""}{orbitxChange.toFixed(1)}%
-                  </b>
-                )}
-                <span className="mb-orbitx-ca">{caCopiedHub ? "Copied!" : "CA"}</span>
-              </button>
-            )}
-            {solPrice != null && (
-              <span className="mb-sol" title="Solana price (live, 24h change)">
-                <span className="mb-sol-dot" /> SOL ${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}
-                {solChange != null && (
-                  <b style={{ color: solChange >= 0 ? "#34d399" : "#fb7185", marginLeft: 2 }}>
-                    {solChange >= 0 ? "+" : ""}{solChange.toFixed(1)}%
-                  </b>
-                )}
-              </span>
-            )}
-            <button className="mb-search" title="Customize background" onClick={() => setBgOpen(true)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4c3.1 0 5.6-2.5 5.6-5.6C23 5.6 18.1 2 12 2z"/></svg>
-            </button>
-            <button className="mb-search" title="Search apps (⌘K)" onClick={() => { setSpotlightOpen(true); setSpotQ(""); }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            </button>
-            <span className="mb-version">{VERSION}</span>
-            <div className="mb-status-icons">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-            </div>
-            <span className="mb-clock">{date} {time}</span>
-          </div>
-        </header>
+  const renderAppIcon = (app: AppItem, size: "grid" | "row" | "detail" = "grid") => (
+    <div
+      className={size === "detail" ? "ios-detail__icon" : size === "row" ? "ios-row__icon" : "ios-app__icon"}
+      style={{ background: app.iconBg }}
+    >
+      {app.glyph}
+    </div>
+  );
 
-        {showChainBanner && (
-          <div className="chain-banner">
-            <span className="chain-banner-emoji">🪽</span>
-            <p className="chain-banner-text">
-              <b>New chain supported:</b> OrbitX now supports <b>Robinhood Chain</b> — search, scan, and screen any Robinhood Chain token right alongside Solana, Ethereum, Base, and 13 other chains.
-            </p>
-            <a href="/ORBITX_DEX" className="chain-banner-cta">Explore</a>
-            <button className="chain-banner-close" onClick={dismissChainBanner} aria-label="Dismiss">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-            </button>
-          </div>
+  const appRows = (apps: AppItem[]) => (
+    <div className="ios-group">
+      {apps.map((app) => (
+        <button key={app.key} type="button" className="ios-row" onClick={() => push({ id: "app", appKey: app.key })}>
+          {renderAppIcon(app, "row")}
+          <span className="ios-row__meta">
+            <span className="ios-row__title">{app.name}</span>
+            <span className="ios-row__cap">{app.caption}</span>
+          </span>
+          <span className="ios-row__chev" aria-hidden>
+            ›
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const rootHome = (
+    <>
+      <h2 className="ios-large-title">{greet}</h2>
+      <p className="ios-subhead">OrbitX hub · tap an app · ⌘K to search</p>
+      <div className="ios-chips">
+        <button type="button" className="ios-chip" onClick={copyCA}>
+          $ORBITX{" "}
+          <b style={{ color: (orbitxChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}>
+            {orbitxPrice != null ? (orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)) : "—"}
+          </b>
+          <span>{caCopied ? "Copied" : "CA"}</span>
+        </button>
+        <span className="ios-chip">
+          SOL{" "}
+          <b style={{ color: (solChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}>
+            {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
+          </b>
+        </span>
+        {fng && (
+          <span className="ios-chip">
+            F&G <b>{fng.v}</b>
+          </span>
         )}
-
-        {/* Desktop Body — organized hub */}
-        <main className="desktop-body">
-          <div className="hub-shell">
-            <header className="hub-hero">
-              <div className="hub-hero-copy">
-                <p className="hub-greet-line">
-                  {(() => { const h = now.getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; })()}
-                  {profile?.username ? `, ${profile.username}` : ""}
-                </p>
-                <p className="hub-greet-sub">Your OrbitX command center · <kbd>⌘K</kbd> to search</p>
-              </div>
-              <div className="hub-quick-actions">
-                {QUICK_ACTIONS.map((a) => (
-                  <a key={a.href} href={a.href} className="hub-quick-btn" style={{ "--qa-tone": a.tone } as React.CSSProperties}>
-                    {a.label}
-                  </a>
-                ))}
-              </div>
-            </header>
-
-            <div className="hub-chips">
-              <button className="hub-chip hub-chip-btn hub-chip-orbitx" onClick={copyOrbitxCA} title="Click to copy contract address">
-                <i className="hub-chip-dot" style={{ background: "#9945FF" }} />
-                $ORBITX {orbitxPrice != null ? `$${orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)}` : "—"}
-                {orbitxChange != null && <b style={{ color: orbitxChange >= 0 ? "#34d399" : "#fb7185" }}>{orbitxChange >= 0 ? "+" : ""}{orbitxChange.toFixed(1)}%</b>}
-                <span className="hub-chip-ca">{caCopiedHub ? "Copied!" : `${ORBITX_CA.slice(0, 4)}…${ORBITX_CA.slice(-4)}`}</span>
-              </button>
-              <span className="hub-chip">
-                <i className="hub-chip-dot" style={{ background: (solChange ?? 0) >= 0 ? "#34d399" : "#fb7185" }} />
-                ◎ {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
-                {solChange != null && <b style={{ color: solChange >= 0 ? "#34d399" : "#fb7185" }}>{solChange >= 0 ? "+" : ""}{solChange.toFixed(1)}%</b>}
-              </span>
-              {fng && (
-                <span className="hub-chip">
-                  🌡 {fng.v} <b style={{ color: fng.v >= 55 ? "#34d399" : fng.v >= 40 ? "#fbbf24" : "#fb7185" }}>{fng.label}</b>
-                </span>
-              )}
-              {trending[0] && (
-                <span className="hub-chip">
-                  🔥 ${trending[0].symbol} <b style={{ color: (trending[0].change24h ?? 0) >= 0 ? "#34d399" : "#fb7185" }}>{(trending[0].change24h ?? 0) >= 0 ? "+" : ""}{(trending[0].change24h ?? 0).toFixed(0)}%</b>
-                </span>
-              )}
-              <button className="hub-chip hub-chip-btn" onClick={() => { setPanelTab("my"); setPanelOpen(true); }}>
-                ⚡ {customWidgets.length} widget{customWidgets.length === 1 ? "" : "s"}
-              </button>
-              <button className="hub-chip hub-chip-btn" onClick={() => setBgOpen(true)}>🎨 Background</button>
-            </div>
-
-            <MobileWidgetGrid
-              solPrice={solPrice}
-              solChange={solChange}
-              trending={trending}
-              widgets={customWidgets}
-              setWidgets={setCustomWidgets}
-              onOpenPanel={() => { setPanelTab("chat"); setPanelOpen(true); }}
-            />
-
-            <div className="desktop-flex">
-              <div className="hub-main">
-                {APP_SECTIONS.map((section, si) => {
-                  const sectionApps = section.keys.map((k) => APP_BY_KEY[k]).filter(Boolean);
-                  if (!sectionApps.length) return null;
-                  return (
-                    <section key={section.id} className="hub-section" style={{ animationDelay: `${si * 80}ms` }}>
-                      <div className="hub-section-head">
-                        <h2 className="hub-section-title">{section.title}</h2>
-                        <p className="hub-section-sub">{section.subtitle}</p>
-                      </div>
-                      <div className="hub-app-grid">
-                        {sectionApps.map((app, i) => renderAppCard(app, si * 80 + i * 40))}
-                      </div>
-                    </section>
-                  );
-                })}
-
-                {showAdminApps && (
-                  <section className="hub-section hub-section-admin">
-                    <div className="hub-section-head">
-                      <h2 className="hub-section-title">Owner Admin</h2>
-                      <p className="hub-section-sub">Platform desks · {OWNER_EMAIL}</p>
-                    </div>
-                    <div className="hub-app-grid">
-                      {OWNER_ADMIN_APPS.map((app, i) => renderAppCard(app, i * 40))}
-                    </div>
-                  </section>
-                )}
-              </div>
-
-              <aside className="widgets-col">
-              <div className="wg wg-clock">
-                <div className="wg-clock-time">{time}</div>
-                <div className="wg-clock-date">{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
-              </div>
-
-              <div className="wg">
-                <div className="wg-head">
-                  <span className="wg-title">◎ Solana</span>
-                  <span className="wg-live"><i />LIVE</span>
-                </div>
-                <div className="wg-sol-price">{solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}</div>
-                {solChange != null && (
-                  <div className="wg-sol-change" style={{ color: solChange >= 0 ? "#34d399" : "#fb7185" }}>
-                    {solChange >= 0 ? "▲" : "▼"} {Math.abs(solChange).toFixed(2)}% today
-                  </div>
-                )}
-              </div>
-
-              <div className="wg">
-                <div className="wg-head">
-                  <span className="wg-title">🔥 Trending</span>
-                  <a className="wg-link" href="/ORBITX_DEX">Open DEX</a>
-                </div>
-                {trending.length === 0 ? (
-                  <div className="wg-empty">Loading market…</div>
-                ) : trending.map((t, i) => {
-                  const up = (t.change24h ?? 0) >= 0;
-                  const mag = Math.min(100, Math.abs(t.change24h ?? 0));
-                  return (
-                    <a key={t.mint} className="wg-row" href="/ORBITX_DEX">
-                      <span className="wg-rank">{i + 1}</span>
-                      <span className="wg-sym">${t.symbol}</span>
-                      <span className="wg-bar"><i style={{ width: `${Math.max(8, mag)}%`, background: up ? "#34d399" : "#fb7185" }} /></span>
-                      <span className="wg-chg" style={{ color: up ? "#34d399" : "#fb7185" }}>{up ? "+" : ""}{(t.change24h ?? 0).toFixed(0)}%</span>
-                    </a>
-                  );
-                })}
-              </div>
-
-              <div className="wg">
-                <div className="wg-head">
-                  <span className="wg-title">💬 Community</span>
-                  <a className="wg-link" href="/orbitx-social">Open</a>
-                </div>
-                {latestPosts.length === 0 ? (
-                  <div className="wg-empty">No posts yet — say gm</div>
-                ) : latestPosts.map((post) => (
-                  <a key={post.id} className="wg-post" href="/orbitx-social">
-                    <span className="wg-post-user">@{post.username || "anon"}</span>
-                    <span className="wg-post-text">{post.content.length > 64 ? post.content.slice(0, 64) + "…" : post.content}</span>
-                    <span className="wg-post-time">{wgTimeAgo(post.created_at)}</span>
-                  </a>
-                ))}
-              </div>
-              </aside>
-            </div>
-          </div>
-        </main>
-
-        {/* macOS Dock — desktop only, hidden on mobile via CSS */}
-        <footer className="mac-dock-container">
-          <div className="mac-dock">
-            <div className="dock-center">
-              {CENTER_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  className="dock-center-item"
-                  style={{ "--tone": tab.tone } as React.CSSProperties}
-                  title={tab.name}
-                  onClick={() => openApp(tab)}
-                >
-                  <div className="mac-icon dock-icon" style={{ background: `linear-gradient(135deg, ${tab.tone}44, ${tab.tone}22)` }}>
-                    <div className="mac-icon-gloss" />
-                    <div className="mac-icon-glyph">{tab.glyph}</div>
-                  </div>
-                  <span className="dock-tooltip">{tab.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </footer>
       </div>
+
+      <p className="ios-group__label">Favorites</p>
+      <div className="ios-app-grid">
+        {QUICK_KEYS.map((k) => {
+          const app = APP_BY_KEY[k];
+          if (!app) return null;
+          return (
+            <button key={app.key} type="button" className="ios-app" onClick={() => push({ id: "app", appKey: app.key })}>
+              {renderAppIcon(app)}
+              <span className="ios-app__name">{app.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="ios-group__label">Shortcuts</p>
+      <div className="ios-group">
+        <button type="button" className="ios-row" onClick={() => switchTab("apps")}>
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Browse all apps</span>
+            <span className="ios-row__cap">Trade, social, MCP, play</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </button>
+        <button type="button" className="ios-row" onClick={() => push({ id: "widgets" })}>
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Widgets</span>
+            <span className="ios-row__cap">{customWidgets.length} on Home</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </button>
+        <button type="button" className="ios-row" onClick={() => setSpotOpen(true)}>
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Search</span>
+            <span className="ios-row__cap">Find any tool</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </button>
+      </div>
+    </>
+  );
+
+  const rootApps = (
+    <>
+      <h2 className="ios-large-title">Apps</h2>
+      <p className="ios-subhead">Open a category, then launch an app.</p>
+      <div className="ios-group">
+        {APP_SECTIONS.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            className="ios-row"
+            onClick={() => push({ id: "section", sectionId: section.id })}
+          >
+            <span className="ios-row__meta">
+              <span className="ios-row__title">{section.title}</span>
+              <span className="ios-row__cap">{section.subtitle}</span>
+            </span>
+            <span className="ios-row__value">{section.keys.length}</span>
+            <span className="ios-row__chev">›</span>
+          </button>
+        ))}
+        {showAdminApps && (
+          <button type="button" className="ios-row" onClick={() => push({ id: "section", sectionId: "admin" })}>
+            <span className="ios-row__meta">
+              <span className="ios-row__title">Owner Admin</span>
+              <span className="ios-row__cap">{OWNER_EMAIL}</span>
+            </span>
+            <span className="ios-row__chev">›</span>
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  const rootActivity = (
+    <>
+      <h2 className="ios-large-title">Activity</h2>
+      <p className="ios-subhead">Markets and community pulse.</p>
+      {trending.map((t) => (
+        <button
+          key={t.mint}
+          type="button"
+          className="ios-card"
+          style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
+          onClick={() => window.location.assign(`/ORBITX_DEX?mint=${encodeURIComponent(t.mint)}`)}
+        >
+          <div className="ios-card__k">Trending</div>
+          <div className="ios-card__v">${t.symbol}</div>
+          <div className="ios-card__meta" style={{ color: (t.change24h ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}>
+            {(t.change24h ?? 0) >= 0 ? "+" : ""}
+            {(t.change24h ?? 0).toFixed(1)}% · 24h
+          </div>
+        </button>
+      ))}
+      {latestPosts.map((p) => (
+        <div key={p.id} className="ios-card">
+          <div className="ios-card__k">@{p.username || "orbit"}</div>
+          <div className="ios-card__meta" style={{ color: "var(--ios-text)", marginTop: 6 }}>
+            {p.content.slice(0, 160)}
+            {p.content.length > 160 ? "…" : ""}
+          </div>
+        </div>
+      ))}
+      {!trending.length && !latestPosts.length && <div className="ios-empty">Loading activity…</div>}
+      <button type="button" className="ios-btn ios-btn--ghost" style={{ width: "100%" }} onClick={() => window.location.assign("/orbitx-social")}>
+        Open Social
+      </button>
+    </>
+  );
+
+  const rootAccount = (
+    <>
+      <h2 className="ios-large-title">Account</h2>
+      <p className="ios-subhead">Wallet, profile, and MCP connectors.</p>
+      <div className="ios-wallet-wrap">
+        <WalletConnectButton />
+      </div>
+      {(profile?.username || user?.email) && (
+        <div className="ios-group" style={{ marginBottom: "0.85rem" }}>
+          <div className="ios-row" style={{ cursor: "default" }}>
+            <span className="ios-row__meta">
+              <span className="ios-row__title">{profile?.username ? `@${profile.username}` : "Signed in"}</span>
+              <span className="ios-row__cap">{user?.email || "Wallet session"}</span>
+            </span>
+          </div>
+        </div>
+      )}
+      <div className="ios-group">
+        <Link to="/profile" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Profile</span>
+            <span className="ios-row__cap">{profile?.username ? `@${profile.username}` : "View profile"}</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/settings" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Settings</span>
+            <span className="ios-row__cap">Preferences</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/agent" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Agent MCP</span>
+            <span className="ios-row__cap">Connect Claude / ChatGPT / Grok</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/x" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">X MCP</span>
+            <span className="ios-row__cap">Post & agent on X</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+      </div>
+      <div className="ios-group">
+        <button type="button" className="ios-row" onClick={() => push({ id: "wallpaper" })}>
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Wallpaper</span>
+            <span className="ios-row__cap">Background & atmosphere</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </button>
+        <button type="button" className="ios-row" onClick={() => push({ id: "widgets" })}>
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Widgets</span>
+            <span className="ios-row__cap">Customize home widgets</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </button>
+      </div>
+      <button type="button" className="ios-btn ios-btn--danger" style={{ width: "100%" }} onClick={logout}>
+        Log Out
+      </button>
+    </>
+  );
+
+  let body: ReactNode = null;
+  if (top.id === "root") {
+    body = tab === "home" ? rootHome : tab === "apps" ? rootApps : tab === "activity" ? rootActivity : rootAccount;
+  } else if (top.id === "section") {
+    const section =
+      top.sectionId === "admin"
+        ? { id: "admin", title: "Owner Admin", subtitle: OWNER_EMAIL, keys: OWNER_ADMIN_APPS.map((a) => a.key) }
+        : APP_SECTIONS.find((s) => s.id === top.sectionId);
+    const apps =
+      top.sectionId === "admin"
+        ? OWNER_ADMIN_APPS
+        : (section?.keys || []).map((k) => APP_BY_KEY[k]).filter(Boolean);
+    body = (
+      <>
+        <h2 className="ios-large-title">{section?.title || "Apps"}</h2>
+        <p className="ios-subhead">{section?.subtitle}</p>
+        {appRows(apps)}
+      </>
+    );
+  } else if (top.id === "app") {
+    const app = APP_BY_KEY[top.appKey] || searchableApps.find((a) => a.key === top.appKey);
+    body = app ? (
+      <div className="ios-detail">
+        {renderAppIcon(app, "detail")}
+        <h2 className="ios-detail__name">{app.name}</h2>
+        <p className="ios-detail__cap">{app.caption}</p>
+        <div className="ios-btn-row">
+          <button type="button" className="ios-btn ios-btn--primary" onClick={() => openAppHref(app)}>
+            {app.external ? "Open ↗" : "Open"}
+          </button>
+          <button type="button" className="ios-btn ios-btn--ghost" onClick={pop}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    ) : (
+      <div className="ios-empty">App not found</div>
+    );
+  } else if (top.id === "widgets") {
+    body = (
+      <>
+        <h2 className="ios-large-title">Widgets</h2>
+        <p className="ios-subhead">Pin market and community widgets.</p>
+        <MobileWidgetGrid
+          solPrice={solPrice}
+          solChange={solChange}
+          trending={trending}
+          widgets={customWidgets}
+          setWidgets={setCustomWidgets}
+          onOpenPanel={() => {
+            setPanelTab("chat");
+            setPanelOpen(true);
+          }}
+        />
+        <button
+          type="button"
+          className="ios-btn ios-btn--primary"
+          style={{ width: "100%", marginTop: 12 }}
+          onClick={() => {
+            setPanelTab("lib");
+            setPanelOpen(true);
+          }}
+        >
+          Widget library
+        </button>
+      </>
+    );
+  } else if (top.id === "wallpaper") {
+    body = (
+      <>
+        <h2 className="ios-large-title">Wallpaper</h2>
+        <p className="ios-subhead">Atmosphere behind your hub.</p>
+        <button type="button" className="ios-btn ios-btn--primary" style={{ width: "100%" }} onClick={() => setBgOpen(true)}>
+          Customize background
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <div className="ios-hub">
+      <style>{aiWidgetCSS}</style>
+      <div className="ios-hub__atmosphere" aria-hidden />
+      <BackgroundFX mode={bgMode} wallpaper={wallpaper} />
+
+      <div className="ios-hub__stage">
+        <div className="ios-stack">
+          <div key={`${tab}-${stack.length}-${top.id}`} className={`ios-stack__pane${navDir === "pop" ? " is-back" : ""}`}>
+            <NavBar
+              title={canBack ? navTitle : "OrbitX"}
+              canBack={canBack}
+              onBack={pop}
+              trail={
+                <button type="button" className="ios-nav__btn" onClick={() => setSpotOpen(true)} aria-label="Search">
+                  ⌕
+                </button>
+              }
+            />
+            <div className="ios-body">{body}</div>
+          </div>
+        </div>
+      </div>
+
+      <nav className="ios-tabbar" aria-label="OrbitX tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`ios-tab${tab === t.id ? " is-on" : ""}`}
+            onClick={() => switchTab(t.id)}
+          >
+            <span className="ios-tab__ico" aria-hidden>
+              {t.ico}
+            </span>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      <div className="ios-home-ind" aria-hidden />
+
+      {spotOpen && (
+        <div className="ios-sheet" onClick={() => setSpotOpen(false)}>
+          <div className="ios-sheet__card" onClick={(e) => e.stopPropagation()}>
+            <div className="ios-sheet__search">
+              <input
+                className="ios-sheet__input"
+                autoFocus
+                value={spotQ}
+                onChange={(e) => setSpotQ(e.target.value)}
+                placeholder="Search apps…"
+              />
+              <button type="button" className="ios-nav__btn" onClick={() => setSpotOpen(false)}>
+                Cancel
+              </button>
+            </div>
+            <div className="ios-sheet__results">
+              {searchableApps
+                .filter((a) => {
+                  const q = spotQ.trim().toLowerCase();
+                  return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
+                })
+                .map((a) => (
+                  <button
+                    key={a.key}
+                    type="button"
+                    className="ios-row"
+                    onClick={() => {
+                      setSpotOpen(false);
+                      setTab("apps");
+                      setStacks((prev) => ({ ...prev, apps: [{ id: "root" }, { id: "app", appKey: a.key }] }));
+                      setNavDir("push");
+                    }}
+                  >
+                    {renderAppIcon(a, "row")}
+                    <span className="ios-row__meta">
+                      <span className="ios-row__title">{a.name}</span>
+                      <span className="ios-row__cap">{a.caption}</span>
+                    </span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {launching && (
+        <div className="ios-launch">
+          <div className="ios-launch__card">
+            <div className="ios-detail__icon" style={{ background: launching.iconBg }}>
+              {launching.glyph}
+            </div>
+            <div style={{ fontWeight: 700 }}>{launching.name}</div>
+          </div>
+        </div>
+      )}
+
+      {panelOpen && (
+        <AIWidgetPanel
+          key={panelTab}
+          initialTab={panelTab}
+          onClose={() => setPanelOpen(false)}
+          widgets={customWidgets}
+          setWidgets={setCustomWidgets}
+        />
+      )}
 
       <BgCustomizeModal
         open={bgOpen}
@@ -659,471 +890,6 @@ export default function Hub() {
         onMode={applyBgMode}
         onWallpaper={applyWallpaper}
       />
-
-      {panelOpen && (
-        <AIWidgetPanel
-          initialTab={panelTab}
-          onClose={() => setPanelOpen(false)}
-          widgets={customWidgets}
-          setWidgets={setCustomWidgets}
-        />
-      )}
-
-      {/* ── CONTEXT MENU ── */}
-      {ctxMenu && (
-        <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => { setCtxMenu(null); setSpotlightOpen(true); setSpotQ(""); }}>🔍 Search apps <span>⌘K</span></button>
-          <button onClick={() => { setCtxMenu(null); setBgOpen(true); }}>🎨 Customize background</button>
-          <button onClick={() => { setCtxMenu(null); applyWallpaper(null); applyBgMode("nebula"); }}>✨ Reset background</button>
-          <div className="ctx-sep" />
-          <button onClick={() => { setCtxMenu(null); setPanelTab("chat"); setPanelOpen(true); }}>✦ Widget Studio</button>
-          <button onClick={() => { setCtxMenu(null); window.location.reload(); }}>🔄 Refresh</button>
-        </div>
-      )}
-
-      {/* ── SPOTLIGHT (⌘K) ── */}
-      {spotlightOpen && !launching && (
-        <div className="spotlight-overlay" onClick={() => setSpotlightOpen(false)}>
-          <div className="spotlight" onClick={(e) => e.stopPropagation()}>
-            <div className="spotlight-input-row">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-              <input
-                autoFocus
-                value={spotQ}
-                onChange={(e) => setSpotQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const q = spotQ.trim().toLowerCase();
-                    const hit = searchableApps.find((a) => !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q));
-                    if (hit) { setSpotlightOpen(false); openApp(hit); }
-                  }
-                }}
-                placeholder={showAdminApps ? "Search apps & admin…" : "Search apps…"}
-              />
-              <span className="spotlight-esc">esc</span>
-            </div>
-            <div className="spotlight-results">
-              {searchableApps.filter((a) => {
-                const q = spotQ.trim().toLowerCase();
-                return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
-              }).map((a) => (
-                <button key={a.key} className="spotlight-item" onClick={() => { setSpotlightOpen(false); openApp(a); }}>
-                  <span className="spotlight-item-icon" style={{ background: a.iconBg }}>{a.glyph}</span>
-                  <span className="spotlight-item-name">{a.name}</span>
-                  <span className="spotlight-item-cap">{a.caption}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MAC OS WINDOW LAUNCH ANIMATION ── */}
-      {launching && (
-        <div className="launch-window-overlay">
-          <div className="launch-window" style={{ '--launch-color': launching.tone } as React.CSSProperties}>
-            <div className="window-titlebar">
-              <div className="window-controls">
-                <span className="wc close" />
-                <span className="wc minimize" />
-                <span className="wc maximize" />
-              </div>
-              <span className="window-title">{launching.name}</span>
-            </div>
-            <div className="window-content">
-              <div className="mac-icon launch-bounce" style={{ background: launching.iconBg }}>
-                <div className="mac-icon-gloss" />
-                <div className="mac-icon-glyph">{launching.glyph}</div>
-              </div>
-              <div className="spinner-ring" />
-            </div>
-          </div>
-        </div>
-      )}
-      <MobileNav onOpenPanel={(t) => { setPanelTab(t); setPanelOpen(true); }} />
     </div>
   );
 }
-
-function useClock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return now;
-}
-
-const css = `
-/* ── Hub layout: organized sections ── */
-.hub-shell{width:100%;max-width:1280px;margin:0 auto;padding:0 4px}
-.hub-hero{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 20px;margin-bottom:14px;animation:fadeSlide .5s ease both}
-.hub-hero-copy{text-align:left}
-.hub-greet-line{font-size:clamp(22px,4vw,30px);font-weight:800;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 16px rgba(0,0,0,.6);margin:0}
-.hub-greet-sub{margin:6px 0 0;font-size:12px;font-weight:600;color:rgba(255,255,255,.42)}
-.hub-greet-sub kbd{padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);font-size:10px}
-.hub-quick-actions{display:flex;flex-wrap:wrap;gap:8px}
-.hub-quick-btn{display:inline-flex;align-items:center;padding:8px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--qa-tone,#2F80FF) 35%,transparent);background:color-mix(in srgb,var(--qa-tone,#2F80FF) 12%,transparent);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.02em;text-decoration:none;transition:transform .15s,background .15s,border-color .15s}
-.hub-quick-btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--qa-tone,#2F80FF) 22%,transparent);border-color:color-mix(in srgb,var(--qa-tone,#2F80FF) 55%,transparent)}
-.hub-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px}
-.hub-section{border-radius:22px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(165deg,rgba(18,22,32,.72),rgba(8,10,14,.78));backdrop-filter:blur(20px);padding:16px 16px 14px;animation:fadeSlide .45s ease both}
-.hub-section-admin{border-color:rgba(240,199,94,.22);background:linear-gradient(165deg,rgba(32,28,14,.55),rgba(12,10,6,.72))}
-.hub-section-head{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06)}
-.hub-section-title{margin:0;font-size:13px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.88)}
-.hub-section-sub{margin:4px 0 0;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.38)}
-.hub-app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
-.hub-app-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);text-align:left;cursor:pointer;transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease;opacity:0;animation:fade-in-up .5s cubic-bezier(.16,1,.3,1) forwards}
-.hub-app-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--app-tone,#2F80FF) 45%,transparent);background:rgba(255,255,255,.06);box-shadow:0 14px 36px -18px color-mix(in srgb,var(--app-tone,#2F80FF) 55%,transparent)}
-.hub-app-card:disabled{opacity:.55;cursor:not-allowed}
-.hub-app-icon{width:52px;height:52px;border-radius:14px}
-.hub-app-glyph{width:28px;height:28px}
-.hub-app-name{font-size:13px;font-weight:800;color:#fff;line-height:1.2}
-.hub-app-cap{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.42);line-height:1.3}
-.hub-app-ext{position:absolute;top:10px;right:10px;font-size:11px;font-weight:800;color:rgba(255,255,255,.35)}
-@keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.mb-sol{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.09);color:#6ee7b7;font-size:11px;font-weight:800;letter-spacing:.02em}
-.mb-sol-dot{width:5px;height:5px;border-radius:99px;background:#34d399;animation:pulse 2s infinite}
-.mb-orbitx{border-color:rgba(153,69,255,.3);background:rgba(153,69,255,.1);color:#c9a3ff;cursor:pointer;font-family:inherit}
-.mb-orbitx:hover{background:rgba(153,69,255,.18)}
-.mb-orbitx-ca{opacity:.6;font-weight:700;margin-left:2px}
-
-.chain-banner{display:flex;align-items:center;gap:10px;padding:9px 16px;margin:0 12px;border-radius:12px;
-  background:linear-gradient(90deg,rgba(0,200,5,.14),rgba(0,200,5,.05));border:1px solid rgba(0,200,5,.25);
-  animation:fadeSlide .4s ease both}
-.chain-banner-emoji{font-size:16px;flex-shrink:0}
-.chain-banner-text{flex:1;font-size:12.5px;color:#d8f5d8;line-height:1.4;min-width:0}
-.chain-banner-text b{color:#fff}
-.chain-banner-cta{flex-shrink:0;font-size:11.5px;font-weight:800;color:#00C805;padding:5px 12px;border-radius:99px;
-  border:1px solid rgba(0,200,5,.4);background:rgba(0,200,5,.1);white-space:nowrap;transition:background .15s}
-.chain-banner-cta:hover{background:rgba(0,200,5,.2)}
-.chain-banner-close{flex-shrink:0;color:#9ca3af;padding:4px;border-radius:8px;transition:background .15s,color .15s}
-.chain-banner-close:hover{background:rgba(255,255,255,.08);color:#fff}
-@media(max-width:640px){.chain-banner{margin:0 8px;padding:8px 10px}.chain-banner-text{font-size:11.5px}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.mb-search{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:rgba(255,255,255,.65);cursor:pointer;transition:background .15s}
-.mb-search:hover{background:rgba(255,255,255,.12)}
-.spotlight-overlay{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);display:flex;justify-content:center;padding-top:18vh;animation:fadeSlide .18s ease both}
-.spotlight{width:min(560px,92vw);height:fit-content;border-radius:18px;border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg,rgba(28,30,36,.96),rgba(16,17,21,.97));box-shadow:0 32px 90px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.08);overflow:hidden}
-.spotlight-input-row{display:flex;align-items:center;gap:11px;padding:15px 17px;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07)}
-.spotlight-input-row input{flex:1;border:0;outline:0;background:transparent;color:#fff;font-size:17px;font-weight:600}
-.spotlight-input-row input::placeholder{color:rgba(255,255,255,.3)}
-.spotlight-esc{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.4)}
-.spotlight-results{max-height:320px;overflow-y:auto;padding:7px}
-.spotlight-item{display:flex;align-items:center;gap:12px;width:100%;padding:9px 11px;border:0;border-radius:12px;background:transparent;cursor:pointer;transition:background .12s;text-align:left}
-.spotlight-item:hover{background:rgba(47,128,255,.14)}
-.spotlight-item-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;color:#fff;flex-shrink:0}
-.spotlight-item-icon svg{width:20px;height:20px}
-.spotlight-item-name{font-size:14px;font-weight:800;color:#fff}
-.spotlight-item-cap{margin-left:auto;font-size:11px;font-weight:600;color:rgba(255,255,255,.35)}
-
-.mac-os {
-  position: relative; min-height: 100vh; background: #000; color: #fff; overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-}
-.mac-os button { font-family: inherit; border: 0; background: none; color: inherit; cursor: pointer; outline: none; }
-.mac-os a { color: inherit; text-decoration: none; }
-
-.desktop {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  opacity: 0; transform: scale(1.02); filter: blur(10px);
-  transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), filter 1.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.desktop.desktop-ready { opacity: 1; transform: none; filter: blur(0); }
-
-.wallpaper { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
-.wp-image {
-  position: absolute; inset: 0;
-  background: url(/bg/bg-nebula.jpg) center/cover no-repeat;
-  filter: saturate(1.2) brightness(0.9);
-  animation: bg-pan 60s ease-in-out infinite alternate;
-}
-.wp-overlay { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.45) 100%); }
-@keyframes bg-pan { 0% { transform: scale(1.05) translate(0%, 0%); } 100% { transform: scale(1.1) translate(-2%, -2%); } }
-
-.menu-bar {
-  position: relative; z-index: 50; display: flex; align-items: center; justify-content: space-between;
-  height: 28px; padding: 0 16px; background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.1); font-size: 13px; font-weight: 500; letter-spacing: -0.01em; color: #fff;
-}
-.mb-left { display: flex; align-items: center; height: 100%; }
-.mb-apple-icon {
-  display: flex; align-items: center; justify-content: center; height: 100%; padding: 0 12px;
-  transition: background 0.1s; border-radius: 4px; margin-left: -8px;
-}
-.mb-apple-icon:hover { background: rgba(255, 255, 255, 0.2); }
-.mb-menus { display: flex; align-items: center; height: 100%; margin-left: 8px; }
-.mb-menus span {
-  display: flex; align-items: center; height: 100%; padding: 0 12px;
-  border-radius: 4px; cursor: default; transition: background 0.1s;
-}
-.mb-menus span:hover { background: rgba(255, 255, 255, 0.2); }
-.mb-app-name { font-weight: 700 !important; }
-
-.mb-right { display: flex; align-items: center; gap: 16px; height: 100%; }
-.mb-version { opacity: 0.6; font-size: 12px; }
-.mb-status-icons { display: flex; align-items: center; gap: 12px; opacity: 0.9; }
-.mb-clock { padding: 0 8px; border-radius: 4px; display: flex; align-items: center; height: 100%; cursor: default; }
-.mb-clock:hover { background: rgba(255, 255, 255, 0.2); }
-
-@media (max-width: 768px) {
-  .mb-menus span:not(.mb-app-name) { display: none; }
-  .mb-status-icons { display: none; }
-}
-
-.desktop-body {
-  position: relative; z-index: 10; flex: 1; padding: 18px 16px 100px;
-  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
-  overflow-y: auto;
-}
-.app-grid {
-  display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px 18px;
-  align-items: flex-end; justify-content: center; max-width: 1000px;
-}
-.desktop-icon-wrapper {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  opacity: 0; transform: translateY(20px);
-  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-play-state: paused;
-}
-.desktop-ready .desktop-icon-wrapper { animation-play-state: running; }
-.desktop-icon-label {
-  font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.92);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-  padding: 2px 6px; border-radius: 4px; transition: background 0.1s;
-}
-.desktop-icon-wrapper:hover .desktop-icon-label { background: rgba(47, 128, 255, 0.8); }
-@keyframes fade-in-up { to { opacity: 1; transform: none; } }
-
-.mac-icon {
-  position: relative; width: 78px; height: 78px; border-radius: 18px;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.2);
-  overflow: hidden; color: #fff;
-}
-.mac-icon-gloss {
-  position: absolute; top: 0; left: 0; right: 0; height: 50%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 100%);
-  pointer-events: none;
-}
-.mac-icon-glyph {
-  position: relative; z-index: 2; width: 40px; height: 40px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
-}
-
-.mac-dock-container {
-  position: absolute; bottom: 16px; left: 0; right: 0; z-index: 40;
-  display: flex; justify-content: center; pointer-events: none;
-}
-.mac-dock {
-  pointer-events: auto; display: flex; align-items: center; gap: 6px;
-  padding: 8px; border-radius: 24px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4);
-}
-.dock-section { display: flex; gap: 6px; align-items: center; }
-.dock-divider { width: 1px; height: 28px; background: rgba(255,255,255,0.15); border-radius: 1px; flex-shrink:0; }
-.dock-center { display: flex; gap: 4px; align-items: center; padding: 0 4px; }
-
-.dock-item-wrapper {
-  position: relative; display: flex; flex-direction: column; align-items: center;
-  cursor: grab; transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.dock-item-wrapper:active { cursor: grabbing; }
-.dock-item-wrapper.dragging { opacity: 0.35; transform: scale(0.9); }
-.dock-item-wrapper.drag-over .dock-item { border-color: rgba(47,128,255,0.6); box-shadow: 0 0 0 3px rgba(47,128,255,0.35); }
-
-.dock-item {
-  position: relative; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: bottom;
-}
-.dock-item:hover { transform: scale(1.25) translateY(-4px); z-index: 10; }
-.dock-icon { width: 54px; height: 54px; border-radius: 13px; transition: filter 0.2s; }
-.dock-item:active .dock-icon { filter: brightness(0.7); }
-.dock-active-dot {
-  width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.8);
-  margin-top: 3px; opacity: 0;
-}
-.dock-item-wrapper:nth-child(even) .dock-active-dot { opacity: 1; }
-
-.dock-center-item {
-  position: relative; height: 40px; min-width: 40px; padding: 0 8px;
-  border-radius: 14px; display: inline-flex; align-items: center; gap: 6px;
-  color: #cfd6e2; border: 1px solid rgba(255,255,255,0.12);
-  background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-  transition: all 0.2s; cursor: pointer;
-}
-.dock-center-item:hover {
-  color: #fff; border-color: var(--tone, #2F80FF);
-  box-shadow: 0 8px 22px -10px var(--tone, #2F80FF); transform: translateY(-3px);
-}
-.dock-center-item .dock-icon { width: 20px; height: 20px; border-radius: 6px; }
-.dock-center-item .mac-icon-glyph { width: 12px; height: 12px; }
-.dock-center-item .mac-icon-gloss { display: none; }
-.dock-center-tip {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
-  white-space: nowrap; color: inherit; display: none;
-}
-@media (min-width: 720px) { .dock-center-tip { display: inline; } }
-
-.dock-tooltip {
-  position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-50%) translateY(8px);
-  background: rgba(20, 20, 20, 0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  color: #fff; padding: 5px 10px; border-radius: 8px; font-size: 12px; font-weight: 500;
-  white-space: nowrap; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
-}
-.dock-item:hover .dock-tooltip, .dock-center-item:hover .dock-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
-.dock-tooltip::after {
-  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  border-width: 5px; border-style: solid; border-color: rgba(20,20,20,0.75) transparent transparent transparent;
-}
-
-@media (max-width: 767px) {
-  .mac-dock-container { display: none !important; }
-}
-
-.launch-window-overlay {
-  position: absolute; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  animation: fade-in 0.3s ease forwards;
-}
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-.launch-window {
-  width: min(800px, 90vw); height: min(500px, 80vh);
-  background: rgba(30, 30, 30, 0.9); backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.5);
-  display: flex; flex-direction: column; overflow: hidden;
-  animation: window-scale-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: center bottom;
-}
-@keyframes window-scale-up { from { opacity: 0; transform: scale(0.6) translateY(100px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-
-.window-titlebar {
-  height: 38px; display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
-  border-bottom: 1px solid rgba(0,0,0,0.4); position: relative;
-}
-.window-controls {
-  position: absolute; left: 16px; top: 0; bottom: 0;
-  display: flex; align-items: center; gap: 8px;
-}
-.wc { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1); }
-.wc.close { background: #FF5F56; }
-.wc.minimize { background: #FFBD2E; }
-.wc.maximize { background: #27C93F; }
-.window-title { font-size: 13px; font-weight: 600; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
-
-.window-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 32px; }
-.launch-bounce { width: 96px; height: 96px; border-radius: 22px; animation: bounce-soft 2s ease-in-out infinite; }
-.launch-bounce .mac-icon-glyph { width: 48px; height: 48px; }
-@keyframes bounce-soft { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-
-.spinner-ring {
-  width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.1);
-  border-top-color: var(--launch-color, #2F80FF); border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-
-/* ═══ 20x DESKTOP UPGRADE ═══ */
-
-/* Aurora atmosphere */
-.aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
-.aurora-blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;will-change:transform}
-.aurora-a{width:52vw;height:52vw;left:-12vw;top:-18vw;background:radial-gradient(circle,rgba(47,128,255,.32),transparent 65%);animation:auraA 26s ease-in-out infinite}
-.aurora-b{width:46vw;height:46vw;right:-10vw;top:8vh;background:radial-gradient(circle,rgba(153,69,255,.28),transparent 65%);animation:auraB 32s ease-in-out infinite}
-.aurora-c{width:40vw;height:40vw;left:28vw;bottom:-16vw;background:radial-gradient(circle,rgba(20,224,200,.16),transparent 65%);animation:auraA 38s ease-in-out infinite reverse}
-@keyframes auraA{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,4vh) scale(1.15)}}
-@keyframes auraB{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,6vh) scale(1.12)}}
-@media (prefers-reduced-motion: reduce){.aurora-blob{animation:none}}
-
-/* Starfield canvas sits above aurora, below UI */
-.starfield{position:absolute;inset:0;z-index:2;pointer-events:none}
-
-/* Layout: sections + widgets side by side */
-.desktop-flex{display:flex;gap:20px;align-items:flex-start;justify-content:stretch;width:100%;margin-top:16px}
-.widgets-col{display:none;flex-direction:column;gap:12px;width:300px;flex-shrink:0;animation:fadeSlide .6s .15s ease both;position:sticky;top:12px}
-@media(min-width:1024px){.widgets-col{display:flex}}
-
-/* Widget cards */
-.wg{border-radius:20px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(160deg,rgba(30,34,44,.62),rgba(12,14,18,.72));backdrop-filter:blur(22px) saturate(150%);box-shadow:0 18px 50px -22px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.08);padding:15px 16px;transition:transform .2s ease,border-color .2s ease}
-.wg:hover{transform:translateY(-2px);border-color:rgba(47,128,255,.32)}
-.wg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
-.wg-title{font-size:12px;font-weight:800;letter-spacing:.04em;color:rgba(255,255,255,.85)}
-.wg-link{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5aa2ff;text-decoration:none}
-.wg-link:hover{color:#8ec1ff}
-.wg-live{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:900;letter-spacing:.12em;color:#34d399}
-.wg-live i{width:5px;height:5px;border-radius:99px;background:#34d399;animation:pulse 2s infinite}
-.wg-empty{font-size:11px;color:rgba(255,255,255,.35);padding:8px 0}
-
-/* Clock widget */
-.wg-clock{text-align:center;padding:18px 16px}
-.wg-clock-time{font-size:34px;font-weight:900;letter-spacing:-.03em;color:#fff;text-shadow:0 2px 24px rgba(47,128,255,.35);font-variant-numeric:tabular-nums}
-.wg-clock-date{margin-top:2px;font-size:12px;font-weight:600;color:rgba(255,255,255,.5)}
-
-/* SOL widget */
-.wg-sol-price{font-size:30px;font-weight:900;letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums}
-.wg-sol-change{margin-top:2px;font-size:12px;font-weight:800}
-
-/* Trending rows */
-.wg-row{display:flex;align-items:center;gap:8px;padding:6px 0;text-decoration:none;border-radius:8px}
-.wg-row:hover .wg-sym{color:#8ec1ff}
-.wg-rank{width:14px;font-size:10px;font-weight:900;color:rgba(255,255,255,.3);text-align:center}
-.wg-sym{width:74px;font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s}
-.wg-bar{flex:1;height:5px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
-.wg-bar i{display:block;height:100%;border-radius:99px;transition:width .6s ease}
-.wg-chg{width:46px;text-align:right;font-size:11px;font-weight:900;font-variant-numeric:tabular-nums}
-
-/* Community posts */
-.wg-post{display:block;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);text-decoration:none}
-.wg-post:first-of-type{border-top:0}
-.wg-post-user{font-size:11px;font-weight:900;color:#5aa2ff;margin-right:6px}
-.wg-post-text{font-size:11.5px;color:rgba(255,255,255,.7);line-height:1.45}
-.wg-post-time{display:block;margin-top:2px;font-size:9px;font-weight:700;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:.08em}
-
-/* Icon hover: 3D lift + tone glow */
-.desktop-icon-wrapper .mac-icon{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease}
-.desktop-icon-wrapper:hover .mac-icon{transform:translateY(-7px) scale(1.09) rotateX(6deg);box-shadow:0 22px 44px -14px rgba(0,0,0,.8),0 0 34px -6px rgba(47,128,255,.4)}
-.desktop-icon-wrapper:active .mac-icon{transform:translateY(-2px) scale(1.02)}
-
-/* Dock magnification (pure CSS neighbor scaling) */
-.dock-center-item{transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
-.dock-center-item:hover{transform:translateY(-12px) scale(1.35);z-index:2}
-.dock-center-item:hover + .dock-center-item{transform:translateY(-5px) scale(1.14)}
-.dock-center-item:has(+ .dock-center-item:hover){transform:translateY(-5px) scale(1.14)}
-
-/* Context menu */
-.ctx-menu{position:fixed;z-index:95;min-width:210px;padding:6px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg,rgba(34,37,45,.97),rgba(18,20,25,.97));backdrop-filter:blur(24px);box-shadow:0 24px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08);animation:fadeSlide .14s ease both}
-.ctx-menu button{display:flex;align-items:center;justify-content:flex-start;gap:8px;width:100%;padding:8px 11px;border:0;border-radius:9px;background:transparent;color:rgba(255,255,255,.85);font-size:12.5px;font-weight:700;cursor:pointer;text-align:left}
-.ctx-menu button:hover{background:rgba(47,128,255,.22);color:#fff}
-.ctx-menu button span{margin-left:auto;font-size:10px;color:rgba(255,255,255,.35)}
-.ctx-sep{height:1px;margin:5px 8px;background:rgba(255,255,255,.09)}
-/* ── greeting chips ── */
-.hub-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px;animation:hubchips .5s .15s ease both}
-@keyframes hubchips{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.hub-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:rgba(10,14,24,.6);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.09);font-size:11px;font-weight:800;color:rgba(255,255,255,.85);letter-spacing:.01em}
-.hub-chip b{font-weight:900}
-.hub-chip-dot{width:6px;height:6px;border-radius:99px;display:inline-block;animation:hubdot 1.8s ease infinite}
-@keyframes hubdot{0%,100%{opacity:1}50%{opacity:.35}}
-.hub-chip-btn{cursor:pointer;font-family:inherit;transition:all .18s}
-.hub-chip-btn:hover{border-color:rgba(90,162,255,.4);background:rgba(47,128,255,.14);transform:translateY(-1px)}
-.hub-chip-orbitx{border-color:rgba(153,69,255,.35);background:rgba(153,69,255,.1)}
-.hub-chip-orbitx:hover{border-color:rgba(153,69,255,.55);background:rgba(153,69,255,.18)}
-.hub-chip-ca{opacity:.55;font-weight:700;font-size:10px;margin-left:1px}
-
-/* Compact mobile hub */
-@media (max-width: 768px) {
-  .desktop-body { padding: 14px 12px 92px; }
-  .hub-hero { flex-direction: column; align-items: flex-start; }
-  .hub-quick-actions { width: 100%; }
-  .hub-quick-btn { flex: 1 1 calc(50% - 4px); justify-content: center; min-width: 0; }
-  .hub-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hub-app-icon { width: 46px; height: 46px; border-radius: 12px; }
-  .hub-app-glyph { width: 24px; height: 24px; }
-}
-`;

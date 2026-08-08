@@ -19,8 +19,17 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#020915] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-og-lime" />
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-3"
+        style={{
+          background:
+            "radial-gradient(700px 360px at 50% -10%, rgba(94,234,212,.14), transparent 55%), #0b0d12",
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif',
+        }}
+      >
+        <Loader2 className="h-7 w-7 animate-spin text-teal-300" />
+        <p className="text-[13px] font-medium tracking-wide text-white/55">Opening OrbitX…</p>
       </div>
     );
   }
