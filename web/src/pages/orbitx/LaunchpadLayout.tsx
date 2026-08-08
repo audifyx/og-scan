@@ -30,7 +30,7 @@ import {
   IosRailBrand,
   IosRailLink,
   type IosTabItem,
-} from "@/components/ios/IosAppShell";
+} from "@/components/app-shell/IosAppShell";
 import "./orbitx-2026.css";
 
 const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [

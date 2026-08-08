@@ -20,7 +20,7 @@ import {
   IosRailBrand,
   IosRailLink,
   type IosTabItem,
-} from "@/components/ios/IosAppShell";
+} from "@/components/app-shell/IosAppShell";
 import "./marketplace.css";
 
 const CATS = ["All", ...NFT_CATEGORIES];

@@ -9,7 +9,7 @@ import {
   IosRailBrand,
   IosRailLink,
   type IosTabItem,
-} from "@/components/ios/IosAppShell";
+} from "@/components/app-shell/IosAppShell";
 import "./agent-shell.css";
 
 export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";

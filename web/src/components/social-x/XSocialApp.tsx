@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 import { PlatformLinks } from "@/components/theme/PlatformDock";
-import "@/components/ios/ios-app-shell.css";
+import "@/components/app-shell/ios-app-shell.css";
 import "./x-social.css";
 
 /* ── Lazy heavy tabs (reuse existing pages — zero functionality lost) ── */

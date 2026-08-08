@@ -4,7 +4,7 @@
  */
 import { lazy, Suspense } from "react";
 import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
-import { IosAppShell } from "@/components/ios/IosAppShell";
+import { IosAppShell } from "@/components/app-shell/IosAppShell";
 import "@/components/social-x/x-social.css";
 
 const XSocialApp = lazy(() => import("@/components/social-x/XSocialApp"));
