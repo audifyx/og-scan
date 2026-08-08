@@ -11,6 +11,7 @@ import {
   mplTokenMetadata, createNft, verifyCollectionV1, fetchDigitalAsset, findMetadataPda,
 } from "@metaplex-foundation/mpl-token-metadata";
 import { generateSigner, percentAmount, publicKey as umiPublicKey, some, none } from "@metaplex-foundation/umi";
+import { checkNftCollectionAntiVamp, checkNftItemAntiVamp } from "@/lib/orbitx/registry";
 
 export interface NftAttribute { trait_type: string; value: string }
 
@@ -23,6 +24,7 @@ export interface MintNftParams {
   royaltyBps: number;       // seller_fee_basis_points, on-chain
   collectionMint?: string;  // optional: mint address of an existing OrbitX collection NFT
   isCollection?: boolean;   // true when minting the collection's own NFT
+  chainId?: string;
 }
 
 export interface MintNftResult {
@@ -41,6 +43,10 @@ function buildUmi(connection: Connection, wallet: WalletAdapter) {
  * built by calling this once per copy (see LaunchpadNftCreate).
  */
 export async function mintNft(params: MintNftParams): Promise<MintNftResult> {
+  const originality = params.isCollection
+    ? await checkNftCollectionAntiVamp(params.name, params.symbol, { chainId: params.chainId })
+    : await checkNftItemAntiVamp(params.name, params.symbol, { chainId: params.chainId });
+  if (originality.blocked) throw new Error(`NFT identity collision: ${originality.hardMatch?.name ?? params.name}`);
   const umi = buildUmi(params.connection, params.wallet);
   const mint = generateSigner(umi);
 

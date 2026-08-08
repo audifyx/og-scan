@@ -76,4 +76,20 @@ describe("antiVampScore", () => {
     expect(isRelevantMarketCandidate("Random Cat Token", "RCAT", "Galaxy Explorer", "GALX")).toBe(false);
     expect(isRelevantMarketCandidate("Galaxy Coin", "GALX", "Galaxy Explorer", "GALX")).toBe(true);
   });
+
+  it("scores collection symbols with the same identity rules", () => {
+    const r = scoreIdentity("OrbitX Gallery", "OGAL", "OrbitX Gallery", "OGAL", "registry");
+    expect(r).toMatchObject({ sim: 1, hard: true, reason: "exact_name" });
+  });
+
+  it("keeps short unrelated ticker reuse non-blocking", () => {
+    const r = scoreIdentity("Base Cat", "CAT", "Polygon Dog", "CAT", "market");
+    expect(r).toMatchObject({ sim: 0, hard: false, reason: "none" });
+  });
+
+  it("marks near matches with an explainable reason", () => {
+    const r = scoreIdentity("OrbitX Anti Vamp", "AVMP", "OrbitX Anti-Vamp", "AVAMP", "market");
+    expect(r.hard).toBe(true);
+    expect(["exact_name", "near_exact_name", "near_exact_identity"]).toContain(r.reason);
+  });
 });

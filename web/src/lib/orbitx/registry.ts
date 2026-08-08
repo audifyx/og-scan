@@ -176,7 +176,7 @@ export async function isNameTaken(name: string): Promise<boolean> {
   }
 }
 
-export interface AntiVampSourceMatch { source: "orbitx" | "pumpfun" | "dexscreener"; name: string; ticker: string; sim: number }
+export interface AntiVampSourceMatch { source: "orbitx" | "pumpfun" | "dexscreener" | "denylist"; name: string; ticker: string; sim: number; hard?: boolean; chainId?: string; assetType?: "token" | "nft_collection" | "nft_item"; reason?: string }
 export interface AntiVampResult {
   blocked: boolean;
   flagged: boolean;
@@ -185,6 +185,10 @@ export interface AntiVampResult {
   message?: string;
   error?: string;
   warning?: string;
+  checkedChains?: string[];
+  checked?: string[];
+  sourceHealth?: Record<string, boolean>;
+  assetType?: "token" | "nft_collection" | "nft_item";
 }
 
 /**
@@ -200,11 +204,18 @@ export interface AntiVampResult {
  * OBX buyback wallet. On a network/server failure the endpoint fails OPEN
  * (blocked: false, warning set) so legitimate launches are not frozen.
  */
-export async function checkAntiVamp(name: string, ticker: string): Promise<AntiVampResult> {
+export interface AntiVampCheckOptions {
+  chainId?: string;
+  chainIds?: string[];
+  assetType?: "token" | "nft_collection" | "nft_item";
+  symbol?: string;
+}
+
+export async function checkAntiVamp(name: string, ticker = "", options: AntiVampCheckOptions = {}): Promise<AntiVampResult> {
   const res = await fetch("/api/orbitx/anti-vamp-check", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, ticker }),
+    body: JSON.stringify({ name, ticker, ...options }),
   });
   if (!res.ok) {
     return {
@@ -218,6 +229,15 @@ export async function checkAntiVamp(name: string, ticker: string): Promise<AntiV
   }
   return (await res.json()) as AntiVampResult;
 }
+
+export const retryAntiVampCheck = (name: string, ticker = "", options: AntiVampCheckOptions = {}) =>
+  checkAntiVamp(name, ticker, options);
+
+export const checkNftCollectionAntiVamp = (name: string, symbol: string, options: Omit<AntiVampCheckOptions, "assetType" | "symbol"> = {}) =>
+  checkAntiVamp(name, symbol, { ...options, symbol, assetType: "nft_collection" });
+
+export const checkNftItemAntiVamp = (name: string, symbol = "", options: Omit<AntiVampCheckOptions, "assetType" | "symbol"> = {}) =>
+  checkAntiVamp(name, symbol, { ...options, symbol, assetType: "nft_item" });
 
 /* ─────────────────────── referrals ─────────────────────── */
 

@@ -8,6 +8,38 @@ export const SOFT_MATCH_SIM = 0.72;
 
 /** OrbitX registry enforces unique name/ticker; market sources need fuller identity overlap. */
 export type VampMatchContext = "registry" | "market";
+export type AntiVampAssetType = "token" | "nft_collection" | "nft_item";
+
+export interface IdentityInput {
+  name: string;
+  ticker?: string;
+  symbol?: string;
+}
+
+export interface IdentityScore {
+  sim: number;
+  hard: boolean;
+  reason: "exact_name" | "exact_ticker" | "near_exact_name" | "near_exact_identity" | "soft_overlap" | "none";
+}
+
+/** Static emergency denylist. Keep small and reviewable; it is intentionally source-controlled. */
+export const KNOWN_VAMP_IDENTITIES: ReadonlyArray<{ name: string; ticker?: string; assetType?: AntiVampAssetType }> = [
+  { name: "orbitx", ticker: "obx" },
+  { name: "ogscan", ticker: "og" },
+];
+
+export function isKnownVampIdentity(input: IdentityInput, assetType: AntiVampAssetType = "token"): boolean {
+  const name = normalizeIdentity(input.name);
+  const ticker = normalizeIdentity(input.ticker ?? input.symbol ?? "");
+  return KNOWN_VAMP_IDENTITIES.some((entry) => {
+    if (entry.assetType && entry.assetType !== assetType) return false;
+    return normalizeIdentity(entry.name) === name || (!!ticker && normalizeIdentity(entry.ticker ?? "") === ticker);
+  });
+}
+
+export function identityField(input: IdentityInput): string {
+  return input.ticker ?? input.symbol ?? "";
+}
 
 export function normalizeIdentity(raw: string): string {
   const stripped = (raw || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -75,21 +107,21 @@ export function scoreIdentity(
   name: string,
   ticker: string,
   context: VampMatchContext = "market",
-): { sim: number; hard: boolean } {
+): IdentityScore {
   const nName = normalizeIdentity(name);
   const nTicker = normalizeIdentity(ticker);
   const nCandName = normalizeIdentity(candidateName);
   const nCandTicker = normalizeIdentity(candidateTicker);
 
-  if (!nName && !nTicker) return { sim: 0, hard: false };
+  if (!nName && !nTicker) return { sim: 0, hard: false, reason: "none" };
 
   const exactTicker = nTicker.length >= 2 && nCandTicker.length >= 2 && nCandTicker === nTicker;
   const exactName = nName.length >= 3 && nCandName.length >= 3 && nCandName === nName;
 
   if (context === "registry") {
-    if (exactTicker || exactName) return { sim: 1, hard: true };
+    if (exactTicker || exactName) return { sim: 1, hard: true, reason: exactName ? "exact_name" : "exact_ticker" };
   } else {
-    if (exactName) return { sim: 1, hard: true };
+    if (exactName) return { sim: 1, hard: true, reason: "exact_name" };
     if (exactTicker) {
       const nameSim = bigramSimilarity(nCandName, nName);
       const nameOverlap =
@@ -97,9 +129,9 @@ export function scoreIdentity(
         sharesIdentityFragment(nName, nCandName);
       if (!nameOverlap) {
         // Common ticker reuse (e.g. MOON, PEPE) with unrelated name — ignore.
-        return { sim: 0, hard: false };
+        return { sim: 0, hard: false, reason: "none" };
       }
-      return { sim: Math.max(nameSim, 0.88), hard: nameSim >= HARD_MATCH_SIM };
+      return { sim: Math.max(nameSim, 0.88), hard: nameSim >= HARD_MATCH_SIM, reason: nameSim >= HARD_MATCH_SIM ? "near_exact_name" : "soft_overlap" };
     }
   }
 
@@ -124,7 +156,7 @@ export function scoreIdentity(
     tickerSim >= SOFT_MATCH_SIM &&
     sim >= HARD_MATCH_SIM;
 
-  return { sim, hard: hardName || hardTicker || hardBoth };
+  return { sim, hard: hardName || hardTicker || hardBoth, reason: hardName ? "near_exact_name" : hardTicker ? "near_exact_identity" : hardBoth ? "near_exact_identity" : sim >= SOFT_MATCH_SIM ? "soft_overlap" : "none" };
 }
 
 /** Pre-filter market search hits before scoring — drops unrelated pump/dex noise. */

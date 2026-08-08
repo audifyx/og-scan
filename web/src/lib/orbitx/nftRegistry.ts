@@ -3,6 +3,7 @@
 // model as the token registry: reads are public, writes go through
 // SECURITY DEFINER RPCs.
 import { supabase } from "@/lib/supabase";
+import { checkNftCollectionAntiVamp, checkNftItemAntiVamp } from "@/lib/orbitx/registry";
 
 export interface OrbitxNftCollection {
   id: string;
@@ -93,9 +94,11 @@ export async function listActiveListings(): Promise<(OrbitxNftListing & { nft: O
 export interface RegisterNftCollectionInput {
   creator_wallet: string; name: string; symbol: string; description?: string;
   banner_url?: string; logo_url?: string; royalty_bps?: number; mint_price_sol?: number; mint_limit?: number | null;
-  mint_address: string;
+  mint_address: string; chainId?: string;
 }
 export async function registerNftCollection(input: RegisterNftCollectionInput): Promise<string> {
+  const originality = await checkNftCollectionAntiVamp(input.name, input.symbol, { chainId: input.chainId });
+  if (originality.blocked) throw new Error(`NFT collection identity is already registered: ${originality.hardMatch?.name ?? input.name}`);
   const { data, error } = await supabase.rpc("orbitx_register_nft_collection", {
     p_creator_wallet: input.creator_wallet, p_name: input.name, p_symbol: input.symbol,
     p_description: input.description ?? null, p_banner_url: input.banner_url ?? null, p_logo_url: input.logo_url ?? null,
@@ -109,9 +112,11 @@ export async function registerNftCollection(input: RegisterNftCollectionInput): 
 export interface RegisterNftInput {
   collection_id?: string | null; mint_address: string; creator_wallet: string; name: string;
   symbol?: string; image_url?: string; metadata_uri?: string; royalty_bps?: number;
-  attributes?: { trait_type: string; value: string }[]; content_hash?: string;
+  attributes?: { trait_type: string; value: string }[]; content_hash?: string; chainId?: string;
 }
 export async function registerNft(input: RegisterNftInput): Promise<string> {
+  const originality = await checkNftItemAntiVamp(input.name, input.symbol ?? "", { chainId: input.chainId });
+  if (originality.blocked) throw new Error(`NFT identity is already registered: ${originality.hardMatch?.name ?? input.name}`);
   const { data, error } = await supabase.rpc("orbitx_register_nft", {
     p_collection_id: input.collection_id ?? null, p_mint_address: input.mint_address, p_creator_wallet: input.creator_wallet,
     p_name: input.name, p_symbol: input.symbol ?? null, p_image_url: input.image_url ?? null,
