@@ -1,4 +1,4 @@
-import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle, Gamepad2, Sparkles,
+import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle, Gamepad2, Sparkles, Store,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/community", icon: Users, label: "Community" },
+  { to: "/x/shop", icon: Store, label: "Shop" },
   { to: "/messages", icon: MessageCircle, label: "Messages" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
@@ -21,6 +22,10 @@ const routeToNav: Record<string, string> = {
   "/app": "/app",
   "/home": "/app",
   "/command": "/app",
+
+  /* Credit shop */
+  "/x/shop": "/x/shop",
+  "/x": "/x/shop",
 
   /* Community — social, voice, discovery */
   "/community": "/community",
