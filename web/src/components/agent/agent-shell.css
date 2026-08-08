@@ -1005,3 +1005,79 @@
     display: none;
   }
 }
+
+/* ── iOS / web-app shell ── */
+.ox-agent.ox-agent-ios {
+  background: transparent !important;
+  min-height: 100dvh;
+  display: block !important;
+}
+
+.ox-agent-ios-frame {
+  display: flex;
+  min-height: 100dvh;
+  width: 100%;
+}
+
+.ox-agent-ios-rail {
+  display: none;
+}
+
+.ox-agent-ios-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.ox-agent-ios-body {
+  flex: 1;
+  padding: 0.85rem 1rem calc(var(--ios-tab-h, 52px) + env(safe-area-inset-bottom, 0px) + 1.25rem) !important;
+  overflow: auto;
+}
+
+.ox-agent-ios .ios-nav {
+  --ios-accent: #5eead4;
+}
+
+.ox-agent-ios .ios-tabbar.ox-agent-ios-tabbar {
+  width: 100%;
+  left: 0;
+  transform: none;
+}
+
+.ox-agent-ios .ox-agent__dock {
+  display: none !important;
+}
+
+.ox-agent-ios .ox-agent__rail,
+.ox-agent-ios .ox-agent__top {
+  display: none !important;
+}
+
+@media (min-width: 900px) {
+  .ox-agent-ios-rail {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    flex-shrink: 0;
+    padding: max(0.85rem, env(safe-area-inset-top)) 0.75rem 1rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(11, 13, 18, 0.72);
+    backdrop-filter: blur(20px) saturate(150%);
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow: auto;
+  }
+
+  .ox-agent-ios-tabbar,
+  .ox-agent-ios .ios-home-ind {
+    display: none !important;
+  }
+
+  .ox-agent-ios-body {
+    padding-bottom: 1.25rem !important;
+  }
+}

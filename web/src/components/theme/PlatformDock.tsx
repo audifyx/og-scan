@@ -11,11 +11,8 @@ const LINKS: { to: string; label: string; ico: string; match?: (p: string) => bo
   { to: "/x", label: "X", ico: "✕", match: (p) => p === "/x" || p.startsWith("/x/") },
 ];
 
+/* Surfaces with in-app tabs use PlatformLinks; dock only for desk routes. */
 const SHOW_ON = [
-  "/orbitxlaunch",
-  "/nft",
-  "/orbitx-social",
-  "/social",
   "/intel",
   "/trade",
   "/predictions",

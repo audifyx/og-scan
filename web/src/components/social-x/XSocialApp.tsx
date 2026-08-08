@@ -18,6 +18,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
+import { PlatformLinks } from "@/components/theme/PlatformDock";
+import "@/components/ios/ios-app-shell.css";
 import "./x-social.css";
 
 /* ── Lazy heavy tabs (reuse existing pages — zero functionality lost) ── */
@@ -1269,6 +1271,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <span className="hidden text-[17px] font-black tracking-tight xl:block">OrbitX</span>
             <a href="/app" className="ml-auto hidden rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/50 transition hover:bg-white/[0.06] hover:text-white xl:block">Hub</a>
           </div>
+          <div className="mb-2 hidden px-2 xl:block">
+            <PlatformLinks className="ox-platform-links--compact" />
+          </div>
           {NAV.map((n) => (
             <button
               key={n.id}
@@ -1405,28 +1410,40 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         </aside>
       )}
 
-      {/* ── Mobile slim top bar (brand + Hub escape; no tab duplicates) ── */}
-      <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b border-white/[0.06] bg-black/80 px-4 py-2 backdrop-blur-xl sm:hidden">
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#2ee6c5] to-[#3b82f6] text-[13px] font-black text-black">O</span>
-          <span className="text-[15px] font-black tracking-tight text-white">OrbitX</span>
-        </div>
-        <div className="flex items-center gap-1">
+      {/* ── Mobile iOS nav (title + Back on nested tabs) ── */}
+      <header className="ios-nav ox-x-ios-nav fixed inset-x-0 top-0 z-30 sm:hidden">
+        {!CORE_TABS.includes(tab) ? (
+          <button
+            type="button"
+            className="ios-nav__back"
+            onClick={() => { setTab("home"); setMoreOpen(false); }}
+          >
+            <span className="ios-nav__back-ico" aria-hidden>‹</span>
+            Back
+          </button>
+        ) : (
+          <span className="flex items-center gap-1.5 pl-1">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#2ee6c5] to-[#3b82f6] text-[13px] font-black text-black">O</span>
+          </span>
+        )}
+        <h1 className="ios-nav__title">
+          {NAV.find((n) => n.id === tab)?.label ?? "Social"}
+        </h1>
+        <div className="ios-nav__trail">
           <button
             type="button"
             onClick={() => { setTab("notifications"); setMoreOpen(false); }}
             aria-label="Notifications"
-            className={cn("relative rounded-full p-2 transition", tab === "notifications" ? "text-[#2ee6c5]" : "text-white/40 hover:text-white")}
+            className={cn("ios-nav__btn relative", tab === "notifications" && "text-[#2ee6c5]")}
           >
             <Bell className="h-4 w-4" />
             {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#2ee6c5] px-1 text-[9px] font-black text-black ring-2 ring-black">{unread > 9 ? "9+" : unread}</span>
+              <span className="absolute right-0.5 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#2ee6c5] px-1 text-[9px] font-black text-black">{unread > 9 ? "9+" : unread}</span>
             )}
           </button>
-          <a href="/settings" className="rounded-full p-2 text-white/40 transition hover:text-white"><Settings className="h-4 w-4" /></a>
-          <a href="/app" className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/60 transition hover:bg-white/[0.06] hover:text-white">Hub</a>
+          <a href="/app" className="ios-nav__btn text-[12px] !min-h-0 py-2">Hub</a>
         </div>
-      </div>
+      </header>
 
       {/* ── Mobile bottom nav: floating centered rounded slider pill ── */}
       <nav className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center sm:hidden">

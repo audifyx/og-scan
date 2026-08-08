@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
 import { PlatformLinks } from "@/components/theme/PlatformDock";
+import {
+  IosAppShell,
+  IosNav,
+  IosTabBar,
+  IosRailBrand,
+  IosRailLink,
+  type IosTabItem,
+} from "@/components/ios/IosAppShell";
 import "./agent-shell.css";
 
 export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";
@@ -55,6 +63,8 @@ export function AgentShell({
   topSubtitle = "Dashboard · Claude · ChatGPT · Grok",
   children,
 }: Props) {
+  const loc = useLocation();
+  const navigate = useNavigate();
   const nav = (tabs?.length ? tabs : DEFAULT_TABS).map((t) => ({
     id: t.id,
     label: t.label,
@@ -66,131 +76,133 @@ export function AgentShell({
       ? { href: "/agent", label: "Agent" }
       : { href: "/x", label: "X MCP" };
 
-  return (
-    <div className={`ox-agent${showTabs ? " ox-agent--dash" : " ox-agent--simple"}`}>
-      <div className="ox-agent__atmosphere" aria-hidden />
+  const title = showTabs
+    ? nav.find((t) => t.id === activeTab)?.label || brandSub
+    : brandSub;
 
-      {showTabs && onTabChange && (
-        <aside className="ox-agent__rail" aria-label="Navigation">
-          <Link to={brandHref} className="ox-agent__brand">
-            <span className="ox-agent__brand-mark" aria-hidden>
-              <img src="/orbitx-banner.jpg" alt="" />
-            </span>
-            <span className="ox-agent__brand-text">
-              <span className="ox-agent__brand-title">
-                Orbit<span>X</span>
-              </span>
-              <span className="ox-agent__brand-sub">{brandSub}</span>
-            </span>
-          </Link>
+  const detailPaths = ["/agent/", "/x/"];
+  const isDetail =
+    detailPaths.some((p) => loc.pathname.startsWith(p) && loc.pathname !== brandHref && loc.pathname !== `${brandHref}/`) &&
+    !showTabs;
 
-          <nav className="ox-agent__nav">
-            {nav.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={`ox-agent__nav-btn${activeTab === t.id ? " is-active" : ""}`}
-                onClick={() => onTabChange(t.id)}
-              >
-                <span className="ox-agent__nav-ico" aria-hidden>
-                  {t.ico}
-                </span>
-                <span className="ox-agent__nav-label">{t.label}</span>
-              </button>
-            ))}
-          </nav>
+  const mobileTabs: IosTabItem[] = nav.map((t) => ({
+    id: t.id,
+    label: t.label,
+    ico: t.ico,
+  }));
 
-          <div className="ox-agent__rail-foot">
-            <span className={`ox-agent__pill${statusWarn ? " is-warn" : " is-ok"}`}>
-              <span className="ox-agent__pill-dot" />
-              {statusLabel}
-            </span>
-            <div className="ox-agent__rail-links">
-              <Link to={railSibling.href}>{railSibling.label}</Link>
-              <Link to="/app">Hub</Link>
-            </div>
-          </div>
-        </aside>
-      )}
+  const accent = brandHref === "/x" ? "teal" : "teal";
 
-      <div className="ox-agent__stage">
-        <header className="ox-agent__top">
-          <div className="ox-agent__top-left">
-            {!showTabs && (
-              <Link to={brandHref} className="ox-agent__brand ox-agent__brand--compact">
-                <span className="ox-agent__brand-title">
-                  Orbit<span>X</span>
-                </span>
-                <span className="ox-agent__brand-sub">{brandSub}</span>
-              </Link>
-            )}
-            {showTabs && (
-              <div className="ox-agent__top-title">
-                <h1>{nav.find((t) => t.id === activeTab)?.label || brandSub}</h1>
-                <p>{topSubtitle}</p>
-              </div>
-            )}
-          </div>
-          <div className="ox-agent__top-actions">
-            <PlatformLinks />
-            <PlatformThemeButton compact />
-            <span className={`ox-agent__pill ox-agent__pill--top${statusWarn ? " is-warn" : " is-ok"}`}>
-              <span className="ox-agent__pill-dot" />
-              {statusLabel}
-            </span>
-            {onRefresh && (
-              <button type="button" className="ox-agent__icon-btn" onClick={onRefresh} aria-label="Refresh" title="Refresh">
-                ↻
-              </button>
-            )}
-            <Link to={siblingHref} className="ox-agent__icon-btn" aria-label={siblingLabel} title={siblingLabel}>
-              {siblingIcon}
+  const rail =
+    showTabs && onTabChange ? (
+      <>
+        <IosRailBrand href={brandHref} title="OrbitX" subtitle={brandSub} />
+        {nav.map((t) => (
+          <IosRailLink
+            key={t.id}
+            label={t.label}
+            ico={t.ico}
+            active={activeTab === t.id}
+            onClick={() => onTabChange(t.id)}
+          />
+        ))}
+        <div className="mt-auto pt-4 space-y-2">
+          <span className={`ox-agent__pill${statusWarn ? " is-warn" : " is-ok"}`}>
+            <span className="ox-agent__pill-dot" />
+            {statusLabel}
+          </span>
+          <div className="flex flex-col gap-1 px-1 text-[12px]">
+            <Link to={railSibling.href} className="text-white/70 hover:text-white">
+              {railSibling.label}
             </Link>
-            <Link to="/app" className="ox-agent__btn ox-agent__btn--ghost ox-agent__hub-link">
+            <Link to="/app" className="text-white/70 hover:text-white">
               Hub
             </Link>
           </div>
-        </header>
+          <PlatformLinks className="ox-platform-links--compact flex-col !items-stretch" />
+        </div>
+      </>
+    ) : null;
 
-        <main className="ox-agent__main">{children}</main>
+  return (
+    <IosAppShell accent={accent} wide className={`ox-agent ox-agent-ios${showTabs ? " ox-agent--dash" : " ox-agent--simple"}`}>
+      <div className="ox-agent-ios-frame">
+        {rail ? (
+          <aside className="ox-agent-ios-rail" aria-label="Navigation">
+            {rail}
+          </aside>
+        ) : null}
 
-        <footer className="ox-agent__footer">
-          <div className="ox-agent__footer-inner">
-            <div className="ox-agent__footer-brand">{footerBrand}</div>
-            <div className="ox-agent__footer-links">
-              <Link to="/app">Hub</Link>
-              <Link to="/agent">Agent</Link>
-              <Link to="/x">X MCP</Link>
-              <a href="/ORBITX_DEX">DEX</a>
-              <Link to="/orbitxlaunch">Launch</Link>
-              <Link to="/nft">NFT</Link>
-              <a href={mcpUrl} target="_blank" rel="noopener noreferrer">
-                MCP URL
-              </a>
+        <div className="ox-agent-ios-main">
+          <IosNav
+            title={title}
+            canBack={isDetail || (!showTabs && loc.pathname !== brandHref)}
+            onBack={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate(brandHref);
+            }}
+            trail={
+              <>
+                <PlatformLinks className="hidden xl:flex" />
+                <PlatformThemeButton compact />
+                <span className={`ox-agent__pill ox-agent__pill--top${statusWarn ? " is-warn" : " is-ok"}`}>
+                  <span className="ox-agent__pill-dot" />
+                  {statusLabel}
+                </span>
+                {onRefresh && (
+                  <button type="button" className="ios-nav__btn" onClick={onRefresh} aria-label="Refresh" title="Refresh">
+                    ↻
+                  </button>
+                )}
+                <Link to={siblingHref} className="ios-nav__btn" aria-label={siblingLabel} title={siblingLabel}>
+                  {siblingIcon}
+                </Link>
+                <Link to="/app" className="ios-nav__btn hidden sm:inline-flex">
+                  Hub
+                </Link>
+              </>
+            }
+          />
+
+          {showTabs ? (
+            <p className="ios-subhead px-4 pt-1 md:hidden">{topSubtitle}</p>
+          ) : null}
+
+          <main className="ox-agent__main ox-agent-ios-body">
+            {showTabs ? <h2 className="ios-large-title md:hidden">{title}</h2> : null}
+            {children}
+          </main>
+
+          <footer className="ox-agent__footer hidden md:block">
+            <div className="ox-agent__footer-inner">
+              <div className="ox-agent__footer-brand">{footerBrand}</div>
+              <div className="ox-agent__footer-links">
+                <Link to="/app">Hub</Link>
+                <Link to="/agent">Agent</Link>
+                <Link to="/x">X MCP</Link>
+                <a href="/ORBITX_DEX">DEX</a>
+                <Link to="/orbitxlaunch">Launch</Link>
+                <Link to="/nft">NFT</Link>
+                <a href={mcpUrl} target="_blank" rel="noopener noreferrer">
+                  MCP URL
+                </a>
+              </div>
+              <p className="ox-agent__footer-note">{footerNote}</p>
             </div>
-            <p className="ox-agent__footer-note">{footerNote}</p>
-          </div>
-        </footer>
-      </div>
+          </footer>
 
-      {showTabs && onTabChange && (
-        <nav className="ox-agent__dock" aria-label="Sections">
-          {nav.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`ox-agent__dock-btn${activeTab === t.id ? " is-active" : ""}`}
-              onClick={() => onTabChange(t.id)}
-            >
-              <span className="ox-agent__dock-ico" aria-hidden>
-                {t.ico}
-              </span>
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </nav>
-      )}
-    </div>
+          {showTabs && onTabChange ? (
+            <IosTabBar
+              tabs={mobileTabs}
+              activeId={activeTab}
+              onChange={onTabChange}
+              className="ox-agent-ios-tabbar"
+            />
+          ) : null}
+          <div className="ios-home-ind" aria-hidden />
+        </div>
+      </div>
+    </IosAppShell>
   );
 }
 

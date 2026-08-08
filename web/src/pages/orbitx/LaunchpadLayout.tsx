@@ -1,16 +1,16 @@
-// OrbitX Launchpad shell — black / metal chrome (gold · blue · silver).
+// OrbitX Launchpad — iOS mobile + desktop web-app shell
 import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionBadge";
-import { NavLink, Outlet, Link, useSearchParams } from "react-router-dom";
+import { NavLink, Outlet, Link, useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useMemo } from "react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { useEvmWallet } from "@/hooks/useEvmWallet";
 import { linkEvmToSolana } from "@/lib/orbitx/walletLink";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { toast } from "sonner";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Link2, Plus,
+  Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Link2, Plus,
   Twitter, Send, Github, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,14 @@ import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
 import { useAuth } from "@/hooks/useAuth";
 import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
 import { PlatformLinks } from "@/components/theme/PlatformDock";
+import {
+  IosAppShell,
+  IosNav,
+  IosTabBar,
+  IosRailBrand,
+  IosRailLink,
+  type IosTabItem,
+} from "@/components/ios/IosAppShell";
 import "./orbitx-2026.css";
 
 const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [
@@ -63,74 +71,36 @@ type TabDef = {
   accent?: "gold";
 };
 
-function HeaderStats() {
-  const tel = useChainTelemetry();
-  const solUsd = useSolUsd();
-  const ok = tel.data?.ok ?? false;
-  return (
-    <div className="ox-header-stats hidden md:flex" aria-label="Network stats">
-      <span className="ox-header-stat">
-        <span className={`ox-header-stat-dot ${ok ? "ox-header-stat-dot--ok" : "ox-header-stat-dot--bad"}`} />
-        {ok ? "Solana live" : "Degraded"}
-      </span>
-      <span className="ox-header-stat ox-header-stat--dim">
-        SOL ${solUsd.data ? solUsd.data.price.toFixed(2) : "—"}
-      </span>
-      <span className="ox-header-stat ox-header-stat--dim">
-        {fmtUsd(ORBITX_FEE_USD)} launch
-      </span>
-      <span className="ox-header-stat ox-header-stat--dim">
-        {(CREATOR_FEE_BPS / 100).toFixed(2)}% trade
-      </span>
-    </div>
-  );
-}
+const MOBILE_TABS: IosTabItem[] = [
+  { id: "board", to: "/orbitxlaunch", label: "Board", ico: "⌂", end: true },
+  { id: "create", to: "/orbitxlaunch/create", label: "Create", ico: "✦" },
+  { id: "claim", to: "/orbitxlaunch/claim", label: "Claim", ico: "◎" },
+  { id: "bag", to: "/orbitxlaunch/portfolio", label: "Bag", ico: "▣" },
+  { id: "you", to: "/orbitxlaunch/profile", label: "You", ico: "◉" },
+];
 
-function TabRail({ isAdmin }: { isAdmin: boolean }) {
-  return (
-    <nav className="ox-tab-groups" aria-label="Launchpad sections">
-      {TAB_GROUPS.map((group, gi) => (
-        <div key={group.id} className="ox-tab-group">
-          <span className="ox-tab-group-label">{group.label}</span>
-          <div className="ox-tab-group-items">
-            {group.tabs.map((t) => (
-              <NavLink
-                key={t.to}
-                to={t.to}
-                end={t.end}
-                className={({ isActive }) =>
-                  cn(
-                    "ox-launch-tab",
-                    isActive && "ox-launch-tab--on",
-                    t.hot && !isActive && "ox-launch-tab--hot",
-                    t.accent === "gold" && !isActive && "ox-launch-tab--accent",
-                  )
-                }
-              >
-                <t.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span>{t.label}</span>
-              </NavLink>
-            ))}
-          </div>
-          {gi < TAB_GROUPS.length - 1 && <span className="ox-tab-group-divider" aria-hidden />}
-        </div>
-      ))}
-      {isAdmin && (
-        <div className="ox-tab-group ox-tab-group--admin">
-          <span className="ox-tab-group-label">Admin</span>
-          <div className="ox-tab-group-items">
-            <NavLink
-              to="/orbitxlaunch/ox-desk-m4k9q"
-              className={({ isActive }) => cn("ox-launch-tab", isActive && "ox-launch-tab--on")}
-            >
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span>Desk</span>
-            </NavLink>
-          </div>
-        </div>
-      )}
-    </nav>
+const ROOT_PATHS = new Set([
+  "/orbitxlaunch",
+  "/orbitxlaunch/",
+  "/orbitxlaunch/leaderboard",
+  "/orbitxlaunch/create",
+  "/orbitxlaunch/claim",
+  "/orbitxlaunch/rescue",
+  "/orbitxlaunch/portfolio",
+  "/orbitxlaunch/profile",
+  "/orbitxlaunch/about",
+  "/orbitxlaunch/ox-desk-m4k9q",
+]);
+
+function titleFor(pathname: string): string {
+  const flat = TAB_GROUPS.flatMap((g) => g.tabs);
+  const hit = flat.find((t) =>
+    t.end ? pathname === t.to || pathname === `${t.to}/` : pathname === t.to || pathname.startsWith(`${t.to}/`),
   );
+  if (hit) return hit.label;
+  if (pathname.includes("/ox-desk")) return "Desk";
+  if (pathname.includes("/coin") || pathname.includes("/token")) return "Coin";
+  return "Launchpad";
 }
 
 function WalletConsole() {
@@ -195,13 +165,13 @@ function EvmWalletButton() {
   }, [publicKey, account]);
   if (!shown) {
     return (
-      <button type="button" onClick={openConnect} className="ox-ghost-btn hidden md:inline-flex">
+      <button type="button" onClick={openConnect} className="ox-ghost-btn hidden lg:inline-flex">
         <Link2 className="h-3.5 w-3.5" /> EVM
       </button>
     );
   }
   return (
-    <div className="ox-wallet-chip hidden md:flex" data-tone="evm">
+    <div className="ox-wallet-chip hidden lg:flex" data-tone="evm">
       <span className="ox-wallet-dot" style={{ background: "#627EEA", boxShadow: "0 0 8px #627EEA" }} />
       <div className="leading-none">
         <div className="pf-mono text-[11px] font-bold text-white">{shortAddr(shown)}</div>
@@ -217,7 +187,7 @@ function NetworkStrip() {
   const solUsd = useSolUsd();
   const ok = tel.data?.ok ?? false;
   return (
-    <div className="ox-ticker">
+    <div className="ox-ticker hidden md:block">
       <div className="ox-ticker-track">
         {Array.from({ length: 2 }).map((_, dup) => (
           <span key={dup} className="inline-flex items-center gap-6 pf-mono text-[11px] uppercase tracking-wide">
@@ -279,7 +249,7 @@ function FooterCol({ title, links }: { title: string; links: [string, string][] 
 function LaunchpadFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="ox-footer">
+    <footer className="ox-footer hidden md:block">
       <div className="ox-footer-inner">
         <div>
           <div className="ox-footer-brand">Orbit<span>X</span></div>
@@ -329,9 +299,13 @@ function LaunchpadFooter() {
 
 export default function LaunchpadLayout() {
   const { isAdmin } = useAdmin();
+  const loc = useLocation();
+  const navigate = useNavigate();
   const headerRef = useRef<HTMLElement | null>(null);
+  const title = useMemo(() => titleFor(loc.pathname), [loc.pathname]);
+  const normalized = loc.pathname.replace(/\/$/, "") || "/orbitxlaunch";
+  const isRoot = ROOT_PATHS.has(normalized) || ROOT_PATHS.has(loc.pathname);
 
-  // Keep board search / sticky panels clear of the sticky launch header.
   useLayoutEffect(() => {
     const el = headerRef.current;
     if (!el) return;
@@ -348,55 +322,135 @@ export default function LaunchpadLayout() {
       window.removeEventListener("resize", apply);
       document.documentElement.style.removeProperty("--ox-lp-header-h");
     };
-  }, []);
+  }, [title, canBack]);
+
+  const rail = (
+    <>
+      <IosRailBrand href="/orbitxlaunch" title="OrbitX" subtitle="Launchpad" />
+      {TAB_GROUPS.map((group) => (
+        <div key={group.id} className="mb-2">
+          <div className="ios-group__label px-2" style={{ margin: "0.5rem 0 0.25rem 0.35rem" }}>
+            {group.label}
+          </div>
+          {group.tabs.map((t) => (
+            <IosRailLink
+              key={t.to}
+              to={t.to}
+              label={t.label}
+              ico={<t.icon className="h-4 w-4" />}
+              active={t.end ? loc.pathname === t.to || loc.pathname === `${t.to}/` : loc.pathname.startsWith(t.to)}
+            />
+          ))}
+        </div>
+      ))}
+      {isAdmin && (
+        <IosRailLink
+          to="/orbitxlaunch/ox-desk-m4k9q"
+          label="Desk"
+          ico={<ShieldCheck className="h-4 w-4" />}
+          active={loc.pathname.includes("ox-desk")}
+        />
+      )}
+      <div className="mt-auto pt-4">
+        <PlatformLinks className="ox-platform-links--compact flex-col !items-stretch" />
+      </div>
+    </>
+  );
 
   return (
-    <div className="lp-classic lp-classic relative flex min-h-screen flex-col">
-      <ReferralCapture />
-      <NetworkStrip />
+    <IosAppShell accent="gold" wide className="lp-classic lp-ios">
+      <div className="lp-ios-frame">
+        <aside className="lp-ios-rail" aria-label="Launchpad">
+          {rail}
+        </aside>
 
-      <header ref={headerRef} className="ox-launch-header sticky top-0 z-40">
-        <div className="ox-shell-inner ox-launch-header-row">
-          <Link to="/orbitxlaunch" className="ox-brand group shrink-0">
-            <div className="ox-brand-mark">
-              <Rocket className="h-4 w-4" strokeWidth={2.8} />
-            </div>
-            <div className="leading-tight">
-              <div className="ox-brand-name">
-                Orbit<span>X</span>
+        <div className="lp-ios-main">
+          <ReferralCapture />
+          <NetworkStrip />
+
+          <header ref={headerRef}>
+            <IosNav
+              title={title}
+              canBack={!isRoot}
+              onBack={() => {
+                if (window.history.length > 1) navigate(-1);
+                else navigate("/orbitxlaunch");
+              }}
+              trail={
+                <>
+                  <PlatformLinks className="ox-platform-links--compact hidden xl:flex" />
+                  <PlatformThemeButton compact />
+                  <AntiVampProtectionBadge />
+                  <Link to="/orbitxlaunch/create" className="ios-nav__btn hidden sm:inline-flex" title="Create">
+                    <Plus className="h-4 w-4" strokeWidth={3} />
+                  </Link>
+                  <EvmWalletButton />
+                  <WalletConsole />
+                </>
+              }
+            />
+
+            {/* Desktop secondary strip — section tabs */}
+            <div className="ox-launch-tabbar lp-ios-desk-tabs">
+              <div className="ox-shell-inner">
+                <nav className="ox-tab-groups" aria-label="Launchpad sections">
+                  {TAB_GROUPS.map((group, gi) => (
+                    <div key={group.id} className="ox-tab-group">
+                      <span className="ox-tab-group-label">{group.label}</span>
+                      <div className="ox-tab-group-items">
+                        {group.tabs.map((t) => (
+                          <NavLink
+                            key={t.to}
+                            to={t.to}
+                            end={t.end}
+                            className={({ isActive }) =>
+                              cn(
+                                "ox-launch-tab",
+                                isActive && "ox-launch-tab--on",
+                                t.hot && !isActive && "ox-launch-tab--hot",
+                                t.accent === "gold" && !isActive && "ox-launch-tab--accent",
+                              )
+                            }
+                          >
+                            <t.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            <span>{t.label}</span>
+                          </NavLink>
+                        ))}
+                      </div>
+                      {gi < TAB_GROUPS.length - 1 && <span className="ox-tab-group-divider" aria-hidden />}
+                    </div>
+                  ))}
+                  {isAdmin && (
+                    <div className="ox-tab-group ox-tab-group--admin">
+                      <span className="ox-tab-group-label">Admin</span>
+                      <div className="ox-tab-group-items">
+                        <NavLink
+                          to="/orbitxlaunch/ox-desk-m4k9q"
+                          className={({ isActive }) => cn("ox-launch-tab", isActive && "ox-launch-tab--on")}
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          <span>Desk</span>
+                        </NavLink>
+                      </div>
+                    </div>
+                  )}
+                </nav>
               </div>
-              <div className="ox-brand-sub">launchpad</div>
             </div>
-          </Link>
+          </header>
 
-          <HeaderStats />
-
-          <div className="ox-shell-actions shrink-0">
-            <PlatformLinks className="ox-platform-links--compact" />
-            <PlatformThemeButton compact />
-            <AntiVampProtectionBadge />
-            <Link to="/orbitxlaunch/create" className="ox-create-cta">
-              <Plus className="h-4 w-4" strokeWidth={3} />
-              <span className="hidden sm:inline">Create coin</span>
-              <span className="sm:hidden">Create</span>
-            </Link>
-            <EvmWalletButton />
-            <WalletConsole />
+          <div className="ox-shell-main flex-1 lp-ios-body">
+            {!isRoot ? null : (
+              <h2 className="ios-large-title px-4 pt-2 md:hidden">{title}</h2>
+            )}
+            <Outlet />
           </div>
-        </div>
 
-        <div className="ox-launch-tabbar">
-          <div className="ox-shell-inner">
-            <TabRail isAdmin={!!isAdmin} />
-          </div>
+          <LaunchpadFooter />
+          <IosTabBar tabs={MOBILE_TABS} pathname={loc.pathname} className="lp-ios-tabbar" />
+          <div className="ios-home-ind" aria-hidden />
         </div>
-      </header>
-
-      <div className="ox-shell-main flex-1">
-        <Outlet />
       </div>
-
-      <LaunchpadFooter />
-    </div>
+    </IosAppShell>
   );
 }

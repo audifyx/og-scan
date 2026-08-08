@@ -178,3 +178,15 @@
   background-size: 200% 100%;
   animation: xShim 1.4s ease infinite;
 }
+
+/* iOS nav alignment inside Social */
+.ox-x-social .ox-x-ios-nav {
+  --ios-accent: #2ee6c5;
+  --ios-line: rgba(255, 255, 255, 0.08);
+  --ios-safe-t: env(safe-area-inset-top, 0px);
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.ox-x-social .ox-x-ios-nav .ios-nav__title {
+  font-family: var(--oxs-font-display);
+}
