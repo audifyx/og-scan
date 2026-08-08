@@ -27,6 +27,14 @@ import {
   buildAgentAuthPasteMessages,
   wrapMcpToolContent,
 } from "./orbitx/mcp-brand.js";
+import {
+  ORBITX_MINT,
+  askBuyOrbitxAmount,
+  prepareBuyOrbitx,
+  saveTradeIntent,
+  loadLatestTradeIntent,
+  getChatTradeAuto,
+} from "./orbitx/buy-orbitx.js";
 
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -1257,6 +1265,13 @@ const TOOL_ALIASES = {
   orbitx_sell: "orbitx_prepare_sell",
   orbitx_buy_auto: "orbitx_prepare_buy",
   orbitx_sell_pump: "orbitx_prepare_sell",
+  "buy orbitx": "orbitx_buy_orbitx",
+  "buy $orbitx": "orbitx_buy_orbitx",
+  buy_orbitx: "orbitx_buy_orbitx",
+  buyorbitx: "orbitx_buy_orbitx",
+  confirm_buy: "orbitx_confirm_buy",
+  "confirm buy": "orbitx_confirm_buy",
+  "yes buy": "orbitx_confirm_buy",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_community: "orbitx_social_create_community",
   orbitx_post_community: "orbitx_social_post",
@@ -1786,6 +1801,47 @@ const CORE_TOOLS = [
         slippage: { type: "number", default: 10 },
       },
       required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_buy_orbitx",
+    description:
+      "Buy official $ORBITX with SOL. When the user says buy $ORBITX / buy orbitx — ASK how much SOL, then whether they want to sign manually or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Phantom immediately. Mint is fixed to official ORBITX.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        amountSol: { type: "number", description: "SOL to spend on $ORBITX" },
+        publicKey: { type: "string", description: "Buyer wallet (optional if linked on /agent)" },
+        confirmMode: {
+          type: "string",
+          enum: ["sign", "auto"],
+          description: "sign = tap Sign on page; auto = open link and Phantom pops (chat auto-confirm)",
+        },
+        autoConfirm: {
+          type: "boolean",
+          description: "If true, same as confirmMode=auto",
+        },
+        slippage: { type: "number", default: 10 },
+        askOnly: {
+          type: "boolean",
+          description: "If true or amountSol omitted, return the ask-how-much prompt",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_confirm_buy",
+    description:
+      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after orbitx_buy_orbitx. Re-prepares the buy and returns autoSignUrl (Phantom auto-prompt). Pass amountSol if known; otherwise uses the last pending intent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        amountSol: { type: "number", description: "SOL amount (optional if a pending intent exists)" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+      },
+      additionalProperties: false,
     },
   },
   {
@@ -2675,7 +2731,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_create_token_pump",
         "orbitx_create_token_custom",
       ],
-      trade: ["orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
+      trade: ["orbitx_buy_orbitx", "orbitx_confirm_buy", "orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
       media: [
         "orbitx_generate_image",
@@ -2879,6 +2935,91 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     };
   }
 
+  if (name === "orbitx_buy_orbitx") {
+    const askOnly = args.askOnly === true || args.amountSol == null || args.amountSol === "";
+    if (askOnly) return askBuyOrbitxAmount();
+    let preferAuto = false;
+    if (auth?.agentId) {
+      try {
+        preferAuto = await getChatTradeAuto(sb, auth.agentId);
+      } catch {
+        preferAuto = false;
+      }
+    }
+    const confirmMode =
+      args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || (preferAuto ? "auto" : "sign");
+    const out = await prepareBuyOrbitx({
+      base,
+      wallet,
+      amountSol: args.amountSol ?? args.sol ?? args.amount,
+      slippage: args.slippage,
+      pool: args.pool || "auto",
+      confirmMode,
+      preferAuto,
+      fetchJson,
+    });
+    if (out.ok && auth?.userId) {
+      try {
+        await saveTradeIntent(sb, auth.userId, {
+          mint: ORBITX_MINT,
+          amountSol: out.amountSol,
+          confirmMode: out.confirmMode,
+          slippage: out.slippage,
+          pool: out.pool,
+        });
+      } catch {
+        /* optional */
+      }
+    }
+    return out;
+  }
+
+  if (name === "orbitx_confirm_buy") {
+    let amountSol = args.amountSol ?? args.sol ?? args.amount;
+    let slippage = Number(args.slippage) || 10;
+    let pool = args.pool || "auto";
+    if ((amountSol == null || amountSol === "") && auth?.userId) {
+      const intent = await loadLatestTradeIntent(sb, auth.userId, { mint: ORBITX_MINT });
+      if (intent) {
+        amountSol = Number(intent.amount_sol);
+        slippage = Number(intent.slippage) || slippage;
+        pool = intent.pool || pool;
+      }
+    }
+    if (amountSol == null || amountSol === "") {
+      return {
+        ok: false,
+        error: "no_pending_buy",
+        message:
+          "No pending $ORBITX buy. Ask how much SOL, call orbitx_buy_orbitx, then confirm — or pass amountSol here.",
+      };
+    }
+    const out = await prepareBuyOrbitx({
+      base,
+      wallet,
+      amountSol,
+      slippage,
+      pool,
+      confirmMode: "auto",
+      preferAuto: true,
+      fetchJson,
+    });
+    if (out.ok && auth?.userId) {
+      try {
+        await saveTradeIntent(sb, auth.userId, {
+          mint: ORBITX_MINT,
+          amountSol: out.amountSol,
+          confirmMode: "auto",
+          slippage: out.slippage,
+          pool: out.pool,
+        });
+      } catch {
+        /* optional */
+      }
+    }
+    return out;
+  }
+
   if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
     const action = name === "orbitx_prepare_buy" ? "buy" : "sell";
@@ -2921,12 +3062,16 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       pool: String(pool),
     });
     const signUrl = `${base}/agent/sign?${signQs.toString()}`;
+    const autoQs = new URLSearchParams(signQs);
+    autoQs.set("auto", "1");
+    const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
     // Do NOT return the raw base64 tx to the model — Claude may try to "buy" without Phantom.
     return {
       ok: true,
       status: "awaiting_phantom_signature",
       requiresSignature: true,
       signUrl,
+      autoSignUrl,
       action,
       wallet,
       mint,
@@ -2938,8 +3083,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       simulated: Boolean(data.simulated),
       hasUnsignedTx: true,
       instructions: [
-        "Open signUrl in the user's browser.",
-        "User connects Phantom and clicks Sign & send.",
+        "Open signUrl in the user's browser (or autoSignUrl to auto-prompt Phantom).",
+        "User connects Phantom and clicks Sign & send (auto mode prompts immediately).",
         "Do NOT broadcast or submit any unsigned transaction yourself.",
         "Trade is incomplete until Phantom confirms a signature.",
       ],
@@ -3833,9 +3978,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.3.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.4.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu and show the markdown (banner + command board). If the user pastes an authCode (from the OrbitX /agent dashboard), call orbitx_auth_status with it — do NOT open a website — then pass that authCode on every later tool (stays linked). Only if they have no authCode: call orbitx_auth_link and send the url. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. Buy $ORBITX: when they say buy $ORBITX / buy orbitx, ASK how much SOL and whether they want manual sign or auto-confirm, then call orbitx_buy_orbitx. For auto/chat confirm send openUrl/autoSignUrl (Phantom pops on open). When they say yes/confirm/go ahead, call orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
           },
         },
         200,

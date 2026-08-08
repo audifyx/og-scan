@@ -50,6 +50,13 @@ import {
   MIN_SOL,
   MAX_SOL,
 } from "./orbitx/x-credits.js";
+import {
+  ORBITX_MINT,
+  askBuyOrbitxAmount,
+  prepareBuyOrbitx,
+  saveTradeIntent,
+  loadLatestTradeIntent,
+} from "./orbitx/buy-orbitx.js";
 
 export const config = { maxDuration: 60 };
 
@@ -468,6 +475,39 @@ const TOOLS = [
     },
     annotations: { title: "Credits usage", readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: "x_buy_orbitx",
+    description:
+      "Buy official $ORBITX with SOL. When the user says buy $ORBITX — ASK how much SOL and whether they want manual sign or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Phantom immediately. Requires wallet linked on /agent (or publicKey).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        amountSol: { type: "number", description: "SOL to spend on $ORBITX" },
+        publicKey: { type: "string", description: "Buyer wallet (optional if linked on /agent)" },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean", description: "Same as confirmMode=auto" },
+        slippage: { type: "number", default: 10 },
+        askOnly: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Buy $ORBITX", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_confirm_buy",
+    description:
+      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after x_buy_orbitx. Returns autoSignUrl (Phantom auto-prompt).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Confirm $ORBITX buy", readOnlyHint: false, openWorldHint: true },
+  },
 ];
 
 const AUTH_CODE_PROP = {
@@ -489,6 +529,13 @@ const X_TOOL_ALIASES = {
   "advanced usage": "x_credits_usage",
   credits: "x_credits_balance",
   balance: "x_credits_balance",
+  "buy orbitx": "x_buy_orbitx",
+  "buy $orbitx": "x_buy_orbitx",
+  buy_orbitx: "x_buy_orbitx",
+  buyorbitx: "x_buy_orbitx",
+  confirm_buy: "x_confirm_buy",
+  "confirm buy": "x_confirm_buy",
+  "yes buy": "x_confirm_buy",
 };
 
 function listToolsForMcp() {
@@ -1592,6 +1639,118 @@ async function callTool(rawName, args, auth, req = null) {
     } catch (e) {
       return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
     }
+  }
+
+  if (name === "x_buy_orbitx") {
+    const askOnly = a.askOnly === true || a.amountSol == null || a.amountSol === "";
+    if (askOnly) return askBuyOrbitxAmount();
+    let wallet = String(a.publicKey || a.wallet || "").trim();
+    if (!wallet) {
+      try {
+        const agent = await ensureAgent(auth.userId);
+        wallet = String(agent?.wallet_address || "").trim();
+      } catch {
+        /* ignore */
+      }
+    }
+    const confirmMode = a.autoConfirm === true || a.auto === true ? "auto" : a.confirmMode || "sign";
+    const fetchJson = async (url, init) => {
+      const r = await fetch(url, init);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const err = new Error(data?.error || data?.message || `HTTP ${r.status}`);
+        err.data = data;
+        throw err;
+      }
+      return data;
+    };
+    const out = await prepareBuyOrbitx({
+      base: MCP_HOST,
+      wallet,
+      amountSol: a.amountSol ?? a.sol ?? a.amount,
+      slippage: a.slippage,
+      pool: a.pool || "auto",
+      confirmMode,
+      fetchJson,
+    });
+    if (out.ok && auth.userId) {
+      try {
+        await saveTradeIntent(sb, auth.userId, {
+          mint: ORBITX_MINT,
+          amountSol: out.amountSol,
+          confirmMode: out.confirmMode,
+          slippage: out.slippage,
+          pool: out.pool,
+        });
+      } catch {
+        /* optional */
+      }
+    }
+    return out;
+  }
+
+  if (name === "x_confirm_buy") {
+    let amountSol = a.amountSol ?? a.sol ?? a.amount;
+    let slippage = Number(a.slippage) || 10;
+    let pool = a.pool || "auto";
+    if ((amountSol == null || amountSol === "") && auth.userId) {
+      const intent = await loadLatestTradeIntent(sb, auth.userId, { mint: ORBITX_MINT });
+      if (intent) {
+        amountSol = Number(intent.amount_sol);
+        slippage = Number(intent.slippage) || slippage;
+        pool = intent.pool || pool;
+      }
+    }
+    if (amountSol == null || amountSol === "") {
+      return {
+        ok: false,
+        error: "no_pending_buy",
+        message: "No pending $ORBITX buy. Ask how much SOL, call x_buy_orbitx, then confirm.",
+      };
+    }
+    let wallet = String(a.publicKey || a.wallet || "").trim();
+    if (!wallet) {
+      try {
+        const agent = await ensureAgent(auth.userId);
+        wallet = String(agent?.wallet_address || "").trim();
+      } catch {
+        /* ignore */
+      }
+    }
+    const fetchJson = async (url, init) => {
+      const r = await fetch(url, init);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const err = new Error(data?.error || data?.message || `HTTP ${r.status}`);
+        err.data = data;
+        throw err;
+      }
+      return data;
+    };
+    const out = await prepareBuyOrbitx({
+      base: MCP_HOST,
+      wallet,
+      amountSol,
+      slippage,
+      pool,
+      confirmMode: "auto",
+      preferAuto: true,
+      fetchJson,
+    });
+    if (out.ok && auth.userId) {
+      try {
+        await saveTradeIntent(sb, auth.userId, {
+          mint: ORBITX_MINT,
+          amountSol: out.amountSol,
+          confirmMode: "auto",
+          slippage: out.slippage,
+          pool: out.pool,
+        });
+      } catch {
+        /* optional */
+      }
+    }
+    return out;
   }
 
   if (name === "x_post" || name === "x_quote" || name === "x_reply") {
@@ -3017,7 +3176,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: "OrbitX X MCP", version: "1.4.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X, run the NVIDIA agent, and buy credits with SOL. When the user says /, menu, or asks what you can do, call x_menu. If they paste an authCode from /x, call x_auth_status — do NOT open a website — then pass authCode on every x_* tool. Buy credits: when they want to buy/top up, ASK how much SOL (any amount), call x_credits_buy, help them pay the platform wallet, then x_credits_confirm — credits apply automatically. Advanced usage: x_credits_usage. Setup: https://www.orbitx.world/x · Shop: https://www.orbitx.world/shop",
+              "OrbitX X MCP — post/DM on X, NVIDIA agent, buy credits, and buy $ORBITX. When the user says /, menu, or asks what you can do, call x_menu. If they paste an authCode from /x, call x_auth_status — do NOT open a website — then pass authCode on every x_* tool. Buy credits: ASK SOL amount → x_credits_buy → pay → x_credits_confirm. Buy $ORBITX: ASK how much SOL + sign vs auto-confirm → x_buy_orbitx; for yes/confirm/auto call x_confirm_buy and send openUrl/autoSignUrl (Phantom pops). Setup: https://www.orbitx.world/x",
           },
         },
         200,

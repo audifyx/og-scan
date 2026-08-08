@@ -38,6 +38,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     "║    chart · ath · research · leaderboard          ║",
     "╠══════════════════════════════════════════════════╣",
     "║  TRADE                                               ║",
+    "║    orbitx_buy_orbitx · confirm_buy (chat auto)   ║",
     "║    orbitx_prepare_buy / sell · claim · burn      ║",
     "╠══════════════════════════════════════════════════╣",
     "║  LAUNCH                                              ║",
@@ -54,6 +55,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `Setup · ${ORBITX_HOST}/agent`,
     `MCP URL · ${ORBITX_HOST}/api/mcp`,
     ``,
+    `_Buy $ORBITX: say “buy $ORBITX” → AI asks SOL amount + sign vs auto → orbitx_buy_orbitx. Say “confirm” / “auto” → orbitx_confirm_buy opens Phantom._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
 }
@@ -96,6 +98,10 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     "║    x_credits_confirm · signature → auto credit    ║",
     "║    x_credits_balance · balance                    ║",
     "║    x_credits_usage   · advanced usage / ledger    ║",
+    "╠══════════════════════════════════════════════════╣",
+    "║  BUY $ORBITX                                         ║",
+    "║    x_buy_orbitx      · ask SOL · sign or auto     ║",
+    "║    x_confirm_buy     · yes/confirm → Phantom auto ║",
     "╠══════════════════════════════════════════════════╣",
     "║  HELP                                                 ║",
     "║    x_help · search · fetch                       ║",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
@@ -36,11 +36,16 @@ export default function AgentSignPage() {
   const expectedWallet = (params.get("publicKey") || "").trim();
   const slippage = Math.min(Math.max(Number(params.get("slippage")) || 10, 1), 50);
   const pool = params.get("pool") || "auto";
+  const autoPrompt =
+    params.get("auto") === "1" ||
+    params.get("auto") === "true" ||
+    params.get("autoconfirm") === "1";
 
   const [busyTrade, setBusyTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [extraNote, setExtraNote] = useState<string | null>(null);
+  const autoStarted = useRef(false);
 
   const wallet = publicKey?.toBase58() || "";
   const walletMismatch = Boolean(expectedWallet && wallet && expectedWallet !== wallet);
@@ -183,16 +188,31 @@ export default function AgentSignPage() {
     }
   };
 
+  /* Chat auto-confirm: ?auto=1 opens Phantom as soon as wallet is ready */
+  useEffect(() => {
+    if (!autoPrompt || autoStarted.current) return;
+    if (!valid || !connected || !publicKey || walletMismatch || busyTrade || signature) return;
+    autoStarted.current = true;
+    const t = window.setTimeout(() => {
+      void onSign();
+    }, 450);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once when wallet becomes ready
+  }, [autoPrompt, valid, connected, publicKey, walletMismatch, busyTrade, signature]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#070a10] p-4 text-white">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c111a] p-6 shadow-2xl">
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
-          <h1 className="text-xl font-black tracking-tight">Sign with Phantom</h1>
+          <h1 className="text-xl font-black tracking-tight">
+            {autoPrompt ? "Auto-confirm buy" : "Sign with Phantom"}
+          </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
-          OrbitX prepared an unsigned {title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you
-          sign.
+          {autoPrompt
+            ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected. Nothing broadcasts until you approve."
+            : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
