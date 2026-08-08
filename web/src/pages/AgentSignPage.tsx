@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Transaction, VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { Check, ExternalLink, Loader2, ShieldAlert, Wallet } from "lucide-react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { PLATFORM_WALLET } from "@/lib/platformFee";
+import { supabase } from "@/lib/supabase";
 
-type Kind = "trade" | "claim" | "burn" | "rent";
+type Kind = "trade" | "claim" | "burn" | "rent" | "credits";
 
 function decodeTx(b64: string): VersionedTransaction | Transaction {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -17,8 +19,8 @@ function decodeTx(b64: string): VersionedTransaction | Transaction {
 }
 
 /**
- * MCP handoff — rebuild unsigned tx (trade / claim / burn / rent), sign in Phantom.
- * Query: kind, action, mint, amount, percent, publicKey, slippage, pool
+ * MCP handoff — rebuild unsigned tx (trade / credits / claim / burn / rent), sign in Phantom.
+ * Query: kind, action, mint, amount, percent, publicKey, slippage, pool, auto
  */
 export default function AgentSignPage() {
   const [params] = useSearchParams();
@@ -28,7 +30,13 @@ export default function AgentSignPage() {
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();
   const kind: Kind =
-    kindParam === "claim" || kindParam === "burn" || kindParam === "rent" ? kindParam : "trade";
+    kindParam === "claim" ||
+    kindParam === "burn" ||
+    kindParam === "rent" ||
+    kindParam === "credits" ||
+    kindParam === "credit"
+      ? (kindParam === "credit" ? "credits" : kindParam)
+      : "trade";
   const action = params.get("action") === "sell" ? "sell" : "buy";
   const mint = (params.get("mint") || "").trim();
   const amountRaw = (params.get("amount") || "").trim();
@@ -51,6 +59,11 @@ export default function AgentSignPage() {
   const walletMismatch = Boolean(expectedWallet && wallet && expectedWallet !== wallet);
 
   const amountLabel = useMemo(() => {
+    if (kind === "credits") {
+      const sol = Number(amountRaw);
+      const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
+      return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
+    }
     if (kind === "claim") return "creator fees";
     if (kind === "rent") return "close empty ATAs";
     if (kind === "burn") {
@@ -63,23 +76,28 @@ export default function AgentSignPage() {
   }, [kind, action, amountRaw, percentRaw]);
 
   const valid = useMemo(() => {
+    if (kind === "credits") {
+      const sol = Number(amountRaw);
+      return Number.isFinite(sol) && sol >= 0.001;
+    }
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
   }, [kind, mint, amountRaw, percentRaw]);
 
   const title =
-    kind === "claim"
-      ? "Claim fees"
-      : kind === "burn"
-        ? "Burn tokens"
-        : kind === "rent"
-          ? "Rent refund"
-          : action.toUpperCase();
+    kind === "credits"
+      ? "Buy credits"
+      : kind === "claim"
+        ? "Claim fees"
+        : kind === "burn"
+          ? "Burn tokens"
+          : kind === "rent"
+            ? "Rent refund"
+            : action.toUpperCase();
 
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
-    // Prefer sendTransaction (signAndSend) — same path as TradingTerminal.
     if (sendTransaction) {
       return sendTransaction(tx as VersionedTransaction, connection, {
         skipPreflight: false,
@@ -117,6 +135,65 @@ export default function AgentSignPage() {
     setBusyTrade(true);
     try {
       const pk = publicKey.toBase58();
+
+      if (kind === "credits") {
+        const sol = Number(amountRaw);
+        if (!Number.isFinite(sol) || sol < 0.001) throw new Error("Invalid SOL amount");
+        const lamports = Math.round(sol * 1e9);
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+        const tx = new Transaction({
+          feePayer: publicKey,
+          recentBlockhash: blockhash,
+        }).add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: new PublicKey(PLATFORM_WALLET),
+            lamports,
+          }),
+        );
+        let sig: string;
+        if (sendTransaction) {
+          sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
+        } else if (signTransaction) {
+          const signed = await signTransaction(tx);
+          sig = await connection.sendRawTransaction(signed.serialize(), {
+            skipPreflight: false,
+            maxRetries: 3,
+          });
+        } else {
+          throw new Error("This wallet cannot sign here — open in Phantom.");
+        }
+        await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+        setSignature(sig);
+
+        // Credit the account (session user, or wallet-linked agent user)
+        try {
+          const session = (await supabase.auth.getSession()).data.session;
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+          const res = await fetch("/api/orbitx-agent/credits/confirm", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ signature: sig, publicKey: pk }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data?.ok) {
+            setExtraNote(
+              data.message ||
+                `+${Number(data.creditsAdded || 0).toLocaleString()} credits added. Balance: ${Number(data.balance || 0).toLocaleString()}`,
+            );
+          } else {
+            setExtraNote(
+              "Payment sent. Tell Grok your signature to finish crediting, or open /x Usage → Confirm payment.",
+            );
+          }
+        } catch {
+          setExtraNote(
+            "Payment sent. Tell Grok your signature to finish crediting, or open /x Usage → Confirm payment.",
+          );
+        }
+        return;
+      }
 
       if (kind === "trade") {
         const amount =
@@ -188,7 +265,6 @@ export default function AgentSignPage() {
     }
   };
 
-  /* Chat auto-confirm: ?auto=1 opens Phantom as soon as wallet is ready */
   useEffect(() => {
     if (!autoPrompt || autoStarted.current) return;
     if (!valid || !connected || !publicKey || walletMismatch || busyTrade || signature) return;
@@ -197,7 +273,7 @@ export default function AgentSignPage() {
       void onSign();
     }, 450);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once when wallet becomes ready
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPrompt, valid, connected, publicKey, walletMismatch, busyTrade, signature]);
 
   return (
@@ -206,19 +282,28 @@ export default function AgentSignPage() {
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
           <h1 className="text-xl font-black tracking-tight">
-            {autoPrompt ? "Auto-confirm buy" : "Sign with Phantom"}
+            {autoPrompt ? "Auto-confirm" : "Sign with Phantom"}
           </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
-          {autoPrompt
-            ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected. Nothing broadcasts until you approve."
-            : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
+          {kind === "credits"
+            ? autoPrompt
+              ? "Chat auto-confirm — Phantom will send SOL to the OrbitX desk wallet, then credits apply."
+              : "Approve the SOL transfer to the OrbitX desk wallet. Credits credit after confirmation."
+            : autoPrompt
+              ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
+              : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
           <Row label="Action" value={title} />
           <Row label="Detail" value={amountLabel} />
-          {mint ? <Row label="Mint" value={`${mint.slice(0, 6)}…${mint.slice(-4)}`} mono /> : null}
+          {kind === "credits" ? (
+            <Row label="Pay to" value={`${PLATFORM_WALLET.slice(0, 6)}…${PLATFORM_WALLET.slice(-4)}`} mono />
+          ) : null}
+          {mint && kind !== "credits" ? (
+            <Row label="Mint" value={`${mint.slice(0, 6)}…${mint.slice(-4)}`} mono />
+          ) : null}
           {kind === "trade" ? <Row label="Slippage" value={`${slippage}%`} /> : null}
           {expectedWallet ? (
             <Row label="Wallet" value={`${expectedWallet.slice(0, 4)}…${expectedWallet.slice(-4)}`} mono />
@@ -258,6 +343,13 @@ export default function AgentSignPage() {
             >
               {signature} <ExternalLink className="h-3 w-3 shrink-0" />
             </a>
+            {kind === "credits" ? (
+              <p className="mt-2 text-[11px] text-white/45">
+                <Link to="/x?tab=usage" className="text-emerald-200/90 hover:underline">
+                  View usage / balance
+                </Link>
+              </p>
+            ) : null}
           </div>
         ) : (
           <>
@@ -289,8 +381,8 @@ export default function AgentSignPage() {
         )}
 
         <p className="mt-4 text-center text-[11px] text-white/35">
-          <Link to="/agent" className="text-white/50 hover:underline">
-            Back to Agent MCP
+          <Link to={kind === "credits" ? "/x?tab=usage" : "/agent"} className="text-white/50 hover:underline">
+            {kind === "credits" ? "Back to Usage" : "Back to Agent MCP"}
           </Link>
         </p>
       </div>

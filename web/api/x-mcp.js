@@ -45,6 +45,7 @@ import {
   getCreditsUsage,
   confirmCreditsPurchase,
   creditsBuyPrompt,
+  prepareCreditsMcpPurchase,
   PLATFORM_CREDITS_WALLET,
   CREDITS_PER_SOL,
   MIN_SOL,
@@ -421,7 +422,7 @@ const TOOLS = [
   {
     name: "x_credits_buy",
     description:
-      "Buy OrbitX X MCP credits with SOL. When the user says they want to buy credits / shop / top up — ASK how much SOL (any amount), then call this with solAmount. Returns pay-to wallet + unsigned transfer (if publicKey). After they pay, call x_credits_confirm with the signature — credits credit automatically.",
+      "Buy OrbitX MCP credits with SOL to the desk wallet. When the user says buy credits / top up — ASK how many credits OR how much SOL, then call this. Returns Phantom signUrl/autoSignUrl that starts the SOL transfer. After pay, call x_credits_confirm (or sign page credits automatically).",
     inputSchema: {
       type: "object",
       properties: {
@@ -429,13 +430,17 @@ const TOOLS = [
           type: "number",
           description: `SOL to spend (any amount ${MIN_SOL}–${MAX_SOL}). 1 SOL = ${CREDITS_PER_SOL} credits.`,
         },
+        credits: { type: "number", description: "Credit count to buy (converted to SOL)" },
+        amount: { type: "number", description: "Alias: credits if >=10, else SOL" },
         publicKey: {
           type: "string",
-          description: "Optional buyer wallet — builds an unsigned SystemProgram.transfer for them to sign",
+          description: "Buyer wallet (optional if linked on /agent)",
         },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean" },
         askOnly: {
           type: "boolean",
-          description: "If true (or solAmount omitted), return the ask-how-much prompt only",
+          description: "If true (or amount omitted), return the ask-how-much prompt only",
         },
       },
       additionalProperties: false,
@@ -1578,35 +1583,42 @@ async function callTool(rawName, args, auth, req = null) {
   }
 
   if (name === "x_credits_buy") {
-    const askOnly = a.askOnly === true || a.solAmount == null || a.solAmount === "";
+    const askOnly =
+      a.askOnly === true ||
+      (a.solAmount == null && a.credits == null && a.amount == null && a.sol == null);
     if (askOnly) return creditsBuyPrompt();
-    const solAmount = Number(a.solAmount ?? a.sol ?? a.amount);
-    const publicKey = String(a.publicKey || a.wallet || a.from || "").trim();
-    if (publicKey) {
+    let wallet = String(a.publicKey || a.wallet || a.from || "").trim();
+    if (!wallet) {
       try {
-        return await buildBuyTransaction({ fromPubkey: publicKey, solAmount });
-      } catch (e) {
-        const q = quoteCredits(solAmount);
-        return {
-          ...q,
-          buildError: e?.message || "could_not_build_tx",
-          message: q.ok
-            ? `Send ${q.solAmount} SOL to ${q.payTo}, then call x_credits_confirm with the signature.`
-            : q.message,
-        };
+        const agent = await ensureAgent(auth.userId);
+        wallet = String(agent?.wallet_address || "").trim();
+      } catch {
+        /* ignore */
       }
     }
-    const q = quoteCredits(solAmount);
-    if (!q.ok) return q;
-    return {
-      ...q,
-      message: `Send ${q.solAmount} SOL (~${q.credits} credits) to ${q.payTo}. After confirmation, call x_credits_confirm with the tx signature.`,
-      instructionsForAi: [
-        "Show the user the payTo address, SOL amount, and credits they will receive.",
-        "Help them send the transfer from their wallet.",
-        "When they have a signature, call x_credits_confirm.",
-      ],
-    };
+    const prepared = prepareCreditsMcpPurchase({
+      base: MCP_HOST,
+      wallet,
+      solAmount: a.solAmount ?? a.sol,
+      credits: a.credits,
+      amount: a.amount,
+      confirmMode: a.autoConfirm === true || a.auto === true ? "auto" : a.confirmMode || "sign",
+    });
+    if (prepared.ok && wallet) {
+      try {
+        const built = await buildBuyTransaction({
+          fromPubkey: wallet,
+          solAmount: prepared.solAmount,
+        });
+        if (built?.ok && built.transactionBase64) {
+          prepared.transactionBase64 = built.transactionBase64;
+          prepared.hasUnsignedTx = true;
+        }
+      } catch {
+        /* signUrl is enough */
+      }
+    }
+    return prepared;
   }
 
   if (name === "x_credits_confirm") {
@@ -3176,7 +3188,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: "OrbitX X MCP", version: "1.4.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X, NVIDIA agent, buy credits, and buy $ORBITX. When the user says /, menu, or asks what you can do, call x_menu. If they paste an authCode from /x, call x_auth_status — do NOT open a website — then pass authCode on every x_* tool. Buy credits: ASK SOL amount → x_credits_buy → pay → x_credits_confirm. Buy $ORBITX: ASK how much SOL + sign vs auto-confirm → x_buy_orbitx; for yes/confirm/auto call x_confirm_buy and send openUrl/autoSignUrl (Phantom pops). Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — post/DM on X, NVIDIA agent, buy credits, and buy $ORBITX. When the user says /, menu, or asks what you can do, call x_menu. If they paste an authCode from /x, call x_auth_status — do NOT open a website — then pass authCode on every x_* tool. Buy credits: ASK credits count or SOL → x_credits_buy → send openUrl/signUrl (Phantom sends SOL to desk wallet) → x_credits_confirm. Buy $ORBITX: ASK SOL + sign vs auto → x_buy_orbitx; yes/confirm → x_confirm_buy. Setup: https://www.orbitx.world/x",
           },
         },
         200,

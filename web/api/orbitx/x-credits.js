@@ -358,11 +358,108 @@ export function creditsBuyPrompt() {
     ok: true,
     action: "ask_amount",
     message:
-      "Ask the user how much SOL they want to spend on OrbitX X MCP credits (any amount). Then call x_credits_buy with solAmount (and publicKey if they share a wallet).",
+      "Ask how many credits they want (or how much SOL). Then call orbitx_credits_buy / x_credits_buy with credits or solAmount. That starts a Phantom sign link which sends SOL to the OrbitX desk wallet.",
     minSol: MIN_SOL,
     maxSol: MAX_SOL,
     creditsPerSol: CREDITS_PER_SOL,
     payTo: PLATFORM_CREDITS_WALLET,
-    example: "x_credits_buy with solAmount: 0.1 → 1,000 credits",
+    examples: [
+      "buy 5000 credits → solAmount 0.5",
+      "buy 0.1 SOL of credits → 1,000 credits",
+      "auto confirm → openUrl with ?auto=1 (Phantom pops)",
+    ],
+  };
+}
+
+/** Accept either SOL or credit count. */
+export function resolvePurchaseAmount({ solAmount, credits, amount } = {}) {
+  if (solAmount != null && solAmount !== "") {
+    return quoteCredits(solAmount);
+  }
+  const creditN = Number(credits ?? (amount != null && Number(amount) >= 10 ? amount : NaN));
+  if (Number.isFinite(creditN) && creditN >= 1) {
+    const sol = creditN / CREDITS_PER_SOL;
+    const q = quoteCredits(sol);
+    if (!q.ok) return q;
+    return { ...q, requestedCredits: Math.floor(creditN) };
+  }
+  const maybeSol = Number(amount);
+  if (Number.isFinite(maybeSol) && maybeSol > 0 && maybeSol < 10) {
+    return quoteCredits(maybeSol);
+  }
+  return {
+    ok: false,
+    error: "amount_required",
+    message: "Pass solAmount (SOL) or credits (count). Example: credits: 5000 or solAmount: 0.5",
+  };
+}
+
+/**
+ * MCP handoff — quote + Phantom sign URLs (SOL → desk wallet → auto credit on confirm).
+ */
+export function prepareCreditsMcpPurchase({
+  base = "https://www.orbitx.world",
+  wallet,
+  solAmount,
+  credits,
+  amount,
+  confirmMode = "sign",
+  preferAuto = false,
+} = {}) {
+  const pk = String(wallet || "").trim();
+  if (!pk || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pk)) {
+    return {
+      ok: false,
+      error: "wallet_required",
+      message: "Link a Solana wallet on https://www.orbitx.world/agent (or pass publicKey).",
+      fixUrl: "https://www.orbitx.world/agent",
+      payTo: PLATFORM_CREDITS_WALLET,
+    };
+  }
+  const q = resolvePurchaseAmount({ solAmount, credits, amount });
+  if (!q.ok) return q;
+
+  const modeRaw = String(confirmMode || "").toLowerCase();
+  const mode =
+    preferAuto || modeRaw === "auto" || modeRaw === "automatic" || modeRaw === "chat"
+      ? "auto"
+      : "sign";
+
+  const qs = new URLSearchParams({
+    kind: "credits",
+    amount: String(q.solAmount),
+    publicKey: pk,
+  });
+  const signUrl = `${base}/agent/sign?${qs.toString()}`;
+  const autoQs = new URLSearchParams(qs);
+  autoQs.set("auto", "1");
+  const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
+  const openUrl = mode === "auto" ? autoSignUrl : signUrl;
+
+  return {
+    ok: true,
+    status: mode === "auto" ? "awaiting_auto_phantom" : "awaiting_phantom_signature",
+    requiresSignature: true,
+    confirmMode: mode,
+    ...q,
+    wallet: pk,
+    signUrl,
+    autoSignUrl,
+    openUrl,
+    instructions:
+      mode === "auto"
+        ? [
+            "Send the user openUrl / autoSignUrl as a clickable link.",
+            "Opening it auto-prompts Phantom to send SOL to the OrbitX desk wallet.",
+            "After Phantom confirms, call orbitx_credits_confirm / x_credits_confirm with the signature (or the sign page credits them if signed in).",
+          ]
+        : [
+            "Send the user signUrl as a clickable link.",
+            "They approve the SOL transfer to the desk wallet in Phantom.",
+            "If they say yes/confirm/auto — call again with confirmMode=auto, or call orbitx_credits_confirm after they pay.",
+          ],
+    note: `Non-custodial. SOL goes to ${PLATFORM_CREDITS_WALLET}. Credits apply after the payment is confirmed.`,
+    usageUrl: "https://www.orbitx.world/x?tab=usage",
+    shopUrl: "https://www.orbitx.world/shop",
   };
 }

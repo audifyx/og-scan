@@ -35,6 +35,15 @@ import {
   loadLatestTradeIntent,
   getChatTradeAuto,
 } from "./orbitx/buy-orbitx.js";
+import {
+  creditsBuyPrompt,
+  prepareCreditsMcpPurchase,
+  confirmCreditsPurchase,
+  getCreditsBalance,
+  getCreditsUsage,
+  PLATFORM_CREDITS_WALLET,
+  CREDITS_PER_SOL,
+} from "./orbitx/x-credits.js";
 
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -438,6 +447,66 @@ async function handleAgent(req, res, parts) {
       return json(res, { error: e?.message || "Failed to create agent", agent: mapAgent(existing) }, 200);
     }
     return json(res, { agent: mapAgent(existing) }, 200);
+  }
+
+  // Credits purchase confirm — session user OR wallet linked on agents table.
+  if (route === "credits/confirm" && req.method === "POST") {
+    const body = await readBody(req);
+    const signature = String(body.signature || body.txSignature || "").trim();
+    const walletPk = normalizeGateWallet(body.publicKey || body.wallet || "");
+    if (!signature) return json(res, { ok: false, error: "signature_required" }, 400);
+    let userId = null;
+    const authUser = await getAuthUser(req);
+    if (authUser?.id) userId = authUser.id;
+    if (!userId && walletPk) {
+      try {
+        const rows = await sb(
+          `agents?wallet_address=eq.${encodeURIComponent(walletPk)}&select=user_id&limit=1`,
+        );
+        userId = Array.isArray(rows) && rows[0]?.user_id ? rows[0].user_id : null;
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!userId) {
+      return json(
+        res,
+        {
+          ok: false,
+          error: "user_required",
+          message: "Sign in or link this wallet on /agent, then confirm — or tell Grok the signature.",
+          signature,
+        },
+        401,
+      );
+    }
+    try {
+      const out = await confirmCreditsPurchase(sb, userId, signature);
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "confirm_failed" }, 500);
+    }
+  }
+
+  if ((route === "credits" || route === "credits/balance") && req.method === "GET") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      return json(res, await getCreditsBalance(sb, authUser.id));
+    } catch (e) {
+      return json(res, { error: e?.message || "credits_failed" }, 500);
+    }
+  }
+
+  if (route === "credits/usage" && req.method === "GET") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const u = new URL(req.url || "/", "http://x");
+    try {
+      return json(res, await getCreditsUsage(sb, authUser.id, { limit: Number(u.searchParams.get("limit") || 40) }));
+    } catch (e) {
+      return json(res, { error: e?.message || "usage_failed" }, 500);
+    }
   }
 
   // Public prepare for /agent/sign (claim / burn / rent) — returns unsigned txs only.
@@ -1272,6 +1341,18 @@ const TOOL_ALIASES = {
   confirm_buy: "orbitx_confirm_buy",
   "confirm buy": "orbitx_confirm_buy",
   "yes buy": "orbitx_confirm_buy",
+  "buy credits": "orbitx_credits_buy",
+  buy_credits: "orbitx_credits_buy",
+  buycredits: "orbitx_credits_buy",
+  topup: "orbitx_credits_buy",
+  "top up": "orbitx_credits_buy",
+  shop: "orbitx_credits_buy",
+  "confirm credits": "orbitx_credits_confirm",
+  credits_confirm: "orbitx_credits_confirm",
+  credits: "orbitx_credits_balance",
+  "credits balance": "orbitx_credits_balance",
+  "credits usage": "orbitx_credits_usage",
+  usage: "orbitx_credits_usage",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_community: "orbitx_social_create_community",
   orbitx_post_community: "orbitx_social_post",
@@ -1801,6 +1882,51 @@ const CORE_TOOLS = [
         slippage: { type: "number", default: 10 },
       },
       required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_credits_buy",
+    description:
+      "Buy OrbitX MCP credits with SOL sent to the OrbitX desk wallet. When the user says buy credits / top up — ASK how many credits OR how much SOL, then call this. Returns a Phantom signUrl (or autoSignUrl) that starts the SOL transfer. After payment, call orbitx_credits_confirm with the signature (sign page often credits automatically).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        solAmount: { type: "number", description: "SOL to spend (any amount)" },
+        credits: { type: "number", description: "Credit count to buy (converted to SOL at 10000/SOL)" },
+        amount: { type: "number", description: "Alias: credits if >=10, else SOL" },
+        publicKey: { type: "string", description: "Buyer wallet (optional if linked on /agent)" },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean" },
+        askOnly: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_credits_confirm",
+    description:
+      "Confirm a credits SOL payment to the desk wallet and credit the user's balance. Pass the Solana tx signature after Phantom confirms.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signature: { type: "string" },
+        txSignature: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_credits_balance",
+    description: "Show purchasable MCP credit balance and lifetime totals.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_credits_usage",
+    description: "Advanced credits usage — balance, ledger, rate, desk wallet. Call when user asks for usage/billing.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer" } },
+      additionalProperties: false,
     },
   },
   {
@@ -2731,6 +2857,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_create_token_pump",
         "orbitx_create_token_custom",
       ],
+      credits: ["orbitx_credits_buy", "orbitx_credits_confirm", "orbitx_credits_balance", "orbitx_credits_usage"],
       trade: ["orbitx_buy_orbitx", "orbitx_confirm_buy", "orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
       media: [
@@ -2933,6 +3060,68 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       ],
       note: "Non-custodial Metaplex mint. Never claim minted without a confirmed signature.",
     };
+  }
+
+  if (name === "orbitx_credits_buy") {
+    const askOnly =
+      args.askOnly === true ||
+      (args.solAmount == null && args.credits == null && args.amount == null && args.sol == null);
+    if (askOnly) return creditsBuyPrompt();
+    const out = prepareCreditsMcpPurchase({
+      base,
+      wallet,
+      solAmount: args.solAmount ?? args.sol,
+      credits: args.credits,
+      amount: args.amount,
+      confirmMode: args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || "sign",
+    });
+    return out;
+  }
+
+  if (name === "orbitx_credits_confirm") {
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "session_required",
+        message: "Authenticate first, then pass the payment signature.",
+      };
+    }
+    const signature = String(args.signature || args.txSignature || args.tx_signature || args.sig || "").trim();
+    if (!signature) {
+      return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
+    }
+    try {
+      return await confirmCreditsPurchase(sb, auth.userId, signature);
+    } catch (e) {
+      return {
+        ok: false,
+        error: "confirm_failed",
+        message: e?.message || "Could not credit purchase — apply x_mcp_credits migration",
+        payTo: PLATFORM_CREDITS_WALLET,
+      };
+    }
+  }
+
+  if (name === "orbitx_credits_balance") {
+    if (!auth?.userId) {
+      return { ok: false, error: "session_required", message: "Authenticate to view credits balance" };
+    }
+    try {
+      return await getCreditsBalance(sb, auth.userId);
+    } catch (e) {
+      return { ok: false, error: "balance_failed", message: e?.message || "balance unavailable" };
+    }
+  }
+
+  if (name === "orbitx_credits_usage") {
+    if (!auth?.userId) {
+      return { ok: false, error: "session_required", message: "Authenticate to view credits usage" };
+    }
+    try {
+      return await getCreditsUsage(sb, auth.userId, { limit: args.limit });
+    } catch (e) {
+      return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
+    }
   }
 
   if (name === "orbitx_buy_orbitx") {
@@ -3978,9 +4167,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.4.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.5.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. Buy $ORBITX: when they say buy $ORBITX / buy orbitx, ASK how much SOL and whether they want manual sign or auto-confirm, then call orbitx_buy_orbitx. For auto/chat confirm send openUrl/autoSignUrl (Phantom pops on open). When they say yes/confirm/go ahead, call orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
