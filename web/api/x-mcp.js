@@ -38,6 +38,7 @@ import {
   wrapMcpToolContent,
   xMenuPayload,
 } from "./orbitx/mcp-brand.js";
+import { withCredits } from "./orbitx/credit-service.js";
 
 export const config = { maxDuration: 60 };
 
@@ -1242,6 +1243,17 @@ async function uploadImageOAuth1a(imageUrl) {
 async function callTool(rawName, args, auth, req = null) {
   const name = X_TOOL_ALIASES[rawName] || rawName;
   const a = args && typeof args === "object" ? args : {};
+  const billableActions = { x_post: a.linkUrl ? "x_post_link" : "x_post", x_quote: "x_post", x_reply: "x_post", x_dm: "x_dm", x_dm_group: "x_dm" };
+  if (auth?.userId && billableActions[name] && !req?._creditWrapped) {
+    const requestId = String(a.requestId || req?.headers?.["x-request-id"] || randomBytes(16).toString("hex"));
+    const wrappedReq = req ? { ...req, _creditWrapped: true } : { _creditWrapped: true };
+    try {
+      const result = await withCredits(auth.userId, billableActions[name], requestId, () => callTool(rawName, a, auth, wrappedReq), { provider: "x", metadata: { tool: name } });
+      return { ...result.value, usage: result.usage };
+    } catch (error) {
+      return { ok: false, error: "credit_action_failed", message: error?.message || "Action failed", usage: error?.usage || null };
+    }
+  }
 
   if (name === "x_menu") {
     let xUsername = null;
@@ -1381,7 +1393,7 @@ async function callTool(rawName, args, auth, req = null) {
       note: "Prefer dashboard paste authCode. Else x_auth_link. Pass authCode on every tool. Separate from Agent MCP (/api/mcp).",
       clients: ["claude", "chatgpt", "grok"],
       grokSetup:
-        "Dashboard paste authCode → x_auth_status → pass authCode. Fallback: x_auth_link → Authorize → x_auth_status",
+        "Dashboard paste authCode → x_auth_status → pass authCode. Fallback: x_auth_link → Authorize ��� x_auth_status",
       env: ["NVIDIA_API_KEY", "TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "CRON_SECRET"],
     };
   }
