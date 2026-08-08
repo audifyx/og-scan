@@ -238,6 +238,22 @@ export function shortXKey(key: string): string {
   return `${key.slice(0, 10)}…${key.slice(-6)}`;
 }
 
+export type XMcpCredits = {
+  balanceCredits: number;
+  balanceUsd: number;
+  freeCreditsRemaining: number;
+  purchasedCreditsRemaining: number;
+  monthCreditsUsed: number;
+  lifetimeCreditsUsed: number;
+};
+export type XMcpCreditPackage = { id: string; name: string; usdValue: number; credits: number; sortOrder: number };
+export type XMcpCreditLedgerEntry = { id: string; action: string; credits: number; usdValue: number; status: string; createdAt: string; balanceAfter: number };
+export async function fetchXMcpCredits(): Promise<XMcpCredits> { return (await xAgentFetch("/credits")) as unknown as XMcpCredits; }
+export async function fetchXMcpCreditPackages(): Promise<XMcpCreditPackage[]> { const data = await xAgentFetch("/credits/packages"); return (data.packages || []) as XMcpCreditPackage[]; }
+export async function fetchXMcpCreditHistory(): Promise<XMcpCreditLedgerEntry[]> { const data = await xAgentFetch("/credits/history"); return (data.entries || []) as XMcpCreditLedgerEntry[]; }
+export async function createXMcpPurchase(packageId: string, walletAddress: string) { return xAgentFetch("/credits/purchases", { method: "POST", body: JSON.stringify({ packageId, walletAddress }) }); }
+export async function verifyXMcpPurchase(purchaseId: string, signature: string) { return xAgentFetch(`/credits/purchases/${encodeURIComponent(purchaseId)}/verify`, { method: "POST", body: JSON.stringify({ signature }) }); }
+
 export type XAgentConfig = {
   id: string;
   name: string;

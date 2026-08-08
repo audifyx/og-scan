@@ -39,6 +39,7 @@ import {
   xMenuPayload,
 } from "./orbitx/mcp-brand.js";
 import { withCredits } from "./orbitx/credit-service.js";
+import { getSolUsdQuote, calculateLamports, verifySolPayment } from "./orbitx/sol-credit-purchases.js";
 
 export const config = { maxDuration: 60 };
 
@@ -1875,6 +1876,52 @@ async function callTool(rawName, args, auth, req = null) {
 }
 async function handleAgent(req, res, parts) {
   const route = parts.slice(1).join("/");
+
+  if (route.startsWith("credits/purchases/") && route.endsWith("/verify") && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const purchaseId = route.slice("credits/purchases/".length, -"/verify".length);
+    const body = await readBody(req); const signature = String(body.signature || "").trim();
+    const rows = await sb(`credit_purchases?id=eq.${encodeURIComponent(purchaseId)}&user_id=eq.${encodeURIComponent(user.id)}&select=*`);
+    const purchase = Array.isArray(rows) ? rows[0] : null;
+    if (!purchase || !signature) return json(res, { error: "purchase_or_signature_required" }, 400);
+    const payment = await verifySolPayment({ signature, senderWallet: purchase.wallet_address, expectedLamports: Math.ceil(Number(purchase.expected_sol) * 1000000000) });
+    const rpcResponse = await fetch(`${SUPA_URL}/rest/v1/rpc/credit_apply_purchase`, { method: "POST", headers: { ...srHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ p_purchase_id: purchase.id, p_signature: signature, p_received_sol: payment.receivedLamports / 1000000000 }) });
+    if (!rpcResponse.ok) throw new Error("credit_purchase_apply_failed");
+    return json(res, await rpcResponse.json());
+  }
+  if (route === "credits" && req.method === "GET") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const rows = await sb(`user_credit_balances?user_id=eq.${encodeURIComponent(user.id)}&select=*`);
+    const b = Array.isArray(rows) ? rows[0] : rows;
+    const free = Number(b?.free_credits || 0) / 1000000;
+    const purchased = Number(b?.purchased_credits || 0) / 1000000;
+    const used = Number(b?.used_credits || 0) / 1000000;
+    return json(res, { balanceCredits: free + purchased, balanceUsd: (free + purchased) * 0.01, freeCreditsRemaining: free, purchasedCreditsRemaining: purchased, monthCreditsUsed: 0, lifetimeCreditsUsed: Number(b?.lifetime_used || 0) / 1000000 });
+  }
+  if (route === "credits/packages" && req.method === "GET") {
+    const rows = await sb("credit_packages?active=eq.true&order=sort_order.asc&select=id,name,usd_value,credits,sort_order");
+    return json(res, { packages: (Array.isArray(rows) ? rows : []).map((p) => ({ id: p.id, name: p.name, usdValue: Number(p.usd_value), credits: Number(p.credits) / 1000000, sortOrder: p.sort_order })) });
+  }
+  if (route === "credits/history" && req.method === "GET") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const rows = await sb(`credit_transactions?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50&select=id,action,credits,usd_value,status,created_at,balance_after`);
+    return json(res, { entries: (Array.isArray(rows) ? rows : []).map((t) => ({ id: t.id, action: t.action || t.type, credits: Number(t.credits) / 1000000, usdValue: Number(t.usd_value), status: t.status, createdAt: t.created_at, balanceAfter: Number(t.balance_after) / 1000000 })) });
+  }
+  if (route === "credits/purchases" && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req); const wallet = String(body.walletAddress || "").trim();
+    const packages = await sb(`credit_packages?id=eq.${encodeURIComponent(String(body.packageId || ""))}&active=eq.true&select=*`);
+    const pkg = Array.isArray(packages) ? packages[0] : null;
+    if (!pkg || !wallet) return json(res, { error: "package_or_wallet_required" }, 400);
+    const quote = await getSolUsdQuote(); const expectedLamports = calculateLamports(Number(pkg.usd_value), quote.solUsd);
+    const created = await sb("credit_purchases", { method: "POST", body: JSON.stringify({ user_id: user.id, wallet_address: wallet, package_id: pkg.id, expected_usd: Number(pkg.usd_value), expected_sol: expectedLamports / 1000000000 }) });
+    const purchase = Array.isArray(created) ? created[0] : created;
+    return json(res, { purchaseId: purchase.id, expectedSol: expectedLamports / 1000000000, solUsd: quote.solUsd, treasuryWallet: "4qD4UBf9y9wRM51qHYccucAJadB24PRSEku7JWpXV6wu", transaction: null }, 201);
+  }
 
   if ((!route || route === "" || route === "bootstrap") && req.method === "POST") {
     const user = await getAuthUser(req);
