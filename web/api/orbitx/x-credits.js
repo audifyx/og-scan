@@ -1,13 +1,19 @@
 /**
  * X MCP purchasable credits — pay SOL to PLATFORM_WALLET, get credits.
  * Rate: 10_000 credits per 1 SOL (any amount within min/max).
+ *
+ * IMPORTANT: Do NOT top-level import @solana/web3.js — it crashes Vercel
+ * serverless load for x-mcp / orbitx-hub (same as mcp-ops lazy pattern).
  */
-import { PublicKey, SystemProgram, Transaction, Connection } from "@solana/web3.js";
 
 export const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 export const CREDITS_PER_SOL = 10_000;
 export const MIN_SOL = 0.001;
 export const MAX_SOL = 100;
+
+async function loadSolana() {
+  return import("@solana/web3.js");
+}
 
 function rpcUrl() {
   return (
@@ -83,6 +89,7 @@ async function rpc(method, params) {
 export async function buildBuyTransaction({ fromPubkey, solAmount }) {
   const q = quoteCredits(solAmount);
   if (!q.ok) return q;
+  const { PublicKey, SystemProgram, Transaction, Connection } = await loadSolana();
   let from;
   try {
     from = new PublicKey(String(fromPubkey));
