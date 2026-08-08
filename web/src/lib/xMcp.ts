@@ -438,3 +438,82 @@ export async function fetchXDmInbox(): Promise<{
     error?: string;
   };
 }
+
+export type XCreditsBalance = {
+  ok: boolean;
+  balance: number;
+  lifetimePurchased: number;
+  lifetimeSpent: number;
+  creditsPerSol: number;
+  payTo: string;
+  usageUrl?: string;
+  shopUrl?: string;
+};
+
+export type XCreditsLedgerEntry = {
+  id: string;
+  kind: string;
+  amount: number;
+  balanceAfter: number | null;
+  sol: number | null;
+  txSignature: string | null;
+  description: string | null;
+  createdAt: string;
+  explorer: string | null;
+};
+
+export type XCreditsUsage = XCreditsBalance & {
+  ledger: XCreditsLedgerEntry[];
+  advanced?: {
+    summary: Record<string, unknown>;
+    howToBuy: string[];
+    ledger: XCreditsLedgerEntry[];
+  };
+};
+
+export type XCreditsQuote = {
+  ok: boolean;
+  solAmount?: number;
+  lamports?: number;
+  credits?: number;
+  creditsPerSol?: number;
+  payTo?: string;
+  rateLabel?: string;
+  transactionBase64?: string;
+  message?: string;
+  error?: string;
+};
+
+export async function fetchXCreditsUsage(limit = 40): Promise<XCreditsUsage> {
+  return (await xAgentFetch(`/credits/usage?limit=${limit}`)) as unknown as XCreditsUsage;
+}
+
+export async function fetchXCreditsBalance(): Promise<XCreditsBalance> {
+  return (await xAgentFetch("/credits")) as unknown as XCreditsBalance;
+}
+
+export async function quoteXCreditsBuy(solAmount: number, publicKey?: string): Promise<XCreditsQuote> {
+  return (await xAgentFetch("/credits/buy", {
+    method: "POST",
+    body: JSON.stringify({ solAmount, publicKey }),
+  })) as unknown as XCreditsQuote;
+}
+
+export async function confirmXCreditsPurchase(signature: string): Promise<XCreditsBalance & {
+  creditsAdded?: number;
+  alreadyCredited?: boolean;
+  message?: string;
+  explorer?: string;
+  signature?: string;
+}> {
+  return (await xAgentFetch("/credits/confirm", {
+    method: "POST",
+    body: JSON.stringify({ signature }),
+  })) as unknown as XCreditsBalance & {
+    creditsAdded?: number;
+    alreadyCredited?: boolean;
+    message?: string;
+    explorer?: string;
+    signature?: string;
+  };
+}

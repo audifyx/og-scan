@@ -38,6 +38,18 @@ import {
   wrapMcpToolContent,
   xMenuPayload,
 } from "./orbitx/mcp-brand.js";
+import {
+  quoteCredits,
+  buildBuyTransaction,
+  getCreditsBalance,
+  getCreditsUsage,
+  confirmCreditsPurchase,
+  creditsBuyPrompt,
+  PLATFORM_CREDITS_WALLET,
+  CREDITS_PER_SOL,
+  MIN_SOL,
+  MAX_SOL,
+} from "./orbitx/x-credits.js";
 
 export const config = { maxDuration: 60 };
 
@@ -399,6 +411,63 @@ const TOOLS = [
     inputSchema: EMPTY_OBJECT_SCHEMA,
     annotations: { title: "Help", readOnlyHint: true, openWorldHint: false },
   },
+  {
+    name: "x_credits_buy",
+    description:
+      "Buy OrbitX X MCP credits with SOL. When the user says they want to buy credits / shop / top up — ASK how much SOL (any amount), then call this with solAmount. Returns pay-to wallet + unsigned transfer (if publicKey). After they pay, call x_credits_confirm with the signature — credits credit automatically.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        solAmount: {
+          type: "number",
+          description: `SOL to spend (any amount ${MIN_SOL}–${MAX_SOL}). 1 SOL = ${CREDITS_PER_SOL} credits.`,
+        },
+        publicKey: {
+          type: "string",
+          description: "Optional buyer wallet — builds an unsigned SystemProgram.transfer for them to sign",
+        },
+        askOnly: {
+          type: "boolean",
+          description: "If true (or solAmount omitted), return the ask-how-much prompt only",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Buy credits", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_credits_confirm",
+    description:
+      "Confirm a SOL payment to the OrbitX credits wallet and credit the user's balance. Pass the Solana transaction signature after they send funds.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signature: { type: "string", description: "Solana tx signature of the SOL transfer" },
+        txSignature: { type: "string", description: "Alias for signature" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Confirm credit purchase", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_credits_balance",
+    description: "Show the user's purchasable X MCP credit balance and lifetime totals.",
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "Credits balance", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "x_credits_usage",
+    description:
+      "Advanced usage — balance, purchase/spend ledger, rate, and how to buy. Call when the user asks for usage, billing, spend history, or advanced credits details.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", description: "Ledger rows (1–100, default 40)" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Credits usage", readOnlyHint: true, openWorldHint: false },
+  },
 ];
 
 const AUTH_CODE_PROP = {
@@ -411,6 +480,15 @@ const X_TOOL_ALIASES = {
   "/": "x_menu",
   menu: "x_menu",
   help: "x_menu",
+  "buy credits": "x_credits_buy",
+  buy_credits: "x_credits_buy",
+  shop: "x_credits_buy",
+  topup: "x_credits_buy",
+  "top up": "x_credits_buy",
+  usage: "x_credits_usage",
+  "advanced usage": "x_credits_usage",
+  credits: "x_credits_balance",
+  balance: "x_credits_balance",
 };
 
 function listToolsForMcp() {
@@ -1296,6 +1374,18 @@ async function callTool(rawName, args, auth, req = null) {
         url: "https://www.orbitx.world/x",
         text: "Use x_agent_list_queue / x_agent_approve for drafts.",
       },
+      {
+        id: "credits",
+        title: "Buy / usage credits",
+        url: "https://www.orbitx.world/x?tab=usage",
+        text: "Buy credits with SOL via x_credits_buy → pay → x_credits_confirm. Advanced usage: x_credits_usage. Shop: /shop",
+      },
+      {
+        id: "usage",
+        title: "Advanced credits usage",
+        url: "https://www.orbitx.world/x?tab=usage",
+        text: "Call x_credits_usage for balance + ledger.",
+      },
       ...catalog,
     ];
     const results = docs.filter(
@@ -1330,11 +1420,17 @@ async function callTool(rawName, args, auth, req = null) {
     if (id === "queue") {
       return callTool("x_agent_list_queue", { limit: 10 }, auth, req);
     }
+    if (id === "credits" || id === "shop" || id === "buy") {
+      return callTool("x_credits_buy", { askOnly: true }, auth, req);
+    }
+    if (id === "usage") {
+      return callTool("x_credits_usage", { limit: 20 }, auth, req);
+    }
     return {
       id,
       title: id,
       url: "https://www.orbitx.world/x",
-      text: "Unknown id. Try menu, help, status, queue, or tool:x_post.",
+      text: "Unknown id. Try menu, help, status, queue, credits, usage, or tool:x_post.",
     };
   }
 
@@ -1365,7 +1461,18 @@ async function callTool(rawName, args, auth, req = null) {
         "Enable auto-reply: mentions / DMs / group DMs (mode=approve queues drafts; mode=auto sends)",
         "Use x_dm / x_dm_inbox / x_dm_group for DMs + group chats",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
+        "Buy credits: ask how much SOL → x_credits_buy → user pays → x_credits_confirm",
+        "Advanced usage: x_credits_usage (also on /x Usage or /shop)",
       ],
+      credits: {
+        buy: "x_credits_buy",
+        confirm: "x_credits_confirm",
+        balance: "x_credits_balance",
+        usage: "x_credits_usage",
+        rate: `${CREDITS_PER_SOL} credits per 1 SOL`,
+        payTo: PLATFORM_CREDITS_WALLET,
+        tip: "User says buy credits → ASK amount → x_credits_buy → after payment x_credits_confirm",
+      },
       dm: {
         send: "x_dm",
         inbox: "x_dm_inbox",
@@ -1421,6 +1528,70 @@ async function callTool(rawName, args, auth, req = null) {
           ? warn
           : `Connected as @${profile.twitter_username || "user"}`,
     };
+  }
+
+  if (name === "x_credits_buy") {
+    const askOnly = a.askOnly === true || a.solAmount == null || a.solAmount === "";
+    if (askOnly) return creditsBuyPrompt();
+    const solAmount = Number(a.solAmount ?? a.sol ?? a.amount);
+    const publicKey = String(a.publicKey || a.wallet || a.from || "").trim();
+    if (publicKey) {
+      try {
+        return await buildBuyTransaction({ fromPubkey: publicKey, solAmount });
+      } catch (e) {
+        const q = quoteCredits(solAmount);
+        return {
+          ...q,
+          buildError: e?.message || "could_not_build_tx",
+          message: q.ok
+            ? `Send ${q.solAmount} SOL to ${q.payTo}, then call x_credits_confirm with the signature.`
+            : q.message,
+        };
+      }
+    }
+    const q = quoteCredits(solAmount);
+    if (!q.ok) return q;
+    return {
+      ...q,
+      message: `Send ${q.solAmount} SOL (~${q.credits} credits) to ${q.payTo}. After confirmation, call x_credits_confirm with the tx signature.`,
+      instructionsForAi: [
+        "Show the user the payTo address, SOL amount, and credits they will receive.",
+        "Help them send the transfer from their wallet.",
+        "When they have a signature, call x_credits_confirm.",
+      ],
+    };
+  }
+
+  if (name === "x_credits_confirm") {
+    const signature = String(a.signature || a.txSignature || a.tx_signature || a.sig || "").trim();
+    if (!signature) {
+      return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
+    }
+    try {
+      return await confirmCreditsPurchase(sb, auth.userId, signature);
+    } catch (e) {
+      return {
+        ok: false,
+        error: "confirm_failed",
+        message: e?.message || "Could not credit purchase — ensure migration x_mcp_credits is applied",
+      };
+    }
+  }
+
+  if (name === "x_credits_balance") {
+    try {
+      return await getCreditsBalance(sb, auth.userId);
+    } catch (e) {
+      return { ok: false, error: "balance_failed", message: e?.message || "balance unavailable" };
+    }
+  }
+
+  if (name === "x_credits_usage") {
+    try {
+      return await getCreditsUsage(sb, auth.userId, { limit: a.limit });
+    } catch (e) {
+      return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
+    }
   }
 
   if (name === "x_post" || name === "x_quote" || name === "x_reply") {
@@ -2113,6 +2284,74 @@ async function handleAgent(req, res, parts) {
     return json(res, { models: NIM_MODELS, defaultModel: DEFAULT_NIM_MODEL });
   }
 
+  // ── Purchasable MCP credits (shop / usage) ───────────────────────────────
+  if (route === "credits" || route === "credits/balance") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    if (req.method !== "GET") return json(res, { error: "method_not_allowed" }, 405);
+    try {
+      return json(res, await getCreditsBalance(sb, user.id));
+    } catch (e) {
+      return json(res, { error: e?.message || "credits_failed" }, 500);
+    }
+  }
+
+  if (route === "credits/usage" && req.method === "GET") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const u = new URL(req.url || "/", "http://x");
+    const limit = Number(u.searchParams.get("limit") || 40);
+    try {
+      return json(res, await getCreditsUsage(sb, user.id, { limit }));
+    } catch (e) {
+      return json(res, { error: e?.message || "usage_failed" }, 500);
+    }
+  }
+
+  if (route === "credits/quote" && (req.method === "GET" || req.method === "POST")) {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    let solAmount;
+    if (req.method === "GET") {
+      const u = new URL(req.url || "/", "http://x");
+      solAmount = Number(u.searchParams.get("sol") || u.searchParams.get("solAmount") || 0);
+    } else {
+      const body = await readBody(req);
+      solAmount = Number(body.solAmount ?? body.sol ?? 0);
+    }
+    return json(res, quoteCredits(solAmount));
+  }
+
+  if (route === "credits/buy" && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const solAmount = Number(body.solAmount ?? body.sol ?? 0);
+    const publicKey = String(body.publicKey || body.wallet || "").trim();
+    try {
+      if (publicKey) {
+        return json(res, await buildBuyTransaction({ fromPubkey: publicKey, solAmount }));
+      }
+      return json(res, quoteCredits(solAmount));
+    } catch (e) {
+      return json(res, { error: e?.message || "buy_setup_failed" }, 500);
+    }
+  }
+
+  if (route === "credits/confirm" && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const signature = String(body.signature || body.txSignature || body.tx_signature || "").trim();
+    if (!signature) return json(res, { error: "signature_required" }, 400);
+    try {
+      const out = await confirmCreditsPurchase(sb, user.id, signature);
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(res, { error: e?.message || "confirm_failed" }, 500);
+    }
+  }
+
   if (route === "x-agents" || route === "agents") {
     const user = await getAuthUser(req);
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
@@ -2776,9 +3015,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "OrbitX X MCP", version: "1.3.0" },
+            serverInfo: { name: "OrbitX X MCP", version: "1.4.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X and run the NVIDIA agent. When the user says /, menu, or asks what you can do, call x_menu and show the markdown (banner + command board). If the user pastes an authCode from the OrbitX /x dashboard, call x_auth_status with it — do NOT open a website — then pass that authCode on every later x_* tool (stays linked). Only if they have no authCode: call x_auth_link and send the url. ChatGPT: search/fetch or x_menu. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — post/DM on X, run the NVIDIA agent, and buy credits with SOL. When the user says /, menu, or asks what you can do, call x_menu. If they paste an authCode from /x, call x_auth_status — do NOT open a website — then pass authCode on every x_* tool. Buy credits: when they want to buy/top up, ASK how much SOL (any amount), call x_credits_buy, help them pay the platform wallet, then x_credits_confirm — credits apply automatically. Advanced usage: x_credits_usage. Setup: https://www.orbitx.world/x · Shop: https://www.orbitx.world/shop",
           },
         },
         200,

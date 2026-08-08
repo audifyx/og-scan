@@ -1338,6 +1338,96 @@
   transition: width 0.25s ease;
 }
 
+.ox-x-usage__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+@media (min-width: 720px) {
+  .ox-x-usage__stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.ox-x-buy__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.ox-x-buy__row .ox-agent__input,
+.ox-agent .ox-x-buy__manual .ox-agent__input {
+  flex: 1 1 140px;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+}
+
+.ox-x-buy__quote {
+  color: #5eead4;
+  font-weight: 650;
+  font-size: 0.95rem;
+}
+
+.ox-x-buy__manual {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ox-x-buy__ok {
+  color: #86efac !important;
+}
+
+.ox-x-usage__ledger {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ox-x-usage__ledger li {
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.ox-agent__linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #5eead4;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a.ox-agent__linkish {
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
+.ox-agent__muted {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .xh-matrix__orbit,
   .xh-matrix__node {

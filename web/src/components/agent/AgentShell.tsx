@@ -180,6 +180,7 @@ export function AgentShell({
                 <Link to="/app">Hub</Link>
                 <Link to="/agent">Agent</Link>
                 <Link to="/x">X MCP</Link>
+                <Link to="/shop">Shop</Link>
                 <a href="/ORBITX_DEX">DEX</a>
                 <Link to="/orbitxlaunch">Launch</Link>
                 <Link to="/nft">NFT</Link>

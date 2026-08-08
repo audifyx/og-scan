@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { xGetStoredUser, xSetStoredUser, xStartLogin, type XUser } from "@/lib/xAuth";
 import {
   approveXAgentQueueItem,
   bootstrapXMcp,
   cancelXAgentQueueItem,
+  confirmXCreditsPurchase,
   createXMcpApiKey,
   disconnectXAccount,
   fetchXAgent,
+  fetchXCreditsUsage,
   fetchXDmInbox,
   generateXAgentPost,
   listXAgentQueue,
   listXMcpApiKeys,
   pollXAgentReplies,
+  quoteXCreditsBuy,
   revokeXMcpApiKey,
   sendXDm,
   shortXKey,
@@ -28,6 +34,7 @@ import {
   type XAgentConfig,
   type XAgentKnowledge,
   type XAgentQueueItem,
+  type XCreditsUsage,
   type XMcpBootstrap,
   type XMcpChatAuthMint,
   type XNimModel,
@@ -36,16 +43,19 @@ import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/Agen
 import XMcpMatrix from "@/components/x/XMcpMatrix";
 import "./x-hub.css";
 
-/** Same 4-tab shell structure as /agent — X MCP content. */
-type XTab = "home" | "account" | "keys" | "connect";
+/** Bottom tabs — Usage is the shop + advanced credits ledger. */
+type XTab = "home" | "usage" | "account" | "keys" | "connect";
 type HomeSub = "post" | "agent" | "queue" | "messages" | "matrix";
 
 const X_TABS: ShellTab[] = [
   { id: "home", label: "Home", ico: "⌂" },
+  { id: "usage", label: "Usage", ico: "◈" },
   { id: "account", label: "Account", ico: "◎" },
   { id: "keys", label: "Keys", ico: "✦" },
   { id: "connect", label: "Connect", ico: "⬡" },
 ];
+
+const VALID_TABS = new Set<XTab>(["home", "usage", "account", "keys", "connect"]);
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -130,12 +140,26 @@ function FieldRow({
 export default function XMcpPage() {
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { connection } = useConnection();
+  const { publicKey, sendTransaction, connected: walletConnected } = useWallet();
 
-  const [tab, setTab] = useState<XTab>("home");
+  const initialTab = (() => {
+    const t = String(searchParams.get("tab") || "").toLowerCase();
+    if (t === "shop" || t === "credits") return "usage" as XTab;
+    return VALID_TABS.has(t as XTab) ? (t as XTab) : "home";
+  })();
+
+  const [tab, setTab] = useState<XTab>(initialTab);
   const [homeSub, setHomeSub] = useState<HomeSub>("post");
   const [boot, setBoot] = useState<XMcpBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
+  const [buySol, setBuySol] = useState("0.1");
+  const [buyBusy, setBuyBusy] = useState(false);
+  const [buyNote, setBuyNote] = useState<string | null>(null);
+  const [manualSig, setManualSig] = useState("");
   const [keyName, setKeyName] = useState("Claude / ChatGPT X");
   const [creating, setCreating] = useState(false);
   const [storedKey, setStoredKey] = useState<string | null>(null);
@@ -191,6 +215,16 @@ export default function XMcpPage() {
     }
   }, [user]);
 
+  const refreshCredits = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await fetchXCreditsUsage(50);
+      setCreditsUsage(data);
+    } catch {
+      /* table may not be migrated yet — Usage tab still explains MCP buy */
+    }
+  }, [user]);
+
   const refresh = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -220,13 +254,39 @@ export default function XMcpPage() {
         }
       }
       // Don't block the shell on secondary loads
-      void Promise.allSettled([refreshAgent(), refreshQueue()]);
+      void Promise.allSettled([refreshAgent(), refreshQueue(), refreshCredits()]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load X MCP");
     } finally {
       setLoading(false);
     }
-  }, [user, refreshAgent, refreshQueue]);
+  }, [user, refreshAgent, refreshQueue, refreshCredits]);
+
+  const selectTab = useCallback(
+    (id: string) => {
+      const next = VALID_TABS.has(id as XTab) ? (id as XTab) : "home";
+      setTab(next);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next === "home") p.delete("tab");
+          else p.set("tab", next);
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  useEffect(() => {
+    const t = String(searchParams.get("tab") || "").toLowerCase();
+    if (t === "shop" || t === "credits") {
+      if (tab !== "usage") setTab("usage");
+      return;
+    }
+    if (VALID_TABS.has(t as XTab) && t !== tab) setTab(t as XTab);
+  }, [searchParams, tab]);
 
   useEffect(() => {
     try {
@@ -275,6 +335,69 @@ export default function XMcpPage() {
       setTimeout(() => setCopied(null), 1600);
     } catch {
       setError("Copy failed — long-press to select instead");
+    }
+  };
+
+  const quotedCredits = useMemo(() => {
+    const sol = Number(buySol);
+    const rate = creditsUsage?.creditsPerSol || 10_000;
+    if (!Number.isFinite(sol) || sol <= 0) return 0;
+    return Math.floor(sol * rate);
+  }, [buySol, creditsUsage?.creditsPerSol]);
+
+  const onBuyCredits = async () => {
+    setBuyBusy(true);
+    setBuyNote(null);
+    setError(null);
+    try {
+      const sol = Number(buySol);
+      if (!Number.isFinite(sol) || sol < 0.001) {
+        throw new Error("Enter at least 0.001 SOL");
+      }
+      if (!publicKey || !walletConnected || !sendTransaction) {
+        throw new Error("Connect a Solana wallet first (same wallet you sign in with)");
+      }
+      const quote = await quoteXCreditsBuy(sol, publicKey.toBase58());
+      if (!quote.ok || !quote.lamports || !quote.payTo) {
+        throw new Error(quote.message || quote.error || "Could not quote purchase");
+      }
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: new PublicKey(quote.payTo || PLATFORM_WALLET),
+          lamports: quote.lamports,
+        }),
+      );
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = publicKey;
+      const signature = await sendTransaction(tx, connection);
+      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+      const credited = await confirmXCreditsPurchase(signature);
+      setBuyNote(credited.message || `+${credited.creditsAdded ?? quote.credits} credits`);
+      await refreshCredits();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Purchase failed");
+    } finally {
+      setBuyBusy(false);
+    }
+  };
+
+  const onConfirmManualSig = async () => {
+    setBuyBusy(true);
+    setBuyNote(null);
+    setError(null);
+    try {
+      const sig = manualSig.trim();
+      if (!sig) throw new Error("Paste a transaction signature");
+      const credited = await confirmXCreditsPurchase(sig);
+      setBuyNote(credited.message || "Credits applied");
+      setManualSig("");
+      await refreshCredits();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Confirm failed");
+    } finally {
+      setBuyBusy(false);
     }
   };
 
@@ -574,12 +697,12 @@ export default function XMcpPage() {
   return (
     <AgentShell
       activeTab={tab}
-      onTabChange={(id) => setTab(id as XTab)}
+      onTabChange={selectTab}
       tabs={X_TABS}
       brandHref="/x"
       brandSub="X MCP"
       footerBrand="OrbitX X MCP"
-      footerNote="Post, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok. Non-custodial X OAuth — you authorize scopes on X."
+      footerNote="Post, DM, buy credits, and run your NVIDIA agent from Claude, ChatGPT, or Grok. Non-custodial X OAuth — you authorize scopes on X."
       mcpUrl={oauth.mcpUrl}
       siblingHref="/agent"
       siblingLabel="Agent MCP"
@@ -622,13 +745,13 @@ export default function XMcpPage() {
               </button>
               <button
                 type="button"
-                className={`ox-agent__kpi${postCredits.remaining > 0 ? " is-ok" : ""}`}
-                onClick={() => goHomeSub("agent")}
-                title="Daily post credits"
+                className={`ox-agent__kpi${(creditsUsage?.balance ?? 0) > 0 || postCredits.remaining > 0 ? " is-ok" : ""}`}
+                onClick={() => selectTab("usage")}
+                title="Purchased + daily post credits"
               >
                 <span className="ox-agent__kpi-k">Credits</span>
                 <span className="ox-agent__kpi-v">
-                  {postCredits.remaining}/{postCredits.max}
+                  {creditsUsage?.balance != null ? creditsUsage.balance.toLocaleString() : "—"}
                 </span>
               </button>
               <button
@@ -644,18 +767,22 @@ export default function XMcpPage() {
             <section className="ox-agent__panel ox-x-credits">
               <div className="ox-agent__panel-h">
                 <h2 className="ox-agent__panel-title">Credits</h2>
-                <span className="ox-agent__panel-hint">resets daily</span>
+                <button type="button" className="ox-agent__panel-hint ox-agent__linkish" onClick={() => selectTab("usage")}>
+                  Usage / shop →
+                </button>
               </div>
               <div className="ox-agent__panel-b">
                 <div className="ox-x-credits__row">
                   <div>
-                    <div className="ox-agent__label">Post credits</div>
+                    <div className="ox-agent__label">Purchased balance</div>
                     <div className="ox-agent__value" style={{ fontSize: "1.35rem", fontWeight: 750 }}>
-                      {postCredits.remaining}
-                      <span style={{ opacity: 0.45, fontSize: "0.9rem", fontWeight: 600 }}>
-                        {" "}
-                        / {postCredits.max} left today
-                      </span>
+                      {(creditsUsage?.balance ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="ox-agent__label">Daily posts left</div>
+                    <div className="ox-agent__value">
+                      {postCredits.remaining}/{postCredits.max}
                     </div>
                   </div>
                   <div className="ox-x-credits__bar" aria-hidden>
@@ -663,8 +790,7 @@ export default function XMcpPage() {
                   </div>
                 </div>
                 <p className="ox-agent__note" style={{ marginTop: "0.65rem", marginBottom: 0 }}>
-                  Used {postCredits.used} post{postCredits.used === 1 ? "" : "s"} today · reply cap{" "}
-                  {replyCredits.max}/day · change limits in Agent settings.
+                  Buy any amount of SOL via Claude/Grok (`x_credits_buy`) or the Usage tab. Advanced ledger is on Usage.
                 </p>
               </div>
             </section>
@@ -820,6 +946,162 @@ export default function XMcpPage() {
           </div>
             </div>
           </section>
+      )}
+
+      {tab === "usage" && (
+        <>
+          <section className="ox-agent__panel ox-x-credits">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Usage</h2>
+              <span className="ox-agent__panel-hint">shop · advanced</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <div className="ox-x-usage__stats">
+                <div>
+                  <div className="ox-agent__label">Balance</div>
+                  <div className="ox-agent__value" style={{ fontSize: "1.6rem", fontWeight: 750 }}>
+                    {(creditsUsage?.balance ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Lifetime bought</div>
+                  <div className="ox-agent__value">
+                    {(creditsUsage?.lifetimePurchased ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Lifetime spent</div>
+                  <div className="ox-agent__value">
+                    {(creditsUsage?.lifetimeSpent ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Daily posts</div>
+                  <div className="ox-agent__value">
+                    {postCredits.remaining}/{postCredits.max}
+                  </div>
+                </div>
+              </div>
+              <p className="ox-agent__note" style={{ marginTop: "0.75rem" }}>
+                Rate: {(creditsUsage?.creditsPerSol || 10_000).toLocaleString()} credits / 1 SOL · pay to{" "}
+                <button
+                  type="button"
+                  className="ox-agent__linkish"
+                  onClick={() => void copy("payTo", creditsUsage?.payTo || PLATFORM_WALLET)}
+                >
+                  {shortXKey(creditsUsage?.payTo || PLATFORM_WALLET)}
+                </button>
+                {copied === "payTo" ? " · copied" : ""}
+              </p>
+            </div>
+          </section>
+
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Buy credits</h2>
+              <span className="ox-agent__panel-hint">any SOL amount</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                In Claude or Grok say <strong>I want to buy credits</strong> — they ask how much, set up the
+                transfer, and after you pay you get credits automatically. Or buy here with your wallet.
+              </p>
+              <label className="ox-agent__label" htmlFor="ox-buy-sol">
+                SOL amount
+              </label>
+              <div className="ox-x-buy__row">
+                <input
+                  id="ox-buy-sol"
+                  className="ox-agent__input"
+                  type="number"
+                  min={0.001}
+                  step={0.001}
+                  value={buySol}
+                  onChange={(e) => setBuySol(e.target.value)}
+                  placeholder="0.1"
+                />
+                <span className="ox-x-buy__quote">→ {quotedCredits.toLocaleString()} credits</span>
+              </div>
+              <div className="ox-agent__actions" style={{ marginTop: "0.75rem" }}>
+                <button
+                  type="button"
+                  className="ox-agent__btn"
+                  disabled={buyBusy}
+                  onClick={() => void onBuyCredits()}
+                >
+                  {buyBusy ? "Processing…" : walletConnected ? "Pay with wallet" : "Connect wallet to pay"}
+                </button>
+                <button
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--ghost"
+                  onClick={() => void refreshCredits()}
+                >
+                  Refresh
+                </button>
+              </div>
+              {buyNote && <p className="ox-agent__note ox-x-buy__ok">{buyNote}</p>}
+              <div className="ox-x-buy__manual">
+                <label className="ox-agent__label" htmlFor="ox-buy-sig">
+                  Already paid? Paste signature
+                </label>
+                <input
+                  id="ox-buy-sig"
+                  className="ox-agent__input"
+                  value={manualSig}
+                  onChange={(e) => setManualSig(e.target.value)}
+                  placeholder="Solana tx signature"
+                />
+                <button
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--ghost"
+                  disabled={buyBusy || !manualSig.trim()}
+                  onClick={() => void onConfirmManualSig()}
+                >
+                  Confirm payment
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Advanced usage</h2>
+              <span className="ox-agent__panel-hint">ledger</span>
+            </div>
+            <div className="ox-agent__panel-b">
+              <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                Ask Claude/Grok for advanced usage — they call <code>x_credits_usage</code>. Same data here.
+              </p>
+              {(creditsUsage?.ledger?.length ?? 0) === 0 ? (
+                <p className="ox-agent__note">No purchases yet — buy above or via MCP.</p>
+              ) : (
+                <ul className="ox-x-usage__ledger">
+                  {creditsUsage!.ledger.map((e) => (
+                    <li key={e.id}>
+                      <div>
+                        <strong>
+                          {e.amount > 0 ? "+" : ""}
+                          {e.amount.toLocaleString()}
+                        </strong>{" "}
+                        <span className="ox-agent__muted">{e.kind}</span>
+                      </div>
+                      <div className="ox-agent__note" style={{ margin: 0 }}>
+                        {e.description || "—"}
+                        {e.sol != null ? ` · ${e.sol} SOL` : ""}
+                        {e.createdAt ? ` · ${new Date(e.createdAt).toLocaleString()}` : ""}
+                      </div>
+                      {e.explorer ? (
+                        <a href={e.explorer} target="_blank" rel="noopener noreferrer" className="ox-agent__linkish">
+                          View tx
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        </>
       )}
 
       {tab === "account" && (

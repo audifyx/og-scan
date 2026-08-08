@@ -12,19 +12,20 @@ const LINKS: { to: string; label: string; ico: string; match?: (p: string) => bo
   { to: "/x", label: "X", ico: "✕", match: (p) => p === "/x" || p.startsWith("/x/") },
 ];
 
-/* Surfaces that still need cross-app jumps (trade tab bar stays clear). */
-const SHOW_ON = ["/intel", "/trade", "/bagwork"];
+/* Surfaces without their own platform chip row — FAB keeps tab bars clear. */
+const SHOW_ON = ["/intel", "/trade", "/bagwork", "/predictions"];
 
-const POS_KEY = "orbitx.platformFab.pos";
+const POS_KEY = "orbitx.platformFab.pos.v2";
 const FAB_SIZE = 52;
 
 type Pos = { x: number; y: number };
 
 function defaultPos(): Pos {
-  if (typeof window === "undefined") return { x: 16, y: 120 };
+  if (typeof window === "undefined") return { x: 16, y: 96 };
+  /* Upper-right — never sits on the bottom trade / iOS tab bars */
   return {
-    x: Math.max(12, window.innerWidth - FAB_SIZE - 16),
-    y: Math.max(80, window.innerHeight - FAB_SIZE - 96),
+    x: Math.max(12, window.innerWidth - FAB_SIZE - 14),
+    y: Math.max(72, Math.min(120, window.innerHeight * 0.14)),
   };
 }
 

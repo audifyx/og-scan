@@ -114,6 +114,7 @@ const ALL_APPS: AppItem[] = [
   { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
   { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #5EEAD4, #0D9488)", glyph: Glyph.agent },
   { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(135deg, #3F3F46, #18181B)", glyph: Glyph.x },
+  { key: "shop", name: "Credits shop", caption: "Buy via X MCP · usage", href: "/shop", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #2DD4BF, #0F766E)", glyph: <span style={{ fontSize: 20 }}>◈</span> },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(135deg, #8B5CF6, #5B21B6)", glyph: Glyph.social },
   { key: "gaming", name: "Gaming", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "predict", name: "Predictions", caption: "Trade YES/NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
@@ -128,7 +129,7 @@ type HubSection = { id: string; title: string; subtitle: string; keys: string[] 
 const APP_SECTIONS: HubSection[] = [
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "trade", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Track wallets, PnL, and AI", keys: ["koltracker", "pnltracker", "ai"] },
-  { id: "mcp", title: "AI Connectors", subtitle: "Agent + X MCP for chat AIs", keys: ["agent", "xmcp"] },
+  { id: "mcp", title: "AI Connectors", subtitle: "Agent + X MCP for chat AIs", keys: ["agent", "xmcp", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed, spaces, and community", keys: ["social"] },
   { id: "play", title: "Play & Earn", subtitle: "Games, markets, NFTs, tasks", keys: ["gaming", "predict", "nft", "bagwork"] },
 ];

@@ -1,0 +1,368 @@
+/**
+ * X MCP purchasable credits — pay SOL to PLATFORM_WALLET, get credits.
+ * Rate: 10_000 credits per 1 SOL (any amount within min/max).
+ */
+import { PublicKey, SystemProgram, Transaction, Connection } from "@solana/web3.js";
+
+export const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
+export const CREDITS_PER_SOL = 10_000;
+export const MIN_SOL = 0.001;
+export const MAX_SOL = 100;
+
+function rpcUrl() {
+  return (
+    process.env.SOLANA_RPC_URL ||
+    process.env.HELIUS_RPC_URL ||
+    (process.env.HELIUS_API_KEY
+      ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+      : "") ||
+    process.env.VITE_SOLANA_RPC_URL ||
+    "https://api.mainnet-beta.solana.com"
+  );
+}
+
+export function solToCredits(sol) {
+  const n = Number(sol);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n * CREDITS_PER_SOL);
+}
+
+export function lamportsToCredits(lamports) {
+  const n = Number(lamports);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor((n / 1e9) * CREDITS_PER_SOL);
+}
+
+export function quoteCredits(solAmount) {
+  const sol = Number(solAmount);
+  if (!Number.isFinite(sol)) {
+    return { ok: false, error: "invalid_amount", message: "solAmount must be a number" };
+  }
+  if (sol < MIN_SOL) {
+    return {
+      ok: false,
+      error: "amount_too_low",
+      message: `Minimum purchase is ${MIN_SOL} SOL`,
+      minSol: MIN_SOL,
+    };
+  }
+  if (sol > MAX_SOL) {
+    return {
+      ok: false,
+      error: "amount_too_high",
+      message: `Maximum purchase is ${MAX_SOL} SOL`,
+      maxSol: MAX_SOL,
+    };
+  }
+  const lamports = Math.round(sol * 1e9);
+  const credits = solToCredits(sol);
+  return {
+    ok: true,
+    solAmount: sol,
+    lamports,
+    credits,
+    creditsPerSol: CREDITS_PER_SOL,
+    payTo: PLATFORM_CREDITS_WALLET,
+    rateLabel: `${CREDITS_PER_SOL.toLocaleString()} credits per 1 SOL`,
+    next: "Send SOL to payTo, then call x_credits_confirm with the transaction signature.",
+  };
+}
+
+async function rpc(method, params) {
+  const r = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc_error");
+  return j.result;
+}
+
+/** Build an unsigned SystemProgram.transfer for the buyer to sign. */
+export async function buildBuyTransaction({ fromPubkey, solAmount }) {
+  const q = quoteCredits(solAmount);
+  if (!q.ok) return q;
+  let from;
+  try {
+    from = new PublicKey(String(fromPubkey));
+  } catch {
+    return { ok: false, error: "invalid_pubkey", message: "publicKey is not a valid Solana address" };
+  }
+  const to = new PublicKey(PLATFORM_CREDITS_WALLET);
+  const conn = new Connection(rpcUrl(), "confirmed");
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
+  const tx = new Transaction({
+    feePayer: from,
+    recentBlockhash: blockhash,
+  }).add(
+    SystemProgram.transfer({
+      fromPubkey: from,
+      toPubkey: to,
+      lamports: q.lamports,
+    }),
+  );
+  const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  return {
+    ...q,
+    publicKey: from.toBase58(),
+    transactionBase64: Buffer.from(serialized).toString("base64"),
+    lastValidBlockHeight,
+    recentBlockhash: blockhash,
+    explorerPreview: `https://solscan.io/account/${PLATFORM_CREDITS_WALLET}`,
+    instructionsForAi: [
+      `Ask the user how much SOL they want to spend (any amount from ${MIN_SOL}–${MAX_SOL}).`,
+      `Build/sign: they must send ${q.solAmount} SOL to ${PLATFORM_CREDITS_WALLET}.`,
+      `After they sign & submit, call x_credits_confirm with the signature — credits credit automatically.`,
+      `They can review advanced usage anytime with x_credits_usage.`,
+    ],
+  };
+}
+
+export async function verifySolPayment(signature) {
+  const sig = String(signature || "").trim();
+  if (!sig || sig.length < 32) {
+    return { ok: false, error: "signature_required", message: "tx signature is required" };
+  }
+  let tx;
+  try {
+    tx = await rpc("getTransaction", [
+      sig,
+      { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
+    ]);
+  } catch (e) {
+    return { ok: false, error: "rpc_failed", message: String(e?.message || e) };
+  }
+  if (!tx) {
+    return {
+      ok: false,
+      error: "not_found",
+      message: "Transaction not found yet — wait for confirmation and retry x_credits_confirm",
+    };
+  }
+  if (tx.meta?.err) {
+    return { ok: false, error: "tx_failed", message: "On-chain transaction failed" };
+  }
+  const keys = (tx.transaction?.message?.accountKeys || []).map((k) =>
+    typeof k === "string" ? k : k.pubkey,
+  );
+  const idx = keys.indexOf(PLATFORM_CREDITS_WALLET);
+  if (idx < 0) {
+    return {
+      ok: false,
+      error: "wrong_recipient",
+      message: `Payment must go to ${PLATFORM_CREDITS_WALLET}`,
+    };
+  }
+  const pre = tx.meta?.preBalances?.[idx] ?? 0;
+  const post = tx.meta?.postBalances?.[idx] ?? 0;
+  const lamports = post - pre;
+  if (lamports <= 0) {
+    return { ok: false, error: "no_sol", message: "No SOL received by the OrbitX credits wallet" };
+  }
+  const solAmount = lamports / 1e9;
+  if (solAmount < MIN_SOL * 0.98) {
+    return {
+      ok: false,
+      error: "amount_too_low",
+      message: `Received ${solAmount} SOL — minimum is ${MIN_SOL} SOL`,
+      lamports,
+    };
+  }
+  const credits = lamportsToCredits(lamports);
+  if (credits < 1) {
+    return { ok: false, error: "credits_zero", message: "Amount too small to mint credits" };
+  }
+  return {
+    ok: true,
+    signature: sig,
+    lamports,
+    solAmount,
+    credits,
+    payTo: PLATFORM_CREDITS_WALLET,
+  };
+}
+
+async function getBalanceRow(sb, userId) {
+  const rows = await sb(
+    `x_mcp_credits?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`,
+  );
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
+export async function getCreditsBalance(sb, userId) {
+  const row = await getBalanceRow(sb, userId);
+  return {
+    ok: true,
+    balance: Number(row?.balance || 0),
+    lifetimePurchased: Number(row?.lifetime_purchased || 0),
+    lifetimeSpent: Number(row?.lifetime_spent || 0),
+    creditsPerSol: CREDITS_PER_SOL,
+    payTo: PLATFORM_CREDITS_WALLET,
+    usageUrl: "https://www.orbitx.world/x?tab=usage",
+    shopUrl: "https://www.orbitx.world/shop",
+  };
+}
+
+export async function getCreditsUsage(sb, userId, { limit = 40 } = {}) {
+  const bal = await getCreditsBalance(sb, userId);
+  const lim = Math.max(1, Math.min(100, Number(limit) || 40));
+  let ledger = [];
+  try {
+    ledger = await sb(
+      `x_mcp_credit_ledger?user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=${lim}&select=id,kind,amount,balance_after,sol_lamports,tx_signature,description,meta,created_at`,
+    );
+  } catch {
+    ledger = [];
+  }
+  const entries = (Array.isArray(ledger) ? ledger : []).map((e) => ({
+    id: e.id,
+    kind: e.kind,
+    amount: Number(e.amount),
+    balanceAfter: e.balance_after != null ? Number(e.balance_after) : null,
+    sol: e.sol_lamports != null ? Number(e.sol_lamports) / 1e9 : null,
+    txSignature: e.tx_signature || null,
+    description: e.description || null,
+    createdAt: e.created_at,
+    explorer: e.tx_signature ? `https://solscan.io/tx/${e.tx_signature}` : null,
+  }));
+  const purchased = entries.filter((e) => e.kind === "purchase");
+  const spent = entries.filter((e) => e.kind === "spend");
+  return {
+    ok: true,
+    ...bal,
+    advanced: {
+      summary: {
+        balance: bal.balance,
+        lifetimePurchased: bal.lifetimePurchased,
+        lifetimeSpent: bal.lifetimeSpent,
+        purchaseCount: purchased.length,
+        spendCount: spent.length,
+        rate: bal.creditsPerSol,
+        payWallet: PLATFORM_CREDITS_WALLET,
+      },
+      howToBuy: [
+        "Tell Claude/Grok: I want to buy credits",
+        "They ask how much SOL (any amount)",
+        "Call x_credits_buy → send the SOL transfer → x_credits_confirm",
+        "Credits appear on /x Usage and via x_credits_balance",
+      ],
+      ledger: entries,
+    },
+    ledger: entries,
+  };
+}
+
+export async function confirmCreditsPurchase(sb, userId, signature) {
+  const verified = await verifySolPayment(signature);
+  if (!verified.ok) return verified;
+
+  // Idempotent — same signature never credits twice
+  try {
+    const existing = await sb(
+      `x_mcp_credit_ledger?tx_signature=eq.${encodeURIComponent(verified.signature)}&select=id,user_id,amount,balance_after&limit=1`,
+    );
+    if (Array.isArray(existing) && existing[0]) {
+      const bal = await getCreditsBalance(sb, userId);
+      return {
+        ok: true,
+        alreadyCredited: true,
+        creditsAdded: Number(existing[0].amount || 0),
+        ...bal,
+        signature: verified.signature,
+        message: "This payment was already credited",
+      };
+    }
+  } catch {
+    /* continue */
+  }
+
+  const current = await getBalanceRow(sb, userId);
+  const prev = Number(current?.balance || 0);
+  const next = prev + verified.credits;
+  const lifetimePurchased = Number(current?.lifetime_purchased || 0) + verified.credits;
+  const now = new Date().toISOString();
+
+  if (current) {
+    await sb(`x_mcp_credits?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        balance: next,
+        lifetime_purchased: lifetimePurchased,
+        updated_at: now,
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } else {
+    await sb("x_mcp_credits", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: userId,
+        balance: next,
+        lifetime_purchased: verified.credits,
+        lifetime_spent: 0,
+        updated_at: now,
+        created_at: now,
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+
+  try {
+    await sb("x_mcp_credit_ledger", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: userId,
+        kind: "purchase",
+        amount: verified.credits,
+        balance_after: next,
+        sol_lamports: verified.lamports,
+        tx_signature: verified.signature,
+        description: `Purchased ${verified.credits} credits for ${verified.solAmount} SOL`,
+        meta: {
+          solAmount: verified.solAmount,
+          payTo: PLATFORM_CREDITS_WALLET,
+          creditsPerSol: CREDITS_PER_SOL,
+        },
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch (e) {
+    // Unique constraint race — treat as already credited
+    if (String(e?.code || e?.message || "").includes("23505") || /duplicate|unique/i.test(String(e?.message))) {
+      const bal = await getCreditsBalance(sb, userId);
+      return { ok: true, alreadyCredited: true, ...bal, signature: verified.signature };
+    }
+    throw e;
+  }
+
+  return {
+    ok: true,
+    alreadyCredited: false,
+    creditsAdded: verified.credits,
+    solAmount: verified.solAmount,
+    signature: verified.signature,
+    balance: next,
+    lifetimePurchased,
+    lifetimeSpent: Number(current?.lifetime_spent || 0),
+    creditsPerSol: CREDITS_PER_SOL,
+    payTo: PLATFORM_CREDITS_WALLET,
+    explorer: `https://solscan.io/tx/${verified.signature}`,
+    message: `+${verified.credits} credits added. New balance: ${next}.`,
+    usageUrl: "https://www.orbitx.world/x?tab=usage",
+  };
+}
+
+export function creditsBuyPrompt() {
+  return {
+    ok: true,
+    action: "ask_amount",
+    message:
+      "Ask the user how much SOL they want to spend on OrbitX X MCP credits (any amount). Then call x_credits_buy with solAmount (and publicKey if they share a wallet).",
+    minSol: MIN_SOL,
+    maxSol: MAX_SOL,
+    creditsPerSol: CREDITS_PER_SOL,
+    payTo: PLATFORM_CREDITS_WALLET,
+    example: "x_credits_buy with solAmount: 0.1 → 1,000 credits",
+  };
+}
