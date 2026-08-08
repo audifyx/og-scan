@@ -117,6 +117,9 @@
   }
 }
 
+/* Keep routed content fully above the fixed native-style tab bar. */
+.xh__page, .ox-agent, .ox-platform-surface { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+
 /* Desktop platform link chips */
 .ox-platform-links {
   display: none;
@@ -154,17 +157,22 @@
 /* iOS-style bottom dock */
 .ox-platform-dock {
   position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
   z-index: 60;
   display: flex;
   align-items: stretch;
   gap: 0.1rem;
-  max-width: min(560px, calc(100vw - 16px));
-  width: max-content;
-  padding: 0.35rem 0.4rem;
-  border-radius: 22px;
+  width: 100%;
+  max-width: none;
+  min-height: calc(64px + env(safe-area-inset-bottom, 0px));
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0.35rem 0.75rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(12, 16, 22, 0.78);
   backdrop-filter: blur(22px) saturate(160%);

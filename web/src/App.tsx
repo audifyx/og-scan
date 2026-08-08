@@ -634,7 +634,10 @@ const App = () => (
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/x" element={<XMcpPage />} />
-  <Route path="/x/shop" element={<XMcpCreditsShop />} />
+            <Route path="/x/shop" element={<XMcpCreditsShop />} />
+            <Route path="/shop" element={<Navigate to="/x/shop" replace />} />
+            <Route path="/credits/shop" element={<Navigate to="/x/shop" replace />} />
+
             <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />

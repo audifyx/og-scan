@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import "./platform-shell.css";
+import { QuickActionFAB } from "@/components/layout/QuickActionFAB";
 
 const LINKS: { to: string; label: string; ico: string; match?: (p: string) => boolean }[] = [
   { to: "/app", label: "Hub", ico: "⌂", match: (p) => p === "/app" || p.startsWith("/hub") },
@@ -14,6 +15,7 @@ const LINKS: { to: string; label: string; ico: string; match?: (p: string) => bo
 
 const SHOW_ON = [
   "/x",
+  "/x/shop",
   "/orbitxlaunch",
   "/nft",
   "/orbitx-social",
@@ -34,8 +36,9 @@ export function PlatformDock() {
   if (!visibleOn(pathname)) return null;
 
   return (
-    <nav className="ox-platform-dock" aria-label="OrbitX platforms">
-      {LINKS.map((l) => {
+    <>
+      <nav className="ox-platform-dock" aria-label="OrbitX platforms">
+        {LINKS.map((l) => {
         const on = l.match ? l.match(pathname) : pathname === l.to || pathname.startsWith(`${l.to}/`);
         const external = l.to.startsWith("/ORBITX_DEX");
         if (external) {
@@ -56,8 +59,10 @@ export function PlatformDock() {
             <span>{l.label}</span>
           </Link>
         );
-      })}
-    </nav>
+        })}
+      </nav>
+      <QuickActionFAB />
+    </>
   );
 }
 
