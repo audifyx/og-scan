@@ -1,5 +1,65 @@
-/* OrbitX · X MCP Hub — desktop dashboard + mobile app shell
+/* OrbitX · X MCP content widgets (page chrome uses AgentShell / ox-agent).
    Fonts: system stack only (no Google @import — that blocked mobile loads). */
+
+/* Nested under AgentShell — tone-match agent panels */
+.ox-agent .xh__composer {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ox-agent .xh__composer textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--oa-line, rgba(255, 255, 255, 0.08));
+  outline: none;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--oa-text, #f2f5f7);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+}
+
+.ox-agent .xh__composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--oa-line, rgba(255, 255, 255, 0.08));
+  grid-column: 1 / -1;
+}
+
+.ox-agent .xh__field label {
+  color: var(--oa-muted, #8b95a5);
+}
+
+.ox-agent .xh__input,
+.ox-agent .xh__select,
+.ox-agent .xh__textarea {
+  border-color: var(--oa-line-strong, rgba(255, 255, 255, 0.14));
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--oa-text, #f2f5f7);
+  border-radius: 12px;
+}
+
+.ox-agent .xh__card {
+  border: 1px solid var(--oa-line, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  margin-bottom: 0.65rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ox-agent .xh__feed {
+  margin-top: 0.85rem;
+}
 
 .xh {
   --xh-bg: #07090c;

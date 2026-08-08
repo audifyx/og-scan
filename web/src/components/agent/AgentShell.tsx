@@ -4,7 +4,9 @@ import "./agent-shell.css";
 
 export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";
 
-const DEFAULT_TABS: { id: AgentTabId; label: string; ico: string }[] = [
+export type ShellTab = { id: string; label: string; ico?: string };
+
+const DEFAULT_TABS: ShellTab[] = [
   { id: "setup", label: "Home", ico: "⌂" },
   { id: "wallet", label: "Wallet", ico: "◎" },
   { id: "keys", label: "Keys", ico: "✦" },
@@ -12,8 +14,8 @@ const DEFAULT_TABS: { id: AgentTabId; label: string; ico: string }[] = [
 ];
 
 type Props = {
-  activeTab?: AgentTabId;
-  onTabChange?: (tab: AgentTabId) => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
   statusLabel?: string;
   statusWarn?: boolean;
   showTabs?: boolean;
@@ -23,7 +25,12 @@ type Props = {
   footerBrand?: string;
   footerNote?: string;
   mcpUrl?: string;
-  tabs?: { id: AgentTabId; label: string; ico?: string }[];
+  tabs?: ShellTab[];
+  /** Cross-link in the top bar (Agent ↔ X). */
+  siblingHref?: string;
+  siblingLabel?: string;
+  siblingIcon?: string;
+  topSubtitle?: string;
   children: ReactNode;
 };
 
@@ -40,22 +47,29 @@ export function AgentShell({
   footerNote = "Non-custodial — keys stay on your device until you copy them. You sign every tx in your wallet.",
   mcpUrl = "https://www.orbitx.world/api/mcp",
   tabs,
+  siblingHref = "/x",
+  siblingLabel = "X MCP",
+  siblingIcon = "✕",
+  topSubtitle = "Dashboard · Claude · ChatGPT · Grok",
   children,
 }: Props) {
-  const nav = (tabs?.length
-    ? tabs.map((t) => ({
-        id: t.id,
-        label: t.label,
-        ico: t.ico || DEFAULT_TABS.find((x) => x.id === t.id)?.ico || "·",
-      }))
-    : DEFAULT_TABS) as { id: AgentTabId; label: string; ico: string }[];
+  const nav = (tabs?.length ? tabs : DEFAULT_TABS).map((t) => ({
+    id: t.id,
+    label: t.label,
+    ico: t.ico || DEFAULT_TABS.find((x) => x.id === t.id)?.ico || "·",
+  }));
+
+  const railSibling =
+    brandHref === "/x"
+      ? { href: "/agent", label: "Agent" }
+      : { href: "/x", label: "X MCP" };
 
   return (
     <div className={`ox-agent${showTabs ? " ox-agent--dash" : " ox-agent--simple"}`}>
       <div className="ox-agent__atmosphere" aria-hidden />
 
       {showTabs && onTabChange && (
-        <aside className="ox-agent__rail" aria-label="Agent navigation">
+        <aside className="ox-agent__rail" aria-label="Navigation">
           <Link to={brandHref} className="ox-agent__brand">
             <span className="ox-agent__brand-mark" aria-hidden>
               <img src="/orbitx-banner.jpg" alt="" />
@@ -90,7 +104,7 @@ export function AgentShell({
               {statusLabel}
             </span>
             <div className="ox-agent__rail-links">
-              <Link to="/x">X MCP</Link>
+              <Link to={railSibling.href}>{railSibling.label}</Link>
               <Link to="/app">Hub</Link>
             </div>
           </div>
@@ -110,8 +124,8 @@ export function AgentShell({
             )}
             {showTabs && (
               <div className="ox-agent__top-title">
-                <h1>{nav.find((t) => t.id === activeTab)?.label || "Agent"}</h1>
-                <p>Dashboard · Claude · ChatGPT · Grok</p>
+                <h1>{nav.find((t) => t.id === activeTab)?.label || brandSub}</h1>
+                <p>{topSubtitle}</p>
               </div>
             )}
           </div>
@@ -125,8 +139,8 @@ export function AgentShell({
                 ↻
               </button>
             )}
-            <Link to="/x" className="ox-agent__icon-btn" aria-label="X MCP" title="X MCP">
-              ✕
+            <Link to={siblingHref} className="ox-agent__icon-btn" aria-label={siblingLabel} title={siblingLabel}>
+              {siblingIcon}
             </Link>
             <Link to="/app" className="ox-agent__btn ox-agent__btn--ghost ox-agent__hub-link">
               Hub
@@ -154,7 +168,7 @@ export function AgentShell({
       </div>
 
       {showTabs && onTabChange && (
-        <nav className="ox-agent__dock" aria-label="Agent sections">
+        <nav className="ox-agent__dock" aria-label="Sections">
           {nav.map((t) => (
             <button
               key={t.id}

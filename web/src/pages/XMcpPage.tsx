@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
@@ -32,18 +32,18 @@ import {
   type XMcpChatAuthMint,
   type XNimModel,
 } from "@/lib/xMcp";
+import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
 import XMcpMatrix from "@/components/x/XMcpMatrix";
 import "./x-hub.css";
 
-type HubTab = "home" | "account" | "agent" | "queue" | "connect" | "messages" | "matrix";
+/** Same 4-tab shell structure as /agent — X MCP content. */
+type XTab = "home" | "account" | "keys" | "connect";
+type HomeSub = "post" | "agent" | "queue" | "messages" | "matrix";
 
-const NAV: { id: HubTab; label: string; ico: string }[] = [
+const X_TABS: ShellTab[] = [
   { id: "home", label: "Home", ico: "⌂" },
   { id: "account", label: "Account", ico: "◎" },
-  { id: "messages", label: "Messages", ico: "✉" },
-  { id: "agent", label: "Agent", ico: "✦" },
-  { id: "queue", label: "Queue", ico: "☰" },
-  { id: "matrix", label: "Matrix", ico: "◈" },
+  { id: "keys", label: "Keys", ico: "✦" },
   { id: "connect", label: "Connect", ico: "⬡" },
 ];
 
@@ -75,27 +75,25 @@ function SecretRow({
   const [visible, setVisible] = useState(false);
   const has = Boolean(value);
   return (
-    <div className="xh__row">
-      <div className="xh__row-label">{label}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <div className="xh__row-value">
-          {!has
-            ? emptyLabel || "Create an API key first"
-            : visible
-              ? value
-              : maskSecret(value, label.toLowerCase().includes("header") ? "header" : "key")}
-        </div>
-        {has && (
-          <>
-            <button type="button" className="xh__btn xh__btn--ghost" onClick={() => setVisible((v) => !v)}>
-              {visible ? "Hide" : "View"}
-            </button>
-            <button type="button" className="xh__btn" onClick={onCopy}>
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </>
-        )}
+    <div className="ox-agent__row">
+      <div className="ox-agent__label">{label}</div>
+      <div className="ox-agent__value">
+        {!has
+          ? emptyLabel || "Create an API key first"
+          : visible
+            ? value
+            : maskSecret(value, label.toLowerCase().includes("header") ? "header" : "key")}
       </div>
+      {has && (
+        <div className="ox-agent__actions">
+          <button type="button" className="ox-agent__btn ox-agent__btn--ghost" onClick={() => setVisible((v) => !v)}>
+            {visible ? "Hide" : "View"}
+          </button>
+          <button type="button" className="ox-agent__btn" onClick={onCopy}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -114,134 +112,27 @@ function FieldRow({
   copyable?: boolean;
 }) {
   return (
-    <div className="xh__row">
-      <div className="xh__row-label">{label}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <div className="xh__row-value">{value}</div>
-        {copyable && onCopy ? (
-          <button type="button" className="xh__btn" onClick={onCopy}>
+    <div className="ox-agent__row">
+      <div className="ox-agent__label">{label}</div>
+      <div className="ox-agent__value">{value}</div>
+      {copyable && onCopy ? (
+        <div className="ox-agent__actions">
+          <button type="button" className="ox-agent__btn" onClick={onCopy}>
             {copied ? "Copied" : "Copy"}
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function HubShell({
-  tab,
-  onTab,
-  title,
-  xHandle,
-  xConnected,
-  hasKey,
-  agentOn,
-  avatarUrl,
-  onRefresh,
-  onCompose,
-  aside,
-  children,
-}: {
-  tab: HubTab;
-  onTab: (t: HubTab) => void;
-  title: string;
-  xHandle: string | null;
-  xConnected: boolean;
-  hasKey?: boolean;
-  agentOn?: boolean;
-  avatarUrl?: string | null;
-  onRefresh?: () => void;
-  onCompose?: () => void;
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
-  const initial = (xHandle || "X").slice(0, 1).toUpperCase();
-  return (
-    <div className="xh">
-      <div className="xh__atmosphere" aria-hidden />
-      <div className="xh__shell">
-        <aside className="xh__left">
-          <Link to="/x" className="xh__brand">
-            <span className="xh__brand-mark" aria-hidden>
-              <img src="/orbitx-banner.jpg" alt="" />
-            </span>
-            <span className="xh__brand-text">
-              <span className="xh__brand-title">
-                Orbit<span>X</span>
-              </span>
-              <span className="xh__brand-sub">X MCP</span>
-            </span>
-          </Link>
-          <nav className="xh__nav" aria-label="X hub">
-            {NAV.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                className={`xh__nav-btn${tab === n.id ? " is-active" : ""}`}
-                onClick={() => onTab(n.id)}
-              >
-                <span className="xh__nav-ico" aria-hidden>
-                  {n.ico}
-                </span>
-                <span className="xh__nav-label">{n.label}</span>
-              </button>
-            ))}
-          </nav>
-          <button type="button" className="xh__compose" onClick={onCompose}>
-            <span className="xh__compose-label">Post</span>
-          </button>
-          <div className="xh__left-foot">
-            <div className="xh__avatar-row">
-              <div className="xh__avatar">
-                {avatarUrl ? <img src={avatarUrl} alt="" decoding="async" /> : initial}
-              </div>
-              <div className="xh__avatar-meta">
-                <div className="xh__avatar-name">{xConnected ? `@${xHandle}` : "Not connected"}</div>
-                <div className="xh__avatar-handle">{xConnected ? "X linked" : "Connect X"}</div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <main className="xh__center">
-          <header className="xh__top">
-            <div className="xh__top-title">
-              <h1>{title}</h1>
-              <p>OrbitX · Claude · ChatGPT · Grok</p>
-            </div>
-            <div className="xh__top-actions">
-              {onRefresh ? (
-                <button type="button" className="xh__icon-btn" onClick={onRefresh} title="Refresh" aria-label="Refresh">
-                  ↻
-                </button>
-              ) : null}
-              <Link to="/agent" className="xh__icon-btn" title="Agent MCP" aria-label="Agent MCP">
-                ◆
-              </Link>
-            </div>
-          </header>
-          <div className="xh__mobile-status" aria-label="Status">
-            <span className={`xh__chip${xConnected ? " is-ok" : " is-warn"}`}>
-              {xConnected ? `@${xHandle}` : "X off"}
-            </span>
-            <span className={`xh__chip${hasKey ? " is-ok" : ""}`}>{hasKey ? "Key" : "No key"}</span>
-            <span className={`xh__chip${agentOn ? " is-ok" : ""}`}>{agentOn ? "Agent on" : "Agent off"}</span>
-          </div>
-          {children}
-        </main>
-
-        <aside className="xh__right">{aside}</aside>
-      </div>
-    </div>
-  );
-}
-
-/** /x — X-inspired MCP hub */
+/** /x — same AgentShell UI as /agent, X MCP content */
 export default function XMcpPage() {
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
 
-  const [tab, setTab] = useState<HubTab>("home");
+  const [tab, setTab] = useState<XTab>("home");
+  const [homeSub, setHomeSub] = useState<HomeSub>("post");
   const [boot, setBoot] = useState<XMcpBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -426,7 +317,7 @@ export default function XMcpPage() {
       }
       const keys = await listXMcpApiKeys();
       setBoot((prev) => (prev ? { ...prev, keys: keys.keys, mintedKey: minted } : prev));
-      setTab("connect");
+      setTab("keys");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create key");
     } finally {
@@ -503,7 +394,10 @@ export default function XMcpPage() {
         setError(res.message || res.error || "Generate failed");
       }
       await refreshQueue();
-      if (!postNow) setTab("queue");
+      if (!postNow) {
+        setTab("home");
+        setHomeSub("queue");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generate failed");
     } finally {
@@ -580,180 +474,180 @@ export default function XMcpPage() {
     }
   };
 
-  const title =
-    tab === "home"
-      ? "Home"
-      : tab === "account"
-        ? "Account"
-        : tab === "messages"
-          ? "Messages"
-          : tab === "agent"
-            ? "Agent"
-            : tab === "queue"
-              ? "Queue"
-              : tab === "matrix"
-                ? "Matrix"
-                : "Connect";
+  const statusLabel = xConnected
+    ? hasKey
+      ? xAgent?.enabled
+        ? "Agent on"
+        : "X ready"
+      : "Need API key"
+    : "Connect X";
 
-  const aside = (
-    <>
-      <div className="xh__aside-card">
-        <h2>Status</h2>
-        <div className="xh__trend">
-          <div className="xh__trend-k">X account</div>
-          <div className="xh__trend-v">{xConnected ? `@${xHandle}` : "Not connected"}</div>
-        </div>
-        <div className="xh__trend">
-          <div className="xh__trend-k">API key</div>
-          <div className="xh__trend-v">{hasKey ? "Ready" : "Create one"}</div>
-        </div>
-        <div className="xh__trend">
-          <div className="xh__trend-k">Agent</div>
-          <div className="xh__trend-v">
-            {xAgent?.enabled ? `${xAgent.mode} · on` : xAgent ? `${xAgent.mode} · off` : "—"}
-          </div>
-        </div>
-        <div className="xh__trend">
-          <div className="xh__trend-k">Queue</div>
-          <div className="xh__trend-v">{queue.length} items</div>
-        </div>
-      </div>
-      <div className="xh__aside-card">
-        <h2>MCP</h2>
-        <p className="xh__note" style={{ marginTop: 0 }}>
-          Post, quote, reply, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok.
-        </p>
-        <div className="xh__btn-row">
-          <button type="button" className="xh__btn xh__btn--primary" onClick={() => setTab("connect")}>
-            Wire AI
-          </button>
-          <button type="button" className="xh__btn" onClick={() => copy("mcp", oauth.mcpUrl)}>
-            {copied === "mcp" ? "Copied" : "Copy URL"}
-          </button>
-        </div>
-      </div>
-    </>
-  );
+  const goHomeSub = (sub: HomeSub) => {
+    setTab("home");
+    setHomeSub(sub);
+  };
 
-  // Show the shell as soon as auth resolves; bootstrap may still finish in background
   if (authLoading && !user) {
-    return (
-      <div className="xh__loading">
-        <div>
-          <div className="xh__spinner" />
-          <div>Opening X Hub…</div>
-          <p>If this stalls, refresh the page.</p>
-        </div>
-      </div>
-    );
+    return <AgentLoading label="Opening X MCP…" />;
   }
 
   if (!user) {
     return (
-      <HubShell
-        tab="home"
-        onTab={() => undefined}
-        title="OrbitX · X"
-        xHandle={null}
-        xConnected={false}
-        hasKey={false}
-        agentOn={false}
-        onCompose={() => undefined}
-        aside={
-          <div className="xh__aside-card">
-            <h2>Welcome</h2>
-            <p className="xh__note" style={{ marginTop: 0 }}>
-              Sign in with your wallet to connect X and MCP tools.
-            </p>
-          </div>
-        }
+      <AgentShell
+        showTabs={false}
+        brandHref="/x"
+        brandSub="X MCP"
+        footerBrand="OrbitX X MCP"
+        footerNote="Connect X. Train an agent. Post from Claude, ChatGPT, or Grok."
+        mcpUrl={oauth.mcpUrl}
+        siblingHref="/agent"
+        siblingLabel="Agent MCP"
+        siblingIcon="◆"
+        statusLabel="Sign in"
+        statusWarn
       >
-        <div className="xh__section-pad">
-          <strong style={{ fontSize: "1.6rem", fontWeight: 800, letterSpacing: "-0.03em" }}>
-            OrbitX
-          </strong>
-          <p className="xh__note">Connect X. Train an agent. Post from Claude.</p>
-          <div className="xh__btn-row">
-            {pickable.slice(0, 4).map((w) => (
-              <button
-                key={w.name}
-                type="button"
-                className="xh__btn xh__btn--primary"
-                disabled={busy === w.name}
-                onClick={() =>
-                  signInWith(w.name, { replaceEmailSession: true })
-                    .then(() => refresh())
-                    .catch((e) => setError(e.message))
-                }
-              >
-                {busy === w.name ? "Connecting…" : w.name}
-              </button>
-            ))}
-          </div>
-          <p className="xh__note">
-            Or{" "}
-            <Link to="/auth?next=/x" style={{ color: "var(--xh-accent)", fontWeight: 700 }}>
-              sign in with email
-            </Link>
-            .
-          </p>
-          {error && <div className="xh__alert">{error}</div>}
+        <div className="ox-agent__hero">
+          <h1 className="ox-agent__title">OrbitX</h1>
+          <p className="ox-agent__lead">X MCP — connect X, train an agent, post from chat AI.</p>
         </div>
-      </HubShell>
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Sign in</h2>
+            <span className="ox-agent__panel-hint">wallet or email</span>
+          </div>
+          <div className="ox-agent__panel-b">
+            <p className="ox-agent__note" style={{ marginTop: 0 }}>
+              Sign in to connect X and mint MCP keys for Claude / ChatGPT / Grok.
+            </p>
+            <div className="ox-agent__btn-row">
+              {pickable.slice(0, 4).map((w) => (
+                <button
+                  key={w.name}
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--primary"
+                  disabled={busy === w.name}
+                  onClick={() =>
+                    signInWith(w.name, { replaceEmailSession: true })
+                      .then(() => refresh())
+                      .catch((e) => setError(e.message))
+                  }
+                >
+                  {busy === w.name ? "Connecting…" : w.name}
+                </button>
+              ))}
+            </div>
+            <p className="ox-agent__note">
+              Or <Link to="/auth?next=/x">sign in with email</Link>.
+            </p>
+            {error && <div className="ox-agent__alert">{error}</div>}
+          </div>
+        </section>
+      </AgentShell>
     );
   }
 
   return (
-    <HubShell
-      tab={tab}
-      onTab={setTab}
-      title={title}
-      xHandle={xHandle}
-      xConnected={xConnected}
-      hasKey={hasKey}
-      agentOn={Boolean(xAgent?.enabled)}
-      avatarUrl={avatarUrl}
+    <AgentShell
+      activeTab={tab}
+      onTabChange={(id) => setTab(id as XTab)}
+      tabs={X_TABS}
+      brandHref="/x"
+      brandSub="X MCP"
+      footerBrand="OrbitX X MCP"
+      footerNote="Post, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok. Non-custodial X OAuth — you authorize scopes on X."
+      mcpUrl={oauth.mcpUrl}
+      siblingHref="/agent"
+      siblingLabel="Agent MCP"
+      siblingIcon="◆"
+      topSubtitle="X MCP · Claude · ChatGPT · Grok"
+      statusLabel={statusLabel}
+      statusWarn={!xConnected || !hasKey}
       onRefresh={refresh}
-      onCompose={() => setTab("home")}
-      aside={aside}
     >
       {loading && (
-        <div className="xh__section-pad" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className="xh__spinner" style={{ margin: 0 }} />
-          <span className="xh__note" style={{ margin: 0 }}>
-            Syncing account…
-          </span>
-        </div>
+        <p className="ox-agent__note" style={{ marginTop: 0 }}>
+          Syncing account…
+        </p>
       )}
-      {error && <div className="xh__alert">{error}</div>}
+      {error && <div className="ox-agent__alert">{error}</div>}
 
       {tab === "home" && (
         <>
-          <div className="xh__hero">
-            <div className="xh__hero-copy">
-              <h2>OrbitX</h2>
-              <p>X MCP control center — post, DM, and run your NVIDIA agent from chat AI.</p>
-            </div>
-            <div className="xh__kpis">
-              <button type="button" className={`xh__kpi${xConnected ? " is-ok" : ""}`} onClick={() => setTab("account")}>
-                <span className="xh__kpi-k">X</span>
-                <span className="xh__kpi-v">{xConnected ? `@${xHandle}` : "Connect"}</span>
-              </button>
-              <button type="button" className={`xh__kpi${hasKey ? " is-ok" : ""}`} onClick={() => setTab("connect")}>
-                <span className="xh__kpi-k">AI</span>
-                <span className="xh__kpi-v">{hasKey ? "Ready" : "Wire"}</span>
+          <div className="ox-agent__hero">
+            <h1 className="ox-agent__title">OrbitX</h1>
+            <p className="ox-agent__lead">
+              X MCP dashboard — post, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok.
+            </p>
+            <div className="ox-agent__kpis">
+              <button
+                type="button"
+                className={`ox-agent__kpi${xConnected ? " is-ok" : ""}`}
+                onClick={() => setTab("account")}
+              >
+                <span className="ox-agent__kpi-k">X</span>
+                <span className="ox-agent__kpi-v">{xConnected ? `@${xHandle}` : "Connect"}</span>
               </button>
               <button
                 type="button"
-                className={`xh__kpi${xAgent?.enabled ? " is-ok" : ""}`}
-                onClick={() => setTab("agent")}
+                className={`ox-agent__kpi${hasKey ? " is-ok" : ""}`}
+                onClick={() => setTab("keys")}
               >
-                <span className="xh__kpi-k">Agent</span>
-                <span className="xh__kpi-v">{xAgent?.enabled ? "On" : "Setup"}</span>
+                <span className="ox-agent__kpi-k">API key</span>
+                <span className="ox-agent__kpi-v">{hasKey ? "Ready" : "Create"}</span>
+              </button>
+              <button
+                type="button"
+                className={`ox-agent__kpi${xAgent?.enabled ? " is-ok" : ""}`}
+                onClick={() => goHomeSub("agent")}
+              >
+                <span className="ox-agent__kpi-k">Agent</span>
+                <span className="ox-agent__kpi-v">{xAgent?.enabled ? "On" : "Setup"}</span>
               </button>
             </div>
+            <div className="ox-agent__steps">
+              <span className={`ox-agent__chip${xConnected ? " is-ok" : ""}`}>
+                {xConnected ? `@${xHandle}` : "X needed"}
+              </span>
+              <span className={`ox-agent__chip${hasKey ? " is-ok" : ""}`}>
+                {hasKey ? "API key ready" : "Create API key"}
+              </span>
+              <span className={`ox-agent__chip${xAgent?.enabled ? " is-ok" : ""}`}>
+                {xAgent?.enabled ? "Agent on" : "Agent off"}
+              </span>
+            </div>
           </div>
-          <div className="xh__composer">
+
+          <div className="ox-agent__subtabs">
+            {(
+              [
+                ["post", "Post"],
+                ["agent", "Agent"],
+                ["queue", "Queue"],
+                ["messages", "Messages"],
+                ["matrix", "Matrix"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`ox-agent__subtab${homeSub === id ? " is-on" : ""}`}
+                onClick={() => setHomeSub(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {tab === "home" && homeSub === "post" && (
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Composer</h2>
+              <span className="ox-agent__panel-hint">draft or post</span>
+            </div>
+            <div className="ox-agent__panel-b">
+          <div className="xh__composer" style={{ border: 0, padding: 0, display: "block" }}>
             <div className="xh__avatar">{avatarUrl ? <img src={avatarUrl} alt="" /> : (xHandle || "X").slice(0, 1).toUpperCase()}</div>
             <div>
               <textarea
@@ -812,8 +706,8 @@ export default function XMcpPage() {
                 <div className="xh__card-title">Create an MCP key</div>
                 <p className="xh__note">Claude and ChatGPT use this bearer token to call X tools.</p>
                 <div className="xh__card-actions">
-                  <button type="button" className="xh__btn xh__btn--ox" onClick={() => setTab("connect")}>
-                    Open Connect
+                  <button type="button" className="xh__btn xh__btn--ox" onClick={() => setTab("keys")}>
+                    Open Keys
                   </button>
                 </div>
               </div>
@@ -860,11 +754,17 @@ export default function XMcpPage() {
               </div>
             )}
           </div>
-        </>
+            </div>
+          </section>
       )}
 
       {tab === "account" && (
-        <div className="xh__section-pad">
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">X account</h2>
+            <span className="ox-agent__panel-hint">OAuth scopes</span>
+          </div>
+          <div className="ox-agent__panel-b">
           {xConnected ? (
             <>
               <div className="xh__avatar-row" style={{ marginBottom: 16 }}>
@@ -879,33 +779,33 @@ export default function XMcpPage() {
                 </div>
               </div>
               {boot?.x?.scopes != null && boot.x.hasTweetWrite === false && (
-                <div className="xh__alert">
+                <div className="ox-agent__alert">
                   No write permission on this token (missing tweet.write). Revoke OrbitX at x.com/settings/connected_apps,
                   stay signed in here, then Reconnect once. Tokens now refresh automatically — you should not need to
                   re-auth every session.
                 </div>
               )}
               {boot?.x?.hasTweetWrite === true && (
-                <p className="xh__note">
+                <p className="ox-agent__note">
                   Write OK: tweet.write{boot.x.hasDmWrite ? " + dm.write" : ""}. Refresh is automatic — reconnect only if
                   posting fails with 403.
                 </p>
               )}
               {boot?.x?.scopes ? (
-                <p className="xh__note" style={{ fontFamily: "var(--xh-mono)", fontSize: "0.75rem" }}>
+                <p className="ox-agent__note" style={{ fontFamily: "var(--oa-mono)", fontSize: "0.75rem" }}>
                   Granted: {boot.x.scopes}
                 </p>
               ) : null}
-              <div className="xh__btn-row">
-                <button type="button" className="xh__btn xh__btn--primary" disabled={connectingX} onClick={onConnectX}>
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={connectingX} onClick={onConnectX}>
                   {connectingX ? "Redirecting…" : "Reconnect X"}
                 </button>
-                <button type="button" className="xh__btn" onClick={() => setTab("matrix")}>
+                <button type="button" className="ox-agent__btn" onClick={() => goHomeSub("matrix")}>
                   Open Matrix
                 </button>
                 <button
                   type="button"
-                  className="xh__btn xh__btn--danger"
+                  className="ox-agent__btn ox-agent__btn--danger"
                   disabled={connectingX}
                   onClick={async () => {
                     try {
@@ -924,21 +824,27 @@ export default function XMcpPage() {
             </>
           ) : (
             <>
-              <p className="xh__note" style={{ marginTop: 0 }}>
+              <p className="ox-agent__note" style={{ marginTop: 0 }}>
                 Connect your X account so Claude or ChatGPT can post, reply, and DM through this MCP.
               </p>
-              <div className="xh__btn-row">
-                <button type="button" className="xh__btn xh__btn--primary" disabled={connectingX} onClick={onConnectX}>
+              <div className="ox-agent__btn-row">
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={connectingX} onClick={onConnectX}>
                   {connectingX ? "Redirecting…" : "Connect X"}
                 </button>
               </div>
             </>
           )}
-        </div>
+          </div>
+        </section>
       )}
 
-      {tab === "messages" && (
-        <div className="xh__section-pad">
+      {tab === "home" && homeSub === "messages" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Messages</h2>
+            <span className="ox-agent__panel-hint">x_dm</span>
+          </div>
+          <div className="ox-agent__panel-b">
           <div className="xh__field">
             <label htmlFor="xh-dm-user">To</label>
             <input
@@ -959,24 +865,30 @@ export default function XMcpPage() {
               placeholder="Write a DM…"
             />
           </div>
-          <div className="xh__btn-row">
-            <button type="button" className="xh__btn xh__btn--primary" disabled={dmBusy || !xConnected} onClick={onSendDm}>
+          <div className="ox-agent__btn-row">
+            <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={dmBusy || !xConnected} onClick={onSendDm}>
               {dmBusy ? "Sending…" : "Send DM"}
             </button>
-            <button type="button" className="xh__btn" disabled={dmBusy || !xConnected} onClick={onLoadDmInbox}>
+            <button type="button" className="ox-agent__btn" disabled={dmBusy || !xConnected} onClick={onLoadDmInbox}>
               Check inbox
             </button>
           </div>
-          {dmNote && <p className="xh__note">{dmNote}</p>}
-          <p className="xh__note">MCP tools: x_dm · x_dm_inbox</p>
-        </div>
+          {dmNote && <p className="ox-agent__note">{dmNote}</p>}
+          <p className="ox-agent__note">MCP tools: x_dm · x_dm_inbox</p>
+          </div>
+        </section>
       )}
 
-      {tab === "agent" && (
+      {tab === "home" && homeSub === "agent" && (
         <>
-          <div className="xh__section-pad">
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">NVIDIA agent</h2>
+              <span className="ox-agent__panel-hint">persona · auto-reply</span>
+            </div>
+            <div className="ox-agent__panel-b">
             {!xAgent ? (
-              <p className="xh__note">Loading agent…</p>
+              <p className="ox-agent__note">Loading agent…</p>
             ) : (
               <>
                 <div className="xh__field">
@@ -1124,13 +1036,13 @@ export default function XMcpPage() {
                     />
                   </label>
                 </div>
-                <div className="xh__btn-row">
-                  <button type="button" className="xh__btn xh__btn--primary" disabled={agentBusy} onClick={onSaveAgent}>
+                <div className="ox-agent__btn-row">
+                  <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={agentBusy} onClick={onSaveAgent}>
                     {agentBusy ? "Saving…" : "Save agent"}
                   </button>
                   <button
                     type="button"
-                    className="xh__btn"
+                    className="ox-agent__btn"
                     disabled={agentBusy}
                     onClick={async () => {
                       setAgentBusy(true);
@@ -1149,11 +1061,14 @@ export default function XMcpPage() {
                 </div>
               </>
             )}
-          </div>
-          <div className="xh__section-pad">
-            <div className="xh__card-title" style={{ marginBottom: 12 }}>
-              Train
             </div>
+          </section>
+          <section className="ox-agent__panel">
+            <div className="ox-agent__panel-h">
+              <h2 className="ox-agent__panel-title">Train</h2>
+              <span className="ox-agent__panel-hint">knowledge</span>
+            </div>
+            <div className="ox-agent__panel-b">
             <div className="xh__field">
               <label htmlFor="xh-ktitle">Title</label>
               <input
@@ -1173,46 +1088,51 @@ export default function XMcpPage() {
                 placeholder="Facts, product points, voice examples…"
               />
             </div>
-            <div className="xh__btn-row">
+            <div className="ox-agent__btn-row">
               <button
                 type="button"
-                className="xh__btn"
+                className="ox-agent__btn"
                 disabled={agentBusy || !trainContent.trim()}
                 onClick={onTrain}
               >
                 Add knowledge
               </button>
-              <button type="button" className="xh__btn xh__btn--ox" disabled={agentBusy} onClick={() => onGenerate(false)}>
+              <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={agentBusy} onClick={() => onGenerate(false)}>
                 Generate draft
               </button>
             </div>
             {knowledge.slice(0, 8).map((k) => (
-              <div key={k.id} className="xh__row">
-                <div>
-                  <div className="xh__card-title">{k.title}</div>
-                  <div className="xh__note">
+              <div key={k.id} className="ox-agent__row">
+                <div className="ox-agent__value ox-agent__value--plain">
+                  <strong>{k.title}</strong>
+                  <div className="ox-agent__note" style={{ marginTop: 4 }}>
                     {k.content.slice(0, 120)}
                     {k.content.length > 120 ? "…" : ""}
                   </div>
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </section>
         </>
       )}
 
-      {tab === "queue" && (
-        <div className="xh__feed">
-          <div className="xh__section-pad" style={{ borderBottom: "1px solid var(--xh-line)" }}>
-            <div className="xh__btn-row" style={{ marginTop: 0 }}>
-              <button type="button" className="xh__btn" disabled={agentBusy} onClick={() => refreshQueue()}>
+      {tab === "home" && homeSub === "queue" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Queue</h2>
+            <span className="ox-agent__panel-hint">{queue.length} items</span>
+          </div>
+          <div className="ox-agent__panel-b">
+            <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
+              <button type="button" className="ox-agent__btn" disabled={agentBusy} onClick={() => refreshQueue()}>
                 Refresh
               </button>
-              <button type="button" className="xh__btn" onClick={() => setTab("home")}>
+              <button type="button" className="ox-agent__btn" onClick={() => goHomeSub("post")}>
                 Composer
               </button>
             </div>
-          </div>
+        <div className="xh__feed" style={{ border: 0 }}>
           {queue.length === 0 ? (
             <div className="xh__empty">
               <strong>No drafts yet</strong>
@@ -1267,26 +1187,35 @@ export default function XMcpPage() {
               );
             })
           )}
-        </div>
+          </div>
+          </div>
+        </section>
       )}
 
-      {tab === "matrix" && (
-        <div className="xh__section-pad">
+      {tab === "home" && homeSub === "matrix" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Matrix</h2>
+            <span className="ox-agent__panel-hint">capabilities</span>
+          </div>
+          <div className="ox-agent__panel-b">
           <XMcpMatrix
             xConnected={xConnected}
             hasTweetWrite={boot?.x?.hasTweetWrite}
             hasDmWrite={boot?.x?.hasDmWrite}
             hasKey={hasKey}
           />
-        </div>
+          </div>
+        </section>
       )}
 
-      {tab === "connect" && (
-        <>
-          <div className="xh__section-pad">
-            <div className="xh__card-title" style={{ marginBottom: 12 }}>
-              API keys
-            </div>
+      {tab === "keys" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">API keys</h2>
+            <span className="ox-agent__panel-hint">oxx_ bearer</span>
+          </div>
+          <div className="ox-agent__panel-b">
             {storedKey && (
               <>
                 <SecretRow
@@ -1301,48 +1230,52 @@ export default function XMcpPage() {
                   copied={copied === "bearerHeader"}
                   onCopy={() => copy("bearerHeader", bearerHeader)}
                 />
-                {showKeyPanel && <p className="xh__note">New key ready — copy into connector headers.</p>}
+                {showKeyPanel && <p className="ox-agent__note">New key ready — copy into connector headers.</p>}
               </>
             )}
-            <div className="xh__btn-row">
+            <div className="ox-agent__btn-row">
               <input
-                className="xh__input"
-                style={{ flex: 1 }}
+                className="ox-agent__input ox-agent__grow"
                 value={keyName}
                 onChange={(e) => setKeyName(e.target.value)}
                 placeholder="Key label"
               />
-              <button type="button" className="xh__btn xh__btn--primary" disabled={creating} onClick={onCreateKey}>
+              <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={creating} onClick={onCreateKey}>
                 {creating ? "Creating…" : "Create key"}
               </button>
             </div>
             {(boot?.keys || []).map((k) => (
-              <div key={k.id} className="xh__row">
+              <div key={k.id} className="ox-agent__keyline">
                 <div>
-                  <div className="xh__card-title">{k.name}</div>
-                  <div className="xh__note">
+                  <div className="ox-agent__value ox-agent__value--plain">{k.name}</div>
+                  <div className="ox-agent__note" style={{ marginTop: 4 }}>
                     {new Date(k.createdAt).toLocaleDateString()}
                     {k.lastUsedAt ? ` · used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
                   </div>
                 </div>
-                <button type="button" className="xh__btn xh__btn--danger" onClick={() => onRevoke(k.id)}>
+                <button type="button" className="ox-agent__btn ox-agent__btn--danger" onClick={() => onRevoke(k.id)}>
                   Revoke
                 </button>
               </div>
             ))}
           </div>
+        </section>
+      )}
 
-          <div className="xh__section-pad">
-            <div className="xh__card-title" style={{ marginBottom: 12 }}>
-              Connect AI
-            </div>
+      {tab === "connect" && (
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">Connect AI</h2>
+            <span className="ox-agent__panel-hint">Claude · ChatGPT · Grok</span>
+          </div>
+          <div className="ox-agent__panel-b">
             {!xConnected && (
-              <div className="xh__alert">Connect X first — without it, posting tools will fail.</div>
+              <div className="ox-agent__alert">Connect X first — without it, posting tools will fail.</div>
             )}
-            <div className="xh__btn-row">
+            <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
               <button
                 type="button"
-                className="xh__btn xh__btn--primary"
+                className="ox-agent__btn ox-agent__btn--primary"
                 onClick={async () => {
                   if (storedKey) await copy("key", storedKey);
                   setSetupOpen("claude");
@@ -1353,7 +1286,7 @@ export default function XMcpPage() {
               </button>
               <button
                 type="button"
-                className="xh__btn"
+                className="ox-agent__btn"
                 onClick={async () => {
                   const pack = [
                     `MCP URL: ${oauth.mcpUrl}`,
@@ -1374,7 +1307,7 @@ export default function XMcpPage() {
               </button>
               <button
                 type="button"
-                className="xh__btn xh__btn--ox"
+                className="ox-agent__btn"
                 onClick={async () => {
                   await copy("grokMcp", oauth.mcpUrl);
                   setOauthGuide(null);
@@ -1386,14 +1319,13 @@ export default function XMcpPage() {
               </button>
             </div>
 
-            <div className="xh__alert" style={{ marginTop: 14 }}>
+            <div className="ox-agent__note" style={{ marginTop: "1rem", padding: "0.85rem 1rem", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, background: "rgba(0,0,0,0.25)" }}>
               <strong style={{ display: "block", marginBottom: 6 }}>Chat auth (no website click)</strong>
-              Connect X + wallet once here, generate a special message, paste it into Grok / Claude / ChatGPT. The AI
-              activates your authCode and stays linked.
-              <div className="xh__btn-row" style={{ marginTop: 10 }}>
+              Generate a special message, paste it into Grok / Claude / ChatGPT. The AI activates your authCode and stays linked.
+              <div className="ox-agent__btn-row">
                 <button
                   type="button"
-                  className="xh__btn xh__btn--primary"
+                  className="ox-agent__btn ox-agent__btn--primary"
                   disabled={mintingAuth}
                   onClick={onMintChatAuth}
                 >
@@ -1401,47 +1333,39 @@ export default function XMcpPage() {
                 </button>
                 {chatAuth?.messages && (
                   <>
-                    <button type="button" className="xh__btn" onClick={() => copy("chatGrok", chatAuth.messages.grok)}>
+                    <button type="button" className="ox-agent__btn" onClick={() => copy("chatGrok", chatAuth.messages.grok)}>
                       {copied === "chatGrok" ? "Copied" : "Copy for Grok"}
                     </button>
-                    <button
-                      type="button"
-                      className="xh__btn"
-                      onClick={() => copy("chatClaude", chatAuth.messages.claude)}
-                    >
+                    <button type="button" className="ox-agent__btn" onClick={() => copy("chatClaude", chatAuth.messages.claude)}>
                       {copied === "chatClaude" ? "Copied" : "Copy for Claude"}
                     </button>
-                    <button
-                      type="button"
-                      className="xh__btn"
-                      onClick={() => copy("chatGpt", chatAuth.messages.chatgpt)}
-                    >
+                    <button type="button" className="ox-agent__btn" onClick={() => copy("chatGpt", chatAuth.messages.chatgpt)}>
                       {copied === "chatGpt" ? "Copied" : "Copy for ChatGPT"}
                     </button>
                   </>
                 )}
               </div>
               {chatAuth?.authCode && (
-                <div style={{ marginTop: 8, opacity: 0.85 }}>
+                <p className="ox-agent__note" style={{ marginBottom: 0 }}>
                   authCode <code>{chatAuth.authCode}</code>
                   {chatAuth.xUsername ? ` · @${chatAuth.xUsername}` : ""}
                   {chatAuth.expiresAt ? ` · until ${chatAuth.expiresAt.slice(0, 10)}` : ""}
-                </div>
+                </p>
               )}
             </div>
 
-            <div className="xh__chip-row" style={{ marginTop: 12 }}>
+            <div className="ox-agent__subtabs" style={{ marginTop: "1.1rem" }}>
               {(
                 [
-                  ["claude", "Claude"],
-                  ["chatgpt", "ChatGPT"],
-                  ["grok", "Grok"],
+                  ["claude", "Claude setup"],
+                  ["chatgpt", "ChatGPT setup"],
+                  ["grok", "Grok setup"],
                 ] as const
               ).map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
-                  className={`xh__chip${setupOpen === id ? " is-ok" : ""}`}
+                  className={`ox-agent__subtab${setupOpen === id ? " is-on" : ""}`}
                   onClick={() => setSetupOpen(id)}
                 >
                   {label}
@@ -1449,41 +1373,33 @@ export default function XMcpPage() {
               ))}
             </div>
             {setupOpen === "claude" && (
-              <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
+              <ol className="ox-agent__ol">
                 <li>MCP URL must end in /mcp</li>
                 <li>Client ID orbitx-x-mcp, secret blank</li>
                 <li>Best: Generate chat auth → Copy for Claude → paste in chat</li>
               </ol>
             )}
             {setupOpen === "chatgpt" && (
-              <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
+              <ol className="ox-agent__ol">
                 <li>Developer Mode on (Apps & Connectors → Advanced)</li>
                 <li>Custom connector with MCP URL + OAuth fields</li>
                 <li>Best: Generate chat auth → Copy for ChatGPT → paste in a chat</li>
               </ol>
             )}
             {setupOpen === "grok" && (
-              <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
+              <ol className="ox-agent__ol">
                 <li>
                   Open <code>grok.com/connectors</code> → New Connector → Custom
                 </li>
                 <li>Paste only the MCP URL below (one-time)</li>
                 <li>
-                  Generate chat auth → <strong>Copy for Grok</strong> → paste in chat (no site click)
+                  Generate chat auth → <strong>Copy for Grok</strong> → paste in chat
                 </li>
                 <li>
-                  Grok calls <code>x_auth_status</code> — stays linked; say <code>/</code> for the OrbitX menu
+                  Grok calls <code>x_auth_status</code> — stays linked; say <code>/</code> for the menu
                 </li>
               </ol>
             )}
-            {copied === "grokMcp" && setupOpen === "grok" && (
-              <p className="xh__note">MCP URL copied — then Generate chat auth → Copy for Grok and paste in chat.</p>
-            )}
-            <p className="xh__note">
-              {setupOpen === "grok"
-                ? "Best path: Generate chat auth → Copy for Grok → paste in chat (no site click). Say / for the OrbitX menu."
-                : "Tools: x_menu, search/fetch, x_post, x_dm, x_agent_run. Prefer dashboard chat auth; OAuth/Bearer still work."}
-            </p>
             <FieldRow
               label="MCP URL"
               value={oauth.mcpUrl}
@@ -1492,42 +1408,22 @@ export default function XMcpPage() {
             />
             {setupOpen !== "grok" && (
               <>
-                <FieldRow
-                  label="Auth URL"
-                  value={oauth.authorizationUrl}
-                  copied={copied === "auth"}
-                  onCopy={() => copy("auth", oauth.authorizationUrl)}
-                />
-                <FieldRow
-                  label="Token URL"
-                  value={oauth.tokenUrl}
-                  copied={copied === "token"}
-                  onCopy={() => copy("token", oauth.tokenUrl)}
-                />
-                <FieldRow
-                  label="Client ID"
-                  value={oauth.clientId}
-                  copied={copied === "client"}
-                  onCopy={() => copy("client", oauth.clientId)}
-                />
+                <FieldRow label="Auth URL" value={oauth.authorizationUrl} copied={copied === "auth"} onCopy={() => copy("auth", oauth.authorizationUrl)} />
+                <FieldRow label="Token URL" value={oauth.tokenUrl} copied={copied === "token"} onCopy={() => copy("token", oauth.tokenUrl)} />
+                <FieldRow label="Client ID" value={oauth.clientId} copied={copied === "client"} onCopy={() => copy("client", oauth.clientId)} />
                 <FieldRow label="Client secret" value="(leave blank)" copyable={false} />
-                <FieldRow
-                  label="Scope"
-                  value={oauth.scope}
-                  copied={copied === "scope"}
-                  onCopy={() => copy("scope", oauth.scope)}
-                />
+                <FieldRow label="Scope" value={oauth.scope} copied={copied === "scope"} onCopy={() => copy("scope", oauth.scope)} />
               </>
             )}
           </div>
-        </>
+        </section>
       )}
 
       {oauthGuide === "chatgpt" && (
-        <div className="xh__modal" onClick={() => setOauthGuide(null)}>
-          <div className="xh__modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="ox-agent__modal" onClick={() => setOauthGuide(null)}>
+          <div className="ox-agent__modal-card" onClick={(e) => e.stopPropagation()}>
             <h2>ChatGPT · X MCP</h2>
-            <p className="xh__note" style={{ marginTop: 0 }}>
+            <p className="ox-agent__note" style={{ marginTop: 0 }}>
               Paste into ChatGPT — leave client secret empty.
             </p>
             {(
@@ -1550,7 +1446,7 @@ export default function XMcpPage() {
             />
             <button
               type="button"
-              className="xh__btn xh__btn--primary"
+              className="ox-agent__btn ox-agent__btn--primary"
               style={{ width: "100%", marginTop: 12 }}
               onClick={() => setOauthGuide(null)}
             >
@@ -1559,6 +1455,6 @@ export default function XMcpPage() {
           </div>
         </div>
       )}
-    </HubShell>
+    </AgentShell>
   );
 }

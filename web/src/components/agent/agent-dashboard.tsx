@@ -262,10 +262,13 @@ export function AgentDashboard() {
   return (
     <AgentShell
       activeTab={tab}
-      onTabChange={setTab}
+      onTabChange={(id) => setTab(id as AgentTabId)}
       statusLabel={statusLabel}
       statusWarn={!hasKey || !linkedWallet}
       onRefresh={refresh}
+      siblingHref="/x"
+      siblingLabel="X MCP"
+      siblingIcon="✕"
     >
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">OrbitX</h1>
