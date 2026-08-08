@@ -488,13 +488,37 @@ const TOOLS = [
     annotations: { title: "Advanced credits usage", readOnlyHint: true, openWorldHint: false },
   },
   {
-    name: "x_buy_orbitx",
+    name: "x_buy",
     description:
-      "Buy official $ORBITX with SOL. When the user says buy $ORBITX — ASK how much SOL and whether they want manual sign or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Phantom immediately. Requires wallet linked on /agent (or publicKey).",
+      "PRIMARY BUY TOOL for Grok/Claude. Use this whenever the user wants to buy credits OR buy ORBITX. Set what=credits|orbitx (ask if unclear). For credits pass credits or solAmount; for ORBITX pass solAmount. Returns a Phantom signUrl/openUrl. Prefer this over inventing names like XBuyTool.",
     inputSchema: {
       type: "object",
       properties: {
-        amountSol: { type: "number", description: "SOL to spend on $ORBITX" },
+        what: {
+          type: "string",
+          enum: ["credits", "orbitx", "ask"],
+          description: "credits = MCP credits (SOL to desk wallet); orbitx = buy ORBITX token; ask = clarify",
+        },
+        solAmount: { type: "number", description: "SOL to spend" },
+        credits: { type: "number", description: "Credit count (credits buy only)" },
+        amount: { type: "number", description: "Alias amount" },
+        publicKey: { type: "string" },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean" },
+        askOnly: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Buy", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_buy_orbitx",
+    description:
+      "Buy official ORBITX token with SOL. When the user says buy ORBITX — ASK how much SOL and sign vs auto-confirm. confirmMode=sign → signUrl; auto → Phantom pops. Prefer x_buy with what=orbitx if unsure of tool name.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        amountSol: { type: "number", description: "SOL to spend on ORBITX" },
         publicKey: { type: "string", description: "Buyer wallet (optional if linked on /agent)" },
         confirmMode: { type: "string", enum: ["sign", "auto"] },
         autoConfirm: { type: "boolean", description: "Same as confirmMode=auto" },
@@ -503,12 +527,12 @@ const TOOLS = [
       },
       additionalProperties: false,
     },
-    annotations: { title: "Buy $ORBITX", readOnlyHint: false, openWorldHint: true },
+    annotations: { title: "Buy ORBITX", readOnlyHint: false, openWorldHint: true },
   },
   {
     name: "x_confirm_buy",
     description:
-      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after x_buy_orbitx. Returns autoSignUrl (Phantom auto-prompt).",
+      "Chat confirm for a pending ORBITX buy. Call when the user says yes / confirm / go ahead / auto after x_buy_orbitx or x_buy. Returns autoSignUrl (Phantom auto-prompt).",
     inputSchema: {
       type: "object",
       properties: {
@@ -518,7 +542,7 @@ const TOOLS = [
       },
       additionalProperties: false,
     },
-    annotations: { title: "Confirm $ORBITX buy", readOnlyHint: false, openWorldHint: true },
+    annotations: { title: "Confirm buy", readOnlyHint: false, openWorldHint: true },
   },
 ];
 
@@ -548,7 +572,60 @@ const X_TOOL_ALIASES = {
   confirm_buy: "x_confirm_buy",
   "confirm buy": "x_confirm_buy",
   "yes buy": "x_confirm_buy",
+  // Grok often invents PascalCase *Tool names — map them to real tools
+  buy: "x_buy",
+  xbuy: "x_buy",
+  x_buy_tool: "x_buy",
+  xbuytool: "x_buy",
+  x_buytool: "x_buy",
+  buytool: "x_buy",
+  xbuyorbitx: "x_buy_orbitx",
+  x_buyorbitx: "x_buy_orbitx",
+  xbuyorbitxtool: "x_buy_orbitx",
+  xcreditsbuy: "x_credits_buy",
+  x_creditsbuy: "x_credits_buy",
+  xcreditsbuytool: "x_credits_buy",
+  xconfirmbuy: "x_confirm_buy",
+  xcreditsusage: "x_credits_usage",
+  xcreditsbalance: "x_credits_balance",
 };
+
+/** Grok mangles snake_case → PascalCase + Tool (e.g. XBuyTool). Normalize to real tool names. */
+function normalizeXToolName(rawName) {
+  let n = String(rawName || "").trim();
+  if (!n) return n;
+  if (X_TOOL_ALIASES[n]) return X_TOOL_ALIASES[n];
+  const lowerExact = n.toLowerCase();
+  if (X_TOOL_ALIASES[lowerExact]) return X_TOOL_ALIASES[lowerExact];
+
+  // Strip common connector prefixes Grok may prepend
+  n = n.replace(/^(OrbitX|Orbitx|ORBITX|XMcp|XMCP|X_MCP)[_\s.-]*/g, "");
+  n = n.replace(/Tool$/i, "");
+  // PascalCase / camelCase → snake_case
+  if (/[A-Z]/.test(n) && !n.includes("_")) {
+    n = n
+      .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .toLowerCase();
+  } else {
+    n = n.toLowerCase();
+  }
+  n = n
+    .replace(/[$\s.-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  // xbuy… → x_buy…
+  if (n.startsWith("xbuy")) n = `x_buy${n.slice(4)}`;
+  if (n.startsWith("xcredits")) n = `x_credits${n.slice(8)}`;
+  if (n.startsWith("xconfirm")) n = `x_confirm${n.slice(8)}`;
+
+  if (n === "buy" || n === "x_buy" || n === "xbuy") return "x_buy";
+  if (n === "buy_orbitx" || n === "buyorbitx" || n === "x_buyorbitx") return "x_buy_orbitx";
+  if (n === "buy_credits" || n === "buycredits" || n === "credits_buy") return "x_credits_buy";
+  if (X_TOOL_ALIASES[n]) return X_TOOL_ALIASES[n];
+  return n;
+}
 
 function listToolsForMcp() {
   return TOOLS.map((t) => {
@@ -564,15 +641,18 @@ function listToolsForMcp() {
     ) {
       props.authCode = AUTH_CODE_PROP;
     }
+    const inputSchema = {
+      ...base,
+      type: "object",
+      properties: props,
+      additionalProperties: false,
+    };
     return {
       name: t.name,
       description: t.description,
-      inputSchema: {
-        ...base,
-        type: "object",
-        properties: props,
-        additionalProperties: false,
-      },
+      inputSchema,
+      // Some clients (incl. Grok variants) read snake_case
+      input_schema: inputSchema,
       ...(t.annotations ? { annotations: t.annotations } : {}),
     };
   });
@@ -1377,7 +1457,7 @@ async function uploadImageOAuth1a(imageUrl) {
 
 
 async function callTool(rawName, args, auth, req = null) {
-  const name = X_TOOL_ALIASES[rawName] || rawName;
+  const name = normalizeXToolName(rawName);
   const a = args && typeof args === "object" ? args : {};
 
   if (name === "x_menu") {
@@ -1687,6 +1767,53 @@ async function callTool(rawName, args, auth, req = null) {
     } catch (e) {
       return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
     }
+  }
+
+  if (name === "x_buy") {
+    const whatRaw = String(a.what || a.target || a.asset || "").toLowerCase().trim();
+    const mentionsOrbitx =
+      whatRaw.includes("orbitx") ||
+      whatRaw === "token" ||
+      Boolean(a.mint) ||
+      /orbitx|\$orbitx/i.test(String(a.hint || a.query || ""));
+    const mentionsCredits =
+      whatRaw.includes("credit") ||
+      a.credits != null ||
+      whatRaw === "credits" ||
+      whatRaw === "shop";
+    let what = "ask";
+    if (whatRaw === "orbitx" || whatRaw === "token" || (mentionsOrbitx && !mentionsCredits)) what = "orbitx";
+    else if (whatRaw === "credits" || whatRaw === "credit" || (mentionsCredits && !mentionsOrbitx)) what = "credits";
+    else if (mentionsOrbitx) what = "orbitx";
+    else if (mentionsCredits) what = "credits";
+
+    if (a.askOnly === true || what === "ask") {
+      if (a.solAmount != null || a.credits != null || a.amount != null) {
+        // Amount given but not what — default to credits (most common Grok "buy" ask)
+        what = mentionsOrbitx ? "orbitx" : "credits";
+      } else {
+        return {
+          ok: true,
+          action: "ask_what",
+          message:
+            "Ask whether they want to buy MCP credits (SOL → desk wallet) or ORBITX token. Then call x_buy again with what=credits|orbitx and the amount.",
+          tools: { credits: "x_credits_buy", orbitx: "x_buy_orbitx", unified: "x_buy" },
+          hint: "Grok: always call tool name x_buy (not XBuyTool).",
+        };
+      }
+    }
+    if (what === "orbitx") {
+      return callTool("x_buy_orbitx", { ...a, askOnly: a.askOnly === true && a.amountSol == null }, auth, req);
+    }
+    return callTool(
+      "x_credits_buy",
+      {
+        ...a,
+        askOnly: a.askOnly === true && a.solAmount == null && a.credits == null && a.amount == null,
+      },
+      auth,
+      req,
+    );
   }
 
   if (name === "x_buy_orbitx") {
@@ -2237,7 +2364,18 @@ async function callTool(rawName, args, auth, req = null) {
     return { ok: true, item: mapQueueRow(row) };
   }
 
-  throw new Error(`Unknown tool: ${name}`);
+  // Last-chance: anything that looks like a buy → unified x_buy (Grok invents names)
+  if (/buy/i.test(String(rawName || name || ""))) {
+    return callTool("x_buy", a, auth, req);
+  }
+  return {
+    ok: false,
+    error: "unknown_tool",
+    tool: name,
+    requested: rawName,
+    message: `Unknown tool "${rawName}". Use exact names: x_buy, x_credits_buy, x_buy_orbitx, x_menu, x_credits_usage.`,
+    availableBuyTools: ["x_buy", "x_credits_buy", "x_buy_orbitx", "x_confirm_buy"],
+  };
 }
 async function handleAgent(req, res, parts) {
   const route = parts.slice(1).join("/");
@@ -3246,7 +3384,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: "OrbitX X MCP", version: "1.4.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X, NVIDIA agent, buy credits, and buy $ORBITX. When the user says /, menu, or asks what you can do, call x_menu. If they paste an authCode from /x, call x_auth_status — do NOT open a website — then pass authCode on every x_* tool. Buy credits: ASK credits count or SOL → x_credits_buy → send openUrl/signUrl (Phantom sends SOL to desk wallet) → x_credits_confirm. Buy $ORBITX: ASK SOL + sign vs auto → x_buy_orbitx; yes/confirm → x_confirm_buy. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — post/DM on X, NVIDIA agent, buy credits, and buy ORBITX. IMPORTANT: call tools by exact snake_case names from tools/list (x_buy, x_credits_buy, x_buy_orbitx). Never invent PascalCase names like XBuyTool. When the user says /, menu, call x_menu. If they paste an authCode from /x, call x_auth_status then pass authCode on every x_* tool. Buy anything: prefer x_buy with what=credits|orbitx. Credits: openUrl → Phantom pays desk wallet → x_credits_confirm. ORBITX: x_buy what=orbitx → signUrl; yes/confirm → x_confirm_buy. Setup: https://www.orbitx.world/x",
           },
         },
         200,
@@ -3269,7 +3407,7 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/call") {
       const rawName = String(params?.name || "");
-      const name = X_TOOL_ALIASES[rawName] || rawName;
+      const name = normalizeXToolName(rawName);
       const rawArgs = params?.arguments && typeof params.arguments === "object" ? params.arguments : {};
       const args = { ...rawArgs };
       const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
