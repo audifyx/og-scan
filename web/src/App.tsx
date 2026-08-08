@@ -172,6 +172,7 @@ import AgentPage from "./pages/Agent";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
 import XMcpPage from "./pages/XMcpPage";
+import XMcpCreditsShop from "./pages/XMcpCreditsShop";
 import XMcpAuthPage from "./pages/XMcpAuthPage";
 import XMcpLinkAuthPage from "./pages/XMcpLinkAuthPage";
 import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
@@ -633,6 +634,7 @@ const App = () => (
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/x" element={<XMcpPage />} />
+  <Route path="/x/shop" element={<XMcpCreditsShop />} />
             <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />

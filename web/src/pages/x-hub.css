@@ -979,6 +979,11 @@
 }
 
 .xh__credits { margin: 1rem 0; }
+.xh__credits-shop { max-width: 980px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.xh__credits-shop__intro { display: flex; justify-content: space-between; gap: 1rem; align-items: center; color: var(--xh-muted); }
+.xh__credits-shop__intro strong { color: var(--xh-accent); font: 800 1.3rem var(--xh-mono); }
+.xh__shop-link { margin-left: 0.75rem; color: var(--xh-accent); font-size: 0.75rem; }
+.xh__credits-status { margin-top: 0.8rem; color: var(--xh-muted); }
 .xh__credits-error { margin: 0.75rem 0; padding: 0.7rem; border: 1px solid rgba(255, 93, 93, 0.5); border-radius: 10px; color: #ffb0b0; }
 .xh__credits-balance { display: flex; align-items: baseline; gap: 0.65rem; padding: 1rem 0; }
 .xh__credits-balance strong { font: 800 2rem var(--xh-mono); color: var(--xh-text); }
