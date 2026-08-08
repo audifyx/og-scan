@@ -70,12 +70,13 @@ export function agentSignTradeUrl(opts: {
   pool?: string;
   origin?: string;
 }): string {
-  let base = (opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://orbitx.world")).replace(
+  let base = (opts.origin || (typeof window !== "undefined" ? window.location.origin : "https://www.orbitx.world")).replace(
     /\/$/,
     "",
   );
-  if (base === "https://www.orbitx.world" || base === "http://www.orbitx.world") {
-    base = "https://orbitx.world";
+  // Prefer www — apex 308s can break some handoff clients
+  if (base === "https://orbitx.world" || base === "http://orbitx.world") {
+    base = "https://www.orbitx.world";
   }
   const q = new URLSearchParams({
     action: opts.action,
@@ -128,7 +129,7 @@ async function readJson(r: Response): Promise<Record<string, unknown>> {
     const snippet = text.replace(/\s+/g, " ").slice(0, 180);
     if (/FUNCTION_INVOCATION_FAILED/i.test(snippet)) {
       throw new Error(
-        "Server was restarting — hard-refresh and try again. MCP URL: https://orbitx.world/api/mcp",
+        "Server was restarting — hard-refresh and try again. MCP URL: https://www.orbitx.world/api/mcp",
       );
     }
     throw new Error(
@@ -226,6 +227,31 @@ export async function approveMcpLinkAuth(
     method: "POST",
     body: JSON.stringify({ code, walletAddress }),
   })) as unknown as { ok: boolean; status: string; authCode: string };
+}
+
+export type McpChatAuthMint = {
+  ok: boolean;
+  status: string;
+  authenticated?: boolean;
+  authCode: string;
+  expiresAt?: string;
+  mcpUrl?: string;
+  walletAddress?: string | null;
+  messages: {
+    grok: string;
+    claude: string;
+    chatgpt: string;
+    authCode: string;
+  };
+  message?: string;
+};
+
+/** Mint a pre-authorized authCode + paste messages for Grok / Claude / ChatGPT (no mid-chat click). */
+export async function mintMcpChatAuth(walletAddress?: string): Promise<McpChatAuthMint> {
+  return (await agentFetch("/link/create", {
+    method: "POST",
+    body: JSON.stringify({ walletAddress }),
+  })) as unknown as McpChatAuthMint;
 }
 
 export async function getMcpLinkStatus(code: string): Promise<{

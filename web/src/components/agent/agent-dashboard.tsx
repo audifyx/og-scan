@@ -12,9 +12,11 @@ import {
   linkAgentWallet,
   listAgentApiKeys,
   mcpOAuthCredentials,
+  mintMcpChatAuth,
   revokeAgentApiKey,
   shortKey,
   type AgentBootstrap,
+  type McpChatAuthMint,
 } from "@/lib/orbitxMcp";
 import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
 
@@ -114,6 +116,8 @@ export function AgentDashboard() {
   const [oauthGuide, setOauthGuide] = useState<"chatgpt" | "grok" | null>(null);
   const [linking, setLinking] = useState(false);
   const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | "grok">("claude");
+  const [chatAuth, setChatAuth] = useState<McpChatAuthMint | null>(null);
+  const [mintingAuth, setMintingAuth] = useState(false);
 
   const walletAddress = useMemo(
     () =>
@@ -184,6 +188,20 @@ export function AgentDashboard() {
     setTimeout(() => setCopied(null), 1600);
   };
 
+  const onMintChatAuth = async () => {
+    setMintingAuth(true);
+    setError(null);
+    try {
+      const minted = await mintMcpChatAuth(linkedWallet || undefined);
+      setChatAuth(minted);
+      setSetupOpen("grok");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to mint chat auth");
+    } finally {
+      setMintingAuth(false);
+    }
+  };
+
   const onCreateKey = async () => {
     setCreating(true);
     setError(null);
@@ -250,20 +268,43 @@ export function AgentDashboard() {
       onRefresh={refresh}
     >
       <div className="ox-agent__hero">
-        <h1 className="ox-agent__title">OrbitX Agent</h1>
+        <h1 className="ox-agent__title">OrbitX</h1>
         <p className="ox-agent__lead">
-          Connect Claude or ChatGPT to OrbitX MCP — trade, launch, mint, and social. Non-custodial;
-          you sign in your wallet.
+          Agent MCP dashboard — wire Claude, ChatGPT, or Grok. Trade, launch, mint, and social.
+          Non-custodial; you sign in your wallet.
         </p>
+        <div className="ox-agent__kpis">
+          <button
+            type="button"
+            className={`ox-agent__kpi${linkedWallet ? " is-ok" : ""}`}
+            onClick={() => setTab("wallet")}
+          >
+            <span className="ox-agent__kpi-k">Wallet</span>
+            <span className="ox-agent__kpi-v">{linkedWallet ? "Linked" : "Connect"}</span>
+          </button>
+          <button
+            type="button"
+            className={`ox-agent__kpi${hasKey ? " is-ok" : ""}`}
+            onClick={() => setTab("keys")}
+          >
+            <span className="ox-agent__kpi-k">API key</span>
+            <span className="ox-agent__kpi-v">{hasKey ? "Ready" : "Create"}</span>
+          </button>
+          <button
+            type="button"
+            className={`ox-agent__kpi${hasKey && linkedWallet ? " is-ok" : ""}`}
+            onClick={() => setTab("connect")}
+          >
+            <span className="ox-agent__kpi-k">AI</span>
+            <span className="ox-agent__kpi-v">{hasKey && linkedWallet ? "Connect" : "Setup"}</span>
+          </button>
+        </div>
         <div className="ox-agent__steps">
           <span className={`ox-agent__chip${linkedWallet ? " is-ok" : ""}`}>
             {linkedWallet ? "Wallet linked" : "Wallet needed"}
           </span>
           <span className={`ox-agent__chip${hasKey ? " is-ok" : ""}`}>
             {hasKey ? "API key ready" : "Create API key"}
-          </span>
-          <span className={`ox-agent__chip${hasKey && linkedWallet ? " is-ok" : ""}`}>
-            {hasKey && linkedWallet ? "Ready to connect" : "Connect AI next"}
           </span>
           {exempt && <span className="ox-agent__chip is-accent">Exempt</span>}
         </div>
@@ -533,6 +574,70 @@ export function AgentDashboard() {
               </button>
             </div>
 
+            <div
+              className="ox-agent__note"
+              style={{
+                marginTop: "1rem",
+                padding: "0.85rem 1rem",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 12,
+                background: "rgba(0,0,0,0.25)",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: 6 }}>Chat auth (no website click)</strong>
+              <p style={{ margin: "0 0 0.75rem", opacity: 0.85 }}>
+                Link wallet once here, then generate a special message for Grok / Claude / ChatGPT. Paste it in chat —
+                the AI activates your <code>authCode</code> and stays connected.
+              </p>
+              <div className="ox-agent__btn-row" style={{ marginTop: 0 }}>
+                <button
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--primary"
+                  disabled={mintingAuth || !linkedWallet}
+                  onClick={onMintChatAuth}
+                >
+                  {mintingAuth ? "Minting…" : "Generate chat auth"}
+                </button>
+                {chatAuth?.messages && (
+                  <>
+                    <button
+                      type="button"
+                      className="ox-agent__btn"
+                      onClick={() => copy("chatGrok", chatAuth.messages.grok)}
+                    >
+                      {copied === "chatGrok" ? "Copied" : "Copy for Grok"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ox-agent__btn"
+                      onClick={() => copy("chatClaude", chatAuth.messages.claude)}
+                    >
+                      {copied === "chatClaude" ? "Copied" : "Copy for Claude"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ox-agent__btn"
+                      onClick={() => copy("chatGpt", chatAuth.messages.chatgpt)}
+                    >
+                      {copied === "chatGpt" ? "Copied" : "Copy for ChatGPT"}
+                    </button>
+                  </>
+                )}
+              </div>
+              {!linkedWallet && (
+                <p className="ox-agent__note" style={{ marginBottom: 0 }}>
+                  Link your Solana wallet on the Setup tab first.
+                </p>
+              )}
+              {chatAuth?.authCode && (
+                <p className="ox-agent__note" style={{ marginBottom: 0 }}>
+                  authCode <code>{chatAuth.authCode}</code>
+                  {chatAuth.expiresAt ? ` · linked until ${chatAuth.expiresAt.slice(0, 10)}` : ""}
+                  {copied?.startsWith("chat") ? " · message copied — paste into that chat" : ""}
+                </p>
+              )}
+            </div>
+
             {copied === "key" && setupOpen === "claude" && (
               <p className="ox-agent__note">
                 API key copied — in Claude use Authenticate, or paste <code>Authorization: Bearer …</code> in
@@ -576,7 +681,10 @@ export function AgentDashboard() {
                   Client ID <code>orbitx-mcp</code>, secret blank
                 </li>
                 <li>
-                  Advanced → header <code>Authorization</code> = Bearer token from the Keys tab
+                  Best: Generate chat auth above → Copy for Claude → paste in chat (no site click)
+                </li>
+                <li>
+                  Or Advanced → header <code>Authorization</code> = Bearer token from the Keys tab
                 </li>
               </ol>
             )}
@@ -587,7 +695,7 @@ export function AgentDashboard() {
                 <li>
                   OAuth: Client ID <code>orbitx-mcp</code>, secret blank, scope <code>orbitx</code>
                 </li>
-                <li>Authenticate → approve on OrbitX</li>
+                <li>Best: Generate chat auth → Copy for ChatGPT → paste in a chat (stays linked)</li>
               </ol>
             )}
             {setupOpen === "grok" && (
@@ -595,11 +703,11 @@ export function AgentDashboard() {
                 <li>
                   Open <code>grok.com/connectors</code> → New Connector → Custom
                 </li>
-                <li>Paste only the MCP URL below</li>
+                <li>Paste only the MCP URL below (one-time setup)</li>
                 <li>
-                  In chat say: <em>authenticate my OrbitX account</em>
+                  Generate chat auth above → <strong>Copy for Grok</strong> → paste that message in chat
                 </li>
-                <li>Grok sends a link → open it → Authorize Grok → tell Grok you&apos;re done</li>
+                <li>Grok calls <code>orbitx_auth_status</code> — stays linked; say <code>/</code> for the OrbitX menu</li>
               </ol>
             )}
 

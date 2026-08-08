@@ -189,6 +189,33 @@ export async function approveXMcpLinkAuth(code: string): Promise<{ ok: boolean; 
   })) as unknown as { ok: boolean; status: string; authCode: string };
 }
 
+export type XMcpChatAuthMint = {
+  ok: boolean;
+  status: string;
+  authenticated?: boolean;
+  authCode: string;
+  expiresAt?: string;
+  mcpUrl?: string;
+  xUsername?: string | null;
+  xConnected?: boolean;
+  walletAddress?: string | null;
+  messages: {
+    grok: string;
+    claude: string;
+    chatgpt: string;
+    authCode: string;
+  };
+  message?: string;
+};
+
+/** Mint a pre-authorized X MCP authCode + paste messages (no mid-chat click). */
+export async function mintXMcpChatAuth(): Promise<XMcpChatAuthMint> {
+  return (await xAgentFetch("/link/create", {
+    method: "POST",
+    body: JSON.stringify({}),
+  })) as unknown as XMcpChatAuthMint;
+}
+
 export async function getXMcpLinkStatus(code: string): Promise<{
   ok?: boolean;
   status?: string;

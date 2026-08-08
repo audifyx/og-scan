@@ -20,6 +20,7 @@ import {
   shortXKey,
   trainXAgent,
   upsertXAgent,
+  mintXMcpChatAuth,
   xChatgptConnectUrl,
   xClaudeConnectUrl,
   xGrokConnectUrl,
@@ -28,6 +29,7 @@ import {
   type XAgentKnowledge,
   type XAgentQueueItem,
   type XMcpBootstrap,
+  type XMcpChatAuthMint,
   type XNimModel,
 } from "@/lib/xMcp";
 import XMcpMatrix from "@/components/x/XMcpMatrix";
@@ -156,13 +158,18 @@ function HubShell({
   const initial = (xHandle || "X").slice(0, 1).toUpperCase();
   return (
     <div className="xh">
+      <div className="xh__atmosphere" aria-hidden />
       <div className="xh__shell">
         <aside className="xh__left">
           <Link to="/x" className="xh__brand">
-            <span className="xh__brand-mark">X</span>
+            <span className="xh__brand-mark" aria-hidden>
+              <img src="/orbitx-banner.jpg" alt="" />
+            </span>
             <span className="xh__brand-text">
-              <span className="xh__brand-title">OrbitX</span>
-              <span className="xh__brand-sub">X Hub</span>
+              <span className="xh__brand-title">
+                Orbit<span>X</span>
+              </span>
+              <span className="xh__brand-sub">X MCP</span>
             </span>
           </Link>
           <nav className="xh__nav" aria-label="X hub">
@@ -198,7 +205,10 @@ function HubShell({
 
         <main className="xh__center">
           <header className="xh__top">
-            <h1>{title}</h1>
+            <div className="xh__top-title">
+              <h1>{title}</h1>
+              <p>OrbitX · Claude · ChatGPT · Grok</p>
+            </div>
             <div className="xh__top-actions">
               {onRefresh ? (
                 <button type="button" className="xh__icon-btn" onClick={onRefresh} title="Refresh" aria-label="Refresh">
@@ -242,6 +252,8 @@ export default function XMcpPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [oauthGuide, setOauthGuide] = useState<"chatgpt" | "grok" | null>(null);
   const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | "grok">("claude");
+  const [chatAuth, setChatAuth] = useState<XMcpChatAuthMint | null>(null);
+  const [mintingAuth, setMintingAuth] = useState(false);
   const [xLocal, setXLocal] = useState<XUser | null>(() => xGetStoredUser());
   const [connectingX, setConnectingX] = useState(false);
   const [xAgent, setXAgent] = useState<XAgentConfig | null>(null);
@@ -372,6 +384,20 @@ export default function XMcpPage() {
       setTimeout(() => setCopied(null), 1600);
     } catch {
       setError("Copy failed — long-press to select instead");
+    }
+  };
+
+  const onMintChatAuth = async () => {
+    setMintingAuth(true);
+    setError(null);
+    try {
+      const minted = await mintXMcpChatAuth();
+      setChatAuth(minted);
+      setSetupOpen("grok");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to mint chat auth");
+    } finally {
+      setMintingAuth(false);
     }
   };
 
@@ -703,6 +729,30 @@ export default function XMcpPage() {
 
       {tab === "home" && (
         <>
+          <div className="xh__hero">
+            <div className="xh__hero-copy">
+              <h2>OrbitX</h2>
+              <p>X MCP control center — post, DM, and run your NVIDIA agent from chat AI.</p>
+            </div>
+            <div className="xh__kpis">
+              <button type="button" className={`xh__kpi${xConnected ? " is-ok" : ""}`} onClick={() => setTab("account")}>
+                <span className="xh__kpi-k">X</span>
+                <span className="xh__kpi-v">{xConnected ? `@${xHandle}` : "Connect"}</span>
+              </button>
+              <button type="button" className={`xh__kpi${hasKey ? " is-ok" : ""}`} onClick={() => setTab("connect")}>
+                <span className="xh__kpi-k">AI</span>
+                <span className="xh__kpi-v">{hasKey ? "Ready" : "Wire"}</span>
+              </button>
+              <button
+                type="button"
+                className={`xh__kpi${xAgent?.enabled ? " is-ok" : ""}`}
+                onClick={() => setTab("agent")}
+              >
+                <span className="xh__kpi-k">Agent</span>
+                <span className="xh__kpi-v">{xAgent?.enabled ? "On" : "Setup"}</span>
+              </button>
+            </div>
+          </div>
           <div className="xh__composer">
             <div className="xh__avatar">{avatarUrl ? <img src={avatarUrl} alt="" /> : (xHandle || "X").slice(0, 1).toUpperCase()}</div>
             <div>
@@ -734,7 +784,7 @@ export default function XMcpPage() {
                   </button>
                   <button
                     type="button"
-                    className="xh__btn xh__btn--primary"
+                    className="xh__btn xh__btn--ox"
                     disabled={agentBusy || !xConnected}
                     onClick={() => onGenerate(true)}
                   >
@@ -1335,6 +1385,51 @@ export default function XMcpPage() {
                 Add to Grok
               </button>
             </div>
+
+            <div className="xh__alert" style={{ marginTop: 14 }}>
+              <strong style={{ display: "block", marginBottom: 6 }}>Chat auth (no website click)</strong>
+              Connect X + wallet once here, generate a special message, paste it into Grok / Claude / ChatGPT. The AI
+              activates your authCode and stays linked.
+              <div className="xh__btn-row" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="xh__btn xh__btn--primary"
+                  disabled={mintingAuth}
+                  onClick={onMintChatAuth}
+                >
+                  {mintingAuth ? "Minting…" : "Generate chat auth"}
+                </button>
+                {chatAuth?.messages && (
+                  <>
+                    <button type="button" className="xh__btn" onClick={() => copy("chatGrok", chatAuth.messages.grok)}>
+                      {copied === "chatGrok" ? "Copied" : "Copy for Grok"}
+                    </button>
+                    <button
+                      type="button"
+                      className="xh__btn"
+                      onClick={() => copy("chatClaude", chatAuth.messages.claude)}
+                    >
+                      {copied === "chatClaude" ? "Copied" : "Copy for Claude"}
+                    </button>
+                    <button
+                      type="button"
+                      className="xh__btn"
+                      onClick={() => copy("chatGpt", chatAuth.messages.chatgpt)}
+                    >
+                      {copied === "chatGpt" ? "Copied" : "Copy for ChatGPT"}
+                    </button>
+                  </>
+                )}
+              </div>
+              {chatAuth?.authCode && (
+                <div style={{ marginTop: 8, opacity: 0.85 }}>
+                  authCode <code>{chatAuth.authCode}</code>
+                  {chatAuth.xUsername ? ` · @${chatAuth.xUsername}` : ""}
+                  {chatAuth.expiresAt ? ` · until ${chatAuth.expiresAt.slice(0, 10)}` : ""}
+                </div>
+              )}
+            </div>
+
             <div className="xh__chip-row" style={{ marginTop: 12 }}>
               {(
                 [
@@ -1357,14 +1452,14 @@ export default function XMcpPage() {
               <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
                 <li>MCP URL must end in /mcp</li>
                 <li>Client ID orbitx-x-mcp, secret blank</li>
-                <li>Authenticate → approve on /x/mcp-auth</li>
+                <li>Best: Generate chat auth → Copy for Claude → paste in chat</li>
               </ol>
             )}
             {setupOpen === "chatgpt" && (
               <ol className="xh__note" style={{ paddingLeft: "1.2rem" }}>
                 <li>Developer Mode on (Apps & Connectors → Advanced)</li>
                 <li>Custom connector with MCP URL + OAuth fields</li>
-                <li>Authenticate → approve on OrbitX /x</li>
+                <li>Best: Generate chat auth → Copy for ChatGPT → paste in a chat</li>
               </ol>
             )}
             {setupOpen === "grok" && (
@@ -1372,20 +1467,22 @@ export default function XMcpPage() {
                 <li>
                   Open <code>grok.com/connectors</code> → New Connector → Custom
                 </li>
-                <li>Paste only the MCP URL below</li>
+                <li>Paste only the MCP URL below (one-time)</li>
                 <li>
-                  In chat say: <em>authenticate my OrbitX account</em>
+                  Generate chat auth → <strong>Copy for Grok</strong> → paste in chat (no site click)
                 </li>
-                <li>Grok sends a link → open it → Authorize Grok → tell Grok you&apos;re done</li>
+                <li>
+                  Grok calls <code>x_auth_status</code> — stays linked; say <code>/</code> for the OrbitX menu
+                </li>
               </ol>
             )}
             {copied === "grokMcp" && setupOpen === "grok" && (
-              <p className="xh__note">MCP URL copied — after connecting, ask Grok to authenticate for a link.</p>
+              <p className="xh__note">MCP URL copied — then Generate chat auth → Copy for Grok and paste in chat.</p>
             )}
             <p className="xh__note">
               {setupOpen === "grok"
-                ? "Best path: ask Grok to authenticate — it calls x_auth_link and gives you a clickable OrbitX URL."
-                : "Tools: search/fetch, x_post, x_dm, x_agent_run, … Claude/ChatGPT use OAuth fields; Grok uses MCP URL + chat auth link."}
+                ? "Best path: Generate chat auth → Copy for Grok → paste in chat (no site click). Say / for the OrbitX menu."
+                : "Tools: x_menu, search/fetch, x_post, x_dm, x_agent_run. Prefer dashboard chat auth; OAuth/Bearer still work."}
             </p>
             <FieldRow
               label="MCP URL"

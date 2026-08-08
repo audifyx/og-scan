@@ -135,7 +135,7 @@ export function mcpBaseUrl(req) {
     const proto = req?.headers?.["x-forwarded-proto"] || req?.headers?.get?.("x-forwarded-proto") || "https";
     if (host) return `${proto}://${host}`.replace(/\/$/, "");
   } catch { /* noop */ }
-  return "https://ogscan.fun";
+  return "https://www.orbitx.world";
 }
 
 function allowedKeys() {

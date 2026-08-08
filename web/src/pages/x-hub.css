@@ -1,26 +1,28 @@
-/* OrbitX · X Hub — X-inspired three-column shell
+/* OrbitX · X MCP Hub — desktop dashboard + mobile app shell
    Fonts: system stack only (no Google @import — that blocked mobile loads). */
 
 .xh {
-  --xh-bg: #000000;
-  --xh-elev: #0a0a0a;
-  --xh-panel: #000000;
-  --xh-hover: rgba(255, 255, 255, 0.03);
-  --xh-line: #2f3336;
-  --xh-text: #e7e9ea;
-  --xh-muted: #71767b;
-  --xh-faint: #536471;
-  --xh-accent: #1d9bf0;
-  --xh-accent-hover: #1a8cd8;
+  --xh-bg: #07090c;
+  --xh-elev: #0e131a;
+  --xh-panel: rgba(12, 16, 22, 0.92);
+  --xh-hover: rgba(255, 255, 255, 0.04);
+  --xh-line: rgba(255, 255, 255, 0.09);
+  --xh-text: #f0f3f6;
+  --xh-muted: #8b95a5;
+  --xh-faint: #5a6472;
+  --xh-accent: #38bdf8;
+  --xh-accent-hover: #0ea5e9;
   --xh-ox: #5eead4;
-  --xh-danger: #f4212e;
-  --xh-ok: #00ba7c;
-  --xh-radius: 9999px;
+  --xh-ox-ink: #042f2e;
+  --xh-danger: #fb7185;
+  --xh-ok: #86efac;
+  --xh-radius: 14px;
+  --xh-pill: 9999px;
   --xh-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --xh-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --xh-left: 275px;
-  --xh-center: min(600px, 100%);
-  --xh-right: 350px;
+  --xh-left: 250px;
+  --xh-center: min(640px, 100%);
+  --xh-right: 320px;
   --xh-nav-h: 64px;
   box-sizing: border-box;
   min-height: 100vh;
@@ -30,6 +32,18 @@
   font-family: var(--xh-font);
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
+  position: relative;
+}
+
+.xh__atmosphere {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(900px 480px at 10% -10%, rgba(94, 234, 212, 0.12), transparent 55%),
+    radial-gradient(700px 400px at 90% 0%, rgba(56, 189, 248, 0.1), transparent 50%),
+    linear-gradient(180deg, #0c1118 0%, var(--xh-bg) 45%, #050608 100%);
 }
 
 .xh *,
@@ -44,11 +58,14 @@
 }
 
 .xh__shell {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: var(--xh-left) var(--xh-center) 1fr;
   max-width: 1280px;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 @media (max-width: 1100px) {
@@ -169,7 +186,13 @@
   }
 
   .xh__nav-btn.is-active {
-    background: rgba(94, 234, 212, 0.08);
+    background: rgba(94, 234, 212, 0.12);
+    box-shadow: none;
+  }
+
+  .xh__left {
+    background: rgba(7, 9, 12, 0.96);
+    backdrop-filter: none;
   }
 
   .xh__center {
@@ -197,6 +220,28 @@
   .xh__composer textarea {
     font-size: 1.05rem;
     min-height: 72px;
+  }
+
+  .xh__top-title p {
+    display: none;
+  }
+
+  .xh__hero {
+    margin: 0.7rem;
+    border-radius: 16px;
+  }
+
+  .xh__kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .xh__btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .xh__btn-row .xh__btn {
+    width: 100%;
   }
 
   .xh__composer-bar {
@@ -242,11 +287,14 @@
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  padding: 0.5rem 0.75rem 1rem;
+  padding: 0.65rem 0.75rem 1rem;
   border-right: 1px solid var(--xh-line);
+  background: rgba(7, 9, 12, 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
 }
 
 .xh__brand {
@@ -264,16 +312,22 @@
 }
 
 .xh__brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  font-weight: 800;
-  font-size: 1.25rem;
-  background: #fff;
-  color: #000;
-  letter-spacing: -0.06em;
+  overflow: hidden;
+  border: 1px solid var(--xh-line);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.xh__brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .xh__brand-text {
@@ -285,15 +339,19 @@
 .xh__brand-title {
   font-weight: 800;
   font-size: 1.15rem;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
+}
+
+.xh__brand-title span {
+  color: var(--xh-ox);
 }
 
 .xh__brand-sub {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--xh-muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .xh__nav {
@@ -306,26 +364,30 @@
 .xh__nav-btn {
   display: inline-flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.7rem 0.95rem;
+  gap: 0.85rem;
+  padding: 0.72rem 0.9rem;
   border: 0;
   background: transparent;
-  color: var(--xh-text);
+  color: var(--xh-muted);
   font: inherit;
-  font-size: 1.15rem;
-  font-weight: 500;
-  border-radius: var(--xh-radius);
+  font-size: 1rem;
+  font-weight: 650;
+  border-radius: 14px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .xh__nav-btn:hover {
   background: var(--xh-hover);
+  color: var(--xh-text);
 }
 
 .xh__nav-btn.is-active {
-  font-weight: 800;
+  color: var(--xh-text);
+  font-weight: 750;
+  background: linear-gradient(135deg, rgba(94, 234, 212, 0.14), rgba(56, 189, 248, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.2);
 }
 
 .xh__nav-btn.is-active .xh__nav-ico {
@@ -342,19 +404,20 @@
 .xh__compose {
   margin-top: 0.5rem;
   border: 0;
-  border-radius: var(--xh-radius);
-  background: var(--xh-accent);
-  color: #fff;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--xh-ox), #2dd4bf);
+  color: var(--xh-ox-ink);
   font: inherit;
-  font-weight: 700;
-  font-size: 1.05rem;
-  padding: 0.9rem 1rem;
+  font-weight: 750;
+  font-size: 1rem;
+  padding: 0.85rem 1rem;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.12s ease;
+  transition: filter 0.15s ease, transform 0.12s ease;
+  box-shadow: 0 10px 28px rgba(45, 212, 191, 0.22);
 }
 
 .xh__compose:hover {
-  background: var(--xh-accent-hover);
+  filter: brightness(1.05);
 }
 
 .xh__compose:active {
@@ -420,7 +483,8 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(7, 9, 12, 0.88);
+  backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--xh-line);
   padding: 0.85rem 1rem;
   display: flex;
@@ -436,14 +500,96 @@
   gap: 0.35rem;
   padding: 0.55rem 0.85rem;
   border-bottom: 1px solid var(--xh-line);
-  background: #050505;
+  background: rgba(5, 8, 12, 0.95);
 }
 
+.xh__top-title h1,
 .xh__top h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.03em;
+}
+
+.xh__top-title p {
+  margin: 0.15rem 0 0;
+  font-size: 0.7rem;
+  color: var(--xh-faint);
+  letter-spacing: 0.04em;
+}
+
+.xh__hero {
+  margin: 0.85rem;
+  padding: 1.2rem 1.1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid var(--xh-line);
+  background:
+    linear-gradient(120deg, rgba(7, 12, 18, 0.55), rgba(7, 12, 18, 0.9)),
+    url("/orbitx-banner.jpg") center/cover no-repeat;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+}
+
+.xh__hero-copy h2 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.45rem, 4vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.xh__hero-copy p {
+  margin: 0;
+  max-width: 28rem;
+  color: rgba(240, 243, 246, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.xh__kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.xh__kpi {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.4);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  border-radius: 14px;
+  padding: 0.7rem 0.75rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+
+.xh__kpi:hover {
+  transform: translateY(-1px);
+  border-color: rgba(94, 234, 212, 0.35);
+}
+
+.xh__kpi.is-ok {
+  border-color: rgba(134, 239, 172, 0.35);
+}
+
+.xh__kpi-k {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--xh-muted);
+  margin-bottom: 0.2rem;
+}
+
+.xh__kpi-v {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .xh__top-actions {
@@ -512,12 +658,13 @@
 }
 
 .xh__chip {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 650;
   color: var(--xh-muted);
   border: 1px solid var(--xh-line);
-  border-radius: var(--xh-radius);
-  padding: 0.25rem 0.65rem;
+  border-radius: var(--xh-pill);
+  padding: 0.28rem 0.65rem;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .xh__chip.is-ok {
@@ -532,19 +679,24 @@
 
 .xh__btn {
   border: 1px solid var(--xh-line);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.03);
   color: var(--xh-text);
   font: inherit;
   font-weight: 700;
-  font-size: 0.9rem;
-  padding: 0.45rem 1rem;
-  border-radius: var(--xh-radius);
+  font-size: 0.88rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
 }
 
 .xh__btn:hover:not(:disabled) {
   background: var(--xh-hover);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.xh__btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .xh__btn:disabled {
@@ -555,17 +707,19 @@
 .xh__btn--primary {
   border-color: transparent;
   background: var(--xh-accent);
-  color: #fff;
+  color: #041018;
 }
 
 .xh__btn--primary:hover:not(:disabled) {
   background: var(--xh-accent-hover);
+  color: #fff;
 }
 
 .xh__btn--ox {
   border-color: transparent;
-  background: var(--xh-ox);
-  color: #042f2e;
+  background: linear-gradient(135deg, var(--xh-ox), #2dd4bf);
+  color: var(--xh-ox-ink);
+  box-shadow: 0 8px 22px rgba(45, 212, 191, 0.2);
 }
 
 .xh__btn--danger {
@@ -744,10 +898,12 @@
 }
 
 .xh__aside-card {
-  background: #16181c;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%), var(--xh-elev);
+  border: 1px solid var(--xh-line);
   border-radius: 16px;
-  padding: 0.85rem 1rem 1rem;
+  padding: 0.9rem 1rem 1.05rem;
   margin-bottom: 1rem;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
 }
 
 .xh__aside-card h2 {

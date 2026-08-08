@@ -33,6 +33,11 @@ import {
   processAutoReplies,
   patchXAgent,
 } from "./orbitx/x-agent-lib.js";
+import {
+  buildXAuthPasteMessages,
+  wrapMcpToolContent,
+  xMenuPayload,
+} from "./orbitx/mcp-brand.js";
 
 export const config = { maxDuration: 60 };
 
@@ -64,7 +69,7 @@ const TOOLS = [
   {
     name: "search",
     description:
-      "Search OrbitX X MCP capabilities and recent queue/status. Query examples: help, status, queue, post, dm, agent.",
+      "Search OrbitX X MCP capabilities and recent queue/status. Query examples: menu, help, status, queue, post, dm, agent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -78,7 +83,7 @@ const TOOLS = [
   {
     name: "fetch",
     description:
-      "Fetch a document by id from search results (help, status, queue, tool:<name>).",
+      "Fetch a document by id from search results (menu, help, status, queue, tool:<name>).",
     inputSchema: {
       type: "object",
       properties: {
@@ -88,6 +93,22 @@ const TOOLS = [
       additionalProperties: false,
     },
     annotations: { title: "Fetch", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "x_menu",
+    description:
+      "OrbitX X command menu — branded banner + capability list. Call when the user says /, menu, help, or asks what you can do.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        authCode: {
+          type: "string",
+          description: "Optional authCode from dashboard paste or x_auth_link",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "OrbitX menu", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_post",
@@ -351,20 +372,20 @@ const TOOLS = [
   {
     name: "x_auth_link",
     description:
-      "Start OrbitX authentication for this chat (best for Grok). Returns a clickable URL. When the user says they want to authenticate / connect / log in to OrbitX, call this tool and send them the url. After they finish in the browser, call x_auth_status with the same authCode, then pass authCode on every later x_* tool call.",
+      "Start OrbitX authentication for this chat (Grok fallback). Prefer a dashboard-pasted authCode when the user provides one — call x_auth_status instead. Otherwise return a clickable URL, then x_auth_status, then pass authCode on later x_* tools.",
     inputSchema: EMPTY_OBJECT_SCHEMA,
     annotations: { title: "Auth link", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_auth_status",
     description:
-      "Check whether the user finished OrbitX link-auth. Pass authCode from x_auth_link. When status is completed, keep using that authCode on subsequent tools.",
+      "Activate or check OrbitX link-auth. Pass authCode from a dashboard paste message or x_auth_link. When completed, keep using that authCode on every later x_* tool (stays linked).",
     inputSchema: {
       type: "object",
       properties: {
         authCode: {
           type: "string",
-          description: "Code returned by x_auth_link",
+          description: "Code from dashboard paste or x_auth_link",
         },
       },
       required: ["authCode"],
@@ -374,7 +395,7 @@ const TOOLS = [
   },
   {
     name: "x_help",
-    description: "How to connect OrbitX X MCP + agent mode to Claude, ChatGPT, or Grok (including link-auth).",
+    description: "How to connect OrbitX X MCP + agent mode to Claude, ChatGPT, or Grok (including dashboard paste auth).",
     inputSchema: EMPTY_OBJECT_SCHEMA,
     annotations: { title: "Help", readOnlyHint: true, openWorldHint: false },
   },
@@ -383,14 +404,27 @@ const TOOLS = [
 const AUTH_CODE_PROP = {
   type: "string",
   description:
-    "OrbitX link-auth code from x_auth_link. After the user authenticates via the link, pass this on every x_* tool call (required for Grok).",
+    "OrbitX authCode from the dashboard paste message or x_auth_link. After auth, pass this on every x_* tool call (required for Grok).",
+};
+
+const X_TOOL_ALIASES = {
+  "/": "x_menu",
+  menu: "x_menu",
+  help: "x_menu",
 };
 
 function listToolsForMcp() {
   return TOOLS.map((t) => {
     const base = t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : EMPTY_OBJECT_SCHEMA;
     const props = { ...(base.properties || {}) };
-    if (t.name !== "x_auth_link" && t.name !== "x_auth_status" && !props.authCode) {
+    if (
+      t.name !== "x_auth_link" &&
+      t.name !== "x_auth_status" &&
+      t.name !== "x_menu" &&
+      t.name !== "search" &&
+      t.name !== "fetch" &&
+      !props.authCode
+    ) {
       props.authCode = AUTH_CODE_PROP;
     }
     return {
@@ -614,6 +648,20 @@ async function touchLinkAuthExpiry(row) {
   }
 }
 
+async function bindLinkSession(row, mcpSessionId) {
+  const sessionId = String(mcpSessionId || "").trim();
+  if (!row?.code || !sessionId || row.mcp_session_id === sessionId) return;
+  try {
+    await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(row.code)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ mcp_session_id: sessionId }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
+
 async function resolveLinkAuth({ authCode, mcpSessionId } = {}) {
   const code = String(authCode || "").trim();
   const sessionId = String(mcpSessionId || "").trim();
@@ -626,6 +674,7 @@ async function resolveLinkAuth({ authCode, mcpSessionId } = {}) {
       if (row && row.status === "completed" && row.user_id) {
         if (new Date(row.expires_at).getTime() < Date.now()) return null;
         await touchLinkAuthExpiry(row);
+        await bindLinkSession(row, sessionId);
         return {
           userId: row.user_id,
           agentId: row.agent_id,
@@ -761,7 +810,7 @@ async function createLinkAuthSession(req) {
     expiresInMinutes: 15,
     expiresAt,
     message:
-      "Send the user this clickable link. Ask them to open it, sign in with their OrbitX Solana wallet, and tap Authorize Grok. When they say they finished, call x_auth_status with this authCode. Then pass authCode on every later x_* tool call in this chat.",
+      "Prefer dashboard paste auth when the user already has an authCode. Otherwise send this clickable link — they authorize once, then call x_auth_status and pass authCode on later x_* tools (stays linked).",
   };
 }
 
@@ -791,7 +840,7 @@ async function getLinkAuthStatus(authCode) {
         authCode: code,
         completedAt: row.completed_at,
         message:
-          "OrbitX linked. Pass this authCode on every subsequent x_* tool call (x_post, x_dm, …).",
+          "OrbitX linked. Pass this authCode on every subsequent x_* tool (or rely on this chat's MCP session — stays connected). Call x_menu for the command board.",
       };
     }
     return {
@@ -800,7 +849,7 @@ async function getLinkAuthStatus(authCode) {
       authenticated: false,
       authCode: code,
       url: `${MCP_HOST}/x/link-auth?code=${encodeURIComponent(code)}`,
-      message: "Still waiting — ask the user to open the link and tap Authorize Grok.",
+      message: "Still waiting — ask the user to open the link and authorize (or paste a dashboard chat-auth message).",
     };
   } catch (e) {
     return {
@@ -881,6 +930,78 @@ async function completeLinkAuthSession({ code, userId }) {
   });
 
   return { ok: true, status: "completed", authCode };
+}
+
+/** Dashboard mint: pre-authorized authCode + paste messages (no mid-chat site click). */
+async function mintLinkAuthSession({ userId } = {}) {
+  if (!userId) throw new Error("unauthorized");
+  const code = opaque("oxlink");
+  const sessionId = opaque("sess").slice(0, 24);
+  const agent = await ensureAgent(userId);
+  const access = opaque("oxx");
+  await sb("agent_api_keys", {
+    method: "POST",
+    body: JSON.stringify({
+      agent_id: agent.id,
+      name: `Chat auth ${new Date().toISOString().slice(0, 16)}`,
+      key_hash: sha256(access),
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+  try {
+    await sb("agent_mcp_oauth_tokens", {
+      method: "POST",
+      body: JSON.stringify({
+        token_hash: sha256(access),
+        user_id: userId,
+        agent_id: agent.id,
+        wallet_address: agent.wallet_address,
+        expires_at: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* optional */
+  }
+  const linkExpires = new Date(Date.now() + LINK_AUTH_TTL_MS).toISOString();
+  await sb("mcp_link_sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      code,
+      mcp_kind: "x",
+      mcp_session_id: sessionId,
+      status: "completed",
+      user_id: userId,
+      agent_id: agent.id,
+      wallet_address: agent.wallet_address,
+      access_token_hash: sha256(access),
+      completed_at: new Date().toISOString(),
+      expires_at: linkExpires,
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+  const profile = await getXProfile(userId);
+  const messages = buildXAuthPasteMessages({
+    authCode: code,
+    mcpUrl: MCP_URL,
+    expiresAt: linkExpires,
+    xUsername: profile?.twitter_username || null,
+  });
+  return {
+    ok: true,
+    status: "completed",
+    authenticated: true,
+    authCode: code,
+    mcpSessionId: sessionId,
+    expiresAt: linkExpires,
+    mcpUrl: MCP_URL,
+    xUsername: profile?.twitter_username || null,
+    xConnected: Boolean(profile?.twitter_access_token),
+    walletAddress: agent.wallet_address || null,
+    messages,
+    message:
+      "Copy the Grok / Claude / ChatGPT message into chat. The AI will call x_auth_status with authCode — no website click needed.",
+  };
 }
 
 async function getXProfile(userId) {
@@ -1118,12 +1239,32 @@ async function uploadImageOAuth1a(imageUrl) {
 }
 
 
-async function callTool(name, args, auth, req = null) {
+async function callTool(rawName, args, auth, req = null) {
+  const name = X_TOOL_ALIASES[rawName] || rawName;
   const a = args && typeof args === "object" ? args : {};
+
+  if (name === "x_menu") {
+    let xUsername = null;
+    if (auth?.userId) {
+      try {
+        const profile = await getXProfile(auth.userId);
+        xUsername = profile?.twitter_username || null;
+      } catch {
+        /* ignore */
+      }
+    }
+    return xMenuPayload({
+      authCode: a.authCode || auth?.authCode || null,
+      xUsername,
+    });
+  }
 
   // ChatGPT connector protocol — exact tool names "search" / "fetch"
   if (name === "search") {
     const q = String(a.query || "").trim().toLowerCase();
+    if (!q || q === "/" || q === "menu" || q === "help" || q === "commands") {
+      return callTool("x_menu", { authCode: a.authCode || auth?.authCode }, auth, req);
+    }
     const catalog = TOOLS.filter((t) => t.name !== "search" && t.name !== "fetch").map((t) => ({
       id: `tool:${t.name}`,
       title: t.name,
@@ -1132,10 +1273,16 @@ async function callTool(name, args, auth, req = null) {
     }));
     const docs = [
       {
+        id: "menu",
+        title: "OrbitX X command menu",
+        url: "https://www.orbitx.world/x",
+        text: "Branded OrbitX banner + X capability menu. Call x_menu or fetch id menu.",
+      },
+      {
         id: "help",
         title: "OrbitX X MCP help",
         url: "https://www.orbitx.world/x",
-        text: "Connect X on /x, mint an oxx_ key, add MCP URL https://www.orbitx.world/api/x/mcp. Tools: x_post, x_dm, x_agent_run, …",
+        text: "Connect X on /x. Prefer dashboard paste authCode; else x_auth_link. Tools: x_post, x_dm, x_agent_run, …",
       },
       {
         id: "status",
@@ -1151,20 +1298,21 @@ async function callTool(name, args, auth, req = null) {
       },
       ...catalog,
     ];
-    const results = q
-      ? docs.filter(
-          (d) =>
-            d.id.includes(q) ||
-            d.title.toLowerCase().includes(q) ||
-            d.text.toLowerCase().includes(q),
-        )
-      : docs.slice(0, 12);
+    const results = docs.filter(
+      (d) =>
+        d.id.includes(q) ||
+        d.title.toLowerCase().includes(q) ||
+        d.text.toLowerCase().includes(q),
+    );
     return { results: results.length ? results : docs.slice(0, 8) };
   }
 
   if (name === "fetch") {
     const id = String(a.id || "").trim();
     if (!id) return { ok: false, error: "id_required", message: "id is required" };
+    if (id === "menu" || id === "/" || id === "help") {
+      return callTool("x_menu", { authCode: a.authCode || auth?.authCode }, auth, req);
+    }
     if (id.startsWith("tool:")) {
       const toolName = id.slice("tool:".length);
       const t = TOOLS.find((x) => x.name === toolName);
@@ -1176,20 +1324,17 @@ async function callTool(name, args, auth, req = null) {
         text: `${t.description}\n\nSchema: ${JSON.stringify(t.inputSchema)}`,
       };
     }
-    if (id === "help") {
-      return callTool("x_help", {}, auth);
-    }
     if (id === "status") {
-      return callTool("x_connection_status", {}, auth);
+      return callTool("x_connection_status", {}, auth, req);
     }
     if (id === "queue") {
-      return callTool("x_agent_list_queue", { limit: 10 }, auth);
+      return callTool("x_agent_list_queue", { limit: 10 }, auth, req);
     }
     return {
       id,
       title: id,
       url: "https://www.orbitx.world/x",
-      text: "Unknown id. Try help, status, queue, or tool:x_post.",
+      text: "Unknown id. Try menu, help, status, queue, or tool:x_post.",
     };
   }
 
@@ -1205,19 +1350,20 @@ async function callTool(name, args, auth, req = null) {
     return {
       ok: true,
       mcpUrl: MCP_URL,
-      setupUrl: "https://orbitx.world/x",
+      setupUrl: "https://www.orbitx.world/x",
       clientId: CLIENT_ID,
       scope: SCOPE,
       tools: TOOLS.map((t) => t.name),
       steps: [
-        "Open https://orbitx.world/x and sign in",
+        "Open https://www.orbitx.world/x and sign in",
         "Connect X (Reconnect after scope upgrades for DMs)",
-        "Grok (easiest): ask Grok to authenticate → it calls x_auth_link → open the URL → Authorize → tell Grok you're done",
+        "Best: on /x dashboard → Copy chat auth for Grok/Claude/ChatGPT → paste into chat (no mid-chat click)",
+        "Fallback Grok: ask to authenticate → x_auth_link → open URL → Authorize → tell Grok you're done",
         "Claude/ChatGPT: connector OAuth or Bearer key from /x",
+        "In chat say / or menu → x_menu shows the OrbitX command board",
         "Train the agent (persona + knowledge) on /x Agent tab",
         "Enable auto-reply: mentions / DMs / group DMs (mode=approve queues drafts; mode=auto sends)",
         "Use x_dm / x_dm_inbox / x_dm_group for DMs + group chats",
-        "Use x_mentions + x_agent_poll_replies, or rely on minute cron",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
       ],
       dm: {
@@ -1232,10 +1378,10 @@ async function callTool(name, args, auth, req = null) {
         mentions: "x_mentions",
         tip: "Turn on toggles via x_agent_upsert or /x Agent tab. Approve mode = draft queue; auto = send.",
       },
-      note: "Grok: call x_auth_link and send the user the url. After they approve, pass authCode on every tool. Separate from Agent MCP (/api/mcp).",
+      note: "Prefer dashboard paste authCode. Else x_auth_link. Pass authCode on every tool. Separate from Agent MCP (/api/mcp).",
       clients: ["claude", "chatgpt", "grok"],
       grokSetup:
-        "User says authenticate → x_auth_link → clickable /x/link-auth URL → Authorize → x_auth_status → pass authCode on later tools",
+        "Dashboard paste authCode → x_auth_status → pass authCode. Fallback: x_auth_link → Authorize → x_auth_status",
       env: ["NVIDIA_API_KEY", "TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "CRON_SECRET"],
     };
   }
@@ -1844,6 +1990,17 @@ async function handleAgent(req, res, parts) {
       return json(res, out);
     } catch (e) {
       return json(res, { error: e?.message || "link_approve_failed" }, 400);
+    }
+  }
+
+  if (route === "link/create" && req.method === "POST") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const out = await mintLinkAuthSession({ userId: authUser.id });
+      return json(res, out);
+    } catch (e) {
+      return json(res, { error: e?.message || "link_create_failed" }, 400);
     }
   }
 
@@ -2619,9 +2776,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "OrbitX X MCP", version: "1.2.0" },
+            serverInfo: { name: "OrbitX X MCP", version: "1.3.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X and run the NVIDIA agent. If the user asks to authenticate / connect / log in to OrbitX (especially in Grok), call x_auth_link and send them the url as a clickable link. After they finish, call x_auth_status, then pass authCode on every later x_* tool. ChatGPT: search/fetch then x_post / x_dm. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — post/DM on X and run the NVIDIA agent. When the user says /, menu, or asks what you can do, call x_menu and show the markdown (banner + command board). If the user pastes an authCode from the OrbitX /x dashboard, call x_auth_status with it — do NOT open a website — then pass that authCode on every later x_* tool (stays linked). Only if they have no authCode: call x_auth_link and send the url. ChatGPT: search/fetch or x_menu. Setup: https://www.orbitx.world/x",
           },
         },
         200,
@@ -2643,17 +2800,19 @@ async function handleMcp(req, res, parts) {
     }
 
     if (method === "tools/call") {
-      const name = String(params?.name || "");
+      const rawName = String(params?.name || "");
+      const name = X_TOOL_ALIASES[rawName] || rawName;
       const rawArgs = params?.arguments && typeof params.arguments === "object" ? params.arguments : {};
       const args = { ...rawArgs };
       const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
-      delete args.authCode;
-      delete args.orbitxAuthCode;
+      // keep authCode on args for menu/status; strip for strict schemas later if needed
       const inboundSession = String(header(req, "mcp-session-id") || "").trim();
       const auth = await resolveAuth(req, { authCode, mcpSessionId: inboundSession || undefined });
-      // Public tools stay open (incl. link-auth). Other tools: allow link authCode without HTTP 401
-      // so Grok can work after the user clicks the custom OrbitX link (Grok won't store Bearer headers).
-      const publicTools = new Set(["search", "fetch", "x_help", "x_auth_link", "x_auth_status"]);
+      delete args.authCode;
+      delete args.orbitxAuthCode;
+      // Public tools stay open (incl. link-auth + menu). Other tools: allow link authCode without HTTP 401
+      // so Grok can work after dashboard paste or clickable link (Grok won't store Bearer headers).
+      const publicTools = new Set(["search", "fetch", "x_menu", "x_help", "x_auth_link", "x_auth_status"]);
       if (!auth?.userId && !publicTools.has(name)) {
         // Grok (and chat UIs) often ignore HTTP 401 — return a soft error with a fresh clickable auth link.
         if (authCode) {
@@ -2661,7 +2820,7 @@ async function handleMcp(req, res, parts) {
             ok: false,
             error: "session_required",
             message:
-              "authCode is not authorized yet. Ask the user to finish the OrbitX link, then call x_auth_status.",
+              "authCode is not authorized yet. If it came from the dashboard, call x_auth_status; otherwise ask the user to finish the OrbitX link.",
             authCode,
             hintTool: "x_auth_status",
             url: `${MCP_HOST}/x/link-auth?code=${encodeURIComponent(authCode)}`,
@@ -2682,7 +2841,7 @@ async function handleMcp(req, res, parts) {
           error: "auth_required",
           tool: name,
           message:
-            "OrbitX auth required. Send the user the url below as a clickable link. When they say they finished, call x_auth_status with authCode, then retry this tool with authCode.",
+            "OrbitX auth required. Prefer a dashboard-pasted authCode (x_auth_status). Or send the user a clickable x_auth_link url, then x_auth_status, then retry with authCode.",
           hintTool: "x_auth_link",
           ...link,
         };
@@ -2706,19 +2865,19 @@ async function handleMcp(req, res, parts) {
       }
 
       try {
-        const result = await callTool(name, args, auth || { userId: null, authCode }, req);
-        const isError = result && result.ok === false;
+        const toolArgs =
+          name === "x_menu" || name === "x_auth_status"
+            ? { ...args, ...(authCode ? { authCode } : {}) }
+            : args;
+        const result = await callTool(name, toolArgs, auth || { userId: null, authCode }, req);
+        const wrapped = wrapMcpToolContent(result);
         const outSession = result?.mcpSessionId || inboundSession || undefined;
         return json(
           res,
           {
             jsonrpc: "2.0",
             id,
-            result: {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-              structuredContent: result,
-              ...(isError ? { isError: true } : {}),
-            },
+            result: wrapped,
           },
           200,
           outSession ? { "Mcp-Session-Id": outSession } : {},

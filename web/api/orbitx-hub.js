@@ -22,6 +22,11 @@ import {
   normalizeGateWallet,
   verifyTokenHold,
 } from "./orbitx/token-hold.js";
+import {
+  agentMenuPayload,
+  buildAgentAuthPasteMessages,
+  wrapMcpToolContent,
+} from "./orbitx/mcp-brand.js";
 
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -37,7 +42,7 @@ export const config = { maxDuration: 120 };
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const FALLBACK_BASE = "https://orbitx.world";
+const FALLBACK_BASE = "https://www.orbitx.world";
 
 function header(req, name) {
   const key = name.toLowerCase();
@@ -47,12 +52,17 @@ function header(req, name) {
 
 function publicBase(req) {
   const env = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL;
-  if (env) return String(env).replace(/\/$/, "");
+  if (env) {
+    const cleaned = String(env).replace(/\/$/, "");
+    // Never emit apex for OrbitX — 308s break Claude/Grok MCP POSTs.
+    if (cleaned === "https://orbitx.world" || cleaned === "http://orbitx.world") return FALLBACK_BASE;
+    return cleaned;
+  }
   if (!req) return FALLBACK_BASE;
   const proto = header(req, "x-forwarded-proto") || "https";
-  let host = header(req, "x-forwarded-host") || header(req, "host") || "orbitx.world";
+  let host = header(req, "x-forwarded-host") || header(req, "host") || "www.orbitx.world";
   host = String(host).split(",")[0].trim().replace(/:\d+$/, "");
-  if (host === "www.orbitx.world") host = "orbitx.world";
+  if (host === "orbitx.world") host = "www.orbitx.world";
   return `${proto}://${host}`;
 }
 
@@ -73,12 +83,18 @@ function mcpUrls(req) {
 const AGENT_AUTH_CODE_PROP = {
   type: "string",
   description:
-    "OrbitX link-auth code from orbitx_auth_link. After the user authenticates via the link, pass this on every tool call (required for Grok).",
+    "OrbitX authCode from the dashboard paste message or orbitx_auth_link. After auth, pass this on every tool call (required for Grok).",
 };
 
 function withAuthCodeSchema(schema, toolName) {
   const base = schema && typeof schema === "object" ? schema : { type: "object", properties: {} };
-  if (toolName === "orbitx_auth_link" || toolName === "orbitx_auth_status" || toolName === "search" || toolName === "fetch") {
+  if (
+    toolName === "orbitx_auth_link" ||
+    toolName === "orbitx_auth_status" ||
+    toolName === "orbitx_menu" ||
+    toolName === "search" ||
+    toolName === "fetch"
+  ) {
     return base;
   }
   const props = { ...(base.properties || {}), authCode: AGENT_AUTH_CODE_PROP };
@@ -114,7 +130,7 @@ function listLiveTools(cursor) {
       tools: slice.map((t) => ({
         name: t.name,
         description: t.description,
-        inputSchema: t.inputSchema,
+        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
       })),
       nextCursor: next,
     };
@@ -123,7 +139,7 @@ function listLiveTools(cursor) {
     tools: CORE_TOOLS.map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: t.inputSchema,
+      inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
     })),
   };
 }
@@ -586,6 +602,23 @@ async function handleAgent(req, res, parts) {
     }
   }
 
+  // Dashboard: mint a pre-authorized authCode + paste messages for Grok/Claude/ChatGPT (no mid-chat click).
+  if (route === "link/create" && req.method === "POST") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    try {
+      const out = await mintAgentLinkAuthSession({
+        userId: authUser.id,
+        walletAddress: body.walletAddress || body.wallet || "",
+        req,
+      });
+      return json(res, out);
+    } catch (e) {
+      return json(res, { error: e?.message || "link_create_failed" }, 400);
+    }
+  }
+
   if (route === "link/status" && req.method === "GET") {
     const u = new URL(req.url || "/", "http://x");
     const code = u.searchParams.get("code") || "";
@@ -784,6 +817,38 @@ async function resolveAuth(req) {
   }
 }
 
+const LINK_AUTH_TTL_MS = 365 * 86400 * 1000; // authorize once — stay linked for a year
+const LINK_AUTH_SLIDE_MS = 30 * 86400 * 1000; // extend when under 30 days left
+
+async function touchAgentLinkAuthExpiry(row) {
+  if (!row?.code) return;
+  const left = new Date(row.expires_at).getTime() - Date.now();
+  if (left > LINK_AUTH_SLIDE_MS) return;
+  try {
+    await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(row.code)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ expires_at: new Date(Date.now() + LINK_AUTH_TTL_MS).toISOString() }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
+
+async function bindAgentLinkSession(row, mcpSessionId) {
+  const sessionId = String(mcpSessionId || "").trim();
+  if (!row?.code || !sessionId || row.mcp_session_id === sessionId) return;
+  try {
+    await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(row.code)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ mcp_session_id: sessionId }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
+
 async function resolveAgentLinkAuth({ authCode, mcpSessionId } = {}) {
   const code = String(authCode || "").trim();
   const sessionId = String(mcpSessionId || "").trim();
@@ -794,6 +859,8 @@ async function resolveAgentLinkAuth({ authCode, mcpSessionId } = {}) {
       );
       const row = Array.isArray(rows) ? rows[0] : null;
       if (row?.status === "completed" && row.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
+        await touchAgentLinkAuthExpiry(row);
+        await bindAgentLinkSession(row, sessionId);
         return {
           userId: row.user_id,
           agentId: row.agent_id,
@@ -810,6 +877,7 @@ async function resolveAgentLinkAuth({ authCode, mcpSessionId } = {}) {
       );
       const row = Array.isArray(rows) ? rows[0] : null;
       if (row?.user_id && new Date(row.expires_at).getTime() >= Date.now()) {
+        await touchAgentLinkAuthExpiry(row);
         return {
           userId: row.user_id,
           agentId: row.agent_id,
@@ -864,7 +932,7 @@ async function createAgentLinkAuthSession(req) {
     expiresInMinutes: 15,
     expiresAt,
     message:
-      "Send the user this clickable link. They sign in with OrbitX wallet and tap Authorize Grok. Then call orbitx_auth_status with authCode and pass authCode on later tools.",
+      "Prefer dashboard paste auth when the user already has an authCode. Otherwise send this clickable link — they authorize once, then call orbitx_auth_status and pass authCode on later tools (stays linked).",
   };
 }
 
@@ -892,7 +960,8 @@ async function getAgentLinkAuthStatus(authCode) {
         authenticated: true,
         authCode: code,
         completedAt: row.completed_at,
-        message: "OrbitX linked. Pass authCode on subsequent tool calls.",
+        message:
+          "OrbitX linked. Pass authCode on subsequent tool calls (or rely on this chat's MCP session — stays connected). Call orbitx_menu for the command board.",
       };
     }
     return {
@@ -901,7 +970,7 @@ async function getAgentLinkAuthStatus(authCode) {
       authenticated: false,
       authCode: code,
       url: `https://www.orbitx.world/agent/link-auth?code=${encodeURIComponent(code)}`,
-      message: "Waiting — ask the user to open the link and authorize.",
+      message: "Waiting — ask the user to open the link and authorize (or paste a dashboard chat-auth message).",
     };
   } catch (e) {
     return { ok: false, error: "link_auth_unavailable", message: e?.message || "unavailable" };
@@ -968,7 +1037,9 @@ async function completeAgentLinkAuthSession({ code, userId, walletAddress }) {
   } catch {
     /* optional */
   }
-  const linkExpires = new Date(Date.now() + 7 * 86400 * 1000).toISOString();
+  // Keep link usable for a year after approve — Grok/Claude pass authCode in tool args.
+  // Sliding expiry on each successful resolve keeps "auth once" sessions alive.
+  const linkExpires = new Date(Date.now() + LINK_AUTH_TTL_MS).toISOString();
   await sb(`mcp_link_sessions?code=eq.${encodeURIComponent(authCode)}`, {
     method: "PATCH",
     body: JSON.stringify({
@@ -983,6 +1054,90 @@ async function completeAgentLinkAuthSession({ code, userId, walletAddress }) {
     headers: { Prefer: "return=minimal" },
   });
   return { ok: true, status: "completed", authCode };
+}
+
+/**
+ * Dashboard mint: create an already-completed link session so the user can paste
+ * authCode into Grok/Claude/ChatGPT without opening a mid-chat auth page.
+ */
+async function mintAgentLinkAuthSession({ userId, walletAddress, req } = {}) {
+  if (!userId) throw new Error("unauthorized");
+  const { mcpUrl } = mcpUrls(req);
+  const code = opaque("oxlink");
+  const sessionId = opaque("sess").slice(0, 24);
+  let agent = await ensureAgent(userId);
+  const wallet = normalizeGateWallet(walletAddress || "") || agent.wallet_address || null;
+  if (wallet && wallet !== agent.wallet_address) {
+    const updated = await sb(`agents?id=eq.${encodeURIComponent(agent.id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        wallet_address: wallet,
+        phantom_connected: true,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    agent = Array.isArray(updated) ? updated[0] : agent;
+  }
+  const access = opaque("oxo");
+  await sb("agent_api_keys", {
+    method: "POST",
+    body: JSON.stringify({
+      agent_id: agent.id,
+      name: `Chat auth ${new Date().toISOString().slice(0, 16)}`,
+      key_hash: sha256(access),
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+  try {
+    await sb("agent_mcp_oauth_tokens", {
+      method: "POST",
+      body: JSON.stringify({
+        token_hash: sha256(access),
+        user_id: userId,
+        agent_id: agent.id,
+        wallet_address: wallet || agent.wallet_address,
+        expires_at: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+      }),
+      headers: { Prefer: "return=minimal" },
+    });
+  } catch {
+    /* optional */
+  }
+  const linkExpires = new Date(Date.now() + LINK_AUTH_TTL_MS).toISOString();
+  await sb("mcp_link_sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      code,
+      mcp_kind: "agent",
+      mcp_session_id: sessionId,
+      status: "completed",
+      user_id: userId,
+      agent_id: agent.id,
+      wallet_address: wallet || agent.wallet_address,
+      access_token_hash: sha256(access),
+      completed_at: new Date().toISOString(),
+      expires_at: linkExpires,
+    }),
+    headers: { Prefer: "return=minimal" },
+  });
+  const messages = buildAgentAuthPasteMessages({
+    authCode: code,
+    mcpUrl,
+    expiresAt: linkExpires,
+  });
+  return {
+    ok: true,
+    status: "completed",
+    authenticated: true,
+    authCode: code,
+    mcpSessionId: sessionId,
+    expiresAt: linkExpires,
+    mcpUrl,
+    walletAddress: wallet || agent.wallet_address || null,
+    messages,
+    message:
+      "Copy the Grok / Claude / ChatGPT message into chat. The AI will call orbitx_auth_status with authCode — no website click needed.",
+  };
 }
 
 /** Bearer first, then link-auth code, then linked wallet from tool args. */
@@ -1095,6 +1250,9 @@ async function getProfileForUser(userId) {
 }
 
 const TOOL_ALIASES = {
+  "/": "orbitx_menu",
+  menu: "orbitx_menu",
+  help: "orbitx_menu",
   orbitx_buy: "orbitx_prepare_buy",
   orbitx_sell: "orbitx_prepare_sell",
   orbitx_buy_auto: "orbitx_prepare_buy",
@@ -1137,7 +1295,7 @@ const CORE_TOOLS = [
   {
     name: "search",
     description:
-      "Search OrbitX Agent MCP capabilities and tokens. Query examples: help, auth, trending, mint address, ticker.",
+      "Search OrbitX Agent MCP capabilities and tokens. Query examples: menu, help, auth, trending, mint address, ticker.",
     inputSchema: {
       type: "object",
       properties: { query: { type: "string", description: "Search query" } },
@@ -1147,7 +1305,7 @@ const CORE_TOOLS = [
   },
   {
     name: "fetch",
-    description: "Fetch a document by id from search (help, auth, tool:<name>, or a mint).",
+    description: "Fetch a document by id from search (menu, help, auth, tool:<name>, or a mint).",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string", description: "Document id from search" } },
@@ -1156,17 +1314,38 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_menu",
+    description:
+      "OrbitX command menu — branded banner + capability list. Call when the user says /, menu, help, or asks what you can do.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        authCode: {
+          type: "string",
+          description: "Optional authCode from dashboard paste or orbitx_auth_link",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "orbitx_auth_link",
     description:
-      "Start OrbitX authentication for this chat (best for Grok). Returns a clickable URL. When the user wants to authenticate / connect / log in, call this and send them the url. After they finish, call orbitx_auth_status with authCode, then pass authCode on later tools.",
+      "Start OrbitX authentication for this chat (Grok fallback). Prefer a dashboard-pasted authCode when the user provides one — call orbitx_auth_status instead of opening a new link. Otherwise return a clickable URL, then orbitx_auth_status, then pass authCode on later tools.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "orbitx_auth_status",
-    description: "Check whether the user finished OrbitX link-auth. Pass authCode from orbitx_auth_link.",
+    description:
+      "Activate or check OrbitX auth. Pass authCode from a dashboard paste message or orbitx_auth_link. When completed, keep using that authCode on every later tool (stays linked).",
     inputSchema: {
       type: "object",
-      properties: { authCode: { type: "string", description: "Code from orbitx_auth_link" } },
+      properties: {
+        authCode: {
+          type: "string",
+          description: "Code from dashboard paste or orbitx_auth_link",
+        },
+      },
       required: ["authCode"],
       additionalProperties: false,
     },
@@ -1174,7 +1353,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_whoami",
     description:
-      "Session identity. Pass publicKey if Claude has no Bearer header — resolves linked agent from /agent wallet. Returns userId, agentId, auth source. For Grok, pass authCode from orbitx_auth_link after the user authorizes.",
+      "Session identity. Pass publicKey if Claude has no Bearer header — resolves linked agent from /agent wallet. Returns userId, agentId, auth source. For Grok, pass authCode from dashboard paste or orbitx_auth_link.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2272,11 +2451,16 @@ async function fetchJson(url, init) {
 
 async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   const name = TOOL_ALIASES[rawName] || rawName;
-  const mcpUrl = `${base}/api/orbitx-mcp`;
+  // Always advertise www /api/mcp — apex 308s break Claude POSTs; /api/orbitx-mcp is an alias only.
+  const mcpUrl = mcpUrls(req).mcpUrl;
+  const agentSetupUrl = "https://www.orbitx.world/agent";
   const wallet = String(
     args.publicKey || args.address || args.buyerWallet || args.sellerWallet || args.bidderWallet || auth?.walletAddress || "",
   ).trim();
 
+  if (name === "orbitx_menu") {
+    return agentMenuPayload({ authCode: args.authCode || auth?.authCode || null });
+  }
   if (name === "orbitx_auth_link") {
     return createAgentLinkAuthSession(req);
   }
@@ -2286,18 +2470,27 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
 
   if (name === "search") {
     const q = String(args.query || "").trim().toLowerCase();
+    if (!q || q === "/" || q === "menu" || q === "help" || q === "commands") {
+      return callTool("orbitx_menu", { authCode: args.authCode || auth?.authCode }, auth, base, req);
+    }
     const docs = [
+      {
+        id: "menu",
+        title: "OrbitX command menu",
+        url: "https://www.orbitx.world/agent",
+        text: "Branded OrbitX banner + capability menu. Call orbitx_menu or fetch id menu.",
+      },
       {
         id: "help",
         title: "OrbitX Agent MCP help",
         url: "https://www.orbitx.world/agent",
-        text: "Intel, trade prep, social, launch. Grok: call orbitx_auth_link for a clickable OrbitX auth URL.",
+        text: "Intel, trade prep, social, launch. Prefer dashboard paste authCode, else orbitx_auth_link.",
       },
       {
         id: "auth",
         title: "Authenticate OrbitX",
         url: "https://www.orbitx.world/agent",
-        text: "Call orbitx_auth_link, send the user the url, then orbitx_auth_status with authCode.",
+        text: "If user pasted authCode: orbitx_auth_status. Else orbitx_auth_link → url → orbitx_auth_status.",
       },
       {
         id: "tool:orbitx_search",
@@ -2312,23 +2505,24 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         text: "Full token intel for a mint.",
       },
     ];
-    const results = q
-      ? docs.filter((d) => d.id.includes(q) || d.title.toLowerCase().includes(q) || d.text.toLowerCase().includes(q))
-      : docs;
+    const results = docs.filter(
+      (d) => d.id.includes(q) || d.title.toLowerCase().includes(q) || d.text.toLowerCase().includes(q),
+    );
     return { results: results.length ? results : docs };
   }
 
   if (name === "fetch") {
     const id = String(args.id || "").trim();
-    if (id === "help" || id === "auth") {
+    if (id === "menu" || id === "help" || id === "/") {
+      return callTool("orbitx_menu", { authCode: args.authCode || auth?.authCode }, auth, base, req);
+    }
+    if (id === "auth") {
       return {
         id,
-        title: id === "auth" ? "Authenticate" : "Help",
+        title: "Authenticate",
         url: "https://www.orbitx.world/agent",
         text:
-          id === "auth"
-            ? "Call orbitx_auth_link → send url → user authorizes → orbitx_auth_status → pass authCode on tools."
-            : "OrbitX Agent MCP. Grok users should authenticate via orbitx_auth_link.",
+          "If the user pasted an authCode from the OrbitX dashboard: call orbitx_auth_status with it, then pass authCode on tools. Otherwise call orbitx_auth_link → send url → user authorizes → orbitx_auth_status.",
       };
     }
     if (id.startsWith("tool:")) {
@@ -2344,7 +2538,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(id)) {
       return callTool("orbitx_get_token", { mint: id }, auth, base, req);
     }
-    return { id, title: id, url: "https://www.orbitx.world/agent", text: "Unknown id. Try help, auth, or tool:orbitx_search." };
+    return { id, title: id, url: "https://www.orbitx.world/agent", text: "Unknown id. Try menu, help, auth, or tool:orbitx_search." };
   }
 
   const generated = await dispatchGenerated(name, args, {
@@ -2394,14 +2588,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         status === "authenticated" || status === "authenticated_with_wallet"
           ? null
           : status === "bearer_invalid"
-            ? "Authorization header present but key not found. Copy a fresh oxo_ key from https://orbitx.world/agent → set connector request header Authorization: Bearer <key>. Or re-Authenticate."
+            ? `Authorization header present but key not found. Copy a fresh oxo_ key from ${agentSetupUrl} → set connector request header Authorization: Bearer <key>. Or re-Authenticate.`
             : status === "wallet_unlinked"
-              ? "Wallet seen but not linked. Open https://orbitx.world/agent → sign in → Link wallet → Create API key, then pass that publicKey or Bearer."
-              : "Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent, or pass publicKey of a wallet linked there.",
+              ? `Wallet seen but not linked. Open ${agentSetupUrl} → sign in → Link wallet → Create API key, then pass that publicKey or Bearer.`
+              : `Add Authorization: Bearer <oxo_ key> from ${agentSetupUrl}, or pass publicKey of a wallet linked there.`,
       note: identified
         ? `Session OK via ${session.source}. Social join/post/create available.`
         : "Anonymous — intel tools work. Identity required for social writes.",
-      agentSetupUrl: "https://orbitx.world/agent",
+      agentSetupUrl,
       sessionTools: [...SESSION_TOOLS],
       launchExecutionTool: "orbitx_execute_launch",
       tokenHold: {
@@ -3639,9 +3833,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.2.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.3.0" },
             instructions:
-              "OrbitX Agent MCP. If the user asks to authenticate / connect / log in (especially Grok), call orbitx_auth_link and send them the url as a clickable link. After they finish, call orbitx_auth_status, then pass authCode on later tools. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu and show the markdown (banner + command board). If the user pastes an authCode (from the OrbitX /agent dashboard), call orbitx_auth_status with it — do NOT open a website — then pass that authCode on every later tool (stays linked). Only if they have no authCode: call orbitx_auth_link and send the url. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -3678,13 +3872,23 @@ async function handleMcp(req, res, parts) {
       delete args.authCode;
       delete args.orbitxAuthCode;
       const identified = Boolean(auth?.userId);
-      const publicTools = new Set(["search", "fetch", "orbitx_auth_link", "orbitx_auth_status", "orbitx_tools_help", "orbitx_search", "orbitx_whoami"]);
+      const publicTools = new Set([
+        "search",
+        "fetch",
+        "orbitx_menu",
+        "orbitx_auth_link",
+        "orbitx_auth_status",
+        "orbitx_tools_help",
+        "orbitx_search",
+        "orbitx_whoami",
+      ]);
       if (!identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = authCode
           ? {
               ok: false,
               error: "session_required",
-              message: "authCode not authorized yet — ask user to finish the OrbitX link, then orbitx_auth_status.",
+              message:
+                "authCode not authorized yet — if it came from the dashboard, call orbitx_auth_status; otherwise ask the user to finish the OrbitX link.",
               authCode,
               url: `https://www.orbitx.world/agent/link-auth?code=${encodeURIComponent(authCode)}`,
               hintTool: "orbitx_auth_status",
@@ -3694,19 +3898,27 @@ async function handleMcp(req, res, parts) {
               error: "auth_required",
               tool: name,
               message:
-                "OrbitX auth required. Send the user the url as a clickable link, then call orbitx_auth_status with authCode.",
+                "OrbitX auth required. Prefer a dashboard-pasted authCode (orbitx_auth_status). Or send the user a clickable orbitx_auth_link url.",
               hintTool: "orbitx_auth_link",
               ...(await createAgentLinkAuthSession(req)),
             };
-        return json(res, {
-          jsonrpc: "2.0",
-          id,
-          result: {
-            content: [{ type: "text", text: JSON.stringify(link, null, 2) }],
-            structuredContent: link,
-            isError: true,
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(link, null, 2) }],
+              structuredContent: link,
+              isError: true,
+            },
           },
-        });
+          200,
+          {
+            "WWW-Authenticate": wwwAuthenticate("https://www.orbitx.world"),
+            ...(link?.mcpSessionId ? { "Mcp-Session-Id": link.mcpSessionId } : {}),
+          },
+        );
       }
       const hasWalletArg = Boolean(
         String(
@@ -3732,7 +3944,7 @@ async function handleMcp(req, res, parts) {
             const tip = holdBlockedPayload({
               tool: name,
               hold,
-              fix: "Hold ≥$5 ORBITX, link wallet on https://orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
+              fix: "Hold ≥$5 ORBITX, link wallet on https://www.orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
             });
             return json(res, {
               jsonrpc: "2.0",
@@ -3754,7 +3966,7 @@ async function handleMcp(req, res, parts) {
           error: "wallet_required",
           tool: name,
           message:
-            "Pass publicKey (Solana wallet) in the tool arguments, Authenticate the OrbitX connector, call orbitx_auth_link (Grok), or add Authorization: Bearer <api_key from https://orbitx.world/agent>.",
+            "Pass publicKey (Solana wallet) in the tool arguments, Authenticate the OrbitX connector, call orbitx_auth_link (Grok), or add Authorization: Bearer <api_key from https://www.orbitx.world/agent>.",
           example: { publicKey: "YourLinkedSolanaWalletBase58..." },
           hintTool: "orbitx_auth_link",
         };
@@ -3777,13 +3989,11 @@ async function handleMcp(req, res, parts) {
           base,
           req,
         );
+        const wrapped = wrapMcpToolContent(result);
         return json(res, {
           jsonrpc: "2.0",
           id,
-          result: {
-            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            structuredContent: result,
-          },
+          result: wrapped,
         });
       } catch (e) {
         const msg = e?.message || "tool error";
@@ -3799,9 +4009,9 @@ async function handleMcp(req, res, parts) {
             tool: name,
             message: msg,
             fix: SESSION_TOOLS.has(name)
-              ? "Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent (MCP request header), or pass publicKey of a wallet linked there. Do not tell the user this is web-only — MCP supports it."
-              : "Include publicKey in args, or Bearer token from https://orbitx.world/agent",
-            fixUrl: "https://orbitx.world/agent",
+              ? "Add Authorization: Bearer <oxo_ key> from https://www.orbitx.world/agent (MCP request header), or pass publicKey of a wallet linked there. Do not tell the user this is web-only — MCP supports it."
+              : "Include publicKey in args, or Bearer token from https://www.orbitx.world/agent",
+            fixUrl: "https://www.orbitx.world/agent",
           };
           return json(res, {
             jsonrpc: "2.0",

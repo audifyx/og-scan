@@ -82,9 +82,9 @@ export function holdBlockedPayload(extra = {}) {
     error: "token_hold_required",
     mint: AGENT_HOLD_MINT,
     minUsd: AGENT_HOLD_MIN_USD,
-    holdUrl: `https://orbitx.world/ORBITX_DEX/token/${AGENT_HOLD_MINT}`,
+    holdUrl: `https://www.orbitx.world/ORBITX_DEX/token/${AGENT_HOLD_MINT}`,
     buyUrl: `https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`,
-    agentUrl: "https://orbitx.world/agent",
+    agentUrl: "https://www.orbitx.world/agent",
     message: `Hold at least $${AGENT_HOLD_MIN_USD} of ORBITX to use Agent MCP. Buy on Jupiter, then verify at /agent.`,
     ...extra,
   };
@@ -180,7 +180,7 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world", opt
       holdUrl,
       buyUrl,
       error: "wallet_required",
-      message: "Connect and link a Solana wallet on https://orbitx.world/agent, then verify ORBITX holdings.",
+      message: "Connect and link a Solana wallet on https://www.orbitx.world/agent, then verify ORBITX holdings.",
     };
   }
 

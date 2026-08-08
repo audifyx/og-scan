@@ -8,15 +8,9 @@
  */
 export const config = { maxDuration: 120 };
 
-const BASE = "https://orbitx.world";
+import { buildToolUrl } from "./ogdex/_mcp.js";
 
-const LEGACY_ROUTES = {
-  ogdex_get_token: (p) =>
-    `${BASE}/api/ogdex/token?mint=${encodeURIComponent(p.mint)}&chain=${encodeURIComponent(p.chain || "solana")}`,
-  ogdex_screen_tokens: (p) =>
-    `${BASE}/api/ogdex/screener?type=${encodeURIComponent(p.type)}&interval=${encodeURIComponent(p.interval || "1h")}&limit=${Number(p.limit) || 20}&chain=${encodeURIComponent(p.chain || "solana")}`,
-  ogdex_search: (p) => `${BASE}/api/ogdex/search?q=${encodeURIComponent(p.q)}`,
-};
+const BASE = "https://www.orbitx.world";
 
 function forceMcpPath(req) {
   try {
@@ -50,6 +44,7 @@ export default async function handler(req, res) {
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Mcp-Session-Id");
+      res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, Mcp-Session-Id");
       res.statusCode = 204;
       return res.end();
     }
@@ -57,14 +52,21 @@ export default async function handler(req, res) {
     // Legacy OG DEX: POST { tool, params } (no jsonrpc)
     if (req.method === "POST") {
       let peek = req.body;
+      let parseFailed = false;
       if (peek == null) {
         try {
           const chunks = [];
           for await (const c of req) chunks.push(typeof c === "string" ? Buffer.from(c) : c);
           const raw = Buffer.concat(chunks).toString("utf8");
-          peek = raw ? JSON.parse(raw) : {};
-          req.body = peek;
+          if (!raw.trim()) {
+            peek = {};
+            req.body = {};
+          } else {
+            peek = JSON.parse(raw);
+            req.body = peek;
+          }
         } catch {
+          parseFailed = true;
           peek = {};
           req.body = {};
         }
@@ -73,17 +75,27 @@ export default async function handler(req, res) {
           peek = JSON.parse(peek);
           req.body = peek;
         } catch {
+          parseFailed = true;
           peek = {};
+          req.body = {};
         }
       }
 
+      if (parseFailed) {
+        return sendJson(
+          res,
+          { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error: Invalid JSON" } },
+          400,
+        );
+      }
+
       if (peek && typeof peek === "object" && !peek.jsonrpc && peek.tool) {
-        const builder = LEGACY_ROUTES[peek.tool];
-        if (!builder) {
+        const url = buildToolUrl(BASE, peek.tool, peek.params || {});
+        if (!url) {
           return sendJson(res, { ok: false, error: `Unknown legacy tool: ${peek.tool}` }, 400);
         }
         try {
-          const r = await fetch(builder(peek.params || {}), { headers: { "User-Agent": "OrbitX-MCP/1.0" } });
+          const r = await fetch(url, { headers: { "User-Agent": "OrbitX-MCP/1.0" } });
           const data = await r.json();
           return sendJson(res, { ok: true, tool: peek.tool, result: data });
         } catch (e) {
