@@ -84,7 +84,7 @@ const preferenceSections: Array<{
   { key: "whaleAlerts", title: "Whale alerts", description: "Large wallet moves and whale activity", icon: Zap },
   { key: "walletActivity", title: "Wallet activity", description: "Tracked wallet buys, sells, and moves", icon: Wallet },
   { key: "tradeSignals", title: "Trade signals", description: "Callouts, alpha, and trade setups", icon: TrendingUp },
-  { key: "ourCoin", title: "OFFICIAL OGS", description: "OG coin buy alerts and token events", icon: Coins },
+  { key: "ourCoin", title: "$ORBITX", description: "Official token buy alerts and events", icon: Coins },
   { key: "communityPosts", title: "Community posts", description: "Community activity and new posts", icon: Bell },
   { key: "newFollowers", title: "Followers", description: "New follows and social growth", icon: BellRing },
   { key: "lobbyInvites", title: "Lobby invites", description: "Trading room and lobby invitations", icon: Bell },

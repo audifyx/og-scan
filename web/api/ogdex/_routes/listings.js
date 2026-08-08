@@ -1,5 +1,36 @@
 import { send, dbSelect, dbInsert, callFn, readBody, cache } from "../_lib.js";
 
+/** Official OrbitX platform token — always pinned as top featured listing. */
+const OFFICIAL_FEATURED = {
+  id: "official-orbitx",
+  contract_address: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+  chain: "solana",
+  project_name: "ORBITX",
+  symbol: "ORBITX",
+  logo_url: "/og-icon.svg",
+  banner_url: null,
+  description: "Official OrbitX platform token",
+  links: {
+    website: "https://orbitx.world",
+    dexscreener: "https://dexscreener.com/solana/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    jupiter: "https://jup.ag/swap/SOL-13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+  },
+  tier: "express",
+  status: "approved",
+  featured: true,
+  featured_rank: 9999,
+  metadata: { official: true },
+  views: 0,
+  created_at: null,
+  approved_at: null,
+};
+
+function withOfficialFeatured(rows) {
+  const mint = OFFICIAL_FEATURED.contract_address;
+  const rest = (rows || []).filter((r) => r.contract_address !== mint);
+  return [OFFICIAL_FEATURED, ...rest];
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://x");
   if (req.method === "POST") return submit(req, res);
@@ -10,9 +41,11 @@ export default async function handler(req, res) {
     let q = "status=eq.approved&order=featured.desc,featured_rank.desc,approved_at.desc&limit=200";
     if (featuredOnly) q = "status=eq.approved&featured=eq.true&order=featured_rank.desc&limit=20";
     const rows = await dbSelect("ogdex_listings", q);
-    return send(res, 200, { rows: rows.map(pub) });
+    const mapped = withOfficialFeatured(rows.map(pub));
+    return send(res, 200, { rows: featuredOnly ? mapped.filter((r) => r.featured) : mapped });
   } catch (e) {
-    return send(res, 200, { rows: [], error: String(e?.message || e) });
+    // Even if DB is down, still serve the official featured token.
+    return send(res, 200, { rows: [OFFICIAL_FEATURED], error: String(e?.message || e) });
   }
 }
 

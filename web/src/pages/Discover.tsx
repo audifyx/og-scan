@@ -23,7 +23,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { fmtUsd, fmtNum } from "@/lib/og";
+import { fmtUsd, fmtNum, OGSCAN_TOKEN_MINT, OGSCAN_TOKEN_NAME, OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import type { JupTokenInfo } from "@/lib/og";
 import { getChain, isSolana } from "@/lib/chains";
@@ -88,6 +88,7 @@ function heatScore(t: LaunchToken): number {
 }
 
 function isSafeToken(t: LaunchToken): boolean {
+  if (t.contract === OGSCAN_TOKEN_MINT) return true;
   const mc = t.marketCapUsd ?? 0;
   const liq = t.liquidityUsd ?? 0;
   const vol = t.volume24hUsd ?? 0;
@@ -201,6 +202,59 @@ async function fetchSubmissions(userId: string | null): Promise<LaunchToken[]> {
       })
       .map((r: any) => submissionToToken(r));
   } catch { return []; }
+}
+
+/** Official $ORBITX — always featured in Discover spotlight. */
+async function fetchOfficialFeatured(): Promise<LaunchToken> {
+  const fallback: LaunchToken = {
+    id: OGSCAN_TOKEN_MINT,
+    name: OGSCAN_TOKEN_NAME,
+    ticker: OGSCAN_TOKEN_SYMBOL,
+    contract: OGSCAN_TOKEN_MINT,
+    logoUrl: "/og-icon.svg",
+    venue: "pumpfun",
+    status: "live",
+    tags: ["official"],
+    featured: true,
+    hot: true,
+    verified: true,
+    createdAt: Date.now(),
+    ownerId: null,
+    price: null,
+    change24hPct: null,
+    liquidityUsd: null,
+    marketCapUsd: null,
+    volume24hUsd: null,
+    holders: null,
+    pairAddress: null,
+    txns24h: 0,
+    upvotes: 0,
+    watchers: 0,
+    source: "submission",
+    chainId: "solana",
+  };
+  try {
+    const res = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${OGSCAN_TOKEN_MINT}`);
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const pair = Array.isArray(data) ? data[0] : data?.pairs?.[0];
+    if (!pair) return fallback;
+    const token = pairToToken(pair, pair.info?.imageUrl || "/og-icon.svg", "boost");
+    return {
+      ...token,
+      id: OGSCAN_TOKEN_MINT,
+      name: OGSCAN_TOKEN_NAME,
+      ticker: OGSCAN_TOKEN_SYMBOL,
+      contract: OGSCAN_TOKEN_MINT,
+      featured: true,
+      hot: true,
+      verified: true,
+      tags: [...(token.tags || []), "official"],
+      source: "submission",
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 function pairToToken(pair: any, icon?: string, source: "dex" | "boost" = "dex"): LaunchToken {
@@ -347,15 +401,17 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
   const fetchAll = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const [boosted, latest, submissions] = await Promise.allSettled([
+      const [boosted, latest, submissions, official] = await Promise.allSettled([
         fetchDexScreenerBoosted(),
         fetchDexScreenerLatest(),
         fetchSubmissions(user?.id ?? null),
+        fetchOfficialFeatured(),
       ]);
       const b = boosted.status === "fulfilled" ? boosted.value : [];
       const l = latest.status === "fulfilled" ? latest.value : [];
       const s = submissions.status === "fulfilled" ? submissions.value : [];
-      setAllTokens(mergeTokens([b, l, s]));
+      const o = official.status === "fulfilled" ? [official.value] : [];
+      setAllTokens(mergeTokens([o, b, l, s]));
     } catch (e) {
       console.error("[discover] fetch failed", e);
     } finally {
@@ -397,12 +453,14 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
     return items;
   }, [safeTokens, allTokens, section, searchResults, user?.id]);
 
-  // Precomputed carousels
-  const featuredSpotlight = useMemo(
-    () => safeTokens.filter(t => t.featured || (t.change24hPct ?? 0) >= 50 && (t.volume24hUsd ?? 0) >= 50_000)
-      .sort((a, b) => (b.change24hPct ?? 0) - (a.change24hPct ?? 0)).slice(0, 8),
-    [safeTokens]
-  );
+  // Precomputed carousels — official $ORBITX always leads Spotlight
+  const featuredSpotlight = useMemo(() => {
+    const official = safeTokens.find((t) => t.contract === OGSCAN_TOKEN_MINT);
+    const rest = safeTokens
+      .filter((t) => t.contract !== OGSCAN_TOKEN_MINT && (t.featured || ((t.change24hPct ?? 0) >= 50 && (t.volume24hUsd ?? 0) >= 50_000)))
+      .sort((a, b) => (b.change24hPct ?? 0) - (a.change24hPct ?? 0));
+    return [official, ...rest].filter(Boolean).slice(0, 8) as LaunchToken[];
+  }, [safeTokens]);
   const topGainers = useMemo(
     () => safeTokens.filter(t => (t.change24hPct ?? 0) > 0).sort((a, b) => (b.change24hPct ?? 0) - (a.change24hPct ?? 0)).slice(0, 5),
     [safeTokens]

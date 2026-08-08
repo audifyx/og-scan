@@ -25,6 +25,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import { safeAvatarUrl } from "@/lib/utils";
+import { OGSCAN_TOKEN_MINT, OGSCAN_TOKEN_NAME, OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 
 interface Submission {
   id: string;
@@ -541,7 +542,37 @@ const PumpV5 = () => {
       }
     });
 
-  const featuredTokens = submissions.filter(s => s.is_featured);
+  const featuredTokens = (() => {
+    const fromDb = submissions.filter((s) => s.is_featured && s.contract_address !== OGSCAN_TOKEN_MINT);
+    const fromList = submissions.find((s) => s.contract_address === OGSCAN_TOKEN_MINT);
+    const official: Submission = fromList
+      ? { ...fromList, is_featured: true, token_name: OGSCAN_TOKEN_NAME, symbol: OGSCAN_TOKEN_SYMBOL }
+      : {
+          id: "official-orbitx",
+          user_id: null,
+          token_name: OGSCAN_TOKEN_NAME,
+          symbol: OGSCAN_TOKEN_SYMBOL,
+          contract_address: OGSCAN_TOKEN_MINT,
+          launch_platform: "pumpfun",
+          description: "Official OrbitX platform token",
+          website: "https://orbitx.world",
+          twitter: "https://x.com/orbitx_wrldbackup",
+          telegram: "https://t.me/ogscan",
+          discord: null,
+          creator_wallet: null,
+          banner_url: null,
+          logo_url: "/og-icon.svg",
+          status: "live",
+          promotion_tier: "featured",
+          is_featured: true,
+          ai_risk_score: null,
+          liquidity_usd: null,
+          holder_count: null,
+          market_cap: null,
+          created_at: new Date().toISOString(),
+        };
+    return [official, ...fromDb];
+  })();
   const totalVolume = Object.values(liveTokenData).reduce((sum, t) => sum + (t.volume24h || 0), 0);
   const totalLiquidity = Object.values(liveTokenData).reduce((sum, t) => sum + (t.liquidity || 0), 0);
 

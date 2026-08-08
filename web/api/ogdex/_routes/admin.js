@@ -6,7 +6,7 @@ function auth(pass) {
   return adminAuthorized(pass);
 }
 
-const OG_TOKEN = "EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump";
+const OG_TOKEN = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 export default async function handler(req, res) {
   if (req.method === "POST") return action(req, res);

@@ -4,7 +4,7 @@ import { fmtUsd, short } from "../lib/api";
 import { Zap, Star, ChevronRight, Crown } from "lucide-react";
 import TokenLogo from "./TokenLogo";
 import { imgProxy } from "../lib/img";
-import { PLATFORM_TOKEN_MINT, PLATFORM_TOKEN_SYMBOL } from "../lib/constants";
+import { PLATFORM_TOKEN_MINT, PLATFORM_TOKEN_NAME, PLATFORM_TOKEN_SYMBOL } from "../lib/constants";
 
 interface Boost {
   id: string; mint: string; symbol?: string; name?: string; icon?: string;
@@ -14,6 +14,23 @@ interface Listing {
   id: string; contract_address: string; chain: string; project_name?: string;
   symbol?: string; logo_url?: string; banner_url?: string; description?: string;
   links?: Record<string, string>; metadata?: any; featured?: boolean;
+}
+
+const OFFICIAL_FEATURED: Listing = {
+  id: "official-orbitx",
+  contract_address: PLATFORM_TOKEN_MINT,
+  chain: "solana",
+  project_name: PLATFORM_TOKEN_NAME,
+  symbol: PLATFORM_TOKEN_SYMBOL,
+  logo_url: "/ORBITX_DEX/ogdex-logo.png",
+  description: "Official OrbitX platform token",
+  featured: true,
+  metadata: { official: true },
+};
+
+function pinOfficialFeatured(rows: Listing[]): Listing[] {
+  const rest = rows.filter((r) => r.contract_address !== PLATFORM_TOKEN_MINT);
+  return [OFFICIAL_FEATURED, ...rest];
 }
 
 
@@ -81,7 +98,10 @@ export default function FeaturedBanner() {
 
   useEffect(() => {
     fetch("/api/ogdex/boosts").then((r) => r.json()).then((d) => setBoosts(d.boosts || [])).catch(() => {});
-    fetch("/api/ogdex/listings?featured=1").then((r) => r.json()).then((d) => setFeatured(d.rows || [])).catch(() => {});
+    fetch("/api/ogdex/listings?featured=1")
+      .then((r) => r.json())
+      .then((d) => setFeatured(pinOfficialFeatured(d.rows || [])))
+      .catch(() => setFeatured([OFFICIAL_FEATURED]));
   }, []);
 
   // Auto-scroll boost reel

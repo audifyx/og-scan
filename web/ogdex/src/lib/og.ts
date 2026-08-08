@@ -15,12 +15,17 @@ export const OGSCAN_TECH_POST_URL = "https://x.com/i/status/2052413018563084370"
 export const OGSCAN_BRAND_IMAGE = "/og-brand.jpg";
 
 export const OGSCAN_DEV_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
-export const OGSCAN_TOKEN_MINT = "EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump";
+/** Official OrbitX platform token mint (Solana CA). */
+export const OGSCAN_TOKEN_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+export const OGSCAN_TOKEN_NAME = "ORBITX";
+export const OGSCAN_TOKEN_SYMBOL = "ORBITX";
 export const SOLANA_CHAIN_ID = "solana";
 export const FARTCOIN_CANONICAL_MINT = "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump";
 export const DEXSCREENER_WEB_BASE = "https://dexscreener.com";
 export const OGSCAN_DEXSCREENER_URL = `${DEXSCREENER_WEB_BASE}/${SOLANA_CHAIN_ID}/${OGSCAN_TOKEN_MINT}`;
 export const OGSCAN_PUMPFUN_URL = `https://pump.fun/coin/${OGSCAN_TOKEN_MINT}`;
+export const OGSCAN_JUPITER_URL = `https://jup.ag/swap/SOL-${OGSCAN_TOKEN_MINT}`;
+export const OGSCAN_SOLSCAN_URL = `https://solscan.io/token/${OGSCAN_TOKEN_MINT}`;
 
 export const JUPITER_BASE = "https://lite-api.jup.ag";
 export const BIRDEYE_BASE = "https://public-api.birdeye.so";
@@ -50,6 +55,9 @@ const POPCAT_MINT = "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr";
 const TRUMP_MINT  = "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN";
 
 const CANONICAL_SOLANA_ORIGINS: Record<string, string> = {
+  // orbitx (official platform token)
+  orbitx:        OGSCAN_TOKEN_MINT,
+  ox:            OGSCAN_TOKEN_MINT,
   // fartcoin
   fartcoin:      FARTCOIN_CANONICAL_MINT,
   fart:          FARTCOIN_CANONICAL_MINT,
@@ -75,6 +83,7 @@ const KNOWN_LP_PULLED_OR_SCAM_MINTS = new Set<string>([
 // one of the verified OG mints?" regardless of the search query / ticker.
 // Every value in CANONICAL_SOLANA_ORIGINS must appear here.
 const ALL_CANONICAL_MINTS = new Set<string>([
+  OGSCAN_TOKEN_MINT,
   FARTCOIN_CANONICAL_MINT,
   BONK_MINT,
   WIF_MINT,

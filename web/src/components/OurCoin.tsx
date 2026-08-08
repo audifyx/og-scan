@@ -126,8 +126,8 @@ export const OurCoin = memo(() => {
       const base = jupTokens[0] ?? {
         id: OGSCAN_TOKEN_MINT,
         chainId: "solana",
-        name: pair?.baseToken?.name ?? "OFFICIAL OGS",
-        symbol: pair?.baseToken?.symbol ?? "OGS",
+        name: pair?.baseToken?.name ?? "ORBITX",
+        symbol: pair?.baseToken?.symbol ?? "ORBITX",
         decimals: 6,
       };
       const enriched = await enrichTokensWithMarketIntel([base], { includeAth: true, includeOnChainIntel: true, maxOnChain: 1, maxBirdeye: 1 });
@@ -175,7 +175,7 @@ export const OurCoin = memo(() => {
     <section className="space-y-5 text-white">
       <div className="overflow-hidden border border-og-lime/35 bg-black shadow-[0_0_40px_rgba(101,255,0,0.08)]">
         <div className="relative isolate overflow-hidden border-b border-og-grid">
-          <img src={BRAND_BANNER} alt="OrbitX OFFICIAL OGS banner" className="absolute inset-0 h-full w-full object-cover opacity-65" />
+          <img src={BRAND_BANNER} alt="OrbitX official token banner" className="absolute inset-0 h-full w-full object-cover opacity-65" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.88)_0%,rgba(0,0,0,0.55)_38%,rgba(0,0,0,0.76)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_center,rgba(187,79,255,0.22),transparent_34%),radial-gradient(circle_at_right_center,rgba(101,255,0,0.16),transparent_30%)]" />
 
@@ -196,7 +196,7 @@ export const OurCoin = memo(() => {
                 <Flame className="h-3.5 w-3.5" /> Official OGS room
               </div>
               <h1 className="mt-4 font-display text-4xl font-black uppercase leading-none tracking-tight text-white sm:text-6xl lg:text-7xl">
-                OFFICIAL OGS
+                $ORBITX
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/82 sm:text-base">
                 Custom OrbitX market room built from your banner and logo art — live price chart, buy and sell flow, token metadata, ATH, migration status, and full scan analysis for the official mint.
@@ -267,7 +267,7 @@ export const OurCoin = memo(() => {
                 <h2 className="mt-1 text-xl font-black uppercase tracking-tight text-white">Price + market view</h2>
               </div>
               <div className="aspect-[16/10] overflow-hidden bg-black">
-                <iframe title="OFFICIAL OGS chart" src={chartEmbedUrl} className="h-full w-full" loading="lazy" />
+                <iframe title="$ORBITX chart" src={chartEmbedUrl} className="h-full w-full" loading="lazy" />
               </div>
             </div>
 
@@ -359,7 +359,7 @@ export const OurCoin = memo(() => {
             buysOnly={false}
             alertOnNewBuys
             title="Sidebar live buy feed"
-            subtitle="Fresh OFFICIAL OGS activity pulled from the official mint and ready for push alerts."
+            subtitle="Fresh $ORBITX activity pulled from the official mint and ready for push alerts."
           />
 
           <div className={panelClass}>

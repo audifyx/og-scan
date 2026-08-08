@@ -110,7 +110,7 @@ export const OurCoinBuyFeed = ({
       void notifyUser({
         userId: user.id,
         type: "our_coin_buy",
-        title: "OFFICIAL OGS buy detected",
+        title: "$ORBITX buy detected",
         message: `${item.amount != null ? fmtNum(item.amount) : "New"} bought by ${shortAddr(item.feePayer, 5)}`,
         url: "/our-coin",
         data: {
