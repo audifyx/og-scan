@@ -258,7 +258,7 @@ function LaunchpadFooter() {
           </p>
           <div className="ox-footer-socials">
             <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" aria-label="X"><Twitter className="h-4 w-4" /></a>
-            <a href="https://t.me/ogscan" target="_blank" rel="noreferrer" aria-label="Telegram"><Send className="h-4 w-4" /></a>
+            <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" aria-label="Telegram"><Send className="h-4 w-4" /></a>
             <a href="https://github.com/audifyx/og-scan" target="_blank" rel="noreferrer" aria-label="GitHub"><Github className="h-4 w-4" /></a>
           </div>
         </div>

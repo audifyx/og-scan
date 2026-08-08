@@ -124,14 +124,15 @@ async function uploadLaunchAssets(mintAddr: string, cfg: LaunchConfig, creator: 
     image: logoUrl,
     showName: true,
     // OrbitX launchpad attribution (see api/pump-create.ts for details).
-    createdOn: "https://orbitx.world",
+    createdOn: "https://www.orbitx.world",
     platformId: "orbitx",
-    external_url: cfg.website || "https://orbitx.world",
+    platform: "OrbitX",
+    external_url: cfg.website || "https://www.orbitx.world",
     extensions: {
       website: cfg.website || undefined, twitter: cfg.twitter || undefined,
       telegram: cfg.telegram || undefined, discord: cfg.discord || undefined,
     },
-    creator, tags: ["orbitx-launch"],
+    creator, tags: ["orbitx", "orbitx-launch"],
   };
   const jsonPath = `orbitxlaunch/${mintAddr}/metadata.json`;
   const { error: jsonErr } = await supabase.storage.from("profile-media")

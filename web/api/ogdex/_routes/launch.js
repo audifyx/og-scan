@@ -12,7 +12,7 @@ import { send, callFn, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from 
  *
  * POST /api/launch   (body.step)
  *   step "ipfs"   { imageBase64, imageMimeType, name, symbol, description, twitter, telegram, website }
- *                 → { metadataUri, metadata }   (uploads to pump.fun IPFS)
+ *                 → { metadataUri, metadata }   (Pinata IPFS with OrbitX createdOn/platformId)
  *   step "create" { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, slippage }
  *                 → { transaction }              (unsigned PumpPortal create tx, base64)
  *   step "record" { payment_tx, pay_currency, creator_wallet, mint, name, symbol, icon,
@@ -143,7 +143,7 @@ async function handleCheck(body, res) {
   return send(res, 200, { ok: true, duplicate: false });
 }
 
-/* ── Step 1: upload image + metadata to pump.fun IPFS ─────────────────── */
+/* ── Step 1: Pinata IPFS with OrbitX attribution (not pump.fun IPFS) ───── */
 async function handleIpfs(body, res) {
   const { imageBase64, imageMimeType, name, symbol, description, twitter, telegram, website } = body;
   if (!imageBase64 || !name || !symbol)
@@ -154,23 +154,54 @@ async function handleIpfs(body, res) {
   const dup = await findDuplicateLaunch(name, symbol, String(body.chain || "solana").toLowerCase());
   if (dup) return send(res, 409, { ok: false, error: dupError(dup) });
 
+  const PINATA_JWT = process.env.PINATA_JWT;
+  if (!PINATA_JWT) return send(res, 500, { ok: false, error: "PINATA_JWT is not configured on the server" });
+
   const imageBuffer = Buffer.from(imageBase64, "base64");
   const ext = (imageMimeType || "image/png").split("/")[1] || "png";
-  const form = new FormData();
-  form.append("file", new Blob([imageBuffer], { type: imageMimeType || "image/png" }), `token.${ext}`);
-  form.append("name", name);
-  form.append("symbol", symbol);
-  form.append("description", description || "");
-  form.append("twitter", twitter || "");
-  form.append("telegram", telegram || "");
-  form.append("website", website || "");
-  form.append("showName", "true");
 
-  const r = await fetch("https://pump.fun/api/ipfs", { method: "POST", body: form });
-  if (!r.ok) return send(res, 502, { ok: false, error: `IPFS upload failed (${r.status}): ${await r.text()}` });
-  const data = await r.json();
-  if (!data.metadataUri) return send(res, 502, { ok: false, error: "no metadataUri returned" });
-  return send(res, 200, { ok: true, metadataUri: data.metadataUri, metadata: data.metadata || data });
+  const imgForm = new FormData();
+  imgForm.append("file", new Blob([imageBuffer], { type: imageMimeType || "image/png" }), `token.${ext}`);
+  imgForm.append("pinataMetadata", JSON.stringify({ name: `${symbol}-image` }));
+  const imgRes = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PINATA_JWT}` },
+    body: imgForm,
+  });
+  if (!imgRes.ok) {
+    return send(res, 502, { ok: false, error: `Pinata image pin failed (${imgRes.status}): ${await imgRes.text()}` });
+  }
+  const { IpfsHash: imageHash } = await imgRes.json();
+  const imageUri = `https://gateway.pinata.cloud/ipfs/${imageHash}`;
+
+  const site = website || "https://www.orbitx.world";
+  const metadata = {
+    name,
+    symbol,
+    description: description || "",
+    image: imageUri,
+    showName: true,
+    createdOn: "https://www.orbitx.world",
+    platformId: "orbitx",
+    platform: "OrbitX",
+    website: site,
+    external_url: site,
+    twitter: twitter || "",
+    telegram: telegram || "",
+    tags: ["orbitx", "orbitx-launch"],
+  };
+
+  const metaRes = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PINATA_JWT}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ pinataMetadata: { name: `${symbol}-metadata` }, pinataContent: metadata }),
+  });
+  if (!metaRes.ok) {
+    return send(res, 502, { ok: false, error: `Pinata metadata pin failed (${metaRes.status}): ${await metaRes.text()}` });
+  }
+  const { IpfsHash: metaHash } = await metaRes.json();
+  const metadataUri = `https://gateway.pinata.cloud/ipfs/${metaHash}`;
+  return send(res, 200, { ok: true, metadataUri, metadata });
 }
 
 /* ── Step 2: build the unsigned create transaction via PumpPortal ──────── */
@@ -209,7 +240,7 @@ async function handleRecord(body, res) {
   const pay_currency = String(body.pay_currency || "sol").toLowerCase();
   const creator_wallet = body.creator_wallet || null;
   const chain = String(body.chain || "solana").toLowerCase();
-  const launchpad = body.launchpad ? String(body.launchpad) : (chain === "solana" ? "pumpfun" : null);
+  const launchpad = body.launchpad ? String(body.launchpad) : (chain === "solana" ? "orbitx" : null);
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
 
   // $0.90 fee on Solana only — every other chain is free. Never trust the

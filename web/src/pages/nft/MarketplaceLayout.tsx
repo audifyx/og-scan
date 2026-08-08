@@ -263,7 +263,7 @@ export default function MarketplaceLayout() {
                   </p>
                   <div className="mt-3 flex items-center gap-2">
                     <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Twitter className="h-4 w-4" /></a>
-                    <a href="https://t.me/ogscan" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Send className="h-4 w-4" /></a>
+                    <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Send className="h-4 w-4" /></a>
                     <a href="https://github.com/audifyx/og-scan" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Github className="h-4 w-4" /></a>
                   </div>
                 </div>

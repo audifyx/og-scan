@@ -3,7 +3,7 @@ import { send } from "../_lib.js";
 // One link to use the whole OG DEX tool: a complete OpenAPI 3.1 spec. Paste this
 // URL into ChatGPT/Claude Actions, Postman, Insomnia, or any codegen and you get
 // every endpoint at once — no copy-pasting individual routes.
-const SERVER = "https://ogscan.fun/api/ogdex";
+const SERVER = "https://www.orbitx.world/api/ogdex";
 
 const mintParam = { name: "mint", in: "query", required: true, schema: { type: "string" }, description: "Token mint address (Solana base58, or 0x EVM address)." };
 const G = (summary, params = [], extra = {}) => ({
@@ -14,10 +14,10 @@ function spec() {
   return {
     openapi: "3.1.0",
     info: {
-      title: "OG DEX Public API",
+      title: "OrbitX DEX Public API",
       version: "1.0.0",
-      description: "Free public REST API powering OG DEX — Solana & multi-chain token intelligence: screener, live signals, full token intel, holders/whales/KOLs, dev & first-buyer forensics, all-time high, wallet PnL, charts, and an AI you can chat with about any coin. No key required; be reasonable with volume. Most endpoints cached at the edge.",
-      contact: { name: "OG Scan", url: "https://ogscan.fun" },
+      description: "Free public REST API powering OrbitX DEX — Solana & multi-chain token intelligence: screener, live signals, full token intel, holders/whales/KOLs, dev & first-buyer forensics, all-time high, wallet PnL, charts, and an AI you can chat with about any coin. No key required; be reasonable with volume. Most endpoints cached at the edge.",
+      contact: { name: "OrbitX", url: "https://www.orbitx.world" },
     },
     servers: [{ url: SERVER }],
     paths: {

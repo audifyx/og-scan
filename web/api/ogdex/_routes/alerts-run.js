@@ -45,18 +45,18 @@ function kindLabel(a) {
 }
 
 function tradeDeskUrl(mint) {
-  return `https://ogscan.fun/trade/desk/${mint}`;
+  return `https://www.orbitx.world/trade/desk/${mint}`;
 }
 
 async function deliverWalletTrade(a, swap) {
   const who = a.label || a.watch.slice(0, 6);
   const verb = swap.side === "buy" ? "bought" : "sold";
-  const text = `\u{1F440} OrbitX Trade: ${who} ${verb} ${swap.solAmount.toFixed(3)} SOL of ${swap.mint.slice(0, 6)}\nWallet https://ogscan.fun/trade/wallet/${a.watch}\nToken https://ogscan.fun/trade/token/${swap.mint}`;
+  const text = `\u{1F440} OrbitX Trade: ${who} ${verb} ${swap.solAmount.toFixed(3)} SOL of ${swap.mint.slice(0, 6)}\nWallet https://www.orbitx.world/trade/wallet/${a.watch}\nToken https://www.orbitx.world/trade/token/${swap.mint}`;
   if (a.channel === "telegram") {
     if (!TG_TOKEN) return false;
     try { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: a.target, text }) }); const d = await r.json().catch(() => ({})); return !!d.ok; } catch { return false; }
   }
-  const msg = { source: "OrbitX Trade Alerts", kind: "wallet_trade", watch: a.watch, label: a.label, side: swap.side, mint: swap.mint, solAmount: swap.solAmount, txHash: swap.txHash, url: `https://ogscan.fun/trade/token/${swap.mint}`, text, content: text };
+  const msg = { source: "OrbitX Trade Alerts", kind: "wallet_trade", watch: a.watch, label: a.label, side: swap.side, mint: swap.mint, solAmount: swap.solAmount, txHash: swap.txHash, url: `https://www.orbitx.world/trade/token/${swap.mint}`, text, content: text };
   try {
     if (!(await safeFetchWebhook(a.target, msg))) return false;
     return true;

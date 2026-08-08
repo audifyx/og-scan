@@ -1,14 +1,14 @@
-// OG DEX — llms.txt : a plain-text guide for AI agents / LLMs on how to use the
+// OrbitX DEX — llms.txt : a plain-text guide for AI agents / LLMs on how to use the
 // public API (https://llmstxt.org convention). Served at /api/ogdex/llms.txt.
-const BASE = "https://ogscan.fun/api/ogdex";
+const BASE = "https://www.orbitx.world/api/ogdex";
 
-const TEXT = `# OG DEX
+const TEXT = `# OrbitX DEX
 
 > Free public REST API for Solana (and multi-chain) memecoin intelligence: token discovery, full on-chain token intel, dev & early-buyer forensics, snipers/bundlers risk X-ray, holders/whales/KOLs, wallet portfolio + PnL, charts, all-time-high, price alerts, and a per-coin AI you can chat with. No API key required. Be reasonable with volume (per-IP rate limits apply). Most endpoints are JSON and edge-cached.
 
 Base URL: ${BASE}
 OpenAPI 3.1 spec (import this into ChatGPT/Claude Actions, Postman, or any codegen for every endpoint at once): ${BASE}/openapi.json
-Brand: https://ogscan.fun  ·  Token page pattern: https://ogscan.fun/ORBITX_DEX/token/{mint}  ·  Wallet page: https://ogscan.fun/ORBITX_DEX/wallet/{address}
+Brand: https://www.orbitx.world  ·  Token page pattern: https://www.orbitx.world/ORBITX_DEX/token/{mint}  ·  Wallet page: https://www.orbitx.world/ORBITX_DEX/wallet/{address}
 
 ## Conventions
 - All responses are JSON with an \`ok\` boolean unless noted. On error: \`{ ok: false, error }\`.
@@ -46,14 +46,14 @@ Brand: https://ogscan.fun  ·  Token page pattern: https://ogscan.fun/ORBITX_DEX
 - POST ${BASE}/chat  body: { "mint": "...", "messages": [{ "role": "user", "content": "is this a rug?" }] }
   Answers from live on-chain data + live web search and cites sources. Returns { ok, answer, sources[] }.
 
-## Alerts (notify-only; OG DEX never auto-trades)
+## Alerts (notify-only; OrbitX DEX never auto-trades)
 - GET ${BASE}/alerts?wallet={wallet} — a wallet's alerts.
 - POST ${BASE}/alerts  body: { "wallet": "...", "alert": { "mint": "...", "type": "price_above|price_below|pct_up|pct_down", "value": 0.01, "channel": "telegram|webhook", "target": "<chatId|@channel|https url>" } }
   Use price_below for limit-buy / stop-loss cues and price_above for take-profit. Alerts only notify you; you sign every trade yourself.
 
 ## Trading (non-custodial)
 - POST ${BASE}/trade  body: { "publicKey": "...", "action": "buy|sell", "mint": "...", "amount": 0.25, "denominatedInSol": "true", "slippage": 10, "pool": "auto" }
-  Returns a base64 transaction the USER signs in their own wallet (Phantom). OG DEX never holds funds or keys and adds no platform fee.
+  Returns a base64 transaction the USER signs in their own wallet (Phantom). OrbitX DEX never holds funds or keys and adds no platform fee.
 
 ## Notes for agents / MCP
 - Ready-made MCP: GET ${BASE.replace("/api/ogdex","")}/api/mcp or GET ${BASE}/mcp for the tool manifest; POST the same URL with { "tool", "params" } to execute.

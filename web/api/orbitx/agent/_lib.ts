@@ -17,7 +17,7 @@ export { adminClient, bearer, handleOptions, json, requireUser };
 export const PUBLIC_BASE =
   process.env.PUBLIC_APP_URL ||
   process.env.VITE_PUBLIC_APP_URL ||
-  "https://ogscan.fun";
+  "https://www.orbitx.world";
 
 export function pathParts(req: VercelRequest, marker: string): string[] {
   const q = req.query.path;
