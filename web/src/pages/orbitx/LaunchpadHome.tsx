@@ -207,13 +207,19 @@ export default function LaunchpadHome() {
         </div>
       </div>
 
-      <div className="ox-board-toolbar">
+      <div className="ox-board-toolbar" role="search">
         <div className="ox-board-search">
-          <Search className="ox-board-search-icon" />
+          <Search className="ox-board-search-icon" aria-hidden />
           <input
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             placeholder="Search name, ticker, or mint…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search launchpad tokens"
           />
         </div>
         <button

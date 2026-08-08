@@ -404,6 +404,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 .lp-classic .ox-brand {
   display: flex;
@@ -455,10 +457,13 @@
 /* ── Launch header + grouped tabs ─────────────────────────────────────── */
 .lp-classic .ox-launch-header {
   border-bottom: 1px solid var(--ox-silver-dim);
-  background: rgba(5, 5, 5, 0.94);
+  background: rgba(5, 5, 5, 0.96);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   box-shadow: 0 12px 40px -28px rgba(0, 0, 0, 0.85);
+  /* Keep sticky chrome from eating clicks on the board search below */
+  pointer-events: auto;
+  isolation: isolate;
 }
 .lp-classic .ox-launch-header-row {
   display: flex;
@@ -467,7 +472,21 @@
   min-height: 62px;
   padding-top: 8px;
   padding-bottom: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
+.lp-classic .ox-shell-actions {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+.lp-classic .ox-platform-links--compact {
+  max-width: min(360px, 32vw);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+}
+.lp-classic .ox-platform-links--compact::-webkit-scrollbar { display: none; }
 .lp-classic .ox-header-stats {
   flex: 1;
   justify-content: center;
@@ -782,10 +801,14 @@
 }
 
 .lp-classic .ox-shell-main {
+  position: relative;
+  z-index: 1;
   margin: 0 auto;
   width: 100%;
   max-width: 1440px;
   padding: 16px 14px 32px;
+  /* Anchor in-page focus targets below sticky header */
+  scroll-padding-top: calc(var(--ox-lp-header-h, 120px) + 12px);
 }
 @media (min-width: 640px) {
   .lp-classic .ox-shell-main { padding: 20px 20px 40px; }
@@ -976,14 +999,35 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Stick under the launch header so search never sits under opaque chrome */
+  position: sticky;
+  top: var(--ox-lp-header-h, 120px);
+  z-index: 30;
+  margin-left: -14px;
+  margin-right: -14px;
+  padding: 10px 14px;
+  background: rgba(5, 5, 5, 0.94);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(168, 176, 188, 0.12);
+  pointer-events: auto;
 }
 @media (min-width: 640px) {
-  .lp-classic .ox-board-toolbar { flex-direction: row; align-items: center; }
+  .lp-classic .ox-board-toolbar {
+    flex-direction: row;
+    align-items: center;
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
 }
 .lp-classic .ox-board-search {
   position: relative;
   flex: 1;
   min-width: 0;
+  z-index: 1;
+  isolation: isolate;
 }
 .lp-classic .ox-board-search-icon {
   pointer-events: none;
@@ -994,8 +1038,11 @@
   width: 16px;
   transform: translateY(-50%);
   color: var(--ox-silver);
+  z-index: 0;
 }
 .lp-classic .ox-board-search input {
+  position: relative;
+  z-index: 1;
   width: 100%;
   border-radius: 12px;
   border: 1px solid var(--ox-silver-dim);
@@ -1004,6 +1051,8 @@
   font-size: 14px;
   color: #fff;
   outline: none;
+  /* Keep focused field clear of sticky header when mobile keyboard opens */
+  scroll-margin-top: calc(var(--ox-lp-header-h, 120px) + 16px);
 }
 .lp-classic .ox-board-search input:focus {
   border-color: rgba(59, 130, 246, 0.55);

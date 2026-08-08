@@ -3,7 +3,7 @@ import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionB
 import { NavLink, Outlet, Link, useSearchParams } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { useEvmWallet } from "@/hooks/useEvmWallet";
 import { linkEvmToSolana } from "@/lib/orbitx/walletLink";
@@ -329,12 +329,33 @@ function LaunchpadFooter() {
 
 export default function LaunchpadLayout() {
   const { isAdmin } = useAdmin();
+  const headerRef = useRef<HTMLElement | null>(null);
+
+  // Keep board search / sticky panels clear of the sticky launch header.
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const apply = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      document.documentElement.style.setProperty("--ox-lp-header-h", `${h}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", apply);
+      document.documentElement.style.removeProperty("--ox-lp-header-h");
+    };
+  }, []);
+
   return (
     <div className="lp-classic lp-classic relative flex min-h-screen flex-col">
       <ReferralCapture />
       <NetworkStrip />
 
-      <header className="ox-launch-header sticky top-0 z-30">
+      <header ref={headerRef} className="ox-launch-header sticky top-0 z-40">
         <div className="ox-shell-inner ox-launch-header-row">
           <Link to="/orbitxlaunch" className="ox-brand group shrink-0">
             <div className="ox-brand-mark">
@@ -351,7 +372,7 @@ export default function LaunchpadLayout() {
           <HeaderStats />
 
           <div className="ox-shell-actions shrink-0">
-            <PlatformLinks />
+            <PlatformLinks className="ox-platform-links--compact" />
             <PlatformThemeButton compact />
             <AntiVampProtectionBadge />
             <Link to="/orbitxlaunch/create" className="ox-create-cta">

@@ -4,8 +4,12 @@
   position: fixed;
   inset: 0;
   z-index: 0;
-  pointer-events: none;
+  pointer-events: none !important;
   overflow: hidden;
+}
+.ox-atmosphere,
+.ox-atmosphere * {
+  pointer-events: none !important;
 }
 
 .ox-atmosphere__veil {

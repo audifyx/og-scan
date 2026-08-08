@@ -291,14 +291,20 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
 
         {/* Search bar (show when there are tokens) */}
         {launches.length > 0 && (
-          <div className="mb-6 relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25" />
-            <Input
-              placeholder="Search by name, ticker, or address…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20 focus:border-[hsl(var(--og-cyan))]/40 h-11"
-            />
+          <div className="ox-board-toolbar mb-6" role="search">
+            <div className="ox-board-search">
+              <Search className="ox-board-search-icon" aria-hidden />
+              <Input
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                placeholder="Search by name, ticker, or address…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search launched tokens"
+                className="h-11 border-white/[0.08] bg-white/[0.03] pl-10 text-white placeholder:text-white/20 focus:border-[hsl(var(--og-cyan))]/40"
+              />
+            </div>
           </div>
         )}
 
