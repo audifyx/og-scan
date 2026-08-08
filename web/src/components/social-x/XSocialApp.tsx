@@ -1450,7 +1450,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           {/* sliding active indicator */}
           {PILL_INDEX >= 0 && (
             <span
-              className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+              className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34\,1.56\,0.64\,1)]"
               style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
             />
           )}
