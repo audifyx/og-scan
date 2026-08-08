@@ -7,6 +7,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { OrbitAtmosphereProvider } from "@/hooks/useOrbitAtmosphere";
+import { OrbitAtmosphereLayer } from "@/components/theme/OrbitAtmosphereLayer";
+import { PlatformDock } from "@/components/theme/PlatformDock";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
@@ -257,6 +260,7 @@ const App = () => (
       <SolanaWalletProvider>
       <EvmWalletProvider>
       <ThemeProvider>
+      <OrbitAtmosphereProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -268,6 +272,8 @@ const App = () => (
         <IntercomSync />
         <OnboardingTour />
         <BrowserRouter>
+          <OrbitAtmosphereLayer />
+          <PlatformDock />
           <SupportNotificationBanner />
           <WalletAuthBridge />
           <UsernameClaimGate />
@@ -641,6 +647,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </OrbitAtmosphereProvider>
       </ThemeProvider>
       </EvmWalletProvider>
       </SolanaWalletProvider>

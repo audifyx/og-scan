@@ -3,12 +3,18 @@
  * This is the canonical social surface (not the /hq demo store).
  */
 import { lazy, Suspense } from "react";
+import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
 
 const XSocialApp = lazy(() => import("@/components/social-x/XSocialApp"));
 
 export default function SocialAppPage() {
   return (
-    <div className="h-[100dvh] overflow-hidden bg-black text-white">
+    <div className="ox-platform-surface relative h-[100dvh] overflow-hidden bg-transparent text-white">
+      <div className="pointer-events-none absolute right-3 top-[max(0.65rem,env(safe-area-inset-top))] z-40">
+        <div className="pointer-events-auto">
+          <PlatformThemeButton compact />
+        </div>
+      </div>
       <Suspense
         fallback={
           <div className="flex h-full items-center justify-center text-sm text-white/40">

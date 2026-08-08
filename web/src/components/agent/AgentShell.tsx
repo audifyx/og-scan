@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
+import { PlatformLinks } from "@/components/theme/PlatformDock";
 import "./agent-shell.css";
 
 export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";
@@ -130,6 +132,8 @@ export function AgentShell({
             )}
           </div>
           <div className="ox-agent__top-actions">
+            <PlatformLinks />
+            <PlatformThemeButton compact />
             <span className={`ox-agent__pill ox-agent__pill--top${statusWarn ? " is-warn" : " is-ok"}`}>
               <span className="ox-agent__pill-dot" />
               {statusLabel}
@@ -154,13 +158,15 @@ export function AgentShell({
           <div className="ox-agent__footer-inner">
             <div className="ox-agent__footer-brand">{footerBrand}</div>
             <div className="ox-agent__footer-links">
+              <Link to="/app">Hub</Link>
               <Link to="/agent">Agent</Link>
               <Link to="/x">X MCP</Link>
+              <a href="/ORBITX_DEX">DEX</a>
+              <Link to="/orbitxlaunch">Launch</Link>
+              <Link to="/nft">NFT</Link>
               <a href={mcpUrl} target="_blank" rel="noopener noreferrer">
                 MCP URL
               </a>
-              <Link to="/Orbitxcity">City</Link>
-              <Link to="/auth">Account</Link>
             </div>
             <p className="ox-agent__footer-note">{footerNote}</p>
           </div>

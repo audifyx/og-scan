@@ -21,6 +21,8 @@ import { redeemReferralCode } from "@/lib/orbitx/registry";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
 import { useAuth } from "@/hooks/useAuth";
+import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
+import { PlatformLinks } from "@/components/theme/PlatformDock";
 import "./orbitx-2026.css";
 
 const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [
@@ -303,12 +305,14 @@ function LaunchpadFooter() {
           ["Profile", "/orbitxlaunch/profile"],
         ]} />
         <FooterCol title="Company" links={[
+          ["App Hub", "/app"],
           ["NFT Market", "/nft"],
           ["DEX", "/ORBITX_DEX"],
+          ["Agent MCP", "/agent"],
+          ["X MCP", "/x"],
+          ["Social", "/orbitx-social"],
           ["Whitepaper", "/whitepaper"],
-          ["Roadmap", "/roadmap"],
           ["Terms", "/terms"],
-          ["Privacy", "/privacy"],
         ]} />
       </div>
       <div className="ox-footer-bar">
@@ -347,6 +351,8 @@ export default function LaunchpadLayout() {
           <HeaderStats />
 
           <div className="ox-shell-actions shrink-0">
+            <PlatformLinks />
+            <PlatformThemeButton compact />
             <AntiVampProtectionBadge />
             <Link to="/orbitxlaunch/create" className="ox-create-cta">
               <Plus className="h-4 w-4" strokeWidth={3} />

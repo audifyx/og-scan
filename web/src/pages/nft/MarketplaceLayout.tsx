@@ -11,6 +11,8 @@ import {
   Bell, ChevronRight, Twitter, Send, Github, ShieldCheck,
 } from "lucide-react";
 import { CurrencyProvider, CurrencyToggle } from "./currency";
+import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
+import { PlatformLinks } from "@/components/theme/PlatformDock";
 import "./marketplace.css";
 
 const CATS = ["All", ...NFT_CATEGORIES];
@@ -158,6 +160,8 @@ export default function MarketplaceLayout() {
               </form>
 
               <div className="mkt-shell-actions">
+                <PlatformLinks />
+                <PlatformThemeButton compact />
                 <CurrencyToggle />
                 <Link to="/nft/create" className="mkt-btn hidden sm:inline-flex">
                   <PlusCircle className="h-4 w-4" /> Create
@@ -214,7 +218,7 @@ export default function MarketplaceLayout() {
             </div>
             <FooterCol title="Marketplace" links={[["Home", "/nft"], ["Explore", "/nft/explore"], ["Drops", "/nft/drops"], ["Activity", "/nft/activity"]]} />
             <FooterCol title="Create" links={[["Mint an NFT", "/nft/create"], ["Launch a drop", "/nft/drops"], ["Creator dashboard", "/nft/me"], ["Claim fees", "/nft/me?tab=fees"]]} />
-            <FooterCol title="Company" links={[["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Whitepaper", "/whitepaper"], ["Roadmap", "/roadmap"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
+            <FooterCol title="Company" links={[["App Hub", "/app"], ["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Agent MCP", "/agent"], ["X MCP", "/x"], ["Social", "/orbitx-social"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
           </div>
           <div className="border-t mkt-hairline">
             <div className="mx-auto flex w-full max-w-[1440px] flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] mkt-muted sm:flex-row">

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 import {
   Activity,
   BarChart3,
@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   Search,
 } from "lucide-react";
+import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
 import "../crypto.css";
 
 const NAV = [
@@ -37,14 +38,20 @@ export default function IntelLayout() {
               {label}
             </NavLink>
           ))}
-          <div style={{ marginTop: "auto", padding: "1rem 0.6rem 0.25rem" }}>
+          <div style={{ marginTop: "auto", padding: "1rem 0.6rem 0.25rem", display: "grid", gap: "0.45rem" }}>
+            <PlatformThemeButton compact />
+            <Link to="/app" className="oxc-link" style={{ fontSize: "0.75rem" }}>
+              App Hub →
+            </Link>
             <a href="/ORBITX_DEX" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Full DEX →
             </a>
-            <br />
-            <a href="/orbitxlaunch" className="oxc-link" style={{ fontSize: "0.75rem" }}>
+            <Link to="/orbitxlaunch" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Launchpad →
-            </a>
+            </Link>
+            <Link to="/agent" className="oxc-link" style={{ fontSize: "0.75rem" }}>
+              Agent MCP →
+            </Link>
           </div>
         </nav>
         <main className="oxc-main">
