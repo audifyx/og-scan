@@ -38,7 +38,7 @@ import XMcpCreditsPanel from "@/components/x/XMcpCreditsPanel";
 import "./x-hub.css";
 
 /** Same 4-tab shell structure as /agent — X MCP content. */
-type XTab = "home" | "account" | "keys" | "connect";
+type XTab = "home" | "account" | "keys" | "connect" | "shop";
 type HomeSub = "post" | "agent" | "queue" | "messages" | "matrix";
 
 const X_TABS: ShellTab[] = [
@@ -46,6 +46,7 @@ const X_TABS: ShellTab[] = [
   { id: "account", label: "Account", ico: "◎" },
   { id: "keys", label: "Keys", ico: "✦" },
   { id: "connect", label: "Connect", ico: "⬡" },
+  { id: "shop", label: "Shop", ico: "$" },
 ];
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
@@ -550,7 +551,7 @@ export default function XMcpPage() {
   return (
     <AgentShell
       activeTab={tab}
-      onTabChange={(id) => setTab(id as XTab)}
+      onTabChange={(id) => id === "shop" ? window.location.assign("/x/shop") : setTab(id as XTab)}
       tabs={X_TABS}
       brandHref="/x"
       brandSub="X MCP"
