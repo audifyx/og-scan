@@ -22,6 +22,13 @@ import {
   sendDmConversationOAuth2,
   listDmEventsOAuth2,
   listMentionsOAuth2,
+  listFollowersOAuth2,
+  listFollowingOAuth2,
+  getTweetMetricsOAuth2,
+  listUserTweetsOAuth2,
+  listOwnedListsOAuth2,
+  listListMembersOAuth2,
+  scanPdfContent,
   getXMe,
   mapAgentRow,
   mapQueueRow,
@@ -45,6 +52,12 @@ import {
   saveTradeIntent,
   loadLatestTradeIntent,
 } from "./orbitx/buy-orbitx.js";
+import {
+  buildXGeneratedTools,
+  dispatchXGenerated,
+  listXGeneratedHelp,
+  xGeneratedStats,
+} from "./orbitx/x-mcp-tools-catalog.js";
 
 /** Lazy — x-credits must not load at cold start (Solana deps can 500 the whole MCP). */
 async function xCredits() {
@@ -81,7 +94,9 @@ const EMPTY_OBJECT_SCHEMA = {
   additionalProperties: false,
 };
 
-const TOOLS = [
+const _xGenerated = buildXGeneratedTools();
+
+const CORE_TOOLS = [
   // ChatGPT custom connectors expect search + fetch (exact names) or they show "no tools".
   {
     name: "search",
@@ -544,7 +559,183 @@ const TOOLS = [
     },
     annotations: { title: "Confirm buy", readOnlyHint: false, openWorldHint: true },
   },
+  {
+    name: "x_tools_help",
+    description:
+      "Browse the full X MCP catalog (~500 shortcuts + ~5000 activity tools). Default tools/list shows CORE only so Grok/Claude stay stable. Query: followers, dm, pdf, analytics, views, lists.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        q: { type: "string", description: "Filter tool names / kinds" },
+        limit: { type: "integer", default: 40 },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Tools catalog", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "x_get_user",
+    description: "Lookup an X user by @username — profile, bio, follower/following/tweet counts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string", description: "@handle" },
+      },
+      required: ["username"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Get user", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_me",
+    description: "Authenticated X profile with public metrics (followers, following, tweets).",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { title: "My X profile", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "x_followers",
+    description: "List followers for your account (or username). Paginated; newest-first when API supports it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string" },
+        maxResults: { type: "integer", default: 20 },
+        paginationToken: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Followers", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_following",
+    description: "List accounts you follow (or for a given @username).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string" },
+        maxResults: { type: "integer", default: 20 },
+        paginationToken: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Following", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_recent_followers",
+    description: "Recent followers (first page of followers, newest-first on supported tiers).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string" },
+        maxResults: { type: "integer", default: 20 },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Recent followers", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_lists",
+    description: "Owned lists + list memberships for your X account (needs list.read — reconnect X after deploy).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string" },
+        maxResults: { type: "integer", default: 20 },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Lists", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_list_members",
+    description: "Members of an X list by listId.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        listId: { type: "string" },
+        maxResults: { type: "integer", default: 20 },
+        paginationToken: { type: "string" },
+      },
+      required: ["listId"],
+      additionalProperties: false,
+    },
+    annotations: { title: "List members", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_tweet_metrics",
+    description: "Tweet analytics: views/impressions (when available), likes, RTs, replies, quotes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tweetId: { type: "string" },
+      },
+      required: ["tweetId"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Tweet metrics", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_user_tweets",
+    description: "Recent tweets for @username or self, each with public metrics (views when available).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string" },
+        maxResults: { type: "integer", default: 10 },
+        paginationToken: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "User tweets", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_analytics",
+    description:
+      "Advanced X account analytics snapshot: profile metrics, recent DMs, mentions, followers sample, latest tweets with views.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        maxResults: { type: "integer", default: 10 },
+        includeDms: { type: "boolean", default: true },
+        includeMentions: { type: "boolean", default: true },
+        includeFollowers: { type: "boolean", default: true },
+        includeTweets: { type: "boolean", default: true },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "X analytics", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_pdf_scan",
+    description:
+      "Scan a PDF (public URL, pasted text, or base64) — extract text, @handles, URLs, numbers, and summary analytics for research.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string" },
+        text: { type: "string" },
+        base64: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "PDF scan", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_dm_recent",
+    description: "Recent DMs inbox (alias of x_dm_inbox) with sender usernames.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        maxResults: { type: "integer", default: 20 },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Recent DMs", readOnlyHint: true, openWorldHint: true },
+  },
 ];
+
+/** Backward-compat alias — CORE tools only (never dump 5000 into connectors). */
+const TOOLS = CORE_TOOLS;
 
 const AUTH_CODE_PROP = {
   type: "string",
@@ -588,6 +779,18 @@ const X_TOOL_ALIASES = {
   xconfirmbuy: "x_confirm_buy",
   xcreditsusage: "x_credits_usage",
   xcreditsbalance: "x_credits_balance",
+  followers: "x_followers",
+  following: "x_following",
+  "recent followers": "x_recent_followers",
+  analytics: "x_analytics",
+  "pdf scan": "x_pdf_scan",
+  pdf: "x_pdf_scan",
+  lists: "x_lists",
+  "get user": "x_get_user",
+  "tweet views": "x_tweet_metrics",
+  views: "x_tweet_metrics",
+  "tools help": "x_tools_help",
+  catalog: "x_tools_help",
 };
 
 /** Grok mangles snake_case → PascalCase + Tool (e.g. XBuyTool). Normalize to real tool names. */
@@ -627,35 +830,71 @@ function normalizeXToolName(rawName) {
   return n;
 }
 
-function listToolsForMcp() {
-  return TOOLS.map((t) => {
-    const base = t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : EMPTY_OBJECT_SCHEMA;
-    const props = { ...(base.properties || {}) };
-    if (
-      t.name !== "x_auth_link" &&
-      t.name !== "x_auth_status" &&
-      t.name !== "x_menu" &&
-      t.name !== "search" &&
-      t.name !== "fetch" &&
-      !props.authCode
-    ) {
-      props.authCode = AUTH_CODE_PROP;
-    }
-    const inputSchema = {
-      ...base,
-      type: "object",
-      properties: props,
-      additionalProperties: false,
-    };
+function withAuthCodeSchema(baseSchema, toolName) {
+  const base = baseSchema && typeof baseSchema === "object" ? baseSchema : EMPTY_OBJECT_SCHEMA;
+  const props = { ...(base.properties || {}) };
+  if (
+    toolName !== "x_auth_link" &&
+    toolName !== "x_auth_status" &&
+    toolName !== "x_menu" &&
+    toolName !== "search" &&
+    toolName !== "fetch" &&
+    toolName !== "x_tools_help" &&
+    toolName !== "x_pdf_scan" &&
+    !props.authCode
+  ) {
+    props.authCode = AUTH_CODE_PROP;
+  }
+  return {
+    ...base,
+    type: "object",
+    properties: props,
+    additionalProperties: false,
+  };
+}
+
+function mapToolForMcp(t) {
+  const inputSchema = withAuthCodeSchema(t.inputSchema, t.name);
+  return {
+    name: t.name,
+    description: t.description,
+    inputSchema,
+    input_schema: inputSchema,
+    ...(t.annotations ? { annotations: t.annotations } : {}),
+  };
+}
+
+/** Claude / Grok choke on 5000+ tools — expose CORE live tools only by default. */
+function listLiveTools(cursor) {
+  const PAGE = 80;
+  if (!cursor || cursor === "core" || cursor === "0") {
     return {
-      name: t.name,
-      description: t.description,
-      inputSchema,
-      // Some clients (incl. Grok variants) read snake_case
-      input_schema: inputSchema,
-      ...(t.annotations ? { annotations: t.annotations } : {}),
+      tools: CORE_TOOLS.map(mapToolForMcp),
+      _meta: {
+        totalAvailable: CORE_TOOLS.length + _xGenerated.length,
+        liveCore: CORE_TOOLS.length,
+        generated: _xGenerated.length,
+        stats: xGeneratedStats(),
+        note: "CORE tools listed. Call x_tools_help for the full catalog; activity shortcuts (x_act_*) still work if you know the name. Paginate generated: cursor gen:0",
+      },
     };
-  });
+  }
+  const m = String(cursor).match(/^gen:(\d+)$/);
+  if (m) {
+    const offset = Number(m[1]) || 0;
+    const slice = _xGenerated.slice(offset, offset + PAGE);
+    const next = offset + PAGE < _xGenerated.length ? `gen:${offset + PAGE}` : undefined;
+    return {
+      tools: slice.map(mapToolForMcp),
+      nextCursor: next,
+      _meta: { offset, pageSize: PAGE, totalGenerated: _xGenerated.length },
+    };
+  }
+  return { tools: CORE_TOOLS.map(mapToolForMcp) };
+}
+
+function listToolsForMcp() {
+  return listLiveTools("core").tools;
 }
 
 function header(req, name) {
@@ -1456,6 +1695,128 @@ async function uploadImageOAuth1a(imageUrl) {
 }
 
 
+async function resolveXTargetUserId(resolved, a = {}) {
+  const username = String(a.username || a.handle || "").replace(/^@/, "").trim();
+  if (username) {
+    const u = await lookupXUser(resolved.accessToken, username);
+    if (!u?.id) {
+      return { ok: false, error: "user_not_found", message: `No X user @${username}` };
+    }
+    return { ok: true, userId: u.id, username: u.username || username, user: u };
+  }
+  let userId = String(a.userId || a.user_id || resolved.profile?.twitter_id || "").trim();
+  if (!userId) {
+    const me = await getXMe(resolved.accessToken);
+    userId = me?.user?.id || "";
+  }
+  if (!userId) {
+    return {
+      ok: false,
+      error: "missing_twitter_id",
+      message: "Could not resolve X user id. Pass username or reconnect X on /x.",
+      fixUrl: "https://orbitx.world/x",
+    };
+  }
+  return { ok: true, userId, username: resolved.profile?.twitter_username || null };
+}
+
+async function runXGeneratedActivity(meta, a, auth, req) {
+  const kind = meta.kind;
+  const limit = Number(a.maxResults ?? a.max_results ?? meta.limit) || meta.limit || 20;
+  const page = Number(meta.page) || 1;
+  // Walk pagination tokens for page > 1 when the API returns next_token
+  async function pageGraph(listFn, resolved, userId) {
+    let token = a.paginationToken || a.pagination_token || undefined;
+    let last = null;
+    for (let p = 1; p <= page; p += 1) {
+      last = await listFn(resolved.accessToken, userId, {
+        maxResults: limit,
+        paginationToken: token,
+      });
+      if (!last?.ok) return last;
+      token = last.nextToken || undefined;
+      if (p < page && !token) {
+        return { ...last, page, note: `Only ${p} page(s) available` };
+      }
+    }
+    return { ...last, page, limit };
+  }
+
+  if (kind === "pdf_scan") {
+    return scanPdfContent({ url: a.url, text: a.text, base64: a.base64 });
+  }
+  if (kind === "credits_usage") {
+    return callTool("x_credits_usage", { ...a, period: a.period || meta.period, limit }, auth, req);
+  }
+  if (kind === "connection") {
+    return callTool("x_connection_status", a, auth, req);
+  }
+
+  const resolved = await resolveUserAccessToken(auth.userId);
+  if (!resolved.ok) return resolved;
+
+  if (kind === "me") return getXMe(resolved.accessToken);
+  if (kind === "user_lookup") {
+    const username = String(a.username || "").replace(/^@/, "").trim();
+    if (!username) return { ok: false, error: "username_required", message: "username required" };
+    try {
+      const u = await lookupXUser(resolved.accessToken, username);
+      return u ? { ok: true, user: u, page, limit } : { ok: false, error: "user_not_found" };
+    } catch (e) {
+      return { ok: false, error: "lookup_failed", message: e?.message };
+    }
+  }
+  if (kind === "dm_inbox") {
+    return listDmEventsOAuth2(resolved.accessToken, { maxResults: limit });
+  }
+  if (kind === "mentions") {
+    const target = await resolveXTargetUserId(resolved, a);
+    if (!target.ok) return target;
+    return listMentionsOAuth2(resolved.accessToken, target.userId, { maxResults: limit });
+  }
+  if (kind === "followers" || kind === "recent_followers" || kind === "audience") {
+    const target = await resolveXTargetUserId(resolved, a);
+    if (!target.ok) return target;
+    return pageGraph(listFollowersOAuth2, resolved, target.userId);
+  }
+  if (kind === "following" || kind === "network") {
+    const target = await resolveXTargetUserId(resolved, a);
+    if (!target.ok) return target;
+    return pageGraph(listFollowingOAuth2, resolved, target.userId);
+  }
+  if (kind === "tweet_metrics" || kind === "views") {
+    return getTweetMetricsOAuth2(resolved.accessToken, a.tweetId || a.tweet_id || a.id);
+  }
+  if (kind === "user_tweets" || kind === "timeline") {
+    const target = await resolveXTargetUserId(resolved, a);
+    if (!target.ok) return target;
+    return listUserTweetsOAuth2(resolved.accessToken, target.userId, {
+      maxResults: limit,
+      paginationToken: a.paginationToken || a.pagination_token || undefined,
+    });
+  }
+  if (kind === "lists") {
+    const target = await resolveXTargetUserId(resolved, a);
+    if (!target.ok) return target;
+    return listOwnedListsOAuth2(resolved.accessToken, target.userId, { maxResults: limit });
+  }
+  if (kind === "list_members") {
+    return listListMembersOAuth2(resolved.accessToken, a.listId || a.list_id, {
+      maxResults: limit,
+      paginationToken: a.paginationToken || a.pagination_token || undefined,
+    });
+  }
+  if (kind === "analytics") {
+    return callTool("x_analytics", { ...a, maxResults: limit }, auth, req);
+  }
+  return {
+    ok: false,
+    error: "unknown_activity",
+    kind,
+    message: `Unknown activity kind ${kind}`,
+  };
+}
+
 async function callTool(rawName, args, auth, req = null) {
   const name = normalizeXToolName(rawName);
   const a = args && typeof args === "object" ? args : {};
@@ -2157,6 +2518,153 @@ async function callTool(rawName, args, auth, req = null) {
     }
   }
 
+  if (name === "x_tools_help") {
+    return listXGeneratedHelp({
+      q: a.q || a.query || "",
+      limit: a.limit ?? 40,
+    });
+  }
+
+  if (name === "x_pdf_scan") {
+    return scanPdfContent({
+      url: a.url,
+      text: a.text,
+      base64: a.base64,
+    });
+  }
+
+  if (name === "x_get_user") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    try {
+      const u = await lookupXUser(resolved.accessToken, a.username);
+      if (!u) return { ok: false, error: "user_not_found", message: `No user @${a.username}` };
+      return { ok: true, user: u };
+    } catch (e) {
+      return { ok: false, error: "lookup_failed", message: e?.message || "Lookup failed" };
+    }
+  }
+
+  if (name === "x_me") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    return getXMe(resolved.accessToken);
+  }
+
+  if (name === "x_followers" || name === "x_recent_followers" || name === "x_following") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    try {
+      const target = await resolveXTargetUserId(resolved, a);
+      if (!target.ok) return target;
+      const opts = {
+        maxResults: a.maxResults ?? a.max_results ?? 20,
+        paginationToken: a.paginationToken || a.pagination_token || undefined,
+      };
+      const edge = name === "x_following" ? listFollowingOAuth2 : listFollowersOAuth2;
+      const out = await edge(resolved.accessToken, target.userId, opts);
+      return {
+        ...out,
+        username: target.username || null,
+        recent: name === "x_recent_followers",
+      };
+    } catch (e) {
+      return { ok: false, error: "graph_failed", message: e?.message || "Followers/following failed" };
+    }
+  }
+
+  if (name === "x_lists") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    try {
+      const target = await resolveXTargetUserId(resolved, a);
+      if (!target.ok) return target;
+      return await listOwnedListsOAuth2(resolved.accessToken, target.userId, {
+        maxResults: a.maxResults ?? a.max_results ?? 20,
+      });
+    } catch (e) {
+      return { ok: false, error: "lists_failed", message: e?.message || "Lists failed" };
+    }
+  }
+
+  if (name === "x_list_members") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    return listListMembersOAuth2(resolved.accessToken, a.listId || a.list_id, {
+      maxResults: a.maxResults ?? a.max_results ?? 20,
+      paginationToken: a.paginationToken || a.pagination_token || undefined,
+    });
+  }
+
+  if (name === "x_tweet_metrics" || name === "x_views") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    return getTweetMetricsOAuth2(resolved.accessToken, a.tweetId || a.tweet_id || a.id);
+  }
+
+  if (name === "x_user_tweets") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    try {
+      const target = await resolveXTargetUserId(resolved, a);
+      if (!target.ok) return target;
+      return await listUserTweetsOAuth2(resolved.accessToken, target.userId, {
+        maxResults: a.maxResults ?? a.max_results ?? 10,
+        paginationToken: a.paginationToken || a.pagination_token || undefined,
+      });
+    } catch (e) {
+      return { ok: false, error: "tweets_failed", message: e?.message || "User tweets failed" };
+    }
+  }
+
+  if (name === "x_dm_recent") {
+    return callTool("x_dm_inbox", a, auth, req);
+  }
+
+  if (name === "x_analytics") {
+    const resolved = await resolveUserAccessToken(auth.userId);
+    if (!resolved.ok) return resolved;
+    const n = Math.min(25, Math.max(5, Number(a.maxResults ?? a.max_results) || 10));
+    const includeDms = a.includeDms !== false && a.include_dms !== false;
+    const includeMentions = a.includeMentions !== false && a.include_mentions !== false;
+    const includeFollowers = a.includeFollowers !== false && a.include_followers !== false;
+    const includeTweets = a.includeTweets !== false && a.include_tweets !== false;
+    try {
+      const me = await getXMe(resolved.accessToken);
+      const uid = me?.user?.id || resolved.profile?.twitter_id;
+      if (!uid) {
+        return { ok: false, error: "missing_twitter_id", message: "Reconnect X on /x", fixUrl: "https://orbitx.world/x" };
+      }
+      const [dms, mentions, followers, tweets] = await Promise.all([
+        includeDms ? listDmEventsOAuth2(resolved.accessToken, { maxResults: n }) : Promise.resolve(null),
+        includeMentions ? listMentionsOAuth2(resolved.accessToken, uid, { maxResults: n }) : Promise.resolve(null),
+        includeFollowers ? listFollowersOAuth2(resolved.accessToken, uid, { maxResults: n }) : Promise.resolve(null),
+        includeTweets ? listUserTweetsOAuth2(resolved.accessToken, uid, { maxResults: n }) : Promise.resolve(null),
+      ]);
+      return {
+        ok: true,
+        profile: me?.user || null,
+        dms: dms?.ok ? { count: dms.events?.length || 0, events: dms.events } : dms,
+        mentions: mentions?.ok ? { count: mentions.mentions?.length || 0, items: mentions.mentions } : mentions,
+        recentFollowers: followers?.ok
+          ? { count: followers.users?.length || 0, users: followers.users, nextToken: followers.nextToken }
+          : followers,
+        recentTweets: tweets?.ok ? { count: tweets.tweets?.length || 0, tweets: tweets.tweets } : tweets,
+        tip: "Reconnect X on /x after deploy to pick up follows.read + list.read scopes.",
+      };
+    } catch (e) {
+      return { ok: false, error: "analytics_failed", message: e?.message || "Analytics failed" };
+    }
+  }
+
+  // Generated activity tools (~500 shortcuts + ~5000 x_act_*)
+  {
+    const gen = await dispatchXGenerated(name, a, (meta, args) =>
+      runXGeneratedActivity(meta, args, auth, req),
+    );
+    if (gen != null) return gen;
+  }
+
   if (name === "x_agent_poll_replies") {
     try {
       return await processAutoReplies(sb, resolveUserAccessToken, uploadImageOAuth1a, {
@@ -2373,8 +2881,9 @@ async function callTool(rawName, args, auth, req = null) {
     error: "unknown_tool",
     tool: name,
     requested: rawName,
-    message: `Unknown tool "${rawName}". Use exact names: x_buy, x_credits_buy, x_buy_orbitx, x_menu, x_credits_usage.`,
+    message: `Unknown tool "${rawName}". Use x_menu, x_tools_help, x_analytics, x_buy, or CORE names from tools/list.`,
     availableBuyTools: ["x_buy", "x_credits_buy", "x_buy_orbitx", "x_confirm_buy"],
+    hint: "Call x_tools_help to browse ~5000 activity tools (followers, DMs, PDF scan, views, lists).",
   };
 }
 async function handleAgent(req, res, parts) {
@@ -3382,9 +3891,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "OrbitX X MCP", version: "1.4.0" },
+            serverInfo: { name: "OrbitX X MCP", version: "1.5.0" },
             instructions:
-              "OrbitX X MCP — post/DM on X, NVIDIA agent, buy credits, and buy ORBITX. IMPORTANT: call tools by exact snake_case names from tools/list (x_buy, x_credits_buy, x_buy_orbitx). Never invent PascalCase names like XBuyTool. When the user says /, menu, call x_menu. If they paste an authCode from /x, call x_auth_status then pass authCode on every x_* tool. Buy anything: prefer x_buy with what=credits|orbitx. Credits: openUrl → Phantom pays desk wallet → x_credits_confirm. ORBITX: x_buy what=orbitx → signUrl; yes/confirm → x_confirm_buy. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — advanced X analytics + post/DM + NVIDIA agent + credits/ORBITX. IMPORTANT: call tools by exact snake_case names from tools/list (x_buy, x_analytics, x_followers, x_get_user, x_pdf_scan). Never invent PascalCase like XBuyTool. tools/list shows CORE only; call x_tools_help for ~500 shortcuts + ~5000 activity tools (still callable by name). When user says /, menu → x_menu. Paste authCode → x_auth_status then pass authCode on every x_* tool. Analytics: x_analytics, x_dm_inbox, x_followers, x_following, x_recent_followers, x_lists, x_tweet_metrics, x_user_tweets, x_get_user @handle. PDF: x_pdf_scan with url. Buy: x_buy what=credits|orbitx. Setup: https://www.orbitx.world/x — reconnect X after scope updates (follows.read list.read).",
           },
         },
         200,
@@ -3396,11 +3905,15 @@ async function handleMcp(req, res, parts) {
     }
 
     if (method === "tools/list") {
+      const cursor = params?.cursor || params?.cursorToken || "core";
+      const listed = listLiveTools(cursor);
       return json(res, {
         jsonrpc: "2.0",
         id,
         result: {
-          tools: listToolsForMcp(),
+          tools: listed.tools,
+          ...(listed.nextCursor ? { nextCursor: listed.nextCursor } : {}),
+          ...(listed._meta ? { _meta: listed._meta } : {}),
         },
       });
     }
@@ -3418,7 +3931,16 @@ async function handleMcp(req, res, parts) {
       delete args.orbitxAuthCode;
       // Public tools stay open (incl. link-auth + menu). Other tools: allow link authCode without HTTP 401
       // so Grok can work after dashboard paste or clickable link (Grok won't store Bearer headers).
-      const publicTools = new Set(["search", "fetch", "x_menu", "x_help", "x_auth_link", "x_auth_status"]);
+      const publicTools = new Set([
+        "search",
+        "fetch",
+        "x_menu",
+        "x_help",
+        "x_auth_link",
+        "x_auth_status",
+        "x_tools_help",
+        "x_pdf_scan",
+      ]);
       if (!auth?.userId && !publicTools.has(name)) {
         // Grok (and chat UIs) often ignore HTTP 401 — return a soft error with a fresh clickable auth link.
         if (authCode) {

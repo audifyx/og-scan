@@ -6,7 +6,7 @@
 // Order matters for X OAuth — keep tweet.write early (same as the previously working set),
 // then append DM scopes. Reconnect X after changing this string.
 export const X_OAUTH_SCOPES =
-  "tweet.write tweet.read users.read offline.access dm.read dm.write like.read";
+  "tweet.write tweet.read users.read follows.read list.read offline.access dm.read dm.write like.read";
 
 export const NIM_MODELS = [
   { id: "meta/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
@@ -130,11 +130,14 @@ export async function postTweetOAuth2(accessToken, opts) {
   };
 }
 
+const USER_FIELDS =
+  "id,name,username,profile_image_url,description,created_at,public_metrics,verified,protected,url,location";
+
 export async function lookupXUser(accessToken, username) {
   const u = String(username || "").replace(/^@/, "").trim();
   if (!u) throw new Error("username required");
   const res = await fetch(
-    `https://api.twitter.com/2/users/by/username/${encodeURIComponent(u)}?user.fields=name,username,profile_image_url`,
+    `https://api.twitter.com/2/users/by/username/${encodeURIComponent(u)}?user.fields=${USER_FIELDS}`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!res.ok) {
@@ -142,7 +145,428 @@ export async function lookupXUser(accessToken, username) {
     throw new Error(err?.detail || err?.title || `User lookup failed (${res.status})`);
   }
   const data = await res.json();
-  return data?.data || null;
+  return mapXUser(data?.data) || data?.data || null;
+}
+
+function mapXUser(u) {
+  if (!u) return null;
+  const m = u.public_metrics || {};
+  return {
+    id: u.id,
+    name: u.name || null,
+    username: u.username || null,
+    description: u.description || null,
+    profileImageUrl: u.profile_image_url || null,
+    createdAt: u.created_at || null,
+    verified: Boolean(u.verified),
+    protected: Boolean(u.protected),
+    url: u.url || null,
+    location: u.location || null,
+    metrics: {
+      followers: m.followers_count ?? null,
+      following: m.following_count ?? null,
+      tweetCount: m.tweet_count ?? null,
+      listed: m.listed_count ?? null,
+      likeCount: m.like_count ?? null,
+    },
+  };
+}
+
+function xApiError(res, err, code, tip) {
+  const msg = err?.detail || err?.title || JSON.stringify(err);
+  if (res.status === 403) {
+    return {
+      ok: false,
+      error: code || "forbidden",
+      status: 403,
+      message: tip || `X rejected request (403): ${msg}`,
+      details: err,
+      fixUrl: "https://orbitx.world/x",
+    };
+  }
+  if (res.status === 429) {
+    return {
+      ok: false,
+      error: "rate_limited",
+      status: 429,
+      message: "X rate limit — wait and retry.",
+      details: err,
+    };
+  }
+  return {
+    ok: false,
+    error: code || "x_api_failed",
+    status: res.status,
+    message: msg,
+    details: err,
+  };
+}
+
+async function listUserGraph(accessToken, userId, edge, { maxResults = 20, paginationToken } = {}) {
+  const uid = String(userId || "").trim();
+  if (!uid) {
+    return { ok: false, error: "user_id_required", message: "X user id required" };
+  }
+  const limit = Math.min(1000, Math.max(1, Number(maxResults) || 20));
+  const params = new URLSearchParams({
+    max_results: String(limit),
+    "user.fields": USER_FIELDS,
+  });
+  if (paginationToken) params.set("pagination_token", String(paginationToken));
+  const res = await fetch(
+    `https://api.twitter.com/2/users/${encodeURIComponent(uid)}/${edge}?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return xApiError(
+      res,
+      err,
+      `${edge}_failed`,
+      `X rejected ${edge} (403). Needs users.read + follows.read — Reconnect X on /x after updating scopes.`,
+    );
+  }
+  const data = await res.json();
+  const users = (Array.isArray(data?.data) ? data.data : []).map(mapXUser);
+  return {
+    ok: true,
+    edge,
+    users,
+    nextToken: data?.meta?.next_token || null,
+    resultCount: data?.meta?.result_count ?? users.length,
+    meta: data?.meta || null,
+  };
+}
+
+/** Followers of userId (newest-first on most X API tiers). */
+export async function listFollowersOAuth2(accessToken, userId, opts = {}) {
+  return listUserGraph(accessToken, userId, "followers", opts);
+}
+
+/** Accounts userId follows. */
+export async function listFollowingOAuth2(accessToken, userId, opts = {}) {
+  return listUserGraph(accessToken, userId, "following", opts);
+}
+
+export async function getTweetMetricsOAuth2(accessToken, tweetId) {
+  const id = String(tweetId || "").trim();
+  if (!id) return { ok: false, error: "tweet_id_required", message: "tweetId required" };
+  const params = new URLSearchParams({
+    "tweet.fields":
+      "created_at,public_metrics,non_public_metrics,organic_metrics,author_id,conversation_id,lang,text",
+    expansions: "author_id",
+    "user.fields": "id,name,username",
+  });
+  const res = await fetch(`https://api.twitter.com/2/tweets/${encodeURIComponent(id)}?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    // Retry without elevated metrics fields
+    if (res.status === 400 || res.status === 403) {
+      const params2 = new URLSearchParams({
+        "tweet.fields": "created_at,public_metrics,author_id,conversation_id,lang,text",
+        expansions: "author_id",
+        "user.fields": "id,name,username",
+      });
+      const res2 = await fetch(
+        `https://api.twitter.com/2/tweets/${encodeURIComponent(id)}?${params2}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!res2.ok) {
+        const err2 = await res2.json().catch(() => ({}));
+        return xApiError(res2, err2, "tweet_metrics_failed");
+      }
+      const data2 = await res2.json();
+      return formatTweetMetrics(data2);
+    }
+    return xApiError(res, err, "tweet_metrics_failed");
+  }
+  const data = await res.json();
+  return formatTweetMetrics(data);
+}
+
+function formatTweetMetrics(data) {
+  const t = data?.data;
+  if (!t) return { ok: false, error: "not_found", message: "Tweet not found" };
+  const pm = t.public_metrics || {};
+  const npm = t.non_public_metrics || {};
+  const om = t.organic_metrics || {};
+  const author = (data?.includes?.users || []).find((u) => u.id === t.author_id) || null;
+  return {
+    ok: true,
+    tweetId: t.id,
+    text: t.text || "",
+    createdAt: t.created_at || null,
+    author: author ? { id: author.id, username: author.username, name: author.name } : null,
+    metrics: {
+      views: pm.impression_count ?? npm.impression_count ?? om.impression_count ?? null,
+      likes: pm.like_count ?? null,
+      retweets: pm.retweet_count ?? null,
+      replies: pm.reply_count ?? null,
+      quotes: pm.quote_count ?? null,
+      bookmarks: pm.bookmark_count ?? null,
+      urlClicks: npm.url_link_clicks ?? null,
+      profileClicks: npm.user_profile_clicks ?? null,
+    },
+    note:
+      pm.impression_count == null && npm.impression_count == null
+        ? "Views/impressions often require elevated X API access on your own posts."
+        : null,
+  };
+}
+
+export async function listUserTweetsOAuth2(accessToken, userId, { maxResults = 10, paginationToken } = {}) {
+  const uid = String(userId || "").trim();
+  if (!uid) return { ok: false, error: "user_id_required", message: "userId required" };
+  const limit = Math.min(100, Math.max(5, Number(maxResults) || 10));
+  const params = new URLSearchParams({
+    max_results: String(limit),
+    "tweet.fields": "created_at,public_metrics,lang,text",
+    exclude: "replies",
+  });
+  if (paginationToken) params.set("pagination_token", String(paginationToken));
+  const res = await fetch(
+    `https://api.twitter.com/2/users/${encodeURIComponent(uid)}/tweets?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return xApiError(res, err, "user_tweets_failed");
+  }
+  const data = await res.json();
+  const tweets = (Array.isArray(data?.data) ? data.data : []).map((t) => {
+    const pm = t.public_metrics || {};
+    return {
+      id: t.id,
+      text: t.text || "",
+      createdAt: t.created_at || null,
+      metrics: {
+        views: pm.impression_count ?? null,
+        likes: pm.like_count ?? null,
+        retweets: pm.retweet_count ?? null,
+        replies: pm.reply_count ?? null,
+        quotes: pm.quote_count ?? null,
+      },
+    };
+  });
+  return {
+    ok: true,
+    tweets,
+    nextToken: data?.meta?.next_token || null,
+    meta: data?.meta || null,
+  };
+}
+
+export async function listOwnedListsOAuth2(accessToken, userId, { maxResults = 20 } = {}) {
+  const uid = String(userId || "").trim();
+  if (!uid) return { ok: false, error: "user_id_required", message: "userId required" };
+  const limit = Math.min(100, Math.max(1, Number(maxResults) || 20));
+  const params = new URLSearchParams({
+    max_results: String(limit),
+    "list.fields": "created_at,follower_count,member_count,private,description,owner_id",
+  });
+  const [ownedRes, memberRes] = await Promise.all([
+    fetch(`https://api.twitter.com/2/users/${encodeURIComponent(uid)}/owned_lists?${params}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+    fetch(
+      `https://api.twitter.com/2/users/${encodeURIComponent(uid)}/list_memberships?${params}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    ),
+  ]);
+  const ownedErr = ownedRes.ok ? null : await ownedRes.json().catch(() => ({}));
+  const memberErr = memberRes.ok ? null : await memberRes.json().catch(() => ({}));
+  if (!ownedRes.ok && !memberRes.ok) {
+    return xApiError(
+      ownedRes,
+      ownedErr,
+      "lists_failed",
+      "X rejected lists (403). Needs list.read — Reconnect X on /x after updating app scopes.",
+    );
+  }
+  const ownedData = ownedRes.ok ? await ownedRes.json() : { data: [] };
+  const memberData = memberRes.ok ? await memberRes.json() : { data: [] };
+  const mapList = (l) => ({
+    id: l.id,
+    name: l.name,
+    description: l.description || null,
+    memberCount: l.member_count ?? null,
+    followerCount: l.follower_count ?? null,
+    private: Boolean(l.private),
+    ownerId: l.owner_id || null,
+  });
+  return {
+    ok: true,
+    owned: (Array.isArray(ownedData?.data) ? ownedData.data : []).map(mapList),
+    memberships: (Array.isArray(memberData?.data) ? memberData.data : []).map(mapList),
+    tips: [
+      !ownedRes.ok ? `owned_lists: ${ownedErr?.detail || ownedRes.status}` : null,
+      !memberRes.ok ? `memberships: ${memberErr?.detail || memberRes.status}` : null,
+    ].filter(Boolean),
+  };
+}
+
+export async function listListMembersOAuth2(accessToken, listId, { maxResults = 20, paginationToken } = {}) {
+  const lid = String(listId || "").trim();
+  if (!lid) return { ok: false, error: "list_id_required", message: "listId required" };
+  const limit = Math.min(100, Math.max(1, Number(maxResults) || 20));
+  const params = new URLSearchParams({
+    max_results: String(limit),
+    "user.fields": USER_FIELDS,
+  });
+  if (paginationToken) params.set("pagination_token", String(paginationToken));
+  const res = await fetch(
+    `https://api.twitter.com/2/lists/${encodeURIComponent(lid)}/members?${params}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return xApiError(
+      res,
+      err,
+      "list_members_failed",
+      "Needs list.read — Reconnect X on /x.",
+    );
+  }
+  const data = await res.json();
+  return {
+    ok: true,
+    listId: lid,
+    users: (Array.isArray(data?.data) ? data.data : []).map(mapXUser),
+    nextToken: data?.meta?.next_token || null,
+    meta: data?.meta || null,
+  };
+}
+
+/** Lightweight PDF text scan — URL via Jina reader + raw PDF byte extract fallback. */
+export async function scanPdfContent({ url, text, base64 } = {}) {
+  const inline = String(text || "").trim();
+  if (inline) {
+    return summarizeExtractedText(inline, { source: "text" });
+  }
+
+  let bytes = null;
+  const b64 = String(base64 || "").trim();
+  if (b64) {
+    try {
+      bytes = Buffer.from(b64.replace(/^data:application\/pdf;base64,/i, ""), "base64");
+    } catch {
+      return { ok: false, error: "bad_base64", message: "Could not decode base64 PDF" };
+    }
+  }
+
+  const srcUrl = String(url || "").trim();
+  let jinaText = "";
+  if (srcUrl) {
+    try {
+      const jina = await fetch(`https://r.jina.ai/${srcUrl}`, {
+        headers: { Accept: "text/plain", "X-Return-Format": "text" },
+        signal: AbortSignal.timeout(25000),
+      });
+      if (jina.ok) {
+        jinaText = (await jina.text()).slice(0, 120_000);
+      }
+    } catch {
+      /* fall through */
+    }
+    if (!bytes) {
+      try {
+        const res = await fetch(srcUrl, { signal: AbortSignal.timeout(20000) });
+        if (res.ok) {
+          const ct = String(res.headers.get("content-type") || "");
+          const ab = await res.arrayBuffer();
+          bytes = Buffer.from(ab);
+          if (!jinaText && !/pdf/i.test(ct) && bytes.length < 500_000) {
+            const asText = bytes.toString("utf8");
+            if (/[\w\s]{40,}/.test(asText)) {
+              return summarizeExtractedText(asText, { source: "url_text", url: srcUrl });
+            }
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  if (jinaText && jinaText.length > 80) {
+    return summarizeExtractedText(jinaText, { source: "jina", url: srcUrl || null });
+  }
+
+  if (bytes?.length) {
+    const extracted = extractTextFromPdfBytes(bytes);
+    if (extracted.length > 40) {
+      return summarizeExtractedText(extracted, { source: "pdf_bytes", url: srcUrl || null });
+    }
+  }
+
+  return {
+    ok: false,
+    error: "pdf_scan_failed",
+    message:
+      "Could not extract PDF text. Pass a public PDF url, pasted text, or base64. Some PDFs are image-only (OCR not available).",
+    url: srcUrl || null,
+  };
+}
+
+function extractTextFromPdfBytes(buf) {
+  const s = buf.toString("latin1");
+  const chunks = [];
+  const paren = /\((?:\\.|[^\\)]){2,400}\)[\s]*Tj/g;
+  let m;
+  while ((m = paren.exec(s))) {
+    const raw = m[0].slice(1, m[0].lastIndexOf(")"));
+    const cleaned = raw
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "")
+      .replace(/\\t/g, " ")
+      .replace(/\\\(/g, "(")
+      .replace(/\\\)/g, ")")
+      .replace(/\\\\/g, "\\");
+    if (/[A-Za-z0-9]/.test(cleaned)) chunks.push(cleaned);
+  }
+  const streams = s.match(/stream\r?\n([\s\S]{20,8000}?)\r?\nendstream/g) || [];
+  for (const st of streams.slice(0, 40)) {
+    const body = st.replace(/^stream\r?\n/, "").replace(/\r?\nendstream$/, "");
+    const ascii = body.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ");
+    const words = ascii.match(/[A-Za-z][A-Za-z0-9 .,'%$-]{4,}/g);
+    if (words?.length) chunks.push(words.join(" "));
+  }
+  return chunks.join("\n").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, 100_000);
+}
+
+function summarizeExtractedText(raw, meta = {}) {
+  const text = String(raw || "").replace(/\r/g, "").trim();
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const words = text.split(/\s+/).filter(Boolean);
+  const emails = [...new Set(text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [])].slice(0, 20);
+  const urls = [...new Set(text.match(/https?:\/\/[^\s)>"']+/gi) || [])].slice(0, 30);
+  const handles = [...new Set(text.match(/@[A-Za-z0-9_]{2,15}/g) || [])].slice(0, 40);
+  const numbers = [...new Set(text.match(/\b\d{1,3}(?:,\d{3})+(?:\.\d+)?%?|\b\d+(?:\.\d+)?%\b/g) || [])].slice(
+    0,
+    30,
+  );
+  return {
+    ok: true,
+    ...meta,
+    chars: text.length,
+    words: words.length,
+    lines: lines.length,
+    preview: text.slice(0, 2500),
+    headings: lines.filter((l) => l.length < 80 && /^[A-Z0-9][\w\s:-]{3,}$/.test(l)).slice(0, 20),
+    emails,
+    urls,
+    handles,
+    numbers,
+    analytics: {
+      avgWordLen: words.length
+        ? Math.round((words.reduce((a, w) => a + w.length, 0) / words.length) * 10) / 10
+        : 0,
+      densityHandles: handles.length,
+      densityUrls: urls.length,
+    },
+  };
 }
 
 export async function sendDmOAuth2(accessToken, { recipientId, text }) {
@@ -289,7 +713,7 @@ export async function sendDmConversationOAuth2(accessToken, { conversationId, te
 
 /** Authenticated user id/username (users.read). */
 export async function getXMe(accessToken) {
-  const res = await fetch("https://api.twitter.com/2/users/me?user.fields=username,name", {
+  const res = await fetch(`https://api.twitter.com/2/users/me?user.fields=${USER_FIELDS}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) {
@@ -301,7 +725,7 @@ export async function getXMe(accessToken) {
     };
   }
   const data = await res.json();
-  return { ok: true, user: data?.data || null };
+  return { ok: true, user: mapXUser(data?.data) || data?.data || null };
 }
 
 /** Recent mentions of the authenticated user. */
