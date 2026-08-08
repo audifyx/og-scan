@@ -467,15 +467,25 @@ const TOOLS = [
   {
     name: "x_credits_usage",
     description:
-      "Advanced usage — balance, purchase/spend ledger, rate, and how to buy. Call when the user asks for usage, billing, spend history, or advanced credits details.",
+      "Advanced credits usage report for Grok/Claude — balance, period analytics (24h/7d/30d/all), SOL in, burn rate, runway, daily series, suggested packs, ledger, and markdown. Call when the user asks for usage, billing, advanced usage, or spend history.",
     inputSchema: {
       type: "object",
       properties: {
-        limit: { type: "integer", description: "Ledger rows (1–100, default 40)" },
+        period: {
+          type: "string",
+          enum: ["24h", "7d", "30d", "all"],
+          description: "Analytics window (default 30d)",
+        },
+        limit: { type: "integer", description: "Ledger rows (1–200, default 50)" },
+        format: {
+          type: "string",
+          enum: ["both", "markdown", "json"],
+          description: "both (default) returns structured + markdown for chat display",
+        },
       },
       additionalProperties: false,
     },
-    annotations: { title: "Credits usage", readOnlyHint: true, openWorldHint: false },
+    annotations: { title: "Advanced credits usage", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_buy_orbitx",
@@ -1648,7 +1658,32 @@ async function callTool(rawName, args, auth, req = null) {
   if (name === "x_credits_usage") {
     try {
       const xc = await xCredits();
-      return await xc.getCreditsUsage(sb, auth.userId, { limit: a.limit });
+      let agentPosts = null;
+      try {
+        const agent = await ensureXAgent(sb, auth.userId);
+        const max = Math.max(0, Number(agent?.max_posts_per_day ?? 5) || 0);
+        const replyMax = Math.max(0, Number(agent?.max_replies_per_day ?? 30) || 0);
+        const start = new Date();
+        start.setUTCHours(0, 0, 0, 0);
+        const q = await sb(
+          `x_agent_queue?user_id=eq.${encodeURIComponent(auth.userId)}&status=eq.posted&updated_at=gte.${encodeURIComponent(start.toISOString())}&select=id`,
+        );
+        const used = Array.isArray(q) ? q.length : 0;
+        agentPosts = {
+          used,
+          max,
+          remaining: Math.max(0, max - used),
+          replyMax,
+        };
+      } catch {
+        /* optional */
+      }
+      return await xc.getCreditsUsage(sb, auth.userId, {
+        limit: a.limit,
+        period: a.period || "30d",
+        format: a.format || "both",
+        agentPosts,
+      });
     } catch (e) {
       return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
     }
@@ -2473,10 +2508,27 @@ async function handleAgent(req, res, parts) {
     const user = await getAuthUser(req);
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
     const u = new URL(req.url || "/", "http://x");
-    const limit = Number(u.searchParams.get("limit") || 40);
+    const limit = Number(u.searchParams.get("limit") || 50);
+    const period = u.searchParams.get("period") || "30d";
+    const format = u.searchParams.get("format") || "both";
     try {
       const xc = await xCredits();
-      return json(res, await xc.getCreditsUsage(sb, user.id, { limit }));
+      let agentPosts = null;
+      try {
+        const agent = await ensureXAgent(sb, user.id);
+        const max = Math.max(0, Number(agent?.max_posts_per_day ?? 5) || 0);
+        const replyMax = Math.max(0, Number(agent?.max_replies_per_day ?? 30) || 0);
+        const start = new Date();
+        start.setUTCHours(0, 0, 0, 0);
+        const q = await sb(
+          `x_agent_queue?user_id=eq.${encodeURIComponent(user.id)}&status=eq.posted&updated_at=gte.${encodeURIComponent(start.toISOString())}&select=id`,
+        );
+        const used = Array.isArray(q) ? q.length : 0;
+        agentPosts = { used, max, remaining: Math.max(0, max - used), replyMax };
+      } catch {
+        /* optional */
+      }
+      return json(res, await xc.getCreditsUsage(sb, user.id, { limit, period, format, agentPosts }));
     } catch (e) {
       return json(res, { error: e?.message || "usage_failed" }, 500);
     }

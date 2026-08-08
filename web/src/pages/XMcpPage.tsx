@@ -156,6 +156,7 @@ export default function XMcpPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
+  const [usagePeriod, setUsagePeriod] = useState<"24h" | "7d" | "30d" | "all">("30d");
   const [buySol, setBuySol] = useState("0.1");
   const [buyBusy, setBuyBusy] = useState(false);
   const [buyNote, setBuyNote] = useState<string | null>(null);
@@ -218,12 +219,16 @@ export default function XMcpPage() {
   const refreshCredits = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await fetchXCreditsUsage(50);
+      const data = await fetchXCreditsUsage(50, usagePeriod);
       setCreditsUsage(data);
     } catch {
       /* table may not be migrated yet — Usage tab still explains MCP buy */
     }
-  }, [user]);
+  }, [user, usagePeriod]);
+
+  useEffect(() => {
+    if (tab === "usage" && user) void refreshCredits();
+  }, [tab, user, usagePeriod, refreshCredits]);
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -952,15 +957,49 @@ export default function XMcpPage() {
         <>
           <section className="ox-agent__panel ox-x-credits">
             <div className="ox-agent__panel-h">
-              <h2 className="ox-agent__panel-title">Usage</h2>
-              <span className="ox-agent__panel-hint">shop · advanced</span>
+              <h2 className="ox-agent__panel-title">Advanced usage</h2>
+              <span className="ox-agent__panel-hint">analytics · shop</span>
             </div>
             <div className="ox-agent__panel-b">
+              <div className="ox-x-period" role="tablist" aria-label="Usage period">
+                {(["24h", "7d", "30d", "all"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    role="tab"
+                    aria-selected={usagePeriod === p}
+                    className={`ox-x-period__btn${usagePeriod === p ? " is-on" : ""}`}
+                    onClick={() => setUsagePeriod(p)}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
               <div className="ox-x-usage__stats">
                 <div>
                   <div className="ox-agent__label">Balance</div>
                   <div className="ox-agent__value" style={{ fontSize: "1.6rem", fontWeight: 750 }}>
                     {(creditsUsage?.balance ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Period bought</div>
+                  <div className="ox-agent__value">
+                    {(creditsUsage?.advanced?.summary?.periodPurchased ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Period SOL in</div>
+                  <div className="ox-agent__value">
+                    {Number(creditsUsage?.advanced?.summary?.periodSolIn ?? 0).toFixed(4)}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Runway</div>
+                  <div className="ox-agent__value">
+                    {creditsUsage?.advanced?.summary?.runwayDays != null
+                      ? `~${creditsUsage.advanced.summary.runwayDays}d`
+                      : "—"}
                   </div>
                 </div>
                 <div>
@@ -970,20 +1009,45 @@ export default function XMcpPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="ox-agent__label">Lifetime spent</div>
+                  <div className="ox-agent__label">Lifetime SOL</div>
                   <div className="ox-agent__value">
-                    {(creditsUsage?.lifetimeSpent ?? 0).toLocaleString()}
+                    {Number(creditsUsage?.lifetimeSolIn ?? creditsUsage?.advanced?.summary?.lifetimeSolIn ?? 0).toFixed(4)}
                   </div>
                 </div>
                 <div>
                   <div className="ox-agent__label">Daily posts</div>
                   <div className="ox-agent__value">
-                    {postCredits.remaining}/{postCredits.max}
+                    {creditsUsage?.advanced?.agentPosts
+                      ? `${creditsUsage.advanced.agentPosts.remaining}/${creditsUsage.advanced.agentPosts.max}`
+                      : `${postCredits.remaining}/${postCredits.max}`}
+                  </div>
+                </div>
+                <div>
+                  <div className="ox-agent__label">Burn / day</div>
+                  <div className="ox-agent__value">
+                    {(creditsUsage?.advanced?.summary?.burnPerDay ?? 0).toLocaleString()}
                   </div>
                 </div>
               </div>
+              {(creditsUsage?.advanced?.daily?.length ?? 0) > 0 ? (
+                <div className="ox-x-bars" aria-label="Daily credits activity">
+                  {creditsUsage!.advanced!.daily!.slice(-14).map((d) => {
+                    const max = Math.max(
+                      1,
+                      ...creditsUsage!.advanced!.daily!.map((x) => x.purchased + x.spent),
+                    );
+                    const h = Math.max(4, Math.round(((d.purchased + d.spent) / max) * 48));
+                    return (
+                      <div key={d.day} className="ox-x-bars__col" title={`${d.day}: +${d.purchased} / −${d.spent}`}>
+                        <span className="ox-x-bars__bar" style={{ height: h }} />
+                        <span className="ox-x-bars__lbl">{d.day.slice(5)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
               <p className="ox-agent__note" style={{ marginTop: "0.75rem" }}>
-                Rate: {(creditsUsage?.creditsPerSol || 10_000).toLocaleString()} credits / 1 SOL · pay to{" "}
+                Rate: {(creditsUsage?.creditsPerSol || 10_000).toLocaleString()} credits / 1 SOL · desk{" "}
                 <button
                   type="button"
                   className="ox-agent__linkish"
@@ -992,6 +1056,7 @@ export default function XMcpPage() {
                   {shortXKey(creditsUsage?.payTo || PLATFORM_WALLET)}
                 </button>
                 {copied === "payTo" ? " · copied" : ""}
+                {" · "}Ask Grok for <strong>advanced usage</strong>
               </p>
             </div>
           </section>
@@ -999,15 +1064,34 @@ export default function XMcpPage() {
           <section className="ox-agent__panel">
             <div className="ox-agent__panel-h">
               <h2 className="ox-agent__panel-title">Buy credits</h2>
-              <span className="ox-agent__panel-hint">any SOL amount</span>
+              <span className="ox-agent__panel-hint">packs · any amount</span>
             </div>
             <div className="ox-agent__panel-b">
               <p className="ox-agent__note" style={{ marginTop: 0 }}>
-                In Claude or Grok say <strong>I want to buy credits</strong> — they ask how much, set up the
-                transfer, and after you pay you get credits automatically. Or buy here with your wallet.
+                In Grok/Claude say <strong>buy credits</strong> — or pick a pack / custom SOL here. Phantom sends SOL
+                to the OrbitX desk wallet; credits apply after confirm.
               </p>
+              <div className="ox-x-packs">
+                {(creditsUsage?.advanced?.suggestedPacks || [
+                  { sol: 0.1, credits: 1000, label: "Starter" },
+                  { sol: 0.5, credits: 5000, label: "Standard" },
+                  { sol: 1, credits: 10000, label: "Pro" },
+                  { sol: 5, credits: 50000, label: "Whale" },
+                ]).map((p) => (
+                  <button
+                    key={p.sol}
+                    type="button"
+                    className={`ox-x-packs__btn${Number(buySol) === p.sol ? " is-on" : ""}`}
+                    onClick={() => setBuySol(String(p.sol))}
+                  >
+                    <span className="ox-x-packs__lbl">{p.label}</span>
+                    <span className="ox-x-packs__sol">{p.sol} SOL</span>
+                    <span className="ox-x-packs__cr">{p.credits.toLocaleString()} cr</span>
+                  </button>
+                ))}
+              </div>
               <label className="ox-agent__label" htmlFor="ox-buy-sol">
-                SOL amount
+                Custom SOL
               </label>
               <div className="ox-x-buy__row">
                 <input
@@ -1065,15 +1149,14 @@ export default function XMcpPage() {
 
           <section className="ox-agent__panel">
             <div className="ox-agent__panel-h">
-              <h2 className="ox-agent__panel-title">Advanced usage</h2>
-              <span className="ox-agent__panel-hint">ledger</span>
+              <h2 className="ox-agent__panel-title">Ledger</h2>
+              <span className="ox-agent__panel-hint">{usagePeriod}</span>
             </div>
             <div className="ox-agent__panel-b">
-              <p className="ox-agent__note" style={{ marginTop: 0 }}>
-                Ask Claude/Grok for advanced usage — they call <code>x_credits_usage</code>. Same data here.
-              </p>
               {(creditsUsage?.ledger?.length ?? 0) === 0 ? (
-                <p className="ox-agent__note">No purchases yet — buy above or via MCP.</p>
+                <p className="ox-agent__note" style={{ marginTop: 0 }}>
+                  No activity in this period — buy above or tell Grok “advanced usage”.
+                </p>
               ) : (
                 <ul className="ox-x-usage__ledger">
                   {creditsUsage!.ledger.map((e) => (

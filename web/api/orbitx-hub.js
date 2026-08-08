@@ -1922,10 +1922,15 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_credits_usage",
-    description: "Advanced credits usage — balance, ledger, rate, desk wallet. Call when user asks for usage/billing.",
+    description:
+      "Advanced credits usage report — balance, period analytics (24h/7d/30d/all), SOL in, burn/runway, packs, ledger, markdown for chat. Call when user asks for usage/billing/advanced usage.",
     inputSchema: {
       type: "object",
-      properties: { limit: { type: "integer" } },
+      properties: {
+        period: { type: "string", enum: ["24h", "7d", "30d", "all"] },
+        limit: { type: "integer" },
+        format: { type: "string", enum: ["both", "markdown", "json"] },
+      },
       additionalProperties: false,
     },
   },
@@ -3121,7 +3126,11 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     try {
       const xc = await xCredits();
-      return await xc.getCreditsUsage(sb, auth.userId, { limit: args.limit });
+      return await xc.getCreditsUsage(sb, auth.userId, {
+        limit: args.limit,
+        period: args.period || "30d",
+        format: args.format || "both",
+      });
     } catch (e) {
       return { ok: false, error: "usage_failed", message: e?.message || "usage unavailable" };
     }

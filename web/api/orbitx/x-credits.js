@@ -211,17 +211,97 @@ export async function getCreditsBalance(sb, userId) {
   };
 }
 
-export async function getCreditsUsage(sb, userId, { limit = 40 } = {}) {
+function periodMs(period) {
+  const p = String(period || "30d").toLowerCase();
+  if (p === "24h" || p === "1d" || p === "day") return 24 * 3600 * 1000;
+  if (p === "7d" || p === "week") return 7 * 24 * 3600 * 1000;
+  if (p === "30d" || p === "month") return 30 * 24 * 3600 * 1000;
+  if (p === "all" || p === "lifetime") return null;
+  return 30 * 24 * 3600 * 1000;
+}
+
+function dayKey(iso) {
+  try {
+    return new Date(iso).toISOString().slice(0, 10);
+  } catch {
+    return "unknown";
+  }
+}
+
+function buildUsageMarkdown(report) {
+  const a = report.advanced || {};
+  const s = a.summary || {};
+  const packs = (a.suggestedPacks || [])
+    .map((p) => `· ${p.sol} SOL → ${Number(p.credits).toLocaleString()} credits`)
+    .join("\n");
+  const series = (a.daily || [])
+    .slice(-14)
+    .map((d) => `${d.day}: +${d.purchased} / −${d.spent} (${d.solIn} SOL)`)
+    .join("\n");
+  const posts = a.agentPosts
+    ? `Daily posts · ${a.agentPosts.remaining}/${a.agentPosts.max} left (used ${a.agentPosts.used}) · replies cap ${a.agentPosts.replyMax ?? "—"}`
+    : null;
+  return [
+    `# OrbitX · Advanced credits usage`,
+    ``,
+    `**Balance** · ${Number(s.balance || 0).toLocaleString()} credits`,
+    `**Period** · ${s.period || "30d"} · bought ${Number(s.periodPurchased || 0).toLocaleString()} · spent ${Number(s.periodSpent || 0).toLocaleString()} · SOL in ${Number(s.periodSolIn || 0).toFixed(4)}`,
+    `**Lifetime** · bought ${Number(s.lifetimePurchased || 0).toLocaleString()} · spent ${Number(s.lifetimeSpent || 0).toLocaleString()} · SOL ${Number(s.lifetimeSolIn || 0).toFixed(4)}`,
+    s.runwayDays != null ? `**Runway** · ~${s.runwayDays} days at current spend` : `**Runway** · n/a (no spend yet)`,
+    `**Rate** · ${Number(s.rate || CREDITS_PER_SOL).toLocaleString()} credits / 1 SOL`,
+    `**Desk wallet** · \`${PLATFORM_CREDITS_WALLET}\``,
+    posts ? `\n${posts}` : "",
+    ``,
+    `## Suggested packs`,
+    packs || "· 0.1 / 0.5 / 1 SOL",
+    ``,
+    `## Recent daily`,
+    series || "(no activity in period)",
+    ``,
+    `## How to buy`,
+    `Say: buy credits → amount → open sign link → Phantom pays desk wallet → credits apply.`,
+    `Dashboard · ${report.usageUrl || "https://www.orbitx.world/x?tab=usage"}`,
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+/**
+ * Advanced usage report for dashboard + Grok/Claude.
+ * @param {object} [opts]
+ * @param {string} [opts.period] 24h|7d|30d|all
+ * @param {number} [opts.limit]
+ * @param {object} [opts.agentPosts] optional { used, max, remaining, replyMax }
+ * @param {'json'|'markdown'|'both'} [opts.format]
+ */
+export async function getCreditsUsage(sb, userId, { limit = 50, period = "30d", agentPosts = null, format = "both" } = {}) {
   const bal = await getCreditsBalance(sb, userId);
-  const lim = Math.max(1, Math.min(100, Number(limit) || 40));
+  const lim = Math.max(1, Math.min(200, Number(limit) || 50));
+  const windowMs = periodMs(period);
+  const sinceIso = windowMs ? new Date(Date.now() - windowMs).toISOString() : null;
+
   let ledger = [];
   try {
-    ledger = await sb(
-      `x_mcp_credit_ledger?user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=${lim}&select=id,kind,amount,balance_after,sol_lamports,tx_signature,description,meta,created_at`,
-    );
+    let path = `x_mcp_credit_ledger?user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=${lim}&select=id,kind,amount,balance_after,sol_lamports,tx_signature,description,meta,created_at`;
+    if (sinceIso) path += `&created_at=gte.${encodeURIComponent(sinceIso)}`;
+    ledger = await sb(path);
   } catch {
     ledger = [];
   }
+
+  // Lifetime SOL from a wider fetch when period-filtered
+  let lifetimeSolIn = 0;
+  try {
+    const life = await sb(
+      `x_mcp_credit_ledger?user_id=eq.${encodeURIComponent(userId)}&kind=eq.purchase&select=sol_lamports&limit=500`,
+    );
+    for (const row of Array.isArray(life) ? life : []) {
+      lifetimeSolIn += Number(row.sol_lamports || 0) / 1e9;
+    }
+  } catch {
+    lifetimeSolIn = 0;
+  }
+
   const entries = (Array.isArray(ledger) ? ledger : []).map((e) => ({
     id: e.id,
     kind: e.kind,
@@ -233,31 +313,95 @@ export async function getCreditsUsage(sb, userId, { limit = 40 } = {}) {
     createdAt: e.created_at,
     explorer: e.tx_signature ? `https://solscan.io/tx/${e.tx_signature}` : null,
   }));
+
   const purchased = entries.filter((e) => e.kind === "purchase");
   const spent = entries.filter((e) => e.kind === "spend");
-  return {
+  const periodPurchased = purchased.reduce((n, e) => n + Math.max(0, e.amount), 0);
+  const periodSpentAbs = spent.reduce((n, e) => n + Math.abs(Number(e.amount) || 0), 0);
+  const periodSolIn = purchased.reduce((n, e) => n + (Number(e.sol) || 0), 0);
+
+  const byDay = new Map();
+  for (const e of entries) {
+    const k = dayKey(e.createdAt);
+    if (!byDay.has(k)) byDay.set(k, { day: k, purchased: 0, spent: 0, solIn: 0, txs: 0 });
+    const d = byDay.get(k);
+    d.txs += 1;
+    if (e.kind === "purchase") {
+      d.purchased += Math.max(0, e.amount);
+      d.solIn += Number(e.sol) || 0;
+    } else if (e.kind === "spend") {
+      d.spent += Math.abs(e.amount);
+    }
+  }
+  const daily = [...byDay.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
+
+  const daysInPeriod =
+    windowMs != null ? Math.max(1, windowMs / (24 * 3600 * 1000)) : Math.max(1, daily.length || 1);
+  const burnPerDay = periodSpentAbs / daysInPeriod;
+  const runwayDays =
+    burnPerDay > 0 ? Math.round((bal.balance / burnPerDay) * 10) / 10 : bal.balance > 0 ? null : 0;
+
+  const suggestedPacks = [
+    { sol: 0.1, credits: solToCredits(0.1), label: "Starter" },
+    { sol: 0.5, credits: solToCredits(0.5), label: "Standard" },
+    { sol: 1, credits: solToCredits(1), label: "Pro" },
+    { sol: 5, credits: solToCredits(5), label: "Whale" },
+  ];
+
+  const periodLabel = String(period || "30d").toLowerCase();
+  const report = {
     ok: true,
     ...bal,
+    period: periodLabel,
+    lifetimeSolIn: Number(lifetimeSolIn.toFixed(6)),
     advanced: {
       summary: {
         balance: bal.balance,
         lifetimePurchased: bal.lifetimePurchased,
         lifetimeSpent: bal.lifetimeSpent,
+        lifetimeSolIn: Number(lifetimeSolIn.toFixed(6)),
+        period: periodLabel,
+        periodPurchased,
+        periodSpent: periodSpentAbs,
+        periodSolIn: Number(periodSolIn.toFixed(6)),
         purchaseCount: purchased.length,
         spendCount: spent.length,
+        avgPurchaseCredits:
+          purchased.length > 0 ? Math.round(periodPurchased / purchased.length) : 0,
+        burnPerDay: Math.round(burnPerDay * 10) / 10,
+        runwayDays,
         rate: bal.creditsPerSol,
         payWallet: PLATFORM_CREDITS_WALLET,
       },
+      agentPosts: agentPosts || null,
+      suggestedPacks,
+      daily,
       howToBuy: [
-        "Tell Claude/Grok: I want to buy credits",
-        "They ask how much SOL (any amount)",
-        "Call x_credits_buy → send the SOL transfer → x_credits_confirm",
-        "Credits appear on /x Usage and via x_credits_balance",
+        "Tell Grok/Claude: buy credits (or buy N credits / 0.5 SOL)",
+        "They call x_credits_buy / orbitx_credits_buy → open signUrl",
+        "Phantom sends SOL to the OrbitX desk wallet",
+        "x_credits_confirm (or sign page) credits your balance",
+        "Ask for advanced usage anytime → x_credits_usage",
       ],
       ledger: entries,
     },
     ledger: entries,
   };
+
+  const markdown = buildUsageMarkdown(report);
+  report.markdown = markdown;
+  report.__mcpFormat = format === "json" ? "json" : "markdown";
+  if (format === "markdown") {
+    return {
+      ok: true,
+      __mcpFormat: "markdown",
+      markdown,
+      balance: bal.balance,
+      period: periodLabel,
+      usageUrl: bal.usageUrl,
+    };
+  }
+  return report;
 }
 
 export async function confirmCreditsPurchase(sb, userId, signature) {

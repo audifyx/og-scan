@@ -1350,6 +1350,116 @@
   }
 }
 
+.ox-x-period {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.ox-x-period__btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ox-x-period__btn.is-on {
+  border-color: rgba(94, 234, 212, 0.45);
+  color: #5eead4;
+  background: rgba(94, 234, 212, 0.1);
+}
+
+.ox-x-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  min-height: 64px;
+  margin-top: 1rem;
+  padding: 0.5rem 0.25rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ox-x-bars__col {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ox-x-bars__bar {
+  width: 100%;
+  max-width: 18px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #5eead4, #0f766e);
+}
+
+.ox-x-bars__lbl {
+  font-size: 0.58rem;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: -0.02em;
+}
+
+.ox-x-packs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0.75rem 0 1rem;
+}
+
+@media (min-width: 720px) {
+  .ox-x-packs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.ox-x-packs__btn {
+  appearance: none;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.ox-x-packs__btn:hover,
+.ox-x-packs__btn.is-on {
+  border-color: rgba(94, 234, 212, 0.45);
+  background: rgba(94, 234, 212, 0.08);
+}
+
+.ox-x-packs__lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ox-x-packs__sol {
+  font-weight: 750;
+  font-size: 1rem;
+}
+
+.ox-x-packs__cr {
+  font-size: 0.8rem;
+  color: #5eead4;
+  font-weight: 650;
+}
+
 .ox-x-buy__row {
   display: flex;
   flex-wrap: wrap;

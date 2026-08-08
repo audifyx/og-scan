@@ -463,9 +463,36 @@ export type XCreditsLedgerEntry = {
 };
 
 export type XCreditsUsage = XCreditsBalance & {
+  period?: string;
+  lifetimeSolIn?: number;
   ledger: XCreditsLedgerEntry[];
+  markdown?: string;
   advanced?: {
-    summary: Record<string, unknown>;
+    summary: {
+      balance?: number;
+      lifetimePurchased?: number;
+      lifetimeSpent?: number;
+      lifetimeSolIn?: number;
+      period?: string;
+      periodPurchased?: number;
+      periodSpent?: number;
+      periodSolIn?: number;
+      purchaseCount?: number;
+      spendCount?: number;
+      avgPurchaseCredits?: number;
+      burnPerDay?: number;
+      runwayDays?: number | null;
+      rate?: number;
+      payWallet?: string;
+    };
+    agentPosts?: {
+      used: number;
+      max: number;
+      remaining: number;
+      replyMax?: number;
+    } | null;
+    suggestedPacks?: Array<{ sol: number; credits: number; label: string }>;
+    daily?: Array<{ day: string; purchased: number; spent: number; solIn: number; txs: number }>;
     howToBuy: string[];
     ledger: XCreditsLedgerEntry[];
   };
@@ -484,8 +511,13 @@ export type XCreditsQuote = {
   error?: string;
 };
 
-export async function fetchXCreditsUsage(limit = 40): Promise<XCreditsUsage> {
-  return (await xAgentFetch(`/credits/usage?limit=${limit}`)) as unknown as XCreditsUsage;
+export async function fetchXCreditsUsage(
+  limit = 50,
+  period: "24h" | "7d" | "30d" | "all" = "30d",
+): Promise<XCreditsUsage> {
+  return (await xAgentFetch(
+    `/credits/usage?limit=${limit}&period=${encodeURIComponent(period)}&format=both`,
+  )) as unknown as XCreditsUsage;
 }
 
 export async function fetchXCreditsBalance(): Promise<XCreditsBalance> {
