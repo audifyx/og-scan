@@ -9,10 +9,10 @@ dist-ssr
 .env
 *.local
 
-# Native
-ios/
-android/
-core
+# Native (repo-root only — do not ignore src/**/ios CSS/components)
+/ios/
+/android/
+/core
 
 # Expo
 .expo

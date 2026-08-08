@@ -84,6 +84,11 @@ const ROOT_PATHS = new Set([
   "/orbitxlaunch/",
   "/orbitxlaunch/leaderboard",
   "/orbitxlaunch/create",
+  "/orbitxlaunch/create/custom",
+  "/orbitxlaunch/create/pump",
+  "/orbitxlaunch/create/api",
+  "/orbitxlaunch/create/curve",
+  "/orbitxlaunch/create/nft",
   "/orbitxlaunch/claim",
   "/orbitxlaunch/rescue",
   "/orbitxlaunch/portfolio",
@@ -93,6 +98,12 @@ const ROOT_PATHS = new Set([
 ]);
 
 function titleFor(pathname: string): string {
+  if (pathname.startsWith("/orbitxlaunch/create/pump")) return "Pump launch";
+  if (pathname.startsWith("/orbitxlaunch/create/custom")) return "Custom launch";
+  if (pathname.startsWith("/orbitxlaunch/create/api")) return "API launch";
+  if (pathname.startsWith("/orbitxlaunch/create/curve")) return "Curve launch";
+  if (pathname.startsWith("/orbitxlaunch/create/nft")) return "NFT launch";
+  if (pathname === "/orbitxlaunch/create" || pathname === "/orbitxlaunch/create/") return "Create";
   const flat = TAB_GROUPS.flatMap((g) => g.tabs);
   const hit = flat.find((t) =>
     t.end ? pathname === t.to || pathname === `${t.to}/` : pathname === t.to || pathname.startsWith(`${t.to}/`),

@@ -13,7 +13,7 @@ const LINKS: { to: string; label: string; ico: string; match?: (p: string) => bo
 ];
 
 /* Surfaces that still need cross-app jumps (trade tab bar stays clear). */
-const SHOW_ON = ["/intel", "/trade", "/predictions", "/bagwork"];
+const SHOW_ON = ["/intel", "/trade", "/bagwork"];
 
 const POS_KEY = "orbitx.platformFab.pos";
 const FAB_SIZE = 52;

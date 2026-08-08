@@ -63,6 +63,10 @@
       "destination": "/api/orbitx-hub?path=mcp"
     },
     {
+      "source": "/api/orbitx/anti-vamp-check",
+      "destination": "/api/orbitx-anti-vamp-check"
+    },
+    {
       "source": "/api/orbitx/(.*)",
       "destination": "/api/orbitx-hub?path=$1"
     },

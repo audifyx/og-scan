@@ -4094,15 +4094,19 @@ export default async function handler(req, res) {
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
     if (head === "anti-vamp-check") {
-      return json(res, { ok: false, error: "use_client_anti_vamp", message: "Server anti-vamp temporarily unavailable" }, 501);
+      // Real checker: api/orbitx/_anti-vamp-check.ts (shared with orbitx-anti-vamp-check.ts).
+      // Prefer the top-level entry so Vercel can bundle TS cleanly from this JS hub.
+      const mod = await import("./orbitx-anti-vamp-check.ts");
+      return mod.default(req, res);
     }
     if (head === "health" || head === "") {
       return json(res, {
         ok: true,
         service: "orbitx",
-        routes: ["agent", "mcp", "crypto-scan"],
+        routes: ["agent", "mcp", "crypto-scan", "anti-vamp-check"],
         agent: "/api/orbitx-agent",
         mcp: "/api/orbitx-mcp",
+        antiVamp: "/api/orbitx/anti-vamp-check",
       });
     }
     return json(res, { ok: false, error: "unknown_orbitx_route", route: head }, 404);

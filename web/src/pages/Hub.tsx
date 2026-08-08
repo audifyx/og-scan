@@ -108,6 +108,7 @@ const ALL_APPS: AppItem[] = [
   { key: "trade", name: "Trade Terminal", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(135deg, #AB9FF2, #6B5FD4)", glyph: Glyph.dex },
   { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
+  { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(135deg, #67E8F9, #0891B2)", glyph: <span style={{ fontSize: 20 }}>🛡</span> },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <span style={{ fontSize: 20 }}>📈</span> },
   { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
@@ -125,7 +126,7 @@ const APP_BY_KEY = Object.fromEntries(ALL_APPS.map((a) => [a.key, a])) as Record
 type HubSection = { id: string; title: string; subtitle: string; keys: string[] };
 
 const APP_SECTIONS: HubSection[] = [
-  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "trade", "scanner", "launchpad"] },
+  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "trade", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Track wallets, PnL, and AI", keys: ["koltracker", "pnltracker", "ai"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Agent + X MCP for chat AIs", keys: ["agent", "xmcp"] },
   { id: "social", title: "Social", subtitle: "Feed, spaces, and community", keys: ["social"] },
