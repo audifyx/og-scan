@@ -9,9 +9,11 @@ const LINKS: { to: string; label: string; ico: string; match?: (p: string) => bo
   { to: "/orbitx-social", label: "Social", ico: "◉", match: (p) => p.startsWith("/orbitx-social") || p.startsWith("/social") },
   { to: "/agent", label: "Agent", ico: "✦", match: (p) => p.startsWith("/agent") },
   { to: "/x", label: "X", ico: "✕", match: (p) => p === "/x" || p.startsWith("/x/") },
+  { to: "/x/shop", label: "Shop", ico: "$", match: (p) => p === "/x/shop" },
 ];
 
 const SHOW_ON = [
+  "/x",
   "/orbitxlaunch",
   "/nft",
   "/orbitx-social",
