@@ -182,8 +182,10 @@ export function PlatformDock() {
 
   if (!visibleOn(pathname)) return null;
 
-  const panelLeft = pos.x + FAB_SIZE + 8 > window.innerWidth - 200;
-  const panelUp = pos.y + 280 > window.innerHeight;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 400;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const panelLeft = pos.x + FAB_SIZE + 8 > vw - 200;
+  const panelUp = pos.y + 280 > vh;
 
   return (
     <div
