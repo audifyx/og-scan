@@ -155,67 +155,130 @@
   background: rgba(94, 234, 212, 0.08);
 }
 
-/* iOS-style bottom dock */
-.ox-platform-dock {
+/* Draggable OrbitX apps FAB (replaces bottom platform dock) */
+.ox-platform-fab {
   position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-  transform: translateX(-50%);
-  z-index: 60;
-  display: flex;
-  align-items: stretch;
-  gap: 0.1rem;
-  max-width: min(560px, calc(100vw - 16px));
-  width: max-content;
-  padding: 0.35rem 0.4rem;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(12, 16, 22, 0.78);
-  backdrop-filter: blur(22px) saturate(160%);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  z-index: 70;
+  width: 52px;
+  height: 52px;
+  touch-action: none;
+  user-select: none;
 }
-.ox-platform-dock__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.12rem;
-  min-width: 52px;
-  padding: 0.35rem 0.4rem 0.3rem;
-  border-radius: 14px;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-.ox-platform-dock__ico {
-  font-size: 1.05rem;
-  line-height: 1;
-}
-.ox-platform-dock__item.is-on {
+
+.ox-platform-fab__btn {
+  appearance: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.4);
+  background: linear-gradient(145deg, rgba(20, 28, 36, 0.94), rgba(8, 10, 14, 0.96));
   color: #5eead4;
-  background: rgba(94, 234, 212, 0.1);
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: grab;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px) saturate(160%);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.ox-platform-dock__item:active {
+
+.ox-platform-fab__btn:active {
+  cursor: grabbing;
   transform: scale(0.96);
 }
 
-/* Room for dock on mobile platform pages */
-@media (max-width: 900px) {
-  .lp-classic,
-  .obx-mkt,
-  .oxc-root {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+.ox-platform-fab.is-open .ox-platform-fab__btn {
+  border-color: rgba(94, 234, 212, 0.65);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(94, 234, 212, 0.18);
+}
+
+.ox-platform-fab__panel {
+  position: absolute;
+  left: calc(100% + 8px);
+  bottom: 0;
+  width: min(200px, calc(100vw - 24px));
+  padding: 0.55rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 14, 20, 0.94);
+  backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  animation: ox-fab-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ox-platform-fab__panel.is-left {
+  left: auto;
+  right: calc(100% + 8px);
+}
+
+.ox-platform-fab__panel.is-up {
+  bottom: auto;
+  top: 0;
+}
+
+@keyframes ox-fab-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
   }
-  .ox-agent--dash .ox-agent__dock {
-    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
-@media (min-width: 901px) {
-  .ox-platform-dock {
-    display: none;
-  }
+.ox-platform-fab__panel-title {
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0.2rem 0.45rem 0.4rem;
+}
+
+.ox-platform-fab__link {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.88rem;
+  font-weight: 650;
+  text-decoration: none;
+  min-height: 40px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ox-platform-fab__link:hover,
+.ox-platform-fab__link:active {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.ox-platform-fab__link.is-on {
+  color: #5eead4;
+  background: rgba(94, 234, 212, 0.1);
+}
+
+.ox-platform-fab__ico {
+  width: 1.25rem;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.ox-platform-fab__hint {
+  margin: 0.35rem 0.45rem 0.1rem;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.35);
 }
