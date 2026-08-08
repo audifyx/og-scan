@@ -212,15 +212,28 @@ export default function AgentSignPage() {
             denominatedInSol: action === "buy",
             slippage,
             pool,
+            platformFee: true,
           }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok || !data?.tx) {
           throw new Error(data?.error || "Could not build trade transaction");
         }
+        // Separate desk-fee tx when the API could not embed the SOL transfer
+        if (typeof data.feeTx === "string" && data.feeTx.length > 0) {
+          const feeSig = await sendOne(data.feeTx);
+          await connection.confirmTransaction(feeSig, "confirmed");
+        }
         const sig = await sendOne(data.tx);
         await connection.confirmTransaction(sig, "confirmed");
         setSignature(sig);
+        const feeSol = data?.platformFee?.feeSol;
+        const feeWallet = data?.platformFee?.wallet || PLATFORM_WALLET;
+        if (feeSol) {
+          setExtraNote(
+            `Platform fee ${Number(feeSol).toFixed(6)} SOL → ${feeWallet.slice(0, 4)}…${feeWallet.slice(-4)}`,
+          );
+        }
         return;
       }
 
@@ -298,13 +311,14 @@ export default function AgentSignPage() {
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
           <Row label="Action" value={title} />
           <Row label="Detail" value={amountLabel} />
-          {kind === "credits" ? (
-            <Row label="Pay to" value={`${PLATFORM_WALLET.slice(0, 6)}…${PLATFORM_WALLET.slice(-4)}`} mono />
+          {kind === "credits" || kind === "trade" ? (
+            <Row label="Fee to" value={`${PLATFORM_WALLET.slice(0, 6)}…${PLATFORM_WALLET.slice(-4)}`} mono />
           ) : null}
           {mint && kind !== "credits" ? (
             <Row label="Mint" value={`${mint.slice(0, 6)}…${mint.slice(-4)}`} mono />
           ) : null}
           {kind === "trade" ? <Row label="Slippage" value={`${slippage}%`} /> : null}
+          {kind === "trade" ? <Row label="Platform fee" value="0.95% SOL → desk" /> : null}
           {expectedWallet ? (
             <Row label="Wallet" value={`${expectedWallet.slice(0, 4)}…${expectedWallet.slice(-4)}`} mono />
           ) : null}

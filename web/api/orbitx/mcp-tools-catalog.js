@@ -544,6 +544,7 @@ export async function dispatchGenerated(name, args, ctx) {
         denominatedInSol: action === "buy",
         slippage: Number(args.slippage) || 10,
         pool: meta.pool || "auto",
+        platformFee: true,
       };
       const data = await fetchJson(`${base}/api/ogdex/trade`, {
         method: "POST",

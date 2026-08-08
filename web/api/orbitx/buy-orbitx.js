@@ -8,6 +8,9 @@ export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const ORBITX_SYMBOL = "ORBITX";
 export const MIN_BUY_SOL = 0.001;
 export const MAX_BUY_SOL = 50;
+/** Desk / dev wallet — platform fee from x_buy / orbitx_buy_orbitx SOL buys */
+export const PLATFORM_FEE_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
+export const PLATFORM_FEE_BPS = 95;
 
 export function askBuyOrbitxAmount() {
   return {
@@ -98,6 +101,7 @@ export async function prepareBuyOrbitx(opts) {
         denominatedInSol: true,
         slippage: slip,
         pool: poolVal,
+        platformFee: true,
       }),
     });
   } catch (e) {
@@ -122,6 +126,12 @@ export async function prepareBuyOrbitx(opts) {
       wallet: pk,
     };
   }
+
+  const platformFee = data.platformFee || {
+    enabled: true,
+    bps: PLATFORM_FEE_BPS,
+    wallet: PLATFORM_FEE_WALLET,
+  };
 
   const qs = new URLSearchParams({
     action: "buy",
@@ -150,28 +160,33 @@ export async function prepareBuyOrbitx(opts) {
     pool: poolVal,
     via: data.via || null,
     routePool: data.pool || null,
+    platformFee,
+    feeWallet: PLATFORM_FEE_WALLET,
     signUrl,
     autoSignUrl,
     openUrl: primaryUrl,
     hasUnsignedTx: true,
+    hasFeeTx: Boolean(data.feeTx),
     instructions:
       mode === "auto"
         ? [
             "Send the user the openUrl / autoSignUrl as a clickable link.",
             "Opening it connects Phantom and prompts Sign automatically (chat auto-confirm).",
+            `0.95% platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
             "If they prefer a button first, use signUrl instead.",
             "Trade is incomplete until Phantom confirms.",
           ]
         : [
             "Send the user the signUrl as a clickable link.",
             "They connect Phantom and tap Sign & send.",
+            `0.95% platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
             "If they say yes / confirm / auto — call orbitx_confirm_buy (or x_confirm_buy) with the same amountSol for auto Phantom prompt.",
             "Do NOT broadcast unsigned transactions yourself.",
           ],
     note:
       mode === "auto"
-        ? "Chat auto-confirm: open autoSignUrl → Phantom pops. Still non-custodial — user must approve in wallet."
-        : "Manual sign: open signUrl. Say “confirm” or “auto” in chat to switch to auto Phantom prompt.",
+        ? `Chat auto-confirm: open autoSignUrl → Phantom pops. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`
+        : `Manual sign: open signUrl. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`,
     jupiter: `https://jup.ag/swap/SOL-${ORBITX_MINT}`,
     dex: `https://www.orbitx.world/ORBITX_DEX/token/${ORBITX_MINT}`,
   };
