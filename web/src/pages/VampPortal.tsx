@@ -8,6 +8,7 @@ interface DemoResult {
   blocked: boolean;
   flagged: boolean;
   warning?: string;
+  message?: string;
   hardMatch?: { name: string; ticker: string; source: string } | null;
   matches?: Array<{ name: string; ticker: string; source: string; sim: number; hard?: boolean; chainId?: string }>;
 }
@@ -16,6 +17,7 @@ const FALLBACK_RESULT: DemoResult = {
   blocked: false,
   flagged: true,
   warning: "verification_degraded",
+  message: "Verification sources are temporarily unavailable. The launch remains fail-open; retry before final settlement.",
   matches: [],
 };
 
@@ -75,11 +77,21 @@ export default function VampPortal() {
 
   const runCheck = async () => {
     setChecking(true);
+    const payload = { name, ticker, chainId, assetType };
     try {
-      const response = await fetch("/api/orbitx/anti-vamp-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, ticker, chainId, assetType }) });
-      if (!response.ok) throw new Error("unavailable");
-      setResult(await response.json());
-    } catch {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await fetch("/api/orbitx/anti-vamp-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+          if (!response.ok) throw new Error(`verification_${response.status}`);
+          setResult(await response.json());
+          return;
+        } catch (error) {
+          lastError = error;
+          if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 500));
+        }
+      }
+      console.warn("[v0] Anti-vamp verification unavailable after retry", lastError);
       setResult(FALLBACK_RESULT);
     } finally {
       setChecking(false);
