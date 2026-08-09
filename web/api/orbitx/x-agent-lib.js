@@ -1012,6 +1012,16 @@ export async function generateAgentPost(sb, agentRow, hint) {
     .join("\n\n")
     .slice(0, 6000);
   const topics = Array.isArray(agentRow.topics) ? agentRow.topics.join(", ") : "";
+  let repoLine = "";
+  try {
+    const { loadLinkedRepo } = await import("./x-github-repo.js");
+    const linked = await loadLinkedRepo(sb, agentRow.id);
+    if (linked?.fullName) {
+      repoLine = `Linked GitHub repo (live): ${linked.fullName} — ${linked.htmlUrl}. Stay accurate to the product; do not invent features.`;
+    }
+  } catch {
+    /* optional */
+  }
   const system = [
     "You write X (Twitter) posts for the user.",
     "Return ONLY valid JSON: {\"text\":\"...\",\"kind\":\"post\"}",
@@ -1019,6 +1029,7 @@ export async function generateAgentPost(sb, agentRow, hint) {
     agentRow.persona ? `Persona:\n${agentRow.persona}` : "",
     agentRow.voice_notes ? `Voice notes:\n${agentRow.voice_notes}` : "",
     topics ? `Topics to prefer: ${topics}` : "",
+    repoLine,
     knowledgeBlock ? `Training knowledge:\n${knowledgeBlock}` : "",
   ]
     .filter(Boolean)

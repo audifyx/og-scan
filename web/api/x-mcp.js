@@ -59,6 +59,19 @@ import {
   xGeneratedStats,
 } from "./orbitx/x-mcp-tools-catalog.js";
 import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
+import {
+  DEFAULT_GITHUB_REPO,
+  loadLinkedRepo,
+  saveLinkedRepo,
+  getRepoInfo,
+  readRepoFile,
+  listRepoTree,
+  searchRepo,
+  buildRepoContext,
+  listRepoResources,
+  parseRepoResourceUri,
+  parseGithubRepo,
+} from "./orbitx/x-github-repo.js";
 
 /** Lazy — x-credits must not load at cold start (Solana deps can 500 the whole MCP). */
 async function xCredits() {
@@ -743,6 +756,87 @@ const CORE_TOOLS = [
     annotations: { title: "Dex chart", readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "x_repo_link",
+    description:
+      "Link a GitHub repo to this X MCP session (saved for your account). After linking, Claude/Grok can read it with x_repo_read / x_repo_search / x_repo_context while drafting posts — no need to paste the URL every time. Pass owner/repo or full github.com URL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        repo: {
+          type: "string",
+          description: "e.g. audifyx/og-scan or https://github.com/audifyx/og-scan",
+        },
+        url: { type: "string", description: "Alias of repo" },
+        ref: { type: "string", description: "Optional branch or tag" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Link GitHub repo", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_repo",
+    description:
+      "Show the linked GitHub repo (or platform default). Call before drafting product posts if you need repo metadata.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { title: "Repo status", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_repo_read",
+    description:
+      "Read a live file from the linked GitHub repo. Use when drafting X posts so copy matches the real codebase (README, AGENTS.md, routes, features).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path e.g. README.md or web/api/x-mcp.js" },
+        ref: { type: "string", description: "Optional branch/tag override" },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Read repo file", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_repo_tree",
+    description: "List important files in the linked GitHub repo (or a directory path).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Optional directory path" },
+        max: { type: "integer", default: 80 },
+        ref: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Repo tree", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_repo_search",
+    description: "Search the linked GitHub repo (code search or path filter). Great for finding feature copy before posting.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        q: { type: "string", description: "Search query" },
+        max: { type: "integer", default: 12 },
+      },
+      required: ["q"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Search repo", readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "x_repo_context",
+    description:
+      "Pull a drafting brief from the linked repo (README + AGENTS.md + optional search). Call this when the user asks to draft an X post about the product/repo.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        hint: { type: "string", description: "What the post is about — used to search the repo" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Repo draft context", readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "x_dm_recent",
     description: "Recent DMs inbox (alias of x_dm_inbox) with sender usernames.",
     inputSchema: {
@@ -814,6 +908,13 @@ const X_TOOL_ALIASES = {
   dexscreener: "x_dex_chart",
   "show chart": "x_dex_chart",
   lists: "x_lists",
+  repo: "x_repo",
+  github: "x_repo",
+  "link repo": "x_repo_link",
+  "github repo": "x_repo_link",
+  "repo context": "x_repo_context",
+  "read repo": "x_repo_read",
+  "search repo": "x_repo_search",
   "get user": "x_get_user",
   "tweet views": "x_tweet_metrics",
   views: "x_tweet_metrics",
@@ -1724,6 +1825,77 @@ async function uploadImageOAuth1a(imageUrl) {
 }
 
 
+async function resolveLinkedRepo(auth) {
+  let agentId = null;
+  if (auth?.userId) {
+    try {
+      const agent = await ensureXAgent(sb, auth.userId);
+      agentId = agent?.id || null;
+    } catch {
+      /* ignore */
+    }
+  }
+  return loadLinkedRepo(sb, agentId);
+}
+
+async function handleXRepoTool(name, a, auth) {
+  if (name === "x_repo_link") {
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "auth_required",
+        message: "Link auth first (authCode / x_auth_status), then call x_repo_link with your GitHub URL.",
+      };
+    }
+    const agent = await ensureXAgent(sb, auth.userId);
+    return saveLinkedRepo(sb, {
+      agentId: agent.id,
+      userId: auth.userId,
+      repoUrl: a.repo || a.url || a.github || "",
+      ref: a.ref || a.branch || undefined,
+    });
+  }
+
+  const linked = await resolveLinkedRepo(auth);
+  if (!linked?.ok || !linked.owner) {
+    return {
+      ok: false,
+      error: "no_repo",
+      message: `No repo linked. Call x_repo_link with owner/repo, or set X_MCP_GITHUB_REPO (default ${DEFAULT_GITHUB_REPO}).`,
+    };
+  }
+
+  if (name === "x_repo") {
+    const info = await getRepoInfo(linked);
+    if (!info.ok) return info;
+    return {
+      ...info,
+      linkedVia: linked.source,
+      defaultRepo: DEFAULT_GITHUB_REPO,
+      tools: ["x_repo_read", "x_repo_tree", "x_repo_search", "x_repo_context", "x_repo_link"],
+      tip: "When drafting posts, call x_repo_context or x_repo_read — do not ask the user to paste the GitHub link again.",
+    };
+  }
+
+  if (name === "x_repo_read") {
+    return readRepoFile(linked, a.path || a.file || "", { ref: a.ref || a.branch });
+  }
+  if (name === "x_repo_tree") {
+    return listRepoTree(linked, {
+      path: a.path || "",
+      ref: a.ref || a.branch,
+      max: a.max ?? 80,
+    });
+  }
+  if (name === "x_repo_search") {
+    return searchRepo(linked, a.q || a.query || "", { max: a.max ?? 12 });
+  }
+  if (name === "x_repo_context") {
+    return buildRepoContext(linked, { hint: a.hint || a.topic || a.q || "" });
+  }
+  return { ok: false, error: "unknown_repo_tool", tool: name };
+}
+
 async function resolveXTargetUserId(resolved, a = {}) {
   const username = String(a.username || a.handle || "").replace(/^@/, "").trim();
   if (username) {
@@ -2564,6 +2736,17 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_dex_chart") {
     return buildDexChartEmbed(a);
+  }
+
+  if (
+    name === "x_repo_link" ||
+    name === "x_repo" ||
+    name === "x_repo_read" ||
+    name === "x_repo_tree" ||
+    name === "x_repo_search" ||
+    name === "x_repo_context"
+  ) {
+    return handleXRepoTool(name, a, auth);
   }
 
   if (name === "x_get_user") {
@@ -3923,10 +4106,13 @@ async function handleMcp(req, res, parts) {
           id,
           result: {
             protocolVersion,
-            capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "OrbitX X MCP", version: "1.5.0" },
+            capabilities: {
+              tools: { listChanged: false },
+              resources: { listChanged: false, subscribe: false },
+            },
+            serverInfo: { name: "OrbitX X MCP", version: "1.6.0" },
             instructions:
-              "OrbitX X MCP — advanced X analytics + post/DM + NVIDIA agent + credits/ORBITX. IMPORTANT: call tools by exact snake_case names from tools/list (x_buy, x_analytics, x_followers, x_get_user, x_pdf_scan, x_dex_chart). Never invent PascalCase like XBuyTool. CHARTS: when user shares a CA and asks for a chart/DexScreener — call x_dex_chart with ca=<mint> and render the markdown embed in chat. tools/list shows CORE only; call x_tools_help for ~500 shortcuts + ~5000 activity tools. When user says /, menu → x_menu. Paste authCode → x_auth_status then pass authCode on every x_* tool. Analytics: x_analytics, x_followers, x_following, x_dm_inbox, x_lists, x_tweet_metrics. PDF: x_pdf_scan. Buy: x_buy what=credits|orbitx. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — X analytics + post/DM + NVIDIA agent + linked GitHub repo + credits/ORBITX. IMPORTANT: snake_case tool names only (never invent XBuyTool). REPO: a GitHub repo is linked for live reads while drafting posts — call x_repo_context or x_repo_read (do NOT ask the user to paste the GitHub URL every time). Link/change with x_repo_link (owner/repo or github.com URL). Default repo from server config. CHARTS: CA + chart → x_dex_chart. Menu → x_menu. authCode → x_auth_status then pass on every x_* tool. Buy: x_buy what=credits|orbitx. Setup: https://www.orbitx.world/x",
           },
         },
         200,
@@ -3935,6 +4121,86 @@ async function handleMcp(req, res, parts) {
     }
     if (method === "notifications/initialized" || method === "ping") {
       return json(res, { jsonrpc: "2.0", id: id ?? null, result: {} });
+    }
+
+    if (method === "resources/list") {
+      try {
+        const authCode = String(params?.authCode || "").trim();
+        const inboundSession = String(header(req, "mcp-session-id") || "").trim();
+        const auth = await resolveAuth(req, { authCode, mcpSessionId: inboundSession || undefined });
+        const linked = await resolveLinkedRepo(auth || {});
+        const info = linked?.ok ? await getRepoInfo(linked) : null;
+        const resources = linked?.ok
+          ? listRepoResources(linked, info?.ok ? info : null)
+          : listRepoResources(parseGithubRepo(DEFAULT_GITHUB_REPO), null);
+        return json(res, { jsonrpc: "2.0", id, result: { resources } });
+      } catch (e) {
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          result: { resources: listRepoResources(parseGithubRepo(DEFAULT_GITHUB_REPO), null) },
+        });
+      }
+    }
+
+    if (method === "resources/read") {
+      try {
+        const uri = String(params?.uri || "").trim();
+        const parsed = parseRepoResourceUri(uri);
+        if (!parsed) {
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32602, message: `Unknown resource uri: ${uri}` },
+          });
+        }
+        const linked = {
+          ok: true,
+          owner: parsed.owner,
+          repo: parsed.repo,
+          fullName: parsed.fullName,
+          htmlUrl: parsed.htmlUrl,
+        };
+        const file = await readRepoFile(linked, parsed.path || "README.md");
+        if (!file.ok) {
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              contents: [
+                {
+                  uri,
+                  mimeType: "text/plain",
+                  text: file.message || "Could not read resource",
+                },
+              ],
+            },
+          });
+        }
+        const text =
+          file.type === "dir"
+            ? (file.entries || []).map((e) => `${e.type}\t${e.path}`).join("\n")
+            : file.content || "";
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            contents: [
+              {
+                uri,
+                mimeType: parsed.path?.endsWith(".md") ? "text/markdown" : "text/plain",
+                text,
+              },
+            ],
+          },
+        });
+      } catch (e) {
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32603, message: e?.message || "resources/read failed" },
+        });
+      }
     }
 
     if (method === "tools/list") {
@@ -3974,6 +4240,11 @@ async function handleMcp(req, res, parts) {
         "x_tools_help",
         "x_pdf_scan",
         "x_dex_chart",
+        "x_repo",
+        "x_repo_read",
+        "x_repo_tree",
+        "x_repo_search",
+        "x_repo_context",
       ]);
       if (!auth?.userId && !publicTools.has(name)) {
         // Grok (and chat UIs) often ignore HTTP 401 — return a soft error with a fresh clickable auth link.

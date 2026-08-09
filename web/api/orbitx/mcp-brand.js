@@ -95,6 +95,9 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     "║    x_lists · x_list_members · x_tweet_metrics    ║",
     "║    x_user_tweets · x_dm_inbox · x_mentions       ║",
     "║    x_pdf_scan · x_dex_chart (CA → Dex embed)     ║",
+    "║  GITHUB · DRAFTING                                   ║",
+    "║    x_repo_link · x_repo · x_repo_context         ║",
+    "║    x_repo_read · x_repo_search · x_repo_tree     ║",
     "║    x_tools_help (5000+ activity tools)          ║",
     "╠══════════════════════════════════════════════════╣",
     "║  POST · DM                                           ║",
@@ -120,7 +123,7 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     `Usage / shop · ${ORBITX_HOST}/shop`,
     `MCP URL · ${ORBITX_HOST}/api/x/mcp`,
     ``,
-    `_Analytics: ask for followers, following, recent followers, DMs, tweet views, lists, or “advanced analytics”. PDF: “scan this PDF” + url. Full catalog: x_tools_help (~500 shortcuts + ~5000 activity tools)._`,
+    `_Analytics: followers, following, DMs, tweet views, lists. Charts: share a CA → x_dex_chart. GitHub: link once with x_repo_link — then x_repo_context / x_repo_read while drafting (no paste every time)._`,
     `_Buy credits: say “buy credits” → amount → Phantom → desk wallet. Reconnect X on /x after deploy to refresh follows.read + list.read._`,
     `_Tip: Mint a chat auth message on the /x dashboard — paste into Grok / Claude / ChatGPT to stay linked without opening a site._`,
   ].join("\n");
