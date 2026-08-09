@@ -35,6 +35,7 @@ import {
   loadLatestTradeIntent,
   getChatTradeAuto,
 } from "./orbitx/buy-orbitx.js";
+import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
@@ -1352,6 +1353,19 @@ const TOOL_ALIASES = {
   credits: "orbitx_credits_balance",
   "credits balance": "orbitx_credits_balance",
   "credits usage": "orbitx_credits_usage",
+  chart: "orbitx_dex_chart",
+  charts: "orbitx_dex_chart",
+  dex_chart: "orbitx_dex_chart",
+  dexchart: "orbitx_dex_chart",
+  embed_chart: "orbitx_dex_chart",
+  "dex chart": "orbitx_dex_chart",
+  "show chart": "orbitx_dex_chart",
+  "token chart": "orbitx_dex_chart",
+  dexscreener: "orbitx_dex_chart",
+  "dex screener": "orbitx_dex_chart",
+  orbitx_chart: "orbitx_dex_chart",
+  orbitx_chart_embed: "orbitx_dex_chart",
+  orbitx_embed_chart: "orbitx_dex_chart",
   usage: "orbitx_credits_usage",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_community: "orbitx_social_create_community",
@@ -1533,7 +1547,8 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_get_chart",
-    description: "OHLCV candlestick data for a token.",
+    description:
+      "Raw OHLCV candlestick JSON for a token. Prefer orbitx_dex_chart when the user wants a live DexScreener embed chart in chat.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1543,6 +1558,39 @@ const CORE_TOOLS = [
         chain: { type: "string", default: "solana" },
       },
       required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_dex_chart",
+    description:
+      "HIGH QUALITY DexScreener embed chart for chat. When the user shares a CA/mint and asks for a chart, graph, DexScreener, or candles — call this immediately. Resolves the best liquidity pair and returns markdown with live embed URL, iframe, price/liq/volume stats, interval links, and OrbitX trade link. Works with Solana mint CA or pair address (also EVM).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ca: {
+          type: "string",
+          description: "Token contract address (mint CA) or DexScreener pair address",
+        },
+        mint: { type: "string", description: "Alias of ca" },
+        chain: {
+          type: "string",
+          description: "Chain id (default solana). Examples: solana, ethereum, base, bsc",
+          default: "solana",
+        },
+        interval: {
+          type: "string",
+          enum: ["1m", "5m", "15m", "1h", "4h", "12h", "24h"],
+          default: "15m",
+          description: "Chart timeframe for the embed",
+        },
+        theme: { type: "string", enum: ["dark", "light"], default: "dark" },
+        iframe: {
+          type: "boolean",
+          default: true,
+          description: "Include HTML iframe block in markdown for clients that render HTML",
+        },
+      },
+      additionalProperties: false,
     },
   },
   {
@@ -2660,7 +2708,19 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     if (!q || q === "/" || q === "menu" || q === "help" || q === "commands") {
       return callTool("orbitx_menu", { authCode: args.authCode || auth?.authCode }, auth, base, req);
     }
+    const caMatch = String(args.query || "").match(
+      /(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/,
+    );
+    if (caMatch && /chart|dex|embed|graph|candle|dexscreener|price/i.test(q)) {
+      return callTool("orbitx_dex_chart", { ca: caMatch[1] }, auth, base, req);
+    }
     const docs = [
+      {
+        id: "tool:orbitx_dex_chart",
+        title: "orbitx_dex_chart",
+        url: "https://www.orbitx.world/ORBITX_DEX",
+        text: "DexScreener embed chart in chat — pass CA/mint when user asks for charts.",
+      },
       {
         id: "menu",
         title: "OrbitX command menu",
@@ -2722,10 +2782,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         text: t?.description || `Tool ${toolName}`,
       };
     }
-    if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(id)) {
+    if (id.startsWith("chart:")) {
+      return callTool("orbitx_dex_chart", { ca: id.slice("chart:".length) }, auth, base, req);
+    }
+    if (/^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(id)) {
       return callTool("orbitx_get_token", { mint: id }, auth, base, req);
     }
-    return { id, title: id, url: "https://www.orbitx.world/agent", text: "Unknown id. Try menu, help, auth, or tool:orbitx_search." };
+    return { id, title: id, url: "https://www.orbitx.world/agent", text: "Unknown id. Try menu, help, auth, chart:<CA>, or tool:orbitx_dex_chart." };
+  }
+
+  if (name === "orbitx_dex_chart" || name === "orbitx_chart_embed" || name === "orbitx_embed_chart") {
+    return buildDexChartEmbed(args);
   }
 
   const generated = await dispatchGenerated(name, args, {
@@ -4181,7 +4248,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {} },
             serverInfo: { name: "OrbitX Agent MCP", version: "1.5.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -4227,6 +4294,8 @@ async function handleMcp(req, res, parts) {
         "orbitx_tools_help",
         "orbitx_search",
         "orbitx_whoami",
+        "orbitx_dex_chart",
+        "orbitx_get_chart",
       ]);
       if (!identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = authCode

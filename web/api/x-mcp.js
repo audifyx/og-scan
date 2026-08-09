@@ -58,6 +58,7 @@ import {
   listXGeneratedHelp,
   xGeneratedStats,
 } from "./orbitx/x-mcp-tools-catalog.js";
+import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
 
 /** Lazy — x-credits must not load at cold start (Solana deps can 500 the whole MCP). */
 async function xCredits() {
@@ -721,6 +722,27 @@ const CORE_TOOLS = [
     annotations: { title: "PDF scan", readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "x_dex_chart",
+    description:
+      "HIGH QUALITY DexScreener embed chart for chat. When the user shares a CA/mint and asks for a chart — call this. Returns markdown with live embed URL, iframe, price/liq/volume, and OrbitX trade link.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ca: { type: "string", description: "Token mint CA or pair address" },
+        mint: { type: "string" },
+        chain: { type: "string", default: "solana" },
+        interval: {
+          type: "string",
+          enum: ["1m", "5m", "15m", "1h", "4h", "12h", "24h"],
+          default: "15m",
+        },
+        theme: { type: "string", enum: ["dark", "light"], default: "dark" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Dex chart", readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "x_dm_recent",
     description: "Recent DMs inbox (alias of x_dm_inbox) with sender usernames.",
     inputSchema: {
@@ -785,6 +807,12 @@ const X_TOOL_ALIASES = {
   analytics: "x_analytics",
   "pdf scan": "x_pdf_scan",
   pdf: "x_pdf_scan",
+  chart: "x_dex_chart",
+  charts: "x_dex_chart",
+  dex_chart: "x_dex_chart",
+  "dex chart": "x_dex_chart",
+  dexscreener: "x_dex_chart",
+  "show chart": "x_dex_chart",
   lists: "x_lists",
   "get user": "x_get_user",
   "tweet views": "x_tweet_metrics",
@@ -841,6 +869,7 @@ function withAuthCodeSchema(baseSchema, toolName) {
     toolName !== "fetch" &&
     toolName !== "x_tools_help" &&
     toolName !== "x_pdf_scan" &&
+    toolName !== "x_dex_chart" &&
     !props.authCode
   ) {
     props.authCode = AUTH_CODE_PROP;
@@ -2533,6 +2562,10 @@ async function callTool(rawName, args, auth, req = null) {
     });
   }
 
+  if (name === "x_dex_chart") {
+    return buildDexChartEmbed(a);
+  }
+
   if (name === "x_get_user") {
     const resolved = await resolveUserAccessToken(auth.userId);
     if (!resolved.ok) return resolved;
@@ -3893,7 +3926,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: "OrbitX X MCP", version: "1.5.0" },
             instructions:
-              "OrbitX X MCP — advanced X analytics + post/DM + NVIDIA agent + credits/ORBITX. IMPORTANT: call tools by exact snake_case names from tools/list (x_buy, x_analytics, x_followers, x_get_user, x_pdf_scan). Never invent PascalCase like XBuyTool. tools/list shows CORE only; call x_tools_help for ~500 shortcuts + ~5000 activity tools (still callable by name). When user says /, menu → x_menu. Paste authCode → x_auth_status then pass authCode on every x_* tool. Analytics: x_analytics, x_dm_inbox, x_followers, x_following, x_recent_followers, x_lists, x_tweet_metrics, x_user_tweets, x_get_user @handle. PDF: x_pdf_scan with url. Buy: x_buy what=credits|orbitx. Setup: https://www.orbitx.world/x — reconnect X after scope updates (follows.read list.read).",
+              "OrbitX X MCP — advanced X analytics + post/DM + NVIDIA agent + credits/ORBITX. IMPORTANT: call tools by exact snake_case names from tools/list (x_buy, x_analytics, x_followers, x_get_user, x_pdf_scan, x_dex_chart). Never invent PascalCase like XBuyTool. CHARTS: when user shares a CA and asks for a chart/DexScreener — call x_dex_chart with ca=<mint> and render the markdown embed in chat. tools/list shows CORE only; call x_tools_help for ~500 shortcuts + ~5000 activity tools. When user says /, menu → x_menu. Paste authCode → x_auth_status then pass authCode on every x_* tool. Analytics: x_analytics, x_followers, x_following, x_dm_inbox, x_lists, x_tweet_metrics. PDF: x_pdf_scan. Buy: x_buy what=credits|orbitx. Setup: https://www.orbitx.world/x",
           },
         },
         200,
@@ -3940,6 +3973,7 @@ async function handleMcp(req, res, parts) {
         "x_auth_status",
         "x_tools_help",
         "x_pdf_scan",
+        "x_dex_chart",
       ]);
       if (!auth?.userId && !publicTools.has(name)) {
         // Grok (and chat UIs) often ignore HTTP 401 — return a soft error with a fresh clickable auth link.
