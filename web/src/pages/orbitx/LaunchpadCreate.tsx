@@ -215,6 +215,7 @@ export default function LaunchpadCreate() {
   const [checkingName, setCheckingName] = useState(false);
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const [checkError, setCheckError] = useState(false);
+  const antiVampBlocked = ANTI_VAMP_ENFORCEMENT_ENABLED && nameTaken;
   const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameCheckTimer = useRef<NodeJS.Timeout>();
@@ -300,7 +301,7 @@ export default function LaunchpadCreate() {
   const allocValid = allocTotal === 100;
 
   const sectionDone = useMemo<Record<SectionId, boolean>>(() => ({
-    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName,
+    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !antiVampBlocked && (!ANTI_VAMP_ENFORCEMENT_ENABLED || !checkingName),
     socials: !!(cfg.website || cfg.twitter || cfg.telegram || cfg.discord),
     supply: /^\d+$/.test(cfg.supply) && Number(cfg.supply) > 0 && Number(cfg.initialPriceUsd) > 0,
     authorities: cfg.revokeMint && cfg.revokeFreeze,
@@ -572,7 +573,7 @@ export default function LaunchpadCreate() {
   };
 
   const renderSection = () => {
-    const nameInvalid = nameTaken || checkingName;
+    const nameInvalid = antiVampBlocked || (ANTI_VAMP_ENFORCEMENT_ENABLED && checkingName);
     
     // Lock entire form if name is not valid
     if (nameInvalid && active !== "identity") {
@@ -589,10 +590,10 @@ export default function LaunchpadCreate() {
     
     switch (active) {
       case "identity":
-        const nameInvalid = nameTaken || checkingName;
+        const nameInvalid = antiVampBlocked || (ANTI_VAMP_ENFORCEMENT_ENABLED && checkingName);
         return (
           <div className="space-y-5">
-            {nameTaken && (
+            {ANTI_VAMP_ENFORCEMENT_ENABLED && nameTaken && (
               <div className="rounded-lg border-2 border-[hsl(var(--og-blood))]/60 bg-[hsl(var(--og-blood))]/15 p-4 flex items-start gap-3 shadow-[0_0_30px_-8px_hsl(var(--og-blood)/0.6)]">
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
                 <div>
@@ -605,7 +606,7 @@ export default function LaunchpadCreate() {
                 </div>
               </div>
             )}
-            {checkError && !nameTaken && (
+            {ANTI_VAMP_ENFORCEMENT_ENABLED && checkError && !nameTaken && (
               <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white/80">
                 Anti-vamp verification is degraded — launch is blocked until verification recovers. Retry once sources are back online.
               </div>
@@ -631,7 +632,7 @@ export default function LaunchpadCreate() {
               <div className="space-y-2"><Label>Ticker</Label>
                 <Input className={`${fieldClass} ${nameTaken ? 'border-[hsl(var(--og-blood))]' : ''}`} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
             </div>
-            {nameTaken && blockedMatch?.name && (
+            {ANTI_VAMP_ENFORCEMENT_ENABLED && nameTaken && blockedMatch?.name && (
               <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>

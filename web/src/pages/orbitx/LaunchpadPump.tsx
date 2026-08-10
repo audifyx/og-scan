@@ -547,6 +547,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [checkingName, setCheckingName] = useState(false);
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const [checkError, setCheckError] = useState(false);
+  const antiVampBlocked = ANTI_VAMP_ENFORCEMENT_ENABLED && nameTaken;
   const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -734,7 +735,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    !!imageFile && !nameTaken && !checkingName && !grinding;
+    !!imageFile && !antiVampBlocked && (!ANTI_VAMP_ENFORCEMENT_ENABLED || !checkingName) && !grinding;
 
   /* Launch flow */
 
@@ -1122,7 +1123,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 </div>
               </div>
             )}
-            {nameTaken && (
+            {ANTI_VAMP_ENFORCEMENT_ENABLED && nameTaken && (
               <div className="rounded-lg border-2 border-[hsl(var(--og-blood))]/60 bg-[hsl(var(--og-blood))]/15 p-4 flex items-start gap-3 shadow-[0_0_30px_-8px_hsl(var(--og-blood)/0.6)]">
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
                 <div>
@@ -1135,7 +1136,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 </div>
               </div>
             )}
-            {checkError && !nameTaken && (
+            {ANTI_VAMP_ENFORCEMENT_ENABLED && checkError && !nameTaken && (
               <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white">
                 Anti-vamp verification is degraded — launch is blocked until verification recovers. Retry once sources are back online.
               </div>
@@ -1180,7 +1181,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                       className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white focus:border-[hsl(var(--og-cyan))]/40 uppercase ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
                   </div>
                 </div>
-                {nameTaken && blockedMatch?.name && (
+                {ANTI_VAMP_ENFORCEMENT_ENABLED && nameTaken && blockedMatch?.name && (
                   <div className="flex items-start gap-1.5 text-xs text-[hsl(var(--og-blood))]">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
                     <span>
