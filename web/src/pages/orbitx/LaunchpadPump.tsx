@@ -876,6 +876,12 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       const tx = VersionedTransaction.deserialize(txBytes);
       tx.sign([mintKeypair]);
       const signedTx = await signTransaction(tx);
+      // Some wallet adapters return a rebuilt transaction and drop client-side
+      // partial signatures. Re-apply the mint signature before serialization.
+      signedTx.sign([mintKeypair]);
+      if (!signedTx.verifySignatures()) {
+        throw new Error(`Launch transaction is missing a required signature for ${mintKeypair.publicKey.toBase58()}. Please reconnect your wallet and retry.`);
+      }
 
       /* Step 5 — Send */
       setStep("sending");
@@ -905,8 +911,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       });
 
       // Shared OrbitX registry - powers the Home feed + the Claim Fees page.
-      // The Anti-Vamp verdict was already established (and enforced) in
-      // Step -1 above, before any fee/on-chain action.
+      // Anti-vamp enforcement is currently paused; launch proceeds normally.
       try {
         await registerToken({
           mint_address: mintAddr,
