@@ -4,16 +4,45 @@ import "./platform-shell.css";
 
 const LINKS: { to: string; label: string; ico: string; match?: (p: string) => boolean }[] = [
   { to: "/app", label: "Hub", ico: "⌂", match: (p) => p === "/app" || p.startsWith("/hub") },
+  { to: "/trade", label: "Trade", ico: "⇅", match: (p) => p === "/trade" || p.startsWith("/trade/") },
   { to: "/ORBITX_DEX", label: "DEX", ico: "◈", match: (p) => p.startsWith("/ORBITX_DEX") },
   { to: "/orbitxlaunch", label: "Launch", ico: "🚀", match: (p) => p.startsWith("/orbitxlaunch") },
+  { to: "/intel", label: "Intel", ico: "◎", match: (p) => p === "/intel" || p.startsWith("/intel/") },
   { to: "/nft", label: "NFT", ico: "🖼", match: (p) => p.startsWith("/nft") },
   { to: "/orbitx-social", label: "Social", ico: "◉", match: (p) => p.startsWith("/orbitx-social") || p.startsWith("/social") },
   { to: "/agent", label: "Agent", ico: "✦", match: (p) => p.startsWith("/agent") },
   { to: "/x", label: "X", ico: "✕", match: (p) => p === "/x" || p.startsWith("/x/") },
+  { to: "/play", label: "Play", ico: "▶", match: (p) => p === "/play" || p.startsWith("/play/") },
+  { to: "/Orbitxcity", label: "City", ico: "🏙", match: (p) => p.toLowerCase().startsWith("/orbitxcity") },
 ];
 
-/* Surfaces without their own platform chip row — FAB keeps tab bars clear. */
-const SHOW_ON = ["/intel", "/trade", "/bagwork", "/predictions"];
+/* Hide on marketing / auth / embeds — show FAB everywhere else in the app. */
+const HIDE_ON_EXACT = new Set([
+  "/",
+  "/splash",
+  "/beta",
+  "/waitlist",
+  "/auth",
+  "/auth/email",
+  "/setup",
+  "/terms",
+  "/privacy",
+  "/vamp",
+  "/whitepaper",
+  "/roadmap",
+  "/cc-callback",
+  "/x-callback",
+]);
+const HIDE_ON_PREFIX = [
+  "/auth/",
+  "/embed",
+  "/r/",
+  "/share/",
+  "/agent/sign",
+  "/agent/link-auth",
+  "/x/link-auth",
+  "/x/mcp-auth",
+];
 
 const POS_KEY = "orbitx.platformFab.pos.v2";
 const FAB_SIZE = 52;
@@ -52,7 +81,10 @@ function clampPos(p: Pos): Pos {
 }
 
 function visibleOn(pathname: string) {
-  return SHOW_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const p = pathname || "/";
+  if (HIDE_ON_EXACT.has(p)) return false;
+  if (HIDE_ON_PREFIX.some((pre) => p === pre || p.startsWith(pre))) return false;
+  return true;
 }
 
 function PlatformLinkItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
