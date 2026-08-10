@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, BASE_LAUNCH_FEE_USD, type FeeBreakdown } from "@/lib/orbitx/fee";
 import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
+import { ANTI_VAMP_ENFORCEMENT_ENABLED } from "@/lib/platformFee";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { consumeTokenCreatePrefill, peekTokenCreatePrefill } from "@/lib/orbitx/tokenCreatePrefill";
@@ -251,6 +252,13 @@ export default function LaunchpadCreate() {
   // similarity on both fields in one RPC call, so a duplicate ticker with a
   // different name blocks live here too, not just at final submit.
   useEffect(() => {
+    if (!ANTI_VAMP_ENFORCEMENT_ENABLED) {
+      setNameTaken(false);
+      setBlockedMatch(null);
+      setCheckError(false);
+      setCheckingName(false);
+      return;
+    }
     if (!cfg.name.trim() && !cfg.ticker.trim()) {
       setNameTaken(false);
       setBlockedMatch(null);
@@ -406,7 +414,8 @@ export default function LaunchpadCreate() {
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
-      /* 1 — OrbitX Anti-Vamp identity check. Solana launches require a successful, unique verification. */
+      /* 1 — Anti-vamp is temporarily paused; launch normally with creator fee routing. */
+      if (ANTI_VAMP_ENFORCEMENT_ENABLED) {
       setPhase("checking"); setPhaseMsg("OrbitX Anti-Vamp check…");
       let flagged = false;
       const preLaunchCheck = await checkAntiVamp(cfg.name, cfg.ticker).catch((err) => {
@@ -441,6 +450,7 @@ export default function LaunchpadCreate() {
             ? `${preLaunchCheck.matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`
             : preLaunchCheck.message || "Anti-vamp caution — launching with elevated fee-routing.",
         );
+      }
       }
 
       /* 2 — mint keypair (vanity-ground if available) */

@@ -26,7 +26,7 @@ import {
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft, CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
+import { ANTI_VAMP_ENFORCEMENT_ENABLED, PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft, CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { registerToken, checkAntiVamp, recordReferralEarning } from "@/lib/orbitx/registry";
 import { setCollectionCoin } from "@/lib/orbitx/nftRegistry";
 import {
@@ -646,6 +646,13 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   // similarity on both fields in one RPC call, so a duplicate ticker with a
   // different name blocks live here too, not just at final submit.
   useEffect(() => {
+    if (!ANTI_VAMP_ENFORCEMENT_ENABLED) {
+      setNameTaken(false);
+      setBlockedMatch(null);
+      setCheckError(false);
+      setCheckingName(false);
+      return;
+    }
     if (!form.name.trim() && !form.symbol.trim()) { setNameTaken(false); setBlockedMatch(null); setCheckError(false); return; }
     clearTimeout(nameCheckTimer.current);
     setCheckingName(true);
@@ -735,7 +742,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     let flagged = false;
-    /* Step -1 - OrbitX Anti-Vamp. Solana launches require a successful, unique verification. */
+    /* Step -1 - Anti-vamp is temporarily paused; launch normally with creator fee routing. */
+    if (ANTI_VAMP_ENFORCEMENT_ENABLED) {
     setStep("uploading");
     setStatusMsg("OrbitX Anti-Vamp check...");
     const result = await checkAntiVamp(form.name, form.symbol).catch((err) => {
@@ -769,9 +777,10 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           : result.message || "Anti-vamp caution - launching with elevated fee-routing.",
       );
     }
+    }
 
     try {
-      /* Step 0 — Platform launch fee ($0.90 in SOL, Solana only) */
+      /* Step 0 — Platform launch fee ($0.50 in SOL, Solana only) */
       if (LAUNCHPAD_FEE_USD > 0) {
         setStep("uploading");
         setStatusMsg("Paying launch fee…");

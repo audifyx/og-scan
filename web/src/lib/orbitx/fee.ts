@@ -3,7 +3,7 @@
 //     · 98.7% → creator (Claim Fees)
 //     · 1.3% → admin (Launchpad Admin / ROUTED_FEE_WALLET)
 //   - platform: 0.95% protocol-rate swap fee on in-app swaps
-// plus one flat Orbitx launch fee, IDENTICAL on both lanes ($0.90, converted
+// plus one flat Orbitx launch fee, IDENTICAL on both lanes ($0.50, converted
 // to SOL live so it stays constant in dollar terms).
 import {
   LAUNCHPAD_FEE_USD, CREATOR_FEE_BPS,

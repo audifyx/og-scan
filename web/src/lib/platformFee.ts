@@ -1,5 +1,5 @@
 /* Platform fee config — OrbitX launchpad trading + launch fees.
-   - Launch fee: flat $0.90 (in SOL), identical on BOTH lanes (pump + custom),
+   - Launch fee: flat $0.50 (in SOL), identical on BOTH lanes (pump + custom),
      routed to PLATFORM_WALLET at launch time.
    - In-app swap fee: 0.95% — protocol-rate swap fee on Jupiter swaps,
      routed to the platform wallet's ATA via Jupiter's feeAccount.
@@ -16,12 +16,15 @@ export const PLATFORM_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 export const PLATFORM_FEE_BPS = 95;           // 0.95% swap fee — pump.fun protocol-fee rate
 export const PLATFORM_FEE_ENABLED = true;     // kill-switch if a fee account issue arises
 /* Launch fee — $0.90 flat on pump + custom lanes (paid in SOL at launch). */
-export const BASE_LAUNCH_FEE_USD = 0.9;
+export const BASE_LAUNCH_FEE_USD = 0.5;
 export const LAUNCH_FEE_PROMO_END = 0; // promo ended — fee active immediately
 export const isLaunchFeePromoActive = (): boolean => Date.now() < LAUNCH_FEE_PROMO_END;
 export const launchFeePromoDaysLeft = (): number =>
   Math.max(0, Math.ceil((LAUNCH_FEE_PROMO_END - Date.now()) / 86_400_000));
 export const LAUNCHPAD_FEE_USD = isLaunchFeePromoActive() ? 0 : BASE_LAUNCH_FEE_USD;
+
+/** Temporary operational switch: anti-vamp observes no launches while disabled. */
+export const ANTI_VAMP_ENFORCEMENT_ENABLED = false;
 
 /** Trading fee on every buy/sell of OrbitX-launched tokens (45 bps = 0.45%). */
 export const CREATOR_FEE_BPS = 45;
