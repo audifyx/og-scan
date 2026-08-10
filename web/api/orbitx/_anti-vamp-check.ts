@@ -6,7 +6,7 @@ import {
   scoreIdentity,
   type AntiVampAssetType,
   type VampMatchContext,
-} from "../../src/lib/orbitx/antiVampScore";
+} from "../../src/lib/orbitx/antiVampScore.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
