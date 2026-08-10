@@ -263,11 +263,11 @@ export default function LaunchpadCreate() {
       try {
         // Unified check: OrbitX registry + pump.fun + DexScreener, live as you type.
         const result = await checkAntiVamp(cfg.name, cfg.ticker);
-        // Only hard-block on a real identity collision — never on empty "$" / degraded checks.
-        const hard = result.blocked && result.hardMatch;
-        setNameTaken(!!hard);
+        // Block on any blocked verdict — a real collision OR a degraded/unavailable check.
+        // Only use hardMatch for the specific "too close to X" messaging.
+        setNameTaken(!!result.blocked);
         setCheckError(!!result.error || !!result.warning);
-        setBlockedMatch(hard ? { name: result.hardMatch!.name, ticker: result.hardMatch!.ticker } : null);
+        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
       } catch (err) {
         console.error("Anti-vamp check failed:", err);
         // Fail closed — an unavailable originality check must be retried before launch.
@@ -597,7 +597,7 @@ export default function LaunchpadCreate() {
             )}
             {checkError && !nameTaken && (
               <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white/80">
-                Anti-vamp verification is degraded — you can still launch. Soft matches may route creator fees to OBX buybacks.
+                Anti-vamp verification is degraded — launch is blocked until verification recovers. Retry once sources are back online.
               </div>
             )}
             <SectionHeading icon={Sparkles} title="Token Identity" desc="Name, ticker, story and logo — the face of your launch." />
