@@ -734,7 +734,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     let flagged = false;
-    /* Step -1 - OrbitX Anti-Vamp. Hard-block only on real collisions; outages fail open. */
+    /* Step -1 - OrbitX Anti-Vamp. Solana launches require a successful, unique verification. */
     setStep("uploading");
     setStatusMsg("OrbitX Anti-Vamp check...");
     const result = await checkAntiVamp(form.name, form.symbol).catch((err) => {
@@ -747,12 +747,16 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       setStep("form");
       return;
     }
-    if (result.blocked && result.hardMatch) {
+    if (result.blocked) {
       setNameTaken(true);
-      setBlockedMatch({ name: result.hardMatch.name, ticker: result.hardMatch.ticker });
-      toast.error(
-        `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
-      );
+      if (result.hardMatch) {
+        setBlockedMatch({ name: result.hardMatch.name, ticker: result.hardMatch.ticker });
+        toast.error(
+          `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
+        );
+      } else {
+        toast.error(result.message || "Launch blocked. Choose a new token name and ticker.");
+      }
       setStep("form");
       return;
     }
@@ -1054,7 +1058,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           </Card>
         )}
 
-        {/* ─── Loading / In-Progress ─────────────────────────── */}
+        {/* ─���─ Loading / In-Progress ─────────────────────────── */}
         {(step === "uploading" || step === "signing" || step === "sending") && (
           <Card className="ox-panel ox-panel--accent pf-card relative overflow-hidden border-0 bg-transparent">
             <CardContent className="p-12 text-center">

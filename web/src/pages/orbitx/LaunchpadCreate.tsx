@@ -406,8 +406,7 @@ export default function LaunchpadCreate() {
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
-      /* 1 — OrbitX Anti-Vamp identity check. Hard-block only on real collisions.
-         Verification outages fail OPEN so legitimate launches are not frozen. */
+      /* 1 — OrbitX Anti-Vamp identity check. Solana launches require a successful, unique verification. */
       setPhase("checking"); setPhaseMsg("OrbitX Anti-Vamp check…");
       let flagged = false;
       const preLaunchCheck = await checkAntiVamp(cfg.name, cfg.ticker).catch((err) => {
@@ -421,12 +420,16 @@ export default function LaunchpadCreate() {
         setLaunching(false);
         return;
       }
-      if (preLaunchCheck.blocked && preLaunchCheck.hardMatch) {
+      if (preLaunchCheck.blocked) {
         setNameTaken(true);
-        setBlockedMatch({ name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker });
-        toast.error(
-          `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
-        );
+        if (preLaunchCheck.hardMatch) {
+          setBlockedMatch({ name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker });
+          toast.error(
+            `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
+          );
+        } else {
+          toast.error(preLaunchCheck.message || "Launch blocked. Choose a new token name and ticker.");
+        }
         setPhase("idle");
         setLaunching(false);
         return;
