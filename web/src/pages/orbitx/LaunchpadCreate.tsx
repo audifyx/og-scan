@@ -490,8 +490,14 @@ export default function LaunchpadCreate() {
       // Some wallet adapters return a rebuilt transaction and drop client-side
       // partial signatures. Re-apply the mint signature before serialization.
       signed.partialSign(mintKeypair);
-      if (!signed.verifySignatures()) {
-        throw new Error(`Launch transaction is missing a required signature for ${mintKeypair.publicKey.toBase58()}. Please reconnect your wallet and retry.`);
+      const message = tx.compileMessage();
+      const requiredSigners = message.accountKeys.slice(0, message.header.numRequiredSignatures);
+      const missingSigner = requiredSigners.find((key) => {
+        const entry = signed.signatures.find((item) => item.publicKey.equals(key));
+        return !entry?.signature;
+      });
+      if (missingSigner) {
+        throw new Error(`Launch transaction is missing a required signature for ${missingSigner.toBase58()}. Please reconnect your wallet and retry.`);
       }
       setPhase("confirming"); setPhaseMsg("Broadcasting to Solana mainnet…");
       const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });

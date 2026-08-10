@@ -879,8 +879,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       // Some wallet adapters return a rebuilt transaction and drop client-side
       // partial signatures. Re-apply the mint signature before serialization.
       signedTx.sign([mintKeypair]);
-      if (!signedTx.verifySignatures()) {
-        throw new Error(`Launch transaction is missing a required signature for ${mintKeypair.publicKey.toBase58()}. Please reconnect your wallet and retry.`);
+      const requiredSignerCount = signedTx.message.header.numRequiredSignatures;
+      const requiredSigners = signedTx.message.staticAccountKeys.slice(0, requiredSignerCount);
+      const missingSigner = requiredSigners.find((key, index) => !signedTx.signatures[index]);
+      if (missingSigner) {
+        throw new Error(`Launch transaction is missing a required signature for ${missingSigner.toBase58()}. Please reconnect your wallet and retry.`);
       }
 
       /* Step 5 — Send */
