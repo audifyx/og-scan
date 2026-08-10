@@ -43,4 +43,6 @@ create or replace function public.orbitx_vamp_check_multichain(
   order by r.created_at asc;
 $$;
 
+grant execute on function public.orbitx_vamp_check_multichain(text, text, text[], text) to anon, authenticated;
+
 comment on table public.orbitx_identity_registry is 'First-party cross-chain originality backstop; populate through reviewed registration flows.';

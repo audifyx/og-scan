@@ -270,8 +270,8 @@ export default function LaunchpadCreate() {
         setBlockedMatch(hard ? { name: result.hardMatch!.name, ticker: result.hardMatch!.ticker } : null);
       } catch (err) {
         console.error("Anti-vamp check failed:", err);
-        // Fail open — verification outages must not freeze launches.
-        setNameTaken(false);
+        // Fail closed — an unavailable originality check must be retried before launch.
+        setNameTaken(true);
         setCheckError(true);
         setBlockedMatch(null);
       } finally {
@@ -414,6 +414,13 @@ export default function LaunchpadCreate() {
         console.error("[orbitx] custom anti-vamp check failed", err);
         return { blocked: false, flagged: true, hardMatch: null, matches: [], warning: "verification_degraded", message: "Originality verification failed — continuing with caution." } as const;
       });
+      if (preLaunchCheck.warning === "verification_degraded") {
+        setNameTaken(true);
+        toast.error("Anti-vamp verification is unavailable. Retry before launching.");
+        setPhase("idle");
+        setLaunching(false);
+        return;
+      }
       if (preLaunchCheck.blocked && preLaunchCheck.hardMatch) {
         setNameTaken(true);
         setBlockedMatch({ name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker });

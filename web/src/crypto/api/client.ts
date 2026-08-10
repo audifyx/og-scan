@@ -86,7 +86,9 @@ export type ScreenerRow = {
 export type AntiVampResult = {
   ok?: boolean;
   blocked?: boolean;
-  hardMatch?: boolean | { name: string; ticker: string; source: string } | null;
+  hardMatch?: boolean | { name: string; ticker: string; source: string; chainId?: string; reason?: string } | null;
+  warning?: "verification_degraded" | string;
+  sourceHealth?: Record<string, boolean>;
   flagged?: boolean;
   maxSim?: number;
   matches?: Array<{ source: string; name: string; ticker: string; sim: number }>;
