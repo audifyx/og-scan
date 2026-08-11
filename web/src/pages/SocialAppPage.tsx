@@ -1,17 +1,16 @@
 /**
  * Production social — X-style shell wired to live Supabase social_messages feed.
- * This is the canonical social surface (not the /hq demo store).
+ * Canonical social surface; chrome owned by XSocialApp (oxs-shell).
  */
 import { lazy, Suspense } from "react";
 import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
-import { IosAppShell } from "@/components/app-shell/IosAppShell";
 import "@/components/social-x/x-social.css";
 
 const XSocialApp = lazy(() => import("@/components/social-x/XSocialApp"));
 
 export default function SocialAppPage() {
   return (
-    <IosAppShell accent="teal" wide className="ox-platform-surface relative h-[100dvh] overflow-hidden bg-transparent text-white">
+    <div className="ox-platform-surface relative h-[100dvh] overflow-hidden bg-transparent text-white">
       <div className="pointer-events-none absolute right-3 top-[max(0.65rem,env(safe-area-inset-top))] z-40 hidden sm:block">
         <div className="pointer-events-auto">
           <PlatformThemeButton compact />
@@ -26,6 +25,6 @@ export default function SocialAppPage() {
       >
         <XSocialApp />
       </Suspense>
-    </IosAppShell>
+    </div>
   );
 }

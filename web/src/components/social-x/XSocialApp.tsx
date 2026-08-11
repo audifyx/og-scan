@@ -19,7 +19,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 import { PlatformLinks } from "@/components/theme/PlatformDock";
-import "@/components/app-shell/ios-app-shell.css";
 import "./x-social.css";
 
 /* ── Lazy heavy tabs (reuse existing pages — zero functionality lost) ── */
@@ -112,10 +111,22 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "bookmarks", label: "Bookmarks", Icon: Bookmark },
 ];
 
-/* Mobile pill: 5 core tabs; the rest live in the More sheet (each tab appears exactly once).
-   Notifications moved to the top-right bell — Communities takes its pill slot. */
+/* Mobile dock: 5 core tabs; overflow + Notifications in More sheet (bell also opens Notifications). */
 const CORE_TABS: XTab[] = ["home", "explore", "communities", "messages", "profile"];
-const MORE_TABS: XTab[] = ["chat", "rooms", "spaces", "bookmarks"];
+const MORE_TABS: XTab[] = ["notifications", "chat", "rooms", "spaces", "bookmarks"];
+
+const TAB_SHORT: Partial<Record<XTab, string>> = {
+  home: "Home",
+  explore: "Explore",
+  communities: "Communities",
+  messages: "Messages",
+  profile: "Profile",
+  notifications: "Alerts",
+  chat: "Chat",
+  rooms: "Rooms",
+  spaces: "Spaces",
+  bookmarks: "Saved",
+};
 
 /* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
 const ENTRY_MAP: Record<string, XTab> = {
@@ -608,13 +619,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, [searchQ, ticker, foundDexCoins]);
 
   const isNarrow = NARROW_TABS.includes(tab);
-  const PILL_INDEX = CORE_TABS.indexOf(tab) >= 0 ? CORE_TABS.indexOf(tab) : MORE_TABS.includes(tab) ? CORE_TABS.length : -1; // More slot; -1 = none (notifications lives top-right)
   const unread = notifs.filter((n) => !n.is_read).length;
+  const tabLabel = NAV.find((n) => n.id === tab)?.label ?? "Social";
+  const dockOnMore = MORE_TABS.includes(tab) || moreOpen;
 
   /* ═══════════ Sub-renderers ═══════════ */
 
   const Composer = ({ inline, refEl }: { inline?: boolean; refEl: React.RefObject<HTMLTextAreaElement> }) => (
-    <div className={cn("flex gap-3", inline && "border-b border-white/[0.08] px-4 py-3")}>
+    <div className={cn("flex gap-3", inline && "oxs-composer px-4 py-3")}>
       <img src={myAvatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
       <div className="min-w-0 flex-1">
         <textarea
@@ -695,13 +707,13 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const marked = bookmarks.has(p.id);
     const own = user && p.user_id === user.id;
     return (
-      <article onClick={() => onOpen?.(p.id)} className={cn("x-fade-in group/post relative flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.025]", onOpen && "cursor-pointer")}>
+      <article onClick={() => onOpen?.(p.id)} className={cn("x-fade-in group/post relative flex gap-3 px-4 py-3", onOpen && "cursor-pointer")}>
         <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/10 transition group-hover/post:ring-[#2ee6c5]/40" />
         <div className="min-w-0 flex-1">
-          {isRepost && <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold text-white/40"><Repeat2 className="h-3.5 w-3.5" /> @{raw.username || "someone"} reposted</div>}
-          <div className="flex items-center gap-1.5 text-[14px]">
+          {isRepost && <div className="mb-0.5 flex items-center gap-1.5 text-[12px] font-bold text-white/40"><Repeat2 className="h-3.5 w-3.5" /> @{raw.username || "someone"} reposted</div>}
+          <div className="flex items-baseline gap-1 text-[14px] leading-5">
             <span className="truncate font-black text-white hover:underline">{p.username || "Anon"}</span>
-            {officialIds.has(p.user_id) && <BadgeCheck className="h-4 w-4 shrink-0 text-[#2ee6c5]" />}
+            {officialIds.has(p.user_id) && <BadgeCheck className="h-4 w-4 shrink-0 self-center text-[#2ee6c5]" />}
             <span className="truncate text-white/35">@{(p.username || "anon").toLowerCase().replace(/\s+/g, "")}</span>
             <span className="text-white/30">·</span>
             <span className="shrink-0 text-white/35 hover:underline">{timeAgo(p.created_at)}</span>
@@ -828,15 +840,15 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "home":
         return (
           <>
-            {/* Sticky For you / Following — clean X header */}
-            <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-black/70 backdrop-blur-xl">
+            {/* Sticky For you / Following — Twitter-style header */}
+            <div className="oxs-sticky">
               <div className="flex">
                 {([["foryou", "For you"], ["following", "Following"]] as const).map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
                     onClick={() => setFeedMode(id)}
-                    className="relative flex-1 py-3.5 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.03]"
+                    className="relative flex-1 py-3 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.03]"
                   >
                     <span className={cn(feedMode === id && "font-black text-white")}>{label}</span>
                     {feedMode === id && (
@@ -847,7 +859,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               </div>
             </div>
 
-            <Composer inline refEl={composerRef} />
+            <div className="oxs-composer-sticky">
+              <Composer inline refEl={composerRef} />
+            </div>
 
             {loading ? (
               <div>
@@ -1257,19 +1271,58 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ═══════════ Layout ═══════════ */
   return (
-    <div className="ox-x-social relative flex h-full min-h-0 w-full justify-center bg-black text-white">
-      {/* ambient atmosphere */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/4 h-80 w-80 rounded-full bg-[#2ee6c5]/[0.05] blur-[120px]" />
-        <div className="absolute -bottom-40 right-1/4 h-80 w-80 rounded-full bg-[#3b82f6]/[0.04] blur-[120px]" />
+    <div className="oxs-shell ox-x-social">
+      <div className="oxs-shell__atmosphere" aria-hidden>
+        <div className="oxs-shell__blob oxs-shell__blob--a" />
+        <div className="oxs-shell__blob oxs-shell__blob--b" />
       </div>
-      {/* ── Left nav rail ── */}
-      <header className="hidden h-full shrink-0 flex-col justify-between border-r border-white/[0.08] px-2 py-3 sm:flex sm:w-[72px] xl:w-[260px] xl:px-4">
-        <div className="flex flex-col gap-1">
-          <div className="mb-1 flex items-center gap-2 px-3 py-2">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-[#2ee6c5] to-[#3b82f6] text-[15px] font-black text-white shadow-[0_4px_16px_rgba(46,230,197,0.35)]">O</span>
-            <span className="hidden text-[17px] font-black tracking-tight xl:block">OrbitX</span>
-            <a href="/app" className="ml-auto hidden rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/50 transition hover:bg-white/[0.06] hover:text-white xl:block">Hub</a>
+
+      {/* ── Mobile header ── */}
+      <header className="oxs-header">
+        <div className="oxs-header__bg" />
+        <div className="oxs-header__brand">
+          {!CORE_TABS.includes(tab) ? (
+            <button
+              type="button"
+              className="oxs-header__back"
+              onClick={() => { setTab("home"); setMoreOpen(false); }}
+            >
+              <span className="oxs-header__back-ico" aria-hidden>‹</span>
+              {tabLabel}
+            </button>
+          ) : (
+            <>
+              <img src="/favicon.png" alt="" width={30} height={30} className="oxs-header__mark" decoding="async" />
+              <div className="oxs-header__text">
+                <p className="oxs-header__name">OrbitX</p>
+                <p className="oxs-header__sub">{tabLabel}</p>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="oxs-header__trail">
+          <button
+            type="button"
+            onClick={() => { setTab("notifications"); setMoreOpen(false); }}
+            aria-label="Notifications"
+            className={cn("oxs-header__bell", tab === "notifications" && "oxs-header__bell--on")}
+          >
+            <Bell className="h-4 w-4" />
+            {unread > 0 && (
+              <span className="oxs-header__badge">{unread > 9 ? "9+" : unread}</span>
+            )}
+          </button>
+          <a href="/app" className="oxs-header__hub">Hub</a>
+        </div>
+      </header>
+
+      {/* ── Left nav rail (desktop) ── */}
+      <header className="oxs-rail">
+        <div>
+          <div className="oxs-rail__brand">
+            <span className="oxs-rail__brand-mark">O</span>
+            <span className="oxs-rail__brand-name">OrbitX</span>
+            <a href="/app" className="oxs-rail__hub">Hub</a>
           </div>
           <div className="mb-2 hidden px-2 xl:block">
             <PlatformLinks className="ox-platform-links--compact" />
@@ -1279,52 +1332,44 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               key={n.id}
               type="button"
               onClick={() => { if (tab === n.id) feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); else setTab(n.id); }}
-              className={cn(
-                "group flex items-center gap-4 rounded-full px-3 py-2.5 transition-all duration-200 active:scale-[0.97]",
-                tab === n.id
-                  ? "bg-white/[0.06] font-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]"
-                  : "font-medium text-white/80 hover:bg-white/[0.05]",
-              )}
+              className={cn("oxs-rail__link", tab === n.id && "oxs-rail__link--on")}
             >
               <span className="relative">
-                <n.Icon className={cn("h-6 w-6 transition-transform duration-200 group-hover:scale-110", tab === n.id ? "text-[#2ee6c5] drop-shadow-[0_0_8px_rgba(46,230,197,0.5)]" : "text-white/80")} />
+                <n.Icon className="oxs-rail__ico h-6 w-6" />
                 {n.id === "notifications" && unread > 0 && (
                   <span className="absolute -right-1.5 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#2ee6c5] px-1 text-[9px] font-black text-black">{unread > 9 ? "9+" : unread}</span>
                 )}
               </span>
-              <span className="hidden text-[19px] xl:block">{n.label}</span>
+              <span className="oxs-rail__label">{n.label}</span>
             </button>
           ))}
           <button
             type="button"
             onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
-            className="mt-3 flex items-center justify-center rounded-full bg-gradient-to-r from-[#2ee6c5] via-[#5eead4] to-[#2ee6c5] bg-[length:200%_100%] bg-left py-3 text-[16px] font-black text-black shadow-[0_8px_24px_rgba(46,230,197,0.35)] transition-all duration-300 hover:bg-right hover:shadow-[0_8px_32px_rgba(46,230,197,0.5)] active:scale-[0.98] xl:px-8"
+            className="oxs-rail__post"
           >
-            <Feather className="h-5 w-5 xl:hidden" />
-            <span className="hidden xl:block">Post</span>
+            <Feather className="oxs-rail__post-ico h-5 w-5" />
+            <span className="oxs-rail__post-label">Post</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 rounded-full border border-transparent p-2 transition hover:border-white/[0.07] hover:bg-white/[0.05]">
+        <div className="oxs-rail__user">
           <img src={myAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
-          <div className="hidden min-w-0 flex-1 xl:block">
+          <div className="oxs-rail__user-meta">
             <div className="truncate text-[14px] font-black">{displayName}</div>
             <div className="truncate text-[12px] text-white/35">@{handle}</div>
           </div>
-          <a href="/settings" title="Settings" className="hidden rounded-full p-1.5 text-white/35 transition hover:text-white xl:block">
+          <a href="/settings" title="Settings" className="oxs-rail__user-action">
             <Settings className="h-4 w-4" />
           </a>
-          <button type="button" title="Log out" onClick={() => signOut?.()} className="hidden rounded-full p-1.5 text-white/35 transition hover:text-rose-400 xl:block">
+          <button type="button" title="Log out" onClick={() => signOut?.()} className="oxs-rail__user-action oxs-rail__user-action--danger">
             <LogOut className="h-4 w-4" />
           </button>
         </div>
       </header>
 
       {/* ── Center column ── */}
-      <main className={cn(
-        "relative flex h-full min-h-0 min-w-0 flex-col border-r border-white/[0.08]",
-        isNarrow ? "w-full max-w-[600px]" : "w-full max-w-[900px]",
-      )}>
+      <main className={cn("oxs-main", !isNarrow && "oxs-main--wide")}>
         {tab === "home" && newPosts > 0 && (
           <button
             type="button"
@@ -1337,13 +1382,15 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <div
           ref={feedScrollRef}
           onScroll={(e) => { if (e.currentTarget.scrollTop < 200 && newPosts) setNewPosts(0); }}
-          className="min-h-0 flex-1 overflow-y-auto pb-24 pt-11 sm:pb-0 sm:pt-0"
-        >{renderCenter()}</div>
+          className="oxs-main__scroll"
+        >
+          {renderCenter()}
+        </div>
       </main>
 
       {/* ── Right rail ── */}
       {isNarrow && (
-        <aside className="hidden h-full w-[350px] shrink-0 flex-col gap-4 overflow-y-auto px-6 py-3 lg:flex">
+        <aside className="oxs-aside">
           {tab !== "explore" && (
             <div className="relative">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
@@ -1356,8 +1403,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
           )}
 
-          {/* Market snapshot */}
-          <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          <div className="oxs-aside__card x-rise">
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-[19px] font-black">Market snapshot</span>
               <span className={cn("flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-black", marketPulse.avg >= 0 ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400")}>
@@ -1379,7 +1425,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
           </div>
 
-          <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ animationDelay: "80ms" }}>
+          <div className="oxs-aside__card x-rise" style={{ animationDelay: "80ms" }}>
             <div className="flex items-center gap-2 px-4 py-3"><span>🔥</span><span className="text-[19px] font-black">What's happening</span></div>
             {ticker.length === 0 ? (
               <div className="space-y-2.5 px-4 pb-3 pt-1">
@@ -1396,7 +1442,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </button>
           </div>
 
-          <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ animationDelay: "160ms" }}>
+          <div className="oxs-aside__card x-rise" style={{ animationDelay: "160ms" }}>
             <div className="px-4 py-3 text-[19px] font-black">Who to follow</div>
             {whoToFollow.slice(0, 3).map((s) => <FollowCard key={s.user_id} s={s} />)}
             <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#2ee6c5] transition hover:bg-white/[0.03]">
@@ -1410,51 +1456,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         </aside>
       )}
 
-      {/* ── Mobile iOS nav (title + Back on nested tabs) ── */}
-      <header className="ios-nav ox-x-ios-nav fixed inset-x-0 top-0 z-30 sm:hidden">
-        {!CORE_TABS.includes(tab) ? (
-          <button
-            type="button"
-            className="ios-nav__back"
-            onClick={() => { setTab("home"); setMoreOpen(false); }}
-          >
-            <span className="ios-nav__back-ico" aria-hidden>‹</span>
-            Back
-          </button>
-        ) : (
-          <span className="flex items-center gap-1.5 pl-1">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#2ee6c5] to-[#3b82f6] text-[13px] font-black text-black">O</span>
-          </span>
-        )}
-        <h1 className="ios-nav__title">
-          {NAV.find((n) => n.id === tab)?.label ?? "Social"}
-        </h1>
-        <div className="ios-nav__trail">
-          <button
-            type="button"
-            onClick={() => { setTab("notifications"); setMoreOpen(false); }}
-            aria-label="Notifications"
-            className={cn("ios-nav__btn relative", tab === "notifications" && "text-[#2ee6c5]")}
-          >
-            <Bell className="h-4 w-4" />
-            {unread > 0 && (
-              <span className="absolute right-0.5 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#2ee6c5] px-1 text-[9px] font-black text-black">{unread > 9 ? "9+" : unread}</span>
-            )}
-          </button>
-          <a href="/app" className="ios-nav__btn text-[12px] !min-h-0 py-2">Hub</a>
-        </div>
-      </header>
-
-      {/* ── Mobile bottom nav: floating centered rounded slider pill ── */}
-      <nav className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center sm:hidden">
-        <div className="pointer-events-auto relative flex items-center rounded-full border border-white/[0.12] bg-gradient-to-b from-[#16181c]/95 to-black/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
-          {/* sliding active indicator */}
-          {PILL_INDEX >= 0 && (
-            <span
-              className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#2ee6c5]/30 to-[#3b82f6]/20 ring-1 ring-[#2ee6c5]/50 shadow-[0_0_14px_rgba(46,230,197,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-              style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
-            />
-          )}
+      {/* ── Mobile liquid-glass dock ── */}
+      <nav className="oxs-dock-wrap" aria-label="Social navigation">
+        <div className="oxs-dock">
           {CORE_TABS.map((id) => {
             const n = NAV.find((x) => x.id === id)!;
             const on = tab === id;
@@ -1462,33 +1466,45 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <button
                 key={id}
                 type="button"
-                onClick={() => { if (tab === id) feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); else setTab(id); }}
-                className={cn("relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors", on ? "text-[#2ee6c5]" : "text-white/45 hover:text-white/75")}
+                onClick={() => {
+                  setMoreOpen(false);
+                  if (tab === id) feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                  else setTab(id);
+                }}
+                className="oxs-dock__item"
+                aria-current={on ? "page" : undefined}
               >
-                <n.Icon className={cn("h-[22px] w-[22px]", on && "stroke-[2.5]")} />
+                <span className={cn("oxs-dock__icon", on && "oxs-dock__icon--on")}>
+                  <n.Icon className="h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 2} />
+                </span>
+                <span className={cn("oxs-dock__label", on && "oxs-dock__label--on")}>
+                  {TAB_SHORT[id] ?? n.label}
+                </span>
               </button>
             );
           })}
           <button
-            key="more"
             type="button"
-            onClick={() => setMoreOpen(!moreOpen)}
-            className="relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors text-white/45 hover:text-white/75"
+            onClick={() => setMoreOpen((v) => !v)}
+            className="oxs-dock__item"
+            aria-expanded={moreOpen}
+            aria-label="More"
           >
-            <MoreHorizontal className="h-[22px] w-[22px]" />
+            <span className={cn("oxs-dock__icon", dockOnMore && "oxs-dock__icon--on")}>
+              <LayoutGrid className="h-[18px] w-[18px]" strokeWidth={dockOnMore ? 2.4 : 2} />
+            </span>
+            <span className={cn("oxs-dock__label", dockOnMore && "oxs-dock__label--on")}>More</span>
           </button>
         </div>
       </nav>
 
-      {/* ── More sheet (Chat / Rooms / Spaces / Communities) ── */}
+      {/* ── More sheet ── */}
       {moreOpen && (
-        <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setMoreOpen(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div
-            className="x-fade-in absolute inset-x-3 bottom-20 rounded-3xl border border-white/[0.1] bg-gradient-to-b from-[#14171b]/98 to-[#0b0d10]/98 p-3 shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="grid grid-cols-3 gap-2">
+        <div className="oxs-more" onClick={() => setMoreOpen(false)}>
+          <div className="oxs-more__backdrop" />
+          <div className="oxs-more__panel x-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="oxs-more__title">More</div>
+            <div className="oxs-more__grid">
               {MORE_TABS.map((id) => {
                 const n = NAV.find((x) => x.id === id)!;
                 const on = tab === id;
@@ -1497,13 +1513,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                     key={id}
                     type="button"
                     onClick={() => { setTab(id); setMoreOpen(false); }}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition",
-                      on ? "bg-[#2ee6c5]/15 text-[#2ee6c5]" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
-                    )}
+                    className={cn("oxs-more__item", on && "oxs-more__item--on")}
                   >
                     <n.Icon className="h-6 w-6" />
-                    <span className="text-[11px] font-bold">{n.label}</span>
+                    <span>{n.label}</span>
                   </button>
                 );
               })}
@@ -1517,7 +1530,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <button
           type="button"
           onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
-          className="fixed bottom-[4.7rem] right-4 z-30 grid h-[52px] w-[52px] place-items-center rounded-full bg-gradient-to-br from-[#2ee6c5] to-[#1a9e8a] text-black shadow-[0_8px_28px_rgba(46,230,197,0.45)] ring-1 ring-white/10 transition-all active:scale-90 sm:hidden"
+          className="oxs-compose-fab"
+          aria-label="Compose post"
         >
           <Feather className="h-6 w-6" />
         </button>
