@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { signInWithWallet } from "@/lib/walletAuth";
 import { supabase } from "@/lib/supabase";
+import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 function isWalletEmail(email?: string | null) {
   return !!email && /@wallet\.orbitx\.app$/i.test(email);
@@ -43,7 +44,7 @@ export function WalletAuthBridge() {
       const flag = `orbitx_siws_${pk}`;
       if (sessionStorage.getItem(flag)) return;
       const adapter = wallet?.adapter as {
-        signMessage?: (m: Uint8Array) => Promise<Uint8Array | { signature: Uint8Array }>;
+        signMessage?: (m: Uint8Array) => Promise<unknown>;
       } | undefined;
       if (!adapter?.signMessage) return;
 
@@ -51,10 +52,7 @@ export function WalletAuthBridge() {
       sessionStorage.setItem(flag, "1");
       try {
         await signInWithWallet(pk, async (m) => {
-          const result = await adapter.signMessage!(m);
-          if (result instanceof Uint8Array) return result;
-          if (result?.signature instanceof Uint8Array) return result.signature;
-          throw new Error("wallet returned an invalid signature");
+          return normalizeSignatureBytes(await adapter.signMessage!(m));
         }, { replaceEmailSession: false });
         if (!cancelled) toast.success("Signed in with wallet");
       } catch {

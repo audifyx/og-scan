@@ -28,6 +28,7 @@ import {
   type WalletSendOptions,
 } from "@/lib/orbitx/sendWalletTx";
 import { connectSolanaWallet } from "@/lib/connectSolanaWallet";
+import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 function shortAddr(a: string, n = 4): string {
   return a.length > n * 2 ? `${a.slice(0, n)}…${a.slice(-n)}` : a;
@@ -163,8 +164,7 @@ export function useActiveTradingWallet() {
       if (!adapterSignMessage) {
         throw new Error("This wallet can't sign messages — connect Phantom, Jupiter, or Solflare");
       }
-      const raw = await adapterSignMessage(message);
-      return raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+      return normalizeSignatureBytes(await adapterSignMessage(message));
     },
     [adapterSignMessage],
   );
