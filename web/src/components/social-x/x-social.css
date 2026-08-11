@@ -1,6 +1,6 @@
 /**
  * OrbitX Social — Twitter-style full app shell
- * Trade-grade liquid glass dock · Syne + Manrope · black / teal
+ * Trade-grade liquid glass dock · Syne + Manrope · black / white
  */
 @import url("https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
@@ -10,24 +10,24 @@
   --oxs-font-body: "Manrope", system-ui, sans-serif;
   --oxs-font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 
-  --oxs-bg: #05080c;
-  --oxs-surface: #0c0e12;
-  --oxs-surface-2: #14171c;
-  --oxs-border: rgba(255, 255, 255, 0.1);
-  --oxs-border-strong: rgba(255, 255, 255, 0.16);
+  --oxs-bg: #000000;
+  --oxs-surface: #0a0a0a;
+  --oxs-surface-2: #141414;
+  --oxs-border: rgba(255, 255, 255, 0.12);
+  --oxs-border-strong: rgba(255, 255, 255, 0.2);
 
   --oxs-text: #ffffff;
   --oxs-text-muted: rgba(255, 255, 255, 0.72);
   --oxs-text-subtle: rgba(255, 255, 255, 0.55);
 
-  --oxs-accent: #2ee6c5;
-  --oxs-accent-hi: #5eead4;
-  --oxs-accent-2: #3de7ff;
-  --oxs-accent-dim: rgba(46, 230, 197, 0.14);
-  --oxs-accent-hover: #26c9ad;
-  --oxs-metal: #3b82f6;
-  --oxs-glass: rgba(10, 18, 28, 0.58);
-  --oxs-line: rgba(46, 230, 197, 0.18);
+  --oxs-accent: #ffffff;
+  --oxs-accent-hi: #f5f5f5;
+  --oxs-accent-2: #e5e5e5;
+  --oxs-accent-dim: rgba(255, 255, 255, 0.12);
+  --oxs-accent-hover: #d4d4d4;
+  --oxs-metal: #a3a3a3;
+  --oxs-glass: rgba(12, 12, 12, 0.72);
+  --oxs-line: rgba(255, 255, 255, 0.14);
 
   font-family: var(--oxs-font-body);
   font-feature-settings: "kern" 1, "liga" 1;
@@ -48,9 +48,9 @@
   overflow: hidden;
   justify-content: center;
   background:
-    radial-gradient(ellipse 85% 55% at 50% -10%, rgba(46, 230, 197, 0.1), transparent 55%),
-    radial-gradient(ellipse 55% 40% at 100% 18%, rgba(61, 231, 255, 0.07), transparent 50%),
-    radial-gradient(ellipse 50% 35% at 0% 70%, rgba(59, 130, 246, 0.05), transparent 55%),
+    radial-gradient(ellipse 85% 55% at 50% -10%, rgba(255, 255, 255, 0.06), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 100% 18%, rgba(255, 255, 255, 0.03), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 0% 70%, rgba(255, 255, 255, 0.025), transparent 55%),
     var(--oxs-bg);
 }
 
@@ -72,14 +72,14 @@
   left: 25%;
   width: 20rem;
   height: 20rem;
-  background: rgba(46, 230, 197, 0.06);
+  background: rgba(255, 255, 255, 0.04);
 }
 .oxs-shell__blob--b {
   bottom: -10rem;
   right: 25%;
   width: 20rem;
   height: 20rem;
-  background: rgba(59, 130, 246, 0.05);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* Mobile header (Trade-like) */
@@ -145,13 +145,13 @@
   height: 30px;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(145deg, #2ee6c5, #3b82f6);
+  background: linear-gradient(145deg, #ffffff, #a3a3a3);
   color: #041016;
   font-family: var(--oxs-font-display);
   font-size: 13px;
   font-weight: 800;
   box-shadow:
-    0 0 0 1px rgba(46, 230, 197, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.28),
     0 1px 0 rgba(255, 255, 255, 0.2) inset,
     0 6px 18px rgba(0, 0, 0, 0.4);
 }
@@ -200,7 +200,7 @@
   color: #fff;
 }
 .oxs-header__bell--on {
-  background: linear-gradient(145deg, rgba(46, 230, 197, 0.95), rgba(61, 231, 255, 0.88));
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.88));
   color: #041016;
   border-color: transparent;
 }
@@ -214,7 +214,7 @@
   place-items: center;
   padding: 0 4px;
   border-radius: 999px;
-  background: #2ee6c5;
+  background: #ffffff;
   color: #041016;
   font-size: 9px;
   font-weight: 800;
@@ -272,12 +272,12 @@
   height: 32px;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(145deg, #2ee6c5, #3b82f6);
+  background: linear-gradient(145deg, #ffffff, #a3a3a3);
   color: #041016;
   font-family: var(--oxs-font-display);
   font-size: 15px;
   font-weight: 800;
-  box-shadow: 0 4px 16px rgba(46, 230, 197, 0.35);
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.35);
 }
 .oxs-rail__brand-name {
   display: none;
@@ -329,7 +329,7 @@
 }
 .oxs-rail__link--on .oxs-rail__ico {
   color: var(--oxs-accent);
-  filter: drop-shadow(0 0 8px rgba(46, 230, 197, 0.5));
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
 }
 .oxs-rail__ico {
   position: relative;
@@ -356,14 +356,14 @@
   border: 0;
   border-radius: 999px;
   padding: 12px;
-  background: linear-gradient(90deg, #2ee6c5, #5eead4, #2ee6c5);
+  background: linear-gradient(90deg, #ffffff, #f5f5f5, #ffffff);
   background-size: 200% 100%;
   color: #041016;
   font-family: var(--oxs-font-display);
   font-size: 16px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(46, 230, 197, 0.35);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.35);
   transition: background-position 0.3s ease, transform 0.15s ease;
 }
 .oxs-rail__post:hover { background-position: 100% 0; }
@@ -485,13 +485,13 @@
   border-radius: 28px;
   isolation: isolate;
   overflow: hidden;
-  border: 1px solid rgba(46, 230, 197, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   background:
-    linear-gradient(180deg, rgba(46, 230, 197, 0.1) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(8, 12, 18, 0.4) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(8, 12, 18, 0.4) 100%),
     var(--oxs-glass);
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.55),
-    0 0 40px rgba(46, 230, 197, 0.06),
+    0 0 40px rgba(255, 255, 255, 0.06),
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
     0 -1px 0 rgba(0, 0, 0, 0.35) inset;
   backdrop-filter: blur(28px) saturate(1.55);
@@ -509,7 +509,7 @@
     rgba(255, 255, 255, 0.18) 0%,
     transparent 28%,
     transparent 72%,
-    rgba(46, 230, 197, 0.12) 100%
+    rgba(255, 255, 255, 0.12) 100%
   );
   opacity: 0.9;
   z-index: 0;
@@ -545,10 +545,10 @@
 }
 .oxs-dock__icon--on {
   color: #041016;
-  background: linear-gradient(160deg, rgba(46, 230, 197, 0.98) 0%, rgba(61, 231, 255, 0.9) 100%);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.9) 100%);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.55) inset,
-    0 6px 18px rgba(46, 230, 197, 0.32);
+    0 6px 18px rgba(255, 255, 255, 0.32);
   transform: translateY(-1px);
 }
 
@@ -625,8 +625,8 @@
   color: #fff;
 }
 .oxs-more__item--on {
-  background: rgba(46, 230, 197, 0.15);
-  color: #2ee6c5;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 .oxs-more__item span {
   font-size: 11px;
@@ -645,10 +645,10 @@
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(145deg, #2ee6c5, #1a9e8a);
+  background: linear-gradient(145deg, #ffffff, #a3a3a3);
   color: #041016;
   box-shadow:
-    0 8px 28px rgba(46, 230, 197, 0.45),
+    0 8px 28px rgba(255, 255, 255, 0.45),
     0 0 0 1px rgba(255, 255, 255, 0.1);
   cursor: pointer;
   transition: transform 0.15s ease;
@@ -807,7 +807,7 @@
 }
 .x-tilt:hover {
   transform: translateY(-3px);
-  border-color: rgba(46, 230, 197, 0.4);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 @keyframes xRise {
