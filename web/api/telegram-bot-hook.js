@@ -1,10 +1,8 @@
 /**
- * /api/telegram-bot-hook — Telegram webhook for MCP-enabled bots (Vercel).
- * Handles MCP /cmds with dashboard auth; forwards everything else to the
- * existing Supabase telegram-webhook (scan/alerts/AI).
- *
- * Query: ?bot=<telegram_bots.id>
- * Header: X-Telegram-Bot-Api-Secret-Token = webhook_secret
+ * /api/telegram-bot-hook — full Telegram bot for MCP-enabled OrbitX users.
+ * - MCP /cmds (dashboard-auth, no trading / auth tools)
+ * - AI chat via enhanced-intelligence (same as Grim)
+ * - Forwards remaining built-ins (/scan, alerts, …) to Supabase webhook with auth
  */
 export const config = { maxDuration: 120 };
 
@@ -18,6 +16,7 @@ import {
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const FALLBACK = "https://www.orbitx.world";
 
 function ok(res) {
@@ -97,26 +96,81 @@ function header(req, name) {
   return h[name.toLowerCase()] || h[name] || "";
 }
 
-function publicBase(req) {
-  const env = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL;
-  if (env) return String(env).replace(/\/$/, "");
-  const proto = header(req, "x-forwarded-proto") || "https";
-  let host = header(req, "x-forwarded-host") || header(req, "host") || "www.orbitx.world";
-  host = String(host).split(",")[0].trim().replace(/:\d+$/, "");
-  if (host === "orbitx.world") host = "www.orbitx.world";
-  return `${proto}://${host}`;
+/** Forward to legacy Supabase telegram-webhook (needs apikey even with verify_jwt=false). */
+async function forwardToSupabase(botId, secret, update) {
+  if (!SUPA_URL || !SRK) return { ok: false, error: "no_supabase" };
+  try {
+    const r = await fetch(`${SUPA_URL}/functions/v1/telegram-webhook?bot=${encodeURIComponent(botId)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Bot-Api-Secret-Token": secret,
+        Authorization: `Bearer ${SRK}`,
+        apikey: SRK,
+      },
+      body: JSON.stringify(update),
+    });
+    return { ok: r.ok, status: r.status };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e) };
+  }
 }
 
-async function forwardToSupabase(botId, secret, update) {
-  if (!SUPA_URL) return;
-  await fetch(`${SUPA_URL}/functions/v1/telegram-webhook?bot=${encodeURIComponent(botId)}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Telegram-Bot-Api-Secret-Token": secret,
-    },
-    body: JSON.stringify(update),
-  }).catch(() => {});
+async function askOrbitxAi(text, bot) {
+  const identity = bot.bot_name || bot.persona
+    ? `You are "${(bot.bot_name || "OrbitX").trim()}", an OrbitX Telegram assistant with full Agent MCP tools via slash commands.`
+      + (bot.persona ? ` Persona: ${bot.persona}` : "")
+    : "You are OrbitX Telegram MCP — AI chat plus MCP tools (/cmds, /img, /token, /chart).";
+  const context =
+    `${identity}\nSource: Telegram bot (dashboard-auth MCP).\n` +
+    `Users can run MCP with /cmds /mcp /img /vid /token /chart /call. No trading or auth-link tools.\n` +
+    `Be helpful, concise, on-chain accurate. If they want a tool result, tell them the slash command or run analysis from knowledge.`;
+
+  const key = SRK || ANON;
+  if (!SUPA_URL || !key) return "AI is not configured on the server.";
+
+  try {
+    const r = await fetch(`${SUPA_URL}/functions/v1/enhanced-intelligence`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+        apikey: key,
+      },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: text }],
+        context,
+        model: bot.ai_model || undefined,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return j.error || j.message || `AI error (${r.status})`;
+    return j.content || j.error || "Couldn't reach OrbitX AI — try again.";
+  } catch (e) {
+    return `AI hiccup: ${e?.message || e}`;
+  }
+}
+
+/** Auto-route natural language to MCP when obvious. */
+function inferMcpFromText(text, kind) {
+  const t = String(text || "").trim();
+  const lower = t.toLowerCase();
+  if (!t || t.startsWith("/")) return null;
+
+  const img = lower.match(/^(?:generate |make |create )?(?:an? )?(?:image|img|picture|art)\b[:\s-]*(.+)$/i);
+  if (img && kind === "agent") return { tool: "orbitx_generate_image", args: { prompt: img[1].trim() } };
+  if (img && kind === "x") return { tool: "orbitx_generate_image", args: { prompt: img[1].trim() } };
+
+  const vid = lower.match(/^(?:generate |make |create )?(?:an? )?(?:video|vid|clip)\b[:\s-]*(.+)$/i);
+  if (vid) return { tool: "orbitx_generate_video", args: { prompt: vid[1].trim() } };
+
+  const chart = lower.match(/\b(?:chart|dex)\b.*?\b([1-9A-HJ-NP-Za-km-z]{32,44}|0x[a-fA-F0-9]{40})\b/i);
+  if (chart && kind === "agent") return { tool: "orbitx_dex_chart", args: { ca: chart[1], mint: chart[1] } };
+
+  const mintOnly = t.match(/^(?:0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/);
+  if (mintOnly && kind === "agent") return { tool: "orbitx_get_token", args: { mint: mintOnly[1] || mintOnly[0] } };
+
+  return null;
 }
 
 const MCP_PRIORITY = new Set(["mcp", "cmds", "img", "vid", "media", "call", "help_mcp"]);
@@ -144,24 +198,22 @@ async function runMcpCall(bot, kind, command, text, req) {
   const cmd = String(command || "").replace(/^\//, "").toLowerCase();
 
   if (cmd === "cmds") {
-    const { AGENT_PRIORITY_CMDS, X_PRIORITY_CMDS, X_TELEGRAM_ALLOW, toolToSlashCommand } = await import(
-      "./orbitx/telegram-mcp-allowlist.js"
-    );
+    const { X_TELEGRAM_ALLOW, toolToSlashCommand } = await import("./orbitx/telegram-mcp-allowlist.js");
     const core = typeof hub.listTelegramAgentCoreTools === "function" ? hub.listTelegramAgentCoreTools() : [];
     const inner =
       kind === "x"
         ? [...X_TELEGRAM_ALLOW]
         : core.map((t) => t.name).filter(isAgentTelegramToolAllowed);
     const lines = [
-      kind === "x" ? "<b>X MCP · img &amp; vid</b> (dashboard auth)" : "<b>OrbitX Agent MCP</b> (dashboard auth)",
-      "No auth tools · no trading",
+      kind === "x" ? "<b>X MCP · img &amp; vid</b> + OrbitX AI chat" : "<b>OrbitX Agent MCP</b> + AI chat",
+      "Dashboard auth · no auth tools · no trading",
       "",
-      ...inner.slice(0, 80).map((n) => {
+      ...inner.slice(0, 60).map((n) => {
         const c = toolToSlashCommand(n, kind === "x" && n.startsWith("x_") ? "x" : "agent");
         return c ? `/${c} → <code>${n}</code>` : `<code>${n}</code>`;
       }),
       "",
-      "Usage: /call &lt;tool&gt; prompt=...   or   /img your prompt",
+      "Chat freely for AI · /img prompt · /call tool args",
     ];
     return { text: lines.join("\n"), parseMode: "HTML", imageUrls: [] };
   }
@@ -172,18 +224,15 @@ async function runMcpCall(bot, kind, command, text, req) {
     tool = sp < 0 ? rest : rest.slice(0, sp);
     args = parseCallArgs(sp < 0 ? "" : rest.slice(sp + 1));
   } else if (cmd === "mcp" || cmd === "help_mcp" || cmd === "menu") {
+    tool = kind === "x" ? "" : "orbitx_menu";
     if (kind === "x") {
       return {
-        text: formatMcpResultForTelegram({
-          ok: true,
-          title: "OrbitX X MCP · Telegram (image & video)",
-          note: "Dashboard-auth · no trading · no auth tools.",
-          commands: [" /mcp", "/cmds", "/img", "/vid", "/media", "/call"],
-        }),
+        text:
+          "<b>X MCP (Telegram)</b>\n/img /vid /media /cmds\n\nChat normally for OrbitX AI.\nClaude/ChatGPT/Grok connectors stay on /x.",
+        parseMode: "HTML",
         imageUrls: [],
       };
     }
-    tool = "orbitx_menu";
   } else {
     const resolved = resolveSlashToTool(cmd, kind);
     if (resolved) tool = resolved;
@@ -212,16 +261,7 @@ async function runMcpCall(bot, kind, command, text, req) {
   delete args.authCode;
   delete args.orbitxAuthCode;
 
-  let result;
-  if (kind === "x" && (tool === "x_menu" || tool === "x_help" || tool === "x_tools_help" || tool === "search" || tool === "fetch")) {
-    result = {
-      ok: true,
-      text: "X Telegram MCP: /img /vid /media. Full X post/DM stays on Claude·ChatGPT·Grok via /x.",
-    };
-  } else {
-    result = await hub.runTelegramAgentTool(bot.user_id, tool, args, req);
-  }
-
+  const result = await hub.runTelegramAgentTool(bot.user_id, tool, args, req);
   const imageUrls = [];
   const push = (u) => {
     if (u && typeof u === "string" && /^https?:\/\//i.test(u)) imageUrls.push(u);
@@ -232,8 +272,23 @@ async function runMcpCall(bot, kind, command, text, req) {
   if (Array.isArray(result?.images)) {
     for (const im of result.images) push(typeof im === "string" ? im : im?.url);
   }
-
   return { text: formatMcpResultForTelegram(result), imageUrls: imageUrls.slice(0, 6) };
+}
+
+async function loadBotRow(botId) {
+  try {
+    const rows = await sb(
+      `telegram_bots?id=eq.${encodeURIComponent(botId)}&select=id,user_id,bot_token,bot_username,bot_id,bot_name,persona,ai_enabled,ai_model,webhook_secret,mcp_agent_enabled,mcp_x_enabled&limit=1`,
+    );
+    return Array.isArray(rows) ? rows[0] : null;
+  } catch (e) {
+    if (!String(e?.message || "").includes("mcp_")) throw e;
+    const rows = await sb(
+      `telegram_bots?id=eq.${encodeURIComponent(botId)}&select=id,user_id,bot_token,bot_username,bot_id,bot_name,persona,ai_enabled,ai_model,webhook_secret&limit=1`,
+    );
+    const bot = Array.isArray(rows) ? rows[0] : null;
+    return bot ? { ...bot, mcp_agent_enabled: true, mcp_x_enabled: false } : null;
+  }
 }
 
 export default async function handler(req, res) {
@@ -248,54 +303,61 @@ export default async function handler(req, res) {
     const botId = String(url.searchParams.get("bot") || "").trim();
     if (!botId) return ok(res);
 
-    let rows;
-    try {
-      rows = await sb(
-        `telegram_bots?id=eq.${encodeURIComponent(botId)}&select=id,user_id,bot_token,bot_username,bot_id,webhook_secret,mcp_agent_enabled,mcp_x_enabled&limit=1`,
-      );
-    } catch (e) {
-      // Migration may be missing columns — fall back and forward everything.
-      console.error("[telegram-bot-hook] load", e?.message || e);
-      return ok(res);
-    }
-    const bot = Array.isArray(rows) ? rows[0] : null;
+    const bot = await loadBotRow(botId);
     if (!bot?.bot_token) return ok(res);
 
     const secret = header(req, "x-telegram-bot-api-secret-token");
-    if (secret !== bot.webhook_secret) {
+    if (secret && secret !== bot.webhook_secret) {
       res.statusCode = 403;
       return res.end("forbidden");
     }
 
     const update = await readBody(req);
-        const agentOn = bot.mcp_agent_enabled === true || (bot.mcp_agent_enabled == null && bot.mcp_x_enabled == null);
-        const xOn = bot.mcp_x_enabled === true;
-        // Flags null = migration missing but webhook is on Vercel → treat as agent MCP.
-        const mcpLive = agentOn || xOn;
-        if (!mcpLive) {
-          await forwardToSupabase(botId, bot.webhook_secret, update);
-          return ok(res);
-        }
+    const agentOn =
+      bot.mcp_agent_enabled === true || (bot.mcp_agent_enabled == null && bot.mcp_x_enabled == null);
+    const xOn = bot.mcp_x_enabled === true;
+    const kind = agentOn ? "agent" : "x";
 
-    const msg = update.message || update.channel_post;
-    if (!msg?.text) {
+    // Non-message updates → legacy handler
+    if (!update.message && !update.channel_post) {
       await forwardToSupabase(botId, bot.webhook_secret, update);
       return ok(res);
     }
 
-    const text = String(msg.text || "").trim();
-    const bare = text.toLowerCase().split(/\s+/)[0].replace(/@.*$/, "").replace(/^\//, "");
-    const kind = agentOn ? "agent" : "x";
+    const msg = update.message || update.channel_post;
+    const text = String(msg.text || msg.caption || "").trim();
+    const chatId = msg.chat?.id;
+    if (!chatId) return ok(res);
 
+    const isGroup = msg.chat?.type === "group" || msg.chat?.type === "supergroup";
+    const bare = text.toLowerCase().split(/\s+/)[0].replace(/@.*$/, "").replace(/^\//, "");
+    const replyExtra = isGroup ? { reply_to_message_id: msg.message_id } : {};
+
+    // Always answer /start /help here so the bot is never silent after connect.
+    if (bare === "start" || bare === "help") {
+      const name = bot.bot_name || bot.bot_username || "OrbitX";
+      await sendLong(
+        bot.bot_token,
+        chatId,
+        `<b>${name}</b> is online — OrbitX AI + MCP.\n\n` +
+          `<b>AI chat</b>\nJust message me, or /chat your question\n\n` +
+          `<b>MCP</b> (dashboard auth · no trading)\n` +
+          `/mcp · /cmds · /img prompt · /vid prompt\n` +
+          (agentOn ? `/token mint · /chart ca · /call tool args\n` : ``) +
+          `\nConnected to your OrbitX account.`,
+        { parse_mode: "HTML", ...replyExtra },
+      );
+      return ok(res);
+    }
+
+    // MCP slash commands
     if (bare && isMcpSlash(bare, agentOn, xOn)) {
-      const chatId = msg.chat.id;
-      const isGroup = msg.chat?.type === "group" || msg.chat?.type === "supergroup";
       await tg(bot.bot_token, "sendChatAction", { chat_id: chatId, action: "typing" });
       try {
         const out = await runMcpCall(bot, kind, bare, text, req);
         await sendLong(bot.bot_token, chatId, out.text || "(no result)", {
           ...(out.parseMode ? { parse_mode: out.parseMode } : {}),
-          ...(isGroup ? { reply_to_message_id: msg.message_id } : {}),
+          ...replyExtra,
         });
         for (const media of out.imageUrls || []) {
           const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(media) || /video/i.test(media);
@@ -306,12 +368,81 @@ export default async function handler(req, res) {
         await tg(bot.bot_token, "sendMessage", {
           chat_id: chatId,
           text: `MCP error: ${e?.message || e}`,
+          ...replyExtra,
         });
       }
       return ok(res);
     }
 
-    // Non-MCP: forward to existing Supabase bot (scan, alerts, Grim, …)
+    // Natural-language → MCP shortcuts (img/vid/chart/mint)
+    if (text && !text.startsWith("/")) {
+      const inferred = inferMcpFromText(text, kind);
+      if (inferred) {
+        await tg(bot.bot_token, "sendChatAction", { chat_id: chatId, action: "typing" });
+        try {
+          const hub = await import("./orbitx-hub.js");
+          const allowed =
+            kind === "x" ? isXTelegramToolAllowed(inferred.tool) : isAgentTelegramToolAllowed(inferred.tool);
+          if (allowed) {
+            const result = await hub.runTelegramAgentTool(bot.user_id, inferred.tool, inferred.args, req);
+            const out = formatMcpResultForTelegram(result);
+            await sendLong(bot.bot_token, chatId, out, replyExtra);
+            const url = result?.imageUrl || result?.videoUrl || result?.urls?.[0];
+            if (url) {
+              if (/video|\.mp4/i.test(url)) await tg(bot.bot_token, "sendVideo", { chat_id: chatId, video: url });
+              else await tg(bot.bot_token, "sendPhoto", { chat_id: chatId, photo: url });
+            }
+            return ok(res);
+          }
+        } catch (e) {
+          await tg(bot.bot_token, "sendMessage", { chat_id: chatId, text: `MCP: ${e?.message || e}`, ...replyExtra });
+          return ok(res);
+        }
+      }
+    }
+
+    // Explicit AI chat + free-text AI (OrbitX enhanced-intelligence)
+    const isChatCmd = ["chat", "ask", "grim", "c"].includes(bare);
+    const wantAi =
+      isChatCmd ||
+      (text && !text.startsWith("/")) ||
+      (text.startsWith("/") && ["chat", "ask", "grim", "c"].includes(bare));
+
+    if (wantAi && bot.ai_enabled !== false) {
+      if (isGroup && !isChatCmd) {
+        const botUser = (bot.bot_username || "").toLowerCase();
+        const mentioned = botUser && new RegExp(`@${botUser}\\b`, "i").test(text);
+        const replyToBot = msg.reply_to_message?.from?.id === bot.bot_id;
+        if (!mentioned && !replyToBot) {
+          // Let legacy handler deal with group noise / auto-scan
+          await forwardToSupabase(botId, bot.webhook_secret, update);
+          return ok(res);
+        }
+      }
+
+      const prompt = isChatCmd
+        ? text.replace(/^\S+\s*/, "").trim() || "gm"
+        : text.replace(new RegExp(`@${bot.bot_username}`, "ig"), " ").replace(/\s+/g, " ").trim() || "gm";
+
+      await tg(bot.bot_token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      const answer = await askOrbitxAi(prompt, bot);
+      await sendLong(bot.bot_token, chatId, answer, replyExtra);
+      return ok(res);
+    }
+
+    // Other slash commands (/scan, /migrations, …) → Supabase legacy bot
+    if (text.startsWith("/")) {
+      const fwd = await forwardToSupabase(botId, bot.webhook_secret, update);
+      if (!fwd.ok) {
+        await tg(bot.bot_token, "sendMessage", {
+          chat_id: chatId,
+          text: "Legacy command relay failed. Try /cmds for MCP or just chat for AI.",
+          ...replyExtra,
+        });
+      }
+      return ok(res);
+    }
+
     await forwardToSupabase(botId, bot.webhook_secret, update);
     return ok(res);
   } catch (e) {

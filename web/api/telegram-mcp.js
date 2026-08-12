@@ -245,6 +245,7 @@ async function handleDashboard(req, res, body) {
     };
     const withMcp = {
       ...baseRow,
+      ai_enabled: true,
       ...(kind === "x" ? { mcp_x_enabled: true, mcp_agent_enabled: false } : { mcp_agent_enabled: true, mcp_x_enabled: false }),
     };
 
@@ -305,8 +306,8 @@ async function handleDashboard(req, res, body) {
     const mcpCmds = kind === "x" ? MCP_X_MENU : MCP_AGENT_MENU;
     await setTelegramCommands(botToken, [
       ...mcpCmds,
+      { command: "chat", description: "Chat with OrbitX AI" },
       { command: "scan", description: "Full token risk report" },
-      { command: "chat", description: "Chat with the AI analyst" },
       { command: "help", description: "Show commands" },
     ]);
 
