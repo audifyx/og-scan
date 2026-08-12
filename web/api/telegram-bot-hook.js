@@ -13,11 +13,72 @@ import {
   parseCallArgs,
   resolveSlashToTool,
 } from "./orbitx/telegram-mcp-allowlist.js";
+import {
+  DEFAULT_TELEGRAM_NIM_MODEL,
+  ORBITX_TELEGRAM_BLURB,
+  ORBITX_TELEGRAM_SYSTEM,
+} from "./orbitx/orbitx-telegram-knowledge.js";
+import { nvidiaChat, NIM_MODELS, DEFAULT_NIM_MODEL } from "./orbitx/x-agent-lib.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const FALLBACK = "https://www.orbitx.world";
+
+function resolveTelegramModel(requested) {
+  const id = String(requested || "").trim();
+  if (id && NIM_MODELS.some((m) => m.id === id)) return id;
+  return process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL || DEFAULT_NIM_MODEL;
+}
+
+async function askOrbitxAi(text, bot) {
+  const personaExtra = bot.bot_name || bot.persona
+    ? `\nBot display name: ${(bot.bot_name || bot.bot_username || "OrbitX").trim()}.` +
+      (bot.persona ? `\nOwner persona notes: ${String(bot.persona).slice(0, 800)}` : "")
+    : "";
+
+  const system = `${ORBITX_TELEGRAM_SYSTEM}${personaExtra}`;
+  const model = resolveTelegramModel(bot.ai_model);
+
+  // Primary: free NVIDIA NIM (same API as Agent/X MCP backend).
+  const nim = await nvidiaChat({
+    system,
+    user: String(text || "gm").slice(0, 6000),
+    model,
+    maxTokens: 900,
+    temperature: 0.65,
+  });
+  if (nim.ok && nim.content) return String(nim.content).trim();
+
+  // Fallback: enhanced-intelligence (also NVIDIA-backed on Supabase).
+  const key = SRK || ANON;
+  if (SUPA_URL && key) {
+    try {
+      const r = await fetch(`${SUPA_URL}/functions/v1/enhanced-intelligence`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+          apikey: key,
+        },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: text }],
+          context: system.slice(0, 12000),
+          model,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && (j.content || j.error)) return String(j.content || j.error).trim();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    nim.message ||
+    "OrbitX AI is offline (NVIDIA_API_KEY missing on Vercel). Add NVIDIA_API_KEY and redeploy, then try again."
+  );
+}
 
 function ok(res) {
   res.statusCode = 200;
@@ -113,41 +174,6 @@ async function forwardToSupabase(botId, secret, update) {
     return { ok: r.ok, status: r.status };
   } catch (e) {
     return { ok: false, error: String(e?.message || e) };
-  }
-}
-
-async function askOrbitxAi(text, bot) {
-  const identity = bot.bot_name || bot.persona
-    ? `You are "${(bot.bot_name || "OrbitX").trim()}", an OrbitX Telegram assistant with full Agent MCP tools via slash commands.`
-      + (bot.persona ? ` Persona: ${bot.persona}` : "")
-    : "You are OrbitX Telegram MCP — AI chat plus MCP tools (/cmds, /img, /token, /chart).";
-  const context =
-    `${identity}\nSource: Telegram bot (dashboard-auth MCP).\n` +
-    `Users can run MCP with /cmds /mcp /img /vid /token /chart /call. No trading or auth-link tools.\n` +
-    `Be helpful, concise, on-chain accurate. If they want a tool result, tell them the slash command or run analysis from knowledge.`;
-
-  const key = SRK || ANON;
-  if (!SUPA_URL || !key) return "AI is not configured on the server.";
-
-  try {
-    const r = await fetch(`${SUPA_URL}/functions/v1/enhanced-intelligence`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-        apikey: key,
-      },
-      body: JSON.stringify({
-        messages: [{ role: "user", content: text }],
-        context,
-        model: bot.ai_model || undefined,
-      }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return j.error || j.message || `AI error (${r.status})`;
-    return j.content || j.error || "Couldn't reach OrbitX AI — try again.";
-  } catch (e) {
-    return `AI hiccup: ${e?.message || e}`;
   }
 }
 
@@ -339,12 +365,12 @@ export default async function handler(req, res) {
       await sendLong(
         bot.bot_token,
         chatId,
-        `<b>${name}</b> is online — OrbitX AI + MCP.\n\n` +
-          `<b>AI chat</b>\nJust message me, or /chat your question\n\n` +
+        `<b>${name}</b> is online.\n${ORBITX_TELEGRAM_BLURB}\n\n` +
+          `<b>AI chat</b> (NVIDIA free model)\nJust message me, or /chat your question\n\n` +
           `<b>MCP</b> (dashboard auth · no trading)\n` +
           `/mcp · /cmds · /img prompt · /vid prompt\n` +
           (agentOn ? `/token mint · /chart ca · /call tool args\n` : ``) +
-          `\nConnected to your OrbitX account.`,
+          `\nTrained on OrbitX product knowledge · connected to your account.`,
         { parse_mode: "HTML", ...replyExtra },
       );
       return ok(res);
