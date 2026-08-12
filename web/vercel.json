@@ -296,6 +296,9 @@
     "api/telegram-mcp.js": {
       "maxDuration": 120
     },
+    "api/telegram-bot-hook.js": {
+      "maxDuration": 120
+    },
     "api/ogdex.js": {
       "maxDuration": 60
     },

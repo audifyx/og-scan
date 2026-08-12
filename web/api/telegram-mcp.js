@@ -1,12 +1,11 @@
 /**
  * /api/telegram-mcp — bridge Telegram bots ↔ OrbitX Agent / X MCP.
  *
- * Auth = dashboard: bot is owned by OrbitX user (telegram_bots.user_id).
- * No auth-link tools, no trading. Agent = full MCP minus deny lists.
- * X = image + video (Grok Imagine) only.
+ * Bot webhook calls: { action, botId, webhookSecret, kind?, tool?, args?, text? }
+ * Dashboard (JWT):   { action: "dashboard_status"|"dashboard_enable"|"dashboard_disable", kind? }
  *
- * POST { action, botId, webhookSecret, kind?, tool?, args?, text? }
- *   action: status | list | call | cmds | help
+ * Auth = dashboard owner. No auth-link tools, no trading.
+ * Agent = full MCP minus deny lists. X = image + video only.
  */
 export const config = { maxDuration: 120 };
 
@@ -25,6 +24,8 @@ import {
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+const FALLBACK = "https://www.orbitx.world";
 
 function send(res, data, status = 200) {
   res.statusCode = status;
@@ -32,6 +33,25 @@ function send(res, data, status = 200) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "no-store");
   res.end(JSON.stringify(data));
+}
+
+function header(req, name) {
+  const h = req.headers || {};
+  return h[name.toLowerCase()] || h[name] || "";
+}
+
+function publicBase(req) {
+  const env = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL;
+  if (env) {
+    const cleaned = String(env).replace(/\/$/, "");
+    if (cleaned === "https://orbitx.world" || cleaned === "http://orbitx.world") return FALLBACK;
+    return cleaned;
+  }
+  const proto = header(req, "x-forwarded-proto") || "https";
+  let host = header(req, "x-forwarded-host") || header(req, "host") || "www.orbitx.world";
+  host = String(host).split(",")[0].trim().replace(/:\d+$/, "");
+  if (host === "orbitx.world") host = "www.orbitx.world";
+  return `${proto}://${host}`;
 }
 
 async function readBody(req) {
@@ -67,16 +87,94 @@ async function sb(path, init = {}) {
   return r.json();
 }
 
+async function getDashboardUser(req) {
+  const auth = header(req, "authorization");
+  if (!auth.startsWith("Bearer ") || !SUPA_URL || !ANON) return null;
+  const r = await fetch(`${SUPA_URL}/auth/v1/user`, {
+    headers: { Authorization: auth, apikey: ANON },
+  });
+  if (!r.ok) return null;
+  const u = await r.json();
+  return u?.id ? { id: u.id, email: u.email || null } : null;
+}
+
 async function loadBot({ botId, webhookSecret }) {
   const id = String(botId || "").trim();
   const secret = String(webhookSecret || "").trim();
   if (!id || !secret) return null;
-  const rows = await sb(
-    `telegram_bots?id=eq.${encodeURIComponent(id)}&select=id,user_id,bot_username,webhook_secret,mcp_agent_enabled,mcp_x_enabled&limit=1`,
-  );
-  const bot = Array.isArray(rows) ? rows[0] : null;
-  if (!bot || bot.webhook_secret !== secret) return null;
-  return bot;
+  try {
+    const rows = await sb(
+      `telegram_bots?id=eq.${encodeURIComponent(id)}&select=id,user_id,bot_username,webhook_secret,mcp_agent_enabled,mcp_x_enabled&limit=1`,
+    );
+    const bot = Array.isArray(rows) ? rows[0] : null;
+    if (!bot || bot.webhook_secret !== secret) return null;
+    return bot;
+  } catch (e) {
+    if (String(e?.message || "").includes("mcp_")) {
+      const rows = await sb(
+        `telegram_bots?id=eq.${encodeURIComponent(id)}&select=id,user_id,bot_username,webhook_secret&limit=1`,
+      );
+      const bot = Array.isArray(rows) ? rows[0] : null;
+      if (!bot || bot.webhook_secret !== secret) return null;
+      return { ...bot, mcp_agent_enabled: false, mcp_x_enabled: false };
+    }
+    throw e;
+  }
+}
+
+function safeBot(b) {
+  if (!b) return null;
+  return {
+    id: b.id,
+    bot_username: b.bot_username,
+    mcp_agent_enabled: !!b.mcp_agent_enabled,
+    mcp_x_enabled: !!b.mcp_x_enabled,
+  };
+}
+
+const MCP_AGENT_MENU = [
+  { command: "mcp", description: "OrbitX MCP menu" },
+  { command: "cmds", description: "List MCP commands" },
+  { command: "img", description: "Generate image (Grok Imagine)" },
+  { command: "vid", description: "Generate video (Grok Imagine)" },
+  { command: "media", description: "Poll image/video task" },
+  { command: "search", description: "Search tokens / MCP" },
+  { command: "token", description: "Token intel by mint" },
+  { command: "chart", description: "Dex chart for a CA" },
+  { command: "call", description: "Call MCP tool: /call name args" },
+  { command: "help_mcp", description: "MCP tools help" },
+];
+
+const MCP_X_MENU = [
+  { command: "mcp", description: "X MCP media menu" },
+  { command: "cmds", description: "List MCP media commands" },
+  { command: "img", description: "Generate image (Grok Imagine)" },
+  { command: "vid", description: "Generate video (Grok Imagine)" },
+  { command: "media", description: "Poll image/video task" },
+  { command: "call", description: "Call media tool: /call name args" },
+  { command: "help_mcp", description: "X MCP help" },
+];
+
+async function setTelegramWebhook(botToken, url, secret) {
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url,
+      secret_token: secret,
+      allowed_updates: ["message", "my_chat_member", "channel_post"],
+      drop_pending_updates: false,
+    }),
+  });
+  return r.json().catch(() => ({}));
+}
+
+async function setTelegramCommands(botToken, commands) {
+  await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commands: commands.slice(0, 100) }),
+  }).catch(() => {});
 }
 
 function xMediaMenu() {
@@ -87,6 +185,113 @@ function xMediaMenu() {
     commands: X_PRIORITY_CMDS.map((c) => `/${c.command} — ${c.description}`),
     tools: [...X_TELEGRAM_ALLOW],
   };
+}
+
+async function handleDashboard(req, res, body) {
+  const user = await getDashboardUser(req);
+  if (!user?.id) return send(res, { error: "unauthorized" }, 401);
+
+  const action = String(body.action || "").toLowerCase();
+  const kind = String(body.kind || "agent").toLowerCase() === "x" ? "x" : "agent";
+
+  let rows;
+  try {
+    rows = await sb(
+      `telegram_bots?user_id=eq.${encodeURIComponent(user.id)}&select=id,user_id,bot_username,bot_token,webhook_secret,mcp_agent_enabled,mcp_x_enabled&limit=1`,
+    );
+  } catch (e) {
+    if (String(e?.message || "").includes("mcp_")) {
+      return send(
+        res,
+        {
+          error: "migration_required",
+          hint: "Apply supabase/migrations/20260812090000_telegram_mcp.sql (mcp_agent_enabled / mcp_x_enabled).",
+        },
+        503,
+      );
+    }
+    throw e;
+  }
+  const bot = Array.isArray(rows) ? rows[0] : null;
+
+  if (action === "dashboard_status") {
+    return send(res, { ok: true, bot: safeBot(bot) });
+  }
+
+  if (!bot) {
+    return send(res, { error: "Connect a Telegram bot first (paste BotFather token).", bot: null }, 400);
+  }
+
+  if (action === "dashboard_enable" || action === "dashboard_disable") {
+    const enable = action === "dashboard_enable";
+    const patch = {
+      updated_at: new Date().toISOString(),
+      ...(kind === "x" ? { mcp_x_enabled: enable } : { mcp_agent_enabled: enable }),
+    };
+    let updated;
+    try {
+      const out = await sb(`telegram_bots?id=eq.${encodeURIComponent(bot.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+        headers: { Prefer: "return=representation" },
+      });
+      updated = Array.isArray(out) ? out[0] : out;
+    } catch (e) {
+      return send(res, { error: e?.message || "failed_to_update", hint: "Apply telegram_mcp migration." }, 400);
+    }
+
+    const agentOn = kind === "agent" ? enable : !!updated.mcp_agent_enabled;
+    const xOn = kind === "x" ? enable : !!updated.mcp_x_enabled;
+    const vercelHook = `${FALLBACK}/api/telegram-bot-hook?bot=${updated.id}`;
+    const supabaseHook = `${SUPA_URL}/functions/v1/telegram-webhook?bot=${updated.id}`;
+    const hookUrl = agentOn || xOn ? vercelHook : supabaseHook;
+    const wh = await setTelegramWebhook(bot.bot_token, hookUrl, bot.webhook_secret);
+    if (!wh?.ok) {
+      return send(
+        res,
+        {
+          error: "webhook_failed",
+          detail: wh?.description || "Telegram rejected setWebhook",
+          bot: safeBot(updated),
+        },
+        400,
+      );
+    }
+
+    const mcpCmds = agentOn ? MCP_AGENT_MENU : xOn ? MCP_X_MENU : [];
+    const baseCmds = [
+      { command: "scan", description: "Full token risk report" },
+      { command: "chat", description: "Chat with the AI analyst" },
+      { command: "help", description: "Show commands" },
+      { command: "trending", description: "Top trending tokens (24h)" },
+      { command: "migrations", description: "Pump.fun graduations" },
+    ];
+    const seen = new Set();
+    const commands = [];
+    for (const c of [...mcpCmds, ...baseCmds]) {
+      if (seen.has(c.command)) continue;
+      seen.add(c.command);
+      commands.push(c);
+    }
+    await setTelegramCommands(bot.bot_token, commands);
+
+    return send(res, {
+      ok: true,
+      bot: safeBot(updated),
+      webhook: hookUrl.startsWith(FALLBACK) ? "vercel-mcp" : "supabase",
+      mcp: {
+        kind,
+        enabled: enable,
+        note:
+          kind === "x"
+            ? "X Telegram MCP: image & video only. Auth from dashboard. No trading / auth tools."
+            : "Agent Telegram MCP: all tools except auth + trading. Auth from dashboard.",
+        cmds: mcpCmds,
+      },
+    });
+  }
+
+  return send(res, { error: "unknown_dashboard_action", action }, 400);
 }
 
 export default async function handler(req, res) {
@@ -102,8 +307,12 @@ export default async function handler(req, res) {
   try {
     const body = await readBody(req);
     const action = String(body.action || "status").toLowerCase();
-    const kind = String(body.kind || "agent").toLowerCase() === "x" ? "x" : "agent";
 
+    if (action.startsWith("dashboard_")) {
+      return handleDashboard(req, res, body);
+    }
+
+    const kind = String(body.kind || "agent").toLowerCase() === "x" ? "x" : "agent";
     const bot = await loadBot(body);
     if (!bot) return send(res, { error: "unauthorized_bot" }, 401);
 
@@ -141,23 +350,14 @@ export default async function handler(req, res) {
               ? "X MCP helper"
               : "MCP",
         }));
-        const commands = buildMcpTelegramCommands(
-          "x",
-          tools.map((t) => t.name),
-          40,
-        );
         return send(res, {
           ok: true,
           kind: "x",
           auth: "dashboard",
-          deny: ["auth tools", "trading", "post/DM"],
-          allow: "image + video only",
           tools,
-          commands,
-          help: formatMcpResultForTelegram(xMediaMenu()),
+          commands: buildMcpTelegramCommands("x", tools.map((t) => t.name), 40),
         });
       }
-
       const tools = coreTools
         .filter((t) => isAgentTelegramToolAllowed(t.name))
         .map((t) => ({
@@ -165,18 +365,12 @@ export default async function handler(req, res) {
           command: toolToSlashCommand(t.name, "agent"),
           description: t.description,
         }));
-      const commands = buildMcpTelegramCommands(
-        "agent",
-        tools.map((t) => t.name),
-        70,
-      );
       return send(res, {
         ok: true,
         kind: "agent",
         auth: "dashboard",
-        deny: ["orbitx_auth_*", "buy/sell/credits"],
         tools,
-        commands,
+        commands: buildMcpTelegramCommands("agent", tools.map((t) => t.name), 70),
         priority: AGENT_PRIORITY_CMDS,
       });
     }
@@ -191,7 +385,6 @@ export default async function handler(req, res) {
       let tool = String(body.tool || "").trim();
       let args = body.args && typeof body.args === "object" ? { ...body.args } : {};
 
-      // Slash helpers: /call name ..., or resolve from command
       if (body.command) {
         const cmd = String(body.command).replace(/^\//, "").toLowerCase();
         if (cmd === "cmds") {
@@ -218,8 +411,7 @@ export default async function handler(req, res) {
           const rest = String(body.text || "").replace(/^\/call(@\w+)?\s*/i, "").trim();
           const sp = rest.indexOf(" ");
           tool = sp < 0 ? rest : rest.slice(0, sp);
-          const argStr = sp < 0 ? "" : rest.slice(sp + 1);
-          args = { ...parseCallArgs(argStr), ...args };
+          args = { ...parseCallArgs(sp < 0 ? "" : rest.slice(sp + 1)), ...args };
         } else if (cmd === "mcp" || cmd === "help_mcp") {
           if (kind === "x") return send(res, { ok: true, text: formatMcpResultForTelegram(xMediaMenu()) });
           tool = "orbitx_menu";
@@ -228,10 +420,7 @@ export default async function handler(req, res) {
           if (resolved) tool = resolved;
           const rest = String(body.text || "").replace(/^\S+\s*/, "").trim();
           if (rest) args = { ...parseCallArgs(rest), ...args };
-          // Convenience: /img prompt /vid prompt
-          if ((cmd === "img" || cmd === "vid") && rest && !args.prompt) {
-            args.prompt = rest;
-          }
+          if ((cmd === "img" || cmd === "vid") && rest && !args.prompt) args.prompt = rest;
           if (cmd === "media" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
           if ((cmd === "token" || cmd === "chart" || cmd === "xray") && rest && !args.mint && !args.ca) {
             args.mint = rest.split(/\s+/)[0];
@@ -241,7 +430,6 @@ export default async function handler(req, res) {
             args.q = rest;
             args.query = rest;
           }
-          if (cmd === "screen" && rest && !args.category) args.category = rest.split(/\s+/)[0];
           if (cmd === "wallet" && rest && !args.address && !args.publicKey) {
             args.address = rest.split(/\s+/)[0];
             args.publicKey = args.address;
@@ -250,50 +438,24 @@ export default async function handler(req, res) {
       }
 
       if (!tool) return send(res, { error: "tool_required" }, 400);
-
-      const allowed =
-        kind === "x" ? isXTelegramToolAllowed(tool) : isAgentTelegramToolAllowed(tool);
+      const allowed = kind === "x" ? isXTelegramToolAllowed(tool) : isAgentTelegramToolAllowed(tool);
       if (!allowed) {
-        return send(
-          res,
-          {
-            error: "tool_not_allowed",
-            tool,
-            hint:
-              kind === "x"
-                ? "X Telegram MCP is image/video only (no auth, no trading, no post)."
-                : "Auth and trading tools are disabled on Telegram.",
-          },
-          403,
-        );
+        return send(res, { error: "tool_not_allowed", tool }, 403);
       }
-
-      // Strip any client-supplied authCode — dashboard auth only
       delete args.authCode;
       delete args.orbitxAuthCode;
 
       let result;
-      if (kind === "x" && (tool === "x_menu" || tool === "x_help" || tool === "x_tools_help" || tool === "search" || tool === "fetch")) {
-        if (tool === "x_menu" || tool === "x_help" || tool === "x_tools_help") {
-          result = xMediaMenu();
-        } else if (tool === "search") {
-          result = {
-            content: [
-              {
-                type: "text",
-                text: "X Telegram MCP: /img /vid /media. Full X post/DM stays on Claude·ChatGPT·Grok via /x.",
-              },
-            ],
-          };
-        } else {
-          result = xMediaMenu();
-        }
+      if (
+        kind === "x" &&
+        (tool === "x_menu" || tool === "x_help" || tool === "x_tools_help" || tool === "search" || tool === "fetch")
+      ) {
+        result = xMediaMenu();
       } else {
-        // Media + agent tools run through Agent MCP (dashboard user)
         result = await hub.runTelegramAgentTool(bot.user_id, tool, args, req);
       }
 
-      const text = formatMcpResultForTelegram(result);
+      const textOut = formatMcpResultForTelegram(result);
       const imageUrls = [];
       const pushUrl = (u) => {
         if (u && typeof u === "string" && /^https?:\/\//i.test(u)) imageUrls.push(u);
@@ -308,10 +470,9 @@ export default async function handler(req, res) {
       return send(res, {
         ok: true,
         tool,
-        text,
+        text: textOut,
         imageUrls: imageUrls.slice(0, 6),
         taskId: result?.taskId || null,
-        raw: typeof result === "object" ? { ok: result.ok, status: result.status, taskId: result.taskId } : undefined,
       });
     }
 
