@@ -9,6 +9,7 @@
  */
 export const config = { maxDuration: 120 };
 
+import { randomUUID } from "crypto";
 import {
   AGENT_PRIORITY_CMDS,
   X_PRIORITY_CMDS,
@@ -26,6 +27,10 @@ const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ""
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const FALLBACK = "https://www.orbitx.world";
+
+function cryptoRandomSecret() {
+  return randomUUID().replace(/-/g, "");
+}
 
 function send(res, data, status = 200) {
   res.statusCode = status;
@@ -216,6 +221,105 @@ async function handleDashboard(req, res, body) {
 
   if (action === "dashboard_status") {
     return send(res, { ok: true, bot: safeBot(bot) });
+  }
+
+  if (action === "dashboard_connect") {
+    const botToken = String(body.botToken || body.bot_token || "").trim();
+    if (!/^\d+:[A-Za-z0-9_-]{30,}$/.test(botToken)) {
+      return send(res, { error: "Invalid BotFather token. Open @BotFather → /newbot and paste the token." }, 400);
+    }
+    const meRes = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+    const me = await meRes.json().catch(() => ({}));
+    if (!me?.ok || !me.result?.id) {
+      return send(res, { error: "Telegram rejected that token. Double-check it with @BotFather." }, 400);
+    }
+
+    const webhookSecret = cryptoRandomSecret();
+    const baseRow = {
+      user_id: user.id,
+      bot_id: me.result.id,
+      bot_username: me.result.username,
+      bot_token: botToken,
+      webhook_secret: webhookSecret,
+      updated_at: new Date().toISOString(),
+    };
+    const withMcp = {
+      ...baseRow,
+      ...(kind === "x" ? { mcp_x_enabled: true, mcp_agent_enabled: false } : { mcp_agent_enabled: true, mcp_x_enabled: false }),
+    };
+
+    let saved = null;
+    let migrationMissing = false;
+    try {
+      if (bot?.id) {
+        const out = await sb(`telegram_bots?id=eq.${encodeURIComponent(bot.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(withMcp),
+          headers: { Prefer: "return=representation" },
+        });
+        saved = Array.isArray(out) ? out[0] : out;
+      } else {
+        const out = await sb("telegram_bots", {
+          method: "POST",
+          body: JSON.stringify(withMcp),
+          headers: { Prefer: "return=representation" },
+        });
+        saved = Array.isArray(out) ? out[0] : out;
+      }
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (msg.includes("mcp_")) {
+        migrationMissing = true;
+        // Persist bot without MCP columns, still route webhook to Vercel.
+        try {
+          if (bot?.id) {
+            const out = await sb(`telegram_bots?id=eq.${encodeURIComponent(bot.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify(baseRow),
+              headers: { Prefer: "return=representation" },
+            });
+            saved = Array.isArray(out) ? out[0] : out;
+          } else {
+            const out = await sb("telegram_bots", {
+              method: "POST",
+              body: JSON.stringify(baseRow),
+              headers: { Prefer: "return=representation" },
+            });
+            saved = Array.isArray(out) ? out[0] : out;
+          }
+          saved = { ...saved, mcp_agent_enabled: kind !== "x", mcp_x_enabled: kind === "x" };
+        } catch (e2) {
+          return send(res, { error: e2?.message || "Failed to save bot" }, 400);
+        }
+      } else {
+        return send(res, { error: msg || "Failed to save bot" }, 400);
+      }
+    }
+
+    const vercelHook = `${FALLBACK}/api/telegram-bot-hook?bot=${saved.id}`;
+    const wh = await setTelegramWebhook(botToken, vercelHook, webhookSecret);
+    if (!wh?.ok) {
+      return send(res, { error: "webhook_failed", detail: wh?.description || "Telegram setWebhook failed" }, 400);
+    }
+
+    const mcpCmds = kind === "x" ? MCP_X_MENU : MCP_AGENT_MENU;
+    await setTelegramCommands(botToken, [
+      ...mcpCmds,
+      { command: "scan", description: "Full token risk report" },
+      { command: "chat", description: "Chat with the AI analyst" },
+      { command: "help", description: "Show commands" },
+    ]);
+
+    return send(res, {
+      ok: true,
+      bot: safeBot(saved),
+      webhook: "vercel-mcp",
+      migrationMissing,
+      hint: migrationMissing
+        ? "Bot connected. Apply supabase/migrations/20260812090000_telegram_mcp.sql so MCP flags persist."
+        : undefined,
+      mcp: { kind, enabled: true, cmds: mcpCmds },
+    });
   }
 
   if (!bot) {

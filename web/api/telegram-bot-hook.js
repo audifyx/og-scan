@@ -268,14 +268,14 @@ export default async function handler(req, res) {
     }
 
     const update = await readBody(req);
-    const agentOn = bot.mcp_agent_enabled === true;
-    const xOn = bot.mcp_x_enabled === true;
-
-    // If MCP not enabled, just forward to Supabase (shouldn't normally hit this hook).
-    if (!agentOn && !xOn) {
-      await forwardToSupabase(botId, bot.webhook_secret, update);
-      return ok(res);
-    }
+        const agentOn = bot.mcp_agent_enabled === true || (bot.mcp_agent_enabled == null && bot.mcp_x_enabled == null);
+        const xOn = bot.mcp_x_enabled === true;
+        // Flags null = migration missing but webhook is on Vercel → treat as agent MCP.
+        const mcpLive = agentOn || xOn;
+        if (!mcpLive) {
+          await forwardToSupabase(botId, bot.webhook_secret, update);
+          return ok(res);
+        }
 
     const msg = update.message || update.channel_post;
     if (!msg?.text) {

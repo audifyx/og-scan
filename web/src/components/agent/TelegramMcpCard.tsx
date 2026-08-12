@@ -27,16 +27,15 @@ async function mcpApi(body: Record<string, unknown>) {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) {
-    throw new Error(j.error || j.hint || `HTTP ${r.status}`);
+    const parts = [j.error, j.detail, j.hint].filter(Boolean);
+    throw new Error(parts.join(" — ") || `HTTP ${r.status}`);
   }
   return j;
 }
 
 /**
- * Fast Telegram MCP setup on /agent and /x Connect tabs.
- * Uses Vercel /api/telegram-mcp (dashboard JWT) so enable works without
- * redeploying Supabase edge functions. Points the bot webhook at
- * /api/telegram-bot-hook for MCP /cmds.
+ * Telegram MCP on /agent and /x — 100% Vercel (no Supabase edge invoke).
+ * Connect + enable + webhook → /api/telegram-mcp + /api/telegram-bot-hook.
  */
 export function TelegramMcpCard({ kind }: Props) {
   const [bot, setBot] = useState<TgBot | null>(null);
@@ -50,20 +49,10 @@ export function TelegramMcpCard({ kind }: Props) {
 
   const load = useCallback(async () => {
     try {
-      // Prefer Vercel dashboard status (has mcp_* flags). Fall back to edge connect status.
-      try {
-        const j = await mcpApi({ action: "dashboard_status", kind });
-        if (j.bot) {
-          setBot(j.bot);
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
-      const { data } = await supabase.functions.invoke("telegram-connect", { body: { action: "status" } });
-      setBot(data?.bot || null);
-    } catch {
-      /* ignore */
+      const j = await mcpApi({ action: "dashboard_status", kind });
+      setBot(j.bot || null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load Telegram status");
     } finally {
       setLoading(false);
     }
@@ -73,32 +62,25 @@ export function TelegramMcpCard({ kind }: Props) {
     void load();
   }, [load]);
 
-  const enableMcp = async () => {
-    const j = await mcpApi({ action: "dashboard_enable", kind });
-    if (j.bot) setBot(j.bot);
-    return j;
-  };
-
   const connect = async () => {
     if (!tokenInput.trim()) return;
     setBusy(true);
     setError(null);
     setNote(null);
     try {
-      const { data, error: err } = await supabase.functions.invoke("telegram-connect", {
-        body: { action: "connect", botToken: tokenInput.trim() },
+      const j = await mcpApi({
+        action: "dashboard_connect",
+        kind,
+        botToken: tokenInput.trim(),
       });
-      if (data?.error) throw new Error(data.error);
-      if (err) throw new Error(err.message || "Connect failed");
-      setBot(data.bot);
+      setBot(j.bot);
       setTokenInput("");
-      // Switch webhook to Vercel MCP hook + set flags (does not need edge mcp_enable).
-      await enableMcp();
       setNote(
         kind === "x"
-          ? `Connected @${data.bot.bot_username} · X MCP img/vid live · try /cmds in Telegram`
-          : `Connected @${data.bot.bot_username} · Agent MCP live · try /cmds in Telegram`,
+          ? `Connected @${j.bot.bot_username} · X MCP img/vid live · try /cmds`
+          : `Connected @${j.bot.bot_username} · Agent MCP live · try /cmds`,
       );
+      if (j.hint) setError(j.hint);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to connect bot");
     } finally {
@@ -114,7 +96,7 @@ export function TelegramMcpCard({ kind }: Props) {
       if (j.bot) setBot(j.bot);
       setNote(
         on
-          ? "MCP live — webhook routed to OrbitX · /cmds registered."
+          ? "MCP live — webhook on OrbitX · /cmds registered."
           : "MCP off — bot back to standard Telegram mode.",
       );
     } catch (e: unknown) {
@@ -127,8 +109,8 @@ export function TelegramMcpCard({ kind }: Props) {
   const title = kind === "x" ? "Telegram · X MCP" : "Telegram · Agent MCP";
   const hint =
     kind === "x"
-      ? "Paste BotFather token → image & video MCP only. Auth from this dashboard. No trading, no auth tools. Claude / ChatGPT / Grok stay as MCP connectors above."
-      : "Paste BotFather token → all Agent MCP tools as /cmds. Auth from this dashboard. No auth-link tools, no trading.";
+      ? "Paste BotFather token → image & video MCP only. Auth from this dashboard. No trading, no auth tools."
+      : "Paste BotFather token → Agent MCP /cmds. Auth from this dashboard. No auth-link tools, no trading.";
 
   return (
     <div
@@ -195,13 +177,12 @@ export function TelegramMcpCard({ kind }: Props) {
             <p className="ox-agent__note" style={{ marginBottom: 0, marginTop: 10 }}>
               {kind === "x" ? (
                 <>
-                  Try <code>/mcp</code> <code>/cmds</code> <code>/img prompt</code> <code>/vid prompt</code>{" "}
-                  <code>/media taskId</code>
+                  Try <code>/mcp</code> <code>/cmds</code> <code>/img prompt</code> <code>/vid prompt</code>
                 </>
               ) : (
                 <>
                   Try <code>/mcp</code> <code>/cmds</code> <code>/img</code> <code>/token mint</code>{" "}
-                  <code>/chart ca</code> <code>/call tool args</code>
+                  <code>/chart ca</code>
                 </>
               )}
             </p>
@@ -217,9 +198,9 @@ export function TelegramMcpCard({ kind }: Props) {
               </a>{" "}
               → <code>/newbot</code>
             </li>
-            <li>Paste the token below → Connect (uses your OrbitX session — no second auth)</li>
+            <li>Paste the token → Connect (OrbitX session auth — no edge function)</li>
             <li>
-              In Telegram: <code>/cmds</code> for the MCP board
+              In Telegram: <code>/cmds</code>
             </li>
           </ol>
           <div className="ox-agent__btn-row" style={{ marginTop: 0, flexWrap: "wrap" }}>
