@@ -1,7 +1,7 @@
 /**
  * /api/telegram-bot-hook — full Telegram bot for MCP-enabled OrbitX users.
  * - MCP /cmds (dashboard-auth, no trading / auth tools)
- * - AI chat via enhanced-intelligence (same as Grim)
+ * - AI chat via NVIDIA NIM free models + OrbitX product knowledge
  * - Forwards remaining built-ins (/scan, alerts, …) to Supabase webhook with auth
  */
 export const config = { maxDuration: 120 };
@@ -31,6 +31,35 @@ function resolveTelegramModel(requested) {
   return process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL || DEFAULT_NIM_MODEL;
 }
 
+/** Models love ``` fences — Telegram then shows the whole reply as code. Strip that. */
+function formatTelegramChatText(raw) {
+  let t = String(raw || "").replace(/\r\n/g, "\n").trim();
+  if (!t) return "(empty reply)";
+
+  // Entire message wrapped in one fence
+  const whole = t.match(/^```(?:[a-zA-Z0-9_+-]*)?\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (whole) t = whole[1].trim();
+
+  // Strip any remaining fenced blocks → keep inner text only
+  t = t.replace(/```(?:[a-zA-Z0-9_+-]*)?\s*\n?([\s\S]*?)```/g, (_, inner) => String(inner || "").trim());
+
+  // Drop orphan fence lines
+  t = t
+    .split("\n")
+    .filter((line) => !/^```/.test(line.trim()))
+    .join("\n");
+
+  // Soften markdown headings / bold dumps into plain chat
+  t = t.replace(/^#{1,6}\s+/gm, "");
+  t = t.replace(/\*\*([^*]+)\*\*/g, "$1");
+  t = t.replace(/__([^_]+)__/g, "$1");
+  t = t.replace(/`([^`]+)`/g, "$1");
+
+  // Collapse crazy blank lines
+  t = t.replace(/\n{3,}/g, "\n\n").trim();
+  return t.slice(0, 3900) || "(empty reply)";
+}
+
 async function askOrbitxAi(text, bot) {
   const personaExtra = bot.bot_name || bot.persona
     ? `\nBot display name: ${(bot.bot_name || bot.bot_username || "OrbitX").trim()}.` +
@@ -48,7 +77,7 @@ async function askOrbitxAi(text, bot) {
     maxTokens: 900,
     temperature: 0.65,
   });
-  if (nim.ok && nim.content) return String(nim.content).trim();
+  if (nim.ok && nim.content) return formatTelegramChatText(nim.content);
 
   // Fallback: enhanced-intelligence (also NVIDIA-backed on Supabase).
   const key = SRK || ANON;
@@ -68,15 +97,15 @@ async function askOrbitxAi(text, bot) {
         }),
       });
       const j = await r.json().catch(() => ({}));
-      if (r.ok && (j.content || j.error)) return String(j.content || j.error).trim();
+      if (r.ok && (j.content || j.error)) return formatTelegramChatText(j.content || j.error);
     } catch {
       /* ignore */
     }
   }
 
-  return (
+  return formatTelegramChatText(
     nim.message ||
-    "OrbitX AI is offline (NVIDIA_API_KEY missing on Vercel). Add NVIDIA_API_KEY and redeploy, then try again."
+      "OrbitX AI is offline (NVIDIA_API_KEY missing on Vercel). Add NVIDIA_API_KEY and redeploy, then try again.",
   );
 }
 
@@ -451,7 +480,8 @@ export default async function handler(req, res) {
         : text.replace(new RegExp(`@${bot.bot_username}`, "ig"), " ").replace(/\s+/g, " ").trim() || "gm";
 
       await tg(bot.bot_token, "sendChatAction", { chat_id: chatId, action: "typing" });
-      const answer = await askOrbitxAi(prompt, bot);
+      const answer = formatTelegramChatText(await askOrbitxAi(prompt, bot));
+      // Plain text only — no parse_mode (avoids monospace / broken HTML)
       await sendLong(bot.bot_token, chatId, answer, replyExtra);
       return ok(res);
     }
