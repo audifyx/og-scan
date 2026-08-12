@@ -53,11 +53,10 @@ function toMatch(source: VampSourceMatch["source"], candName: string, candTicker
 async function checkOrbitxRegistry(name: string, ticker: string, chainIds: string[], assetType: AntiVampAssetType) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return { matches: [] as VampSourceMatch[], failed: true };
   try {
-    const res = await withTimeout(fetch(`${SUPABASE_URL}/rest/v1/rpc/orbitx_vamp_check_multichain`, { method: "POST", headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ p_name: name, p_ticker: ticker, p_chain_ids: chainIds, p_asset_type: assetType }) }), FETCH_TIMEOUT_MS);
+    const res = await withTimeout(fetch(`${SUPABASE_URL}/rest/v1/rpc/orbitx_vamp_check`, { method: "POST", headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ p_name: name, p_ticker: ticker, p_chain_ids: chainIds, p_asset_type: assetType }) }), FETCH_TIMEOUT_MS);
     if (!res.ok) return { matches: [], failed: true };
-    const payload = await res.json();
-    const rows = Array.isArray(payload) ? payload : [];
-    return { matches: rows.map((row: { name?: string; ticker?: string; chain_id?: string; decision?: string }) => toMatch("orbitx", String(row.name ?? ""), String(row.ticker ?? ""), name, ticker, row.chain_id, assetType)).filter(Boolean) as VampSourceMatch[], failed: false };
+    const rows = await res.json() as { name: string; ticker?: string; symbol?: string; chain_id?: string }[];
+    return { matches: (rows ?? []).map((row) => toMatch("orbitx", row.name, row.ticker ?? row.symbol ?? "", name, ticker, row.chain_id, assetType)).filter(Boolean) as VampSourceMatch[], failed: false };
   } catch (error) { console.error("[anti-vamp] registry source failed", error); return { matches: [], failed: true }; }
 }
 async function fetchDex(query: string): Promise<any[]> {
@@ -113,8 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const deny = isKnownVampIdentity({ name, ticker, symbol: input.symbol }, assetType) ? [{ source: "denylist", name, ticker, sim: 1, hard: true, assetType, reason: "known_vamp_identity" } as VampSourceMatch] : [];
     const [orbitx, pumpfun, dexscreener] = await Promise.all([checkOrbitxRegistry(name, ticker, chains, assetType), assetType === "token" && chains.includes("solana") ? checkPumpFun(name, ticker) : Promise.resolve({ matches: [], failed: false }), checkDexScreener(name, ticker, chains, assetType)]);
     const health = { orbitx: !orbitx.failed, pumpfun: !pumpfun.failed, dexscreener: !dexscreener.failed }; const all = [...deny, ...orbitx.matches, ...pumpfun.matches, ...dexscreener.matches].sort((a, b) => b.sim - a.sim); const hard = all.find((m) => m.hard) ?? null; const matches = all.filter((m) => m.sim >= SOFT_MATCH_SIM || m.hard); const degraded = Object.values(health).every((healthy) => !healthy);
-    const verificationBlocked = degraded && !hard;
-    return res.status(200).json({ blocked: !!hard || verificationBlocked, flagged: matches.length > 0 || degraded, hardMatch: hard ? { name: hard.name, ticker: hard.ticker || "—", source: hard.source, chainId: hard.chainId, reason: hard.reason } : null, matches, checked: ["orbitx", "pumpfun", "dexscreener"], checkedChains: chains, sourceHealth: health, warning: degraded ? "verification_degraded" : undefined, assetType, message: degraded ? "Originality verification is unavailable. Retry before launching." : undefined });
+    return res.status(200).json({ blocked: !!hard, flagged: matches.length > 0 || degraded, hardMatch: hard ? { name: hard.name, ticker: hard.ticker || "—", source: hard.source, chainId: hard.chainId, reason: hard.reason } : null, matches, checked: ["orbitx", "pumpfun", "dexscreener"], checkedChains: chains, sourceHealth: health, warning: degraded ? "verification_degraded" : undefined, assetType, message: degraded ? "Originality sources are unavailable — launch allowed with platform-routing caution." : undefined });
   } catch (error) { console.error("[anti-vamp] unexpected checker failure", error); return res.status(200).json({ blocked: false, flagged: true, hardMatch: null, matches: [], checkedChains: chains, warning: "verification_degraded", message: "Originality verification hit an error — launch allowed; retry before continuing if unsure." }); }
 }
 

@@ -659,8 +659,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         setBlockedMatch(hard ? { name: result.hardMatch!.name, ticker: result.hardMatch!.ticker } : null);
       } catch (err) {
         console.error("Anti-vamp check failed:", err);
-        // Fail closed — an unavailable originality check must be retried before launch.
-        setNameTaken(true);
+        // Fail open — verification outages must not freeze launches.
+        setNameTaken(false);
         setCheckError(true);
         setBlockedMatch(null);
       } finally {
@@ -741,12 +741,6 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       console.error("[orbitx] pump anti-vamp check failed", err);
       return { blocked: false, flagged: true, hardMatch: null, matches: [], warning: "verification_degraded", message: "Originality verification failed - continuing with caution." } as const;
     });
-    if (result.warning === "verification_degraded") {
-      setNameTaken(true);
-      toast.error("Anti-vamp verification is unavailable. Retry before launching.");
-      setStep("form");
-      return;
-    }
     if (result.blocked && result.hardMatch) {
       setNameTaken(true);
       setBlockedMatch({ name: result.hardMatch.name, ticker: result.hardMatch.ticker });

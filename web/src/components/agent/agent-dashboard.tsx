@@ -19,6 +19,7 @@ import {
   type McpChatAuthMint,
 } from "@/lib/orbitxMcp";
 import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
+import { TelegramMcpCard } from "./TelegramMcpCard";
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -752,6 +753,8 @@ export function AgentDashboard() {
                 />
               </>
             )}
+
+            <TelegramMcpCard kind="agent" />
           </div>
         </section>
       )}

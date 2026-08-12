@@ -48,6 +48,88 @@ async function logOutbound(botToken: string, result: any, body: any) {
 
 const ok = () => new Response("ok", { status: 200 });
 
+const APP_URL = (Deno.env.get("PUBLIC_APP_URL") || Deno.env.get("ORBITX_APP_URL") || "https://www.orbitx.world").replace(/\/$/, "");
+
+const MCP_CMDS = new Set([
+  "mcp", "cmds", "img", "vid", "media", "call", "token", "screen", "chart", "xray", "research",
+  "help_mcp", "search", "menu", "get_token", "generate_image", "generate_video", "media_status",
+  "grok_image", "grok_video", "tools_help", "dex_chart", "get_wallet", "whoami", "platform_stats",
+  "health", "config", "leaderboard", "boosts", "social_feed", "social_communities",
+]);
+
+async function callTelegramMcp(bot: any, kind: "agent" | "x", payload: Record<string, unknown>) {
+  const r = await fetch(`${APP_URL}/api/telegram-mcp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      botId: bot.id,
+      webhookSecret: bot.webhook_secret,
+      kind,
+      ...payload,
+    }),
+  });
+  return r.json().catch(() => ({ error: "bad_json", status: r.status }));
+}
+
+async function handleMcpCommand(token: string, bot: any, chatId: number, cmd: string, text: string, replyTo?: number) {
+  const agentOn = !!bot.mcp_agent_enabled;
+  const xOn = !!bot.mcp_x_enabled;
+  if (!agentOn && !xOn) return false;
+
+  const bare = cmd.replace(/^\//, "").toLowerCase();
+  // Prefer agent when both on (full MCP); X-only bots use media surface.
+  const kind: "agent" | "x" = agentOn ? "agent" : "x";
+
+  const priorityOnly = new Set(["mcp", "cmds", "img", "vid", "media", "call", "help_mcp"]);
+  const xExtra = new Set(["search", "menu", "generate_image", "generate_video", "media_status", "grok_image", "grok_video"]);
+  const isMcp =
+    priorityOnly.has(bare) ||
+    (agentOn && (
+      MCP_CMDS.has(bare) ||
+      bare.startsWith("generate_") ||
+      bare.startsWith("get_") ||
+      bare.startsWith("orbitx_") ||
+      bare.startsWith("screen_") ||
+      bare.startsWith("nft_") ||
+      bare.startsWith("social_")
+    )) ||
+    (!agentOn && xOn && xExtra.has(bare));
+  if (!isMcp) return false;
+
+  await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+  const j = await callTelegramMcp(bot, kind, {
+    action: "call",
+    command: bare,
+    text,
+  });
+  if (j?.error) {
+    await tg(token, "sendMessage", {
+      chat_id: chatId,
+      text: `MCP: ${j.error}${j.hint ? ` — ${j.hint}` : ""}`,
+      ...(replyTo ? { reply_to_message_id: replyTo } : {}),
+    });
+    return true;
+  }
+  const parseMode = j.parseMode || undefined;
+  await sendLong(token, chatId, j.text || "(no result)", {
+    ...(parseMode ? { parse_mode: parseMode } : {}),
+    ...(replyTo ? { reply_to_message_id: replyTo } : {}),
+  });
+  for (const url of (j.imageUrls || []).slice(0, 4)) {
+    const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(url) || /video/i.test(url);
+    if (isVid) {
+      await tg(token, "sendVideo", { chat_id: chatId, video: url }).catch(() =>
+        tg(token, "sendMessage", { chat_id: chatId, text: url })
+      );
+    } else {
+      await tg(token, "sendPhoto", { chat_id: chatId, photo: url }).catch(() =>
+        tg(token, "sendMessage", { chat_id: chatId, text: url })
+      );
+    }
+  }
+  return true;
+}
+
 async function tg(botToken: string, method: string, body: object) {
   try {
     const r = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
@@ -878,6 +960,12 @@ Deno.serve(async (req) => {
       const intro = bot.persona
         ? escHtml(String(bot.persona)).slice(0, 300)
         : "I read the Solana chain and rip tokens apart — no hopium.";
+      const mcpBlock = (bot.mcp_agent_enabled || bot.mcp_x_enabled)
+        ? `\n\n<b>MCP</b> (dashboard auth · no trading · no auth tools)\n` +
+          (bot.mcp_agent_enabled
+            ? `/mcp · /cmds · /img · /vid · /token · /chart · /call &lt;tool&gt;\n`
+            : `/mcp · /cmds · /img · /vid · /media  <i>(X · image &amp; video only)</i>\n`)
+        : "";
       await tg(token, "sendMessage", {
         chat_id: chatId, parse_mode: "HTML", disable_web_page_preview: true,
         text:
@@ -900,12 +988,29 @@ Deno.serve(async (req) => {
           `/alpha — community alpha callouts\n` +
           `/migrations — pump.fun graduations (last 24h)\n` +
           `/alerts on|off — instant migration alerts in this chat\n` +
-          `/help — this menu\n\n` +
-          `Or just send me a contract address, a wallet, or a ticker and I'll analyze it live.\n\n` +
+          `/help — this menu` +
+          mcpBlock +
+          `\n\nOr just send me a contract address, a wallet, or a ticker and I'll analyze it live.\n\n` +
           `<b>In groups:</b> tag me <b>@${bot.bot_username}</b> (or reply to my messages) to chat. To let me read every message, open @BotFather → /setprivacy → Disable.` +
           customText,
       });
       return ok();
+    }
+
+    // OrbitX MCP bridge (Agent and/or X) — registered from /agent + /x dashboards
+    {
+      const bare = cmd.replace(/^\//, "").toLowerCase();
+      if (bare && (bot.mcp_agent_enabled || bot.mcp_x_enabled)) {
+        const handled = await handleMcpCommand(
+          token,
+          bot,
+          chatId,
+          bare,
+          text,
+          isGroup ? msg.message_id : undefined,
+        );
+        if (handled) return ok();
+      }
     }
 
     if (cmd === "/migrations" || cmd === "/migrated" || cmd === "/graduations") {

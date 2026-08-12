@@ -22,16 +22,17 @@ import {
 } from "@solana/wallet-adapter-base";
 import type { SendTransactionOptions, WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { PublicKey, type Connection, type Transaction, type TransactionVersion, type VersionedTransaction } from "@solana/web3.js";
+import { coercePublicKey, normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 export const JupiterWalletName = "Jupiter" as WalletName<"Jupiter">;
 
 type JupiterProvider = {
   isJupiter?: boolean;
   isConnected?: boolean;
-  publicKey: PublicKey | null;
-  connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: PublicKey }>;
+  publicKey: PublicKey | string | null;
+  connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: PublicKey | string } | void>;
   disconnect(): Promise<void>;
-  signMessage: (message: Uint8Array) => Promise<Uint8Array | { signature: Uint8Array }>;
+  signMessage: (message: Uint8Array) => Promise<unknown>;
   signTransaction?: <T extends Transaction | VersionedTransaction>(tx: T) => Promise<T>;
   signAllTransactions?: <T extends Transaction | VersionedTransaction>(txs: T[]) => Promise<T[]>;
   signAndSendTransaction?: (
@@ -44,16 +45,15 @@ type JupiterProvider = {
 
 export function getJupiterProvider(): JupiterProvider | null {
   if (typeof window === "undefined") return null;
-  const w = window as Window & { jupiter?: { solana?: JupiterProvider }; solana?: JupiterProvider };
+  const w = window as Window & {
+    jupiter?: { solana?: JupiterProvider; isJupiter?: boolean };
+    solana?: JupiterProvider;
+  };
+  // Prefer dedicated Jupiter inject — never steal Phantom's window.solana.
   if (w.jupiter?.solana) return w.jupiter.solana;
+  if (w.jupiter && (w.jupiter as JupiterProvider).connect) return w.jupiter as JupiterProvider;
   if (w.solana?.isJupiter) return w.solana;
   return null;
-}
-
-function normalizeSignature(result: Uint8Array | { signature: Uint8Array }): Uint8Array {
-  if (result instanceof Uint8Array) return result;
-  if (result && typeof result === "object" && result.signature instanceof Uint8Array) return result.signature;
-  throw new Error("wallet returned an invalid signature");
 }
 
 export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
@@ -139,22 +139,23 @@ export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
       const wallet = getJupiterProvider();
       if (!wallet) throw new WalletNotReadyError();
 
-      if (!wallet.isConnected) {
-        try {
-          await wallet.connect();
-        } catch (error) {
-          throw new WalletConnectionError(error instanceof Error ? error.message : String(error), error);
-        }
+      let connectResult: { publicKey?: PublicKey | string } | void;
+      try {
+        connectResult = await wallet.connect();
+      } catch (error) {
+        throw new WalletConnectionError(error instanceof Error ? error.message : String(error), error);
       }
-
-      if (!wallet.publicKey) throw new WalletAccountError();
 
       let publicKey: PublicKey;
       try {
-        publicKey = new PublicKey(wallet.publicKey.toBytes());
+        publicKey = coercePublicKey(wallet.publicKey, connectResult);
       } catch (error) {
-        throw new WalletPublicKeyError(error instanceof Error ? error.message : String(error), error);
+        throw new WalletPublicKeyError(
+          error instanceof Error ? error.message : "Jupiter returned no public key",
+          error,
+        );
       }
+      if (!publicKey) throw new WalletAccountError();
 
       wallet.on?.("disconnect", this._disconnected);
       wallet.on?.("accountChanged", this._accountChanged);
@@ -261,7 +262,7 @@ export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
       const wallet = this._wallet;
       if (!wallet) throw new WalletNotConnectedError();
       try {
-        return normalizeSignature(await wallet.signMessage(message));
+        return normalizeSignatureBytes(await wallet.signMessage(message));
       } catch (error) {
         throw new WalletSignMessageError(error instanceof Error ? error.message : String(error), error);
       }

@@ -60,7 +60,7 @@ export async function connectSolanaWallet(opts: {
   const adapter = pick.adapter;
   opts.select(adapter.name as WalletName);
   // Allow WalletProvider to adopt the selected adapter before context.connect().
-  await new Promise((r) => setTimeout(r, 40));
+  await new Promise((r) => setTimeout(r, 100));
 
   if (!adapter.connected) {
     try {
@@ -72,7 +72,11 @@ export async function connectSolanaWallet(opts: {
   if (!adapter.connected) {
     await adapter.connect();
   }
+  // Some Standard wallets set publicKey a tick after connect resolves.
+  if (!adapter.publicKey) {
+    await new Promise((r) => setTimeout(r, 80));
+  }
   const pk = adapter.publicKey?.toBase58();
-  if (!pk) throw new Error(`${adapter.name} connected but returned no public key`);
+  if (!pk) throw new Error(`${adapter.name} connected but returned no public key — unlock the extension and retry`);
   return pk;
 }

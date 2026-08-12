@@ -1,6 +1,7 @@
 import { FC, ReactNode, useCallback, useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletError, WalletNotReadyError } from "@solana/wallet-adapter-base";
+import { useStandardWalletAdapters } from "@solana/wallet-standard-wallet-adapter-react";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import {
   LedgerWalletAdapter,
@@ -20,9 +21,13 @@ interface Props {
  * JupiterWalletAdapter.url was https://jup.ag — so autoConnect / connect() on a
  * missing Jupiter extension yanked users to the Jupiter website instead of signing
  * in-app. Never navigate away from OrbitX for wallet errors.
+ *
+ * useStandardWalletAdapters discovers Phantom / Jupiter Wallet Extension via the
+ * Solana Wallet Standard (required for reliable browser signMessage / signTransaction).
+ * Legacy inject adapters remain as fallbacks when Standard isn't registered yet.
  */
 export const SolanaWalletProvider: FC<Props> = ({ children }) => {
-  const wallets = useMemo(
+  const adapters = useMemo(
     () => [
       new PhantomWalletAdapter(),
       new JupiterWalletAdapter(),
@@ -33,6 +38,9 @@ export const SolanaWalletProvider: FC<Props> = ({ children }) => {
     ],
     [],
   );
+
+  // Prefer Wallet Standard adapters (Phantom, Jupiter V2, Solflare, …) when present.
+  const wallets = useStandardWalletAdapters(adapters);
 
   const onError = useCallback((error: WalletError) => {
     // Critical: do NOT window.open(adapter.url). Default WalletProvider does that

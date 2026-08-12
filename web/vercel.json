@@ -293,6 +293,9 @@
     "api/x-mcp.js": {
       "maxDuration": 60
     },
+    "api/telegram-mcp.js": {
+      "maxDuration": 120
+    },
     "api/ogdex.js": {
       "maxDuration": 60
     },

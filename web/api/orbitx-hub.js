@@ -4494,6 +4494,30 @@ async function handleCryptoScan(req, res) {
   return json(res, { ok: true, mint, safety, forensics, token });
 }
 
+/**
+ * Telegram MCP bridge — dashboard-auth (bot owner userId), no auth-link tools.
+ * Used by /api/telegram-mcp. Trading / auth tools must be filtered by caller allowlist.
+ */
+export async function runTelegramAgentTool(userId, toolName, args = {}, req = null) {
+  const uid = String(userId || "").trim();
+  if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
+  const agent = await ensureAgent(uid);
+  const auth = {
+    userId: uid,
+    agentId: agent.id,
+    walletAddress: agent.wallet_address || null,
+    agentName: agent.name || null,
+    source: "telegram",
+    bearerPresent: false,
+  };
+  const base = publicBase(req);
+  return callTool(String(toolName || "").trim(), args || {}, auth, base, req);
+}
+
+export function listTelegramAgentCoreTools() {
+  return CORE_TOOLS.map((t) => ({ name: t.name, description: t.description }));
+}
+
 export default async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") {
@@ -4518,7 +4542,7 @@ export default async function handler(req, res) {
       return json(res, {
         ok: true,
         service: "orbitx",
-        routes: ["agent", "mcp", "crypto-scan", "anti-vamp-check"],
+        routes: ["agent", "mcp", "crypto-scan", "anti-vamp-check", "telegram-mcp"],
         agent: "/api/orbitx-agent",
         mcp: "/api/orbitx-mcp",
         antiVamp: "/api/orbitx/anti-vamp-check",

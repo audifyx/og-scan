@@ -40,6 +40,7 @@ import {
   type XNimModel,
 } from "@/lib/xMcp";
 import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
+import { TelegramMcpCard } from "@/components/agent/TelegramMcpCard";
 import XMcpMatrix from "@/components/x/XMcpMatrix";
 import "./x-hub.css";
 
@@ -1844,6 +1845,8 @@ export default function XMcpPage() {
                 <FieldRow label="Scope" value={oauth.scope} copied={copied === "scope"} onCopy={() => copy("scope", oauth.scope)} />
               </>
             )}
+
+            <TelegramMcpCard kind="x" />
           </div>
         </section>
       )}

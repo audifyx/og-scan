@@ -112,7 +112,7 @@ export default function AgentSignPage() {
           : (signed as Transaction).serialize();
       return connection.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
     }
-    throw new Error("This wallet cannot sign here — open in Phantom.");
+    throw new Error("This wallet cannot sign here — reconnect Phantom or Jupiter.");
   };
 
   const onSign = async () => {
@@ -124,7 +124,7 @@ export default function AgentSignPage() {
       return;
     }
     if (!connected || !publicKey) {
-      setError("Connect Phantom first.");
+      setError("Connect Phantom or Jupiter first.");
       return;
     }
     if (walletMismatch) {
@@ -161,7 +161,7 @@ export default function AgentSignPage() {
             maxRetries: 3,
           });
         } else {
-          throw new Error("This wallet cannot sign here — open in Phantom.");
+          throw new Error("This wallet cannot sign here — reconnect Phantom or Jupiter.");
         }
         await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
         setSignature(sig);

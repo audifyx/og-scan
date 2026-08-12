@@ -3,10 +3,11 @@
 // to telegram-webhook with a per-bot secret, and store it. Requires user JWT.
 //
 // POST actions:
-//   { action: "connect", botToken }      -> validate + setWebhook + upsert
+//   { action: "connect", botToken, mcp_agent?, mcp_x? } -> validate + setWebhook + upsert (+ optional MCP)
 //   { action: "disconnect" }             -> deleteWebhook + remove row
 //   { action: "status" }                 -> current bot info (no token leaked)
 //   { action: "settings", alerts_migrations?, ai_enabled?, min_marketcap? }
+//   { action: "mcp_enable"|"mcp_disable"|"mcp_set", kind: "agent"|"x" } -> Telegram MCP /cmds
 //   { action: "set_identity", bot_name?, persona? }  -> name + persona (also set on Telegram)
 //   { action: "commands_list" }
 //   { action: "command_upsert", command, description?, response_type?, content }
@@ -42,6 +43,8 @@ const safe = (b: any) => b && ({
   ai_model: b.ai_model,
   auto_scan: b.auto_scan, digest_enabled: b.digest_enabled,
   min_marketcap: b.min_marketcap, created_at: b.created_at,
+  mcp_agent_enabled: !!b.mcp_agent_enabled,
+  mcp_x_enabled: !!b.mcp_x_enabled,
 });
 
 // Commands the bot handles natively — users can't override these.
@@ -52,14 +55,47 @@ const RESERVED_COMMANDS = new Set([
   "vibecodeanything", "vibecode", "vibe", "vca",
   "price", "p", "btc", "eth", "sol", "global", "market", "fear", "fng", "feargreed", "tvl",
   "trending", "trend", "wallet", "portfolio", "pnl", "holders", "watch", "watchlist", "unwatch", "report", "pdf",
+  // MCP bridge
+  "mcp", "cmds", "img", "vid", "media", "call", "token", "screen", "chart", "xray", "research", "help_mcp",
+  "search", "menu", "get_token", "generate_image", "generate_video", "media_status",
 ]);
+
+const MCP_AGENT_MENU = [
+  { command: "mcp", description: "OrbitX MCP menu" },
+  { command: "cmds", description: "List MCP commands" },
+  { command: "img", description: "Generate image (Grok Imagine)" },
+  { command: "vid", description: "Generate video (Grok Imagine)" },
+  { command: "media", description: "Poll image/video task" },
+  { command: "search", description: "Search tokens / MCP" },
+  { command: "token", description: "Token intel by mint" },
+  { command: "chart", description: "Dex chart for a CA" },
+  { command: "call", description: "Call MCP tool: /call name args" },
+  { command: "help_mcp", description: "MCP tools help" },
+];
+
+const MCP_X_MENU = [
+  { command: "mcp", description: "X MCP media menu" },
+  { command: "cmds", description: "List MCP media commands" },
+  { command: "img", description: "Generate image (Grok Imagine)" },
+  { command: "vid", description: "Generate video (Grok Imagine)" },
+  { command: "media", description: "Poll image/video task" },
+  { command: "call", description: "Call media tool: /call name args" },
+  { command: "help_mcp", description: "X MCP help" },
+];
 
 function normalizeCommand(raw: string): string {
   return String(raw || "").trim().toLowerCase().replace(/^\//, "").replace(/[^a-z0-9_]/g, "");
 }
 
-// Refresh the Telegram command menu = built-ins + this bot's custom commands.
-async function refreshCommandMenu(admin: any, botToken: string, botRowId: string) {
+// Refresh the Telegram command menu = built-ins + MCP (if enabled) + custom commands.
+async function refreshCommandMenu(admin: any, botToken: string, botRowId: string, flags?: { mcp_agent_enabled?: boolean; mcp_x_enabled?: boolean }) {
+  let mcpAgent = flags?.mcp_agent_enabled;
+  let mcpX = flags?.mcp_x_enabled;
+  if (mcpAgent == null || mcpX == null) {
+    const { data: row } = await admin.from("telegram_bots").select("mcp_agent_enabled, mcp_x_enabled").eq("id", botRowId).maybeSingle();
+    mcpAgent = !!row?.mcp_agent_enabled;
+    mcpX = !!row?.mcp_x_enabled;
+  }
   const base = [
     { command: "chat", description: "Chat with the AI analyst" },
     { command: "scan", description: "Full token risk report" },
@@ -85,6 +121,8 @@ async function refreshCommandMenu(admin: any, botToken: string, botRowId: string
     { command: "digest", description: "Daily digest: on | off" },
     { command: "help", description: "Show commands" },
   ];
+  const mcpExtra = mcpAgent ? MCP_AGENT_MENU : mcpX ? MCP_X_MENU : [];
+  // Prefer MCP cmds near the top when enabled (Telegram shows ~first commands prominently).
   const { data: customs } = await admin
     .from("telegram_custom_commands")
     .select("command, description, enabled")
@@ -93,8 +131,14 @@ async function refreshCommandMenu(admin: any, botToken: string, botRowId: string
     command: c.command,
     description: (c.description || "Custom command").slice(0, 256),
   }));
-  // Telegram allows up to 100 commands; keep within bounds.
-  const commands = [...base, ...extra].slice(0, 100);
+  const seen = new Set<string>();
+  const commands: { command: string; description: string }[] = [];
+  for (const c of [...mcpExtra, ...base, ...extra]) {
+    if (seen.has(c.command)) continue;
+    seen.add(c.command);
+    commands.push(c);
+    if (commands.length >= 100) break;
+  }
   await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ commands }),
@@ -158,7 +202,7 @@ Deno.serve(async (req) => {
       if (!me.ok) return json({ error: "Telegram rejected that token. Double-check it with @BotFather." }, 400);
 
       const webhookSecret = crypto.randomUUID().replace(/-/g, "");
-      const row = {
+      const row: Record<string, unknown> = {
         user_id: user.id,
         bot_id: me.result.id,
         bot_username: me.result.username,
@@ -166,6 +210,9 @@ Deno.serve(async (req) => {
         webhook_secret: webhookSecret,
         updated_at: new Date().toISOString(),
       };
+      // Optional: enable MCP surfaces from /agent or /x dashboards on connect.
+      if (body.mcp_agent === true || body.mcpAgent === true) row.mcp_agent_enabled = true;
+      if (body.mcp_x === true || body.mcpX === true) row.mcp_x_enabled = true;
       // One bot per user: upsert on user_id.
       const { data: existing } = await admin.from("telegram_bots").select("id").eq("user_id", user.id).maybeSingle();
       let saved: any;
@@ -195,9 +242,40 @@ Deno.serve(async (req) => {
       if (!setJson.ok) return json({ error: "Connected, but failed to set webhook: " + (setJson.description || "unknown") }, 400);
 
       // Register the full command menu so every command is pre-installed.
-      await refreshCommandMenu(admin, botToken, saved.id);
+      await refreshCommandMenu(admin, botToken, saved.id, {
+        mcp_agent_enabled: !!saved.mcp_agent_enabled,
+        mcp_x_enabled: !!saved.mcp_x_enabled,
+      });
 
       return json({ ok: true, bot: safe(saved) });
+    }
+
+    if (action === "mcp_enable" || action === "mcp_disable" || action === "mcp_set") {
+      const { data: existing } = await admin.from("telegram_bots").select("*").eq("user_id", user.id).maybeSingle();
+      if (!existing) return json({ error: "Connect a Telegram bot first (paste BotFather token)." }, 400);
+      const kind = String(body.kind || body.mcp || "agent").toLowerCase() === "x" ? "x" : "agent";
+      const enable = action === "mcp_enable" ? true : action === "mcp_disable" ? false : body.enabled !== false;
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (kind === "x") patch.mcp_x_enabled = enable;
+      else patch.mcp_agent_enabled = enable;
+      const { data, error } = await admin.from("telegram_bots").update(patch).eq("user_id", user.id).select().single();
+      if (error) return json({ error: error.message }, 400);
+      await refreshCommandMenu(admin, existing.bot_token, existing.id, {
+        mcp_agent_enabled: kind === "agent" ? enable : !!data.mcp_agent_enabled,
+        mcp_x_enabled: kind === "x" ? enable : !!data.mcp_x_enabled,
+      });
+      return json({
+        ok: true,
+        bot: safe(data),
+        mcp: {
+          kind,
+          enabled: enable,
+          note: kind === "x"
+            ? "X Telegram MCP: image & video only. Auth from dashboard. No trading / auth tools."
+            : "Agent Telegram MCP: all tools except auth + trading. Auth from dashboard.",
+          cmds: kind === "x" ? MCP_X_MENU : MCP_AGENT_MENU,
+        },
+      });
     }
 
     if (action === "set_identity") {
