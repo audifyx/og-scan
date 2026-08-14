@@ -1293,6 +1293,7 @@ async function handleToolExecute(req, res, ctx, body) {
   const executingEvent = {
     ...confirmation,
     status: "executing",
+    expiresAt: new Date(Date.now() + TOOL_TIMEOUT_MS + 8_000).toISOString(),
     result: { message: "OrbitX is executing the confirmed action." },
   };
   const executingEvents = sourceEvents.map((stored) =>
@@ -1314,14 +1315,18 @@ async function handleToolExecute(req, res, ctx, body) {
 
   let result;
   try {
-    result = await runEmbeddedAgentTool({
-      userId: ctx.userId,
-      walletAddress: ctx.walletAddress,
-      email: ctx.email,
-      toolName,
-      args,
-      req,
-    });
+    result = await withTimeout(
+      runEmbeddedAgentTool({
+        userId: ctx.userId,
+        walletAddress: ctx.walletAddress,
+        email: ctx.email,
+        toolName,
+        args,
+        req,
+      }),
+      TOOL_TIMEOUT_MS,
+      `${toolName} timed out`,
+    );
   } catch (error) {
     result = {
       ok: false,

@@ -48,6 +48,13 @@ describe("OrbitX AI security guards", () => {
     expect(page).toContain("tool.requiresConfirmation");
   });
 
+  it("bounds MCP HTTP and confirmed executions so chat cannot hang forever", () => {
+    const hub = readFileSync(resolve(__dirname, "../../api/orbitx-hub.js"), "utf8");
+    expect(hub).toContain("AbortSignal.timeout(timeoutMs)");
+    expect(executeHandler).toContain("withTimeout(");
+    expect(executeHandler).toContain("TOOL_TIMEOUT_MS");
+  });
+
   it("streams chat progress, live model deltas, and tool events", () => {
     expect(api).toContain('if (action === "chat.stream")');
     expect(api).toContain('"application/x-ndjson; charset=utf-8"');

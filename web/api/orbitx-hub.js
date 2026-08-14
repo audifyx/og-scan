@@ -2664,10 +2664,13 @@ const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
 const TOOLS = [...CORE_TOOLS, ..._generated];
 for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
 
-async function fetchJson(url, init) {
+async function fetchJson(url, init = {}) {
+  const timeoutMs = Number(init.timeoutMs) > 0 ? Number(init.timeoutMs) : 12_000;
+  const { timeoutMs: _timeoutMs, ...rest } = init;
   const r = await fetch(url, {
-    ...init,
-    headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(init?.headers || {}) },
+    ...rest,
+    headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(rest.headers || {}) },
+    signal: rest.signal || AbortSignal.timeout(timeoutMs),
   });
   const text = await r.text();
   let data = null;
