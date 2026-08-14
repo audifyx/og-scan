@@ -154,6 +154,93 @@ function requiresConfirmation(name) {
   return !DIRECT_TOOL_NAMES.has(String(name || ""));
 }
 
+function toolCategory(name) {
+  const normalized = String(name || "").toLowerCase();
+  if (normalized.includes("nft")) return "NFT";
+  if (
+    normalized.includes("social") ||
+    normalized.includes("community") ||
+    normalized.includes("feed") ||
+    normalized.includes("post")
+  ) return "Social";
+  if (
+    normalized.includes("image") ||
+    normalized.includes("video") ||
+    normalized.includes("media")
+  ) return "Media";
+  if (
+    normalized.includes("launch") ||
+    normalized.includes("mint") ||
+    normalized.includes("vanity") ||
+    normalized.includes("create_token")
+  ) return "Launch";
+  if (
+    normalized.includes("buy") ||
+    normalized.includes("sell") ||
+    normalized.includes("trade") ||
+    normalized.includes("swap") ||
+    normalized.includes("claim") ||
+    normalized.includes("burn") ||
+    normalized.includes("rent")
+  ) return "Trade";
+  if (
+    normalized.includes("wallet") ||
+    normalized.includes("balance") ||
+    normalized.includes("credits")
+  ) return "Wallet";
+  if (
+    normalized.includes("token") ||
+    normalized.includes("chart") ||
+    normalized.includes("scan") ||
+    normalized.includes("safety") ||
+    normalized.includes("forensic") ||
+    normalized.includes("research") ||
+    normalized.includes("signal") ||
+    normalized.includes("trader") ||
+    normalized.includes("kol") ||
+    normalized.includes("ath") ||
+    normalized.includes("xray") ||
+    normalized.includes("leaderboard") ||
+    normalized.includes("boost")
+  ) return "Markets";
+  return "Platform";
+}
+
+let cachedToolCatalog = null;
+
+function toolCatalog() {
+  if (cachedToolCatalog) return cachedToolCatalog;
+  cachedToolCatalog = listEmbeddedAgentTools()
+    .filter((tool) => !BLOCKED_EMBEDDED_TOOLS.has(tool.name))
+    .map((tool) => {
+      const schema = objectValue(tool.inputSchema);
+      const properties = objectValue(schema.properties);
+      const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+      return {
+        name: text(tool.name, 160),
+        description: text(tool.description, 500),
+        category: toolCategory(tool.name),
+        requiresConfirmation: requiresConfirmation(tool.name),
+        parameters: Object.entries(properties).slice(0, 16).map(([name, definition]) => {
+          const parameter = objectValue(definition);
+          return {
+            name: text(name, 80),
+            type: text(parameter.type, 40) || "value",
+            description: text(parameter.description, 180),
+            required: required.has(name),
+            options: Array.isArray(parameter.enum)
+              ? parameter.enum.map((option) => text(option, 80)).filter(Boolean).slice(0, 20)
+              : [],
+          };
+        }),
+      };
+    })
+    .sort((left, right) =>
+      left.category.localeCompare(right.category) || left.name.localeCompare(right.name)
+    );
+  return cachedToolCatalog;
+}
+
 function normalizedMediaSettings(kind, value) {
   const source = objectValue(value);
   const aspectCandidate = text(source.aspect_ratio, 12);
@@ -607,6 +694,7 @@ async function handleBootstrap(req, res, ctx) {
     defaultModel: DEFAULT_NIM_MODEL,
     conversations: (conversations || []).map(mapConversation),
     generations: (generations || []).map(mapGeneration),
+    tools: toolCatalog(),
   });
 }
 
@@ -695,6 +783,22 @@ async function handleConversation(req, res, ctx, body) {
       modelId(body.model),
     );
     return json(res, { conversation: mapConversation(conversation) }, 201);
+  }
+  if (operation === "rename") {
+    const id = text(body.conversationId, 80);
+    const title = text(body.title, 120);
+    if (!id) return json(res, { error: "conversationId_required" }, 400);
+    if (!title) return json(res, { error: "conversation_title_required" }, 400);
+    const { data, error } = await ctx.db
+      .from("ai_conversations")
+      .update({ title, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", ctx.userId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return json(res, { error: "conversation_not_found" }, 404);
+    return json(res, { conversation: mapConversation(data) });
   }
   if (operation === "delete") {
     const id = text(body.conversationId, 80);

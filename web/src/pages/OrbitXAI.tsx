@@ -28,9 +28,11 @@ import {
   ChevronDown,
   CircleDollarSign,
   Clock3,
+  Command,
   Copy,
   Download,
   ExternalLink,
+  FileDown,
   Film,
   GalleryHorizontalEnd,
   History,
@@ -38,11 +40,12 @@ import {
   Loader2,
   Menu,
   MessageCircle,
-  MoreHorizontal,
   PanelLeftClose,
+  Pencil,
   Plus,
   RefreshCw,
   Rocket,
+  Search,
   Send,
   ShieldCheck,
   Sparkles,
@@ -68,12 +71,14 @@ import {
   fetchAiMessages,
   generateAiMedia,
   pollAiMedia,
+  renameAiConversation,
   sendAiMessage,
   type AiBootstrap,
   type AiConversation,
   type AiGate,
   type AiGeneration,
   type AiMessage,
+  type AiToolDefinition,
   type AiToolEvent,
 } from "@/lib/orbitxAi";
 import {
@@ -88,7 +93,7 @@ import {
 import { xStartLogin } from "@/lib/xAuth";
 import "./orbitx-ai.css";
 
-type AiTab = "chat" | "create" | "x";
+type AiTab = "chat" | "tools" | "create" | "x";
 type MediaKind = "image" | "video";
 type SendAsset = "SOL" | "ORBITX" | "CUSTOM";
 const SOL_DECIMALS = String(LAMPORTS_PER_SOL).length - 1;
@@ -133,6 +138,7 @@ const TAB_ITEMS: Array<{
   icon: typeof MessageCircle;
 }> = [
   { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "tools", label: "Tools", icon: Command },
   { id: "create", label: "Create", icon: WandSparkles },
   { id: "x", label: "X Studio", icon: X },
 ];
@@ -471,6 +477,16 @@ function ChatMessage({
         <div className="oai-message__meta">
           <strong>{isUser ? "You" : isTool ? "OrbitX action" : "OrbitX AI"}</strong>
           <span>{relativeTime(message.createdAt)}</span>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(message.content);
+              toast.success("Message copied");
+            }}
+            aria-label="Copy message"
+          >
+            <Copy size={11} />
+          </button>
         </div>
         <div className="oai-message__content">
           {isUser || isTool ? (
@@ -581,6 +597,8 @@ function ConversationRail({
   onNew,
   onSelect,
   onDelete,
+  onRename,
+  onExport,
 }: {
   open: boolean;
   conversations: AiConversation[];
@@ -589,7 +607,32 @@ function ConversationRail({
   onNew: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => Promise<void>;
+  onExport: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+  const filteredConversations = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return conversations;
+    return conversations.filter((conversation) =>
+      conversation.title.toLowerCase().includes(normalized)
+    );
+  }, [conversations, query]);
+
+  const finishRename = async (id: string) => {
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle) return;
+    try {
+      await onRename(id, nextTitle);
+      setEditingId(null);
+      setTitleDraft("");
+    } catch {
+      // The parent surfaces the API error; keep the input open for correction.
+    }
+  };
+
   return (
     <>
       {open && <button type="button" className="oai-rail-scrim" onClick={onClose} aria-label="Close history" />}
@@ -608,55 +651,268 @@ function ConversationRail({
         </div>
         <button type="button" className="oai-new-chat" onClick={onNew}>
           <Plus size={16} /> New conversation
-          <span>⌘ K</span>
+          <span>+</span>
         </button>
+        <label className="oai-rail-search">
+          <Search size={13} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search conversations"
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search">
+              <X size={12} />
+            </button>
+          )}
+        </label>
         <div className="oai-rail__section">
-          <span>Recent</span>
-          <MoreHorizontal size={15} />
+          <span>{query ? "Matches" : "Recent"}</span>
+          <small>{filteredConversations.length}</small>
         </div>
         <div className="oai-conversation-list">
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <div
               key={conversation.id}
               className={`oai-conversation${activeId === conversation.id ? " is-active" : ""}`}
             >
-              <button
-                type="button"
-                className="oai-conversation__select"
-                onClick={() => onSelect(conversation.id)}
-              >
-                <MessageCircle size={14} />
-                <span>
-                  <strong>{conversation.title}</strong>
-                  <small>{relativeTime(conversation.updatedAt)}</small>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="oai-conversation__delete"
-                onClick={() => onDelete(conversation.id)}
-                aria-label={`Delete ${conversation.title}`}
-              >
-                <Trash2 size={13} />
-              </button>
+              {editingId === conversation.id ? (
+                <form
+                  className="oai-conversation__edit"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void finishRename(conversation.id);
+                  }}
+                >
+                  <input
+                    value={titleDraft}
+                    onChange={(event) => setTitleDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setEditingId(null);
+                        setTitleDraft("");
+                      }
+                    }}
+                    maxLength={120}
+                    autoFocus
+                  />
+                  <button type="submit" aria-label="Save conversation title">
+                    <Check size={13} />
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="oai-conversation__select"
+                  onClick={() => onSelect(conversation.id)}
+                >
+                  <MessageCircle size={14} />
+                  <span>
+                    <strong>{conversation.title}</strong>
+                    <small>{relativeTime(conversation.updatedAt)}</small>
+                  </span>
+                </button>
+              )}
+              {editingId !== conversation.id && (
+                <div className="oai-conversation__actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingId(conversation.id);
+                      setTitleDraft(conversation.title);
+                    }}
+                    aria-label={`Rename ${conversation.title}`}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(conversation.id)}
+                    aria-label={`Delete ${conversation.title}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
-          {conversations.length === 0 && (
+          {filteredConversations.length === 0 && (
             <div className="oai-rail__empty">
               <MessageCircle size={22} />
-              Your conversations will appear here.
+              {query ? "No conversations match your search." : "Your conversations will appear here."}
             </div>
           )}
         </div>
-        <div className="oai-rail__foot">
-          <ShieldCheck size={14} />
+        <button type="button" className="oai-rail__foot" onClick={onExport} disabled={!activeId}>
+          <FileDown size={14} />
           <span>
-            <strong>Private by design</strong>
-            Wallet-gated history
+            <strong>Export conversation</strong>
+            Private Markdown backup
           </span>
-        </div>
+        </button>
       </aside>
     </>
+  );
+}
+
+const TOOL_CATEGORY_ORDER = [
+  "All",
+  "Markets",
+  "Trade",
+  "Wallet",
+  "Launch",
+  "NFT",
+  "Social",
+  "Media",
+  "Platform",
+] as const;
+
+function toolDisplayName(name: string): string {
+  return name
+    .replace(/^orbitx_/, "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function CommandCenter({
+  tools,
+  onLaunch,
+}: {
+  tools: AiToolDefinition[];
+  onLaunch: (tool: AiToolDefinition) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<(typeof TOOL_CATEGORY_ORDER)[number]>("All");
+  const [showAll, setShowAll] = useState(false);
+  const categoryCounts = useMemo(
+    () =>
+      tools.reduce<Record<string, number>>((counts, tool) => {
+        counts[tool.category] = (counts[tool.category] || 0) + 1;
+        return counts;
+      }, {}),
+    [tools],
+  );
+  const filteredTools = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return tools.filter((tool) => {
+      if (category !== "All" && tool.category !== category) return false;
+      if (!normalized) return true;
+      return (
+        tool.name.toLowerCase().includes(normalized) ||
+        tool.description.toLowerCase().includes(normalized) ||
+        tool.category.toLowerCase().includes(normalized) ||
+        tool.parameters.some((parameter) =>
+          parameter.name.toLowerCase().includes(normalized)
+        )
+      );
+    });
+  }, [category, query, tools]);
+  const visibleTools = showAll ? filteredTools : filteredTools.slice(0, 24);
+  const instantCount = tools.filter((tool) => !tool.requiresConfirmation).length;
+
+  return (
+    <section className="oai-tab-page oai-tools-page">
+      <div className="oai-tab-page__hero">
+        <span className="oai-eyebrow">
+          <Command size={13} /> Live MCP command center
+        </span>
+        <h1>One interface. <em>{tools.length} superpowers.</em></h1>
+        <p>
+          Discover every core OrbitX capability, then launch it through the guarded AI
+          workflow with live data and explicit confirmation for write actions.
+        </p>
+      </div>
+
+      <div className="oai-tool-stats">
+        <div><strong>{tools.length}</strong><span>Live tools</span></div>
+        <div><strong>{instantCount}</strong><span>Instant reads</span></div>
+        <div><strong>{tools.length - instantCount}</strong><span>Guarded actions</span></div>
+        <div><strong>{Object.keys(categoryCounts).length}</strong><span>Capability lanes</span></div>
+      </div>
+
+      <div className="oai-tool-browser">
+        <label className="oai-tool-search">
+          <Search size={17} />
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setShowAll(false);
+            }}
+            placeholder="Search charts, wallets, launches, NFTs, social…"
+          />
+          <kbd>⌘ K</kbd>
+        </label>
+        <div className="oai-tool-categories" role="tablist" aria-label="Tool categories">
+          {TOOL_CATEGORY_ORDER.filter(
+            (item) => item === "All" || Boolean(categoryCounts[item]),
+          ).map((item) => (
+            <button
+              type="button"
+              className={category === item ? "is-active" : ""}
+              onClick={() => {
+                setCategory(item);
+                setShowAll(false);
+              }}
+              key={item}
+            >
+              {item}
+              <span>{item === "All" ? tools.length : categoryCounts[item] || 0}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="oai-tool-grid">
+        {visibleTools.map((tool) => {
+          const required = tool.parameters.filter((parameter) => parameter.required);
+          return (
+            <article className={`oai-tool-card is-${tool.category.toLowerCase()}`} key={tool.name}>
+              <div className="oai-tool-card__head">
+                <span className="oai-tool-card__icon"><Command size={16} /></span>
+                <div>
+                  <small>{tool.category}</small>
+                  <h2>{toolDisplayName(tool.name)}</h2>
+                </div>
+                <span className={tool.requiresConfirmation ? "is-guarded" : "is-live"}>
+                  {tool.requiresConfirmation ? <ShieldCheck size={10} /> : <Zap size={10} />}
+                  {tool.requiresConfirmation ? "Guarded" : "Instant"}
+                </span>
+              </div>
+              <p>{tool.description}</p>
+              <div className="oai-tool-card__params">
+                {required.slice(0, 4).map((parameter) => (
+                  <span key={parameter.name}>{parameter.name}</span>
+                ))}
+                {required.length === 0 && <span>No required inputs</span>}
+                {required.length > 4 && <span>+{required.length - 4}</span>}
+              </div>
+              <div className="oai-tool-card__foot">
+                <code>{tool.name}</code>
+                <button type="button" onClick={() => onLaunch(tool)}>
+                  Open in chat <ArrowUp size={12} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {filteredTools.length === 0 && (
+        <div className="oai-tool-empty">
+          <Search size={25} />
+          <strong>No tool matched that search</strong>
+          <span>Try a task like chart, wallet, NFT, launch, or social.</span>
+        </div>
+      )}
+      {!showAll && filteredTools.length > visibleTools.length && (
+        <button type="button" className="oai-tool-show-all" onClick={() => setShowAll(true)}>
+          Show all {filteredTools.length} tools
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -1462,6 +1718,19 @@ export default function OrbitXAI() {
   }, [authLoading, refreshAccess]);
 
   useEffect(() => {
+    const openCommandCenter = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      event.preventDefault();
+      setTab("tools");
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLInputElement>(".oai-tool-search input")?.focus();
+      });
+    };
+    window.addEventListener("keydown", openCommandCenter);
+    return () => window.removeEventListener("keydown", openCommandCenter);
+  }, []);
+
+  useEffect(() => {
     if (!activeId || !bootstrap) {
       setMessages([]);
       return;
@@ -1550,6 +1819,59 @@ export default function OrbitXAI() {
     }
   };
 
+  const renameConversation = async (id: string, title: string) => {
+    try {
+      const result = await renameAiConversation(id, title);
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === id ? result.conversation : conversation
+        )
+      );
+      toast.success("Conversation renamed");
+    } catch (renameError) {
+      toast.error(renameError instanceof Error ? renameError.message : "Could not rename chat");
+      throw renameError;
+    }
+  };
+
+  const exportConversation = () => {
+    const conversation = conversations.find((item) => item.id === activeId);
+    if (!conversation || messages.length === 0) {
+      toast.error("There is no conversation to export yet");
+      return;
+    }
+    const sections = messages.map((message) => {
+      const role =
+        message.role === "user"
+          ? "You"
+          : message.role === "tool"
+            ? "OrbitX Action"
+            : "OrbitX AI";
+      const events = message.toolEvents.length
+        ? `\n\n${message.toolEvents
+            .map((event) => `- \`${event.tool}\` — ${event.status}`)
+            .join("\n")}`
+        : "";
+      return `## ${role}\n\n${message.content}${events}`;
+    });
+    const markdown = [
+      `# ${conversation.title}`,
+      "",
+      `Exported from OrbitX AI on ${new Date().toISOString()}`,
+      "",
+      ...sections,
+      "",
+    ].join("\n");
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${conversation.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "orbitx-chat"}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success("Conversation exported");
+  };
+
   const sendMessage = async (override?: string) => {
     const prompt = (override ?? composer).trim();
     if (!prompt || sending) return;
@@ -1590,6 +1912,19 @@ export default function OrbitXAI() {
     } finally {
       setSending(false);
     }
+  };
+
+  const launchTool = (tool: AiToolDefinition) => {
+    const requiredInputs = tool.parameters
+      .filter((parameter) => parameter.required)
+      .map((parameter) => parameter.name);
+    const inputInstruction = requiredInputs.length
+      ? `Ask me only for any missing required inputs (${requiredInputs.join(", ")}) before running it.`
+      : "Run it now using my authenticated OrbitX session.";
+    void sendMessage(
+      `Use the exact OrbitX MCP tool \`${tool.name}\` for this task. ${inputInstruction} ` +
+      "Show the live result clearly and explain any risk or confirmation step.",
+    );
   };
 
   const confirmTool = async (messageId: string, event: AiToolEvent) => {
@@ -1671,6 +2006,8 @@ export default function OrbitXAI() {
         onNew={() => void newConversation()}
         onSelect={selectConversation}
         onDelete={(id) => void removeConversation(id)}
+        onRename={renameConversation}
+        onExport={exportConversation}
       />
       <div className="oai-app__shell">
         <header className="oai-topbar">
@@ -1813,6 +2150,9 @@ export default function OrbitXAI() {
                 onChart={() => setChartModal(true)}
               />
             </section>
+          )}
+          {tab === "tools" && (
+            <CommandCenter tools={bootstrap.tools || []} onLaunch={launchTool} />
           )}
           {tab === "create" && (
             <CreateCenter

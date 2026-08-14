@@ -24,4 +24,12 @@ describe("OrbitX AI security guards", () => {
     expect(page).toContain("disabled={busy || !walletMatchesGate}");
     expect(page).toContain("Reconnect the wallet that passed the OrbitX access check");
   });
+
+  it("exposes the embedded MCP catalog through the guarded command center", () => {
+    expect(api).toContain("listEmbeddedAgentTools()");
+    expect(api).toContain("tools: toolCatalog()");
+    expect(page).toContain('id: "tools"');
+    expect(page).toContain("<CommandCenter");
+    expect(page).toContain("tool.requiresConfirmation");
+  });
 });

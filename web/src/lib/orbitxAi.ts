@@ -22,6 +22,22 @@ export type AiModel = {
   label: string;
 };
 
+export type AiToolParameter = {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+  options: string[];
+};
+
+export type AiToolDefinition = {
+  name: string;
+  description: string;
+  category: string;
+  requiresConfirmation: boolean;
+  parameters: AiToolParameter[];
+};
+
 export type AiConversation = {
   id: string;
   title: string;
@@ -78,6 +94,7 @@ export type AiBootstrap = {
   defaultModel: string;
   conversations: AiConversation[];
   generations: AiGeneration[];
+  tools: AiToolDefinition[];
 };
 
 type ApiErrorShape = {
@@ -191,6 +208,13 @@ export async function createAiConversation(
 
 export async function deleteAiConversation(conversationId: string): Promise<void> {
   await post("conversation", { operation: "delete", conversationId }, 30_000);
+}
+
+export async function renameAiConversation(
+  conversationId: string,
+  title: string,
+): Promise<{ conversation: AiConversation }> {
+  return post("conversation", { operation: "rename", conversationId, title }, 30_000);
 }
 
 export async function generateAiMedia(payload: {
