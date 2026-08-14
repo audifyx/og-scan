@@ -4495,6 +4495,67 @@ async function handleCryptoScan(req, res) {
 }
 
 /**
+ * Embedded OrbitX AI bridge — authenticated by the caller's Supabase session.
+ * Exposes the same live MCP catalog without forcing the first-party app through
+ * an OAuth/API-key round trip.
+ */
+export function listEmbeddedAgentTools({ includeGenerated = false } = {}) {
+  const source = includeGenerated ? TOOLS : CORE_TOOLS;
+  return source.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+  }));
+}
+
+export function hasEmbeddedAgentTool(toolName) {
+  const rawName = String(toolName || "").trim();
+  const name = TOOL_ALIASES[rawName] || rawName;
+  return TOOLS.some((tool) => tool.name === name);
+}
+
+export async function runEmbeddedAgentTool({
+  userId,
+  walletAddress = null,
+  email = null,
+  toolName,
+  args = {},
+  req = null,
+}) {
+  const uid = String(userId || "").trim();
+  if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
+
+  const rawName = String(toolName || "").trim();
+  const name = TOOL_ALIASES[rawName] || rawName;
+  if (!hasEmbeddedAgentTool(name)) {
+    throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
+  }
+
+  const agent = await ensureAgent(uid);
+  const authoritativeWallet = String(walletAddress || agent.wallet_address || "").trim() || null;
+  const auth = {
+    userId: uid,
+    agentId: agent.id,
+    walletAddress: authoritativeWallet,
+    agentName: agent.name || null,
+    email: String(email || "").trim() || null,
+    source: "orbitx_ai",
+    bearerPresent: true,
+  };
+  const base = publicBase(req);
+
+  if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
+    const candidates = holdCandidateWallets(auth, args);
+    const hold = await verifyTokenHold(candidates[0] || "", base, { email: auth.email });
+    if (!hold.meetsRequirement) {
+      return holdBlockedPayload({ tool: name, hold });
+    }
+  }
+
+  return callTool(name, args || {}, auth, base, req);
+}
+
+/**
  * Telegram MCP bridge — dashboard-auth (bot owner userId), no auth-link tools.
  * Used by /api/telegram-mcp. Trading / auth tools must be filtered by caller allowlist.
  */

@@ -1,0 +1,1810 @@
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferCheckedInstruction,
+  getAssociatedTokenAddressSync,
+  getMint,
+} from "@solana/spl-token";
+import ReactMarkdown from "react-markdown";
+import {
+  ArrowUp,
+  BarChart3,
+  Bot,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  Clock3,
+  Copy,
+  Download,
+  ExternalLink,
+  Film,
+  GalleryHorizontalEnd,
+  History,
+  Image as ImageIcon,
+  Loader2,
+  Menu,
+  MessageCircle,
+  MoreHorizontal,
+  PanelLeftClose,
+  Plus,
+  RefreshCw,
+  Rocket,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  Video,
+  Wallet,
+  WandSparkles,
+  X,
+  Zap,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { TokenGatingVerifier } from "@/components/agent/token-gating-verifier";
+import { AGENT_HOLD_MIN_USD, AGENT_HOLD_MINT } from "@/lib/agentTokenGate";
+import { OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
+import {
+  bootstrapOrbitXAi,
+  createAiConversation,
+  deleteAiConversation,
+  executeAiTool,
+  fetchAiGate,
+  fetchAiMessages,
+  generateAiMedia,
+  pollAiMedia,
+  sendAiMessage,
+  type AiBootstrap,
+  type AiConversation,
+  type AiGate,
+  type AiGeneration,
+  type AiMessage,
+  type AiToolEvent,
+} from "@/lib/orbitxAi";
+import {
+  approveXAgentQueueItem,
+  bootstrapXMcp,
+  enqueueXAgentItem,
+  generateXAgentPost,
+  listXAgentQueue,
+  type XMcpBootstrap,
+  type XAgentQueueItem,
+} from "@/lib/xMcp";
+import { xStartLogin } from "@/lib/xAuth";
+import "./orbitx-ai.css";
+
+type AiTab = "chat" | "create" | "x";
+type MediaKind = "image" | "video";
+type SendAsset = "SOL" | "ORBITX" | "CUSTOM";
+const SOL_DECIMALS = String(LAMPORTS_PER_SOL).length - 1;
+
+const STARTER_PROMPTS = [
+  {
+    icon: BarChart3,
+    title: "Live token chart",
+    prompt: "Show me the live chart and key levels for the ORBITX token.",
+    tone: "cyan",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Deep safety scan",
+    prompt: "Help me run a full safety and forensics scan on a token contract.",
+    tone: "violet",
+  },
+  {
+    icon: Rocket,
+    title: "Find momentum",
+    prompt: "Screen Solana for the strongest trending tokens in the last hour.",
+    tone: "lime",
+  },
+  {
+    icon: Wallet,
+    title: "Wallet intelligence",
+    prompt: "Analyze my connected wallet, holdings, recent swaps, and risk exposure.",
+    tone: "gold",
+  },
+] as const;
+
+const X_IDEA_PROMPTS = [
+  "A sharp market observation about today's Solana momentum",
+  "A useful educational post about avoiding token scams",
+  "A bold but credible OrbitX product update",
+  "A high-conviction community question that starts a conversation",
+];
+
+const TAB_ITEMS: Array<{
+  id: AiTab;
+  label: string;
+  icon: typeof MessageCircle;
+}> = [
+  { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "create", label: "Create", icon: WandSparkles },
+  { id: "x", label: "X Studio", icon: X },
+];
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function recordString(value: unknown, key: string): string {
+  const candidate = asRecord(value)[key];
+  return typeof candidate === "string" ? candidate : "";
+}
+
+function recordNumber(value: unknown, key: string): number | null {
+  const candidate = asRecord(value)[key];
+  return typeof candidate === "number" && Number.isFinite(candidate)
+    ? candidate
+    : null;
+}
+
+function formatUsd(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (Math.abs(value) >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  if (Math.abs(value) >= 1) return `$${value.toFixed(2)}`;
+  return `$${value.toPrecision(3)}`;
+}
+
+function shortAddress(value?: string | null): string {
+  if (!value) return "No wallet";
+  return `${value.slice(0, 4)}…${value.slice(-4)}`;
+}
+
+function relativeTime(iso: string): string {
+  const delta = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(delta) || delta < 0) return "now";
+  if (delta < 60_000) return "now";
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m`;
+  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h`;
+  return `${Math.floor(delta / 86_400_000)}d`;
+}
+
+function amountToBaseUnits(input: string, decimals: number): bigint {
+  const clean = input.trim();
+  if (!/^\d+(?:\.\d+)?$/.test(clean)) throw new Error("Enter a valid positive amount");
+  const [whole, fraction = ""] = clean.split(".");
+  if (fraction.length > decimals) {
+    throw new Error(`This token supports up to ${decimals} decimal places`);
+  }
+  const padded = fraction.padEnd(decimals, "0");
+  const value = BigInt(whole) * 10n ** BigInt(decimals) + BigInt(padded || "0");
+  if (value <= 0n) throw new Error("Amount must be greater than zero");
+  return value;
+}
+
+function AiMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`oai-mark${compact ? " is-compact" : ""}`} aria-hidden>
+      <span className="oai-mark__halo" />
+      <span className="oai-mark__core">
+        <Sparkles />
+      </span>
+    </div>
+  );
+}
+
+function LoadingScreen({ label = "Waking OrbitX AI" }: { label?: string }) {
+  return (
+    <div className="oai-root oai-root--center">
+      <div className="oai-boot">
+        <AiMark />
+        <div className="oai-boot__loader">
+          <span />
+          <span />
+          <span />
+        </div>
+        <p>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function LockedScreen({
+  gate,
+  error,
+  onRetry,
+}: {
+  gate: AiGate | null;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="oai-root oai-gate">
+      <div className="oai-gate__glow oai-gate__glow--one" />
+      <div className="oai-gate__glow oai-gate__glow--two" />
+      <header className="oai-gate__header">
+        <div className="oai-brand">
+          <AiMark compact />
+          <div>
+            <strong>OrbitX AI</strong>
+            <span>Private intelligence layer</span>
+          </div>
+        </div>
+        <WalletConnectButton />
+      </header>
+      <main className="oai-gate__main">
+        <section className="oai-gate__copy">
+          <span className="oai-eyebrow">
+            <ShieldCheck size={13} /> Wallet-gated super app
+          </span>
+          <h1>
+            One agent.
+            <br />
+            <em>Every OrbitX tool.</em>
+          </h1>
+          <p>
+            Chat with NVIDIA intelligence, inspect live markets, sign non-custodial
+            transactions, create Grok media, and run your X agent from one mobile-first
+            command center.
+          </p>
+          <div className="oai-gate__features">
+            <span>
+              <Bot /> MCP-native agent
+            </span>
+            <span>
+              <GalleryHorizontalEnd /> Image + video
+            </span>
+            <span>
+              <Wallet /> Secure wallet actions
+            </span>
+          </div>
+        </section>
+        <section className="oai-gate__card">
+          <div className="oai-gate__card-top">
+            <div className="oai-gate__token">
+              <span>OX</span>
+            </div>
+            <div>
+              <span className="oai-kicker">Access requirement</span>
+              <strong>Hold ${AGENT_HOLD_MIN_USD} in {OGSCAN_TOKEN_SYMBOL}</strong>
+            </div>
+            <span className="oai-live-pill">
+              <i /> Mainnet
+            </span>
+          </div>
+          <div className="oai-gate__meter">
+            <div>
+              <span>Your verified holding</span>
+              <strong>{formatUsd(gate?.holdingUsd)}</strong>
+            </div>
+            <div className="oai-gate__track">
+              <span
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.max(4, ((gate?.holdingUsd || 0) / AGENT_HOLD_MIN_USD) * 100),
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+          {(gate?.message || error) && (
+            <div className="oai-gate__notice">{error || gate?.message}</div>
+          )}
+          <div className="oai-gate__verify">
+            <TokenGatingVerifier onUnlocked={onRetry} />
+          </div>
+          <div className="oai-gate__actions">
+            <a
+              href={`https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`}
+              target="_blank"
+              rel="noreferrer"
+              className="oai-primary-btn"
+            >
+              Buy {OGSCAN_TOKEN_SYMBOL} <ExternalLink size={15} />
+            </a>
+            <button type="button" className="oai-secondary-btn" onClick={onRetry}>
+              <RefreshCw size={14} /> Recheck
+            </button>
+          </div>
+          <p className="oai-gate__foot">
+            Owner wallets are recognized automatically. OrbitX never asks for private
+            keys or seed phrases.
+          </p>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function ToolResultCard({
+  event,
+  busy,
+  onConfirm,
+}: {
+  event: AiToolEvent;
+  busy: boolean;
+  onConfirm: (event: AiToolEvent) => void;
+}) {
+  const result = asRecord(event.result);
+  const embedUrl = recordString(result, "embedUrl");
+  const imageUrls = Array.isArray(result.imageUrls)
+    ? result.imageUrls.filter((url): url is string => typeof url === "string")
+    : Array.isArray(result.resultUrls)
+      ? result.resultUrls.filter((url): url is string => typeof url === "string")
+      : [];
+  const signUrl =
+    recordString(result, "signUrl") ||
+    recordString(result, "openUrl") ||
+    recordString(result, "autoSignUrl");
+  const isChart = Boolean(embedUrl) || /chart/i.test(event.tool);
+  const isPending = event.status === "confirmation_required";
+  const failed = event.status === "failed";
+
+  if (isChart && embedUrl) {
+    return (
+      <div className="oai-tool oai-tool--chart">
+        <div className="oai-tool__head">
+          <span>
+            <BarChart3 size={15} /> Live DexScreener
+          </span>
+          <a href={recordString(result, "pageUrl") || embedUrl} target="_blank" rel="noreferrer">
+            Open <ExternalLink size={12} />
+          </a>
+        </div>
+        <div className="oai-chart-frame">
+          <iframe src={embedUrl} title="Live token chart" loading="lazy" allowFullScreen />
+        </div>
+        <div className="oai-chart-stats">
+          <span>
+            Price <strong>{formatUsd(recordNumber(result, "priceUsd"))}</strong>
+          </span>
+          <span>
+            Liquidity <strong>{formatUsd(recordNumber(result, "liquidityUsd"))}</strong>
+          </span>
+          <span>
+            24h vol <strong>{formatUsd(recordNumber(result, "volume24h"))}</strong>
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (imageUrls.length > 0) {
+    return (
+      <div className="oai-tool oai-tool--media">
+        <div className="oai-tool__head">
+          <span>
+            <WandSparkles size={15} /> {event.tool.replaceAll("_", " ")}
+          </span>
+          <span className="oai-tool__status is-ok">
+            <Check size={11} /> Ready
+          </span>
+        </div>
+        <div className="oai-tool__images">
+          {imageUrls.slice(0, 4).map((url) => (
+            <a href={url} target="_blank" rel="noreferrer" key={url}>
+              <img src={url} alt="Generated OrbitX media" loading="lazy" />
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`oai-tool${failed ? " is-failed" : ""}${isPending ? " is-pending" : ""}`}>
+      <div className="oai-tool__head">
+        <span>
+          {isPending ? <ShieldCheck size={15} /> : failed ? <X size={15} /> : <Zap size={15} />}
+          {event.tool.replace(/^orbitx_/, "").replaceAll("_", " ")}
+        </span>
+        <span className={`oai-tool__status${failed ? " is-bad" : isPending ? " is-warn" : " is-ok"}`}>
+          {failed ? "Failed" : isPending ? "Confirm" : "Complete"}
+        </span>
+      </div>
+      {isPending ? (
+        <>
+          <p>This action can change data or prepare a transaction. Review it before running.</p>
+          <pre>{JSON.stringify(event.args, null, 2)}</pre>
+          <button
+            type="button"
+            className="oai-tool__confirm"
+            disabled={busy}
+            onClick={() => onConfirm(event)}
+          >
+            {busy ? <Loader2 className="oai-spin" size={14} /> : <ShieldCheck size={14} />}
+            Confirm action
+          </button>
+        </>
+      ) : (
+        <>
+          <pre>{JSON.stringify(event.result, null, 2).slice(0, 2400)}</pre>
+          {signUrl && (
+            <a className="oai-tool__confirm" href={signUrl} target="_blank" rel="noreferrer">
+              Open secure signer <ExternalLink size={13} />
+            </a>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChatMessage({
+  message,
+  confirming,
+  onConfirm,
+}: {
+  message: AiMessage;
+  confirming: string | null;
+  onConfirm: (event: AiToolEvent) => void;
+}) {
+  const isUser = message.role === "user";
+  const isTool = message.role === "tool";
+  return (
+    <article className={`oai-message oai-message--${message.role}`}>
+      {!isUser && (
+        <div className="oai-message__avatar">
+          {isTool ? <Zap size={14} /> : <AiMark compact />}
+        </div>
+      )}
+      <div className="oai-message__body">
+        <div className="oai-message__meta">
+          <strong>{isUser ? "You" : isTool ? "OrbitX action" : "OrbitX AI"}</strong>
+          <span>{relativeTime(message.createdAt)}</span>
+        </div>
+        <div className="oai-message__content">
+          {isUser || isTool ? (
+            <p>{message.content}</p>
+          ) : (
+            <ReactMarkdown
+              components={{
+                a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
+        </div>
+        {message.toolEvents.map((event) => (
+          <ToolResultCard
+            key={event.id}
+            event={event}
+            busy={confirming === event.id}
+            onConfirm={onConfirm}
+          />
+        ))}
+      </div>
+      {isUser && (
+        <div className="oai-message__avatar oai-message__avatar--user">
+          <ArrowUp size={14} />
+        </div>
+      )}
+    </article>
+  );
+}
+
+function Composer({
+  value,
+  busy,
+  onChange,
+  onSubmit,
+  onSendAsset,
+  onChart,
+}: {
+  value: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onSendAsset: () => void;
+  onChart: () => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.style.height = "0px";
+    ref.current.style.height = `${Math.min(148, Math.max(26, ref.current.scrollHeight))}px`;
+  }, [value]);
+
+  return (
+    <div className="oai-composer-wrap">
+      <div className="oai-quick-row">
+        <button type="button" onClick={onSendAsset}>
+          <Send size={13} /> Send tokens
+        </button>
+        <button type="button" onClick={onChart}>
+          <BarChart3 size={13} /> Live chart
+        </button>
+        <button type="button" onClick={() => onChange("Run a deep safety scan on ")}>
+          <ShieldCheck size={13} /> Safety scan
+        </button>
+      </div>
+      <div className="oai-composer">
+        <button type="button" className="oai-composer__plus" aria-label="More actions" onClick={onSendAsset}>
+          <Plus size={19} />
+        </button>
+        <textarea
+          ref={ref}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Message OrbitX AI…"
+          aria-label="Message OrbitX AI"
+          rows={1}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="oai-composer__send"
+          aria-label="Send message"
+          disabled={busy || !value.trim()}
+          onClick={onSubmit}
+        >
+          {busy ? <Loader2 className="oai-spin" size={18} /> : <ArrowUp size={18} />}
+        </button>
+      </div>
+      <p className="oai-composer-note">
+        OrbitX can make mistakes. Verify financial data and approve every transaction in your wallet.
+      </p>
+    </div>
+  );
+}
+
+function ConversationRail({
+  open,
+  conversations,
+  activeId,
+  onClose,
+  onNew,
+  onSelect,
+  onDelete,
+}: {
+  open: boolean;
+  conversations: AiConversation[];
+  activeId: string | null;
+  onClose: () => void;
+  onNew: () => void;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <>
+      {open && <button type="button" className="oai-rail-scrim" onClick={onClose} aria-label="Close history" />}
+      <aside className={`oai-rail${open ? " is-open" : ""}`}>
+        <div className="oai-rail__brand">
+          <div className="oai-brand">
+            <AiMark compact />
+            <div>
+              <strong>OrbitX AI</strong>
+              <span>Command everything</span>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close history">
+            <PanelLeftClose size={18} />
+          </button>
+        </div>
+        <button type="button" className="oai-new-chat" onClick={onNew}>
+          <Plus size={16} /> New conversation
+          <span>⌘ K</span>
+        </button>
+        <div className="oai-rail__section">
+          <span>Recent</span>
+          <MoreHorizontal size={15} />
+        </div>
+        <div className="oai-conversation-list">
+          {conversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              className={`oai-conversation${activeId === conversation.id ? " is-active" : ""}`}
+            >
+              <button
+                type="button"
+                className="oai-conversation__select"
+                onClick={() => onSelect(conversation.id)}
+              >
+                <MessageCircle size={14} />
+                <span>
+                  <strong>{conversation.title}</strong>
+                  <small>{relativeTime(conversation.updatedAt)}</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="oai-conversation__delete"
+                onClick={() => onDelete(conversation.id)}
+                aria-label={`Delete ${conversation.title}`}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+          {conversations.length === 0 && (
+            <div className="oai-rail__empty">
+              <MessageCircle size={22} />
+              Your conversations will appear here.
+            </div>
+          )}
+        </div>
+        <div className="oai-rail__foot">
+          <ShieldCheck size={14} />
+          <span>
+            <strong>Private by design</strong>
+            Wallet-gated history
+          </span>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function CreateCenter({
+  generations,
+  busy,
+  onGenerate,
+}: {
+  generations: AiGeneration[];
+  busy: boolean;
+  onGenerate: (
+    kind: MediaKind,
+    prompt: string,
+    settings: Record<string, unknown>,
+  ) => void;
+}) {
+  const [kind, setKind] = useState<MediaKind>("image");
+  const [prompt, setPrompt] = useState("");
+  const [aspect, setAspect] = useState("1:1");
+  const [quality, setQuality] = useState(true);
+  const [videoMode, setVideoMode] = useState("normal");
+  const [duration, setDuration] = useState(10);
+
+  const submit = () => {
+    if (!prompt.trim()) {
+      toast.error("Describe what you want to create");
+      return;
+    }
+    onGenerate(
+      kind,
+      prompt,
+      kind === "image"
+        ? { aspect_ratio: aspect, enable_pro: quality, nsfw_checker: true }
+        : {
+            aspect_ratio: aspect,
+            mode: videoMode,
+            duration,
+            resolution: "720p",
+            nsfw_checker: true,
+          },
+    );
+  };
+
+  return (
+    <section className="oai-tab-page oai-create-page">
+      <div className="oai-tab-page__hero">
+        <span className="oai-eyebrow">
+          <Sparkles size={13} /> Grok Imagine studio
+        </span>
+        <h1>Turn ideas into <em>visual worlds.</em></h1>
+        <p>Generate production-ready images and cinematic video without leaving OrbitX.</p>
+      </div>
+      <div className="oai-create-card">
+        <div className="oai-mode-switch">
+          <button
+            type="button"
+            className={kind === "image" ? "is-active" : ""}
+            onClick={() => {
+              setKind("image");
+              if (aspect === "16:9") setAspect("1:1");
+            }}
+          >
+            <ImageIcon size={15} /> Image
+          </button>
+          <button
+            type="button"
+            className={kind === "video" ? "is-active" : ""}
+            onClick={() => {
+              setKind("video");
+              setAspect("16:9");
+            }}
+          >
+            <Film size={15} /> Video
+          </button>
+        </div>
+        <label className="oai-create-prompt">
+          <span>Creative direction</span>
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder={
+              kind === "image"
+                ? "A futuristic Solana city floating above a neon ocean, editorial lighting…"
+                : "Camera flies through a glowing crypto command center as live charts rise from the floor…"
+            }
+            rows={5}
+          />
+          <small>{prompt.length}/5000</small>
+        </label>
+        <div className="oai-create-settings">
+          <div>
+            <span>Aspect ratio</span>
+            <div className="oai-chip-row">
+              {["1:1", "3:2", "2:3", "16:9", "9:16"].map((option) => (
+                <button
+                  type="button"
+                  className={aspect === option ? "is-active" : ""}
+                  onClick={() => setAspect(option)}
+                  key={option}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+          {kind === "image" ? (
+            <div>
+              <span>Render mode</span>
+              <div className="oai-chip-row">
+                <button type="button" className={!quality ? "is-active" : ""} onClick={() => setQuality(false)}>
+                  Fast
+                </button>
+                <button type="button" className={quality ? "is-active" : ""} onClick={() => setQuality(true)}>
+                  <Sparkles size={12} /> Pro
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <span>Motion</span>
+                <div className="oai-chip-row">
+                  {["normal", "fun", "spicy"].map((option) => (
+                    <button
+                      type="button"
+                      className={videoMode === option ? "is-active" : ""}
+                      onClick={() => setVideoMode(option)}
+                      key={option}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span>Duration</span>
+                <div className="oai-chip-row">
+                  {[6, 10, 15, 30].map((seconds) => (
+                    <button
+                      type="button"
+                      className={duration === seconds ? "is-active" : ""}
+                      onClick={() => setDuration(seconds)}
+                      key={seconds}
+                    >
+                      {seconds}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <button type="button" className="oai-generate-btn" onClick={submit} disabled={busy || !prompt.trim()}>
+          {busy ? <Loader2 className="oai-spin" size={18} /> : <WandSparkles size={18} />}
+          {busy ? "Starting generation…" : `Generate ${kind}`}
+          <span>Grok Imagine</span>
+        </button>
+      </div>
+
+      <div className="oai-gallery-head">
+        <div>
+          <span className="oai-kicker">Your generations</span>
+          <h2>Creation history</h2>
+        </div>
+        <span>{generations.length} projects</span>
+      </div>
+      <div className="oai-gallery">
+        {generations.map((generation) => (
+          <article className="oai-generation" key={generation.id}>
+            <div className="oai-generation__visual">
+              {generation.status === "success" && generation.resultUrls[0] ? (
+                generation.kind === "video" ? (
+                  <video src={generation.resultUrls[0]} controls playsInline preload="metadata" />
+                ) : (
+                  <img src={generation.resultUrls[0]} alt={generation.prompt} loading="lazy" />
+                )
+              ) : (
+                <div className={`oai-generation__pending is-${generation.status}`}>
+                  {generation.status === "failed" ? (
+                    <X size={24} />
+                  ) : generation.kind === "video" ? (
+                    <Video size={24} />
+                  ) : (
+                    <ImageIcon size={24} />
+                  )}
+                  <strong>
+                    {generation.status === "failed" ? "Generation failed" : "Creating your vision"}
+                  </strong>
+                  <span>{generation.error || "Grok Imagine is rendering…"}</span>
+                </div>
+              )}
+              <span className="oai-generation__kind">
+                {generation.kind === "video" ? <Video size={11} /> : <ImageIcon size={11} />}
+                {generation.kind}
+              </span>
+              {generation.resultUrls[0] && (
+                <a
+                  href={generation.resultUrls[0]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="oai-generation__download"
+                  aria-label="Open generated media"
+                >
+                  <Download size={14} />
+                </a>
+              )}
+            </div>
+            <div className="oai-generation__body">
+              <p>{generation.prompt}</p>
+              <span>
+                {generation.model.replace("grok-imagine/", "")} · {relativeTime(generation.createdAt)}
+              </span>
+            </div>
+          </article>
+        ))}
+        {generations.length === 0 && (
+          <div className="oai-gallery-empty">
+            <WandSparkles size={28} />
+            <strong>Your canvas is ready</strong>
+            <span>Describe an image or video above to begin.</span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function XStudio() {
+  const [boot, setBoot] = useState<XMcpBootstrap | null>(null);
+  const [queue, setQueue] = useState<XAgentQueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<"connect" | "generate" | "post" | null>(null);
+  const [hint, setHint] = useState("");
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [nextBoot, nextQueue] = await Promise.all([
+        bootstrapXMcp(),
+        listXAgentQueue(),
+      ]);
+      setBoot(nextBoot);
+      setQueue(nextQueue.items || []);
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "Could not load X Studio");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const connect = async () => {
+    setBusy("connect");
+    try {
+      await xStartLogin();
+    } catch (connectError) {
+      setBusy(null);
+      toast.error(connectError instanceof Error ? connectError.message : "Could not connect X");
+    }
+  };
+
+  const generate = async (idea?: string) => {
+    setBusy("generate");
+    setError(null);
+    try {
+      const result = await generateXAgentPost({
+        hint: idea || hint || "Create a timely, useful OrbitX post idea.",
+        postNow: false,
+      });
+      const text = result.draft?.text || String(result.item?.payload?.text || "");
+      if (!text) throw new Error(result.message || result.error || "No draft returned");
+      setDraft(text);
+      if (result.item) setQueue((current) => [result.item!, ...current.filter((item) => item.id !== result.item?.id)]);
+    } catch (generateError) {
+      setError(generateError instanceof Error ? generateError.message : "Could not generate an idea");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const postNow = async () => {
+    if (!draft.trim()) return;
+    if (!boot?.x.connected) {
+      toast.error("Connect your X account before posting");
+      return;
+    }
+    setBusy("post");
+    setError(null);
+    try {
+      const { item } = await enqueueXAgentItem({
+        text: draft.trim(),
+        kind: "post",
+        status: "pending",
+      });
+      await approveXAgentQueueItem(item.id);
+      toast.success("Posted to X");
+      setDraft("");
+      await refresh();
+    } catch (postError) {
+      setError(postError instanceof Error ? postError.message : "Could not post to X");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="oai-tab-page oai-x-page oai-tab-loading">
+        <Loader2 className="oai-spin" />
+        Loading your X agent…
+      </section>
+    );
+  }
+
+  const connected = Boolean(boot?.x.connected);
+  return (
+    <section className="oai-tab-page oai-x-page">
+      <div className="oai-tab-page__hero oai-x-hero">
+        <span className="oai-eyebrow">
+          <X size={13} /> NVIDIA-powered social studio
+        </span>
+        <h1>Own your voice. <em>Multiply your signal.</em></h1>
+        <p>Train ideas, refine posts, and publish through your securely connected X account.</p>
+      </div>
+      <div className={`oai-x-account${connected ? " is-connected" : ""}`}>
+        <div className="oai-x-account__avatar">
+          {boot?.x.avatar ? <img src={boot.x.avatar} alt="" /> : <X size={23} />}
+          {connected && <span><Check size={10} /></span>}
+        </div>
+        <div>
+          <span className="oai-kicker">{connected ? "Connected account" : "Account required"}</span>
+          <strong>{connected ? `@${boot?.x.username}` : "Connect your X account"}</strong>
+          <p>
+            {connected
+              ? "OAuth is active. OrbitX can draft and publish with your approval."
+              : "Authorize tweet.write so your agent can publish ideas you approve."}
+          </p>
+        </div>
+        <button type="button" onClick={connect} disabled={busy === "connect"}>
+          {busy === "connect" ? <Loader2 className="oai-spin" size={14} /> : connected ? <RefreshCw size={14} /> : <X size={14} />}
+          {connected ? "Reconnect" : "Connect X"}
+        </button>
+      </div>
+
+      {error && <div className="oai-inline-error">{error}</div>}
+
+      <div className="oai-x-grid">
+        <div className="oai-x-composer">
+          <div className="oai-x-composer__head">
+            <div>
+              <span className="oai-kicker">AI post lab</span>
+              <h2>Make something worth reading</h2>
+            </div>
+            <span className="oai-live-pill">
+              <i /> NVIDIA NIM
+            </span>
+          </div>
+          <label>
+            <span>What should the post be about?</span>
+            <input
+              value={hint}
+              onChange={(event) => setHint(event.target.value)}
+              placeholder="A specific angle, announcement, or market insight…"
+            />
+          </label>
+          <div className="oai-x-ideas">
+            {X_IDEA_PROMPTS.map((idea) => (
+              <button type="button" onClick={() => void generate(idea)} key={idea}>
+                <Sparkles size={12} /> {idea}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="oai-x-generate"
+            disabled={busy === "generate"}
+            onClick={() => void generate()}
+          >
+            {busy === "generate" ? <Loader2 className="oai-spin" size={16} /> : <WandSparkles size={16} />}
+            Generate post idea
+          </button>
+          <label className="oai-x-draft">
+            <span>Draft</span>
+            <textarea
+              rows={7}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value.slice(0, 280))}
+              placeholder="Your AI-generated draft will appear here. You stay in control."
+            />
+            <small className={draft.length > 260 ? "is-warn" : ""}>{draft.length}/280</small>
+          </label>
+          <div className="oai-x-composer__actions">
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(draft);
+                toast.success("Draft copied");
+              }}
+              disabled={!draft}
+            >
+              <Copy size={14} /> Copy
+            </button>
+            <button
+              type="button"
+              className="is-primary"
+              onClick={() => void postNow()}
+              disabled={!draft.trim() || busy === "post"}
+            >
+              {busy === "post" ? <Loader2 className="oai-spin" size={14} /> : <Send size={14} />}
+              Post to X
+            </button>
+          </div>
+        </div>
+
+        <aside className="oai-x-queue">
+          <div className="oai-x-queue__head">
+            <div>
+              <span className="oai-kicker">Agent activity</span>
+              <h2>Recent queue</h2>
+            </div>
+            <button type="button" onClick={() => void refresh()} aria-label="Refresh queue">
+              <RefreshCw size={14} />
+            </button>
+          </div>
+          <div className="oai-x-queue__list">
+            {queue.slice(0, 8).map((item) => (
+              <article key={item.id}>
+                <p>{String(item.payload?.text || "Queued X action")}</p>
+                <div>
+                  <span className={`is-${item.status}`}>{item.status}</span>
+                  <time>{item.createdAt ? relativeTime(item.createdAt) : "now"}</time>
+                </div>
+              </article>
+            ))}
+            {queue.length === 0 && (
+              <div className="oai-x-queue__empty">
+                <Clock3 size={22} />
+                <strong>No posts yet</strong>
+                Generate your first idea to start the queue.
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function SendAssetModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { connection } = useConnection();
+  const { publicKey, sendTransaction, connected } = useWallet();
+  const [asset, setAsset] = useState<SendAsset>("SOL");
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+  const [mint, setMint] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [signature, setSignature] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setSignature(null);
+      setBusy(false);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!connected || !publicKey) {
+      toast.error("Connect your wallet first");
+      return;
+    }
+    setBusy(true);
+    try {
+      const destination = new PublicKey(recipient.trim());
+      const transaction = new Transaction();
+      if (asset === "SOL") {
+        const lamports = amountToBaseUnits(amount, SOL_DECIMALS);
+        if (lamports > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("SOL amount is too large");
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: destination,
+            lamports: Number(lamports),
+          }),
+        );
+      } else {
+        const mintAddress = asset === "ORBITX" ? AGENT_HOLD_MINT : mint.trim();
+        const mintKey = new PublicKey(mintAddress);
+        const mintInfo = await getMint(connection, mintKey, "confirmed");
+        const units = amountToBaseUnits(amount, mintInfo.decimals);
+        const sourceAta = getAssociatedTokenAddressSync(mintKey, publicKey);
+        const destinationAta = getAssociatedTokenAddressSync(mintKey, destination);
+        if (!(await connection.getAccountInfo(sourceAta, "confirmed"))) {
+          throw new Error("Your wallet does not have a token account for this mint");
+        }
+        if (!(await connection.getAccountInfo(destinationAta, "confirmed"))) {
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              publicKey,
+              destinationAta,
+              destination,
+              mintKey,
+            ),
+          );
+        }
+        transaction.add(
+          createTransferCheckedInstruction(
+            sourceAta,
+            mintKey,
+            destinationAta,
+            publicKey,
+            units,
+            mintInfo.decimals,
+          ),
+        );
+      }
+
+      const latest = await connection.getLatestBlockhash("confirmed");
+      transaction.recentBlockhash = latest.blockhash;
+      transaction.feePayer = publicKey;
+      const nextSignature = await sendTransaction(transaction, connection, {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+      await connection.confirmTransaction(
+        { signature: nextSignature, ...latest },
+        "confirmed",
+      );
+      setSignature(nextSignature);
+      toast.success("Transfer confirmed");
+    } catch (sendError) {
+      toast.error(sendError instanceof Error ? sendError.message : "Transfer failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="oai-modal" role="dialog" aria-modal="true" aria-label="Send tokens">
+      <button type="button" className="oai-modal__scrim" onClick={onClose} aria-label="Close" />
+      <form className="oai-sheet" onSubmit={submit}>
+        <div className="oai-sheet__handle" />
+        <div className="oai-sheet__head">
+          <div>
+            <span className="oai-kicker">Non-custodial transfer</span>
+            <h2>Send tokens</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close send tokens">
+            <X size={18} />
+          </button>
+        </div>
+        {signature ? (
+          <div className="oai-send-success">
+            <span><Check size={24} /></span>
+            <h3>Transfer confirmed</h3>
+            <p>Your wallet signed and the Solana network confirmed the transaction.</p>
+            <a href={`https://solscan.io/tx/${signature}`} target="_blank" rel="noreferrer">
+              View on Solscan <ExternalLink size={13} />
+            </a>
+            <button type="button" className="oai-primary-btn" onClick={onClose}>Done</button>
+          </div>
+        ) : (
+          <>
+            <div className="oai-asset-switch">
+              {(["SOL", "ORBITX", "CUSTOM"] as SendAsset[]).map((option) => (
+                <button
+                  type="button"
+                  className={asset === option ? "is-active" : ""}
+                  onClick={() => setAsset(option)}
+                  key={option}
+                >
+                  {option === "CUSTOM" ? "SPL token" : option}
+                </button>
+              ))}
+            </div>
+            <label className="oai-field">
+              <span>Recipient wallet</span>
+              <input
+                value={recipient}
+                onChange={(event) => setRecipient(event.target.value)}
+                placeholder="Solana address"
+                autoComplete="off"
+                required
+              />
+            </label>
+            {asset === "CUSTOM" && (
+              <label className="oai-field">
+                <span>Token mint</span>
+                <input
+                  value={mint}
+                  onChange={(event) => setMint(event.target.value)}
+                  placeholder="SPL token mint address"
+                  autoComplete="off"
+                  required
+                />
+              </label>
+            )}
+            <label className="oai-field">
+              <span>Amount</span>
+              <div className="oai-amount-field">
+                <input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+                <strong>{asset === "CUSTOM" ? "TOKEN" : asset}</strong>
+              </div>
+            </label>
+            <div className="oai-security-note">
+              <ShieldCheck size={16} />
+              <span>
+                OrbitX builds the transfer locally. Your wallet shows the final details and
+                must approve before anything moves.
+              </span>
+            </div>
+            <button type="submit" className="oai-primary-btn oai-sheet__submit" disabled={busy}>
+              {busy ? <Loader2 className="oai-spin" size={16} /> : <Wallet size={16} />}
+              {busy ? "Waiting for confirmation…" : "Review in wallet"}
+            </button>
+          </>
+        )}
+      </form>
+    </div>
+  );
+}
+
+function ChartModal({
+  open,
+  onClose,
+  onRun,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onRun: (mint: string, interval: string) => void;
+}) {
+  const [mint, setMint] = useState("");
+  const [interval, setInterval] = useState("15m");
+  if (!open) return null;
+  return (
+    <div className="oai-modal" role="dialog" aria-modal="true" aria-label="Open live chart">
+      <button type="button" className="oai-modal__scrim" onClick={onClose} aria-label="Close" />
+      <form
+        className="oai-sheet oai-sheet--small"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!mint.trim()) return;
+          onRun(mint.trim(), interval);
+          setMint("");
+        }}
+      >
+        <div className="oai-sheet__handle" />
+        <div className="oai-sheet__head">
+          <div>
+            <span className="oai-kicker">MCP live tool</span>
+            <h2>Open token chart</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close chart">
+            <X size={18} />
+          </button>
+        </div>
+        <label className="oai-field">
+          <span>Contract address</span>
+          <input
+            value={mint}
+            onChange={(event) => setMint(event.target.value)}
+            placeholder="Solana mint or EVM address"
+            required
+          />
+        </label>
+        <div className="oai-create-settings">
+          <div>
+            <span>Interval</span>
+            <div className="oai-chip-row">
+              {["5m", "15m", "1h", "4h", "24h"].map((option) => (
+                <button
+                  type="button"
+                  className={interval === option ? "is-active" : ""}
+                  onClick={() => setInterval(option)}
+                  key={option}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <button type="submit" className="oai-primary-btn oai-sheet__submit">
+          <BarChart3 size={16} /> Load live chart
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function OrbitXAI() {
+  const { user, loading: authLoading } = useAuth();
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [gate, setGate] = useState<AiGate | null>(null);
+  const [bootstrap, setBootstrap] = useState<AiBootstrap | null>(null);
+  const [tab, setTab] = useState<AiTab>("chat");
+  const [railOpen, setRailOpen] = useState(false);
+  const [conversations, setConversations] = useState<AiConversation[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<AiMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [composer, setComposer] = useState("");
+  const [sending, setSending] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelOpen, setModelOpen] = useState(false);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [generations, setGenerations] = useState<AiGeneration[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [sendModal, setSendModal] = useState(false);
+  const [chartModal, setChartModal] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const refreshAccess = useCallback(async () => {
+    if (!user) {
+      setAccessLoading(false);
+      setGate(null);
+      setBootstrap(null);
+      return;
+    }
+    setAccessLoading(true);
+    setAccessError(null);
+    try {
+      const gateResponse = await fetchAiGate();
+      setGate(gateResponse.gate);
+      if (!gateResponse.gate.hasAccess) {
+        setBootstrap(null);
+        return;
+      }
+      const data = await bootstrapOrbitXAi();
+      setBootstrap(data);
+      setGate(data.gate);
+      setConversations(data.conversations);
+      setGenerations(data.generations);
+      setSelectedModel((current) => current || data.defaultModel);
+      setActiveId((current) =>
+        current && data.conversations.some((conversation) => conversation.id === current)
+          ? current
+          : data.conversations[0]?.id || null,
+      );
+    } catch (refreshError) {
+      setAccessError(
+        refreshError instanceof Error ? refreshError.message : "Could not open OrbitX AI",
+      );
+    } finally {
+      setAccessLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void refreshAccess();
+  }, [authLoading, refreshAccess]);
+
+  useEffect(() => {
+    if (!activeId || !bootstrap) {
+      setMessages([]);
+      return;
+    }
+    let alive = true;
+    setMessagesLoading(true);
+    void fetchAiMessages(activeId)
+      .then((result) => {
+        if (alive) setMessages(result.messages);
+      })
+      .catch((messageError) => {
+        if (alive) toast.error(messageError instanceof Error ? messageError.message : "Could not load conversation");
+      })
+      .finally(() => {
+        if (alive) setMessagesLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [activeId, bootstrap]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    element.scrollTo({ top: element.scrollHeight, behavior: messages.length > 2 ? "smooth" : "auto" });
+  }, [messages, sending]);
+
+  const pendingGenerationIds = useMemo(
+    () =>
+      generations
+        .filter((generation) => ["queued", "waiting", "processing"].includes(generation.status))
+        .map((generation) => generation.id),
+    [generations],
+  );
+
+  useEffect(() => {
+    if (!pendingGenerationIds.length) return;
+    const poll = async () => {
+      const updates = await Promise.allSettled(
+        pendingGenerationIds.map((id) => pollAiMedia(id)),
+      );
+      setGenerations((current) =>
+        current.map((generation) => {
+          const index = pendingGenerationIds.indexOf(generation.id);
+          if (index < 0) return generation;
+          const update = updates[index];
+          return update?.status === "fulfilled" ? update.value.generation : generation;
+        }),
+      );
+    };
+    const timer = window.setInterval(() => void poll(), 7_000);
+    return () => window.clearInterval(timer);
+  }, [pendingGenerationIds.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const newConversation = async () => {
+    setActiveId(null);
+    setMessages([]);
+    setComposer("");
+    setRailOpen(false);
+    if (!selectedModel) return;
+    try {
+      const result = await createAiConversation(selectedModel);
+      setConversations((current) => [result.conversation, ...current]);
+      setActiveId(result.conversation.id);
+    } catch (createError) {
+      toast.error(createError instanceof Error ? createError.message : "Could not create chat");
+    }
+  };
+
+  const selectConversation = (id: string) => {
+    setActiveId(id);
+    setRailOpen(false);
+    setTab("chat");
+  };
+
+  const removeConversation = async (id: string) => {
+    try {
+      await deleteAiConversation(id);
+      setConversations((current) => current.filter((conversation) => conversation.id !== id));
+      if (activeId === id) {
+        setActiveId(null);
+        setMessages([]);
+      }
+    } catch (deleteError) {
+      toast.error(deleteError instanceof Error ? deleteError.message : "Could not delete chat");
+    }
+  };
+
+  const sendMessage = async (override?: string) => {
+    const prompt = (override ?? composer).trim();
+    if (!prompt || sending) return;
+    setTab("chat");
+    setComposer("");
+    setSending(true);
+    const temporary: AiMessage = {
+      id: `local-${Date.now()}`,
+      conversationId: activeId || "new",
+      role: "user",
+      content: prompt,
+      model: selectedModel,
+      toolEvents: [],
+      metadata: {},
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((current) => [...current, temporary]);
+    try {
+      const result = await sendAiMessage({
+        conversationId: activeId,
+        message: prompt,
+        model: selectedModel,
+      });
+      setActiveId(result.conversation.id);
+      setConversations((current) => [
+        result.conversation,
+        ...current.filter((conversation) => conversation.id !== result.conversation.id),
+      ]);
+      setMessages((current) => [
+        ...current.filter((message) => message.id !== temporary.id),
+        result.userMessage,
+        result.assistantMessage,
+      ]);
+    } catch (sendError) {
+      setMessages((current) => current.filter((message) => message.id !== temporary.id));
+      setComposer(prompt);
+      toast.error(sendError instanceof Error ? sendError.message : "OrbitX AI could not respond");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const confirmTool = async (event: AiToolEvent) => {
+    setConfirming(event.id);
+    try {
+      const result = await executeAiTool({
+        conversationId: activeId,
+        tool: event.tool,
+        args: event.args,
+      });
+      setMessages((current) => {
+        const updated = current.map((message) => ({
+          ...message,
+          toolEvents: message.toolEvents.map((item) =>
+            item.id === event.id ? result.event : item,
+          ),
+        }));
+        return result.message ? [...updated, result.message] : updated;
+      });
+      toast.success("OrbitX action completed");
+    } catch (toolError) {
+      toast.error(toolError instanceof Error ? toolError.message : "Action failed");
+    } finally {
+      setConfirming(null);
+    }
+  };
+
+  const generateMedia = async (
+    kind: MediaKind,
+    prompt: string,
+    settings: Record<string, unknown>,
+  ) => {
+    setGenerating(true);
+    try {
+      const result = await generateAiMedia({
+        kind,
+        prompt,
+        conversationId: activeId,
+        settings,
+      });
+      setGenerations((current) => [
+        result.generation,
+        ...current.filter((generation) => generation.id !== result.generation.id),
+      ]);
+      toast.success(`${kind === "video" ? "Video" : "Image"} generation started`);
+    } catch (generateError) {
+      toast.error(generateError instanceof Error ? generateError.message : "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (authLoading || accessLoading) return <LoadingScreen />;
+  if (!bootstrap || !gate?.hasAccess) {
+    return (
+      <LockedScreen gate={gate} error={accessError} onRetry={() => void refreshAccess()} />
+    );
+  }
+
+  const activeConversation = conversations.find((conversation) => conversation.id === activeId);
+  const modelLabel =
+    bootstrap.models.find((model) => model.id === selectedModel)?.label || "NVIDIA NIM";
+
+  return (
+    <div className="oai-root oai-app">
+      <ConversationRail
+        open={railOpen}
+        conversations={conversations}
+        activeId={activeId}
+        onClose={() => setRailOpen(false)}
+        onNew={() => void newConversation()}
+        onSelect={selectConversation}
+        onDelete={(id) => void removeConversation(id)}
+      />
+      <div className="oai-app__shell">
+        <header className="oai-topbar">
+          <div className="oai-topbar__left">
+            <button
+              type="button"
+              className="oai-icon-btn"
+              onClick={() => setRailOpen(true)}
+              aria-label="Open conversation history"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="oai-brand oai-brand--mobile">
+              <AiMark compact />
+              <div>
+                <strong>OrbitX AI</strong>
+                <span>{activeConversation?.title || "New conversation"}</span>
+              </div>
+            </div>
+          </div>
+          <div className="oai-model-wrap">
+            <button
+              type="button"
+              className="oai-model-btn"
+              onClick={() => setModelOpen((current) => !current)}
+            >
+              <span><i /> {modelLabel}</span>
+              <ChevronDown size={13} />
+            </button>
+            {modelOpen && (
+              <div className="oai-model-menu">
+                <span>Choose intelligence</span>
+                {bootstrap.models.map((model) => (
+                  <button
+                    type="button"
+                    className={model.id === selectedModel ? "is-active" : ""}
+                    onClick={() => {
+                      setSelectedModel(model.id);
+                      setModelOpen(false);
+                    }}
+                    key={model.id}
+                  >
+                    <div>
+                      <strong>{model.label}</strong>
+                      <small>{model.id}</small>
+                    </div>
+                    {model.id === selectedModel && <Check size={14} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="oai-topbar__right">
+            <span className="oai-wallet-pill">
+              <i />
+              {shortAddress(bootstrap.walletAddress)}
+            </span>
+            <button
+              type="button"
+              className="oai-icon-btn"
+              onClick={() => setRailOpen(true)}
+              aria-label="Conversation history"
+            >
+              <History size={17} />
+            </button>
+            <WalletConnectButton />
+          </div>
+        </header>
+
+        <main className="oai-main">
+          {tab === "chat" && (
+            <section className="oai-chat">
+              <div className="oai-chat__scroll" ref={scrollRef}>
+                {messagesLoading ? (
+                  <div className="oai-chat-loading">
+                    <Loader2 className="oai-spin" size={20} /> Loading conversation…
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="oai-welcome">
+                    <AiMark />
+                    <span className="oai-eyebrow">
+                      <i /> MCP tools online
+                    </span>
+                    <h1>What will we <em>build today?</em></h1>
+                    <p>
+                      Markets, wallets, charts, launches, media, X, and every OrbitX
+                      intelligence tool — in one conversation.
+                    </p>
+                    <div className="oai-starters">
+                      {STARTER_PROMPTS.map(({ icon: Icon, title, prompt, tone }) => (
+                        <button
+                          type="button"
+                          className={`is-${tone}`}
+                          onClick={() => void sendMessage(prompt)}
+                          key={title}
+                        >
+                          <span><Icon size={17} /></span>
+                          <strong>{title}</strong>
+                          <small>{prompt}</small>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="oai-capabilities">
+                      <span><BarChart3 /> Live charts</span>
+                      <span><CircleDollarSign /> Token actions</span>
+                      <span><ImageIcon /> Grok media</span>
+                      <span><X /> X agent</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="oai-message-list">
+                    {messages.map((message) => (
+                      <ChatMessage
+                        key={message.id}
+                        message={message}
+                        confirming={confirming}
+                        onConfirm={(event) => void confirmTool(event)}
+                      />
+                    ))}
+                    {sending && (
+                      <div className="oai-thinking">
+                        <div className="oai-message__avatar"><AiMark compact /></div>
+                        <div>
+                          <span />
+                          <span />
+                          <span />
+                          <small>OrbitX is thinking and checking live tools</small>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Composer
+                value={composer}
+                busy={sending}
+                onChange={setComposer}
+                onSubmit={() => void sendMessage()}
+                onSendAsset={() => setSendModal(true)}
+                onChart={() => setChartModal(true)}
+              />
+            </section>
+          )}
+          {tab === "create" && (
+            <CreateCenter
+              generations={generations}
+              busy={generating}
+              onGenerate={(kind, prompt, settings) => void generateMedia(kind, prompt, settings)}
+            />
+          )}
+          {tab === "x" && <XStudio />}
+        </main>
+
+        <nav className="oai-tabbar" aria-label="OrbitX AI sections">
+          {TAB_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              type="button"
+              className={tab === id ? "is-active" : ""}
+              onClick={() => setTab(id)}
+              key={id}
+            >
+              <span><Icon size={18} /></span>
+              <small>{label}</small>
+            </button>
+          ))}
+          <span
+            className="oai-tabbar__indicator"
+            style={{ transform: `translateX(${TAB_ITEMS.findIndex((item) => item.id === tab) * 100}%)` }}
+          />
+        </nav>
+      </div>
+
+      <SendAssetModal open={sendModal} onClose={() => setSendModal(false)} />
+      <ChartModal
+        open={chartModal}
+        onClose={() => setChartModal(false)}
+        onRun={(mint, interval) => {
+          setChartModal(false);
+          void sendMessage(`Show me the live ${interval} chart for ${mint}. Include price, liquidity, volume, market cap, and risk context.`);
+        }}
+      />
+    </div>
+  );
+}

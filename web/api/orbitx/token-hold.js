@@ -189,8 +189,10 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world", opt
     const holdingUsd = price != null ? amount * price : 0;
     const meets = price != null ? holdingUsd >= minUsd : amount > 0 && minUsd <= 0;
 
-    // If price is unavailable but they hold a meaningful amount, allow with caution threshold
-    const fallbackMeets = price == null && amount >= 1000;
+    // Legacy Agent surfaces permit a conservative token-count fallback when the
+    // price provider is unavailable. High-value gates can opt into fail-closed
+    // USD verification so an upstream outage cannot weaken the requirement.
+    const fallbackMeets = !opts.requireUsdPrice && price == null && amount >= 1000;
     const meetsRequirement = meets || fallbackMeets;
 
     return {
@@ -205,10 +207,16 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world", opt
       holdingUsd: Number(holdingUsd.toFixed(4)),
       holdUrl,
       buyUrl,
-      error: meetsRequirement ? undefined : "token_hold_required",
+      error: meetsRequirement
+        ? undefined
+        : price == null && opts.requireUsdPrice
+          ? "price_unavailable"
+          : "token_hold_required",
       message: meetsRequirement
         ? `Hold OK — ~$${holdingUsd.toFixed(2)} ORBITX.`
-        : `Need ≥$${minUsd} ORBITX. Current ~$${holdingUsd.toFixed(2)} (${amount.toFixed(2)} tokens). Buy then re-verify.`,
+        : price == null && opts.requireUsdPrice
+          ? "ORBITX USD pricing is temporarily unavailable, so access cannot be verified safely. Retry shortly."
+          : `Need ≥$${minUsd} ORBITX. Current ~$${holdingUsd.toFixed(2)} (${amount.toFixed(2)} tokens). Buy then re-verify.`,
     };
   } catch (e) {
     return {

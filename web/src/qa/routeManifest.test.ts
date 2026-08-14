@@ -8,12 +8,13 @@ import { resolve } from "node:path";
 describe("OrbitX route manifest", () => {
   const app = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
 
-  it("keeps OS, Play, Intel, Social, and City routes", () => {
+  it("keeps OS, Play, Intel, Social, City, and AI routes", () => {
     expect(app).toContain('path="/os/*"');
     expect(app).toContain('path="/play/*"');
     expect(app).toContain('path="/intel"');
     expect(app).toContain('path="/orbitx-social"');
     expect(app).toContain('path="/Orbitxcity"');
+    expect(app).toContain('path="/AI"');
   });
 
   it("lazy-loads team apps", () => {
@@ -21,6 +22,7 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain("./gaming/PlayApp");
     expect(app).toContain("./crypto/pages/IntelLayout");
     expect(app).toContain("./pages/SocialAppPage");
+    expect(app).toContain("./pages/OrbitXAI");
   });
 
   it("redirects legacy social aliases to live social app", () => {

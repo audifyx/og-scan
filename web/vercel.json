@@ -290,6 +290,9 @@
     "api/orbitx-hub.js": {
       "maxDuration": 120
     },
+    "api/orbitx-ai.js": {
+      "maxDuration": 120
+    },
     "api/x-mcp.js": {
       "maxDuration": 60
     },

@@ -207,6 +207,7 @@ const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
 const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCityPage"));
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
+const OrbitXAI = lazyWithRetry(() => import("./pages/OrbitXAI"));
 
 function RouteFallback({ label }: { label: string }) {
   return (
@@ -311,6 +312,16 @@ const App = () => (
               }
             />
             <Route path="/orbitxcity" element={<Navigate to="/Orbitxcity" replace />} />
+
+            {/* ── OrbitX AI — wallet-authenticated, token-gated super app ── */}
+            <Route
+              path="/AI"
+              element={
+                <Suspense fallback={<RouteFallback label="OrbitX AI" />}>
+                  <OrbitXAI />
+                </Suspense>
+              }
+            />
 
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route
