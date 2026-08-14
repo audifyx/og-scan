@@ -11,6 +11,7 @@ import { createHash, randomBytes } from "crypto";
 import {
   buildGeneratedTools,
   dispatchGenerated,
+  GEN_META,
   GEN_WALLET_TOOLS,
   generatedStats,
 } from "./orbitx/mcp-tools-catalog.js";
@@ -2663,10 +2664,13 @@ const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
 const TOOLS = [...CORE_TOOLS, ..._generated];
 for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
 
-async function fetchJson(url, init) {
+async function fetchJson(url, init = {}) {
+  const timeoutMs = Number(init.timeoutMs) > 0 ? Number(init.timeoutMs) : 12_000;
+  const { timeoutMs: _timeoutMs, ...rest } = init;
   const r = await fetch(url, {
-    ...init,
-    headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(init?.headers || {}) },
+    ...rest,
+    headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(rest.headers || {}) },
+    signal: rest.signal || AbortSignal.timeout(timeoutMs),
   });
   const text = await r.text();
   let data = null;
@@ -4512,6 +4516,28 @@ export function hasEmbeddedAgentTool(toolName) {
   const rawName = String(toolName || "").trim();
   const name = TOOL_ALIASES[rawName] || rawName;
   return TOOLS.some((tool) => tool.name === name);
+}
+
+const READ_ONLY_GENERATED_KINDS = new Set([
+  "screener",
+  "chart",
+  "mint_get",
+  "search",
+  "get",
+  "sb",
+  "report",
+  "open_dex",
+  "open",
+  "wallet",
+  "swaps",
+  "balance",
+]);
+
+export function isEmbeddedAgentToolReadOnly(toolName) {
+  const rawName = String(toolName || "").trim();
+  const name = TOOL_ALIASES[rawName] || rawName;
+  const metadata = GEN_META.get(name);
+  return Boolean(metadata && READ_ONLY_GENERATED_KINDS.has(metadata.kind));
 }
 
 export async function runEmbeddedAgentTool({

@@ -39,11 +39,48 @@ describe("OrbitX AI security guards", () => {
   });
 
   it("exposes the embedded MCP catalog through the guarded command center", () => {
-    expect(api).toContain("listEmbeddedAgentTools()");
+    expect(api).toContain("listEmbeddedAgentTools({ includeGenerated: true })");
     expect(api).toContain("tools: toolCatalog()");
+    expect(api).toContain('name: "orbitx_tool_search"');
+    expect(api).toContain("isEmbeddedAgentToolReadOnly");
     expect(page).toContain('id: "tools"');
     expect(page).toContain("<CommandCenter");
     expect(page).toContain("tool.requiresConfirmation");
+  });
+
+  it("bounds MCP HTTP and confirmed executions so chat cannot hang forever", () => {
+    const hub = readFileSync(resolve(__dirname, "../../api/orbitx-hub.js"), "utf8");
+    expect(hub).toContain("AbortSignal.timeout(timeoutMs)");
+    expect(executeHandler).toContain("withTimeout(");
+    expect(executeHandler).toContain("TOOL_TIMEOUT_MS");
+  });
+
+  it("streams chat progress, live model deltas, and tool events", () => {
+    expect(api).toContain('if (action === "chat.stream")');
+    expect(api).toContain('"application/x-ndjson; charset=utf-8"');
+    expect(api).toContain('type: "delta"');
+    expect(api).toContain('type: "tool"');
+    expect(api).toContain("readOpenAiChatResponse");
+    expect(page).toContain("streamAiMessage(");
+    expect(page).toContain("oai-live-cursor");
+    expect(page).toContain("stopResponse");
+  });
+
+  it("sends agent mode into the streaming chat runtime", () => {
+    expect(api).toContain("AGENT_MODE_DIRECTIVES");
+    expect(api).toContain("function modeDirective");
+    expect(api).toContain("mode: body.mode");
+    expect(page).toContain("AGENT_MODES");
+    expect(page).toContain('mode === "research"');
+  });
+
+  it("exposes studio slash commands, workspace pinning, and starred tools", () => {
+    expect(page).toContain("matchSlashCommands");
+    expect(page).toContain("WorkspaceDrawer");
+    expect(page).toContain("oai-mode-row");
+    expect(page).toContain("oai-workspace");
+    expect(page).toContain("onToggleFavorite");
+    expect(page).toContain("speakText");
   });
 
   it("renders structured results and a mobile quick-action menu", () => {
