@@ -53,7 +53,7 @@ export type AiToolEvent = {
   id: string;
   tool: string;
   args: Record<string, unknown>;
-  status: "completed" | "failed" | "confirmation_required" | "executing";
+  status: "completed" | "failed" | "confirmation_required" | "executing" | "cancelled";
   result: unknown;
   expiresAt?: string;
 };
@@ -240,4 +240,15 @@ export async function executeAiTool(payload: {
   message?: AiMessage | null;
 }> {
   return post("tool.execute", payload, 115_000);
+}
+
+export async function cancelAiTool(payload: {
+  conversationId: string;
+  messageId: string;
+  eventId: string;
+}): Promise<{
+  ok: boolean;
+  event: AiToolEvent;
+}> {
+  return post("tool.cancel", payload, 30_000);
 }

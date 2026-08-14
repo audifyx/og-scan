@@ -64,6 +64,7 @@ import { AGENT_HOLD_MIN_USD, AGENT_HOLD_MINT } from "@/lib/agentTokenGate";
 import { OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 import {
   bootstrapOrbitXAi,
+  cancelAiTool,
   createAiConversation,
   deleteAiConversation,
   executeAiTool,
@@ -332,14 +333,161 @@ function LockedScreen({
   );
 }
 
+const RESULT_METRICS = [
+  { keys: ["priceUsd", "price_usd", "price"], label: "Price", kind: "usd" },
+  { keys: ["marketCapUsd", "market_cap_usd", "marketCap"], label: "Market cap", kind: "usd" },
+  { keys: ["liquidityUsd", "liquidity_usd", "liquidity"], label: "Liquidity", kind: "usd" },
+  { keys: ["volume24h", "volume24hUsd", "volume_24h"], label: "24h volume", kind: "usd" },
+  { keys: ["balanceUsd", "totalUsd", "portfolioUsd"], label: "Portfolio", kind: "usd" },
+  { keys: ["solBalance", "balanceSol"], label: "SOL", kind: "number" },
+  { keys: ["score", "safetyScore", "riskScore"], label: "Score", kind: "number" },
+] as const;
+
+const RESULT_LIST_KEYS = [
+  "tokens",
+  "holdings",
+  "items",
+  "results",
+  "launches",
+  "listings",
+  "sales",
+  "offers",
+  "members",
+  "communities",
+  "feed",
+] as const;
+
+function firstRecordValue(
+  sources: Array<Record<string, unknown>>,
+  keys: readonly string[],
+): unknown {
+  for (const source of sources) {
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null) return source[key];
+    }
+  }
+  return null;
+}
+
+function metricText(value: unknown, kind: "usd" | "number"): string {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(number)) return String(value || "—");
+  if (kind === "usd") return formatUsd(number);
+  return number.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function resultList(result: Record<string, unknown>): Array<Record<string, unknown>> {
+  for (const key of RESULT_LIST_KEYS) {
+    const candidate = result[key];
+    if (Array.isArray(candidate)) {
+      return candidate.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object" && !Array.isArray(item),
+      );
+    }
+  }
+  if (Array.isArray(result.data)) {
+    return result.data.filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object" && !Array.isArray(item),
+    );
+  }
+  return [];
+}
+
+function StructuredToolResult({ event }: { event: AiToolEvent }) {
+  const result = asRecord(event.result);
+  const sources = [
+    result,
+    asRecord(result.data),
+    asRecord(result.token),
+    asRecord(result.wallet),
+    asRecord(result.summary),
+  ];
+  const summary =
+    recordString(result, "message") ||
+    recordString(result, "summary") ||
+    recordString(result, "description") ||
+    recordString(result, "error");
+  const metrics = RESULT_METRICS.map((metric) => ({
+    ...metric,
+    value: firstRecordValue(sources, metric.keys),
+  })).filter((metric) => metric.value !== null);
+  const rows = resultList(result).slice(0, 6);
+  const serialized = JSON.stringify(event.result, null, 2);
+
+  return (
+    <div className="oai-result">
+      {summary && <p className="oai-result__summary">{summary.slice(0, 700)}</p>}
+      {metrics.length > 0 && (
+        <div className="oai-result__metrics">
+          {metrics.slice(0, 4).map((metric) => (
+            <span key={metric.label}>
+              <small>{metric.label}</small>
+              <strong>{metricText(metric.value, metric.kind)}</strong>
+            </span>
+          ))}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="oai-result__rows">
+          {rows.map((row, index) => {
+            const title = firstRecordValue(
+              [row],
+              ["name", "symbol", "title", "username", "mint", "address", "id"],
+            );
+            const subtitle = firstRecordValue(
+              [row],
+              ["status", "description", "message", "chain", "type"],
+            );
+            const value = firstRecordValue(
+              [row],
+              ["priceUsd", "balanceUsd", "amount", "score", "floorPrice", "members"],
+            );
+            return (
+              <div key={`${String(title || "result")}-${index}`}>
+                <span>
+                  <strong>{String(title || `Result ${index + 1}`).slice(0, 70)}</strong>
+                  {subtitle != null && <small>{String(subtitle).slice(0, 100)}</small>}
+                </span>
+                {value != null && <b>{String(value).slice(0, 30)}</b>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!summary && metrics.length === 0 && rows.length === 0 && (
+        <p className="oai-result__summary">
+          {event.status === "completed" ? "OrbitX completed this tool run." : "No result summary available."}
+        </p>
+      )}
+      <details className="oai-result__details">
+        <summary>Technical details</summary>
+        <pre>{serialized.slice(0, 12_000)}</pre>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(serialized);
+            toast.success("Tool result copied");
+          }}
+        >
+          <Copy size={12} /> Copy JSON
+        </button>
+      </details>
+    </div>
+  );
+}
+
 function ToolResultCard({
   event,
   busy,
   onConfirm,
+  onCancel,
 }: {
   event: AiToolEvent;
   busy: boolean;
   onConfirm: (event: AiToolEvent) => void;
+  onCancel: (event: AiToolEvent) => void;
 }) {
   const result = asRecord(event.result);
   const embedUrl = recordString(result, "embedUrl");
@@ -355,7 +503,12 @@ function ToolResultCard({
   const isChart = Boolean(embedUrl) || /chart/i.test(event.tool);
   const isPending = event.status === "confirmation_required";
   const isExecuting = event.status === "executing";
-  const failed = event.status === "failed";
+  const isCancelled = event.status === "cancelled";
+  const isStaleExecuting =
+    isExecuting &&
+    Boolean(event.expiresAt) &&
+    new Date(event.expiresAt || "").getTime() <= Date.now();
+  const failed = event.status === "failed" || isCancelled;
 
   if (isChart && embedUrl) {
     return (
@@ -424,26 +577,54 @@ function ToolResultCard({
           {event.tool.replace(/^orbitx_/, "").replaceAll("_", " ")}
         </span>
         <span className={`oai-tool__status${failed ? " is-bad" : isPending ? " is-warn" : " is-ok"}`}>
-          {failed ? "Failed" : isPending ? "Confirm" : isExecuting ? "Running" : "Complete"}
+          {isCancelled
+            ? "Cancelled"
+            : failed
+              ? "Failed"
+              : isPending
+                ? "Confirm"
+                : isExecuting
+                  ? "Running"
+                  : "Complete"}
         </span>
       </div>
       {isPending ? (
         <>
           <p>This action can change data or prepare a transaction. Review it before running.</p>
           <pre>{JSON.stringify(event.args, null, 2)}</pre>
-          <button
-            type="button"
-            className="oai-tool__confirm"
-            disabled={busy}
-            onClick={() => onConfirm(event)}
-          >
-            {busy ? <Loader2 className="oai-spin" size={14} /> : <ShieldCheck size={14} />}
-            Confirm action
-          </button>
+          <div className="oai-tool__decision">
+            <button
+              type="button"
+              className="oai-tool__cancel"
+              disabled={busy}
+              onClick={() => onCancel(event)}
+            >
+              <X size={14} /> Cancel
+            </button>
+            <button
+              type="button"
+              className="oai-tool__confirm"
+              disabled={busy}
+              onClick={() => onConfirm(event)}
+            >
+              {busy ? <Loader2 className="oai-spin" size={14} /> : <ShieldCheck size={14} />}
+              Confirm action
+            </button>
+          </div>
         </>
       ) : (
         <>
-          <pre>{JSON.stringify(event.result, null, 2).slice(0, 2400)}</pre>
+          <StructuredToolResult event={event} />
+          {isStaleExecuting && (
+            <button
+              type="button"
+              className="oai-tool__cancel"
+              disabled={busy}
+              onClick={() => onCancel(event)}
+            >
+              Close timed-out action
+            </button>
+          )}
           {signUrl && (
             <a className="oai-tool__confirm" href={signUrl} target="_blank" rel="noreferrer">
               Open secure signer <ExternalLink size={13} />
@@ -459,10 +640,12 @@ function ChatMessage({
   message,
   confirming,
   onConfirm,
+  onCancel,
 }: {
   message: AiMessage;
   confirming: string | null;
   onConfirm: (messageId: string, event: AiToolEvent) => void;
+  onCancel: (messageId: string, event: AiToolEvent) => void;
 }) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
@@ -507,6 +690,7 @@ function ChatMessage({
             event={event}
             busy={confirming === event.id}
             onConfirm={(pendingEvent) => onConfirm(message.id, pendingEvent)}
+            onCancel={(pendingEvent) => onCancel(message.id, pendingEvent)}
           />
         ))}
       </div>
@@ -526,6 +710,9 @@ function Composer({
   onSubmit,
   onSendAsset,
   onChart,
+  onTools,
+  onCreate,
+  onXStudio,
 }: {
   value: string;
   busy: boolean;
@@ -533,8 +720,12 @@ function Composer({
   onSubmit: () => void;
   onSendAsset: () => void;
   onChart: () => void;
+  onTools: () => void;
+  onCreate: () => void;
+  onXStudio: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
   useEffect(() => {
     if (!ref.current) return;
     ref.current.style.height = "0px";
@@ -555,7 +746,37 @@ function Composer({
         </button>
       </div>
       <div className="oai-composer">
-        <button type="button" className="oai-composer__plus" aria-label="More actions" onClick={onSendAsset}>
+        {actionsOpen && (
+          <div className="oai-composer-actions">
+            {[
+              { label: "Send tokens", detail: "Non-custodial", icon: Send, action: onSendAsset },
+              { label: "Live chart", detail: "DexScreener", icon: BarChart3, action: onChart },
+              { label: "MCP tools", detail: "99 capabilities", icon: Command, action: onTools },
+              { label: "Create media", detail: "Grok Imagine", icon: WandSparkles, action: onCreate },
+              { label: "X Studio", detail: "Draft & publish", icon: X, action: onXStudio },
+            ].map(({ label, detail, icon: Icon, action }) => (
+              <button
+                type="button"
+                onClick={() => {
+                  setActionsOpen(false);
+                  action();
+                }}
+                key={label}
+              >
+                <span><Icon size={15} /></span>
+                <div><strong>{label}</strong><small>{detail}</small></div>
+                <ArrowUp size={12} />
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          className={`oai-composer__plus${actionsOpen ? " is-open" : ""}`}
+          aria-label="More actions"
+          aria-expanded={actionsOpen}
+          onClick={() => setActionsOpen((current) => !current)}
+        >
           <Plus size={19} />
         </button>
         <textarea
@@ -566,6 +787,10 @@ function Composer({
           aria-label="Message OrbitX AI"
           rows={1}
           onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setActionsOpen(false);
+              return;
+            }
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               onSubmit();
@@ -1960,6 +2185,31 @@ export default function OrbitXAI() {
     }
   };
 
+  const cancelTool = async (messageId: string, event: AiToolEvent) => {
+    if (!activeId) return;
+    setConfirming(event.id);
+    try {
+      const result = await cancelAiTool({
+        conversationId: activeId,
+        messageId,
+        eventId: event.id,
+      });
+      setMessages((current) =>
+        current.map((message) => ({
+          ...message,
+          toolEvents: message.toolEvents.map((item) =>
+            item.id === event.id ? result.event : item,
+          ),
+        }))
+      );
+      toast.success(event.status === "executing" ? "Timed-out action closed" : "Action cancelled");
+    } catch (cancelError) {
+      toast.error(cancelError instanceof Error ? cancelError.message : "Could not cancel action");
+    } finally {
+      setConfirming(null);
+    }
+  };
+
   const generateMedia = async (
     kind: MediaKind,
     prompt: string,
@@ -2125,6 +2375,7 @@ export default function OrbitXAI() {
                         message={message}
                         confirming={confirming}
                         onConfirm={(messageId, event) => void confirmTool(messageId, event)}
+                        onCancel={(messageId, event) => void cancelTool(messageId, event)}
                       />
                     ))}
                     {sending && (
@@ -2148,6 +2399,9 @@ export default function OrbitXAI() {
                 onSubmit={() => void sendMessage()}
                 onSendAsset={() => setSendModal(true)}
                 onChart={() => setChartModal(true)}
+                onTools={() => setTab("tools")}
+                onCreate={() => setTab("create")}
+                onXStudio={() => setTab("x")}
               />
             </section>
           )}

@@ -116,6 +116,12 @@ function text(value, max = 5000) {
   return String(value || "").trim().slice(0, max);
 }
 
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || ""),
+  );
+}
+
 function objectValue(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -967,8 +973,7 @@ async function handleToolExecute(req, res, ctx, body) {
   const messageId = text(body.messageId, 80);
   const eventId = text(body.eventId, 80);
   if (!conversationId) return json(res, { error: "conversationId_required" }, 400);
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidPattern.test(messageId) || !uuidPattern.test(eventId)) {
+  if (!isUuid(messageId) || !isUuid(eventId)) {
     return json(res, { error: "valid_messageId_and_eventId_required" }, 400);
   }
 
@@ -1083,6 +1088,69 @@ async function handleToolExecute(req, res, ctx, body) {
   return json(res, { ok: !failed, event, message });
 }
 
+async function handleToolCancel(req, res, ctx, body) {
+  requireAccess(ctx);
+  rateLimit(req, ctx.userId, "tool-cancel", 30, 60_000);
+  const conversationId = text(body.conversationId, 80);
+  const messageId = text(body.messageId, 80);
+  const eventId = text(body.eventId, 80);
+  if (!conversationId) return json(res, { error: "conversationId_required" }, 400);
+  if (!isUuid(messageId) || !isUuid(eventId)) {
+    return json(res, { error: "valid_messageId_and_eventId_required" }, 400);
+  }
+
+  const conversation = await ensureConversation(ctx, conversationId, "", "");
+  const { data: sourceMessage, error: sourceError } = await ctx.db
+    .from("ai_messages")
+    .select("id, tool_events")
+    .eq("id", messageId)
+    .eq("user_id", ctx.userId)
+    .eq("conversation_id", conversation.id)
+    .maybeSingle();
+  if (sourceError) throw new Error(sourceError.message);
+  if (!sourceMessage) return json(res, { error: "confirmation_not_found" }, 404);
+
+  const sourceEvents = Array.isArray(sourceMessage.tool_events)
+    ? sourceMessage.tool_events
+    : [];
+  const pending = sourceEvents.find((stored) => stored?.id === eventId);
+  const isPending = pending?.status === "confirmation_required";
+  const isStaleExecution =
+    pending?.status === "executing" &&
+    pending?.expiresAt &&
+    new Date(pending.expiresAt).getTime() <= Date.now();
+  if (!pending || (!isPending && !isStaleExecution)) {
+    return json(res, { error: "confirmation_cannot_be_cancelled" }, 409);
+  }
+
+  const event = {
+    ...pending,
+    status: "cancelled",
+    result: {
+      ok: false,
+      error: isStaleExecution ? "execution_timed_out" : "cancelled_by_user",
+      message: isStaleExecution
+        ? "The tool execution timed out and was safely closed."
+        : "You cancelled this action before it ran.",
+    },
+  };
+  const updatedEvents = sourceEvents.map((stored) =>
+    stored?.id === eventId ? event : stored
+  );
+  const { data: cancelled, error: cancelError } = await ctx.db
+    .from("ai_messages")
+    .update({ tool_events: updatedEvents })
+    .eq("id", sourceMessage.id)
+    .eq("user_id", ctx.userId)
+    .eq("conversation_id", conversation.id)
+    .contains("tool_events", [{ id: eventId, status: pending.status }])
+    .select("id")
+    .maybeSingle();
+  if (cancelError) throw new Error(cancelError.message);
+  if (!cancelled) return json(res, { error: "confirmation_already_changed" }, 409);
+  return json(res, { ok: true, event });
+}
+
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   try {
@@ -1103,6 +1171,7 @@ export default async function handler(req, res) {
     if (action === "media.generate") return handleMediaGenerate(req, res, ctx, body);
     if (action === "media.status") return handleMediaStatus(req, res, ctx, body);
     if (action === "tool.execute") return handleToolExecute(req, res, ctx, body);
+    if (action === "tool.cancel") return handleToolCancel(req, res, ctx, body);
     return json(res, { error: "unknown_action" }, 404);
   } catch (error) {
     const status =

@@ -19,6 +19,14 @@ describe("OrbitX AI security guards", () => {
     expect(executeHandler).not.toContain("body.args");
   });
 
+  it("supports atomic cancellation without accepting client tool arguments", () => {
+    expect(api).toContain("async function handleToolCancel");
+    expect(api).toContain('if (action === "tool.cancel")');
+    expect(api).toContain('.contains("tool_events", [{ id: eventId, status: pending.status }])');
+    expect(executeHandler).not.toContain("body.tool");
+    expect(executeHandler).not.toContain("body.args");
+  });
+
   it("binds token sends to the wallet that passed the access gate", () => {
     expect(page).toContain("connectedWalletAddress === gatedWalletAddress");
     expect(page).toContain("disabled={busy || !walletMatchesGate}");
@@ -31,5 +39,12 @@ describe("OrbitX AI security guards", () => {
     expect(page).toContain('id: "tools"');
     expect(page).toContain("<CommandCenter");
     expect(page).toContain("tool.requiresConfirmation");
+  });
+
+  it("renders structured results and a mobile quick-action menu", () => {
+    expect(page).toContain("function StructuredToolResult");
+    expect(page).toContain("Technical details");
+    expect(page).toContain("oai-composer-actions");
+    expect(page).toContain('label: "MCP tools"');
   });
 });
