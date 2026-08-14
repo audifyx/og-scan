@@ -109,6 +109,21 @@ Safety:
 The Image Center uses Grok Imagine. The X Studio connects the user's own X account and
 uses the existing NVIDIA X agent.`;
 
+const AGENT_MODE_DIRECTIVES = {
+  research:
+    "Active mode: Research. Prioritize orbitx_get_token, orbitx_get_safety, orbitx_get_forensics, orbitx_research, orbitx_xray, and orbitx_dex_chart. Lead with facts, risks, and missing data.",
+  trade:
+    "Active mode: Trade desk. Prioritize live charts, liquidity, volume, wallet balances, and prepare-trade tools. Never claim a transaction was sent. Write actions stay on confirmation cards.",
+  create:
+    "Active mode: Create. Shape vivid visual direction and prefer image/video tools when the user wants media.",
+  social:
+    "Active mode: Social. Prefer feed, community, and X-ready copy. Keep posts punchy, useful, and non-hypey.",
+};
+
+function modeDirective(value) {
+  return AGENT_MODE_DIRECTIVES[text(value, 20)] || "";
+}
+
 function parseBody(req) {
   if (!req.body) return {};
   if (typeof req.body === "object") return req.body;
@@ -659,13 +674,16 @@ async function runChat(
   rows,
   selectedModel,
   req,
-  { onStatus, onDelta, onReset, onToolEvent } = {},
+  { onStatus, onDelta, onReset, onToolEvent, mode } = {},
 ) {
   const history = rows.slice(-42).map((row) => ({
     role: row.role === "tool" ? "assistant" : row.role,
     content: row.content,
   }));
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
+  const messages = [{ role: "system", content: SYSTEM_PROMPT }];
+  const directive = modeDirective(mode);
+  if (directive) messages.push({ role: "system", content: directive });
+  messages.push(...history);
   const tools = directTools();
   const toolEvents = [];
   const deadline = Date.now() + CHAT_DEADLINE_MS;
@@ -909,7 +927,9 @@ async function handleChat(req, res, ctx, body) {
   }
 
   const rows = await loadMessages(ctx, conversation.id);
-  const result = await runChat(ctx, conversation, rows, selectedModel, req);
+  const result = await runChat(ctx, conversation, rows, selectedModel, req, {
+    mode: body.mode,
+  });
   const now = new Date().toISOString();
   const { data: assistantMessage, error: assistantError } = await ctx.db
     .from("ai_messages")
@@ -999,6 +1019,7 @@ async function handleChatStream(req, res, ctx, body) {
 
     const rows = await loadMessages(ctx, conversation.id);
     const result = await runChat(ctx, conversation, rows, selectedModel, req, {
+      mode: body.mode,
       onStatus: (message) => writeChatEvent(res, { type: "status", message }),
       onDelta: (delta) => writeChatEvent(res, { type: "delta", delta }),
       onReset: () => writeChatEvent(res, { type: "reset" }),

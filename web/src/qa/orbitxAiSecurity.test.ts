@@ -66,6 +66,23 @@ describe("OrbitX AI security guards", () => {
     expect(page).toContain("stopResponse");
   });
 
+  it("sends agent mode into the streaming chat runtime", () => {
+    expect(api).toContain("AGENT_MODE_DIRECTIVES");
+    expect(api).toContain("function modeDirective");
+    expect(api).toContain("mode: body.mode");
+    expect(page).toContain("AGENT_MODES");
+    expect(page).toContain('mode === "research"');
+  });
+
+  it("exposes studio slash commands, workspace pinning, and starred tools", () => {
+    expect(page).toContain("matchSlashCommands");
+    expect(page).toContain("WorkspaceDrawer");
+    expect(page).toContain("oai-mode-row");
+    expect(page).toContain("oai-workspace");
+    expect(page).toContain("onToggleFavorite");
+    expect(page).toContain("speakText");
+  });
+
   it("renders structured results and a mobile quick-action menu", () => {
     expect(page).toContain("function StructuredToolResult");
     expect(page).toContain("Technical details");

@@ -30,6 +30,7 @@ import {
   Clock3,
   Command,
   Copy,
+  Crosshair,
   Download,
   ExternalLink,
   FileDown,
@@ -37,20 +38,29 @@ import {
   GalleryHorizontalEnd,
   History,
   Image as ImageIcon,
+  Keyboard,
+  Layers,
   Loader2,
+  Maximize2,
   Menu,
   MessageCircle,
+  Mic,
+  MicOff,
   PanelLeftClose,
   Pencil,
+  Pin,
   Plus,
   RefreshCw,
+  Repeat2,
   Rocket,
   Search,
   Send,
   ShieldCheck,
   Sparkles,
+  Star,
   Trash2,
   Video,
+  Volume2,
   Wallet,
   WandSparkles,
   X,
@@ -92,7 +102,32 @@ import {
   type XAgentQueueItem,
 } from "@/lib/xMcp";
 import { xStartLogin } from "@/lib/xAuth";
+import {
+  AGENT_MODES,
+  canUseVoiceInput,
+  detectMint,
+  loadAgentMode,
+  loadFavoriteTools,
+  matchSlashCommands,
+  saveAgentMode,
+  saveFavoriteTools,
+  speakText,
+  startVoiceInput,
+  stopSpeaking,
+  suggestFollowUps,
+  type AgentMode,
+  type SlashCommand,
+} from "@/lib/orbitxAiStudio";
 import "./orbitx-ai.css";
+
+type WorkspaceArtifact = {
+  id: string;
+  title: string;
+  tool: string;
+  embedUrl?: string;
+  imageUrl?: string;
+  metrics: Array<{ label: string; value: string }>;
+};
 
 type AiTab = "chat" | "tools" | "create" | "x";
 type MediaKind = "image" | "video";
@@ -183,6 +218,29 @@ function relativeTime(iso: string): string {
   if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m`;
   if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h`;
   return `${Math.floor(delta / 86_400_000)}d`;
+}
+
+function artifactFromEvent(event: AiToolEvent): WorkspaceArtifact | null {
+  const result = asRecord(event.result);
+  const embedUrl = recordString(result, "embedUrl");
+  const imageUrls = Array.isArray(result.imageUrls)
+    ? result.imageUrls.filter((url): url is string => typeof url === "string")
+    : Array.isArray(result.resultUrls)
+      ? result.resultUrls.filter((url): url is string => typeof url === "string")
+      : [];
+  if (!embedUrl && imageUrls.length === 0) return null;
+  return {
+    id: event.id,
+    title: event.tool.replace(/^orbitx_/, "").replaceAll("_", " "),
+    tool: event.tool,
+    embedUrl: embedUrl || undefined,
+    imageUrl: imageUrls[0],
+    metrics: [
+      { label: "Price", value: formatUsd(recordNumber(result, "priceUsd")) },
+      { label: "Liquidity", value: formatUsd(recordNumber(result, "liquidityUsd")) },
+      { label: "24h vol", value: formatUsd(recordNumber(result, "volume24h")) },
+    ],
+  };
 }
 
 function amountToBaseUnits(input: string, decimals: number): bigint {
@@ -483,11 +541,13 @@ function ToolResultCard({
   busy,
   onConfirm,
   onCancel,
+  onPin,
 }: {
   event: AiToolEvent;
   busy: boolean;
   onConfirm: (event: AiToolEvent) => void;
   onCancel: (event: AiToolEvent) => void;
+  onPin?: (artifact: WorkspaceArtifact) => void;
 }) {
   const result = asRecord(event.result);
   const embedUrl = recordString(result, "embedUrl");
@@ -511,15 +571,23 @@ function ToolResultCard({
   const failed = event.status === "failed" || isCancelled;
 
   if (isChart && embedUrl) {
+    const artifact = artifactFromEvent(event);
     return (
       <div className="oai-tool oai-tool--chart">
         <div className="oai-tool__head">
           <span>
             <BarChart3 size={15} /> Live DexScreener
           </span>
-          <a href={recordString(result, "pageUrl") || embedUrl} target="_blank" rel="noreferrer">
-            Open <ExternalLink size={12} />
-          </a>
+          <div className="oai-tool__head-actions">
+            {artifact && onPin && (
+              <button type="button" onClick={() => onPin(artifact)}>
+                <Pin size={12} /> Workspace
+              </button>
+            )}
+            <a href={recordString(result, "pageUrl") || embedUrl} target="_blank" rel="noreferrer">
+              Open <ExternalLink size={12} />
+            </a>
+          </div>
         </div>
         <div className="oai-chart-frame">
           <iframe src={embedUrl} title="Live token chart" loading="lazy" allowFullScreen />
@@ -540,15 +608,23 @@ function ToolResultCard({
   }
 
   if (imageUrls.length > 0) {
+    const artifact = artifactFromEvent(event);
     return (
       <div className="oai-tool oai-tool--media">
         <div className="oai-tool__head">
           <span>
             <WandSparkles size={15} /> {event.tool.replaceAll("_", " ")}
           </span>
-          <span className="oai-tool__status is-ok">
-            <Check size={11} /> Ready
-          </span>
+          <div className="oai-tool__head-actions">
+            {artifact && onPin && (
+              <button type="button" onClick={() => onPin(artifact)}>
+                <Pin size={12} /> Workspace
+              </button>
+            )}
+            <span className="oai-tool__status is-ok">
+              <Check size={11} /> Ready
+            </span>
+          </div>
         </div>
         <div className="oai-tool__images">
           {imageUrls.slice(0, 4).map((url) => (
@@ -639,13 +715,23 @@ function ToolResultCard({
 function ChatMessage({
   message,
   confirming,
+  followUps,
   onConfirm,
   onCancel,
+  onPin,
+  onFollowUp,
+  onSpeak,
+  onRetry,
 }: {
   message: AiMessage;
   confirming: string | null;
+  followUps?: string[];
   onConfirm: (messageId: string, event: AiToolEvent) => void;
   onCancel: (messageId: string, event: AiToolEvent) => void;
+  onPin?: (artifact: WorkspaceArtifact) => void;
+  onFollowUp?: (prompt: string) => void;
+  onSpeak?: (content: string) => void;
+  onRetry?: () => void;
 }) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
@@ -671,6 +757,16 @@ function ChatMessage({
           >
             <Copy size={11} />
           </button>
+          {!isUser && !isTool && onSpeak && (
+            <button type="button" onClick={() => onSpeak(message.content)} aria-label="Read aloud">
+              <Volume2 size={11} />
+            </button>
+          )}
+          {!isUser && !isTool && onRetry && !isStreaming && (
+            <button type="button" onClick={onRetry} aria-label="Regenerate">
+              <Repeat2 size={11} />
+            </button>
+          )}
         </div>
         <div className="oai-message__content">
           {isUser || isTool ? (
@@ -695,8 +791,18 @@ function ChatMessage({
             busy={confirming === event.id}
             onConfirm={(pendingEvent) => onConfirm(message.id, pendingEvent)}
             onCancel={(pendingEvent) => onCancel(message.id, pendingEvent)}
+            onPin={onPin}
           />
         ))}
+        {followUps && followUps.length > 0 && onFollowUp && (
+          <div className="oai-followups">
+            {followUps.map((prompt) => (
+              <button type="button" key={prompt} onClick={() => onFollowUp(prompt)}>
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {isUser && (
         <div className="oai-message__avatar oai-message__avatar--user">
@@ -710,6 +816,7 @@ function ChatMessage({
 function Composer({
   value,
   busy,
+  mode,
   onChange,
   onSubmit,
   onStop,
@@ -718,30 +825,103 @@ function Composer({
   onTools,
   onCreate,
   onXStudio,
+  onMode,
   toolCount,
 }: {
   value: string;
   busy: boolean;
+  mode: AgentMode;
   onChange: (value: string) => void;
-  onSubmit: () => void;
+  onSubmit: (prompt?: string) => void;
   onStop: () => void;
   onSendAsset: () => void;
   onChart: () => void;
   onTools: () => void;
   onCreate: () => void;
   onXStudio: () => void;
+  onMode: (mode: AgentMode) => void;
   toolCount: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [listening, setListening] = useState(false);
+  const voiceRef = useRef<{ stop: () => void } | null>(null);
+  const slashMatches = useMemo(() => matchSlashCommands(value), [value]);
+  const detectedMint = detectMint(value);
+
   useEffect(() => {
     if (!ref.current) return;
     ref.current.style.height = "0px";
     ref.current.style.height = `${Math.min(148, Math.max(26, ref.current.scrollHeight))}px`;
   }, [value]);
 
+  useEffect(() => () => voiceRef.current?.stop(), []);
+
+  const runSlash = (command: SlashCommand) => {
+    if (command.action === "prompt" && command.prompt) {
+      if (command.prompt.endsWith(" ")) {
+        onChange(command.prompt);
+        window.requestAnimationFrame(() => ref.current?.focus());
+        return;
+      }
+      onChange("");
+      onSubmit(command.prompt);
+      return;
+    }
+    if (command.action === "chart") {
+      const mint = detectMint(value);
+      if (mint) {
+        onChange("");
+        onSubmit(
+          `Show me the live chart for ${mint}. Include price, liquidity, volume, market cap, and risk context.`,
+        );
+        return;
+      }
+      onChart();
+    }
+    if (command.action === "create") onCreate();
+    if (command.action === "x") onXStudio();
+    if (command.action === "send") onSendAsset();
+    if (command.action === "tools") onTools();
+    onChange("");
+  };
+
+  const toggleVoice = () => {
+    if (listening) {
+      voiceRef.current?.stop();
+      voiceRef.current = null;
+      setListening(false);
+      return;
+    }
+    const handle = startVoiceInput((transcript, isFinal) => {
+      onChange(transcript);
+      if (isFinal) {
+        setListening(false);
+        voiceRef.current = null;
+      }
+    });
+    if (!handle) {
+      toast.error("Voice input is not available in this browser");
+      return;
+    }
+    voiceRef.current = handle;
+    setListening(true);
+  };
+
   return (
     <div className="oai-composer-wrap">
+      <div className="oai-mode-row" role="tablist" aria-label="Agent modes">
+        {AGENT_MODES.map((item) => (
+          <button
+            type="button"
+            className={mode === item.id ? "is-active" : ""}
+            onClick={() => onMode(item.id)}
+            key={item.id}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
       <div className="oai-quick-row">
         <button type="button" onClick={onSendAsset}>
           <Send size={13} /> Send tokens
@@ -754,6 +934,19 @@ function Composer({
         </button>
       </div>
       <div className="oai-composer">
+        {slashMatches.length > 0 && (
+          <div className="oai-slash">
+            {slashMatches.map((command) => (
+              <button type="button" key={command.cmd} onClick={() => runSlash(command)}>
+                <code>{command.cmd}</code>
+                <div>
+                  <strong>{command.label}</strong>
+                  <small>{command.detail}</small>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
         {actionsOpen && (
           <div className="oai-composer-actions">
             {[
@@ -796,7 +989,17 @@ function Composer({
           ref={ref}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="Message OrbitX AI…"
+          placeholder={
+            mode === "research"
+              ? "Ask for a live scan, chart, or forensic brief…"
+              : mode === "trade"
+                ? "Ask for liquidity, wallets, or a trade handoff…"
+                : mode === "create"
+                  ? "Describe an image, video, or visual world…"
+                  : mode === "social"
+                    ? "Draft a post, scan the feed, or brief a community…"
+                    : "Message OrbitX AI  ·  /chart  /scan  /wallet"
+          }
           aria-label="Message OrbitX AI"
           rows={1}
           onKeyDown={(event) => {
@@ -806,22 +1009,49 @@ function Composer({
             }
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
+              if (slashMatches[0] && value.trim().startsWith("/") && !value.includes(" ")) {
+                runSlash(slashMatches[0]);
+                return;
+              }
               onSubmit();
             }
           }}
         />
+        {canUseVoiceInput() && (
+          <button
+            type="button"
+            className={`oai-composer__mic${listening ? " is-live" : ""}`}
+            aria-label={listening ? "Stop voice input" : "Voice input"}
+            onClick={toggleVoice}
+          >
+            {listening ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+        )}
         <button
           type="button"
           className="oai-composer__send"
           aria-label={busy ? "Stop response" : "Send message"}
           disabled={!busy && !value.trim()}
-          onClick={busy ? onStop : onSubmit}
+          onClick={() => (busy ? onStop() : onSubmit())}
         >
           {busy ? <X size={17} /> : <ArrowUp size={18} />}
         </button>
       </div>
+      {detectedMint && (
+        <button
+          type="button"
+          className="oai-mint-chip"
+          onClick={() =>
+            onSubmit(
+              `Show me the live chart for ${detectedMint}. Include price, liquidity, volume, market cap, and risk context.`,
+            )
+          }
+        >
+          <Crosshair size={12} /> Detected mint {shortAddress(detectedMint)} · open chart
+        </button>
+      )}
       <p className="oai-composer-note">
-        OrbitX can make mistakes. Verify financial data and approve every transaction in your wallet.
+        Slash commands, voice, live MCP tools. Verify financial data and approve every transaction in your wallet.
       </p>
     </div>
   );
@@ -1016,13 +1246,17 @@ function toolDisplayName(name: string): string {
 
 function CommandCenter({
   tools,
+  favorites,
   onLaunch,
+  onToggleFavorite,
 }: {
   tools: AiToolDefinition[];
+  favorites: string[];
   onLaunch: (tool: AiToolDefinition) => void;
+  onToggleFavorite: (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof TOOL_CATEGORY_ORDER)[number]>("All");
+  const [category, setCategory] = useState<(typeof TOOL_CATEGORY_ORDER)[number] | "Starred">("All");
   const [showAll, setShowAll] = useState(false);
   const categoryCounts = useMemo(
     () =>
@@ -1033,9 +1267,11 @@ function CommandCenter({
     [tools],
   );
   const filteredTools = useMemo(() => {
+    const favoriteSet = new Set(favorites);
     const normalized = query.trim().toLowerCase();
     return tools.filter((tool) => {
-      if (category !== "All" && tool.category !== category) return false;
+      if (category === "Starred" && !favoriteSet.has(tool.name)) return false;
+      if (category !== "All" && category !== "Starred" && tool.category !== category) return false;
       if (!normalized) return true;
       return (
         tool.name.toLowerCase().includes(normalized) ||
@@ -1046,7 +1282,7 @@ function CommandCenter({
         )
       );
     });
-  }, [category, query, tools]);
+  }, [category, favorites, query, tools]);
   const visibleTools = showAll ? filteredTools : filteredTools.slice(0, 24);
   const instantCount = tools.filter((tool) => !tool.requiresConfirmation).length;
 
@@ -1084,8 +1320,8 @@ function CommandCenter({
           <kbd>⌘ K</kbd>
         </label>
         <div className="oai-tool-categories" role="tablist" aria-label="Tool categories">
-          {TOOL_CATEGORY_ORDER.filter(
-            (item) => item === "All" || Boolean(categoryCounts[item]),
+          {(["Starred", ...TOOL_CATEGORY_ORDER] as const).filter(
+            (item) => item === "All" || item === "Starred" || Boolean(categoryCounts[item]),
           ).map((item) => (
             <button
               type="button"
@@ -1097,7 +1333,13 @@ function CommandCenter({
               key={item}
             >
               {item}
-              <span>{item === "All" ? tools.length : categoryCounts[item] || 0}</span>
+              <span>
+                {item === "All"
+                  ? tools.length
+                  : item === "Starred"
+                    ? favorites.length
+                    : categoryCounts[item] || 0}
+              </span>
             </button>
           ))}
         </div>
@@ -1114,10 +1356,20 @@ function CommandCenter({
                   <small>{tool.category}</small>
                   <h2>{toolDisplayName(tool.name)}</h2>
                 </div>
-                <span className={tool.requiresConfirmation ? "is-guarded" : "is-live"}>
-                  {tool.requiresConfirmation ? <ShieldCheck size={10} /> : <Zap size={10} />}
-                  {tool.requiresConfirmation ? "Guarded" : "Instant"}
-                </span>
+                <div className="oai-tool-card__meta">
+                  <span className={tool.requiresConfirmation ? "is-guarded" : "is-live"}>
+                    {tool.requiresConfirmation ? <ShieldCheck size={10} /> : <Zap size={10} />}
+                    {tool.requiresConfirmation ? "Guarded" : "Instant"}
+                  </span>
+                  <button
+                    type="button"
+                    className={`oai-tool-star${favorites.includes(tool.name) ? " is-on" : ""}`}
+                    aria-label={favorites.includes(tool.name) ? "Unstar tool" : "Star tool"}
+                    onClick={() => onToggleFavorite(tool.name)}
+                  >
+                    <Star size={12} />
+                  </button>
+                </div>
               </div>
               <p>{tool.description}</p>
               <div className="oai-tool-card__params">
@@ -1891,6 +2143,42 @@ function ChartModal({
   );
 }
 
+function WorkspaceDrawer({
+  artifact,
+  onClose,
+}: {
+  artifact: WorkspaceArtifact | null;
+  onClose: () => void;
+}) {
+  if (!artifact) return null;
+  return (
+    <aside className="oai-workspace" aria-label="Live workspace">
+      <div className="oai-workspace__head">
+        <span><Layers size={14} /> Workspace</span>
+        <strong>{artifact.title}</strong>
+        <button type="button" onClick={onClose} aria-label="Close workspace">
+          <X size={16} />
+        </button>
+      </div>
+      {artifact.embedUrl ? (
+        <div className="oai-workspace__chart">
+          <iframe src={artifact.embedUrl} title={artifact.title} loading="lazy" allowFullScreen />
+        </div>
+      ) : artifact.imageUrl ? (
+        <img src={artifact.imageUrl} alt={artifact.title} />
+      ) : null}
+      <div className="oai-workspace__metrics">
+        {artifact.metrics.map((metric) => (
+          <span key={metric.label}>
+            <small>{metric.label}</small>
+            <strong>{metric.value}</strong>
+          </span>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 export default function OrbitXAI() {
   const { user, loading: authLoading } = useAuth();
   const [accessLoading, setAccessLoading] = useState(true);
@@ -1913,12 +2201,24 @@ export default function OrbitXAI() {
   const [generating, setGenerating] = useState(false);
   const [sendModal, setSendModal] = useState(false);
   const [chartModal, setChartModal] = useState(false);
+  const [mode, setMode] = useState<AgentMode>(() => loadAgentMode());
+  const [focusMode, setFocusMode] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [workspace, setWorkspace] = useState<WorkspaceArtifact | null>(null);
+  const [favorites, setFavorites] = useState<string[]>(() => loadFavoriteTools());
   const scrollRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    return () => streamAbortRef.current?.abort();
+    return () => {
+      streamAbortRef.current?.abort();
+      stopSpeaking();
+    };
   }, []);
+
+  useEffect(() => {
+    saveAgentMode(mode);
+  }, [mode]);
 
   const refreshAccess = useCallback(async () => {
     if (!user) {
@@ -1962,16 +2262,35 @@ export default function OrbitXAI() {
   }, [authLoading, refreshAccess]);
 
   useEffect(() => {
-    const openCommandCenter = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
-      event.preventDefault();
-      setTab("tools");
-      window.requestAnimationFrame(() => {
-        document.querySelector<HTMLInputElement>(".oai-tool-search input")?.focus();
-      });
+    const onKey = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement | null)?.tagName;
+      const typing = tag === "TEXTAREA" || tag === "INPUT";
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setTab("tools");
+        window.requestAnimationFrame(() => {
+          document.querySelector<HTMLInputElement>(".oai-tool-search input")?.focus();
+        });
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setFocusMode((current) => !current);
+        return;
+      }
+      if (event.key === "?" && !typing) {
+        event.preventDefault();
+        setShortcutsOpen((current) => !current);
+        return;
+      }
+      if (event.key === "Escape") {
+        setShortcutsOpen(false);
+        setWorkspace(null);
+        setModelOpen(false);
+      }
     };
-    window.addEventListener("keydown", openCommandCenter);
-    return () => window.removeEventListener("keydown", openCommandCenter);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   useEffect(() => {
@@ -2167,6 +2486,7 @@ export default function OrbitXAI() {
           conversationId: activeId,
           message: prompt,
           model: selectedModel,
+          mode,
         },
         {
           signal: controller.signal,
@@ -2195,6 +2515,8 @@ export default function OrbitXAI() {
                 ...streamedEvents.filter((item) => item.id !== event.event.id),
                 event.event,
               ];
+              const artifact = artifactFromEvent(event.event);
+              if (artifact) setWorkspace(artifact);
               renderStream();
             }
           },
@@ -2279,6 +2601,8 @@ export default function OrbitXAI() {
         return result.message ? [...updated, result.message] : updated;
       });
       if (result.ok && result.event.status === "completed") {
+        const artifact = artifactFromEvent(result.event);
+        if (artifact) setWorkspace(artifact);
         toast.success("OrbitX action completed");
       } else {
         toast.error("OrbitX action failed. Review the result card for details.");
@@ -2354,8 +2678,29 @@ export default function OrbitXAI() {
     (message) => message.role === "assistant" && message.metadata.streaming === true,
   );
 
+  const lastAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.metadata.streaming !== true);
+  const lastUserPrompt =
+    [...messages].reverse().find((message) => message.role === "user")?.content || "";
+  const followUps = lastAssistant
+    ? suggestFollowUps(
+        lastAssistant.content,
+        lastAssistant.toolEvents.map((event) => event.tool),
+      )
+    : [];
+  const activeMode = AGENT_MODES.find((item) => item.id === mode) ?? AGENT_MODES[0];
+
+  const toggleFavorite = (name: string) => {
+    setFavorites((prev) => {
+      const next = prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name];
+      saveFavoriteTools(next);
+      return next;
+    });
+  };
+
   return (
-    <div className="oai-root oai-app">
+    <div className={`oai-root oai-app${focusMode ? " oai-app--focus" : ""}${workspace ? " oai-app--workspace" : ""}`}>
       <ConversationRail
         open={railOpen}
         conversations={conversations}
@@ -2381,8 +2726,8 @@ export default function OrbitXAI() {
             <div className="oai-brand oai-brand--mobile">
               <AiMark compact />
               <div>
-                <strong>OrbitX AI</strong>
-                <span>{activeConversation?.title || "New conversation"}</span>
+                <strong>OrbitX AI Studio</strong>
+                <span>{activeConversation?.title || activeMode?.label || "New conversation"}</span>
               </div>
             </div>
           </div>
@@ -2419,10 +2764,28 @@ export default function OrbitXAI() {
             )}
           </div>
           <div className="oai-topbar__right">
+            <span className="oai-pill oai-pill--mode">{mode}</span>
             <span className="oai-wallet-pill">
               <i />
               {shortAddress(bootstrap.walletAddress)}
             </span>
+            <button
+              type="button"
+              className={`oai-icon-btn${focusMode ? " is-on" : ""}`}
+              onClick={() => setFocusMode((current) => !current)}
+              aria-label="Focus mode"
+              title="Focus mode"
+            >
+              <Maximize2 size={16} />
+            </button>
+            <button
+              type="button"
+              className="oai-icon-btn"
+              onClick={() => setShortcutsOpen(true)}
+              aria-label="Keyboard shortcuts"
+            >
+              <Keyboard size={16} />
+            </button>
             <button
               type="button"
               className="oai-icon-btn"
@@ -2434,6 +2797,18 @@ export default function OrbitXAI() {
             <WalletConnectButton />
           </div>
         </header>
+
+        <div className="oai-hud" aria-live="polite">
+          <span>{activeMode?.label}</span>
+          <span>{bootstrap.tools.length.toLocaleString()} tools</span>
+          <span>{modelLabel}</span>
+          {workspace && <span>{workspace.title}</span>}
+          {sending ? (
+            <span className="oai-hud__live">{streamStatus || "Live"}</span>
+          ) : (
+            <span>Ready</span>
+          )}
+        </div>
 
         <main className="oai-main">
           {tab === "chat" && (
@@ -2447,13 +2822,29 @@ export default function OrbitXAI() {
                   <div className="oai-welcome">
                     <AiMark />
                     <span className="oai-eyebrow">
-                      <i /> MCP tools online
+                      <i /> {bootstrap.tools.length.toLocaleString()} MCP tools online
                     </span>
-                    <h1>What will we <em>build today?</em></h1>
+                    <h1>A live studio for <em>markets, media, and the catalog.</em></h1>
                     <p>
-                      Markets, wallets, charts, launches, media, X, and every OrbitX
-                      intelligence tool — in one conversation.
+                      Pick a mode, type a slash command, or just ask. Charts and scans pin to the
+                      workspace. Buys, sells, and launches still wait for your tap.
                     </p>
+                    <div className="oai-mode-grid">
+                      {AGENT_MODES.filter((item) => item.id !== "auto").map((item) => (
+                        <button
+                          type="button"
+                          className={`oai-mode-card${mode === item.id ? " is-active" : ""}`}
+                          onClick={() => {
+                            setMode(item.id);
+                            setComposer(item.starter);
+                          }}
+                          key={item.id}
+                        >
+                          <strong>{item.label}</strong>
+                          <span>{item.detail}</span>
+                        </button>
+                      ))}
+                    </div>
                     <div className="oai-starters">
                       {STARTER_PROMPTS.map(({ icon: Icon, title, prompt, tone }) => (
                         <button
@@ -2465,6 +2856,13 @@ export default function OrbitXAI() {
                           <span><Icon size={17} /></span>
                           <strong>{title}</strong>
                           <small>{prompt}</small>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="oai-slash-hints">
+                      {["/chart", "/scan", "/wallet", "/image", "/post", "/tools"].map((cmd) => (
+                        <button type="button" key={cmd} onClick={() => setComposer(cmd)}>
+                          {cmd}
                         </button>
                       ))}
                     </div>
@@ -2482,8 +2880,17 @@ export default function OrbitXAI() {
                         key={message.id}
                         message={message}
                         confirming={confirming}
+                        followUps={message.id === lastAssistant?.id ? followUps : undefined}
                         onConfirm={(messageId, event) => void confirmTool(messageId, event)}
                         onCancel={(messageId, event) => void cancelTool(messageId, event)}
+                        onPin={setWorkspace}
+                        onFollowUp={(prompt) => void sendMessage(prompt)}
+                        onSpeak={speakText}
+                        onRetry={
+                          message.id === lastAssistant?.id && lastUserPrompt
+                            ? () => void sendMessage(lastUserPrompt)
+                            : undefined
+                        }
                       />
                     ))}
                     {sending && !liveTyping && (
@@ -2503,20 +2910,27 @@ export default function OrbitXAI() {
               <Composer
                 value={composer}
                 busy={sending}
+                mode={mode}
                 onChange={setComposer}
-                onSubmit={() => void sendMessage()}
+                onSubmit={(prompt) => void sendMessage(prompt)}
                 onStop={stopResponse}
                 onSendAsset={() => setSendModal(true)}
                 onChart={() => setChartModal(true)}
                 onTools={() => setTab("tools")}
                 onCreate={() => setTab("create")}
                 onXStudio={() => setTab("x")}
+                onMode={setMode}
                 toolCount={bootstrap.tools.length}
               />
             </section>
           )}
           {tab === "tools" && (
-            <CommandCenter tools={bootstrap.tools || []} onLaunch={launchTool} />
+            <CommandCenter
+              tools={bootstrap.tools || []}
+              favorites={favorites}
+              onLaunch={launchTool}
+              onToggleFavorite={toggleFavorite}
+            />
           )}
           {tab === "create" && (
             <CreateCenter
@@ -2546,6 +2960,39 @@ export default function OrbitXAI() {
           />
         </nav>
       </div>
+
+      <WorkspaceDrawer artifact={workspace} onClose={() => setWorkspace(null)} />
+
+      {shortcutsOpen && (
+        <div className="oai-shortcuts" role="dialog" aria-label="Studio shortcuts">
+          <button
+            type="button"
+            className="oai-shortcuts__scrim"
+            onClick={() => setShortcutsOpen(false)}
+            aria-label="Close shortcuts"
+          />
+          <div className="oai-shortcuts__card">
+            <h3>Studio shortcuts</h3>
+            <ul>
+              <li>
+                <kbd>⌘K</kbd> Command center
+              </li>
+              <li>
+                <kbd>⌘B</kbd> Focus mode
+              </li>
+              <li>
+                <kbd>?</kbd> This overlay
+              </li>
+              <li>
+                <kbd>/</kbd> Slash commands in chat
+              </li>
+              <li>
+                <kbd>Esc</kbd> Close overlays
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       <SendAssetModal
         open={sendModal}

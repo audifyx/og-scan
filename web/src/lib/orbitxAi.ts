@@ -209,6 +209,7 @@ export async function sendAiMessage(payload: {
   conversationId?: string | null;
   message: string;
   model?: string;
+  mode?: string;
 }): Promise<AiChatResult> {
   return post("chat", payload, 115_000);
 }
@@ -218,6 +219,7 @@ export async function streamAiMessage(
     conversationId?: string | null;
     message: string;
     model?: string;
+    mode?: string;
   },
   options: {
     signal?: AbortSignal;
