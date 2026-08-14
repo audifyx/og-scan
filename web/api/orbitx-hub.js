@@ -11,6 +11,7 @@ import { createHash, randomBytes } from "crypto";
 import {
   buildGeneratedTools,
   dispatchGenerated,
+  GEN_META,
   GEN_WALLET_TOOLS,
   generatedStats,
 } from "./orbitx/mcp-tools-catalog.js";
@@ -4512,6 +4513,28 @@ export function hasEmbeddedAgentTool(toolName) {
   const rawName = String(toolName || "").trim();
   const name = TOOL_ALIASES[rawName] || rawName;
   return TOOLS.some((tool) => tool.name === name);
+}
+
+const READ_ONLY_GENERATED_KINDS = new Set([
+  "screener",
+  "chart",
+  "mint_get",
+  "search",
+  "get",
+  "sb",
+  "report",
+  "open_dex",
+  "open",
+  "wallet",
+  "swaps",
+  "balance",
+]);
+
+export function isEmbeddedAgentToolReadOnly(toolName) {
+  const rawName = String(toolName || "").trim();
+  const name = TOOL_ALIASES[rawName] || rawName;
+  const metadata = GEN_META.get(name);
+  return Boolean(metadata && READ_ONLY_GENERATED_KINDS.has(metadata.kind));
 }
 
 export async function runEmbeddedAgentTool({

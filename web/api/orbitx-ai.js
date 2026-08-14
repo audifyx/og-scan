@@ -16,9 +16,11 @@ import {
   requireUser,
 } from "./orbitx/ai-runtime.js";
 import {
+  isEmbeddedAgentToolReadOnly,
   listEmbeddedAgentTools,
   runEmbeddedAgentTool,
 } from "./orbitx-hub.js";
+import { readOpenAiChatResponse } from "./orbitx/ai-stream.js";
 import { verifyTokenHold } from "./orbitx/token-hold.js";
 import {
   DEFAULT_NIM_MODEL,
@@ -30,9 +32,12 @@ export const config = { maxDuration: 120 };
 const NVIDIA_BASE =
   process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
 const MAX_PROMPT = 12_000;
-const MAX_TOOL_LOOPS = 4;
+const MAX_TOOL_LOOPS = 3;
 const MAX_TOOL_STORAGE_CHARS = 60_000;
 const MAX_TOOL_MODEL_CHARS = 16_000;
+const NVIDIA_TIMEOUT_MS = 30_000;
+const TOOL_TIMEOUT_MS = 22_000;
+const CHAT_DEADLINE_MS = 108_000;
 const CONFIRMATION_TTL_MS = 15 * 60_000;
 const FALLBACK_PUBLIC_BASE = "https://www.orbitx.world";
 const MEDIA_ASPECTS = new Set(["2:3", "3:2", "1:1", "9:16", "16:9"]);
@@ -87,8 +92,10 @@ const SYSTEM_PROMPT = `You are OrbitX AI, the first-party crypto copilot inside 
 You have live OrbitX MCP tools for token research, wallets, charts, trading handoffs,
 launches, NFTs, social, generated media, and platform data. Use tools whenever live
 data is useful. For a contract address plus "chart", call orbitx_dex_chart immediately.
-Use orbitx_tools_help or orbitx_command when the user asks for a capability that is
-not in the direct tool list.
+You can reach the complete MCP catalog through two router tools. If the capability is
+not in the direct tool list, call orbitx_tool_search with a concise capability query,
+then call orbitx_command with the exact returned tool name and its matching arguments.
+Never claim a capability is unavailable before searching the full catalog.
 
 Safety:
 - Never ask for a seed phrase or private key.
@@ -157,7 +164,12 @@ function modelId(requested) {
 }
 
 function requiresConfirmation(name) {
-  return !DIRECT_TOOL_NAMES.has(String(name || ""));
+  const normalized = String(name || "");
+  return (
+    normalized !== "orbitx_tool_search" &&
+    !DIRECT_TOOL_NAMES.has(normalized) &&
+    !isEmbeddedAgentToolReadOnly(normalized)
+  );
 }
 
 function toolCategory(name) {
@@ -216,7 +228,7 @@ let cachedToolCatalog = null;
 
 function toolCatalog() {
   if (cachedToolCatalog) return cachedToolCatalog;
-  cachedToolCatalog = listEmbeddedAgentTools()
+  cachedToolCatalog = listEmbeddedAgentTools({ includeGenerated: true })
     .filter((tool) => !BLOCKED_EMBEDDED_TOOLS.has(tool.name))
     .map((tool) => {
       const schema = objectValue(tool.inputSchema);
@@ -245,6 +257,45 @@ function toolCatalog() {
       left.category.localeCompare(right.category) || left.name.localeCompare(right.name)
     );
   return cachedToolCatalog;
+}
+
+function searchToolCatalog(value) {
+  const query = text(value, 240).toLowerCase();
+  const terms = query.split(/[^a-z0-9]+/).filter(Boolean);
+  const scored = toolCatalog()
+    .map((tool) => {
+      const name = tool.name.toLowerCase();
+      const description = tool.description.toLowerCase();
+      let score = query && name === query ? 100 : 0;
+      if (query && name.includes(query)) score += 40;
+      if (query && description.includes(query)) score += 20;
+      for (const term of terms) {
+        if (name.includes(term)) score += 8;
+        if (description.includes(term)) score += 3;
+      }
+      return { tool, score };
+    })
+    .filter(({ score }) => !query || score > 0)
+    .sort(
+      (left, right) =>
+        right.score - left.score || left.tool.name.localeCompare(right.tool.name),
+    )
+    .slice(0, 24)
+    .map(({ tool }) => ({
+      name: tool.name,
+      description: tool.description,
+      requiresConfirmation: tool.requiresConfirmation,
+      parameters: tool.parameters,
+    }));
+  return {
+    ok: true,
+    query,
+    totalAvailable: toolCatalog().length,
+    matches: scored,
+    message: scored.length
+      ? `Found ${scored.length} matching OrbitX MCP tools.`
+      : "No exact match. Try a broader capability query.",
+  };
 }
 
 function normalizedMediaSettings(kind, value) {
@@ -475,6 +526,25 @@ function directTools() {
   tools.push({
     type: "function",
     function: {
+      name: "orbitx_tool_search",
+      description:
+        "Search the complete live OrbitX MCP catalog by capability. Use this before orbitx_command whenever the exact tool name or required arguments are unknown.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Concise capability query such as Base 1h chart, create token, NFT bid, or social post",
+          },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  });
+  tools.push({
+    type: "function",
+    function: {
       name: "orbitx_command",
       description:
         "Call any live OrbitX MCP tool by exact name. Use orbitx_tools_help first when unsure. Write, launch, trade, social, and NFT mutation tools return a confirmation card before execution.",
@@ -496,7 +566,18 @@ function directTools() {
   return tools;
 }
 
-async function callNvidia(messages, model, tools) {
+function routingTools() {
+  return directTools().filter(({ function: definition }) =>
+    ["orbitx_tool_search", "orbitx_command"].includes(definition.name)
+  );
+}
+
+async function callNvidia(
+  messages,
+  model,
+  tools,
+  { stream = false, onContent, timeoutMs = NVIDIA_TIMEOUT_MS } = {},
+) {
   const key = process.env.NVIDIA_API_KEY || "";
   if (!key) {
     throw Object.assign(new Error("NVIDIA_API_KEY is not configured"), { status: 503 });
@@ -513,9 +594,13 @@ async function callNvidia(messages, model, tools) {
       ...(tools?.length ? { tools, tool_choice: "auto" } : {}),
       temperature: 0.55,
       max_tokens: 1800,
+      stream,
     }),
-    signal: AbortSignal.timeout(75_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
+  if (stream && response.ok) {
+    return readOpenAiChatResponse(response, { onContent });
+  }
   const raw = await response.text();
   let parsed = {};
   try {
@@ -535,6 +620,22 @@ async function callNvidia(messages, model, tools) {
   return message;
 }
 
+async function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(Object.assign(new Error(message), { status: 504 }));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function resolveToolCall(call) {
   const functionName = text(call?.function?.name, 160);
   let args = {};
@@ -552,7 +653,14 @@ function resolveToolCall(call) {
   };
 }
 
-async function runChat(ctx, conversation, rows, selectedModel, req) {
+async function runChat(
+  ctx,
+  conversation,
+  rows,
+  selectedModel,
+  req,
+  { onStatus, onDelta, onReset, onToolEvent } = {},
+) {
   const history = rows.slice(-42).map((row) => ({
     role: row.role === "tool" ? "assistant" : row.role,
     content: row.content,
@@ -560,22 +668,56 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
   const tools = directTools();
   const toolEvents = [];
+  const deadline = Date.now() + CHAT_DEADLINE_MS;
   let finalContent = "";
 
+  const modelTimeout = () => {
+    const remaining = deadline - Date.now();
+    if (remaining < 1_500) {
+      throw Object.assign(new Error("OrbitX AI reached its response deadline"), {
+        status: 504,
+      });
+    }
+    return Math.min(NVIDIA_TIMEOUT_MS, remaining);
+  };
+  const callModel = async (toolSet) => {
+    let streamed = false;
+    const assistant = await callNvidia(messages, selectedModel, toolSet, {
+      stream: Boolean(onDelta),
+      timeoutMs: modelTimeout(),
+      onContent: (chunk) => {
+        streamed = true;
+        onDelta?.(chunk);
+      },
+    });
+    return { assistant, streamed };
+  };
+
   for (let iteration = 0; iteration < MAX_TOOL_LOOPS; iteration += 1) {
-    let assistant;
+    onStatus?.(iteration === 0 ? "Reading your request…" : "Analyzing live tool results…");
+    let response;
     try {
-      assistant = await callNvidia(messages, selectedModel, tools);
+      response = await callModel(tools);
     } catch (error) {
       if (iteration !== 0) throw error;
-      assistant = await callNvidia(messages, selectedModel, []);
+      onReset?.();
+      onStatus?.("Switching to the lightweight MCP router…");
+      try {
+        response = await callModel(routingTools());
+      } catch {
+        onReset?.();
+        onStatus?.("Connecting without tool schemas…");
+        response = await callModel([]);
+      }
     }
 
+    const { assistant, streamed } = response;
     const calls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
     if (!calls.length) {
       finalContent = text(assistant.content, 100_000);
       break;
     }
+    if (streamed) onReset?.();
 
     messages.push({
       role: "assistant",
@@ -583,7 +725,7 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
       tool_calls: calls,
     });
 
-    for (const call of calls) {
+    const iterationEvents = await Promise.all(calls.map(async (call) => {
       const resolved = resolveToolCall(call);
       const confirmableArgs = confirmationArgs(resolved.args);
       const event = {
@@ -596,9 +738,16 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
         result: null,
       };
 
+      onStatus?.(
+        resolved.name === "orbitx_tool_search"
+          ? "Searching all OrbitX MCP tools…"
+          : `Running ${resolved.name || "OrbitX tool"}…`,
+      );
       if (!resolved.name) {
         event.status = "failed";
         event.result = { error: "Tool name missing" };
+      } else if (resolved.name === "orbitx_tool_search") {
+        event.result = searchToolCatalog(resolved.args.query);
       } else if (BLOCKED_EMBEDDED_TOOLS.has(resolved.name)) {
         event.status = "failed";
         event.result = {
@@ -616,14 +765,18 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
         };
       } else {
         try {
-          const result = await runEmbeddedAgentTool({
-            userId: ctx.userId,
-            walletAddress: ctx.walletAddress,
-            email: ctx.email,
-            toolName: resolved.name,
-            args: resolved.args,
-            req,
-          });
+          const result = await withTimeout(
+            runEmbeddedAgentTool({
+              userId: ctx.userId,
+              walletAddress: ctx.walletAddress,
+              email: ctx.email,
+              toolName: resolved.name,
+              args: resolved.args,
+              req,
+            }),
+            Math.min(TOOL_TIMEOUT_MS, Math.max(1_500, deadline - Date.now())),
+            `${resolved.name} timed out`,
+          );
           event.result = jsonSafe(result);
           if (result?.ok === false) event.status = "failed";
         } catch (error) {
@@ -634,6 +787,11 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
         }
       }
 
+      onToolEvent?.(event);
+      return { call, event };
+    }));
+
+    for (const { call, event } of iterationEvents) {
       toolEvents.push(event);
       messages.push({
         role: "tool",
@@ -649,6 +807,7 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
   }
 
   if (!finalContent) {
+    onStatus?.("Writing the answer…");
     const last = await callNvidia(
       [
         ...messages,
@@ -659,6 +818,11 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
       ],
       selectedModel,
       [],
+      {
+        stream: Boolean(onDelta),
+        timeoutMs: modelTimeout(),
+        onContent: onDelta,
+      },
     );
     finalContent = text(last.content, 100_000);
   }
@@ -775,6 +939,124 @@ async function handleChat(req, res, ctx, body) {
     userMessage: mapMessage(userMessage),
     assistantMessage: mapMessage(assistantMessage),
   });
+}
+
+function beginChatStream(res) {
+  res.statusCode = 200;
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+}
+
+function writeChatEvent(res, event) {
+  if (res.writableEnded || res.destroyed) return;
+  res.write(`${JSON.stringify(event)}\n`);
+}
+
+async function handleChatStream(req, res, ctx, body) {
+  requireAccess(ctx);
+  rateLimit(req, ctx.userId, "chat", 30, 60_000);
+  const prompt = text(body.message, MAX_PROMPT);
+  if (!prompt) return json(res, { error: "message_required" }, 400);
+
+  beginChatStream(res);
+  writeChatEvent(res, { type: "status", message: "Starting OrbitX AI…" });
+  const heartbeat = setInterval(() => {
+    writeChatEvent(res, { type: "ping", at: Date.now() });
+  }, 10_000);
+
+  try {
+    const selectedModel = modelId(body.model);
+    const conversation = await ensureConversation(
+      ctx,
+      body.conversationId,
+      prompt,
+      selectedModel,
+    );
+    writeChatEvent(res, {
+      type: "conversation",
+      conversation: mapConversation(conversation),
+    });
+
+    const { data: userMessage, error: insertError } = await ctx.db
+      .from("ai_messages")
+      .insert({
+        conversation_id: conversation.id,
+        user_id: ctx.userId,
+        role: "user",
+        content: prompt,
+        model: selectedModel,
+      })
+      .select("*")
+      .single();
+    if (insertError || !userMessage) {
+      throw new Error(insertError?.message || "Could not save message");
+    }
+    writeChatEvent(res, { type: "user_message", message: mapMessage(userMessage) });
+
+    const rows = await loadMessages(ctx, conversation.id);
+    const result = await runChat(ctx, conversation, rows, selectedModel, req, {
+      onStatus: (message) => writeChatEvent(res, { type: "status", message }),
+      onDelta: (delta) => writeChatEvent(res, { type: "delta", delta }),
+      onReset: () => writeChatEvent(res, { type: "reset" }),
+      onToolEvent: (event) => writeChatEvent(res, { type: "tool", event }),
+    });
+    const now = new Date().toISOString();
+    const { data: assistantMessage, error: assistantError } = await ctx.db
+      .from("ai_messages")
+      .insert({
+        conversation_id: conversation.id,
+        user_id: ctx.userId,
+        role: "assistant",
+        content: result.content,
+        model: selectedModel,
+        tool_events: result.toolEvents,
+      })
+      .select("*")
+      .single();
+    if (assistantError || !assistantMessage) {
+      throw new Error(assistantError?.message || "Could not save assistant message");
+    }
+
+    await ctx.db
+      .from("ai_conversations")
+      .update({ model: selectedModel, updated_at: now })
+      .eq("id", conversation.id)
+      .eq("user_id", ctx.userId);
+
+    writeChatEvent(res, {
+      type: "complete",
+      ok: true,
+      conversation: mapConversation({
+        ...conversation,
+        model: selectedModel,
+        updated_at: now,
+      }),
+      userMessage: mapMessage(userMessage),
+      assistantMessage: mapMessage(assistantMessage),
+    });
+  } catch (error) {
+    const status =
+      typeof error?.status === "number" && error.status >= 400 ? error.status : 500;
+    if (status >= 500) console.error("[orbitx-ai:stream]", error);
+    writeChatEvent(res, {
+      type: "error",
+      status,
+      error: status >= 500 ? "orbitx_ai_error" : error?.message || "request_failed",
+      message:
+        status === 504 || error?.name === "TimeoutError"
+          ? "A live provider took too long. Please retry—OrbitX stopped waiting safely."
+          : status >= 500
+            ? "OrbitX AI could not complete the response. Please retry."
+            : error?.message || "Request failed",
+    });
+  } finally {
+    clearInterval(heartbeat);
+    if (!res.writableEnded) res.end();
+  }
 }
 
 async function handleConversation(req, res, ctx, body) {
@@ -1166,6 +1448,7 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
 
     const body = parseBody(req);
+    if (action === "chat.stream") return handleChatStream(req, res, ctx, body);
     if (action === "chat") return handleChat(req, res, ctx, body);
     if (action === "conversation") return handleConversation(req, res, ctx, body);
     if (action === "media.generate") return handleMediaGenerate(req, res, ctx, body);

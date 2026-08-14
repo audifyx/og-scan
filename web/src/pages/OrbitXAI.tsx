@@ -73,7 +73,7 @@ import {
   generateAiMedia,
   pollAiMedia,
   renameAiConversation,
-  sendAiMessage,
+  streamAiMessage,
   type AiBootstrap,
   type AiConversation,
   type AiGate,
@@ -649,6 +649,7 @@ function ChatMessage({
 }) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
+  const isStreaming = message.metadata.streaming === true;
   return (
     <article className={`oai-message oai-message--${message.role}`}>
       {!isUser && (
@@ -675,13 +676,16 @@ function ChatMessage({
           {isUser || isTool ? (
             <p>{message.content}</p>
           ) : (
-            <ReactMarkdown
-              components={{
-                a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <>
+              <ReactMarkdown
+                components={{
+                  a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+              {isStreaming && <span className="oai-live-cursor" aria-label="OrbitX AI is typing" />}
+            </>
           )}
         </div>
         {message.toolEvents.map((event) => (
@@ -708,21 +712,25 @@ function Composer({
   busy,
   onChange,
   onSubmit,
+  onStop,
   onSendAsset,
   onChart,
   onTools,
   onCreate,
   onXStudio,
+  toolCount,
 }: {
   value: string;
   busy: boolean;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  onStop: () => void;
   onSendAsset: () => void;
   onChart: () => void;
   onTools: () => void;
   onCreate: () => void;
   onXStudio: () => void;
+  toolCount: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -751,7 +759,12 @@ function Composer({
             {[
               { label: "Send tokens", detail: "Non-custodial", icon: Send, action: onSendAsset },
               { label: "Live chart", detail: "DexScreener", icon: BarChart3, action: onChart },
-              { label: "MCP tools", detail: "99 capabilities", icon: Command, action: onTools },
+              {
+                label: "MCP tools",
+                detail: `${toolCount.toLocaleString()} capabilities`,
+                icon: Command,
+                action: onTools,
+              },
               { label: "Create media", detail: "Grok Imagine", icon: WandSparkles, action: onCreate },
               { label: "X Studio", detail: "Draft & publish", icon: X, action: onXStudio },
             ].map(({ label, detail, icon: Icon, action }) => (
@@ -800,11 +813,11 @@ function Composer({
         <button
           type="button"
           className="oai-composer__send"
-          aria-label="Send message"
-          disabled={busy || !value.trim()}
-          onClick={onSubmit}
+          aria-label={busy ? "Stop response" : "Send message"}
+          disabled={!busy && !value.trim()}
+          onClick={busy ? onStop : onSubmit}
         >
-          {busy ? <Loader2 className="oai-spin" size={18} /> : <ArrowUp size={18} />}
+          {busy ? <X size={17} /> : <ArrowUp size={18} />}
         </button>
       </div>
       <p className="oai-composer-note">
@@ -1892,6 +1905,7 @@ export default function OrbitXAI() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [composer, setComposer] = useState("");
   const [sending, setSending] = useState(false);
+  const [streamStatus, setStreamStatus] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [modelOpen, setModelOpen] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -1900,6 +1914,11 @@ export default function OrbitXAI() {
   const [sendModal, setSendModal] = useState(false);
   const [chartModal, setChartModal] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => streamAbortRef.current?.abort();
+  }, []);
 
   const refreshAccess = useCallback(async () => {
     if (!user) {
@@ -2103,6 +2122,10 @@ export default function OrbitXAI() {
     setTab("chat");
     setComposer("");
     setSending(true);
+    setStreamStatus("Connecting to OrbitX AI…");
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    const streamId = `stream-${Date.now()}`;
     const temporary: AiMessage = {
       id: `local-${Date.now()}`,
       conversationId: activeId || "new",
@@ -2113,30 +2136,112 @@ export default function OrbitXAI() {
       metadata: {},
       createdAt: new Date().toISOString(),
     };
+    let streamedContent = "";
+    let streamedEvents: AiToolEvent[] = [];
+    let streamConversationId = activeId || "new";
+    let savedUserMessage: AiMessage | null = null;
+
+    const renderStream = () => {
+      const streamingMessage: AiMessage = {
+        id: streamId,
+        conversationId: streamConversationId,
+        role: "assistant",
+        content: streamedContent,
+        model: selectedModel,
+        toolEvents: streamedEvents,
+        metadata: { streaming: true },
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((current) => {
+        const exists = current.some((message) => message.id === streamId);
+        return exists
+          ? current.map((message) => (message.id === streamId ? streamingMessage : message))
+          : [...current, streamingMessage];
+      });
+    };
+
     setMessages((current) => [...current, temporary]);
     try {
-      const result = await sendAiMessage({
-        conversationId: activeId,
-        message: prompt,
-        model: selectedModel,
-      });
+      const result = await streamAiMessage(
+        {
+          conversationId: activeId,
+          message: prompt,
+          model: selectedModel,
+        },
+        {
+          signal: controller.signal,
+          onEvent: (event) => {
+            if (event.type === "status") {
+              setStreamStatus(event.message);
+            } else if (event.type === "conversation") {
+              streamConversationId = event.conversation.id;
+              setConversations((current) => [
+                event.conversation,
+                ...current.filter(
+                  (conversation) => conversation.id !== event.conversation.id,
+                ),
+              ]);
+            } else if (event.type === "user_message") {
+              savedUserMessage = event.message;
+            } else if (event.type === "delta") {
+              streamedContent += event.delta;
+              setStreamStatus("Responding live…");
+              renderStream();
+            } else if (event.type === "reset") {
+              streamedContent = "";
+              renderStream();
+            } else if (event.type === "tool") {
+              streamedEvents = [
+                ...streamedEvents.filter((item) => item.id !== event.event.id),
+                event.event,
+              ];
+              renderStream();
+            }
+          },
+        },
+      );
       setActiveId(result.conversation.id);
       setConversations((current) => [
         result.conversation,
         ...current.filter((conversation) => conversation.id !== result.conversation.id),
       ]);
       setMessages((current) => [
-        ...current.filter((message) => message.id !== temporary.id),
+        ...current.filter(
+          (message) => message.id !== temporary.id && message.id !== streamId,
+        ),
         result.userMessage,
         result.assistantMessage,
       ]);
     } catch (sendError) {
-      setMessages((current) => current.filter((message) => message.id !== temporary.id));
-      setComposer(prompt);
-      toast.error(sendError instanceof Error ? sendError.message : "OrbitX AI could not respond");
+      const message =
+        sendError instanceof Error ? sendError.message : "OrbitX AI could not respond";
+      setMessages((current) =>
+        current.map((item) => {
+          if (item.id === temporary.id && savedUserMessage) return savedUserMessage;
+          if (item.id !== streamId) return item;
+          return {
+            ...item,
+            content:
+              item.content ||
+              (message.includes("stopped")
+                ? "Response stopped."
+                : "I couldn't finish that response. Please retry."),
+            metadata: { ...item.metadata, streaming: false, incomplete: true },
+          };
+        }),
+      );
+      if (!message.includes("stopped")) setComposer(prompt);
+      toast.error(message);
     } finally {
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
+      setStreamStatus("");
       setSending(false);
     }
+  };
+
+  const stopResponse = () => {
+    setStreamStatus("Stopping response…");
+    streamAbortRef.current?.abort();
   };
 
   const launchTool = (tool: AiToolDefinition) => {
@@ -2245,6 +2350,9 @@ export default function OrbitXAI() {
   const activeConversation = conversations.find((conversation) => conversation.id === activeId);
   const modelLabel =
     bootstrap.models.find((model) => model.id === selectedModel)?.label || "NVIDIA NIM";
+  const liveTyping = messages.some(
+    (message) => message.role === "assistant" && message.metadata.streaming === true,
+  );
 
   return (
     <div className="oai-root oai-app">
@@ -2378,14 +2486,14 @@ export default function OrbitXAI() {
                         onCancel={(messageId, event) => void cancelTool(messageId, event)}
                       />
                     ))}
-                    {sending && (
+                    {sending && !liveTyping && (
                       <div className="oai-thinking">
                         <div className="oai-message__avatar"><AiMark compact /></div>
                         <div>
                           <span />
                           <span />
                           <span />
-                          <small>OrbitX is thinking and checking live tools</small>
+                          <small>{streamStatus || "OrbitX is preparing a live response…"}</small>
                         </div>
                       </div>
                     )}
@@ -2397,11 +2505,13 @@ export default function OrbitXAI() {
                 busy={sending}
                 onChange={setComposer}
                 onSubmit={() => void sendMessage()}
+                onStop={stopResponse}
                 onSendAsset={() => setSendModal(true)}
                 onChart={() => setChartModal(true)}
                 onTools={() => setTab("tools")}
                 onCreate={() => setTab("create")}
                 onXStudio={() => setTab("x")}
+                toolCount={bootstrap.tools.length}
               />
             </section>
           )}
