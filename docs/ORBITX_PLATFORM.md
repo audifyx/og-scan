@@ -12,7 +12,7 @@ Last verified: 2026-07-25 after merging teams 1–5 into `main`.
 | Crypto Intel | `/intel/*` | `web/src/crypto/**` | Crypto Intelligence |
 | Social HQ | `/hq/*` | `web/src/social/**` | Social + Growth |
 | DEX | `/ORBITX_DEX` | `web/ogdex/**` | Production DEX |
-| OrbitX AI | `/AI` | `web/src/pages/OrbitXAI.tsx`, `web/api/orbitx-ai.js` | Wallet-gated AI + MCP super app |
+| OrbitX AI | `/ai` | `web/src/pages/OrbitXAI.tsx`, `web/api/orbitx-ai.js` | Wallet-gated AI + MCP super app |
 | Launchpad | `/orbitxlaunch` | `web/src/pages/orbitx/**` | Token launch |
 | Terminal | `/terminal` | `web/src/pages/orbitx/Terminal*` + `TradingTerminal` | Trade UI |
 

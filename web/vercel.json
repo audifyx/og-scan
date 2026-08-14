@@ -1,6 +1,13 @@
 {
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
+  "redirects": [
+    {
+      "source": "/AI",
+      "destination": "/ai",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/ai-fn/(.*)",
@@ -152,6 +159,15 @@
     }
   ],
   "headers": [
+    {
+      "source": "/ai",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/ORBITX_DEX/assets/(.*)",
       "headers": [

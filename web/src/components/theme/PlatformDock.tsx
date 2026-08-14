@@ -10,7 +10,7 @@ const LINKS: { to: string; label: string; ico: string; match?: (p: string) => bo
   { to: "/intel", label: "Intel", ico: "◎", match: (p) => p === "/intel" || p.startsWith("/intel/") },
   { to: "/nft", label: "NFT", ico: "🖼", match: (p) => p.startsWith("/nft") },
   { to: "/orbitx-social", label: "Social", ico: "◉", match: (p) => p.startsWith("/orbitx-social") || p.startsWith("/social") },
-  { to: "/AI", label: "AI", ico: "✧", match: (p) => p.toLowerCase() === "/ai" },
+  { to: "/ai", label: "AI", ico: "✧", match: (p) => p.toLowerCase() === "/ai" },
   { to: "/agent", label: "Agent", ico: "✦", match: (p) => p.startsWith("/agent") },
   { to: "/x", label: "X", ico: "✕", match: (p) => p === "/x" || p.startsWith("/x/") },
   { to: "/play", label: "Play", ico: "▶", match: (p) => p === "/play" || p.startsWith("/play/") },

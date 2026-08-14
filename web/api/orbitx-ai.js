@@ -14,7 +14,7 @@ import {
   json,
   memoryRateLimit,
   requireUser,
-} from "./orbitx/world/_lib";
+} from "./orbitx/ai-runtime.js";
 import {
   listEmbeddedAgentTools,
   runEmbeddedAgentTool,

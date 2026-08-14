@@ -14,15 +14,18 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('path="/intel"');
     expect(app).toContain('path="/orbitx-social"');
     expect(app).toContain('path="/Orbitxcity"');
+    expect(app).toContain('path="/ai"');
     expect(app).toContain('path="/AI"');
+    expect(app).toContain('Navigate to="/ai"');
   });
 
-  it("lazy-loads team apps", () => {
+  it("loads team apps and keeps OrbitX AI eager for route reliability", () => {
     expect(app).toContain("./os/OsApp");
     expect(app).toContain("./gaming/PlayApp");
     expect(app).toContain("./crypto/pages/IntelLayout");
     expect(app).toContain("./pages/SocialAppPage");
-    expect(app).toContain("./pages/OrbitXAI");
+    expect(app).toContain('import OrbitXAI from "./pages/OrbitXAI"');
+    expect(app).not.toContain('lazyWithRetry(() => import("./pages/OrbitXAI"))');
   });
 
   it("redirects legacy social aliases to live social app", () => {

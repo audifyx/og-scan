@@ -106,6 +106,7 @@ import LaunchpadApiLaunch from "./pages/orbitx/LaunchpadApiLaunch";
 import LaunchpadCurveEvm from "./pages/orbitx/LaunchpadCurveEvm";
 import LaunchpadCurveTrade from "./pages/orbitx/LaunchpadCurveTrade";
 import LaunchpadCurveMarkets from "./pages/orbitx/LaunchpadCurveMarkets";
+import OrbitXAI from "./pages/OrbitXAI";
 const LaunchpadNftHub = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftCreate"));
 const NftMarketLayout = lazyWithRetry(() => import("./pages/nft/MarketplaceLayout"));
@@ -207,7 +208,6 @@ const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
 const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCityPage"));
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
-const OrbitXAI = lazyWithRetry(() => import("./pages/OrbitXAI"));
 
 function RouteFallback({ label }: { label: string }) {
   return (
@@ -315,13 +315,11 @@ const App = () => (
 
             {/* ── OrbitX AI — wallet-authenticated, token-gated super app ── */}
             <Route
-              path="/AI"
-              element={
-                <Suspense fallback={<RouteFallback label="OrbitX AI" />}>
-                  <OrbitXAI />
-                </Suspense>
-              }
+              path="/ai"
+              caseSensitive
+              element={<OrbitXAI />}
             />
+            <Route path="/AI" caseSensitive element={<Navigate to="/ai" replace />} />
 
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route

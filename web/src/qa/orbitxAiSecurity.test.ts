@@ -10,6 +10,11 @@ describe("OrbitX AI security guards", () => {
     api.indexOf("export default async function handler"),
   );
 
+  it("uses a JavaScript-safe server runtime entry", () => {
+    expect(api).toContain('from "./orbitx/ai-runtime.js"');
+    expect(api).not.toContain('from "./orbitx/world/_lib"');
+  });
+
   it("atomically consumes a server-side confirmation instead of client tool arguments", () => {
     expect(executeHandler).toContain('body.eventId');
     expect(executeHandler).toContain('body.messageId');

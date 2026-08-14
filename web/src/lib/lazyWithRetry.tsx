@@ -12,8 +12,9 @@ export function lazyWithRetry<T extends ComponentType<any>>(factory: () => Promi
       if (isChunkLoadError(e)) {
         try {
           return await factory(); // transient? retry once
-        } catch {
+        } catch (retryError) {
           reloadOnce(); // stale HTML — reload to get fresh chunks
+          throw retryError;
         }
       }
       throw e;
