@@ -33,6 +33,7 @@ const MAX_PROMPT = 12_000;
 const MAX_TOOL_LOOPS = 4;
 const MAX_TOOL_STORAGE_CHARS = 60_000;
 const MAX_TOOL_MODEL_CHARS = 16_000;
+const CONFIRMATION_TTL_MS = 15 * 60_000;
 const FALLBACK_PUBLIC_BASE = "https://www.orbitx.world";
 const MEDIA_ASPECTS = new Set(["2:3", "3:2", "1:1", "9:16", "16:9"]);
 const VIDEO_MODES = new Set(["fun", "normal", "spicy"]);
@@ -516,6 +517,7 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
         event.result = { error: confirmableArgs.error };
       } else if (requiresConfirmation(resolved.name)) {
         event.status = "confirmation_required";
+        event.expiresAt = new Date(Date.now() + CONFIRMATION_TTL_MS).toISOString();
         event.result = {
           message: "Review and confirm this action in OrbitX AI before it runs.",
         };
@@ -665,25 +667,6 @@ async function handleChat(req, res, ctx, body) {
     .single();
   if (assistantError || !assistantMessage) {
     throw new Error(assistantError?.message || "Could not save assistant message");
-  }
-
-  const pendingConfirmations = result.toolEvents
-    .filter((event) => event.status === "confirmation_required")
-    .map((event) => ({
-      event_id: event.id,
-      user_id: ctx.userId,
-      conversation_id: conversation.id,
-      message_id: assistantMessage.id,
-      tool_name: event.tool,
-      arguments: event.args,
-    }));
-  if (pendingConfirmations.length) {
-    const { error: confirmationError } = await ctx.db
-      .from("ai_tool_confirmations")
-      .insert(pendingConfirmations);
-    if (confirmationError) {
-      throw new Error(`Could not secure tool confirmation: ${confirmationError.message}`);
-    }
   }
 
   await ctx.db
@@ -877,57 +860,77 @@ async function handleToolExecute(req, res, ctx, body) {
   requireAccess(ctx);
   rateLimit(req, ctx.userId, "tool", 24, 60_000);
   const conversationId = text(body.conversationId, 80);
+  const messageId = text(body.messageId, 80);
   const eventId = text(body.eventId, 80);
   if (!conversationId) return json(res, { error: "conversationId_required" }, 400);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)) {
-    return json(res, { error: "valid_eventId_required" }, 400);
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidPattern.test(messageId) || !uuidPattern.test(eventId)) {
+    return json(res, { error: "valid_messageId_and_eventId_required" }, 400);
   }
 
   const conversation = await ensureConversation(ctx, conversationId, "", "");
-  const now = new Date().toISOString();
-  const { data: confirmation, error: consumeError } = await ctx.db
-    .from("ai_tool_confirmations")
-    .update({ status: "executing", updated_at: now })
-    .eq("event_id", eventId)
+  const { data: sourceMessage, error: sourceError } = await ctx.db
+    .from("ai_messages")
+    .select("id, tool_events")
+    .eq("id", messageId)
     .eq("user_id", ctx.userId)
     .eq("conversation_id", conversation.id)
-    .eq("status", "pending")
-    .gt("expires_at", now)
-    .select("*")
     .maybeSingle();
-  if (consumeError) throw new Error(consumeError.message);
-  if (!confirmation) {
-    const { data: existing, error: existingError } = await ctx.db
-      .from("ai_tool_confirmations")
-      .select("status, expires_at")
-      .eq("event_id", eventId)
-      .eq("user_id", ctx.userId)
-      .eq("conversation_id", conversation.id)
-      .maybeSingle();
-    if (existingError) throw new Error(existingError.message);
-    if (!existing) return json(res, { error: "confirmation_not_found" }, 404);
-    if (new Date(existing.expires_at).getTime() <= Date.now()) {
-      return json(res, { error: "confirmation_expired" }, 410);
-    }
-    return json(res, { error: "confirmation_already_used", status: existing.status }, 409);
+  if (sourceError) throw new Error(sourceError.message);
+  if (!sourceMessage) return json(res, { error: "confirmation_not_found" }, 404);
+
+  const sourceEvents = Array.isArray(sourceMessage.tool_events)
+    ? sourceMessage.tool_events
+    : [];
+  const confirmation = sourceEvents.find((stored) => stored?.id === eventId);
+  if (!confirmation || confirmation.status !== "confirmation_required") {
+    return json(res, { error: "confirmation_already_used_or_missing" }, 409);
+  }
+  if (
+    !confirmation.expiresAt ||
+    new Date(confirmation.expiresAt).getTime() <= Date.now()
+  ) {
+    return json(res, { error: "confirmation_expired" }, 410);
   }
 
-  const toolName = confirmation.tool_name;
-  const args = objectValue(confirmation.arguments);
+  const toolName = text(confirmation.tool, 160);
+  const args = objectValue(confirmation.args);
+  if (!toolName || BLOCKED_EMBEDDED_TOOLS.has(toolName) || !requiresConfirmation(toolName)) {
+    return json(res, { error: "tool_unavailable_in_orbitx_ai" }, 400);
+  }
+
+  const executingEvent = {
+    ...confirmation,
+    status: "executing",
+    result: { message: "OrbitX is executing the confirmed action." },
+  };
+  const executingEvents = sourceEvents.map((stored) =>
+    stored?.id === eventId ? executingEvent : stored
+  );
+  const { data: claimed, error: claimError } = await ctx.db
+    .from("ai_messages")
+    .update({ tool_events: executingEvents })
+    .eq("id", sourceMessage.id)
+    .eq("user_id", ctx.userId)
+    .eq("conversation_id", conversation.id)
+    .contains("tool_events", [{ id: eventId, status: "confirmation_required" }])
+    .select("id")
+    .maybeSingle();
+  if (claimError) throw new Error(claimError.message);
+  if (!claimed) {
+    return json(res, { error: "confirmation_already_used" }, 409);
+  }
+
   let result;
   try {
-    if (BLOCKED_EMBEDDED_TOOLS.has(toolName) || !requiresConfirmation(toolName)) {
-      result = { ok: false, error: "tool_unavailable_in_orbitx_ai" };
-    } else {
-      result = await runEmbeddedAgentTool({
-        userId: ctx.userId,
-        walletAddress: ctx.walletAddress,
-        email: ctx.email,
-        toolName,
-        args,
-        req,
-      });
-    }
+    result = await runEmbeddedAgentTool({
+      userId: ctx.userId,
+      walletAddress: ctx.walletAddress,
+      email: ctx.email,
+      toolName,
+      args,
+      req,
+    });
   } catch (error) {
     result = {
       ok: false,
@@ -944,39 +947,17 @@ async function handleToolExecute(req, res, ctx, body) {
     result: jsonSafe(result),
   };
 
+  const finalizedEvents = executingEvents.map((stored) =>
+    stored?.id === eventId ? event : stored
+  );
   const { error: finalizeError } = await ctx.db
-    .from("ai_tool_confirmations")
-    .update({
-      status: failed ? "failed" : "completed",
-      result: event.result,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("event_id", eventId)
-    .eq("user_id", ctx.userId)
-    .eq("status", "executing");
-  if (finalizeError) throw new Error(finalizeError.message);
-
-  const { data: sourceMessage, error: sourceError } = await ctx.db
     .from("ai_messages")
-    .select("tool_events")
-    .eq("id", confirmation.message_id)
+    .update({ tool_events: finalizedEvents })
+    .eq("id", sourceMessage.id)
     .eq("user_id", ctx.userId)
-    .maybeSingle();
-  if (sourceError) {
-    console.error("[orbitx-ai] could not load confirmation message", sourceError);
-  } else if (sourceMessage) {
-    const updatedEvents = Array.isArray(sourceMessage.tool_events)
-      ? sourceMessage.tool_events.map((stored) => stored?.id === eventId ? event : stored)
-      : [event];
-    const { error: sourceUpdateError } = await ctx.db
-      .from("ai_messages")
-      .update({ tool_events: updatedEvents })
-      .eq("id", confirmation.message_id)
-      .eq("user_id", ctx.userId);
-    if (sourceUpdateError) {
-      console.error("[orbitx-ai] could not update confirmation message", sourceUpdateError);
-    }
-  }
+    .eq("conversation_id", conversation.id)
+    .contains("tool_events", [{ id: eventId, status: "executing" }]);
+  if (finalizeError) throw new Error(finalizeError.message);
 
   let message = null;
   const { data, error: messageError } = await ctx.db

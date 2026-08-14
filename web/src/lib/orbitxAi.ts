@@ -37,8 +37,9 @@ export type AiToolEvent = {
   id: string;
   tool: string;
   args: Record<string, unknown>;
-  status: "completed" | "failed" | "confirmation_required";
+  status: "completed" | "failed" | "confirmation_required" | "executing";
   result: unknown;
+  expiresAt?: string;
 };
 
 export type AiMessage = {
@@ -207,6 +208,7 @@ export async function pollAiMedia(generationId: string): Promise<{ generation: A
 
 export async function executeAiTool(payload: {
   conversationId: string;
+  messageId: string;
   eventId: string;
 }): Promise<{
   ok: boolean;

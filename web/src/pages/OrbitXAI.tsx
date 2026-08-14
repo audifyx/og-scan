@@ -348,6 +348,7 @@ function ToolResultCard({
     recordString(result, "autoSignUrl");
   const isChart = Boolean(embedUrl) || /chart/i.test(event.tool);
   const isPending = event.status === "confirmation_required";
+  const isExecuting = event.status === "executing";
   const failed = event.status === "failed";
 
   if (isChart && embedUrl) {
@@ -405,11 +406,19 @@ function ToolResultCard({
     <div className={`oai-tool${failed ? " is-failed" : ""}${isPending ? " is-pending" : ""}`}>
       <div className="oai-tool__head">
         <span>
-          {isPending ? <ShieldCheck size={15} /> : failed ? <X size={15} /> : <Zap size={15} />}
+          {isPending ? (
+            <ShieldCheck size={15} />
+          ) : isExecuting ? (
+            <Loader2 className="oai-spin" size={15} />
+          ) : failed ? (
+            <X size={15} />
+          ) : (
+            <Zap size={15} />
+          )}
           {event.tool.replace(/^orbitx_/, "").replaceAll("_", " ")}
         </span>
         <span className={`oai-tool__status${failed ? " is-bad" : isPending ? " is-warn" : " is-ok"}`}>
-          {failed ? "Failed" : isPending ? "Confirm" : "Complete"}
+          {failed ? "Failed" : isPending ? "Confirm" : isExecuting ? "Running" : "Complete"}
         </span>
       </div>
       {isPending ? (
@@ -447,7 +456,7 @@ function ChatMessage({
 }: {
   message: AiMessage;
   confirming: string | null;
-  onConfirm: (event: AiToolEvent) => void;
+  onConfirm: (messageId: string, event: AiToolEvent) => void;
 }) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
@@ -481,7 +490,7 @@ function ChatMessage({
             key={event.id}
             event={event}
             busy={confirming === event.id}
-            onConfirm={onConfirm}
+            onConfirm={(pendingEvent) => onConfirm(message.id, pendingEvent)}
           />
         ))}
       </div>
@@ -1583,7 +1592,7 @@ export default function OrbitXAI() {
     }
   };
 
-  const confirmTool = async (event: AiToolEvent) => {
+  const confirmTool = async (messageId: string, event: AiToolEvent) => {
     if (!activeId) {
       toast.error("Open the conversation before confirming this action");
       return;
@@ -1592,6 +1601,7 @@ export default function OrbitXAI() {
     try {
       const result = await executeAiTool({
         conversationId: activeId,
+        messageId,
         eventId: event.id,
       });
       setMessages((current) => {
@@ -1777,7 +1787,7 @@ export default function OrbitXAI() {
                         key={message.id}
                         message={message}
                         confirming={confirming}
-                        onConfirm={(event) => void confirmTool(event)}
+                        onConfirm={(messageId, event) => void confirmTool(messageId, event)}
                       />
                     ))}
                     {sending && (

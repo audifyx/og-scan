@@ -10,10 +10,11 @@ describe("OrbitX AI security guards", () => {
     api.indexOf("export default async function handler"),
   );
 
-  it("consumes a server-side confirmation instead of client tool arguments", () => {
+  it("atomically consumes a server-side confirmation instead of client tool arguments", () => {
     expect(executeHandler).toContain('body.eventId');
-    expect(executeHandler).toContain('.from("ai_tool_confirmations")');
-    expect(executeHandler).toContain('.eq("status", "pending")');
+    expect(executeHandler).toContain('body.messageId');
+    expect(executeHandler).toContain('.from("ai_messages")');
+    expect(executeHandler).toContain('.contains("tool_events", [{ id: eventId, status: "confirmation_required" }])');
     expect(executeHandler).not.toContain("body.tool");
     expect(executeHandler).not.toContain("body.args");
   });
