@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TOKEN_GATE_EXEMPT_WALLETS_BASE,
   isTokenGateExemptAny,
@@ -10,6 +10,11 @@ import {
 
 const J = "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb";
 const J_LOWER = J.toLowerCase();
+const NON_EXEMPT = "11111111111111111111111111111111";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("server token-hold exempt", () => {
   it("lists j fee wallet", () => {
@@ -45,5 +50,28 @@ describe("server token-hold exempt", () => {
     });
     expect(hold.exempt).toBe(true);
     expect(hold.meetsRequirement).toBe(true);
+  });
+
+  it("fails closed when strict USD pricing is unavailable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) => {
+        const href = String(url);
+        const payload = href.includes("/balance")
+          ? { token: { uiAmount: 500_000 } }
+          : {};
+        return new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const hold = await verifyTokenHold(NON_EXEMPT, "https://www.orbitx.world", {
+      requireUsdPrice: true,
+    });
+
+    expect(hold.meetsRequirement).toBe(false);
+    expect(hold.error).toBe("price_unavailable");
   });
 });
