@@ -74,6 +74,12 @@ const DIRECT_TOOL_NAMES = new Set([
   "orbitx_open_dex",
   "orbitx_tools_help",
 ]);
+const BLOCKED_EMBEDDED_TOOLS = new Set([
+  // The first-party app already has an authoritative Supabase/SIWS session.
+  // Minting connector auth codes here would unnecessarily persist credentials
+  // in chat tool events.
+  "orbitx_auth_link",
+]);
 
 const SENSITIVE_TOOL_RE =
   /^orbitx_(?:execute|create|prepare|launch|buy|sell|claim|burn|rent|confirm|submit|request|mint|vanity|credits_buy|social_(?:join|post|create|leave)|nft_(?:register|like|comment|follow|make|cancel|list|create|place|submit))/;
@@ -480,6 +486,12 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
       if (!resolved.name) {
         event.status = "failed";
         event.result = { error: "Tool name missing" };
+      } else if (BLOCKED_EMBEDDED_TOOLS.has(resolved.name)) {
+        event.status = "failed";
+        event.result = {
+          error: "This connector-auth action is unavailable inside OrbitX AI.",
+          message: "Use the connected wallet session or the dedicated Agent connector page.",
+        };
       } else if (requiresConfirmation(resolved.name)) {
         event.status = "confirmation_required";
         event.result = {
@@ -827,6 +839,9 @@ async function handleToolExecute(req, res, ctx, body) {
   const args = objectValue(body.args);
   const conversationId = text(body.conversationId, 80);
   if (!toolName) return json(res, { error: "tool_required" }, 400);
+  if (BLOCKED_EMBEDDED_TOOLS.has(toolName)) {
+    return json(res, { error: "tool_unavailable_in_orbitx_ai" }, 400);
+  }
   const result = await runEmbeddedAgentTool({
     userId: ctx.userId,
     walletAddress: ctx.walletAddress,
