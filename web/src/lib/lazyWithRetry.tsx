@@ -4,7 +4,7 @@
 import { lazy, type ComponentType } from "react";
 import { isChunkLoadError, reloadOnce } from "./chunkReload";
 
-export function lazyWithRetry<T extends ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+export function lazyWithRetry<T extends ComponentType>(factory: () => Promise<{ default: T }>) {
   return lazy(async () => {
     try {
       return await factory();
