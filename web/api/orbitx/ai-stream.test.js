@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readOpenAiChatResponse } from "../../api/orbitx/ai-stream.js";
+import { readOpenAiChatResponse } from "./ai-stream.js";
 
 function streamResponse(chunks) {
   const encoder = new TextEncoder();

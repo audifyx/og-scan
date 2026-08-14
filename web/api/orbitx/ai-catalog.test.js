@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isEmbeddedAgentToolReadOnly,
   listEmbeddedAgentTools,
-} from "../../api/orbitx-hub.js";
+} from "../orbitx-hub.js";
 
 describe("OrbitX AI embedded MCP catalog", () => {
   it("makes the complete generated catalog discoverable", () => {
