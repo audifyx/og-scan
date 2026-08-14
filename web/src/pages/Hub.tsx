@@ -111,7 +111,7 @@ const ALL_APPS: AppItem[] = [
   { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(135deg, #67E8F9, #0891B2)", glyph: <span style={{ fontSize: 20 }}>🛡</span> },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <span style={{ fontSize: 20 }}>📈</span> },
-  { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
+  { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/AI", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
   { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #5EEAD4, #0D9488)", glyph: Glyph.agent },
   { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(135deg, #3F3F46, #18181B)", glyph: Glyph.x },
   { key: "shop", name: "Credits shop", caption: "Buy via X MCP · usage", href: "/shop", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #2DD4BF, #0F766E)", glyph: <span style={{ fontSize: 20 }}>◈</span> },

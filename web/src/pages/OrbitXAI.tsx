@@ -1105,9 +1105,11 @@ function XStudio() {
 function SendAssetModal({
   open,
   onClose,
+  gatedWalletAddress,
 }: {
   open: boolean;
   onClose: () => void;
+  gatedWalletAddress: string | null;
 }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, connected } = useWallet();
@@ -1126,11 +1128,22 @@ function SendAssetModal({
   }, [open]);
 
   if (!open) return null;
+  const connectedWalletAddress = publicKey?.toBase58() || null;
+  const walletMatchesGate =
+    Boolean(gatedWalletAddress) && connectedWalletAddress === gatedWalletAddress;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!connected || !publicKey) {
       toast.error("Connect your wallet first");
+      return;
+    }
+    if (!gatedWalletAddress) {
+      toast.error("Sign in with a wallet before sending tokens");
+      return;
+    }
+    if (!walletMatchesGate) {
+      toast.error("Reconnect the wallet that passed the OrbitX access check");
       return;
     }
     setBusy(true);
@@ -1225,6 +1238,19 @@ function SendAssetModal({
           </div>
         ) : (
           <>
+            {!walletMatchesGate && (
+              <div className="oai-wallet-mismatch" role="alert">
+                <ShieldCheck size={17} />
+                <div>
+                  <strong>Reconnect your verified wallet</strong>
+                  <span>
+                    Transfers are restricted to {shortAddress(gatedWalletAddress)}, the wallet
+                    that passed this session&apos;s access check.
+                  </span>
+                </div>
+                <WalletConnectButton />
+              </div>
+            )}
             <div className="oai-asset-switch">
               {(["SOL", "ORBITX", "CUSTOM"] as SendAsset[]).map((option) => (
                 <button
@@ -1279,7 +1305,11 @@ function SendAssetModal({
                 must approve before anything moves.
               </span>
             </div>
-            <button type="submit" className="oai-primary-btn oai-sheet__submit" disabled={busy}>
+            <button
+              type="submit"
+              className="oai-primary-btn oai-sheet__submit"
+              disabled={busy || !walletMatchesGate}
+            >
               {busy ? <Loader2 className="oai-spin" size={16} /> : <Wallet size={16} />}
               {busy ? "Waiting for confirmation…" : "Review in wallet"}
             </button>
@@ -1554,12 +1584,15 @@ export default function OrbitXAI() {
   };
 
   const confirmTool = async (event: AiToolEvent) => {
+    if (!activeId) {
+      toast.error("Open the conversation before confirming this action");
+      return;
+    }
     setConfirming(event.id);
     try {
       const result = await executeAiTool({
         conversationId: activeId,
-        tool: event.tool,
-        args: event.args,
+        eventId: event.id,
       });
       setMessages((current) => {
         const updated = current.map((message) => ({
@@ -1570,7 +1603,11 @@ export default function OrbitXAI() {
         }));
         return result.message ? [...updated, result.message] : updated;
       });
-      toast.success("OrbitX action completed");
+      if (result.ok && result.event.status === "completed") {
+        toast.success("OrbitX action completed");
+      } else {
+        toast.error("OrbitX action failed. Review the result card for details.");
+      }
     } catch (toolError) {
       toast.error(toolError instanceof Error ? toolError.message : "Action failed");
     } finally {
@@ -1796,7 +1833,11 @@ export default function OrbitXAI() {
         </nav>
       </div>
 
-      <SendAssetModal open={sendModal} onClose={() => setSendModal(false)} />
+      <SendAssetModal
+        open={sendModal}
+        onClose={() => setSendModal(false)}
+        gatedWalletAddress={bootstrap.walletAddress}
+      />
       <ChartModal
         open={chartModal}
         onClose={() => setChartModal(false)}

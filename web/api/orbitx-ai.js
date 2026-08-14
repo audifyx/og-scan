@@ -14,7 +14,7 @@ import {
   json,
   memoryRateLimit,
   requireUser,
-} from "./orbitx/world/_lib.ts";
+} from "./orbitx/world/_lib";
 import {
   listEmbeddedAgentTools,
   runEmbeddedAgentTool,
@@ -80,9 +80,6 @@ const BLOCKED_EMBEDDED_TOOLS = new Set([
   // in chat tool events.
   "orbitx_auth_link",
 ]);
-
-const SENSITIVE_TOOL_RE =
-  /^orbitx_(?:execute|create|prepare|launch|buy|sell|claim|burn|rent|confirm|submit|request|mint|vanity|credits_buy|social_(?:join|post|create|leave)|nft_(?:register|like|comment|follow|make|cancel|list|create|place|submit))/;
 
 const SYSTEM_PROMPT = `You are OrbitX AI, the first-party crypto copilot inside OrbitX.
 
@@ -153,8 +150,7 @@ function modelId(requested) {
 }
 
 function requiresConfirmation(name) {
-  const normalized = String(name || "");
-  return !DIRECT_TOOL_NAMES.has(normalized) || SENSITIVE_TOOL_RE.test(normalized);
+  return !DIRECT_TOOL_NAMES.has(String(name || ""));
 }
 
 function normalizedMediaSettings(kind, value) {
@@ -196,6 +192,26 @@ function jsonSafe(value, maxChars = MAX_TOOL_STORAGE_CHARS) {
     };
   } catch {
     return { error: "Tool result could not be serialized" };
+  }
+}
+
+function confirmationArgs(value) {
+  try {
+    const serialized = JSON.stringify(objectValue(value));
+    if (serialized.length > MAX_TOOL_STORAGE_CHARS) {
+      return {
+        ok: false,
+        value: {},
+        error: `Tool arguments exceed the ${MAX_TOOL_STORAGE_CHARS}-character confirmation limit.`,
+      };
+    }
+    return { ok: true, value: JSON.parse(serialized), error: null };
+  } catch {
+    return {
+      ok: false,
+      value: {},
+      error: "Tool arguments could not be saved safely for confirmation.",
+    };
   }
 }
 
@@ -475,10 +491,13 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
 
     for (const call of calls) {
       const resolved = resolveToolCall(call);
+      const confirmableArgs = confirmationArgs(resolved.args);
       const event = {
-        id: text(call.id, 160) || crypto.randomUUID(),
+        id: crypto.randomUUID(),
         tool: resolved.name,
-        args: jsonSafe(resolved.args, 20_000),
+        args: confirmableArgs.ok
+          ? confirmableArgs.value
+          : jsonSafe(resolved.args, 20_000),
         status: "completed",
         result: null,
       };
@@ -492,6 +511,9 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
           error: "This connector-auth action is unavailable inside OrbitX AI.",
           message: "Use the connected wallet session or the dedicated Agent connector page.",
         };
+      } else if (requiresConfirmation(resolved.name) && !confirmableArgs.ok) {
+        event.status = "failed";
+        event.result = { error: confirmableArgs.error };
       } else if (requiresConfirmation(resolved.name)) {
         event.status = "confirmation_required";
         event.result = {
@@ -643,6 +665,25 @@ async function handleChat(req, res, ctx, body) {
     .single();
   if (assistantError || !assistantMessage) {
     throw new Error(assistantError?.message || "Could not save assistant message");
+  }
+
+  const pendingConfirmations = result.toolEvents
+    .filter((event) => event.status === "confirmation_required")
+    .map((event) => ({
+      event_id: event.id,
+      user_id: ctx.userId,
+      conversation_id: conversation.id,
+      message_id: assistantMessage.id,
+      tool_name: event.tool,
+      arguments: event.args,
+    }));
+  if (pendingConfirmations.length) {
+    const { error: confirmationError } = await ctx.db
+      .from("ai_tool_confirmations")
+      .insert(pendingConfirmations);
+    if (confirmationError) {
+      throw new Error(`Could not secure tool confirmation: ${confirmationError.message}`);
+    }
   }
 
   await ctx.db
@@ -835,48 +876,126 @@ async function handleMediaStatus(req, res, ctx, body) {
 async function handleToolExecute(req, res, ctx, body) {
   requireAccess(ctx);
   rateLimit(req, ctx.userId, "tool", 24, 60_000);
-  const toolName = text(body.tool, 160);
-  const args = objectValue(body.args);
   const conversationId = text(body.conversationId, 80);
-  if (!toolName) return json(res, { error: "tool_required" }, 400);
-  if (BLOCKED_EMBEDDED_TOOLS.has(toolName)) {
-    return json(res, { error: "tool_unavailable_in_orbitx_ai" }, 400);
+  const eventId = text(body.eventId, 80);
+  if (!conversationId) return json(res, { error: "conversationId_required" }, 400);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId)) {
+    return json(res, { error: "valid_eventId_required" }, 400);
   }
-  const result = await runEmbeddedAgentTool({
-    userId: ctx.userId,
-    walletAddress: ctx.walletAddress,
-    email: ctx.email,
-    toolName,
-    args,
-    req,
-  });
+
+  const conversation = await ensureConversation(ctx, conversationId, "", "");
+  const now = new Date().toISOString();
+  const { data: confirmation, error: consumeError } = await ctx.db
+    .from("ai_tool_confirmations")
+    .update({ status: "executing", updated_at: now })
+    .eq("event_id", eventId)
+    .eq("user_id", ctx.userId)
+    .eq("conversation_id", conversation.id)
+    .eq("status", "pending")
+    .gt("expires_at", now)
+    .select("*")
+    .maybeSingle();
+  if (consumeError) throw new Error(consumeError.message);
+  if (!confirmation) {
+    const { data: existing, error: existingError } = await ctx.db
+      .from("ai_tool_confirmations")
+      .select("status, expires_at")
+      .eq("event_id", eventId)
+      .eq("user_id", ctx.userId)
+      .eq("conversation_id", conversation.id)
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
+    if (!existing) return json(res, { error: "confirmation_not_found" }, 404);
+    if (new Date(existing.expires_at).getTime() <= Date.now()) {
+      return json(res, { error: "confirmation_expired" }, 410);
+    }
+    return json(res, { error: "confirmation_already_used", status: existing.status }, 409);
+  }
+
+  const toolName = confirmation.tool_name;
+  const args = objectValue(confirmation.arguments);
+  let result;
+  try {
+    if (BLOCKED_EMBEDDED_TOOLS.has(toolName) || !requiresConfirmation(toolName)) {
+      result = { ok: false, error: "tool_unavailable_in_orbitx_ai" };
+    } else {
+      result = await runEmbeddedAgentTool({
+        userId: ctx.userId,
+        walletAddress: ctx.walletAddress,
+        email: ctx.email,
+        toolName,
+        args,
+        req,
+      });
+    }
+  } catch (error) {
+    result = {
+      ok: false,
+      error: error instanceof Error ? error.message : "OrbitX tool failed",
+    };
+  }
+
   const failed = result?.ok === false;
   const event = {
-    id: crypto.randomUUID(),
+    id: eventId,
     tool: toolName,
-    args: jsonSafe(args, 20_000),
+    args: jsonSafe(args),
     status: failed ? "failed" : "completed",
     result: jsonSafe(result),
   };
 
-  let message = null;
-  if (conversationId) {
-    const conversation = await ensureConversation(ctx, conversationId, "", "");
-    const { data, error } = await ctx.db
+  const { error: finalizeError } = await ctx.db
+    .from("ai_tool_confirmations")
+    .update({
+      status: failed ? "failed" : "completed",
+      result: event.result,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("event_id", eventId)
+    .eq("user_id", ctx.userId)
+    .eq("status", "executing");
+  if (finalizeError) throw new Error(finalizeError.message);
+
+  const { data: sourceMessage, error: sourceError } = await ctx.db
+    .from("ai_messages")
+    .select("tool_events")
+    .eq("id", confirmation.message_id)
+    .eq("user_id", ctx.userId)
+    .maybeSingle();
+  if (sourceError) {
+    console.error("[orbitx-ai] could not load confirmation message", sourceError);
+  } else if (sourceMessage) {
+    const updatedEvents = Array.isArray(sourceMessage.tool_events)
+      ? sourceMessage.tool_events.map((stored) => stored?.id === eventId ? event : stored)
+      : [event];
+    const { error: sourceUpdateError } = await ctx.db
       .from("ai_messages")
-      .insert({
-        conversation_id: conversation.id,
-        user_id: ctx.userId,
-        role: "tool",
-        content: `${toolName} completed.`,
-        tool_events: [event],
-      })
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
+      .update({ tool_events: updatedEvents })
+      .eq("id", confirmation.message_id)
+      .eq("user_id", ctx.userId);
+    if (sourceUpdateError) {
+      console.error("[orbitx-ai] could not update confirmation message", sourceUpdateError);
+    }
+  }
+
+  let message = null;
+  const { data, error: messageError } = await ctx.db
+    .from("ai_messages")
+    .insert({
+      conversation_id: conversation.id,
+      user_id: ctx.userId,
+      role: "tool",
+      content: `${toolName} ${failed ? "failed" : "completed"}.`,
+      tool_events: [event],
+    })
+    .select("*")
+    .single();
+  if (messageError) {
+    console.error("[orbitx-ai] could not save tool result message", messageError);
+  } else {
     message = data ? mapMessage(data) : null;
   }
-  return json(res, { ok: true, event, message });
+  return json(res, { ok: !failed, event, message });
 }
 
 export default async function handler(req, res) {

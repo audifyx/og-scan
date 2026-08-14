@@ -206,9 +206,8 @@ export async function pollAiMedia(generationId: string): Promise<{ generation: A
 }
 
 export async function executeAiTool(payload: {
-  conversationId?: string | null;
-  tool: string;
-  args: Record<string, unknown>;
+  conversationId: string;
+  eventId: string;
 }): Promise<{
   ok: boolean;
   event: AiToolEvent;

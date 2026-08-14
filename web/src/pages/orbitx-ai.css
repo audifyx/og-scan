@@ -1967,6 +1967,26 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+.oai-wallet-mismatch {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 11px;
+  border: 1px solid rgba(255, 181, 71, 0.2);
+  border-radius: 12px;
+  color: #ffc772;
+  background: rgba(255, 181, 71, 0.055);
+}
+
+.oai-wallet-mismatch > svg { flex: 0 0 auto; }
+.oai-wallet-mismatch strong,
+.oai-wallet-mismatch span { display: block; }
+.oai-wallet-mismatch strong { margin-bottom: 3px; font-size: 9px; }
+.oai-wallet-mismatch span { color: #9b8666; font-size: 8px; line-height: 1.45; }
+.oai-wallet-mismatch button { min-height: 32px !important; }
+
 .oai-asset-switch {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
