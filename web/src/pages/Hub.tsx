@@ -362,47 +362,11 @@ export default function Hub() {
 
   const rootHome = (
     <div className="ox-deck__hero">
-      <div>
-        <div className="ox-deck__intro">
-          <h1>{greet}.</h1>
-          <p>Command deck over deep space. Four gates in front of you — City, DEX, Agent, Shop. Search any station with ⌘K.</p>
-        </div>
-        <div className="ox-deck__gates">
-          {GATE_KEYS.map((key) => {
-            const app = PLATFORM_BY_KEY[key];
-            if (!app) return null;
-            const copy = GATE_COPY[key];
-            return (
-              <button key={app.key} type="button" className="ox-gate" onClick={() => push({ id: "app", appKey: app.key })}>
-                {renderMark(app, "ox-gate__orb")}
-                <span className="ox-gate__kicker">{copy.kicker}</span>
-                <span className="ox-gate__name">{app.name}</span>
-                <span className="ox-gate__cap">{copy.line}</span>
-              </button>
-            );
-          })}
-        </div>
-        <section className="ox-deck__section">
-          <h2>All stations</h2>
-          <p>Every OrbitX surface, one orbit.</p>
-          <div className="ox-stations">
-            {HOME_GRID_KEYS.filter((k) => !(GATE_KEYS as readonly string[]).includes(k)).map((k) => {
-              const app = PLATFORM_BY_KEY[k];
-              if (!app) return null;
-              return (
-                <button key={app.key} type="button" className="ox-station" onClick={() => push({ id: "app", appKey: app.key })}>
-                  {renderMark(app, "ox-station__mark")}
-                  <span>
-                    <span className="ox-station__name">{app.name}</span>
-                    <span className="ox-station__cap">{app.caption}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+      <div className="ox-deck__intro">
+        <h1>{greet}.</h1>
+        <p>Command deck over deep space. Four gates in front of you — City, DEX, Agent, Shop. Search any station with ⌘K.</p>
       </div>
-      <aside className="ox-deck__side" aria-label="Live telemetry">
+      <aside className="ox-deck__ticker" aria-label="Live telemetry">
         <button type="button" className="ox-tel" onClick={copyCA}>
           <span className="ox-tel__k">$ORBITX</span>
           <span className="ox-tel__v" style={{ color: changeColor(orbitxChange) }}>
@@ -425,6 +389,43 @@ export default function Hub() {
           <span className="ox-tel__m">{fng?.label || "Market mood"}</span>
         </div>
       </aside>
+      <div className="ox-deck__gates">
+        {GATE_KEYS.map((key) => {
+          const app = PLATFORM_BY_KEY[key];
+          if (!app) return null;
+          const copy = GATE_COPY[key];
+          return (
+            <button key={app.key} type="button" className="ox-gate" onClick={() => push({ id: "app", appKey: app.key })}>
+              {renderMark(app, "ox-gate__orb")}
+              <span className="ox-gate__copy">
+                <span className="ox-gate__kicker">{copy.kicker}</span>
+                <span className="ox-gate__name">{app.name}</span>
+              </span>
+              <span className="ox-gate__go">Enter</span>
+              <span className="ox-gate__cap">{copy.line}</span>
+            </button>
+          );
+        })}
+      </div>
+      <section className="ox-deck__section">
+        <h2>All stations</h2>
+        <p>Every OrbitX surface, one orbit.</p>
+        <div className="ox-stations">
+          {HOME_GRID_KEYS.filter((k) => !(GATE_KEYS as readonly string[]).includes(k)).map((k) => {
+            const app = PLATFORM_BY_KEY[k];
+            if (!app) return null;
+            return (
+              <button key={app.key} type="button" className="ox-station" onClick={() => push({ id: "app", appKey: app.key })}>
+                {renderMark(app, "ox-station__mark")}
+                <span>
+                  <span className="ox-station__name">{app.name}</span>
+                  <span className="ox-station__cap">{app.caption}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 

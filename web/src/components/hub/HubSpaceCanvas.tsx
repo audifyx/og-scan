@@ -123,21 +123,21 @@ function Planet({ reduced }: { reduced: boolean }) {
   });
 
   return (
-    <group ref={group} position={[2.35, -0.55, -1.6]} rotation={[0.18, 0.4, -0.12]}>
+    <group ref={group} position={[3.15, -0.15, -0.4]} rotation={[0.22, 0.55, -0.08]}>
       <mesh>
-        <sphereGeometry args={[1.55, 64, 64]} />
-        <meshStandardMaterial map={maps.color} roughness={0.86} metalness={0.08} />
+        <sphereGeometry args={[2.05, 64, 64]} />
+        <meshStandardMaterial map={maps.color} roughness={0.78} metalness={0.12} />
       </mesh>
       <mesh ref={cloudsRef} scale={1.018}>
-        <sphereGeometry args={[1.55, 48, 48]} />
-        <meshStandardMaterial map={maps.clouds} transparent opacity={0.42} depthWrite={false} roughness={1} metalness={0} />
+        <sphereGeometry args={[2.05, 48, 48]} />
+        <meshStandardMaterial map={maps.clouds} transparent opacity={0.5} depthWrite={false} roughness={1} metalness={0} />
       </mesh>
-      <mesh scale={1.12}>
-        <sphereGeometry args={[1.55, 32, 32]} />
-        <meshBasicMaterial color="#7dd3fc" transparent opacity={0.11} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} />
+      <mesh scale={1.14}>
+        <sphereGeometry args={[2.05, 32, 32]} />
+        <meshBasicMaterial color="#7dd3fc" transparent opacity={0.16} side={THREE.BackSide} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh rotation={[1.32, 0.1, 0.18]}>
-        <ringGeometry args={[2.05, 3.15, 96]} />
+        <ringGeometry args={[2.55, 3.95, 96]} />
         <meshBasicMaterial
           map={ringMap}
           transparent
@@ -167,7 +167,7 @@ function Nebulae({ count, reduced }: { count: number; reduced: boolean }) {
         ] as [number, number, number],
         scale: 3.2 + hash21(i, 4) * 5.5,
         color: ["#67e8f9", "#c084fc", "#38bdf8", "#f472b6", "#5eead4"][i % 5],
-        opacity: 0.045 + hash21(i, 5) * 0.04,
+        opacity: 0.07 + hash21(i, 5) * 0.05,
       })),
     [count],
   );
@@ -273,10 +273,10 @@ function SpaceScene({ quality }: { quality: SpaceQuality }) {
     <>
       <color attach="background" args={["#02040a"]} />
       <fog attach="fog" args={["#02040a", 12, 38]} />
-      <ambientLight intensity={0.18} color="#8b9cff" />
-      <directionalLight position={[7.5, 4.2, 6]} intensity={1.55} color="#fff4e0" />
-      <pointLight position={[-8, 2, -4]} intensity={8} color="#c084fc" distance={28} />
-      <pointLight position={[4, -3, 2]} intensity={5} color="#22d3ee" distance={22} />
+      <ambientLight intensity={0.28} color="#9bb6ff" />
+      <directionalLight position={[7.5, 4.2, 6]} intensity={2.05} color="#fff4e0" />
+      <pointLight position={[-8, 2, -4]} intensity={12} color="#c084fc" distance={32} />
+      <pointLight position={[4, -3, 2]} intensity={8} color="#22d3ee" distance={26} />
       <mesh position={[9.2, 4.6, 7]}>
         <sphereGeometry args={[0.18, 16, 16]} />
         <meshBasicMaterial color="#fff6d8" />

@@ -48,8 +48,15 @@
 .ox-deck__space-fallback {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   pointer-events: none;
+}
+
+.ox-deck__space > * {
+  width: 100%;
+  height: 100%;
 }
 
 .ox-deck__space-placeholder {
@@ -71,9 +78,8 @@
   inset: 0;
   z-index: 1;
   background:
-    radial-gradient(120% 80% at 50% 0%, rgba(2, 4, 10, 0.18), transparent 46%),
-    radial-gradient(90% 70% at 8% 100%, rgba(2, 4, 10, 0.55), transparent 50%),
-    linear-gradient(180deg, rgba(2, 4, 10, 0.28) 0%, rgba(2, 4, 10, 0.08) 28%, rgba(2, 4, 10, 0.42) 100%);
+    linear-gradient(90deg, rgba(2, 4, 10, 0.55) 0%, rgba(2, 4, 10, 0.12) 46%, rgba(2, 4, 10, 0.02) 72%, rgba(2, 4, 10, 0.18) 100%),
+    linear-gradient(180deg, rgba(2, 4, 10, 0.22) 0%, transparent 30%, rgba(2, 4, 10, 0.38) 100%);
 }
 
 .ox-deck__veil::after {
@@ -231,12 +237,20 @@
 .ox-deck__hero {
   display: grid;
   gap: 22px;
+  max-width: 760px;
 }
 
-@media (min-width: 1080px) {
-  .ox-deck__hero {
-    grid-template-columns: minmax(0, 1.4fr) 280px;
-    align-items: start;
+.ox-deck__ticker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 22px;
+  max-width: 760px;
+}
+
+@media (max-width: 640px) {
+  .ox-deck__ticker {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -263,32 +277,27 @@
 
 .ox-deck__gates {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 720px) {
-  .ox-deck__gates {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+  gap: 10px;
 }
 
 .ox-gate {
   appearance: none;
   position: relative;
   overflow: hidden;
-  min-height: 168px;
-  padding: 16px;
+  min-height: 88px;
+  padding: 16px 18px;
   border: 1px solid var(--deck-line);
-  border-radius: 22px;
+  border-radius: 20px;
   background: var(--deck-glass);
   backdrop-filter: var(--deck-blur);
   color: inherit;
   text-align: left;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 14px;
+  align-items: center;
   isolation: isolate;
   transition: transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
 }
@@ -311,20 +320,37 @@
 }
 
 .ox-gate__orb {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
   display: grid;
   place-items: center;
   color: #fff;
-  margin-bottom: 18px;
   position: relative;
   z-index: 1;
+  grid-row: 1 / span 2;
 }
 
 .ox-gate__orb svg {
   width: 26px;
   height: 26px;
+}
+
+.ox-gate__copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.ox-gate__go {
+  grid-row: 1 / span 2;
+  font-family: var(--deck-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--deck-cyan);
+  position: relative;
+  z-index: 1;
 }
 
 .ox-gate__kicker,
@@ -342,7 +368,7 @@
 .ox-station__name,
 .ox-pulse__v {
   display: block;
-  margin-top: 6px;
+  margin-top: 3px;
   font-family: var(--deck-display);
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -350,13 +376,13 @@
 }
 
 .ox-gate__cap {
-  margin-top: auto;
-  padding-top: 12px;
+  margin: 0;
   color: var(--deck-mute);
   font-size: 0.82rem;
   line-height: 1.35;
   position: relative;
   z-index: 1;
+  grid-column: 2;
 }
 
 .ox-deck__side {
@@ -385,7 +411,7 @@ button.ox-tel {
   display: block;
   margin-top: 4px;
   font-family: var(--deck-display);
-  font-size: 1.45rem;
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
   font-weight: 800;
   letter-spacing: -0.04em;
 }
