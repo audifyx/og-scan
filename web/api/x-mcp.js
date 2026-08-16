@@ -46,6 +46,14 @@ import {
   xMenuPayload,
 } from "./orbitx/mcp-brand.js";
 import {
+  accessBuyPrompt,
+  confirmAccessBurn,
+  getAccessStatus,
+  listPackages,
+  prepareAccessBurn,
+  prepareAccessMcpPurchase,
+} from "./orbitx/mcp-burn-access.js";
+import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
   prepareBuyOrbitx,
@@ -517,17 +525,60 @@ const CORE_TOOLS = [
     annotations: { title: "Advanced credits usage", readOnlyHint: true, openWorldHint: false },
   },
   {
+    name: "x_mcp_access_status",
+    description:
+      "Show temporary MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 day = 100 tokens, 1 week = 1,000 tokens). Call when the user asks about MCP access, burn access, or time remaining.",
+    inputSchema: EMPTY_OBJECT_SCHEMA,
+    annotations: { title: "MCP access status", readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: "x_mcp_access_buy",
+    description:
+      "Buy temporary MCP access by burning $ORBITX. When the user says buy access / burn ORBITX for MCP / 1 day or 1 week access — ASK day (100 tokens) or week (1,000 tokens), then call this. Returns a Phantom signUrl. After the burn, call x_mcp_access_confirm with the signature.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        package: { type: "string", enum: ["day", "week"], description: "Access package" },
+        packageId: { type: "string", enum: ["day", "week"] },
+        publicKey: { type: "string", description: "Burner wallet (optional if linked on /agent or /x)" },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean" },
+        askOnly: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Burn ORBITX for MCP access", readOnlyHint: false, openWorldHint: true },
+  },
+  {
+    name: "x_mcp_access_confirm",
+    description:
+      "Confirm an $ORBITX burn and grant MCP access for the matching package duration. Pass the Solana tx signature after Phantom confirms.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signature: { type: "string" },
+        txSignature: { type: "string" },
+        package: { type: "string", enum: ["day", "week"] },
+        packageId: { type: "string", enum: ["day", "week"] },
+      },
+      additionalProperties: false,
+    },
+    annotations: { title: "Confirm MCP access burn", readOnlyHint: false, openWorldHint: true },
+  },
+  {
     name: "x_buy",
     description:
-      "PRIMARY BUY TOOL for Grok/Claude. Use this whenever the user wants to buy credits OR buy ORBITX. Set what=credits|orbitx (ask if unclear). For credits pass credits or solAmount; for ORBITX pass solAmount. Returns a Phantom signUrl/openUrl. Prefer this over inventing names like XBuyTool.",
+      "PRIMARY BUY TOOL for Grok/Claude. Use this whenever the user wants to buy credits, buy ORBITX, or burn ORBITX for timed MCP access. Set what=credits|orbitx|access (ask if unclear). For credits pass credits or solAmount; for ORBITX pass solAmount; for access pass package=day|week. Returns a Phantom signUrl/openUrl. Prefer this over inventing names like XBuyTool.",
     inputSchema: {
       type: "object",
       properties: {
         what: {
           type: "string",
-          enum: ["credits", "orbitx", "ask"],
-          description: "credits = MCP credits (SOL to desk wallet); orbitx = buy ORBITX token; ask = clarify",
+          enum: ["credits", "orbitx", "access", "ask"],
+          description: "credits = MCP credits (SOL to desk wallet); orbitx = buy ORBITX token; access = burn ORBITX for 1 day/1 week MCP access; ask = clarify",
         },
+        package: { type: "string", enum: ["day", "week"], description: "MCP access package when what=access" },
+        packageId: { type: "string", enum: ["day", "week"] },
         solAmount: { type: "number", description: "SOL to spend" },
         credits: { type: "number", description: "Credit count (credits buy only)" },
         amount: { type: "number", description: "Alias amount" },
@@ -872,6 +923,16 @@ const X_TOOL_ALIASES = {
   "advanced usage": "x_credits_usage",
   credits: "x_credits_balance",
   balance: "x_credits_balance",
+  "mcp access": "x_mcp_access_status",
+  "access status": "x_mcp_access_status",
+  "burn access": "x_mcp_access_buy",
+  "buy access": "x_mcp_access_buy",
+  mcp_access: "x_mcp_access_status",
+  mcp_access_buy: "x_mcp_access_buy",
+  "confirm access": "x_mcp_access_confirm",
+  xmcpaccess: "x_mcp_access_status",
+  xmcpaccessbuy: "x_mcp_access_buy",
+  xmcpaccessbuytool: "x_mcp_access_buy",
   "buy orbitx": "x_buy_orbitx",
   "buy $orbitx": "x_buy_orbitx",
   buy_orbitx: "x_buy_orbitx",
@@ -2082,6 +2143,12 @@ async function callTool(rawName, args, auth, req = null) {
         text: "Buy credits with SOL via x_credits_buy → pay → x_credits_confirm. Advanced usage: x_credits_usage. Shop: /shop",
       },
       {
+        id: "access",
+        title: "MCP access via $ORBITX burn",
+        url: "https://www.orbitx.world/x?tab=usage",
+        text: "Burn 100 $ORBITX for 1 day or 1,000 for 1 week. Call x_mcp_access_buy → Phantom → x_mcp_access_confirm. Status: x_mcp_access_status.",
+      },
+      {
         id: "usage",
         title: "Advanced credits usage",
         url: "https://www.orbitx.world/x?tab=usage",
@@ -2124,6 +2191,9 @@ async function callTool(rawName, args, auth, req = null) {
     if (id === "credits" || id === "shop" || id === "buy") {
       return callTool("x_credits_buy", { askOnly: true }, auth, req);
     }
+    if (id === "access" || id === "mcp-access" || id === "burn") {
+      return callTool("x_mcp_access_buy", { askOnly: true }, auth, req);
+    }
     if (id === "usage") {
       return callTool("x_credits_usage", { limit: 20 }, auth, req);
     }
@@ -2163,8 +2233,16 @@ async function callTool(rawName, args, auth, req = null) {
         "Use x_dm / x_dm_inbox / x_dm_group for DMs + group chats",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
         "Buy credits: ask how much SOL → x_credits_buy → user pays → x_credits_confirm",
+        "MCP access: ask day (100 $ORBITX) or week (1,000) → x_mcp_access_buy → Phantom burn → x_mcp_access_confirm",
         "Advanced usage: x_credits_usage (also on /x Usage or /shop)",
       ],
+      mcpAccess: {
+        status: "x_mcp_access_status",
+        buy: "x_mcp_access_buy",
+        confirm: "x_mcp_access_confirm",
+        packages: listPackages(),
+        dashboard: "https://www.orbitx.world/x?tab=usage",
+      },
       credits: {
         buy: "x_credits_buy",
         confirm: "x_credits_confirm",
@@ -2297,6 +2375,76 @@ async function callTool(rawName, args, auth, req = null) {
     }
   }
 
+  if (name === "x_mcp_access_status") {
+    if (!auth?.userId) {
+      return { ok: false, error: "session_required", message: "Authenticate to view MCP access status" };
+    }
+    try {
+      return await getAccessStatus(sb, auth.userId);
+    } catch (e) {
+      return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
+    }
+  }
+
+  if (name === "x_mcp_access_buy") {
+    const askOnly =
+      a.askOnly === true || (a.package == null && a.packageId == null && a.option == null);
+    if (askOnly) {
+      return accessBuyPrompt({
+        buyTool: "x_mcp_access_buy",
+        confirmTool: "x_mcp_access_confirm",
+        statusTool: "x_mcp_access_status",
+        accessUrl: "https://www.orbitx.world/x?tab=usage",
+      });
+    }
+    let wallet = String(a.publicKey || a.wallet || a.from || "").trim();
+    if (!wallet) {
+      try {
+        const agent = await ensureAgent(auth.userId);
+        wallet = String(agent?.wallet_address || "").trim();
+      } catch {
+        /* ignore */
+      }
+    }
+    return prepareAccessMcpPurchase({
+      base: MCP_HOST,
+      wallet,
+      packageId: a.package || a.packageId || a.option,
+      confirmMode: a.autoConfirm === true || a.auto === true ? "auto" : a.confirmMode || "sign",
+      accessUrl: "https://www.orbitx.world/x?tab=usage",
+      buyTool: "x_mcp_access_buy",
+      confirmTool: "x_mcp_access_confirm",
+    });
+  }
+
+  if (name === "x_mcp_access_confirm") {
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "session_required",
+        message: "Authenticate first, then pass the burn transaction signature.",
+      };
+    }
+    const signature = String(a.signature || a.txSignature || a.tx_signature || a.sig || "").trim();
+    if (!signature) {
+      return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
+    }
+    try {
+      return await confirmAccessBurn(sb, {
+        userId: auth.userId,
+        signature,
+        packageId: a.package || a.packageId,
+        wallet: a.publicKey || a.wallet,
+      });
+    } catch (e) {
+      return {
+        ok: false,
+        error: "confirm_failed",
+        message: e?.message || "Could not grant access — apply mcp_burn_access migration",
+      };
+    }
+  }
+
   if (name === "x_credits_usage") {
     try {
       const xc = await xCredits();
@@ -2343,14 +2491,24 @@ async function callTool(rawName, args, auth, req = null) {
       a.credits != null ||
       whatRaw === "credits" ||
       whatRaw === "shop";
+    const mentionsAccess =
+      whatRaw === "access" ||
+      whatRaw.includes("access") ||
+      whatRaw === "burn" ||
+      a.package != null ||
+      a.packageId != null;
     let what = "ask";
-    if (whatRaw === "orbitx" || whatRaw === "token" || (mentionsOrbitx && !mentionsCredits)) what = "orbitx";
-    else if (whatRaw === "credits" || whatRaw === "credit" || (mentionsCredits && !mentionsOrbitx)) what = "credits";
+    if (whatRaw === "access" || (mentionsAccess && !mentionsOrbitx && !mentionsCredits)) what = "access";
+    else if (whatRaw === "orbitx" || whatRaw === "token" || (mentionsOrbitx && !mentionsCredits && !mentionsAccess)) what = "orbitx";
+    else if (whatRaw === "credits" || whatRaw === "credit" || (mentionsCredits && !mentionsOrbitx && !mentionsAccess)) what = "credits";
+    else if (mentionsAccess) what = "access";
     else if (mentionsOrbitx) what = "orbitx";
     else if (mentionsCredits) what = "credits";
 
     if (a.askOnly === true || what === "ask") {
-      if (a.solAmount != null || a.credits != null || a.amount != null) {
+      if (a.package != null || a.packageId != null) {
+        what = "access";
+      } else if (a.solAmount != null || a.credits != null || a.amount != null) {
         // Amount given but not what — default to credits (most common Grok "buy" ask)
         what = mentionsOrbitx ? "orbitx" : "credits";
       } else {
@@ -2358,11 +2516,19 @@ async function callTool(rawName, args, auth, req = null) {
           ok: true,
           action: "ask_what",
           message:
-            "Ask whether they want to buy MCP credits (SOL → desk wallet) or ORBITX token. Then call x_buy again with what=credits|orbitx and the amount.",
-          tools: { credits: "x_credits_buy", orbitx: "x_buy_orbitx", unified: "x_buy" },
+            "Ask whether they want MCP credits (SOL → desk wallet), ORBITX token, or timed MCP access (burn 100/1,000 $ORBITX). Then call x_buy again with what=credits|orbitx|access.",
+          tools: {
+            credits: "x_credits_buy",
+            orbitx: "x_buy_orbitx",
+            access: "x_mcp_access_buy",
+            unified: "x_buy",
+          },
           hint: "Grok: always call tool name x_buy (not XBuyTool).",
         };
       }
+    }
+    if (what === "access") {
+      return callTool("x_mcp_access_buy", { ...a, askOnly: a.askOnly === true && a.package == null && a.packageId == null }, auth, req);
     }
     if (what === "orbitx") {
       return callTool("x_buy_orbitx", { ...a, askOnly: a.askOnly === true && a.amountSol == null }, auth, req);
@@ -3098,7 +3264,15 @@ async function callTool(rawName, args, auth, req = null) {
     tool: name,
     requested: rawName,
     message: `Unknown tool "${rawName}". Use x_menu, x_tools_help, x_analytics, x_buy, or CORE names from tools/list.`,
-    availableBuyTools: ["x_buy", "x_credits_buy", "x_buy_orbitx", "x_confirm_buy"],
+    availableBuyTools: [
+      "x_buy",
+      "x_credits_buy",
+      "x_buy_orbitx",
+      "x_confirm_buy",
+      "x_mcp_access_buy",
+      "x_mcp_access_confirm",
+      "x_mcp_access_status",
+    ],
     hint: "Call x_tools_help to browse ~5000 activity tools (followers, DMs, PDF scan, views, lists).",
   };
 }
@@ -3426,6 +3600,47 @@ async function handleAgent(req, res, parts) {
       return json(res, xc.quoteCredits(solAmount));
     } catch (e) {
       return json(res, { error: e?.message || "buy_setup_failed" }, 500);
+    }
+  }
+
+  if (route === "mcp-access" && req.method === "GET") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      return json(res, await getAccessStatus(sb, user.id));
+    } catch (e) {
+      return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
+    }
+  }
+
+  if (route === "mcp-access/prepare" && req.method === "POST") {
+    const body = await readBody(req);
+    const pk = String(body.publicKey || body.wallet || body.walletAddress || "").trim();
+    const packageId = body.packageId || body.package || body.option;
+    try {
+      const out = await prepareAccessBurn({ publicKey: pk, packageId });
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "prepare_failed" }, 400);
+    }
+  }
+
+  if (route === "mcp-access/confirm" && req.method === "POST") {
+    const user = await getAuthUser(req);
+    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const body = await readBody(req);
+    const signature = String(body.signature || body.txSignature || body.tx_signature || "").trim();
+    if (!signature) return json(res, { error: "signature_required" }, 400);
+    try {
+      const out = await confirmAccessBurn(sb, {
+        userId: user.id,
+        signature,
+        packageId: body.packageId || body.package,
+        wallet: body.publicKey || body.wallet,
+      });
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(res, { error: e?.message || "confirm_failed" }, 500);
     }
   }
 
@@ -4112,7 +4327,7 @@ async function handleMcp(req, res, parts) {
             },
             serverInfo: { name: "OrbitX X MCP", version: "1.6.0" },
             instructions:
-              "OrbitX X MCP — X analytics + post/DM + NVIDIA agent + linked GitHub repo + credits/ORBITX. IMPORTANT: snake_case tool names only (never invent XBuyTool). REPO: a GitHub repo is linked for live reads while drafting posts — call x_repo_context or x_repo_read (do NOT ask the user to paste the GitHub URL every time). Link/change with x_repo_link (owner/repo or github.com URL). Default repo from server config. CHARTS: CA + chart → x_dex_chart. Menu → x_menu. authCode → x_auth_status then pass on every x_* tool. Buy: x_buy what=credits|orbitx. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — X analytics + post/DM + NVIDIA agent + linked GitHub repo + credits/ORBITX + timed MCP access. IMPORTANT: snake_case tool names only (never invent XBuyTool). REPO: a GitHub repo is linked for live reads while drafting posts — call x_repo_context or x_repo_read (do NOT ask the user to paste the GitHub URL every time). Link/change with x_repo_link (owner/repo or github.com URL). Default repo from server config. CHARTS: CA + chart → x_dex_chart. Menu → x_menu. authCode → x_auth_status then pass on every x_* tool. Buy: x_buy what=credits|orbitx|access. MCP access: ask day (100 $ORBITX) or week (1,000) → x_mcp_access_buy → Phantom burn → x_mcp_access_confirm. Status: x_mcp_access_status. Setup: https://www.orbitx.world/x",
           },
         },
         200,

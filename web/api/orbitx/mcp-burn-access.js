@@ -548,15 +548,20 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
   };
 }
 
-export function accessBuyPrompt() {
+export function accessBuyPrompt({
+  buyTool = "orbitx_mcp_access_buy",
+  confirmTool = "orbitx_mcp_access_confirm",
+  statusTool = "orbitx_mcp_access_status",
+  accessUrl = "https://www.orbitx.world/agent",
+} = {}) {
   return {
     ok: true,
     action: "ask_package",
-    message:
-      "Ask which MCP access package they want: 1 day (100 $ORBITX) or 1 week (1,000 $ORBITX). Then call orbitx_mcp_access_buy with package=day or package=week.",
+    message: `Ask which MCP access package they want: 1 day (100 $ORBITX) or 1 week (1,000 $ORBITX). Then call ${buyTool} with package=day or package=week.`,
     packages: listPackages(),
     mint: ORBITX_BURN_MINT,
-    accessUrl: "https://www.orbitx.world/agent",
+    accessUrl,
+    tools: { buy: buyTool, confirm: confirmTool, status: statusTool },
   };
 }
 
@@ -566,6 +571,9 @@ export function prepareAccessMcpPurchase({
   packageId,
   confirmMode = "sign",
   preferAuto = false,
+  accessUrl = "https://www.orbitx.world/agent",
+  buyTool = "orbitx_mcp_access_buy",
+  confirmTool = "orbitx_mcp_access_confirm",
 } = {}) {
   const quote = calculateBurnAmount(packageId);
   if (!quote.ok) return quote;
@@ -574,8 +582,8 @@ export function prepareAccessMcpPurchase({
     return {
       ok: false,
       error: "wallet_required",
-      message: "Link a Solana wallet on https://www.orbitx.world/agent (or pass publicKey).",
-      fixUrl: "https://www.orbitx.world/agent",
+      message: `Link a Solana wallet on ${accessUrl} (or pass publicKey).`,
+      fixUrl: accessUrl,
       ...quote,
     };
   }
@@ -613,14 +621,15 @@ export function prepareAccessMcpPurchase({
         ? [
             "Send the user openUrl as a clickable link.",
             `Opening it auto-prompts Phantom to burn ${quote.tokens} $ORBITX.`,
-            "After Phantom confirms, call orbitx_mcp_access_confirm with the signature.",
+            `After Phantom confirms, call ${confirmTool} with the signature.`,
           ]
         : [
             "Send the user signUrl as a clickable link.",
             `They approve burning ${quote.tokens} $ORBITX in Phantom.`,
-            "Then call orbitx_mcp_access_confirm with the signature (the sign page confirms if they are signed in).",
+            `Then call ${confirmTool} with the signature (the sign page confirms if they are signed in).`,
           ],
     note: `Non-custodial. Exact burn of ${quote.tokens} $ORBITX unlocks ${quote.label}. Access expires automatically.`,
-    accessUrl: "https://www.orbitx.world/agent",
+    accessUrl,
+    tools: { buy: buyTool, confirm: confirmTool },
   };
 }

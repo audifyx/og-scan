@@ -15,6 +15,7 @@ import {
   disconnectXAccount,
   fetchXAgent,
   fetchXCreditsUsage,
+  fetchXMcpAccess,
   fetchXDmInbox,
   generateXAgentPost,
   listXAgentQueue,
@@ -35,12 +36,14 @@ import {
   type XAgentKnowledge,
   type XAgentQueueItem,
   type XCreditsUsage,
+  type XMcpAccessStatus,
   type XMcpBootstrap,
   type XMcpChatAuthMint,
   type XNimModel,
 } from "@/lib/xMcp";
 import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
 import { TelegramMcpCard } from "@/components/agent/TelegramMcpCard";
+import { McpBurnAccessCard } from "@/components/agent/McpBurnAccessCard";
 import XMcpMatrix from "@/components/x/XMcpMatrix";
 import "./x-hub.css";
 
@@ -157,6 +160,7 @@ export default function XMcpPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
+  const [mcpAccess, setMcpAccess] = useState<XMcpAccessStatus | null>(null);
   const [usagePeriod, setUsagePeriod] = useState<"24h" | "7d" | "30d" | "all">("30d");
   const [buySol, setBuySol] = useState("0.1");
   const [buyBusy, setBuyBusy] = useState(false);
@@ -224,6 +228,11 @@ export default function XMcpPage() {
       setCreditsUsage(data);
     } catch {
       /* table may not be migrated yet — Usage tab still explains MCP buy */
+    }
+    try {
+      setMcpAccess(await fetchXMcpAccess());
+    } catch {
+      /* mcp_burn_access migration may not be applied yet */
     }
   }, [user, usagePeriod]);
 
@@ -768,6 +777,17 @@ export default function XMcpPage() {
                 <span className="ox-agent__kpi-k">Agent</span>
                 <span className="ox-agent__kpi-v">{xAgent?.enabled ? "On" : "Setup"}</span>
               </button>
+              <button
+                type="button"
+                className={`ox-agent__kpi${mcpAccess?.active ? " is-ok" : ""}`}
+                onClick={() => selectTab("usage")}
+                title="Timed MCP access from burning $ORBITX"
+              >
+                <span className="ox-agent__kpi-k">Access</span>
+                <span className="ox-agent__kpi-v">
+                  {mcpAccess?.active ? mcpAccess.remainingLabel : "Hold or burn"}
+                </span>
+              </button>
             </div>
 
             <section className="ox-agent__panel ox-x-credits">
@@ -797,9 +817,26 @@ export default function XMcpPage() {
                 </div>
                 <p className="ox-agent__note" style={{ marginTop: "0.65rem", marginBottom: 0 }}>
                   Buy any amount of SOL via Claude/Grok (`x_credits_buy`) or the Usage tab. Advanced ledger is on Usage.
+                  Timed MCP access: say “buy access” → `x_mcp_access_buy` (100 $ORBITX / 1 day, 1,000 / 1 week).
                 </p>
               </div>
             </section>
+            <McpBurnAccessCard
+              walletAddress={publicKey?.toBase58() || boot?.agent?.walletAddress}
+              onAccessGranted={(status) =>
+                setMcpAccess({
+                  ok: status.ok,
+                  active: status.active,
+                  expired: status.expired,
+                  packageId: status.packageId,
+                  expiresAt: status.expiresAt,
+                  remainingMs: status.remainingMs,
+                  remainingLabel: status.remainingLabel,
+                  tokensBurned: status.tokensBurned,
+                  lifetimeTokensBurned: status.lifetimeTokensBurned,
+                })
+              }
+            />
             <div className="ox-agent__steps">
               <span className={`ox-agent__chip${xConnected ? " is-ok" : ""}`}>
                 {xConnected ? `@${xHandle}` : "X needed"}
@@ -810,6 +847,9 @@ export default function XMcpPage() {
               <span className={`ox-agent__chip${xAgent?.enabled ? " is-ok" : ""}`}>
                 {xAgent?.enabled ? "Agent on" : "Agent off"}
               </span>
+              {mcpAccess?.active && (
+                <span className="ox-agent__chip is-ok">{mcpAccess.remainingLabel}</span>
+              )}
             </div>
           </div>
 
@@ -956,6 +996,22 @@ export default function XMcpPage() {
 
       {tab === "usage" && (
         <>
+          <McpBurnAccessCard
+            walletAddress={publicKey?.toBase58() || boot?.agent?.walletAddress}
+            onAccessGranted={(status) =>
+              setMcpAccess({
+                ok: status.ok,
+                active: status.active,
+                expired: status.expired,
+                packageId: status.packageId,
+                expiresAt: status.expiresAt,
+                remainingMs: status.remainingMs,
+                remainingLabel: status.remainingLabel,
+                tokensBurned: status.tokensBurned,
+                lifetimeTokensBurned: status.lifetimeTokensBurned,
+              })
+            }
+          />
           <section className="ox-agent__panel ox-x-credits">
             <div className="ox-agent__panel-h">
               <h2 className="ox-agent__panel-title">Advanced usage</h2>

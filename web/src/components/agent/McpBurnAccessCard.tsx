@@ -126,7 +126,11 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
         {!compact && (
           <p className="ox-agent__note">
             Burn the exact package amount. Tokens are destroyed on-chain. Access expires automatically
-            when the clock runs out.
+            when the clock runs out. From Claude/Grok call{" "}
+            <code>orbitx_mcp_access_buy</code> or <code>x_mcp_access_buy</code> (or{" "}
+            <code>x_buy what=access</code>), then <code>orbitx_mcp_access_confirm</code> /{" "}
+            <code>x_mcp_access_confirm</code>. Status: <code>orbitx_mcp_access_status</code> /{" "}
+            <code>x_mcp_access_status</code>.
           </p>
         )}
 

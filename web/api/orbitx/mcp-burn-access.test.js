@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MCP_ACCESS_PACKAGES,
   accessBlockedPayload,
+  accessBuyPrompt,
   calculateBurnAmount,
   computeExpiresAt,
   evaluateMcpAccess,
@@ -9,6 +10,7 @@ import {
   inferPackageFromTokens,
   isAccessActive,
   listPackages,
+  prepareAccessMcpPurchase,
   remainingMs,
   resolvePackage,
   statusFromRow,
@@ -284,5 +286,45 @@ describe("MCP access blocked payload", () => {
     expect(payload.packages).toHaveLength(2);
     expect(payload.message).toMatch(/burn 100 ORBITX/);
     expect(payload.tool).toBe("orbitx_prepare_buy");
+  });
+});
+
+describe("MCP access MCP purchase payloads", () => {
+  it("names Agent tools by default and X tools when asked", () => {
+    const agent = accessBuyPrompt();
+    expect(agent.tools.buy).toBe("orbitx_mcp_access_buy");
+    expect(agent.message).toContain("orbitx_mcp_access_buy");
+
+    const x = accessBuyPrompt({
+      buyTool: "x_mcp_access_buy",
+      confirmTool: "x_mcp_access_confirm",
+      statusTool: "x_mcp_access_status",
+      accessUrl: "https://www.orbitx.world/x?tab=usage",
+    });
+    expect(x.tools).toEqual({
+      buy: "x_mcp_access_buy",
+      confirm: "x_mcp_access_confirm",
+      status: "x_mcp_access_status",
+    });
+    expect(x.message).toContain("x_mcp_access_buy");
+    expect(x.accessUrl).toContain("/x");
+  });
+
+  it("returns a Phantom signUrl that confirms via the calling MCP", () => {
+    const out = prepareAccessMcpPurchase({
+      wallet: "11111111111111111111111111111111",
+      packageId: "day",
+      accessUrl: "https://www.orbitx.world/x?tab=usage",
+      buyTool: "x_mcp_access_buy",
+      confirmTool: "x_mcp_access_confirm",
+    });
+    expect(out.ok).toBe(true);
+    expect(out.tokens).toBe(100);
+    expect(out.signUrl).toContain("/agent/sign?");
+    expect(out.signUrl).toContain("kind=mcp-access");
+    expect(out.signUrl).toContain("package=day");
+    expect(out.accessUrl).toContain("/x");
+    expect(out.tools.confirm).toBe("x_mcp_access_confirm");
+    expect(out.instructions.join(" ")).toContain("x_mcp_access_confirm");
   });
 });

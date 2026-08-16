@@ -110,9 +110,10 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     "║    x_agent_run · schedule · queue · approve      ║",
     "║    x_agent_poll_replies · x_agent_upsert         ║",
     "╠══════════════════════════════════════════════════╣",
-    "║  BUY · CREDITS                                       ║",
-    "║    x_buy             · credits OR orbitx (use this)║",
+    "║  BUY · CREDITS · ACCESS                              ║",
+    "║    x_buy             · credits / orbitx / access ║",
     "║    x_credits_buy · confirm · balance · usage      ║",
+    "║    x_mcp_access_buy · confirm · status           ║",
     "║    x_buy_orbitx · x_confirm_buy                   ║",
     "║  (Grok: call x_buy — never invent XBuyTool)         ║",
     "╠══════════════════════════════════════════════════╣",
@@ -127,6 +128,7 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     ``,
     `_Analytics: followers, following, DMs, tweet views, lists. Charts: share a CA → x_dex_chart. GitHub: link once with x_repo_link — then x_repo_context / x_repo_read while drafting (no paste every time)._`,
     `_Buy credits: say “buy credits” → amount → Phantom → desk wallet. Reconnect X on /x after deploy to refresh follows.read + list.read._`,
+    `_MCP access: burn 100 $ORBITX (1 day) or 1,000 (1 week) → x_mcp_access_buy or x_buy what=access → Phantom → x_mcp_access_confirm. Time remaining: x_mcp_access_status._`,
     `_Tip: Mint a chat auth message on the /x dashboard — paste into Grok / Claude / ChatGPT to stay linked without opening a site._`,
   ].join("\n");
 }
