@@ -16,125 +16,19 @@ import { ADMIN_APPS } from "@/lib/adminApps";
 import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
+import {
+  HOME_DOCK,
+  HOME_GRID_KEYS,
+  PLATFORM_APPS,
+  PLATFORM_BY_KEY,
+  PLATFORM_SECTIONS,
+  type PlatformApp,
+} from "@/lib/orbitxPlatforms";
 import "./hub-ios.css";
 
 const ORBITX_CA = OGSCAN_TOKEN_MINT;
 
-type AppItem = {
-  key: string;
-  name: string;
-  caption: string;
-  href: string;
-  external?: boolean;
-  tone: string;
-  iconBg: string;
-  glyph: ReactNode;
-};
-
-const Glyph = {
-  dex: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <path d="M8 34l9-11 7 6 11-15" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8 40h32" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" opacity=".4" />
-      <circle cx="35" cy="14" r="3.5" fill="currentColor" />
-    </svg>
-  ),
-  social: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <circle cx="18" cy="18" r="6" stroke="currentColor" strokeWidth="3.5" />
-      <circle cx="32" cy="22" r="5" stroke="currentColor" strokeWidth="3.5" opacity=".6" />
-      <path d="M8 40c0-6 5-10 10-10s10 4 10 10" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-      <path d="M30 40c0-5 3-8 6-8s6 3 6 8" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" opacity=".6" />
-    </svg>
-  ),
-  predict: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <rect x="10" y="10" width="28" height="28" rx="8" stroke="currentColor" strokeWidth="3.5" />
-      <circle cx="18" cy="18" r="3" fill="currentColor" />
-      <circle cx="30" cy="30" r="3" fill="currentColor" />
-      <circle cx="30" cy="18" r="3" fill="currentColor" />
-      <circle cx="18" cy="30" r="3.5" fill="currentColor" />
-    </svg>
-  ),
-  scanner: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="14" stroke="currentColor" strokeWidth="3.5" opacity=".3" />
-      <circle cx="24" cy="24" r="7" stroke="currentColor" strokeWidth="3.5" opacity=".8" />
-      <path d="M24 24L36 12" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-      <circle cx="24" cy="24" r="3" fill="currentColor" />
-    </svg>
-  ),
-  ai: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="14" stroke="currentColor" strokeWidth="3" opacity=".5" />
-      <circle cx="24" cy="24" r="8" stroke="currentColor" strokeWidth="3" opacity=".75" />
-      <path d="M24 16v-4M24 36v-4M16 24h-4M32 24h-4" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="24" cy="24" r="2.5" fill="currentColor" />
-    </svg>
-  ),
-  gaming: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <path d="M18 40V16l6-6 6 6v24" stroke="currentColor" strokeWidth="3.5" strokeLinejoin="round" />
-      <path d="M12 40h24" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-    </svg>
-  ),
-  agent: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <rect x="10" y="12" width="28" height="24" rx="6" stroke="currentColor" strokeWidth="3.5" />
-      <path d="M18 22h12M18 28h8" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-    </svg>
-  ),
-  x: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <path d="M14 14l20 20M34 14L14 34" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-    </svg>
-  ),
-  koltracker: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <path d="M24 8c-5 0-9 4-9 9v6l-3 6h24l-3-6v-6c0-5-4-9-9-9z" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M20 34a4 4 0 008 0" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-    </svg>
-  ),
-  launchpad: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <path d="M24 6c6 3 10 9 10 17 0 5-2 9-4 12l-6 7-6-7c-2-3-4-7-4-12 0-8 4-14 10-17z" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="24" cy="20" r="4" stroke="currentColor" strokeWidth="3.5" />
-    </svg>
-  ),
-};
-
-const ALL_APPS: AppItem[] = [
-  { key: "dex", name: "OrbitX DEX", caption: "Scanner & Trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(135deg, #1A6CFF, #0037A3)", glyph: Glyph.dex },
-  { key: "trade", name: "Trade Terminal", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(135deg, #AB9FF2, #6B5FD4)", glyph: Glyph.dex },
-  { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
-  { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
-  { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(135deg, #67E8F9, #0891B2)", glyph: <span style={{ fontSize: 20 }}>🛡</span> },
-  { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
-  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <span style={{ fontSize: 20 }}>📈</span> },
-  { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
-  { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #5EEAD4, #0D9488)", glyph: Glyph.agent },
-  { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(135deg, #3F3F46, #18181B)", glyph: Glyph.x },
-  { key: "shop", name: "MCP shop", caption: "Credits + burn access", href: "/shop", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #2DD4BF, #0F766E)", glyph: <span style={{ fontSize: 20 }}>◈</span> },
-  { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(135deg, #8B5CF6, #5B21B6)", glyph: Glyph.social },
-  { key: "gaming", name: "Gaming", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
-  { key: "predict", name: "Predictions", caption: "Trade YES/NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
-  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <span style={{ fontSize: 20 }}>🖼</span> },
-  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)", glyph: <span style={{ fontSize: 20 }}>💼</span> },
-];
-
-const APP_BY_KEY = Object.fromEntries(ALL_APPS.map((a) => [a.key, a])) as Record<string, AppItem>;
-
-type HubSection = { id: string; title: string; subtitle: string; keys: string[] };
-
-const APP_SECTIONS: HubSection[] = [
-  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "trade", "scanner", "launchpad", "vamp"] },
-  { id: "intel", title: "Intelligence", subtitle: "Track wallets, PnL, and AI", keys: ["koltracker", "pnltracker", "ai"] },
-  { id: "mcp", title: "AI Connectors", subtitle: "Agent + X MCP for chat AIs", keys: ["agent", "xmcp", "shop"] },
-  { id: "social", title: "Social", subtitle: "Feed, spaces, and community", keys: ["social"] },
-  { id: "play", title: "Play & Earn", subtitle: "Games, markets, NFTs, tasks", keys: ["gaming", "predict", "nft", "bagwork"] },
-];
-
-const QUICK_KEYS = ["scanner", "dex", "trade", "agent", "xmcp", "social"];
+type AppItem = PlatformApp;
 
 const OWNER_ADMIN_APPS: AppItem[] = ADMIN_APPS.map((a) => ({
   key: `admin-${a.key}`,
@@ -156,12 +50,67 @@ type Frame =
   | { id: "widgets" }
   | { id: "wallpaper" };
 
-const TABS: { id: TabId; label: string; ico: string }[] = [
-  { id: "home", label: "Home", ico: "⌂" },
-  { id: "apps", label: "Apps", ico: "▦" },
-  { id: "activity", label: "Activity", ico: "◎" },
-  { id: "account", label: "Account", ico: "☺" },
+const TABS: { id: TabId; label: string }[] = [
+  { id: "home", label: "Home" },
+  { id: "apps", label: "Apps" },
+  { id: "activity", label: "Activity" },
+  { id: "account", label: "Me" },
 ];
+
+const TAB_GLYPH: Record<TabId, ReactNode> = {
+  home: (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  ),
+  apps: (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  ),
+  activity: (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 16l5-6 4 3 7-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 20h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" opacity=".4" />
+    </svg>
+  ),
+  account: (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5 19c1.4-3.2 3.8-5 7-5s5.6 1.8 7 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+};
+
+function IosStatusBar({ now }: { now: Date }) {
+  const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return (
+    <div className="ios26-status" aria-hidden>
+      <span className="ios26-status__time">{time}</span>
+      <span className="ios26-status__island" />
+      <span className="ios26-status__sys">
+        <svg viewBox="0 0 18 12" className="ios26-status__sig">
+          <rect x="0" y="8" width="3" height="4" rx="0.6" fill="currentColor" opacity=".35" />
+          <rect x="5" y="5.5" width="3" height="6.5" rx="0.6" fill="currentColor" opacity=".55" />
+          <rect x="10" y="3" width="3" height="9" rx="0.6" fill="currentColor" opacity=".8" />
+          <rect x="15" y="0" width="3" height="12" rx="0.6" fill="currentColor" />
+        </svg>
+        <svg viewBox="0 0 16 12" className="ios26-status__wifi">
+          <path d="M1 4.2C4.2 1.4 11.8 1.4 15 4.2M3.4 6.6c2.2-1.8 6.9-1.8 9.1 0M6.2 9c1.1-.9 2.5-.9 3.6 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+        </svg>
+        <span className="ios26-status__batt">
+          <span className="ios26-status__batt-body">
+            <span className="ios26-status__batt-fill" />
+          </span>
+          <span className="ios26-status__batt-nip" />
+        </span>
+      </span>
+    </div>
+  );
+}
 
 function useClock() {
   const [now, setNow] = useState(() => new Date());
@@ -177,14 +126,16 @@ function NavBar({
   canBack,
   onBack,
   trail,
+  home,
 }: {
   title: string;
   canBack: boolean;
   onBack: () => void;
   trail?: ReactNode;
+  home?: boolean;
 }) {
   return (
-    <header className="ios-nav">
+    <header className={`ios-nav${home && !canBack ? " ios-nav--home" : ""}`}>
       {canBack ? (
         <button type="button" className="ios-nav__back" onClick={onBack}>
           <span className="ios-nav__back-ico" aria-hidden>
@@ -192,10 +143,17 @@ function NavBar({
           </span>
           Back
         </button>
+      ) : home ? (
+        <div className="ios26-brand">
+          <span className="ios26-brand__mark" aria-hidden>
+            ◈
+          </span>
+          <span className="ios26-brand__name">OrbitX</span>
+        </div>
       ) : (
         <span />
       )}
-      <h1 className="ios-nav__title">{title}</h1>
+      {!home || canBack ? <h1 className="ios-nav__title">{title}</h1> : <span />}
       <div className="ios-nav__trail">{trail}</div>
     </header>
   );
@@ -230,7 +188,7 @@ export default function Hub() {
 
   const showAdminApps = useMemo(() => isOwnerIdentity({ email: user?.email }), [user?.email]);
   const searchableApps = useMemo(
-    () => (showAdminApps ? [...ALL_APPS, ...OWNER_ADMIN_APPS] : ALL_APPS),
+    () => (showAdminApps ? [...PLATFORM_APPS, ...OWNER_ADMIN_APPS] : PLATFORM_APPS),
     [showAdminApps],
   );
 
@@ -422,8 +380,8 @@ export default function Hub() {
   })();
 
   const navTitle = (() => {
-    if (top.id === "app") return APP_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "App";
-    if (top.id === "section") return APP_SECTIONS.find((s) => s.id === top.sectionId)?.title || "Apps";
+    if (top.id === "app") return PLATFORM_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "App";
+    if (top.id === "section") return PLATFORM_SECTIONS.find((s) => s.id === top.sectionId)?.title || "Apps";
     if (top.id === "widgets") return "Widgets";
     if (top.id === "wallpaper") return "Wallpaper";
     return TABS.find((t) => t.id === tab)?.label || "OrbitX";
@@ -457,33 +415,44 @@ export default function Hub() {
 
   const rootHome = (
     <>
-      <h2 className="ios-large-title">{greet}</h2>
-      <p className="ios-subhead">OrbitX hub · tap an app · ⌘K to search</p>
-      <div className="ios-chips">
-        <button type="button" className="ios-chip" onClick={copyCA}>
-          $ORBITX{" "}
-          <b style={{ color: (orbitxChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}>
-            {orbitxPrice != null ? (orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)) : "—"}
-          </b>
-          <span>{caCopied ? "Copied" : "CA"}</span>
-        </button>
-        <span className="ios-chip">
-          SOL{" "}
-          <b style={{ color: (solChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}>
-            {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
-          </b>
-        </span>
-        {fng && (
-          <span className="ios-chip">
-            F&G <b>{fng.v}</b>
-          </span>
-        )}
+      <div className="ios26-hello">
+        <p className="ios26-hello__greet">{greet}</p>
+        <p className="ios26-hello__sub">Tap an app · ⌘K to search</p>
       </div>
 
-      <p className="ios-group__label">Favorites</p>
+      <div className="ios26-widgets">
+        <button type="button" className="ios26-widget" onClick={copyCA}>
+          <span className="ios26-widget__k">$ORBITX</span>
+          <span
+            className="ios26-widget__v"
+            style={{ color: (orbitxChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}
+          >
+            {orbitxPrice != null ? (orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)) : "—"}
+          </span>
+          <span className="ios26-widget__m">{caCopied ? "Copied CA" : "Tap to copy CA"}</span>
+        </button>
+        <div className="ios26-widget">
+          <span className="ios26-widget__k">SOL</span>
+          <span
+            className="ios26-widget__v"
+            style={{ color: (solChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}
+          >
+            {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
+          </span>
+          <span className="ios26-widget__m">
+            {solChange != null ? `${solChange >= 0 ? "+" : ""}${solChange.toFixed(1)}% 24h` : "Live"}
+          </span>
+        </div>
+        <div className="ios26-widget">
+          <span className="ios26-widget__k">Fear & Greed</span>
+          <span className="ios26-widget__v">{fng ? fng.v : "—"}</span>
+          <span className="ios26-widget__m">{fng?.label || "Market mood"}</span>
+        </div>
+      </div>
+
       <div className="ios-app-grid">
-        {QUICK_KEYS.map((k) => {
-          const app = APP_BY_KEY[k];
+        {HOME_GRID_KEYS.map((k) => {
+          const app = PLATFORM_BY_KEY[k];
           if (!app) return null;
           return (
             <button key={app.key} type="button" className="ios-app" onClick={() => push({ id: "app", appKey: app.key })}>
@@ -494,29 +463,18 @@ export default function Hub() {
         })}
       </div>
 
-      <p className="ios-group__label">Shortcuts</p>
-      <div className="ios-group">
-        <button type="button" className="ios-row" onClick={() => switchTab("apps")}>
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Browse all apps</span>
-            <span className="ios-row__cap">Trade, social, MCP, play</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </button>
-        <button type="button" className="ios-row" onClick={() => push({ id: "widgets" })}>
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Widgets</span>
-            <span className="ios-row__cap">{customWidgets.length} on Home</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </button>
-        <button type="button" className="ios-row" onClick={() => setSpotOpen(true)}>
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Search</span>
-            <span className="ios-row__cap">Find any tool</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </button>
+      <div className="ios26-dock" aria-label="Home dock">
+        {HOME_DOCK.map((app) => (
+          <button
+            key={app.key}
+            type="button"
+            className="ios-app ios-app--dock"
+            aria-label={app.name}
+            onClick={() => push({ id: "app", appKey: app.key })}
+          >
+            {renderAppIcon(app)}
+          </button>
+        ))}
       </div>
     </>
   );
@@ -526,7 +484,7 @@ export default function Hub() {
       <h2 className="ios-large-title">Apps</h2>
       <p className="ios-subhead">Open a category, then launch an app.</p>
       <div className="ios-group">
-        {APP_SECTIONS.map((section) => (
+        {PLATFORM_SECTIONS.map((section) => (
           <button
             key={section.id}
             type="button"
@@ -643,6 +601,48 @@ export default function Hub() {
           </span>
           <span className="ios-row__chev">›</span>
         </Link>
+        <Link to="/shop" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Shop</span>
+            <span className="ios-row__cap">Credits + burn access</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/os" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">OrbitX OS</span>
+            <span className="ios-row__cap">Desktop launcher</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/Orbitxcity" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">City</span>
+            <span className="ios-row__cap">3D OrbitX city</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/play" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Play</span>
+            <span className="ios-row__cap">Games & missions</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/intel" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Intel</span>
+            <span className="ios-row__cap">Crypto intelligence</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/predictions" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">Predictions</span>
+            <span className="ios-row__cap">Trade YES / NO</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
         <Link to="/agent" className="ios-row">
           <span className="ios-row__meta">
             <span className="ios-row__title">Agent MCP</span>
@@ -661,6 +661,13 @@ export default function Hub() {
           <span className="ios-row__meta">
             <span className="ios-row__title">Social</span>
             <span className="ios-row__cap">Feed & spaces</span>
+          </span>
+          <span className="ios-row__chev">›</span>
+        </Link>
+        <Link to="/hq" className="ios-row">
+          <span className="ios-row__meta">
+            <span className="ios-row__title">HQ</span>
+            <span className="ios-row__cap">Social headquarters</span>
           </span>
           <span className="ios-row__chev">›</span>
         </Link>
@@ -694,11 +701,11 @@ export default function Hub() {
     const section =
       top.sectionId === "admin"
         ? { id: "admin", title: "Owner Admin", subtitle: OWNER_EMAIL, keys: OWNER_ADMIN_APPS.map((a) => a.key) }
-        : APP_SECTIONS.find((s) => s.id === top.sectionId);
+        : PLATFORM_SECTIONS.find((s) => s.id === top.sectionId);
     const apps =
       top.sectionId === "admin"
         ? OWNER_ADMIN_APPS
-        : (section?.keys || []).map((k) => APP_BY_KEY[k]).filter(Boolean);
+        : (section?.keys || []).map((k) => PLATFORM_BY_KEY[k]).filter(Boolean);
     body = (
       <>
         <h2 className="ios-large-title">{section?.title || "Apps"}</h2>
@@ -707,7 +714,7 @@ export default function Hub() {
       </>
     );
   } else if (top.id === "app") {
-    const app = APP_BY_KEY[top.appKey] || searchableApps.find((a) => a.key === top.appKey);
+    const app = PLATFORM_BY_KEY[top.appKey] || searchableApps.find((a) => a.key === top.appKey);
     body = app ? (
       <div className="ios-detail">
         {renderAppIcon(app, "detail")}
@@ -766,30 +773,41 @@ export default function Hub() {
     );
   }
 
+  const homeRoot = tab === "home" && top.id === "root";
+
   return (
-    <div className="ios-hub">
+    <div className={`ios-hub${homeRoot ? " ios-hub--home" : ""}`}>
       <style>{aiWidgetCSS}</style>
+      <div className="ios-hub__wallpaper" aria-hidden />
       <div className="ios-hub__atmosphere" aria-hidden />
 
       <div className="ios-hub__stage">
+        <IosStatusBar now={now} />
         <div className="ios-stack">
           <div key={`${tab}-${stack.length}-${top.id}`} className={`ios-stack__pane${navDir === "pop" ? " is-back" : ""}`}>
             <NavBar
               title={canBack ? navTitle : "OrbitX"}
               canBack={canBack}
               onBack={pop}
+              home={homeRoot}
               trail={
                 <>
-                  <button type="button" className="ios-nav__btn" onClick={openTheme} aria-label="Theme">
-                    🎨
+                  <button type="button" className="ios-nav__btn ios-nav__btn--glass" onClick={openTheme} aria-label="Theme">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+                      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
                   </button>
-                  <button type="button" className="ios-nav__btn" onClick={() => setSpotOpen(true)} aria-label="Search">
-                    ⌕
+                  <button type="button" className="ios-nav__btn ios-nav__btn--glass" onClick={() => setSpotOpen(true)} aria-label="Search">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+                      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M16 16.5 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
                   </button>
                 </>
               }
             />
-            <div className="ios-body">{body}</div>
+            <div className={`ios-body${homeRoot ? " ios-body--home" : ""}`}>{body}</div>
           </div>
         </div>
       </div>
@@ -803,7 +821,7 @@ export default function Hub() {
             onClick={() => switchTab(t.id)}
           >
             <span className="ios-tab__ico" aria-hidden>
-              {t.ico}
+              {TAB_GLYPH[t.id]}
             </span>
             {t.label}
           </button>
