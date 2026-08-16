@@ -6,6 +6,7 @@ import { Check, ExternalLink, Loader2, ShieldAlert, Wallet } from "lucide-react"
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { supabase } from "@/lib/supabase";
+import { buildMcpAccessBurnTransaction } from "@/lib/mcpBurnAccess";
 
 type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access";
 
@@ -219,10 +220,34 @@ export default function AgentSignPage() {
           body: JSON.stringify({ publicKey: pk, packageId: pkg }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || data?.ok === false || typeof data.transaction !== "string") {
-          throw new Error(data?.error || data?.message || "Could not build access burn");
+        if (!res.ok || data?.ok === false) {
+          throw new Error(data?.error || data?.message || "Could not quote access burn");
         }
-        const sig = await sendOne(data.transaction);
+        let sig: string;
+        if (typeof data.transaction === "string" && data.transaction) {
+          sig = await sendOne(data.transaction);
+        } else if (data.tokenAccount && data.amountRaw && data.programId) {
+          const tx = await buildMcpAccessBurnTransaction(connection, publicKey, {
+            tokenAccount: String(data.tokenAccount),
+            mint: String(data.mint || mint),
+            programId: String(data.programId),
+            amountRaw: String(data.amountRaw),
+            closesAccount: Boolean(data.closesAccount),
+          });
+          if (sendTransaction) {
+            sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
+          } else if (signTransaction) {
+            const signed = await signTransaction(tx);
+            sig = await connection.sendRawTransaction(signed.serialize(), {
+              skipPreflight: false,
+              maxRetries: 3,
+            });
+          } else {
+            throw new Error("This wallet cannot sign here — reconnect Phantom or Jupiter.");
+          }
+        } else {
+          throw new Error(data?.message || "Could not build access burn");
+        }
         await connection.confirmTransaction(sig, "confirmed");
         setSignature(sig);
         try {

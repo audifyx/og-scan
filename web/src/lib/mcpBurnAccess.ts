@@ -1,5 +1,7 @@
 /** Client helpers for MCP access purchased by burning $ORBITX. */
 
+import { PublicKey, Transaction, type Connection } from "@solana/web3.js";
+import { createBurnInstruction, createCloseAccountInstruction } from "@solana/spl-token";
 import { AGENT_API } from "@/lib/orbitxMcp";
 
 export const MCP_BURN_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -67,18 +69,29 @@ export async function getMcpBurnAccess(): Promise<McpBurnAccessStatus> {
   return data as unknown as McpBurnAccessStatus;
 }
 
-export async function prepareMcpAccessBurn(opts: {
-  packageId: McpAccessPackageId;
-  publicKey: string;
-}): Promise<{
+export type McpAccessBurnPrepare = {
   ok: boolean;
   packageId: McpAccessPackageId;
   tokens: number;
   label: string;
-  transaction: string;
+  mint: string;
+  publicKey: string;
+  tokenAccount: string;
+  programId: string;
+  decimals: number;
+  amountRaw: string;
+  balanceRaw: string;
+  closesAccount: boolean;
+  buildOnClient?: boolean;
+  transaction?: string;
   message?: string;
   error?: string;
-}> {
+};
+
+export async function prepareMcpAccessBurn(opts: {
+  packageId: McpAccessPackageId;
+  publicKey: string;
+}): Promise<McpAccessBurnPrepare> {
   const headers = await authHeaders();
   const r = await fetch(`${AGENT_API}/mcp-access/prepare`, {
     method: "POST",
@@ -92,13 +105,43 @@ export async function prepareMcpAccessBurn(opts: {
   if (!r.ok || data.ok === false) {
     throw new Error(String(data.message || data.error || `Prepare burn failed (${r.status})`));
   }
-  return data as {
-    ok: boolean;
-    packageId: McpAccessPackageId;
-    tokens: number;
-    label: string;
-    transaction: string;
-  };
+  return data as unknown as McpAccessBurnPrepare;
+}
+
+/** Browser-only: build the unsigned SPL burn. Never do this in a Vercel function. */
+export async function buildMcpAccessBurnTransaction(
+  connection: Connection,
+  owner: PublicKey,
+  prepared: Pick<
+    McpAccessBurnPrepare,
+    "tokenAccount" | "mint" | "programId" | "amountRaw" | "closesAccount"
+  >,
+): Promise<Transaction> {
+  const programId = new PublicKey(prepared.programId);
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: owner, recentBlockhash: blockhash });
+  tx.add(
+    createBurnInstruction(
+      new PublicKey(prepared.tokenAccount),
+      new PublicKey(prepared.mint),
+      owner,
+      BigInt(prepared.amountRaw),
+      [],
+      programId,
+    ),
+  );
+  if (prepared.closesAccount) {
+    tx.add(
+      createCloseAccountInstruction(
+        new PublicKey(prepared.tokenAccount),
+        owner,
+        owner,
+        [],
+        programId,
+      ),
+    );
+  }
+  return tx;
 }
 
 export async function confirmMcpAccessBurn(opts: {
