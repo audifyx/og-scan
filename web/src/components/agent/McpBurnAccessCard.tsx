@@ -179,7 +179,7 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
             onClick={() => void onBurn()}
           >
             {burning
-              ? "Opening Phantom…"
+              ? "Opening Jupiter…"
               : `Burn ${selectedPkg?.tokens.toLocaleString() || "—"} $ORBITX`}
           </button>
           <button type="button" className="ox-agent__btn" disabled={loading} onClick={() => void refresh()}>
