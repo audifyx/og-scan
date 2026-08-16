@@ -17,6 +17,7 @@ import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
 import { HubSpaceBackground } from "@/components/hub/HubSpaceBackground";
+import { Ios27Island } from "@/components/hub/Ios27Island";
 import {
   HOME_GRID_KEYS,
   PLATFORM_APPS,
@@ -24,7 +25,7 @@ import {
   PLATFORM_SECTIONS,
   type PlatformApp,
 } from "@/lib/orbitxPlatforms";
-import { groupAppsByLetter } from "@/lib/hubIos";
+import { groupAppsByLetter, islandQuickAccess } from "@/lib/hubIos";
 import "./hub-deck.css";
 import "./hub-ios-ui.css";
 
@@ -162,6 +163,7 @@ export default function Hub() {
   });
   const [spotOpen, setSpotOpen] = useState(false);
   const [spotQ, setSpotQ] = useState("");
+  const [islandOpen, setIslandOpen] = useState(false);
   const [appsQ, setAppsQ] = useState("");
   const [settingsQ, setSettingsQ] = useState("");
   const [launching, setLaunching] = useState<AppItem | null>(null);
@@ -204,8 +206,22 @@ export default function Hub() {
   }, [tab]);
 
   const switchTab = (id: TabId) => {
+    setIslandOpen(false);
     setTab(id);
   };
+
+  const goHome = useCallback(() => {
+    setIslandOpen(false);
+    setSpotOpen(false);
+    setPanelOpen(false);
+    setTab("home");
+    setStacks({
+      home: [{ id: "root" }],
+      apps: [{ id: "root" }],
+      activity: [{ id: "root" }],
+      account: [{ id: "root" }],
+    });
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -233,6 +249,10 @@ export default function Hub() {
         setSpotQ("");
       }
       if (e.key === "Escape") {
+        if (islandOpen) {
+          setIslandOpen(false);
+          return;
+        }
         if (spotOpen) {
           setSpotOpen(false);
           return;
@@ -250,7 +270,7 @@ export default function Hub() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canBack, pop, spotOpen, panelOpen, themeOpen, closeTheme]);
+  }, [canBack, pop, spotOpen, panelOpen, themeOpen, closeTheme, islandOpen]);
 
   useEffect(() => {
     let on = true;
@@ -848,6 +868,18 @@ export default function Hub() {
       </div>
       <div className="ox-deck__veil" aria-hidden />
 
+      <Ios27Island
+        now={now}
+        apps={islandQuickAccess(PLATFORM_APPS, showAdminApps ? OWNER_ADMIN_APPS : [])}
+        open={islandOpen}
+        onToggle={() => setIslandOpen((v) => !v)}
+        onClose={() => setIslandOpen(false)}
+        onLaunch={(app) => {
+          setIslandOpen(false);
+          openAppHref(app);
+        }}
+      />
+
       <div className="ox-deck__stage">
         {iosMode && canBack ? (
           <header className="ios-nav">
@@ -895,7 +927,23 @@ export default function Hub() {
       </div>
 
       <nav className="ox-deck__rail" aria-label="OrbitX command rail">
-        {TABS.map((t) => (
+        {TABS.slice(0, 2).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`ox-railbtn${tab === t.id ? " is-on" : ""}`}
+            onClick={() => switchTab(t.id)}
+          >
+            {TAB_GLYPH[t.id]}
+            {t.label}
+          </button>
+        ))}
+        <button type="button" className="ox-homebtn" aria-label="Home" onClick={goHome}>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 11.4 12 5l8 6.4V20a1 1 0 0 1-1 1h-5.2v-6.2H10.2V21H5a1 1 0 0 1-1-1v-8.6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+          </svg>
+        </button>
+        {TABS.slice(2).map((t) => (
           <button
             key={t.id}
             type="button"
