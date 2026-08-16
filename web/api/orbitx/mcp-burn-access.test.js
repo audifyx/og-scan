@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MCP_ACCESS_PACKAGES,
   accessBlockedPayload,
@@ -12,6 +12,7 @@ import {
   remainingMs,
   resolvePackage,
   statusFromRow,
+  verifyOrbitxBurn,
 } from "./mcp-burn-access.js";
 
 describe("MCP burn access packages", () => {
@@ -192,6 +193,86 @@ describe("evaluateMcpAccess middleware", () => {
     });
     expect(access.allowed).toBe(true);
     expect(access.source).toBe("hold");
+  });
+});
+
+describe("verifyOrbitxBurn", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts an exact 100-token ORBITX burn for the day package", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 250, amount: "250000000", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 150, amount: "150000000", decimals: 6 },
+                  },
+                ],
+                innerInstructions: [],
+              },
+              transaction: { message: { instructions: [] } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const verified = await verifyOrbitxBurn("1".repeat(64), { packageId: "day" });
+    expect(verified.ok).toBe(true);
+    expect(verified.tokensBurned).toBe(100);
+    expect(verified.package.id).toBe("day");
+  });
+
+  it("rejects a 100-token burn when the week package is selected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [],
+                innerInstructions: [],
+              },
+              transaction: { message: { instructions: [] } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const verified = await verifyOrbitxBurn("2".repeat(64), { packageId: "week" });
+    expect(verified.ok).toBe(false);
+    expect(verified.error).toBe("amount_too_low");
   });
 });
 
