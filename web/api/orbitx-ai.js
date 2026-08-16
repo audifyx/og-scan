@@ -2,8 +2,8 @@
  * OrbitX AI first-party backend.
  *
  * Auth: Supabase JWT.
- * Access: authoritative SIWS wallet identity holding >= $5 ORBITX, with the
- * existing owner/platform exemptions.
+ * Access: authoritative SIWS wallet identity holding >= $5 ORBITX, unexpired
+ * $ORBITX burn access, or owner/platform exemptions.
  * Intelligence: NVIDIA NIM with the live OrbitX MCP tool catalog.
  * Media: Grok Imagine through the existing MCP media implementation.
  */
@@ -20,6 +20,7 @@ import {
   runEmbeddedAgentTool,
 } from "./orbitx-hub.js";
 import { verifyTokenHold } from "./orbitx/token-hold.js";
+import { statusFromRow } from "./orbitx/mcp-burn-access.js";
 import {
   DEFAULT_NIM_MODEL,
   NIM_MODELS,
@@ -383,13 +384,27 @@ async function authenticatedContext(req) {
     requireUsdPrice: true,
   });
 
+  let burn = statusFromRow(null);
+  try {
+    const { data: burnRow } = await db
+      .from("mcp_burn_access")
+      .select("package_id, expires_at, tokens_burned, lifetime_tokens_burned, wallet_address, last_tx_signature")
+      .eq("user_id", id)
+      .maybeSingle();
+    burn = statusFromRow(burnRow);
+  } catch {
+    /* table may not exist until migration is applied */
+  }
+
   return {
     userId: id,
     email,
     walletAddress,
     gate: {
       ...gate,
-      hasAccess: Boolean(gate.meetsRequirement || gate.exempt),
+      hasAccess: Boolean(gate.meetsRequirement || gate.exempt || burn.active),
+      mcpAccess: burn,
+      accessSource: gate.exempt ? "exempt" : burn.active ? "burn" : gate.meetsRequirement ? "hold" : null,
     },
     db,
   };
@@ -397,7 +412,9 @@ async function authenticatedContext(req) {
 
 function requireAccess(ctx) {
   if (ctx.gate.hasAccess) return;
-  const error = new Error(ctx.gate.message || "ORBITX hold required");
+  const error = new Error(
+    ctx.gate.message || "MCP access required — hold ≥$5 ORBITX or burn 100/1,000 tokens for timed access",
+  );
   error.status = 403;
   error.payload = ctx.gate;
   throw error;

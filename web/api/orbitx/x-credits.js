@@ -206,7 +206,7 @@ export async function getCreditsBalance(sb, userId) {
     lifetimeSpent: Number(row?.lifetime_spent || 0),
     creditsPerSol: CREDITS_PER_SOL,
     payTo: PLATFORM_CREDITS_WALLET,
-    usageUrl: "https://www.orbitx.world/x?tab=usage",
+    usageUrl: "https://www.orbitx.world/x?tab=shop",
     shopUrl: "https://www.orbitx.world/shop",
   };
 }
@@ -260,7 +260,7 @@ function buildUsageMarkdown(report) {
     ``,
     `## How to buy`,
     `Say: buy credits → amount → open sign link → Phantom pays desk wallet → credits apply.`,
-    `Dashboard · ${report.usageUrl || "https://www.orbitx.world/x?tab=usage"}`,
+    `Dashboard · ${report.usageUrl || "https://www.orbitx.world/shop"}`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -500,7 +500,7 @@ export async function confirmCreditsPurchase(sb, userId, signature) {
     payTo: PLATFORM_CREDITS_WALLET,
     explorer: `https://solscan.io/tx/${verified.signature}`,
     message: `+${verified.credits} credits added. New balance: ${next}.`,
-    usageUrl: "https://www.orbitx.world/x?tab=usage",
+    usageUrl: "https://www.orbitx.world/x?tab=shop",
   };
 }
 
@@ -610,7 +610,7 @@ export function prepareCreditsMcpPurchase({
             "If they say yes/confirm/auto — call again with confirmMode=auto, or call orbitx_credits_confirm after they pay.",
           ],
     note: `Non-custodial. SOL goes to ${PLATFORM_CREDITS_WALLET}. Credits apply after the payment is confirmed.`,
-    usageUrl: "https://www.orbitx.world/x?tab=usage",
+    usageUrl: "https://www.orbitx.world/x?tab=shop",
     shopUrl: "https://www.orbitx.world/shop",
   };
 }

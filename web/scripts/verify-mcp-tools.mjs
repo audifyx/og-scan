@@ -16,6 +16,7 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HUB = join(__dirname, "../api/orbitx-hub.js");
+const X_MCP = join(__dirname, "../api/x-mcp.js");
 const MCP_URL = (process.env.MCP_URL || "https://www.orbitx.world/api/mcp").replace(/\/$/, "");
 const LIVE = process.argv.includes("--live");
 
@@ -200,6 +201,21 @@ async function main() {
     }
   }
   if (coreMissing === 0) ok(`CORE tools have handler markers (${coreNames.length})`);
+
+  // 3b) X MCP burn-access tools are callable (separate connector)
+  const xSrc = readFileSync(X_MCP, "utf8");
+  const xAccess = ["x_mcp_access_status", "x_mcp_access_buy", "x_mcp_access_confirm"];
+  const missingDeclared = xAccess.filter((n) => !xSrc.includes(`name: "${n}"`));
+  if (missingDeclared.length) fail(`X MCP CORE missing access tools: ${missingDeclared.join(", ")}`);
+  else ok(`X MCP CORE includes ${xAccess.join(", ")}`);
+  for (const n of xAccess) {
+    if (!xSrc.includes(`name === "${n}"`)) fail(`X MCP missing handler for ${n}`);
+  }
+  if (!xSrc.includes('enum: ["credits", "orbitx", "access", "ask"]')) {
+    fail("x_buy what enum missing access");
+  } else {
+    ok("x_buy what=access routes to timed MCP access");
+  }
 
   // 4) Live MCP
   if (LIVE) {

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { isAgentHoldExempt, resolveAuthWallet } from "@/lib/agentTokenGate";
+import { fetchXCreditsUsage, type XCreditsUsage } from "@/lib/xMcp";
 import {
   bootstrapAgent,
   chatgptConnectUrl,
@@ -20,6 +22,7 @@ import {
 } from "@/lib/orbitxMcp";
 import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
 import { TelegramMcpCard } from "./TelegramMcpCard";
+import { McpShop } from "./McpShop";
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -100,12 +103,22 @@ function FieldRow({
   );
 }
 
+const AGENT_TABS = new Set<AgentTabId>(["setup", "shop", "wallet", "keys", "connect"]);
+
+function parseAgentTab(raw: string): AgentTabId {
+  const t = String(raw || "").toLowerCase();
+  if (t === "shop" || t === "credits" || t === "usage" || t === "access") return "shop";
+  return AGENT_TABS.has(t as AgentTabId) ? (t as AgentTabId) : "setup";
+}
+
 export function AgentDashboard() {
   const { user, profile } = useAuth();
   const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<AgentTabId>("setup");
+  const [tab, setTab] = useState<AgentTabId>(() => parseAgentTab(searchParams.get("tab") || ""));
+  const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
   const [boot, setBoot] = useState<AgentBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +185,32 @@ export function AgentDashboard() {
     }
   }, []);
 
+  const selectTab = useCallback(
+    (id: string) => {
+      const next = parseAgentTab(id);
+      setTab(next);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next === "setup") p.delete("tab");
+          else p.set("tab", next);
+          return p;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const refreshCredits = useCallback(async () => {
+    if (!user) return;
+    try {
+      setCreditsUsage(await fetchXCreditsUsage(20, "30d"));
+    } catch {
+      /* credits table may not be migrated yet */
+    }
+  }, [user]);
+
   useEffect(() => {
     try {
       const cached = localStorage.getItem("agent_api_key");
@@ -181,6 +220,15 @@ export function AgentDashboard() {
     }
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const next = parseAgentTab(searchParams.get("tab") || "");
+    if (next !== tab) setTab(next);
+  }, [searchParams, tab]);
+
+  useEffect(() => {
+    if (tab === "shop") void refreshCredits();
+  }, [tab, refreshCredits]);
 
   const copy = async (label: string, value: string) => {
     if (!value) return;
@@ -217,7 +265,7 @@ export function AgentDashboard() {
       }
       const keys = await listAgentApiKeys();
       setBoot((prev) => (prev ? { ...prev, keys: keys.keys, mintedKey: minted } : prev));
-      setTab("keys");
+      selectTab("keys");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create key");
     } finally {
@@ -252,18 +300,21 @@ export function AgentDashboard() {
     return <AgentLoading label="Booting agent session…" />;
   }
 
+  const burnActive = Boolean(boot?.mcpAccess?.active);
   const statusLabel = exempt
     ? "Owner exempt"
-    : boot?.hold?.meetsRequirement
-      ? "Hold verified"
-      : hasKey
-        ? "MCP ready"
-        : "Setup needed";
+    : burnActive
+      ? boot?.mcpAccess?.remainingLabel || "Burn access"
+      : boot?.hold?.meetsRequirement
+        ? "Hold verified"
+        : hasKey
+          ? "MCP ready"
+          : "Setup needed";
 
   return (
     <AgentShell
       activeTab={tab}
-      onTabChange={(id) => setTab(id as AgentTabId)}
+      onTabChange={selectTab}
       statusLabel={statusLabel}
       statusWarn={!hasKey || !linkedWallet}
       onRefresh={refresh}
@@ -281,7 +332,7 @@ export function AgentDashboard() {
           <button
             type="button"
             className={`ox-agent__kpi${linkedWallet ? " is-ok" : ""}`}
-            onClick={() => setTab("wallet")}
+            onClick={() => selectTab("wallet")}
           >
             <span className="ox-agent__kpi-k">Wallet</span>
             <span className="ox-agent__kpi-v">{linkedWallet ? "Linked" : "Connect"}</span>
@@ -289,7 +340,7 @@ export function AgentDashboard() {
           <button
             type="button"
             className={`ox-agent__kpi${hasKey ? " is-ok" : ""}`}
-            onClick={() => setTab("keys")}
+            onClick={() => selectTab("keys")}
           >
             <span className="ox-agent__kpi-k">API key</span>
             <span className="ox-agent__kpi-v">{hasKey ? "Ready" : "Create"}</span>
@@ -297,10 +348,20 @@ export function AgentDashboard() {
           <button
             type="button"
             className={`ox-agent__kpi${hasKey && linkedWallet ? " is-ok" : ""}`}
-            onClick={() => setTab("connect")}
+            onClick={() => selectTab("connect")}
           >
             <span className="ox-agent__kpi-k">AI</span>
             <span className="ox-agent__kpi-v">{hasKey && linkedWallet ? "Connect" : "Setup"}</span>
+          </button>
+          <button
+            type="button"
+            className={`ox-agent__kpi${burnActive ? " is-ok" : ""}`}
+            onClick={() => selectTab("shop")}
+          >
+            <span className="ox-agent__kpi-k">Access</span>
+            <span className="ox-agent__kpi-v">
+              {burnActive ? boot?.mcpAccess?.remainingLabel || "Active" : "Hold or burn"}
+            </span>
           </button>
         </div>
         <div className="ox-agent__steps">
@@ -311,6 +372,11 @@ export function AgentDashboard() {
             {hasKey ? "API key ready" : "Create API key"}
           </span>
           {exempt && <span className="ox-agent__chip is-accent">Exempt</span>}
+          {burnActive && (
+            <span className="ox-agent__chip is-ok">
+              {boot?.mcpAccess?.remainingLabel || "Burn access"}
+            </span>
+          )}
         </div>
       </div>
 
@@ -326,6 +392,7 @@ export function AgentDashboard() {
       )}
 
       {tab === "setup" && (
+        <>
         <div className="ox-agent__grid ox-agent__grid--2">
           <section className="ox-agent__panel">
             <div className="ox-agent__panel-h">
@@ -339,13 +406,13 @@ export function AgentDashboard() {
                 <li>Add OrbitX to Claude or ChatGPT and Authenticate</li>
               </ol>
               <div className="ox-agent__btn-row">
-                <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => setTab("wallet")}>
+                <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => selectTab("wallet")}>
                   {linkedWallet ? "Review wallet" : "Link wallet"}
                 </button>
-                <button type="button" className="ox-agent__btn" onClick={() => setTab("keys")}>
+                <button type="button" className="ox-agent__btn" onClick={() => selectTab("keys")}>
                   {hasKey ? "Manage keys" : "Create key"}
                 </button>
-                <button type="button" className="ox-agent__btn" onClick={() => setTab("connect")}>
+                <button type="button" className="ox-agent__btn" onClick={() => selectTab("connect")}>
                   Connect AI
                 </button>
               </div>
@@ -372,7 +439,7 @@ export function AgentDashboard() {
                 <button
                   type="button"
                   className="ox-agent__btn ox-agent__btn--primary"
-                  onClick={() => setTab("connect")}
+                  onClick={() => selectTab("connect")}
                 >
                   Open connect
                 </button>
@@ -380,6 +447,17 @@ export function AgentDashboard() {
             </div>
           </section>
         </div>
+        </>
+      )}
+
+      {tab === "shop" && (
+        <McpShop
+          variant="agent"
+          walletAddress={linkedWallet}
+          creditsUsage={creditsUsage}
+          onAccessGranted={() => void refresh()}
+          onCreditsPurchased={() => void refreshCredits()}
+        />
       )}
 
       {tab === "wallet" && (

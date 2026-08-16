@@ -7,7 +7,7 @@ import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { supabase } from "@/lib/supabase";
 
-type Kind = "trade" | "claim" | "burn" | "rent" | "credits";
+type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access";
 
 function decodeTx(b64: string): VersionedTransaction | Transaction {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -34,9 +34,17 @@ export default function AgentSignPage() {
     kindParam === "burn" ||
     kindParam === "rent" ||
     kindParam === "credits" ||
-    kindParam === "credit"
-      ? (kindParam === "credit" ? "credits" : kindParam)
+    kindParam === "credit" ||
+    kindParam === "mcp-access" ||
+    kindParam === "mcp_access" ||
+    kindParam === "access"
+      ? kindParam === "credit"
+        ? "credits"
+        : kindParam === "mcp_access" || kindParam === "access"
+          ? "mcp-access"
+          : kindParam
       : "trade";
+  const packageId = (params.get("package") || params.get("packageId") || "").toLowerCase();
   const action = params.get("action") === "sell" ? "sell" : "buy";
   const mint = (params.get("mint") || "").trim();
   const amountRaw = (params.get("amount") || "").trim();
@@ -64,6 +72,11 @@ export default function AgentSignPage() {
       const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
+    if (kind === "mcp-access") {
+      const tokens = packageId === "week" ? 1000 : 100;
+      const label = packageId === "week" ? "1 week" : "1 day";
+      return `Burn ${tokens.toLocaleString()} $ORBITX → ${label} MCP access`;
+    }
     if (kind === "claim") return "creator fees";
     if (kind === "rent") return "close empty ATAs";
     if (kind === "burn") {
@@ -73,28 +86,31 @@ export default function AgentSignPage() {
     if (!amountRaw) return "—";
     if (action === "buy") return `${amountRaw} SOL`;
     return amountRaw.endsWith("%") ? amountRaw : `${amountRaw} tokens`;
-  }, [kind, action, amountRaw, percentRaw]);
+  }, [kind, action, amountRaw, percentRaw, packageId]);
 
   const valid = useMemo(() => {
     if (kind === "credits") {
       const sol = Number(amountRaw);
       return Number.isFinite(sol) && sol >= 0.001;
     }
+    if (kind === "mcp-access") return packageId === "day" || packageId === "week";
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
-  }, [kind, mint, amountRaw, percentRaw]);
+  }, [kind, mint, amountRaw, percentRaw, packageId]);
 
   const title =
     kind === "credits"
       ? "Buy credits"
-      : kind === "claim"
-        ? "Claim fees"
-        : kind === "burn"
-          ? "Burn tokens"
-          : kind === "rent"
-            ? "Rent refund"
-            : action.toUpperCase();
+      : kind === "mcp-access"
+        ? "Burn for MCP access"
+        : kind === "claim"
+          ? "Claim fees"
+          : kind === "burn"
+            ? "Burn tokens"
+            : kind === "rent"
+              ? "Rent refund"
+              : action.toUpperCase();
 
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
@@ -191,6 +207,46 @@ export default function AgentSignPage() {
           setExtraNote(
             "Payment sent. Tell Grok your signature to finish crediting, or open /x Usage → Confirm payment.",
           );
+        }
+        return;
+      }
+
+      if (kind === "mcp-access") {
+        const pkg = packageId === "week" ? "week" : "day";
+        const res = await fetch("/api/orbitx-agent/mcp-access/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicKey: pk, packageId: pkg }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.ok === false || typeof data.transaction !== "string") {
+          throw new Error(data?.error || data?.message || "Could not build access burn");
+        }
+        const sig = await sendOne(data.transaction);
+        await connection.confirmTransaction(sig, "confirmed");
+        setSignature(sig);
+        try {
+          const session = (await supabase.auth.getSession()).data.session;
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+          const confirmRes = await fetch("/api/orbitx-agent/mcp-access/confirm", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ signature: sig, publicKey: pk, packageId: pkg }),
+          });
+          const granted = await confirmRes.json().catch(() => ({}));
+          if (confirmRes.ok && granted?.ok) {
+            setExtraNote(
+              granted.message ||
+                `${granted.remainingLabel || "Access granted"}. Opens /agent when the clock is running.`,
+            );
+          } else {
+            setExtraNote(
+              "Burn sent. Sign in on /agent and confirm the signature if access did not unlock.",
+            );
+          }
+        } catch {
+          setExtraNote("Burn sent. Open /agent to refresh access status.");
         }
         return;
       }
@@ -303,9 +359,13 @@ export default function AgentSignPage() {
             ? autoPrompt
               ? "Chat auto-confirm — Phantom will send SOL to the OrbitX desk wallet, then credits apply."
               : "Approve the SOL transfer to the OrbitX desk wallet. Credits credit after confirmation."
-            : autoPrompt
-              ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
-              : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
+            : kind === "mcp-access"
+              ? autoPrompt
+                ? "Chat auto-confirm — Phantom will burn the exact $ORBITX package amount, then MCP access starts."
+                : "Approve the $ORBITX burn. MCP access starts after confirmation and expires automatically."
+              : autoPrompt
+                ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
+                : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
@@ -359,8 +419,15 @@ export default function AgentSignPage() {
             </a>
             {kind === "credits" ? (
               <p className="mt-2 text-[11px] text-white/45">
-                <Link to="/x?tab=usage" className="text-emerald-200/90 hover:underline">
-                  View usage / balance
+                <Link to="/shop" className="text-emerald-200/90 hover:underline">
+                  View shop / balance
+                </Link>
+              </p>
+            ) : null}
+            {kind === "mcp-access" ? (
+              <p className="mt-2 text-[11px] text-white/45">
+                <Link to="/shop" className="text-emerald-200/90 hover:underline">
+                  Open shop
                 </Link>
               </p>
             ) : null}
@@ -395,8 +462,11 @@ export default function AgentSignPage() {
         )}
 
         <p className="mt-4 text-center text-[11px] text-white/35">
-          <Link to={kind === "credits" ? "/x?tab=usage" : "/agent"} className="text-white/50 hover:underline">
-            {kind === "credits" ? "Back to Usage" : "Back to Agent MCP"}
+          <Link
+            to={kind === "credits" || kind === "mcp-access" ? "/shop" : "/agent"}
+            className="text-white/50 hover:underline"
+          >
+            {kind === "credits" || kind === "mcp-access" ? "Back to Shop" : "Back to Agent MCP"}
           </Link>
         </p>
       </div>

@@ -1081,3 +1081,93 @@
     padding-bottom: 1.25rem !important;
   }
 }
+
+/* ── MCP burn-access packages ── */
+.ox-agent__access-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--oa-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  margin-bottom: 1rem;
+}
+
+.ox-agent__access-status.is-ok {
+  border-color: rgba(134, 239, 172, 0.28);
+  background: rgba(134, 239, 172, 0.08);
+}
+
+.ox-agent__access-status.is-expired {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.ox-agent__access-time {
+  margin-top: 0.2rem;
+  font-size: 1.25rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.ox-agent__pkg-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.85rem 0 0.35rem;
+}
+
+@media (min-width: 640px) {
+  .ox-agent__pkg-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ox-agent__pkg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--oa-line);
+  background: rgba(0, 0, 0, 0.28);
+  color: inherit;
+  cursor: pointer;
+}
+
+.ox-agent__pkg:hover {
+  border-color: rgba(94, 234, 212, 0.35);
+}
+
+.ox-agent__pkg.is-on {
+  border-color: rgba(94, 234, 212, 0.55);
+  background: rgba(94, 234, 212, 0.1);
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.2);
+}
+
+.ox-agent__pkg-k {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oa-faint);
+}
+
+.ox-agent__pkg-title {
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.ox-agent__pkg-cost {
+  font-family: var(--oa-mono);
+  font-size: 0.86rem;
+  color: var(--oa-accent);
+}
+
+.ox-agent__pkg-meta {
+  font-size: 0.75rem;
+  color: var(--oa-muted);
+}

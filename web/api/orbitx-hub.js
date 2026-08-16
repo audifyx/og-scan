@@ -23,6 +23,17 @@ import {
   verifyTokenHold,
 } from "./orbitx/token-hold.js";
 import {
+  accessBlockedPayload,
+  accessBuyPrompt,
+  calculateBurnAmount,
+  confirmAccessBurn,
+  evaluateMcpAccess,
+  getAccessStatus,
+  listPackages,
+  prepareAccessBurn,
+  prepareAccessMcpPurchase,
+} from "./orbitx/mcp-burn-access.js";
+import {
   agentMenuPayload,
   buildAgentAuthPasteMessages,
   wrapMcpToolContent,
@@ -44,6 +55,26 @@ async function mcpOps() {
 /** Lazy — credits module (may pull Solana) must not crash MCP cold start. */
 async function xCredits() {
   return import("./orbitx/x-credits.js");
+}
+
+/** Combined MCP gate: exempt OR unexpired burn access OR $ORBITX hold. */
+async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}) {
+  const candidates = (wallets || []).map((w) => normalizeGateWallet(w)).filter(Boolean);
+  if (isTokenGateExemptAny({ wallets: candidates, email })) {
+    return { allowed: true, source: "exempt", hold: { exempt: true, meetsRequirement: true } };
+  }
+  const hold = await verifyTokenHold(candidates[0] || "", base, { email });
+  const access = await evaluateMcpAccess({ sb, userId, hold });
+  if (access.allowed) return access;
+  return {
+    ...access,
+    blocked: accessBlockedPayload({
+      tool,
+      hold,
+      burn: access.burn,
+      fix: "Hold ≥$5 ORBITX, or burn 100 $ORBITX (1 day) / 1,000 $ORBITX (1 week) at https://www.orbitx.world/shop.",
+    }),
+  };
 }
 
 const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
@@ -510,6 +541,80 @@ async function handleAgent(req, res, parts) {
     }
   }
 
+  if (route === "mcp-access" && req.method === "GET") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    try {
+      return json(res, await getAccessStatus(sb, authUser.id));
+    } catch (e) {
+      return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
+    }
+  }
+
+  if (route === "mcp-access/prepare" && req.method === "POST") {
+    const body = await readBody(req);
+    const pk = normalizeGateWallet(body.publicKey || body.wallet || body.walletAddress || "");
+    const packageId = body.packageId || body.package || body.option;
+    try {
+      const out = await prepareAccessBurn({ publicKey: pk, packageId });
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "prepare_failed", ...calculateBurnAmount(packageId) }, 400);
+    }
+  }
+
+  if (route === "mcp-access/confirm" && req.method === "POST") {
+    const body = await readBody(req);
+    const signature = String(body.signature || body.txSignature || "").trim();
+    const walletPk = normalizeGateWallet(body.publicKey || body.wallet || body.walletAddress || "");
+    const packageId = body.packageId || body.package || body.option;
+    if (!signature) return json(res, { ok: false, error: "signature_required" }, 400);
+    let userId = null;
+    const authUser = await getAuthUser(req);
+    if (authUser?.id) userId = authUser.id;
+    if (!userId && walletPk) {
+      try {
+        const rows = await sb(
+          `agents?wallet_address=eq.${encodeURIComponent(walletPk)}&select=user_id&limit=1`,
+        );
+        userId = Array.isArray(rows) && rows[0]?.user_id ? rows[0].user_id : null;
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!userId) {
+      return json(
+        res,
+        {
+          ok: false,
+          error: "user_required",
+          message: "Sign in or link this wallet on /agent, then confirm the burn.",
+          signature,
+        },
+        401,
+      );
+    }
+    try {
+      const out = await confirmAccessBurn(sb, {
+        userId,
+        signature,
+        packageId,
+        wallet: walletPk,
+      });
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(
+        res,
+        {
+          ok: false,
+          error: e?.message || "confirm_failed",
+          message: e?.message || "Could not grant access — apply mcp_burn_access migration",
+        },
+        500,
+      );
+    }
+  }
+
   // Public prepare for /agent/sign (claim / burn / rent) — returns unsigned txs only.
   if (route === "ops-prepare" && req.method === "POST") {
     try {
@@ -545,7 +650,22 @@ async function handleAgent(req, res, parts) {
       wallet = normalizeGateWallet(agent.wallet_address);
     }
     const hold = await verifyTokenHold(wallet, base, { email: authUser.email });
-    return json(res, hold, hold.meetsRequirement ? 200 : 403);
+    const access = await evaluateMcpAccess({ sb, userId: authUser.id, hold });
+    return json(
+      res,
+      {
+        ...hold,
+        ok: access.allowed,
+        meetsRequirement: access.allowed,
+        mcpAccess: access.burn,
+        accessSource: access.source,
+        message:
+          access.source === "burn"
+            ? `Burn access active — ${access.burn.remainingLabel}.`
+            : hold.message,
+      },
+      access.allowed ? 200 : 403,
+    );
   }
 
   if (route === "bootstrap" && req.method === "POST") {
@@ -555,10 +675,11 @@ async function handleAgent(req, res, parts) {
     const agent = await ensureAgent(userId);
     const { base, mcpUrl } = mcpUrls(req);
     const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
+    const access = await evaluateMcpAccess({ sb, userId, hold });
     const keys = await listKeys(agent.id);
     let mintedKey = null;
-    // Only auto-mint a key when hold (or exempt) is satisfied.
-    if (keys.length === 0 && hold.meetsRequirement) {
+    // Only auto-mint a key when hold, burn access, or exempt is satisfied.
+    if (keys.length === 0 && access.allowed) {
       mintedKey = await createKey(agent.id, "Default MCP Key");
     }
     return json(res, {
@@ -572,6 +693,8 @@ async function handleAgent(req, res, parts) {
       mintedKey,
       mcpUrl,
       hold,
+      mcpAccess: access.burn,
+      accessSource: access.source,
     });
   }
 
@@ -599,9 +722,15 @@ async function handleAgent(req, res, parts) {
     const name = String(body.name || "").trim() || "MCP Key";
     const agent = await ensureAgent(userId);
     const { base } = mcpUrls(req);
-    const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
-    if (!hold.meetsRequirement) {
-      return json(res, holdBlockedPayload({ hold }), 403);
+    const access = await requireMcpAccess({
+      userId,
+      wallets: [agent.wallet_address],
+      email: authUser.email,
+      base,
+      tool: "create_key",
+    });
+    if (!access.allowed) {
+      return json(res, access.blocked || holdBlockedPayload({ hold: access.hold }), 403);
     }
     const minted = await createKey(agent.id, name);
     return json(
@@ -727,19 +856,15 @@ async function handleAgent(req, res, parts) {
     }
 
     const { base } = mcpUrls(req);
-    // Exempt if connected wallet, linked agent wallet, OR owner/SIWS email qualifies.
-    if (
-      !isTokenGateExemptAny({
-        wallets: [wallet, agent.wallet_address],
-        email: authUser.email,
-      })
-    ) {
-      const hold = await verifyTokenHold(wallet || agent.wallet_address, base, {
-        email: authUser.email,
-      });
-      if (!hold.meetsRequirement) {
-        return json(res, holdBlockedPayload({ hold }), 403);
-      }
+    const access = await requireMcpAccess({
+      userId,
+      wallets: [wallet, agent.wallet_address],
+      email: authUser.email,
+      base,
+      tool: "oauth_approve",
+    });
+    if (!access.allowed) {
+      return json(res, access.blocked || holdBlockedPayload({ hold: access.hold }), 403);
     }
 
     // Always mint a Bearer access token as API key (oxo_). Claude exchanges the
@@ -1367,6 +1492,13 @@ const TOOL_ALIASES = {
   orbitx_chart_embed: "orbitx_dex_chart",
   orbitx_embed_chart: "orbitx_dex_chart",
   usage: "orbitx_credits_usage",
+  "mcp access": "orbitx_mcp_access_status",
+  "access status": "orbitx_mcp_access_status",
+  "burn access": "orbitx_mcp_access_buy",
+  "buy access": "orbitx_mcp_access_buy",
+  mcp_access: "orbitx_mcp_access_status",
+  mcp_access_buy: "orbitx_mcp_access_buy",
+  "confirm access": "orbitx_mcp_access_confirm",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_community: "orbitx_social_create_community",
   orbitx_post_community: "orbitx_social_post",
@@ -1978,6 +2110,44 @@ const CORE_TOOLS = [
         period: { type: "string", enum: ["24h", "7d", "30d", "all"] },
         limit: { type: "integer" },
         format: { type: "string", enum: ["both", "markdown", "json"] },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_mcp_access_status",
+    description:
+      "Show temporary Agent MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 day = 100 tokens, 1 week = 1,000 tokens).",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_mcp_access_buy",
+    description:
+      "Buy temporary Agent MCP access by burning $ORBITX. Packages: day = 100 tokens (24h), week = 1,000 tokens (7d). Returns a Phantom signUrl. After the burn confirms, call orbitx_mcp_access_confirm with the signature.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        package: { type: "string", enum: ["day", "week"], description: "Access package" },
+        packageId: { type: "string", enum: ["day", "week"] },
+        publicKey: { type: "string", description: "Burner wallet (optional if linked on /agent)" },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean" },
+        askOnly: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_mcp_access_confirm",
+    description:
+      "Confirm an $ORBITX burn and grant MCP access for the matching package duration. Pass the Solana tx signature after Phantom confirms.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signature: { type: "string" },
+        txSignature: { type: "string" },
+        package: { type: "string", enum: ["day", "week"] },
+        packageId: { type: "string", enum: ["day", "week"] },
       },
       additionalProperties: false,
     },
@@ -2930,6 +3100,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_create_token_custom",
       ],
       credits: ["orbitx_credits_buy", "orbitx_credits_confirm", "orbitx_credits_balance", "orbitx_credits_usage"],
+      mcpAccess: ["orbitx_mcp_access_status", "orbitx_mcp_access_buy", "orbitx_mcp_access_confirm"],
       trade: ["orbitx_buy_orbitx", "orbitx_confirm_buy", "orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
       media: [
@@ -3184,6 +3355,60 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       return await xc.getCreditsBalance(sb, auth.userId);
     } catch (e) {
       return { ok: false, error: "balance_failed", message: e?.message || "balance unavailable" };
+    }
+  }
+
+  if (name === "orbitx_mcp_access_status") {
+    if (!auth?.userId) {
+      return { ok: false, error: "session_required", message: "Authenticate to view MCP access status" };
+    }
+    try {
+      return await getAccessStatus(sb, auth.userId);
+    } catch (e) {
+      return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
+    }
+  }
+
+  if (name === "orbitx_mcp_access_buy") {
+    const askOnly =
+      args.askOnly === true || (args.package == null && args.packageId == null && args.option == null);
+    if (askOnly) {
+      return accessBuyPrompt({ accessUrl: "https://www.orbitx.world/agent?tab=shop" });
+    }
+    return prepareAccessMcpPurchase({
+      base,
+      wallet: wallet || args.publicKey,
+      packageId: args.package || args.packageId || args.option,
+      confirmMode: args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || "sign",
+      accessUrl: "https://www.orbitx.world/agent?tab=shop",
+    });
+  }
+
+  if (name === "orbitx_mcp_access_confirm") {
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "session_required",
+        message: "Authenticate first, then pass the burn transaction signature.",
+      };
+    }
+    const signature = String(args.signature || args.txSignature || args.tx_signature || args.sig || "").trim();
+    if (!signature) {
+      return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
+    }
+    try {
+      return await confirmAccessBurn(sb, {
+        userId: auth.userId,
+        signature,
+        packageId: args.package || args.packageId,
+        wallet: wallet || args.publicKey,
+      });
+    } catch (e) {
+      return {
+        ok: false,
+        error: "confirm_failed",
+        message: e?.message || "Could not grant access — apply mcp_burn_access migration",
+      };
     }
   }
 
@@ -4248,7 +4473,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {} },
             serverInfo: { name: "OrbitX Agent MCP", version: "1.5.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. MCP access: when they say buy access / burn ORBITX for MCP / 1 day or 1 week access — ASK day (100 tokens) or week (1,000 tokens), call orbitx_mcp_access_buy, send openUrl/signUrl so Phantom burns the exact amount, then orbitx_mcp_access_confirm with the signature. Time remaining: orbitx_mcp_access_status. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -4347,30 +4572,27 @@ async function handleMcp(req, res, parts) {
         ).trim(),
       );
 
-      // Token hold block — write/tx tools require ≥$5 ORBITX.
-      // Owner wallets + audifyx@gmail.com (resolved from API-key userId) skip entirely.
+      // MCP access — write/tx tools require exempt, unexpired burn access, or ≥$5 ORBITX hold.
       if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
         const candidates = holdCandidateWallets(auth, args);
-        const holdWallet = candidates[0] || "";
-        const holdEmail = auth?.email || null;
-        if (!isTokenGateExemptAny({ wallets: candidates, email: holdEmail })) {
-          const hold = await verifyTokenHold(holdWallet, base, { email: holdEmail });
-          if (!hold.meetsRequirement) {
-            const tip = holdBlockedPayload({
-              tool: name,
-              hold,
-              fix: "Hold ≥$5 ORBITX, link wallet on https://www.orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
-            });
-            return json(res, {
-              jsonrpc: "2.0",
-              id,
-              result: {
-                content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
-                structuredContent: tip,
-                isError: true,
-              },
-            });
-          }
+        const access = await requireMcpAccess({
+          userId: auth?.userId,
+          wallets: candidates,
+          email: auth?.email || null,
+          base,
+          tool: name,
+        });
+        if (!access.allowed) {
+          const tip = access.blocked || holdBlockedPayload({ tool: name, hold: access.hold });
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+              structuredContent: tip,
+              isError: true,
+            },
+          });
         }
       }
 
@@ -4546,9 +4768,15 @@ export async function runEmbeddedAgentTool({
 
   if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
     const candidates = holdCandidateWallets(auth, args);
-    const hold = await verifyTokenHold(candidates[0] || "", base, { email: auth.email });
-    if (!hold.meetsRequirement) {
-      return holdBlockedPayload({ tool: name, hold });
+    const access = await requireMcpAccess({
+      userId: uid,
+      wallets: candidates,
+      email: auth.email,
+      base,
+      tool: name,
+    });
+    if (!access.allowed) {
+      return access.blocked || holdBlockedPayload({ tool: name, hold: access.hold });
     }
   }
 

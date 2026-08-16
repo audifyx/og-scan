@@ -114,7 +114,7 @@ const ALL_APPS: AppItem[] = [
   { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(135deg, #38BDF8, #0284C7)", glyph: Glyph.ai },
   { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #5EEAD4, #0D9488)", glyph: Glyph.agent },
   { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(135deg, #3F3F46, #18181B)", glyph: Glyph.x },
-  { key: "shop", name: "Credits shop", caption: "Buy via X MCP · usage", href: "/shop", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #2DD4BF, #0F766E)", glyph: <span style={{ fontSize: 20 }}>◈</span> },
+  { key: "shop", name: "MCP shop", caption: "Credits + burn access", href: "/shop", tone: "#5EEAD4", iconBg: "linear-gradient(135deg, #2DD4BF, #0F766E)", glyph: <span style={{ fontSize: 20 }}>◈</span> },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(135deg, #8B5CF6, #5B21B6)", glyph: Glyph.social },
   { key: "gaming", name: "Gaming", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "predict", name: "Predictions", caption: "Trade YES/NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },

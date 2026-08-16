@@ -60,6 +60,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { TokenGatingVerifier } from "@/components/agent/token-gating-verifier";
+import { McpBurnAccessCard } from "@/components/agent/McpBurnAccessCard";
 import { AGENT_HOLD_MIN_USD, AGENT_HOLD_MINT } from "@/lib/agentTokenGate";
 import { OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 import {
@@ -282,7 +283,7 @@ function LockedScreen({
             </div>
             <div>
               <span className="oai-kicker">Access requirement</span>
-              <strong>Hold ${AGENT_HOLD_MIN_USD} in {OGSCAN_TOKEN_SYMBOL}</strong>
+              <strong>Hold ${AGENT_HOLD_MIN_USD} in {OGSCAN_TOKEN_SYMBOL} or burn for timed access</strong>
             </div>
             <span className="oai-live-pill">
               <i /> Mainnet
@@ -310,6 +311,7 @@ function LockedScreen({
           <div className="oai-gate__verify">
             <TokenGatingVerifier onUnlocked={onRetry} />
           </div>
+          <McpBurnAccessCard walletAddress={gate?.wallet} onAccessGranted={onRetry} compact />
           <div className="oai-gate__actions">
             <a
               href={`https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`}
