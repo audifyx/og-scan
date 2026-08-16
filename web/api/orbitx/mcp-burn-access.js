@@ -271,28 +271,96 @@ export async function evaluateMcpAccess({
   };
 }
 
+/**
+ * Quote + ATA lookup for an access burn.
+ * Do NOT import mcp-ops / @solana/web3.js here — rpc-websockets requires ESM uuid
+ * and crashes the Vercel function (ERR_REQUIRE_ESM). The browser builds the tx.
+ */
 export async function prepareAccessBurn({ publicKey, packageId }) {
   const quote = calculateBurnAmount(packageId);
   if (!quote.ok) return quote;
   const pk = String(publicKey || "").trim();
   if (!pk || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(pk)) {
     return {
+      ...quote,
       ok: false,
       error: "wallet_required",
       message: "Connect a Solana wallet, then burn ORBITX for MCP access.",
-      ...quote,
     };
   }
-  const { prepareBurn } = await import("./mcp-ops.js");
-  const built = await prepareBurn(pk, ORBITX_BURN_MINT, String(quote.tokens), null);
+
+  let accounts;
+  try {
+    accounts = await rpc("getTokenAccountsByOwner", [
+      pk,
+      { mint: ORBITX_BURN_MINT },
+      { encoding: "jsonParsed" },
+    ]);
+  } catch (e) {
+    return {
+      ...quote,
+      ok: false,
+      error: "rpc_failed",
+      message: e?.message || "Could not read $ORBITX balance",
+    };
+  }
+
+  let best = null;
+  for (const row of accounts?.value || []) {
+    const info = row?.account?.data?.parsed?.info;
+    if (!info) continue;
+    let balanceRaw = 0n;
+    try {
+      balanceRaw = BigInt(info.tokenAmount?.amount || "0");
+    } catch {
+      continue;
+    }
+    if (balanceRaw <= 0n) continue;
+    if (!best || balanceRaw > best.balanceRaw) {
+      best = {
+        tokenAccount: row.pubkey,
+        programId: row.account.owner,
+        decimals: Number(info.tokenAmount?.decimals || 0),
+        balanceRaw,
+      };
+    }
+  }
+
+  if (!best) {
+    return {
+      ...quote,
+      ok: false,
+      error: "no_balance",
+      message: `This wallet has no $ORBITX to burn. Need ${quote.tokens} tokens.`,
+      mint: ORBITX_BURN_MINT,
+    };
+  }
+
+  const amountRaw = BigInt(quote.tokens) * 10n ** BigInt(Math.max(0, best.decimals));
+  if (amountRaw > best.balanceRaw) {
+    const have = Number(best.balanceRaw) / 10 ** best.decimals;
+    return {
+      ...quote,
+      ok: false,
+      error: "insufficient_balance",
+      message: `Need ${quote.tokens} $ORBITX. Wallet has ${have}.`,
+      mint: ORBITX_BURN_MINT,
+    };
+  }
+
   return {
     ok: true,
     ...quote,
     publicKey: pk,
-    amountRaw: built.amountRaw,
-    closesAccount: Boolean(built.closesAccount),
-    transaction: built.transaction,
-    note: `Unsigned burn of ${quote.tokens} $ORBITX for ${quote.label}. Sign with the holder wallet.`,
+    mint: ORBITX_BURN_MINT,
+    tokenAccount: best.tokenAccount,
+    programId: best.programId,
+    decimals: best.decimals,
+    amountRaw: amountRaw.toString(),
+    balanceRaw: best.balanceRaw.toString(),
+    closesAccount: amountRaw >= best.balanceRaw,
+    buildOnClient: true,
+    note: `Burn ${quote.tokens} $ORBITX for ${quote.label}. Sign with the holder wallet.`,
   };
 }
 

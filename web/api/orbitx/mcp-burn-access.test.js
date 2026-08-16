@@ -10,6 +10,7 @@ import {
   inferPackageFromTokens,
   isAccessActive,
   listPackages,
+  prepareAccessBurn,
   prepareAccessMcpPurchase,
   remainingMs,
   resolvePackage,
@@ -287,6 +288,73 @@ describe("MCP access blocked payload", () => {
     expect(payload.message).toMatch(/burn 100 ORBITX/);
     expect(payload.accessUrl).toContain("/shop");
     expect(payload.tool).toBe("orbitx_prepare_buy");
+  });
+});
+
+describe("prepareAccessBurn (no Solana SDK)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns ATA metadata so the client can build the burn", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              value: [
+                {
+                  pubkey: "TokenAccount11111111111111111111111111111",
+                  account: {
+                    owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                    data: {
+                      parsed: {
+                        info: {
+                          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                          tokenAmount: { amount: "500000000", decimals: 6, uiAmount: 500 },
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const out = await prepareAccessBurn({
+      publicKey: "11111111111111111111111111111111",
+      packageId: "day",
+    });
+    expect(out.ok).toBe(true);
+    expect(out.tokens).toBe(100);
+    expect(out.amountRaw).toBe("100000000");
+    expect(out.tokenAccount).toBe("TokenAccount11111111111111111111111111111");
+    expect(out.buildOnClient).toBe(true);
+    expect(out.transaction).toBeUndefined();
+  });
+
+  it("rejects a wallet with no ORBITX", async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { value: [] } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const out = await prepareAccessBurn({
+      publicKey: "11111111111111111111111111111111",
+      packageId: "week",
+    });
+    expect(out.ok).toBe(false);
+    expect(out.error).toBe("no_balance");
   });
 });
 
