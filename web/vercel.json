@@ -335,7 +335,7 @@
     },
     {
       "path": "/api/ogdex/alerts-run",
-      "schedule": "* * * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/predictions/api/cron/resolve",
@@ -343,7 +343,7 @@
     },
     {
       "path": "/api/x-mcp?path=agent/cron",
-      "schedule": "* * * * *"
+      "schedule": "0 16 * * *"
     }
   ]
 }

@@ -457,12 +457,12 @@ const App = () => (
             <Route path="/hq/*" element={<Navigate to="/orbitx-social" replace />} />
 
             {/* ── Protected: App shell ── */}
-            <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
+            <Route path="/app" element={<Hub />} />
             <Route path="/koltelebot" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
             <Route path="/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
             <Route path="/app/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
             <Route path="/app/pnl-tracker" element={<ProtectedRoute><PnlTracker /></ProtectedRoute>} />
-            <Route path="/hub" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
+            <Route path="/hub" element={<Hub />} />
             <Route path="/command" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/our-coin" element={<OgdexRedirect to="/ORBITX_DEX" />} />
