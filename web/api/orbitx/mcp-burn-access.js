@@ -161,11 +161,11 @@ export function accessBlockedPayload(extra = {}) {
     error: "mcp_access_required",
     mint: ORBITX_BURN_MINT,
     packages: listPackages(),
-    accessUrl: "https://www.orbitx.world/agent",
+    accessUrl: "https://www.orbitx.world/shop",
     holdUrl: `https://www.orbitx.world/ORBITX_DEX/token/${ORBITX_BURN_MINT}`,
     buyUrl: `https://jup.ag/swap/SOL-${ORBITX_BURN_MINT}`,
     message:
-      "MCP access required. Hold ≥$5 ORBITX, or burn 100 ORBITX (1 day) / 1,000 ORBITX (1 week) at /agent.",
+      "MCP access required. Hold ≥$5 ORBITX, or burn 100 ORBITX (1 day) / 1,000 ORBITX (1 week) at /shop.",
     ...extra,
   };
 }
@@ -552,7 +552,7 @@ export function accessBuyPrompt({
   buyTool = "orbitx_mcp_access_buy",
   confirmTool = "orbitx_mcp_access_confirm",
   statusTool = "orbitx_mcp_access_status",
-  accessUrl = "https://www.orbitx.world/agent",
+  accessUrl = "https://www.orbitx.world/shop",
 } = {}) {
   return {
     ok: true,
@@ -571,7 +571,7 @@ export function prepareAccessMcpPurchase({
   packageId,
   confirmMode = "sign",
   preferAuto = false,
-  accessUrl = "https://www.orbitx.world/agent",
+  accessUrl = "https://www.orbitx.world/shop",
   buyTool = "orbitx_mcp_access_buy",
   confirmTool = "orbitx_mcp_access_confirm",
 } = {}) {

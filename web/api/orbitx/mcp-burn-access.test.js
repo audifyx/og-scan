@@ -285,6 +285,7 @@ describe("MCP access blocked payload", () => {
     expect(payload.error).toBe("mcp_access_required");
     expect(payload.packages).toHaveLength(2);
     expect(payload.message).toMatch(/burn 100 ORBITX/);
+    expect(payload.accessUrl).toContain("/shop");
     expect(payload.tool).toBe("orbitx_prepare_buy");
   });
 });
@@ -299,7 +300,7 @@ describe("MCP access MCP purchase payloads", () => {
       buyTool: "x_mcp_access_buy",
       confirmTool: "x_mcp_access_confirm",
       statusTool: "x_mcp_access_status",
-      accessUrl: "https://www.orbitx.world/x?tab=usage",
+      accessUrl: "https://www.orbitx.world/x?tab=shop",
     });
     expect(x.tools).toEqual({
       buy: "x_mcp_access_buy",
@@ -314,7 +315,7 @@ describe("MCP access MCP purchase payloads", () => {
     const out = prepareAccessMcpPurchase({
       wallet: "11111111111111111111111111111111",
       packageId: "day",
-      accessUrl: "https://www.orbitx.world/x?tab=usage",
+      accessUrl: "https://www.orbitx.world/x?tab=shop",
       buyTool: "x_mcp_access_buy",
       confirmTool: "x_mcp_access_confirm",
     });

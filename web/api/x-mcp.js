@@ -2139,19 +2139,19 @@ async function callTool(rawName, args, auth, req = null) {
       {
         id: "credits",
         title: "Buy / usage credits",
-        url: "https://www.orbitx.world/x?tab=usage",
-        text: "Buy credits with SOL via x_credits_buy → pay → x_credits_confirm. Advanced usage: x_credits_usage. Shop: /shop",
+        url: "https://www.orbitx.world/x?tab=shop",
+        text: "Buy credits with SOL via x_credits_buy → pay → x_credits_confirm. Advanced usage: x_credits_usage. Shop: /shop or /x?tab=shop",
       },
       {
         id: "access",
         title: "MCP access via $ORBITX burn",
-        url: "https://www.orbitx.world/x?tab=usage",
+        url: "https://www.orbitx.world/x?tab=shop",
         text: "Burn 100 $ORBITX for 1 day or 1,000 for 1 week. Call x_mcp_access_buy → Phantom → x_mcp_access_confirm. Status: x_mcp_access_status.",
       },
       {
         id: "usage",
         title: "Advanced credits usage",
-        url: "https://www.orbitx.world/x?tab=usage",
+        url: "https://www.orbitx.world/x?tab=shop",
         text: "Call x_credits_usage for balance + ledger.",
       },
       ...catalog,
@@ -2234,14 +2234,14 @@ async function callTool(rawName, args, auth, req = null) {
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
         "Buy credits: ask how much SOL → x_credits_buy → user pays → x_credits_confirm",
         "MCP access: ask day (100 $ORBITX) or week (1,000) → x_mcp_access_buy → Phantom burn → x_mcp_access_confirm",
-        "Advanced usage: x_credits_usage (also on /x Usage or /shop)",
+        "Advanced usage: x_credits_usage (also on /x Shop or /shop)",
       ],
       mcpAccess: {
         status: "x_mcp_access_status",
         buy: "x_mcp_access_buy",
         confirm: "x_mcp_access_confirm",
         packages: listPackages(),
-        dashboard: "https://www.orbitx.world/x?tab=usage",
+        dashboard: "https://www.orbitx.world/x?tab=shop",
       },
       credits: {
         buy: "x_credits_buy",
@@ -2394,7 +2394,7 @@ async function callTool(rawName, args, auth, req = null) {
         buyTool: "x_mcp_access_buy",
         confirmTool: "x_mcp_access_confirm",
         statusTool: "x_mcp_access_status",
-        accessUrl: "https://www.orbitx.world/x?tab=usage",
+        accessUrl: "https://www.orbitx.world/x?tab=shop",
       });
     }
     let wallet = String(a.publicKey || a.wallet || a.from || "").trim();
@@ -2411,7 +2411,7 @@ async function callTool(rawName, args, auth, req = null) {
       wallet,
       packageId: a.package || a.packageId || a.option,
       confirmMode: a.autoConfirm === true || a.auto === true ? "auto" : a.confirmMode || "sign",
-      accessUrl: "https://www.orbitx.world/x?tab=usage",
+      accessUrl: "https://www.orbitx.world/x?tab=shop",
       buyTool: "x_mcp_access_buy",
       confirmTool: "x_mcp_access_confirm",
     });

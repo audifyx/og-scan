@@ -72,7 +72,7 @@ async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}
       tool,
       hold,
       burn: access.burn,
-      fix: "Hold ≥$5 ORBITX, or burn 100 $ORBITX (1 day) / 1,000 $ORBITX (1 week) at https://www.orbitx.world/agent.",
+      fix: "Hold ≥$5 ORBITX, or burn 100 $ORBITX (1 day) / 1,000 $ORBITX (1 week) at https://www.orbitx.world/shop.",
     }),
   };
 }
@@ -3372,12 +3372,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   if (name === "orbitx_mcp_access_buy") {
     const askOnly =
       args.askOnly === true || (args.package == null && args.packageId == null && args.option == null);
-    if (askOnly) return accessBuyPrompt();
+    if (askOnly) {
+      return accessBuyPrompt({ accessUrl: "https://www.orbitx.world/agent?tab=shop" });
+    }
     return prepareAccessMcpPurchase({
       base,
       wallet: wallet || args.publicKey,
       packageId: args.package || args.packageId || args.option,
       confirmMode: args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || "sign",
+      accessUrl: "https://www.orbitx.world/agent?tab=shop",
     });
   }
 

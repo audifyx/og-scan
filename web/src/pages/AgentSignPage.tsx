@@ -419,15 +419,15 @@ export default function AgentSignPage() {
             </a>
             {kind === "credits" ? (
               <p className="mt-2 text-[11px] text-white/45">
-                <Link to="/x?tab=usage" className="text-emerald-200/90 hover:underline">
-                  View usage / balance
+                <Link to="/shop" className="text-emerald-200/90 hover:underline">
+                  View shop / balance
                 </Link>
               </p>
             ) : null}
             {kind === "mcp-access" ? (
               <p className="mt-2 text-[11px] text-white/45">
-                <Link to="/agent" className="text-emerald-200/90 hover:underline">
-                  Open Agent MCP
+                <Link to="/shop" className="text-emerald-200/90 hover:underline">
+                  Open shop
                 </Link>
               </p>
             ) : null}
@@ -462,8 +462,11 @@ export default function AgentSignPage() {
         )}
 
         <p className="mt-4 text-center text-[11px] text-white/35">
-          <Link to={kind === "credits" ? "/x?tab=usage" : "/agent"} className="text-white/50 hover:underline">
-            {kind === "credits" ? "Back to Usage" : "Back to Agent MCP"}
+          <Link
+            to={kind === "credits" || kind === "mcp-access" ? "/shop" : "/agent"}
+            className="text-white/50 hover:underline"
+          >
+            {kind === "credits" || kind === "mcp-access" ? "Back to Shop" : "Back to Agent MCP"}
           </Link>
         </p>
       </div>

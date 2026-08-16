@@ -35,3 +35,11 @@ describe("mcpAccessSignUrl", () => {
     ]);
   });
 });
+
+describe("MCP shop catalog", () => {
+  it("lists both burn packages for the shared shop", () => {
+    expect(DEFAULT_MCP_ACCESS_PACKAGES).toHaveLength(2);
+    expect(DEFAULT_MCP_ACCESS_PACKAGES[0]).toMatchObject({ id: "day", tokens: 100 });
+    expect(DEFAULT_MCP_ACCESS_PACKAGES[1]).toMatchObject({ id: "week", tokens: 1000 });
+  });
+});

@@ -123,7 +123,7 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     "```",
     ``,
     `Setup · ${ORBITX_HOST}/x`,
-    `Usage / shop · ${ORBITX_HOST}/shop`,
+    `Shop · ${ORBITX_HOST}/shop · ${ORBITX_HOST}/x?tab=shop · ${ORBITX_HOST}/agent?tab=shop`,
     `MCP URL · ${ORBITX_HOST}/api/x/mcp`,
     ``,
     `_Analytics: followers, following, DMs, tweet views, lists. Charts: share a CA → x_dex_chart. GitHub: link once with x_repo_link — then x_repo_context / x_repo_read while drafting (no paste every time)._`,
