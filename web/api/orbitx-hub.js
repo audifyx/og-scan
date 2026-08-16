@@ -740,7 +740,9 @@ async function handleAgent(req, res, parts) {
         name: minted.name,
         key: minted.key,
         message: "Save this key securely. You will not be able to see it again.",
-        hold,
+        hold: access.hold,
+        mcpAccess: access.burn,
+        accessSource: access.source,
       },
       201,
     );
@@ -856,15 +858,15 @@ async function handleAgent(req, res, parts) {
     }
 
     const { base } = mcpUrls(req);
-    const access = await requireMcpAccess({
+    const mcpAccess = await requireMcpAccess({
       userId,
       wallets: [wallet, agent.wallet_address],
       email: authUser.email,
       base,
       tool: "oauth_approve",
     });
-    if (!access.allowed) {
-      return json(res, access.blocked || holdBlockedPayload({ hold: access.hold }), 403);
+    if (!mcpAccess.allowed) {
+      return json(res, mcpAccess.blocked || holdBlockedPayload({ hold: mcpAccess.hold }), 403);
     }
 
     // Always mint a Bearer access token as API key (oxo_). Claude exchanges the

@@ -11,6 +11,7 @@
  */
 import { buildGeneratedTools, GEN_META, generatedStats } from "../api/orbitx/mcp-tools-catalog.js";
 import { readFileSync } from "fs";
+import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -107,6 +108,15 @@ async function mcp(method, params = {}, id = 1, attempt = 1) {
 
 async function main() {
   console.log("=== OrbitX MCP tool verification ===\n");
+
+  for (const file of [HUB, X_MCP]) {
+    try {
+      execFileSync(process.execPath, ["--check", file], { stdio: "pipe" });
+      ok(`syntax ${file.split("/").slice(-2).join("/")}`);
+    } catch (e) {
+      fail(`syntax ${file}: ${e.stderr?.toString() || e.message}`);
+    }
+  }
 
   // Reset GEN_META by rebuilding
   GEN_META.clear();
