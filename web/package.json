@@ -128,6 +128,13 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
-    "axios": "1.13.2"
+    "axios": "1.13.2",
+    "uuid": "9.0.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "axios": "1.13.2",
+      "uuid": "9.0.1"
+    }
   }
 }

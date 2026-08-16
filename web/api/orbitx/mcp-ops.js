@@ -1,18 +1,20 @@
 /**
  * Unsigned-tx builders for OrbitX MCP: claim fees, rent refund, burn.
  * Non-custodial — caller signs with their wallet.
+ *
+ * Do NOT top-level import @solana/web3.js or @solana/spl-token.
+ * Those pull rpc-websockets@9, which `require()`s ESM-only uuid@14 and
+ * crashes the Vercel hub / x-mcp lambda on load (ERR_REQUIRE_ESM).
+ * Load Solana only inside the functions that actually build txs.
  */
-import {
-  Connection,
-  PublicKey,
-  Transaction,
-} from "@solana/web3.js";
-import {
-  TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
-  createCloseAccountInstruction,
-  createBurnInstruction,
-} from "@solana/spl-token";
+
+async function loadSolana() {
+  const [web3, spl] = await Promise.all([
+    import("@solana/web3.js"),
+    import("@solana/spl-token"),
+  ]);
+  return { web3, spl };
+}
 
 function rpcUrl() {
   return (
@@ -21,10 +23,6 @@ function rpcUrl() {
     process.env.VITE_SOLANA_RPC_URL ||
     "https://api.mainnet-beta.solana.com"
   );
-}
-
-function connection() {
-  return new Connection(rpcUrl(), "confirmed");
 }
 
 function serializeTx(tx, recentBlockhash, feePayer) {
@@ -59,7 +57,10 @@ export async function preparePumpClaim(publicKey) {
 
 /** Scan empty ATAs and build close-account txs (rent refund). */
 export async function prepareRentRefund(publicKey) {
-  const conn = connection();
+  const { web3, spl } = await loadSolana();
+  const { Connection, PublicKey, Transaction } = web3;
+  const { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, createCloseAccountInstruction } = spl;
+  const conn = new Connection(rpcUrl(), "confirmed");
   const owner = new PublicKey(publicKey);
   const [legacy, token22] = await Promise.all([
     conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
@@ -116,7 +117,15 @@ export async function prepareRentRefund(publicKey) {
 
 /** Build burn (+ optional close) for a mint amount. */
 export async function prepareBurn(publicKey, mint, amount, percent) {
-  const conn = connection();
+  const { web3, spl } = await loadSolana();
+  const { Connection, PublicKey, Transaction } = web3;
+  const {
+    TOKEN_PROGRAM_ID,
+    TOKEN_2022_PROGRAM_ID,
+    createCloseAccountInstruction,
+    createBurnInstruction,
+  } = spl;
+  const conn = new Connection(rpcUrl(), "confirmed");
   const owner = new PublicKey(publicKey);
   const mintPk = new PublicKey(mint);
 
