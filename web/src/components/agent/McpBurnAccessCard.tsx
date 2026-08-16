@@ -4,8 +4,10 @@ import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import {
   DEFAULT_MCP_ACCESS_PACKAGES,
   confirmMcpAccessBurn,
+  confirmMcpAccessBurnUntilGranted,
   getMcpBurnAccess,
   mcpAccessSignUrl,
+  takePendingMcpBurn,
   type McpAccessPackageId,
   type McpBurnAccessStatus,
 } from "@/lib/mcpBurnAccess";
@@ -56,7 +58,23 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
     setLoading(true);
     setError(null);
     try {
-      const next = await getMcpBurnAccess();
+      const pending = takePendingMcpBurn();
+      if (pending?.signature) {
+        try {
+          const granted = await confirmMcpAccessBurnUntilGranted({
+            signature: pending.signature,
+            publicKey: pending.publicKey || wallet,
+            packageId: pending.packageId,
+            attempts: 4,
+          });
+          setStatus(granted);
+          if (granted.active) onAccessGranted?.(granted);
+          return;
+        } catch {
+          /* fall through to status — burn may still be indexing */
+        }
+      }
+      const next = await getMcpBurnAccess(wallet);
       setStatus(next);
       if (next.active) onAccessGranted?.(next);
     } catch (e) {
@@ -69,7 +87,7 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [wallet]);
 
   const onBurn = async () => {
     if (!selectedPkg) return;

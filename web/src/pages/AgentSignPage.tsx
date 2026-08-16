@@ -6,7 +6,11 @@ import { Check, ExternalLink, Loader2, ShieldAlert, Wallet } from "lucide-react"
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { supabase } from "@/lib/supabase";
-import { buildMcpAccessBurnTransaction } from "@/lib/mcpBurnAccess";
+import {
+  buildMcpAccessBurnTransaction,
+  confirmMcpAccessBurnUntilGranted,
+  rememberPendingMcpBurn,
+} from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
 type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access";
@@ -225,29 +229,16 @@ export default function AgentSignPage() {
         }
         await connection.confirmTransaction(sig, "confirmed");
         setSignature(sig);
-        try {
-          const session = (await supabase.auth.getSession()).data.session;
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-          const confirmRes = await fetch("/api/orbitx-agent/mcp-access/confirm", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ signature: sig, publicKey: pk, packageId: pkg }),
-          });
-          const granted = await confirmRes.json().catch(() => ({}));
-          if (confirmRes.ok && granted?.ok) {
-            setExtraNote(
-              granted.message ||
-                `${granted.remainingLabel || "Access granted"}. Opens /agent when the clock is running.`,
-            );
-          } else {
-            setExtraNote(
-              "Burn sent. Sign in on /agent and confirm the signature if access did not unlock.",
-            );
-          }
-        } catch {
-          setExtraNote("Burn sent. Open /agent to refresh access status.");
-        }
+        rememberPendingMcpBurn({ signature: sig, publicKey: pk, packageId: pkg });
+        const granted = await confirmMcpAccessBurnUntilGranted({
+          signature: sig,
+          publicKey: pk,
+          packageId: pkg,
+        });
+        setExtraNote(
+          granted.message ||
+            `${granted.remainingLabel || "Access granted"}. Timed MCP access is active now.`,
+        );
         return;
       }
 

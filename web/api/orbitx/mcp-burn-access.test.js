@@ -5,6 +5,7 @@ import {
   accessBuyPrompt,
   calculateBurnAmount,
   computeExpiresAt,
+  confirmAccessBurn,
   evaluateMcpAccess,
   formatRemaining,
   inferPackageFromTokens,
@@ -180,6 +181,31 @@ describe("evaluateMcpAccess middleware", () => {
     expect(access.blocked.error).toBe("mcp_access_required");
   });
 
+  it("allows a wallet-keyed burn grant without a signed-in user", async () => {
+    const access = await evaluateMcpAccess({
+      sb: async (path) => {
+        if (String(path).includes("mcp_burn_wallet_access")) {
+          return [
+            {
+              package_id: "week",
+              expires_at: "2026-08-23T12:00:00.000Z",
+              tokens_burned: 1000,
+              lifetime_tokens_burned: 1000,
+              wallet_address: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
+            },
+          ];
+        }
+        return [];
+      },
+      wallets: ["jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb"],
+      hold: { exempt: false, meetsRequirement: false },
+      now,
+    });
+    expect(access.allowed).toBe(true);
+    expect(access.source).toBe("burn");
+    expect(access.burn.packageId).toBe("week");
+  });
+
   it("allows a valid token hold after burn access expires", async () => {
     const access = await evaluateMcpAccess({
       sb: async () => [
@@ -276,6 +302,105 @@ describe("verifyOrbitxBurn", () => {
     const verified = await verifyOrbitxBurn("2".repeat(64), { packageId: "week" });
     expect(verified.ok).toBe(false);
     expect(verified.error).toBe("amount_too_low");
+  });
+
+  it("retries getTransaction until the burn is indexed", async () => {
+    let n = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        n += 1;
+        if (n === 1) {
+          return new Response(JSON.stringify({ result: null }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [],
+                innerInstructions: [],
+              },
+              transaction: { message: { instructions: [] } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+
+    const verified = await verifyOrbitxBurn("3".repeat(64), {
+      packageId: "day",
+      pollAttempts: 3,
+      pollMs: 0,
+    });
+    expect(verified.ok).toBe(true);
+    expect(verified.tokensBurned).toBe(100);
+    expect(n).toBe(2);
+  });
+});
+
+describe("confirmAccessBurn", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("grants timed access from the burn wallet without a signed-in user", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [],
+                innerInstructions: [],
+              },
+              transaction: { message: { instructions: [] } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const writes = [];
+    const sb = async (path, init) => {
+      writes.push({ path, method: init?.method || "GET" });
+      return [];
+    };
+
+    const out = await confirmAccessBurn(sb, {
+      signature: "4".repeat(64),
+      packageId: "day",
+      wallet: "BurnerWallet111111111111111111111111111",
+    });
+
+    expect(out.ok).toBe(true);
+    expect(out.active).toBe(true);
+    expect(out.packageId).toBe("day");
+    expect(out.remainingLabel).toMatch(/remaining/);
+    expect(writes.some((w) => w.path === "mcp_burn_wallet_access" && w.method === "POST")).toBe(true);
   });
 });
 

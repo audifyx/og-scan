@@ -212,6 +212,24 @@ export function statusFromRow(row, now = Date.now()) {
   };
 }
 
+function isSchemaMissing(e) {
+  return /relation|does not exist|42P01|mcp_burn/i.test(String(e?.message || e?.code || e));
+}
+
+function normalizeWallet(wallet) {
+  return String(wallet || "").trim();
+}
+
+function pickBestAccessRow(rows) {
+  const list = (rows || []).filter((row) => row && (row.expires_at || row.expiresAt));
+  if (!list.length) return null;
+  return list.slice().sort((a, b) => {
+    const ae = Date.parse(a.expires_at || a.expiresAt || 0) || 0;
+    const be = Date.parse(b.expires_at || b.expiresAt || 0) || 0;
+    return be - ae;
+  })[0];
+}
+
 async function getAccessRow(sb, userId) {
   const uid = String(userId || "").trim();
   if (!uid) return null;
@@ -221,17 +239,77 @@ async function getAccessRow(sb, userId) {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
-export async function getAccessStatus(sb, userId, { now = Date.now() } = {}) {
-  const uid = String(userId || "").trim();
-  if (!uid) return emptyStatus(now);
+async function getWalletAccessRow(sb, wallet) {
+  const w = normalizeWallet(wallet);
+  if (!w) return null;
   try {
-    return statusFromRow(await getAccessRow(sb, uid), now);
+    const rows = await sb(
+      `mcp_burn_wallet_access?wallet_address=eq.${encodeURIComponent(w)}&select=*&limit=1`,
+    );
+    if (Array.isArray(rows) && rows[0]) return rows[0];
   } catch (e) {
-    if (/relation|does not exist|42P01|mcp_burn_access/i.test(String(e?.message || e))) {
-      return { ...emptyStatus(now), schemaMissing: true };
-    }
-    throw e;
+    if (!isSchemaMissing(e)) throw e;
   }
+  try {
+    const rows = await sb(
+      `mcp_burn_access?wallet_address=eq.${encodeURIComponent(w)}&select=*&order=expires_at.desc&limit=1`,
+    );
+    if (Array.isArray(rows) && rows[0]) return rows[0];
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  return null;
+}
+
+export async function findUserIdByWallet(sb, wallet) {
+  const w = normalizeWallet(wallet);
+  if (!w) return null;
+  for (const path of [
+    `agents?wallet_address=eq.${encodeURIComponent(w)}&select=user_id&limit=1`,
+    `mcp_burn_access?wallet_address=eq.${encodeURIComponent(w)}&select=user_id&limit=1`,
+    `mcp_burn_wallet_access?wallet_address=eq.${encodeURIComponent(w)}&select=user_id&limit=1`,
+  ]) {
+    try {
+      const rows = await sb(path);
+      if (Array.isArray(rows) && rows[0]?.user_id) return rows[0].user_id;
+    } catch {
+      /* table may not exist */
+    }
+  }
+  return null;
+}
+
+export async function getAccessStatus(sb, userId, { now = Date.now(), wallets = [] } = {}) {
+  const uid = String(userId || "").trim();
+  const walletList = (Array.isArray(wallets) ? wallets : [wallets])
+    .map((w) => normalizeWallet(w))
+    .filter(Boolean);
+  if (!uid && !walletList.length) return emptyStatus(now);
+
+  const rows = [];
+  let schemaMissing = false;
+  try {
+    if (uid) {
+      const row = await getAccessRow(sb, uid);
+      if (row) rows.push(row);
+    }
+  } catch (e) {
+    if (isSchemaMissing(e)) schemaMissing = true;
+    else throw e;
+  }
+  for (const wallet of walletList) {
+    try {
+      const row = await getWalletAccessRow(sb, wallet);
+      if (row) rows.push(row);
+    } catch (e) {
+      if (isSchemaMissing(e)) schemaMissing = true;
+      else throw e;
+    }
+  }
+
+  const status = statusFromRow(pickBestAccessRow(rows), now);
+  if (schemaMissing && !status.active) return { ...status, schemaMissing: true };
+  return status;
 }
 
 export async function hasValidAccess(sb, userId, { now = Date.now() } = {}) {
@@ -247,8 +325,9 @@ export async function evaluateMcpAccess({
   userId,
   hold = null,
   now = Date.now(),
+  wallets = [],
 } = {}) {
-  const burn = userId ? await getAccessStatus(sb, userId, { now }) : emptyStatus(now);
+  const burn = await getAccessStatus(sb, userId, { now, wallets });
   if (hold?.exempt) {
     return { allowed: true, source: "exempt", hold, burn };
   }
@@ -382,7 +461,14 @@ function collectInstructions(tx) {
   return [...top, ...inner];
 }
 
-export async function verifyOrbitxBurn(signature, { packageId, wallet } = {}) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function verifyOrbitxBurn(
+  signature,
+  { packageId, wallet, pollAttempts = 8, pollMs = 750 } = {},
+) {
   const sig = String(signature || "").trim();
   if (!sig || sig.length < 32) {
     return { ok: false, error: "signature_required", message: "Transaction signature is required" };
@@ -397,20 +483,29 @@ export async function verifyOrbitxBurn(signature, { packageId, wallet } = {}) {
     };
   }
 
-  let tx;
-  try {
-    tx = await rpc("getTransaction", [
-      sig,
-      { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 },
-    ]);
-  } catch (e) {
-    return { ok: false, error: "rpc_failed", message: String(e?.message || e) };
+  const attempts = Math.max(1, Number(pollAttempts) || 1);
+  const delay = Math.max(0, Number(pollMs) || 0);
+  let tx = null;
+  let lastRpcError = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      tx = await rpc("getTransaction", [
+        sig,
+        { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+      ]);
+      if (tx) break;
+    } catch (e) {
+      lastRpcError = e;
+    }
+    if (i < attempts - 1 && delay) await sleep(delay);
   }
   if (!tx) {
     return {
       ok: false,
-      error: "not_found",
-      message: "Transaction not found yet — wait for confirmation and retry.",
+      error: lastRpcError ? "rpc_failed" : "not_found",
+      message: lastRpcError
+        ? String(lastRpcError?.message || lastRpcError)
+        : "Transaction not found yet — wait for confirmation and retry.",
     };
   }
   if (tx.meta?.err) {
@@ -499,28 +594,82 @@ export async function verifyOrbitxBurn(signature, { packageId, wallet } = {}) {
   };
 }
 
-export async function confirmAccessBurn(sb, { userId, signature, packageId, wallet } = {}) {
-  const uid = String(userId || "").trim();
-  if (!uid) {
-    return { ok: false, error: "user_required", message: "Sign in on /agent, then confirm the burn." };
+async function upsertWalletAccess(sb, row) {
+  let existing = null;
+  try {
+    const rows = await sb(
+      `mcp_burn_wallet_access?wallet_address=eq.${encodeURIComponent(row.wallet_address)}&select=wallet_address&limit=1`,
+    );
+    existing = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+    throw e;
   }
+  if (existing) {
+    await sb(`mcp_burn_wallet_access?wallet_address=eq.${encodeURIComponent(row.wallet_address)}`, {
+      method: "PATCH",
+      body: JSON.stringify(row),
+      headers: { Prefer: "return=minimal" },
+    });
+    return;
+  }
+  await sb("mcp_burn_wallet_access", {
+    method: "POST",
+    body: JSON.stringify({ ...row, created_at: row.updated_at }),
+    headers: { Prefer: "return=minimal" },
+  });
+}
 
+async function upsertUserAccess(sb, uid, accessRow, iso) {
+  const current = await getAccessRow(sb, uid);
+  if (current) {
+    await sb(`mcp_burn_access?user_id=eq.${encodeURIComponent(uid)}`, {
+      method: "PATCH",
+      body: JSON.stringify(accessRow),
+      headers: { Prefer: "return=minimal" },
+    });
+    return current;
+  }
+  await sb("mcp_burn_access", {
+    method: "POST",
+    body: JSON.stringify({ ...accessRow, created_at: iso }),
+    headers: { Prefer: "return=minimal" },
+  });
+  return null;
+}
+
+export async function confirmAccessBurn(sb, { userId, signature, packageId, wallet } = {}) {
   const verified = await verifyOrbitxBurn(signature, { packageId, wallet });
   if (!verified.ok) return verified;
+
+  const burnWallet = normalizeWallet(verified.wallet || wallet);
+  let uid = String(userId || "").trim();
+  if (!uid && burnWallet) {
+    uid = (await findUserIdByWallet(sb, burnWallet)) || "";
+  }
+  if (!uid && !burnWallet) {
+    return {
+      ok: false,
+      error: "user_required",
+      message: "Pass the burn wallet publicKey so access can be granted immediately.",
+    };
+  }
 
   try {
     const existing = await sb(
       `mcp_burn_ledger?tx_signature=eq.${encodeURIComponent(verified.signature)}&select=id,user_id,package_id,expires_at,tokens_burned&limit=1`,
     );
     if (Array.isArray(existing) && existing[0]) {
-      const status = await getAccessStatus(sb, uid);
+      const status = await getAccessStatus(sb, uid, { wallets: [burnWallet] });
       return {
         ok: true,
         alreadyGranted: true,
         ...status,
         signature: verified.signature,
         packageId: existing[0].package_id,
-        message: "This burn already granted MCP access.",
+        message: status.active
+          ? `This burn already granted MCP access. ${status.remainingLabel}.`
+          : "This burn already granted MCP access.",
         explorer: verified.explorer,
       };
     }
@@ -529,17 +678,19 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
   }
 
   const now = Date.now();
-  const current = await getAccessRow(sb, uid);
+  const currentUser = uid ? await getAccessRow(sb, uid).catch(() => null) : null;
+  const currentWallet = burnWallet ? await getWalletAccessRow(sb, burnWallet).catch(() => null) : null;
+  const current = pickBestAccessRow([currentUser, currentWallet]);
   const pkg = verified.package;
   const expiresAt = computeExpiresAt(now, current?.expires_at, pkg.durationMs);
   const tokensBurned = Number(verified.tokensBurned);
-  const lifetime = Number(current?.lifetime_tokens_burned || 0) + tokensBurned;
+  const lifetime =
+    Number(currentUser?.lifetime_tokens_burned || currentWallet?.lifetime_tokens_burned || 0) +
+    tokensBurned;
   const iso = new Date(now).toISOString();
-  const burnWallet = verified.wallet || String(wallet || "").trim() || current?.wallet_address || null;
 
   const accessRow = {
-    user_id: uid,
-    wallet_address: burnWallet,
+    wallet_address: burnWallet || null,
     package_id: pkg.id,
     tokens_burned: tokensBurned,
     expires_at: expiresAt,
@@ -548,26 +699,37 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
     updated_at: iso,
   };
 
-  if (current) {
-    await sb(`mcp_burn_access?user_id=eq.${encodeURIComponent(uid)}`, {
-      method: "PATCH",
-      body: JSON.stringify(accessRow),
-      headers: { Prefer: "return=minimal" },
-    });
-  } else {
-    await sb("mcp_burn_access", {
-      method: "POST",
-      body: JSON.stringify({ ...accessRow, created_at: iso }),
-      headers: { Prefer: "return=minimal" },
-    });
+  let wrote = false;
+  let schemaMissing = false;
+  if (burnWallet) {
+    try {
+      await upsertWalletAccess(sb, {
+        ...accessRow,
+        wallet_address: burnWallet,
+        user_id: uid || null,
+      });
+      wrote = true;
+    } catch (e) {
+      if (isSchemaMissing(e)) schemaMissing = true;
+      else throw e;
+    }
+  }
+  if (uid) {
+    try {
+      await upsertUserAccess(sb, uid, { ...accessRow, user_id: uid }, iso);
+      wrote = true;
+    } catch (e) {
+      if (isSchemaMissing(e)) schemaMissing = true;
+      else throw e;
+    }
   }
 
   try {
     await sb("mcp_burn_ledger", {
       method: "POST",
       body: JSON.stringify({
-        user_id: uid,
-        wallet_address: burnWallet,
+        user_id: uid || null,
+        wallet_address: burnWallet || null,
         package_id: pkg.id,
         tokens_burned: tokensBurned,
         duration_seconds: pkg.durationSeconds,
@@ -582,16 +744,36 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
     });
   } catch (e) {
     if (/23505|duplicate|unique/i.test(String(e?.code || e?.message || ""))) {
-      const status = await getAccessStatus(sb, uid);
+      const status = await getAccessStatus(sb, uid, { wallets: [burnWallet] });
       return {
         ok: true,
         alreadyGranted: true,
         ...status,
         signature: verified.signature,
         explorer: verified.explorer,
+        message: status.active
+          ? `This burn already granted MCP access. ${status.remainingLabel}.`
+          : "This burn already granted MCP access.",
       };
     }
-    throw e;
+    if (!isSchemaMissing(e) && wrote) {
+      /* ledger is optional once the grant row exists */
+    } else if (!wrote) {
+      throw e;
+    } else {
+      schemaMissing = schemaMissing || isSchemaMissing(e);
+    }
+  }
+
+  if (!wrote) {
+    return {
+      ok: false,
+      error: "schema_missing",
+      schemaMissing: true,
+      message: "Apply sql/Aug_SQL/11_mcp_burn_wallet_access.sql so burns can grant access immediately.",
+      signature: verified.signature,
+      explorer: verified.explorer,
+    };
   }
 
   const status = statusFromRow(
@@ -612,6 +794,7 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
     ...status,
     signature: verified.signature,
     explorer: verified.explorer,
+    schemaMissing: schemaMissing || undefined,
     message: `${pkg.label} granted. ${status.remainingLabel}.`,
   };
 }

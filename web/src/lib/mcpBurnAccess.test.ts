@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MCP_ACCESS_PACKAGES, MCP_BURN_MINT, mcpAccessSignUrl } from "./mcpBurnAccess";
+import {
+  DEFAULT_MCP_ACCESS_PACKAGES,
+  MCP_BURN_MINT,
+  clearPendingMcpBurn,
+  mcpAccessSignUrl,
+  rememberPendingMcpBurn,
+  takePendingMcpBurn,
+} from "./mcpBurnAccess";
 
 describe("mcpAccessSignUrl", () => {
   it("builds a day-package burn handoff", () => {
@@ -33,6 +40,23 @@ describe("mcpAccessSignUrl", () => {
       ["day", 100],
       ["week", 1000],
     ]);
+  });
+});
+
+describe("pending burn handoff", () => {
+  it("remembers a Jupiter burn so shop can grant access if confirm raced the RPC", () => {
+    clearPendingMcpBurn();
+    rememberPendingMcpBurn({
+      signature: "sig123",
+      publicKey: "11111111111111111111111111111111",
+      packageId: "day",
+    });
+    expect(takePendingMcpBurn()).toMatchObject({
+      signature: "sig123",
+      packageId: "day",
+    });
+    clearPendingMcpBurn();
+    expect(takePendingMcpBurn()).toBeNull();
   });
 });
 
