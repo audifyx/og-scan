@@ -12,7 +12,7 @@ export type PlatformApp = {
   glyph: ReactNode;
   /** Include in the floating mini menu. Default true. */
   menu?: boolean;
-  /** Pin on the iOS home dock. */
+  /** Pin as a command-deck gate on /app. */
   dock?: boolean;
 };
 

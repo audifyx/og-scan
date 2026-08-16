@@ -1,4 +1,4 @@
-/* Shared OrbitX atmosphere + iOS-style platform chrome */
+/* Shared OrbitX atmosphere + platform chrome */
 
 .ox-atmosphere {
   position: fixed;
@@ -29,6 +29,7 @@
 .ox-agent,
 .oxc-root,
 .ios-hub,
+.ox-deck,
 .ox-platform-surface {
   position: relative;
   z-index: 1;

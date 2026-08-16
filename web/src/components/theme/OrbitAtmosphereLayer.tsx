@@ -16,6 +16,8 @@ const EXCLUDE_PREFIXES = [
   "/play",
   "/embed",
   "/auth",
+  "/app",
+  "/hub",
 ];
 
 function shouldShowAtmosphere(pathname: string): boolean {

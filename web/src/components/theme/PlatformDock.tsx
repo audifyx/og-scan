@@ -56,7 +56,7 @@ type Pos = { x: number; y: number };
 
 function defaultPos(): Pos {
   if (typeof window === "undefined") return { x: 16, y: 96 };
-  /* Upper-right — never sits on the bottom trade / iOS tab bars */
+  /* Upper-right — never sits on the bottom trade / command rail */
   return {
     x: Math.max(12, window.innerWidth - FAB_SIZE - 14),
     y: Math.max(72, Math.min(120, window.innerHeight * 0.14)),

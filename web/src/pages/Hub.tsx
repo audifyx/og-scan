@@ -16,15 +16,15 @@ import { ADMIN_APPS } from "@/lib/adminApps";
 import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
+import { HubSpaceBackground } from "@/components/hub/HubSpaceBackground";
 import {
-  HOME_DOCK,
   HOME_GRID_KEYS,
   PLATFORM_APPS,
   PLATFORM_BY_KEY,
   PLATFORM_SECTIONS,
   type PlatformApp,
 } from "@/lib/orbitxPlatforms";
-import "./hub-ios.css";
+import "./hub-deck.css";
 
 const ORBITX_CA = OGSCAN_TOKEN_MINT;
 
@@ -51,30 +51,36 @@ type Frame =
   | { id: "wallpaper" };
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "home", label: "Home" },
-  { id: "apps", label: "Apps" },
-  { id: "activity", label: "Activity" },
-  { id: "account", label: "Me" },
+  { id: "home", label: "Deck" },
+  { id: "apps", label: "Stations" },
+  { id: "activity", label: "Pulse" },
+  { id: "account", label: "Identity" },
 ];
+
+const GATE_KEYS = ["city", "dex", "agent", "shop"] as const;
+
+const GATE_COPY: Record<(typeof GATE_KEYS)[number], { kicker: string; line: string }> = {
+  city: { kicker: "01 · World", line: "Walk the living 3D city" },
+  dex: { kicker: "02 · Markets", line: "Scanner, tape, and execution" },
+  agent: { kicker: "03 · Mesh", line: "Claude, ChatGPT, and Grok" },
+  shop: { kicker: "04 · Access", line: "Credits and $ORBITX burn" },
+};
 
 const TAB_GLYPH: Record<TabId, ReactNode> = {
   home: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 4v2.2M12 17.8V20M4 12h2.2M17.8 12H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   ),
   apps: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="4" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
-      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 4l7 4v8l-7 4-7-4V8l7-4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   ),
   activity: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M4 16l5-6 4 3 7-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4 20h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" opacity=".4" />
     </svg>
   ),
   account: (
@@ -85,33 +91,6 @@ const TAB_GLYPH: Record<TabId, ReactNode> = {
   ),
 };
 
-function IosStatusBar({ now }: { now: Date }) {
-  const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return (
-    <div className="ios26-status" aria-hidden>
-      <span className="ios26-status__time">{time}</span>
-      <span className="ios26-status__island" />
-      <span className="ios26-status__sys">
-        <svg viewBox="0 0 18 12" className="ios26-status__sig">
-          <rect x="0" y="8" width="3" height="4" rx="0.6" fill="currentColor" opacity=".35" />
-          <rect x="5" y="5.5" width="3" height="6.5" rx="0.6" fill="currentColor" opacity=".55" />
-          <rect x="10" y="3" width="3" height="9" rx="0.6" fill="currentColor" opacity=".8" />
-          <rect x="15" y="0" width="3" height="12" rx="0.6" fill="currentColor" />
-        </svg>
-        <svg viewBox="0 0 16 12" className="ios26-status__wifi">
-          <path d="M1 4.2C4.2 1.4 11.8 1.4 15 4.2M3.4 6.6c2.2-1.8 6.9-1.8 9.1 0M6.2 9c1.1-.9 2.5-.9 3.6 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-        </svg>
-        <span className="ios26-status__batt">
-          <span className="ios26-status__batt-body">
-            <span className="ios26-status__batt-fill" />
-          </span>
-          <span className="ios26-status__batt-nip" />
-        </span>
-      </span>
-    </div>
-  );
-}
-
 function useClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -121,42 +100,15 @@ function useClock() {
   return now;
 }
 
-function NavBar({
-  title,
-  canBack,
-  onBack,
-  trail,
-  home,
-}: {
-  title: string;
-  canBack: boolean;
-  onBack: () => void;
-  trail?: ReactNode;
-  home?: boolean;
-}) {
-  return (
-    <header className={`ios-nav${home && !canBack ? " ios-nav--home" : ""}`}>
-      {canBack ? (
-        <button type="button" className="ios-nav__back" onClick={onBack}>
-          <span className="ios-nav__back-ico" aria-hidden>
-            ‹
-          </span>
-          Back
-        </button>
-      ) : home ? (
-        <div className="ios26-brand">
-          <span className="ios26-brand__mark" aria-hidden>
-            ◈
-          </span>
-          <span className="ios26-brand__name">OrbitX</span>
-        </div>
-      ) : (
-        <span />
-      )}
-      {!home || canBack ? <h1 className="ios-nav__title">{title}</h1> : <span />}
-      <div className="ios-nav__trail">{trail}</div>
-    </header>
-  );
+function fmtPrice(n: number | null, digits = 2): string {
+  if (n == null) return "—";
+  if (n < 0.01) return n.toExponential(2);
+  return n.toFixed(digits);
+}
+
+function changeColor(n: number | null): string {
+  if (n == null) return "var(--deck-ink)";
+  return n >= 0 ? "var(--deck-ok)" : "var(--deck-bad)";
 }
 
 export default function Hub() {
@@ -169,7 +121,6 @@ export default function Hub() {
     activity: [{ id: "root" }],
     account: [{ id: "root" }],
   });
-  const [navDir, setNavDir] = useState<"push" | "pop">("push");
   const [spotOpen, setSpotOpen] = useState(false);
   const [spotQ, setSpotQ] = useState("");
   const [launching, setLaunching] = useState<AppItem | null>(null);
@@ -198,14 +149,12 @@ export default function Hub() {
 
   const push = useCallback(
     (frame: Frame) => {
-      setNavDir("push");
       setStacks((prev) => ({ ...prev, [tab]: [...prev[tab], frame] }));
     },
     [tab],
   );
 
   const pop = useCallback(() => {
-    setNavDir("pop");
     setStacks((prev) => {
       const cur = prev[tab];
       if (cur.length <= 1) return prev;
@@ -214,7 +163,6 @@ export default function Hub() {
   }, [tab]);
 
   const switchTab = (id: TabId) => {
-    setNavDir("push");
     setTab(id);
   };
 
@@ -379,34 +327,33 @@ export default function Hub() {
     return profile?.username ? `${part}, ${profile.username}` : part;
   })();
 
+  const utcClock = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+
   const navTitle = (() => {
-    if (top.id === "app") return PLATFORM_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "App";
-    if (top.id === "section") return PLATFORM_SECTIONS.find((s) => s.id === top.sectionId)?.title || "Apps";
+    if (top.id === "app") return PLATFORM_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "Station";
+    if (top.id === "section") return PLATFORM_SECTIONS.find((s) => s.id === top.sectionId)?.title || "Stations";
     if (top.id === "widgets") return "Widgets";
-    if (top.id === "wallpaper") return "Wallpaper";
+    if (top.id === "wallpaper") return "Atmosphere";
     return TABS.find((t) => t.id === tab)?.label || "OrbitX";
   })();
 
-  const renderAppIcon = (app: AppItem, size: "grid" | "row" | "detail" = "grid") => (
-    <div
-      className={size === "detail" ? "ios-detail__icon" : size === "row" ? "ios-row__icon" : "ios-app__icon"}
-      style={{ background: app.iconBg }}
-    >
+  const renderMark = (app: AppItem, className: string) => (
+    <div className={className} style={{ background: app.iconBg }}>
       {app.glyph}
     </div>
   );
 
   const appRows = (apps: AppItem[]) => (
-    <div className="ios-group">
+    <div>
       {apps.map((app) => (
-        <button key={app.key} type="button" className="ios-row" onClick={() => push({ id: "app", appKey: app.key })}>
-          {renderAppIcon(app, "row")}
-          <span className="ios-row__meta">
-            <span className="ios-row__title">{app.name}</span>
-            <span className="ios-row__cap">{app.caption}</span>
+        <button key={app.key} type="button" className="ox-row" onClick={() => push({ id: "app", appKey: app.key })}>
+          {renderMark(app, "ox-station__mark")}
+          <span className="ox-row__meta">
+            <span className="ox-row__title">{app.name}</span>
+            <span className="ox-row__cap">{app.caption}</span>
           </span>
-          <span className="ios-row__chev" aria-hidden>
-            ›
+          <span className="ox-row__chev" aria-hidden>
+            →
           </span>
         </button>
       ))}
@@ -414,135 +361,138 @@ export default function Hub() {
   );
 
   const rootHome = (
-    <>
-      <div className="ios26-hello">
-        <p className="ios26-hello__greet">{greet}</p>
-        <p className="ios26-hello__sub">Tap an app · ⌘K to search</p>
+    <div className="ox-deck__hero">
+      <div>
+        <div className="ox-deck__intro">
+          <h1>{greet}.</h1>
+          <p>Command deck over deep space. Four gates in front of you — City, DEX, Agent, Shop. Search any station with ⌘K.</p>
+        </div>
+        <div className="ox-deck__gates">
+          {GATE_KEYS.map((key) => {
+            const app = PLATFORM_BY_KEY[key];
+            if (!app) return null;
+            const copy = GATE_COPY[key];
+            return (
+              <button key={app.key} type="button" className="ox-gate" onClick={() => push({ id: "app", appKey: app.key })}>
+                {renderMark(app, "ox-gate__orb")}
+                <span className="ox-gate__kicker">{copy.kicker}</span>
+                <span className="ox-gate__name">{app.name}</span>
+                <span className="ox-gate__cap">{copy.line}</span>
+              </button>
+            );
+          })}
+        </div>
+        <section className="ox-deck__section">
+          <h2>All stations</h2>
+          <p>Every OrbitX surface, one orbit.</p>
+          <div className="ox-stations">
+            {HOME_GRID_KEYS.filter((k) => !(GATE_KEYS as readonly string[]).includes(k)).map((k) => {
+              const app = PLATFORM_BY_KEY[k];
+              if (!app) return null;
+              return (
+                <button key={app.key} type="button" className="ox-station" onClick={() => push({ id: "app", appKey: app.key })}>
+                  {renderMark(app, "ox-station__mark")}
+                  <span>
+                    <span className="ox-station__name">{app.name}</span>
+                    <span className="ox-station__cap">{app.caption}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       </div>
-
-      <div className="ios26-widgets">
-        <button type="button" className="ios26-widget" onClick={copyCA}>
-          <span className="ios26-widget__k">$ORBITX</span>
-          <span
-            className="ios26-widget__v"
-            style={{ color: (orbitxChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}
-          >
-            {orbitxPrice != null ? (orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)) : "—"}
+      <aside className="ox-deck__side" aria-label="Live telemetry">
+        <button type="button" className="ox-tel" onClick={copyCA}>
+          <span className="ox-tel__k">$ORBITX</span>
+          <span className="ox-tel__v" style={{ color: changeColor(orbitxChange) }}>
+            {fmtPrice(orbitxPrice, 6)}
           </span>
-          <span className="ios26-widget__m">{caCopied ? "Copied CA" : "Tap to copy CA"}</span>
+          <span className="ox-tel__m">{caCopied ? "Contract copied" : "Tap to copy contract"}</span>
         </button>
-        <div className="ios26-widget">
-          <span className="ios26-widget__k">SOL</span>
-          <span
-            className="ios26-widget__v"
-            style={{ color: (solChange ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}
-          >
+        <div className="ox-tel">
+          <span className="ox-tel__k">SOL</span>
+          <span className="ox-tel__v" style={{ color: changeColor(solChange) }}>
             {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
           </span>
-          <span className="ios26-widget__m">
-            {solChange != null ? `${solChange >= 0 ? "+" : ""}${solChange.toFixed(1)}% 24h` : "Live"}
+          <span className="ox-tel__m">
+            {solChange != null ? `${solChange >= 0 ? "+" : ""}${solChange.toFixed(1)}% 24h` : "Live feed"}
           </span>
         </div>
-        <div className="ios26-widget">
-          <span className="ios26-widget__k">Fear & Greed</span>
-          <span className="ios26-widget__v">{fng ? fng.v : "—"}</span>
-          <span className="ios26-widget__m">{fng?.label || "Market mood"}</span>
+        <div className="ox-tel">
+          <span className="ox-tel__k">Fear & Greed</span>
+          <span className="ox-tel__v">{fng ? fng.v : "—"}</span>
+          <span className="ox-tel__m">{fng?.label || "Market mood"}</span>
         </div>
-      </div>
-
-      <div className="ios-app-grid">
-        {HOME_GRID_KEYS.map((k) => {
-          const app = PLATFORM_BY_KEY[k];
-          if (!app) return null;
-          return (
-            <button key={app.key} type="button" className="ios-app" onClick={() => push({ id: "app", appKey: app.key })}>
-              {renderAppIcon(app)}
-              <span className="ios-app__name">{app.name}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="ios26-dock" aria-label="Home dock">
-        {HOME_DOCK.map((app) => (
-          <button
-            key={app.key}
-            type="button"
-            className="ios-app ios-app--dock"
-            aria-label={app.name}
-            onClick={() => push({ id: "app", appKey: app.key })}
-          >
-            {renderAppIcon(app)}
-          </button>
-        ))}
-      </div>
-    </>
+      </aside>
+    </div>
   );
 
   const rootApps = (
     <>
-      <h2 className="ios-large-title">Apps</h2>
-      <p className="ios-subhead">Open a category, then launch an app.</p>
-      <div className="ios-group">
-        {PLATFORM_SECTIONS.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            className="ios-row"
-            onClick={() => push({ id: "section", sectionId: section.id })}
-          >
-            <span className="ios-row__meta">
-              <span className="ios-row__title">{section.title}</span>
-              <span className="ios-row__cap">{section.subtitle}</span>
-            </span>
-            <span className="ios-row__value">{section.keys.length}</span>
-            <span className="ios-row__chev">›</span>
-          </button>
-        ))}
-        {showAdminApps && (
-          <button type="button" className="ios-row" onClick={() => push({ id: "section", sectionId: "admin" })}>
-            <span className="ios-row__meta">
-              <span className="ios-row__title">Owner Admin</span>
-              <span className="ios-row__cap">{OWNER_EMAIL}</span>
-            </span>
-            <span className="ios-row__chev">›</span>
-          </button>
-        )}
+      <div className="ox-deck__intro">
+        <h1>Stations</h1>
+        <p className="ox-deck__sub">Open a constellation, then launch a surface.</p>
       </div>
+      {PLATFORM_SECTIONS.map((section) => (
+        <button
+          key={section.id}
+          type="button"
+          className="ox-row"
+          onClick={() => push({ id: "section", sectionId: section.id })}
+        >
+          <span className="ox-row__meta">
+            <span className="ox-row__title">{section.title}</span>
+            <span className="ox-row__cap">{section.subtitle}</span>
+          </span>
+          <span className="ox-row__value">{section.keys.length}</span>
+          <span className="ox-row__chev">→</span>
+        </button>
+      ))}
+      {showAdminApps && (
+        <button type="button" className="ox-row" onClick={() => push({ id: "section", sectionId: "admin" })}>
+          <span className="ox-row__meta">
+            <span className="ox-row__title">Owner Admin</span>
+            <span className="ox-row__cap">{OWNER_EMAIL}</span>
+          </span>
+          <span className="ox-row__chev">→</span>
+        </button>
+      )}
     </>
   );
 
   const rootActivity = (
     <>
-      <h2 className="ios-large-title">Activity</h2>
-      <p className="ios-subhead">Markets and community pulse.</p>
+      <div className="ox-deck__intro">
+        <h1>Pulse</h1>
+        <p className="ox-deck__sub">Markets and community moving under the same sky.</p>
+      </div>
       {trending.map((t) => (
         <button
           key={t.mint}
           type="button"
-          className="ios-card"
-          style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
+          className="ox-card"
           onClick={() => window.location.assign(`/ORBITX_DEX?mint=${encodeURIComponent(t.mint)}`)}
         >
-          <div className="ios-card__k">Trending</div>
-          <div className="ios-card__v">${t.symbol}</div>
-          <div className="ios-card__meta" style={{ color: (t.change24h ?? 0) >= 0 ? "var(--ios-ok)" : "var(--ios-danger)" }}>
+          <div className="ox-pulse__k">Trending</div>
+          <div className="ox-pulse__v">${t.symbol}</div>
+          <div className="ox-pulse__m" style={{ color: changeColor(t.change24h) }}>
             {(t.change24h ?? 0) >= 0 ? "+" : ""}
             {(t.change24h ?? 0).toFixed(1)}% · 24h
           </div>
         </button>
       ))}
       {latestPosts.map((p) => (
-        <div key={p.id} className="ios-card">
-          <div className="ios-card__k">@{p.username || "orbit"}</div>
-          <div className="ios-card__meta" style={{ color: "var(--ios-text)", marginTop: 6 }}>
+        <div key={p.id} className="ox-card">
+          <div className="ox-pulse__k">@{p.username || "orbit"}</div>
+          <div className="ox-pulse__m" style={{ color: "var(--deck-ink)" }}>
             {p.content.slice(0, 160)}
             {p.content.length > 160 ? "…" : ""}
           </div>
         </div>
       ))}
-      {!trending.length && !latestPosts.length && <div className="ios-empty">Loading activity…</div>}
-      <button type="button" className="ios-btn ios-btn--ghost" style={{ width: "100%" }} onClick={() => window.location.assign("/orbitx-social")}>
+      {!trending.length && !latestPosts.length && <div className="ox-empty">Listening for pulse…</div>}
+      <button type="button" className="ox-btn ox-btn--ghost" style={{ width: "100%" }} onClick={() => window.location.assign("/orbitx-social")}>
         Open Social
       </button>
     </>
@@ -550,145 +500,64 @@ export default function Hub() {
 
   const rootAccount = (
     <>
-      <h2 className="ios-large-title">Account</h2>
-      <p className="ios-subhead">Wallet, profile, and MCP connectors.</p>
-      <div className="ios-wallet-wrap">
+      <div className="ox-deck__intro">
+        <h1>Identity</h1>
+        <p className="ox-deck__sub">Wallet, profile, and MCP connectors.</p>
+      </div>
+      <div className="ox-wallet">
         <WalletConnectButton />
       </div>
       {(profile?.username || user?.email) && (
-        <div className="ios-group" style={{ marginBottom: "0.85rem" }}>
-          <div className="ios-row" style={{ cursor: "default" }}>
-            <span className="ios-row__meta">
-              <span className="ios-row__title">{profile?.username ? `@${profile.username}` : "Signed in"}</span>
-              <span className="ios-row__cap">{user?.email || "Wallet session"}</span>
-            </span>
-          </div>
+        <div className="ox-row" style={{ cursor: "default", marginBottom: 10 }}>
+          <span className="ox-row__meta">
+            <span className="ox-row__title">{profile?.username ? `@${profile.username}` : "Signed in"}</span>
+            <span className="ox-row__cap">{user?.email || "Wallet session"}</span>
+          </span>
         </div>
       )}
-      <div className="ios-group">
-        <Link to="/profile" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Profile</span>
-            <span className="ios-row__cap">{profile?.username ? `@${profile.username}` : "View profile"}</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/settings" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Settings</span>
-            <span className="ios-row__cap">Preferences & color themes</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <a href="/ORBITX_DEX" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">OrbitX DEX</span>
-            <span className="ios-row__cap">Terminal & scanner</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </a>
-        <Link to="/orbitxlaunch" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Launchpad</span>
-            <span className="ios-row__cap">Create & trade coins</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/nft" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">NFT Market</span>
-            <span className="ios-row__cap">Mint & trade</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/shop" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Shop</span>
-            <span className="ios-row__cap">Credits + burn access</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/os" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">OrbitX OS</span>
-            <span className="ios-row__cap">Desktop launcher</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/Orbitxcity" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">City</span>
-            <span className="ios-row__cap">3D OrbitX city</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/play" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Play</span>
-            <span className="ios-row__cap">Games & missions</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/intel" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Intel</span>
-            <span className="ios-row__cap">Crypto intelligence</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/predictions" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Predictions</span>
-            <span className="ios-row__cap">Trade YES / NO</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/agent" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Agent MCP</span>
-            <span className="ios-row__cap">Connect Claude / ChatGPT / Grok</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/x" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">X MCP</span>
-            <span className="ios-row__cap">Post & agent on X</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/orbitx-social" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Social</span>
-            <span className="ios-row__cap">Feed & spaces</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-        <Link to="/hq" className="ios-row">
-          <span className="ios-row__meta">
-            <span className="ios-row__title">HQ</span>
-            <span className="ios-row__cap">Social headquarters</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </Link>
-      </div>
-      <div className="ios-group">
-        <button type="button" className="ios-row" onClick={() => push({ id: "wallpaper" })}>
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Wallpaper</span>
-            <span className="ios-row__cap">Background & atmosphere</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </button>
-        <button type="button" className="ios-row" onClick={() => push({ id: "widgets" })}>
-          <span className="ios-row__meta">
-            <span className="ios-row__title">Widgets</span>
-            <span className="ios-row__cap">Customize home widgets</span>
-          </span>
-          <span className="ios-row__chev">›</span>
-        </button>
-      </div>
-      <button type="button" className="ios-btn ios-btn--danger" style={{ width: "100%" }} onClick={logout}>
+      <Link to="/profile" className="ox-row">
+        <span className="ox-row__meta">
+          <span className="ox-row__title">Profile</span>
+          <span className="ox-row__cap">{profile?.username ? `@${profile.username}` : "View profile"}</span>
+        </span>
+        <span className="ox-row__chev">→</span>
+      </Link>
+      <Link to="/settings" className="ox-row">
+        <span className="ox-row__meta">
+          <span className="ox-row__title">Settings</span>
+          <span className="ox-row__cap">Preferences & color themes</span>
+        </span>
+        <span className="ox-row__chev">→</span>
+      </Link>
+      <Link to="/agent" className="ox-row">
+        <span className="ox-row__meta">
+          <span className="ox-row__title">Agent MCP</span>
+          <span className="ox-row__cap">Connect Claude / ChatGPT / Grok</span>
+        </span>
+        <span className="ox-row__chev">→</span>
+      </Link>
+      <Link to="/x" className="ox-row">
+        <span className="ox-row__meta">
+          <span className="ox-row__title">X MCP</span>
+          <span className="ox-row__cap">Post & agent on X</span>
+        </span>
+        <span className="ox-row__chev">→</span>
+      </Link>
+      <button type="button" className="ox-row" onClick={() => push({ id: "wallpaper" })}>
+        <span className="ox-row__meta">
+          <span className="ox-row__title">Atmosphere</span>
+          <span className="ox-row__cap">Theme other OrbitX surfaces</span>
+        </span>
+        <span className="ox-row__chev">→</span>
+      </button>
+      <button type="button" className="ox-row" onClick={() => push({ id: "widgets" })}>
+        <span className="ox-row__meta">
+          <span className="ox-row__title">Widgets</span>
+          <span className="ox-row__cap">Pin market and community tiles</span>
+        </span>
+        <span className="ox-row__chev">→</span>
+      </button>
+      <button type="button" className="ox-btn ox-btn--danger" onClick={logout}>
         Log Out
       </button>
     </>
@@ -708,35 +577,39 @@ export default function Hub() {
         : (section?.keys || []).map((k) => PLATFORM_BY_KEY[k]).filter(Boolean);
     body = (
       <>
-        <h2 className="ios-large-title">{section?.title || "Apps"}</h2>
-        <p className="ios-subhead">{section?.subtitle}</p>
+        <div className="ox-deck__intro">
+          <h1>{section?.title || "Stations"}</h1>
+          <p className="ox-deck__sub">{section?.subtitle}</p>
+        </div>
         {appRows(apps)}
       </>
     );
   } else if (top.id === "app") {
     const app = PLATFORM_BY_KEY[top.appKey] || searchableApps.find((a) => a.key === top.appKey);
     body = app ? (
-      <div className="ios-detail">
-        {renderAppIcon(app, "detail")}
-        <h2 className="ios-detail__name">{app.name}</h2>
-        <p className="ios-detail__cap">{app.caption}</p>
-        <div className="ios-btn-row">
-          <button type="button" className="ios-btn ios-btn--primary" onClick={() => openAppHref(app)}>
-            {app.external ? "Open ↗" : "Open"}
+      <div className="ox-detail">
+        {renderMark(app, "ox-detail__icon")}
+        <h2 className="ox-detail__name">{app.name}</h2>
+        <p className="ox-detail__cap">{app.caption}</p>
+        <div className="ox-btn-row">
+          <button type="button" className="ox-btn ox-btn--primary" onClick={() => openAppHref(app)}>
+            {app.external ? "Open ↗" : "Enter"}
           </button>
-          <button type="button" className="ios-btn ios-btn--ghost" onClick={pop}>
-            Cancel
+          <button type="button" className="ox-btn ox-btn--ghost" onClick={pop}>
+            Stay
           </button>
         </div>
       </div>
     ) : (
-      <div className="ios-empty">App not found</div>
+      <div className="ox-empty">Station not found</div>
     );
   } else if (top.id === "widgets") {
     body = (
       <>
-        <h2 className="ios-large-title">Widgets</h2>
-        <p className="ios-subhead">Pin market and community widgets.</p>
+        <div className="ox-deck__intro">
+          <h1>Widgets</h1>
+          <p className="ox-deck__sub">Pin market and community widgets.</p>
+        </div>
         <MobileWidgetGrid
           solPrice={solPrice}
           solChange={solChange}
@@ -750,7 +623,7 @@ export default function Hub() {
         />
         <button
           type="button"
-          className="ios-btn ios-btn--primary"
+          className="ox-btn ox-btn--primary"
           style={{ width: "100%", marginTop: 12 }}
           onClick={() => {
             setPanelTab("lib");
@@ -764,123 +637,125 @@ export default function Hub() {
   } else if (top.id === "wallpaper") {
     body = (
       <>
-        <h2 className="ios-large-title">Wallpaper</h2>
-        <p className="ios-subhead">Applies across Hub, DEX, Launchpad, NFT, Agent, X, and more.</p>
-        <button type="button" className="ios-btn ios-btn--primary" style={{ width: "100%" }} onClick={openTheme}>
+        <div className="ox-deck__intro">
+          <h1>Atmosphere</h1>
+          <p className="ox-deck__sub">This deck keeps its 3D space. Theme still applies across DEX, Launchpad, NFT, Agent, and X.</p>
+        </div>
+        <button type="button" className="ox-btn ox-btn--primary" style={{ width: "100%" }} onClick={openTheme}>
           Customize platform theme
         </button>
       </>
     );
   }
 
-  const homeRoot = tab === "home" && top.id === "root";
-
   return (
-    <div className={`ios-hub${homeRoot ? " ios-hub--home" : ""}`}>
+    <div className="ox-deck ios-hub">
       <style>{aiWidgetCSS}</style>
-      <div className="ios-hub__wallpaper" aria-hidden />
-      <div className="ios-hub__atmosphere" aria-hidden />
+      <div className="ox-deck__space" aria-hidden>
+        <HubSpaceBackground />
+      </div>
+      <div className="ox-deck__veil" aria-hidden />
 
-      <div className="ios-hub__stage">
-        <IosStatusBar now={now} />
-        <div className="ios-stack">
-          <div key={`${tab}-${stack.length}-${top.id}`} className={`ios-stack__pane${navDir === "pop" ? " is-back" : ""}`}>
-            <NavBar
-              title={canBack ? navTitle : "OrbitX"}
-              canBack={canBack}
-              onBack={pop}
-              home={homeRoot}
-              trail={
-                <>
-                  <button type="button" className="ios-nav__btn ios-nav__btn--glass" onClick={openTheme} aria-label="Theme">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
-                      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
-                      <path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                  <button type="button" className="ios-nav__btn ios-nav__btn--glass" onClick={() => setSpotOpen(true)} aria-label="Search">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
-                      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
-                      <path d="M16 16.5 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                </>
-              }
-            />
-            <div className={`ios-body${homeRoot ? " ios-body--home" : ""}`}>{body}</div>
+      <div className="ox-deck__stage">
+        <header className="ox-deck__chrome">
+          {canBack ? (
+            <button type="button" className="ox-deck__back" onClick={pop}>
+              ← {navTitle}
+            </button>
+          ) : (
+            <div className="ox-deck__brand">
+              <span className="ox-deck__mark" aria-hidden>
+                ◈
+              </span>
+              <span className="ox-deck__word">
+                <strong>OrbitX</strong>
+                <span className="ox-deck__live">
+                  <i />
+                  Live · {utcClock}
+                </span>
+              </span>
+            </div>
+          )}
+          <div className="ox-deck__actions">
+            {!canBack && <span className="ox-deck__title">{navTitle}</span>}
+            <button type="button" className="ox-deck__iconbtn" onClick={openTheme} aria-label="Theme">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button type="button" className="ox-deck__iconbtn" onClick={() => setSpotOpen(true)} aria-label="Search">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M16 16.5 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
-        </div>
+        </header>
+        <div className="ox-deck__body">{body}</div>
       </div>
 
-      <nav className="ios-tabbar" aria-label="OrbitX tabs">
+      <nav className="ox-deck__rail" aria-label="OrbitX command rail">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={`ios-tab${tab === t.id ? " is-on" : ""}`}
+            className={`ox-railbtn${tab === t.id ? " is-on" : ""}`}
             onClick={() => switchTab(t.id)}
           >
-            <span className="ios-tab__ico" aria-hidden>
-              {TAB_GLYPH[t.id]}
-            </span>
+            {TAB_GLYPH[t.id]}
             {t.label}
           </button>
         ))}
       </nav>
-      <div className="ios-home-ind" aria-hidden />
 
       {spotOpen && (
-        <div className="ios-sheet" onClick={() => setSpotOpen(false)}>
-          <div className="ios-sheet__card" onClick={(e) => e.stopPropagation()}>
-            <div className="ios-sheet__search">
+        <div className="ox-sheet" onClick={() => setSpotOpen(false)}>
+          <div className="ox-sheet__card" onClick={(e) => e.stopPropagation()}>
+            <div className="ox-sheet__search">
               <input
-                className="ios-sheet__input"
+                className="ox-sheet__input"
                 autoFocus
                 value={spotQ}
                 onChange={(e) => setSpotQ(e.target.value)}
-                placeholder="Search apps…"
+                placeholder="Search stations…"
               />
-              <button type="button" className="ios-nav__btn" onClick={() => setSpotOpen(false)}>
-                Cancel
+              <button type="button" className="ox-btn ox-btn--ghost" onClick={() => setSpotOpen(false)}>
+                Close
               </button>
             </div>
-            <div className="ios-sheet__results">
-              {searchableApps
-                .filter((a) => {
-                  const q = spotQ.trim().toLowerCase();
-                  return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
-                })
-                .map((a) => (
-                  <button
-                    key={a.key}
-                    type="button"
-                    className="ios-row"
-                    onClick={() => {
-                      setSpotOpen(false);
-                      setTab("apps");
-                      setStacks((prev) => ({ ...prev, apps: [{ id: "root" }, { id: "app", appKey: a.key }] }));
-                      setNavDir("push");
-                    }}
-                  >
-                    {renderAppIcon(a, "row")}
-                    <span className="ios-row__meta">
-                      <span className="ios-row__title">{a.name}</span>
-                      <span className="ios-row__cap">{a.caption}</span>
-                    </span>
-                  </button>
-                ))}
-            </div>
+            {searchableApps
+              .filter((a) => {
+                const q = spotQ.trim().toLowerCase();
+                return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
+              })
+              .map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  className="ox-row"
+                  onClick={() => {
+                    setSpotOpen(false);
+                    setTab("apps");
+                    setStacks((prev) => ({ ...prev, apps: [{ id: "root" }, { id: "app", appKey: a.key }] }));
+                  }}
+                >
+                  {renderMark(a, "ox-station__mark")}
+                  <span className="ox-row__meta">
+                    <span className="ox-row__title">{a.name}</span>
+                    <span className="ox-row__cap">{a.caption}</span>
+                  </span>
+                </button>
+              ))}
           </div>
         </div>
       )}
 
       {launching && (
-        <div className="ios-launch">
-          <div className="ios-launch__card">
-            <div className="ios-detail__icon" style={{ background: launching.iconBg }}>
-              {launching.glyph}
-            </div>
-            <div style={{ fontWeight: 700 }}>{launching.name}</div>
+        <div className="ox-launch">
+          <div className="ox-launch__card">
+            {renderMark(launching, "ox-detail__icon")}
+            <div>{launching.name}</div>
           </div>
         </div>
       )}
