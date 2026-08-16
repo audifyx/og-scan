@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { PLATFORM_MENU, matchPlatformPath, type PlatformApp } from "@/lib/orbitxPlatforms";
 import "./platform-shell.css";
 
-const LINKS: { to: string; label: string; ico: string; match?: (p: string) => boolean }[] = [
-  { to: "/app", label: "Hub", ico: "⌂", match: (p) => p === "/app" || p.startsWith("/hub") },
-  { to: "/trade", label: "Trade", ico: "⇅", match: (p) => p === "/trade" || p.startsWith("/trade/") },
-  { to: "/ORBITX_DEX", label: "DEX", ico: "◈", match: (p) => p.startsWith("/ORBITX_DEX") },
-  { to: "/orbitxlaunch", label: "Launch", ico: "🚀", match: (p) => p.startsWith("/orbitxlaunch") },
-  { to: "/intel", label: "Intel", ico: "◎", match: (p) => p === "/intel" || p.startsWith("/intel/") },
-  { to: "/nft", label: "NFT", ico: "🖼", match: (p) => p.startsWith("/nft") },
-  { to: "/orbitx-social", label: "Social", ico: "◉", match: (p) => p.startsWith("/orbitx-social") || p.startsWith("/social") },
-  { to: "/ai", label: "AI", ico: "✧", match: (p) => p.toLowerCase() === "/ai" },
-  { to: "/agent", label: "Agent", ico: "✦", match: (p) => p.startsWith("/agent") },
-  { to: "/x", label: "X", ico: "✕", match: (p) => p === "/x" || p.startsWith("/x/") },
-  { to: "/play", label: "Play", ico: "▶", match: (p) => p === "/play" || p.startsWith("/play/") },
-  { to: "/Orbitxcity", label: "City", ico: "🏙", match: (p) => p.toLowerCase().startsWith("/orbitxcity") },
-];
+const HUB_LINK: PlatformApp = {
+  key: "hub",
+  name: "Hub",
+  caption: "Home",
+  href: "/app",
+  tone: "#7ee7d8",
+  iconBg: "linear-gradient(145deg, #99F6E4 0%, #14B8A6 50%, #115E59 100%)",
+  glyph: (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden>
+      <path d="M8 22 24 10l16 12v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V22Z" stroke="currentColor" strokeWidth="3.5" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+
+const MENU_APPS: PlatformApp[] = [HUB_LINK, ...PLATFORM_MENU];
 
 /* Hide on marketing / auth / embeds — show FAB everywhere else in the app. */
 const HIDE_ON_EXACT = new Set([
@@ -92,31 +94,32 @@ function visibleOn(pathname: string) {
 
 function PlatformLinkItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
-    <>
-      {LINKS.map((l) => {
-        const on = l.match ? l.match(pathname) : pathname === l.to || pathname.startsWith(`${l.to}/`);
-        const external = l.to.startsWith("/ORBITX_DEX");
-        const className = `ox-platform-fab__link${on ? " is-on" : ""}`;
-        if (external) {
+    <div className="ox-platform-fab__grid">
+      {MENU_APPS.map((app) => {
+        const on = matchPlatformPath(app.href, pathname);
+        const className = `ox-platform-fab__app${on ? " is-on" : ""}`;
+        const inner = (
+          <>
+            <span className="ox-platform-fab__icon" style={{ background: app.iconBg }} aria-hidden>
+              {app.glyph}
+            </span>
+            <span className="ox-platform-fab__name">{app.name}</span>
+          </>
+        );
+        if (app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("http")) {
           return (
-            <a key={l.to} href={l.to} className={className} onClick={onNavigate}>
-              <span className="ox-platform-fab__ico" aria-hidden>
-                {l.ico}
-              </span>
-              <span>{l.label}</span>
+            <a key={app.key} href={app.href} className={className} onClick={onNavigate}>
+              {inner}
             </a>
           );
         }
         return (
-          <Link key={l.to} to={l.to} className={className} onClick={onNavigate}>
-            <span className="ox-platform-fab__ico" aria-hidden>
-              {l.ico}
-            </span>
-            <span>{l.label}</span>
+          <Link key={app.key} to={app.href} className={className} onClick={onNavigate}>
+            {inner}
           </Link>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -220,7 +223,7 @@ export function PlatformDock() {
 
   const vw = typeof window !== "undefined" ? window.innerWidth : 400;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-  const panelLeft = pos.x + FAB_SIZE + 8 > vw - 200;
+  const panelLeft = pos.x + FAB_SIZE + 8 > vw - 300;
   const panelUp = pos.y + 280 > vh;
 
   return (
@@ -234,9 +237,9 @@ export function PlatformDock() {
           className={`ox-platform-fab__panel${panelLeft ? " is-left" : ""}${panelUp ? " is-up" : ""}`}
           aria-label="OrbitX platforms"
         >
-          <div className="ox-platform-fab__panel-title">OrbitX apps</div>
+          <div className="ox-platform-fab__panel-title">OrbitX</div>
           <PlatformLinkItems pathname={pathname} onNavigate={() => setOpen(false)} />
-          <p className="ox-platform-fab__hint">Drag the button to move</p>
+          <p className="ox-platform-fab__hint">Shop · City · OS · Play · Intel · HQ</p>
         </nav>
       )}
 
@@ -261,19 +264,19 @@ export function PlatformLinks({ className = "" }: { className?: string }) {
   const { pathname } = useLocation();
   return (
     <div className={`ox-platform-links ${className}`.trim()} aria-label="OrbitX apps">
-      {LINKS.map((l) => {
-        const on = l.match ? l.match(pathname) : pathname === l.to || pathname.startsWith(`${l.to}/`);
-        const external = l.to.startsWith("/ORBITX_DEX");
+      {MENU_APPS.map((app) => {
+        const on = matchPlatformPath(app.href, pathname);
+        const external = Boolean(app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("http"));
         if (external) {
           return (
-            <a key={l.to} href={l.to} className={`ox-platform-links__a${on ? " is-on" : ""}`}>
-              {l.label}
+            <a key={app.key} href={app.href} className={`ox-platform-links__a${on ? " is-on" : ""}`}>
+              {app.name}
             </a>
           );
         }
         return (
-          <Link key={l.to} to={l.to} className={`ox-platform-links__a${on ? " is-on" : ""}`}>
-            {l.label}
+          <Link key={app.key} to={app.href} className={`ox-platform-links__a${on ? " is-on" : ""}`}>
+            {app.name}
           </Link>
         );
       })}
