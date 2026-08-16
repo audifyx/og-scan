@@ -7,6 +7,7 @@ import {
   confirmMcpAccessBurnUntilGranted,
   getMcpBurnAccess,
   mcpAccessSignUrl,
+  parseBurnTxSignature,
   takePendingMcpBurn,
   type McpAccessPackageId,
   type McpBurnAccessStatus,
@@ -39,6 +40,9 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
   const [selected, setSelected] = useState<McpAccessPackageId>("day");
   const [loading, setLoading] = useState(true);
   const [burning, setBurning] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [pasteSig, setPasteSig] = useState("");
+  const [confirmNote, setConfirmNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -105,6 +109,35 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start burn");
       setBurning(false);
+    }
+  };
+
+  const onConfirmPaste = async () => {
+    const signature = parseBurnTxSignature(pasteSig);
+    if (!signature || signature.length < 64) {
+      setError("Paste a Solana transaction signature or Solscan link.");
+      return;
+    }
+    setConfirming(true);
+    setError(null);
+    setConfirmNote(null);
+    try {
+      const granted = await confirmMcpAccessBurnUntilGranted({
+        signature,
+        publicKey: wallet || undefined,
+        packageId: selectedPkg?.id,
+      });
+      setStatus(granted);
+      setConfirmNote(
+        granted.message ||
+          `${granted.remainingLabel || "Access granted"}. Timed MCP access is active now.`,
+      );
+      setPasteSig("");
+      if (granted.active) onAccessGranted?.(granted);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not confirm that burn");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -203,6 +236,30 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
           <button type="button" className="ox-agent__btn" disabled={loading} onClick={() => void refresh()}>
             Refresh status
           </button>
+        </div>
+
+        <div className="ox-x-buy__manual">
+          <label className="ox-agent__label" htmlFor="ox-mcp-burn-sig">
+            Already burned? Paste transaction
+          </label>
+          <input
+            id="ox-mcp-burn-sig"
+            className="ox-agent__input"
+            value={pasteSig}
+            onChange={(e) => setPasteSig(e.target.value)}
+            placeholder="Solana tx signature or Solscan link"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            className="ox-agent__btn ox-agent__btn--ghost"
+            disabled={confirming || !pasteSig.trim()}
+            onClick={() => void onConfirmPaste()}
+          >
+            {confirming ? "Confirming burn…" : "Confirm burn"}
+          </button>
+          {confirmNote && <p className="ox-agent__note ox-x-buy__ok">{confirmNote}</p>}
         </div>
       </div>
     </section>

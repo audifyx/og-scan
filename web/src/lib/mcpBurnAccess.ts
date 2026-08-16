@@ -199,6 +199,18 @@ export async function buildMcpAccessBurnTransaction(
   return tx;
 }
 
+/** Accept a raw sig or a Solscan / Explorer / SolanaFM URL. */
+export function parseBurnTxSignature(input: string): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  const fromUrl = raw.match(
+    /(?:solscan\.io|explorer\.solana\.com|solana\.fm)\/tx\/([1-9A-HJ-NP-Za-km-z]{64,88})/i,
+  );
+  if (fromUrl?.[1]) return fromUrl[1];
+  const bare = raw.match(/[1-9A-HJ-NP-Za-km-z]{64,88}/);
+  return bare?.[0] || raw.replace(/\s+/g, "");
+}
+
 export async function confirmMcpAccessBurn(opts: {
   signature: string;
   packageId?: McpAccessPackageId;

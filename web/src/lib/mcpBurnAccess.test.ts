@@ -4,6 +4,7 @@ import {
   MCP_BURN_MINT,
   clearPendingMcpBurn,
   mcpAccessSignUrl,
+  parseBurnTxSignature,
   rememberPendingMcpBurn,
   takePendingMcpBurn,
 } from "./mcpBurnAccess";
@@ -40,6 +41,16 @@ describe("mcpAccessSignUrl", () => {
       ["day", 100],
       ["week", 1000],
     ]);
+  });
+});
+
+describe("parseBurnTxSignature", () => {
+  const sig = `${"1".repeat(32)}${"2".repeat(32)}abcd`;
+
+  it("accepts a raw signature or a Solscan link", () => {
+    expect(parseBurnTxSignature(`  ${sig}  `)).toBe(sig);
+    expect(parseBurnTxSignature(`https://solscan.io/tx/${sig}`)).toBe(sig);
+    expect(parseBurnTxSignature(`https://explorer.solana.com/tx/${sig}?cluster=mainnet`)).toBe(sig);
   });
 });
 
