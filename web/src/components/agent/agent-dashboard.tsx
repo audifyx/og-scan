@@ -20,6 +20,7 @@ import {
 } from "@/lib/orbitxMcp";
 import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
 import { TelegramMcpCard } from "./TelegramMcpCard";
+import { McpBurnAccessCard } from "./McpBurnAccessCard";
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -252,13 +253,16 @@ export function AgentDashboard() {
     return <AgentLoading label="Booting agent session…" />;
   }
 
+  const burnActive = Boolean(boot?.mcpAccess?.active);
   const statusLabel = exempt
     ? "Owner exempt"
-    : boot?.hold?.meetsRequirement
-      ? "Hold verified"
-      : hasKey
-        ? "MCP ready"
-        : "Setup needed";
+    : burnActive
+      ? boot?.mcpAccess?.remainingLabel || "Burn access"
+      : boot?.hold?.meetsRequirement
+        ? "Hold verified"
+        : hasKey
+          ? "MCP ready"
+          : "Setup needed";
 
   return (
     <AgentShell
@@ -302,6 +306,16 @@ export function AgentDashboard() {
             <span className="ox-agent__kpi-k">AI</span>
             <span className="ox-agent__kpi-v">{hasKey && linkedWallet ? "Connect" : "Setup"}</span>
           </button>
+          <button
+            type="button"
+            className={`ox-agent__kpi${burnActive ? " is-ok" : ""}`}
+            onClick={() => setTab("setup")}
+          >
+            <span className="ox-agent__kpi-k">Access</span>
+            <span className="ox-agent__kpi-v">
+              {burnActive ? boot?.mcpAccess?.remainingLabel || "Active" : "Hold or burn"}
+            </span>
+          </button>
         </div>
         <div className="ox-agent__steps">
           <span className={`ox-agent__chip${linkedWallet ? " is-ok" : ""}`}>
@@ -311,6 +325,11 @@ export function AgentDashboard() {
             {hasKey ? "API key ready" : "Create API key"}
           </span>
           {exempt && <span className="ox-agent__chip is-accent">Exempt</span>}
+          {burnActive && (
+            <span className="ox-agent__chip is-ok">
+              {boot?.mcpAccess?.remainingLabel || "Burn access"}
+            </span>
+          )}
         </div>
       </div>
 
@@ -326,6 +345,7 @@ export function AgentDashboard() {
       )}
 
       {tab === "setup" && (
+        <>
         <div className="ox-agent__grid ox-agent__grid--2">
           <section className="ox-agent__panel">
             <div className="ox-agent__panel-h">
@@ -380,6 +400,11 @@ export function AgentDashboard() {
             </div>
           </section>
         </div>
+        <McpBurnAccessCard
+          walletAddress={linkedWallet}
+          onAccessGranted={() => void refresh()}
+        />
+        </>
       )}
 
       {tab === "wallet" && (

@@ -1,0 +1,37 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_MCP_ACCESS_PACKAGES, MCP_BURN_MINT, mcpAccessSignUrl } from "./mcpBurnAccess";
+
+describe("mcpAccessSignUrl", () => {
+  it("builds a day-package burn handoff", () => {
+    const url = mcpAccessSignUrl({
+      packageId: "day",
+      publicKey: "11111111111111111111111111111111",
+      origin: "https://www.orbitx.world",
+    });
+    expect(url).toContain("/agent/sign?");
+    expect(url).toContain("kind=mcp-access");
+    expect(url).toContain("package=day");
+    expect(url).toContain("amount=100");
+    expect(url).toContain(MCP_BURN_MINT);
+  });
+
+  it("builds a week-package auto-confirm handoff", () => {
+    const url = mcpAccessSignUrl({
+      packageId: "week",
+      publicKey: "11111111111111111111111111111111",
+      auto: true,
+      origin: "https://orbitx.world",
+    });
+    expect(url.startsWith("https://www.orbitx.world/agent/sign?")).toBe(true);
+    expect(url).toContain("package=week");
+    expect(url).toContain("amount=1000");
+    expect(url).toContain("auto=1");
+  });
+
+  it("keeps the published package prices", () => {
+    expect(DEFAULT_MCP_ACCESS_PACKAGES.map((p) => [p.id, p.tokens])).toEqual([
+      ["day", 100],
+      ["week", 1000],
+    ]);
+  });
+});

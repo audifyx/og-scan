@@ -107,6 +107,15 @@ export type AgentBootstrap = {
     minUsd?: number;
     message?: string;
   };
+  mcpAccess?: {
+    active?: boolean;
+    expired?: boolean;
+    packageId?: string | null;
+    expiresAt?: string | null;
+    remainingMs?: number;
+    remainingLabel?: string;
+  };
+  accessSource?: string | null;
 };
 
 async function authHeaders(): Promise<HeadersInit> {

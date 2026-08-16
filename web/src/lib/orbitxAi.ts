@@ -15,6 +15,13 @@ export type AiGate = {
   holdUrl?: string;
   error?: string;
   message?: string;
+  accessSource?: "exempt" | "burn" | "hold" | null;
+  mcpAccess?: {
+    active?: boolean;
+    expired?: boolean;
+    remainingLabel?: string;
+    expiresAt?: string | null;
+  };
 };
 
 export type AiModel = {
