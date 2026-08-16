@@ -402,6 +402,86 @@ describe("confirmAccessBurn", () => {
     expect(out.remainingLabel).toMatch(/remaining/);
     expect(writes.some((w) => w.path === "mcp_burn_wallet_access" && w.method === "POST")).toBe(true);
   });
+
+  it("attaches an already-granted week burn to the wallet so shop can see it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 2,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
+                    uiTokenAmount: { uiAmount: 3006.474628, amount: "3006474628", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [
+                  {
+                    accountIndex: 2,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
+                    uiTokenAmount: { uiAmount: 2006.474628, amount: "2006474628", decimals: 6 },
+                  },
+                ],
+                innerInstructions: [],
+              },
+              transaction: {
+                message: {
+                  instructions: [
+                    {
+                      parsed: {
+                        type: "burn",
+                        info: {
+                          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                          authority: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
+                          amount: "1000000000",
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const writes = [];
+    const sb = async (path, init) => {
+      writes.push({ path, method: init?.method || "GET" });
+      if (String(path).startsWith("mcp_burn_ledger?tx_signature")) {
+        return [
+          {
+            id: "led-1",
+            user_id: "other-user",
+            package_id: "week",
+            expires_at: "2026-08-23T10:58:26.392Z",
+            tokens_burned: 1000,
+          },
+        ];
+      }
+      return [];
+    };
+
+    const out = await confirmAccessBurn(sb, {
+      signature: "13GCQvvZUGUWb4EAx2JHraKguMqQPuTrSjYGKGaFD74swjJhUVXjpy7DzF4MuApJJoabFU4niicajr68KrCWAkf",
+      packageId: "week",
+      wallet: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
+    });
+
+    expect(out.ok).toBe(true);
+    expect(out.alreadyGranted).toBe(true);
+    expect(out.active).toBe(true);
+    expect(out.packageId).toBe("week");
+    expect(writes.some((w) => w.path === "mcp_burn_wallet_access" && w.method === "POST")).toBe(true);
+  });
 });
 
 describe("MCP access blocked payload", () => {

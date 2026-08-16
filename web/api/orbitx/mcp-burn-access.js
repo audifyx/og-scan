@@ -541,6 +541,15 @@ export async function verifyOrbitxBurn(
     if (!owner && info.authority) owner = info.authority;
     const parsedUi = Number(info.tokenAmount?.uiAmount);
     if (Number.isFinite(parsedUi) && parsedUi > burnedUi) burnedUi = parsedUi;
+    else {
+      const raw = Number(info.tokenAmount?.amount ?? info.amount);
+      const decimals = Number(info.tokenAmount?.decimals);
+      const dec = Number.isFinite(decimals) && decimals >= 0 ? decimals : 6;
+      if (Number.isFinite(raw) && raw > 0) {
+        const ui = raw / 10 ** dec;
+        if (ui > burnedUi) burnedUi = ui;
+      }
+    }
   }
 
   if (burnedUi <= 0 && !sawBurn) {
@@ -660,15 +669,44 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
       `mcp_burn_ledger?tx_signature=eq.${encodeURIComponent(verified.signature)}&select=id,user_id,package_id,expires_at,tokens_burned&limit=1`,
     );
     if (Array.isArray(existing) && existing[0]) {
+      const prior = existing[0];
+      if (burnWallet) {
+        try {
+          await upsertWalletAccess(sb, {
+            wallet_address: burnWallet,
+            user_id: uid || prior.user_id || null,
+            package_id: prior.package_id,
+            tokens_burned: Number(prior.tokens_burned || verified.tokensBurned),
+            expires_at: prior.expires_at,
+            last_tx_signature: verified.signature,
+            lifetime_tokens_burned: Number(prior.tokens_burned || verified.tokensBurned),
+            updated_at: new Date().toISOString(),
+          });
+        } catch {
+          /* wallet table may not exist yet — status can still use user row */
+        }
+      }
       const status = await getAccessStatus(sb, uid, { wallets: [burnWallet] });
+      const shown = status.active
+        ? status
+        : statusFromRow(
+            {
+              package_id: prior.package_id,
+              expires_at: prior.expires_at,
+              tokens_burned: prior.tokens_burned,
+              lifetime_tokens_burned: prior.tokens_burned,
+              wallet_address: burnWallet,
+              last_tx_signature: verified.signature,
+            },
+          );
       return {
         ok: true,
         alreadyGranted: true,
-        ...status,
+        ...shown,
         signature: verified.signature,
-        packageId: existing[0].package_id,
-        message: status.active
-          ? `This burn already granted MCP access. ${status.remainingLabel}.`
+        packageId: prior.package_id,
+        message: shown.active
+          ? `This burn already granted MCP access. ${shown.remainingLabel}.`
           : "This burn already granted MCP access.",
         explorer: verified.explorer,
       };

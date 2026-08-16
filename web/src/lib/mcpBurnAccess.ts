@@ -65,6 +65,22 @@ export async function getMcpBurnAccess(wallet?: string | null): Promise<McpBurnA
   const r = await fetch(`${AGENT_API}/mcp-access${q}`, { headers });
   const data = await readJson(r);
   if (!r.ok) {
+    if (r.status === 401 && wallet) {
+      return {
+        ok: true,
+        active: false,
+        expired: false,
+        packageId: null,
+        expiresAt: null,
+        remainingMs: 0,
+        remainingLabel: "Connect or paste the burn tx to unlock",
+        tokensBurned: 0,
+        lifetimeTokensBurned: 0,
+        packages: DEFAULT_MCP_ACCESS_PACKAGES,
+        mint: MCP_BURN_MINT,
+        message: "Paste the burn transaction below to grant access for this wallet.",
+      };
+    }
     throw new Error(String(data.message || data.error || `Access status failed (${r.status})`));
   }
   return data as unknown as McpBurnAccessStatus;
