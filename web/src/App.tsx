@@ -107,6 +107,7 @@ import LaunchpadCurveEvm from "./pages/orbitx/LaunchpadCurveEvm";
 import LaunchpadCurveTrade from "./pages/orbitx/LaunchpadCurveTrade";
 import LaunchpadCurveMarkets from "./pages/orbitx/LaunchpadCurveMarkets";
 import OrbitXAI from "./pages/OrbitXAI";
+import TelegramOrbitX from "./pages/TelegramOrbitX";
 const LaunchpadNftHub = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftCreate"));
 const NftMarketLayout = lazyWithRetry(() => import("./pages/nft/MarketplaceLayout"));
@@ -321,6 +322,10 @@ const App = () => (
               element={<OrbitXAI />}
             />
             <Route path="/AI" caseSensitive element={<Navigate to="/ai" replace />} />
+
+            {/* ── Official Telegram bot companion ── */}
+            <Route path="/telegram" element={<TelegramOrbitX />} />
+            <Route path="/Telegram" element={<Navigate to="/telegram" replace />} />
 
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route

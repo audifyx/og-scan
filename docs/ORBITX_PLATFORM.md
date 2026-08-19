@@ -13,6 +13,7 @@ Last verified: 2026-07-25 after merging teams 1–5 into `main`.
 | Social HQ | `/hq/*` | `web/src/social/**` | Social + Growth |
 | DEX | `/ORBITX_DEX` | `web/ogdex/**` | Production DEX |
 | OrbitX AI | `/ai` | `web/src/pages/OrbitXAI.tsx`, `web/api/orbitx-ai.js` | Wallet-gated AI + MCP super app |
+| Telegram | `/telegram` | `web/src/pages/TelegramOrbitX.tsx`, `web/api/telegram-orbitx.js` | Official @theorbitxmcpbot (groups public, DMs linked) |
 | Launchpad | `/orbitxlaunch` | `web/src/pages/orbitx/**` | Token launch |
 | Terminal | `/terminal` | `web/src/pages/orbitx/Terminal*` + `TradingTerminal` | Trade UI |
 
