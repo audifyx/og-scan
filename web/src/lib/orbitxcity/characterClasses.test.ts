@@ -2,18 +2,49 @@ import { describe, expect, it } from "vitest";
 import {
   CHARACTER_CLASSES,
   appearanceFromClass,
+  classPowerIndex,
   getCharacterClass,
+  getRarityMeta,
   hasBuilderMissionPerk,
   hasCreatorPresencePerk,
+  hasProtocolInspectPerk,
   hasTraderTerminalPerk,
   missionClaimCooldownMs,
   resolveClassId,
 } from "./characterClasses";
 
 describe("characterClasses", () => {
-  it("exposes five crypto-native mascots", () => {
-    expect(CHARACTER_CLASSES).toHaveLength(5);
-    expect(CHARACTER_CLASSES.map((c) => c.id)).toEqual(["pepe", "wojak", "chad", "doge", "anon"]);
+  it("exposes six crypto-native mascots", () => {
+    expect(CHARACTER_CLASSES).toHaveLength(6);
+    expect(CHARACTER_CLASSES.map((c) => c.id)).toEqual([
+      "pepe",
+      "wojak",
+      "chad",
+      "doge",
+      "anon",
+      "vitalik",
+    ]);
+  });
+
+  it("gives every mascot rarity, movement and a build recipe", () => {
+    for (const cls of CHARACTER_CLASSES) {
+      expect(["common", "rare", "epic", "legendary"]).toContain(cls.rarity);
+      expect(cls.movement.speed).toBeGreaterThan(0.5);
+      expect(cls.movement.jump).toBeGreaterThan(0.5);
+      expect(cls.build.head).toBeTruthy();
+      expect(cls.build.torso).toBeTruthy();
+      expect(cls.handle.startsWith("@")).toBe(true);
+      expect(cls.stats.length).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("computes a sane power index", () => {
+    for (const cls of CHARACTER_CLASSES) {
+      const p = classPowerIndex(cls.id);
+      expect(p).toBeGreaterThan(0);
+      expect(p).toBeLessThanOrEqual(100);
+    }
+    expect(getRarityMeta("vitalik").label).toBe("Legendary");
   });
 
   it("aliases legacy class ids onto mascots", () => {
@@ -36,7 +67,7 @@ describe("characterClasses", () => {
 
   it("gives each mascot a distinct silhouette + palette", () => {
     const accents = new Set(CHARACTER_CLASSES.map((c) => c.accentColor));
-    expect(accents.size).toBe(5);
+    expect(accents.size).toBe(6);
     for (const cls of CHARACTER_CLASSES) {
       expect(cls.scale.y).toBeGreaterThan(0.8);
       const look = appearanceFromClass(cls);
@@ -54,6 +85,9 @@ describe("characterClasses", () => {
     expect(hasBuilderMissionPerk("builder")).toBe(true);
     expect(hasCreatorPresencePerk("wojak")).toBe(true);
     expect(hasCreatorPresencePerk("creator")).toBe(true);
+    expect(hasBuilderMissionPerk("vitalik")).toBe(true);
+    expect(hasProtocolInspectPerk("vitalik")).toBe(true);
+    expect(hasProtocolInspectPerk("anon")).toBe(false);
     expect(missionClaimCooldownMs("trader", false)).toBe(30_000);
     expect(missionClaimCooldownMs("builder", false)).toBe(8_000);
     expect(missionClaimCooldownMs("anon", true)).toBe(2_000);

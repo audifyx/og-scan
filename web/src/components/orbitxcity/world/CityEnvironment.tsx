@@ -13,6 +13,8 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { mulberry32, hashSeed } from "@/lib/orbitxcity/collision";
 import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
+import { BlockyBuildingMesh } from "./BlockyBuildingMesh";
+import { Baseplate } from "./BlockBuilding";
 import { BillboardMesh } from "./BillboardMesh";
 import { GraffitiLayer } from "./GraffitiLayer";
 import { Skyline } from "./Skyline";
@@ -30,6 +32,14 @@ import { PropScatter } from "./PropScatter";
 import { LandmarkMesh } from "./LandmarkMesh";
 import { landmarkModelId } from "@/lib/orbitxcity/assets/catalog";
 import type { LandmarkDefinition } from "@/lib/orbitxcity/types";
+
+/**
+ * Blocky (Roblox-style) world render mode. Set VITE_OXC_BLOCKY=0 to fall back
+ * to the legacy Manhattan facade renderer. Collision is unaffected either way.
+ */
+const BLOCKY_WORLD: boolean =
+  (import.meta.env?.VITE_OXC_BLOCKY ?? "1") !== "0";
+
 
 function cityTheme(cityId: CityId) {
   return getWorldTheme(cityId);
@@ -376,7 +386,14 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       )}
       <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.7} color={theme.neon} distance={28} />
 
-      <Ground block={block} />
+      {BLOCKY_WORLD ? (
+        <>
+          <Baseplate size={260} color="#7fbf6a" grid="#6aa858" />
+          <Ground block={block} />
+        </>
+      ) : (
+        <Ground block={block} />
+      )}
       <UrbanNature block={block} lite={!high} />
       <Skyline block={block} lite={!high} />
       <StreetProps block={block} />
@@ -385,9 +402,13 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <PropScatter block={block} />
       {high && <GraffitiLayer block={block} />}
 
-      {block.buildings.map((b) => (
-        <BuildingMesh key={b.id} building={b} />
-      ))}
+      {block.buildings.map((b) =>
+        BLOCKY_WORLD ? (
+          <BlockyBuildingMesh key={b.id} building={b} />
+        ) : (
+          <BuildingMesh key={b.id} building={b} />
+        ),
+      )}
 
       {landmarks.map((lm) => (
         <LandmarkMesh key={lm.id} landmark={lm} />

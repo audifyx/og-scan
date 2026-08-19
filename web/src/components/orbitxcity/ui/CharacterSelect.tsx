@@ -1,5 +1,8 @@
 /**
- * OrbitX City — pick a crypto-native mascot. Same mesh is used in the world.
+ * OrbitX City — operative select.
+ *
+ * Console-style roster: 6 mascots in a card grid, live 3D preview, rarity
+ * framing, animated stat bars and a deploy bar. Same mesh renders in-world.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
@@ -9,6 +12,8 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import {
   CHARACTER_CLASSES,
   appearanceFromClass,
+  classPowerIndex,
+  getRarityMeta,
   resolveClassId,
   type CharacterClassId,
 } from "@/lib/orbitxcity/characterClasses";
@@ -17,36 +22,50 @@ import { CosmicBackdrop } from "./CosmicBackdrop";
 import { CharacterPreview } from "./CharacterPreview";
 import { MascotPortrait } from "./MascotPortrait";
 
-const CLASS_FLAVOR: Record<CharacterClassId, { lore: string; perk: string; badge?: string }> = {
+const CLASS_FLAVOR: Record<
+  CharacterClassId,
+  { lore: string; perk: string; role: string }
+> = {
   pepe: {
-    lore: "The frog reads candles like a battlefield. Rarely blinks. Always early or catastrophically late.",
+    lore: "Reads candles like a battlefield. Rarely blinks. Always early, or catastrophically late.",
     perk: "Priority lane on trading-floor terminals",
-    badge: "Degen",
+    role: "Trader",
   },
   wojak: {
     lore: "Broadcasts the feels. Turns rugs into lore and lore into markets.",
     perk: "Boosted social-feed presence aura",
+    role: "Culture",
   },
   chad: {
-    lore: "Jawline priced in. Every candle is a ranked match and he never looks at the chart twice.",
+    lore: "Jawline priced in. Every candle is a ranked match and he never looks twice.",
     perk: "Highlighted games-district markers",
-    badge: "Aura",
+    role: "Bruiser",
   },
   doge: {
-    lore: "Much explore. Very district. Maps unknown blocks first and still has time for wow.",
+    lore: "Maps unknown blocks first and still has time to stop and stare at the skyline.",
     perk: "Extended teleport reveal radius",
+    role: "Scout",
   },
   anon: {
-    lore: "Laser-eyed maxi. Ships rails, never doxxes, orange-pills the room.",
+    lore: "Ships rails at 4am, never doxxes, orange-pills the room on the way out.",
     perk: "Faster mission claim cooldown at OrbitX HQ",
+    role: "Operator",
+  },
+  vitalik: {
+    lore: "Thinks in state trees. Reads a contract the way everyone else reads a chart.",
+    perk: "Free contract inspect at any terminal",
+    role: "Architect",
   },
 };
 
 export function CharacterSelect() {
   const { setGate, setEntered, setAvatar, avatar } = useCity();
   const { user, profile } = useAuth();
-  const { connected, publicKey } = useWallet();
-  const [selectedId, setSelectedId] = useState<CharacterClassId>(resolveClassId(avatar.classId));
+  const { connected } = useWallet();
+
+  const [selectedId, setSelectedId] = useState<CharacterClassId>(
+    resolveClassId(avatar.classId),
+  );
   const [name, setName] = useState(profile?.username ?? avatar.name ?? "Traveler");
   const [visible, setVisible] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -56,8 +75,21 @@ export function CharacterSelect() {
     [selectedId],
   );
   const flavor = CLASS_FLAVOR[selected.id];
+  const rarity = getRarityMeta(selected.id);
+  const power = classPowerIndex(selected.id);
   const ready = Boolean(user || connected);
   const displayName = name.trim() || selected.name;
+
+  const cssVars = useMemo(
+    () =>
+      ({
+        "--oxc-cs-neon": selected.neon,
+        "--oxc-cs-gold": selected.gold,
+        "--oxc-cs-rarity": rarity.color,
+        "--oxc-cs-glow": rarity.glow,
+      }) as CSSProperties,
+    [selected, rarity],
+  );
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
@@ -66,181 +98,181 @@ export function CharacterSelect() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
       const idx = CHARACTER_CLASSES.findIndex((c) => c.id === selectedId);
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
-        const next = CHARACTER_CLASSES[(idx + 1) % CHARACTER_CLASSES.length]!;
         cityAudio.play("ui");
-        setSelectedId(next.id);
+        setSelectedId(CHARACTER_CLASSES[(idx + 1) % CHARACTER_CLASSES.length]!.id);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
-        const prev = CHARACTER_CLASSES[(idx - 1 + CHARACTER_CLASSES.length) % CHARACTER_CLASSES.length]!;
         cityAudio.play("ui");
-        setSelectedId(prev.id);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (ready) commitAndEnter(false);
-        else commitAndSkipLobby(true);
+        setSelectedId(
+          CHARACTER_CLASSES[
+            (idx - 1 + CHARACTER_CLASSES.length) % CHARACTER_CLASSES.length
+          ]!.id,
+        );
+      } else if (e.key === "Escape") {
+        setGate("menu");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, ready, name, selected]);
+  }, [selectedId, setGate]);
 
-  const playEnterFlash = () => {
+  const pulse = () => {
     setFlash(true);
-    window.setTimeout(() => setFlash(false), 700);
+    window.setTimeout(() => setFlash(false), 520);
   };
 
-  const commitAndEnter = (forceDemo = false) => {
-    setAvatar(appearanceFromClass(selected, name));
-    if (!forceDemo && !ready) {
-      cityAudio.play("deny");
-      return;
-    }
-    cityAudio.play("confirm");
-    playEnterFlash();
-    window.setTimeout(() => setGate("lobbies"), 220);
-  };
-
-  const commitAndSkipLobby = (forceDemo = false) => {
-    setAvatar(appearanceFromClass(selected, name));
-    if (!forceDemo && !ready) {
-      cityAudio.play("deny");
-      return;
-    }
+  const deploy = () => {
+    void cityAudio.unlock();
     cityAudio.play("enter");
-    playEnterFlash();
+    setAvatar(appearanceFromClass(selected, name));
+    pulse();
     window.setTimeout(() => {
       setGate("world");
       setEntered(true);
-    }, 220);
+    }, 260);
   };
 
-  const walletLabel =
-    connected && publicKey
-      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
-      : "Wallet offline";
+  const toLobbies = () => {
+    cityAudio.play("confirm");
+    setAvatar(appearanceFromClass(selected, name));
+    window.setTimeout(() => setGate("lobbies"), 200);
+  };
 
   return (
-    <div
-      className={`oxc-chars oxc-chars--mascots ${visible ? "is-in" : ""}`}
-      style={
-        {
-          ["--pod-neon" as string]: selected.neon,
-          ["--pod-gold" as string]: selected.gold,
-        } as CSSProperties
-      }
-    >
-      <CosmicBackdrop variant="chamber" />
+    <div className={`oxc-chars oxc-chars--v2 ${visible ? "is-in" : ""}`} style={cssVars}>
+      <CosmicBackdrop />
       <div className={`oxc-chars-flash ${flash ? "is-on" : ""}`} aria-hidden />
 
-      <header className="oxc-chars-bar">
+      <header className="oxc-chars-top">
         <button type="button" className="oxc-chars-back" onClick={() => setGate("menu")}>
-          ← Menu
+          ← Back
         </button>
-        <div className="oxc-chars-bar-center">
-          <p className="oxc-chars-kicker">Crypto native</p>
-          <h1 className="oxc-chars-title">
-            SELECT <span className="oxc-chars-title-x">OPERATIVE</span>
-          </h1>
-        </div>
-        <div className="oxc-chars-wallet-slot">
-          <WalletConnectButton />
-        </div>
+        <h1 className="oxc-chars-title">Select Operative</h1>
+        <span className="oxc-chars-count">
+          {CHARACTER_CLASSES.length} available
+        </span>
       </header>
 
       <div className="oxc-chars-stage">
-        <section className="oxc-chars-hero" aria-live="polite">
-          <div className="oxc-chars-hero-fig">
+        {/* ── Preview column ──────────────────────────────── */}
+        <section className="oxc-chars-preview" aria-label="Operative preview">
+          <div className="oxc-chars-podium" data-rarity={selected.rarity}>
             <CharacterPreview key={selected.id} classId={selected.id} />
+            <span className="oxc-chars-ring" aria-hidden />
           </div>
-          <div className="oxc-chars-hero-meta">
-            {flavor.badge && <span className="oxc-chars-badge">{flavor.badge}</span>}
-            <p className="oxc-chars-class-label" style={{ color: selected.neon }}>
-              {selected.name}
-            </p>
-            <h2 className="oxc-chars-callsign">{displayName}</h2>
+
+          <div className="oxc-chars-nameplate">
+            <span className="oxc-chars-rarity" data-rarity={selected.rarity}>
+              {rarity.label}
+            </span>
+            <h2>{selected.name}</h2>
+            <p className="oxc-chars-handle">{selected.handle}</p>
             <p className="oxc-chars-tagline">{selected.tagline}</p>
-            <p className="oxc-chars-lore">{flavor.lore}</p>
-            <p className="oxc-chars-perk" style={{ color: selected.neon }}>
-              Perk · {flavor.perk}
-            </p>
-            <ul className="oxc-chars-statrow">
-              {selected.stats.map((s) => (
-                <li key={s.label}>
-                  <span>{s.label}</span>
-                  <div className="oxc-pod-bar">
-                    <i key={`${selected.id}-${s.label}`} style={{ width: `${s.value}%`, background: selected.neon }} />
-                  </div>
-                  <em>{s.value}</em>
-                </li>
-              ))}
-            </ul>
-            <label className="oxc-chars-namefield">
-              Callsign
-              <input
-                value={name}
-                maxLength={24}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={selected.name}
-                autoComplete="nickname"
-              />
-            </label>
           </div>
         </section>
 
-        <nav className="oxc-chars-strip" role="listbox" aria-label="Crypto operatives">
-          {CHARACTER_CLASSES.map((cls, i) => {
-            const on = cls.id === selectedId;
-            return (
-              <button
-                key={cls.id}
-                type="button"
-                role="option"
-                aria-selected={on}
-                className={`oxc-chars-chip ${on ? "is-on" : ""}`}
-                style={{
-                  animationDelay: `${70 + i * 45}ms`,
-                  ["--pod-neon" as string]: cls.neon,
-                }}
-                onClick={() => {
-                  cityAudio.play("ui");
-                  setSelectedId(cls.id);
-                }}
-              >
-                <span className="oxc-chars-chip-fig">
-                  <MascotPortrait id={cls.id} />
-                </span>
-                <span className="oxc-chars-chip-name">{cls.name}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* ── Roster grid ─────────────────────────────────── */}
+        <section className="oxc-chars-roster" aria-label="Roster">
+          <div className="oxc-chars-grid" role="radiogroup" aria-label="Operatives">
+            {CHARACTER_CLASSES.map((cls) => {
+              const r = getRarityMeta(cls.id);
+              const on = cls.id === selectedId;
+              return (
+                <button
+                  key={cls.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  className={`oxc-chars-card ${on ? "is-active" : ""}`}
+                  data-rarity={cls.rarity}
+                  style={
+                    {
+                      "--card-neon": cls.neon,
+                      "--card-rarity": r.color,
+                    } as CSSProperties
+                  }
+                  onClick={() => {
+                    cityAudio.play("ui");
+                    setSelectedId(cls.id);
+                  }}
+                  onDoubleClick={deploy}
+                >
+                  <span className="oxc-chars-portrait">
+                    <MascotPortrait id={cls.id} />
+                  </span>
+                  <span className="oxc-chars-cardname">{cls.name}</span>
+                  <span className="oxc-chars-cardrole">
+                    {CLASS_FLAVOR[cls.id].role}
+                  </span>
+                  <span className="oxc-chars-cardrarity" data-rarity={cls.rarity}>
+                    {r.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Detail panel ──────────────────────────────── */}
+          <div className="oxc-chars-detail">
+            <p className="oxc-chars-lore">{flavor.lore}</p>
+
+            <ul className="oxc-chars-stats">
+              {selected.stats.map((s) => (
+                <li key={s.label}>
+                  <span className="oxc-chars-statlabel">{s.label}</span>
+                  <span className="oxc-chars-statbar">
+                    <i style={{ width: `${s.value}%` }} />
+                  </span>
+                  <span className="oxc-chars-statval">{s.value}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="oxc-chars-power">
+              <span>Power index</span>
+              <strong>{power}</strong>
+            </div>
+
+            <p className="oxc-chars-perk">
+              <span>Perk</span>
+              {flavor.perk}
+            </p>
+          </div>
+        </section>
       </div>
 
-      <footer className="oxc-chars-foot">
-        <div className="oxc-chars-foot-meta">
-          <span className={connected ? "is-on" : ""}>{walletLabel}</span>
-          <span aria-hidden>·</span>
-          <span>← → switch operative · Enter confirm</span>
-        </div>
-        <div className={`oxc-chars-actions ${ready ? "has-secondary" : ""}`}>
-          <button
-            type="button"
-            className="oxc-chars-cta oxc-chars-cta--primary"
-            onClick={() => (ready ? commitAndEnter(false) : commitAndSkipLobby(true))}
-          >
-            {ready ? "Continue → Multiplayer" : "Enter City"}
+      {/* ── Deploy bar ────────────────────────────────────── */}
+      <footer className="oxc-chars-deploy">
+        <label className="oxc-chars-namefield">
+          <span>Callsign</span>
+          <input
+            type="text"
+            value={name}
+            maxLength={20}
+            placeholder={selected.name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+
+        <div className="oxc-chars-actions">
+          {!ready && <WalletConnectButton />}
+          <button type="button" className="oxc-chars-lobby" onClick={toLobbies}>
+            Browse Lobbies
           </button>
-          {ready && (
-            <button type="button" className="oxc-chars-cta oxc-chars-cta--ghost" onClick={() => commitAndSkipLobby(true)}>
-              Skip lobby
-            </button>
-          )}
+          <button type="button" className="oxc-chars-go" onClick={deploy}>
+            Deploy as {displayName}
+          </button>
         </div>
+
+        <p className="oxc-chars-hint">← → to cycle · Enter to deploy · Esc to go back</p>
       </footer>
     </div>
   );

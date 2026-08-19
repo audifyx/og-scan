@@ -42,6 +42,21 @@ export function MascotPortrait({ id }: { id: CharacterClassId }) {
       </svg>
     );
   }
+  if (id === "vitalik") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <circle cx="32" cy="30" r="17" fill="#e7d9c4" />
+        <path d="M17 24c3-9 27-9 30 0-7-5-23-5-30 0z" fill="#3b3468" />
+        <rect x="14" y="27" width="36" height="7" rx="3.5" fill="#8a7dff" opacity="0.9" />
+        <circle cx="23" cy="30.5" r="2.4" fill="#0e0c1c" />
+        <circle cx="41" cy="30.5" r="2.4" fill="#0e0c1c" />
+        <path d="M32 8l7 12-7 4-7-4z" fill="#8a7dff" />
+        <path d="M32 8l7 12-7-3z" fill="#c3bcff" />
+        <path d="M27 43c3 2.4 7 2.4 10 0" fill="none" stroke="#a08b74" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
   if (id === "anon") {
     return (
       <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
