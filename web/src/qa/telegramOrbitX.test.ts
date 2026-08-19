@@ -4,18 +4,27 @@ import { resolve } from "node:path";
 import {
   argsFromCommand,
   cmdsPage,
+  extractMint,
   formatMediaCountdown,
+  formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatTokenCard,
   inferPublicTool,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
+  isTelegramAdminWallet,
   loginCode,
   mediaEtaSeconds,
+  mergeTokenScanPayloads,
+  ORBITX_FAQ_CHUNKS,
+  ORBITX_FAQ_CORE,
+  ORBITX_FAQ_SECTIONS,
+  orbitXFaqSystemAddon,
   parseCallInvocation,
   resolveOfficialCommand,
+  selectOrbitXFaqChunks,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
-import { formatOrbitXLinksHtml } from "../../api/orbitx/orbitx-telegram-knowledge.js";
+import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
@@ -49,6 +58,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("/img@theorbitxmcpbot").tool).toBe("orbitx_generate_image");
     expect(resolveOfficialCommand("tweet").tool).toBe("x_post");
     expect(resolveOfficialCommand("buy").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("trade").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("shop").tool).toBe("orbitx_shop");
+    expect(resolveOfficialCommand("autobuy").kind).toBe("meta");
     expect(resolveOfficialCommand("auth").kind).toBe("meta");
     expect(resolveOfficialCommand("login").kind).toBe("meta");
     expect(resolveOfficialCommand("check").kind).toBe("meta");
@@ -56,14 +68,28 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("links").kind).toBe("meta");
     expect(resolveOfficialCommand("group").kind).toBe("meta");
     expect(resolveOfficialCommand("menu").kind).toBe("meta");
+    expect(resolveOfficialCommand("verify").kind).toBe("meta");
+    expect(resolveOfficialCommand("faq").kind).toBe("meta");
+    expect(argsFromCommand("faq", "/faq burn").q).toBe("burn");
+    expect(inferPublicTool("faq mcp")?.meta).toBe("faq");
     expect(argsFromCommand("check", "/check abc123").taskId).toBe("abc123");
+    expect(argsFromCommand("verify", "/verify 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9").mint).toBe(
+      "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    );
     expect(argsFromCommand("img", "/img neon saturn")).toMatchObject({ prompt: "neon saturn" });
     expect(parseCallInvocation("/call get_token mint=So111").tool).toBe("orbitx_get_token");
+    expect(parseCallInvocation("/call trade").tool).toBe("orbitx_prepare_buy");
     expect(inferPublicTool("generate an image of a cyan planet")?.tool).toBe("orbitx_generate_image");
     expect(inferPublicTool("So11111111111111111111111111111111111111112")?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool("links")?.meta).toBe("links");
     expect(inferPublicTool("join the group")?.meta).toBe("links");
     expect(inferPublicTool("check")?.meta).toBe("check");
+    expect(inferPublicTool("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")?.tool).toBe("orbitx_get_token");
+    expect(extractMint("scan this 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 please")).toBe(
+      "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    );
+    expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);
+    expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
   });
 
   it("issues alphanumeric login codes without a bot token", () => {
@@ -103,11 +129,44 @@ describe("official OrbitX Telegram bot", () => {
     const text = formatOrbitXTelegramResult(payload);
     expect(card).toContain("ORBITX");
     expect(card).toContain("Price");
+    expect(card).toContain("MC");
     expect(card).toContain("mint revoked");
+    expect(card).toContain("Top 10");
+    expect(card).toContain("DexScreener");
     expect(card).not.toContain('"priceUsd"');
+    expect(card).not.toContain('"holderCount"');
     expect(text).toBe(card);
     expect(text.startsWith("{")).toBe(false);
     expect(formatOrbitXTelegramResult({ ok: true, result: payload })).toContain("Holders");
+
+    const branded = formatTokenCard(
+      mergeTokenScanPayloads({
+        token: { ...payload, athMcap: 210_000, athPrice: 0.00022 },
+        xray: {
+          mint: payload.mint,
+          verdict: "Looks clean",
+          concentration: { top10Pct: 31.1, whales: 4 },
+          bundles: { pct: 12, count: 3 },
+          dev: { wallet: "BC8FPb72MEZbExy21aeKTEVrG7cubSjrZxBBj51uA225", pct: 0, sold: true },
+        },
+        forensics: {
+          mint: payload.mint,
+          dexPaid: { paid: true, services: [{ type: "tokenProfile", status: "approved" }] },
+          concentration: { whales: 4, top10Pct: 31.1 },
+        },
+        boosts: { boosts: [{ mint: payload.mint, tier: "24h" }] },
+        verified: { mint: payload.mint, verified_by_wallet: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb" },
+      }),
+    );
+    expect(branded).toContain("OrbitX Verified");
+    expect(branded).toContain("ATH");
+    expect(branded).toContain("Whales");
+    expect(branded).toContain("Bundles");
+    expect(branded).toContain("KOLs");
+    expect(branded).toContain("Boosts");
+    expect(branded).toContain("DEX paid");
+    expect(branded).toContain("24h");
+    expect(branded.startsWith("{")).toBe(false);
   });
 
   it("renders /cmds as a slash menu, not a JSON dump", () => {
@@ -118,6 +177,7 @@ describe("official OrbitX Telegram bot", () => {
       ],
       { page: 1, query: "" },
     );
+    expect(page.text).toContain("/faq");
     expect(page.text).toContain("/token");
     expect(page.text).toContain("/check");
     expect(page.text).toContain("/img");
@@ -186,6 +246,77 @@ describe("official OrbitX Telegram bot", () => {
     expect(html).toContain("orbitx.world");
     expect(html).toContain("ORBITX_DEX");
     expect(html).toContain("Orbitxcity");
+    expect(html).toContain("ogscan.fun");
+  });
+
+  it("trains official Telegram AI on OrbitX FAQ hold/burn/MCP facts", () => {
+    expect(ORBITX_FAQ_CORE).toContain("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
+    expect(ORBITX_FAQ_CORE).toContain("100 $ORBITX");
+    expect(ORBITX_FAQ_CORE).toContain("10,000");
+    expect(ORBITX_FAQ_CORE).toContain("programs/betting/");
+    expect(ORBITX_FAQ_CORE).toContain("ogscan.fun");
+    expect(ORBITX_FAQ_CORE).toContain("16 chain");
+    expect(ORBITX_FAQ_CORE).toContain("not a separate standalone Solana-betting");
+    expect(ORBITX_FAQ_CORE).not.toContain("$70k");
+
+    const ids = ORBITX_FAQ_CHUNKS.map((c) => c.id);
+    for (const need of [
+      "what",
+      "token",
+      "hold",
+      "burn",
+      "shop",
+      "mcp",
+      "agents",
+      "dex",
+      "wallet",
+      "coinai",
+      "pulse",
+      "launch",
+      "surfaces",
+      "social",
+      "nft",
+      "predict",
+      "stack",
+      "roadmap",
+      "custody",
+      "answers",
+      "caveats",
+    ]) {
+      expect(ids).toContain(need);
+    }
+    expect(Object.keys(ORBITX_FAQ_SECTIONS)).toHaveLength(12);
+
+    const burn = orbitXFaqSystemAddon("how does burning work");
+    expect(burn).toContain("Jupiter");
+    expect(burn).toContain("Shop");
+    expect(burn.toLowerCase()).toContain("stackable");
+    expect(selectOrbitXFaqChunks("how does burning work").some((c) => c.id === "burn")).toBe(true);
+    expect(selectOrbitXFaqChunks("how do I connect MCP").some((c) => c.id === "mcp")).toBe(true);
+    expect(selectOrbitXFaqChunks("what is OrbitX").some((c) => c.id === "what")).toBe(true);
+    expect(selectOrbitXFaqChunks("what is the utility of $ORBITX").some((c) => c.id === "hold")).toBe(true);
+    expect(selectOrbitXFaqChunks("is it custodial").some((c) => c.id === "custody")).toBe(true);
+    expect(selectOrbitXFaqChunks("where is the code").some((c) => c.id === "stack")).toBe(true);
+    expect(selectOrbitXFaqChunks("can I launch a token for free with vanity").some((c) => c.id === "launch")).toBe(true);
+    expect(selectOrbitXFaqChunks("prediction markets").some((c) => c.id === "predict")).toBe(true);
+    expect(selectOrbitXFaqChunks("Coin AI analyst").some((c) => c.id === "coinai")).toBe(true);
+    expect(selectOrbitXFaqChunks("wallet copy-tracking").some((c) => c.id === "wallet")).toBe(true);
+
+    const shop = orbitXFaqSystemAddon("how does the shop burn work");
+    expect(shop).toContain("Jupiter");
+    expect(shop).toContain("does not take");
+
+    const faq = formatOrbitXFaqHtml("/faq mcp");
+    expect(faq).toContain("/api/mcp");
+    expect(faq).toContain("OrbitX FAQ");
+    expect(formatOrbitXFaqHtml("").toLowerCase()).toContain("hold");
+    expect(formatOrbitXFaqHtml("").length).toBeLessThan(4096);
+
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("$5");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("10,000");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("programs/betting/");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("ogscan.fun");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("/faq");
   });
 
   it("never commits a BotFather token and gates configure", () => {
@@ -205,7 +336,17 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("OFFICIAL_ORBITX_TELEGRAM_SYSTEM");
     expect(api).toContain("wait: false");
     expect(api).toContain("async function ensureWebhook");
-    expect(api).toContain("telegram_orbitx_media_jobs");
+    expect(api).toContain("buildBrandedScan");
+    expect(api).toContain("handleVerify");
+    expect(api).toContain("orbitx_token_verifications");
+    expect(api).toContain("TOKEN_INTEL_TOOLS");
+    expect(api).toContain("orbitXFaqSystemAddon");
+    expect(api).toContain("formatOrbitXFaqHtml");
+    expect(api).toContain("resolveOrbitXToolName");
+    expect(api).toContain("handleAutoBuy");
+    expect(api).toContain("auto_buy");
+    const imgLines = api.match(/\/img prompt · \/vid prompt/g) || [];
+    expect(imgLines.length).toBe(1);
     expect(api).not.toContain("8595161432");
   });
 });

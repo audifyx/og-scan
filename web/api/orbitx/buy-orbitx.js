@@ -42,6 +42,55 @@ export function normalizeConfirmMode(raw, { preferAuto = false } = {}) {
   return "sign";
 }
 
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const SOL_USD_CACHE = { v: 0, t: 0 };
+
+export async function fetchSolUsdPrice() {
+  if (Date.now() - SOL_USD_CACHE.t < 60_000 && SOL_USD_CACHE.v > 0) return SOL_USD_CACHE.v;
+  try {
+    const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`);
+    const d = await r.json();
+    const px = Number(d?.[SOL_MINT]?.usdPrice) || 0;
+    if (px > 0) {
+      SOL_USD_CACHE.v = px;
+      SOL_USD_CACHE.t = Date.now();
+      return px;
+    }
+  } catch {
+    /* try coingecko */
+  }
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+    const d = await r.json();
+    const px = Number(d?.solana?.usd) || 0;
+    if (px > 0) {
+      SOL_USD_CACHE.v = px;
+      SOL_USD_CACHE.t = Date.now();
+      return px;
+    }
+  } catch {
+    /* ignore */
+  }
+  return SOL_USD_CACHE.v || 0;
+}
+
+/** Convert a USD/USDC spend into SOL for /api/ogdex/trade (SOL-denominated buys). */
+export async function usdToSol(amountUsd) {
+  const usd = Number(amountUsd);
+  if (!Number.isFinite(usd) || usd <= 0) {
+    return { ok: false, error: "invalid_usd", message: "amountUsd must be a positive number" };
+  }
+  const px = await fetchSolUsdPrice();
+  if (!px) {
+    return {
+      ok: false,
+      error: "sol_price_unavailable",
+      message: "Could not quote SOL/USD. Retry with an amount in SOL (e.g. 0.1 SOL).",
+    };
+  }
+  return { ok: true, amountSol: usd / px, solUsd: px, amountUsd: usd };
+}
+
 export function parseBuySol(amountSol) {
   const n = Number(amountSol);
   if (!Number.isFinite(n)) {
@@ -231,11 +280,12 @@ export async function saveTradeIntent(sb, userId, payload) {
   }
 }
 
-export async function loadLatestTradeIntent(sb, userId, { mint = ORBITX_MINT } = {}) {
+export async function loadLatestTradeIntent(sb, userId, { mint } = {}) {
   if (!userId || typeof sb !== "function") return null;
   try {
+    const mintQ = mint ? `&mint=eq.${encodeURIComponent(mint)}` : "";
     const rows = await sb(
-      `agent_trade_intents?user_id=eq.${encodeURIComponent(userId)}&mint=eq.${encodeURIComponent(mint)}&status=eq.pending&order=created_at.desc&limit=1`,
+      `agent_trade_intents?user_id=eq.${encodeURIComponent(userId)}${mintQ}&status=eq.pending&order=created_at.desc&limit=1`,
     );
     const row = Array.isArray(rows) ? rows[0] : null;
     if (!row) return null;
@@ -264,6 +314,21 @@ export async function getChatTradeAuto(sb, agentId) {
       `agent_settings?agent_id=eq.${encodeURIComponent(agentId)}&select=chat_trade_auto&limit=1`,
     );
     return Boolean(Array.isArray(rows) && rows[0]?.chat_trade_auto);
+  } catch {
+    return false;
+  }
+}
+
+export async function setChatTradeAuto(sb, agentId, enabled) {
+  if (!agentId || typeof sb !== "function") return false;
+  const on = Boolean(enabled);
+  try {
+    await sb(`agent_settings?agent_id=eq.${encodeURIComponent(agentId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ chat_trade_auto: on }),
+      headers: { Prefer: "return=minimal" },
+    });
+    return true;
   } catch {
     return false;
   }
