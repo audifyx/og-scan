@@ -207,11 +207,25 @@ async function loadWallet(userId) {
   return Array.isArray(rows) ? rows[0]?.wallet || null : null;
 }
 
+const BUY_TOOL_ALIASES = {
+  orbitx_trade: "orbitx_prepare_buy",
+  orbitx_swap: "orbitx_prepare_buy",
+  trade: "orbitx_prepare_buy",
+  swap: "orbitx_prepare_buy",
+  orbitx_buy: "orbitx_prepare_buy",
+  orbitx_buy_auto: "orbitx_prepare_buy",
+};
+
 async function runTool({ tool, args, req, link, allowPrivileged }) {
   const hub = await import("./orbitx-hub.js");
   const requested = String(tool || "").trim();
   if (!requested) return { ok: false, error: "tool_required" };
-  const name = hub.resolveOrbitXToolName(requested) || hub.resolveEmbeddedAgentToolName(requested);
+  const aliased = BUY_TOOL_ALIASES[requested] || BUY_TOOL_ALIASES[requested.toLowerCase()] || requested;
+  const name =
+    hub.resolveOrbitXToolName(aliased) ||
+    hub.resolveOrbitXToolName(requested) ||
+    hub.resolveEmbeddedAgentToolName(aliased) ||
+    aliased;
   if (!hub.hasEmbeddedAgentTool(name) && name !== "x_post") {
     return {
       ok: false,
@@ -1209,6 +1223,8 @@ export default async function handler(req, res) {
         tokenConfigured: Boolean(BOT_TOKEN),
         webhook: webhook?.url || webhook,
         webhookOk: webhook?.ok !== false,
+        sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+        trade: "orbitx_prepare_buy",
       });
     }
 

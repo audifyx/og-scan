@@ -2049,6 +2049,36 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_trade",
+    description: "Alias for orbitx_prepare_buy (/trade). Returns Phantom signUrl.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_swap",
+    description: "Alias for orbitx_prepare_buy (/swap). Returns Phantom signUrl.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
     name: "orbitx_sell",
     description: "Alias for orbitx_prepare_sell — returns Phantom signUrl.",
     inputSchema: {
@@ -2875,20 +2905,29 @@ export function resolveOrbitXToolName(rawName) {
   const raw = String(rawName || "").trim();
   if (!raw) return "";
   const lower = raw.toLowerCase();
+  const prefixed =
+    !lower.startsWith("orbitx_") && lower !== "search" && lower !== "fetch" && !lower.startsWith("x_")
+      ? `orbitx_${lower}`
+      : "";
+  // Aliases first so names like orbitx_trade never win over orbitx_prepare_buy.
   const guesses = [
-    raw,
-    lower,
     TOOL_ALIASES[raw],
     TOOL_ALIASES[lower],
     applyTelegramAlias(raw),
     applyTelegramAlias(lower),
+    prefixed ? TOOL_ALIASES[prefixed] : "",
+    prefixed ? applyTelegramAlias(prefixed) : "",
+    raw,
+    lower,
+    prefixed,
   ];
-  if (!lower.startsWith("orbitx_") && lower !== "search" && lower !== "fetch" && !lower.startsWith("x_")) {
-    guesses.push(`orbitx_${lower}`, applyTelegramAlias(`orbitx_${lower}`), TOOL_ALIASES[`orbitx_${lower}`]);
-  }
   for (const guess of guesses) {
     if (!guess) continue;
-    if (TOOL_NAME_SET.has(guess)) return guess;
+    if (TOOL_NAME_SET.has(guess)) {
+      const aliased = TOOL_ALIASES[guess] || applyTelegramAlias(guess);
+      if (aliased && aliased !== guess && TOOL_NAME_SET.has(aliased)) return aliased;
+      return guess;
+    }
     const aliased = TOOL_ALIASES[guess] || applyTelegramAlias(guess);
     if (aliased && TOOL_NAME_SET.has(aliased)) return aliased;
   }
@@ -3614,9 +3653,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     return callTool("orbitx_prepare_buy", args, auth, base, req);
   }
 
-  if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
+  if (name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_buy_auto" || name === "orbitx_trade" || name === "orbitx_swap" || name === "orbitx_prepare_sell") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const action = name === "orbitx_prepare_buy" ? "buy" : "sell";
+    const action = name === "orbitx_prepare_sell" ? "sell" : "buy";
     const mint = String(args.mint || "");
     if (action === "buy" && !mint) {
       return { ok: false, error: "mint_required", message: "Pass a mint / CA to buy, or say buy $ORBITX." };
