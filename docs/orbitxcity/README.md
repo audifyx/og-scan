@@ -26,3 +26,6 @@ useCity().lobby / setLobby / selectedCityId / exitToMenu
 ```
 
 See `TEAM_CONTRACTS.md` for ownership boundaries.
+
+Midtown open-district pass (ground, humanoids, banners): `OPEN_CITY.md`.
+Burn store (Jupiter buy → burn ORBITX → unlock clothes/ads/listings): `CITY_SHOP.md`.

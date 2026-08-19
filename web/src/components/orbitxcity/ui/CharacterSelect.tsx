@@ -19,7 +19,7 @@ import { MascotPortrait } from "./MascotPortrait";
 
 const CLASS_FLAVOR: Record<CharacterClassId, { lore: string; perk: string; badge?: string }> = {
   pepe: {
-    lore: "The frog reads candles like a battlefield. Rarely blinks. Always early or catastrophically late.",
+    lore: "Reads candles like a battlefield. Rarely blinks. Always early or catastrophically late.",
     perk: "Priority lane on trading-floor terminals",
     badge: "Degen",
   },
@@ -142,7 +142,7 @@ export function CharacterSelect() {
           ← Menu
         </button>
         <div className="oxc-chars-bar-center">
-          <p className="oxc-chars-kicker">Crypto native</p>
+          <p className="oxc-chars-kicker">OrbitX City · Operative</p>
           <h1 className="oxc-chars-title">
             SELECT <span className="oxc-chars-title-x">OPERATIVE</span>
           </h1>

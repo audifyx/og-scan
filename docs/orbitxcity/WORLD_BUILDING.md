@@ -46,6 +46,16 @@ Generic OSM fill buildings stay solid.
 
 Walk-in venues get marquees, blade signs, open doorways, and roof crowns. Generic OSM fill stays solid (base band only — no fake doors).
 
+## Building-face banners
+
+`banners.ts` resolves ads for `BuildingMesh`:
+
+1. `building.banners` authored on the definition
+2. `BANNER_REGISTRY` (dev/admin overrides by `buildingId`)
+3. Default south-face title card for walk-in venue kinds
+
+Shape: `{ id, buildingId, face, u, v, width, height, imageUrl?, title, subtitle?, accent, enabled? }`. Missing / failed `imageUrl` uses a neon canvas card. See `OPEN_CITY.md` for the admin hook.
+
 ## Street life
 
 `StreetProps` places lamps, crosswalks, hydrants, trash cans, and bollards along `getWorldStreets()` sidewalks.

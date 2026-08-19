@@ -37,99 +37,99 @@ function roomPalette(theme: RoomTheme): RoomPalette {
   switch (theme) {
     case "hq":
       return {
-        floor: "#0c1218",
-        wall: "#152028",
-        ceiling: "#0e141a",
-        entry: "#101820",
-        key: "#d8ebe4",
+        floor: "#243038",
+        wall: "#2a3844",
+        ceiling: "#1a242c",
+        entry: "#2c3a42",
+        key: "#e8f4ee",
         fill: "#c5a26f",
         floorRough: 0.32,
         floorMetal: 0.48,
-        keyIntensity: 1.45,
+        keyIntensity: 1.7,
       };
     case "trade":
       return {
-        floor: "#101820",
-        wall: "#18222c",
-        ceiling: "#0c1218",
-        entry: "#121a22",
-        key: "#cfe4f0",
+        floor: "#243440",
+        wall: "#2a3a48",
+        ceiling: "#1a2630",
+        entry: "#2c3c48",
+        key: "#d8eef8",
         fill: "#3de7ff",
         floorRough: 0.45,
         floorMetal: 0.35,
-        keyIntensity: 1.5,
+        keyIntensity: 1.75,
       };
     case "club":
       return {
-        floor: "#120e18",
-        wall: "#1a1222",
-        ceiling: "#0e0a14",
-        entry: "#18101e",
-        key: "#f0c8e0",
+        floor: "#2a2034",
+        wall: "#322844",
+        ceiling: "#1c1628",
+        entry: "#30263c",
+        key: "#f6d4ea",
         fill: "#ff4d9a",
         floorRough: 0.4,
         floorMetal: 0.42,
-        keyIntensity: 1.2,
+        keyIntensity: 1.45,
       };
     case "market":
       return {
-        floor: "#1a1814",
-        wall: "#242018",
-        ceiling: "#161410",
-        entry: "#1e1a14",
-        key: "#f0e2c8",
+        floor: "#322c24",
+        wall: "#3c3428",
+        ceiling: "#241e18",
+        entry: "#3a3228",
+        key: "#f6ead4",
         fill: "#c5a26f",
         floorRough: 0.7,
         floorMetal: 0.15,
-        keyIntensity: 1.35,
+        keyIntensity: 1.55,
       };
     case "launch":
       return {
-        floor: "#2a2418",
-        wall: "#2c261c",
-        ceiling: "#1a160e",
-        entry: "#241e14",
-        key: "#f7ecd0",
+        floor: "#3a3224",
+        wall: "#403828",
+        ceiling: "#2a2418",
+        entry: "#3c3426",
+        key: "#fff4d8",
         fill: "#ffb84d",
         floorRough: 0.62,
         floorMetal: 0.22,
-        keyIntensity: 1.4,
+        keyIntensity: 1.65,
       };
     case "theater":
       return {
-        floor: "#12161c",
-        wall: "#1a2028",
-        ceiling: "#0c1016",
-        entry: "#141a20",
-        key: "#e8eef4",
+        floor: "#283038",
+        wall: "#303844",
+        ceiling: "#1c242c",
+        entry: "#2c3440",
+        key: "#f0f4f8",
         fill: "#a78bfa",
         floorRough: 0.55,
         floorMetal: 0.25,
-        keyIntensity: 1.25,
+        keyIntensity: 1.5,
       };
     case "lounge":
       return {
-        floor: "#1a1c22",
-        wall: "#22262e",
-        ceiling: "#141820",
-        entry: "#1c2028",
-        key: "#efe6d6",
+        floor: "#2c3038",
+        wall: "#363c48",
+        ceiling: "#222830",
+        entry: "#323844",
+        key: "#f4eadc",
         fill: "#00ff9f",
         floorRough: 0.6,
         floorMetal: 0.2,
-        keyIntensity: 1.3,
+        keyIntensity: 1.55,
       };
     default:
       return {
-        floor: "#1a1f26",
-        wall: "#1c242c",
-        ceiling: "#151a20",
-        entry: "#10161c",
-        key: "#efe6d6",
+        floor: "#2a323c",
+        wall: "#323a44",
+        ceiling: "#222830",
+        entry: "#2c343c",
+        key: "#f4eadc",
         fill: "#cfe8ff",
         floorRough: 0.55,
         floorMetal: 0.28,
-        keyIntensity: 1.35,
+        keyIntensity: 1.55,
       };
   }
 }
@@ -238,7 +238,7 @@ function FurnitureLayer({
 }) {
   const paths = getFurnitureSet(theme);
   const slots = useMemo(
-    () => furnitureSlots(theme, width, depth, paths).slice(3, 7),
+    () => furnitureSlots(theme, width, depth, paths).slice(0, 6),
     [theme, width, depth, paths],
   );
   if (!slots.length) return null;
@@ -830,9 +830,11 @@ export function InteriorRoom({
         </mesh>
       ))}
 
-      <pointLight position={[0, h - 0.4, 0]} intensity={palette.keyIntensity} distance={13} color={palette.key} />
-      <pointLight position={[0, 1.8, -d / 2 + 0.8]} intensity={0.75} distance={9} color={building.accent} />
-      <pointLight position={[0, 1.4, d / 2 - 0.6]} intensity={0.5} distance={6} color={palette.fill} />
+      <pointLight position={[0, h - 0.4, 0]} intensity={palette.keyIntensity} distance={14} color={palette.key} />
+      <pointLight position={[0, 1.8, -d / 2 + 0.8]} intensity={0.95} distance={10} color={building.accent} />
+      <pointLight position={[0, 1.4, d / 2 - 0.6]} intensity={0.7} distance={7} color={palette.fill} />
+      <pointLight position={[-w * 0.28, 2.2, 0.2]} intensity={0.45} distance={8} color="#f0e6d4" />
+      <pointLight position={[w * 0.3, 2.4, -0.4]} intensity={0.4} distance={8} color="#f4eadc" />
 
       <Text
         position={[0, h - 0.5, -d / 2 + 0.22]}

@@ -1,61 +1,75 @@
-import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 
-const DAY_SECONDS = 360;
-
-function skyPalette(cityId: WorldBlockConfig["cityId"]) {
+function nightPalette(cityId: WorldBlockConfig["cityId"]): {
+  sky: string;
+  fog: string;
+  hemiSky: string;
+  hemiGround: string;
+  moon: string;
+  fill: string;
+} {
   switch (cityId) {
     case "miami":
-      return { day: new THREE.Color("#6a98a4"), dusk: new THREE.Color("#3a4a58"), night: new THREE.Color("#0c141c") };
+      return {
+        sky: "#0c1c28",
+        fog: "#163040",
+        hemiSky: "#3a6a78",
+        hemiGround: "#1a2a22",
+        moon: "#e8f4f0",
+        fill: "#5ec4b6",
+      };
     case "la":
-      return { day: new THREE.Color("#7a8090"), dusk: new THREE.Color("#3a3048"), night: new THREE.Color("#100e18") };
+      return {
+        sky: "#14101c",
+        fog: "#1c1830",
+        hemiSky: "#4a3a68",
+        hemiGround: "#221a1c",
+        moon: "#f0e4d8",
+        fill: "#b388ff",
+      };
     case "boston":
-      return { day: new THREE.Color("#748490"), dusk: new THREE.Color("#2e3844"), night: new THREE.Color("#0c1218") };
+      return {
+        sky: "#0c1628",
+        fog: "#152238",
+        hemiSky: "#3a5880",
+        hemiGround: "#1a221c",
+        moon: "#dce8f8",
+        fill: "#5b8def",
+      };
     default:
-      return { day: new THREE.Color("#6e7e8a"), dusk: new THREE.Color("#2a3440"), night: new THREE.Color("#0a0e14") };
+      return {
+        sky: "#0c1624",
+        fog: "#152030",
+        hemiSky: "#3a5a80",
+        hemiGround: "#1a2418",
+        moon: "#e8eef8",
+        fill: "#c5a26f",
+      };
   }
 }
 
-/** A slow real-time sky cycle with sun/moon lighting and city-specific haze. */
+/**
+ * Night cyber-financial district sky.
+ * Ground stays readable via street lamps + neon bounce — not a black void,
+ * not a daytime suburb.
+ */
 export function SkyCycle({ block }: { block: WorldBlockConfig }) {
-  const sun = useRef<THREE.DirectionalLight>(null);
-  const fill = useRef<THREE.HemisphereLight>(null);
-  const moon = useRef<THREE.Mesh>(null);
-  const palette = skyPalette(block.cityId);
-
-  useFrame(({ clock, scene }) => {
-    const phase = (clock.elapsedTime % DAY_SECONDS) / DAY_SECONDS;
-    const arc = phase * Math.PI * 2 - Math.PI / 2;
-    const daylight = Math.max(0, Math.sin(arc));
-    const twilight = Math.max(0, 1 - Math.abs(Math.sin(arc)) * 2);
-    const sky = palette.night.clone().lerp(palette.dusk, twilight).lerp(palette.day, daylight);
-    scene.background = sky;
-    // Keep fog cool/dark so neon emissives stay readable.
-    if (scene.fog instanceof THREE.Fog) {
-      scene.fog.color.copy(sky).lerp(new THREE.Color("#121820"), 0.45);
-    }
-
-    if (sun.current) {
-      sun.current.position.set(Math.cos(arc) * 46, 10 + daylight * 48, Math.sin(arc) * 34);
-      sun.current.intensity = 0.38 + daylight * 0.7 + twilight * 0.28;
-      sun.current.color.set(daylight > 0.35 ? "#fff0d2" : "#c5d4e4");
-    }
-    if (fill.current) fill.current.intensity = 0.48 + daylight * 0.4;
-    if (moon.current) {
-      moon.current.position.set(-Math.cos(arc) * 58, 12 + (1 - daylight) * 36, -Math.sin(arc) * 46);
-      moon.current.visible = daylight < 0.42;
-    }
-  });
-
+  const pal = nightPalette(block.cityId);
   return (
     <>
-      <hemisphereLight ref={fill} args={["#a8c0d0", "#1a2228", 0.75]} />
-      <directionalLight ref={sun} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} shadow-camera-left={-70} shadow-camera-right={70} shadow-camera-top={70} shadow-camera-bottom={-70} shadow-bias={-0.0002} />
-      <mesh ref={moon}>
-        <sphereGeometry args={[2.1, 20, 16]} />
-        <meshBasicMaterial color="#e8edf0" toneMapped={false} />
+      <color attach="background" args={[pal.sky]} />
+      <fog attach="fog" args={[pal.fog, 48, 170]} />
+      <hemisphereLight args={[pal.hemiSky, pal.hemiGround, 0.42]} />
+      <directionalLight position={[28, 44, 16]} intensity={0.32} color="#d8e4f4" />
+      <directionalLight position={[-16, 18, -10]} intensity={0.18} color={pal.fill} />
+      <mesh position={[36, 58, 20]}>
+        <sphereGeometry args={[2.6, 20, 16]} />
+        <meshBasicMaterial color={pal.moon} toneMapped={false} />
+      </mesh>
+      <mesh position={[36, 58, 20]}>
+        <sphereGeometry args={[4.2, 16, 12]} />
+        <meshBasicMaterial color={pal.moon} transparent opacity={0.08} depthWrite={false} toneMapped={false} />
       </mesh>
     </>
   );

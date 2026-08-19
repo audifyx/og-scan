@@ -74,6 +74,26 @@ export interface BuildingDefinition {
   label?: string;
   /** Local-space ground footprint (relative to building.position). When set, mesh uses extruded OSM outline. */
   footprint?: Array<{ x: number; z: number }>;
+  /** Optional face banners / ads. See `banners.ts`. */
+  banners?: BuildingBanner[];
+}
+
+export type BuildingFace = "south" | "north" | "east" | "west";
+
+/** Dev/admin banner on a building face. Image optional — title card if missing. */
+export interface BuildingBanner {
+  id: string;
+  buildingId: string;
+  face: BuildingFace;
+  u: number;
+  v: number;
+  width: number;
+  height: number;
+  imageUrl?: string;
+  title: string;
+  subtitle?: string;
+  accent: string;
+  enabled?: boolean;
 }
 
 export interface BillboardDefinition {
@@ -150,11 +170,13 @@ export type HudPanel =
   | "settings"
   | "help"
   | "lobbies"
-  | "character";
+  | "character"
+  | "shop";
 
-export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk";
-export type OutfitStyle = "street" | "suit" | "sport" | "neon";
+export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk" | "fade" | "twin";
+export type OutfitStyle = "street" | "suit" | "sport" | "neon" | "hoodie" | "gold" | "royal" | "pilot" | "legend";
 export type FaceStyle = "neutral" | "cool" | "smile";
+export type BeardStyle = "none" | "stubble" | "full" | "goatee";
 
 export interface StreetSegment {
   /** "h" runs along X at z=at; "v" runs along Z at x=at. */
@@ -179,6 +201,8 @@ export interface AvatarAppearance {
   hairColor: string;
   outfit: OutfitStyle;
   faceStyle: FaceStyle;
+  /** Optional; class identity supplies a default (Chad full, Wojak stubble). */
+  beardStyle?: BeardStyle;
 }
 
 /** Pre-world gate screens for AAA menu flow. */
@@ -187,7 +211,7 @@ export type CityGate = "menu" | "characters" | "lobbies" | "settings" | "world";
 
 export interface InventoryItem {
   id: string;
-  kind: "token" | "badge" | "key" | "ad_slot";
+  kind: "token" | "badge" | "key" | "ad_slot" | "cosmetic" | "listing" | "perk";
   label: string;
   detail?: string;
   mint?: string;

@@ -26,7 +26,7 @@ export function Skyline({ block = NYC_DEMO_BLOCK, lite = false }: { block?: Worl
       metalness: 0.28,
       roughness: 0.72,
       emissive: "#f0d7a0",
-      emissiveIntensity: lite ? 0.18 : 0.28,
+      emissiveIntensity: lite ? 0.42 : 0.62,
     });
     const towersMesh = new THREE.InstancedMesh(towerGeo, towerMat, count);
 
