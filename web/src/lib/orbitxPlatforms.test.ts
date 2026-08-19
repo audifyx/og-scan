@@ -33,7 +33,7 @@ describe("OrbitX platform catalog", () => {
     }
   });
 
-  it("pins Shop, Agent, DEX, and City on the iOS dock", () => {
+  it("pins Shop, Agent, DEX, and City as command deck gates", () => {
     expect(HOME_DOCK.map((a) => a.key)).toEqual(["dex", "agent", "shop", "city"]);
   });
 
