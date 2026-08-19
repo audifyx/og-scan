@@ -41,6 +41,7 @@ export function useActiveTradingWallet() {
     signTransaction,
     sendTransaction,
     signMessage: adapterSignMessage,
+    wallet: adapterWallet,
     wallets,
     select,
     connect,
@@ -136,12 +137,13 @@ export function useActiveTradingWallet() {
         {
           sendTransaction: sendTransaction ?? undefined,
           signTransaction: signTransaction ?? undefined,
+          walletName: adapterWallet?.adapter?.name ?? null,
         },
         tx,
         options,
       );
     },
-    [sendTransaction, signTransaction],
+    [sendTransaction, signTransaction, adapterWallet],
   );
 
   /** Sign an arbitrary message for wallet-proof APIs (alerts CRUD). */

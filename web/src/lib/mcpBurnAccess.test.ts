@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MCP_ACCESS_PACKAGES, MCP_BURN_MINT, mcpAccessSignUrl } from "./mcpBurnAccess";
+import {
+  DEFAULT_MCP_ACCESS_PACKAGES,
+  MCP_BURN_MINT,
+  clearPendingMcpBurn,
+  mcpAccessSignUrl,
+  parseBurnTxSignature,
+  rememberPendingMcpBurn,
+  takePendingMcpBurn,
+} from "./mcpBurnAccess";
 
 describe("mcpAccessSignUrl", () => {
   it("builds a day-package burn handoff", () => {
@@ -33,6 +41,33 @@ describe("mcpAccessSignUrl", () => {
       ["day", 100],
       ["week", 1000],
     ]);
+  });
+});
+
+describe("parseBurnTxSignature", () => {
+  const sig = `${"1".repeat(32)}${"2".repeat(32)}abcd`;
+
+  it("accepts a raw signature or a Solscan link", () => {
+    expect(parseBurnTxSignature(`  ${sig}  `)).toBe(sig);
+    expect(parseBurnTxSignature(`https://solscan.io/tx/${sig}`)).toBe(sig);
+    expect(parseBurnTxSignature(`https://explorer.solana.com/tx/${sig}?cluster=mainnet`)).toBe(sig);
+  });
+});
+
+describe("pending burn handoff", () => {
+  it("remembers a Jupiter burn so shop can grant access if confirm raced the RPC", () => {
+    clearPendingMcpBurn();
+    rememberPendingMcpBurn({
+      signature: "sig123",
+      publicKey: "11111111111111111111111111111111",
+      packageId: "day",
+    });
+    expect(takePendingMcpBurn()).toMatchObject({
+      signature: "sig123",
+      packageId: "day",
+    });
+    clearPendingMcpBurn();
+    expect(takePendingMcpBurn()).toBeNull();
   });
 });
 

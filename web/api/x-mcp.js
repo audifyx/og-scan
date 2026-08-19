@@ -2376,11 +2376,10 @@ async function callTool(rawName, args, auth, req = null) {
   }
 
   if (name === "x_mcp_access_status") {
-    if (!auth?.userId) {
-      return { ok: false, error: "session_required", message: "Authenticate to view MCP access status" };
-    }
     try {
-      return await getAccessStatus(sb, auth.userId);
+      return await getAccessStatus(sb, auth?.userId, {
+        wallets: [a.publicKey, a.wallet, auth?.walletAddress],
+      });
     } catch (e) {
       return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
     }
@@ -2418,23 +2417,16 @@ async function callTool(rawName, args, auth, req = null) {
   }
 
   if (name === "x_mcp_access_confirm") {
-    if (!auth?.userId) {
-      return {
-        ok: false,
-        error: "session_required",
-        message: "Authenticate first, then pass the burn transaction signature.",
-      };
-    }
     const signature = String(a.signature || a.txSignature || a.tx_signature || a.sig || "").trim();
     if (!signature) {
       return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
     }
     try {
       return await confirmAccessBurn(sb, {
-        userId: auth.userId,
+        userId: auth?.userId,
         signature,
         packageId: a.package || a.packageId,
-        wallet: a.publicKey || a.wallet,
+        wallet: a.publicKey || a.wallet || auth?.walletAddress,
       });
     } catch (e) {
       return {
@@ -3605,9 +3597,13 @@ async function handleAgent(req, res, parts) {
 
   if (route === "mcp-access" && req.method === "GET") {
     const user = await getAuthUser(req);
-    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
+    const u = new URL(req.url || "/", "http://x");
+    const walletPk = String(
+      u.searchParams.get("wallet") || u.searchParams.get("publicKey") || "",
+    ).trim();
+    if (!user?.id && !walletPk) return json(res, { error: "unauthorized" }, 401);
     try {
-      return json(res, await getAccessStatus(sb, user.id));
+      return json(res, await getAccessStatus(sb, user?.id, { wallets: [walletPk] }));
     } catch (e) {
       return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
     }
@@ -3627,13 +3623,12 @@ async function handleAgent(req, res, parts) {
 
   if (route === "mcp-access/confirm" && req.method === "POST") {
     const user = await getAuthUser(req);
-    if (!user?.id) return json(res, { error: "unauthorized" }, 401);
     const body = await readBody(req);
     const signature = String(body.signature || body.txSignature || body.tx_signature || "").trim();
     if (!signature) return json(res, { error: "signature_required" }, 400);
     try {
       const out = await confirmAccessBurn(sb, {
-        userId: user.id,
+        userId: user?.id,
         signature,
         packageId: body.packageId || body.package,
         wallet: body.publicKey || body.wallet,

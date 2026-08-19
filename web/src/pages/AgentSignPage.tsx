@@ -6,7 +6,12 @@ import { Check, ExternalLink, Loader2, ShieldAlert, Wallet } from "lucide-react"
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { supabase } from "@/lib/supabase";
-import { buildMcpAccessBurnTransaction } from "@/lib/mcpBurnAccess";
+import {
+  buildMcpAccessBurnTransaction,
+  confirmMcpAccessBurnUntilGranted,
+  rememberPendingMcpBurn,
+} from "@/lib/mcpBurnAccess";
+import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
 type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access";
 
@@ -20,14 +25,23 @@ function decodeTx(b64: string): VersionedTransaction | Transaction {
 }
 
 /**
- * MCP handoff — rebuild unsigned tx (trade / credits / claim / burn / rent), sign in Phantom.
+ * MCP handoff — rebuild unsigned tx (trade / credits / claim / burn / rent), sign in Jupiter.
  * Query: kind, action, mint, amount, percent, publicKey, slippage, pool, auto
  */
 export default function AgentSignPage() {
   const [params] = useSearchParams();
   const { connection } = useConnection();
-  const { publicKey, signTransaction, sendTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected, wallet: adapterWallet } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
+  const walletCaps = {
+    sendTransaction: sendTransaction ?? undefined,
+    signTransaction: signTransaction ?? undefined,
+    walletName: adapterWallet?.adapter?.name ?? null,
+  };
+  const connectWallets = [...pickable].sort((a, b) => {
+    const rank = (n: string) => (/jupiter/i.test(n) ? 0 : /phantom/i.test(n) ? 2 : 1);
+    return rank(a.name) - rank(b.name);
+  });
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();
   const kind: Kind =
@@ -115,21 +129,7 @@ export default function AgentSignPage() {
 
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
-    if (sendTransaction) {
-      return sendTransaction(tx as VersionedTransaction, connection, {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
-    }
-    if (signTransaction) {
-      const signed = await signTransaction(tx as VersionedTransaction);
-      const raw =
-        signed instanceof VersionedTransaction
-          ? signed.serialize()
-          : (signed as Transaction).serialize();
-      return connection.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
-    }
-    throw new Error("This wallet cannot sign here — reconnect Phantom or Jupiter.");
+    return sendWalletTransaction(connection, walletCaps, tx);
   };
 
   const onSign = async () => {
@@ -141,7 +141,7 @@ export default function AgentSignPage() {
       return;
     }
     if (!connected || !publicKey) {
-      setError("Connect Phantom or Jupiter first.");
+      setError("Connect Jupiter first.");
       return;
     }
     if (walletMismatch) {
@@ -168,18 +168,7 @@ export default function AgentSignPage() {
             lamports,
           }),
         );
-        let sig: string;
-        if (sendTransaction) {
-          sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
-        } else if (signTransaction) {
-          const signed = await signTransaction(tx);
-          sig = await connection.sendRawTransaction(signed.serialize(), {
-            skipPreflight: false,
-            maxRetries: 3,
-          });
-        } else {
-          throw new Error("This wallet cannot sign here — reconnect Phantom or Jupiter.");
-        }
+        const sig = await sendWalletTransaction(connection, walletCaps, tx);
         await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
         setSignature(sig);
 
@@ -234,45 +223,22 @@ export default function AgentSignPage() {
             amountRaw: String(data.amountRaw),
             closesAccount: Boolean(data.closesAccount),
           });
-          if (sendTransaction) {
-            sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
-          } else if (signTransaction) {
-            const signed = await signTransaction(tx);
-            sig = await connection.sendRawTransaction(signed.serialize(), {
-              skipPreflight: false,
-              maxRetries: 3,
-            });
-          } else {
-            throw new Error("This wallet cannot sign here — reconnect Phantom or Jupiter.");
-          }
+          sig = await sendWalletTransaction(connection, walletCaps, tx);
         } else {
           throw new Error(data?.message || "Could not build access burn");
         }
         await connection.confirmTransaction(sig, "confirmed");
         setSignature(sig);
-        try {
-          const session = (await supabase.auth.getSession()).data.session;
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-          const confirmRes = await fetch("/api/orbitx-agent/mcp-access/confirm", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ signature: sig, publicKey: pk, packageId: pkg }),
-          });
-          const granted = await confirmRes.json().catch(() => ({}));
-          if (confirmRes.ok && granted?.ok) {
-            setExtraNote(
-              granted.message ||
-                `${granted.remainingLabel || "Access granted"}. Opens /agent when the clock is running.`,
-            );
-          } else {
-            setExtraNote(
-              "Burn sent. Sign in on /agent and confirm the signature if access did not unlock.",
-            );
-          }
-        } catch {
-          setExtraNote("Burn sent. Open /agent to refresh access status.");
-        }
+        rememberPendingMcpBurn({ signature: sig, publicKey: pk, packageId: pkg });
+        const granted = await confirmMcpAccessBurnUntilGranted({
+          signature: sig,
+          publicKey: pk,
+          packageId: pkg,
+        });
+        setExtraNote(
+          granted.message ||
+            `${granted.remainingLabel || "Access granted"}. Timed MCP access is active now.`,
+        );
         return;
       }
 
@@ -376,21 +342,21 @@ export default function AgentSignPage() {
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
           <h1 className="text-xl font-black tracking-tight">
-            {autoPrompt ? "Auto-confirm" : "Sign with Phantom"}
+            {autoPrompt ? "Auto-confirm" : "Sign with Jupiter"}
           </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
           {kind === "credits"
             ? autoPrompt
-              ? "Chat auto-confirm — Phantom will send SOL to the OrbitX desk wallet, then credits apply."
+              ? "Chat auto-confirm — Jupiter will send SOL to the OrbitX desk wallet, then credits apply."
               : "Approve the SOL transfer to the OrbitX desk wallet. Credits credit after confirmation."
             : kind === "mcp-access"
               ? autoPrompt
-                ? "Chat auto-confirm — Phantom will burn the exact $ORBITX package amount, then MCP access starts."
-                : "Approve the $ORBITX burn. MCP access starts after confirmation and expires automatically."
+                ? "Chat auto-confirm — Jupiter will burn the exact $ORBITX package amount, then MCP access starts."
+                : "Approve the $ORBITX burn in Jupiter. MCP access starts after confirmation and expires automatically."
               : autoPrompt
-                ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
-                : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
+                ? "Chat auto-confirm — Jupiter will prompt as soon as your wallet is connected."
+                : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Jupiter — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
@@ -461,7 +427,7 @@ export default function AgentSignPage() {
           <>
             {!connected && (
               <div className="mb-3 flex flex-wrap gap-2">
-                {pickable.map((w) => (
+                {connectWallets.map((w) => (
                   <button
                     key={w.name}
                     type="button"
@@ -481,7 +447,7 @@ export default function AgentSignPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab9ff2] px-4 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40"
             >
               {busyTrade ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-              {busyTrade ? "Waiting for Phantom…" : `Sign & send ${title}`}
+              {busyTrade ? "Waiting for Jupiter…" : `Sign & send ${title}`}
             </button>
           </>
         )}

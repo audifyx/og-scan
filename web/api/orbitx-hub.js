@@ -64,7 +64,7 @@ async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}
     return { allowed: true, source: "exempt", hold: { exempt: true, meetsRequirement: true } };
   }
   const hold = await verifyTokenHold(candidates[0] || "", base, { email });
-  const access = await evaluateMcpAccess({ sb, userId, hold });
+  const access = await evaluateMcpAccess({ sb, userId, hold, wallets: candidates });
   if (access.allowed) return access;
   return {
     ...access,
@@ -543,9 +543,13 @@ async function handleAgent(req, res, parts) {
 
   if (route === "mcp-access" && req.method === "GET") {
     const authUser = await getAuthUser(req);
-    if (!authUser?.id) return json(res, { error: "unauthorized" }, 401);
+    const u = new URL(req.url || "/", "http://x");
+    const walletPk = normalizeGateWallet(
+      u.searchParams.get("wallet") || u.searchParams.get("publicKey") || "",
+    );
+    if (!authUser?.id && !walletPk) return json(res, { error: "unauthorized" }, 401);
     try {
-      return json(res, await getAccessStatus(sb, authUser.id));
+      return json(res, await getAccessStatus(sb, authUser?.id, { wallets: [walletPk] }));
     } catch (e) {
       return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
     }
@@ -581,18 +585,6 @@ async function handleAgent(req, res, parts) {
       } catch {
         /* ignore */
       }
-    }
-    if (!userId) {
-      return json(
-        res,
-        {
-          ok: false,
-          error: "user_required",
-          message: "Sign in or link this wallet on /agent, then confirm the burn.",
-          signature,
-        },
-        401,
-      );
     }
     try {
       const out = await confirmAccessBurn(sb, {
@@ -650,7 +642,12 @@ async function handleAgent(req, res, parts) {
       wallet = normalizeGateWallet(agent.wallet_address);
     }
     const hold = await verifyTokenHold(wallet, base, { email: authUser.email });
-    const access = await evaluateMcpAccess({ sb, userId: authUser.id, hold });
+    const access = await evaluateMcpAccess({
+      sb,
+      userId: authUser.id,
+      hold,
+      wallets: [wallet, agent.wallet_address],
+    });
     return json(
       res,
       {
@@ -675,7 +672,12 @@ async function handleAgent(req, res, parts) {
     const agent = await ensureAgent(userId);
     const { base, mcpUrl } = mcpUrls(req);
     const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
-    const access = await evaluateMcpAccess({ sb, userId, hold });
+    const access = await evaluateMcpAccess({
+      sb,
+      userId,
+      hold,
+      wallets: [agent.wallet_address],
+    });
     const keys = await listKeys(agent.id);
     let mintedKey = null;
     // Only auto-mint a key when hold, burn access, or exempt is satisfied.
@@ -3361,11 +3363,10 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   }
 
   if (name === "orbitx_mcp_access_status") {
-    if (!auth?.userId) {
-      return { ok: false, error: "session_required", message: "Authenticate to view MCP access status" };
-    }
     try {
-      return await getAccessStatus(sb, auth.userId);
+      return await getAccessStatus(sb, auth?.userId, {
+        wallets: [wallet, args.publicKey, args.wallet, auth?.walletAddress],
+      });
     } catch (e) {
       return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
     }
@@ -3387,23 +3388,16 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   }
 
   if (name === "orbitx_mcp_access_confirm") {
-    if (!auth?.userId) {
-      return {
-        ok: false,
-        error: "session_required",
-        message: "Authenticate first, then pass the burn transaction signature.",
-      };
-    }
     const signature = String(args.signature || args.txSignature || args.tx_signature || args.sig || "").trim();
     if (!signature) {
       return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
     }
     try {
       return await confirmAccessBurn(sb, {
-        userId: auth.userId,
+        userId: auth?.userId,
         signature,
         packageId: args.package || args.packageId,
-        wallet: wallet || args.publicKey,
+        wallet: wallet || args.publicKey || args.wallet,
       });
     } catch (e) {
       return {
