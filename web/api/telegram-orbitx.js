@@ -63,14 +63,14 @@ function header(req, name) {
   return h[name.toLowerCase()] || h[name] || "";
 }
 
-function publicBase(req) {
+function officialOrigin() {
   const env = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL;
   if (env) return String(env).replace(/\/$/, "").replace("://orbitx.world", "://www.orbitx.world");
-  const proto = header(req, "x-forwarded-proto") || "https";
-  let host = header(req, "x-forwarded-host") || header(req, "host") || "www.orbitx.world";
-  host = String(host).split(",")[0].trim().replace(/:\d+$/, "");
-  if (host === "orbitx.world") host = "www.orbitx.world";
-  return `${proto}://${host}`;
+  return FALLBACK;
+}
+
+function publicBase(req) {
+  return officialOrigin();
 }
 
 async function readBody(req) {
@@ -347,7 +347,7 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
-  if (bare === "login") {
+  if (bare === "login" || bare === "auth") {
     if (isGroup) {
       await tg("sendMessage", {
         chat_id: chatId,
@@ -458,7 +458,7 @@ async function handleTelegramUpdate(update, req) {
 
 async function configureBot(req) {
   if (!BOT_TOKEN) return { ok: false, error: "TELEGRAM_ORBITX_BOT_TOKEN is not set" };
-  const base = publicBase(req);
+  const base = officialOrigin();
   const webhookUrl = `${base}/api/telegram-orbitx`;
   const me = await tg("getMe", {});
   const name = await tg("setMyName", { name: OFFICIAL_BOT_NAME });
@@ -475,7 +475,7 @@ async function configureBot(req) {
   const defaultCmds = await tg("setMyCommands", { commands: GROUP_COMMANDS.slice(0, 100) });
   const webhook = await tg("setWebhook", {
     url: webhookUrl,
-    secret_token: WEBHOOK_SECRET || undefined,
+    secret_token: process.env.TELEGRAM_ORBITX_WEBHOOK_SECRET || undefined,
     allowed_updates: ["message", "edited_message", "channel_post", "callback_query"],
     drop_pending_updates: false,
   });
@@ -507,6 +507,22 @@ async function setBotPhoto(base) {
   } catch (error) {
     return { ok: false, error: error?.message || "photo_failed" };
   }
+}
+
+let lastWebhookEnsure = 0;
+const WEBHOOK_ENSURE_MS = 5 * 60_000;
+
+async function ensureWebhook(req) {
+  if (!BOT_TOKEN) return { ok: false, skipped: true, error: "no_token" };
+  const want = `${officialOrigin()}/api/telegram-orbitx`;
+  if (Date.now() - lastWebhookEnsure < WEBHOOK_ENSURE_MS) {
+    return { ok: true, cached: true, url: want };
+  }
+  lastWebhookEnsure = Date.now();
+  const info = await tg("getWebhookInfo", {});
+  const current = String(info?.result?.url || "");
+  if (current === want) return { ok: true, already: true, url: want };
+  return configureBot(req);
 }
 
 async function handleWeb(req, res, body) {
@@ -633,12 +649,18 @@ export default async function handler(req, res) {
         return json(res, await configureBot(req));
       }
       const hub = await import("./orbitx-hub.js");
+      const webhook = await ensureWebhook(req).catch((error) => ({
+        ok: false,
+        error: error?.message || "ensure_failed",
+      }));
       return json(res, {
         ok: true,
         service: "telegram-orbitx",
         bot: OFFICIAL_BOT_USERNAME,
         tools: hub.listAllOrbitXTools().length,
         tokenConfigured: Boolean(BOT_TOKEN),
+        webhook: webhook?.url || webhook,
+        webhookOk: webhook?.ok !== false,
       });
     }
 

@@ -43,6 +43,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("/img@theorbitxmcpbot").tool).toBe("orbitx_generate_image");
     expect(resolveOfficialCommand("tweet").tool).toBe("x_post");
     expect(resolveOfficialCommand("buy").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("auth").kind).toBe("meta");
+    expect(resolveOfficialCommand("login").kind).toBe("meta");
     expect(argsFromCommand("img", "/img neon saturn")).toMatchObject({ prompt: "neon saturn" });
     expect(parseCallInvocation("/call get_token mint=So111").tool).toBe("orbitx_get_token");
     expect(inferPublicTool("generate an image of a cyan planet")?.tool).toBe("orbitx_generate_image");

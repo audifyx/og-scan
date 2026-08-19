@@ -66,6 +66,7 @@ export const GROUP_COMMANDS = [
 export const PRIVATE_COMMANDS = [
   ...GROUP_COMMANDS,
   { command: "login", description: "Link your OrbitX wallet" },
+  { command: "auth", description: "Link your OrbitX wallet" },
   { command: "logout", description: "Unlink this Telegram account" },
   { command: "me", description: "Show linked OrbitX identity" },
   { command: "buy", description: "Prepare a token buy (linked)" },
@@ -80,6 +81,7 @@ const PRIORITY_TOOL = {
   help: null,
   cmds: null,
   login: null,
+  auth: null,
   logout: null,
   me: null,
   ask: null,
