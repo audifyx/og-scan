@@ -17,7 +17,7 @@ const DRONES: DroneSpec[] = [
   { radius: 12, height: 12, speed: -0.36, phase: 1.2, color: "#f5c542" },
 ];
 
-function Drone({ spec }: { spec: DroneSpec }) {
+function Drone({ spec, origin }: { spec: DroneSpec; origin: { x: number; z: number } }) {
   const group = useRef<THREE.Group>(null);
   const lamp = useRef<THREE.Mesh>(null);
 
@@ -25,9 +25,9 @@ function Drone({ spec }: { spec: DroneSpec }) {
     const t = clock.elapsedTime * spec.speed + spec.phase;
     if (group.current) {
       group.current.position.set(
-        Math.cos(t) * spec.radius,
+        origin.x + Math.cos(t) * spec.radius,
         spec.height + Math.sin(clock.elapsedTime * 1.6 + spec.phase) * 0.4,
-        Math.sin(t) * spec.radius,
+        origin.z + Math.sin(t) * spec.radius,
       );
       group.current.rotation.y = -t + Math.PI / 2;
     }
@@ -64,12 +64,12 @@ function Drone({ spec }: { spec: DroneSpec }) {
   );
 }
 
-/** Ad drones circling the block — ambient sky motion. */
-export function Drones() {
+/** Ad drones circling the district spawn / HQ. */
+export function Drones({ origin = { x: 0, z: 0 } }: { origin?: { x: number; z: number } }) {
   return (
     <group>
       {DRONES.map((d, i) => (
-        <Drone key={i} spec={d} />
+        <Drone key={i} spec={d} origin={origin} />
       ))}
     </group>
   );

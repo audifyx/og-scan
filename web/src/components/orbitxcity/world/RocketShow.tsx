@@ -3,13 +3,13 @@ import { useFrame } from "@react-three/fiber";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
 
-const PAD = { x: 21, z: 6 };
 const IDLE_SECONDS = 14;
 const BOOST_SECONDS = 4;
 const PARTICLES = 90;
 
 /** Launch Arena set piece: countdown, lift-off, exhaust particles, reset. */
-export function RocketShow() {
+export function RocketShow({ origin = { x: 21, z: 6 } }: { origin?: { x: number; z: number } }) {
+  const PAD = origin;
   const rocket = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
   const points = useRef<THREE.Points>(null);

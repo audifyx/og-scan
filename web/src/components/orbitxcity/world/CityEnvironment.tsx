@@ -405,11 +405,23 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <HqBeacon block={block} />
       <GlassShards origin={shardOrigin} count={high ? 18 : 8} />
 
-      {high && !paused && <RocketShow />}
+      {high && !paused && (
+        <RocketShow
+          origin={
+            block.zones.find((z) => z.kind === "launch")?.position ?? {
+              x: block.spawn.x + 8,
+              z: block.spawn.z + 6,
+            }
+          }
+        />
+      )}
       <NPCs block={block} count={high ? 9 : 4} />
-      {high && !paused && <Drones />}
+      {high && !paused && <Drones origin={{ x: block.spawn.x, z: block.spawn.z }} />}
       {high && <OxiGuide spawn={block.spawn} />}
-      {high && block.cityId === "nyc" && <Park />}
+      <Park
+        origin={{ x: block.bounds.minX + 22, z: block.bounds.minZ + 22 }}
+        lite={!high}
+      />
       <Traffic count={high ? 10 : 3} block={block} paused={paused} />
     </group>
   );

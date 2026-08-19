@@ -4,15 +4,20 @@ import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { mulberry32 } from "@/lib/orbitxcity/collision";
 
-const CENTER = { x: -42, z: -42 };
-const TREE_COUNT = 42;
-
 /** City Park — grassy clearing with tall pine-like trees and a quiet pond. */
-export function Park() {
+export function Park({
+  origin = { x: -42, z: -42 },
+  lite = false,
+}: {
+  origin?: { x: number; z: number };
+  lite?: boolean;
+}) {
+  const CENTER = origin;
+  const treeCount = lite ? 18 : 42;
   const { trunks, canopies } = useMemo(() => {
     const rand = mulberry32(0x9a7c);
     const spots: Array<{ x: number; z: number; s: number }> = [];
-    for (let i = 0; i < TREE_COUNT; i++) {
+    for (let i = 0; i < treeCount; i++) {
       const a = rand() * Math.PI * 2;
       const r = 4.2 + rand() * 9.2;
       const x = CENTER.x + Math.cos(a) * r;
@@ -61,7 +66,7 @@ export function Park() {
     trunksMesh.receiveShadow = true;
     canopiesMesh.receiveShadow = true;
     return { trunks: trunksMesh, canopies: canopiesMesh };
-  }, []);
+  }, [CENTER.x, CENTER.z, treeCount]);
 
   const pond = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
