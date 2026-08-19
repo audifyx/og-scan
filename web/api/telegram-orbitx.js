@@ -20,15 +20,20 @@ import {
   argsFromCommand,
   cmdsPage,
   collectMediaUrls,
+  formatMediaCountdown,
   formatOrbitXTelegramResult,
   inferPublicTool,
   isPrivilegedTelegramTool,
   loginCode,
+  mediaEtaSeconds,
   parseCallInvocation,
   resolveOfficialCommand,
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
+  formatOrbitXLinksHtml,
+  OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
+  ORBITX_GC,
   ORBITX_TELEGRAM_BLURB,
 } from "./orbitx/orbitx-telegram-knowledge.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
@@ -265,25 +270,129 @@ async function postLinkedX(userId, args) {
 function helpText(isPrivate, linked) {
   return [
     `<b>OrbitX</b> · @${OFFICIAL_BOT_USERNAME}`,
-    ORBITX_TELEGRAM_BLURB.replace("no trading in Telegram.", isPrivate && linked ? "linked account · trade & X unlocked." : "groups are public · DMs unlock trade & X."),
+    ORBITX_TELEGRAM_BLURB,
+    "Anyone can ask about live products — DEX, City, OS, Play, Intel, Launchpad, HQ.",
     "",
-    "<b>Groups (no login)</b>",
-    "/token mint · /chart ca · /img prompt · /vid prompt · /cmds",
-    "Or just paste a CA, or say “generate an image of …”",
+    "<b>Commands</b>",
+    "/cmds — slash menu + live tool catalog",
+    "/token mint · /chart ca · /scan · /xray · /research",
+    "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
+    "/check — countdown + poll the latest image/video job",
+    "/links · /group — every URL + community GC",
+    "/ask — talk to OrbitX AI",
     "",
-    "<b>Private</b>",
-    linked
-      ? "Account linked. /me · /buy · /sell · /tweet · /post · /launch · /call tool"
-      : "/login to bind this Telegram to your OrbitX wallet.",
+    isPrivate
+      ? linked
+        ? "Account linked. /me · /buy · /sell · /tweet · /post · /launch · /call tool"
+        : "/login to bind this Telegram to your OrbitX wallet."
+      : "Groups stay public. Wallet commands (/buy /tweet) only work in DM after /login.",
     "",
-    "Groups: privacy mode is on — use a slash command or mention @theorbitxmcpbot.",
+    `Live team chat: ${ORBITX_GC}`,
+    "If a feat is live-ops / you need a human, join the GC and ask a team member.",
     "Web: https://www.orbitx.world/telegram",
-    "Full catalog (~5000 live tools): /cmds or /call name args",
   ].join("\n");
 }
 
+function isMediaGenTool(name) {
+  return name === "orbitx_generate_image" || name === "orbitx_generate_video";
+}
+
+function mediaKindForTool(name, fallback) {
+  if (name === "orbitx_generate_video" || fallback === "video") return "video";
+  return "image";
+}
+
+function parseTaskId(result) {
+  if (!result || typeof result !== "object") return "";
+  return String(result.taskId || result.id || result.jobId || "").trim();
+}
+
+const mediaJobsByChat = new Map();
+const mediaJobsByTask = new Map();
+
+function cacheMediaJob(job) {
+  if (!job?.task_id) return;
+  mediaJobsByTask.set(String(job.task_id), job);
+  if (job.chat_id) mediaJobsByChat.set(String(job.chat_id), job);
+}
+
+async function rememberMediaJob({ chatId, fromId, taskId, kind, prompt }) {
+  if (!taskId) return null;
+  const job = {
+    chat_id: String(chatId),
+    telegram_user_id: fromId != null ? String(fromId) : null,
+    task_id: String(taskId),
+    kind: mediaKindForTool("", kind),
+    prompt: prompt ? String(prompt).slice(0, 500) : null,
+    eta_seconds: mediaEtaSeconds(kind),
+    started_at: new Date().toISOString(),
+    status: "waiting",
+  };
+  cacheMediaJob(job);
+  try {
+    await sb("telegram_orbitx_media_jobs", {
+      method: "POST",
+      body: JSON.stringify(job),
+    });
+  } catch {
+    /* table may not exist until the migration is applied */
+  }
+  return job;
+}
+
+async function latestMediaJob(chatId) {
+  try {
+    const rows = await sb(
+      `telegram_orbitx_media_jobs?chat_id=eq.${encodeURIComponent(String(chatId))}&select=task_id,kind,prompt,eta_seconds,started_at,status&order=started_at.desc&limit=8`,
+    );
+    const list = Array.isArray(rows) ? rows : [];
+    const open = list.find((row) => !["succeeded", "failed", "success", "fail"].includes(String(row.status || "").toLowerCase()));
+    const picked = open || list[0] || null;
+    if (picked) cacheMediaJob({ ...picked, chat_id: String(chatId) });
+    if (picked) return picked;
+  } catch {
+    /* ignore missing table */
+  }
+  return mediaJobsByChat.get(String(chatId)) || null;
+}
+
+async function findMediaJob(taskId, chatId) {
+  const id = String(taskId || "").trim();
+  if (id) {
+    try {
+      const rows = await sb(
+        `telegram_orbitx_media_jobs?task_id=eq.${encodeURIComponent(id)}&select=task_id,kind,prompt,eta_seconds,started_at,status,chat_id&limit=1`,
+      );
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (row) {
+        cacheMediaJob(row);
+        return row;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (mediaJobsByTask.has(id)) return mediaJobsByTask.get(id);
+  }
+  return latestMediaJob(chatId);
+}
+
+async function markMediaJob(taskId, status) {
+  const id = String(taskId || "").trim();
+  if (!id) return;
+  const cached = mediaJobsByTask.get(id);
+  if (cached) cacheMediaJob({ ...cached, status });
+  try {
+    await sb(`telegram_orbitx_media_jobs?task_id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 async function handleCmds(text, tools) {
-  const rest = String(text || "").replace(/^\/cmds(@\w+)?\s*/i, "").trim();
+  const rest = String(text || "").replace(/^\/(cmds|menu)(@\w+)?\s*/i, "").trim();
   const pageMatch = rest.match(/^(\d+)$/);
   const page = pageMatch ? Number(pageMatch[1]) : 1;
   const query = pageMatch ? "" : rest;
@@ -291,19 +400,123 @@ async function handleCmds(text, tools) {
 }
 
 async function askAi(prompt, { linked }) {
-  const system = `You are the official OrbitX Telegram bot (@${OFFICIAL_BOT_USERNAME}).
-Groups are public: token intel, charts, Grok image/video. Private DMs can /login to trade, tweet, and use write tools.
-Never ask for a seed phrase. Prefer a concrete /command the user can tap.
-Reply in plain Telegram text. No markdown code fences.`;
+  const extra = linked
+    ? "This user is linked to their OrbitX account in a private DM — they can /buy /sell /tweet /post."
+    : "This chat is public unless they /login in a private DM.";
   const nim = await nvidiaChat({
-    system: linked ? `${system}\nThis user is linked to their OrbitX account.` : system,
+    system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}`,
     user: String(prompt || "gm").slice(0, 6000),
     model: process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL,
-    maxTokens: 700,
-    temperature: 0.55,
+    maxTokens: 900,
+    temperature: 0.45,
   });
   if (nim.ok && nim.content) return String(nim.content).replace(/```[\s\S]*?```/g, "").trim().slice(0, 3900);
-  return nim.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /token /chart /img /cmds.";
+  return nim.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /token /chart /img /check /links.";
+}
+
+async function sendLinks(chatId, extra = {}) {
+  await sendLong(
+    chatId,
+    `${formatOrbitXLinksHtml()}\n\nNeed a live human answer? Join ${ORBITX_GC} and ask a team member.`,
+    { parse_mode: "HTML", ...extra },
+  );
+}
+
+function withTelegramToolArgs(tool, args) {
+  if (!isMediaGenTool(tool)) return args || {};
+  return { ...(args || {}), wait: false };
+}
+
+function startedAtMs(job, result) {
+  if (job?.started_at) {
+    const parsed = Date.parse(job.started_at);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (Number.isFinite(Number(result?.startedAt))) return Number(result.startedAt);
+  return Date.now();
+}
+
+async function replyToolResult(chatId, result, { tool, extra, job } = {}) {
+  const timed =
+    result && typeof result === "object" && parseTaskId(result)
+      ? {
+          ...result,
+          kind: result.kind || job?.kind,
+          startedAt: result.startedAt || startedAtMs(job, result),
+          etaSeconds: result.etaSeconds || job?.eta_seconds || mediaEtaSeconds(result.kind || job?.kind),
+        }
+      : result;
+  await sendLong(chatId, formatOrbitXTelegramResult(timed, tool), { parse_mode: "HTML", ...extra });
+  await sendMedia(chatId, collectMediaUrls(timed || result));
+}
+
+async function handleCheck(chatId, text, { req, link, extra }) {
+  const rest = String(text || "").replace(/^\S+\s*/, "").trim();
+  const argId = rest.split(/\s+/)[0] || "";
+  const job = await findMediaJob(argId, chatId);
+  const taskId = argId || job?.task_id || "";
+  if (!taskId) {
+    await sendLong(
+      chatId,
+      [
+        "<b>Nothing to check yet.</b>",
+        "Start an image or video first:",
+        "/img neon orbitx city",
+        "/vid orbitx trailer",
+        "Then keep sending /check until the countdown hits ready (usually a few minutes).",
+      ].join("\n"),
+      { parse_mode: "HTML", ...extra },
+    );
+    return;
+  }
+  const result = await runTool({
+    tool: "orbitx_media_status",
+    args: { taskId },
+    req,
+    link,
+    allowPrivileged: false,
+  });
+  const state = String(result?.state || result?.status || "").toLowerCase();
+  const kind = job?.kind || result?.kind || "image";
+  if (result?.error && !state) {
+    await sendLong(chatId, formatOrbitXTelegramResult(result), { parse_mode: "HTML", ...extra });
+    return;
+  }
+  if (state === "success" || state === "succeeded" || state === "completed" || state === "done") {
+    await markMediaJob(taskId, "succeeded");
+    await sendLong(
+      chatId,
+      formatMediaCountdown({ kind, taskId, state: "success" }),
+      { parse_mode: "HTML", ...extra },
+    );
+    await sendMedia(chatId, collectMediaUrls(result));
+    return;
+  }
+  if (state === "fail" || state === "failed" || state === "error") {
+    await markMediaJob(taskId, "failed");
+    await sendLong(
+      chatId,
+      formatMediaCountdown({
+        kind,
+        taskId,
+        state: "fail",
+        failMsg: result?.failMsg || result?.error || result?.message,
+      }),
+      { parse_mode: "HTML", ...extra },
+    );
+    return;
+  }
+  await sendLong(
+    chatId,
+    formatMediaCountdown({
+      kind,
+      taskId,
+      startedAt: startedAtMs(job, result),
+      etaSeconds: Number(job?.eta_seconds) > 0 ? Number(job.eta_seconds) : mediaEtaSeconds(kind),
+      state: result?.state || "waiting",
+    }),
+    { parse_mode: "HTML", ...extra },
+  );
 }
 
 async function startLogin(telegramUser, base) {
@@ -407,9 +620,19 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
-  if (bare === "cmds") {
+  if (bare === "cmds" || bare === "menu") {
     const page = await handleCmds(text, tools);
     await sendLong(chatId, page.text, { parse_mode: "HTML", ...replyExtra });
+    return;
+  }
+
+  if (bare === "links" || bare === "group" || bare === "gc") {
+    await sendLinks(chatId, replyExtra);
+    return;
+  }
+
+  if (bare === "check" || (bare === "media" && !String(text).replace(/^\S+\s*/, "").trim())) {
+    await handleCheck(chatId, text, { req, link, extra: replyExtra });
     return;
   }
 
@@ -421,7 +644,20 @@ async function handleTelegramUpdate(update, req) {
     args = parsed.args;
   } else if (bare === "ask" || (text && !text.startsWith("/"))) {
     const inferred = inferPublicTool(text.replace(new RegExp(`@${OFFICIAL_BOT_USERNAME}`, "ig"), " ").trim());
-    if (inferred) {
+    if (inferred?.meta === "links") {
+      await sendLinks(chatId, replyExtra);
+      return;
+    }
+    if (inferred?.meta === "check") {
+      await handleCheck(chatId, text, { req, link, extra: replyExtra });
+      return;
+    }
+    if (inferred?.meta === "cmds") {
+      const page = await handleCmds(text, tools);
+      await sendLong(chatId, page.text, { parse_mode: "HTML", ...replyExtra });
+      return;
+    }
+    if (inferred?.tool) {
       tool = inferred.tool;
       args = inferred.args;
     } else {
@@ -443,7 +679,7 @@ async function handleTelegramUpdate(update, req) {
     if (text.startsWith("/")) {
       await tg("sendMessage", {
         chat_id: chatId,
-        text: "Unknown command. Try /cmds or /call toolname args.",
+        text: "Unknown command. Try /cmds, /links, /check, or /help.",
         ...replyExtra,
       });
     }
@@ -455,6 +691,7 @@ async function handleTelegramUpdate(update, req) {
     action: tool.includes("video") ? "upload_video" : tool.includes("image") || tool.includes("grok") ? "upload_photo" : "typing",
   });
   try {
+    args = withTelegramToolArgs(tool, args);
     const result = await runTool({
       tool,
       args,
@@ -462,8 +699,18 @@ async function handleTelegramUpdate(update, req) {
       link,
       allowPrivileged: !isGroup && Boolean(link),
     });
-    await sendLong(chatId, formatOrbitXTelegramResult(result), { parse_mode: "HTML", ...replyExtra });
-    await sendMedia(chatId, collectMediaUrls(result));
+    const taskId = parseTaskId(result);
+    let job = null;
+    if (taskId && isMediaGenTool(tool)) {
+      job = await rememberMediaJob({
+        chatId,
+        fromId: from.id,
+        taskId,
+        kind: mediaKindForTool(tool, result?.kind),
+        prompt: args.prompt,
+      });
+    }
+    await replyToolResult(chatId, result, { tool, extra: replyExtra, job });
   } catch (error) {
     await tg("sendMessage", {
       chat_id: chatId,
@@ -623,9 +870,10 @@ async function handleWeb(req, res, body) {
       return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet to run this tool." }, 401);
     }
     const wallet = user?.id ? await loadWallet(user.id) : null;
+    const toolArgs = withTelegramToolArgs(tool, args);
     const result = await runTool({
       tool,
-      args,
+      args: toolArgs,
       req,
       link: user?.id ? { user_id: user.id, wallet_address: wallet } : null,
       allowPrivileged: Boolean(user?.id),

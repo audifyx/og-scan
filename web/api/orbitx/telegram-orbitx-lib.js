@@ -46,11 +46,15 @@ export function isPublicTelegramTool(name) {
 export const GROUP_COMMANDS = [
   { command: "start", description: "OrbitX bot intro" },
   { command: "help", description: "What this bot can do" },
-  { command: "cmds", description: "Browse live tools" },
-  { command: "ask", description: "Ask OrbitX AI" },
+  { command: "cmds", description: "Command menu + live tools" },
+  { command: "menu", description: "Same as /cmds" },
+  { command: "ask", description: "Ask OrbitX AI anything" },
+  { command: "links", description: "All OrbitX URLs" },
+  { command: "group", description: "Join the community GC" },
   { command: "img", description: "Generate an image (Grok Imagine)" },
   { command: "vid", description: "Generate a video (Grok Imagine)" },
-  { command: "media", description: "Poll an image/video task" },
+  { command: "check", description: "Poll latest image/video job" },
+  { command: "media", description: "Poll a taskId" },
   { command: "token", description: "Token intel by mint / CA" },
   { command: "chart", description: "Live DexScreener chart" },
   { command: "scan", description: "Safety + forensics scan" },
@@ -80,6 +84,11 @@ const PRIORITY_TOOL = {
   start: null,
   help: null,
   cmds: null,
+  menu: null,
+  links: null,
+  group: null,
+  gc: null,
+  check: null,
   login: null,
   auth: null,
   logout: null,
@@ -129,6 +138,7 @@ export function argsFromCommand(command, text) {
     if (!args.q && command === "ask") args.q = rest;
   }
   if (command === "media" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
+  if (command === "check" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
   if (["token", "chart", "xray", "research", "scan", "buy", "sell"].includes(command) && rest && !args.mint) {
     const token = rest.split(/\s+/)[0];
     args.mint = token;
@@ -160,6 +170,21 @@ export function inferPublicTool(text) {
   const t = String(text || "").trim();
   const lower = t.toLowerCase();
   if (!t || t.startsWith("/")) return null;
+
+  if (
+    /^(links?|urls?|socials?|community|group chat|\bgc\b)\b/i.test(t) ||
+    (t.length < 120 && /\b(telegram (group|gc|chat)|join (the )?group|orbitx links?)\b/i.test(lower))
+  ) {
+    return { meta: "links" };
+  }
+
+  if (/^(check|status|poll)\b/i.test(lower) && t.length < 80) {
+    return { meta: "check" };
+  }
+
+  if (/^(cmds|commands|menu|tools)\b/i.test(lower) && t.length < 40) {
+    return { meta: "cmds" };
+  }
 
   const img = lower.match(/^(?:generate |make |create )?(?:an? )?(?:image|img|picture|art)\b[:\s-]*(.+)$/i);
   if (img?.[1]) return { tool: "orbitx_generate_image", args: { prompt: img[1].trim() } };
@@ -206,6 +231,94 @@ function fmtPct(n) {
 function fmtInt(n) {
   if (n == null || n === "" || Number.isNaN(Number(n))) return "—";
   return Math.round(Number(n)).toLocaleString("en-US");
+}
+
+function fmtClock(seconds) {
+  const s = Math.max(0, Math.round(Number(seconds) || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+export function mediaEtaSeconds(kind) {
+  return String(kind || "").includes("video") ? 240 : 180;
+}
+
+export function formatMediaCountdown({
+  kind = "image",
+  taskId,
+  startedAt,
+  etaSeconds,
+  state,
+  failMsg,
+} = {}) {
+  const eta = Number(etaSeconds) || mediaEtaSeconds(kind);
+  const started = Number(startedAt) || Date.now();
+  const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
+  const left = Math.max(0, eta - elapsed);
+  const label = String(kind || "image").includes("video") ? "video" : "image";
+  if (state === "success") {
+    return `<b>Grok Imagine</b> · ${tgEsc(label)} ready.\nSend /check if the files didn’t attach.`;
+  }
+  if (state === "fail") {
+    return `<b>Grok Imagine failed</b>\n${tgEsc(failMsg || "try a simpler prompt")}\nRetry /img or /vid.`;
+  }
+  const waitLine =
+    left > 0
+      ? `Elapsed ${tgEsc(fmtClock(elapsed))} · <b>~${tgEsc(fmtClock(left))} left</b>`
+      : `Elapsed ${tgEsc(fmtClock(elapsed))} · still rendering past the usual ${tgEsc(fmtClock(eta))} — keep /check`;
+  return [
+    `<b>Grok Imagine</b> · ${tgEsc(label)} is cooking`,
+    waitLine,
+    "This takes a few minutes. Keep sending /check until it lands.",
+    taskId ? `<code>${tgEsc(taskId)}</code>` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatDexChartCard(data) {
+  if (!data || typeof data !== "object") return null;
+  if (!(data.embedUrl || data.action === "dex_chart_embed" || data.pageUrl && data.symbol && data.pairAddress)) {
+    return null;
+  }
+  const symbol = data.symbol || "TOKEN";
+  const name = data.name || symbol;
+  const mint = data.mint || data.ca || "";
+  const dex = data.embedUrl || data.pageUrl;
+  const orbitx = data.orbitxDex || (mint ? `https://www.orbitx.world/ORBITX_DEX/token/${mint}` : "https://www.orbitx.world/ORBITX_DEX");
+  return [
+    `<b>$${tgEsc(symbol)}</b> · ${tgEsc(name)}`,
+    `Price ${tgEsc(fmtUsd(data.priceUsd))} · 24h ${tgEsc(fmtPct(data.change24h))}`,
+    `Liq ${tgEsc(fmtUsd(data.liquidityUsd))} · Vol ${tgEsc(fmtUsd(data.volume24h))} · MC ${tgEsc(fmtUsd(data.marketCap))}`,
+    "",
+    dex ? `<a href="${tgEsc(dex)}">DexScreener live chart</a>` : "",
+    `<a href="${tgEsc(orbitx)}">Trade on OrbitX DEX</a>`,
+    mint ? `<code>${tgEsc(mint)}</code>` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatActionLinks(data) {
+  const urls = [];
+  if (data?.openUrl) urls.push(`Open: ${data.openUrl}`);
+  if (data?.signUrl) urls.push(`Sign: ${data.signUrl}`);
+  if (data?.reportUrl) urls.push(`Report: ${data.reportUrl}`);
+  if (data?.launchpadUrl) urls.push(`Launchpad: ${data.launchpadUrl}`);
+  if (data?.mcpUrl) urls.push(`MCP: ${data.mcpUrl}`);
+  if (data?.setupUrl) urls.push(`Setup: ${data.setupUrl}`);
+  if (!urls.length && !data?.instructions && !data?.message) return null;
+  const lines = ["<b>OrbitX</b>"];
+  if (data.message) lines.push(tgEsc(data.message));
+  if (Array.isArray(data.instructions)) {
+    for (const step of data.instructions.slice(0, 6)) lines.push(`• ${tgEsc(step)}`);
+  }
+  for (const url of urls) {
+    const [label, href] = url.split(": ");
+    lines.push(href ? `<a href="${tgEsc(href)}">${tgEsc(label)}</a>` : tgEsc(url));
+  }
+  return lines.join("\n");
 }
 
 export function unwrapToolPayload(result) {
@@ -337,15 +450,51 @@ export function formatOrbitXTelegramResult(result) {
   }
   const token = formatTokenCard(data);
   if (token) return token;
+  const chart = formatDexChartCard(data);
+  if (chart) return chart;
   const list = formatTokenList(data);
   if (list) return list;
+  const mediaState = String(data?.state || data?.status || "").toLowerCase();
+  if (data?.taskId && (mediaState === "success" || mediaState === "succeeded" || mediaState === "completed" || mediaState === "done")) {
+    return formatMediaCountdown({
+      kind: data.kind,
+      taskId: data.taskId,
+      state: "success",
+    });
+  }
+  if (data?.taskId && (mediaState === "fail" || mediaState === "failed" || mediaState === "error")) {
+    return formatMediaCountdown({
+      kind: data.kind,
+      taskId: data.taskId,
+      state: "fail",
+      failMsg: data.failMsg || data.error || data.message,
+    });
+  }
+  if (
+    data?.taskId &&
+    (data.pending ||
+      data.code === "STILL_GENERATING" ||
+      ["waiting", "queuing", "generating", "pending", "processing"].includes(mediaState) ||
+      ((data.kind === "image" || data.kind === "video") && !["success", "succeeded", "fail", "failed"].includes(mediaState)))
+  ) {
+    return formatMediaCountdown({
+      kind: data.kind,
+      taskId: data.taskId,
+      startedAt: data.startedAt,
+      etaSeconds: data.etaSeconds,
+      state: data.state || "waiting",
+      failMsg: data.failMsg,
+    });
+  }
+  const actions = formatActionLinks(data);
+  if (actions && (data.openUrl || data.signUrl || data.reportUrl || data.launchpadUrl)) return actions;
   const fallback = formatMcpResultForTelegram(data);
   if (fallback && !fallback.trim().startsWith("{") && !fallback.trim().startsWith("[")) {
-    return fallback.slice(0, 3500);
+    return fallback.replace(/```[\s\S]*?```/g, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "").slice(0, 3500);
   }
   const compact = formatCompactObject(data);
   if (compact) return compact;
-  return "Got a result, but it isn’t a readable token card. Try /token mint or /cmds.";
+  return "Got a result. Try /token mint, /chart ca, /cmds, or /links.";
 }
 
 export function collectMediaUrls(result) {
@@ -366,9 +515,14 @@ export function collectMediaUrls(result) {
   push(data?.icon);
   if (Array.isArray(result?.urls)) result.urls.forEach(push);
   if (Array.isArray(result?.resultUrls)) result.resultUrls.forEach(push);
+  if (Array.isArray(data?.resultUrls)) data.resultUrls.forEach(push);
   if (Array.isArray(result?.imageUrls)) result.imageUrls.forEach(push);
+  if (Array.isArray(data?.imageUrls)) data.imageUrls.forEach(push);
   if (Array.isArray(result?.images)) {
     for (const im of result.images) push(typeof im === "string" ? im : im?.url);
+  }
+  if (Array.isArray(data?.images)) {
+    for (const im of data.images) push(typeof im === "string" ? im : im?.url);
   }
   return urls;
 }
@@ -393,9 +547,23 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
   const safePage = Math.min(totalPages, Math.max(1, Number(page) || 1));
   const start = (safePage - 1) * pageSize;
   const slice = filtered.slice(start, start + pageSize);
+  const menu =
+    !normalized && safePage === 1
+      ? [
+          "<b>OrbitX /cmds</b>",
+          "/token mint · /chart ca · /scan · /xray · /research",
+          "/img prompt · /vid prompt · /check",
+          "/search q · /screen · /ask · /links · /group",
+          "/call name args · DMs: /login /buy /sell /tweet",
+          "",
+          `<b>Live catalog</b> · ${filtered.length} tools · page ${safePage}/${totalPages}`,
+        ]
+      : [
+          `<b>OrbitX live tools</b> · ${filtered.length} shown · page ${safePage}/${totalPages}`,
+          "Public in groups. Trade / X / writes need a private /login.",
+        ];
   const lines = [
-    `<b>OrbitX live tools</b> · ${filtered.length} shown · page ${safePage}/${totalPages}`,
-    "Public in groups. Trade / X / writes need a private /login.",
+    ...menu,
     "",
     ...slice.map((tool) => {
       const cmd = toolToSlashCommand(tool.name, "agent");
@@ -403,7 +571,7 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
       return `${badge} ${cmd ? `/${cmd}` : ""} <code>${tool.name}</code>`;
     }),
     "",
-    "Next page: /cmds 2   ·   Search: /cmds chart   ·   Run: /call name args",
+    "Next: /cmds 2   ·   Search: /cmds chart   ·   Run: /call name args",
   ];
   return { text: lines.join("\n"), page: safePage, totalPages, count: filtered.length };
 }

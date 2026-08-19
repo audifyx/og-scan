@@ -3,15 +3,19 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   argsFromCommand,
+  cmdsPage,
+  formatMediaCountdown,
   formatOrbitXTelegramResult,
   formatTokenCard,
   inferPublicTool,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
   loginCode,
+  mediaEtaSeconds,
   parseCallInvocation,
   resolveOfficialCommand,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
+import { formatOrbitXLinksHtml } from "../../api/orbitx/orbitx-telegram-knowledge.js";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
@@ -47,10 +51,19 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("buy").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("auth").kind).toBe("meta");
     expect(resolveOfficialCommand("login").kind).toBe("meta");
+    expect(resolveOfficialCommand("check").kind).toBe("meta");
+    expect(resolveOfficialCommand("check").tool).toBeNull();
+    expect(resolveOfficialCommand("links").kind).toBe("meta");
+    expect(resolveOfficialCommand("group").kind).toBe("meta");
+    expect(resolveOfficialCommand("menu").kind).toBe("meta");
+    expect(argsFromCommand("check", "/check abc123").taskId).toBe("abc123");
     expect(argsFromCommand("img", "/img neon saturn")).toMatchObject({ prompt: "neon saturn" });
     expect(parseCallInvocation("/call get_token mint=So111").tool).toBe("orbitx_get_token");
     expect(inferPublicTool("generate an image of a cyan planet")?.tool).toBe("orbitx_generate_image");
     expect(inferPublicTool("So11111111111111111111111111111111111111112")?.tool).toBe("orbitx_get_token");
+    expect(inferPublicTool("links")?.meta).toBe("links");
+    expect(inferPublicTool("join the group")?.meta).toBe("links");
+    expect(inferPublicTool("check")?.meta).toBe("check");
   });
 
   it("issues alphanumeric login codes without a bot token", () => {
@@ -97,6 +110,84 @@ describe("official OrbitX Telegram bot", () => {
     expect(formatOrbitXTelegramResult({ ok: true, result: payload })).toContain("Holders");
   });
 
+  it("renders /cmds as a slash menu, not a JSON dump", () => {
+    const page = cmdsPage(
+      [
+        { name: "orbitx_get_token", description: "token intel" },
+        { name: "orbitx_generate_image", description: "image" },
+      ],
+      { page: 1, query: "" },
+    );
+    expect(page.text).toContain("/token");
+    expect(page.text).toContain("/check");
+    expect(page.text).toContain("/img");
+    expect(page.text).toContain("orbitx_get_token");
+    expect(page.text.startsWith("{")).toBe(false);
+  });
+
+  it("formats dex charts and media countdowns without iframes or raw JSON", () => {
+    const chart = formatOrbitXTelegramResult({
+      __mcpFormat: "markdown",
+      action: "dex_chart_embed",
+      symbol: "ORBITX",
+      name: "ORBITX",
+      mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      priceUsd: 0.00007,
+      change24h: -12.2,
+      liquidityUsd: 9000,
+      volume24h: 15000,
+      marketCap: 74000,
+      embedUrl: "https://dexscreener.com/solana/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    });
+    expect(chart).toContain("DexScreener");
+    expect(chart).toContain("ORBITX");
+    expect(chart).not.toMatch(/<iframe/i);
+    expect(chart.startsWith("{")).toBe(false);
+
+    const waiting = formatOrbitXTelegramResult({
+      ok: true,
+      kind: "image",
+      taskId: "task-1",
+      state: "waiting",
+      pending: true,
+      startedAt: Date.now(),
+      etaSeconds: mediaEtaSeconds("image"),
+    });
+    expect(waiting).toContain("Elapsed");
+    expect(waiting).toContain("/check");
+    expect(waiting).toContain("task-1");
+    expect(waiting.startsWith("{")).toBe(false);
+
+    const actions = formatOrbitXTelegramResult({
+      ok: true,
+      message: "Sign this buy on OrbitX",
+      signUrl: "https://www.orbitx.world/trade?sign=1",
+      openUrl: "https://www.orbitx.world/trade",
+    });
+    expect(actions).toContain("Sign");
+    expect(actions).toContain("https://www.orbitx.world/trade");
+    expect(actions.startsWith("{")).toBe(false);
+
+    const tick = formatMediaCountdown({
+      kind: "video",
+      taskId: "vid-9",
+      startedAt: Date.now() - 15_000,
+      etaSeconds: 240,
+      state: "waiting",
+    });
+    expect(tick).toContain("0:15");
+    expect(tick).toContain("left");
+    expect(tick).toContain("/check");
+  });
+
+  it("lists real OrbitX links including the community GC", () => {
+    const html = formatOrbitXLinksHtml();
+    expect(html).toContain("t.me/orbitxwrld");
+    expect(html).toContain("orbitx.world");
+    expect(html).toContain("ORBITX_DEX");
+    expect(html).toContain("Orbitxcity");
+  });
+
   it("never commits a BotFather token and gates configure", () => {
     const files = [...walkSource(resolve(WEB, "api")), ...walkSource(resolve(WEB, "src")), ...walkSource(resolve(REPO, "supabase"))];
     const tokenPattern = /\b\d{8,}:AA[A-Za-z0-9_-]{20,}\b/;
@@ -108,9 +199,13 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
-    expect(api).toContain("formatOrbitXTelegramResult(result)");
-    expect(api).toContain("bare === \"login\" || bare === \"auth\"");
+    expect(api).toContain("formatOrbitXTelegramResult");
+    expect(api).toContain('bare === "login" || bare === "auth"');
+    expect(api).toContain('bare === "check"');
+    expect(api).toContain("OFFICIAL_ORBITX_TELEGRAM_SYSTEM");
+    expect(api).toContain("wait: false");
     expect(api).toContain("async function ensureWebhook");
+    expect(api).toContain("telegram_orbitx_media_jobs");
     expect(api).not.toContain("8595161432");
   });
 });
