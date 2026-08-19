@@ -1,44 +1,75 @@
 import * as THREE from "three";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 
-function skyColor(cityId: WorldBlockConfig["cityId"]): string {
+function nightPalette(cityId: WorldBlockConfig["cityId"]): {
+  sky: string;
+  fog: string;
+  hemiSky: string;
+  hemiGround: string;
+  moon: string;
+  fill: string;
+} {
   switch (cityId) {
     case "miami":
-      return "#7eb8c8";
+      return {
+        sky: "#0c1c28",
+        fog: "#163040",
+        hemiSky: "#3a6a78",
+        hemiGround: "#1a2a22",
+        moon: "#e8f4f0",
+        fill: "#5ec4b6",
+      };
     case "la":
-      return "#8aa0c0";
+      return {
+        sky: "#14101c",
+        fog: "#1c1830",
+        hemiSky: "#4a3a68",
+        hemiGround: "#221a1c",
+        moon: "#f0e4d8",
+        fill: "#b388ff",
+      };
     case "boston":
-      return "#7a92a8";
+      return {
+        sky: "#0c1628",
+        fog: "#152238",
+        hemiSky: "#3a5880",
+        hemiGround: "#1a221c",
+        moon: "#dce8f8",
+        fill: "#5b8def",
+      };
     default:
-      return "#7eaccc";
+      return {
+        sky: "#0c1624",
+        fog: "#152030",
+        hemiSky: "#3a5a80",
+        hemiGround: "#1a2418",
+        moon: "#e8eef8",
+        fill: "#c5a26f",
+      };
   }
 }
 
-/** Locked daytime sky — OrbitX City is always day. No night cycle. */
+/**
+ * Night cyber-financial district sky.
+ * Ground stays readable via street lamps + neon bounce — not a black void,
+ * not a daytime suburb.
+ */
 export function SkyCycle({ block }: { block: WorldBlockConfig }) {
-  const sky = skyColor(block.cityId);
+  const pal = nightPalette(block.cityId);
   return (
     <>
-      <color attach="background" args={[sky]} />
-      <fog attach="fog" args={["#9bb8c8", 70, 220]} />
-      <hemisphereLight args={["#d8e8f4", "#6a8a6a", 0.95]} />
-      <directionalLight
-        position={[32, 54, 18]}
-        intensity={1.55}
-        color="#fff4d8"
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-left={-70}
-        shadow-camera-right={70}
-        shadow-camera-top={70}
-        shadow-camera-bottom={-70}
-        shadow-bias={-0.0002}
-      />
-      <directionalLight position={[-18, 22, -12]} intensity={0.35} color="#b8d4ff" />
-      <mesh position={[38, 62, 22]}>
-        <sphereGeometry args={[3.4, 20, 16]} />
-        <meshBasicMaterial color="#fff3c4" toneMapped={false} />
+      <color attach="background" args={[pal.sky]} />
+      <fog attach="fog" args={[pal.fog, 48, 170]} />
+      <hemisphereLight args={[pal.hemiSky, pal.hemiGround, 0.42]} />
+      <directionalLight position={[28, 44, 16]} intensity={0.32} color="#d8e4f4" />
+      <directionalLight position={[-16, 18, -10]} intensity={0.18} color={pal.fill} />
+      <mesh position={[36, 58, 20]}>
+        <sphereGeometry args={[2.6, 20, 16]} />
+        <meshBasicMaterial color={pal.moon} toneMapped={false} />
+      </mesh>
+      <mesh position={[36, 58, 20]}>
+        <sphereGeometry args={[4.2, 16, 12]} />
+        <meshBasicMaterial color={pal.moon} transparent opacity={0.08} depthWrite={false} toneMapped={false} />
       </mesh>
     </>
   );

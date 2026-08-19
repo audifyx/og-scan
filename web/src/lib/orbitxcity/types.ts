@@ -176,6 +176,7 @@ export type HudPanel =
 export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk" | "fade" | "twin";
 export type OutfitStyle = "street" | "suit" | "sport" | "neon" | "hoodie" | "gold" | "royal" | "pilot" | "legend";
 export type FaceStyle = "neutral" | "cool" | "smile";
+export type BeardStyle = "none" | "stubble" | "full" | "goatee";
 
 export interface StreetSegment {
   /** "h" runs along X at z=at; "v" runs along Z at x=at. */
@@ -200,6 +201,8 @@ export interface AvatarAppearance {
   hairColor: string;
   outfit: OutfitStyle;
   faceStyle: FaceStyle;
+  /** Optional; class identity supplies a default (Chad full, Wojak stubble). */
+  beardStyle?: BeardStyle;
 }
 
 /** Pre-world gate screens for AAA menu flow. */

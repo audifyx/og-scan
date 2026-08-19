@@ -37,13 +37,13 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
   {
     id: "pepe",
     name: "Pepe",
-    tagline: "The frog · degen tape reader",
+    tagline: "Degen tape reader",
     neon: "#5cb85c",
     gold: "#c5e07a",
     bodyColor: "#3d7a38",
     accentColor: "#c23b3b",
     skinColor: "#c9a07a",
-    scale: { x: 1.08, y: 0.92, z: 1.08 },
+    scale: { x: 1.04, y: 1.0, z: 1.04 },
     stats: [
       { label: "Instinct", value: 94 },
       { label: "Degen", value: 96 },
@@ -60,7 +60,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     bodyColor: "#6b7280",
     accentColor: "#e8b4c8",
     skinColor: "#f3d5c0",
-    scale: { x: 0.94, y: 1.02, z: 0.94 },
+    scale: { x: 0.96, y: 1.04, z: 0.96 },
     stats: [
       { label: "Feels", value: 98 },
       { label: "Reach", value: 84 },
@@ -77,7 +77,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     bodyColor: "#3a5a72",
     accentColor: "#d4a017",
     skinColor: "#d4a574",
-    scale: { x: 1.22, y: 1.12, z: 1.1 },
+    scale: { x: 1.1, y: 1.08, z: 1.08 },
     stats: [
       { label: "Aura", value: 99 },
       { label: "Reflex", value: 91 },
@@ -94,7 +94,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     bodyColor: "#d4893a",
     accentColor: "#c0392b",
     skinColor: "#d4a574",
-    scale: { x: 1.06, y: 0.88, z: 1.14 },
+    scale: { x: 1.04, y: 1.0, z: 1.06 },
     stats: [
       { label: "Wow", value: 97 },
       { label: "Range", value: 88 },
@@ -167,13 +167,19 @@ export function missionClaimCooldownMs(
 export function appearanceFromClass(cls: CharacterClassDef, name?: string): AvatarAppearance {
   const look: Record<
     CharacterClassId,
-    { hairStyle: AvatarAppearance["hairStyle"]; hairColor: string; outfit: AvatarAppearance["outfit"]; faceStyle: AvatarAppearance["faceStyle"] }
+    {
+      hairStyle: AvatarAppearance["hairStyle"];
+      hairColor: string;
+      outfit: AvatarAppearance["outfit"];
+      faceStyle: AvatarAppearance["faceStyle"];
+      beardStyle: NonNullable<AvatarAppearance["beardStyle"]>;
+    }
   > = {
-    pepe: { hairStyle: "short", hairColor: "#3d7a38", outfit: "street", faceStyle: "cool" },
-    wojak: { hairStyle: "buzz", hairColor: "#6b5344", outfit: "street", faceStyle: "neutral" },
-    chad: { hairStyle: "short", hairColor: "#1a1410", outfit: "sport", faceStyle: "cool" },
-    doge: { hairStyle: "short", hairColor: "#c47a28", outfit: "street", faceStyle: "smile" },
-    anon: { hairStyle: "buzz", hairColor: "#111318", outfit: "suit", faceStyle: "neutral" },
+    pepe: { hairStyle: "short", hairColor: "#2a4a28", outfit: "hoodie", faceStyle: "smile", beardStyle: "goatee" },
+    wojak: { hairStyle: "buzz", hairColor: "#6b5344", outfit: "hoodie", faceStyle: "neutral", beardStyle: "stubble" },
+    chad: { hairStyle: "short", hairColor: "#1a1410", outfit: "sport", faceStyle: "cool", beardStyle: "full" },
+    doge: { hairStyle: "short", hairColor: "#c47a28", outfit: "street", faceStyle: "smile", beardStyle: "none" },
+    anon: { hairStyle: "buzz", hairColor: "#111318", outfit: "suit", faceStyle: "neutral", beardStyle: "none" },
   };
 
   const kit = look[cls.id];
@@ -187,5 +193,6 @@ export function appearanceFromClass(cls: CharacterClassDef, name?: string): Avat
     hairColor: kit.hairColor,
     outfit: kit.outfit,
     faceStyle: kit.faceStyle,
+    beardStyle: kit.beardStyle,
   };
 }

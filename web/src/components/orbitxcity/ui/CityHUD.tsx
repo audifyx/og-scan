@@ -237,7 +237,7 @@ export function CityHUD() {
           </button>
           <button
             type="button"
-            className="oxc-toggle-btn"
+            className="oxc-toggle-btn oxc-hide-phone"
             onClick={() => {
               cityAudio.play("ui");
               resetPlayer();
@@ -342,6 +342,9 @@ export function CityHUD() {
             </button>
             <AudioToggle />
             <OnlineBadge />
+            <button type="button" className="oxc-toggle-btn" onClick={() => { setMoreOpen(false); resetPlayer(); }}>
+              Unstuck
+            </button>
             <button type="button" className="oxc-toggle-btn" onClick={() => { setMoreOpen(false); openPanel("lobbies"); }}>
               Lobby
             </button>

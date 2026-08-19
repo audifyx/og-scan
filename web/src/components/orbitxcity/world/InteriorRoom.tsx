@@ -834,6 +834,7 @@ export function InteriorRoom({
       <pointLight position={[0, 1.8, -d / 2 + 0.8]} intensity={0.95} distance={10} color={building.accent} />
       <pointLight position={[0, 1.4, d / 2 - 0.6]} intensity={0.7} distance={7} color={palette.fill} />
       <pointLight position={[-w * 0.28, 2.2, 0.2]} intensity={0.45} distance={8} color="#f0e6d4" />
+      <pointLight position={[w * 0.3, 2.4, -0.4]} intensity={0.4} distance={8} color="#f4eadc" />
 
       <Text
         position={[0, h - 0.5, -d / 2 + 0.22]}

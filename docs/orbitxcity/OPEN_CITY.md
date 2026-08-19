@@ -1,28 +1,34 @@
-# OrbitX City — Midtown open-district pass
+# OrbitX City — master visual pass (night cyber Midtown)
 
-Surgical upgrade on the existing City stack. **Kept** `CityProvider`, `WorldCanvas`, quality tiers, `enterBuilding` / `exitBuilding`, collision doorways, realtime presence, MainMenu / CharacterSelect gates, and the neon `#00ff9f` + black + gold language.
+Surgical upgrade on the existing City stack. **Kept** `CityProvider`, `WorldCanvas`, quality tiers, `enterBuilding` / `exitBuilding`, collision doorways, realtime presence, MainMenu / CharacterSelect gates, Jupiter burn shop, and the neon `#00ff9f` + black + gold `#c5a26f` language.
+
+This pass restores **night cyber-financial district** mood (overrides the daytime lock) while keeping streets readable.
 
 ## Kept vs upgraded
 
 | System | Status |
 |--------|--------|
 | CityProvider, gate flow, quality high/lite | Kept |
-| enter/exit + `interiorLayout` + `furnitureSolids` | Kept (brighter rooms, more furniture) |
-| Realtime + `RemoteAvatars` | Kept — remotes already use `HumanoidMesh` |
+| enter/exit + `interiorLayout` + furniture collision | Kept |
+| Realtime + `RemoteAvatars` presence Map | Kept — remotes use `HumanoidMesh` |
 | Collision south-face doorways | Kept |
-| Ground | Upgraded — asphalt, curbs, sidewalks, grass, wear (no mirror void) |
-| Facades | Upgraded — family textures, marquees, raised WALK IN labels |
-| Characters | Upgraded — human skin/clothes; select preview uses the same humanoid |
-| Banners | New — data model + face mesh; admin UI later |
+| Burn shop (`cityShop` / Jupiter → ORBITX burn) | Kept |
+| Title / home | Upgraded — brighter skyline, centered high-contrast 3D buttons |
+| Characters | Upgraded — adult humanoid with face, hair, beard, clothes |
+| Ground / atmosphere | Upgraded — night sky + lit asphalt / sidewalk / grass |
+| Facades + interiors | Upgraded — punched window grids, facade signage, extra room lights |
+| HUD | Upgraded — floating roof TOP labels removed; prompts raised; Unstuck in More |
+| Banners | Kept + documented — data model + facade plane + branded fallback |
 
-## Visual results
+## Results
 
-- **Ground / streets / grass:** Textured asphalt slab + dirt shoulder (not a black void). Lane dashes, crosswalks, raised cement sidewalks and curb lips. Grass patches with dirt rings + instanced tufts. Lite uses the same materials with fewer instances.
-- **Facades + interiors:** Brick / limestone / glass / retail families, lighter night fade. Walk-ins keep open south doorways. Interiors have brighter floors/walls and extra fill lights. Collision unchanged.
-- **Humanoids:** In-world + remotes + character select share `HumanoidMesh`. Mascot identity is cosmetics (Pepe cap/jacket, Chad chain, Anon lasers) on a human body — not frog/blob skin.
-- **Traffic / life:** Cars stay on `getWorldStreets()` lanes and yield to the player. NPCs walk sidewalks in human clothing. Street lamps emit more so asphalt reads at night.
-- **Banners:** `BuildingBanner` on `BuildingDefinition.banners` + `BANNER_REGISTRY`. Auto south-face ads on walk-in venues. Optional `imageUrl` (404 falls back to a neon title card).
-- **Home / select / panels:** Title screen unchanged (already cinematic). Select preview is the in-world humanoid. HUD prompts raised and higher contrast. Panels stay centered.
+- **Title:** Lit window maps, stronger key/fill lights, weaker vignette. PLAY / MULTIPLAYER / SETTINGS / QUICK PLAY optically centered with metal/glass slabs.
+- **Characters:** Same `HumanoidMesh` in select, world, remotes, NPCs, interiors. Classes are skins (Pepe cap, Wojak hoodie + stubble, Chad beard, Doge beanie, Anon mask/lasers). Adult scale (no toy squash).
+- **Ground:** Asphalt + lane glow, curbs, sidewalks, grass tufts under street lamps. `SkyCycle` is night navy with moon — not a black void and not a daytime suburb.
+- **Buildings:** Window grids with emissive night panes. Walk-in marquees stay on the facade. Roof billboard name tags (floating TOP chrome) removed. Interiors keep desks/counters + extra fill lights.
+- **HUD:** Doorway WALK IN / E prompts raised in world and as a high-contrast HUD chip. Map / token panels stay centered. Phone Unstuck lives in More.
+- **Traffic / life:** Cars stay on street segments and reverse on building collision. Lamps brighter so ground reads at night. Lite reduces lamp/window counts.
+- **Banners:** `BuildingBanner` schema unchanged. Missing `imageUrl` → neon title card, never a pink error mesh.
 
 ## Banner data (admin hook)
 
@@ -43,26 +49,22 @@ interface BuildingBanner {
 }
 ```
 
-Resolution: authored `building.banners` + `BANNER_REGISTRY` (by `buildingId`) → else default walk-in ad. Generic OSM fill gets no auto ad.
-
-Admin UI later: CRUD into `BANNER_REGISTRY` or persist the same shape (Supabase / Edge Config). Do not change `BuildingMesh` shell APIs.
+Resolution: authored `building.banners` + `BANNER_REGISTRY` (by `buildingId`) → else default walk-in ad.
 
 ## Asset paths
 
-No new binaries required. Runtime-generated canvases cover asphalt, cement, grass, facades, and banner title cards.
+No new binaries required. Runtime canvases cover asphalt, cement, grass, facades, banner cards, title windows.
 
-Optional later: `web/public/orbitxcity/ads/<id>.jpg` referenced as `/orbitxcity/ads/<id>.jpg` on `imageUrl`.
+Optional later: `web/public/orbitxcity/ads/<id>.jpg` as `imageUrl`.
 
-Kenney furniture / citybits GLTFs still omit textures — interiors keep procedural stand-ins.
+## What is solid / next phase
 
-## Next phase
+Solid: Midtown as a walkable night district — title, humanoid operatives, roads vs sidewalk vs grass, enterable venues, presence, shop, banners.
 
-Solid now: Midtown ground, readable walk-in facades, humanoid avatars, banner data path, night-readable streets, door/realtime logic.
-
-Next agents:
+Next:
 
 1. Larger world / more districts (do not rewrite collision).
 2. Full ad editor UI writing `BuildingBanner` records.
-3. Photo banners under `/orbitxcity/ads/` once assets exist.
-4. Richer humanoid kits (GLB) that still honor `AvatarAppearance`.
-5. Traffic intersections / parked-car density without extra draw-call spikes.
+3. Photo banners under `/orbitxcity/ads/`.
+4. GLB humanoid kits that still honor `AvatarAppearance`.
+5. Driveable vehicles (out of this pass).

@@ -209,7 +209,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
       {/* City slab */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[worldSize, worldSize]} />
-        <meshStandardMaterial map={asphaltMap} color="#3a424c" metalness={0.12} roughness={0.82} />
+            <meshStandardMaterial map={asphaltMap} color="#3a424c" metalness={0.12} roughness={0.82} emissive="#1a222c" emissiveIntensity={0.08} />
       </mesh>
 
       <RoadWear block={block} dense={high} />
@@ -240,7 +240,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
           <group key={`street-${i}`}>
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={pos} receiveShadow>
               <planeGeometry args={planeSize} />
-              <meshStandardMaterial map={asphaltMap} color="#343a42" metalness={0.16} roughness={0.78} />
+              <meshStandardMaterial map={asphaltMap} color="#343a42" metalness={0.16} roughness={0.78} emissive="#1c242c" emissiveIntensity={0.1} />
             </mesh>
             {Array.from({ length: dashCount }).map((_, di) => {
               const t = (di + 0.5) / dashCount;
@@ -252,7 +252,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                   position={horizontal ? [along, yRoad + 0.012, s.at] : [s.at, yRoad + 0.012, along]}
                 >
                   <planeGeometry args={horizontal ? [1.55, 0.14] : [0.14, 1.55]} />
-                  <meshStandardMaterial color="#e8e2c4" roughness={0.62} />
+                  <meshStandardMaterial color="#f2ecd0" emissive="#cfc6a0" emissiveIntensity={0.22} roughness={0.55} />
                 </mesh>
               );
             })}

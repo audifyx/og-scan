@@ -33,4 +33,9 @@ describe("titleTheme", () => {
     expect(vars["--menu-accent"]).toBe(TITLE_THEMES.boston.uiAccent);
     expect(isArcadeLime(vars["--title-accent"] ?? "")).toBe(false);
   });
+
+  it("keeps title skies brighter than the previous purple-black wash", () => {
+    const nyc = Number.parseInt(TITLE_THEMES.nyc.sky.slice(1), 16);
+    expect(nyc).toBeGreaterThan(0x070910);
+  });
 });

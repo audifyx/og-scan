@@ -46,6 +46,12 @@ describe("characterClasses", () => {
     }
     expect(appearanceFromClass(getCharacterClass("anon")).outfit).toBe("suit");
     expect(appearanceFromClass(getCharacterClass("doge")).faceStyle).toBe("smile");
+    expect(appearanceFromClass(getCharacterClass("wojak")).outfit).toBe("hoodie");
+    expect(appearanceFromClass(getCharacterClass("chad")).beardStyle).toBe("full");
+    expect(appearanceFromClass(getCharacterClass("pepe")).beardStyle).toBe("goatee");
+    for (const cls of CHARACTER_CLASSES) {
+      expect(cls.scale.y).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("maps perks through aliases", () => {
