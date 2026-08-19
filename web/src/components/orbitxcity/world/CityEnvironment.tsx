@@ -15,6 +15,7 @@ import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
 import { BlockyBuildingMesh } from "./BlockyBuildingMesh";
 import { Baseplate } from "./BlockBuilding";
+import { CityFill } from "./CityFill";
 import { BillboardMesh } from "./BillboardMesh";
 import { GraffitiLayer } from "./GraffitiLayer";
 import { Skyline } from "./Skyline";
@@ -388,8 +389,13 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
 
       {BLOCKY_WORLD ? (
         <>
-          <Baseplate size={260} color="#7fbf6a" grid="#6aa858" />
+          <Baseplate size={560} color="#7fbf6a" grid="#6aa858" />
           <Ground block={block} />
+          <CityFill
+            seed={`orbitx-${block.id ?? "nyc"}`}
+            lite={!high}
+            outerRadius={high ? 250 : 170}
+          />
         </>
       ) : (
         <Ground block={block} />

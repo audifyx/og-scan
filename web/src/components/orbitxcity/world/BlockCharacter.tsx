@@ -1,9 +1,9 @@
 /**
  * OrbitX City — blocky operative mesh.
  *
- * Roblox-style proportions: box torso, cylinder-free limbs, oversized head.
- * Silhouette is driven entirely by the class `build` recipe so all six
- * mascots read differently from across the street.
+ * Built to true R6 blocky proportions in stud units, then normalised to the
+ * world's avatar height so it drops in at the same scale as the previous
+ * humanoid. Silhouette is driven by the class `build` recipe.
  */
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -15,7 +15,6 @@ import {
 
 export interface BlockCharacterProps {
   classId?: CharacterClassId | string;
-  /** Overrides from the character creator. */
   bodyColor?: string;
   skinColor?: string;
   accentColor?: string;
@@ -26,19 +25,35 @@ export interface BlockCharacterProps {
   castShadow?: boolean;
 }
 
+/* ── Proportions, in studs (R6 reference) ─────────────────── */
+const LEG_H = 2.0;
+const LEG_W = 1.0;
+const LEG_D = 1.0;
+const TORSO_H = 2.0;
+const TORSO_W = 2.0;
+const TORSO_D = 1.0;
+const ARM_H = 2.0;
+const ARM_W = 1.0;
+const HEAD_H = 1.25;
+
+/** Total stud height, and the world height we normalise to. */
+const STUD_H = LEG_H + TORSO_H + HEAD_H;
+const TARGET_H = 2.3;
+const UNIT = TARGET_H / STUD_H;
+
 const HEAD_SHAPE: Record<string, [number, number, number]> = {
-  round: [1.05, 1.0, 1.05],
-  block: [1.2, 1.05, 1.1],
-  wide: [1.35, 0.92, 1.15],
-  tall: [0.95, 1.25, 0.95],
-  snout: [1.1, 1.0, 1.3],
+  round: [1.5, 1.25, 1.4],
+  block: [1.7, 1.3, 1.45],
+  wide: [1.85, 1.15, 1.5],
+  tall: [1.35, 1.5, 1.3],
+  snout: [1.5, 1.25, 1.6],
 };
 
-const TORSO_SHAPE: Record<string, [number, number, number]> = {
-  slim: [1.15, 1.5, 0.62],
-  regular: [1.35, 1.5, 0.72],
-  broad: [1.6, 1.5, 0.8],
-  bulk: [1.85, 1.55, 0.92],
+const TORSO_W_BY_BUILD: Record<string, number> = {
+  slim: 1.75,
+  regular: 2.0,
+  broad: 2.3,
+  bulk: 2.55,
 };
 
 function flat(color: string, emissive?: string, intensity = 0) {
@@ -47,7 +62,7 @@ function flat(color: string, emissive?: string, intensity = 0) {
       color={color}
       emissive={emissive ?? "#000000"}
       emissiveIntensity={intensity}
-      roughness={0.68}
+      roughness={0.7}
       metalness={0.02}
       flatShading
     />
@@ -72,7 +87,7 @@ export function BlockCharacter({
   const trim = cls.trimColor;
 
   const head = HEAD_SHAPE[build.head] ?? HEAD_SHAPE.round!;
-  const torso = TORSO_SHAPE[build.torso] ?? TORSO_SHAPE.regular!;
+  const torsoW = TORSO_W_BY_BUILD[build.torso] ?? TORSO_W;
 
   const armL = useRef<THREE.Group>(null);
   const armR = useRef<THREE.Group>(null);
@@ -80,176 +95,221 @@ export function BlockCharacter({
   const legR = useRef<THREE.Group>(null);
   const root = useRef<THREE.Group>(null);
 
-  const torsoTop = 1.7 + torso[1] / 2;
+  /* Key Y positions, in studs, measured from the feet. */
+  const hipY = LEG_H;
+  const shoulderY = LEG_H + TORSO_H;
+  const headY = shoulderY + head[1] / 2;
 
   useFrame((state) => {
     const t = state.clock.elapsedTime + phase;
-    const swing = Math.sin(t * (4 + moveAmount * 5)) * (0.18 + moveAmount * 0.75);
-    const bob = Math.sin(t * (8 + moveAmount * 8)) * (0.02 + moveAmount * 0.07);
+    const amt = Math.min(1, Math.max(0, moveAmount));
+    const swing = Math.sin(t * (3.2 + amt * 5.5)) * (0.1 + amt * 0.72);
+    const bob = Math.sin(t * (6.4 + amt * 9)) * (0.012 + amt * 0.05);
 
     if (armL.current) armL.current.rotation.x = swing;
     if (armR.current) armR.current.rotation.x = -swing;
-    if (legL.current) legL.current.rotation.x = -swing * 0.9;
-    if (legR.current) legR.current.rotation.x = swing * 0.9;
+    if (legL.current) legL.current.rotation.x = -swing * 0.85;
+    if (legR.current) legR.current.rotation.x = swing * 0.85;
     if (root.current) root.current.position.y = bob;
   });
 
-  const eyeEmissive = useMemo(() => {
+  const eye = useMemo(() => {
     switch (build.eyes) {
       case "laser":
-        return { color: "#ff2b2b", intensity: 2.4 };
+        return { color: "#ff2b2b", intensity: 2.2 };
       case "glow":
-        return { color: cls.neon, intensity: 1.5 };
+        return { color: cls.neon, intensity: 1.4 };
       case "shade":
         return { color: "#0a0c11", intensity: 0 };
       default:
-        return { color: "#12151c", intensity: 0 };
+        return { color: "#14171f", intensity: 0 };
     }
   }, [build.eyes, cls.neon]);
 
   return (
-    <group ref={root} scale={[cls.scale.x, cls.scale.y, cls.scale.z]}>
-      {/* Torso */}
-      <mesh position={[0, 1.7 + torso[1] / 2, 0]} castShadow={castShadow} receiveShadow>
-        <boxGeometry args={torso} />
-        {flat(body)}
-      </mesh>
-
-      {/* Chest accent stripe */}
-      <mesh position={[0, 1.7 + torso[1] * 0.62, torso[2] / 2 + 0.02]}>
-        <boxGeometry args={[torso[0] * 0.5, 0.26, 0.06]} />
-        {flat(accent, accent, 0.35)}
-      </mesh>
-
-      {/* Head */}
-      <group position={[0, torsoTop + head[1] / 2 + 0.12, 0]}>
-        <mesh castShadow={castShadow}>
-          <boxGeometry args={head} />
-          {flat(skin)}
+    <group scale={[UNIT * cls.scale.x, UNIT * cls.scale.y, UNIT * cls.scale.z]}>
+      <group ref={root}>
+        {/* ── Torso ─────────────────────────────────────── */}
+        <mesh position={[0, hipY + TORSO_H / 2, 0]} castShadow={castShadow} receiveShadow>
+          <boxGeometry args={[torsoW, TORSO_H, TORSO_D]} />
+          {flat(body)}
         </mesh>
 
-        {/* Eyes */}
-        {[-1, 1].map((s) => (
-          <mesh key={s} position={[s * head[0] * 0.22, head[1] * 0.1, head[2] / 2 + 0.03]}>
-            <boxGeometry args={[head[0] * 0.2, head[1] * 0.16, 0.06]} />
-            {flat(eyeEmissive.color, eyeEmissive.color, eyeEmissive.intensity)}
-          </mesh>
-        ))}
+        {/* Chest accent */}
+        <mesh position={[0, hipY + TORSO_H * 0.66, TORSO_D / 2 + 0.02]}>
+          <boxGeometry args={[torsoW * 0.46, 0.34, 0.05]} />
+          {flat(accent, accent, 0.3)}
+        </mesh>
 
-        {/* Snout for the canine build */}
-        {build.head === "snout" && (
-          <mesh position={[0, -head[1] * 0.18, head[2] / 2 + 0.18]} castShadow={castShadow}>
-            <boxGeometry args={[head[0] * 0.42, head[1] * 0.34, 0.42]} />
-            {flat(trim)}
-          </mesh>
-        )}
+        {/* Belt */}
+        <mesh position={[0, hipY + 0.16, 0]} castShadow={castShadow}>
+          <boxGeometry args={[torsoW + 0.04, 0.3, TORSO_D + 0.04]} />
+          {flat(trim)}
+        </mesh>
 
-        {/* Headgear */}
-        {build.headgear === "cap" && (
-          <group position={[0, head[1] / 2 + 0.1, 0]}>
-            <mesh castShadow={castShadow}>
-              <boxGeometry args={[head[0] * 1.04, 0.24, head[2] * 1.04]} />
+        {/* ── Head ──────────────────────────────────────── */}
+        <group position={[0, headY, 0]}>
+          <mesh castShadow={castShadow}>
+            <boxGeometry args={head} />
+            {flat(skin)}
+          </mesh>
+
+          {[-1, 1].map((s) => (
+            <mesh
+              key={s}
+              position={[s * head[0] * 0.23, head[1] * 0.12, head[2] / 2 + 0.02]}
+            >
+              <boxGeometry args={[head[0] * 0.19, head[1] * 0.17, 0.05]} />
+              {flat(eye.color, eye.color, eye.intensity)}
+            </mesh>
+          ))}
+
+          {/* Mouth line keeps the face readable at distance */}
+          <mesh position={[0, -head[1] * 0.22, head[2] / 2 + 0.02]}>
+            <boxGeometry args={[head[0] * 0.34, 0.06, 0.04]} />
+            {flat("#1b1f28")}
+          </mesh>
+
+          {build.head === "snout" && (
+            <mesh
+              position={[0, -head[1] * 0.16, head[2] / 2 + 0.22]}
+              castShadow={castShadow}
+            >
+              <boxGeometry args={[head[0] * 0.44, head[1] * 0.36, 0.46]} />
+              {flat(trim)}
+            </mesh>
+          )}
+
+          {/* Ears for the canine build */}
+          {build.head === "snout" &&
+            [-1, 1].map((s) => (
+              <mesh
+                key={s}
+                position={[s * head[0] * 0.32, head[1] * 0.62, 0]}
+                castShadow={castShadow}
+              >
+                <boxGeometry args={[0.28, 0.42, 0.16]} />
+                {flat(trim)}
+              </mesh>
+            ))}
+
+          {build.headgear === "cap" && (
+            <group position={[0, head[1] / 2 + 0.12, 0]}>
+              <mesh castShadow={castShadow}>
+                <boxGeometry args={[head[0] * 1.03, 0.26, head[2] * 1.03]} />
+                {flat(accent)}
+              </mesh>
+              <mesh position={[0, -0.02, head[2] * 0.62]} castShadow={castShadow}>
+                <boxGeometry args={[head[0] * 0.86, 0.1, 0.46]} />
+                {flat(accent)}
+              </mesh>
+            </group>
+          )}
+
+          {build.headgear === "beanie" && (
+            <mesh position={[0, head[1] / 2 + 0.16, 0]} castShadow={castShadow}>
+              <boxGeometry args={[head[0] * 1.05, 0.44, head[2] * 1.05]} />
               {flat(accent)}
             </mesh>
-            <mesh position={[0, -0.02, head[2] * 0.6]} castShadow={castShadow}>
-              <boxGeometry args={[head[0] * 0.9, 0.1, 0.5]} />
-              {flat(accent)}
+          )}
+
+          {build.headgear === "hood" && (
+            <>
+              <mesh
+                position={[0, head[1] * 0.1, -head[2] * 0.2]}
+                castShadow={castShadow}
+              >
+                <boxGeometry args={[head[0] * 1.18, head[1] * 1.12, head[2] * 1.12]} />
+                {flat(body)}
+              </mesh>
+              <mesh position={[0, head[1] * 0.08, head[2] * 0.44]}>
+                <boxGeometry args={[head[0] * 0.94, head[1] * 0.88, 0.05]} />
+                {flat("#05070a")}
+              </mesh>
+            </>
+          )}
+
+          {build.headgear === "visor" && (
+            <mesh
+              position={[0, head[1] * 0.12, head[2] / 2 + 0.04]}
+              castShadow={castShadow}
+            >
+              <boxGeometry args={[head[0] * 1.04, head[1] * 0.28, 0.1]} />
+              {flat(cls.neon, cls.neon, 1.1)}
+            </mesh>
+          )}
+
+          {build.headgear === "crown" && (
+            <mesh position={[0, head[1] / 2 + 0.2, 0]} castShadow={castShadow}>
+              <boxGeometry args={[head[0] * 0.88, 0.34, head[2] * 0.88]} />
+              {flat(cls.gold, cls.gold, 0.45)}
+            </mesh>
+          )}
+        </group>
+
+        {/* ── Arms — pivot at the shoulder ──────────────── */}
+        {[-1, 1].map((s) => (
+          <group
+            key={s}
+            ref={s < 0 ? armL : armR}
+            position={[s * (torsoW / 2 + ARM_W / 2), shoulderY, 0]}
+          >
+            <mesh position={[0, -ARM_H / 2, 0]} castShadow={castShadow}>
+              <boxGeometry args={[ARM_W, ARM_H, TORSO_D]} />
+              {flat(body)}
+            </mesh>
+            {/* Hand */}
+            <mesh position={[0, -ARM_H + 0.14, 0]} castShadow={castShadow}>
+              <boxGeometry args={[ARM_W + 0.02, 0.32, TORSO_D + 0.02]} />
+              {flat(skin)}
             </mesh>
           </group>
+        ))}
+
+        {/* ── Legs — pivot at the hip ───────────────────── */}
+        {[-1, 1].map((s) => (
+          <group key={s} ref={s < 0 ? legL : legR} position={[s * (LEG_W / 2), hipY, 0]}>
+            <mesh position={[0, -LEG_H / 2, 0]} castShadow={castShadow}>
+              <boxGeometry args={[LEG_W, LEG_H, LEG_D]} />
+              {flat(trim)}
+            </mesh>
+            {/* Shoe sits flush with the ground plane */}
+            <mesh position={[0, -LEG_H + 0.13, 0.08]} castShadow={castShadow}>
+              <boxGeometry args={[LEG_W + 0.04, 0.26, LEG_D + 0.16]} />
+              {flat("#1a1d24")}
+            </mesh>
+          </group>
+        ))}
+
+        {/* ── Trailing accessory ────────────────────────── */}
+        {build.trail === "cape" && (
+          <mesh
+            position={[0, hipY + TORSO_H * 0.55, -TORSO_D / 2 - 0.09]}
+            castShadow={castShadow}
+          >
+            <boxGeometry args={[torsoW * 0.92, TORSO_H * 1.15, 0.08]} />
+            {flat(accent, accent, 0.2)}
+          </mesh>
         )}
 
-        {build.headgear === "beanie" && (
-          <mesh position={[0, head[1] / 2 + 0.14, 0]} castShadow={castShadow}>
-            <boxGeometry args={[head[0] * 1.06, 0.4, head[2] * 1.06]} />
+        {build.trail === "scarf" && (
+          <mesh position={[0, shoulderY - 0.1, 0]} castShadow={castShadow}>
+            <boxGeometry args={[torsoW * 0.8, 0.32, TORSO_D * 1.35]} />
             {flat(accent)}
           </mesh>
         )}
 
-        {build.headgear === "hood" && (
-          <group>
-            <mesh position={[0, head[1] * 0.16, -head[2] * 0.22]} castShadow={castShadow}>
-              <boxGeometry args={[head[0] * 1.22, head[1] * 1.15, head[2] * 1.1]} />
-              {flat(body)}
-            </mesh>
-            <mesh position={[0, head[1] * 0.16, head[2] * 0.42]}>
-              <boxGeometry args={[head[0] * 1.0, head[1] * 0.94, 0.06]} />
-              {flat("#05070a")}
-            </mesh>
-          </group>
-        )}
-
-        {build.headgear === "visor" && (
-          <mesh position={[0, head[1] * 0.12, head[2] / 2 + 0.06]} castShadow={castShadow}>
-            <boxGeometry args={[head[0] * 1.06, head[1] * 0.3, 0.12]} />
-            {flat(cls.neon, cls.neon, 1.2)}
-          </mesh>
-        )}
-
-        {build.headgear === "crown" && (
-          <mesh position={[0, head[1] / 2 + 0.2, 0]} castShadow={castShadow}>
-            <boxGeometry args={[head[0] * 0.9, 0.36, head[2] * 0.9]} />
-            {flat(cls.gold, cls.gold, 0.5)}
+        {build.trail === "tail" && (
+          <mesh
+            position={[0, hipY + 0.35, -TORSO_D / 2 - 0.3]}
+            rotation={[0.6, 0, 0]}
+            castShadow={castShadow}
+          >
+            <boxGeometry args={[0.34, 1.2, 0.34]} />
+            {flat(trim)}
           </mesh>
         )}
       </group>
-
-      {/* Arms */}
-      {[-1, 1].map((s) => (
-        <group
-          key={s}
-          ref={s < 0 ? armL : armR}
-          position={[s * (torso[0] / 2 + 0.28), torsoTop - 0.06, 0]}
-        >
-          <mesh position={[0, -0.68, 0]} castShadow={castShadow}>
-            <boxGeometry args={[0.44, 1.36, 0.44]} />
-            {flat(body)}
-          </mesh>
-          <mesh position={[0, -1.42, 0]} castShadow={castShadow}>
-            <boxGeometry args={[0.46, 0.3, 0.46]} />
-            {flat(skin)}
-          </mesh>
-        </group>
-      ))}
-
-      {/* Legs */}
-      {[-1, 1].map((s) => (
-        <group key={s} ref={s < 0 ? legL : legR} position={[s * 0.34, 1.7, 0]}>
-          <mesh position={[0, -0.85, 0]} castShadow={castShadow}>
-            <boxGeometry args={[0.52, 1.7, 0.52]} />
-            {flat(trim)}
-          </mesh>
-          <mesh position={[0, -1.78, 0.08]} castShadow={castShadow}>
-            <boxGeometry args={[0.56, 0.26, 0.7]} />
-            {flat("#1a1d24")}
-          </mesh>
-        </group>
-      ))}
-
-      {/* Trailing accessory */}
-      {build.trail === "cape" && (
-        <mesh position={[0, torsoTop - 0.5, -torso[2] / 2 - 0.12]} castShadow={castShadow}>
-          <boxGeometry args={[torso[0] * 0.96, 1.9, 0.1]} />
-          {flat(accent, accent, 0.25)}
-        </mesh>
-      )}
-
-      {build.trail === "scarf" && (
-        <mesh position={[0, torsoTop + 0.08, 0]} castShadow={castShadow}>
-          <boxGeometry args={[torso[0] * 0.82, 0.3, torso[2] * 1.3]} />
-          {flat(accent)}
-        </mesh>
-      )}
-
-      {build.trail === "tail" && (
-        <mesh
-          position={[0, 1.95, -torso[2] / 2 - 0.4]}
-          rotation={[0.5, 0, 0]}
-          castShadow={castShadow}
-        >
-          <boxGeometry args={[0.32, 1.1, 0.32]} />
-          {flat(trim)}
-        </mesh>
-      )}
     </group>
   );
 }

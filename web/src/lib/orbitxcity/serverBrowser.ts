@@ -1,42 +1,43 @@
 /**
- * OrbitX City — FiveM-style server browser model.
+ * OrbitX City — district server model.
  *
- * The title screen is a server list, not a tile dashboard: each district is a
- * "server" with a live player count, ping, tags and a connect action.
+ * Player counts come from the live realtime presence directory. There is no
+ * simulated or padded traffic: when realtime is unavailable, or nobody is in a
+ * district, the count is 0 and the UI says so.
  */
 import type { CityId } from "./types";
 import { ORBITX_CITIES } from "./cities";
+import { districtLobby, type DirectoryLobby } from "./realtime";
 
-export type ServerStatus = "online" | "busy" | "full" | "offline";
+export type ServerStatus = "online" | "busy" | "full" | "empty" | "offline";
 
 export interface CityServer {
   id: CityId;
-  /** Display name in the browser row. */
   name: string;
-  /** Short banner line under the name. */
   blurb: string;
   region: "na-east" | "na-west" | "eu-west" | "global";
   maxPlayers: number;
   tags: string[];
-  /** Whether the district is playable yet. */
   unlocked: boolean;
+  /** Realtime lobby id this district maps onto. */
+  lobbyId: string;
 }
 
 export interface ServerRuntime {
   players: number;
-  ping: number;
   status: ServerStatus;
-  queue: number;
+  /** True when a live presence figure was actually received. */
+  live: boolean;
 }
 
 export type ServerRow = CityServer & ServerRuntime;
 
-const SERVER_META: Record<CityId, Omit<CityServer, "id" | "name" | "unlocked">> = {
+const SERVER_META: Record<CityId, Omit<CityServer, "id" | "name" | "unlocked" | "lobbyId">> = {
   nyc: {
     blurb: "Midtown financial core · launch desks · meme market",
     region: "na-east",
     maxPlayers: 256,
-    tags: ["Trading", "Launchpad", "Roleplay", "Voice"],
+    tags: ["Trading", "Launchpad", "Voice"],
   },
   miami: {
     blurb: "Coastal social district · plazas and voice circles",
@@ -72,49 +73,41 @@ export function getCityServers(): CityServer[] {
       id: c.id as CityId,
       name: c.name.replace(/^OrbitX\s+/i, ""),
       unlocked: c.unlocked !== false,
+      lobbyId: districtLobby(c.id).id,
       ...meta,
     };
   });
 }
 
-/**
- * Deterministic pseudo-live runtime so the browser never renders empty while
- * real presence counts are still loading. Real counts overwrite this when the
- * lobby directory resolves.
- */
-export function simulateRuntime(server: CityServer, seed = Date.now()): ServerRuntime {
-  const bucket = Math.floor(seed / 20_000);
-  const h = hash(`${server.id}:${bucket}`);
-  const load = server.id === "nyc" ? 0.62 : server.id === "boston" ? 0.24 : 0.42;
-  const jitter = ((h % 1000) / 1000 - 0.5) * 0.18;
-  const players = server.unlocked
-    ? Math.max(1, Math.round(server.maxPlayers * clamp01(load + jitter)))
-    : 0;
-  const ping = 18 + (h % 46);
+function statusFor(server: CityServer, players: number, live: boolean): ServerStatus {
+  if (!server.unlocked) return "offline";
+  if (!live || players <= 0) return "empty";
   const ratio = players / server.maxPlayers;
-
-  let status: ServerStatus = "online";
-  if (!server.unlocked) status = "offline";
-  else if (ratio >= 0.98) status = "full";
-  else if (ratio >= 0.8) status = "busy";
-
-  return {
-    players,
-    ping,
-    status,
-    queue: status === "full" ? 1 + (h % 7) : 0,
-  };
+  if (ratio >= 0.98) return "full";
+  if (ratio >= 0.8) return "busy";
+  return "online";
 }
 
-export function buildServerRows(
-  live?: Partial<Record<CityId, Partial<ServerRuntime>>>,
-  seed?: number,
-): ServerRow[] {
+/**
+ * Build display rows from the live lobby directory. Districts with no presence
+ * report 0 — never a placeholder figure.
+ */
+export function buildServerRows(directory?: DirectoryLobby[] | null): ServerRow[] {
+  const counts = new Map<string, number>();
+  for (const lobby of directory ?? []) {
+    counts.set(lobby.id, lobby.count);
+  }
+  const live = Array.isArray(directory);
+
   return getCityServers().map((s) => {
-    const sim = simulateRuntime(s, seed);
-    const override = live?.[s.id] ?? {};
-    return { ...s, ...sim, ...override };
+    const players = s.unlocked ? (counts.get(s.lobbyId) ?? 0) : 0;
+    return { ...s, players, live, status: statusFor(s, players, live) };
   });
+}
+
+/** Total real players across all districts. */
+export function totalPlayers(rows: ServerRow[]): number {
+  return rows.reduce((a, r) => a + r.players, 0);
 }
 
 export function statusLabel(status: ServerStatus): string {
@@ -125,27 +118,16 @@ export function statusLabel(status: ServerStatus): string {
       return "Busy";
     case "full":
       return "Full";
+    case "empty":
+      return "Empty";
     default:
       return "Offline";
   }
 }
 
-export function pingBars(ping: number): 1 | 2 | 3 | 4 {
-  if (ping < 30) return 4;
-  if (ping < 55) return 3;
-  if (ping < 90) return 2;
-  return 1;
-}
-
-function clamp01(v: number): number {
-  return Math.min(1, Math.max(0, v));
-}
-
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i += 1) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
+/** Human label for a district's occupancy, used in the list. */
+export function occupancyLabel(row: ServerRow): string {
+  if (!row.unlocked) return "Locked";
+  if (!row.live) return "—";
+  return `${row.players}/${row.maxPlayers}`;
 }

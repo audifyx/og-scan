@@ -4574,3 +4574,112 @@ button.oxc-token-row {
   .oxc-chars-actions { margin-left: 0; width: 100%; }
   .oxc-chars-go { flex: 1; }
 }
+
+/* ============================================================
+   GTA launcher — mobile layout corrections
+   Fixes: header overlap, row text clipping, dead vertical space,
+   low CTA, and the removed ping pips.
+   ============================================================ */
+
+/* Header no longer overflows: it wraps and the meta shrinks. */
+.oxc-gta-head {
+  flex-wrap: wrap;
+  row-gap: 10px;
+  padding: 16px 24px 0;
+}
+.oxc-gta-headright { flex-wrap: wrap; justify-content: flex-end; }
+.oxc-gta-online {
+  white-space: nowrap;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.oxc-gta-online[data-live="false"] { color: rgba(233, 237, 242, 0.34); }
+.oxc-gta-online[data-live="false"] i { background: #7c8798; box-shadow: none; animation: none; }
+
+/* Panel hugs its content instead of stretching to the viewport. */
+.oxc-gta-panel {
+  margin-top: 16px;
+  align-content: start;
+}
+.oxc-gta-list { align-self: start; }
+
+/* Rows: two-line, nothing clipped, comfortable tap target. */
+.oxc-gta-row {
+  gap: 12px;
+  padding: 12px 16px;
+  min-height: 58px;
+  margin-bottom: 3px;
+}
+.oxc-gta-rowtext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.oxc-gta-rowlabel {
+  font-size: 15px;
+  line-height: 1.25;
+  min-width: 0;
+}
+.oxc-gta-rowsub {
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(233, 237, 242, 0.42);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.oxc-gta-row.is-on .oxc-gta-rowsub { color: rgba(13, 16, 20, 0.6); }
+
+.oxc-gta-rowmeta {
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  text-align: right;
+}
+.oxc-gta-rowval { font-size: 13px; font-weight: 640; white-space: nowrap; }
+.oxc-gta-rowstate {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.oxc-gta-rowstate[data-status="online"] { color: #4ade80; }
+.oxc-gta-rowstate[data-status="busy"] { color: #ffb427; }
+.oxc-gta-rowstate[data-status="full"] { color: #ff6b6b; }
+.oxc-gta-rowstate[data-status="empty"] { color: rgba(233, 237, 242, 0.34); }
+.oxc-gta-rowstate[data-status="offline"] { color: rgba(233, 237, 242, 0.28); }
+.oxc-gta-row.is-on .oxc-gta-rowstate { color: rgba(13, 16, 20, 0.62); }
+
+/* Hint bar sits directly under the content, not pinned to the floor. */
+.oxc-gta-hints { padding: 16px 24px 20px; margin-top: 8px; }
+
+@media (max-width: 780px) {
+  .oxc-gta-head { padding: 14px 16px 0; }
+  .oxc-gta-logo { font-size: 19px; }
+  .oxc-gta-city { letter-spacing: 0.3em; font-size: 10px; }
+  .oxc-gta-online { font-size: 10.5px; padding: 3px 8px; }
+  .oxc-gta-ico { width: 30px; height: 30px; }
+
+  .oxc-gta-tabs { margin: 14px 16px 0; }
+  .oxc-gta-panel { padding: 0 16px; margin-top: 14px; }
+
+  /* Rows keep both lines and the count on a narrow screen. */
+  .oxc-gta-row { padding: 11px 14px; min-height: 62px; }
+  .oxc-gta-row.is-on { transform: none; outline: 2px solid var(--gta-hi); outline-offset: -2px; }
+  .oxc-gta-rowlabel { font-size: 14.5px; }
+  .oxc-gta-rowsub { font-size: 10.5px; }
+
+  /* CTA rides just below the list instead of at the screen bottom. */
+  .oxc-gta-hints {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px 16px 22px;
+    margin-top: 4px;
+  }
+  .oxc-gta-spacer { display: none; }
+  .oxc-gta-cta { width: 100%; padding: 15px 24px; font-size: 13px; }
+}

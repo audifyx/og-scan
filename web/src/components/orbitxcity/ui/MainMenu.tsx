@@ -19,11 +19,13 @@ import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { resolveTitleTheme, titleCssVars } from "@/lib/orbitxcity/titleTheme";
 import {
   buildServerRows,
-  pingBars,
+  occupancyLabel,
   REGION_LABEL,
   statusLabel,
+  totalPlayers as sumPlayers,
   type ServerRow,
 } from "@/lib/orbitxcity/serverBrowser";
+import { watchLobbyDirectory, type DirectoryLobby } from "@/lib/orbitxcity/realtime";
 import {
   CHARACTER_CLASSES,
   appearanceFromClass,
@@ -62,14 +64,15 @@ export function MainMenu() {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [tick, setTick] = useState(() => Date.now());
+  const [directory, setDirectory] = useState<DirectoryLobby[] | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
   const theme = resolveTitleTheme(selectedCityId);
   const cssVars = useMemo(() => titleCssVars(theme) as CSSProperties, [theme]);
 
-  const servers = useMemo(() => buildServerRows(undefined, tick), [tick]);
-  const totalPlayers = servers.reduce((a, s) => a + s.players, 0);
+  const servers = useMemo(() => buildServerRows(directory), [directory]);
+  const totalPlayers = sumPlayers(servers);
+  const liveCounts = servers.some((s) => s.live);
 
   const selectedClassId = resolveClassId(avatar.classId);
 
@@ -85,10 +88,10 @@ export function MainMenu() {
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setVisible(true));
-    const id = window.setInterval(() => setTick(Date.now()), 20_000);
+    const stop = watchLobbyDirectory((lobbies) => setDirectory(lobbies));
     return () => {
       cancelAnimationFrame(raf);
-      window.clearInterval(id);
+      stop();
     };
   }, []);
 
@@ -233,8 +236,9 @@ export function MainMenu() {
           <span className="oxc-gta-city">CITY</span>
         </div>
         <div className="oxc-gta-headright">
-          <span className="oxc-gta-online">
-            <i aria-hidden /> {totalPlayers.toLocaleString()} online
+          <span className="oxc-gta-online" data-live={liveCounts}>
+            <i aria-hidden />
+            {liveCounts ? `${totalPlayers.toLocaleString()} online` : "Connecting…"}
           </span>
           <AudioToggle />
           <button
@@ -398,13 +402,11 @@ export function MainMenu() {
               <dl className="oxc-gta-facts">
                 <div>
                   <dt>Players</dt>
-                  <dd>
-                    {activeServer.players}/{activeServer.maxPlayers}
-                  </dd>
+                  <dd>{occupancyLabel(activeServer)}</dd>
                 </div>
                 <div>
-                  <dt>Ping</dt>
-                  <dd>{activeServer.ping}ms</dd>
+                  <dt>Region</dt>
+                  <dd>{REGION_LABEL[activeServer.region]}</dd>
                 </div>
                 <div>
                   <dt>Status</dt>
@@ -506,7 +508,6 @@ function ServerLine({
   onHover: () => void;
   onPick: () => void;
 }) {
-  const bars = pingBars(server.ping);
   return (
     <li>
       <button
@@ -518,15 +519,14 @@ function ServerLine({
         onMouseEnter={onHover}
         onClick={onPick}
       >
-        <span className="oxc-gta-rowlabel">{server.name}</span>
+        <span className="oxc-gta-rowtext">
+          <span className="oxc-gta-rowlabel">{server.name}</span>
+          <span className="oxc-gta-rowsub">{server.blurb}</span>
+        </span>
         <span className="oxc-gta-rowmeta">
-          <span className="oxc-gta-pips" title={`${server.ping}ms`}>
-            {[1, 2, 3, 4].map((i) => (
-              <i key={i} className={i <= bars ? "on" : ""} />
-            ))}
-          </span>
-          <span className="oxc-gta-rowval">
-            {server.players}/{server.maxPlayers}
+          <span className="oxc-gta-rowval">{occupancyLabel(server)}</span>
+          <span className="oxc-gta-rowstate" data-status={server.status}>
+            {statusLabel(server.status)}
           </span>
         </span>
       </button>
