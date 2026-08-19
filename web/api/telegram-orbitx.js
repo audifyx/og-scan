@@ -331,33 +331,20 @@ async function lookupVerifiedMint(mint) {
 }
 
 async function buildBrandedScan(mint, { req, link, isGroup }) {
-  const ctx = {
-    req,
-    link,
-    allowPrivileged: false,
-  };
-  const args = { mint };
-  const snapshotP = fetchTelegramTokenSnapshot(mint).catch(() => null);
-  const extrasP = Promise.all([
-    raceTimeout(runTool({ tool: "orbitx_xray", args, ...ctx }), 6_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_get_forensics", args: { mint, first: "0" }, ...ctx }), 5_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_boosts", args: {}, ...ctx }), 4_000).catch(() => null),
-    lookupVerifiedMint(mint),
-  ]);
-  const [snapshot, extras] = await Promise.all([
-    snapshotP,
-    raceTimeout(extrasP, 6_500).catch(() => [null, null, null, null]),
-  ]);
-  const [xray, forensics, boosts, verified] = Array.isArray(extras) ? extras : [null, null, null, null];
-  const merged = mergeTokenScanPayloads({
+  // Quote Dex/Jupiter/Gecko first. Never self-HTTP /api/ogdex/* from this webhook —
+  // same-isolate calls hang and abort the live quote (TOKEN cards / "no live quote").
+  const snapshot = await fetchTelegramTokenSnapshot(mint).catch((error) => {
+    console.warn("[telegram-orbitx] snapshot", error?.message || error);
+    return null;
+  });
+  const verified = await lookupVerifiedMint(mint).catch(() => null);
+  void req;
+  void link;
+  void isGroup;
+  return mergeTokenScanPayloads({
     token: snapshot,
-    xray,
-    forensics,
-    boosts,
     verified,
   });
-  void isGroup;
-  return merged;
 }
 
 async function handleVerify(chatId, text, { isGroup, link, extra }) {

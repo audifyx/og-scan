@@ -1,13 +1,27 @@
 /**
- * Fast token snapshot for Telegram — DexScreener + Jupiter, no self-HTTP.
- * The webhook must not call /api/ogdex/token (same Vercel isolation → empty TOKEN cards).
+ * Fast token snapshot for Telegram — DexScreener + Jupiter + Gecko, no self-HTTP.
+ * The webhook must not call /api/ogdex/* (same Vercel isolation starves outbound quotes).
  */
 import { normToken, num } from "../ogdex/_normalize.js";
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
-const DEX_URL = "https://api.dexscreener.com/latest/dex/tokens/";
-const JUP_URL = "https://lite-api.jup.ag/tokens/v2/search?query=";
+const DEX_LATEST = "https://api.dexscreener.com/latest/dex/tokens/";
+const DEX_V1 = "https://api.dexscreener.com/tokens/v1/solana/";
+const JUP_SEARCH = "https://lite-api.jup.ag/tokens/v2/search?query=";
+const JUP_PRICE = "https://lite-api.jup.ag/price/v3?ids=";
+const GECKO = "https://api.geckoterminal.com/api/v2/networks/solana/tokens/";
+
+const FETCH_HEADERS = {
+  Accept: "application/json",
+  "User-Agent": "OrbitXTelegram/1.0 (+https://www.orbitx.world)",
+};
+const GECKO_HEADERS = {
+  ...FETCH_HEADERS,
+  Accept: "application/json;version=20230302",
+};
+
+const snapCache = new Map();
 
 export const KNOWN_MINTS = {
   [ORBITX_MINT]: {
@@ -32,6 +46,7 @@ export function looksLikeOrbitXCard(text) {
   if (/Whales\s+0 wallets/.test(t) && /DEX paid/.test(t) && /DexScreener/.test(t)) return true;
   if (/💰 Market Snapshot/.test(t) && /Security/.test(t)) return true;
   if (/^\$?TOKEN \(\$TOKEN\) is live on /i.test(t)) return true;
+  if (/No live DexScreener\/Jupiter quote/i.test(t)) return true;
   return false;
 }
 
@@ -54,22 +69,70 @@ export function hasTokenIdentity(token) {
   return !dummy(name) || !dummy(symbol);
 }
 
-function withTimeout(ms) {
-  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-    return AbortSignal.timeout(ms);
-  }
+async function fetchJson(url, ms = 8000, headers = FETCH_HEADERS) {
   const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), ms);
-  return ctrl.signal;
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { headers, signal: ctrl.signal });
+    if (!r.ok) throw new Error(`http ${r.status}`);
+    return await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-async function fetchJson(url, ms = 4500) {
-  const r = await fetch(url, {
-    headers: { Accept: "application/json" },
-    signal: withTimeout(ms),
-  });
-  if (!r.ok) throw new Error(`http ${r.status}`);
-  return r.json();
+export function normalizeDexResponse(raw) {
+  if (!raw) return { pairs: [] };
+  if (Array.isArray(raw)) return { pairs: raw };
+  if (Array.isArray(raw.pairs)) return raw;
+  return { pairs: [] };
+}
+
+export function jupListFromRaw(jupRaw, mint) {
+  if (!jupRaw) return null;
+  if (Array.isArray(jupRaw)) return jupRaw;
+  if (Array.isArray(jupRaw.tokens)) return jupRaw.tokens;
+  if (Array.isArray(jupRaw.data)) return jupRaw.data;
+  const row = jupRaw[mint] || jupRaw.data?.[mint];
+  if (row && typeof row === "object" && !Array.isArray(row) && (row.usdPrice != null || row.price != null || row.liquidity != null)) {
+    return [
+      {
+        id: mint,
+        mint,
+        usdPrice: row.usdPrice ?? row.price,
+        liquidity: row.liquidity,
+        decimals: row.decimals,
+        ...row,
+      },
+    ];
+  }
+  if (jupRaw.id || jupRaw.mint || jupRaw.usdPrice != null) return [jupRaw];
+  return null;
+}
+
+export function tokenFromGecko(mint, geckoRaw) {
+  const a = geckoRaw?.data?.attributes;
+  if (!a || typeof a !== "object") return null;
+  const icon = a.image_url && a.image_url !== "missing.png" ? a.image_url : null;
+  return {
+    mint,
+    chain: "solana",
+    name: a.name || null,
+    symbol: a.symbol || null,
+    icon,
+    priceUsd: num(a.price_usd),
+    mcap: num(a.market_cap_usd) || num(a.fdv_usd),
+    fdv: num(a.fdv_usd),
+    liquidity: num(a.total_reserve_in_usd),
+    volume: num(a.volume_usd?.h24),
+    holderCount: num(a.holders?.count ?? a.holders_count),
+    isVerified: false,
+    createdAt: null,
+    ageDays: null,
+    firstPool: null,
+    audit: { mintAuthorityDisabled: null, freezeAuthorityDisabled: null },
+    stats: { "5m": {}, "1h": {}, "6h": {}, "24h": {} },
+  };
 }
 
 function dexSocials(pair) {
@@ -121,25 +184,28 @@ export function pickDexPair(mint, pairs) {
   return [...pool].sort((a, b) => (num(b.liquidity?.usd) || 0) - (num(a.liquidity?.usd) || 0))[0] || null;
 }
 
-export function mergeTokenSnapshot({ mint, jupRaw, dexRaw } = {}) {
+export function mergeTokenSnapshot({ mint, jupRaw, dexRaw, geckoRaw } = {}) {
   const known = hydrateKnownMint(mint) || {};
-  const jupHit = Array.isArray(jupRaw)
-    ? jupRaw.find((t) => String(t.id || t.mint) === mint) || jupRaw[0]
-    : jupRaw && typeof jupRaw === "object"
-      ? jupRaw
-      : null;
-  let token = jupHit ? normToken(jupHit, "24h") : null;
+  const jupList = jupListFromRaw(jupRaw, mint);
+  const jupHit = Array.isArray(jupList)
+    ? jupList.find((t) => String(t.id || t.mint) === mint) || jupList[0]
+    : null;
+  let token = null;
+  try {
+    token = jupHit ? normToken(jupHit, "24h") : null;
+  } catch (error) {
+    console.warn("[telegram-token-snapshot] normToken", error?.message || error);
+    token = null;
+  }
   if (token) token.chain = token.chain || "solana";
-  const pair = pickDexPair(mint, dexRaw?.pairs);
+  const pair = pickDexPair(mint, normalizeDexResponse(dexRaw).pairs);
   const dexToken = tokenFromDexPair(mint, pair);
+  const geckoToken = tokenFromGecko(mint, geckoRaw);
   const socials = pair ? dexSocials(pair) : {};
   if (known.website && !socials.website) socials.website = known.website;
 
-  if (bestMerge(token, dexToken)) {
-    token = overlayDex(token || dexToken, dexToken);
-  } else if (dexToken) {
-    token = dexToken;
-  }
+  if (token || dexToken) token = overlayDex(token || dexToken, dexToken);
+  if (geckoToken) token = overlayDex(token || geckoToken, geckoToken);
   if (!token) token = { mint, chain: "solana" };
   if (known.name && (!token.name || /^token$/i.test(token.name))) token.name = known.name;
   if (known.symbol && (!token.symbol || /^token$/i.test(token.symbol))) token.symbol = known.symbol;
@@ -168,43 +234,79 @@ export function mergeTokenSnapshot({ mint, jupRaw, dexRaw } = {}) {
   };
 }
 
-function bestMerge(jupToken, dexToken) {
-  return Boolean(jupToken || dexToken);
-}
-
-function overlayDex(token, dexToken) {
-  if (!dexToken) return token;
+function overlayDex(token, extra) {
+  if (!extra) return token;
   const next = { ...token };
-  if (next.priceUsd == null) next.priceUsd = dexToken.priceUsd;
-  if (!next.volume) next.volume = dexToken.volume;
-  if (!next.liquidity) next.liquidity = dexToken.liquidity;
-  if (!next.mcap) next.mcap = dexToken.mcap;
-  if (!next.fdv) next.fdv = dexToken.fdv;
-  if (next.change24h == null) next.change24h = dexToken.change24h;
-  if (next.change1h == null) next.change1h = dexToken.change1h;
-  if (next.change6h == null) next.change6h = dexToken.change6h;
-  if (next.change5m == null) next.change5m = dexToken.change5m;
-  if (!next.icon) next.icon = dexToken.icon;
-  if (!next.firstPool?.id) next.firstPool = dexToken.firstPool;
-  if (!next.ageDays && dexToken.ageDays != null) {
-    next.ageDays = dexToken.ageDays;
-    next.createdAt = dexToken.createdAt;
+  if (next.priceUsd == null) next.priceUsd = extra.priceUsd;
+  if (!next.volume) next.volume = extra.volume;
+  if (!next.liquidity) next.liquidity = extra.liquidity;
+  if (!next.mcap) next.mcap = extra.mcap;
+  if (!next.fdv) next.fdv = extra.fdv;
+  if (next.change24h == null) next.change24h = extra.change24h;
+  if (next.change1h == null) next.change1h = extra.change1h;
+  if (next.change6h == null) next.change6h = extra.change6h;
+  if (next.change5m == null) next.change5m = extra.change5m;
+  if (!next.icon) next.icon = extra.icon;
+  if (!next.firstPool?.id) next.firstPool = extra.firstPool;
+  if (!next.ageDays && extra.ageDays != null) {
+    next.ageDays = extra.ageDays;
+    next.createdAt = extra.createdAt;
   }
-  if (!next.name) next.name = dexToken.name;
-  if (!next.symbol) next.symbol = dexToken.symbol;
+  if (!next.name) next.name = extra.name;
+  if (!next.symbol) next.symbol = extra.symbol;
+  if (next.holderCount == null) next.holderCount = extra.holderCount;
   return next;
 }
 
 export async function fetchTelegramTokenSnapshot(mint) {
   const id = String(mint || "").trim();
   if (!id) return null;
-  const [jupRaw, dexRaw] = await Promise.all([
-    fetchJson(`${JUP_URL}${encodeURIComponent(id)}`, 4500).catch(() => null),
-    fetchJson(`${DEX_URL}${encodeURIComponent(id)}`, 4500).catch(() => null),
+  const cached = snapCache.get(id);
+  if (cached && Date.now() - cached.at < 20_000 && hasMarketSnapshot(cached.data?.token)) {
+    return cached.data;
+  }
+
+  const [jupSearch, dexLatest, geckoRaw] = await Promise.all([
+    fetchJson(`${JUP_SEARCH}${encodeURIComponent(id)}`, 8000).catch((err) => {
+      console.warn("[telegram-token-snapshot] jup search", err?.message || err);
+      return null;
+    }),
+    fetchJson(`${DEX_LATEST}${encodeURIComponent(id)}`, 8000).catch((err) => {
+      console.warn("[telegram-token-snapshot] dex latest", err?.message || err);
+      return null;
+    }),
+    fetchJson(`${GECKO}${encodeURIComponent(id)}`, 8000, GECKO_HEADERS).catch((err) => {
+      console.warn("[telegram-token-snapshot] gecko", err?.message || err);
+      return null;
+    }),
   ]);
-  const merged = mergeTokenSnapshot({ mint: id, jupRaw, dexRaw });
+
+  let jupRaw = jupListFromRaw(jupSearch, id);
+  let dexRaw = normalizeDexResponse(dexLatest);
+
+  if (!dexRaw.pairs.length) {
+    const v1 = await fetchJson(`${DEX_V1}${encodeURIComponent(id)}`, 8000).catch(() => null);
+    if (v1) dexRaw = normalizeDexResponse(v1);
+  }
+  if (!jupRaw) {
+    const price = await fetchJson(`${JUP_PRICE}${encodeURIComponent(id)}`, 8000).catch(() => null);
+    jupRaw = jupListFromRaw(price, id);
+  }
+
+  const merged = mergeTokenSnapshot({ mint: id, jupRaw, dexRaw, geckoRaw });
   if (!hasTokenIdentity(merged.token) && !hasMarketSnapshot(merged.token) && !hydrateKnownMint(id)) {
     return { mint: id, token: merged.token, error: "token_not_found" };
+  }
+  if (hasMarketSnapshot(merged.token)) {
+    snapCache.set(id, { at: Date.now(), data: merged });
+    if (snapCache.size > 200) {
+      const cutoff = Date.now() - 60_000;
+      for (const [k, v] of snapCache) {
+        if (v.at < cutoff) snapCache.delete(k);
+      }
+    }
+  } else {
+    console.warn("[telegram-token-snapshot] no market", id);
   }
   return merged;
 }
