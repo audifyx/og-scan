@@ -22,8 +22,10 @@ import {
   collectMediaUrls,
   extractMint,
   formatMediaCountdown,
+  formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   inferPublicTool,
+  orbitXFaqSystemAddon,
   isPrivilegedTelegramTool,
   isTelegramAdminWallet,
   loginCode,
@@ -408,8 +410,8 @@ function helpText(isPrivate, linked) {
     "/token mint · /chart ca · /scan · /xray · /research",
     "Drop a CA in chat for a branded scan (MC, ATH, holders, whales, bundles, boosts)",
     "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
-    "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
     "/check — countdown + poll the latest image/video job",
+    "/faq [topic] — OrbitX FAQ (token, MCP, burns, City, DEX)",
     "/links · /group — every URL + community GC",
     "/ask — talk to OrbitX AI",
     "",
@@ -536,7 +538,7 @@ async function askAi(prompt, { linked }) {
     ? "This user is linked to their OrbitX account in a private DM — they can /buy /sell /tweet /post."
     : "This chat is public unless they /login in a private DM.";
   const nim = await nvidiaChat({
-    system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}`,
+    system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}\n\n${orbitXFaqSystemAddon(prompt)}`,
     user: String(prompt || "gm").slice(0, 6000),
     model: process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL,
     maxTokens: 900,
@@ -763,6 +765,11 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
+  if (bare === "faq") {
+    await sendLong(chatId, formatOrbitXFaqHtml(text), { parse_mode: "HTML", ...replyExtra });
+    return;
+  }
+
   if (bare === "check" || (bare === "media" && !String(text).replace(/^\S+\s*/, "").trim())) {
     await handleCheck(chatId, text, { req, link, extra: replyExtra });
     return;
@@ -792,6 +799,13 @@ async function handleTelegramUpdate(update, req) {
     if (inferred?.meta === "cmds") {
       const page = await handleCmds(text, tools);
       await sendLong(chatId, page.text, { parse_mode: "HTML", ...replyExtra });
+      return;
+    }
+    if (inferred?.meta === "faq") {
+      await sendLong(chatId, formatOrbitXFaqHtml(inferred.args?.q || text), {
+        parse_mode: "HTML",
+        ...replyExtra,
+      });
       return;
     }
     if (inferred?.tool) {

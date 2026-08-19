@@ -49,6 +49,7 @@ export const GROUP_COMMANDS = [
   { command: "cmds", description: "Command menu + live tools" },
   { command: "menu", description: "Same as /cmds" },
   { command: "ask", description: "Ask OrbitX AI anything" },
+  { command: "faq", description: "OrbitX FAQ — token, MCP, burns, City" },
   { command: "links", description: "All OrbitX URLs" },
   { command: "group", description: "Join the community GC" },
   { command: "img", description: "Generate an image (Grok Imagine)" },
@@ -96,6 +97,7 @@ const PRIORITY_TOOL = {
   me: null,
   verify: null,
   ask: null,
+  faq: null,
   img: "orbitx_generate_image",
   vid: "orbitx_generate_video",
   media: "orbitx_media_status",
@@ -159,6 +161,7 @@ export function argsFromCommand(command, text) {
     args.mint = token;
     args.ca = token;
   }
+  if (command === "faq" && rest && !args.q) args.q = rest;
   if (command === "screen" && !args.chain) args.chain = "solana";
   return args;
 }
@@ -191,6 +194,10 @@ export function inferPublicTool(text) {
 
   if (/^(cmds|commands|menu|tools)\b/i.test(lower) && t.length < 40) {
     return { meta: "cmds" };
+  }
+
+  if (/^(faq|faqs)\b/i.test(lower) && t.length < 120) {
+    return { meta: "faq", args: { q: t.replace(/^(?:faq|faqs)\b[:\s-]*/i, "").trim() } };
   }
 
   const img = lower.match(/^(?:generate |make |create )?(?:an? )?(?:image|img|picture|art)\b[:\s-]*(.+)$/i);
@@ -738,7 +745,7 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
           "<b>OrbitX /cmds</b>",
           "/token mint · /chart ca · /scan · /xray · /research",
           "/img prompt · /vid prompt · /check",
-          "/search q · /screen · /ask · /links · /group",
+          "/faq topic · /search q · /screen · /ask · /links · /group",
           "/call name args · DMs: /login /buy /sell /tweet",
           "",
           `<b>Live catalog</b> · ${filtered.length} tools · page ${safePage}/${totalPages}`,
@@ -761,4 +768,10 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
   return { text: lines.join("\n"), page: safePage, totalPages, count: filtered.length };
 }
 
+export {
+  formatOrbitXFaqHtml,
+  orbitXFaqSystemAddon,
+  ORBITX_FAQ_CORE,
+  selectOrbitXFaqChunks,
+} from "./orbitx-faq-training.js";
 export { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand };
