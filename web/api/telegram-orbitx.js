@@ -48,6 +48,7 @@ import {
   OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
   ORBITX_GC,
 } from "./orbitx/orbitx-telegram-knowledge.js";
+import { fetchTelegramTokenSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
@@ -336,14 +337,25 @@ async function buildBrandedScan(mint, { req, link, isGroup }) {
     allowPrivileged: false,
   };
   const args = { mint };
-  const [token, xray, forensics, boosts, verified] = await Promise.all([
-    raceTimeout(runTool({ tool: "orbitx_get_token", args, ...ctx }), 12_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_xray", args, ...ctx }), 12_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_get_forensics", args: { mint, first: "0" }, ...ctx }), 10_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_boosts", args: {}, ...ctx }), 8_000).catch(() => null),
+  const snapshotP = fetchTelegramTokenSnapshot(mint).catch(() => null);
+  const extrasP = Promise.all([
+    raceTimeout(runTool({ tool: "orbitx_xray", args, ...ctx }), 6_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_get_forensics", args: { mint, first: "0" }, ...ctx }), 5_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_boosts", args: {}, ...ctx }), 4_000).catch(() => null),
     lookupVerifiedMint(mint),
   ]);
-  const merged = mergeTokenScanPayloads({ token, xray, forensics, boosts, verified });
+  const [snapshot, extras] = await Promise.all([
+    snapshotP,
+    raceTimeout(extrasP, 6_500).catch(() => [null, null, null, null]),
+  ]);
+  const [xray, forensics, boosts, verified] = Array.isArray(extras) ? extras : [null, null, null, null];
+  const merged = mergeTokenScanPayloads({
+    token: snapshot,
+    xray,
+    forensics,
+    boosts,
+    verified,
+  });
   void isGroup;
   return merged;
 }
@@ -377,10 +389,7 @@ async function handleVerify(chatId, text, { isGroup, link, extra }) {
   let symbol = null;
   let name = null;
   try {
-    const token = await raceTimeout(
-      runTool({ tool: "orbitx_get_token", args: { mint }, req: null, link, allowPrivileged: false }),
-      10_000,
-    );
+    const token = await raceTimeout(fetchTelegramTokenSnapshot(mint), 8_000);
     symbol = token?.token?.symbol || token?.symbol || null;
     name = token?.token?.name || token?.name || null;
   } catch {
@@ -486,6 +495,39 @@ function parseTaskId(result) {
 
 const mediaJobsByChat = new Map();
 const mediaJobsByTask = new Map();
+const scanCooldown = new Map();
+const seenUpdateIds = new Map();
+
+function alreadyHandledUpdate(updateId) {
+  const id = Number(updateId);
+  if (!Number.isFinite(id)) return false;
+  const prev = seenUpdateIds.get(id);
+  if (prev && Date.now() - prev < 120_000) return true;
+  seenUpdateIds.set(id, Date.now());
+  if (seenUpdateIds.size > 800) {
+    const cutoff = Date.now() - 180_000;
+    for (const [k, ts] of seenUpdateIds) {
+      if (ts < cutoff) seenUpdateIds.delete(k);
+    }
+  }
+  return false;
+}
+
+function recentlyScanned(chatId, mint) {
+  const id = String(mint || "").trim().toLowerCase();
+  if (!id || chatId == null) return false;
+  const key = `${chatId}:${id}`;
+  const prev = scanCooldown.get(key);
+  if (prev && Date.now() - prev < 25_000) return true;
+  scanCooldown.set(key, Date.now());
+  if (scanCooldown.size > 2000) {
+    const cutoff = Date.now() - 90_000;
+    for (const [k, ts] of scanCooldown) {
+      if (ts < cutoff) scanCooldown.delete(k);
+    }
+  }
+  return false;
+}
 
 function cacheMediaJob(job) {
   if (!job?.task_id) return;
@@ -802,6 +844,7 @@ async function handleCallbackQuery(cq, req) {
 }
 
 async function handleTelegramUpdate(update, req) {
+  if (alreadyHandledUpdate(update?.update_id)) return;
   if (update.callback_query) {
     await handleCallbackQuery(update.callback_query, req);
     return;
@@ -811,9 +854,20 @@ async function handleTelegramUpdate(update, req) {
   const text = String(msg.text || msg.caption || "").trim();
   const chatId = msg.chat?.id;
   if (!chatId) return;
+  const from = msg.from || {};
+  if (from.is_bot || String(from.username || "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase()) return;
+  if (looksLikeOrbitXCard(text)) return;
+  const quoted = String(msg.reply_to_message?.text || msg.reply_to_message?.caption || "");
+  if (
+    quoted &&
+    String(msg.reply_to_message?.from?.username || "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase() &&
+    looksLikeOrbitXCard(quoted) &&
+    (!text || extractMint(text) === extractMint(quoted))
+  ) {
+    return;
+  }
   const chatType = String(msg.chat?.type || "");
   const isGroup = chatType === "group" || chatType === "supergroup";
-  const from = msg.from || {};
   const replyExtra = isGroup ? { reply_to_message_id: msg.message_id } : {};
   const link = from.id ? await loadLink(from.id) : null;
   const limit = memoryRateLimit(
@@ -993,6 +1047,7 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
   if (TOKEN_INTEL_TOOLS.has(tool) && mintArg) {
+    if (recentlyScanned(chatId, mintArg)) return;
     await tg("sendChatAction", { chat_id: chatId, action: "typing" });
     try {
       const merged = await buildBrandedScan(mintArg, { req, link, isGroup });

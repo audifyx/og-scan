@@ -1,6 +1,8 @@
 /**
  * Shared Telegram payload helpers — no menus, no hub imports.
  */
+import { hasMarketSnapshot, hasTokenIdentity, hydrateKnownMint } from "./telegram-token-snapshot.js";
+
 export const CA_RE = /(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/;
 
 export function extractMint(text) {
@@ -88,8 +90,6 @@ export function unwrapToolPayload(result) {
       try {
         return JSON.parse(trimmed);
       } catch {
-        const mint = extractMint(trimmed);
-        if (mint) return { mint, token: { mint } };
         return result;
       }
     }
@@ -118,14 +118,27 @@ export function asTokenRecord(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const token = value.token && typeof value.token === "object" ? value.token : value;
   const mint = String(token.mint || value.mint || token.ca || value.ca || "").trim();
-  const symbol = token.symbol || value.symbol || token.ticker || value.meta?.symbol;
-  const name = token.name || value.name || value.meta?.name;
-  if (!mint && !symbol) return null;
-  if (mint && !CA_RE.test(mint) && !symbol) return null;
+  const known = hydrateKnownMint(mint);
+  const symbol = token.symbol || value.symbol || token.ticker || value.meta?.symbol || known?.symbol;
+  const name = token.name || value.name || value.meta?.name || known?.name;
+  if (!mint && !symbol && !name) return null;
+  if (mint && !CA_RE.test(mint) && !symbol && !name) return null;
   if (value.holdings && Array.isArray(value.holdings) && (value.address || value.publicKey || value.sol != null)) {
     return null;
   }
-  return { ...value, ...token, mint, symbol, name, meta: value.meta || token.meta };
+  const record = {
+    ...value,
+    ...token,
+    mint,
+    symbol,
+    name,
+    meta: value.meta || token.meta,
+    tags: Array.isArray(token.tags) && token.tags.length ? token.tags : known?.tags || token.tags,
+    tokenProgram: token.tokenProgram || known?.tokenProgram,
+    chain: token.chain || value.chain || value.meta?.chain || known?.chain,
+  };
+  if (!hasTokenIdentity(record) && !hasMarketSnapshot(record)) return null;
+  return record;
 }
 
 export function kolRows(holders) {

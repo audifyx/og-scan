@@ -18,8 +18,10 @@ import {
   telegramMessageParts,
   tgEsc,
   unwrapToolPayload,
+  CA_RE,
 } from "./telegram-payload.js";
 import { ORBITX_GC, ORBITX_HOST, ORBITX_MINT } from "./orbitx-telegram-knowledge.js";
+import { hasMarketSnapshot, hydrateKnownMint } from "./telegram-token-snapshot.js";
 
 export { telegramMessageParts };
 
@@ -452,9 +454,12 @@ export function formatTokenCard(raw) {
   const data = unwrapToolPayload(raw);
   const token = asTokenRecord(data);
   if (!token) return null;
+  if (!hasMarketSnapshot(token)) return null;
   const mint = String(token.mint || "");
-  const symbol = String(token.symbol || "TOKEN");
-  const name = String(token.name || symbol);
+  const symbol = String(token.symbol || "").trim();
+  const name = String(token.name || symbol || "").trim();
+  const displayName = name && !/^token$/i.test(name) ? name : symbol && !/^token$/i.test(symbol) ? symbol : shortAddr(mint) || "Unknown";
+  const displaySymbol = symbol && !/^token$/i.test(symbol) ? symbol : displayName;
   const chain = String(token.chain || token.meta?.chain || "solana");
   const age = ageLabel(token);
   const standard = tokenStandard(token);
@@ -493,7 +498,7 @@ export function formatTokenCard(raw) {
   const jupVerified = token.isVerified || meta.isVerifiedJup;
 
   const header =
-    `🚀 <b>${tgEsc(name)}</b> · $${tgEsc(symbol)}` +
+    `🚀 <b>${tgEsc(displayName)}</b> · $${tgEsc(displaySymbol)}` +
     (verified ? " · ✓ OrbitX Verified" : "") +
     (jupVerified ? " · Jup" : "");
   const sub = `🌐 <b>${tgEsc(chainLabel(chain))}</b> · ${tgEsc(standard)}${age ? ` · <b>${tgEsc(age)}</b>` : ""}`;
@@ -555,20 +560,17 @@ export function formatTokenCard(raw) {
     (Array.isArray(forensics.dexPaid?.services) && forensics.dexPaid.services.some((s) => s.status === "approved"));
   const extras = [];
   if (xray.verdict) extras.push(`Verdict → ${xray.verdict}`);
-  if (whales != null) extras.push(`Whales → ${whales} wallets ≥1%`);
+  const hasHolderSample = holders.length > 0 || xray.concentration?.totalHolders != null || xray.concentration?.top10Pct != null;
+  if (hasHolderSample && whales != null) extras.push(`Whales → ${whales} wallets ≥1%`);
   if (bundleCount != null || bundlePct != null) {
     extras.push(
       `Bundles → ${bundleCount != null ? bundleCount : "—"}${typeof bundlePct === "number" ? ` · ${bundlePct}% early` : ""}`,
     );
   }
   const kols = kolRows(holders);
-  extras.push(
-    kols.length
-      ? `KOLs → ${kols.slice(0, 3).map((k) => k.name || k.twitter || k.handle || shortAddr(k.owner)).join(" · ")}`
-      : xray.verdict || data?.xray
-        ? "KOLs → none labeled"
-        : "",
-  );
+  if (kols.length) {
+    extras.push(`KOLs → ${kols.slice(0, 3).map((k) => k.name || k.twitter || k.handle || shortAddr(k.owner)).join(" · ")}`);
+  }
   if (boosts.length) extras.push(`Boosts → ${boosts.map((b) => b.tier || b.label || "active").join(" · ")}`);
   if (dexPaid) extras.push("DEX paid → Yes");
 
@@ -581,6 +583,7 @@ export function formatTokenCard(raw) {
     href(jup, "Jupiter"),
     href(bird, "Birdeye"),
     href(scan, "Solscan"),
+    mint ? href(`${ORBITX_HOST}/ORBITX_DEX/token/${encodeURIComponent(mint)}`, "OrbitX DEX") : "",
     site ? href(site, "Official Site") : "",
   ].filter(Boolean);
 
@@ -1181,13 +1184,31 @@ export function formatOrbitXTelegramResult(result, tool) {
     }
     return tgEsc(data).slice(0, 3500);
   }
+  const chart = formatDexChartCard(data);
+  if (chart) return chart;
+  const token = formatTokenCard(data);
+  if (token) return token;
+  const mintOnly = String(data?.mint || data?.ca || data?.token?.mint || "").trim();
+  if (mintOnly && CA_RE.test(mintOnly) && !hasMarketSnapshot(data?.token || data) && !data?.packages && !data?.holdings) {
+    const dex = `https://dexscreener.com/solana/${encodeURIComponent(mintOnly)}`;
+    const known = hydrateKnownMint(mintOnly);
+    const title = known?.name ? `${known.name} · $${known.symbol || known.name}` : "Token intel";
+    return {
+      text: [
+        `🚀 <b>${tgEsc(title)}</b>`,
+        "No live DexScreener/Jupiter quote yet. Won't invent a name, price, or whale count.",
+        data?.error && data.error !== "token_not_found" ? `<i>${tgEsc(String(data.error).slice(0, 160))}</i>` : "",
+        `<code>${tgEsc(mintOnly)}</code>`,
+        `${href(dex, "DexScreener")} · ${href(`https://jup.ag/tokens/${encodeURIComponent(mintOnly)}`, "Jupiter")} · ${href(`${ORBITX_HOST}/ORBITX_DEX/token/${encodeURIComponent(mintOnly)}`, "OrbitX DEX")} · /token`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      reply_markup: tokenCardKeyboard(mintOnly),
+    };
+  }
   if (data?.error) {
     return `Error: ${tgEsc(data.error)}${data.message ? ` — ${tgEsc(data.message)}` : ""}`;
   }
-  const token = formatTokenCard(data);
-  if (token) return token;
-  const chart = formatDexChartCard(data);
-  if (chart) return chart;
   const shop = formatShopCard(data);
   if (shop) return shop;
   const wallet = formatWalletCard(data);
