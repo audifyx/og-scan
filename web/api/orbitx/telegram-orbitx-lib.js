@@ -30,6 +30,7 @@ export function isPrivilegedTelegramTool(name) {
   const n = String(name || "").trim();
   if (!n) return false;
   if (AUTH_TOOLS.has(n) || n.startsWith("orbitx_auth_")) return true;
+  if (n === "trade" || n === "swap" || n === "orbitx_trade" || n === "orbitx_swap") return true;
   if (isHoldGatedTool(n)) return true;
   if (n.startsWith("x_") && !["x_menu", "x_help", "x_tools_help"].includes(n)) return true;
   return WRITE_PREFIXES.some((re) => re.test(n));
@@ -74,6 +75,8 @@ export const PRIVATE_COMMANDS = [
   { command: "logout", description: "Unlink this Telegram account" },
   { command: "me", description: "Show linked OrbitX identity" },
   { command: "buy", description: "Prepare a token buy (linked)" },
+  { command: "trade", description: "Same as /buy — prepare a swap (linked)" },
+  { command: "swap", description: "Same as /buy — prepare a swap (linked)" },
   { command: "sell", description: "Prepare a token sell (linked)" },
   { command: "tweet", description: "Post to your connected X (linked)" },
   { command: "post", description: "Post to OrbitX social (linked)" },
@@ -108,6 +111,8 @@ const PRIORITY_TOOL = {
   health: "orbitx_health",
   call: null,
   buy: "orbitx_prepare_buy",
+  trade: "orbitx_prepare_buy",
+  swap: "orbitx_prepare_buy",
   sell: "orbitx_prepare_sell",
   tweet: "x_post",
   post: "orbitx_social_post",
@@ -129,6 +134,19 @@ export function resolveOfficialCommand(cmd) {
   return { kind: "tool", command: c, tool: `orbitx_${c}` };
 }
 
+export const DEFAULT_TELEGRAM_BUY_SOL = 0.05;
+const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap"];
+const BUY_COMMANDS = ["buy", "trade", "swap"];
+const BUY_TOOLS = new Set(["orbitx_prepare_buy", "orbitx_buy", "orbitx_buy_auto", "orbitx_trade", "orbitx_swap"]);
+
+export function applyDefaultBuyAmount(tool, args) {
+  const next = { ...(args || {}) };
+  if (!BUY_TOOLS.has(String(tool || "").trim())) return next;
+  const n = Number(next.amountSol);
+  if (!Number.isFinite(n) || n <= 0) next.amountSol = DEFAULT_TELEGRAM_BUY_SOL;
+  return next;
+}
+
 export function argsFromCommand(command, text) {
   const rest = String(text || "").replace(/^\S+\s*/, "").trim();
   const args = rest ? parseCallArgs(rest) : {};
@@ -139,10 +157,16 @@ export function argsFromCommand(command, text) {
   }
   if (command === "media" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
   if (command === "check" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
-  if (["token", "chart", "xray", "research", "scan", "buy", "sell"].includes(command) && rest && !args.mint) {
-    const token = rest.split(/\s+/)[0];
+  if (MINT_COMMANDS.includes(command) && rest && !args.mint) {
+    const parts = rest.split(/\s+/);
+    const token = parts[0];
     args.mint = token;
     args.ca = token;
+  }
+  if (BUY_COMMANDS.includes(command) && rest && args.amountSol == null) {
+    const parts = rest.split(/\s+/);
+    const maybeAmount = parts.find((part, i) => i > 0 && Number.isFinite(Number(part)) && Number(part) > 0);
+    if (maybeAmount) args.amountSol = Number(maybeAmount);
   }
   if (command === "search" && rest && !args.q) {
     args.q = rest;
@@ -554,7 +578,7 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
           "/token mint · /chart ca · /scan · /xray · /research",
           "/img prompt · /vid prompt · /check",
           "/search q · /screen · /ask · /links · /group",
-          "/call name args · DMs: /login /buy /sell /tweet",
+          "/call name args · DMs: /login /trade /buy /sell /tweet",
           "",
           `<b>Live catalog</b> · ${filtered.length} tools · page ${safePage}/${totalPages}`,
         ]

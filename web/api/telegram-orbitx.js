@@ -18,6 +18,7 @@ import {
   OFFICIAL_BOT_USERNAME,
   PRIVATE_COMMANDS,
   argsFromCommand,
+  applyDefaultBuyAmount,
   cmdsPage,
   collectMediaUrls,
   formatMediaCountdown,
@@ -195,12 +196,13 @@ async function loadWallet(userId) {
 
 async function runTool({ tool, args, req, link, allowPrivileged }) {
   const hub = await import("./orbitx-hub.js");
-  const name = String(tool || "").trim();
-  if (!name) return { ok: false, error: "tool_required" };
+  const raw = String(tool || "").trim();
+  if (!raw) return { ok: false, error: "tool_required" };
+  const name = hub.resolveEmbeddedAgentToolName(raw);
   if (!hub.hasEmbeddedAgentTool(name) && name !== "x_post") {
-    return { ok: false, error: `Unknown OrbitX tool: ${name}` };
+    return { ok: false, error: `Unknown OrbitX tool: ${raw}` };
   }
-  const privileged = isPrivilegedTelegramTool(name) || name === "x_post";
+  const privileged = isPrivilegedTelegramTool(name) || isPrivilegedTelegramTool(raw) || name === "x_post";
   if (privileged && !allowPrivileged) {
     return {
       ok: false,
@@ -218,6 +220,7 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
   if (name === "x_post") {
     return postLinkedX(link.user_id, args);
   }
+  const toolArgs = applyDefaultBuyAmount(name, args);
   if (privileged) {
     const emailRows = await sb(
       `wallet_identities?user_id=eq.${encodeURIComponent(link.user_id)}&select=wallet&limit=1`,
@@ -226,11 +229,11 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       userId: link.user_id,
       walletAddress: link.wallet_address || emailRows?.[0]?.wallet || null,
       toolName: name,
-      args,
+      args: toolArgs,
       req,
     });
   }
-  return hub.runPublicOrbitXTool({ toolName: name, args, req });
+  return hub.runPublicOrbitXTool({ toolName: name, args: toolArgs, req });
 }
 
 async function postLinkedX(userId, args) {
@@ -283,9 +286,9 @@ function helpText(isPrivate, linked) {
     "",
     isPrivate
       ? linked
-        ? "Account linked. /me · /buy · /sell · /tweet · /post · /launch · /call tool"
+        ? "Account linked. /me · /trade · /buy · /sell · /tweet · /post · /launch · /call tool"
         : "/login to bind this Telegram to your OrbitX wallet."
-      : "Groups stay public. Wallet commands (/buy /tweet) only work in DM after /login.",
+      : "Groups stay public. Wallet commands (/trade /buy /tweet) only work in DM after /login.",
     "",
     `Live team chat: ${ORBITX_GC}`,
     "If a feat is live-ops / you need a human, join the GC and ask a team member.",
@@ -401,7 +404,7 @@ async function handleCmds(text, tools) {
 
 async function askAi(prompt, { linked }) {
   const extra = linked
-    ? "This user is linked to their OrbitX account in a private DM — they can /buy /sell /tweet /post."
+    ? "This user is linked to their OrbitX account in a private DM — they can /trade /buy /sell /tweet /post."
     : "This chat is public unless they /login in a private DM.";
   const nim = await nvidiaChat({
     system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}`,
@@ -423,8 +426,9 @@ async function sendLinks(chatId, extra = {}) {
 }
 
 function withTelegramToolArgs(tool, args) {
-  if (!isMediaGenTool(tool)) return args || {};
-  return { ...(args || {}), wait: false };
+  const next = applyDefaultBuyAmount(tool, args);
+  if (!isMediaGenTool(tool)) return next;
+  return { ...next, wait: false };
 }
 
 function startedAtMs(job, result) {
@@ -537,7 +541,7 @@ async function startLogin(telegramUser, base) {
     "1. Open the secure page (expires in 15 minutes)",
     url,
     "2. Sign in with the wallet you use on OrbitX",
-    "3. Confirm. Then /buy /sell /tweet /post work in this DM.",
+    "3. Confirm. Then /trade /buy /sell /tweet /post work in this DM.",
   ].join("\n");
 }
 
@@ -856,7 +860,7 @@ async function handleWeb(req, res, body) {
     if (BOT_TOKEN) {
       await tg("sendMessage", {
         chat_id: telegramUserId,
-        text: "OrbitX linked. You can now /buy /sell /tweet /post and /call write tools in this private chat.",
+        text: "OrbitX linked. You can now /trade /buy /sell /tweet /post and /call write tools in this private chat.",
       });
     }
     return json(res, { ok: true, link: { telegramUserId, wallet } });

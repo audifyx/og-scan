@@ -250,6 +250,8 @@ export const HOLD_GATED_TOOLS = new Set([
   "orbitx_prepare_buy",
   "orbitx_prepare_sell",
   "orbitx_buy",
+  "orbitx_trade",
+  "orbitx_swap",
   "orbitx_sell",
   "orbitx_buy_auto",
   "orbitx_sell_pump",
