@@ -3043,7 +3043,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     orbitx_screen_tokens: () =>
       `${base}/api/ogdex/screener?type=${encodeURIComponent(String(args.type || "trending"))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 20}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
     orbitx_get_forensics: () =>
-      `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}`,
+      `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}${
+        args.first === 0 || args.first === "0" ? "&first=0" : ""
+      }`,
     orbitx_get_safety: () =>
       `${base}/api/ogdex/safety?mint=${encodeURIComponent(String(args.mint || ""))}`,
     orbitx_crypto_scan: () =>

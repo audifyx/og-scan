@@ -20,14 +20,18 @@ import {
   argsFromCommand,
   cmdsPage,
   collectMediaUrls,
+  extractMint,
   formatMediaCountdown,
   formatOrbitXTelegramResult,
   inferPublicTool,
   isPrivilegedTelegramTool,
+  isTelegramAdminWallet,
   loginCode,
   mediaEtaSeconds,
+  mergeTokenScanPayloads,
   parseCallInvocation,
   resolveOfficialCommand,
+  TOKEN_INTEL_TOOLS,
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
@@ -233,6 +237,132 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
   return hub.runPublicOrbitXTool({ toolName: name, args, req });
 }
 
+function raceTimeout(promise, ms) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("timeout")), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+async function lookupVerifiedMint(mint) {
+  const id = String(mint || "").trim();
+  if (!id) return null;
+  try {
+    const rows = await sb(
+      `orbitx_token_verifications?mint=eq.${encodeURIComponent(id)}&select=mint,symbol,name,verified_by_wallet,verified_at&limit=1`,
+    );
+    return Array.isArray(rows) ? rows[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+async function buildBrandedScan(mint, { req, link, isGroup }) {
+  const ctx = {
+    req,
+    link,
+    allowPrivileged: false,
+  };
+  const args = { mint };
+  const [token, xray, forensics, boosts, verified] = await Promise.all([
+    raceTimeout(runTool({ tool: "orbitx_get_token", args, ...ctx }), 12_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_xray", args, ...ctx }), 12_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_get_forensics", args: { mint, first: "0" }, ...ctx }), 10_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_boosts", args: {}, ...ctx }), 8_000).catch(() => null),
+    lookupVerifiedMint(mint),
+  ]);
+  const merged = mergeTokenScanPayloads({ token, xray, forensics, boosts, verified });
+  void isGroup;
+  return merged;
+}
+
+async function handleVerify(chatId, text, { isGroup, link, extra }) {
+  if (isGroup) {
+    await sendLong(
+      chatId,
+      "Token verify is admin-only in a private DM after /login with the admin wallet.",
+      extra,
+    );
+    return;
+  }
+  if (!link?.user_id) {
+    await sendLong(chatId, "Auth mode required. Send /login in this DM, then /verify CA.", extra);
+    return;
+  }
+  if (!isTelegramAdminWallet(link.wallet_address)) {
+    await sendLong(
+      chatId,
+      "Only the OrbitX admin wallet can /verify a mint. Link that wallet with /login.",
+      extra,
+    );
+    return;
+  }
+  const mint = extractMint(text);
+  if (!mint) {
+    await sendLong(chatId, "Usage: /verify CA", extra);
+    return;
+  }
+  let symbol = null;
+  let name = null;
+  try {
+    const token = await raceTimeout(
+      runTool({ tool: "orbitx_get_token", args: { mint }, req: null, link, allowPrivileged: false }),
+      10_000,
+    );
+    symbol = token?.token?.symbol || token?.symbol || null;
+    name = token?.token?.name || token?.name || null;
+  } catch {
+    /* still allow verify */
+  }
+  const row = {
+    mint,
+    symbol,
+    name,
+    verified_by_telegram_user_id: String(link.telegram_user_id || ""),
+    verified_by_wallet: String(link.wallet_address || ""),
+    verified_at: new Date().toISOString(),
+  };
+  try {
+    const existing = await lookupVerifiedMint(mint);
+    if (existing) {
+      await sb(`orbitx_token_verifications?mint=eq.${encodeURIComponent(mint)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          symbol: symbol || existing.symbol,
+          name: name || existing.name,
+          verified_by_telegram_user_id: row.verified_by_telegram_user_id,
+          verified_by_wallet: row.verified_by_wallet,
+          verified_at: row.verified_at,
+        }),
+      });
+    } else {
+      await sb("orbitx_token_verifications", { method: "POST", body: JSON.stringify(row) });
+    }
+  } catch (error) {
+    await sendLong(
+      chatId,
+      `Could not save verification (apply orbitx_token_verifications migration): ${error?.message || error}`,
+      extra,
+    );
+    return;
+  }
+  await sendLong(
+    chatId,
+    [
+      "<b>✓ OrbitX Verified</b>",
+      name ? `${name} · $${symbol || "TOKEN"}` : "",
+      `<code>${mint}</code>`,
+      "This badge now shows whenever the mint is scanned in Telegram (/token, CA drop, /scan, /xray).",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+}
+
 async function postLinkedX(userId, args) {
   const text = String(args.text || args.prompt || args.q || "").trim();
   if (!text) return { ok: false, error: "text_required", message: "Usage: /tweet your post" };
@@ -276,6 +406,8 @@ function helpText(isPrivate, linked) {
     "<b>Commands</b>",
     "/cmds — slash menu + live tool catalog",
     "/token mint · /chart ca · /scan · /xray · /research",
+    "Drop a CA in chat for a branded scan (MC, ATH, holders, whales, bundles, boosts)",
+    "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
     "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
     "/check — countdown + poll the latest image/video job",
     "/links · /group — every URL + community GC",
@@ -636,6 +768,11 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
+  if (bare === "verify") {
+    await handleVerify(chatId, text, { isGroup, link, extra: replyExtra });
+    return;
+  }
+
   let tool = "";
   let args = {};
   if (bare === "call") {
@@ -680,6 +817,23 @@ async function handleTelegramUpdate(update, req) {
       await tg("sendMessage", {
         chat_id: chatId,
         text: "Unknown command. Try /cmds, /links, /check, or /help.",
+        ...replyExtra,
+      });
+    }
+    return;
+  }
+
+  const mintArg = String(args.mint || args.ca || extractMint(text) || "").trim();
+  if (TOKEN_INTEL_TOOLS.has(tool) && mintArg) {
+    await tg("sendChatAction", { chat_id: chatId, action: "typing" });
+    try {
+      const merged = await buildBrandedScan(mintArg, { req, link, isGroup });
+      await sendLong(chatId, formatOrbitXTelegramResult(merged), { parse_mode: "HTML", ...replyExtra });
+      await sendMedia(chatId, collectMediaUrls(merged));
+    } catch (error) {
+      await tg("sendMessage", {
+        chat_id: chatId,
+        text: `OrbitX scan error: ${error?.message || error}`,
         ...replyExtra,
       });
     }
@@ -871,6 +1025,21 @@ async function handleWeb(req, res, body) {
     }
     const wallet = user?.id ? await loadWallet(user.id) : null;
     const toolArgs = withTelegramToolArgs(tool, args);
+    const mint = String(toolArgs.mint || toolArgs.ca || "").trim();
+    if (TOKEN_INTEL_TOOLS.has(tool) && mint) {
+      const merged = await buildBrandedScan(mint, {
+        req,
+        link: user?.id ? { user_id: user.id, wallet_address: wallet } : null,
+        isGroup: false,
+      });
+      return json(res, {
+        ok: true,
+        tool,
+        text: formatOrbitXTelegramResult(merged),
+        imageUrls: collectMediaUrls(merged),
+        result: merged,
+      });
+    }
     const result = await runTool({
       tool,
       args: toolArgs,

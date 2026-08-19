@@ -4,14 +4,17 @@ import { resolve } from "node:path";
 import {
   argsFromCommand,
   cmdsPage,
+  extractMint,
   formatMediaCountdown,
   formatOrbitXTelegramResult,
   formatTokenCard,
   inferPublicTool,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
+  isTelegramAdminWallet,
   loginCode,
   mediaEtaSeconds,
+  mergeTokenScanPayloads,
   parseCallInvocation,
   resolveOfficialCommand,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
@@ -56,7 +59,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("links").kind).toBe("meta");
     expect(resolveOfficialCommand("group").kind).toBe("meta");
     expect(resolveOfficialCommand("menu").kind).toBe("meta");
+    expect(resolveOfficialCommand("verify").kind).toBe("meta");
     expect(argsFromCommand("check", "/check abc123").taskId).toBe("abc123");
+    expect(argsFromCommand("verify", "/verify 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9").mint).toBe(
+      "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    );
     expect(argsFromCommand("img", "/img neon saturn")).toMatchObject({ prompt: "neon saturn" });
     expect(parseCallInvocation("/call get_token mint=So111").tool).toBe("orbitx_get_token");
     expect(inferPublicTool("generate an image of a cyan planet")?.tool).toBe("orbitx_generate_image");
@@ -64,6 +71,12 @@ describe("official OrbitX Telegram bot", () => {
     expect(inferPublicTool("links")?.meta).toBe("links");
     expect(inferPublicTool("join the group")?.meta).toBe("links");
     expect(inferPublicTool("check")?.meta).toBe("check");
+    expect(inferPublicTool("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")?.tool).toBe("orbitx_get_token");
+    expect(extractMint("scan this 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 please")).toBe(
+      "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    );
+    expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);
+    expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
   });
 
   it("issues alphanumeric login codes without a bot token", () => {
@@ -103,11 +116,44 @@ describe("official OrbitX Telegram bot", () => {
     const text = formatOrbitXTelegramResult(payload);
     expect(card).toContain("ORBITX");
     expect(card).toContain("Price");
+    expect(card).toContain("MC");
     expect(card).toContain("mint revoked");
+    expect(card).toContain("Top 10");
+    expect(card).toContain("DexScreener");
     expect(card).not.toContain('"priceUsd"');
+    expect(card).not.toContain('"holderCount"');
     expect(text).toBe(card);
     expect(text.startsWith("{")).toBe(false);
     expect(formatOrbitXTelegramResult({ ok: true, result: payload })).toContain("Holders");
+
+    const branded = formatTokenCard(
+      mergeTokenScanPayloads({
+        token: { ...payload, athMcap: 210_000, athPrice: 0.00022 },
+        xray: {
+          mint: payload.mint,
+          verdict: "Looks clean",
+          concentration: { top10Pct: 31.1, whales: 4 },
+          bundles: { pct: 12, count: 3 },
+          dev: { wallet: "BC8FPb72MEZbExy21aeKTEVrG7cubSjrZxBBj51uA225", pct: 0, sold: true },
+        },
+        forensics: {
+          mint: payload.mint,
+          dexPaid: { paid: true, services: [{ type: "tokenProfile", status: "approved" }] },
+          concentration: { whales: 4, top10Pct: 31.1 },
+        },
+        boosts: { boosts: [{ mint: payload.mint, tier: "24h" }] },
+        verified: { mint: payload.mint, verified_by_wallet: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb" },
+      }),
+    );
+    expect(branded).toContain("OrbitX Verified");
+    expect(branded).toContain("ATH");
+    expect(branded).toContain("Whales");
+    expect(branded).toContain("Bundles");
+    expect(branded).toContain("KOLs");
+    expect(branded).toContain("Boosts");
+    expect(branded).toContain("DEX paid");
+    expect(branded).toContain("24h");
+    expect(branded.startsWith("{")).toBe(false);
   });
 
   it("renders /cmds as a slash menu, not a JSON dump", () => {
@@ -205,7 +251,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("OFFICIAL_ORBITX_TELEGRAM_SYSTEM");
     expect(api).toContain("wait: false");
     expect(api).toContain("async function ensureWebhook");
-    expect(api).toContain("telegram_orbitx_media_jobs");
+    expect(api).toContain("buildBrandedScan");
+    expect(api).toContain("handleVerify");
+    expect(api).toContain("orbitx_token_verifications");
+    expect(api).toContain("TOKEN_INTEL_TOOLS");
     expect(api).not.toContain("8595161432");
   });
 });

@@ -78,6 +78,7 @@ export const PRIVATE_COMMANDS = [
   { command: "tweet", description: "Post to your connected X (linked)" },
   { command: "post", description: "Post to OrbitX social (linked)" },
   { command: "launch", description: "Launch / create token (linked)" },
+  { command: "verify", description: "Admin: verify a mint (linked admin wallet)" },
 ];
 
 const PRIORITY_TOOL = {
@@ -93,6 +94,7 @@ const PRIORITY_TOOL = {
   auth: null,
   logout: null,
   me: null,
+  verify: null,
   ask: null,
   img: "orbitx_generate_image",
   vid: "orbitx_generate_video",
@@ -152,6 +154,11 @@ export function argsFromCommand(command, text) {
     args.address = rest.split(/\s+/)[0];
     args.publicKey = args.address;
   }
+  if (command === "verify" && rest && !args.mint) {
+    const token = rest.split(/\s+/)[0];
+    args.mint = token;
+    args.ca = token;
+  }
   if (command === "screen" && !args.chain) args.chain = "solana";
   return args;
 }
@@ -178,7 +185,7 @@ export function inferPublicTool(text) {
     return { meta: "links" };
   }
 
-  if (/^(check|status|poll)\b/i.test(lower) && t.length < 80) {
+  if (/^(check|status|poll)\b/i.test(lower) && t.length < 80 && !extractMint(t)) {
     return { meta: "check" };
   }
 
@@ -195,10 +202,44 @@ export function inferPublicTool(text) {
   const chart = t.match(/\b(?:chart|dex)\b[\s\S]*?\b(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})\b/i);
   if (chart) return { tool: "orbitx_dex_chart", args: { ca: chart[1], mint: chart[1] } };
 
-  const mintOnly = t.match(/^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/);
-  if (mintOnly) return { tool: "orbitx_get_token", args: { mint: mintOnly[1] } };
+  const mint = extractMint(t);
+  if (mint) return { tool: "orbitx_get_token", args: { mint } };
 
   return null;
+}
+
+export const CA_RE = /(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/;
+
+export const TOKEN_INTEL_TOOLS = new Set([
+  "orbitx_get_token",
+  "orbitx_crypto_scan",
+  "orbitx_xray",
+  "orbitx_research",
+  "orbitx_get_forensics",
+  "orbitx_get_ath",
+]);
+
+const ADMIN_WALLETS_BASE = [
+  "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+  "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE",
+  "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
+  "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh",
+];
+
+export function extractMint(text) {
+  const m = String(text || "").match(CA_RE);
+  return m ? m[1] : "";
+}
+
+export function isTelegramAdminWallet(wallet) {
+  const addr = String(wallet || "").trim();
+  if (!addr) return false;
+  const extra = String(process.env.ORBITX_TELEGRAM_ADMIN_WALLETS || "")
+    .split(/[,\s]+/)
+    .map((w) => w.trim())
+    .filter(Boolean);
+  const pool = [...ADMIN_WALLETS_BASE, ...extra];
+  return pool.some((w) => w === addr || w.toLowerCase() === addr.toLowerCase());
 }
 
 function tgEsc(value) {
@@ -329,6 +370,8 @@ export function unwrapToolPayload(result) {
       try {
         return JSON.parse(trimmed);
       } catch {
+        const mint = extractMint(trimmed);
+        if (mint) return { mint, token: { mint } };
         return result;
       }
     }
@@ -338,6 +381,10 @@ export function unwrapToolPayload(result) {
   if (Array.isArray(result.content) && result.content[0]?.text) {
     const inner = unwrapToolPayload(result.content[0].text);
     if (inner && typeof inner === "object") return inner;
+  }
+  if (result.structuredContent && typeof result.structuredContent === "object") {
+    const inner = unwrapToolPayload(result.structuredContent);
+    if (inner && typeof inner === "object" && (inner.token || inner.mint || inner.meta)) return inner;
   }
   if (
     result.result &&
@@ -349,56 +396,185 @@ export function unwrapToolPayload(result) {
   return result;
 }
 
+function shortAddr(addr) {
+  const s = String(addr || "");
+  if (s.length <= 10) return s;
+  return `${s.slice(0, 4)}…${s.slice(-4)}`;
+}
+
 function asTokenRecord(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const token = value.token && typeof value.token === "object" ? value.token : value;
   const mint = String(token.mint || value.mint || token.ca || value.ca || "").trim();
-  const symbol = token.symbol || value.symbol || token.ticker;
-  const name = token.name || value.name;
-  const price = token.priceUsd ?? token.price ?? value.priceUsd;
-  const mcap = token.mcap ?? token.fdv ?? token.marketCap ?? value.mcap;
+  const symbol = token.symbol || value.symbol || token.ticker || value.meta?.symbol;
+  const name = token.name || value.name || value.meta?.name;
   if (!mint && !symbol) return null;
-  if (price == null && mcap == null && !token.holderCount && !token.liquidity) return null;
+  if (mint && !CA_RE.test(mint) && !symbol) return null;
   return { ...value, ...token, mint, symbol, name, meta: value.meta || token.meta };
 }
 
+export function mergeTokenScanPayloads({ token, xray, forensics, boosts, verified } = {}) {
+  const raw = unwrapToolPayload(token);
+  const base = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  const xr = unwrapToolPayload(xray);
+  const fo = unwrapToolPayload(forensics);
+  if (base.error && ((xr && xr.mint) || (fo && fo.mint) || base.token)) delete base.error;
+  const boostPayload = unwrapToolPayload(boosts);
+  const mint = String(base.mint || base.token?.mint || fo?.mint || xr?.mint || "").trim();
+  if (mint && !base.mint) base.mint = mint;
+  const rows = Array.isArray(boostPayload?.boosts)
+    ? boostPayload.boosts
+    : Array.isArray(boostPayload)
+      ? boostPayload
+      : [];
+  const mine = mint
+    ? rows.filter((row) => String(row.mint || "").toLowerCase() === mint.toLowerCase())
+    : [];
+  return {
+    ...base,
+    mint: mint || base.mint,
+    xray: xr && typeof xr === "object" ? xr : base.xray,
+    forensics: fo && typeof fo === "object" ? fo : base.forensics,
+    boosts: mine.length ? mine : base.boosts || [],
+    orbitxVerified: verified || base.orbitxVerified || null,
+  };
+}
+
+function kolRows(holders) {
+  if (!Array.isArray(holders)) return [];
+  return holders.filter((h) => {
+    const blob = `${h.label || ""} ${h.tag || ""} ${(h.tags || []).join(" ")} ${h.name || ""} ${h.twitter || h.handle || ""}`.toLowerCase();
+    return /\bkol\b|twitter|k(?:o|0)l|influencer|@/.test(blob) && !/whale|pool|lp/.test(h.label || "");
+  });
+}
+
 export function formatTokenCard(raw) {
-  const token = asTokenRecord(unwrapToolPayload(raw));
+  const data = unwrapToolPayload(raw);
+  const token = asTokenRecord(data);
   if (!token) return null;
   const mint = String(token.mint || "");
   const symbol = String(token.symbol || "TOKEN");
   const name = String(token.name || symbol);
-  const chain = String(token.chain || "solana");
-  const age = token.ageDays != null ? `${token.ageDays}d` : "";
+  const chain = String(token.chain || token.meta?.chain || "solana");
+  const age = token.ageDays != null ? `${token.ageDays}d` : token.meta?.ageDays != null ? `${token.meta.ageDays}d` : "";
   const audit = token.audit || {};
+  const meta = token.meta && typeof token.meta === "object" ? token.meta : {};
+  const xray = data?.xray && typeof data.xray === "object" ? data.xray : {};
+  const forensics = data?.forensics && typeof data.forensics === "object" ? data.forensics : {};
+  const intel = data?.intel && typeof data.intel === "object" ? data.intel : {};
+  const holders = Array.isArray(intel.holders) ? intel.holders : Array.isArray(xray.holders) ? xray.holders : [];
+  const athMcap = data?.athMcap ?? meta.athMcap ?? token.athMcap;
+  const athPrice = data?.athPrice ?? meta.athPrice ?? token.athPrice;
+  const mcap = token.mcap ?? token.fdv;
+  const topPct =
+    audit.topHoldersPercentage ??
+    xray.concentration?.top10Pct ??
+    forensics.concentration?.top10Pct;
+  const whales =
+    xray.concentration?.whales ??
+    forensics.concentration?.whales ??
+    holders.filter((h) => Number(h.pct) >= 1).length;
+  const bundlePct = xray.bundles?.pct ?? xray.counts?.bundlePct;
+  const bundleCount = xray.bundles?.count ?? xray.counts?.bundles ?? (Array.isArray(xray.bundles) ? xray.bundles.length : null);
+  const dev = forensics.dev || xray.dev || (token.dev ? { wallet: token.dev } : null);
+  const devPct = dev?.holding?.pct ?? dev?.pct ?? null;
+  const dexPaid = forensics.dexPaid?.paid === true || (Array.isArray(forensics.dexPaid?.services) && forensics.dexPaid.services.some((s) => s.status === "approved"));
+  const boosts = Array.isArray(data?.boosts) ? data.boosts : [];
+  const verified = data?.orbitxVerified;
+  const jupVerified = token.isVerified || meta.isVerifiedJup;
   const organic = token.organicScoreLabel || (token.organicScore != null ? String(token.organicScore) : "");
   const dex = mint ? `https://dexscreener.com/${encodeURIComponent(chain)}/${encodeURIComponent(mint)}` : "";
+  const trade = mint ? `https://www.orbitx.world/ORBITX_DEX/token/${encodeURIComponent(mint)}` : "https://www.orbitx.world/ORBITX_DEX";
+  const socials = meta.socials || {};
+
+  const badges = [];
+  if (verified) badges.push("✓ OrbitX Verified");
+  if (jupVerified) badges.push("Jup verified");
+  if (Array.isArray(token.tags) && token.tags.includes("token-2022")) badges.push("Token-2022");
+
+  const headerBits = [chain, age, ...badges].filter(Boolean);
+
+  const summaryBits = [];
+  if (xray.summary) summaryBits.push(String(xray.summary));
+  else {
+    summaryBits.push(`${name} ($${symbol}) is ${age || "live"} on ${chain}`);
+    if (mcap != null) summaryBits.push(`MC ${fmtUsd(mcap)}${athMcap != null ? ` · ATH ${fmtUsd(athMcap)}` : ""}`);
+    if (token.change24h != null) summaryBits.push(`24h ${fmtPct(token.change24h)}`);
+    const volInner = token.volume ?? token.stats?.["24h"]?.volume;
+    if (volInner != null) summaryBits.push(`${fmtUsd(volInner)} vol`);
+    if (topPct != null) summaryBits.push(`top 10 hold ${Number(topPct).toFixed(1)}%`);
+  }
+
+  const vol = token.volume ?? token.stats?.["24h"]?.volume;
+
   const lines = [
     `<b>${tgEsc(name)}</b> · $${tgEsc(symbol)}`,
-    [chain, age, Array.isArray(token.tags) && token.tags.includes("token-2022") ? "Token-2022" : ""]
-      .filter(Boolean)
-      .map(tgEsc)
-      .join(" · "),
+    headerBits.map(tgEsc).join(" · "),
     "",
-    `Price   ${tgEsc(fmtUsd(token.priceUsd ?? token.price))}`,
-    `MC      ${tgEsc(fmtUsd(token.mcap ?? token.fdv))}`,
-    `Liq     ${tgEsc(fmtUsd(token.liquidity))}`,
-    `Vol 24h ${tgEsc(fmtUsd(token.volume ?? token.stats?.["24h"]?.volume))}`,
-    `Holders ${tgEsc(fmtInt(token.holderCount))} (${tgEsc(fmtPct(token.holderChange24h))} 24h)`,
+    `Price     ${tgEsc(fmtUsd(token.priceUsd ?? token.price))}${athPrice != null ? `   ATH ${tgEsc(fmtUsd(athPrice))}` : ""}`,
+    `MC        ${tgEsc(fmtUsd(mcap))}${athMcap != null ? `   ATH ${tgEsc(fmtUsd(athMcap))}` : ""}`,
+    `Liq       ${tgEsc(fmtUsd(token.liquidity))}   Vol 24h ${tgEsc(fmtUsd(vol))}`,
+    `Holders   ${tgEsc(fmtInt(token.holderCount ?? xray.concentration?.totalHolders ?? forensics.concentration?.totalHolders))}   Top 10 ${topPct != null ? tgEsc(`${Number(topPct).toFixed(1)}%`) : "—"}`,
+    `5m ${tgEsc(fmtPct(token.change5m))} · 1h ${tgEsc(fmtPct(token.change1h))} · 6h ${tgEsc(fmtPct(token.change6h))} · 24h ${tgEsc(fmtPct(token.change24h))}`,
     "",
-    `5m ${tgEsc(fmtPct(token.change5m))}   1h ${tgEsc(fmtPct(token.change1h))}   6h ${tgEsc(fmtPct(token.change6h))}   24h ${tgEsc(fmtPct(token.change24h))}`,
+    `<i>${tgEsc(summaryBits.join(". "))}.</i>`,
   ];
+
+  const intelLines = [];
+  if (dev?.wallet) {
+    const sold = dev.sold ? "exited" : "holding";
+    const pct = devPct != null ? `${Number(devPct).toFixed(2)}%` : "—";
+    intelLines.push(`Dev       ${tgEsc(pct)} ${tgEsc(sold)} · <code>${tgEsc(shortAddr(dev.wallet))}</code>`);
+  }
+  intelLines.push(`Whales    ${whales != null ? tgEsc(String(whales)) : "—"} wallets ≥1%`);
+  if (bundleCount != null || bundlePct != null) {
+    intelLines.push(
+      `Bundles   ${bundleCount != null ? tgEsc(String(bundleCount)) : "—"} clusters${bundlePct != null && typeof bundlePct === "number" ? ` · ${tgEsc(String(bundlePct))}% early` : ""}`,
+    );
+  }
+  const kols = kolRows(holders);
+  intelLines.push(
+    kols.length
+      ? `KOLs      ${tgEsc(kols.slice(0, 3).map((k) => k.name || k.twitter || k.handle || shortAddr(k.owner)).join(" · "))}`
+      : "KOLs      none labeled on this scan",
+  );
+  intelLines.push(
+    boosts.length
+      ? `Boosts    ${tgEsc(boosts.map((b) => b.tier || b.label || "active").join(" · "))}`
+      : "Boosts    none active",
+  );
+  intelLines.push(dexPaid ? "DEX paid  yes · DexScreener profile" : "DEX paid  no");
+  lines.push("", ...intelLines);
+
+  if (holders.length) {
+    lines.push("", "<b>Top holders</b>");
+    for (const h of holders.slice(0, 5)) {
+      const pct = h.pct != null ? `${Number(h.pct).toFixed(1)}%` : "—";
+      const tag = h.label && h.label !== "holder" ? ` ${h.label}` : "";
+      lines.push(`${tgEsc(pct)}  <code>${tgEsc(shortAddr(h.owner || h.wallet))}</code>${tgEsc(tag)}`);
+    }
+  }
+
   const flags = [];
-  if (audit.mintAuthorityDisabled) flags.push("mint revoked");
-  if (audit.freezeAuthorityDisabled) flags.push("freeze revoked");
-  if (audit.topHoldersPercentage != null) flags.push(`top holders ${Number(audit.topHoldersPercentage).toFixed(1)}%`);
-  if (flags.length) lines.push("", `Audit: ${tgEsc(flags.join(" · "))}`);
-  if (organic) lines.push(`Organic: ${tgEsc(organic)}`);
+  if (audit.mintAuthorityDisabled || xray.safety?.mintRenounced) flags.push("mint revoked");
+  if (audit.freezeAuthorityDisabled || xray.safety?.freezeRenounced) flags.push("freeze revoked");
+  if (xray.verdict) flags.push(String(xray.verdict));
+  if (flags.length) lines.push("", `Audit  ${tgEsc(flags.join(" · "))}`);
+  if (organic) lines.push(`Organic  ${tgEsc(organic)}`);
+
+  const linkBits = [];
+  if (socials.website) linkBits.push(`<a href="${tgEsc(socials.website)}">Site</a>`);
+  if (socials.twitter) linkBits.push(`<a href="${tgEsc(socials.twitter)}">X</a>`);
+  if (socials.telegram) linkBits.push(`<a href="${tgEsc(socials.telegram)}">Telegram</a>`);
+
   if (mint) {
     lines.push("", `<code>${tgEsc(mint)}</code>`);
-    lines.push(`<a href="${tgEsc(dex)}">DexScreener</a> · /chart <code>${tgEsc(mint)}</code>`);
+    lines.push(
+      `<a href="${tgEsc(dex)}">DexScreener</a> · <a href="${tgEsc(trade)}">OrbitX DEX</a> · /chart`,
+    );
+    if (linkBits.length) lines.push(linkBits.join(" · "));
   }
-  return lines.join("\n");
+  return lines.filter((line, i, arr) => line !== "" || arr[i - 1] !== "").join("\n");
 }
 
 function formatTokenList(raw) {
@@ -444,7 +620,14 @@ function formatCompactObject(raw) {
 export function formatOrbitXTelegramResult(result) {
   if (result == null) return "(empty)";
   const data = unwrapToolPayload(result);
-  if (typeof data === "string") return tgEsc(data).slice(0, 3500);
+  if (typeof data === "string") {
+    const maybe = unwrapToolPayload(data);
+    if (maybe && typeof maybe === "object") return formatOrbitXTelegramResult(maybe);
+    if (extractMint(data)) {
+      return `Token scan came back as text. Try /token <code>${tgEsc(extractMint(data))}</code>`;
+    }
+    return tgEsc(data).slice(0, 3500);
+  }
   if (data?.error) {
     return `Error: ${tgEsc(data.error)}${data.message ? ` — ${tgEsc(data.message)}` : ""}`;
   }
@@ -511,6 +694,8 @@ export function collectMediaUrls(result) {
   push(data?.videoUrl);
   push(data?.meta?.image);
   push(data?.meta?.icon);
+  push(data?.meta?.openGraph);
+  push(data?.meta?.banner);
   push(data?.token?.icon);
   push(data?.icon);
   if (Array.isArray(result?.urls)) result.urls.forEach(push);
