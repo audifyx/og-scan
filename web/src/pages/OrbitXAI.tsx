@@ -416,7 +416,7 @@ function StructuredToolResult({ event }: { event: AiToolEvent }) {
     value: firstRecordValue(sources, metric.keys),
   })).filter((metric) => metric.value !== null);
   const rows = resultList(result).slice(0, 6);
-  const serialized = JSON.stringify(event.result, null, 2);
+  const serialized = JSON.stringify(event.result ?? null, null, 2) ?? "null";
 
   return (
     <div className="oai-result">
@@ -478,6 +478,10 @@ function StructuredToolResult({ event }: { event: AiToolEvent }) {
       </details>
     </div>
   );
+}
+
+function toolLabel(name: string | undefined | null): string {
+  return String(name || "orbitx tool").replace(/^orbitx_/, "").replace(/_/g, " ");
 }
 
 function ToolResultCard({
@@ -546,7 +550,7 @@ function ToolResultCard({
       <div className="oai-tool oai-tool--media">
         <div className="oai-tool__head">
           <span>
-            <WandSparkles size={15} /> {event.tool.replaceAll("_", " ")}
+            <WandSparkles size={15} /> {toolLabel(event.tool)}
           </span>
           <span className="oai-tool__status is-ok">
             <Check size={11} /> Ready
@@ -576,7 +580,7 @@ function ToolResultCard({
           ) : (
             <Zap size={15} />
           )}
-          {event.tool.replace(/^orbitx_/, "").replaceAll("_", " ")}
+          {toolLabel(event.tool)}
         </span>
         <span className={`oai-tool__status${failed ? " is-bad" : isPending ? " is-warn" : " is-ok"}`}>
           {isCancelled
@@ -1428,7 +1432,7 @@ function XStudio() {
 
   const postNow = async () => {
     if (!draft.trim()) return;
-    if (!boot?.x.connected) {
+    if (!boot?.x?.connected) {
       toast.error("Connect your X account before posting");
       return;
     }
@@ -1460,7 +1464,7 @@ function XStudio() {
     );
   }
 
-  const connected = Boolean(boot?.x.connected);
+  const connected = Boolean(boot?.x?.connected);
   return (
     <section className="oai-tab-page oai-x-page">
       <div className="oai-tab-page__hero oai-x-hero">
@@ -1472,12 +1476,12 @@ function XStudio() {
       </div>
       <div className={`oai-x-account${connected ? " is-connected" : ""}`}>
         <div className="oai-x-account__avatar">
-          {boot?.x.avatar ? <img src={boot.x.avatar} alt="" /> : <X size={23} />}
+          {boot?.x?.avatar ? <img src={boot.x.avatar} alt="" /> : <X size={23} />}
           {connected && <span><Check size={10} /></span>}
         </div>
         <div>
           <span className="oai-kicker">{connected ? "Connected account" : "Account required"}</span>
-          <strong>{connected ? `@${boot?.x.username}` : "Connect your X account"}</strong>
+          <strong>{connected ? `@${boot?.x?.username || "account"}` : "Connect your X account"}</strong>
           <p>
             {connected
               ? "OAuth is active. OrbitX can draft and publish with your approval."
@@ -1882,6 +1886,10 @@ function ChartModal({
 
 export default function OrbitXAI() {
   const { user, loading: authLoading } = useAuth();
+  // Depend on the id, not the user object: Supabase hands out a fresh object on
+  // every token refresh, which would otherwise re-boot the whole app and wipe
+  // the open conversation.
+  const userId = user?.id ?? null;
   const [accessLoading, setAccessLoading] = useState(true);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [gate, setGate] = useState<AiGate | null>(null);
@@ -1904,7 +1912,7 @@ export default function OrbitXAI() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshAccess = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setAccessLoading(false);
       setGate(null);
       setBootstrap(null);
@@ -1937,7 +1945,7 @@ export default function OrbitXAI() {
     } finally {
       setAccessLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -1982,7 +1990,13 @@ export default function OrbitXAI() {
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
-    element.scrollTo({ top: element.scrollHeight, behavior: messages.length > 2 ? "smooth" : "auto" });
+    // Some embedded webviews ship without Element.scrollTo; never let autoscroll
+    // take the whole chat down.
+    if (typeof element.scrollTo === "function") {
+      element.scrollTo({ top: element.scrollHeight, behavior: messages.length > 2 ? "smooth" : "auto" });
+    } else {
+      element.scrollTop = element.scrollHeight;
+    }
   }, [messages, sending]);
 
   const pendingGenerationIds = useMemo(

@@ -19,7 +19,8 @@ describe("OrbitX AI security guards", () => {
     expect(executeHandler).toContain('body.eventId');
     expect(executeHandler).toContain('body.messageId');
     expect(executeHandler).toContain('.from("ai_messages")');
-    expect(executeHandler).toContain('.contains("tool_events", [{ id: eventId, status: "confirmation_required" }])');
+    expect(executeHandler).toContain('.contains("tool_events", toolEventFilter(eventId, "confirmation_required"))');
+    expect(executeHandler).toContain('.contains("tool_events", toolEventFilter(eventId, "executing"))');
     expect(executeHandler).not.toContain("body.tool");
     expect(executeHandler).not.toContain("body.args");
   });
@@ -27,9 +28,33 @@ describe("OrbitX AI security guards", () => {
   it("supports atomic cancellation without accepting client tool arguments", () => {
     expect(api).toContain("async function handleToolCancel");
     expect(api).toContain('if (action === "tool.cancel")');
-    expect(api).toContain('.contains("tool_events", [{ id: eventId, status: pending.status }])');
+    expect(api).toContain('.contains("tool_events", toolEventFilter(eventId, pending.status))');
     expect(executeHandler).not.toContain("body.tool");
     expect(executeHandler).not.toContain("body.args");
+  });
+
+  it("builds jsonb-safe contains filters so the atomic claim can actually match", () => {
+    // supabase-js turns an array argument into `cs.{[object Object]}`, which never
+    // matches a jsonb column. The filter must be serialized JSON instead.
+    expect(api).toContain("function toolEventFilter(eventId, status)");
+    expect(api).toContain("JSON.stringify([{ id: eventId, status }])");
+    expect(api).not.toMatch(/\.contains\("tool_events", \[/);
+  });
+
+  it("awaits every dispatched handler so rejections cannot escape the error handler", () => {
+    const dispatch = api.slice(api.indexOf("export default async function handler"));
+    for (const handlerName of [
+      "handleBootstrap",
+      "handleMessages",
+      "handleChat",
+      "handleConversation",
+      "handleMediaGenerate",
+      "handleMediaStatus",
+      "handleToolExecute",
+      "handleToolCancel",
+    ]) {
+      expect(dispatch).toContain(`return await ${handlerName}(`);
+    }
   });
 
   it("binds token sends to the wallet that passed the access gate", () => {
