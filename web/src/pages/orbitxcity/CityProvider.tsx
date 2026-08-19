@@ -19,8 +19,15 @@ import type {
   Vec3,
 } from "@/lib/orbitxcity/types";
 import { getWorldBlock } from "@/lib/orbitxcity/worlds";
-import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbitxcity/realtime";
+import {
+  CityRealtimeClient,
+  MAIN_LOBBY,
+  districtLobby,
+  isDistrictLobby,
+  type LobbyDescriptor,
+} from "@/lib/orbitxcity/realtime";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
+import { resetVirtualInput } from "@/lib/orbitxcity/input";
 import { missionClaimCooldownMs } from "@/lib/orbitxcity/characterClasses";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -76,7 +83,7 @@ interface CityContextValue {
   triggerEmote: () => void;
   /** When set, player is inside this building (collision ignored + interior room). */
   interiorBuildingId: string | null;
-  enterBuilding: (buildingId: string) => void;
+  enterBuilding: (buildingId: string, opts?: { soft?: boolean }) => void;
   exitBuilding: (opts?: { soft?: boolean }) => void;
   /** Open a building's branded venue tools menu (E only — never teleports). */
   openVenue: (buildingId: string) => void;
@@ -178,8 +185,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const { publicKey } = useWallet();
   const [gate, setGateState] = useState<CityGate>("menu");
   const [entered, setEnteredState] = useState(false);
-  const [lobby, setLobby] = useState<LobbyDescriptor>(MAIN_LOBBY);
-  const [selectedCityId, setSelectedCityId] = useState<CityId>("nyc");
+  const enteredRef = useRef(false);
+  const [lobby, setLobbyState] = useState<LobbyDescriptor>(MAIN_LOBBY);
+  const [selectedCityId, setSelectedCityIdState] = useState<CityId>("nyc");
+  const selectedCityIdRef = useRef<CityId>("nyc");
+  const interiorRef = useRef<string | null>(null);
   const [panel, setPanel] = useState<HudPanel>("none");
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
   const [playerPos, setPlayerPos] = useState<Vec3>(getWorldBlock("nyc").spawn);
@@ -213,98 +223,144 @@ export function CityProvider({ children }: { children: ReactNode }) {
   // The public lobby follows the selected district. Custom/private lobbies
   // remain untouched so friends can keep their room while changing views.
   useEffect(() => {
-    setLobby((current) => {
-      if (!current.id.startsWith("oxc-world-")) return current;
-      const id = `oxc-world-${selectedCityId}`;
-      if (current.id === id) return current;
-      return { id, label: `Main Lobby · ${selectedCityId.toUpperCase()}`, isPrivate: false };
+    setLobbyState((current) => {
+      if (!isDistrictLobby(current.id)) return current;
+      const next = districtLobby(selectedCityId);
+      return current.id === next.id ? current : next;
     });
   }, [selectedCityId]);
 
-  const setGate = useCallback((g: CityGate) => {
-    setGateState(g);
-    if (g !== "world") setEnteredState(false);
+  useEffect(() => {
+    if (!interiorBuildingId) return;
+    const exists = getWorldBlock(selectedCityId).buildings.some((b) => b.id === interiorBuildingId);
+    if (!exists) {
+      interiorRef.current = null;
+      setInteriorBuildingId(null);
+      setInteriorVendor(null);
+    }
+  }, [interiorBuildingId, selectedCityId]);
+
+  const setLobby = useCallback((next: LobbyDescriptor) => {
+    if (!next?.id) return;
+    setLobbyState((current) => (current.id === next.id && current.label === next.label ? current : next));
   }, []);
 
-  const setEntered = useCallback(
-    (v: boolean) => {
-      if (v) {
-        const spawn = getWorldBlock(selectedCityId).spawn;
-        setPlayerPos(spawn);
-        setPlayerYaw(0);
-        setPanel("none");
-        setInteriorBuildingId(null);
-        setInteriorVendor(null);
+  const setSelectedCityId = useCallback((cityId: CityId) => {
+    if (!cityId || cityId === selectedCityIdRef.current) return;
+    selectedCityIdRef.current = cityId;
+    setSelectedCityIdState(cityId);
+    interiorRef.current = null;
+    setInteriorBuildingId(null);
+    setInteriorVendor(null);
+    if (enteredRef.current) {
+      const spawn = getWorldBlock(cityId).spawn;
+      setPlayerPos(spawn);
+      setTeleportTarget((prev) => ({ x: spawn.x, z: spawn.z, seq: (prev?.seq ?? 0) + 1 }));
+    }
+  }, []);
+
+  const setGate = useCallback((g: CityGate) => {
+    setGateState(g);
+    if (g !== "world") {
+      enteredRef.current = false;
+      setEnteredState(false);
+    }
+  }, []);
+
+  const setEntered = useCallback((v: boolean) => {
+    if (v) {
+      if (enteredRef.current) {
         setGateState("world");
+        return;
       }
-      setEnteredState(v);
-      if (!v) setGateState((prev) => (prev === "world" ? "menu" : prev));
-    },
-    [selectedCityId],
-  );
+      const spawn = getWorldBlock(selectedCityIdRef.current).spawn;
+      enteredRef.current = true;
+      setPlayerPos(spawn);
+      setPlayerYaw(0);
+      setPanel("none");
+      interiorRef.current = null;
+      setInteriorBuildingId(null);
+      setInteriorVendor(null);
+      setStreetNpc(null);
+      resetVirtualInput();
+      setGateState("world");
+      setEnteredState(true);
+      return;
+    }
+    if (!enteredRef.current) {
+      setGateState((prev) => (prev === "world" ? "menu" : prev));
+      return;
+    }
+    enteredRef.current = false;
+    setEnteredState(false);
+    setGateState((prev) => (prev === "world" ? "menu" : prev));
+  }, []);
 
   const exitToMenu = useCallback(() => {
+    resetVirtualInput();
     setRealtime((prev) => {
       prev?.disconnect();
       return null;
     });
     setPanel("none");
     setActiveZone(null);
+    interiorRef.current = null;
     setInteriorBuildingId(null);
     setInteriorVendor(null);
     setStreetNpc(null);
+    enteredRef.current = false;
     setEnteredState(false);
     setGateState("menu");
   }, []);
 
-  const exitBuilding = useCallback(
-    (opts?: { soft?: boolean }) => {
-      if (!interiorBuildingId) return;
-      const block = getWorldBlock(selectedCityId);
-      const b = block.buildings.find((x) => x.id === interiorBuildingId);
-      setInteriorBuildingId(null);
-      setInteriorVendor(null);
-      cityAudio.play("whoosh");
-      // Soft exit = walked out through the door; keep current position.
-      if (opts?.soft || !b) return;
-      const x = b.position.x;
-      const z = b.position.z + b.size.depth / 2 + 1.6;
-      setPlayerPos({ x, y: 0, z });
-      setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
-    },
-    [interiorBuildingId, selectedCityId],
-  );
+  const exitBuilding = useCallback((opts?: { soft?: boolean }) => {
+    const currentId = interiorRef.current;
+    if (!currentId) return;
+    const block = getWorldBlock(selectedCityIdRef.current);
+    const b = block.buildings.find((x) => x.id === currentId) ?? null;
+    interiorRef.current = null;
+    setInteriorBuildingId(null);
+    setInteriorVendor(null);
+    cityAudio.play("whoosh");
+    if (opts?.soft || !b) return;
+    const x = b.position.x;
+    const z = b.position.z + b.size.depth / 2 + 1.6;
+    setPlayerPos({ x, y: 0, z });
+    setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
 
-  const enterBuilding = useCallback(
-    (buildingId: string) => {
-      const block = getWorldBlock(selectedCityId);
-      const b = block.buildings.find((x) => x.id === buildingId);
-      if (!b) return;
-      const interiorDepth = Math.max(5.2, Math.min(14, b.size.depth - 0.8));
-      // Just inside the south doorway — matches walk-in threshold + open door gap.
-      const x = b.position.x;
-      const z = b.position.z + interiorDepth / 2 - 1.35;
-      setInteriorBuildingId(buildingId);
-      setInteriorVendor(null);
-      setPanel("none");
-      setPlayerPos({ x, y: 0, z });
-      setTeleportTarget((prev) => ({
-        x,
-        z,
-        seq: (prev?.seq ?? 0) + 1,
-      }));
-      cityAudio.play("enter");
-    },
-    [selectedCityId],
-  );
+  const enterBuilding = useCallback((buildingId: string, opts?: { soft?: boolean }) => {
+    if (!buildingId) return;
+    if (interiorRef.current === buildingId) return;
+    const block = getWorldBlock(selectedCityIdRef.current);
+    const b = block.buildings.find((x) => x.id === buildingId);
+    if (!b) return;
+    interiorRef.current = buildingId;
+    setInteriorBuildingId(buildingId);
+    setInteriorVendor(null);
+    setPanel("none");
+    cityAudio.play("enter");
+    if (opts?.soft) return;
+    const interiorDepth = Math.max(5.4, Math.min(14, b.size.depth - 0.8));
+    const x = b.position.x;
+    const z = b.position.z + interiorDepth / 2 - 1.35;
+    setPlayerPos({ x, y: 0, z });
+    setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
 
   const playerId = useMemo(
     () => makePlayerId(user?.id, publicKey?.toBase58() ?? null),
     [user?.id, publicKey],
   );
 
-  const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
-  const closePanel = useCallback(() => setPanel("none"), []);
+  const openPanel = useCallback((p: HudPanel) => {
+    resetVirtualInput();
+    setPanel(p);
+  }, []);
+  const closePanel = useCallback(() => {
+    resetVirtualInput();
+    setPanel("none");
+  }, []);
   const collectShard = useCallback(() => {
     cityAudio.play("coin");
     setShards((s) => s + 1);
@@ -347,19 +403,26 @@ export function CityProvider({ children }: { children: ReactNode }) {
     [missionClaimReadyAt, selectedCityId, interiorBuildingId, activeZone, avatar.classId],
   );
   const teleport = useCallback((x: number, z: number) => {
-    setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    const block = getWorldBlock(selectedCityIdRef.current);
+    const nx = Math.min(block.bounds.maxX - 0.6, Math.max(block.bounds.minX + 0.6, x));
+    const nz = Math.min(block.bounds.maxZ - 0.6, Math.max(block.bounds.minZ + 0.6, z));
+    setTeleportTarget((prev) => ({ x: nx, z: nz, seq: (prev?.seq ?? 0) + 1 }));
+    setPlayerPos({ x: nx, y: 0, z: nz });
     setPanel("none");
   }, []);
 
   const resetPlayer = useCallback(() => {
-    const spawn = getWorldBlock(selectedCityId).spawn;
+    const spawn = getWorldBlock(selectedCityIdRef.current).spawn;
+    interiorRef.current = null;
     setInteriorBuildingId(null);
     setInteriorVendor(null);
     setPanel("none");
+    resetVirtualInput();
     setPlayerPos(spawn);
     setTeleportTarget((prev) => ({ x: spawn.x, z: spawn.z, seq: (prev?.seq ?? 0) + 1 }));
     cityAudio.play("confirm");
-  }, [selectedCityId]);
+  }, []);
 
   const triggerEmote = useCallback(() => {
     setEmoteAt(Date.now());
@@ -477,9 +540,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
         hairColor: avatar.hairColor,
         outfit: avatar.outfit,
         faceStyle: avatar.faceStyle,
+        classId: avatar.classId,
       },
       lobby,
     );
+    client.sendPosition(playerPos.x, playerPos.z, playerYaw, true);
     client.connect();
     setRealtime(client);
     return () => {
@@ -489,12 +554,22 @@ export function CityProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entered, playerId, lobby.id]);
 
-  const lastBroadcast = useRef(0);
+  useEffect(() => {
+    realtime?.setCosmetics({
+      name: avatar.name,
+      accentColor: avatar.accentColor,
+      bodyColor: avatar.bodyColor,
+      skinColor: avatar.skinColor,
+      hairStyle: avatar.hairStyle,
+      hairColor: avatar.hairColor,
+      outfit: avatar.outfit,
+      faceStyle: avatar.faceStyle,
+      classId: avatar.classId,
+    });
+  }, [realtime, avatar]);
+
   useEffect(() => {
     if (!realtime || !entered) return;
-    const now = performance.now();
-    if (now - lastBroadcast.current < 160) return;
-    lastBroadcast.current = now;
     realtime.sendPosition(playerPos.x, playerPos.z, playerYaw);
   }, [realtime, entered, playerPos, playerYaw]);
 
@@ -560,7 +635,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setEntered,
       exitToMenu,
       lobby,
+      setLobby,
       selectedCityId,
+      setSelectedCityId,
       panel,
       openPanel,
       closePanel,

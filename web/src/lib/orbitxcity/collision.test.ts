@@ -103,3 +103,19 @@ describe("doorway threshold crossing", () => {
     expect(crossedExitDoorway(3.9, 3.5, 0, tradingFloor)).toBe(false);
   });
 });
+
+describe("deep building porch", () => {
+  const deep: BuildingDefinition = {
+    ...market,
+    id: "deep-venue",
+    size: { width: 10, height: 8, depth: 20 },
+  };
+  const deepBlock: WorldBlockConfig = { ...block, buildings: [deep] };
+
+  it("keeps the interior-to-street porch walkable after exit", () => {
+    // Interior south face is well north of the exterior south face.
+    expect(collidesAt(0, 7.2, 0.3, deepBlock)).toBe(false);
+    expect(collidesAt(0, 9.6, 0.3, deepBlock)).toBe(false);
+    expect(collidesAt(4.2, 9.6, 0.3, deepBlock)).toBe(true);
+  });
+});

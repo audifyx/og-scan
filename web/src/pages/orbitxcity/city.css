@@ -375,6 +375,7 @@ body.oxc-lock {
   position: absolute;
   inset: 0;
   z-index: 2;
+  overflow: hidden;
 }
 
 .oxc-hud > * {
@@ -1186,7 +1187,7 @@ button.oxc-token-row {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 3;
+  z-index: 5;
 }
 
 .oxc-stick {
@@ -3183,6 +3184,17 @@ button.oxc-token-row {
   }
 
   /* Equal-width primary dock — no horizontal scroll fight with the stick */
+  .oxc-hud--phone {
+    overflow: hidden;
+  }
+
+  .oxc-hud--phone .oxc-prompt {
+    left: max(0.45rem, var(--oxc-safe-left));
+    right: max(0.45rem, var(--oxc-safe-right));
+    bottom: calc(var(--oxc-dock-h, 3.55rem) + 7.6rem);
+    max-width: none;
+  }
+
   .oxc-hud--phone .oxc-dock {
     left: max(0.35rem, var(--oxc-safe-left));
     right: max(0.35rem, var(--oxc-safe-right));

@@ -96,6 +96,8 @@ export function PlayerAvatar({
   blockRef.current = block;
   const ignoreRef = useRef(ignoreBuildingId);
   ignoreRef.current = ignoreBuildingId;
+  const lingerIgnore = useRef<string | null>(null);
+  if (ignoreBuildingId) lingerIgnore.current = ignoreBuildingId;
   const interiorRef = useRef(interiorBuilding);
   interiorRef.current = interiorBuilding;
   const onEnterRef = useRef(onEnterBuilding);
@@ -182,7 +184,7 @@ export function PlayerAvatar({
       const nextX = pos.current.x + nx * t;
       const nextZ = pos.current.z + nz * t;
       const world = blockRef.current;
-      const ignore = ignoreRef.current;
+      const ignore = ignoreRef.current ?? lingerIgnore.current;
       const interior = interiorRef.current;
       if (
         !collidesAt(nextX, pos.current.z, 0.45, world, ignore) &&
@@ -216,6 +218,20 @@ export function PlayerAvatar({
             transitionCd.current = 0.7;
             onExitRef.current?.();
           }
+        }
+      }
+      const linger = lingerIgnore.current;
+      if (linger && !ignoreRef.current) {
+        const left = world.buildings.find((b) => b.id === linger);
+        if (!left) lingerIgnore.current = null;
+        else {
+          const minX = left.position.x - left.size.width / 2 - 0.2;
+          const maxX = left.position.x + left.size.width / 2 + 0.2;
+          const minZ = left.position.z - left.size.depth / 2 - 0.2;
+          const maxZ = left.position.z + left.size.depth / 2 + 0.2;
+          const inside =
+            pos.current.x > minX && pos.current.x < maxX && pos.current.z > minZ && pos.current.z < maxZ;
+          if (!inside) lingerIgnore.current = null;
         }
       }
     } else {

@@ -11,6 +11,7 @@ import {
   type RoomTheme,
 } from "@/lib/orbitxcity/interiorLayout";
 import { getFurnitureSet } from "@/lib/orbitxcity/assets/catalog";
+import { interiorDoorWidth, interiorMetrics } from "@/lib/orbitxcity/collision";
 import { appearanceFromClass, getCharacterClass } from "@/lib/orbitxcity/characterClasses";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { GltfProp } from "./GltfProp";
@@ -668,8 +669,7 @@ export function InteriorRoom({
   onRequestExit: () => void;
 }) {
   const theme = resolveRoomTheme(building);
-  const w = Math.max(5.4, Math.min(14, building.size.width - 0.8));
-  const d = Math.max(5.4, Math.min(14, building.size.depth - 0.8));
+  const { width: w, depth: d } = interiorMetrics(building);
   const h = Math.min(4.5, Math.max(3.4, building.size.height * 0.32));
   const { x, z } = building.position;
   const palette = roomPalette(theme);
@@ -695,7 +695,7 @@ export function InteriorRoom({
       </mesh>
       {/* South wall split around open doorway */}
       {([-1, 1] as const).map((side) => {
-        const doorW = Math.min(2.8, Math.max(1.8, w * 0.28));
+        const doorW = interiorDoorWidth(building);
         const seg = Math.max(0.2, (w - doorW - 0.35) / 2);
         return (
           <mesh key={`sw-${side}`} position={[side * (doorW / 2 + seg / 2 + 0.1), h / 2, d / 2]} castShadow receiveShadow>

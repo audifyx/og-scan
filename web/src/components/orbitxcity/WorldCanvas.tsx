@@ -1,9 +1,10 @@
-import { Suspense, useCallback, useMemo } from "react";
+import { Component, Suspense, useCallback, useMemo, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useContextBridge } from "@react-three/drei";
 import * as THREE from "three";
-import type { Vec3 } from "@/lib/orbitxcity/types";
+import type { CityId, Vec3 } from "@/lib/orbitxcity/types";
 import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
+import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { CityContext, useCity } from "@/pages/orbitxcity/CityProvider";
 import { CityEnvironment } from "./world/CityEnvironment";
@@ -13,6 +14,30 @@ import { InteractionMarkers } from "./world/InteractionMarkers";
 import { CoinField } from "./world/CoinField";
 import { FXPipeline } from "./world/FXPipeline";
 import { InteriorRoom } from "./world/InteriorRoom";
+
+function safeWorldBlock(cityId: string | undefined) {
+  try {
+    const block = getWorldBlock((cityId as CityId) || "nyc");
+    if (block?.buildings && block.bounds && block.spawn) return block;
+  } catch {
+    /* fall through */
+  }
+  return NYC_DEMO_BLOCK;
+}
+
+class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error) {
+    console.warn("[WorldCanvas] scene error", error.message);
+  }
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
 
 function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   const {
@@ -33,15 +58,18 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     exitBuilding,
     panel,
   } = useCity();
-  const block = getWorldBlock(selectedCityId);
+  const block = safeWorldBlock(selectedCityId);
+  const high = quality === "high";
+  const locked = panel !== "none";
 
-  const interiorBuilding = useMemo(
-    () => (interiorBuildingId ? block.buildings.find((b) => b.id === interiorBuildingId) ?? null : null),
-    [block.buildings, interiorBuildingId],
-  );
+  const interiorBuilding = useMemo(() => {
+    if (!interiorBuildingId || !block.buildings?.length) return null;
+    return block.buildings.find((b) => b.id === interiorBuildingId) ?? null;
+  }, [block.buildings, interiorBuildingId]);
 
   const onMove = useCallback(
     (p: Vec3, yaw: number) => {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) return;
       setPlayerPos(p);
       setPlayerYaw(yaw);
     },
@@ -51,9 +79,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   return (
     <>
       <CityEnvironment tickerRows={tickerRows} block={block} />
-      {interiorBuilding && (
-        <InteriorRoom building={interiorBuilding} onRequestExit={exitBuilding} />
-      )}
+      {interiorBuilding ? <InteriorRoom building={interiorBuilding} onRequestExit={exitBuilding} /> : null}
       <PlayerAvatar
         appearance={avatar}
         onMove={onMove}
@@ -61,21 +87,23 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         teleportTarget={teleportTarget}
         emoteAt={emoteAt}
         block={block}
-        ignoreBuildingId={interiorBuildingId}
+        ignoreBuildingId={interiorBuilding ? interiorBuildingId : null}
         interiorBuilding={interiorBuilding}
-        onEnterBuilding={enterBuilding}
+        onEnterBuilding={(id) => enterBuilding(id, { soft: true })}
         onExitBuilding={() => exitBuilding({ soft: true })}
-        locked={panel !== "none"}
+        locked={locked}
       />
       <RemoteAvatars client={realtime} />
-      <InteractionMarkers
-        zones={block.zones}
-        playerPos={playerPos}
-        activeZoneId={activeZone?.id ?? null}
-        onNearest={setActiveZone}
-      />
-      <CoinField playerPos={playerPos} onCollect={collectShard} lite={quality === "lite"} block={block} />
-      {quality === "high" && <FXPipeline />}
+      {!locked && (
+        <InteractionMarkers
+          zones={block.zones ?? []}
+          playerPos={playerPos}
+          activeZoneId={activeZone?.id ?? null}
+          onNearest={setActiveZone}
+        />
+      )}
+      <CoinField playerPos={playerPos} onCollect={collectShard} lite={!high} block={block} />
+      {high && !locked && <FXPipeline />}
     </>
   );
 }
@@ -90,21 +118,22 @@ export function WorldCanvas({ tickerRows }: { tickerRows: ScreenerRow[] }) {
       <Canvas
         shadows={high}
         dpr={high ? [1, 1.6] : [1, 1]}
-        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: high ? 240 : 160 }}
+        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: high ? 240 : 140 }}
         gl={{
           antialias: high,
           powerPreference: high ? "high-performance" : "low-power",
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: high ? 1.08 : 1,
-          // Avoid stencil/depth thrash on mobile GPUs
           stencil: false,
         }}
-        performance={{ min: high ? 0.5 : 0.3 }}
+        performance={{ min: high ? 0.5 : 0.25 }}
       >
         <ContextBridge>
-          <Suspense fallback={null}>
-            <WorldScene tickerRows={tickerRows} />
-          </Suspense>
+          <SceneBoundary>
+            <Suspense fallback={null}>
+              <WorldScene tickerRows={tickerRows} />
+            </Suspense>
+          </SceneBoundary>
         </ContextBridge>
       </Canvas>
     </div>

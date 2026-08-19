@@ -29,7 +29,7 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
     hairColor: appearanceSource.hairColor ?? "#151018",
     outfit: appearanceSource.outfit ?? "street",
     faceStyle: appearanceSource.faceStyle ?? "cool",
-    classId: appearanceSource.classId,
+    classId: player.classId ?? appearanceSource.classId,
   };
   const heroPath = quality === "high" ? getCharacterGltfPath(appearance.classId) : null;
 

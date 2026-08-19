@@ -2,15 +2,32 @@ import { NYC_DEMO_BLOCK } from "./demoBlock";
 import { furnitureSolids, resolveRoomTheme } from "./interiorLayout";
 import type { BuildingDefinition, WorldBlockConfig } from "./types";
 
+/** Shared with InteriorRoom so walls, door, and collision occupy the same box. */
 export function interiorMetrics(building: BuildingDefinition) {
-  const width = Math.max(5.2, Math.min(14, building.size.width - 0.8));
-  const depth = Math.max(5.2, Math.min(14, building.size.depth - 0.8));
+  const width = Math.max(5.4, Math.min(14, building.size.width - 0.8));
+  const depth = Math.max(5.4, Math.min(14, building.size.depth - 0.8));
   const theme = resolveRoomTheme(building);
-  return { width, depth, theme, solids: furnitureSolids(theme, width, depth) };
+  const solids = furnitureSolids(theme, width, depth).filter(
+    (s) => !blocksSouthDoor(s, interiorDoorWidth(building) / 2, depth / 2),
+  );
+  return { width, depth, theme, solids };
 }
 
-/** Depth of the passable south doorway slot carved out of a facade. */
-const DOOR_GAP_DEPTH = 1.6;
+/** True when a furniture AABB would seal the south doorway corridor. */
+function blocksSouthDoor(
+  s: { x: number; z: number; w: number; d: number },
+  halfDoor: number,
+  halfD: number,
+): boolean {
+  const doorClearZ = halfD - 1.85;
+  return Math.abs(s.x) < halfDoor + s.w / 2 && s.z + s.d / 2 > doorClearZ;
+}
+
+/** Interior south-door opening — matches InteriorRoom split walls. */
+export function interiorDoorWidth(building: BuildingDefinition): number {
+  const width = Math.max(5.4, Math.min(14, building.size.width - 0.8));
+  return Math.min(2.8, Math.max(1.8, width * 0.28));
+}
 
 /** Structural kinds that represent designed, enterable OrbitX venues. */
 const VENUE_KINDS = new Set<string>([
@@ -50,7 +67,13 @@ export function buildingDoorway(b: BuildingDefinition) {
 function inDoorwaySlot(x: number, z: number, radius: number, b: BuildingDefinition): boolean {
   if (!isWalkInBuilding(b)) return false;
   const { cx, faceZ, halfDoor } = buildingDoorway(b);
-  return Math.abs(x - cx) + radius <= halfDoor && z + radius > faceZ - DOOR_GAP_DEPTH;
+  const { depth } = interiorMetrics(b);
+  const interiorFaceZ = b.position.z + depth / 2;
+  // Cover the whole porch from interior threshold to the street face so
+  // walking out never leaves the player jammed between two wall AABBs.
+  const minZ = Math.min(interiorFaceZ, faceZ) - 0.45;
+  const maxZ = faceZ + 0.55;
+  return Math.abs(x - cx) + radius <= halfDoor && z + radius > minZ && z - radius < maxZ;
 }
 
 /** 2D collision against building AABBs + world bounds, with south doorway gaps. */
@@ -92,7 +115,7 @@ export function collidesInInterior(
   const halfW = width / 2;
   const halfD = depth / 2;
   const wall = 0.28;
-  const halfDoor = buildingDoorWidth(building) / 2;
+  const halfDoor = interiorDoorWidth(building) / 2;
 
   if (
     localX - radius < -halfW + wall ||
@@ -146,7 +169,7 @@ export function crossedExitDoorway(
 ): boolean {
   const { depth } = interiorMetrics(b);
   const faceZ = b.position.z + depth / 2;
-  const halfDoor = buildingDoorWidth(b) / 2;
+  const halfDoor = interiorDoorWidth(b) / 2;
   return prevZ <= faceZ && nextZ > faceZ && Math.abs(x - b.position.x) <= halfDoor;
 }
 

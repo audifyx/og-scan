@@ -4,17 +4,16 @@
  */
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Text, Billboard, Clone, useGLTF } from "@react-three/drei";
+import { Text, Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
-import { CITY_BUILDING_MODELS } from "@/lib/orbitxcity/assets/catalog";
 import { getBuildingKit, gltfPathForBuilding } from "@/lib/orbitxcity/assets/buildingKits";
+import { GltfProp } from "./GltfProp";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#3e464e", metalness: 0.28, roughness: 0.72 });
-const CITY_MODEL_PATHS = Object.values(CITY_BUILDING_MODELS);
 
 /** Manhattan-inspired facade family from massing + venue role. */
 export type FacadeFamily = "brick" | "limestone" | "glass" | "retail";
@@ -462,12 +461,11 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const kit = useMemo(() => getBuildingKit(building.kind), [building.kind]);
-  const modelPath = gltfPathForBuilding(building.id, building.kind);
-  const { scene } = useGLTF(modelPath);
+  const modelPath = useMemo(() => gltfPathForBuilding(building.id, building.kind), [building.id, building.kind]);
   const hasFootprint = Boolean(building.footprint && building.footprint.length >= 3);
   // Prefer OrbitX custom shell when available; else Kenney hash sample on high quality.
   const useAssetShell =
-    !hasFootprint && quality === "high" && (kit.isOrbitx || hashSeed(building.id) % 5 === 0);
+    !hasFootprint && quality === "high" && Boolean(modelPath) && (kit.isOrbitx || hashSeed(building.id) % 5 === 0);
   const marqueeIntensity = kit.marqueeIntensity;
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
   const top = tiers[tiers.length - 1]!;
@@ -482,9 +480,9 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
     <group position={[position.x, 0, position.z]}>
       {hasFootprint ? (
         <FootprintShell building={building} />
-      ) : useAssetShell ? (
-        <Clone
-          object={scene}
+      ) : useAssetShell && modelPath ? (
+        <GltfProp
+          path={modelPath}
           scale={[size.width / 2, size.height / 1.65, size.depth / 2]}
           castShadow
           receiveShadow
@@ -656,5 +654,3 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
     </group>
   );
 }
-
-CITY_MODEL_PATHS.forEach((path) => useGLTF.preload(path));

@@ -38,6 +38,15 @@ export function addZoom(delta: number): void {
   virtualInput.zoomDelta += delta;
 }
 
+/** Drop analog stick / sprint so menu or HUD never leaves the player walking. */
+export function resetVirtualInput(): void {
+  virtualInput.axisX = 0;
+  virtualInput.axisZ = 0;
+  virtualInput.sprint = false;
+  virtualInput.jumpQueued = false;
+  virtualInput.zoomDelta = 0;
+}
+
 /** Drain the pending zoom delta (called once per frame by the camera). */
 export function consumeZoom(): number {
   const z = virtualInput.zoomDelta;
