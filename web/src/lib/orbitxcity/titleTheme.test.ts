@@ -22,8 +22,14 @@ describe("titleTheme", () => {
     }
   });
 
-  it("exposes a four-item console nav with a single primary", () => {
-    expect(TITLE_NAV.map((item) => item.id)).toEqual(["play", "multiplayer", "settings", "quick"]);
+  it("exposes a five-item console nav with a single primary", () => {
+    expect(TITLE_NAV.map((item) => item.id)).toEqual([
+      "play",
+      "multiplayer",
+      "settings",
+      "help",
+      "quick",
+    ]);
     expect(TITLE_NAV.filter((item) => item.primary)).toHaveLength(1);
   });
 

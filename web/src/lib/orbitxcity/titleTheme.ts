@@ -66,7 +66,7 @@ export const TITLE_THEMES: Record<TitleDistrictId, TitleDistrictTheme> = {
   },
 };
 
-export type TitleNavId = "play" | "multiplayer" | "settings" | "quick";
+export type TitleNavId = "play" | "multiplayer" | "settings" | "help" | "quick";
 
 export const TITLE_NAV: {
   id: TitleNavId;
@@ -74,10 +74,11 @@ export const TITLE_NAV: {
   hint: string;
   primary?: boolean;
 }[] = [
-  { id: "play", label: "Play", hint: "Choose operative", primary: true },
+  { id: "play", label: "Play", hint: "Choose your mascot", primary: true },
   { id: "multiplayer", label: "Multiplayer", hint: "Lobbies & rooms" },
   { id: "settings", label: "Settings", hint: "Audio · quality · touch" },
-  { id: "quick", label: "Quick Play", hint: "Skip setup · demo" },
+  { id: "help", label: "Controls", hint: "Keys · mobile · tips" },
+  { id: "quick", label: "Quick Play", hint: "Pick district · drop in" },
 ];
 
 export function isTitleDistrictId(value: string): value is TitleDistrictId {

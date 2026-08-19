@@ -4046,3 +4046,428 @@ button.oxc-token-row {
     height: 400px;
   }
 }
+
+/* ── Dedicated gate pages (characters / lobbies / settings / help / quick) ── */
+.oxc-chars:has(> .oxc-gate) {
+  display: block;
+  padding: 0;
+  background: transparent;
+}
+
+.oxc-gate {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  padding:
+    max(0.75rem, var(--oxc-safe-top))
+    max(0.95rem, var(--oxc-safe-right))
+    max(0.75rem, var(--oxc-safe-bottom))
+    max(0.95rem, var(--oxc-safe-left));
+  overflow: hidden;
+  color: #e8eef8;
+}
+
+.oxc-gate-top {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.oxc-gate-back,
+.oxc-gate-link {
+  appearance: none;
+  background: rgba(8, 10, 16, 0.55);
+  border: 1px solid color-mix(in srgb, #c5a26f 38%, transparent);
+  color: rgba(232, 201, 154, 0.82);
+  border-radius: 999px;
+  padding: 0.42rem 0.9rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.oxc-gate-back:hover,
+.oxc-gate-link:hover,
+.oxc-gate-back:focus-visible,
+.oxc-gate-link:focus-visible {
+  color: #f4e6c8;
+  border-color: color-mix(in srgb, #e8c99a 70%, transparent);
+  outline: none;
+}
+
+.oxc-gate-kicker {
+  margin: 0;
+  text-align: center;
+  font-family: var(--oxc-font-display);
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #c5a26f 78%, #9ec4ff);
+}
+
+.oxc-gate-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.oxc-gate-actions .wallet-adapter-button,
+.oxc-gate-actions button {
+  border-radius: 999px !important;
+  font-size: 0.72rem !important;
+  height: 2.15rem !important;
+  padding: 0 0.85rem !important;
+}
+
+.oxc-gate-head {
+  position: relative;
+  z-index: 2;
+  max-width: 46rem;
+}
+
+.oxc-gate-head h1 {
+  margin: 0;
+  font-family: var(--oxc-font-display);
+  font-weight: 800;
+  font-size: clamp(1.35rem, 3.6vw, 2rem);
+  letter-spacing: 0.04em;
+  color: #f6f2ea;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+}
+
+.oxc-gate-head p {
+  margin: 0.35rem 0 0;
+  color: rgba(190, 205, 230, 0.68);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  max-width: 52ch;
+}
+
+.oxc-gate-body {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.oxc-gate-foot {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.oxc-gate-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.oxc-gate .oxc-menu-section-head {
+  display: none;
+}
+
+.oxc-gate .oxc-settings-panel,
+.oxc-gate .oxc-help-panel,
+.oxc-gate .oxc-lobby-browser {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.oxc-gate .oxc-settings-row,
+.oxc-gate .oxc-help-card,
+.oxc-gate .oxc-lobby-card,
+.oxc-gate .oxc-lobby-current {
+  border-radius: 16px;
+  border-color: color-mix(in srgb, #c5a26f 28%, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(160deg, rgba(10, 14, 22, 0.78), rgba(6, 8, 14, 0.62));
+  backdrop-filter: blur(16px);
+}
+
+.oxc-gate .oxc-settings-title svg,
+.oxc-gate .oxc-switch.on,
+.oxc-gate .oxc-lobby-row.on {
+  color: #e8c99a;
+}
+
+.oxc-gate .oxc-switch.on,
+.oxc-gate .oxc-lobby-row.on {
+  border-color: color-mix(in srgb, #c5a26f 55%, transparent);
+  background: color-mix(in srgb, #c5a26f 12%, transparent);
+}
+
+.oxc-gate .oxc-switch.on span {
+  background: #e8c99a;
+}
+
+.oxc-char-layout {
+  display: grid;
+  gap: 0.85rem;
+  min-height: 100%;
+}
+
+.oxc-char-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.oxc-char-card {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 7.2rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 10, 16, 0.55);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: oxc-rail-in 0.4s ease forwards;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.oxc-char-card:hover,
+.oxc-char-card:focus-visible {
+  border-color: color-mix(in srgb, var(--pod-neon, #c5a26f) 55%, transparent);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.oxc-char-card.is-on {
+  border-color: var(--pod-neon, #c5a26f);
+  background: color-mix(in srgb, var(--pod-neon, #c5a26f) 14%, rgba(8, 10, 16, 0.72));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--pod-neon, #c5a26f) 24%, transparent);
+}
+
+.oxc-char-card-fig {
+  width: 64px;
+  pointer-events: none;
+}
+
+.oxc-char-card-copy {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.oxc-char-card-name {
+  font-family: var(--oxc-font-display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+}
+
+.oxc-char-card-handle,
+.oxc-char-card-perk {
+  font-size: 0.68rem;
+  color: rgba(190, 205, 230, 0.62);
+}
+
+.oxc-char-card-perk {
+  color: var(--pod-neon, #c5a26f);
+}
+
+.oxc-char-card-kit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+}
+
+.oxc-char-card-kit em {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pod-gold, #c5a26f) 35%, transparent);
+  color: color-mix(in srgb, var(--pod-gold, #c5a26f) 80%, #fff);
+}
+
+.oxc-char-dossier {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, #c5a26f 26%, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(160deg, rgba(10, 14, 22, 0.82), rgba(6, 8, 14, 0.7));
+  backdrop-filter: blur(16px);
+}
+
+.oxc-char-dossier-fig {
+  display: grid;
+  place-items: end center;
+  min-height: 200px;
+}
+
+.oxc-quick {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.oxc-quick-mascot {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.85rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, #c5a26f 30%, transparent);
+  background: rgba(8, 10, 16, 0.58);
+}
+
+.oxc-quick-mascot h2 {
+  margin: 0.15rem 0 0;
+  font-family: var(--oxc-font-display);
+  font-size: 1.35rem;
+}
+
+.oxc-quick-mascot p {
+  margin: 0.2rem 0 0;
+  color: rgba(190, 205, 230, 0.65);
+  font-size: 0.8rem;
+}
+
+.oxc-quick-mascot-fig {
+  width: 72px;
+}
+
+.oxc-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.oxc-quick-card {
+  appearance: none;
+  display: grid;
+  gap: 0.28rem;
+  min-height: 8.4rem;
+  padding: 0.85rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--card-accent, #c5a26f) 28%, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(160deg, rgba(10, 14, 22, 0.78), rgba(6, 8, 14, 0.62));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.oxc-quick-card.is-on {
+  border-color: var(--card-accent, #c5a26f);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--card-accent, #c5a26f) 22%, transparent);
+}
+
+.oxc-quick-card-kicker {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--card-accent, #c5a26f);
+}
+
+.oxc-quick-card strong {
+  font-family: var(--oxc-font-display);
+  font-size: 1.05rem;
+}
+
+.oxc-quick-card em {
+  font-style: normal;
+  color: rgba(232, 201, 154, 0.78);
+  font-size: 0.78rem;
+}
+
+.oxc-quick-card span:last-child {
+  color: rgba(190, 205, 230, 0.62);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.oxc-chars-cta--primary {
+  border-color: color-mix(in srgb, #c5a26f 55%, transparent);
+  background: linear-gradient(135deg, rgba(197, 162, 111, 0.32), rgba(94, 141, 239, 0.16));
+  box-shadow: 0 0 24px rgba(197, 162, 111, 0.18);
+}
+
+.oxc-chars-cta--primary:hover,
+.oxc-chars-cta--primary:focus-visible {
+  box-shadow: 0 0 32px rgba(197, 162, 111, 0.32);
+}
+
+.oxc-chars-cta--ghost:hover,
+.oxc-chars-cta--ghost:focus-visible {
+  border-color: color-mix(in srgb, #c5a26f 40%, transparent);
+}
+
+.oxc-chars-foot-meta .is-on,
+.oxc-chars-namefield input:focus {
+  color: #e8c99a;
+  border-color: #c5a26f;
+}
+
+.oxc-menu-rail--3d .oxc-btn3d {
+  padding: 0.1rem 0 0.42rem;
+}
+
+.oxc-menu-rail--3d .oxc-btn3d-face {
+  min-height: 3.1rem;
+}
+
+@media (min-width: 980px) {
+  .oxc-char-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    align-items: start;
+  }
+
+  .oxc-char-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-char-dossier-fig {
+    min-height: 280px;
+  }
+
+  .oxc-quick-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .oxc-gate .oxc-help-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .oxc-char-card {
+    grid-template-columns: 52px minmax(0, 1fr);
+    min-height: 6.4rem;
+    padding: 0.5rem;
+  }
+
+  .oxc-char-card-kit {
+    display: none;
+  }
+
+  .oxc-quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oxc-gate-head h1 {
+    font-size: 1.25rem;
+  }
+}
