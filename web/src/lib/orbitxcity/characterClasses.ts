@@ -42,7 +42,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     gold: "#c5e07a",
     bodyColor: "#3d7a38",
     accentColor: "#c23b3b",
-    skinColor: "#5cb85c",
+    skinColor: "#c9a07a",
     scale: { x: 1.08, y: 0.92, z: 1.08 },
     stats: [
       { label: "Instinct", value: 94 },
@@ -74,7 +74,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     tagline: "Gigachad · clutch heat checks",
     neon: "#f0c27a",
     gold: "#ffd700",
-    bodyColor: "#1c1420",
+    bodyColor: "#3a5a72",
     accentColor: "#d4a017",
     skinColor: "#d4a574",
     scale: { x: 1.22, y: 1.12, z: 1.1 },
@@ -93,7 +93,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     gold: "#f5d08a",
     bodyColor: "#d4893a",
     accentColor: "#c0392b",
-    skinColor: "#e8a54b",
+    skinColor: "#d4a574",
     scale: { x: 1.06, y: 0.88, z: 1.14 },
     stats: [
       { label: "Wow", value: 97 },
@@ -108,9 +108,9 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     tagline: "Laser eyes · protocol maxi",
     neon: "#f7931a",
     gold: "#f5c542",
-    bodyColor: "#111318",
+    bodyColor: "#3a4454",
     accentColor: "#f7931a",
-    skinColor: "#f4f1ea",
+    skinColor: "#e8d5c0",
     scale: { x: 1.02, y: 1.06, z: 1.02 },
     stats: [
       { label: "Craft", value: 91 },

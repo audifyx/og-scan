@@ -32,6 +32,7 @@ describe("characterClasses", () => {
     expect(a.classId).toBe("pepe");
     expect(a.accentColor).toBe(pepe.accentColor);
     expect(a.skinColor).toBe(pepe.skinColor);
+    expect(pepe.skinColor.toLowerCase()).not.toBe("#5cb85c");
   });
 
   it("gives each mascot a distinct silhouette + palette", () => {

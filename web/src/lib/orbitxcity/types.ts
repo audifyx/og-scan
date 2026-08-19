@@ -74,6 +74,26 @@ export interface BuildingDefinition {
   label?: string;
   /** Local-space ground footprint (relative to building.position). When set, mesh uses extruded OSM outline. */
   footprint?: Array<{ x: number; z: number }>;
+  /** Optional face banners / ads. See `banners.ts`. */
+  banners?: BuildingBanner[];
+}
+
+export type BuildingFace = "south" | "north" | "east" | "west";
+
+/** Dev/admin banner on a building face. Image optional — title card if missing. */
+export interface BuildingBanner {
+  id: string;
+  buildingId: string;
+  face: BuildingFace;
+  u: number;
+  v: number;
+  width: number;
+  height: number;
+  imageUrl?: string;
+  title: string;
+  subtitle?: string;
+  accent: string;
+  enabled?: boolean;
 }
 
 export interface BillboardDefinition {

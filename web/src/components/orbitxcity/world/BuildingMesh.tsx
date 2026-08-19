@@ -2,12 +2,13 @@
  * Modular building massing — stacked boxes/cylinders, neon strips, roof props, enterable doors.
  * Prefer procedural shells (AI-buildable) over GLTF; OSM footprints still extrude when present.
  */
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text, Billboard } from "@react-three/drei";
 import * as THREE from "three";
-import type { BuildingDefinition } from "@/lib/orbitxcity/types";
+import type { BuildingBanner, BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
+import { bannerLocalPose, createBannerTexture, resolveBuildingBanners } from "@/lib/orbitxcity/banners";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
 import { getBuildingKit, gltfPathForBuilding } from "@/lib/orbitxcity/assets/buildingKits";
 import { GltfProp } from "./GltfProp";
@@ -377,6 +378,7 @@ function FacadeTier({
       FAMILY_WALL[family],
       building.accent,
       tier.ground,
+      family,
     );
     const side = new THREE.MeshStandardMaterial({
       map: tex,
@@ -437,6 +439,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
       FAMILY_WALL[family],
       building.accent,
       true,
+      family,
     );
     return new THREE.MeshStandardMaterial({
       map: tex,
@@ -659,7 +662,7 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
             <meshStandardMaterial color="#080c10" transparent opacity={0.35} depthWrite={false} />
           </mesh>
           <Text
-            position={[0, 2.82, size.depth / 2 + 0.42]}
+            position={[0, 4.15, size.depth / 2 + 0.42]}
             fontSize={0.2}
             color="#e8fff4"
             anchorX="center"
@@ -674,7 +677,7 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
             {`WALK IN · ${(label ?? name).toUpperCase()}`}
           </Text>
           <Text
-            position={[0, 2.52, size.depth / 2 + 0.42]}
+            position={[0, 3.82, size.depth / 2 + 0.42]}
             fontSize={0.13}
             color={accent}
             anchorX="center"
@@ -703,6 +706,65 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
           </Billboard>
         </>
       )}
+
+      {resolveBuildingBanners(building).map((banner) => (
+        <BannerFace key={banner.id} banner={banner} size={size} />
+      ))}
     </group>
+  );
+}
+
+function useOptionalTexture(url?: string): THREE.Texture | null {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    if (!url) {
+      setTex(null);
+      return;
+    }
+    const loader = new THREE.TextureLoader();
+    let cancelled = false;
+    loader.load(
+      url,
+      (loaded) => {
+        if (cancelled) return;
+        loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.anisotropy = 4;
+        setTex(loaded);
+      },
+      undefined,
+      () => {
+        if (!cancelled) setTex(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return tex;
+}
+
+function BannerFace({
+  banner,
+  size,
+}: {
+  banner: BuildingBanner;
+  size: { width: number; height: number; depth: number };
+}) {
+  const pose = bannerLocalPose(banner, size);
+  const fallback = useMemo(() => createBannerTexture(banner), [banner]);
+  const photo = useOptionalTexture(banner.imageUrl);
+  const map = photo ?? fallback;
+  return (
+    <mesh position={pose.position} rotation={[0, pose.rotationY, 0]} castShadow={false} receiveShadow={false}>
+      <planeGeometry args={[banner.width, banner.height]} />
+      <meshStandardMaterial
+        map={map}
+        roughness={0.42}
+        metalness={0.08}
+        emissive={banner.accent}
+        emissiveIntensity={0.18}
+        toneMapped={false}
+      />
+    </mesh>
   );
 }

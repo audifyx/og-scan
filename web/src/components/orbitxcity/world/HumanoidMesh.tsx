@@ -199,12 +199,38 @@ export function HumanoidMesh({
         <meshStandardMaterial color={skin} roughness={0.65} />
       </mesh>
 
-      {/* Torso */}
-      <mesh position={[0, 1.18, 0]} castShadow>
-        <boxGeometry args={[0.42, 0.42, 0.22]} />
-        <meshStandardMaterial color={body} roughness={0.55} metalness={0.12} />
+      {/* Torso + shoulders — jacket / class cosmetics sit on a human body */}
+      <mesh position={[0, 1.2, 0]} castShadow>
+        <boxGeometry args={[0.44, 0.46, 0.24]} />
+        <meshStandardMaterial color={body} roughness={0.52} metalness={0.1} />
       </mesh>
-      <mesh position={[0, 1.18, 0.118]}>
+      <mesh position={[-0.24, 1.38, 0]} rotation={[0, 0, 0.42]} castShadow>
+        <capsuleGeometry args={[0.07, 0.1, 4, 8]} />
+        <meshStandardMaterial color={classId === "pepe" ? "#3d7a38" : body} roughness={0.5} />
+      </mesh>
+      <mesh position={[0.24, 1.38, 0]} rotation={[0, 0, -0.42]} castShadow>
+        <capsuleGeometry args={[0.07, 0.1, 4, 8]} />
+        <meshStandardMaterial color={classId === "pepe" ? "#3d7a38" : body} roughness={0.5} />
+      </mesh>
+      {classId === "pepe" && (
+        <mesh position={[0, 1.2, 0.02]} castShadow>
+          <boxGeometry args={[0.46, 0.48, 0.26]} />
+          <meshStandardMaterial color="#3d7a38" roughness={0.55} metalness={0.08} />
+        </mesh>
+      )}
+      {classId === "wojak" && (
+        <mesh position={[0, 1.36, -0.08]} rotation={[0.35, 0, 0]} castShadow>
+          <boxGeometry args={[0.3, 0.16, 0.16]} />
+          <meshStandardMaterial color="#6b7280" roughness={0.78} />
+        </mesh>
+      )}
+      {classId === "doge" && (
+        <mesh position={[0, 1.36, 0.08]} rotation={[0.4, 0, 0]}>
+          <torusGeometry args={[0.12, 0.028, 8, 18]} />
+          <meshStandardMaterial color="#e8a54b" roughness={0.45} emissive="#e8a54b" emissiveIntensity={0.2} />
+        </mesh>
+      )}
+      <mesh position={[0, 1.2, 0.128]}>
         <boxGeometry args={[0.12, 0.28, 0.02]} />
         <meshStandardMaterial
           color={accent}
@@ -214,7 +240,7 @@ export function HumanoidMesh({
         />
       </mesh>
       {outfit === "suit" && (
-        <mesh position={[0, 1.08, 0.12]}>
+        <mesh position={[0, 1.08, 0.13]}>
           <boxGeometry args={[0.08, 0.22, 0.02]} />
           <meshStandardMaterial color={clothes.trim} emissive={clothes.trim} emissiveIntensity={0.2} />
         </mesh>
