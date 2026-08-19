@@ -24,6 +24,7 @@ import { NPCs } from "./NPCs";
 import { Drones } from "./Drones";
 import { RocketShow } from "./RocketShow";
 import { MegaScreen } from "./MegaScreen";
+import { ChartBoard, usePriceHistory } from "./ChartBoard";
 import { OxiGuide } from "./OxiGuide";
 import { Park } from "./Park";
 import { Traffic } from "./Traffic";
@@ -342,6 +343,53 @@ function DistrictBanners({ block }: { block: WorldBlockConfig }) {
   );
 }
 
+/**
+ * Live chart boards mounted on market and trading venues. One board per
+ * trending token, hung on the facade of the matching building.
+ */
+function MarketBoards({
+  block,
+  rows,
+}: {
+  block: WorldBlockConfig;
+  rows: ScreenerRow[];
+}) {
+  const history = usePriceHistory(rows);
+
+  const venues = useMemo(
+    () =>
+      block.buildings.filter((b) =>
+        ["market", "marketplace", "trading_floor", "trading", "hq"].includes(b.kind),
+      ),
+    [block.buildings],
+  );
+
+  if (!venues.length) return null;
+
+  return (
+    <group name="oxc-market-boards">
+      {venues.map((b, i) => {
+        const row = rows[i % Math.max(1, rows.length)];
+        const key = row?.mint ?? row?.address ?? row?.symbol ?? "";
+        return (
+          <ChartBoard
+            key={b.id}
+            row={row}
+            history={history[key] ?? []}
+            position={[
+              b.position.x,
+              b.position.y + Math.min(b.size.height * 0.55, 16),
+              b.position.z + b.size.depth / 2 + 0.4,
+            ]}
+            width={Math.min(b.size.width * 0.68, 11)}
+            height={Math.min(b.size.width * 0.42, 6.8)}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
 export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { tickerRows: ScreenerRow[]; block?: WorldBlockConfig }) {
   const theme = cityTheme(block.cityId);
   const { quality, panel } = useCity();
@@ -355,7 +403,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
   return (
     <group>
       <color attach="background" args={[theme.background]} />
-      <fog attach="fog" args={[theme.fog, high ? 55 : 40, high ? 175 : 120]} />
+      <fog attach="fog" args={[theme.fog, high ? 130 : 95, high ? 430 : 310]} />
 
       <SkyCycle block={block} />
       <ambientLight intensity={high ? 0.42 : 0.36} color="#c8d4de" />
@@ -389,7 +437,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
 
       {BLOCKY_WORLD ? (
         <>
-          <Baseplate size={560} color="#7fbf6a" grid="#6aa858" />
+          <Baseplate size={900} color="#7fbf6a" grid="#6aa858" />
           <Ground block={block} />
           <CityFill
             seed={`orbitx-${block.id ?? "nyc"}`}
@@ -427,6 +475,8 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       {screens.map((screen, index) => (
         <MegaScreen key={`screen-${index}`} rows={tickerRows} {...screen} />
       ))}
+
+      <MarketBoards block={block} rows={tickerRows} />
 
       <CentralPlaza block={block} />
       <HqBeacon block={block} />
