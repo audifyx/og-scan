@@ -16,7 +16,7 @@ import { TokenBuyPanel } from "./TokenBuyPanel";
 import { ChatPanel } from "./ChatPanel";
 import { SocialFeedPanel } from "./SocialFeedPanel";
 import { VoicePanel } from "./VoicePanel";
-import { MemeStorePanel } from "./MemeStorePanel";
+import { CityShopPanel } from "./CityShopPanel";
 import { HelpPanel } from "./HelpPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { LobbyBrowser } from "./LobbyBrowser";
@@ -32,9 +32,12 @@ import {
   LobbiesSystemExtras,
   CityDistrictCatalog,
 } from "./CitySystemPanels";
+import { liveListings } from "@/lib/orbitxcity/cityShop";
 import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
 import { hasExplorerMapPerk } from "@/lib/orbitxcity/characterClasses";
-import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices, Wand2 } from "lucide-react";
+import { hubZonesForBlock } from "@/lib/orbitxcity/metaverseHub";
+import { CityHomeDashboard } from "./CityHomeDashboard";
+import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices, Wand2, Flame, House } from "lucide-react";
 
 const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
   map: "World Map",
@@ -59,6 +62,8 @@ const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
   help: "Help",
   lobbies: "Lobbies",
   character: "Character",
+  shop: "Burn Store · Shop",
+  home: "City Home",
 };
 
 export function CityPanelHost() {
@@ -66,7 +71,7 @@ export function CityPanelHost() {
   if (panel === "none") return null;
 
   return (
-    <aside className="oxc-panel" role="dialog" aria-label={TITLES[panel]}>
+    <aside className={`oxc-panel ${panel === "home" ? "oxc-panel--home" : ""}`} role="dialog" aria-label={TITLES[panel]}>
       <header className="oxc-panel-head">
         <div>
           <div className="oxc-kicker">{TITLES[panel]}</div>
@@ -77,6 +82,7 @@ export function CityPanelHost() {
         </button>
       </header>
       <div className="oxc-panel-body">
+        {panel === "home" && <CityHomeDashboard />}
         {panel === "map" && <MapPanel />}
         {panel === "inventory" && <InventorySystemPanel />}
         {panel === "profile" && <ProfilePanel />}
@@ -89,6 +95,7 @@ export function CityPanelHost() {
             <MarketplaceSystemExtras />
           </>
         )}
+        {panel === "shop" && <CityShopPanel />}
         {panel === "live" && <LiveDataPanel />}
         {panel === "community" && <CommunityPanel />}
         {panel === "events" && <EventsSystemPanel />}
@@ -174,6 +181,7 @@ function NftPanel() {
 function MapPanel() {
   const { teleport, selectedCityId, playerPos, avatar } = useCity();
   const block = getWorldBlock(selectedCityId);
+  const hubZones = hubZonesForBlock(block);
   const explorerPerk = hasExplorerMapPerk(avatar.classId);
   const teleports = getTeleportPoints(selectedCityId)
     .map((p) => ({
@@ -203,6 +211,25 @@ function MapPanel() {
 
   return (
     <div className="oxc-stack">
+      <div className="oxc-section-label">
+        Hub districts
+      </div>
+      <div className="oxc-teleport-grid">
+        {hubZones.map((z) => (
+          <button
+            key={z.id}
+            type="button"
+            className="oxc-teleport-btn"
+            style={{ ["--tp" as string]: z.accent }}
+            onClick={() => teleport(z.x, z.z)}
+          >
+            <span>{z.label}</span>
+            <span className="oxc-muted" style={{ display: "block", fontSize: "0.68rem", marginTop: 2 }}>
+              {z.blurb}
+            </span>
+          </button>
+        ))}
+      </div>
       <div className="oxc-section-label">
         <Map className="h-3.5 w-3.5" /> Fast travel
         {explorerPerk ? " · Explorer range" : ""}
@@ -321,12 +348,28 @@ function useMarket() {
 }
 
 function LiveDataPanel() {
-  const { openToken } = useCity();
+  const { openToken, shopPurchases } = useCity();
   const { data, isLoading } = useMarket();
   const rows = data?.trending ?? [];
+  const listed = liveListings(shopPurchases);
   return (
     <div className="oxc-stack">
       <p className="oxc-muted">Live screener feed from OrbitX DEX APIs. Tap a row to open the in-world buy panel.</p>
+      {listed.length > 0 && (
+        <>
+          <div className="oxc-section-label">City shop listings</div>
+          <div className="oxc-token-list">
+            {listed.map((row) => (
+              <button key={row.mint} type="button" className="oxc-token-row link" onClick={() => openToken(row.mint)}>
+                <div>
+                  <div className="oxc-tile-title">{row.name}</div>
+                  <div className="oxc-muted">{shortMint(row.mint)} · {row.tier}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <div className="oxc-section-label"><Radio className="h-3.5 w-3.5" /> Trending · 24h</div>
       {isLoading && <div className="oxc-muted">Loading tape…</div>}
       <div className="oxc-token-list">
@@ -433,9 +476,11 @@ function CommunityPanel() {
 }
 
 export const PANEL_NAV = [
+  { id: "home" as const, label: "Home", icon: House },
   { id: "map" as const, label: "Map", icon: Map },
   { id: "live" as const, label: "Live", icon: Radio },
   { id: "marketplace" as const, label: "Market", icon: Store },
+  { id: "shop" as const, label: "Shop", icon: Flame },
   { id: "chat" as const, label: "Chat", icon: MessageSquare },
   { id: "social" as const, label: "Social", icon: Users },
   { id: "voice" as const, label: "Voice", icon: Mic },
@@ -447,18 +492,21 @@ export const PANEL_NAV = [
 
 /** Phone dock — keep only the actions players need mid-run. */
 export const MOBILE_DOCK = [
+  { id: "home" as const, label: "Home", icon: House },
   { id: "map" as const, label: "Map", icon: Map },
   { id: "marketplace" as const, label: "Market", icon: Store },
-  { id: "chat" as const, label: "Chat", icon: MessageSquare },
-  { id: "voice" as const, label: "Voice", icon: Mic },
+  { id: "shop" as const, label: "Shop", icon: Flame },
   { id: "inventory" as const, label: "Bag", icon: Backpack },
 ];
 
 /** Overflow sheet on phones. */
 export const MORE_PANELS = [
+  { id: "home" as const, label: "Home", icon: House },
+  { id: "shop" as const, label: "Shop", icon: Flame },
   { id: "live" as const, label: "Live", icon: Radio },
   { id: "social" as const, label: "Social", icon: Users },
   { id: "character" as const, label: "Look", icon: Wand2 },
+  { id: "friends" as const, label: "Friends", icon: Users },
   { id: "events" as const, label: "Events", icon: Rocket },
   { id: "profile" as const, label: "Profile", icon: UserRound },
   { id: "help" as const, label: "Help", icon: Gamepad2 },

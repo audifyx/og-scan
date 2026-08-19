@@ -1,6 +1,6 @@
 /**
  * In-world avatar — readable humanoid with synced cosmetics.
- * Character-select still uses CryptoMascotMesh for class identity.
+ * Character-select previews the same HumanoidMesh.
  */
 import { HumanoidMesh } from "./HumanoidMesh";
 import type { AvatarAppearance, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";

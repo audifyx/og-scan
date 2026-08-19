@@ -32,6 +32,7 @@ describe("characterClasses", () => {
     expect(a.classId).toBe("pepe");
     expect(a.accentColor).toBe(pepe.accentColor);
     expect(a.skinColor).toBe(pepe.skinColor);
+    expect(pepe.skinColor.toLowerCase()).not.toBe("#5cb85c");
   });
 
   it("gives each mascot a distinct silhouette + palette", () => {
@@ -45,6 +46,12 @@ describe("characterClasses", () => {
     }
     expect(appearanceFromClass(getCharacterClass("anon")).outfit).toBe("suit");
     expect(appearanceFromClass(getCharacterClass("doge")).faceStyle).toBe("smile");
+    expect(appearanceFromClass(getCharacterClass("wojak")).outfit).toBe("hoodie");
+    expect(appearanceFromClass(getCharacterClass("chad")).beardStyle).toBe("full");
+    expect(appearanceFromClass(getCharacterClass("pepe")).beardStyle).toBe("goatee");
+    for (const cls of CHARACTER_CLASSES) {
+      expect(cls.scale.y).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("maps perks through aliases", () => {

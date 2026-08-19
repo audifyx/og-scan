@@ -2,12 +2,14 @@
  * Modular building massing — stacked boxes/cylinders, neon strips, roof props, enterable doors.
  * Prefer procedural shells (AI-buildable) over GLTF; OSM footprints still extrude when present.
  */
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Text, Billboard } from "@react-three/drei";
+import { Text } from "@react-three/drei";
 import * as THREE from "three";
-import type { BuildingDefinition } from "@/lib/orbitxcity/types";
+import type { BuildingBanner, BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
+import { bannerLocalPose, createBannerTexture, resolveBuildingBanners } from "@/lib/orbitxcity/banners";
+import { bannerTargetsBuilding, liveUserBanners } from "@/lib/orbitxcity/cityShop";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
 import { getBuildingKit, gltfPathForBuilding } from "@/lib/orbitxcity/assets/buildingKits";
 import { GltfProp } from "./GltfProp";
@@ -164,6 +166,79 @@ function BlinkingBeacon({ height, accent }: { height: number; accent: string }) 
         <sphereGeometry args={[0.12, 10, 10]} />
         <meshBasicMaterial color={accent} transparent opacity={0.55} toneMapped={false} />
       </mesh>
+    </group>
+  );
+}
+
+function FacadeWindowGrid({
+  w,
+  h,
+  d,
+  yBase,
+  accent,
+  seed,
+  lite,
+}: {
+  w: number;
+  h: number;
+  d: number;
+  yBase: number;
+  accent: string;
+  seed: number;
+  lite?: boolean;
+}) {
+  const panes = useMemo(() => {
+    const r = mulberry32(seed);
+    const cols = Math.max(3, Math.floor(w / (lite ? 1.7 : 1.25)));
+    const rows = Math.max(2, Math.floor(h / (lite ? 2.4 : 1.9)));
+    const out: Array<{ x: number; y: number; z: number; ww: number; hh: number; side: 0 | 1 | 2 | 3; lit: boolean }> = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (r() < 0.16) continue;
+        const lit = r() > 0.2;
+        const ww = Math.min(0.52, w / (cols + 1.2));
+        const hh = 0.62;
+        const u = (col + 0.5) / cols - 0.5;
+        const y = yBase + 1.35 + row * ((h - 1.8) / Math.max(1, rows));
+        if (y > yBase + h - 0.7) continue;
+        for (const side of [0, 1, 2, 3] as const) {
+          if (lite && side > 1 && r() > 0.45) continue;
+          const isZ = side < 2;
+          const sign = side % 2 === 0 ? 1 : -1;
+          out.push({
+            x: isZ ? u * w * 0.78 : sign * (w / 2 + 0.05),
+            y,
+            z: isZ ? sign * (d / 2 + 0.05) : u * d * 0.78,
+            ww: isZ ? ww : 0.08,
+            hh,
+            side,
+            lit,
+          });
+        }
+      }
+    }
+    return out.slice(0, lite ? 56 : 140);
+  }, [w, h, d, yBase, seed, lite]);
+
+  return (
+    <group>
+      {panes.map((p, i) => (
+        <mesh
+          key={i}
+          position={[p.x, p.y, p.z]}
+          rotation={p.side < 2 ? [0, 0, 0] : [0, Math.PI / 2, 0]}
+        >
+          <boxGeometry args={[p.side < 2 ? p.ww : 0.08, p.hh, p.side < 2 ? 0.08 : p.ww]} />
+          <meshStandardMaterial
+            color={p.lit ? "#1a2430" : "#0a1016"}
+            emissive={p.lit ? (i % 5 === 0 ? accent : "#f0d8a0") : "#000000"}
+            emissiveIntensity={p.lit ? 0.95 : 0}
+            metalness={0.35}
+            roughness={0.28}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -368,6 +443,7 @@ function FacadeTier({
   building: BuildingDefinition;
   index: number;
 }) {
+  const { quality } = useCity();
   const materials = useMemo(() => {
     const family = facadeFamily(building);
     const tex = createFacadeTexture(
@@ -377,6 +453,7 @@ function FacadeTier({
       FAMILY_WALL[family],
       building.accent,
       tier.ground,
+      family,
     );
     const side = new THREE.MeshStandardMaterial({
       map: tex,
@@ -394,6 +471,15 @@ function FacadeTier({
       <mesh position={[0, tier.yBase + tier.h / 2, 0]} castShadow receiveShadow material={materials}>
         <boxGeometry args={[tier.w, tier.h, tier.d]} />
       </mesh>
+      <FacadeWindowGrid
+        w={tier.w}
+        h={tier.h}
+        d={tier.d}
+        yBase={tier.yBase}
+        accent={building.accent}
+        seed={hashSeed(`${building.id}-win-${index}`)}
+        lite={quality !== "high"}
+      />
       <NeonWindowStrips
         w={tier.w}
         h={tier.h}
@@ -437,6 +523,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
       FAMILY_WALL[family],
       building.accent,
       true,
+      family,
     );
     return new THREE.MeshStandardMaterial({
       map: tex,
@@ -480,7 +567,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
 }
 
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
-  const { openVenue, quality } = useCity();
+  const { openVenue, quality, shopPurchases } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const kit = useMemo(() => getBuildingKit(building.kind), [building.kind]);
@@ -659,12 +746,12 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
             <meshStandardMaterial color="#080c10" transparent opacity={0.35} depthWrite={false} />
           </mesh>
           <Text
-            position={[0, 2.82, size.depth / 2 + 0.42]}
-            fontSize={0.2}
+            position={[0, 5.55, size.depth / 2 + 0.42]}
+            fontSize={0.22}
             color="#e8fff4"
             anchorX="center"
             anchorY="middle"
-            outlineWidth={0.018}
+            outlineWidth={0.02}
             outlineColor="#05080c"
             onClick={(e) => {
               e.stopPropagation();
@@ -674,8 +761,8 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
             {`WALK IN · ${(label ?? name).toUpperCase()}`}
           </Text>
           <Text
-            position={[0, 2.52, size.depth / 2 + 0.42]}
-            fontSize={0.13}
+            position={[0, 5.18, size.depth / 2 + 0.42]}
+            fontSize={0.14}
             color={accent}
             anchorX="center"
             outlineWidth={0.012}
@@ -687,22 +774,72 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
             <planeGeometry args={[doorW + 2.6, 2.4]} />
             <meshStandardMaterial color="#6a7178" roughness={0.9} metalness={0.06} />
           </mesh>
-
-          <Billboard position={[0, roofY + 1.7, 0]}>
-            <Text
-              fontSize={0.42}
-              color="#e8eef2"
-              anchorX="center"
-              anchorY="middle"
-              outlineWidth={0.025}
-              outlineColor="#12161a"
-              maxWidth={8}
-            >
-              {label ?? name}
-            </Text>
-          </Billboard>
         </>
       )}
+
+      {[
+        ...resolveBuildingBanners(building),
+        ...liveUserBanners(shopPurchases).filter((banner) =>
+          bannerTargetsBuilding(banner.buildingId, building.id, building.kind, walkIn),
+        ),
+      ].map((banner) => (
+        <BannerFace key={banner.id} banner={banner} size={size} />
+      ))}
     </group>
+  );
+}
+
+function useOptionalTexture(url?: string): THREE.Texture | null {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    if (!url) {
+      setTex(null);
+      return;
+    }
+    const loader = new THREE.TextureLoader();
+    let cancelled = false;
+    loader.load(
+      url,
+      (loaded) => {
+        if (cancelled) return;
+        loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.anisotropy = 4;
+        setTex(loaded);
+      },
+      undefined,
+      () => {
+        if (!cancelled) setTex(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return tex;
+}
+
+function BannerFace({
+  banner,
+  size,
+}: {
+  banner: BuildingBanner;
+  size: { width: number; height: number; depth: number };
+}) {
+  const pose = bannerLocalPose(banner, size);
+  const fallback = useMemo(() => createBannerTexture(banner), [banner]);
+  const photo = useOptionalTexture(banner.imageUrl);
+  const map = photo ?? fallback;
+  return (
+    <mesh position={pose.position} rotation={[0, pose.rotationY, 0]} castShadow={false} receiveShadow={false}>
+      <planeGeometry args={[banner.width, banner.height]} />
+      <meshStandardMaterial
+        map={map}
+        roughness={0.42}
+        metalness={0.08}
+        emissive={banner.accent}
+        emissiveIntensity={0.18}
+        toneMapped={false}
+      />
+    </mesh>
   );
 }

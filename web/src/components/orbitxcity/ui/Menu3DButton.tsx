@@ -43,7 +43,7 @@ export function Menu3DButton({
   const onPointerLeave = useCallback(() => {
     const slab = slabRef.current;
     if (!slab) return;
-    setTilt(slab, 22, -12);
+    setTilt(slab, 12, -3);
   }, []);
 
   return (

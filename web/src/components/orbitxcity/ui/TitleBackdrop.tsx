@@ -36,15 +36,15 @@ function makeWindowMaps(windowHex: string, seed: number) {
   const cctx = color.getContext("2d");
   const ectx = emit.getContext("2d");
   if (!cctx || !ectx) return null;
-  cctx.fillStyle = "#10151e";
+  cctx.fillStyle = "#2a323c";
   cctx.fillRect(0, 0, width, height);
   ectx.fillStyle = "#000000";
   ectx.fillRect(0, 0, width, height);
   for (let y = 4; y < height - 4; y += 7) {
     for (let x = 3; x < width - 3; x += 6) {
-      if (rand() < 0.72) {
-        const lit = rand() > 0.18;
-        cctx.fillStyle = lit ? windowHex : "#1c2430";
+      if (rand() < 0.82) {
+        const lit = rand() > 0.12;
+        cctx.fillStyle = lit ? windowHex : "#3a4450";
         cctx.fillRect(x, y, 3, 4);
         if (lit) {
           ectx.fillStyle = windowHex;
@@ -90,11 +90,11 @@ function TitleSkyline({ theme, lite }: { theme: TitleDistrictTheme; lite: boolea
   const mat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#8a93a3",
+        color: "#b4bcc8",
         map: maps?.map ?? null,
         emissive: theme.window,
         emissiveMap: maps?.emissiveMap ?? null,
-        emissiveIntensity: 1.35,
+        emissiveIntensity: 2.15,
         metalness: 0.42,
         roughness: 0.48,
         envMapIntensity: 0.45,
@@ -203,13 +203,14 @@ function TitleLights({ theme }: { theme: TitleDistrictTheme }) {
   return (
     <>
       <color attach="background" args={[theme.sky]} />
-      <fog attach="fog" args={[theme.fog, 28, 88]} />
-      <ambientLight color={theme.fill} intensity={0.28} />
-      <hemisphereLight args={[theme.fill, "#0c1016", 0.42]} />
-      <directionalLight position={[-12, 18, 10]} color={theme.key} intensity={1.05} />
-      <directionalLight position={[14, 8, 6]} color={theme.fill} intensity={0.48} />
-      <pointLight position={[3.2, 10, -8]} color={theme.window} intensity={16} distance={48} decay={2} />
-      <pointLight position={[-4, 8, -6]} color="#00ff9f" intensity={6} distance={28} decay={2} />
+      <fog attach="fog" args={[theme.fog, 36, 110]} />
+      <ambientLight color={theme.fill} intensity={0.52} />
+      <hemisphereLight args={[theme.fill, "#1a2430", 0.62]} />
+      <directionalLight position={[-12, 18, 10]} color={theme.key} intensity={1.45} />
+      <directionalLight position={[14, 8, 6]} color={theme.fill} intensity={0.78} />
+      <pointLight position={[3.2, 10, -8]} color={theme.window} intensity={28} distance={56} decay={2} />
+      <pointLight position={[-4, 8, -6]} color="#00ff9f" intensity={10} distance={34} decay={2} />
+      <pointLight position={[8, 6, -4]} color={theme.key} intensity={14} distance={40} decay={2} />
     </>
   );
 }
@@ -220,11 +221,11 @@ function TitleGround({ theme }: { theme: TitleDistrictTheme }) {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.5, -0.02, -10]} receiveShadow={false}>
         <planeGeometry args={[110, 80]} />
         <meshStandardMaterial
-          color="#07090f"
-          metalness={0.68}
-          roughness={0.32}
+          color="#1a222c"
+          metalness={0.58}
+          roughness={0.38}
           emissive={theme.fog}
-          emissiveIntensity={0.06}
+          emissiveIntensity={0.14}
         />
       </mesh>
       <mesh position={[3, 4.2, -22]} rotation={[0, 0, 0]}>
@@ -298,7 +299,7 @@ export function TitleBackdrop({ cityId = "nyc", intensity = "title", lite }: Tit
               antialias: !autoLite,
               powerPreference: autoLite ? "low-power" : "high-performance",
               toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.05,
+              toneMappingExposure: 1.38,
               stencil: false,
               alpha: false,
             }}

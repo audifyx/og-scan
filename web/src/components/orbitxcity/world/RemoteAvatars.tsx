@@ -26,6 +26,8 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
     outfit: appearanceSource.outfit ?? "street",
     faceStyle: appearanceSource.faceStyle ?? "cool",
     classId: player.classId ?? appearanceSource.classId,
+    beardStyle: player.beardStyle ?? appearanceSource.beardStyle,
+    bodyType: player.bodyType ?? appearanceSource.bodyType,
   };
 
   useFrame(({ clock }, rawDt) => {

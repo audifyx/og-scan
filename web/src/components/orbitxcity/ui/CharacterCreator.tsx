@@ -2,19 +2,27 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import type {
   AvatarAppearance,
+  BeardStyle,
+  BodyType,
   FaceStyle,
   HairStyle,
   OutfitStyle,
 } from "@/lib/orbitxcity/types";
+import { SHOP_HAIR, SHOP_OUTFITS, getShopItem } from "@/lib/orbitxcity/cityShop";
+import {
+  BEARD_STYLES,
+  BODY_TYPES,
+  deleteCharacterSlot,
+  loadCharacterSlots,
+  saveCharacterSlot,
+  type CharacterSlot,
+} from "@/lib/orbitxcity/metaverseHub";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const BODY_PRESETS = ["#1a2438", "#2a1f3d", "#1e4436", "#3d2a1e", "#1a3040", "#3a1f28"];
 const SKIN_PRESETS = ["#e8d5c0", "#c9a07a", "#8d5524", "#f0d5b8", "#5c3a21", "#ffdbac"];
 const ACCENT_PRESETS = ["#17ff4d", "#3de7ff", "#f5c542", "#ff4d9a", "#ff6b35", "#8cffd2"];
 const HAIR_PRESETS = ["#101014", "#3a2318", "#f5c542", "#d9d0c3", "#17ff4d", "#3de7ff"];
-
-const HAIR_STYLES: HairStyle[] = ["short", "long", "buzz", "bun", "mohawk"];
-const OUTFITS: OutfitStyle[] = ["street", "suit", "sport", "neon"];
 const FACE_STYLES: FaceStyle[] = ["neutral", "cool", "smile"];
 
 const AVATAR_FALLBACK: AvatarAppearance = {
@@ -26,6 +34,8 @@ const AVATAR_FALLBACK: AvatarAppearance = {
   hairColor: "#101014",
   outfit: "street",
   faceStyle: "cool",
+  beardStyle: "none",
+  bodyType: "standard",
 };
 
 function completeAvatar(avatar: AvatarAppearance): AvatarAppearance {
@@ -37,11 +47,26 @@ function optionLabel(value: string): string {
 }
 
 export function CharacterCreator({ onDone }: { onDone?: () => void }) {
-  const { avatar, setAvatar } = useCity();
+  const { avatar, setAvatar, shopPurchases } = useCity();
   const { profile } = useAuth();
+  const HAIR_STYLES: HairStyle[] = useMemo(() => {
+    const owned = new Set(
+      shopPurchases.map((p) => getShopItem(p.itemId)?.appearance?.hairStyle).filter(Boolean),
+    );
+    return SHOP_HAIR.filter((h) => h === "short" || h === "long" || h === "buzz" || h === "bun" || h === "mohawk" || owned.has(h));
+  }, [shopPurchases]);
+  const OUTFITS: OutfitStyle[] = useMemo(() => {
+    const owned = new Set(
+      shopPurchases.map((p) => getShopItem(p.itemId)?.appearance?.outfit).filter(Boolean),
+    );
+    return SHOP_OUTFITS.filter(
+      (o) => o === "street" || o === "suit" || o === "sport" || o === "neon" || owned.has(o),
+    );
+  }, [shopPurchases]);
   const [draft, setDraft] = useState<AvatarAppearance>(() =>
     completeAvatar({ ...avatar, name: avatar.name || profile?.username || AVATAR_FALLBACK.name }),
   );
+  const [slots, setSlots] = useState<CharacterSlot[]>(() => loadCharacterSlots());
 
   const previewStyle = useMemo(
     () => ({
@@ -64,17 +89,20 @@ export function CharacterCreator({ onDone }: { onDone?: () => void }) {
       <div className="oxc-menu-section-head">
         <span className="oxc-kicker">Character creator</span>
         <h2>Sims-style city identity</h2>
-        <p>Tune your look before you hit the plaza. Changes update your local avatar preview immediately.</p>
+        <p>CSS doll here, live 3D body in the world — no second WebGL canvas. Save up to six looks.</p>
       </div>
 
       <div className="oxc-character-layout">
         <div className="oxc-character-preview" style={previewStyle}>
-          <div className={`oxc-character-doll hair-${draft.hairStyle} outfit-${draft.outfit} face-${draft.faceStyle}`}>
+          <div
+            className={`oxc-character-doll hair-${draft.hairStyle} outfit-${draft.outfit} face-${draft.faceStyle} body-${draft.bodyType ?? "standard"} beard-${draft.beardStyle ?? "none"}`}
+          >
             <div className="oxc-char-hair" />
             <div className="oxc-char-head">
               <span className="oxc-char-eye left" />
               <span className="oxc-char-eye right" />
               <span className="oxc-char-mouth" />
+              <span className="oxc-char-beard" />
             </div>
             <div className="oxc-char-neck" />
             <div className="oxc-char-body">
@@ -87,9 +115,10 @@ export function CharacterCreator({ onDone }: { onDone?: () => void }) {
           </div>
           <div className="oxc-character-name">@{draft.name.trim() || "traveler"}</div>
           <div className="oxc-character-tags">
+            <span>{draft.bodyType ?? "standard"}</span>
             <span>{draft.hairStyle} hair</span>
             <span>{draft.outfit}</span>
-            <span>{draft.faceStyle}</span>
+            <span>{draft.beardStyle ?? "none"}</span>
           </div>
         </div>
 
@@ -127,9 +156,63 @@ export function CharacterCreator({ onDone }: { onDone?: () => void }) {
             options={FACE_STYLES}
             onChange={(value) => update("faceStyle", value)}
           />
+          <OptionGroup<BodyType>
+            label="Body"
+            value={draft.bodyType ?? "standard"}
+            options={BODY_TYPES}
+            onChange={(value) => update("bodyType", value)}
+          />
+          <OptionGroup<BeardStyle>
+            label="Beard"
+            value={draft.beardStyle ?? "none"}
+            options={BEARD_STYLES}
+            onChange={(value) => update("beardStyle", value)}
+          />
+
+          <div className="oxc-section-label">Saved looks</div>
+          <button
+            type="button"
+            className="oxc-btn ghost oxc-menu-wide"
+            onClick={() => setSlots(saveCharacterSlot(completeAvatar(draft)))}
+          >
+            Save slot
+          </button>
+          <div className="oxc-char-slots">
+            {slots.map((slot) => (
+              <div key={slot.id} className="oxc-char-slot">
+                <button
+                  type="button"
+                  className="oxc-btn ghost compact"
+                  onClick={() => {
+                    const next = completeAvatar(slot.appearance);
+                    setDraft(next);
+                    setAvatar(next);
+                  }}
+                >
+                  {slot.appearance.name || "Look"} · {slot.appearance.outfit}
+                </button>
+                <button
+                  type="button"
+                  className="oxc-icon-btn"
+                  aria-label="Delete look"
+                  onClick={() => setSlots(deleteCharacterSlot(slot.id))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {!slots.length && <p className="oxc-muted">No saved looks yet — save a slot to switch later.</p>}
+          </div>
 
           {onDone && (
-            <button type="button" className="oxc-btn primary oxc-menu-wide" onClick={onDone}>
+            <button
+              type="button"
+              className="oxc-btn primary oxc-menu-wide"
+              onClick={() => {
+                setSlots(saveCharacterSlot(completeAvatar(draft)));
+                onDone();
+              }}
+            >
               Save character
             </button>
           )}

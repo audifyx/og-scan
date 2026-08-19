@@ -70,6 +70,7 @@ export function createFacadeTexture(
   baseColor: string,
   accent: string,
   groundFloor: boolean,
+  family: "brick" | "limestone" | "glass" | "retail" = "brick",
 ): THREE.CanvasTexture {
   const cols = Math.max(2, Math.round(widthUnits / 1.35));
   const rows = Math.max(2, Math.round(heightUnits / 1.7));
@@ -82,10 +83,16 @@ export function createFacadeTexture(
   // Wall base with vertical shading + grime near the ground
   const wall = ctx.createLinearGradient(0, 0, 0, H);
   wall.addColorStop(0, baseColor);
-  wall.addColorStop(0.75, baseColor);
-  wall.addColorStop(1, "#05070c");
+  wall.addColorStop(0.72, baseColor);
+  wall.addColorStop(1, family === "glass" ? "#1a2430" : "#2e2824");
   ctx.fillStyle = wall;
   ctx.fillRect(0, 0, W, H);
+  if (family === "brick") {
+    ctx.fillStyle = "rgba(40, 18, 12, 0.18)";
+    for (let y = 0; y < H; y += 7) {
+      ctx.fillRect(0, y, W, 1);
+    }
+  }
 
   // Subtle panel seams
   ctx.strokeStyle = "rgba(0,0,0,0.35)";
@@ -102,7 +109,7 @@ export function createFacadeTexture(
   const cellH = H / rows;
   const winW = cellW * 0.56;
   const winH = cellH * 0.6;
-  const litPalette = ["#f0d7a0", "#ffe9b8", "#e8c99a", "#c8d8e8", "#00ff9f"];
+  const litPalette = ["#ffe9b8", "#f0d7a0", "#fff4c8", "#d4e8f4", "#7dffc4"];
 
   const groundRows = groundFloor ? 1 : 0;
   for (let r = 0; r < rows - groundRows; r++) {
@@ -118,7 +125,7 @@ export function createFacadeTexture(
       } else if (roll < 0.9) {
         const color = litPalette[Math.floor(rand() * litPalette.length)]!;
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.62 + rand() * 0.32;
+        ctx.globalAlpha = 0.78 + rand() * 0.22;
         ctx.fillRect(x, y, winW, winH);
         ctx.globalAlpha = 0.28;
         ctx.fillStyle = "#fff6d0";

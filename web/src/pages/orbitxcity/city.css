@@ -471,18 +471,18 @@ body.oxc-lock {
 .oxc-prompt {
   position: absolute;
   left: 50%;
-  top: 38%;
+  top: 22%;
   bottom: auto;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 0.75rem;
   width: min(420px, calc(100% - 1.5rem));
-  border: 1px solid rgba(0, 255, 159, 0.28);
-  background: var(--oxc-hud-glass);
-  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(0, 255, 159, 0.72);
+  background: rgba(6, 10, 14, 0.94);
+  padding: 0.82rem 0.95rem;
   backdrop-filter: blur(14px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 28px rgba(0, 255, 159, 0.28), 0 12px 28px rgba(0, 0, 0, 0.5);
   animation: oxc-prompt-in 0.25s ease-out;
   z-index: 5;
 }
@@ -668,7 +668,7 @@ body.oxc-lock {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--oxc-line);
-  background: var(--oxc-panel);
+  background: rgba(8, 10, 16, 0.92);
   backdrop-filter: blur(16px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
   transform: translate(-50%, -50%);
@@ -1595,13 +1595,14 @@ button.oxc-token-row {
 .oxc-menu-stage {
   position: relative;
   z-index: 2;
-  width: min(440px, 100%);
+  width: min(420px, 92%);
   display: grid;
-  gap: 1.35rem;
+  gap: 1.2rem;
   margin: 0 auto;
   align-self: center;
   justify-items: center;
   text-align: center;
+  transform: translateY(-2vh);
 }
 
 .oxc-menu-brand {
@@ -3220,7 +3221,7 @@ button.oxc-token-row {
   .oxc-hud--phone .oxc-prompt {
     left: 50%;
     right: auto;
-    top: 36%;
+    top: 20%;
     bottom: auto;
     width: min(420px, calc(100% - 1.2rem));
     max-width: none;
@@ -3368,7 +3369,7 @@ button.oxc-token-row {
   .oxc-prompt {
     left: 50%;
     right: auto;
-    top: 34%;
+    top: 20%;
     bottom: auto;
     width: min(420px, calc(100% - 1.1rem));
     transform: translate(-50%, -50%);
@@ -3378,7 +3379,7 @@ button.oxc-token-row {
   }
 
   .oxc-hud--touch .oxc-prompt {
-    top: 32%;
+    top: 18%;
   }
 
   .oxc-prompt-key {
@@ -3392,7 +3393,7 @@ button.oxc-token-row {
   .oxc-prompt span { font-size: 9px; }
 
   .oxc-panel {
-    top: 46%;
+    top: 50%;
     left: 50%;
     right: auto;
     bottom: auto;
@@ -3464,7 +3465,8 @@ button.oxc-token-row {
   }
 
   .oxc-prompt {
-    bottom: calc(3.2rem + var(--oxc-safe-bottom) + 5.2rem);
+    top: 28%;
+    bottom: auto;
   }
 
   .oxc-panel {
@@ -3675,7 +3677,7 @@ button.oxc-token-row {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background: #05070d;
+  background: #101c32;
 }
 
 .oxc-titlebg-canvas {
@@ -3702,8 +3704,8 @@ button.oxc-token-row {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 58% at 50% 42%, rgba(5, 7, 13, 0.18) 0%, rgba(5, 7, 13, 0.52) 70%, rgba(5, 7, 13, 0.78) 100%),
-    linear-gradient(180deg, rgba(5, 7, 13, 0.38) 0%, transparent 28%, transparent 62%, rgba(5, 7, 13, 0.82) 100%);
+    radial-gradient(ellipse 78% 68% at 50% 42%, rgba(8, 14, 24, 0.04) 0%, rgba(8, 14, 24, 0.22) 72%, rgba(8, 14, 24, 0.48) 100%),
+    linear-gradient(180deg, rgba(8, 14, 24, 0.18) 0%, transparent 22%, transparent 68%, rgba(8, 14, 24, 0.55) 100%);
 }
 
 .oxc-titlebg--chamber .oxc-titlebg-vignette {
@@ -3735,8 +3737,8 @@ button.oxc-token-row {
 
 .oxc-btn3d {
   --btn3d-accent: var(--title-accent, #c5a26f);
-  --tilt-x: 22deg;
-  --tilt-y: -12deg;
+  --tilt-x: 12deg;
+  --tilt-y: -3deg;
   appearance: none;
   border: 0;
   background: none;
@@ -3783,12 +3785,12 @@ button.oxc-token-row {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  min-height: 3.55rem;
-  padding: 0.75rem 1.1rem;
+  min-height: 3.75rem;
+  padding: 0.8rem 1.15rem;
   border-radius: 14px;
   overflow: hidden;
-  color: #f6f2ea;
-  border: 1px solid color-mix(in srgb, var(--btn3d-accent) 40%, rgba(255, 255, 255, 0.12));
+  color: #f8f4ea;
+  border: 1px solid color-mix(in srgb, var(--btn3d-accent) 62%, rgba(255, 255, 255, 0.28));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 16%, rgba(10, 12, 18, 0.72) 58%, rgba(5, 6, 10, 0.82) 100%),
     linear-gradient(115deg, color-mix(in srgb, var(--btn3d-accent) 22%, transparent), transparent 46%);
@@ -3810,15 +3812,15 @@ button.oxc-token-row {
 }
 
 .oxc-btn3d--primary .oxc-btn3d-face {
-  min-height: 3.75rem;
-  border-color: color-mix(in srgb, #e8c99a 58%, transparent);
+  min-height: 4rem;
+  border-color: color-mix(in srgb, #00ff9f 70%, #e8c99a);
   background:
-    linear-gradient(180deg, rgba(255, 236, 196, 0.3) 0%, rgba(197, 162, 111, 0.16) 26%, rgba(16, 12, 8, 0.78) 100%),
-    linear-gradient(115deg, rgba(232, 201, 154, 0.24), transparent 48%);
+    linear-gradient(180deg, rgba(0, 255, 159, 0.28) 0%, rgba(16, 24, 20, 0.82) 42%, rgba(8, 12, 10, 0.9) 100%),
+    linear-gradient(115deg, rgba(0, 255, 159, 0.22), transparent 48%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 246, 220, 0.45),
+    inset 0 1px 0 rgba(232, 255, 244, 0.45),
     inset 0 -12px 22px rgba(0, 0, 0, 0.4),
-    0 0 28px color-mix(in srgb, var(--btn3d-accent) 22%, transparent);
+    0 0 32px rgba(0, 255, 159, 0.28);
 }
 
 .oxc-btn3d-edge {
@@ -4090,5 +4092,400 @@ button.oxc-token-row {
   .oxc-mascot-preview {
     width: 360px;
     height: 400px;
+  }
+}
+
+.oxc-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.65rem;
+}
+
+.oxc-shop-card {
+  border: 1px solid color-mix(in srgb, var(--shop, #00ff9f) 45%, transparent);
+  background: rgba(8, 12, 16, 0.72);
+  padding: 0.7rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.oxc-shop-card h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.oxc-shop-card p {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.oxc-shop-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.oxc-shop-card.is-owned {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shop, #00ff9f) 55%, transparent);
+}
+
+/* ---- Metaverse Alpha: home, character doll, rarity ---- */
+.oxc-panel--home {
+  width: min(560px, calc(100% - 1.2rem));
+}
+
+.oxc-home {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.oxc-home-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.oxc-home-ident {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.oxc-home-ident h3 {
+  margin: 0.1rem 0 0;
+  font-size: 1rem;
+}
+
+.oxc-home-wallet {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: end;
+}
+
+.oxc-home-wallet span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.oxc-home-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.oxc-home-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.oxc-home-actions .oxc-btn {
+  min-height: 2.6rem;
+  justify-content: center;
+}
+
+.oxc-home-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.oxc-home-sort {
+  display: inline-flex;
+  border: 1px solid rgba(0, 255, 159, 0.25);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.45rem;
+}
+
+.oxc-home-sort button {
+  background: transparent;
+  border: none;
+  color: var(--oxc-muted);
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oxc-home-sort button.on {
+  background: rgba(0, 255, 159, 0.18);
+  color: var(--oxc-lime);
+}
+
+.oxc-home-inv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.oxc-rarity {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.oxc-rarity-common { color: #a8b4c0; }
+.oxc-rarity-rare { color: #5b8def; }
+.oxc-rarity-epic { color: #b388ff; }
+.oxc-rarity-legendary { color: #c5a26f; }
+
+.oxc-menu-control {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+}
+
+.oxc-menu-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.oxc-menu-swatches button {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.oxc-menu-swatches button.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px var(--oxc-lime);
+}
+
+.oxc-menu-swatches input[type="color"] {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.oxc-character-layout {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.oxc-character-preview {
+  border: 1px solid rgba(0, 255, 159, 0.22);
+  background:
+    radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--accent, #00ff9f) 22%, transparent), transparent 60%),
+    rgba(8, 12, 16, 0.65);
+  padding: 0.8rem 0.5rem 0.7rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+}
+
+.oxc-character-doll {
+  --skin: #e8d5c0;
+  --body: #1a2438;
+  --accent: #00ff9f;
+  --hair: #101014;
+  position: relative;
+  width: 86px;
+  height: 168px;
+}
+
+.oxc-char-head {
+  position: absolute;
+  left: 26px;
+  top: 22px;
+  width: 34px;
+  height: 36px;
+  border-radius: 16px 16px 14px 14px;
+  background: var(--skin);
+}
+
+.oxc-char-hair {
+  position: absolute;
+  left: 24px;
+  top: 12px;
+  width: 38px;
+  height: 22px;
+  border-radius: 18px 18px 6px 6px;
+  background: var(--hair);
+  z-index: 1;
+}
+
+.oxc-char-eye {
+  position: absolute;
+  top: 14px;
+  width: 5px;
+  height: 6px;
+  border-radius: 50%;
+  background: #15181e;
+}
+
+.oxc-char-eye.left { left: 7px; }
+.oxc-char-eye.right { right: 7px; }
+
+.oxc-char-mouth {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  width: 10px;
+  height: 3px;
+  border-radius: 0 0 8px 8px;
+  background: #7a4a3a;
+}
+
+.oxc-char-beard {
+  display: none;
+  position: absolute;
+  left: 8px;
+  bottom: 2px;
+  width: 18px;
+  height: 8px;
+  border-radius: 0 0 10px 10px;
+  background: var(--hair);
+}
+
+.oxc-character-doll.beard-stubble .oxc-char-beard,
+.oxc-character-doll.beard-goatee .oxc-char-beard,
+.oxc-character-doll.beard-full .oxc-char-beard {
+  display: block;
+}
+
+.oxc-character-doll.beard-stubble .oxc-char-beard { opacity: 0.45; height: 5px; }
+.oxc-character-doll.beard-goatee .oxc-char-beard { width: 8px; left: 13px; }
+
+.oxc-char-neck {
+  position: absolute;
+  left: 38px;
+  top: 56px;
+  width: 10px;
+  height: 8px;
+  background: var(--skin);
+}
+
+.oxc-char-body {
+  position: absolute;
+  left: 22px;
+  top: 62px;
+  width: 42px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--body);
+}
+
+.oxc-char-jacket {
+  position: absolute;
+  inset: 6px 8px auto;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+.oxc-char-arm,
+.oxc-char-leg {
+  position: absolute;
+  width: 10px;
+  border-radius: 6px;
+  background: var(--body);
+}
+
+.oxc-char-arm { top: 66px; height: 42px; }
+.oxc-char-arm.left { left: 10px; }
+.oxc-char-arm.right { right: 10px; }
+.oxc-char-leg { top: 108px; height: 48px; background: #2a3340; }
+.oxc-char-leg.left { left: 28px; }
+.oxc-char-leg.right { right: 28px; }
+
+.oxc-character-doll.body-slim {
+  transform: scaleX(0.88) scaleY(1.05);
+  transform-origin: top center;
+}
+
+.oxc-character-doll.body-strong {
+  transform: scaleX(1.12) scaleY(1.02);
+  transform-origin: top center;
+}
+
+.oxc-character-name {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oxc-character-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  justify-content: center;
+}
+
+.oxc-character-tags span {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+  border: 1px solid var(--oxc-line);
+  padding: 0.12rem 0.35rem;
+}
+
+.oxc-char-slots {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.oxc-char-slot {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.oxc-char-slot .oxc-btn {
+  flex: 1;
+  justify-content: flex-start;
+}
+
+@media (min-width: 900px) {
+  .oxc-panel--home {
+    width: min(720px, calc(100% - 1.5rem));
+  }
+
+  .oxc-home-grid {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .oxc-home-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-home-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-character-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .oxc-home-wallet {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .oxc-home-actions .oxc-btn {
+    min-height: 2.85rem;
   }
 }
