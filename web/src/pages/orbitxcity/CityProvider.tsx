@@ -96,7 +96,7 @@ const DEFAULT_AVATAR: AvatarAppearance = {
   accentColor: "#00ff9f",
   skinColor: "#e8d5c0",
   name: "Traveler",
-  classId: "trader",
+  classId: "pepe",
   hairStyle: "short",
   hairColor: "#151018",
   outfit: "suit",

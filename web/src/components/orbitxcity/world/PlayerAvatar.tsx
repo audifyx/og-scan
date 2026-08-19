@@ -317,7 +317,7 @@ export function PlayerAvatar({
         <ringGeometry args={[0.45, 0.55, 32]} />
         <meshBasicMaterial color={appearance.accentColor} transparent opacity={0.55} toneMapped={false} />
       </mesh>
-      {appearance.classId === "creator" && (
+      {(appearance.classId === "wojak" || appearance.classId === "creator") && (
         <>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
             <ringGeometry args={[0.7, 0.82, 40]} />

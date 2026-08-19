@@ -57,10 +57,11 @@ describe("orbitxcity assets catalog", () => {
     }
   });
 
-  it("assigns character kits per class", () => {
-    expect(getCharacterKit("trader").accessory).toBe("briefcase");
-    expect(getCharacterKit("gamer").accessory).toBe("headset");
-    expect(getCharacterGltfPath("trader")).toBeNull();
+  it("assigns character kits per mascot and alias", () => {
+    expect(getCharacterKit("pepe").accessory).toBe("briefcase");
+    expect(getCharacterKit("trader").classId).toBe("pepe");
+    expect(getCharacterKit("chad").accessory).toBe("headset");
+    expect(getCharacterGltfPath("pepe")).toBeNull();
   });
 
   it("assigns building kits by kind", () => {

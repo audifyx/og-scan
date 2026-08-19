@@ -1,6 +1,5 @@
 /**
- * OrbitX City — Character Select (console recruitment).
- * Full-bleed city art · featured operative · compact class strip · callsign CTA.
+ * OrbitX City — pick a crypto-native mascot. Same mesh is used in the world.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
@@ -10,100 +9,44 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import {
   CHARACTER_CLASSES,
   appearanceFromClass,
-  type CharacterClassDef,
+  resolveClassId,
   type CharacterClassId,
 } from "@/lib/orbitxcity/characterClasses";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { MenuBackdrop } from "./MenuBackdrop";
+import { CharacterPreview } from "./CharacterPreview";
+import { MascotPortrait } from "./MascotPortrait";
 
 const CLASS_FLAVOR: Record<CharacterClassId, { lore: string; perk: string; badge?: string }> = {
-  trader: {
-    lore: "Reads tape like a battlefield. Clean entries, hard exits.",
+  pepe: {
+    lore: "The frog reads candles like a battlefield. Rarely blinks. Always early or catastrophically late.",
     perk: "Priority lane on trading-floor terminals",
+    badge: "Degen",
   },
-  builder: {
-    lore: "Architect of rails and rituals. Turns Midtown into leverage.",
-    perk: "Faster mission claim cooldown at OrbitX HQ",
-  },
-  gamer: {
-    lore: "Born for heat checks. Every candle is a ranked match.",
-    perk: "Highlighted games-district markers",
-    badge: "Recommended",
-  },
-  creator: {
-    lore: "Broadcasts the culture layer. Memes become markets.",
+  wojak: {
+    lore: "Broadcasts the feels. Turns rugs into lore and lore into markets.",
     perk: "Boosted social-feed presence aura",
   },
-  explorer: {
-    lore: "Maps unknown districts first. Always two blocks ahead.",
+  chad: {
+    lore: "Jawline priced in. Every candle is a ranked match and he never looks at the chart twice.",
+    perk: "Highlighted games-district markers",
+    badge: "Aura",
+  },
+  doge: {
+    lore: "Much explore. Very district. Maps unknown blocks first and still has time for wow.",
     perk: "Extended teleport reveal radius",
   },
+  anon: {
+    lore: "Laser-eyed maxi. Ships rails, never doxxes, orange-pills the room.",
+    perk: "Faster mission claim cooldown at OrbitX HQ",
+  },
 };
-
-function outfitFor(cls: CharacterClassDef) {
-  return cls.id === "trader" ? "suit" : cls.id === "gamer" ? "sport" : cls.id === "creator" ? "neon" : "street";
-}
-
-function HoloAvatar({
-  cls,
-  selected,
-  size = "md",
-}: {
-  cls: CharacterClassDef;
-  selected: boolean;
-  size?: "sm" | "md" | "lg" | "hero";
-}) {
-  const outfit = outfitFor(cls);
-  return (
-    <div
-      className={`oxc-pod-avatar oxc-pod-${cls.id} oxc-pod-outfit-${outfit} oxc-pod-size-${size} ${selected ? "is-selected" : ""}`}
-      style={{
-        ["--pod-neon" as string]: cls.neon,
-        ["--pod-gold" as string]: cls.gold,
-        ["--pod-body" as string]: cls.bodyColor,
-        ["--pod-skin" as string]: cls.skinColor,
-        ["--pod-accent" as string]: cls.accentColor,
-        backgroundImage: size === "sm" ? undefined : "url(/orbitxcity/ui/pod-frame.svg)",
-        backgroundSize: "contain",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "center",
-      }}
-      aria-hidden
-    >
-      <div className="oxc-pod-energy" />
-      <div className="oxc-pod-beam" />
-      <div className="oxc-pod-halo" />
-      <div className="oxc-pod-figure">
-        <div className="oxc-pod-hair" data-style={cls.id} />
-        <div className="oxc-pod-head">
-          <span className="oxc-pod-eye" />
-          <span className="oxc-pod-eye" />
-          <span className="oxc-pod-visor" />
-        </div>
-        <div className="oxc-pod-torso">
-          <span className="oxc-pod-arm left" />
-          <span className="oxc-pod-arm right" />
-          <span className="oxc-pod-detail" />
-        </div>
-        <div className="oxc-pod-legs">
-          <span />
-          <span />
-        </div>
-        <div className="oxc-pod-shoes">
-          <i />
-          <i />
-        </div>
-      </div>
-      <div className="oxc-pod-ring" />
-    </div>
-  );
-}
 
 export function CharacterSelect() {
   const { setGate, setEntered, setAvatar, avatar, selectedCityId } = useCity();
   const { user, profile } = useAuth();
   const { connected, publicKey } = useWallet();
-  const [selectedId, setSelectedId] = useState<CharacterClassId>(avatar.classId ?? "trader");
+  const [selectedId, setSelectedId] = useState<CharacterClassId>(resolveClassId(avatar.classId));
   const [name, setName] = useState(profile?.username ?? avatar.name ?? "Traveler");
   const [visible, setVisible] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -114,7 +57,7 @@ export function CharacterSelect() {
   );
   const flavor = CLASS_FLAVOR[selected.id];
   const ready = Boolean(user || connected);
-  const displayName = name.trim() || "Traveler";
+  const displayName = name.trim() || selected.name;
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
@@ -183,7 +126,7 @@ export function CharacterSelect() {
 
   return (
     <div
-      className={`oxc-chars ${visible ? "is-in" : ""}`}
+      className={`oxc-chars oxc-chars--mascots ${visible ? "is-in" : ""}`}
       style={
         {
           ["--pod-neon" as string]: selected.neon,
@@ -199,9 +142,9 @@ export function CharacterSelect() {
           ← Menu
         </button>
         <div className="oxc-chars-bar-center">
-          <p className="oxc-chars-kicker">Operatives</p>
+          <p className="oxc-chars-kicker">Crypto native</p>
           <h1 className="oxc-chars-title">
-            SELECT <span className="oxc-chars-title-x">CLASS</span>
+            SELECT <span className="oxc-chars-title-x">OPERATIVE</span>
           </h1>
         </div>
         <div className="oxc-chars-wallet-slot">
@@ -212,7 +155,7 @@ export function CharacterSelect() {
       <div className="oxc-chars-stage">
         <section className="oxc-chars-hero" aria-live="polite">
           <div className="oxc-chars-hero-fig">
-            <HoloAvatar key={selected.id} cls={selected} selected size="hero" />
+            <CharacterPreview key={selected.id} classId={selected.id} />
           </div>
           <div className="oxc-chars-hero-meta">
             {flavor.badge && <span className="oxc-chars-badge">{flavor.badge}</span>}
@@ -242,14 +185,14 @@ export function CharacterSelect() {
                 value={name}
                 maxLength={24}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Traveler"
+                placeholder={selected.name}
                 autoComplete="nickname"
               />
             </label>
           </div>
         </section>
 
-        <nav className="oxc-chars-strip" role="listbox" aria-label="Character classes">
+        <nav className="oxc-chars-strip" role="listbox" aria-label="Crypto operatives">
           {CHARACTER_CLASSES.map((cls, i) => {
             const on = cls.id === selectedId;
             return (
@@ -269,7 +212,7 @@ export function CharacterSelect() {
                 }}
               >
                 <span className="oxc-chars-chip-fig">
-                  <HoloAvatar cls={cls} selected={on} size="sm" />
+                  <MascotPortrait id={cls.id} />
                 </span>
                 <span className="oxc-chars-chip-name">{cls.name}</span>
               </button>
@@ -282,7 +225,7 @@ export function CharacterSelect() {
         <div className="oxc-chars-foot-meta">
           <span className={connected ? "is-on" : ""}>{walletLabel}</span>
           <span aria-hidden>·</span>
-          <span>← → switch class · Enter confirm</span>
+          <span>← → switch operative · Enter confirm</span>
         </div>
         <div className={`oxc-chars-actions ${ready ? "has-secondary" : ""}`}>
           <button

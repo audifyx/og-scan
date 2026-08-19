@@ -44,17 +44,17 @@ const PHRASES = [
   "my bags are heavy",
 ];
 
-const NAMES = ["Apex", "Nova", "Drift", "Pixel", "Quark", "Moxie", "Rune", "Echo", "Vex", "Sol"];
+const NAMES = ["Pepe", "Wojak", "Ser", "Anon", "Doge", "Ape", "Chad", "Gm", "Bags", "Sol"];
 
-const NPC_COLORS = ["#233a5c", "#3c2a4d", "#1e4436", "#4d3a1e", "#2a3d4d", "#43242e"];
-const ACCENTS = ["#3de7ff", "#ff4d9a", "#17ff4d", "#f5c542", "#a78bfa", "#ff6b35"];
+const NPC_COLORS = ["#3d7a38", "#6b7280", "#1c1420", "#d4893a", "#111318", "#43242e"];
+const ACCENTS = ["#5cb85c", "#e8b4c8", "#d4a017", "#e8a54b", "#f7931a", "#ff6b35"];
 const OUTFITS: AvatarAppearance["outfit"][] = ["street", "suit", "sport", "neon"];
 const CLASSES: NonNullable<AvatarAppearance["classId"]>[] = [
-  "trader",
-  "builder",
-  "gamer",
-  "creator",
-  "explorer",
+  "pepe",
+  "wojak",
+  "chad",
+  "doge",
+  "anon",
 ];
 
 type StreetNpcLive = {

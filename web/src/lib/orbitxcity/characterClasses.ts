@@ -1,7 +1,18 @@
-/** Character classes for OrbitX City — distinct silhouettes + palettes. */
+/** Crypto-native playable mascots for OrbitX City. */
 import type { AvatarAppearance } from "./types";
 
-export type CharacterClassId = "trader" | "builder" | "gamer" | "creator" | "explorer";
+export type CharacterClassId = "pepe" | "wojak" | "chad" | "doge" | "anon";
+
+/** Legacy class ids still stored on interiors / old sessions. */
+export type LegacyClassId = "trader" | "builder" | "gamer" | "creator" | "explorer";
+
+export const CLASS_ALIASES: Record<LegacyClassId, CharacterClassId> = {
+  trader: "pepe",
+  builder: "anon",
+  gamer: "chad",
+  creator: "wojak",
+  explorer: "doge",
+};
 
 export interface CharacterStat {
   label: string;
@@ -24,118 +35,127 @@ export interface CharacterClassDef {
 
 export const CHARACTER_CLASSES: CharacterClassDef[] = [
   {
-    id: "trader",
-    name: "Trader",
-    tagline: "Market predator · execution first",
-    neon: "#c5a26f",
-    gold: "#e0c48a",
-    bodyColor: "#1a1f2a",
-    accentColor: "#c5a26f",
-    skinColor: "#e8d5c0",
-    scale: { x: 1, y: 1.02, z: 1 },
+    id: "pepe",
+    name: "Pepe",
+    tagline: "The frog · degen tape reader",
+    neon: "#5cb85c",
+    gold: "#c5e07a",
+    bodyColor: "#3d7a38",
+    accentColor: "#c23b3b",
+    skinColor: "#5cb85c",
+    scale: { x: 1.08, y: 0.92, z: 1.08 },
     stats: [
-      { label: "Instinct", value: 92 },
-      { label: "Speed", value: 78 },
-      { label: "Risk", value: 86 },
+      { label: "Instinct", value: 94 },
+      { label: "Degen", value: 96 },
+      { label: "Risk", value: 88 },
+      { label: "Focus", value: 71 },
+    ],
+  },
+  {
+    id: "wojak",
+    name: "Wojak",
+    tagline: "Feels guy · culture layer",
+    neon: "#e8b4c8",
+    gold: "#c5a26f",
+    bodyColor: "#6b7280",
+    accentColor: "#e8b4c8",
+    skinColor: "#f3d5c0",
+    scale: { x: 0.94, y: 1.02, z: 0.94 },
+    stats: [
+      { label: "Feels", value: 98 },
+      { label: "Reach", value: 84 },
+      { label: "Cope", value: 90 },
+      { label: "Focus", value: 62 },
+    ],
+  },
+  {
+    id: "chad",
+    name: "Chad",
+    tagline: "Gigachad · clutch heat checks",
+    neon: "#f0c27a",
+    gold: "#ffd700",
+    bodyColor: "#1c1420",
+    accentColor: "#d4a017",
+    skinColor: "#d4a574",
+    scale: { x: 1.22, y: 1.12, z: 1.1 },
+    stats: [
+      { label: "Aura", value: 99 },
+      { label: "Reflex", value: 91 },
+      { label: "Clutch", value: 93 },
       { label: "Focus", value: 80 },
     ],
   },
   {
-    id: "builder",
-    name: "Builder",
-    tagline: "Systems · protocols · craft",
-    neon: "#5b8def",
-    gold: "#8eb0ff",
-    bodyColor: "#243044",
-    accentColor: "#5b8def",
-    skinColor: "#c9a07a",
-    scale: { x: 1.18, y: 1.05, z: 1.12 },
+    id: "doge",
+    name: "Doge",
+    tagline: "Such wow · frontier scout",
+    neon: "#e8a54b",
+    gold: "#f5d08a",
+    bodyColor: "#d4893a",
+    accentColor: "#c0392b",
+    skinColor: "#e8a54b",
+    scale: { x: 1.06, y: 0.88, z: 1.14 },
     stats: [
-      { label: "Craft", value: 90 },
-      { label: "Stamina", value: 84 },
-      { label: "Vision", value: 72 },
-      { label: "Focus", value: 88 },
-    ],
-  },
-  {
-    id: "gamer",
-    name: "Gamer",
-    tagline: "Arenas · streaks · clutch plays",
-    neon: "#ff4d6a",
-    gold: "#ffd700",
-    bodyColor: "#1c1420",
-    accentColor: "#ff4d6a",
-    skinColor: "#f0d5b8",
-    scale: { x: 0.92, y: 0.96, z: 0.92 },
-    stats: [
-      { label: "Reflex", value: 95 },
-      { label: "Speed", value: 90 },
-      { label: "Luck", value: 70 },
-      { label: "Focus", value: 82 },
-    ],
-  },
-  {
-    id: "creator",
-    name: "Creator",
-    tagline: "Signal · culture · narrative",
-    neon: "#b388ff",
-    gold: "#c5a26f",
-    bodyColor: "#2a1f36",
-    accentColor: "#b388ff",
-    skinColor: "#f2dcc8",
-    scale: { x: 0.98, y: 1.04, z: 0.98 },
-    stats: [
-      { label: "Style", value: 93 },
-      { label: "Reach", value: 85 },
-      { label: "Charm", value: 88 },
+      { label: "Wow", value: 97 },
+      { label: "Range", value: 88 },
+      { label: "Stamina", value: 86 },
       { label: "Focus", value: 74 },
     ],
   },
   {
-    id: "explorer",
-    name: "Explorer",
-    tagline: "Frontier routes · discovery",
-    neon: "#00ff9f",
-    gold: "#d4af37",
-    bodyColor: "#1e2a22",
-    accentColor: "#3d9a6a",
-    skinColor: "#8d5524",
-    scale: { x: 1.04, y: 1.08, z: 1.04 },
+    id: "anon",
+    name: "Anon",
+    tagline: "Laser eyes · protocol maxi",
+    neon: "#f7931a",
+    gold: "#f5c542",
+    bodyColor: "#111318",
+    accentColor: "#f7931a",
+    skinColor: "#f4f1ea",
+    scale: { x: 1.02, y: 1.06, z: 1.02 },
     stats: [
-      { label: "Range", value: 91 },
-      { label: "Stamina", value: 87 },
-      { label: "Instinct", value: 80 },
-      { label: "Focus", value: 76 },
+      { label: "Craft", value: 91 },
+      { label: "Conviction", value: 95 },
+      { label: "Stamina", value: 82 },
+      { label: "Focus", value: 90 },
     ],
   },
 ];
 
-export function getCharacterClass(id: CharacterClassId | string | undefined): CharacterClassDef {
-  return CHARACTER_CLASSES.find((c) => c.id === id) ?? CHARACTER_CLASSES[0]!;
+export function isCharacterClassId(value: string | undefined | null): value is CharacterClassId {
+  return value === "pepe" || value === "wojak" || value === "chad" || value === "doge" || value === "anon";
 }
 
-/** Live class perks used by InteractionMarkers / Map panel. */
+export function resolveClassId(id: string | undefined | null): CharacterClassId {
+  if (isCharacterClassId(id)) return id;
+  if (id && id in CLASS_ALIASES) return CLASS_ALIASES[id as LegacyClassId];
+  return "pepe";
+}
+
+export function getCharacterClass(id: CharacterClassId | string | undefined): CharacterClassDef {
+  return CHARACTER_CLASSES.find((c) => c.id === resolveClassId(id)) ?? CHARACTER_CLASSES[0]!;
+}
+
 export function hasGamerMarkerPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "gamer";
+  return resolveClassId(classId) === "chad";
 }
 
 export function hasExplorerMapPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "explorer";
+  return resolveClassId(classId) === "doge";
 }
 
 export function hasTraderTerminalPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "trader";
+  return resolveClassId(classId) === "pepe";
 }
 
 export function hasBuilderMissionPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "builder";
+  return resolveClassId(classId) === "anon";
 }
 
 export function hasCreatorPresencePerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "creator";
+  return resolveClassId(classId) === "wojak";
 }
 
-/** City-board claim cooldown. Builder at HQ is nearly instant. */
+/** City-board claim cooldown. Anon at HQ is nearly instant. */
 export function missionClaimCooldownMs(
   classId?: CharacterClassId | string | null,
   atHq = false,
@@ -145,31 +165,27 @@ export function missionClaimCooldownMs(
 }
 
 export function appearanceFromClass(cls: CharacterClassDef, name?: string): AvatarAppearance {
-  const hairByClass = {
-    trader: { hairStyle: "short" as const, hairColor: "#2a2218" },
-    builder: { hairStyle: "buzz" as const, hairColor: "#1a1814" },
-    gamer: { hairStyle: "mohawk" as const, hairColor: cls.accentColor },
-    creator: { hairStyle: "bun" as const, hairColor: "#c5a26f" },
-    explorer: { hairStyle: "long" as const, hairColor: "#3a2410" },
-  }[cls.id];
+  const look: Record<
+    CharacterClassId,
+    { hairStyle: AvatarAppearance["hairStyle"]; hairColor: string; outfit: AvatarAppearance["outfit"]; faceStyle: AvatarAppearance["faceStyle"] }
+  > = {
+    pepe: { hairStyle: "short", hairColor: "#3d7a38", outfit: "street", faceStyle: "cool" },
+    wojak: { hairStyle: "buzz", hairColor: "#6b5344", outfit: "street", faceStyle: "neutral" },
+    chad: { hairStyle: "short", hairColor: "#1a1410", outfit: "sport", faceStyle: "cool" },
+    doge: { hairStyle: "short", hairColor: "#c47a28", outfit: "street", faceStyle: "smile" },
+    anon: { hairStyle: "buzz", hairColor: "#111318", outfit: "suit", faceStyle: "neutral" },
+  };
 
-  const outfitByClass = {
-    trader: "suit" as const,
-    builder: "street" as const,
-    gamer: "sport" as const,
-    creator: "neon" as const,
-    explorer: "street" as const,
-  }[cls.id];
-
+  const kit = look[cls.id];
   return {
     name: name?.trim() || cls.name,
     bodyColor: cls.bodyColor,
     accentColor: cls.accentColor,
     skinColor: cls.skinColor,
     classId: cls.id,
-    hairStyle: hairByClass.hairStyle,
-    hairColor: hairByClass.hairColor,
-    outfit: outfitByClass,
-    faceStyle: cls.id === "creator" ? "smile" : cls.id === "gamer" ? "cool" : "neutral",
+    hairStyle: kit.hairStyle,
+    hairColor: kit.hairColor,
+    outfit: kit.outfit,
+    faceStyle: kit.faceStyle,
   };
 }

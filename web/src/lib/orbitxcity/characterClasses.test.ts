@@ -5,50 +5,57 @@ import {
   getCharacterClass,
   hasBuilderMissionPerk,
   hasCreatorPresencePerk,
+  hasTraderTerminalPerk,
   missionClaimCooldownMs,
+  resolveClassId,
 } from "./characterClasses";
 
 describe("characterClasses", () => {
-  it("exposes five holographic pods", () => {
+  it("exposes five crypto-native mascots", () => {
     expect(CHARACTER_CLASSES).toHaveLength(5);
-    expect(CHARACTER_CLASSES.map((c) => c.id)).toEqual([
-      "trader",
-      "builder",
-      "gamer",
-      "creator",
-      "explorer",
-    ]);
+    expect(CHARACTER_CLASSES.map((c) => c.id)).toEqual(["pepe", "wojak", "chad", "doge", "anon"]);
   });
 
-  it("maps class to avatar appearance", () => {
-    const trader = getCharacterClass("trader");
-    const a = appearanceFromClass(trader, "Nova");
+  it("aliases legacy class ids onto mascots", () => {
+    expect(resolveClassId("trader")).toBe("pepe");
+    expect(resolveClassId("builder")).toBe("anon");
+    expect(resolveClassId("gamer")).toBe("chad");
+    expect(resolveClassId("creator")).toBe("wojak");
+    expect(resolveClassId("explorer")).toBe("doge");
+    expect(getCharacterClass("trader").id).toBe("pepe");
+  });
+
+  it("maps mascot to in-world appearance", () => {
+    const pepe = getCharacterClass("pepe");
+    const a = appearanceFromClass(pepe, "Nova");
     expect(a.name).toBe("Nova");
-    expect(a.classId).toBe("trader");
-    expect(a.accentColor).toBe(trader.accentColor);
-    expect(a.outfit).toBe("suit");
-    expect(a.hairStyle).toBe("short");
+    expect(a.classId).toBe("pepe");
+    expect(a.accentColor).toBe(pepe.accentColor);
+    expect(a.skinColor).toBe(pepe.skinColor);
   });
 
-  it("gives each class a distinct silhouette + palette", () => {
+  it("gives each mascot a distinct silhouette + palette", () => {
     const accents = new Set(CHARACTER_CLASSES.map((c) => c.accentColor));
     expect(accents.size).toBe(5);
     for (const cls of CHARACTER_CLASSES) {
-      expect(cls.scale.y).toBeGreaterThan(0.9);
+      expect(cls.scale.y).toBeGreaterThan(0.8);
       const look = appearanceFromClass(cls);
       expect(look.classId).toBe(cls.id);
-      expect(look.hairStyle).toBeTruthy();
       expect(look.outfit).toBeTruthy();
     }
-    expect(appearanceFromClass(getCharacterClass("gamer")).hairStyle).toBe("mohawk");
-    expect(appearanceFromClass(getCharacterClass("builder")).outfit).toBe("street");
+    expect(appearanceFromClass(getCharacterClass("anon")).outfit).toBe("suit");
+    expect(appearanceFromClass(getCharacterClass("doge")).faceStyle).toBe("smile");
   });
 
-  it("ships builder / creator cooldown and presence perks", () => {
+  it("maps perks through aliases", () => {
+    expect(hasTraderTerminalPerk("pepe")).toBe(true);
+    expect(hasTraderTerminalPerk("trader")).toBe(true);
+    expect(hasBuilderMissionPerk("anon")).toBe(true);
     expect(hasBuilderMissionPerk("builder")).toBe(true);
+    expect(hasCreatorPresencePerk("wojak")).toBe(true);
     expect(hasCreatorPresencePerk("creator")).toBe(true);
     expect(missionClaimCooldownMs("trader", false)).toBe(30_000);
     expect(missionClaimCooldownMs("builder", false)).toBe(8_000);
-    expect(missionClaimCooldownMs("builder", true)).toBe(2_000);
+    expect(missionClaimCooldownMs("anon", true)).toBe(2_000);
   });
 });

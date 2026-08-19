@@ -3,7 +3,7 @@ import type {
   HudPanel,
   OutfitStyle,
 } from "./types";
-import type { CharacterClassId } from "./characterClasses";
+import type { CharacterClassId, LegacyClassId } from "./characterClasses";
 
 export type RoomTheme =
   | "trade"
@@ -26,7 +26,7 @@ export interface InteriorNpcSlot {
   x: number;
   z: number;
   rotY: number;
-  classId: CharacterClassId;
+  classId: CharacterClassId | LegacyClassId;
   outfit: OutfitStyle;
   /** Idle speech bubble lines (cycled). */
   lines: string[];
