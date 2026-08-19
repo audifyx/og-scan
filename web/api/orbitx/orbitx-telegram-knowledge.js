@@ -100,12 +100,13 @@ export const ORBITX_LINKS = [
 export function formatOrbitXLinksHtml() {
   const rows = ORBITX_LINKS.map((row) => `• <a href="${row.url}">${row.label}</a>`);
   return [
-    "<b>OrbitX links</b>",
+    "🔗 <b>OrbitX · every door</b>",
+    "<i>Tap through — DEX, City, OS, Play, HQ, MCP, shop.</i>",
     "",
     ...rows,
     "",
-    `Team live chat: <a href="${ORBITX_GC}">t.me/orbitxwrld</a>`,
-    "Ask a team member there if you need a human / live ops answer.",
+    `Live humans: <a href="${ORBITX_GC}">t.me/orbitxwrld</a>`,
+    "Ask a team member there for live-ops / if a feat is mid-flight.",
   ].join("\n");
 }
 
