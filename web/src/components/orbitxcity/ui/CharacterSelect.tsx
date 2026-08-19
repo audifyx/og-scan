@@ -13,7 +13,7 @@ import {
   type CharacterClassId,
 } from "@/lib/orbitxcity/characterClasses";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
-import { MenuBackdrop } from "./MenuBackdrop";
+import { CosmicBackdrop } from "./CosmicBackdrop";
 import { CharacterPreview } from "./CharacterPreview";
 import { MascotPortrait } from "./MascotPortrait";
 
@@ -43,7 +43,7 @@ const CLASS_FLAVOR: Record<CharacterClassId, { lore: string; perk: string; badge
 };
 
 export function CharacterSelect() {
-  const { setGate, setEntered, setAvatar, avatar, selectedCityId } = useCity();
+  const { setGate, setEntered, setAvatar, avatar } = useCity();
   const { user, profile } = useAuth();
   const { connected, publicKey } = useWallet();
   const [selectedId, setSelectedId] = useState<CharacterClassId>(resolveClassId(avatar.classId));
@@ -134,7 +134,7 @@ export function CharacterSelect() {
         } as CSSProperties
       }
     >
-      <MenuBackdrop cityId={selectedCityId} intensity="chamber" />
+      <CosmicBackdrop variant="chamber" />
       <div className={`oxc-chars-flash ${flash ? "is-on" : ""}`} aria-hidden />
 
       <header className="oxc-chars-bar">
