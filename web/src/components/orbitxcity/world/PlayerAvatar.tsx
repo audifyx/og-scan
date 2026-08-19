@@ -326,7 +326,7 @@ export function PlayerAvatar({
       </mesh>
       {/* Ground ring — Creator presence aura is a wider double ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <ringGeometry args={[0.45, 0.55, 32]} />
+        <ringGeometry args={[0.52, 0.64, 32]} />
         <meshBasicMaterial color={appearance.accentColor} transparent opacity={0.55} toneMapped={false} />
       </mesh>
       {(appearance.classId === "wojak" || appearance.classId === "creator") && (

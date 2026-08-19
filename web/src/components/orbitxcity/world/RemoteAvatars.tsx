@@ -68,7 +68,7 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
         <meshBasicMaterial color={player.accentColor} transparent opacity={0.45} toneMapped={false} />
       </mesh>
 
-      <Billboard position={[0, 2.55, 0]}>
+      <Billboard position={[0, 2.85, 0]}>
         <Text
           fontSize={0.28}
           color={player.accentColor}

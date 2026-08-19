@@ -191,7 +191,7 @@ function NeonWindowStrips({
       const y = yBase + 1.1 + row * (h / (rows + 0.4));
       if (y > yBase + h - 0.6) continue;
       for (const side of [0, 1, 2, 3] as const) {
-        if (r() > 0.58) continue;
+        if (r() > 0.72) continue;
         const ww = Math.min(w, d) * (0.28 + r() * 0.42);
         out.push({ x: 0, y, z: 0, ww, side });
       }

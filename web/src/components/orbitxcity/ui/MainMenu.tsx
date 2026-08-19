@@ -140,7 +140,7 @@ export function MainMenu() {
               primary={item.primary}
               focused={focus === item.id}
               delayMs={90 + i * 55}
-              accent={item.primary ? theme.key : theme.uiAccent}
+              accent={item.primary ? "#00ff9f" : theme.uiAccent}
               onFocus={() => setFocus(item.id)}
               onClick={() => run(item.id)}
             />

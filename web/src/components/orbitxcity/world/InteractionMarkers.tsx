@@ -148,7 +148,7 @@ function ZoneMarker({
       )}
       {active && (
         <>
-          <mesh position={[0, 2.55, 0]}>
+          <mesh position={[0, 3.55, 0]}>
             <torusGeometry args={[boosted ? 0.68 : 0.55, 0.035, 8, 32]} />
             <meshStandardMaterial
               color={color}
@@ -159,7 +159,7 @@ function ZoneMarker({
             />
           </mesh>
           <Text
-            position={[0, 3.2, 0]}
+            position={[0, 4.25, 0]}
             fontSize={0.22}
             color={color}
             anchorX="center"
@@ -170,39 +170,25 @@ function ZoneMarker({
             {boostLabel}
           </Text>
           <Text
-            position={[0, 2.2, 0]}
-            fontSize={0.32}
+            position={[0, 3.15, 0]}
+            fontSize={0.34}
             color="#eef2f4"
             anchorX="center"
-            outlineWidth={0.022}
+            outlineWidth={0.024}
             outlineColor="#12161a"
           >
             {promptLine}
           </Text>
-          {!walkIn && (
-            <Text
-              position={[0, 1.85, 0]}
-              fontSize={0.16}
-              color="#c5d0dc"
-              anchorX="center"
-              outlineWidth={0.012}
-              outlineColor="#0a1014"
-            >
-              Press E for tools
-            </Text>
-          )}
-          {walkIn && (
-            <Text
-              position={[0, 1.85, 0]}
-              fontSize={0.16}
-              color="#c5d0dc"
-              anchorX="center"
-              outlineWidth={0.012}
-              outlineColor="#0a1014"
-            >
-              Doorway open · E for tools
-            </Text>
-          )}
+          <Text
+            position={[0, 2.72, 0]}
+            fontSize={0.16}
+            color="#c5d0dc"
+            anchorX="center"
+            outlineWidth={0.012}
+            outlineColor="#0a1014"
+          >
+            {walkIn ? "Doorway open · E for tools" : "Press E for tools"}
+          </Text>
         </>
       )}
     </group>

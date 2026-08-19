@@ -19,10 +19,10 @@ interface HumanoidMeshProps {
 }
 
 const OUTFIT: Record<OutfitStyle, { top: string; bottom: string; shoe: string; trim: string }> = {
-  street: { top: "#2a3344", bottom: "#1a2028", shoe: "#111418", trim: "#00ff9f" },
-  suit: { top: "#1a1c22", bottom: "#12141a", shoe: "#0a0c10", trim: "#c5a26f" },
-  sport: { top: "#1c3a32", bottom: "#141820", shoe: "#f2f4f6", trim: "#3de7ff" },
-  neon: { top: "#111318", bottom: "#0c1014", shoe: "#00ff9f", trim: "#00ff9f" },
+  street: { top: "#5a6a82", bottom: "#3a4656", shoe: "#1c222c", trim: "#00ff9f" },
+  suit: { top: "#4a5264", bottom: "#323846", shoe: "#1a1e24", trim: "#c5a26f" },
+  sport: { top: "#2e8a6e", bottom: "#2a3a4c", shoe: "#f2f4f6", trim: "#3de7ff" },
+  neon: { top: "#1c2a38", bottom: "#162028", shoe: "#00ff9f", trim: "#00ff9f" },
 };
 
 function hairMesh(style: HairStyle, color: string) {
@@ -164,7 +164,7 @@ export function HumanoidMesh({
   });
 
   return (
-    <group ref={root} name="humanoid" scale={1.18}>
+    <group ref={root} name="humanoid" scale={1.34}>
       {/* Head */}
       <group ref={head} position={[0, 1.58, 0]}>
         <mesh castShadow>
@@ -209,7 +209,7 @@ export function HumanoidMesh({
         <meshStandardMaterial
           color={accent}
           emissive={accent}
-          emissiveIntensity={outfit === "neon" ? 0.7 : 0.28}
+          emissiveIntensity={outfit === "neon" ? 0.95 : 0.55}
           toneMapped={false}
         />
       </mesh>
