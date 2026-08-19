@@ -4,9 +4,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 import { McpShop } from "@/components/agent/McpShop";
+import { DeskShop } from "@/components/agent/DeskShop";
 import { fetchXCreditsUsage, type XCreditsUsage } from "@/lib/xMcp";
 
-/** /shop — shared catalog for Agent MCP + X MCP (burn access + credits). */
+/** /shop — Solana-betting desk catalog (buy $ORBITX + burn) plus Agent/X MCP seats. */
 export default function ShopPage() {
   const { user, loading: authLoading } = useAuth();
   const { publicKey } = useWallet();
@@ -36,7 +37,7 @@ export default function ShopPage() {
       brandHref="/shop"
       brandSub="Shop"
       footerBrand="OrbitX Shop"
-      footerNote="Burn $ORBITX for timed MCP access, or buy credits with SOL. Same catalog for Agent MCP and X MCP."
+      footerNote="One Phantom sign buys $ORBITX and burns it. Same items as the Solana-betting shop. Then copy the note and send it to the team."
       siblingHref="/agent?tab=shop"
       siblingLabel="Agent shop"
       siblingIcon="◆"
@@ -51,7 +52,7 @@ export default function ShopPage() {
           </div>
           <div className="ox-agent__panel-b">
             <p className="ox-agent__note" style={{ marginTop: 0 }}>
-              Connect the Solana wallet you use on /agent and /x to burn access or buy credits.
+              Connect the Solana wallet you use on /agent and /x. Desk shop items buy $ORBITX and burn in one Phantom tx.
             </p>
             <div className="ox-agent__btn-row">
               {pickable.slice(0, 3).map((w) => (
@@ -69,6 +70,7 @@ export default function ShopPage() {
           </div>
         </section>
       )}
+      <DeskShop />
       <McpShop
         variant="both"
         walletAddress={publicKey?.toBase58()}

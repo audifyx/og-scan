@@ -4850,6 +4850,10 @@ export default async function handler(req, res) {
   const head = parts[0] || "";
 
   try {
+    if (head === "shop") {
+      const { handleDeskShop } = await import("./orbitx/desk-shop.js");
+      return handleDeskShop(req, res, parts, json);
+    }
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
@@ -4863,7 +4867,7 @@ export default async function handler(req, res) {
       return json(res, {
         ok: true,
         service: "orbitx",
-        routes: ["agent", "mcp", "crypto-scan", "anti-vamp-check", "telegram-mcp"],
+        routes: ["agent", "mcp", "shop", "crypto-scan", "anti-vamp-check", "telegram-mcp"],
         agent: "/api/orbitx-agent",
         mcp: "/api/orbitx-mcp",
         antiVamp: "/api/orbitx/anti-vamp-check",
