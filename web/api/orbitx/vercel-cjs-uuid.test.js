@@ -1,3 +1,6 @@
+// @vitest-environment node
+// Node-side packaging assertion: the default jsdom env applies vite's
+// nodePolyfills, which browser-shims `url` and breaks fileURLToPath.
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
