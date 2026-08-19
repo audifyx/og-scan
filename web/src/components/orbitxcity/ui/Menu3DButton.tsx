@@ -37,13 +37,13 @@ export function Menu3DButton({
     const rect = event.currentTarget.getBoundingClientRect();
     const px = (event.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
     const py = (event.clientY - rect.top) / Math.max(1, rect.height) - 0.5;
-    setTilt(slab, 12 - py * 10, -8 + px * 16);
+    setTilt(slab, 20 - py * 12, -12 + px * 18);
   }, []);
 
   const onPointerLeave = useCallback(() => {
     const slab = slabRef.current;
     if (!slab) return;
-    setTilt(slab, 14, -8);
+    setTilt(slab, 22, -12);
   }, []);
 
   return (
@@ -66,6 +66,7 @@ export function Menu3DButton({
       <span ref={slabRef} className="oxc-btn3d-slab">
         <span className="oxc-btn3d-edge" aria-hidden />
         <span className="oxc-btn3d-side" aria-hidden />
+        <span className="oxc-btn3d-top" aria-hidden />
         <span className="oxc-btn3d-face">
           <span className="oxc-btn3d-sheen" aria-hidden />
           <span className="oxc-btn3d-gem" aria-hidden />

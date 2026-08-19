@@ -25,13 +25,48 @@ function detectWebGL(): boolean {
   }
 }
 
-function hexToColor(hex: string): THREE.Color {
-  return new THREE.Color(hex);
+function makeWindowMaps(windowHex: string, seed: number) {
+  const rand = mulberry32(seed);
+  const width = 64;
+  const height = 128;
+  const color = document.createElement("canvas");
+  const emit = document.createElement("canvas");
+  color.width = emit.width = width;
+  color.height = emit.height = height;
+  const cctx = color.getContext("2d");
+  const ectx = emit.getContext("2d");
+  if (!cctx || !ectx) return null;
+  cctx.fillStyle = "#10151e";
+  cctx.fillRect(0, 0, width, height);
+  ectx.fillStyle = "#000000";
+  ectx.fillRect(0, 0, width, height);
+  for (let y = 4; y < height - 4; y += 7) {
+    for (let x = 3; x < width - 3; x += 6) {
+      if (rand() < 0.58) {
+        const lit = rand() > 0.28;
+        cctx.fillStyle = lit ? windowHex : "#1c2430";
+        cctx.fillRect(x, y, 3, 4);
+        if (lit) {
+          ectx.fillStyle = windowHex;
+          ectx.fillRect(x, y, 3, 4);
+        }
+      }
+    }
+  }
+  const map = new THREE.CanvasTexture(color);
+  const emissiveMap = new THREE.CanvasTexture(emit);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(1, 3);
+  emissiveMap.repeat.set(1, 3);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 2;
+  return { map, emissiveMap };
 }
 
 function CameraDrift({ intensity, reduced }: { intensity: "title" | "chamber"; reduced: boolean }) {
-  const base = intensity === "chamber" ? new THREE.Vector3(5.4, 5.2, 13.5) : new THREE.Vector3(7.2, 5.8, 16.2);
-  const look = intensity === "chamber" ? new THREE.Vector3(-1.2, 2.6, -6) : new THREE.Vector3(-2.4, 2.8, -8);
+  const base = intensity === "chamber" ? new THREE.Vector3(6.8, 6.2, 16.4) : new THREE.Vector3(9.6, 6.8, 19.2);
+  const look = intensity === "chamber" ? new THREE.Vector3(1.4, 3.4, -8) : new THREE.Vector3(1.8, 3.8, -10);
 
   useFrame(({ camera, clock }) => {
     if (reduced) {
@@ -49,20 +84,22 @@ function CameraDrift({ intensity, reduced }: { intensity: "title" | "chamber"; r
 
 function TitleSkyline({ theme, lite }: { theme: TitleDistrictTheme; lite: boolean }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const count = lite ? 28 : 48;
+  const count = lite ? 36 : 64;
+  const maps = useMemo(() => makeWindowMaps(theme.window, 0x51c17 ^ theme.id.length * 13), [theme.id, theme.window]);
   const geo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   const mat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#1a2230",
-        metalness: 0.58,
-        roughness: 0.42,
+        color: "#8a93a3",
+        map: maps?.map ?? null,
         emissive: theme.window,
-        emissiveIntensity: 0.14,
-        vertexColors: true,
-        envMapIntensity: 0.6,
+        emissiveMap: maps?.emissiveMap ?? null,
+        emissiveIntensity: 0.85,
+        metalness: 0.42,
+        roughness: 0.48,
+        envMapIntensity: 0.45,
       }),
-    [theme.window],
+    [maps, theme.window],
   );
 
   useLayoutEffect(() => {
@@ -70,42 +107,52 @@ function TitleSkyline({ theme, lite }: { theme: TitleDistrictTheme; lite: boolea
     if (!mesh) return;
     const rand = mulberry32(0xc17c ^ theme.id.charCodeAt(0) * 97);
     const m = new THREE.Matrix4();
-    const color = new THREE.Color();
-    const windowCol = hexToColor(theme.window);
-    const stone = new THREE.Color("#161c28");
-    const cols = lite ? 7 : 8;
+    const cols = lite ? 8 : 10;
 
     for (let i = 0; i < count; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const x = (col - (cols - 1) / 2) * (2.15 + rand() * 0.35) + (rand() - 0.5) * 0.55;
-      const z = -4.5 - row * (2.4 + rand() * 0.5) + (rand() - 0.5) * 0.6;
-      const w = 0.95 + rand() * 1.55;
-      const d = 0.95 + rand() * 1.45;
-      const hero = i % 11 === 0;
-      const h = (hero ? 14 : 5) + rand() * (hero ? 16 : 11);
-      m.compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(w, h, d));
+      const x = (col - (cols - 1) / 2) * (1.85 + rand() * 0.28) + (rand() - 0.5) * 0.4;
+      const z = -6.2 - row * (2.05 + rand() * 0.45) + (rand() - 0.5) * 0.45;
+      const w = 0.7 + rand() * 1.15;
+      const d = 0.7 + rand() * 1.05;
+      const hero = i % 9 === 0;
+      const needle = i % 17 === 0;
+      const h = (needle ? 20 : hero ? 13 : 4.2) + rand() * (needle ? 14 : hero ? 10 : 8);
+      m.compose(new THREE.Vector3(x + 2.4, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(w, h, d));
       mesh.setMatrixAt(i, m);
-      if (rand() > 0.38) {
-        color.copy(windowCol).lerp(stone, 0.35 + rand() * 0.25);
-      } else {
-        color.copy(stone).offsetHSL(0, 0, (rand() - 0.5) * 0.06);
-      }
-      mesh.setColorAt(i, color);
     }
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [count, lite, theme.id]);
 
   useEffect(
     () => () => {
       geo.dispose();
       mat.dispose();
+      maps?.map.dispose();
+      maps?.emissiveMap.dispose();
     },
-    [geo, mat],
+    [geo, mat, maps],
   );
 
-  return <instancedMesh ref={meshRef} args={[geo, mat, count]} frustumCulled={false} />;
+  return (
+    <group>
+      <instancedMesh ref={meshRef} args={[geo, mat, count]} frustumCulled={false} />
+      <mesh position={[4.2, 16.4, -11.2]} material={mat}>
+        <boxGeometry args={[1.1, 32.8, 1.1]} />
+      </mesh>
+      <mesh position={[4.2, 33.4, -11.2]}>
+        <cylinderGeometry args={[0.08, 0.12, 3.4, 8]} />
+        <meshStandardMaterial color={theme.rim} emissive={theme.key} emissiveIntensity={0.7} metalness={0.8} roughness={0.22} />
+      </mesh>
+      <mesh position={[-1.1, 11.8, -8.6]} material={mat}>
+        <boxGeometry args={[2.2, 23.6, 1.6]} />
+      </mesh>
+      <mesh position={[7.8, 9.6, -7.4]} material={mat}>
+        <boxGeometry args={[1.6, 19.2, 1.4]} />
+      </mesh>
+    </group>
+  );
 }
 
 function StarField({ lite }: { lite: boolean }) {
@@ -156,28 +203,34 @@ function TitleLights({ theme }: { theme: TitleDistrictTheme }) {
   return (
     <>
       <color attach="background" args={[theme.sky]} />
-      <fog attach="fog" args={[theme.fog, 16, 72]} />
-      <ambientLight color={theme.fill} intensity={0.28} />
-      <hemisphereLight args={[theme.fill, "#1a140e", 0.35]} />
-      <directionalLight position={[-10, 16, 8]} color={theme.key} intensity={1.35} />
-      <directionalLight position={[12, 6, 4]} color={theme.fill} intensity={0.42} />
-      <pointLight position={[0, 9, -6]} color={theme.window} intensity={8} distance={36} decay={2} />
+      <fog attach="fog" args={[theme.fog, 28, 88]} />
+      <ambientLight color={theme.fill} intensity={0.16} />
+      <hemisphereLight args={[theme.fill, "#0c1016", 0.28]} />
+      <directionalLight position={[-12, 18, 10]} color={theme.key} intensity={0.72} />
+      <directionalLight position={[14, 8, 6]} color={theme.fill} intensity={0.32} />
+      <pointLight position={[3.2, 10, -8]} color={theme.window} intensity={10} distance={42} decay={2} />
     </>
   );
 }
 
 function TitleGround({ theme }: { theme: TitleDistrictTheme }) {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, -8]} receiveShadow={false}>
-      <planeGeometry args={[90, 70]} />
-      <meshStandardMaterial
-        color="#07090f"
-        metalness={0.72}
-        roughness={0.28}
-        emissive={theme.fog}
-        emissiveIntensity={0.08}
-      />
-    </mesh>
+    <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.5, -0.02, -10]} receiveShadow={false}>
+        <planeGeometry args={[110, 80]} />
+        <meshStandardMaterial
+          color="#07090f"
+          metalness={0.68}
+          roughness={0.32}
+          emissive={theme.fog}
+          emissiveIntensity={0.06}
+        />
+      </mesh>
+      <mesh position={[3, 4.2, -22]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[48, 10]} />
+        <meshBasicMaterial color={theme.key} transparent opacity={0.08} depthWrite={false} />
+      </mesh>
+    </>
   );
 }
 
@@ -239,7 +292,7 @@ export function TitleBackdrop({ cityId = "nyc", intensity = "title", lite }: Tit
         <div className="oxc-titlebg-canvas">
           <Canvas
             dpr={autoLite ? [1, 1] : [1, 1.35]}
-            camera={{ position: [7.2, 5.8, 16.2], fov: 46, near: 0.1, far: 120 }}
+            camera={{ position: [9.6, 6.8, 19.2], fov: 42, near: 0.1, far: 140 }}
             gl={{
               antialias: !autoLite,
               powerPreference: autoLite ? "low-power" : "high-performance",
