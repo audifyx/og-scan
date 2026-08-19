@@ -31,8 +31,11 @@ import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowl
 import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
 import { asTokenRecord } from "../../api/orbitx/telegram-payload.js";
 import {
+  jupListFromRaw,
   looksLikeOrbitXCard,
   mergeTokenSnapshot,
+  normalizeDexResponse,
+  tokenFromGecko,
 } from "../../api/orbitx/telegram-token-snapshot.js";
 
 const WEB = resolve(__dirname, "../..");
@@ -297,6 +300,35 @@ describe("official OrbitX Telegram bot", () => {
     expect(live).toContain("Revoked");
     expect(live).toContain("OrbitX DEX");
 
+    const fromDexArray = mergeTokenSnapshot({
+      mint,
+      dexRaw: [
+        {
+          chainId: "solana",
+          baseToken: { address: mint, name: "ORBITX", symbol: "ORBITX" },
+          priceUsd: "0.000081",
+          marketCap: 81000,
+          liquidity: { usd: 19000 },
+          volume: { h24: 4000 },
+        },
+      ],
+    });
+    expect(cardText(formatTokenCard(fromDexArray))).toContain("$0.000081");
+    expect(normalizeDexResponse([{ pairAddress: "abc" }]).pairs).toHaveLength(1);
+    expect(jupListFromRaw({ [mint]: { usdPrice: 0.00009, liquidity: 8000 } }, mint)?.[0].usdPrice).toBe(0.00009);
+
+    const gecko = tokenFromGecko(mint, {
+      data: { attributes: { name: "ORBITX", symbol: "ORBITX", price_usd: "0.00007", market_cap_usd: "69000", fdv_usd: "69000" } },
+    });
+    expect(gecko?.priceUsd).toBeCloseTo(0.00007);
+    const fromGecko = mergeTokenSnapshot({
+      mint,
+      geckoRaw: {
+        data: { attributes: { name: "ORBITX", symbol: "ORBITX", price_usd: 0.00007, market_cap_usd: 69000 } },
+      },
+    });
+    expect(cardText(formatTokenCard(fromGecko))).toContain("$0.00007");
+
     const oldStub = [
       "TOKEN · $TOKEN",
       "solana",
@@ -315,6 +347,7 @@ describe("official OrbitX Telegram bot", () => {
       "DexScreener · OrbitX DEX · /chart",
     ].join("\n");
     expect(looksLikeOrbitXCard(oldStub)).toBe(true);
+    expect(looksLikeOrbitXCard("🚀 ORBITX · $ORBITX\nNo live DexScreener/Jupiter quote yet.")).toBe(true);
     expect(looksLikeOrbitXCard("gm what is orbitx")).toBe(false);
   });
 
@@ -507,6 +540,9 @@ describe("official OrbitX Telegram bot", () => {
     const branded = api.slice(api.indexOf("async function buildBrandedScan"), api.indexOf("async function handleVerify"));
     expect(branded).toContain("fetchTelegramTokenSnapshot");
     expect(branded).not.toContain("orbitx_get_token");
+    expect(branded).not.toContain("orbitx_xray");
+    expect(branded).not.toContain("orbitx_get_forensics");
+    expect(branded).not.toContain("runTool");
     expect(api).toContain("handleVerify");
     expect(api).toContain("orbitx_token_verifications");
     expect(api).toContain("TOKEN_INTEL_TOOLS");
