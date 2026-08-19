@@ -1,35 +1,30 @@
 ﻿/**
- * OrbitX City — Console title screen.
- * Full-bleed city art + brand + vertical nav. No tile dashboard.
+ * OrbitX City — console title screen.
+ * Cinematic 3D skyline + extruded metallic nav. No tile dashboard, no arcade lime.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
 import type { CityId } from "@/lib/orbitxcity/types";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
+import { TITLE_NAV, resolveTitleTheme, titleCssVars, type TitleNavId } from "@/lib/orbitxcity/titleTheme";
 import { MenuBackdrop } from "./MenuBackdrop";
+import { Menu3DButton, Menu3DChip } from "./Menu3DButton";
 import { AudioToggle } from "./AudioToggle";
 import { InstallCityPWA } from "./InstallCityPWA";
-
-type NavId = "play" | "multiplayer" | "settings" | "quick";
-
-const NAV: { id: NavId; label: string; hint: string; primary?: boolean }[] = [
-  { id: "play", label: "Play", hint: "Choose operative", primary: true },
-  { id: "multiplayer", label: "Multiplayer", hint: "Lobbies & rooms" },
-  { id: "settings", label: "Settings", hint: "Audio · quality · touch" },
-  { id: "quick", label: "Quick Play", hint: "Skip setup · demo" },
-];
 
 export function MainMenu() {
   const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
   const [visible, setVisible] = useState(false);
   const [flash, setFlash] = useState(false);
-  const [focus, setFocus] = useState<NavId>("play");
+  const [focus, setFocus] = useState<TitleNavId>("play");
   const [isTouch, setIsTouch] = useState(
     () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches,
   );
 
   const activeCity = ORBITX_CITIES.find((c) => c.id === selectedCityId) ?? ORBITX_CITIES[0]!;
+  const theme = resolveTitleTheme(selectedCityId);
+  const cssVars = useMemo(() => titleCssVars(theme) as CSSProperties, [theme]);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
@@ -47,7 +42,7 @@ export function MainMenu() {
     window.setTimeout(() => setFlash(false), 550);
   };
 
-  const run = (id: NavId) => {
+  const run = (id: TitleNavId) => {
     void cityAudio.unlock();
     setFocus(id);
     switch (id) {
@@ -82,10 +77,7 @@ export function MainMenu() {
   };
 
   return (
-    <div
-      className={`oxc-menu ${visible ? "is-in" : ""}`}
-      style={{ ["--menu-accent" as string]: activeCity.accent }}
-    >
+    <div className={`oxc-menu oxc-menu--title ${visible ? "is-in" : ""}`} style={cssVars}>
       <MenuBackdrop cityId={selectedCityId} intensity="title" />
       <div className={`oxc-menu-flash ${flash ? "is-on" : ""}`} aria-hidden />
 
@@ -110,7 +102,7 @@ export function MainMenu() {
 
       <div className="oxc-menu-stage">
         <header className="oxc-menu-brand">
-          <p className="oxc-menu-kicker">OrbitX · Live District</p>
+          <p className="oxc-menu-kicker">OrbitX World · Live District</p>
           <div className="oxc-menu-logo" aria-label="OrbitX City">
             <span className="oxc-menu-logo-orbit">
               Orbit<span className="oxc-menu-logo-x">X</span>
@@ -127,42 +119,33 @@ export function MainMenu() {
           </div>
           <div className="oxc-menu-cities" role="group" aria-label="City server">
             {ORBITX_CITIES.map((c) => (
-              <button
+              <Menu3DChip
                 key={c.id}
-                type="button"
-                className={`oxc-menu-city ${selectedCityId === c.id ? "on" : ""}`}
-                style={{ ["--chip" as string]: c.accent }}
+                label={c.name.replace(/^OrbitX\s+/i, "")}
+                accent={resolveTitleTheme(c.id).uiAccent}
+                active={selectedCityId === c.id}
                 onClick={() => {
                   cityAudio.play("ui");
                   setSelectedCityId(c.id as CityId);
                 }}
-                aria-pressed={selectedCityId === c.id}
-              >
-                <span>{c.name.replace(/^OrbitX\s+/i, "")}</span>
-              </button>
+              />
             ))}
           </div>
         </section>
 
-        <nav className="oxc-menu-rail" aria-label="Main menu">
-          {NAV.map((item, i) => (
-            <button
+        <nav className="oxc-menu-rail oxc-menu-rail--3d" aria-label="Main menu">
+          {TITLE_NAV.map((item, i) => (
+            <Menu3DButton
               key={item.id}
-              type="button"
-              className={`oxc-menu-rail-item ${item.primary ? "is-primary" : ""} ${focus === item.id ? "is-focus" : ""}`}
-              style={{ animationDelay: `${90 + i * 55}ms` }}
-              onMouseEnter={() => setFocus(item.id)}
+              label={item.label}
+              hint={item.hint}
+              primary={item.primary}
+              focused={focus === item.id}
+              delayMs={90 + i * 55}
+              accent={item.primary ? theme.key : theme.uiAccent}
               onFocus={() => setFocus(item.id)}
               onClick={() => run(item.id)}
-            >
-              <span className="oxc-menu-rail-marker" aria-hidden>
-                {focus === item.id ? "▸" : "·"}
-              </span>
-              <span className="oxc-menu-rail-copy">
-                <span className="oxc-menu-rail-label">{item.label}</span>
-                <span className="oxc-menu-rail-hint">{item.hint}</span>
-              </span>
-            </button>
+            />
           ))}
         </nav>
       </div>
