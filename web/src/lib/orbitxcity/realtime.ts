@@ -9,7 +9,7 @@
  */
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
-import type { AvatarAppearance, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
+import type { AvatarAppearance, BeardStyle, BodyType, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
 
 export const REALTIME_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
@@ -24,6 +24,8 @@ export interface CityIdentity {
   outfit?: OutfitStyle;
   faceStyle?: FaceStyle;
   classId?: AvatarAppearance["classId"];
+  beardStyle?: BeardStyle;
+  bodyType?: BodyType;
 }
 
 export interface LobbyDescriptor {
@@ -89,7 +91,7 @@ export type CityLobbyInput = LobbyDescriptor | string;
 export type CityLobbyMeta = Partial<Pick<LobbyDescriptor, "label" | "isPrivate">>;
 
 type PlayerPresenceMeta = Pick<CityIdentity, "name" | "accentColor" | "bodyColor" | "skinColor"> &
-  Partial<Pick<CityIdentity, "hairStyle" | "hairColor" | "outfit" | "faceStyle" | "classId">> & {
+  Partial<Pick<CityIdentity, "hairStyle" | "hairColor" | "outfit" | "faceStyle" | "classId" | "beardStyle" | "bodyType">> & {
     x?: number;
     z?: number;
     yaw?: number;
@@ -171,6 +173,8 @@ export interface RemotePlayerState {
   outfit?: OutfitStyle;
   faceStyle?: FaceStyle;
   classId?: AvatarAppearance["classId"];
+  beardStyle?: BeardStyle;
+  bodyType?: BodyType;
   x: number;
   z: number;
   yaw: number;
@@ -267,6 +271,12 @@ export class CityRealtimeClient {
           hairColor?: string;
           outfit?: OutfitStyle;
           faceStyle?: FaceStyle;
+          classId?: AvatarAppearance["classId"];
+          beardStyle?: BeardStyle;
+          bodyType?: BodyType;
+          x?: number;
+          z?: number;
+          yaw?: number;
         };
         const existing = this.players.get(id);
         if (existing) {
@@ -279,6 +289,8 @@ export class CityRealtimeClient {
           existing.outfit = meta.outfit ?? existing.outfit;
           existing.faceStyle = meta.faceStyle ?? existing.faceStyle;
           existing.classId = meta.classId ?? existing.classId;
+          existing.beardStyle = meta.beardStyle ?? existing.beardStyle;
+          existing.bodyType = meta.bodyType ?? existing.bodyType;
           if (typeof meta.x === "number" && typeof meta.z === "number") {
             existing.x = meta.x;
             existing.z = meta.z;
@@ -296,6 +308,8 @@ export class CityRealtimeClient {
             outfit: meta.outfit,
             faceStyle: meta.faceStyle,
             classId: meta.classId,
+            beardStyle: meta.beardStyle,
+            bodyType: meta.bodyType,
             x: typeof meta.x === "number" ? meta.x : 0,
             z: typeof meta.z === "number" ? meta.z : 8,
             yaw: typeof meta.yaw === "number" ? meta.yaw : 0,
@@ -472,6 +486,8 @@ export class CityRealtimeClient {
       outfit: this.identity.outfit,
       faceStyle: this.identity.faceStyle,
       classId: this.identity.classId,
+      beardStyle: this.identity.beardStyle,
+      bodyType: this.identity.bodyType,
       x: round2(this.lastPos.x),
       z: round2(this.lastPos.z),
       yaw: round2(this.lastPos.yaw),

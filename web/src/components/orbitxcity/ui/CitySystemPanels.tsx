@@ -36,6 +36,7 @@ import { FeatureCatalog, SystemTabs } from "./FeatureCatalog";
 import { DAILY_MISSIONS, WEEKLY_MISSIONS } from "@/gaming/catalogs/progressionCatalog";
 import { claimMission as claimGameMission } from "@/gaming/state/GameProfileStore";
 import { useGameProfile } from "@/gaming/state/useGameProfile";
+import { loadPartyIds, togglePartyMember } from "@/lib/orbitxcity/metaverseHub";
 
 function PanelShell({
   system,
@@ -343,6 +344,7 @@ export function FriendsSystemPanel() {
   const { user } = useAuth();
   const { followers, following, mutuals, loading } = useFriends();
   const players = Array.from(realtime?.players.values() ?? []);
+  const [partyIds, setPartyIds] = useState<string[]>(() => loadPartyIds());
 
   const copyInvite = async () => {
     const url = `${window.location.origin}/Orbitxcity?lobby=${encodeURIComponent(lobby.id)}`;
@@ -391,12 +393,22 @@ export function FriendsSystemPanel() {
       </div>
 
       <div className="oxc-section-label">In lobby · {lobby.label}</div>
-      {players.map((player) => (
-        <div key={player.id} className="oxc-tile on">
-          <div className="oxc-tile-title">{player.name}</div>
-          <div className="oxc-muted">Online now</div>
-        </div>
-      ))}
+      {players.map((player) => {
+        const inParty = partyIds.includes(player.id);
+        return (
+          <div key={player.id} className="oxc-tile on">
+            <div className="oxc-tile-title">{player.name}</div>
+            <div className="oxc-muted">{inParty ? "Party member · online" : "Online now"}</div>
+            <button
+              type="button"
+              className={`oxc-btn ${inParty ? "primary" : "ghost"} compact`}
+              onClick={() => setPartyIds(togglePartyMember(player.id))}
+            >
+              {inParty ? "Leave party" : "Add to party"}
+            </button>
+          </div>
+        );
+      })}
       {!players.length && <p className="oxc-muted">Nobody else in this lobby yet — send the invite.</p>}
 
       <div className="oxc-section-label">OrbitX graph {user ? "" : "(sign in)"}</div>

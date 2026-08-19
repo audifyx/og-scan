@@ -7,6 +7,7 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getCharacterClass, resolveClassId } from "@/lib/orbitxcity/characterClasses";
+import { bodyTypeScale } from "@/lib/orbitxcity/metaverseHub";
 import type { AvatarAppearance, BeardStyle, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
 import type { CharacterAnimationState } from "./CryptoMascotMesh";
 
@@ -299,6 +300,7 @@ export function HumanoidMesh({
   const clothes = OUTFIT[outfit];
   const beard = appearance?.beardStyle ?? classBeard(classId);
   const beardColor = hairColor === "#3d7a38" ? "#2a4a28" : hairColor;
+  const bodyScale = bodyTypeScale(appearance?.bodyType);
 
   useFrame(({ clock }) => {
     const t = animation?.time ?? time ?? clock.elapsedTime;
@@ -321,7 +323,11 @@ export function HumanoidMesh({
   });
 
   return (
-    <group ref={root} name="humanoid" scale={[1.22 * cls.scale.x, 1.22 * cls.scale.y, 1.22 * cls.scale.z]}>
+    <group
+      ref={root}
+      name="humanoid"
+      scale={[1.22 * cls.scale.x * bodyScale.x, 1.22 * cls.scale.y * bodyScale.y, 1.22 * cls.scale.z * bodyScale.z]}
+    >
       <group ref={head} position={[0, 1.58, 0]}>
         <mesh castShadow>
           <sphereGeometry args={[0.185, 20, 18]} />

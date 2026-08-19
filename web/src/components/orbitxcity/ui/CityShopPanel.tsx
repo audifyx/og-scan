@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
-import { ExternalLink, Flame, Loader2, Shirt, Store, Wand2, Megaphone, ListPlus, Crown } from "lucide-react";
+import { ExternalLink, Flame, Heart, Loader2, Shirt, Store, Wand2, Megaphone, ListPlus, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
@@ -23,6 +23,7 @@ import {
 import { buyAndBurnShopItem, quoteShopItem } from "@/lib/orbitxcity/cityShopCheckout";
 import { fetchTokenDetail } from "@/lib/orbitxcity/tokenApi";
 import { fmtUsd } from "@/lib/orbitxcity/marketData";
+import { loadWishlist, shopRarity, toggleWishlist } from "@/lib/orbitxcity/metaverseHub";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const TABS: Array<{ id: ShopCategory; label: string; icon: typeof Shirt }> = [
@@ -44,6 +45,7 @@ export function CityShopPanel() {
   const [listingMint, setListingMint] = useState("");
   const [bannerTitle, setBannerTitle] = useState("");
   const [bannerSubtitle, setBannerSubtitle] = useState("");
+  const [wishlist, setWishlist] = useState<string[]>(() => loadWishlist());
 
   useEffect(() => {
     setPurchases(loadPurchases(walletKey));
@@ -213,6 +215,7 @@ export function CityShopPanel() {
             <article key={item.id} className={`oxc-shop-card ${owned ? "is-owned" : ""}`} style={{ ["--shop" as string]: item.accent }}>
               <div className="oxc-shop-card-top">
                 <span className="oxc-inv-kind">{item.category}</span>
+                <span className={`oxc-rarity oxc-rarity-${shopRarity(item.priceUsd)}`}>{shopRarity(item.priceUsd)}</span>
                 <strong>{fmtUsd(item.priceUsd)}</strong>
               </div>
               <h3>{item.name}</h3>
@@ -221,6 +224,14 @@ export function CityShopPanel() {
                 Burn ~{burnEst > 0 ? burnEst.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"} ORBITX
               </div>
               <div className="oxc-actions">
+                <button
+                  type="button"
+                  className={`oxc-btn ghost compact ${wishlist.includes(item.id) ? "on" : ""}`}
+                  onClick={() => setWishlist(toggleWishlist(item.id))}
+                  aria-label={wishlist.includes(item.id) ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <Heart className="h-3.5 w-3.5" fill={wishlist.includes(item.id) ? "currentColor" : "none"} />
+                </button>
                 {owned && (item.category === "wear" || item.category === "character") && (
                   <button type="button" className="oxc-btn ghost compact" onClick={() => equip(item.id)} disabled={equipped}>
                     {equipped ? "Equipped" : "Wear in city"}

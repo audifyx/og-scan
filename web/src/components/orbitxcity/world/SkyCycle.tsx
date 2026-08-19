@@ -1,75 +1,53 @@
 import * as THREE from "three";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 
-function nightPalette(cityId: WorldBlockConfig["cityId"]): {
+function dayPalette(cityId: WorldBlockConfig["cityId"]): {
   sky: string;
   fog: string;
   hemiSky: string;
   hemiGround: string;
-  moon: string;
-  fill: string;
+  sun: string;
 } {
   switch (cityId) {
     case "miami":
-      return {
-        sky: "#0c1c28",
-        fog: "#163040",
-        hemiSky: "#3a6a78",
-        hemiGround: "#1a2a22",
-        moon: "#e8f4f0",
-        fill: "#5ec4b6",
-      };
+      return { sky: "#7ec8e8", fog: "#9ed4e8", hemiSky: "#dff4ff", hemiGround: "#6aaa72", sun: "#fff6c8" };
     case "la":
-      return {
-        sky: "#14101c",
-        fog: "#1c1830",
-        hemiSky: "#4a3a68",
-        hemiGround: "#221a1c",
-        moon: "#f0e4d8",
-        fill: "#b388ff",
-      };
+      return { sky: "#8ab4e0", fog: "#a8c4e8", hemiSky: "#e8f0ff", hemiGround: "#8a7a62", sun: "#ffe8b0" };
     case "boston":
-      return {
-        sky: "#0c1628",
-        fog: "#152238",
-        hemiSky: "#3a5880",
-        hemiGround: "#1a221c",
-        moon: "#dce8f8",
-        fill: "#5b8def",
-      };
+      return { sky: "#7aa0c8", fog: "#98b4d0", hemiSky: "#d8e8f8", hemiGround: "#6a8a62", sun: "#fff4d0" };
     default:
-      return {
-        sky: "#0c1624",
-        fog: "#152030",
-        hemiSky: "#3a5a80",
-        hemiGround: "#1a2418",
-        moon: "#e8eef8",
-        fill: "#c5a26f",
-      };
+      return { sky: "#7eb6e0", fog: "#9cc8e4", hemiSky: "#e4f2ff", hemiGround: "#6a9a62", sun: "#fff3c0" };
   }
 }
 
 /**
- * Night cyber-financial district sky.
- * Ground stays readable via street lamps + neon bounce — not a black void,
- * not a daytime suburb.
+ * Bright Roblox-like daylight. Strong sun, readable shadows, warm NYC sky.
+ * Night cyber lighting is a later quality toggle — Alpha launches in day.
  */
 export function SkyCycle({ block }: { block: WorldBlockConfig }) {
-  const pal = nightPalette(block.cityId);
+  const pal = dayPalette(block.cityId);
   return (
     <>
       <color attach="background" args={[pal.sky]} />
-      <fog attach="fog" args={[pal.fog, 48, 170]} />
-      <hemisphereLight args={[pal.hemiSky, pal.hemiGround, 0.42]} />
-      <directionalLight position={[28, 44, 16]} intensity={0.32} color="#d8e4f4" />
-      <directionalLight position={[-16, 18, -10]} intensity={0.18} color={pal.fill} />
-      <mesh position={[36, 58, 20]}>
-        <sphereGeometry args={[2.6, 20, 16]} />
-        <meshBasicMaterial color={pal.moon} toneMapped={false} />
-      </mesh>
-      <mesh position={[36, 58, 20]}>
-        <sphereGeometry args={[4.2, 16, 12]} />
-        <meshBasicMaterial color={pal.moon} transparent opacity={0.08} depthWrite={false} toneMapped={false} />
+      <fog attach="fog" args={[pal.fog, 70, 210]} />
+      <hemisphereLight args={[pal.hemiSky, pal.hemiGround, 0.95]} />
+      <directionalLight
+        position={[32, 54, 18]}
+        intensity={1.65}
+        color={pal.sun}
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-70}
+        shadow-camera-right={70}
+        shadow-camera-top={70}
+        shadow-camera-bottom={-70}
+        shadow-bias={-0.0002}
+      />
+      <directionalLight position={[-18, 22, -12]} intensity={0.32} color="#b8d4ff" />
+      <mesh position={[38, 62, 22]}>
+        <sphereGeometry args={[3.6, 20, 16]} />
+        <meshBasicMaterial color="#fff3c4" toneMapped={false} />
       </mesh>
     </>
   );

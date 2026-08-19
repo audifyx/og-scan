@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ExternalLink, Flame, Rocket, Search, Sparkles, Store } from "lucide-react";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/orbitxcity/marketData";
 import { listTokens, type OrbitxToken } from "@/lib/orbitx/registry";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { sortScreener } from "@/lib/orbitxcity/metaverseHub";
 
 type StoreTab = "trending" | "pump" | "new" | "orbitx" | "search";
 
@@ -57,6 +58,7 @@ export function MemeStorePanel() {
   const { openToken, openPanel } = useCity();
   const [tab, setTab] = useState<StoreTab>("trending");
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"name" | "price" | "change">("change");
 
   const trending = useQuery({
     queryKey: ["oxc-store", "trending"],
@@ -110,6 +112,10 @@ export function MemeStorePanel() {
 
   const activeQuery =
     tab === "trending" ? trending : tab === "pump" ? pump : tab === "new" ? fresh : tab === "search" ? search : null;
+  const sortedRows = useMemo(
+    () => sortScreener(activeQuery?.data ?? [], sort),
+    [activeQuery?.data, sort],
+  );
 
   return (
     <div className="oxc-stack">
@@ -135,6 +141,14 @@ export function MemeStorePanel() {
             </button>
           );
         })}
+      </div>
+
+      <div className="oxc-home-sort" role="group" aria-label="Sort market">
+        {(["name", "price", "change"] as const).map((key) => (
+          <button key={key} type="button" className={sort === key ? "on" : ""} onClick={() => setSort(key)}>
+            {key}
+          </button>
+        ))}
       </div>
 
       {tab === "search" && (
@@ -169,7 +183,7 @@ export function MemeStorePanel() {
           </>
         ) : (
           <>
-            {(activeQuery?.data ?? []).map((row, i) => {
+            {(sortedRows).map((row, i) => {
               const mint = row.mint ?? row.address;
               return (
                 <TokenStoreRow

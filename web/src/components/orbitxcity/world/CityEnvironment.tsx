@@ -29,6 +29,7 @@ import { UrbanNature } from "./UrbanNature";
 import { PropScatter } from "./PropScatter";
 import { LandmarkMesh } from "./LandmarkMesh";
 import { landmarkModelId } from "@/lib/orbitxcity/assets/catalog";
+import { hubZonesForBlock } from "@/lib/orbitxcity/metaverseHub";
 import type { LandmarkDefinition } from "@/lib/orbitxcity/types";
 
 function cityTheme(cityId: CityId) {
@@ -181,44 +182,75 @@ function CentralPlaza({ block }: { block: WorldBlockConfig }) {
   const hq = block.buildings.find((b) => b.kind === "hq");
   const cx = hq ? (hq.position.x + spawn.x) / 2 : spawn.x;
   const cz = hq ? (hq.position.z + spawn.z) / 2 : spawn.z;
+  const stalls = hubZonesForBlock(block).filter((z) => z.id !== "hub");
 
   return (
     <group>
-      {/* Wide plaza disc */}
       <mesh position={[cx, 0.05, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[5.2, 64]} />
-        <meshStandardMaterial color="#3a424c" metalness={0.28} roughness={0.55} />
+        <circleGeometry args={[6.2, 64]} />
+        <meshStandardMaterial color="#d8dde4" metalness={0.12} roughness={0.62} />
       </mesh>
       <mesh position={[cx, 0.07, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[4.7, 5.2, 64]} />
+        <ringGeometry args={[5.6, 6.2, 64]} />
         <meshStandardMaterial
-          color="#c5a26f"
-          emissive="#c5a26f"
-          emissiveIntensity={0.35}
-          metalness={0.4}
-          roughness={0.4}
+          color="#00ff9f"
+          emissive="#00ff9f"
+          emissiveIntensity={0.28}
+          metalness={0.25}
+          roughness={0.45}
           toneMapped={false}
         />
       </mesh>
       <mesh position={[cx, 0.08, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[2.4, 2.65, 48]} />
-        <meshStandardMaterial color="#3de7ff" emissive="#3de7ff" emissiveIntensity={0.45} toneMapped={false} />
+        <ringGeometry args={[2.6, 2.9, 48]} />
+        <meshStandardMaterial color="#f5c542" emissive="#f5c542" emissiveIntensity={0.35} toneMapped={false} />
       </mesh>
-      {/* Spawn pad */}
       <mesh position={[spawn.x, 0.09, spawn.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[2.2, 40]} />
-        <meshStandardMaterial color="#4a545e" metalness={0.2} roughness={0.7} />
+        <meshStandardMaterial color="#eef2f6" metalness={0.12} roughness={0.55} />
       </mesh>
-      {/* Plaza neon bollards */}
+      <Text
+        position={[cx, 3.4, cz]}
+        fontSize={0.55}
+        color="#102018"
+        anchorX="center"
+        outlineWidth={0.03}
+        outlineColor="#e8fff4"
+      >
+        ORBITX HUB
+      </Text>
+      <Text position={[cx, 2.85, cz]} fontSize={0.18} color="#1a2a22" anchorX="center">
+        SPAWN · SHOP · TRADE · PLAY
+      </Text>
+      {stalls.map((stall, i) => {
+        const a = (i / stalls.length) * Math.PI * 2 + 0.4;
+        const x = cx + Math.cos(a) * 7.4;
+        const z = cz + Math.sin(a) * 7.4;
+        return (
+          <group key={stall.id} position={[x, 0, z]} rotation={[0, -a + Math.PI / 2, 0]}>
+            <mesh position={[0, 0.7, 0]} castShadow>
+              <boxGeometry args={[1.8, 1.4, 1.1]} />
+              <meshStandardMaterial color="#f2f4f8" roughness={0.55} />
+            </mesh>
+            <mesh position={[0, 1.55, 0]} castShadow>
+              <boxGeometry args={[2.05, 0.12, 1.3]} />
+              <meshStandardMaterial color={stall.accent} emissive={stall.accent} emissiveIntensity={0.35} toneMapped={false} />
+            </mesh>
+            <Text position={[0, 1.85, 0.2]} fontSize={0.16} color="#102018" anchorX="center" maxWidth={2}>
+              {stall.label.toUpperCase()}
+            </Text>
+          </group>
+        );
+      })}
       {[0, 1, 2, 3, 4, 5].map((i) => {
         const a = (i / 6) * Math.PI * 2;
         return (
-          <mesh key={i} position={[cx + Math.cos(a) * 4.9, 0.55, cz + Math.sin(a) * 4.9]} castShadow>
+          <mesh key={i} position={[cx + Math.cos(a) * 5.8, 0.55, cz + Math.sin(a) * 5.8]} castShadow>
             <cylinderGeometry args={[0.08, 0.1, 1.1, 8]} />
             <meshStandardMaterial
-              color={i % 2 === 0 ? "#c5a26f" : "#3de7ff"}
-              emissive={i % 2 === 0 ? "#c5a26f" : "#3de7ff"}
-              emissiveIntensity={0.55}
+              color={i % 2 === 0 ? "#c5a26f" : "#00ff9f"}
+              emissive={i % 2 === 0 ? "#c5a26f" : "#00ff9f"}
+              emissiveIntensity={0.4}
               toneMapped={false}
             />
           </mesh>
@@ -288,34 +320,34 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
   return (
     <group>
       <SkyCycle block={block} />
-      <ambientLight intensity={high ? 0.28 : 0.22} color="#8aa0b8" />
-      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, high ? 0.28 : 0.22]} />
-      <directionalLight position={[-22, 28, 12]} intensity={high ? 0.22 : 0.16} color="#c8d4e8" />
-      {high && <directionalLight position={[18, 16, -10]} intensity={0.14} color="#3de7ff" />}
+      <ambientLight intensity={high ? 0.55 : 0.42} color="#f4f8ff" />
+      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, high ? 0.38 : 0.28]} />
+      <directionalLight position={[-22, 28, 12]} intensity={high ? 0.35 : 0.22} color="#ffe8c0" />
+      {high && <directionalLight position={[18, 16, -10]} intensity={0.18} color="#8ec8ff" />}
 
       {/* Neon atmosphere lights — cyan / gold / magenta / lime */}
-      <pointLight position={[block.spawn.x, 8, block.spawn.z]} intensity={1.45} color={theme.secondary} distance={42} />
+      <pointLight position={[block.spawn.x, 8, block.spawn.z]} intensity={0.55} color={theme.secondary} distance={42} />
       <pointLight
         position={[shardOrigin.x + 8, 9, shardOrigin.z - 4]}
-        intensity={1.15}
+        intensity={0.4}
         color={theme.warm}
         distance={40}
       />
       <pointLight
         position={[shardOrigin.x - 10, 8, shardOrigin.z + 6]}
-        intensity={0.85}
+        intensity={0.32}
         color={theme.magenta}
         distance={34}
       />
       {high && (
         <pointLight
           position={[block.bounds.maxX * 0.35, 12, block.bounds.minZ * 0.2]}
-          intensity={0.7}
+          intensity={0.28}
           color={theme.primary}
           distance={44}
         />
       )}
-      <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.7} color={theme.neon} distance={28} />
+      <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.35} color={theme.neon} distance={28} />
 
       <Ground block={block} />
       <UrbanNature block={block} lite={!high} />

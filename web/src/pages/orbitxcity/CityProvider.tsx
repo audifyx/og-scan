@@ -111,6 +111,8 @@ const DEFAULT_AVATAR: AvatarAppearance = {
   hairColor: "#151018",
   outfit: "suit",
   faceStyle: "cool",
+  beardStyle: "none",
+  bodyType: "standard",
 };
 
 const STARTER_INVENTORY: InventoryItem[] = [
@@ -568,6 +570,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
         outfit: avatar.outfit,
         faceStyle: avatar.faceStyle,
         classId: avatar.classId,
+        beardStyle: avatar.beardStyle,
+        bodyType: avatar.bodyType,
       },
       lobby,
     );
@@ -592,6 +596,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       outfit: avatar.outfit,
       faceStyle: avatar.faceStyle,
       classId: avatar.classId,
+      beardStyle: avatar.beardStyle,
+      bodyType: avatar.bodyType,
     });
   }, [realtime, avatar]);
 
