@@ -10,6 +10,7 @@ import {
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatTokenCard,
+  formatToolMenu,
   inferPublicTool,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
@@ -17,6 +18,7 @@ import {
   loginCode,
   mediaEtaSeconds,
   mergeTokenScanPayloads,
+  missingToolInput,
   ORBITX_FAQ_CHUNKS,
   ORBITX_FAQ_CORE,
   ORBITX_FAQ_SECTIONS,
@@ -27,9 +29,21 @@ import {
 } from "../../api/orbitx/telegram-orbitx-lib.js";
 import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
 import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
+import { asTokenRecord } from "../../api/orbitx/telegram-payload.js";
+import {
+  looksLikeOrbitXCard,
+  mergeTokenSnapshot,
+} from "../../api/orbitx/telegram-token-snapshot.js";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
+
+function cardText(value: unknown): string {
+  if (value && typeof value === "object" && "text" in (value as { text?: string })) {
+    return String((value as { text: string }).text || "");
+  }
+  return String(value ?? "");
+}
 
 function walkSource(dir: string, acc: string[] = []): string[] {
   for (const name of readdirSync(dir, { withFileTypes: true })) {
@@ -153,38 +167,48 @@ describe("official OrbitX Telegram bot", () => {
       },
       meta: { name: "ORBITX", symbol: "ORBITX" },
     };
-    const card = formatTokenCard(payload);
-    const text = formatOrbitXTelegramResult(payload);
+    const card = cardText(formatTokenCard(payload));
+    const text = cardText(formatOrbitXTelegramResult(payload));
+    expect(card).toContain("🚀");
     expect(card).toContain("ORBITX");
+    expect(card).toContain("Market Snapshot");
     expect(card).toContain("Price");
-    expect(card).toContain("MC");
-    expect(card).toContain("mint revoked");
-    expect(card).toContain("Top 10");
+    expect(card).toContain("Market Cap");
+    expect(card).toContain("Mint Authority");
+    expect(card).toContain("Revoked");
+    expect(card).toContain("Top Holders");
     expect(card).toContain("DexScreener");
+    expect(card).toContain("Jupiter");
+    expect(card).toContain("Birdeye");
+    expect(card).toContain("OrbitX DEX");
     expect(card).not.toContain('"priceUsd"');
     expect(card).not.toContain('"holderCount"');
     expect(text).toBe(card);
     expect(text.startsWith("{")).toBe(false);
-    expect(formatOrbitXTelegramResult({ ok: true, result: payload })).toContain("Holders");
+    expect(cardText(formatOrbitXTelegramResult({ ok: true, result: payload }))).toContain("Holders");
 
-    const branded = formatTokenCard(
-      mergeTokenScanPayloads({
-        token: { ...payload, athMcap: 210_000, athPrice: 0.00022 },
-        xray: {
-          mint: payload.mint,
-          verdict: "Looks clean",
-          concentration: { top10Pct: 31.1, whales: 4 },
-          bundles: { pct: 12, count: 3 },
-          dev: { wallet: "BC8FPb72MEZbExy21aeKTEVrG7cubSjrZxBBj51uA225", pct: 0, sold: true },
-        },
-        forensics: {
-          mint: payload.mint,
-          dexPaid: { paid: true, services: [{ type: "tokenProfile", status: "approved" }] },
-          concentration: { whales: 4, top10Pct: 31.1 },
-        },
-        boosts: { boosts: [{ mint: payload.mint, tier: "24h" }] },
-        verified: { mint: payload.mint, verified_by_wallet: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb" },
-      }),
+    const branded = cardText(
+      formatTokenCard(
+        mergeTokenScanPayloads({
+          token: { ...payload, athMcap: 210_000, athPrice: 0.00022 },
+          xray: {
+            mint: payload.mint,
+            verdict: "Looks clean",
+            concentration: { top10Pct: 31.1, whales: 4, totalHolders: 255 },
+            bundles: { pct: 12, count: 3 },
+            holders: [{ owner: "KOL111111111111111111111111111111111111111", label: "kol", twitter: "@alice" }],
+            dev: { wallet: "BC8FPb72MEZbExy21aeKTEVrG7cubSjrZxBBj51uA225", pct: 0, sold: true },
+            safety: { mintRenounced: true, freezeRenounced: true, lpLockedPct: 95 },
+          },
+          forensics: {
+            mint: payload.mint,
+            dexPaid: { paid: true, services: [{ type: "tokenProfile", status: "approved" }] },
+            concentration: { whales: 4, top10Pct: 31.1 },
+          },
+          boosts: { boosts: [{ mint: payload.mint, tier: "24h" }] },
+          verified: { mint: payload.mint, verified_by_wallet: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb" },
+        }),
+      ),
     );
     expect(branded).toContain("OrbitX Verified");
     expect(branded).toContain("ATH");
@@ -194,7 +218,104 @@ describe("official OrbitX Telegram bot", () => {
     expect(branded).toContain("Boosts");
     expect(branded).toContain("DEX paid");
     expect(branded).toContain("24h");
+    expect(branded).toContain("LP Locked");
+    expect(branded).toContain("Project Summary");
     expect(branded.startsWith("{")).toBe(false);
+    expect(missingToolInput("orbitx_get_token", {})).toBe("mint");
+    expect(cardText(formatToolMenu("orbitx_get_token"))).toContain("/token");
+  });
+
+  it("never renders a TOKEN · $TOKEN stub from mint-only or empty x-ray payloads", () => {
+    const mint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+    const randomMint = "So11111111111111111111111111111111111111112";
+    expect(formatTokenCard({ mint: randomMint })).toBeNull();
+    expect(asTokenRecord({ mint: randomMint })).toBeNull();
+    expect(formatTokenCard({ mint, concentration: { whales: 0 } })).toBeNull();
+    expect(formatTokenCard({ mint, xray: { mint, concentration: { whales: 0 } } })).toBeNull();
+
+    const stub = cardText(
+      formatOrbitXTelegramResult({
+        mint,
+        xray: { mint, concentration: { whales: 0 } },
+        forensics: { mint },
+      }),
+    );
+    expect(stub).not.toMatch(/TOKEN · \$TOKEN/);
+    expect(stub).not.toMatch(/TOKEN \(\$TOKEN\) is live on/i);
+    expect(stub).toContain("ORBITX");
+    expect(stub).toContain("No live DexScreener/Jupiter quote");
+    expect(stub).not.toContain("Whales    0");
+    expect(stub).not.toContain("DEX paid  no");
+    expect(stub).not.toContain("KOLs      none labeled");
+    expect(stub).toContain(mint);
+    expect(stub.toLowerCase()).not.toContain("token · $token");
+
+    const merged = mergeTokenSnapshot({
+      mint,
+      jupRaw: [
+        {
+          id: mint,
+          name: "ORBITX",
+          symbol: "ORBITX",
+          usdPrice: 0.00007412,
+          mcap: 72100,
+          liquidity: 20150,
+          holderCount: 276,
+          tags: ["token-2022"],
+          tokenProgram: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          audit: { mintAuthorityDisabled: true, freezeAuthorityDisabled: true, topHoldersPercentage: 28.4 },
+          stats5m: { priceChange: 0.2 },
+          stats1h: { priceChange: -1.1 },
+          stats6h: { priceChange: 2.4 },
+          stats24h: { priceChange: -8.6, buyVolume: 4200, sellVolume: 3100, holderChange: 1.2 },
+        },
+      ],
+      dexRaw: {
+        pairs: [
+          {
+            chainId: "solana",
+            baseToken: { address: mint, name: "ORBITX", symbol: "ORBITX" },
+            priceUsd: "0.00007412",
+            marketCap: 72100,
+            fdv: 72100,
+            liquidity: { usd: 20150 },
+            volume: { h24: 7300 },
+            priceChange: { m5: 0.2, h1: -1.1, h6: 2.4, h24: -8.6 },
+            info: { websites: [{ url: "https://www.orbitx.world" }] },
+          },
+        ],
+      },
+    });
+    const live = cardText(formatTokenCard(merged));
+    expect(live).toContain("🚀");
+    expect(live).toContain("ORBITX");
+    expect(live).not.toMatch(/TOKEN · \$TOKEN/);
+    expect(live).toContain("Market Snapshot");
+    expect(live).toContain("$0.000074");
+    expect(live).toContain("Market Cap");
+    expect(live).toContain("$72.1K");
+    expect(live).toContain("Revoked");
+    expect(live).toContain("OrbitX DEX");
+
+    const oldStub = [
+      "TOKEN · $TOKEN",
+      "solana",
+      "Price     —",
+      "MC        —",
+      "Liq       —   Vol 24h —",
+      "Holders   —   Top 10 —",
+      "5m — · 1h — · 6h — · 24h —",
+      "",
+      "TOKEN ($TOKEN) is live on solana.",
+      "Whales    0 wallets ≥1%",
+      "KOLs      none labeled on this scan",
+      "Boosts    none active",
+      "DEX paid  no",
+      mint,
+      "DexScreener · OrbitX DEX · /chart",
+    ].join("\n");
+    expect(looksLikeOrbitXCard(oldStub)).toBe(true);
+    expect(looksLikeOrbitXCard("gm what is orbitx")).toBe(false);
   });
 
   it("renders /cmds as a slash menu, not a JSON dump", () => {
@@ -211,58 +332,70 @@ describe("official OrbitX Telegram bot", () => {
     expect(page.text).toContain("/img");
     expect(page.text).toContain("orbitx_get_token");
     expect(page.text.startsWith("{")).toBe(false);
+    expect(page.reply_markup?.inline_keyboard?.length).toBeGreaterThan(0);
+    const coins = cmdsPage([{ name: "orbitx_get_token", description: "token intel" }], { query: "coins" });
+    expect(coins.text).toContain("Token Intel");
+    expect(coins.text).toContain("/token");
   });
 
   it("formats dex charts and media countdowns without iframes or raw JSON", () => {
-    const chart = formatOrbitXTelegramResult({
-      __mcpFormat: "markdown",
-      action: "dex_chart_embed",
-      symbol: "ORBITX",
-      name: "ORBITX",
-      mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-      priceUsd: 0.00007,
-      change24h: -12.2,
-      liquidityUsd: 9000,
-      volume24h: 15000,
-      marketCap: 74000,
-      embedUrl: "https://dexscreener.com/solana/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-    });
+    const chart = cardText(
+      formatOrbitXTelegramResult({
+        __mcpFormat: "markdown",
+        action: "dex_chart_embed",
+        symbol: "ORBITX",
+        name: "ORBITX",
+        mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        priceUsd: 0.00007,
+        change24h: -12.2,
+        liquidityUsd: 9000,
+        volume24h: 15000,
+        marketCap: 74000,
+        embedUrl: "https://dexscreener.com/solana/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      }),
+    );
     expect(chart).toContain("DexScreener");
     expect(chart).toContain("ORBITX");
     expect(chart).not.toMatch(/<iframe/i);
     expect(chart.startsWith("{")).toBe(false);
 
-    const waiting = formatOrbitXTelegramResult({
-      ok: true,
-      kind: "image",
-      taskId: "task-1",
-      state: "waiting",
-      pending: true,
-      startedAt: Date.now(),
-      etaSeconds: mediaEtaSeconds("image"),
-    });
+    const waiting = cardText(
+      formatOrbitXTelegramResult({
+        ok: true,
+        kind: "image",
+        taskId: "task-1",
+        state: "waiting",
+        pending: true,
+        startedAt: Date.now(),
+        etaSeconds: mediaEtaSeconds("image"),
+      }),
+    );
     expect(waiting).toContain("Elapsed");
     expect(waiting).toContain("/check");
     expect(waiting).toContain("task-1");
     expect(waiting.startsWith("{")).toBe(false);
 
-    const actions = formatOrbitXTelegramResult({
-      ok: true,
-      message: "Sign this buy on OrbitX",
-      signUrl: "https://www.orbitx.world/trade?sign=1",
-      openUrl: "https://www.orbitx.world/trade",
-    });
+    const actions = cardText(
+      formatOrbitXTelegramResult({
+        ok: true,
+        message: "Sign this buy on OrbitX",
+        signUrl: "https://www.orbitx.world/trade?sign=1",
+        openUrl: "https://www.orbitx.world/trade",
+      }),
+    );
     expect(actions).toContain("Sign");
     expect(actions).toContain("https://www.orbitx.world/trade");
     expect(actions.startsWith("{")).toBe(false);
 
-    const tick = formatMediaCountdown({
-      kind: "video",
-      taskId: "vid-9",
-      startedAt: Date.now() - 15_000,
-      etaSeconds: 240,
-      state: "waiting",
-    });
+    const tick = cardText(
+      formatMediaCountdown({
+        kind: "video",
+        taskId: "vid-9",
+        startedAt: Date.now() - 15_000,
+        etaSeconds: 240,
+        state: "waiting",
+      }),
+    );
     expect(tick).toContain("0:15");
     expect(tick).toContain("left");
     expect(tick).toContain("/check");
@@ -365,6 +498,15 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("wait: false");
     expect(api).toContain("async function ensureWebhook");
     expect(api).toContain("buildBrandedScan");
+    expect(api).toContain("fetchTelegramTokenSnapshot");
+    expect(api).toContain("alreadyHandledUpdate");
+    expect(api).toContain("recentlyScanned");
+    expect(api).toContain("looksLikeOrbitXCard");
+    expect(api).toContain("from.is_bot");
+    expect(api).toContain('from "./orbitx/x-agent-lib.js"');
+    const branded = api.slice(api.indexOf("async function buildBrandedScan"), api.indexOf("async function handleVerify"));
+    expect(branded).toContain("fetchTelegramTokenSnapshot");
+    expect(branded).not.toContain("orbitx_get_token");
     expect(api).toContain("handleVerify");
     expect(api).toContain("orbitx_token_verifications");
     expect(api).toContain("TOKEN_INTEL_TOOLS");
@@ -373,8 +515,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("resolveOrbitXToolName");
     expect(api).toContain("handleAutoBuy");
     expect(api).toContain("auto_buy");
-    const imgLines = api.match(/\/img prompt · \/vid prompt/g) || [];
-    expect(imgLines.length).toBe(1);
+    expect(api).toContain("handleCallbackQuery");
+    expect(api).toContain("formatToolMenu");
+    expect(api).toContain("missingToolInput");
+    expect(api).toContain("sendCard");
     expect(api).not.toContain("8595161432");
   });
 });

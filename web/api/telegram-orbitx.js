@@ -19,12 +19,16 @@ import {
   PRIVATE_COMMANDS,
   argsFromCommand,
   applyDefaultBuyAmount,
+  deskKeyboard,
   cmdsPage,
   collectMediaUrls,
   extractMint,
+  formatFamilyMenu,
+  formatHelpDesk,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
+  formatToolMenu,
   inferPublicTool,
   orbitXFaqSystemAddon,
   isPrivilegedTelegramTool,
@@ -32,8 +36,10 @@ import {
   loginCode,
   mediaEtaSeconds,
   mergeTokenScanPayloads,
+  missingToolInput,
   parseCallInvocation,
   resolveOfficialCommand,
+  telegramMessageParts,
   TOKEN_INTEL_TOOLS,
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
@@ -41,8 +47,8 @@ import {
   formatOrbitXLinksHtml,
   OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
   ORBITX_GC,
-  ORBITX_TELEGRAM_BLURB,
 } from "./orbitx/orbitx-telegram-knowledge.js";
+import { fetchTelegramTokenSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
@@ -140,6 +146,7 @@ async function tg(method, body, { form } = {}) {
 
 async function sendLong(chatId, text, extra = {}) {
   const MAX = 3800;
+  const { reply_markup, ...rest } = extra;
   const str = String(text || "");
   const chunks = [];
   if (str.length <= MAX) chunks.push(str);
@@ -154,18 +161,22 @@ async function sendLong(chatId, text, extra = {}) {
     if (buf) chunks.push(buf);
   }
   let last = null;
-  for (const chunk of chunks) {
-    last = await tg("sendMessage", {
+  for (let i = 0; i < chunks.length; i += 1) {
+    const chunk = chunks[i];
+    const payload = {
       chat_id: chatId,
       text: chunk,
-      disable_web_page_preview: extra.parse_mode === "HTML" ? false : true,
-      ...extra,
-    });
-    if (!last?.ok && extra.parse_mode) {
+      disable_web_page_preview: rest.parse_mode === "HTML" ? false : true,
+      ...rest,
+    };
+    if (reply_markup && i === chunks.length - 1) payload.reply_markup = reply_markup;
+    last = await tg("sendMessage", payload);
+    if (!last?.ok && rest.parse_mode) {
       last = await tg("sendMessage", {
         chat_id: chatId,
         text: chunk.replace(/<[^>]+>/g, ""),
         disable_web_page_preview: true,
+        ...(reply_markup && i === chunks.length - 1 ? { reply_markup } : {}),
       });
     }
   }
@@ -326,14 +337,25 @@ async function buildBrandedScan(mint, { req, link, isGroup }) {
     allowPrivileged: false,
   };
   const args = { mint };
-  const [token, xray, forensics, boosts, verified] = await Promise.all([
-    raceTimeout(runTool({ tool: "orbitx_get_token", args, ...ctx }), 12_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_xray", args, ...ctx }), 12_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_get_forensics", args: { mint, first: "0" }, ...ctx }), 10_000).catch(() => null),
-    raceTimeout(runTool({ tool: "orbitx_boosts", args: {}, ...ctx }), 8_000).catch(() => null),
+  const snapshotP = fetchTelegramTokenSnapshot(mint).catch(() => null);
+  const extrasP = Promise.all([
+    raceTimeout(runTool({ tool: "orbitx_xray", args, ...ctx }), 6_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_get_forensics", args: { mint, first: "0" }, ...ctx }), 5_000).catch(() => null),
+    raceTimeout(runTool({ tool: "orbitx_boosts", args: {}, ...ctx }), 4_000).catch(() => null),
     lookupVerifiedMint(mint),
   ]);
-  const merged = mergeTokenScanPayloads({ token, xray, forensics, boosts, verified });
+  const [snapshot, extras] = await Promise.all([
+    snapshotP,
+    raceTimeout(extrasP, 6_500).catch(() => [null, null, null, null]),
+  ]);
+  const [xray, forensics, boosts, verified] = Array.isArray(extras) ? extras : [null, null, null, null];
+  const merged = mergeTokenScanPayloads({
+    token: snapshot,
+    xray,
+    forensics,
+    boosts,
+    verified,
+  });
   void isGroup;
   return merged;
 }
@@ -367,10 +389,7 @@ async function handleVerify(chatId, text, { isGroup, link, extra }) {
   let symbol = null;
   let name = null;
   try {
-    const token = await raceTimeout(
-      runTool({ tool: "orbitx_get_token", args: { mint }, req: null, link, allowPrivileged: false }),
-      10_000,
-    );
+    const token = await raceTimeout(fetchTelegramTokenSnapshot(mint), 8_000);
     symbol = token?.token?.symbol || token?.symbol || null;
     name = token?.token?.name || token?.name || null;
   } catch {
@@ -457,32 +476,7 @@ async function postLinkedX(userId, args) {
 }
 
 function helpText(isPrivate, linked) {
-  return [
-    `<b>OrbitX</b> · @${OFFICIAL_BOT_USERNAME}`,
-    ORBITX_TELEGRAM_BLURB,
-    "Anyone can ask about live products — DEX, City, OS, Play, Intel, Launchpad, HQ.",
-    "",
-    "<b>Commands</b>",
-    "/cmds — slash menu + live tool catalog",
-    "/token mint · /chart ca · /scan · /xray · /research",
-    "Drop a CA in chat for a branded scan (MC, ATH, holders, whales, bundles, boosts)",
-    "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
-    "/check — countdown + poll the latest image/video job",
-    "/faq [topic] — OrbitX FAQ (utility, MCP, burn, shop, DEX, launch)",
-    "/shop — MCP seats + credits (linked wallet for buys)",
-    "/links · /group — every URL + community GC",
-    "/ask — talk to OrbitX AI",
-    "",
-    isPrivate
-      ? linked
-        ? "Account linked. /me · /buy CA 0.1 sol · /trade · /orbitx · /shop · /autobuy on · /launch · /mint · /call tool"
-        : "/login to bind THIS Telegram to YOUR OrbitX wallet. Nobody else can trade for you."
-      : "Groups stay public. Wallet commands (/trade /buy /tweet) only work in DM after /login.",
-    "",
-    `Live team chat: ${ORBITX_GC}`,
-    "If a feat is live-ops / you need a human, join the GC and ask a team member.",
-    "Web: https://www.orbitx.world/telegram",
-  ].join("\n");
+  return formatHelpDesk(isPrivate, linked);
 }
 
 function isMediaGenTool(name) {
@@ -501,6 +495,39 @@ function parseTaskId(result) {
 
 const mediaJobsByChat = new Map();
 const mediaJobsByTask = new Map();
+const scanCooldown = new Map();
+const seenUpdateIds = new Map();
+
+function alreadyHandledUpdate(updateId) {
+  const id = Number(updateId);
+  if (!Number.isFinite(id)) return false;
+  const prev = seenUpdateIds.get(id);
+  if (prev && Date.now() - prev < 120_000) return true;
+  seenUpdateIds.set(id, Date.now());
+  if (seenUpdateIds.size > 800) {
+    const cutoff = Date.now() - 180_000;
+    for (const [k, ts] of seenUpdateIds) {
+      if (ts < cutoff) seenUpdateIds.delete(k);
+    }
+  }
+  return false;
+}
+
+function recentlyScanned(chatId, mint) {
+  const id = String(mint || "").trim().toLowerCase();
+  if (!id || chatId == null) return false;
+  const key = `${chatId}:${id}`;
+  const prev = scanCooldown.get(key);
+  if (prev && Date.now() - prev < 25_000) return true;
+  scanCooldown.set(key, Date.now());
+  if (scanCooldown.size > 2000) {
+    const cutoff = Date.now() - 90_000;
+    for (const [k, ts] of scanCooldown) {
+      if (ts < cutoff) scanCooldown.delete(k);
+    }
+  }
+  return false;
+}
 
 function cacheMediaJob(job) {
   if (!job?.task_id) return;
@@ -655,7 +682,7 @@ async function sendLinks(chatId, extra = {}) {
   await sendLong(
     chatId,
     `${formatOrbitXLinksHtml()}\n\nNeed a live human answer? Join ${ORBITX_GC} and ask a team member.`,
-    { parse_mode: "HTML", ...extra },
+    { parse_mode: "HTML", reply_markup: deskKeyboard(), ...extra },
   );
 }
 
@@ -684,7 +711,7 @@ async function replyToolResult(chatId, result, { tool, extra, job } = {}) {
           etaSeconds: result.etaSeconds || job?.eta_seconds || mediaEtaSeconds(result.kind || job?.kind),
         }
       : result;
-  await sendLong(chatId, formatOrbitXTelegramResult(timed, tool), { parse_mode: "HTML", ...extra });
+  await sendCard(chatId, formatOrbitXTelegramResult(timed, tool), extra);
   await sendMedia(chatId, collectMediaUrls(timed || result));
 }
 
@@ -717,22 +744,18 @@ async function handleCheck(chatId, text, { req, link, extra }) {
   const state = String(result?.state || result?.status || "").toLowerCase();
   const kind = job?.kind || result?.kind || "image";
   if (result?.error && !state) {
-    await sendLong(chatId, formatOrbitXTelegramResult(result), { parse_mode: "HTML", ...extra });
+    await sendCard(chatId, formatOrbitXTelegramResult(result), extra);
     return;
   }
   if (state === "success" || state === "succeeded" || state === "completed" || state === "done") {
     await markMediaJob(taskId, "succeeded");
-    await sendLong(
-      chatId,
-      formatMediaCountdown({ kind, taskId, state: "success" }),
-      { parse_mode: "HTML", ...extra },
-    );
+    await sendCard(chatId, formatMediaCountdown({ kind, taskId, state: "success" }), extra);
     await sendMedia(chatId, collectMediaUrls(result));
     return;
   }
   if (state === "fail" || state === "failed" || state === "error") {
     await markMediaJob(taskId, "failed");
-    await sendLong(
+    await sendCard(
       chatId,
       formatMediaCountdown({
         kind,
@@ -740,11 +763,11 @@ async function handleCheck(chatId, text, { req, link, extra }) {
         state: "fail",
         failMsg: result?.failMsg || result?.error || result?.message,
       }),
-      { parse_mode: "HTML", ...extra },
+      extra,
     );
     return;
   }
-  await sendLong(
+  await sendCard(
     chatId,
     formatMediaCountdown({
       kind,
@@ -753,7 +776,7 @@ async function handleCheck(chatId, text, { req, link, extra }) {
       etaSeconds: Number(job?.eta_seconds) > 0 ? Number(job.eta_seconds) : mediaEtaSeconds(kind),
       state: result?.state || "waiting",
     }),
-    { parse_mode: "HTML", ...extra },
+    extra,
   );
 }
 
@@ -779,15 +802,72 @@ async function startLogin(telegramUser, base) {
   ].join("\n");
 }
 
+async function sendCard(chatId, formatted, extra = {}) {
+  const parts = telegramMessageParts(formatted);
+  return sendLong(chatId, parts.text, {
+    parse_mode: "HTML",
+    reply_markup: parts.reply_markup,
+    ...extra,
+  });
+}
+
+async function handleCallbackQuery(cq, req) {
+  const data = String(cq?.data || "").trim();
+  const chatId = cq?.message?.chat?.id;
+  const from = cq?.from || {};
+  if (cq?.id) await tg("answerCallbackQuery", { callback_query_id: cq.id });
+  if (!chatId || !data.startsWith("ox:")) return;
+  const key = data.slice(3);
+  if (key === "links") {
+    await sendLinks(chatId, {});
+    return;
+  }
+  if (key.startsWith("chart:")) {
+    const mint = key.slice(6);
+    if (!mint) return;
+    await tg("sendChatAction", { chat_id: chatId, action: "typing" });
+    try {
+      const result = await runTool({
+        tool: "orbitx_dex_chart",
+        args: { mint, ca: mint },
+        req,
+        link: from.id ? await loadLink(from.id) : null,
+        allowPrivileged: false,
+      });
+      await sendCard(chatId, formatOrbitXTelegramResult(result, "orbitx_dex_chart"));
+    } catch (error) {
+      await tg("sendMessage", { chat_id: chatId, text: `Chart error: ${error?.message || error}` });
+    }
+    return;
+  }
+  await sendCard(chatId, formatFamilyMenu(key));
+}
+
 async function handleTelegramUpdate(update, req) {
+  if (alreadyHandledUpdate(update?.update_id)) return;
+  if (update.callback_query) {
+    await handleCallbackQuery(update.callback_query, req);
+    return;
+  }
   const msg = update.message || update.edited_message || update.channel_post;
   if (!msg) return;
   const text = String(msg.text || msg.caption || "").trim();
   const chatId = msg.chat?.id;
   if (!chatId) return;
+  const from = msg.from || {};
+  if (from.is_bot || String(from.username || "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase()) return;
+  if (looksLikeOrbitXCard(text)) return;
+  const quoted = String(msg.reply_to_message?.text || msg.reply_to_message?.caption || "");
+  if (
+    quoted &&
+    String(msg.reply_to_message?.from?.username || "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase() &&
+    looksLikeOrbitXCard(quoted) &&
+    (!text || extractMint(text) === extractMint(quoted))
+  ) {
+    return;
+  }
   const chatType = String(msg.chat?.type || "");
   const isGroup = chatType === "group" || chatType === "supergroup";
-  const from = msg.from || {};
   const replyExtra = isGroup ? { reply_to_message_id: msg.message_id } : {};
   const link = from.id ? await loadLink(from.id) : null;
   const limit = memoryRateLimit(
@@ -811,7 +891,7 @@ async function handleTelegramUpdate(update, req) {
   const tools = hub.listAllOrbitXTools();
 
   if (bare === "start" || bare === "help") {
-    await sendLong(chatId, helpText(!isGroup, Boolean(link)), { parse_mode: "HTML", ...replyExtra });
+    await sendCard(chatId, helpText(!isGroup, Boolean(link)), replyExtra);
     return;
   }
 
@@ -860,7 +940,7 @@ async function handleTelegramUpdate(update, req) {
 
   if (bare === "cmds" || bare === "menu") {
     const page = await handleCmds(text, tools);
-    await sendLong(chatId, page.text, { parse_mode: "HTML", ...replyExtra });
+    await sendLong(chatId, page.text, { parse_mode: "HTML", reply_markup: page.reply_markup, ...replyExtra });
     return;
   }
 
@@ -907,7 +987,7 @@ async function handleTelegramUpdate(update, req) {
     }
     if (inferred?.meta === "cmds") {
       const page = await handleCmds(text, tools);
-      await sendLong(chatId, page.text, { parse_mode: "HTML", ...replyExtra });
+      await sendLong(chatId, page.text, { parse_mode: "HTML", reply_markup: page.reply_markup, ...replyExtra });
       return;
     }
     if (inferred?.meta === "faq") {
@@ -952,11 +1032,26 @@ async function handleTelegramUpdate(update, req) {
   }
 
   const mintArg = String(args.mint || args.ca || extractMint(text) || "").trim();
+  if (
+    (tool === "orbitx_get_wallet" || tool === "orbitx_get_swaps" || tool === "orbitx_get_balance") &&
+    !args.address &&
+    !args.publicKey &&
+    link?.wallet_address
+  ) {
+    args.address = link.wallet_address;
+    args.publicKey = link.wallet_address;
+  }
+  const needed = missingToolInput(tool, { ...args, mint: args.mint || mintArg, ca: args.ca || mintArg });
+  if (needed) {
+    await sendCard(chatId, formatToolMenu(tool), replyExtra);
+    return;
+  }
   if (TOKEN_INTEL_TOOLS.has(tool) && mintArg) {
+    if (recentlyScanned(chatId, mintArg)) return;
     await tg("sendChatAction", { chat_id: chatId, action: "typing" });
     try {
       const merged = await buildBrandedScan(mintArg, { req, link, isGroup });
-      await sendLong(chatId, formatOrbitXTelegramResult(merged), { parse_mode: "HTML", ...replyExtra });
+      await sendCard(chatId, formatOrbitXTelegramResult(merged, tool), replyExtra);
       await sendMedia(chatId, collectMediaUrls(merged));
     } catch (error) {
       await tg("sendMessage", {
@@ -1163,7 +1258,7 @@ async function handleWeb(req, res, body) {
       return json(res, {
         ok: true,
         tool,
-        text: formatOrbitXTelegramResult(merged),
+        text: telegramMessageParts(formatOrbitXTelegramResult(merged, tool)).text,
         imageUrls: collectMediaUrls(merged),
         result: merged,
       });
@@ -1178,7 +1273,7 @@ async function handleWeb(req, res, body) {
     return json(res, {
       ok: result?.ok !== false,
       tool,
-      text: formatOrbitXTelegramResult(result),
+      text: telegramMessageParts(formatOrbitXTelegramResult(result, tool)).text,
       imageUrls: collectMediaUrls(result),
       result,
     });
@@ -1242,7 +1337,7 @@ export default async function handler(req, res) {
     }
 
     // Telegram webhook updates have update_id; never require JWT.
-    if (body.update_id != null || body.message || body.channel_post) {
+    if (body.update_id != null || body.message || body.channel_post || body.callback_query) {
       await handleTelegramUpdate(body, req);
       return ok(res);
     }
