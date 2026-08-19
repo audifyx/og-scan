@@ -808,7 +808,9 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
 export {
   formatOrbitXFaqHtml,
   orbitXFaqSystemAddon,
+  ORBITX_FAQ_CHUNKS,
   ORBITX_FAQ_CORE,
+  ORBITX_FAQ_SECTIONS,
   selectOrbitXFaqChunks,
 } from "./orbitx-faq-training.js";
 export { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand };

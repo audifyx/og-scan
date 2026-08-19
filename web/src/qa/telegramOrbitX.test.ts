@@ -16,7 +16,9 @@ import {
   loginCode,
   mediaEtaSeconds,
   mergeTokenScanPayloads,
+  ORBITX_FAQ_CHUNKS,
   ORBITX_FAQ_CORE,
+  ORBITX_FAQ_SECTIONS,
   orbitXFaqSystemAddon,
   parseCallInvocation,
   resolveOfficialCommand,
@@ -253,17 +255,62 @@ describe("official OrbitX Telegram bot", () => {
     expect(ORBITX_FAQ_CORE).toContain("10,000");
     expect(ORBITX_FAQ_CORE).toContain("programs/betting/");
     expect(ORBITX_FAQ_CORE).toContain("ogscan.fun");
+    expect(ORBITX_FAQ_CORE).toContain("16 chain");
+    expect(ORBITX_FAQ_CORE).toContain("not a separate standalone Solana-betting");
+    expect(ORBITX_FAQ_CORE).not.toContain("$70k");
+
+    const ids = ORBITX_FAQ_CHUNKS.map((c) => c.id);
+    for (const need of [
+      "what",
+      "token",
+      "hold",
+      "burn",
+      "shop",
+      "mcp",
+      "agents",
+      "dex",
+      "wallet",
+      "coinai",
+      "pulse",
+      "launch",
+      "surfaces",
+      "social",
+      "nft",
+      "predict",
+      "stack",
+      "roadmap",
+      "custody",
+      "answers",
+      "caveats",
+    ]) {
+      expect(ids).toContain(need);
+    }
+    expect(Object.keys(ORBITX_FAQ_SECTIONS)).toHaveLength(12);
 
     const burn = orbitXFaqSystemAddon("how does burning work");
     expect(burn).toContain("Jupiter");
     expect(burn).toContain("Shop");
     expect(burn.toLowerCase()).toContain("stackable");
+    expect(selectOrbitXFaqChunks("how does burning work").some((c) => c.id === "burn")).toBe(true);
     expect(selectOrbitXFaqChunks("how do I connect MCP").some((c) => c.id === "mcp")).toBe(true);
+    expect(selectOrbitXFaqChunks("what is OrbitX").some((c) => c.id === "what")).toBe(true);
+    expect(selectOrbitXFaqChunks("what is the utility of $ORBITX").some((c) => c.id === "hold")).toBe(true);
+    expect(selectOrbitXFaqChunks("is it custodial").some((c) => c.id === "custody")).toBe(true);
+    expect(selectOrbitXFaqChunks("where is the code").some((c) => c.id === "stack")).toBe(true);
+    expect(selectOrbitXFaqChunks("can I launch a token for free with vanity").some((c) => c.id === "launch")).toBe(true);
+    expect(selectOrbitXFaqChunks("prediction markets").some((c) => c.id === "predict")).toBe(true);
+    expect(selectOrbitXFaqChunks("Coin AI analyst").some((c) => c.id === "coinai")).toBe(true);
+    expect(selectOrbitXFaqChunks("wallet copy-tracking").some((c) => c.id === "wallet")).toBe(true);
+
+    const shop = orbitXFaqSystemAddon("how does the shop burn work");
+    expect(shop).toContain("Jupiter");
+    expect(shop).toContain("does not take");
 
     const faq = formatOrbitXFaqHtml("/faq mcp");
     expect(faq).toContain("/api/mcp");
     expect(faq).toContain("OrbitX FAQ");
     expect(formatOrbitXFaqHtml("").toLowerCase()).toContain("hold");
+    expect(formatOrbitXFaqHtml("").length).toBeLessThan(4096);
 
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("$5");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("10,000");

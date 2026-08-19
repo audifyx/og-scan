@@ -153,7 +153,7 @@ Live products (give the URL when they ask for links or “where is X”):
 
 TELEGRAM COMMANDS YOU SHOULD POINT TO
 /cmds — full live tool catalog (~5000) + slash menu
-/faq [topic] — OrbitX FAQ (token, MCP, burns, DEX, City, predictions)
+/faq [topic] — OrbitX FAQ (what, utility, MCP, burn, shop, DEX, launch, predictions, stack)
 /token mint — real token intel (price, MC, liq, holders, audit)
 /chart ca — DexScreener live chart + OrbitX DEX link
 /scan /xray /research /search /screen — intel

@@ -452,7 +452,7 @@ function helpText(isPrivate, linked) {
     "Drop a CA in chat for a branded scan (MC, ATH, holders, whales, bundles, boosts)",
     "/img prompt · /vid prompt — Grok Imagine (a few minutes)",
     "/check — countdown + poll the latest image/video job",
-    "/faq [topic] — OrbitX FAQ (token, MCP, burns, City, DEX)",
+    "/faq [topic] — OrbitX FAQ (utility, MCP, burn, shop, DEX, launch)",
     "/shop — MCP seats + credits (linked wallet for buys)",
     "/links · /group — every URL + community GC",
     "/ask — talk to OrbitX AI",
