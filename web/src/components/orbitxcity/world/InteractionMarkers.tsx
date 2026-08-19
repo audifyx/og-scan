@@ -24,7 +24,7 @@ const KIND_HINT: Record<string, string> = {
   trading: "DEX trading floor",
   community: "Community · social & chat",
   hq: "OrbitX HQ · command floor",
-  billboard: "Live OrbitX data wall",
+  billboard: "Burn store · ads & listings",
   token: "Buy desk · Jupiter swap",
   voice: "Voice plaza",
   games: "Games district",
@@ -148,7 +148,7 @@ function ZoneMarker({
       )}
       {active && (
         <>
-          <mesh position={[0, 3.55, 0]}>
+          <mesh position={[0, 4.35, 0]}>
             <torusGeometry args={[boosted ? 0.68 : 0.55, 0.035, 8, 32]} />
             <meshStandardMaterial
               color={color}
@@ -159,7 +159,7 @@ function ZoneMarker({
             />
           </mesh>
           <Text
-            position={[0, 4.25, 0]}
+            position={[0, 5.05, 0]}
             fontSize={0.22}
             color={color}
             anchorX="center"
@@ -170,7 +170,7 @@ function ZoneMarker({
             {boostLabel}
           </Text>
           <Text
-            position={[0, 3.15, 0]}
+            position={[0, 4.15, 0]}
             fontSize={0.34}
             color="#eef2f4"
             anchorX="center"
@@ -180,7 +180,7 @@ function ZoneMarker({
             {promptLine}
           </Text>
           <Text
-            position={[0, 2.72, 0]}
+            position={[0, 3.62, 0]}
             fontSize={0.16}
             color="#c5d0dc"
             anchorX="center"

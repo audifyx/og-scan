@@ -29,6 +29,7 @@ import {
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { resetVirtualInput } from "@/lib/orbitxcity/input";
 import { missionClaimCooldownMs } from "@/lib/orbitxcity/characterClasses";
+import { applyShopAppearance, loadPurchases, purchasesToInventory, type ShopPurchase } from "@/lib/orbitxcity/cityShop";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
@@ -58,6 +59,8 @@ interface CityContextValue {
   setAvatar: (a: AvatarAppearance) => void;
   inventory: InventoryItem[];
   shards: number;
+  refreshShop: () => void;
+  shopPurchases: ShopPurchase[];
   collectShard: () => void;
   claimedMissionIds: string[];
   /** Epoch ms when the next city-board claim is allowed. */
@@ -155,7 +158,7 @@ function zoneToPanel(kind: InteractionKind): HudPanel {
     case "hq":
       return "live";
     case "billboard":
-      return "live";
+      return "shop";
     case "voice":
       return "voice";
     case "games":
@@ -218,7 +221,31 @@ export function CityProvider({ children }: { children: ReactNode }) {
     panel: HudPanel;
   } | null>(null);
   const [streetNpc, setStreetNpc] = useState<{ name: string; line: string } | null>(null);
-  const inventory = STARTER_INVENTORY;
+  const [shopTick, setShopTick] = useState(0);
+  const walletKey = publicKey?.toBase58() ?? "";
+  const shopPurchases = useMemo(() => loadPurchases(walletKey), [walletKey, shopTick]);
+  const inventory = useMemo(
+    () => [...STARTER_INVENTORY, ...purchasesToInventory(shopPurchases)],
+    [shopPurchases],
+  );
+  const refreshShop = useCallback(() => setShopTick((n) => n + 1), []);
+
+  useEffect(() => {
+    if (!shopPurchases.length) return;
+    setAvatar((current) => {
+      const next = applyShopAppearance(current, shopPurchases);
+      if (
+        next.outfit === current.outfit &&
+        next.bodyColor === current.bodyColor &&
+        next.accentColor === current.accentColor &&
+        next.classId === current.classId &&
+        next.hairStyle === current.hairStyle
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [shopPurchases]);
 
   // The public lobby follows the selected district. Custom/private lobbies
   // remain untouched so friends can keep their room while changing views.
@@ -598,6 +625,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setAvatar,
       inventory,
       shards,
+      refreshShop,
+      shopPurchases,
       collectShard,
       claimedMissionIds,
       missionClaimReadyAt,
@@ -648,6 +677,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       avatar,
       inventory,
       shards,
+      refreshShop,
+      shopPurchases,
       collectShard,
       claimedMissionIds,
       missionClaimReadyAt,

@@ -471,18 +471,18 @@ body.oxc-lock {
 .oxc-prompt {
   position: absolute;
   left: 50%;
-  top: 38%;
+  top: 32%;
   bottom: auto;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 0.75rem;
   width: min(420px, calc(100% - 1.5rem));
-  border: 1px solid rgba(0, 255, 159, 0.28);
-  background: var(--oxc-hud-glass);
-  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(0, 255, 159, 0.62);
+  background: rgba(4, 8, 12, 0.92);
+  padding: 0.78rem 0.9rem;
   backdrop-filter: blur(14px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 26px rgba(0, 255, 159, 0.22), 0 12px 28px rgba(0, 0, 0, 0.45);
   animation: oxc-prompt-in 0.25s ease-out;
   z-index: 5;
 }
@@ -3220,7 +3220,7 @@ button.oxc-token-row {
   .oxc-hud--phone .oxc-prompt {
     left: 50%;
     right: auto;
-    top: 36%;
+    top: 30%;
     bottom: auto;
     width: min(420px, calc(100% - 1.2rem));
     max-width: none;
@@ -3368,7 +3368,7 @@ button.oxc-token-row {
   .oxc-prompt {
     left: 50%;
     right: auto;
-    top: 34%;
+    top: 30%;
     bottom: auto;
     width: min(420px, calc(100% - 1.1rem));
     transform: translate(-50%, -50%);
@@ -3378,7 +3378,7 @@ button.oxc-token-row {
   }
 
   .oxc-hud--touch .oxc-prompt {
-    top: 32%;
+    top: 28%;
   }
 
   .oxc-prompt-key {
@@ -3464,7 +3464,8 @@ button.oxc-token-row {
   }
 
   .oxc-prompt {
-    bottom: calc(3.2rem + var(--oxc-safe-bottom) + 5.2rem);
+    top: 28%;
+    bottom: auto;
   }
 
   .oxc-panel {
@@ -4091,4 +4092,44 @@ button.oxc-token-row {
     width: 360px;
     height: 400px;
   }
+}
+
+.oxc-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.65rem;
+}
+
+.oxc-shop-card {
+  border: 1px solid color-mix(in srgb, var(--shop, #00ff9f) 45%, transparent);
+  background: rgba(8, 12, 16, 0.72);
+  padding: 0.7rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.oxc-shop-card h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.oxc-shop-card p {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.oxc-shop-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.oxc-shop-card.is-owned {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shop, #00ff9f) 55%, transparent);
 }

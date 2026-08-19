@@ -34,7 +34,7 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     const headMat = new THREE.MeshStandardMaterial({
       color: "#d8d2c0",
       emissive: "#c4b896",
-      emissiveIntensity: 0.45,
+      emissiveIntensity: 0.85,
       metalness: 0.35,
       roughness: 0.4,
     });
@@ -88,7 +88,7 @@ function StreetLampLights({ block }: { block: WorldBlockConfig }) {
             <meshBasicMaterial color="#f0e2b8" toneMapped={false} />
           </mesh>
           <pointLight
-            intensity={high ? 1.35 : 0.95}
+            intensity={high ? 1.55 : 1.1}
             color={i % 3 === 0 ? "#00ff9f" : "#f0d7a0"}
             distance={high ? 18 : 14}
             decay={2}

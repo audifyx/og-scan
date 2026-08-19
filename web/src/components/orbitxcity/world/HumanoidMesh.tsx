@@ -23,10 +23,46 @@ const OUTFIT: Record<OutfitStyle, { top: string; bottom: string; shoe: string; t
   suit: { top: "#4a5264", bottom: "#323846", shoe: "#1a1e24", trim: "#c5a26f" },
   sport: { top: "#2e8a6e", bottom: "#2a3a4c", shoe: "#f2f4f6", trim: "#3de7ff" },
   neon: { top: "#1c2a38", bottom: "#162028", shoe: "#00ff9f", trim: "#00ff9f" },
+  hoodie: { top: "#2a3344", bottom: "#1c222c", shoe: "#111418", trim: "#00ff9f" },
+  gold: { top: "#c5a26f", bottom: "#2a2418", shoe: "#1a1610", trim: "#ffd700" },
+  royal: { top: "#1a1428", bottom: "#121018", shoe: "#c5a26f", trim: "#e0c48a" },
+  pilot: { top: "#3a4a58", bottom: "#2a3038", shoe: "#0e1216", trim: "#3de7ff" },
+  legend: { top: "#0c1410", bottom: "#08100c", shoe: "#00ff9f", trim: "#00ff9f" },
 };
 
 function hairMesh(style: HairStyle, color: string) {
-  if (style === "buzz") {
+  if (style === "fade") {
+    return (
+      <group>
+        <mesh position={[0, 0.14, -0.01]} castShadow>
+          <sphereGeometry args={[0.175, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
+          <meshStandardMaterial color={color} roughness={0.82} />
+        </mesh>
+        <mesh position={[0, 0.1, -0.02]} castShadow>
+          <sphereGeometry args={[0.16, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.35]} />
+          <meshStandardMaterial color="#2a2218" roughness={0.9} />
+        </mesh>
+      </group>
+    );
+  }
+  if (style === "twin") {
+    return (
+      <group>
+        <mesh position={[0, 0.15, -0.01]} castShadow>
+          <sphereGeometry args={[0.18, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+          <meshStandardMaterial color={color} roughness={0.76} />
+        </mesh>
+        <mesh position={[-0.12, -0.02, -0.12]} castShadow>
+          <capsuleGeometry args={[0.04, 0.22, 4, 8]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        <mesh position={[0.12, -0.02, -0.12]} castShadow>
+          <capsuleGeometry args={[0.04, 0.22, 4, 8]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+      </group>
+    );
+  }
     return (
       <mesh position={[0, 0.16, 0]} castShadow>
         <sphereGeometry args={[0.175, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.48]} />
@@ -199,12 +235,38 @@ export function HumanoidMesh({
         <meshStandardMaterial color={skin} roughness={0.65} />
       </mesh>
 
-      {/* Torso */}
-      <mesh position={[0, 1.18, 0]} castShadow>
-        <boxGeometry args={[0.42, 0.42, 0.22]} />
-        <meshStandardMaterial color={body} roughness={0.55} metalness={0.12} />
+      {/* Torso + shoulders — jacket / class cosmetics sit on a human body */}
+      <mesh position={[0, 1.2, 0]} castShadow>
+        <boxGeometry args={[0.44, 0.46, 0.24]} />
+        <meshStandardMaterial color={body} roughness={0.52} metalness={0.1} />
       </mesh>
-      <mesh position={[0, 1.18, 0.118]}>
+      <mesh position={[-0.24, 1.38, 0]} rotation={[0, 0, 0.42]} castShadow>
+        <capsuleGeometry args={[0.07, 0.1, 4, 8]} />
+        <meshStandardMaterial color={classId === "pepe" ? "#3d7a38" : body} roughness={0.5} />
+      </mesh>
+      <mesh position={[0.24, 1.38, 0]} rotation={[0, 0, -0.42]} castShadow>
+        <capsuleGeometry args={[0.07, 0.1, 4, 8]} />
+        <meshStandardMaterial color={classId === "pepe" ? "#3d7a38" : body} roughness={0.5} />
+      </mesh>
+      {classId === "pepe" && (
+        <mesh position={[0, 1.2, 0.02]} castShadow>
+          <boxGeometry args={[0.46, 0.48, 0.26]} />
+          <meshStandardMaterial color="#3d7a38" roughness={0.55} metalness={0.08} />
+        </mesh>
+      )}
+      {outfit === "hoodie" && (
+        <mesh position={[0, 1.36, -0.08]} rotation={[0.4, 0, 0]} castShadow>
+          <boxGeometry args={[0.32, 0.16, 0.18]} />
+          <meshStandardMaterial color={clothes.top} roughness={0.78} />
+        </mesh>
+      )}
+      {classId === "doge" && (
+        <mesh position={[0, 1.36, 0.08]} rotation={[0.4, 0, 0]}>
+          <torusGeometry args={[0.12, 0.028, 8, 18]} />
+          <meshStandardMaterial color="#e8a54b" roughness={0.45} emissive="#e8a54b" emissiveIntensity={0.2} />
+        </mesh>
+      )}
+      <mesh position={[0, 1.2, 0.128]}>
         <boxGeometry args={[0.12, 0.28, 0.02]} />
         <meshStandardMaterial
           color={accent}
@@ -214,7 +276,7 @@ export function HumanoidMesh({
         />
       </mesh>
       {outfit === "suit" && (
-        <mesh position={[0, 1.08, 0.12]}>
+        <mesh position={[0, 1.08, 0.13]}>
           <boxGeometry args={[0.08, 0.22, 0.02]} />
           <meshStandardMaterial color={clothes.trim} emissive={clothes.trim} emissiveIntensity={0.2} />
         </mesh>

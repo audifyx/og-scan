@@ -6,15 +6,13 @@ import type {
   HairStyle,
   OutfitStyle,
 } from "@/lib/orbitxcity/types";
+import { SHOP_HAIR, SHOP_OUTFITS, getShopItem } from "@/lib/orbitxcity/cityShop";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const BODY_PRESETS = ["#1a2438", "#2a1f3d", "#1e4436", "#3d2a1e", "#1a3040", "#3a1f28"];
 const SKIN_PRESETS = ["#e8d5c0", "#c9a07a", "#8d5524", "#f0d5b8", "#5c3a21", "#ffdbac"];
 const ACCENT_PRESETS = ["#17ff4d", "#3de7ff", "#f5c542", "#ff4d9a", "#ff6b35", "#8cffd2"];
 const HAIR_PRESETS = ["#101014", "#3a2318", "#f5c542", "#d9d0c3", "#17ff4d", "#3de7ff"];
-
-const HAIR_STYLES: HairStyle[] = ["short", "long", "buzz", "bun", "mohawk"];
-const OUTFITS: OutfitStyle[] = ["street", "suit", "sport", "neon"];
 const FACE_STYLES: FaceStyle[] = ["neutral", "cool", "smile"];
 
 const AVATAR_FALLBACK: AvatarAppearance = {
@@ -37,8 +35,22 @@ function optionLabel(value: string): string {
 }
 
 export function CharacterCreator({ onDone }: { onDone?: () => void }) {
-  const { avatar, setAvatar } = useCity();
+  const { avatar, setAvatar, shopPurchases } = useCity();
   const { profile } = useAuth();
+  const HAIR_STYLES: HairStyle[] = useMemo(() => {
+    const owned = new Set(
+      shopPurchases.map((p) => getShopItem(p.itemId)?.appearance?.hairStyle).filter(Boolean),
+    );
+    return SHOP_HAIR.filter((h) => h === "short" || h === "long" || h === "buzz" || h === "bun" || h === "mohawk" || owned.has(h));
+  }, [shopPurchases]);
+  const OUTFITS: OutfitStyle[] = useMemo(() => {
+    const owned = new Set(
+      shopPurchases.map((p) => getShopItem(p.itemId)?.appearance?.outfit).filter(Boolean),
+    );
+    return SHOP_OUTFITS.filter(
+      (o) => o === "street" || o === "suit" || o === "sport" || o === "neon" || owned.has(o),
+    );
+  }, [shopPurchases]);
   const [draft, setDraft] = useState<AvatarAppearance>(() =>
     completeAvatar({ ...avatar, name: avatar.name || profile?.username || AVATAR_FALLBACK.name }),
   );

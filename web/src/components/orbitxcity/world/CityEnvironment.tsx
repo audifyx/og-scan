@@ -347,8 +347,8 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <fog attach="fog" args={[theme.fog, high ? 55 : 40, high ? 175 : 120]} />
 
       <SkyCycle block={block} />
-      <ambientLight intensity={high ? 0.42 : 0.36} color="#c8d4de" />
-      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, high ? 0.55 : 0.42]} />
+      <ambientLight intensity={high ? 0.72 : 0.6} color="#e8f0f8" />
+      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, high ? 0.42 : 0.32]} />
       <directionalLight position={[-22, 28, 12]} intensity={high ? 0.62 : 0.48} color="#e8d8b0" />
       {high && <directionalLight position={[18, 16, -10]} intensity={0.28} color="#8eb8ff" />}
 
