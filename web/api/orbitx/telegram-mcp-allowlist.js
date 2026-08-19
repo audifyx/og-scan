@@ -12,6 +12,8 @@ export const AGENT_AUTH_DENY = new Set([
 /** Buy / sell / credits / fee ops — never on Telegram. */
 export const AGENT_TRADE_DENY = new Set([
   "orbitx_buy",
+  "orbitx_trade",
+  "orbitx_swap",
   "orbitx_sell",
   "orbitx_buy_auto",
   "orbitx_sell_pump",

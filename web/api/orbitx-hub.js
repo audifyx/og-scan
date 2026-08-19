@@ -1465,13 +1465,13 @@ const TOOL_ALIASES = {
   menu: "orbitx_menu",
   help: "orbitx_menu",
   orbitx_buy: "orbitx_prepare_buy",
-  orbitx_sell: "orbitx_prepare_sell",
-  orbitx_buy_auto: "orbitx_prepare_buy",
-  orbitx_sell_pump: "orbitx_prepare_sell",
   orbitx_trade: "orbitx_prepare_buy",
   orbitx_swap: "orbitx_prepare_buy",
   trade: "orbitx_prepare_buy",
   swap: "orbitx_prepare_buy",
+  orbitx_sell: "orbitx_prepare_sell",
+  orbitx_buy_auto: "orbitx_prepare_buy",
+  orbitx_sell_pump: "orbitx_prepare_sell",
   "buy orbitx": "orbitx_buy_orbitx",
   "buy $orbitx": "orbitx_buy_orbitx",
   buy_orbitx: "orbitx_buy_orbitx",
@@ -4882,6 +4882,10 @@ export function listEmbeddedAgentTools({ includeGenerated = false } = {}) {
     description: tool.description,
     inputSchema: tool.inputSchema,
   }));
+}
+
+export function resolveEmbeddedAgentToolName(toolName) {
+  return resolveOrbitXToolName(toolName) || String(toolName || "").trim();
 }
 
 export function hasEmbeddedAgentTool(toolName) {

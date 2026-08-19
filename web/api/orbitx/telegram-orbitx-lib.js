@@ -21,7 +21,7 @@ export const AUTH_TOOLS = new Set([
 ]);
 
 const WRITE_PREFIXES = [
-  /^orbitx_(buy|sell|trade|swap|prepare_buy|prepare_sell|confirm_buy|credits_buy|credits_confirm)/,
+  /^orbitx_(buy|sell|prepare_buy|prepare_sell|confirm_buy|credits_buy|credits_confirm)/,
   /^orbitx_social_(post|join|create|leave)/,
   /^orbitx_nft_(prepare_buy|submit_buy|like|comment|follow|register|make_offer|cancel_offer|list_for_sale|cancel_listing|create_auction|place_bid|favorite)/,
   /^orbitx_(create_token|execute_launch|prepare_launch|launch_|vanity_mint|mint_nft|submit_listing|request_boost|burn|claim_fees|rent_refund)/,
@@ -31,6 +31,7 @@ export function isPrivilegedTelegramTool(name) {
   const n = String(name || "").trim();
   if (!n) return false;
   if (AUTH_TOOLS.has(n) || n.startsWith("orbitx_auth_")) return true;
+  if (n === "trade" || n === "swap" || n === "orbitx_trade" || n === "orbitx_swap") return true;
   if (n === "orbitx_trade_auto" || n === "orbitx_whoami") return true;
   if (n.startsWith("orbitx_mcp_access_")) return true;
   if (isHoldGatedTool(n)) return true;
@@ -79,12 +80,12 @@ export const PRIVATE_COMMANDS = [
   { command: "logout", description: "Unlink this Telegram account" },
   { command: "me", description: "Show linked OrbitX identity" },
   { command: "buy", description: "Prepare a token buy (linked)" },
+  { command: "trade", description: "Buy a token with SOL (linked)" },
+  { command: "swap", description: "Same as /trade (linked)" },
   { command: "sell", description: "Prepare a token sell (linked)" },
   { command: "tweet", description: "Post to your connected X (linked)" },
   { command: "post", description: "Post to OrbitX social (linked)" },
   { command: "launch", description: "Launch / create token (linked)" },
-  { command: "trade", description: "Buy a token with SOL / USD (linked)" },
-  { command: "swap", description: "Same as /trade (linked)" },
   { command: "mint", description: "Mint an NFT (linked)" },
   { command: "nft", description: "NFT marketplace" },
   { command: "credits", description: "Buy credits with SOL (linked)" },
@@ -124,9 +125,9 @@ const PRIORITY_TOOL = {
   health: "orbitx_health",
   call: null,
   buy: "orbitx_prepare_buy",
-  sell: "orbitx_prepare_sell",
   trade: "orbitx_prepare_buy",
   swap: "orbitx_prepare_buy",
+  sell: "orbitx_prepare_sell",
   shop: "orbitx_shop",
   mint: "orbitx_mint_nft",
   nft: "orbitx_nft_listings",
@@ -155,6 +156,19 @@ export function resolveOfficialCommand(cmd) {
   return { kind: "tool", command: c, tool: aliased || prefixed };
 }
 
+export const DEFAULT_TELEGRAM_BUY_SOL = 0.05;
+const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap"];
+const BUY_COMMANDS = ["buy", "trade", "swap"];
+const BUY_TOOLS = new Set(["orbitx_prepare_buy", "orbitx_buy", "orbitx_buy_auto", "orbitx_trade", "orbitx_swap"]);
+
+export function applyDefaultBuyAmount(tool, args) {
+  const next = { ...(args || {}) };
+  if (!BUY_TOOLS.has(String(tool || "").trim())) return next;
+  const n = Number(next.amountSol);
+  if (!Number.isFinite(n) || n <= 0) next.amountSol = DEFAULT_TELEGRAM_BUY_SOL;
+  return next;
+}
+
 export function argsFromCommand(command, text) {
   const rest = String(text || "").replace(/^\S+\s*/, "").trim();
   const args = rest ? parseCallArgs(rest) : {};
@@ -165,10 +179,19 @@ export function argsFromCommand(command, text) {
   }
   if (command === "media" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
   if (command === "check" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
-  if (["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap", "orbitx"].includes(command) && rest && !args.mint) {
+  if (
+    (MINT_COMMANDS.includes(command) || command === "orbitx") &&
+    rest &&
+    !args.mint
+  ) {
     const token = rest.split(/\s+/)[0];
     args.mint = token;
     args.ca = token;
+  }
+  if (BUY_COMMANDS.includes(command) && rest && args.amountSol == null) {
+    const parts = rest.split(/\s+/);
+    const maybeAmount = parts.find((part, i) => i > 0 && Number.isFinite(Number(part)) && Number(part) > 0);
+    if (maybeAmount) args.amountSol = Number(maybeAmount);
   }
   if (["buy", "sell", "trade", "swap", "orbitx", "credits", "shop", "launch", "mint"].includes(command)) {
     const intent = parseTradeIntent(text);

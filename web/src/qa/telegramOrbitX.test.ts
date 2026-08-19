@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   argsFromCommand,
+  applyDefaultBuyAmount,
   cmdsPage,
   extractMint,
   formatMediaCountdown,
@@ -24,6 +25,7 @@ import {
   resolveOfficialCommand,
   selectOrbitXFaqChunks,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
+import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
 import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
 
 const WEB = resolve(__dirname, "../..");
@@ -47,6 +49,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(isPublicTelegramTool("orbitx_generate_video")).toBe(true);
     expect(isPublicTelegramTool("orbitx_prepare_buy")).toBe(false);
     expect(isPrivilegedTelegramTool("orbitx_prepare_buy")).toBe(true);
+    expect(isPrivilegedTelegramTool("orbitx_trade")).toBe(true);
+    expect(isPrivilegedTelegramTool("orbitx_swap")).toBe(true);
+    expect(isPublicTelegramTool("orbitx_trade")).toBe(false);
+    expect(isPublicTelegramTool("orbitx_traders_top5")).toBe(true);
+    expect(isPrivilegedTelegramTool("orbitx_traders_top5")).toBe(false);
     expect(isPrivilegedTelegramTool("orbitx_prepare_sell")).toBe(true);
     expect(isPrivilegedTelegramTool("orbitx_social_post")).toBe(true);
     expect(isPrivilegedTelegramTool("x_post")).toBe(true);
@@ -59,6 +66,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("tweet").tool).toBe("x_post");
     expect(resolveOfficialCommand("buy").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("trade").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("swap").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("/trade@theorbitxmcpbot").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("shop").tool).toBe("orbitx_shop");
     expect(resolveOfficialCommand("autobuy").kind).toBe("meta");
     expect(resolveOfficialCommand("auth").kind).toBe("meta");
@@ -90,6 +99,25 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
+  });
+
+  it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
+    const mint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+    expect(argsFromCommand("trade", `/trade ${mint}`)).toMatchObject({ mint, ca: mint });
+    expect(argsFromCommand("trade", `/trade ${mint} 0.1`)).toMatchObject({ mint, amountSol: 0.1 });
+    expect(applyDefaultBuyAmount("orbitx_trade", { mint })).toMatchObject({ mint, amountSol: 0.05 });
+    expect(applyDefaultBuyAmount("orbitx_prepare_buy", { mint, amountSol: 0.25 }).amountSol).toBe(0.25);
+    expect(isAgentTelegramToolAllowed("orbitx_trade")).toBe(false);
+    expect(isAgentTelegramToolAllowed("orbitx_swap")).toBe(false);
+    expect(isAgentTelegramToolAllowed("orbitx_prepare_buy")).toBe(false);
+    expect(isAgentTelegramToolAllowed("orbitx_get_token")).toBe(true);
+    const hub = readFileSync(resolve(WEB, "api/orbitx-hub.js"), "utf8");
+    expect(hub).toContain('orbitx_trade: "orbitx_prepare_buy"');
+    expect(hub).toContain('orbitx_swap: "orbitx_prepare_buy"');
+    expect(hub).toContain("export function resolveEmbeddedAgentToolName");
+    const api = readFileSync(resolve(WEB, "api/telegram-orbitx.js"), "utf8");
+    expect(api).toContain("resolveEmbeddedAgentToolName");
+    expect(api).toContain("applyDefaultBuyAmount");
   });
 
   it("issues alphanumeric login codes without a bot token", () => {

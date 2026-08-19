@@ -18,6 +18,7 @@ import {
   OFFICIAL_BOT_USERNAME,
   PRIVATE_COMMANDS,
   argsFromCommand,
+  applyDefaultBuyAmount,
   cmdsPage,
   collectMediaUrls,
   extractMint,
@@ -209,8 +210,8 @@ async function loadWallet(userId) {
 async function runTool({ tool, args, req, link, allowPrivileged }) {
   const hub = await import("./orbitx-hub.js");
   const requested = String(tool || "").trim();
-  const name = hub.resolveOrbitXToolName(requested) || requested;
-  if (!name) return { ok: false, error: "tool_required" };
+  if (!requested) return { ok: false, error: "tool_required" };
+  const name = hub.resolveOrbitXToolName(requested) || hub.resolveEmbeddedAgentToolName(requested);
   if (!hub.hasEmbeddedAgentTool(name) && name !== "x_post") {
     return {
       ok: false,
@@ -219,7 +220,8 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       hint: "/cmds · /shop · /buy CA 0.1 sol · /login in DM",
     };
   }
-  const privileged = isPrivilegedTelegramTool(name) || name === "x_post";
+  const privileged =
+    isPrivilegedTelegramTool(name) || isPrivilegedTelegramTool(requested) || name === "x_post";
   if (privileged && !allowPrivileged) {
     return {
       ok: false,
@@ -234,7 +236,7 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       message: "Link your OrbitX wallet first: /login (private DM only). Nobody else can use your account.",
     };
   }
-  const cleanArgs = { ...(args || {}) };
+  const cleanArgs = applyDefaultBuyAmount(name, args);
   delete cleanArgs.__resolvedTool;
   if (
     allowPrivileged &&
@@ -461,7 +463,7 @@ function helpText(isPrivate, linked) {
       ? linked
         ? "Account linked. /me · /buy CA 0.1 sol · /trade · /orbitx · /shop · /autobuy on · /launch · /mint · /call tool"
         : "/login to bind THIS Telegram to YOUR OrbitX wallet. Nobody else can trade for you."
-      : "Groups stay public. Wallet commands (/buy /tweet) only work in DM after /login.",
+      : "Groups stay public. Wallet commands (/trade /buy /tweet) only work in DM after /login.",
     "",
     `Live team chat: ${ORBITX_GC}`,
     "If a feat is live-ops / you need a human, join the GC and ask a team member.",
@@ -622,7 +624,7 @@ async function handleCmds(text, tools) {
 
 async function askAi(prompt, { linked }) {
   const extra = linked
-    ? "This user is linked to their OrbitX account in a private DM — they can /buy /sell /tweet /post."
+    ? "This user is linked to their OrbitX account in a private DM — they can /trade /buy /sell /tweet /post."
     : "This chat is public unless they /login in a private DM.";
   const nim = await nvidiaChat({
     system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}\n\n${orbitXFaqSystemAddon(prompt)}`,
@@ -644,8 +646,9 @@ async function sendLinks(chatId, extra = {}) {
 }
 
 function withTelegramToolArgs(tool, args) {
-  if (!isMediaGenTool(tool)) return args || {};
-  return { ...(args || {}), wait: false };
+  const next = applyDefaultBuyAmount(tool, args);
+  if (!isMediaGenTool(tool)) return next;
+  return { ...next, wait: false };
 }
 
 function startedAtMs(job, result) {
@@ -758,7 +761,7 @@ async function startLogin(telegramUser, base) {
     "1. Open the secure page (expires in 15 minutes)",
     url,
     "2. Sign in with the wallet you use on OrbitX",
-    "3. Confirm. Then /buy /sell /tweet /post work in this DM.",
+    "3. Confirm. Then /trade /buy /sell /tweet /post work in this DM.",
   ].join("\n");
 }
 
