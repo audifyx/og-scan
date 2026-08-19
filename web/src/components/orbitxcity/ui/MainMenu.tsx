@@ -14,7 +14,7 @@ import { AudioToggle } from "./AudioToggle";
 import { InstallCityPWA } from "./InstallCityPWA";
 
 export function MainMenu() {
-  const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
+  const { setGate, setEntered, selectedCityId, setSelectedCityId } = useCity();
   const [visible, setVisible] = useState(false);
   const [flash, setFlash] = useState(false);
   const [focus, setFocus] = useState<TitleNavId>("play");
@@ -57,11 +57,9 @@ export function MainMenu() {
         window.setTimeout(() => setGate("lobbies"), 160);
         break;
       case "settings":
-        cityAudio.play("enter");
+        cityAudio.play("ui");
         pulse();
-        setGate("world");
-        setEntered(true);
-        openPanel("settings");
+        window.setTimeout(() => setGate("settings"), 140);
         break;
       case "quick":
         cityAudio.play("enter");
@@ -109,7 +107,7 @@ export function MainMenu() {
             </span>
             <span className="oxc-menu-logo-city">CITY</span>
           </div>
-          <p className="oxc-menu-tag">{activeCity.tagline}. Walk Midtown. Trade. Launch. Play.</p>
+          <p className="oxc-menu-tag">Financial hub. Walk Midtown. Trade. Launch. Play.</p>
         </header>
 
         <section className="oxc-menu-districts" aria-labelledby="oxc-district-label">

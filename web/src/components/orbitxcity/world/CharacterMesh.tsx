@@ -1,8 +1,10 @@
 /**
- * In-world avatar — crypto mascots (Pepe, Wojak, Chad, Doge, Anon).
+ * In-world avatar — readable humanoid with synced cosmetics.
+ * Character-select still uses CryptoMascotMesh for class identity.
  */
-import { CryptoMascotMesh, type CharacterAnimationState } from "./CryptoMascotMesh";
+import { HumanoidMesh } from "./HumanoidMesh";
 import type { AvatarAppearance, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
+import type { CharacterAnimationState } from "./CryptoMascotMesh";
 
 export type { CharacterAnimationState };
 
@@ -33,7 +35,7 @@ export function CharacterMesh(props: CharacterMeshProps) {
     faceStyle: props.faceStyle,
   };
   return (
-    <CryptoMascotMesh
+    <HumanoidMesh
       appearance={appearance}
       animation={props.animation}
       moving={props.moving}

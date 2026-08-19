@@ -34,11 +34,34 @@ const FAMILY_TRIM: Record<FacadeFamily, string> = {
 };
 
 const FAMILY_WALL: Record<FacadeFamily, string> = {
-  brick: "#6b3f32",
-  limestone: "#c4b6a0",
-  glass: "#1a222c",
-  retail: "#3a3530",
+  brick: "#8a5344",
+  limestone: "#d4c8b0",
+  glass: "#2a3848",
+  retail: "#4a4440",
 };
+
+const KIND_SIGN: Partial<Record<BuildingDefinition["kind"] | NonNullable<BuildingDefinition["interaction"]>, string>> = {
+  hq: "ORBITX",
+  trading_floor: "DEX",
+  trading: "DEX",
+  launch_arena: "PUMP",
+  launch: "PUMP",
+  market: "SOL",
+  marketplace: "SOL",
+  social_hub: "COMMUNITY",
+  community: "COMMUNITY",
+  shop: "GAMES",
+  games: "GAMES",
+  ad_tower: "ADS",
+};
+
+function buildingSign(b: BuildingDefinition): string {
+  return (
+    KIND_SIGN[b.kind] ??
+    (b.interaction ? KIND_SIGN[b.interaction] : undefined) ??
+    (b.label ?? b.name).slice(0, 10).toUpperCase()
+  );
+}
 
 function Cornice({ w, d, y, color }: { w: number; d: number; y: number; color: string }) {
   return (
@@ -359,7 +382,7 @@ function FacadeTier({
       map: tex,
       emissiveMap: tex,
       emissive: new THREE.Color("#ffffff"),
-      emissiveIntensity: family === "glass" ? 0.22 : 0.14,
+      emissiveIntensity: family === "glass" ? 0.48 : 0.32,
       metalness: family === "glass" ? 0.45 : 0.18,
       roughness: family === "glass" ? 0.35 : 0.78,
     });
@@ -419,7 +442,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
       map: tex,
       emissiveMap: tex,
       emissive: new THREE.Color("#ffffff"),
-      emissiveIntensity: family === "glass" ? 0.22 : 0.14,
+      emissiveIntensity: family === "glass" ? 0.48 : 0.32,
       metalness: family === "glass" ? 0.42 : 0.2,
       roughness: family === "glass" ? 0.38 : 0.72,
     });
@@ -464,8 +487,7 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const modelPath = useMemo(() => gltfPathForBuilding(building.id, building.kind), [building.id, building.kind]);
   const hasFootprint = Boolean(building.footprint && building.footprint.length >= 3);
   // Prefer OrbitX custom shell when available; else Kenney hash sample on high quality.
-  const useAssetShell =
-    !hasFootprint && quality === "high" && Boolean(modelPath) && (kit.isOrbitx || hashSeed(building.id) % 5 === 0);
+  const useAssetShell = !hasFootprint && quality === "high" && Boolean(modelPath) && kit.isOrbitx;
   const marqueeIntensity = kit.marqueeIntensity;
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
   const top = tiers[tiers.length - 1]!;
@@ -530,6 +552,25 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
           <boxGeometry args={[Math.min(size.width * 0.96, size.width - 0.2), 2.7, 0.1]} />
           <meshStandardMaterial color={FAMILY_TRIM[family]} metalness={0.22} roughness={0.72} />
         </mesh>
+      )}
+
+      {!walkIn && size.height >= 6 && (
+        <mesh position={[0, Math.min(size.height * 0.42, 5.2), size.depth / 2 + 0.12]} castShadow>
+          <boxGeometry args={[Math.min(size.width * 0.72, 5.6), 0.55, 0.16]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} toneMapped={false} />
+        </mesh>
+      )}
+      {!walkIn && size.height >= 6 && (
+        <Text
+          position={[0, Math.min(size.height * 0.42, 5.2), size.depth / 2 + 0.24]}
+          fontSize={0.22}
+          color="#061018"
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={Math.min(size.width * 0.68, 5.2)}
+        >
+          {buildingSign(building)}
+        </Text>
       )}
 
       {walkIn && (
@@ -618,18 +659,29 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
             <meshStandardMaterial color="#080c10" transparent opacity={0.35} depthWrite={false} />
           </mesh>
           <Text
-            position={[0, 0.28, size.depth / 2 + 0.28]}
-            fontSize={0.14}
-            color={accent}
+            position={[0, 2.82, size.depth / 2 + 0.42]}
+            fontSize={0.2}
+            color="#e8fff4"
             anchorX="center"
-            outlineWidth={0.01}
+            anchorY="middle"
+            outlineWidth={0.018}
             outlineColor="#05080c"
             onClick={(e) => {
               e.stopPropagation();
               openVenue(building.id);
             }}
           >
-            WALK IN · E TOOLS
+            {`WALK IN · ${(label ?? name).toUpperCase()}`}
+          </Text>
+          <Text
+            position={[0, 2.52, size.depth / 2 + 0.42]}
+            fontSize={0.13}
+            color={accent}
+            anchorX="center"
+            outlineWidth={0.012}
+            outlineColor="#05080c"
+          >
+            Doorway open · E for tools
           </Text>
           <mesh position={[0, 0.02, size.depth / 2 + 1.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
             <planeGeometry args={[doorW + 2.6, 2.4]} />

@@ -167,10 +167,33 @@ export function TokenBuyPanel() {
         </div>
       </div>
 
-      <div className="oxc-stat-row">
+      <div className="oxc-stat-row dense">
         <div><small>MCAP</small><b>{fmtUsd(token?.mcap)}</b></div>
         <div><small>VOL 24H</small><b>{fmtUsd(token?.volume24h)}</b></div>
         <div><small>LIQ</small><b>{fmtUsd(token?.liquidity)}</b></div>
+        <div><small>FDV</small><b>{fmtUsd(token?.fdv)}</b></div>
+        <div><small>HOLDERS</small><b>{token?.holderCount != null ? token.holderCount.toLocaleString() : "—"}</b></div>
+        <div><small>CLUSTER</small><b>{token?.holderCount != null ? (token.holderCount > 2000 ? "Wide" : token.holderCount > 400 ? "Active" : "Thin") : "—"}</b></div>
+      </div>
+      <div className="oxc-token-links">
+        {token?.website && (
+          <a className="oxc-btn ghost compact" href={token.website} target="_blank" rel="noreferrer">
+            Site
+          </a>
+        )}
+        {token?.twitter && (
+          <a className="oxc-btn ghost compact" href={token.twitter} target="_blank" rel="noreferrer">
+            X
+          </a>
+        )}
+        <a
+          className="oxc-btn ghost compact"
+          href={`https://app.bubblemaps.io/sol/token/${selectedMint}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Bubblemaps
+        </a>
       </div>
 
       {spark.length > 1 && (

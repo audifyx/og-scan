@@ -102,7 +102,7 @@ export function createFacadeTexture(
   const cellH = H / rows;
   const winW = cellW * 0.56;
   const winH = cellH * 0.6;
-  const litPalette = ["#d9c9a8", "#c4d0d8", "#b8c4b0", "#cfc4b0"];
+  const litPalette = ["#f0d7a0", "#ffe9b8", "#e8c99a", "#c8d8e8", "#00ff9f"];
 
   const groundRows = groundFloor ? 1 : 0;
   for (let r = 0; r < rows - groundRows; r++) {
@@ -110,21 +110,19 @@ export function createFacadeTexture(
       const x = c * cellW + (cellW - winW) / 2;
       const y = r * cellH + (cellH - winH) / 2;
       const roll = rand();
-      if (roll < 0.55) {
-        // Dark / reflective glass
+      if (roll < 0.32) {
         ctx.fillStyle = "#12161a";
         ctx.fillRect(x, y, winW, winH);
-        ctx.fillStyle = "rgba(180,200,210,0.12)";
+        ctx.fillStyle = "rgba(180,200,210,0.16)";
         ctx.fillRect(x, y, winW, winH * 0.4);
-      } else if (roll < 0.82) {
-        // Soft interior light — warm realistic glow, not neon
-        const color = litPalette[Math.floor(rand() * litPalette.length)];
+      } else if (roll < 0.9) {
+        const color = litPalette[Math.floor(rand() * litPalette.length)]!;
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.28 + rand() * 0.22;
+        ctx.globalAlpha = 0.62 + rand() * 0.32;
         ctx.fillRect(x, y, winW, winH);
-        ctx.globalAlpha = 0.2;
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(x, y + winH * 0.55, winW, winH * 0.45);
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = "#fff6d0";
+        ctx.fillRect(x + 1, y + 1, winW - 2, winH * 0.35);
         ctx.globalAlpha = 1;
       } else {
         ctx.fillStyle = "#0a0d10";

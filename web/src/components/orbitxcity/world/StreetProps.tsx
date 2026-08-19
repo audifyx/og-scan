@@ -6,6 +6,7 @@ import { collidesAt } from "@/lib/orbitxcity/collision";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { CITY_STREET_MODELS } from "@/lib/orbitxcity/assets/catalog";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const BENCH_PATH = CITY_STREET_MODELS.bench;
 useGLTF.preload(BENCH_PATH);
@@ -62,6 +63,43 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     <group>
       <primitive object={poles} />
       <primitive object={heads} />
+    </group>
+  );
+}
+
+function StreetLampLights({ block }: { block: WorldBlockConfig }) {
+  const { quality } = useCity();
+  const high = quality === "high";
+  const spots = useMemo(() => {
+    const streets = getWorldStreets(block.cityId);
+    const out: Array<[number, number]> = [];
+    const spacing = high ? 22 : 36;
+    for (const s of streets) {
+      const off = s.w / 2 + 1;
+      for (let t = s.from + 8; t <= s.to - 6; t += spacing) {
+        const p: [number, number] = s.o === "h" ? [t, s.at + off] : [s.at + off, t];
+        if (!collidesAt(p[0], p[1], 0.4, block)) out.push(p);
+      }
+    }
+    return out.slice(0, high ? 14 : 6);
+  }, [block, high]);
+
+  return (
+    <group>
+      {spots.map(([x, z], i) => (
+        <group key={`lamp-light-${i}`} position={[x, 4.6, z]}>
+          <mesh>
+            <sphereGeometry args={[0.12, 8, 8]} />
+            <meshBasicMaterial color="#f0e2b8" toneMapped={false} />
+          </mesh>
+          <pointLight
+            intensity={high ? 1.35 : 0.95}
+            color={i % 3 === 0 ? "#00ff9f" : "#f0d7a0"}
+            distance={high ? 18 : 14}
+            decay={2}
+          />
+        </group>
+      ))}
     </group>
   );
 }
@@ -253,6 +291,7 @@ export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConf
   return (
     <group>
       <LampField block={block} />
+      <StreetLampLights block={block} />
       <Crosswalks block={block} />
       <SidewalkScatter block={block} />
       <StreetFurniture block={block} />

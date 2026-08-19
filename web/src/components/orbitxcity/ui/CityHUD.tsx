@@ -394,7 +394,7 @@ export function CityHUD() {
         )}
       </nav>
 
-      {prompt && (
+      {prompt && panel === "none" && (
         <div className="oxc-prompt">
           <div className="oxc-prompt-key">E</div>
           <div className="oxc-prompt-copy">

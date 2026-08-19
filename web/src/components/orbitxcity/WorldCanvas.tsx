@@ -123,7 +123,7 @@ export function WorldCanvas({ tickerRows }: { tickerRows: ScreenerRow[] }) {
           antialias: high,
           powerPreference: high ? "high-performance" : "low-power",
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: high ? 1.08 : 1,
+          toneMappingExposure: high ? 1.22 : 1.12,
           stencil: false,
         }}
         performance={{ min: high ? 0.5 : 0.25 }}

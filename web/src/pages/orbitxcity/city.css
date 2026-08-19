@@ -471,23 +471,25 @@ body.oxc-lock {
 .oxc-prompt {
   position: absolute;
   left: 50%;
-  bottom: 5.5rem;
-  transform: translateX(-50%);
+  top: 38%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 0.75rem;
   width: min(420px, calc(100% - 1.5rem));
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(0, 255, 159, 0.28);
   background: var(--oxc-hud-glass);
   padding: 0.7rem 0.8rem;
   backdrop-filter: blur(14px);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
   animation: oxc-prompt-in 0.25s ease-out;
+  z-index: 5;
 }
 
 @keyframes oxc-prompt-in {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
 .oxc-prompt-key {
@@ -658,22 +660,25 @@ body.oxc-lock {
 /* ΓöÇΓöÇ Panels ΓöÇΓöÇ */
 .oxc-panel {
   position: absolute;
-  top: 4.5rem;
-  right: 1rem;
-  width: min(380px, calc(100% - 2rem));
-  max-height: calc(100% - 8.5rem);
+  top: 50%;
+  left: 50%;
+  right: auto;
+  width: min(440px, calc(100% - 1.6rem));
+  max-height: min(76vh, calc(100% - 9.5rem));
   display: flex;
   flex-direction: column;
   border: 1px solid var(--oxc-line);
   background: var(--oxc-panel);
   backdrop-filter: blur(16px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%);
   animation: oxc-panel-in 0.22s ease-out;
+  z-index: 6;
 }
 
 @keyframes oxc-panel-in {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
 .oxc-panel-head {
@@ -907,6 +912,25 @@ body.oxc-lock {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.4rem;
+}
+
+.oxc-stat-row.dense {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.oxc-token-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.oxc-settings-gate-body {
+  position: relative;
+  z-index: 2;
+  width: min(520px, calc(100% - 1.5rem));
+  margin: 0 auto;
+  overflow: auto;
+  padding: 0.4rem 0 1.2rem;
 }
 
 .oxc-stat-row div {
@@ -1148,11 +1172,12 @@ button.oxc-token-row {
   border: 1px solid color-mix(in srgb, var(--tp, var(--oxc-lime)) 45%, transparent);
   background: color-mix(in srgb, var(--tp, var(--oxc-lime)) 9%, transparent);
   color: var(--tp, var(--oxc-lime));
-  padding: 0.55rem 0.5rem;
+  min-height: 3.35rem;
+  padding: 0.7rem 0.65rem;
   font: inherit;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.15s;
@@ -1492,7 +1517,8 @@ button.oxc-token-row {
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: center;
   gap: 0;
   padding:
     max(1rem, var(--oxc-safe-top))
@@ -1569,18 +1595,19 @@ button.oxc-token-row {
 .oxc-menu-stage {
   position: relative;
   z-index: 2;
-  width: min(420px, 100%);
+  width: min(440px, 100%);
   display: grid;
   gap: 1.35rem;
-  margin-bottom: auto;
-  margin-top: clamp(4.5rem, 12vh, 7rem);
-  align-self: flex-start;
+  margin: 0 auto;
+  align-self: center;
+  justify-items: center;
+  text-align: center;
 }
 
 .oxc-menu-brand {
   position: relative;
   z-index: 1;
-  text-align: left;
+  text-align: center;
   width: 100%;
 }
 
@@ -1596,7 +1623,7 @@ button.oxc-token-row {
 .oxc-menu-logo {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.2rem;
 }
 
@@ -1633,13 +1660,13 @@ button.oxc-token-row {
 }
 
 .oxc-menu-tag {
-  margin: 0.85rem 0 0;
-  max-width: 22rem;
-  font-size: 0.95rem;
-  color: rgba(220, 226, 236, 0.72);
-  letter-spacing: 0.02em;
+  margin: 0.85rem auto 0;
+  max-width: 26rem;
+  font-size: 1rem;
+  color: rgba(236, 242, 248, 0.88);
+  letter-spacing: 0.03em;
   line-height: 1.45;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.75);
 }
 
 @keyframes oxc-logo-breathe {
@@ -1657,18 +1684,19 @@ button.oxc-token-row {
   width: 100%;
   display: grid;
   gap: 0.45rem;
+  justify-items: center;
 }
 
 .oxc-menu-section-label {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: center;
   gap: 0.75rem;
   font-family: var(--oxc-font-display);
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(210, 218, 230, 0.45);
+  color: rgba(210, 218, 230, 0.55);
 }
 
 .oxc-menu-section-label em {
@@ -1683,6 +1711,7 @@ button.oxc-token-row {
   display: grid;
   gap: 0.35rem;
   width: 100%;
+  justify-items: stretch;
 }
 
 .oxc-menu-rail-item {
@@ -1758,7 +1787,7 @@ button.oxc-token-row {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.35rem;
   margin-top: 1.25rem;
 }
@@ -1767,23 +1796,24 @@ button.oxc-token-row {
   font-family: var(--oxc-font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
-  color: rgba(190, 205, 230, 0.42);
-  text-align: left;
+  color: rgba(210, 220, 236, 0.58);
+  text-align: center;
 }
 
 @media (min-width: 900px) {
   .oxc-menu {
     justify-content: center;
+    align-items: center;
   }
 
   .oxc-menu-stage {
-    margin-top: 0;
-    margin-bottom: 0;
-    margin-left: clamp(1.5rem, 6vw, 5rem);
+    margin: 0 auto;
+    width: min(480px, 92vw);
   }
 
   .oxc-menu-foot {
-    margin-left: clamp(1.5rem, 6vw, 5rem);
+    margin: 1.25rem auto 0;
+    align-items: center;
   }
 }
 
@@ -2592,8 +2622,8 @@ button.oxc-token-row {
 
 @media (max-width: 640px) {
   .oxc-menu {
-    justify-content: flex-end;
-    align-items: stretch;
+    justify-content: center;
+    align-items: center;
     padding:
       max(0.75rem, var(--oxc-safe-top))
       max(0.75rem, var(--oxc-safe-right))
@@ -2611,9 +2641,8 @@ button.oxc-token-row {
   }
 
   .oxc-menu-stage {
-    width: 100%;
-    margin-top: clamp(3.5rem, 10vh, 5.5rem);
-    margin-bottom: 0;
+    width: min(420px, 100%);
+    margin: 0 auto;
     gap: 1.1rem;
   }
 
@@ -2642,14 +2671,13 @@ button.oxc-token-row {
   }
 
   .oxc-menu-foot {
-    margin-top: 0.85rem;
-    margin-left: 0;
-    align-items: flex-start;
+    margin: 0.85rem auto 0;
+    align-items: center;
   }
 
   .oxc-menu-meta {
     font-size: 9px;
-    text-align: left;
+    text-align: center;
     max-width: 34ch;
     line-height: 1.4;
   }
@@ -2967,6 +2995,7 @@ button.oxc-token-row {
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.4rem;
   width: 100%;
 }
@@ -3189,10 +3218,13 @@ button.oxc-token-row {
   }
 
   .oxc-hud--phone .oxc-prompt {
-    left: max(0.45rem, var(--oxc-safe-left));
-    right: max(0.45rem, var(--oxc-safe-right));
-    bottom: calc(var(--oxc-dock-h, 3.55rem) + 7.6rem);
+    left: 50%;
+    right: auto;
+    top: 36%;
+    bottom: auto;
+    width: min(420px, calc(100% - 1.2rem));
     max-width: none;
+    transform: translate(-50%, -50%);
   }
 
   .oxc-hud--phone .oxc-dock {
@@ -3334,18 +3366,19 @@ button.oxc-token-row {
   }
 
   .oxc-prompt {
-    left: max(0.55rem, var(--oxc-safe-left));
-    right: max(0.55rem, var(--oxc-safe-right));
-    width: auto;
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 7.1rem);
-    transform: none;
+    left: 50%;
+    right: auto;
+    top: 34%;
+    bottom: auto;
+    width: min(420px, calc(100% - 1.1rem));
+    transform: translate(-50%, -50%);
     gap: 0.45rem;
     padding: 0.5rem 0.55rem;
     border-radius: 14px;
   }
 
   .oxc-hud--touch .oxc-prompt {
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 7.8rem);
+    top: 32%;
   }
 
   .oxc-prompt-key {
@@ -3359,22 +3392,23 @@ button.oxc-token-row {
   .oxc-prompt span { font-size: 9px; }
 
   .oxc-panel {
-    top: auto;
-    left: max(0.4rem, var(--oxc-safe-left));
-    right: max(0.4rem, var(--oxc-safe-right));
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
-    width: auto;
-    max-height: min(50dvh, 400px);
-    border-radius: 16px 16px 12px 12px;
+    top: 46%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    width: min(440px, calc(100% - 0.9rem));
+    max-height: min(62dvh, calc(100dvh - 8.4rem));
+    border-radius: 16px;
+    transform: translate(-50%, -50%);
   }
 
   .oxc-hud--touch .oxc-panel {
-    max-height: min(40dvh, 340px);
+    max-height: min(58dvh, calc(100dvh - 9rem));
   }
 
   @keyframes oxc-panel-in {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
   }
 }
 
@@ -3668,8 +3702,8 @@ button.oxc-token-row {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(5, 7, 13, 0.82) 0%, rgba(5, 7, 13, 0.42) 38%, rgba(5, 7, 13, 0.18) 68%, rgba(5, 7, 13, 0.55) 100%),
-    linear-gradient(180deg, rgba(5, 7, 13, 0.42) 0%, transparent 30%, transparent 58%, rgba(5, 7, 13, 0.78) 100%);
+    radial-gradient(ellipse 70% 58% at 50% 42%, rgba(5, 7, 13, 0.18) 0%, rgba(5, 7, 13, 0.52) 70%, rgba(5, 7, 13, 0.78) 100%),
+    linear-gradient(180deg, rgba(5, 7, 13, 0.38) 0%, transparent 28%, transparent 62%, rgba(5, 7, 13, 0.82) 100%);
 }
 
 .oxc-titlebg--chamber .oxc-titlebg-vignette {

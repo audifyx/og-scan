@@ -42,8 +42,8 @@ function makeWindowMaps(windowHex: string, seed: number) {
   ectx.fillRect(0, 0, width, height);
   for (let y = 4; y < height - 4; y += 7) {
     for (let x = 3; x < width - 3; x += 6) {
-      if (rand() < 0.58) {
-        const lit = rand() > 0.28;
+      if (rand() < 0.72) {
+        const lit = rand() > 0.18;
         cctx.fillStyle = lit ? windowHex : "#1c2430";
         cctx.fillRect(x, y, 3, 4);
         if (lit) {
@@ -94,7 +94,7 @@ function TitleSkyline({ theme, lite }: { theme: TitleDistrictTheme; lite: boolea
         map: maps?.map ?? null,
         emissive: theme.window,
         emissiveMap: maps?.emissiveMap ?? null,
-        emissiveIntensity: 0.85,
+        emissiveIntensity: 1.35,
         metalness: 0.42,
         roughness: 0.48,
         envMapIntensity: 0.45,
@@ -204,11 +204,12 @@ function TitleLights({ theme }: { theme: TitleDistrictTheme }) {
     <>
       <color attach="background" args={[theme.sky]} />
       <fog attach="fog" args={[theme.fog, 28, 88]} />
-      <ambientLight color={theme.fill} intensity={0.16} />
-      <hemisphereLight args={[theme.fill, "#0c1016", 0.28]} />
-      <directionalLight position={[-12, 18, 10]} color={theme.key} intensity={0.72} />
-      <directionalLight position={[14, 8, 6]} color={theme.fill} intensity={0.32} />
-      <pointLight position={[3.2, 10, -8]} color={theme.window} intensity={10} distance={42} decay={2} />
+      <ambientLight color={theme.fill} intensity={0.28} />
+      <hemisphereLight args={[theme.fill, "#0c1016", 0.42]} />
+      <directionalLight position={[-12, 18, 10]} color={theme.key} intensity={1.05} />
+      <directionalLight position={[14, 8, 6]} color={theme.fill} intensity={0.48} />
+      <pointLight position={[3.2, 10, -8]} color={theme.window} intensity={16} distance={48} decay={2} />
+      <pointLight position={[-4, 8, -6]} color="#00ff9f" intensity={6} distance={28} decay={2} />
     </>
   );
 }

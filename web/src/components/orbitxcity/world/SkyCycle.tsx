@@ -39,10 +39,10 @@ export function SkyCycle({ block }: { block: WorldBlockConfig }) {
 
     if (sun.current) {
       sun.current.position.set(Math.cos(arc) * 46, 10 + daylight * 48, Math.sin(arc) * 34);
-      sun.current.intensity = 0.08 + daylight * 0.95 + twilight * 0.35;
-      sun.current.color.set(daylight > 0.35 ? "#fff0d2" : "#a8c0d4");
+      sun.current.intensity = 0.38 + daylight * 0.7 + twilight * 0.28;
+      sun.current.color.set(daylight > 0.35 ? "#fff0d2" : "#c5d4e4");
     }
-    if (fill.current) fill.current.intensity = 0.2 + daylight * 0.55;
+    if (fill.current) fill.current.intensity = 0.48 + daylight * 0.4;
     if (moon.current) {
       moon.current.position.set(-Math.cos(arc) * 58, 12 + (1 - daylight) * 36, -Math.sin(arc) * 46);
       moon.current.visible = daylight < 0.42;
