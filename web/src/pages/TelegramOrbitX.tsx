@@ -158,7 +158,8 @@ export default function TelegramOrbitX() {
           <div className="ox-agent__panel-b">
             <p className="ox-tg__lead">
               In Telegram, message the bot privately and send <code>/login</code>. Then confirm here with the same OrbitX wallet.
-              Groups stay public (charts, scans, Grok image/video) with no login.
+              Groups stay public: <code>/cmds</code>, <code>/token</code>, <code>/chart</code>, <code>/img</code>, <code>/vid</code>, <code>/check</code>, <code>/links</code>.
+              Image and video take a few minutes — keep sending <code>/check</code> until the countdown hits ready.
             </p>
             <div className="ox-agent__btn-row">
               <a className="ox-agent__btn ox-agent__btn--primary" href={TELEGRAM_ORBITX_TME} target="_blank" rel="noreferrer">
