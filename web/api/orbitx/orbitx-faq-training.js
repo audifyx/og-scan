@@ -103,6 +103,12 @@ export const ORBITX_FAQ_CHUNKS = [
     text: `Main app: Vite + React Router SPA in web/ — not Next.js. R3F City. Supabase (RLS, RPCs, edge oxw-*). Vercel serverless web/api. Solana/Jupiter. Anchor betting at programs/betting/. EVM curve contracts for multi-chain launch. Vitest. Docs under docs/. Clone → cd web → pnpm/npm install → npm run dev. Transparency: public GitHub ${ORBITX_GITHUB}.`,
   },
   {
+    id: "tgtrade",
+    title: "Telegram login / trade",
+    keys: ["telegram", "autobuy", "auto buy", "buy with", "usdc", "trade", "login", "linked"],
+    text: `Official bot @theorbitxmcpbot. Groups: public intel. DMs: /login links THIS Telegram user to YOUR OrbitX wallet — nobody else can spend it. Trade alts with SOL or USD/USDC quotes (“buy <CA> with 10$ usdc”, “buy 0.1 sol of $ORBITX”). /autobuy on = Phantom auto-prompt (you still sign). /autobuy off = Sign each time. /shop burns 100 $ORBITX (1 day MCP) or 1,000 (7 days) or buys credits. /launch /mint /nft after login. /call name runs any live OrbitX tool (~2500). Never invent live prices — /token for quotes.`,
+  },
+  {
     id: "custody",
     title: "Non-custodial",
     keys: ["custodial", "custody", "keys", "seed", "non-custodial", "phantom", "sign"],

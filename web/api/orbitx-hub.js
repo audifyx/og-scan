@@ -45,7 +45,10 @@ import {
   saveTradeIntent,
   loadLatestTradeIntent,
   getChatTradeAuto,
+  setChatTradeAuto,
+  usdToSol,
 } from "./orbitx/buy-orbitx.js";
+import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias } from "./orbitx/telegram-trade-intent.js";
 import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -1457,6 +1460,7 @@ async function getProfileForUser(userId) {
 }
 
 const TOOL_ALIASES = {
+  ...TELEGRAM_TOOL_ALIASES,
   "/": "orbitx_menu",
   menu: "orbitx_menu",
   help: "orbitx_menu",
@@ -1464,6 +1468,10 @@ const TOOL_ALIASES = {
   orbitx_sell: "orbitx_prepare_sell",
   orbitx_buy_auto: "orbitx_prepare_buy",
   orbitx_sell_pump: "orbitx_prepare_sell",
+  orbitx_trade: "orbitx_prepare_buy",
+  orbitx_swap: "orbitx_prepare_buy",
+  trade: "orbitx_prepare_buy",
+  swap: "orbitx_prepare_buy",
   "buy orbitx": "orbitx_buy_orbitx",
   "buy $orbitx": "orbitx_buy_orbitx",
   buy_orbitx: "orbitx_buy_orbitx",
@@ -1476,7 +1484,8 @@ const TOOL_ALIASES = {
   buycredits: "orbitx_credits_buy",
   topup: "orbitx_credits_buy",
   "top up": "orbitx_credits_buy",
-  shop: "orbitx_credits_buy",
+  shop: "orbitx_shop",
+  orbitx_shop: "orbitx_shop",
   "confirm credits": "orbitx_credits_confirm",
   credits_confirm: "orbitx_credits_confirm",
   credits: "orbitx_credits_balance",
@@ -2825,9 +2834,33 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_shop",
+    description:
+      "OrbitX Shop catalog: burn 100 $ORBITX for 1 day MCP, 1,000 for 7 days, or buy credits with SOL. Returns package list + Phantom openUrls.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        package: { type: "string", description: "day | week | credits" },
+        amountSol: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "orbitx_trade_auto",
+    description:
+      "Enable or disable chat auto-buy for this linked wallet. Auto-buy still requires a Phantom signature; it skips the extra Telegram confirm step.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        enabled: { type: "boolean" },
+        on: { type: "boolean" },
+      },
+    },
+  },
+  {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category + total count (500+ generated). Call when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (2500+ generated). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
@@ -2835,7 +2868,32 @@ const CORE_TOOLS = [
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
 const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
 const TOOLS = [...CORE_TOOLS, ..._generated];
+const TOOL_NAME_SET = new Set(TOOLS.map((t) => t.name));
 for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
+
+export function resolveOrbitXToolName(rawName) {
+  const raw = String(rawName || "").trim();
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  const guesses = [
+    raw,
+    lower,
+    TOOL_ALIASES[raw],
+    TOOL_ALIASES[lower],
+    applyTelegramAlias(raw),
+    applyTelegramAlias(lower),
+  ];
+  if (!lower.startsWith("orbitx_") && lower !== "search" && lower !== "fetch" && !lower.startsWith("x_")) {
+    guesses.push(`orbitx_${lower}`, applyTelegramAlias(`orbitx_${lower}`), TOOL_ALIASES[`orbitx_${lower}`]);
+  }
+  for (const guess of guesses) {
+    if (!guess) continue;
+    if (TOOL_NAME_SET.has(guess)) return guess;
+    const aliased = TOOL_ALIASES[guess] || applyTelegramAlias(guess);
+    if (aliased && TOOL_NAME_SET.has(aliased)) return aliased;
+  }
+  return "";
+}
 
 async function fetchJson(url, init) {
   const r = await fetch(url, {
@@ -2859,7 +2917,7 @@ async function fetchJson(url, init) {
 }
 
 async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
-  const name = TOOL_ALIASES[rawName] || rawName;
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
   // Always advertise www /api/mcp — apex 308s break Claude POSTs; /api/orbitx-mcp is an alias only.
   const mcpUrl = mcpUrls(req).mcpUrl;
   const agentSetupUrl = "https://www.orbitx.world/agent";
@@ -3465,57 +3523,131 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     return out;
   }
 
+  if (name === "orbitx_shop") {
+    const pack = String(args.package || args.item || "").toLowerCase();
+    if (pack === "day" || pack === "week" || pack === "access") {
+      return callTool("orbitx_mcp_access_buy", { ...args, package: pack === "week" ? "week" : "day" }, auth, base, req);
+    }
+    if (pack === "credits" || pack === "topup") {
+      return callTool("orbitx_credits_buy", args, auth, base, req);
+    }
+    return {
+      ok: true,
+      shop: true,
+      openUrl: `${base}/shop`,
+      message:
+        "OrbitX Shop — burn $ORBITX for MCP seats or buy credits with SOL. Linked Telegram: /shop day · /shop week · /credits 0.1 sol",
+      packages: [
+        { id: "day", title: "1 Day MCP", cost: "100 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "day" } },
+        { id: "week", title: "1 Week MCP", cost: "1,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "week" } },
+        { id: "credits", title: "Credits", cost: "10,000 / 1 SOL", tool: "orbitx_credits_buy" },
+      ],
+      note: "Burns destroy supply. Credits are shared across Agent MCP + X MCP. Non-custodial Phantom sign.",
+    };
+  }
+
+  if (name === "orbitx_trade_auto") {
+    const enabled = args.enabled === true || args.on === true || String(args.enabled || args.on || "").toLowerCase() === "true";
+    const off = args.enabled === false || args.on === false;
+    const on = off ? false : enabled || String(args.mode || "").toLowerCase() === "auto";
+    if (auth?.agentId) {
+      await setChatTradeAuto(sb, auth.agentId, on);
+    }
+    return {
+      ok: true,
+      autoBuy: on,
+      message: on
+        ? "Auto-buy ON for this account. Next /buy sends a Phantom auto-prompt (no extra Telegram confirm). You still sign in Phantom."
+        : "Auto-buy OFF. Each /buy returns a Sign link; say confirm or /autobuy on to skip the extra step.",
+    };
+  }
+
   if (name === "orbitx_confirm_buy") {
     let amountSol = args.amountSol ?? args.sol ?? args.amount;
     let slippage = Number(args.slippage) || 10;
     let pool = args.pool || "auto";
-    if ((amountSol == null || amountSol === "") && auth?.userId) {
-      const intent = await loadLatestTradeIntent(sb, auth.userId, { mint: ORBITX_MINT });
+    let mint = String(args.mint || "").trim();
+    if (auth?.userId) {
+      const intent = await loadLatestTradeIntent(sb, auth.userId, mint ? { mint } : {});
       if (intent) {
-        amountSol = Number(intent.amount_sol);
+        if (amountSol == null || amountSol === "") amountSol = Number(intent.amount_sol);
         slippage = Number(intent.slippage) || slippage;
         pool = intent.pool || pool;
+        if (!mint) mint = String(intent.mint || "");
       }
     }
+    if (!mint) mint = ORBITX_MINT;
     if (amountSol == null || amountSol === "") {
       return {
         ok: false,
         error: "no_pending_buy",
-        message:
-          "No pending $ORBITX buy. Ask how much SOL, call orbitx_buy_orbitx, then confirm — or pass amountSol here.",
+        message: "No pending buy. Send buy <CA> with 0.1 sol (or $10 usdc), then confirm — or pass amountSol.",
       };
     }
-    const out = await prepareBuyOrbitx({
-      base,
-      wallet,
-      amountSol,
-      slippage,
-      pool,
-      confirmMode: "auto",
-      preferAuto: true,
-      fetchJson,
-    });
-    if (out.ok && auth?.userId) {
-      try {
-        await saveTradeIntent(sb, auth.userId, {
-          mint: ORBITX_MINT,
-          amountSol: out.amountSol,
-          confirmMode: "auto",
-          slippage: out.slippage,
-          pool: out.pool,
-        });
-      } catch {
-        /* optional */
+    if (mint === ORBITX_MINT) {
+      const out = await prepareBuyOrbitx({
+        base,
+        wallet,
+        amountSol,
+        slippage,
+        pool,
+        confirmMode: "auto",
+        preferAuto: true,
+        fetchJson,
+      });
+      if (out.ok && auth?.userId) {
+        try {
+          await saveTradeIntent(sb, auth.userId, {
+            mint: ORBITX_MINT,
+            amountSol: out.amountSol,
+            confirmMode: "auto",
+            slippage: out.slippage,
+            pool: out.pool,
+          });
+        } catch {
+          /* optional */
+        }
       }
+      return out;
     }
-    return out;
+    args = { ...args, mint, amountSol, slippage, pool, autoConfirm: true };
+    return callTool("orbitx_prepare_buy", args, auth, base, req);
   }
 
   if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
     const action = name === "orbitx_prepare_buy" ? "buy" : "sell";
     const mint = String(args.mint || "");
-    const amount = action === "buy" ? Number(args.amountSol) : args.amount;
+    if (action === "buy" && !mint) {
+      return { ok: false, error: "mint_required", message: "Pass a mint / CA to buy, or say buy $ORBITX." };
+    }
+    let preferAuto = false;
+    if (auth?.agentId) {
+      try {
+        preferAuto = await getChatTradeAuto(sb, auth.agentId);
+      } catch {
+        preferAuto = false;
+      }
+    }
+    const auto =
+      args.autoConfirm === true ||
+      args.auto === true ||
+      String(args.confirmMode || "").toLowerCase() === "auto" ||
+      preferAuto;
+    let amount = action === "buy" ? Number(args.amountSol) : args.amount;
+    let usdQuote = null;
+    if (action === "buy" && (!Number.isFinite(amount) || amount <= 0) && args.amountUsd != null) {
+      usdQuote = await usdToSol(args.amountUsd);
+      if (!usdQuote.ok) return usdQuote;
+      amount = usdQuote.amountSol;
+    }
+    if (action === "buy" && (!Number.isFinite(amount) || amount <= 0)) {
+      return {
+        ok: false,
+        error: "amount_required",
+        message: "How much? Example: buy <CA> with 0.1 sol  — or  buy <CA> with 10$ usdc",
+      };
+    }
     const slippage = Number(args.slippage) || 10;
     const pool = args.pool || "auto";
     const body = {
@@ -3526,6 +3658,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       denominatedInSol: action === "buy",
       slippage,
       pool,
+      platformFee: true,
     };
     const data = await fetchJson(`${base}/api/ogdex/trade`, {
       method: "POST",
@@ -3556,30 +3689,53 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const autoQs = new URLSearchParams(signQs);
     autoQs.set("auto", "1");
     const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
-    // Do NOT return the raw base64 tx to the model — Claude may try to "buy" without Phantom.
+    if (action === "buy" && auth?.userId) {
+      try {
+        await saveTradeIntent(sb, auth.userId, {
+          mint,
+          amountSol: amount,
+          confirmMode: auto ? "auto" : "sign",
+          slippage,
+          pool,
+        });
+      } catch {
+        /* optional */
+      }
+    }
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: auto ? "awaiting_auto_phantom" : "awaiting_phantom_signature",
       requiresSignature: true,
+      confirmMode: auto ? "auto" : "sign",
       signUrl,
       autoSignUrl,
+      openUrl: auto ? autoSignUrl : signUrl,
       action,
       wallet,
       mint,
       amount,
+      amountUsd: usdQuote?.amountUsd || null,
+      solUsd: usdQuote?.solUsd || null,
       slippage,
       pool,
       via: data.via || null,
       routePool: data.pool || null,
       simulated: Boolean(data.simulated),
       hasUnsignedTx: true,
-      instructions: [
-        "Open signUrl in the user's browser (or autoSignUrl to auto-prompt Phantom).",
-        "User connects Phantom and clicks Sign & send (auto mode prompts immediately).",
-        "Do NOT broadcast or submit any unsigned transaction yourself.",
-        "Trade is incomplete until Phantom confirms a signature.",
-      ],
-      note: "Non-custodial. Route the user to signUrl for Phantom — never attempt an unsigned buy/sell.",
+      instructions: auto
+        ? [
+            "Open autoSignUrl — Phantom pops immediately (auto-buy).",
+            "Approve in Phantom. OrbitX never holds keys or funds.",
+            "Trade is incomplete until Phantom confirms.",
+          ]
+        : [
+            "Open signUrl and tap Sign & send in Phantom.",
+            "Say confirm or /autobuy on to skip this extra Telegram step next time.",
+            "Do NOT broadcast unsigned transactions.",
+          ],
+      note: auto
+        ? "Auto-buy: Phantom still must sign. Non-custodial."
+        : "Manual sign. Non-custodial. Route the user to signUrl.",
     };
   }
 
@@ -4497,7 +4653,7 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/call") {
       const rawName = String(params?.name || "");
-      const name = TOOL_ALIASES[rawName] || rawName;
+      const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
       const rawArgs = params?.arguments && typeof params.arguments === "object" ? params.arguments : {};
       const args = { ...rawArgs };
       if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
@@ -4729,9 +4885,7 @@ export function listEmbeddedAgentTools({ includeGenerated = false } = {}) {
 }
 
 export function hasEmbeddedAgentTool(toolName) {
-  const rawName = String(toolName || "").trim();
-  const name = TOOL_ALIASES[rawName] || rawName;
-  return TOOLS.some((tool) => tool.name === name);
+  return Boolean(resolveOrbitXToolName(toolName));
 }
 
 /** Full live catalog, including generated screeners / charts / mint intel. */
@@ -4750,7 +4904,7 @@ export function listAllOrbitXTools() {
  */
 export async function runPublicOrbitXTool({ toolName, args = {}, req = null }) {
   const rawName = String(toolName || "").trim();
-  const name = TOOL_ALIASES[rawName] || rawName;
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
   if (!hasEmbeddedAgentTool(name)) {
     throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
   }
@@ -4782,7 +4936,7 @@ export async function runEmbeddedAgentTool({
   if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
 
   const rawName = String(toolName || "").trim();
-  const name = TOOL_ALIASES[rawName] || rawName;
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
   if (!hasEmbeddedAgentTool(name)) {
     throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
   }

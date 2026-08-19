@@ -56,6 +56,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("/img@theorbitxmcpbot").tool).toBe("orbitx_generate_image");
     expect(resolveOfficialCommand("tweet").tool).toBe("x_post");
     expect(resolveOfficialCommand("buy").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("trade").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("shop").tool).toBe("orbitx_shop");
+    expect(resolveOfficialCommand("autobuy").kind).toBe("meta");
     expect(resolveOfficialCommand("auth").kind).toBe("meta");
     expect(resolveOfficialCommand("login").kind).toBe("meta");
     expect(resolveOfficialCommand("check").kind).toBe("meta");
@@ -73,6 +76,7 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(argsFromCommand("img", "/img neon saturn")).toMatchObject({ prompt: "neon saturn" });
     expect(parseCallInvocation("/call get_token mint=So111").tool).toBe("orbitx_get_token");
+    expect(parseCallInvocation("/call trade").tool).toBe("orbitx_prepare_buy");
     expect(inferPublicTool("generate an image of a cyan planet")?.tool).toBe("orbitx_generate_image");
     expect(inferPublicTool("So11111111111111111111111111111111111111112")?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool("links")?.meta).toBe("links");
@@ -291,7 +295,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("TOKEN_INTEL_TOOLS");
     expect(api).toContain("orbitXFaqSystemAddon");
     expect(api).toContain("formatOrbitXFaqHtml");
-    expect(api).toContain('bare === "faq"');
+    expect(api).toContain("resolveOrbitXToolName");
+    expect(api).toContain("handleAutoBuy");
+    expect(api).toContain("auto_buy");
     const imgLines = api.match(/\/img prompt · \/vid prompt/g) || [];
     expect(imgLines.length).toBe(1);
     expect(api).not.toContain("8595161432");

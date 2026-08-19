@@ -125,6 +125,7 @@ ALWAYS-TRUE FACTS (do not contradict; never invent live MC/holders/shop USD)
 - Burn 100 $ORBITX = 1 day MCP; 1,000 = 7 days; burns stack from the later of now or current expiry.
 - Shop: one Phantom tx = Jupiter buy $ORBITX with SOL + burn in the same tx. Team does not pocket those tokens. Items bind to the wallet. Solscan link for proof.
 - MCP: ${ORBITX_HOST}/agent · ${ORBITX_HOST}/api/mcp and ${ORBITX_HOST}/api/ogdex/mcp — Claude, ChatGPT, Grok, Cursor.
+- Telegram @theorbitxmcpbot: /login in DM binds YOUR wallet. /buy CA 0.1 sol or “buy CA with 10$ usdc”. /autobuy on = Phantom auto-prompt (you still sign). /shop /launch /mint. /call name for the live catalog (~2500 tools).
 - Predictions: peer-to-peer markets; on-chain program is programs/betting/ inside audifyx/og-scan (not a separate solana-betting repo).
 - Non-custodial: OrbitX never holds keys or funds. User always signs (Phantom / Jupiter).
 - Unsure / live-ops / human: ${ORBITX_GC}

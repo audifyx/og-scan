@@ -6,6 +6,7 @@
  */
 import { isHoldGatedTool } from "./token-hold.js";
 import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
+import { applyTelegramAlias, parseTradeIntent } from "./telegram-trade-intent.js";
 
 export const OFFICIAL_BOT_USERNAME = "theorbitxmcpbot";
 export const OFFICIAL_BOT_NAME = "OrbitX";
@@ -20,7 +21,7 @@ export const AUTH_TOOLS = new Set([
 ]);
 
 const WRITE_PREFIXES = [
-  /^orbitx_(buy|sell|prepare_buy|prepare_sell|confirm_buy|credits_buy|credits_confirm)/,
+  /^orbitx_(buy|sell|trade|swap|prepare_buy|prepare_sell|confirm_buy|credits_buy|credits_confirm)/,
   /^orbitx_social_(post|join|create|leave)/,
   /^orbitx_nft_(prepare_buy|submit_buy|like|comment|follow|register|make_offer|cancel_offer|list_for_sale|cancel_listing|create_auction|place_bid|favorite)/,
   /^orbitx_(create_token|execute_launch|prepare_launch|launch_|vanity_mint|mint_nft|submit_listing|request_boost|burn|claim_fees|rent_refund)/,
@@ -30,6 +31,8 @@ export function isPrivilegedTelegramTool(name) {
   const n = String(name || "").trim();
   if (!n) return false;
   if (AUTH_TOOLS.has(n) || n.startsWith("orbitx_auth_")) return true;
+  if (n === "orbitx_trade_auto" || n === "orbitx_whoami") return true;
+  if (n.startsWith("orbitx_mcp_access_")) return true;
   if (isHoldGatedTool(n)) return true;
   if (n.startsWith("x_") && !["x_menu", "x_help", "x_tools_help"].includes(n)) return true;
   return WRITE_PREFIXES.some((re) => re.test(n));
@@ -66,6 +69,7 @@ export const GROUP_COMMANDS = [
   { command: "wallet", description: "Wallet snapshot (address)" },
   { command: "health", description: "OrbitX platform health" },
   { command: "call", description: "Call any public tool: /call name args" },
+  { command: "shop", description: "OrbitX shop (MCP seats + credits)" },
 ];
 
 export const PRIVATE_COMMANDS = [
@@ -79,6 +83,14 @@ export const PRIVATE_COMMANDS = [
   { command: "tweet", description: "Post to your connected X (linked)" },
   { command: "post", description: "Post to OrbitX social (linked)" },
   { command: "launch", description: "Launch / create token (linked)" },
+  { command: "trade", description: "Buy a token with SOL / USD (linked)" },
+  { command: "swap", description: "Same as /trade (linked)" },
+  { command: "mint", description: "Mint an NFT (linked)" },
+  { command: "nft", description: "NFT marketplace" },
+  { command: "credits", description: "Buy credits with SOL (linked)" },
+  { command: "orbitx", description: "Buy $ORBITX (linked)" },
+  { command: "autobuy", description: "Auto Phantom prompt on/off (linked)" },
+  { command: "confirm", description: "Confirm pending buy (linked)" },
   { command: "verify", description: "Admin: verify a mint (linked admin wallet)" },
 ];
 
@@ -113,6 +125,15 @@ const PRIORITY_TOOL = {
   call: null,
   buy: "orbitx_prepare_buy",
   sell: "orbitx_prepare_sell",
+  trade: "orbitx_prepare_buy",
+  swap: "orbitx_prepare_buy",
+  shop: "orbitx_shop",
+  mint: "orbitx_mint_nft",
+  nft: "orbitx_nft_listings",
+  credits: "orbitx_credits_buy",
+  orbitx: "orbitx_buy_orbitx",
+  autobuy: null,
+  confirm: "orbitx_confirm_buy",
   tweet: "x_post",
   post: "orbitx_social_post",
   launch: "orbitx_execute_launch",
@@ -129,8 +150,9 @@ export function resolveOfficialCommand(cmd) {
     const tool = PRIORITY_TOOL[c];
     return { kind: tool ? "tool" : "meta", command: c, tool };
   }
-  if (c.startsWith("orbitx_")) return { kind: "tool", command: c, tool: c };
-  return { kind: "tool", command: c, tool: `orbitx_${c}` };
+  const prefixed = c.startsWith("orbitx_") || c.startsWith("x_") ? c : `orbitx_${c}`;
+  const aliased = applyTelegramAlias(prefixed);
+  return { kind: "tool", command: c, tool: aliased || prefixed };
 }
 
 export function argsFromCommand(command, text) {
@@ -143,10 +165,17 @@ export function argsFromCommand(command, text) {
   }
   if (command === "media" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
   if (command === "check" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
-  if (["token", "chart", "xray", "research", "scan", "buy", "sell"].includes(command) && rest && !args.mint) {
+  if (["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap", "orbitx"].includes(command) && rest && !args.mint) {
     const token = rest.split(/\s+/)[0];
     args.mint = token;
     args.ca = token;
+  }
+  if (["buy", "sell", "trade", "swap", "orbitx", "credits", "shop", "launch", "mint"].includes(command)) {
+    const intent = parseTradeIntent(text);
+    if (intent?.args) Object.assign(args, intent.args);
+    if (intent?.tool && ["buy", "sell", "trade", "swap", "orbitx"].includes(command)) {
+      args.__resolvedTool = intent.tool;
+    }
   }
   if (command === "search" && rest && !args.q) {
     args.q = rest;
@@ -171,7 +200,8 @@ export function parseCallInvocation(text) {
   if (!rest) return { tool: "", args: {} };
   const sp = rest.indexOf(" ");
   const raw = sp < 0 ? rest : rest.slice(0, sp);
-  const tool = raw.startsWith("orbitx_") || raw.startsWith("x_") ? raw : `orbitx_${raw}`;
+  const prefixed = raw.startsWith("orbitx_") || raw.startsWith("x_") || raw === "search" || raw === "fetch" ? raw : `orbitx_${raw}`;
+  const tool = applyTelegramAlias(prefixed);
   const args = parseCallArgs(sp < 0 ? "" : rest.slice(sp + 1));
   return { tool, args };
 }
@@ -199,6 +229,10 @@ export function inferPublicTool(text) {
   if (/^(faq|faqs)\b/i.test(lower) && t.length < 120) {
     return { meta: "faq", args: { q: t.replace(/^(?:faq|faqs)\b[:\s-]*/i, "").trim() } };
   }
+
+  const trade = parseTradeIntent(t);
+  if (trade?.meta === "autobuy") return trade;
+  if (trade?.tool) return { tool: trade.tool, args: trade.args || {} };
 
   const img = lower.match(/^(?:generate |make |create )?(?:an? )?(?:image|img|picture|art)\b[:\s-]*(.+)$/i);
   if (img?.[1]) return { tool: "orbitx_generate_image", args: { prompt: img[1].trim() } };
@@ -351,7 +385,10 @@ function formatDexChartCard(data) {
 function formatActionLinks(data) {
   const urls = [];
   if (data?.openUrl) urls.push(`Open: ${data.openUrl}`);
-  if (data?.signUrl) urls.push(`Sign: ${data.signUrl}`);
+  if (data?.autoSignUrl && data.autoSignUrl !== data.openUrl && data.autoSignUrl !== data.signUrl) {
+    urls.push(`Auto-sign: ${data.autoSignUrl}`);
+  }
+  if (data?.signUrl && data.signUrl !== data.openUrl) urls.push(`Sign: ${data.signUrl}`);
   if (data?.reportUrl) urls.push(`Report: ${data.reportUrl}`);
   if (data?.launchpadUrl) urls.push(`Launchpad: ${data.launchpadUrl}`);
   if (data?.mcpUrl) urls.push(`MCP: ${data.mcpUrl}`);
@@ -745,8 +782,8 @@ export function cmdsPage(tools, { page = 1, pageSize = 40, query = "" } = {}) {
           "<b>OrbitX /cmds</b>",
           "/token mint · /chart ca · /scan · /xray · /research",
           "/img prompt · /vid prompt · /check",
-          "/faq topic · /search q · /screen · /ask · /links · /group",
-          "/call name args · DMs: /login /buy /sell /tweet",
+          "/faq topic · /shop · /search q · /screen · /ask · /links",
+          "/call name args · DMs: /login /buy /sell /trade /autobuy /launch /mint",
           "",
           `<b>Live catalog</b> · ${filtered.length} tools · page ${safePage}/${totalPages}`,
         ]
