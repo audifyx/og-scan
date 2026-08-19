@@ -9,7 +9,7 @@ import {
   ORBITX_SHOP_SKUS,
   formatShopTeamMessage,
   usdToShopSol,
-} from "../../api/orbitx/desk-shop-catalog.js";
+} from "@/lib/orbitx/desk-shop-catalog";
 
 type ShopSku = {
   sku: string;

@@ -7,7 +7,7 @@ import {
   shopMemo,
   snapShopUsd,
   usdToShopSol,
-} from "../../api/orbitx/desk-shop-catalog.js";
+} from "@/lib/orbitx/desk-shop-catalog";
 
 describe("OrbitX desk shop catalog", () => {
   it("ports the Solana-betting shop SKU count and hero items", () => {

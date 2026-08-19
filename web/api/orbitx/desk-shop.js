@@ -17,7 +17,7 @@ import {
   getShopSku,
   shopMemo,
   usdToShopSol,
-} from "./desk-shop-catalog.js";
+} from "../../src/lib/orbitx/desk-shop-catalog.js";
 import { fetchSolUsdPrice } from "./buy-orbitx.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
