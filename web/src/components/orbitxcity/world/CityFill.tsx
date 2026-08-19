@@ -12,6 +12,7 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
 import { BlockBuilding, type BlockKind } from "./BlockBuilding";
+import { ShopInterior, type ShopKind } from "./ShopInterior";
 
 export interface CityFillProps {
   /** Half-extent of the protected centre that filler must avoid. */
@@ -37,7 +38,18 @@ const TRIMS = ["#949cab", "#adb5c2", "#9fac9f", "#b5a594", "#98a7b5"];
 const GLASS = ["#8fdcff", "#ffe08a", "#a8f0d0", "#cbb6ff", "#ffc9a8"];
 const AWNINGS = ["#c9463f", "#2f7d5c", "#2b5d99", "#c98a2b", "#7a4a8c"];
 const SIGNS = ["DEX", "PUMP", "HODL", "MOON", "SOL", "BAGS", "APE", "GM", "WAGMI", "LFG"];
-const SHOPS = ["DELI", "COFFEE", "BARBER", "PIZZA", "LAUNDRY", "BODEGA", "RAMEN", "ARCADE"];
+const SHOPS: { label: string; kind: ShopKind }[] = [
+  { label: "DELI", kind: "deli" },
+  { label: "COFFEE", kind: "coffee" },
+  { label: "BARBER", kind: "barber" },
+  { label: "PIZZA", kind: "deli" },
+  { label: "EXCHANGE", kind: "office" },
+  { label: "BODEGA", kind: "deli" },
+  { label: "RAMEN", kind: "coffee" },
+  { label: "ARCADE", kind: "arcade" },
+  { label: "GALLERY", kind: "gallery" },
+  { label: "OFFICE", kind: "office" },
+];
 
 interface Lot {
   x: number;
@@ -52,6 +64,7 @@ interface Lot {
   rot: number;
   sign?: string;
   shop?: string;
+  shopKind: ShopKind;
   awning: string;
   type: "building" | "park" | "plaza";
 }
@@ -135,12 +148,18 @@ function planDistrict(
         sign: floors >= 8 && rand() < 0.32
           ? SIGNS[Math.floor(rand() * SIGNS.length)]
           : undefined,
-        shop: floors <= 4 && rand() < 0.55
-          ? SHOPS[Math.floor(rand() * SHOPS.length)]
-          : undefined,
+        shop: undefined,
+        shopKind: "deli",
         awning: AWNINGS[Math.floor(rand() * AWNINGS.length)]!,
         type,
       });
+
+      const lot = lots[lots.length - 1]!;
+      if (lot.floors <= 4 && rand() < 0.62) {
+        const pick = SHOPS[Math.floor(rand() * SHOPS.length)]!;
+        lot.shop = pick.label;
+        lot.shopKind = pick.kind;
+      }
 
       // Street furniture along the lot's kerb line.
       const kerb = lotSize / 2 + SIDEWALK_W * 0.6;
@@ -418,6 +437,20 @@ export function CityFill({
               studs={!lite && lot.floors <= 6}
               sign={lot.sign}
             />
+            {lot.shop && (
+              <group
+                position={[lot.x, 0.16, lot.z + lot.d / 2 - 0.1]}
+                rotation={[0, lot.rot, 0]}
+              >
+                <ShopInterior
+                  width={lot.w}
+                  depth={lot.d}
+                  kind={lot.shopKind}
+                  seed={`${lot.x}:${lot.z}:shop`}
+                  lite={lite}
+                />
+              </group>
+            )}
             {!lite && lot.shop && <Storefront lot={lot} />}
           </group>
         );

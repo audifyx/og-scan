@@ -42,6 +42,60 @@ export function MascotPortrait({ id }: { id: CharacterClassId }) {
       </svg>
     );
   }
+  if (id === "whale") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <path d="M10 34c6-11 38-11 44 0-6 11-38 11-44 0z" fill="#3fa7d6" />
+        <path d="M10 34c6-6 38-6 44 0-6 5-38 5-44 0z" fill="#5fc0e8" />
+        <circle cx="22" cy="31" r="3" fill="#0d2430" />
+        <path d="M46 22l8-6 2 10z" fill="#2c6b8a" />
+        <path d="M26 14l6 8 6-8z" fill="#9fd8f0" />
+        <path d="M32 12l-3 6h6z" fill="#f0dcff" opacity="0.8" />
+      </svg>
+    );
+  }
+
+  if (id === "bot") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <rect x="14" y="18" width="36" height="30" rx="5" fill="#1b2b2e" />
+        <rect x="18" y="26" width="28" height="10" rx="2" fill="#00e5c0" />
+        <circle cx="25" cy="31" r="2.4" fill="#04211d" />
+        <circle cx="39" cy="31" r="2.4" fill="#04211d" />
+        <rect x="24" y="41" width="16" height="3" rx="1.5" fill="#37585c" />
+        <rect x="30" y="10" width="4" height="8" fill="#37585c" />
+        <circle cx="32" cy="9" r="3" fill="#00e5c0" />
+      </svg>
+    );
+  }
+
+  if (id === "oracle") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <path d="M32 8c12 0 19 10 19 22 0 10-6 18-19 18s-19-8-19-18C13 18 20 8 32 8z" fill="#2a1f3d" />
+        <ellipse cx="32" cy="34" rx="13" ry="14" fill="#d9c3b0" />
+        <circle cx="26" cy="32" r="2.6" fill="#d9a7ff" />
+        <circle cx="38" cy="32" r="2.6" fill="#d9a7ff" />
+        <path d="M27 41c3 2 7 2 10 0" fill="none" stroke="#8a7060" strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="32" cy="18" r="3.5" fill="#d9a7ff" opacity="0.9" />
+      </svg>
+    );
+  }
+
+  if (id === "miner") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <circle cx="32" cy="34" r="16" fill="#c08d5f" />
+        <path d="M14 26c2-9 34-9 36 0z" fill="#f2a13c" />
+        <rect x="12" y="24" width="40" height="5" rx="2.5" fill="#6b4f34" />
+        <circle cx="26" cy="34" r="2.6" fill="#2b1d12" />
+        <circle cx="38" cy="34" r="2.6" fill="#2b1d12" />
+        <path d="M25 42c4 3 10 3 14 0" fill="none" stroke="#7a5638" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="32" cy="21" r="3" fill="#ffd08a" />
+      </svg>
+    );
+  }
+
   if (id === "vitalik") {
     return (
       <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>

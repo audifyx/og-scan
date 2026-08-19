@@ -16,7 +16,11 @@ export type CharacterClassId =
   | "chad"
   | "doge"
   | "anon"
-  | "vitalik";
+  | "vitalik"
+  | "whale"
+  | "bot"
+  | "oracle"
+  | "miner";
 
 /** Legacy class ids still stored on interiors / old sessions. */
 export type LegacyClassId =
@@ -219,6 +223,94 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
       { label: "Focus", value: 97 },
     ],
   },
+  {
+    id: "whale",
+    name: "Fathom",
+    handle: "@fathom.ox",
+    tagline: "Moves size · the chart moves after",
+    rarity: "legendary",
+    neon: "#3fa7d6",
+    gold: "#9fd8f0",
+    bodyColor: "#16394f",
+    accentColor: "#3fa7d6",
+    skinColor: "#5fb7d8",
+    trimColor: "#2c6b8a",
+    scale: { x: 1.3, y: 1.16, z: 1.22 },
+    movement: { speed: 0.86, jump: 0.92, accel: 0.78 },
+    build: { head: "wide", torso: "bulk", headgear: "crown", eyes: "glow", trail: "cape" },
+    stats: [
+      { label: "Weight", value: 99 },
+      { label: "Patience", value: 94 },
+      { label: "Pace", value: 58 },
+      { label: "Focus", value: 88 },
+    ],
+  },
+  {
+    id: "bot",
+    name: "Tick",
+    handle: "@tick.ox",
+    tagline: "Fills before you finish reading the tweet",
+    rarity: "epic",
+    neon: "#00e5c0",
+    gold: "#8ff5e4",
+    bodyColor: "#1b2b2e",
+    accentColor: "#00e5c0",
+    skinColor: "#7f8c92",
+    trimColor: "#37585c",
+    scale: { x: 0.94, y: 1.04, z: 0.94 },
+    movement: { speed: 1.22, jump: 1.02, accel: 1.3 },
+    build: { head: "block", torso: "slim", headgear: "visor", eyes: "laser", trail: "none" },
+    stats: [
+      { label: "Speed", value: 99 },
+      { label: "Precision", value: 95 },
+      { label: "Nerve", value: 62 },
+      { label: "Focus", value: 91 },
+    ],
+  },
+  {
+    id: "oracle",
+    name: "Sable",
+    handle: "@sable.ox",
+    tagline: "Prices truth · feeds the whole city",
+    rarity: "epic",
+    neon: "#d9a7ff",
+    gold: "#f0dcff",
+    bodyColor: "#2a1f3d",
+    accentColor: "#d9a7ff",
+    skinColor: "#d9c3b0",
+    trimColor: "#6b4f8a",
+    scale: { x: 0.96, y: 1.08, z: 0.96 },
+    movement: { speed: 0.98, jump: 1.0, accel: 0.96 },
+    build: { head: "tall", torso: "regular", headgear: "hood", eyes: "glow", trail: "cape" },
+    stats: [
+      { label: "Insight", value: 97 },
+      { label: "Signal", value: 93 },
+      { label: "Reach", value: 84 },
+      { label: "Focus", value: 92 },
+    ],
+  },
+  {
+    id: "miner",
+    name: "Grit",
+    handle: "@grit.ox",
+    tagline: "Was here before the chart · will be here after",
+    rarity: "rare",
+    neon: "#f2a13c",
+    gold: "#ffd08a",
+    bodyColor: "#4a3524",
+    accentColor: "#f2a13c",
+    skinColor: "#c08d5f",
+    trimColor: "#6b4f34",
+    scale: { x: 1.16, y: 1.02, z: 1.1 },
+    movement: { speed: 0.92, jump: 1.1, accel: 0.94 },
+    build: { head: "block", torso: "broad", headgear: "cap", eyes: "flat", trail: "none" },
+    stats: [
+      { label: "Stamina", value: 98 },
+      { label: "Grit", value: 96 },
+      { label: "Pace", value: 66 },
+      { label: "Focus", value: 83 },
+    ],
+  },
 ];
 
 const VALID_IDS = new Set<string>(CHARACTER_CLASSES.map((c) => c.id));
@@ -277,6 +369,17 @@ export function hasCreatorPresencePerk(classId?: CharacterClassId | string | nul
 }
 
 /** Proto reads contract internals at terminals without a scan cost. */
+/** Fathom's size shows a deeper order-book preview at terminals. */
+export function hasDepthPerk(classId?: CharacterClassId | string | null): boolean {
+  return resolveClassId(classId) === "whale";
+}
+
+/** Tick and Sable surface live signal markers across the district. */
+export function hasSignalPerk(classId?: CharacterClassId | string | null): boolean {
+  const id = resolveClassId(classId);
+  return id === "bot" || id === "oracle";
+}
+
 export function hasProtocolInspectPerk(classId?: CharacterClassId | string | null): boolean {
   return resolveClassId(classId) === "vitalik";
 }
@@ -309,6 +412,10 @@ export function appearanceFromClass(
     doge: { hairStyle: "short", hairColor: "#c47a28", outfit: "street", faceStyle: "smile" },
     anon: { hairStyle: "buzz", hairColor: "#0f1116", outfit: "suit", faceStyle: "neutral" },
     vitalik: { hairStyle: "short", hairColor: "#3b3468", outfit: "suit", faceStyle: "neutral" },
+    whale: { hairStyle: "buzz", hairColor: "#16394f", outfit: "suit", faceStyle: "cool" },
+    bot: { hairStyle: "buzz", hairColor: "#1b2b2e", outfit: "sport", faceStyle: "neutral" },
+    oracle: { hairStyle: "short", hairColor: "#2a1f3d", outfit: "suit", faceStyle: "neutral" },
+    miner: { hairStyle: "short", hairColor: "#4a3524", outfit: "street", faceStyle: "smile" },
   };
 
   const kit = look[cls.id];

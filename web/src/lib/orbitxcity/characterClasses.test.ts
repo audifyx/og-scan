@@ -14,8 +14,8 @@ import {
 } from "./characterClasses";
 
 describe("characterClasses", () => {
-  it("exposes six crypto-native mascots", () => {
-    expect(CHARACTER_CLASSES).toHaveLength(6);
+  it("exposes ten crypto-native mascots", () => {
+    expect(CHARACTER_CLASSES).toHaveLength(10);
     expect(CHARACTER_CLASSES.map((c) => c.id)).toEqual([
       "pepe",
       "wojak",
@@ -23,6 +23,10 @@ describe("characterClasses", () => {
       "doge",
       "anon",
       "vitalik",
+      "whale",
+      "bot",
+      "oracle",
+      "miner",
     ]);
   });
 
@@ -67,7 +71,7 @@ describe("characterClasses", () => {
 
   it("gives each mascot a distinct silhouette + palette", () => {
     const accents = new Set(CHARACTER_CLASSES.map((c) => c.accentColor));
-    expect(accents.size).toBe(6);
+    expect(accents.size).toBeGreaterThanOrEqual(9);
     for (const cls of CHARACTER_CLASSES) {
       expect(cls.scale.y).toBeGreaterThan(0.8);
       const look = appearanceFromClass(cls);

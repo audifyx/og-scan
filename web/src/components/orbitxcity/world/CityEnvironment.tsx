@@ -16,6 +16,7 @@ import { BuildingMesh } from "./BuildingMesh";
 import { BlockyBuildingMesh } from "./BlockyBuildingMesh";
 import { Baseplate } from "./BlockBuilding";
 import { CityFill } from "./CityFill";
+import { OrbitxBillboardRing } from "./OrbitxBillboard";
 import { BillboardMesh } from "./BillboardMesh";
 import { GraffitiLayer } from "./GraffitiLayer";
 import { Skyline } from "./Skyline";
@@ -443,6 +444,11 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
             seed={`orbitx-${block.id ?? "nyc"}`}
             lite={!high}
             outerRadius={high ? 250 : 170}
+          />
+          <OrbitxBillboardRing
+            radius={high ? 150 : 110}
+            count={high ? 8 : 4}
+            lite={!high}
           />
         </>
       ) : (
