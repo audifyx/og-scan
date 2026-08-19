@@ -31,7 +31,7 @@ export function CityAudioController() {
   useEffect(() => {
     if (gate === "world" && entered) {
       cityAudio.setTheme("world");
-    } else if (gate === "menu" || gate === "characters" || gate === "lobbies") {
+    } else if (gate !== "world") {
       cityAudio.setTheme("menu");
     } else {
       cityAudio.setTheme("off");

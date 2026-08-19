@@ -182,7 +182,7 @@ export interface AvatarAppearance {
 }
 
 /** Pre-world gate screens for AAA menu flow. */
-export type CityGate = "menu" | "characters" | "lobbies" | "world";
+export type CityGate = "menu" | "characters" | "lobbies" | "settings" | "help" | "quick" | "world";
 
 
 export interface InventoryItem {

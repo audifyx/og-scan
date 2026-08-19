@@ -27,7 +27,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 
 interface CityContextValue {
-  /** AAA gate: menu → characters → lobbies → world */
+  /** AAA gate: menu → characters | lobbies | settings | help | quick → world */
   gate: CityGate;
   setGate: (g: CityGate) => void;
   entered: boolean;
@@ -179,7 +179,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [gate, setGateState] = useState<CityGate>("menu");
   const [entered, setEnteredState] = useState(false);
   const [lobby, setLobby] = useState<LobbyDescriptor>(MAIN_LOBBY);
-  const [selectedCityId, setSelectedCityId] = useState<CityId>("nyc");
+  const [selectedCityId, setSelectedCityIdState] = useState<CityId>("nyc");
+  const selectedCityIdRef = useRef<CityId>("nyc");
   const [panel, setPanel] = useState<HudPanel>("none");
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
   const [playerPos, setPlayerPos] = useState<Vec3>(getWorldBlock("nyc").spawn);
@@ -221,27 +222,29 @@ export function CityProvider({ children }: { children: ReactNode }) {
     });
   }, [selectedCityId]);
 
+  const setSelectedCityId = useCallback((cityId: CityId) => {
+    selectedCityIdRef.current = cityId;
+    setSelectedCityIdState(cityId);
+  }, []);
+
   const setGate = useCallback((g: CityGate) => {
     setGateState(g);
     if (g !== "world") setEnteredState(false);
   }, []);
 
-  const setEntered = useCallback(
-    (v: boolean) => {
-      if (v) {
-        const spawn = getWorldBlock(selectedCityId).spawn;
-        setPlayerPos(spawn);
-        setPlayerYaw(0);
-        setPanel("none");
-        setInteriorBuildingId(null);
-        setInteriorVendor(null);
-        setGateState("world");
-      }
-      setEnteredState(v);
-      if (!v) setGateState((prev) => (prev === "world" ? "menu" : prev));
-    },
-    [selectedCityId],
-  );
+  const setEntered = useCallback((v: boolean) => {
+    if (v) {
+      const spawn = getWorldBlock(selectedCityIdRef.current).spawn;
+      setPlayerPos(spawn);
+      setPlayerYaw(0);
+      setPanel("none");
+      setInteriorBuildingId(null);
+      setInteriorVendor(null);
+      setGateState("world");
+    }
+    setEnteredState(v);
+    if (!v) setGateState((prev) => (prev === "world" ? "menu" : prev));
+  }, []);
 
   const exitToMenu = useCallback(() => {
     setRealtime((prev) => {
@@ -561,6 +564,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       exitToMenu,
       lobby,
       selectedCityId,
+      setSelectedCityId,
       panel,
       openPanel,
       closePanel,

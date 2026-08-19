@@ -14,7 +14,7 @@ import { AudioToggle } from "./AudioToggle";
 import { InstallCityPWA } from "./InstallCityPWA";
 
 export function MainMenu() {
-  const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
+  const { setGate, selectedCityId, setSelectedCityId } = useCity();
   const [visible, setVisible] = useState(false);
   const [flash, setFlash] = useState(false);
   const [focus, setFocus] = useState<TitleNavId>("play");
@@ -57,19 +57,19 @@ export function MainMenu() {
         window.setTimeout(() => setGate("lobbies"), 160);
         break;
       case "settings":
-        cityAudio.play("enter");
+        cityAudio.play("confirm");
         pulse();
-        setGate("world");
-        setEntered(true);
-        openPanel("settings");
+        window.setTimeout(() => setGate("settings"), 160);
+        break;
+      case "help":
+        cityAudio.play("confirm");
+        pulse();
+        window.setTimeout(() => setGate("help"), 160);
         break;
       case "quick":
-        cityAudio.play("enter");
+        cityAudio.play("confirm");
         pulse();
-        window.setTimeout(() => {
-          setGate("world");
-          setEntered(true);
-        }, 140);
+        window.setTimeout(() => setGate("quick"), 160);
         break;
       default:
         break;
