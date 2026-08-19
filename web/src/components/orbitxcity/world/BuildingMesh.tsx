@@ -9,6 +9,7 @@ import * as THREE from "three";
 import type { BuildingBanner, BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
 import { bannerLocalPose, createBannerTexture, resolveBuildingBanners } from "@/lib/orbitxcity/banners";
+import { bannerTargetsBuilding, liveUserBanners } from "@/lib/orbitxcity/cityShop";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
 import { getBuildingKit, gltfPathForBuilding } from "@/lib/orbitxcity/assets/buildingKits";
 import { GltfProp } from "./GltfProp";
@@ -483,7 +484,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
 }
 
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
-  const { openVenue, quality } = useCity();
+  const { openVenue, quality, shopPurchases } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const kit = useMemo(() => getBuildingKit(building.kind), [building.kind]);
@@ -707,7 +708,12 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         </>
       )}
 
-      {resolveBuildingBanners(building).map((banner) => (
+      {[
+        ...resolveBuildingBanners(building),
+        ...liveUserBanners(shopPurchases).filter((banner) =>
+          bannerTargetsBuilding(banner.buildingId, building.id, building.kind, walkIn),
+        ),
+      ].map((banner) => (
         <BannerFace key={banner.id} banner={banner} size={size} />
       ))}
     </group>

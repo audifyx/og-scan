@@ -24,7 +24,7 @@ const KIND_HINT: Record<string, string> = {
   trading: "DEX trading floor",
   community: "Community · social & chat",
   hq: "OrbitX HQ · command floor",
-  billboard: "Live OrbitX data wall",
+  billboard: "Burn store · ads & listings",
   token: "Buy desk · Jupiter swap",
   voice: "Voice plaza",
   games: "Games district",

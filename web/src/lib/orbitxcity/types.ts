@@ -170,10 +170,11 @@ export type HudPanel =
   | "settings"
   | "help"
   | "lobbies"
-  | "character";
+  | "character"
+  | "shop";
 
-export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk";
-export type OutfitStyle = "street" | "suit" | "sport" | "neon";
+export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk" | "fade" | "twin";
+export type OutfitStyle = "street" | "suit" | "sport" | "neon" | "hoodie" | "gold" | "royal" | "pilot" | "legend";
 export type FaceStyle = "neutral" | "cool" | "smile";
 
 export interface StreetSegment {
@@ -207,7 +208,7 @@ export type CityGate = "menu" | "characters" | "lobbies" | "settings" | "world";
 
 export interface InventoryItem {
   id: string;
-  kind: "token" | "badge" | "key" | "ad_slot";
+  kind: "token" | "badge" | "key" | "ad_slot" | "cosmetic" | "listing" | "perk";
   label: string;
   detail?: string;
   mint?: string;

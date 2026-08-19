@@ -4093,3 +4093,43 @@ button.oxc-token-row {
     height: 400px;
   }
 }
+
+.oxc-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.65rem;
+}
+
+.oxc-shop-card {
+  border: 1px solid color-mix(in srgb, var(--shop, #00ff9f) 45%, transparent);
+  background: rgba(8, 12, 16, 0.72);
+  padding: 0.7rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.oxc-shop-card h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.oxc-shop-card p {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.oxc-shop-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.oxc-shop-card.is-owned {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--shop, #00ff9f) 55%, transparent);
+}

@@ -54,7 +54,7 @@ function TokenStoreRow({ row, onOpen }: { row: ScreenerRow; onOpen: () => void }
  * New = fresh pairs · OrbitX = launchpad registry · Search = all of Solana.
  */
 export function MemeStorePanel() {
-  const { openToken } = useCity();
+  const { openToken, openPanel } = useCity();
   const [tab, setTab] = useState<StoreTab>("trending");
   const [query, setQuery] = useState("");
 
@@ -116,6 +116,9 @@ export function MemeStorePanel() {
       <p className="oxc-muted">
         Real coins, real wallet — every Solana token buyable in-world via Jupiter. Tap a coin to open the buy panel.
       </p>
+      <button type="button" className="oxc-btn primary" onClick={() => openPanel("shop")}>
+        Open Burn Store · clothes, ads, listings
+      </button>
 
       <div className="oxc-store-tabs">
         {TABS.map((t) => {
