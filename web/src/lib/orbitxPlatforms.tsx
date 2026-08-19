@@ -171,6 +171,12 @@ export const PlatformGlyph = {
       <path d="M14 20l6 4-6 4M24 28h10" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   ),
+  telegram: (
+    <Svg>
+      <path d="M10 24l28-12-8 28-6-8-8 4 2-10z" stroke="currentColor" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M20 22l12-8-8 14" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" opacity=".7" />
+    </Svg>
+  ),
 };
 
 export const PLATFORM_APPS: PlatformApp[] = [
@@ -186,6 +192,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #38BDF8 48%, #0284C7 100%)", glyph: PlatformGlyph.ai },
   { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.agent, dock: true },
   { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(145deg, #71717A 0%, #3F3F46 50%, #18181B 100%)", glyph: PlatformGlyph.x },
+  { key: "telegram", name: "Telegram", caption: "Official @theorbitxmcpbot", href: "/telegram", tone: "#2AABEE", iconBg: "linear-gradient(145deg, #6FD0FF 0%, #2AABEE 48%, #0B5F8A 100%)", glyph: PlatformGlyph.telegram },
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
   { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq },
@@ -206,7 +213,7 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "world", title: "World", subtitle: "City, OS, and play surfaces", keys: ["city", "os", "play", "gaming"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Intel desk, wallets, PnL, AI", keys: ["intel", "koltracker", "pnltracker", "ai"] },
-  { id: "mcp", title: "AI Connectors", subtitle: "Agent + X MCP and shop", keys: ["agent", "xmcp", "shop"] },
+  { id: "mcp", title: "AI Connectors", subtitle: "Agent, X, Telegram, and shop", keys: ["agent", "xmcp", "telegram", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed, HQ, and community", keys: ["social", "hq"] },
   { id: "play", title: "Play & Earn", subtitle: "Markets, NFTs, tasks", keys: ["predict", "nft", "bagwork"] },
 ];
@@ -227,6 +234,7 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
   if (href === "/intel") return pathname === "/intel" || pathname.startsWith("/intel/");
   if (href === "/x") return pathname === "/x" || pathname.startsWith("/x/");
   if (href === "/ai") return pathname.toLowerCase() === "/ai";
+  if (href === "/telegram") return pathname.toLowerCase() === "/telegram";
   if (href === "/app") return pathname === "/app" || pathname.startsWith("/hub");
   return pathname === href || pathname.startsWith(`${href}/`);
 }

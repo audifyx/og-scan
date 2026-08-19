@@ -4738,6 +4738,42 @@ export function hasEmbeddedAgentTool(toolName) {
   return TOOLS.some((tool) => tool.name === name);
 }
 
+/** Full live catalog, including generated screeners / charts / mint intel. */
+export function listAllOrbitXTools() {
+  return TOOLS.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+  }));
+}
+
+/**
+ * Public Telegram / web runner — no OrbitX login required.
+ * Used for group chats and unauthenticated /telegram browse of read tools.
+ * Privileged (trade / X / social write) tools must go through runEmbeddedAgentTool.
+ */
+export async function runPublicOrbitXTool({ toolName, args = {}, req = null }) {
+  const rawName = String(toolName || "").trim();
+  const name = TOOL_ALIASES[rawName] || rawName;
+  if (!hasEmbeddedAgentTool(name)) {
+    throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
+  }
+  const { isPrivilegedTelegramTool } = await import("./orbitx/telegram-orbitx-lib.js");
+  if (isPrivilegedTelegramTool(name) || name === "x_post") {
+    throw Object.assign(new Error("login_required"), { status: 401 });
+  }
+  const auth = {
+    userId: null,
+    agentId: null,
+    walletAddress: null,
+    agentName: "OrbitX Telegram",
+    email: null,
+    source: "telegram_public",
+    bearerPresent: false,
+  };
+  return callTool(name, args || {}, auth, publicBase(req), req);
+}
+
 export async function runEmbeddedAgentTool({
   userId,
   walletAddress = null,

@@ -17,6 +17,8 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('path="/ai"');
     expect(app).toContain('path="/AI"');
     expect(app).toContain('Navigate to="/ai"');
+    expect(app).toContain('path="/telegram"');
+    expect(app).toContain('import TelegramOrbitX from "./pages/TelegramOrbitX"');
   });
 
   it("loads team apps and keeps OrbitX AI eager for route reliability", () => {

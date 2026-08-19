@@ -1,5 +1,6 @@
 /**
- * /api/telegram-mcp — bridge Telegram bots ↔ OrbitX Agent / X MCP.
+ * /api/telegram-mcp — user-owned BotFather tokens (dashboard JWT).
+ * Official first-party bot is /api/telegram-orbitx.js (@theorbitxmcpbot) — do not mix.
  *
  * Bot webhook calls: { action, botId, webhookSecret, kind?, tool?, args?, text? }
  * Dashboard (JWT):   { action: "dashboard_status"|"dashboard_enable"|"dashboard_disable", kind? }

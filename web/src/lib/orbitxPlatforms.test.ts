@@ -23,6 +23,7 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "intel")?.href).toBe("/intel");
     expect(PLATFORM_APPS.find((a) => a.key === "hq")?.href).toBe("/hq");
     expect(PLATFORM_APPS.find((a) => a.key === "predict")?.href).toBe("/predictions");
+    expect(PLATFORM_APPS.find((a) => a.key === "telegram")?.href).toBe("/telegram");
   });
 
   it("puts those platforms on the home grid and mini menu", () => {
