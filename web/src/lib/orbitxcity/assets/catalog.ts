@@ -16,6 +16,7 @@ export const CITY_BUILDING_MODELS = {
   d: `${BASE}/citybits/building_D.gltf`,
 } as const;
 
+/** Inventory only — runtime street cars/benches are procedural (missing Kenney textures + toy scale). */
 export const CITY_STREET_MODELS = {
   bench: `${BASE}/citybits/bench.gltf`,
   carSedan: `${BASE}/citybits/car_sedan.gltf`,

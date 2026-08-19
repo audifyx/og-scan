@@ -46,8 +46,9 @@ const PHRASES = [
 
 const NAMES = ["Pepe", "Wojak", "Ser", "Anon", "Doge", "Ape", "Chad", "Gm", "Bags", "Sol"];
 
-const NPC_COLORS = ["#3d7a38", "#6b7280", "#1c1420", "#d4893a", "#111318", "#43242e"];
+const NPC_COLORS = ["#5cb85c", "#8b93a3", "#c5a26f", "#e8a54b", "#6ec8ff", "#ff7a9a"];
 const ACCENTS = ["#5cb85c", "#e8b4c8", "#d4a017", "#e8a54b", "#f7931a", "#ff6b35"];
+const HAIR = ["#3a2a1c", "#1a2438", "#5a3a28", "#2a1814", "#4a5060", "#c5a26f"];
 const OUTFITS: AvatarAppearance["outfit"][] = ["street", "suit", "sport", "neon"];
 const CLASSES: NonNullable<AvatarAppearance["classId"]>[] = [
   "pepe",
@@ -90,7 +91,7 @@ function StreetLocal({
       name,
       classId: CLASSES[Math.floor(rand() * CLASSES.length)],
       hairStyle: idle ? "bun" : "short",
-      hairColor: "#1a1420",
+      hairColor: HAIR[Math.floor(rand() * HAIR.length)]!,
       outfit: OUTFITS[Math.floor(rand() * OUTFITS.length)]!,
       faceStyle: idle ? "smile" : "cool",
     }),
@@ -218,7 +219,7 @@ function StreetLocal({
       )}
       <CharacterMesh appearance={appearance} moving={!idle && isMoving} walkIntensity={idle ? 0.2 : 0.85} />
       {bubble && (
-        <Billboard position={[0, 2.55, 0]}>
+        <Billboard position={[0, 2.9, 0]}>
           <Text
             fontSize={0.26}
             color="#e8f1ff"

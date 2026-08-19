@@ -202,7 +202,7 @@ export function HumanoidMesh({
       {/* Torso */}
       <mesh position={[0, 1.18, 0]} castShadow>
         <boxGeometry args={[0.42, 0.42, 0.22]} />
-        <meshStandardMaterial color={outfit === "neon" || outfit === "sport" ? body : clothes.top} roughness={0.55} metalness={0.12} />
+        <meshStandardMaterial color={body} roughness={0.55} metalness={0.12} />
       </mesh>
       <mesh position={[0, 1.18, 0.118]}>
         <boxGeometry args={[0.12, 0.28, 0.02]} />

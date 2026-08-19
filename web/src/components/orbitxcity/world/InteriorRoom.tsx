@@ -14,12 +14,11 @@ import { getFurnitureSet } from "@/lib/orbitxcity/assets/catalog";
 import { interiorDoorWidth, interiorMetrics } from "@/lib/orbitxcity/collision";
 import { appearanceFromClass, getCharacterClass } from "@/lib/orbitxcity/characterClasses";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { GltfProp } from "./GltfProp";
 import { CharacterMesh } from "./CharacterMesh";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-const NPC_BODY = ["#233a5c", "#3c2a4d", "#1e4436", "#4d3a1e", "#2a3d4d"];
+const NPC_BODY = ["#4a7ab8", "#8a6ab0", "#3d8a6e", "#c5a26f", "#5a8aaa"];
 const VENDOR_RADIUS = 1.85;
 
 type RoomPalette = {
@@ -135,27 +134,125 @@ function roomPalette(theme: RoomTheme): RoomPalette {
   }
 }
 
+function furnitureKind(path: string): "seat" | "table" | "cabinet" | "lamp" | "plant" {
+  if (path.includes("couch") || path.includes("armchair") || path.includes("chair")) return "seat";
+  if (path.includes("table") || path.includes("rug")) return "table";
+  if (path.includes("cabinet") || path.includes("shelf") || path.includes("book")) return "cabinet";
+  if (path.includes("lamp")) return "lamp";
+  return "plant";
+}
+
+/** Kenney furniture GLTFs ship without textures — use readable procedural stand-ins. */
+function ProceduralProp({
+  path,
+  x,
+  z,
+  rotY,
+  scale,
+  accent,
+}: {
+  path: string;
+  x: number;
+  z: number;
+  rotY: number;
+  scale: number;
+  accent: string;
+}) {
+  const kind = furnitureKind(path);
+  return (
+    <group position={[x, 0, z]} rotation={[0, rotY, 0]} scale={scale}>
+      {kind === "seat" && (
+        <>
+          <mesh position={[0, 0.32, 0]} castShadow>
+            <boxGeometry args={[1.15, 0.38, 0.62]} />
+            <meshStandardMaterial color="#3a4454" roughness={0.68} />
+          </mesh>
+          <mesh position={[0, 0.62, -0.22]} castShadow>
+            <boxGeometry args={[1.15, 0.48, 0.16]} />
+            <meshStandardMaterial color="#4a5568" roughness={0.62} />
+          </mesh>
+        </>
+      )}
+      {kind === "table" && (
+        <>
+          <mesh position={[0, 0.48, 0]} castShadow>
+            <boxGeometry args={[1.15, 0.08, 0.7]} />
+            <meshStandardMaterial color="#8ec8e8" metalness={0.45} roughness={0.22} transparent opacity={0.7} />
+          </mesh>
+          <mesh position={[0, 0.24, 0]} castShadow>
+            <boxGeometry args={[0.12, 0.4, 0.12]} />
+            <meshStandardMaterial color="#1a222c" metalness={0.4} roughness={0.45} />
+          </mesh>
+        </>
+      )}
+      {kind === "cabinet" && (
+        <>
+          <mesh position={[0, 0.7, 0]} castShadow>
+            <boxGeometry args={[1.05, 1.35, 0.42]} />
+            <meshStandardMaterial color="#243040" metalness={0.28} roughness={0.55} />
+          </mesh>
+          <mesh position={[0, 1.28, 0.22]}>
+            <boxGeometry args={[0.9, 0.08, 0.04]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.45} toneMapped={false} />
+          </mesh>
+        </>
+      )}
+      {kind === "lamp" && (
+        <>
+          <mesh position={[0, 0.55, 0]} castShadow>
+            <cylinderGeometry args={[0.05, 0.08, 1.1, 8]} />
+            <meshStandardMaterial color="#2a323c" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 1.15, 0]}>
+            <sphereGeometry args={[0.14, 10, 8]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} toneMapped={false} />
+          </mesh>
+        </>
+      )}
+      {kind === "plant" && (
+        <>
+          <mesh position={[0, 0.18, 0]} castShadow>
+            <cylinderGeometry args={[0.12, 0.16, 0.28, 8]} />
+            <meshStandardMaterial color="#6a5340" roughness={0.8} />
+          </mesh>
+          <mesh position={[0, 0.55, 0]} castShadow>
+            <sphereGeometry args={[0.22, 10, 8]} />
+            <meshStandardMaterial color="#3d8a6e" roughness={0.7} />
+          </mesh>
+        </>
+      )}
+    </group>
+  );
+}
+
 function FurnitureLayer({
   theme,
   width,
   depth,
+  accent,
 }: {
   theme: RoomTheme;
   width: number;
   depth: number;
+  accent: string;
 }) {
   const paths = getFurnitureSet(theme);
-  const slots = useMemo(() => furnitureSlots(theme, width, depth, paths), [theme, width, depth, paths]);
+  const slots = useMemo(
+    () => furnitureSlots(theme, width, depth, paths).slice(3, 7),
+    [theme, width, depth, paths],
+  );
   if (!slots.length) return null;
   return (
     <group>
       {slots.map((s, i) => (
-        <GltfProp
+        <ProceduralProp
           key={`${s.path}-${i}`}
           path={s.path}
-          position={[s.x, 0, s.z]}
-          rotation={[0, s.rotY, 0]}
+          x={s.x}
+          z={s.z}
+          rotY={s.rotY}
           scale={s.scale}
+          accent={accent}
         />
       ))}
     </group>
@@ -243,7 +340,7 @@ function InteriorNpc({
         </mesh>
       )}
       {bubble && (
-        <Billboard position={[0, 2.45, 0]}>
+        <Billboard position={[0, 2.9, 0]}>
           <Text
             fontSize={0.2}
             color="#eef4ff"
@@ -762,7 +859,7 @@ export function InteriorRoom({
       </Text>
 
       <ThemeSet theme={theme} width={w} depth={d} height={h} accent={building.accent} building={building} />
-      <FurnitureLayer theme={theme} width={w} depth={d} />
+      <FurnitureLayer theme={theme} width={w} depth={d} accent={building.accent} />
       <InteriorCrowd theme={theme} width={w} depth={d} building={building} />
 
       <mesh

@@ -8,6 +8,7 @@ import type { StreetSegment, WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 import { collidesAt } from "@/lib/orbitxcity/collision";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { CITY_CAR_BODIES, CITY_CAR_GLOWS, CityCarMesh } from "./CityCarMesh";
 
 interface LaneCar {
   phase: number;
@@ -17,9 +18,6 @@ interface LaneCar {
   segmentIndex: number;
   body: string;
 }
-
-const GLOWS = ["#3de7ff", "#00ff9f", "#f5c542", "#a78bfa", "#ff6b35", "#c5a26f"];
-const BODIES = ["#1a2230", "#2a1818", "#142028", "#1c1a14", "#12161c", "#201418"];
 
 function segmentLength(s: StreetSegment): number {
   return Math.abs(s.to - s.from);
@@ -37,45 +35,6 @@ function pointOnSegment(
     return { x: a, z: s.at + lane, yaw: reverse ? -Math.PI / 2 : Math.PI / 2 };
   }
   return { x: s.at + lane, z: a, yaw: reverse ? Math.PI : 0 };
-}
-
-function CarBody({ glow, body }: { glow: string; body: string }) {
-  return (
-    <group>
-      <mesh position={[0, 0.28, 0]} castShadow>
-        <boxGeometry args={[1.05, 0.32, 2.15]} />
-        <meshStandardMaterial color={body} metalness={0.55} roughness={0.38} />
-      </mesh>
-      <mesh position={[0, 0.55, -0.08]} castShadow>
-        <boxGeometry args={[0.88, 0.28, 1.15]} />
-        <meshStandardMaterial color="#1a2430" metalness={0.35} roughness={0.22} emissive={glow} emissiveIntensity={0.08} />
-      </mesh>
-      {[-1, 1].map((s) => (
-        <group key={s}>
-          <mesh position={[s * 0.46, 0.16, 0.68]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.16, 0.16, 0.12, 10]} />
-            <meshStandardMaterial color="#111418" roughness={0.7} />
-          </mesh>
-          <mesh position={[s * 0.46, 0.16, -0.68]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.16, 0.16, 0.12, 10]} />
-            <meshStandardMaterial color="#111418" roughness={0.7} />
-          </mesh>
-        </group>
-      ))}
-      <mesh position={[0, 0.32, 1.1]}>
-        <boxGeometry args={[0.7, 0.08, 0.06]} />
-        <meshBasicMaterial color="#e8f4ff" toneMapped={false} />
-      </mesh>
-      <mesh position={[0, 0.32, -1.1]}>
-        <boxGeometry args={[0.7, 0.08, 0.06]} />
-        <meshBasicMaterial color="#ff3b3b" toneMapped={false} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <planeGeometry args={[1.05, 2.2]} />
-        <meshBasicMaterial color={glow} transparent opacity={0.16} toneMapped={false} />
-      </mesh>
-    </group>
-  );
 }
 
 function StreetCar({
@@ -130,7 +89,7 @@ function StreetCar({
   const start = pointOnSegment(segment, phase, reverse);
   return (
     <group ref={group} position={[start.x, 0, start.z]} rotation={[0, start.yaw, 0]}>
-      <CarBody glow={glow} body={body} />
+      <CityCarMesh glow={glow} body={body} />
     </group>
   );
 }
@@ -163,8 +122,8 @@ export function Traffic({
         phase: (i * 0.19) % 1,
         speed: 5.4 + (i % 4) * 0.9,
         reverse: i % 2 === 1,
-        glow: GLOWS[i % GLOWS.length]!,
-        body: BODIES[i % BODIES.length]!,
+        glow: CITY_CAR_GLOWS[i % CITY_CAR_GLOWS.length]!,
+        body: CITY_CAR_BODIES[i % CITY_CAR_BODIES.length]!,
       });
     }
     return out;
