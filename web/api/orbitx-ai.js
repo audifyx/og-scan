@@ -16,6 +16,7 @@ import {
   requireUser,
 } from "./orbitx/ai-runtime.js";
 import {
+  hasEmbeddedAgentTool,
   listEmbeddedAgentTools,
   runEmbeddedAgentTool,
 } from "./orbitx-hub.js";
@@ -32,6 +33,11 @@ const NVIDIA_BASE =
   process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
 const MAX_PROMPT = 12_000;
 const MAX_TOOL_LOOPS = 4;
+// config.maxDuration is 120s. Keep the model + tool budget inside that so a long
+// tool chain returns a real answer instead of a platform timeout.
+const CHAT_BUDGET_MS = 96_000;
+const NVIDIA_TIMEOUT_MS = 45_000;
+const MIN_MODEL_CALL_MS = 8_000;
 const MAX_TOOL_STORAGE_CHARS = 60_000;
 const MAX_TOOL_MODEL_CHARS = 16_000;
 const CONFIRMATION_TTL_MS = 15 * 60_000;
@@ -125,6 +131,15 @@ function isUuid(value) {
 
 function objectValue(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+/**
+ * supabase-js serializes an array passed to `.contains()` as a Postgres array
+ * literal (`{[object Object]}`), which never matches a jsonb column. Passing the
+ * JSON string keeps the `cs.` filter as real jsonb containment.
+ */
+function toolEventFilter(eventId, status) {
+  return JSON.stringify([{ id: eventId, status }]);
 }
 
 function trustedPublicBase() {
@@ -368,17 +383,20 @@ async function authenticatedContext(req) {
   }
 
   const db = adminClient();
-  const { data: identity, error: identityError } = await db
+  // A duplicate identity row must never take the whole AI app down, so read the
+  // oldest link instead of demanding exactly one.
+  const { data: identities, error: identityError } = await db
     .from("wallet_identities")
     .select("wallet")
     .eq("user_id", id)
-    .maybeSingle();
+    .order("created_at", { ascending: true })
+    .limit(1);
   if (identityError) {
     throw Object.assign(new Error(identityError.message), { status: 500 });
   }
 
   const email = authData.user.email || null;
-  const walletAddress = identity?.wallet || null;
+  const walletAddress = identities?.[0]?.wallet || null;
   const gate = await verifyTokenHold(walletAddress, trustedPublicBase(), {
     email,
     requireUsdPrice: true,
@@ -386,12 +404,13 @@ async function authenticatedContext(req) {
 
   let burn = statusFromRow(null);
   try {
-    const { data: burnRow } = await db
+    const { data: burnRows } = await db
       .from("mcp_burn_access")
       .select("package_id, expires_at, tokens_burned, lifetime_tokens_burned, wallet_address, last_tx_signature")
       .eq("user_id", id)
-      .maybeSingle();
-    burn = statusFromRow(burnRow);
+      .order("expires_at", { ascending: false })
+      .limit(1);
+    burn = statusFromRow(burnRows?.[0] || null);
   } catch {
     /* table may not exist until migration is applied */
   }
@@ -513,26 +532,55 @@ function directTools() {
   return tools;
 }
 
-async function callNvidia(messages, model, tools) {
+function isUnknownModelError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.status === 502 &&
+    (message.includes("model") &&
+      (message.includes("not found") ||
+        message.includes("does not exist") ||
+        message.includes("unknown") ||
+        message.includes("unavailable") ||
+        message.includes("invalid")))
+  );
+}
+
+async function requestNvidia(messages, model, tools, timeoutMs, toolChoice = "auto") {
   const key = process.env.NVIDIA_API_KEY || "";
   if (!key) {
-    throw Object.assign(new Error("NVIDIA_API_KEY is not configured"), { status: 503 });
+    throw Object.assign(
+      new Error("OrbitX AI is missing its model credentials (NVIDIA_API_KEY). Contact support."),
+      { status: 503 },
+    );
   }
-  const response = await fetch(`${NVIDIA_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      ...(tools?.length ? { tools, tool_choice: "auto" } : {}),
-      temperature: 0.55,
-      max_tokens: 1800,
-    }),
-    signal: AbortSignal.timeout(75_000),
-  });
+  let response;
+  try {
+    response = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        ...(tools?.length ? { tools, tool_choice: toolChoice } : {}),
+        temperature: 0.55,
+        max_tokens: 1800,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+    throw Object.assign(
+      new Error(
+        timedOut
+          ? "The model took too long to respond. Try a shorter prompt or a faster model."
+          : `Could not reach the model provider: ${error?.message || "network error"}`,
+      ),
+      { status: timedOut ? 504 : 502 },
+    );
+  }
   const raw = await response.text();
   let parsed = {};
   try {
@@ -542,14 +590,38 @@ async function callNvidia(messages, model, tools) {
   }
   if (!response.ok) {
     const message =
-      parsed?.error?.message || raw.slice(0, 300) || `NVIDIA error ${response.status}`;
-    throw Object.assign(new Error(message), { status: 502 });
+      parsed?.error?.message ||
+      parsed?.detail?.[0]?.msg ||
+      parsed?.detail ||
+      raw.slice(0, 300) ||
+      `NVIDIA error ${response.status}`;
+    throw Object.assign(new Error(text(message, 300)), { status: 502 });
   }
   const message = parsed?.choices?.[0]?.message;
   if (!message) {
-    throw Object.assign(new Error("NVIDIA returned no assistant message"), { status: 502 });
+    throw Object.assign(new Error("The model returned an empty response."), { status: 502 });
   }
   return message;
+}
+
+/**
+ * The published NIM catalog drifts. If the selected model id is retired, retry
+ * once on the default model so a stale dropdown choice can never break chat.
+ */
+async function callNvidia(
+  messages,
+  model,
+  tools,
+  timeoutMs = NVIDIA_TIMEOUT_MS,
+  toolChoice = "auto",
+) {
+  try {
+    return await requestNvidia(messages, model, tools, timeoutMs, toolChoice);
+  } catch (error) {
+    if (model === DEFAULT_NIM_MODEL || !isUnknownModelError(error)) throw error;
+    console.warn(`[orbitx-ai] model ${model} unavailable, retrying on ${DEFAULT_NIM_MODEL}`);
+    return requestNvidia(messages, DEFAULT_NIM_MODEL, tools, timeoutMs, toolChoice);
+  }
 }
 
 function resolveToolCall(call) {
@@ -569,23 +641,60 @@ function resolveToolCall(call) {
   };
 }
 
+function toolEventSummary(toolEvents) {
+  if (!toolEvents.length) return "";
+  const lines = toolEvents.map((event) => {
+    const label = String(event.tool || "tool").replace(/^orbitx_/, "").replace(/_/g, " ");
+    if (event.status === "confirmation_required") return `- ${label} — waiting for your confirmation`;
+    if (event.status === "failed") {
+      return `- ${label} — failed${event.result?.error ? `: ${text(event.result.error, 160)}` : ""}`;
+    }
+    return `- ${label} — completed`;
+  });
+  return [
+    "I ran your OrbitX tools but could not reach the model for a written summary.",
+    "Here is what happened — the result cards below have the full data:",
+    "",
+    ...lines,
+  ].join("\n");
+}
+
 async function runChat(ctx, conversation, rows, selectedModel, req) {
-  const history = rows.slice(-42).map((row) => ({
-    role: row.role === "tool" ? "assistant" : row.role,
-    content: row.content,
-  }));
+  const history = rows
+    .slice(-42)
+    .map((row) => ({
+      role: row.role === "tool" ? "assistant" : row.role,
+      content: text(row.content, 24_000),
+    }))
+    .filter((entry) => entry.content);
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
   const tools = directTools();
   const toolEvents = [];
+  const deadline = Date.now() + CHAT_BUDGET_MS;
+  const remainingBudget = () => Math.min(NVIDIA_TIMEOUT_MS, deadline - Date.now());
   let finalContent = "";
+  let modelError = null;
 
   for (let iteration = 0; iteration < MAX_TOOL_LOOPS; iteration += 1) {
+    const budget = remainingBudget();
+    if (budget < MIN_MODEL_CALL_MS) break;
+
     let assistant;
     try {
-      assistant = await callNvidia(messages, selectedModel, tools);
+      assistant = await callNvidia(messages, selectedModel, tools, budget);
     } catch (error) {
-      if (iteration !== 0) throw error;
-      assistant = await callNvidia(messages, selectedModel, []);
+      // Some NIM models reject large tool schemas. Retry once without tools so a
+      // plain answer still reaches the user.
+      if (iteration === 0 && remainingBudget() >= MIN_MODEL_CALL_MS) {
+        try {
+          assistant = await callNvidia(messages, selectedModel, [], remainingBudget());
+        } catch (retryError) {
+          throw retryError;
+        }
+      } else {
+        modelError = error;
+        break;
+      }
     }
 
     const calls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
@@ -621,6 +730,12 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
         event.result = {
           error: "This connector-auth action is unavailable inside OrbitX AI.",
           message: "Use the connected wallet session or the dedicated Agent connector page.",
+        };
+      } else if (!hasEmbeddedAgentTool(resolved.name)) {
+        event.status = "failed";
+        event.result = {
+          error: `Unknown OrbitX tool: ${resolved.name}`,
+          message: "Call orbitx_tools_help to list the live tool names.",
         };
       } else if (requiresConfirmation(resolved.name) && !confirmableArgs.ok) {
         event.status = "failed";
@@ -665,24 +780,38 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
     }
   }
 
-  if (!finalContent) {
-    const last = await callNvidia(
-      [
-        ...messages,
-        {
-          role: "system",
-          content: "Return the final user-facing answer now. Do not call more tools.",
-        },
-      ],
-      selectedModel,
-      [],
-    );
-    finalContent = text(last.content, 100_000);
+  if (!finalContent && remainingBudget() >= MIN_MODEL_CALL_MS) {
+    try {
+      // Keep the tool schema attached: NIM chat templates reject a transcript
+      // containing tool calls when `tools` is omitted. `tool_choice: none` stops
+      // another round of calls.
+      const last = await callNvidia(
+        [
+          ...messages,
+          {
+            role: "system",
+            content: "Return the final user-facing answer now. Do not call more tools.",
+          },
+        ],
+        selectedModel,
+        tools,
+        remainingBudget(),
+        "none",
+      );
+      finalContent = text(last.content, 100_000);
+    } catch (error) {
+      modelError = error;
+    }
+  }
+
+  if (!finalContent && !toolEvents.length) {
+    throw modelError || Object.assign(new Error("The model returned an empty response."), { status: 502 });
   }
 
   return {
     content:
       finalContent ||
+      toolEventSummary(toolEvents) ||
       "I finished the OrbitX tool run, but the model returned no summary. The result cards are below.",
     toolEvents,
     conversation,
@@ -1039,7 +1168,7 @@ async function handleToolExecute(req, res, ctx, body) {
     .eq("id", sourceMessage.id)
     .eq("user_id", ctx.userId)
     .eq("conversation_id", conversation.id)
-    .contains("tool_events", [{ id: eventId, status: "confirmation_required" }])
+    .contains("tool_events", toolEventFilter(eventId, "confirmation_required"))
     .select("id")
     .maybeSingle();
   if (claimError) throw new Error(claimError.message);
@@ -1082,7 +1211,7 @@ async function handleToolExecute(req, res, ctx, body) {
     .eq("id", sourceMessage.id)
     .eq("user_id", ctx.userId)
     .eq("conversation_id", conversation.id)
-    .contains("tool_events", [{ id: eventId, status: "executing" }]);
+    .contains("tool_events", toolEventFilter(eventId, "executing"));
   if (finalizeError) throw new Error(finalizeError.message);
 
   let message = null;
@@ -1160,7 +1289,7 @@ async function handleToolCancel(req, res, ctx, body) {
     .eq("id", sourceMessage.id)
     .eq("user_id", ctx.userId)
     .eq("conversation_id", conversation.id)
-    .contains("tool_events", [{ id: eventId, status: pending.status }])
+    .contains("tool_events", toolEventFilter(eventId, pending.status))
     .select("id")
     .maybeSingle();
   if (cancelError) throw new Error(cancelError.message);
@@ -1177,18 +1306,20 @@ export default async function handler(req, res) {
         ? text(req.query.action, 40) || "bootstrap"
         : text(parseBody(req).action, 40);
 
+    // Every branch is awaited: returning the promise from inside `try` would let
+    // handler rejections escape this catch and crash the invocation with no body.
     if (action === "gate") return json(res, { ok: true, gate: ctx.gate, walletAddress: ctx.walletAddress });
-    if (req.method === "GET" && action === "bootstrap") return handleBootstrap(req, res, ctx);
-    if (req.method === "GET" && action === "messages") return handleMessages(req, res, ctx);
+    if (req.method === "GET" && action === "bootstrap") return await handleBootstrap(req, res, ctx);
+    if (req.method === "GET" && action === "messages") return await handleMessages(req, res, ctx);
     if (req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
 
     const body = parseBody(req);
-    if (action === "chat") return handleChat(req, res, ctx, body);
-    if (action === "conversation") return handleConversation(req, res, ctx, body);
-    if (action === "media.generate") return handleMediaGenerate(req, res, ctx, body);
-    if (action === "media.status") return handleMediaStatus(req, res, ctx, body);
-    if (action === "tool.execute") return handleToolExecute(req, res, ctx, body);
-    if (action === "tool.cancel") return handleToolCancel(req, res, ctx, body);
+    if (action === "chat") return await handleChat(req, res, ctx, body);
+    if (action === "conversation") return await handleConversation(req, res, ctx, body);
+    if (action === "media.generate") return await handleMediaGenerate(req, res, ctx, body);
+    if (action === "media.status") return await handleMediaStatus(req, res, ctx, body);
+    if (action === "tool.execute") return await handleToolExecute(req, res, ctx, body);
+    if (action === "tool.cancel") return await handleToolCancel(req, res, ctx, body);
     return json(res, { error: "unknown_action" }, 404);
   } catch (error) {
     const status =
@@ -1197,14 +1328,20 @@ export default async function handler(req, res) {
         : 500;
     if (error?.retryAfter) res.setHeader("Retry-After", String(error.retryAfter));
     if (status >= 500) console.error("[orbitx-ai]", error);
+    // Upstream failures (model provider, media provider) carry an actionable
+    // message. Only genuine internal errors are masked.
+    const upstream = status >= 502 && status <= 504;
+    const detail = text(error?.message, 400);
     return json(
       res,
       {
-        error: status >= 500 ? "orbitx_ai_error" : error?.message || "request_failed",
+        error: status >= 500 && !upstream ? "orbitx_ai_error" : detail || "request_failed",
         message:
-          status >= 500
-            ? "OrbitX AI could not complete the request."
-            : error?.message || "Request failed",
+          upstream && detail
+            ? detail
+            : status >= 500
+              ? "OrbitX AI could not complete the request."
+              : detail || "Request failed",
         ...(error?.payload ? { gate: error.payload } : {}),
       },
       status,

@@ -8,12 +8,14 @@
 export const X_OAUTH_SCOPES =
   "tweet.write tweet.read users.read follows.read list.read offline.access dm.read dm.write like.read";
 
+// Every id must exist in https://integrate.api.nvidia.com/v1/models — an id that
+// NIM has retired makes chat fail for anyone who picks it in the model menu.
 export const NIM_MODELS = [
   { id: "meta/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
   { id: "meta/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
-  { id: "meta/llama-4-maverick-17b-128e-instruct", label: "Llama 4 Maverick" },
+  { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" },
   { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5", label: "Nemotron Super 49B" },
-  { id: "deepseek-ai/deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+  { id: "deepseek-ai/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash" },
   { id: "mistralai/mistral-nemotron", label: "Mistral Nemotron" },
   { id: "moonshotai/kimi-k2.6", label: "Kimi K2" },
   { id: "minimaxai/minimax-m3", label: "MiniMax M3" },
