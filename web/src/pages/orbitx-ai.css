@@ -1129,6 +1129,22 @@
 .oai-message__content pre code { padding: 0; border: 0; background: none; }
 .oai-message__content a { color: #8cdcff; text-underline-offset: 3px; }
 
+.oai-live-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  border-radius: 999px;
+  vertical-align: -0.16em;
+  background: var(--oai-cyan);
+  box-shadow: 0 0 10px rgba(68, 215, 255, 0.65);
+  animation: oai-cursor-blink 0.85s steps(2, start) infinite;
+}
+
+@keyframes oai-cursor-blink {
+  50% { opacity: 0.12; }
+}
+
 .oai-message--user .oai-message__content {
   width: fit-content;
   max-width: 100%;

@@ -39,11 +39,31 @@ describe("OrbitX AI security guards", () => {
   });
 
   it("exposes the embedded MCP catalog through the guarded command center", () => {
-    expect(api).toContain("listEmbeddedAgentTools()");
+    expect(api).toContain("listEmbeddedAgentTools({ includeGenerated: true })");
     expect(api).toContain("tools: toolCatalog()");
+    expect(api).toContain('name: "orbitx_tool_search"');
+    expect(api).toContain("isEmbeddedAgentToolReadOnly");
     expect(page).toContain('id: "tools"');
     expect(page).toContain("<CommandCenter");
     expect(page).toContain("tool.requiresConfirmation");
+  });
+
+  it("bounds MCP HTTP and confirmed executions so chat cannot hang forever", () => {
+    const hub = readFileSync(resolve(__dirname, "../../api/orbitx-hub.js"), "utf8");
+    expect(hub).toContain("AbortSignal.timeout(timeoutMs)");
+    expect(executeHandler).toContain("withTimeout(");
+    expect(executeHandler).toContain("TOOL_TIMEOUT_MS");
+  });
+
+  it("streams chat progress, live model deltas, and tool events", () => {
+    expect(api).toContain('if (action === "chat.stream")');
+    expect(api).toContain('"application/x-ndjson; charset=utf-8"');
+    expect(api).toContain('type: "delta"');
+    expect(api).toContain('type: "tool"');
+    expect(api).toContain("readOpenAiChatResponse");
+    expect(page).toContain("streamAiMessage(");
+    expect(page).toContain("oai-live-cursor");
+    expect(page).toContain("stopResponse");
   });
 
   it("renders structured results and a mobile quick-action menu", () => {
