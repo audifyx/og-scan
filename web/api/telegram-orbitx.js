@@ -20,10 +20,9 @@ import {
   argsFromCommand,
   cmdsPage,
   collectMediaUrls,
-  formatMcpResultForTelegram,
+  formatOrbitXTelegramResult,
   inferPublicTool,
   isPrivilegedTelegramTool,
-  isPublicTelegramTool,
   loginCode,
   parseCallInvocation,
   resolveOfficialCommand,
@@ -130,17 +129,35 @@ async function tg(method, body, { form } = {}) {
 async function sendLong(chatId, text, extra = {}) {
   const MAX = 3800;
   const str = String(text || "");
-  if (str.length <= MAX) {
-    return tg("sendMessage", { chat_id: chatId, text: str, disable_web_page_preview: true, ...extra });
+  const chunks = [];
+  if (str.length <= MAX) chunks.push(str);
+  else {
+    let buf = "";
+    for (const line of str.split("\n")) {
+      if ((buf + "\n" + line).length > MAX) {
+        if (buf) chunks.push(buf);
+        buf = line;
+      } else buf = buf ? `${buf}\n${line}` : line;
+    }
+    if (buf) chunks.push(buf);
   }
-  let buf = "";
-  for (const line of str.split("\n")) {
-    if ((buf + "\n" + line).length > MAX) {
-      await tg("sendMessage", { chat_id: chatId, text: buf, disable_web_page_preview: true, ...extra });
-      buf = line;
-    } else buf = buf ? `${buf}\n${line}` : line;
+  let last = null;
+  for (const chunk of chunks) {
+    last = await tg("sendMessage", {
+      chat_id: chatId,
+      text: chunk,
+      disable_web_page_preview: extra.parse_mode === "HTML" ? false : true,
+      ...extra,
+    });
+    if (!last?.ok && extra.parse_mode) {
+      last = await tg("sendMessage", {
+        chat_id: chatId,
+        text: chunk.replace(/<[^>]+>/g, ""),
+        disable_web_page_preview: true,
+      });
+    }
   }
-  if (buf) await tg("sendMessage", { chat_id: chatId, text: buf, disable_web_page_preview: true, ...extra });
+  return last;
 }
 
 async function sendMedia(chatId, urls) {
@@ -445,7 +462,7 @@ async function handleTelegramUpdate(update, req) {
       link,
       allowPrivileged: !isGroup && Boolean(link),
     });
-    await sendLong(chatId, formatMcpResultForTelegram(result), replyExtra);
+    await sendLong(chatId, formatOrbitXTelegramResult(result), { parse_mode: "HTML", ...replyExtra });
     await sendMedia(chatId, collectMediaUrls(result));
   } catch (error) {
     await tg("sendMessage", {
@@ -616,7 +633,7 @@ async function handleWeb(req, res, body) {
     return json(res, {
       ok: result?.ok !== false,
       tool,
-      text: formatMcpResultForTelegram(result),
+      text: formatOrbitXTelegramResult(result),
       imageUrls: collectMediaUrls(result),
       result,
     });

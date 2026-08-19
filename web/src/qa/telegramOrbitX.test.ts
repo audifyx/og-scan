@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   argsFromCommand,
+  formatOrbitXTelegramResult,
+  formatTokenCard,
   inferPublicTool,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
@@ -56,6 +58,45 @@ describe("official OrbitX Telegram bot", () => {
     expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
   });
 
+  it("renders token intel as a card instead of raw JSON", () => {
+    const payload = {
+      mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      token: {
+        mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        name: "ORBITX",
+        symbol: "ORBITX",
+        priceUsd: 0.0000775253639603371,
+        mcap: 74726.22656430396,
+        liquidity: 9211.390808634686,
+        holderCount: 255,
+        volume: 15081.753341212232,
+        change1h: -5.453137607817787,
+        change6h: 4.123730044775421,
+        change24h: -12.283618973938905,
+        holderChange24h: -6.934306569343065,
+        organicScoreLabel: "low",
+        chain: "solana",
+        ageDays: 41,
+        tags: ["token-2022"],
+        audit: {
+          mintAuthorityDisabled: true,
+          freezeAuthorityDisabled: true,
+          topHoldersPercentage: 31.12,
+        },
+      },
+      meta: { name: "ORBITX", symbol: "ORBITX" },
+    };
+    const card = formatTokenCard(payload);
+    const text = formatOrbitXTelegramResult(payload);
+    expect(card).toContain("ORBITX");
+    expect(card).toContain("Price");
+    expect(card).toContain("mint revoked");
+    expect(card).not.toContain('"priceUsd"');
+    expect(text).toBe(card);
+    expect(text.startsWith("{")).toBe(false);
+    expect(formatOrbitXTelegramResult({ ok: true, result: payload })).toContain("Holders");
+  });
+
   it("never commits a BotFather token and gates configure", () => {
     const files = [...walkSource(resolve(WEB, "api")), ...walkSource(resolve(WEB, "src")), ...walkSource(resolve(REPO, "supabase"))];
     const tokenPattern = /\b\d{8,}:AA[A-Za-z0-9_-]{20,}\b/;
@@ -67,6 +108,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
+    expect(api).toContain("formatOrbitXTelegramResult(result)");
+    expect(api).toContain("bare === \"login\" || bare === \"auth\"");
+    expect(api).toContain("async function ensureWebhook");
     expect(api).not.toContain("8595161432");
   });
 });
