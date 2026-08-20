@@ -615,7 +615,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(html).toContain("orbitx.world");
     expect(html).toContain("ORBITX_DEX");
     expect(html).toContain("Orbitxcity");
-    expect(html).toContain("ogscan.fun");
+    expect(html).not.toContain("ogscan.fun");
   });
 
   it("trains official Telegram AI on OrbitX FAQ hold/burn/MCP facts", () => {
@@ -623,7 +623,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(ORBITX_FAQ_CORE).toContain("100 $ORBITX");
     expect(ORBITX_FAQ_CORE).toContain("10,000");
     expect(ORBITX_FAQ_CORE).toContain("programs/betting/");
-    expect(ORBITX_FAQ_CORE).toContain("ogscan.fun");
+    expect(ORBITX_FAQ_CORE).toContain("orbitx.world");
+    expect(ORBITX_FAQ_CORE).not.toContain("ogscan.fun");
     expect(ORBITX_FAQ_CORE).toContain("16 chain");
     expect(ORBITX_FAQ_CORE).toContain("not a separate standalone Solana-betting");
     expect(ORBITX_FAQ_CORE).not.toContain("$70k");
@@ -684,7 +685,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("$5");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("10,000");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("programs/betting/");
-    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("ogscan.fun");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("orbitx.world");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).not.toContain("ogscan.fun");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("/faq");
   });
 
