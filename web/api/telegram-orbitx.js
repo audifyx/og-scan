@@ -27,13 +27,13 @@ import {
   formatGroupWelcomeHtml,
   formatHelpDesk,
   formatTelegramStartGate,
-  formatTelegramGroupLockHtml,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatToolMenu,
   inferPublicTool,
   isOrbitXCommunityChat,
+  isOrbitXCommunityMessage,
   isPublicGroupTrigger,
   isOfficialBotUsername,
   orbitXFaqSystemAddon,
@@ -521,14 +521,11 @@ async function senderGate(from, link) {
 
 async function rejectLockedSender(chatId, from, link, extra, req, isGroup) {
   if (isGroup) {
-    await sendLong(chatId, formatTelegramGroupLockHtml(), { parse_mode: "HTML", ...extra });
-    if (from?.id && String(from.id) !== String(chatId)) {
-      try {
-        await handleStartDm(from.id, from, link, {}, req);
-      } catch {
-        /* user may not have started the bot yet */
-      }
-    }
+    await sendLong(
+      chatId,
+      "Public intel works in this group. Trades / login stay in a DM with @theorbitxmcpbot.",
+      { parse_mode: "HTML", ...extra },
+    );
     return;
   }
   await handleStartDm(chatId, from, link, extra, req);
@@ -1116,12 +1113,11 @@ async function handleCallbackQuery(cq, req) {
   const key = data.slice(3);
   const chatType = String(cq?.message?.chat?.type || "");
   const isGroupChat = chatType === "group" || chatType === "supergroup" || isOrbitXCommunityChat(cq?.message?.chat);
-  const isHome = isOrbitXCommunityChat(cq?.message?.chat);
   const link = from.id ? await loadLink(from.id) : null;
-  if (from.id && !key.startsWith("gate:") && !isHome) {
+  if (from.id && !key.startsWith("gate:") && !isGroupChat) {
     const dmGate = await senderGate(from, link);
     if (!dmGate.unlocked) {
-      await rejectLockedSender(chatId, from, link, extra, req, isGroupChat);
+      await rejectLockedSender(chatId, from, link, extra, req, false);
       return;
     }
   }
@@ -1190,6 +1186,8 @@ async function handleMyChatMember(update) {
   const m = update?.my_chat_member;
   if (!m) return;
   const chat = m.chat || {};
+  await pinOrbitXHomeChat();
+  rememberOrbitXHomeChat(chat);
   const isHome = isOrbitXCommunityChat(chat);
   const isGroup = chat.type === "group" || chat.type === "supergroup" || (isHome && chat.type === "channel");
   if (!isGroup || !chat.id) return;
@@ -1236,8 +1234,13 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
   if (failedQuote && stubMint) text = `/token ${stubMint}`;
-  const { isGroup, isHome, extra: replyExtra } = telegramChatExtras(msg);
   rememberOrbitXHomeChat(msg.chat);
+  rememberOrbitXHomeChat(msg.sender_chat);
+  let { isGroup, isHome, extra: replyExtra } = telegramChatExtras(msg);
+  if (isGroup && !isHome) {
+    await pinOrbitXHomeChat();
+    ({ isGroup, isHome, extra: replyExtra } = telegramChatExtras(msg));
+  }
   const link = from.id ? await loadLink(from.id) : null;
   const limit = memoryRateLimit(
     `tg-orbitx:${isGroup ? chatId : from.id || chatId}`,
@@ -1273,16 +1276,7 @@ async function handleTelegramUpdate(update, req) {
   const gate = await senderGate(from, link);
 
   if (isGroup) {
-    if (!gate.unlocked && !isHome) {
-      const addressed =
-        bare === "start" ||
-        bare === "code" ||
-        isOrbitXBetaCode(text) ||
-        isPublicGroupTrigger(text, msg);
-      if (addressed) await rejectLockedSender(chatId, from, link, replyExtra, req, true);
-      return;
-    }
-    if (!isPublicGroupTrigger(text, msg) && bare !== "start") return;
+    if (!isPublicGroupTrigger(text, msg) && bare !== "start" && bare !== "help") return;
   } else if (!gate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
     awaitingCode.set(String(from.id), Date.now());
     await handleStartDm(chatId, from, link, replyExtra, req);
@@ -1540,9 +1534,9 @@ async function handleTelegramUpdate(update, req) {
     args = withTelegramToolArgs(tool, args);
     const liveGate = await senderGate(from, link);
     if (!liveGate.unlocked) {
-      const publicOk = isHome && isPublicTelegramTool(tool);
+      const publicOk = isGroup && isPublicTelegramTool(tool);
       if (!publicOk) {
-        if (isHome && isGroup) {
+        if (isGroup) {
           await sendLong(
             chatId,
             "Trades stay in a DM with @theorbitxmcpbot after /login. Public intel stays on here.",
@@ -1550,7 +1544,7 @@ async function handleTelegramUpdate(update, req) {
           );
           return;
         }
-        await rejectLockedSender(chatId, from, link, replyExtra, req, isGroup);
+        await rejectLockedSender(chatId, from, link, replyExtra, req, false);
         return;
       }
     }
@@ -1585,8 +1579,24 @@ async function handleTelegramUpdate(update, req) {
 async function pinOrbitXHomeChat() {
   try {
     const home = await tg("getChat", { chat_id: `@${ORBITX_GC_USERNAME}` });
-    if (home?.ok && home.result) rememberOrbitXHomeChat(home.result);
-    return home?.result || null;
+    if (!home?.ok || !home.result) return null;
+    rememberOrbitXHomeChat(home.result);
+    const linkedId = home.result.linked_chat_id;
+    if (linkedId) {
+      rememberOrbitXHomeChat({ id: linkedId, username: ORBITX_GC_USERNAME, linked_chat_id: linkedId });
+      try {
+        const linked = await tg("getChat", { chat_id: linkedId });
+        if (linked?.ok && linked.result) {
+          rememberOrbitXHomeChat({
+            ...linked.result,
+            username: linked.result.username || ORBITX_GC_USERNAME,
+          });
+        }
+      } catch {
+        /* discussion group still remembered by id */
+      }
+    }
+    return home.result;
   } catch {
     return null;
   }

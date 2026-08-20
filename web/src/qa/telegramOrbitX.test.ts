@@ -16,6 +16,7 @@ import {
   formatToolMenu,
   inferPublicTool,
   isOrbitXCommunityChat,
+  rememberOrbitXHomeChat,
   isPublicGroupTrigger,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
@@ -209,6 +210,20 @@ describe("official OrbitX Telegram bot", () => {
     });
     expect(homeExtras.isHome).toBe(true);
     expect(homeExtras.isGroup).toBe(true);
+    rememberOrbitXHomeChat({
+      id: -100111,
+      username: "orbitxwrld",
+      type: "channel",
+      linked_chat_id: -100222,
+    });
+    expect(isOrbitXCommunityChat({ id: -100222, type: "supergroup" })).toBe(true);
+    const discussion = telegramChatExtras({
+      chat: { id: -100222, type: "supergroup" },
+      sender_chat: { id: -100111, username: "orbitxwrld", type: "channel" },
+      message_id: 44,
+    });
+    expect(discussion.isHome).toBe(true);
+    expect(discussion.isGroup).toBe(true);
   });
 
   it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
@@ -705,8 +720,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("shouldSkipTelegramSender");
     expect(api).toContain("isPublicGroupTrigger");
     expect(api).toContain("isOrbitXCommunityChat");
+    expect(api).toContain("isOrbitXCommunityMessage");
     expect(api).toContain("pinOrbitXHomeChat");
-    expect(api).toContain("!gate.unlocked && !isHome");
+    expect(api).toContain("linked_chat_id");
+    expect(api).toContain("Public intel works in this group");
+    expect(api).not.toContain("formatTelegramGroupLockHtml");
     expect(api).toContain("orbitxwrld");
     expect(api).toContain("handleMyChatMember");
     expect(api).toContain("my_chat_member");

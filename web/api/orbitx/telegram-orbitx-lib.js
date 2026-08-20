@@ -78,6 +78,10 @@ function chatUsername(chat) {
     .toLowerCase();
 }
 
+function chatId(chat) {
+  return chat?.id == null ? "" : String(chat.id);
+}
+
 export function extraOrbitXHomeChatIds() {
   return String(process.env.ORBITX_TELEGRAM_HOME_CHAT_IDS || "")
     .split(/[\s,]+/)
@@ -85,10 +89,18 @@ export function extraOrbitXHomeChatIds() {
     .filter(Boolean);
 }
 
+function rememberHomeChatId(id) {
+  const key = String(id || "").trim();
+  if (key) rememberedHomeChatIds.add(key);
+}
+
 export function rememberOrbitXHomeChat(chat) {
-  const id = chat?.id == null ? "" : String(chat.id);
-  if (!id) return;
-  if (chatUsername(chat) === ORBITX_GC_USERNAME) rememberedHomeChatIds.add(id);
+  if (!chat || typeof chat !== "object") return;
+  const named = chatUsername(chat) === ORBITX_GC_USERNAME;
+  const known = rememberedHomeChatIds.has(chatId(chat)) || extraOrbitXHomeChatIds().includes(chatId(chat));
+  if (!named && !known) return;
+  rememberHomeChatId(chat.id);
+  rememberHomeChatId(chat.linked_chat_id);
 }
 
 export function isOrbitXCommunityChat(chat) {
@@ -97,10 +109,32 @@ export function isOrbitXCommunityChat(chat) {
     rememberOrbitXHomeChat(chat);
     return true;
   }
-  const id = chat.id == null ? "" : String(chat.id);
+  const id = chatId(chat);
   if (!id) return false;
-  if (rememberedHomeChatIds.has(id)) return true;
-  return extraOrbitXHomeChatIds().includes(id);
+  if (rememberedHomeChatIds.has(id)) {
+    rememberOrbitXHomeChat(chat);
+    return true;
+  }
+  if (extraOrbitXHomeChatIds().includes(id)) {
+    rememberOrbitXHomeChat(chat);
+    return true;
+  }
+  return false;
+}
+
+function chatsFromTelegramMessage(msg) {
+  return [
+    msg?.chat,
+    msg?.sender_chat,
+    msg?.forward_from_chat,
+    msg?.reply_to_message?.sender_chat,
+    msg?.reply_to_message?.forward_from_chat,
+  ].filter((c) => c && typeof c === "object");
+}
+
+/** Channel @orbitxwrld plus its linked discussion group (often no username). */
+export function isOrbitXCommunityMessage(msg) {
+  return chatsFromTelegramMessage(msg).some((chat) => isOrbitXCommunityChat(chat));
 }
 
 export function formatOrbitXHomeWelcomeHtml() {
@@ -134,7 +168,7 @@ export function shouldSkipTelegramSender(msg) {
 export function telegramChatExtras(msg) {
   const chat = msg?.chat || {};
   const chatType = String(chat.type || "");
-  const isHome = isOrbitXCommunityChat(chat);
+  const isHome = isOrbitXCommunityMessage(msg) || isOrbitXCommunityChat(chat);
   const isGroup =
     chatType === "group" || chatType === "supergroup" || (isHome && chatType === "channel");
   const extra = {};
