@@ -6,12 +6,14 @@ import {
   applyDefaultBuyAmount,
   cmdsPage,
   extractMint,
+  formatGroupWelcomeHtml,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
+  isPublicGroupTrigger,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
   isTelegramAdminWallet,
@@ -26,6 +28,8 @@ import {
   parseCallInvocation,
   resolveOfficialCommand,
   selectOrbitXFaqChunks,
+  shouldSkipTelegramSender,
+  telegramChatExtras,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
 import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
 import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
@@ -113,11 +117,46 @@ describe("official OrbitX Telegram bot", () => {
     expect(inferPublicTool("join the group")?.meta).toBe("links");
     expect(inferPublicTool("check")?.meta).toBe("check");
     expect(inferPublicTool("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")?.tool).toBe("orbitx_get_token");
+    expect(inferPublicTool("$ORBITX")?.tool).toBe("orbitx_get_token");
+    expect(inferPublicTool("$ORBITX")?.args).toMatchObject({ mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9" });
     expect(extractMint("scan this 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 please")).toBe(
       "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
     );
     expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
+  });
+
+  it("handles public group triggers, forum threads, and anonymous admins", () => {
+    const mint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+    expect(isPublicGroupTrigger(`/token ${mint}`)).toBe(true);
+    expect(isPublicGroupTrigger(`/token@theorbitxmcpbot ${mint}`)).toBe(true);
+    expect(isPublicGroupTrigger(`/token@otherbot ${mint}`)).toBe(false);
+    expect(isPublicGroupTrigger(mint)).toBe(true);
+    expect(isPublicGroupTrigger("$ORBITX")).toBe(true);
+    expect(isPublicGroupTrigger("buy $ORBITX")).toBe(true);
+    expect(isPublicGroupTrigger("orbitx is pumping")).toBe(false);
+    expect(isPublicGroupTrigger("gm what is lunch")).toBe(false);
+    expect(
+      isPublicGroupTrigger("chart please", {
+        reply_to_message: { from: { username: "theorbitxmcpbot" } },
+      }),
+    ).toBe(true);
+    expect(shouldSkipTelegramSender({ from: { is_bot: true, username: "SomeOtherBot" } })).toBe(true);
+    expect(shouldSkipTelegramSender({ from: { is_bot: true, username: "GroupAnonymousBot" } })).toBe(false);
+    expect(shouldSkipTelegramSender({ from: { is_bot: false, username: "alice" } })).toBe(false);
+    expect(shouldSkipTelegramSender({ from: { is_bot: true, username: "theorbitxmcpbot" } })).toBe(true);
+    const extras = telegramChatExtras({
+      chat: { type: "supergroup" },
+      message_id: 88,
+      message_thread_id: 12,
+      is_topic_message: true,
+    });
+    expect(extras.isGroup).toBe(true);
+    expect(extras.extra.reply_to_message_id).toBe(88);
+    expect(extras.extra.allow_sending_without_reply).toBe(true);
+    expect(extras.extra.message_thread_id).toBe(12);
+    expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
+    expect(formatGroupWelcomeHtml()).toContain("/token");
   });
 
   it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
@@ -599,7 +638,12 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("rememberSuccessfulScan");
     expect(api).toContain("forgetScan");
     expect(api).toContain("looksLikeOrbitXCard");
-    expect(api).toContain("from.is_bot");
+    expect(api).toContain("shouldSkipTelegramSender");
+    expect(api).toContain("isPublicGroupTrigger");
+    expect(api).toContain("handleMyChatMember");
+    expect(api).toContain("my_chat_member");
+    expect(api).toContain("message_thread_id");
+    expect(api).toContain("allow_sending_without_reply");
     expect(api).toContain('from "./orbitx/x-agent-lib.js"');
     const snap = readFileSync(resolve(WEB, "api/orbitx/telegram-token-snapshot.js"), "utf8");
     expect(snap).toContain("price/v3");

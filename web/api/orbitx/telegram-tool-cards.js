@@ -1255,7 +1255,7 @@ export function formatHelpDesk(isPrivate = false, linked = false) {
     ? linked
       ? "Account linked. /trade /buy /orbitx /shop /launch are live in this DM."
       : "/login binds THIS Telegram to YOUR wallet. Nobody else can trade for you."
-    : "Groups stay public. /trade /buy /tweet only in DM after /login.";
+    : "Groups stay public. Drop a CA or $ORBITX here. /trade /buy /tweet only in DM after /login.";
   const text = [
     "🚀 <b>OrbitX Desk</b> · @theorbitxmcpbot",
     "Premium intel · live charts · Grok · shop burns · Phantom trades",

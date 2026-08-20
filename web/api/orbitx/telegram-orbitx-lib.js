@@ -7,6 +7,7 @@
 import { isHoldGatedTool } from "./token-hold.js";
 import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
 import { applyTelegramAlias, parseTradeIntent } from "./telegram-trade-intent.js";
+import { ORBITX_MINT } from "./telegram-token-snapshot.js";
 import {
   CA_RE as PAYLOAD_CA_RE,
   extractMint as payloadExtractMint,
@@ -33,6 +34,79 @@ export const OFFICIAL_BOT_SHORT =
   "Official OrbitX bot — charts, scans, Grok image/video, and (in DMs) trade, X, and your account.";
 export const OFFICIAL_BOT_ABOUT =
   "OrbitX's official Telegram bot. In groups it answers without login: token intel, Dex charts, screeners, and Grok Imagine image/video. Message it privately to link your OrbitX wallet, then trade, post to X, and run the full live tool catalog (~5000 capabilities). Not an MCP connector — tools run natively on OrbitX.";
+
+const GROUP_ANON = "groupanonymousbot";
+
+export function isOfficialBotUsername(name) {
+  return String(name || "").replace(/^@/, "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase();
+}
+
+export function commandTargetsThisBot(text, msg) {
+  const raw = String(text || "").trim();
+  const entities = Array.isArray(msg?.entities) ? msg.entities : [];
+  const cmd = entities.find((e) => e?.type === "bot_command" && Number(e.offset) === 0);
+  const token = cmd
+    ? raw.slice(Number(cmd.offset) || 0, (Number(cmd.offset) || 0) + Number(cmd.length || 0))
+    : raw.split(/\s+/)[0] || "";
+  const at = token.indexOf("@");
+  if (at < 0) return true;
+  return isOfficialBotUsername(token.slice(at + 1));
+}
+
+export function isAddressedToOfficialBot(text, msg) {
+  const t = String(text || "");
+  if (new RegExp(`@${OFFICIAL_BOT_USERNAME}\\b`, "i").test(t)) return true;
+  if (isOfficialBotUsername(msg?.reply_to_message?.from?.username)) return true;
+  const mention = [...(msg?.entities || []), ...(msg?.caption_entities || [])].find((e) => e?.type === "mention");
+  if (mention) {
+    const src = String(msg?.text || msg?.caption || "");
+    const hit = src.slice(Number(mention.offset) || 0, (Number(mention.offset) || 0) + Number(mention.length || 0));
+    if (isOfficialBotUsername(hit)) return true;
+  }
+  return false;
+}
+
+export function isPublicGroupTrigger(text, msg) {
+  const t = String(text || "").trim();
+  if (!t) return false;
+  if (t.startsWith("/")) return commandTargetsThisBot(t, msg);
+  if (isAddressedToOfficialBot(t, msg)) return true;
+  if (payloadExtractMint(t)) return true;
+  if (/\$orbitx\b/i.test(t) && t.length < 180) return true;
+  if (/^orbitx$/i.test(t)) return true;
+  return false;
+}
+
+export function shouldSkipTelegramSender(msg) {
+  const from = msg?.from || {};
+  if (isOfficialBotUsername(from.username)) return true;
+  const uname = String(from.username || "").toLowerCase();
+  if (from.is_bot && uname !== GROUP_ANON && !msg?.sender_chat) return true;
+  return false;
+}
+
+export function telegramChatExtras(msg) {
+  const chatType = String(msg?.chat?.type || "");
+  const isGroup = chatType === "group" || chatType === "supergroup";
+  const extra = {};
+  if (isGroup && msg?.message_id) {
+    extra.reply_to_message_id = msg.message_id;
+    extra.allow_sending_without_reply = true;
+  }
+  const thread = Number(msg?.message_thread_id);
+  if (Number.isFinite(thread) && thread > 0) extra.message_thread_id = thread;
+  return { isGroup, extra };
+}
+
+export function formatGroupWelcomeHtml() {
+  return [
+    "🚀 <b>OrbitX is in this group</b>",
+    "Public — no login: drop a CA, <code>$ORBITX</code>, /token, /chart, /scan, /xray, /screen, /img, /faq",
+    "Trade / shop burns: DM @theorbitxmcpbot → /login",
+    "",
+    "<i>Promote me to admin (or disable Group Privacy in BotFather) so I see CA pastes without an @mention.</i>",
+  ].join("\n");
+}
 
 export const AUTH_TOOLS = new Set([
   "orbitx_auth_link",
@@ -302,6 +376,9 @@ export function inferPublicTool(text) {
 
   const mint = extractMint(t);
   if (mint) return { tool: "orbitx_get_token", args: { mint } };
+  if (/^\$orbitx\b/i.test(t) || /^orbitx$/i.test(t)) {
+    return { tool: "orbitx_get_token", args: { mint: ORBITX_MINT } };
+  }
 
   return null;
 }
