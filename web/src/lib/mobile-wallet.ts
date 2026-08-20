@@ -6,6 +6,7 @@
 export interface MobileWalletInfo {
   isMobile: boolean;
   isPhantomBrowser: boolean;
+  isJupiterBrowser: boolean;
   isInAppBrowser: boolean;
   userAgent: string;
 }
@@ -13,8 +14,15 @@ export interface MobileWalletInfo {
 export function detectMobileWallet(): MobileWalletInfo {
   const ua = navigator.userAgent.toLowerCase();
   const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(ua);
-  const isPhantomBrowser = /phantom/.test(ua) || Boolean((window as Window & { phantom?: { solana?: { isPhantom?: boolean } } }).phantom?.solana?.isPhantom);
-  const isTelegram = /telegram/i.test(ua) || Boolean((window as Window & { TelegramWebviewProxy?: unknown }).TelegramWebviewProxy);
+  const win = window as Window & {
+    phantom?: { solana?: { isPhantom?: boolean } };
+    jupiter?: { solana?: unknown; isJupiter?: boolean };
+    TelegramWebviewProxy?: unknown;
+  };
+  const isPhantomBrowser = /phantom/.test(ua) || Boolean(win.phantom?.solana?.isPhantom);
+  const isJupiterBrowser =
+    /jupiter/i.test(ua) || Boolean(win.jupiter?.solana) || Boolean(win.jupiter?.isJupiter);
+  const isTelegram = /telegram/i.test(ua) || Boolean(win.TelegramWebviewProxy);
   const isInAppBrowser =
     isTelegram ||
     /instagram|facebook|twitter|line\//.test(ua) ||
@@ -23,6 +31,7 @@ export function detectMobileWallet(): MobileWalletInfo {
   return {
     isMobile,
     isPhantomBrowser,
+    isJupiterBrowser,
     isInAppBrowser,
     userAgent: ua,
   };

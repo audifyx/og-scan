@@ -13,7 +13,7 @@ export type WalletLike = {
   readyState: WalletReadyState | string;
 };
 
-const PREFERRED = ["Phantom", "Jupiter", "Solflare", "Backpack"] as const;
+const PREFERRED = ["Jupiter", "Solflare", "Backpack"] as const;
 
 function isReady(rs: string): boolean {
   return rs === WalletReadyState.Installed || rs === WalletReadyState.Loadable || rs === "Installed" || rs === "Loadable";
@@ -34,12 +34,15 @@ export function findConnectableWallet(
     const hit = wallets.find((w) => w.adapter.name === name && isReady(String(w.readyState)));
     if (hit) return hit;
   }
-  return wallets.find((w) => isReady(String(w.readyState))) ?? null;
+  return wallets.find((w) => isReady(String(w.readyState)) && !/phantom/i.test(String(w.adapter.name))) ?? null;
 }
 
-export function phantomInstallHint(name = "Phantom"): string {
-  return `${name} isn't detected in this browser. Install the ${name} extension, then refresh — we never open external swap sites.`;
+export function jupiterInstallHint(name = "Jupiter"): string {
+  return `${name} isn't detected in this browser. Open OrbitX in the Jupiter Wallet extension or Jupiter Mobile dApp browser — we never open external swap sites.`;
 }
+
+/** @deprecated Alias — OrbitX transactions use Jupiter. */
+export const phantomInstallHint = jupiterInstallHint;
 
 export async function connectSolanaWallet(opts: {
   wallets: readonly WalletLike[];
@@ -49,12 +52,12 @@ export async function connectSolanaWallet(opts: {
 }): Promise<string> {
   const pick = findConnectableWallet(opts.wallets, opts.preferredName);
   if (!pick) {
-    const wanted = opts.preferredName || "Phantom";
+    const wanted = opts.preferredName || "Jupiter";
     const listed = opts.wallets.find((w) => w.adapter.name === wanted);
     if (listed && !isReady(String(listed.readyState))) {
-      throw new Error(phantomInstallHint(wanted));
+      throw new Error(jupiterInstallHint(wanted));
     }
-    throw new Error(phantomInstallHint(wanted));
+    throw new Error(jupiterInstallHint(wanted));
   }
 
   const adapter = pick.adapter;

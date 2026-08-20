@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
+import { TelegramAutoBuyCard } from "@/components/agent/TelegramAutoBuyCard";
 import {
   TELEGRAM_ORBITX_BOT,
   TELEGRAM_ORBITX_TME,
@@ -48,7 +49,7 @@ export default function TelegramOrbitX() {
     try {
       const next = await telegramOrbitXStatus();
       setStatus(next);
-      setAutoBuy(Boolean(next.links?.[0]?.auto_buy));
+      setAutoBuy(Boolean(next.autoBuy ?? next.links?.[0]?.auto_buy));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load Telegram status");
     }
@@ -106,18 +107,21 @@ export default function TelegramOrbitX() {
       setOutput(result.text || JSON.stringify(result.result || result, null, 2));
       setMedia(result.imageUrls || []);
       const payload = (result.result && typeof result.result === "object" ? result.result : {}) as Record<string, unknown>;
-      const open =
-        (typeof payload.openUrl === "string" && payload.openUrl) ||
-        (typeof payload.signUrl === "string" && payload.signUrl) ||
-        (typeof payload.autoSignUrl === "string" && payload.autoSignUrl) ||
-        "";
+      const executed = payload.executed === true || (typeof payload.signature === "string" && payload.signature.length > 20);
+      const open = executed
+        ? ""
+        : (typeof payload.openUrl === "string" && payload.openUrl) ||
+          (typeof payload.signUrl === "string" && payload.signUrl) ||
+          "";
       if (open) setSignHref(open);
       const scan =
         (typeof payload.solscan === "string" && payload.solscan) ||
         (typeof payload.solscanToken === "string" && payload.solscanToken) ||
         "";
       if (scan) setSolscanHref(scan);
-      if (!result.ok && result.message) setError(result.message);
+      if (payload.error === "auto_wallet_unfunded" && typeof payload.wallet === "string") {
+        setError(`Auto-buy is ON. Send SOL to ${payload.wallet} then send the buy again — no Sign step.`);
+      } else if (!result.ok && result.message) setError(result.message);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tool failed");
     } finally {
@@ -131,8 +135,9 @@ export default function TelegramOrbitX() {
     try {
       const next = await telegramOrbitXSetAutoBuy(enabled);
       setAutoBuy(next.autoBuy);
+      await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save auto-sign");
+      setError(e instanceof Error ? e.message : "Could not save Auto-buy");
     } finally {
       setSavingAuto(false);
     }
@@ -228,24 +233,12 @@ export default function TelegramOrbitX() {
             )}
 
             {alreadyLinked && status?.links?.[0] ? (
-              <>
-                <p className="ox-agent__note">
-                  Linked Telegram {status.links[0].telegram_username ? `@${status.links[0].telegram_username}` : status.links[0].telegram_user_id}
-                  {status.links[0].wallet_address ? ` · ${status.links[0].wallet_address.slice(0, 4)}…${status.links[0].wallet_address.slice(-4)}` : ""}
-                </p>
-                <label className="ox-tg__toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoBuy}
-                    disabled={savingAuto || !user}
-                    onChange={(e) => void onToggleAuto(e.target.checked)}
-                  />
-                  <span>
-                    Auto-sign buys — Phantom prompts as soon as the swap is ready. You still approve in the wallet. OrbitX never holds keys.
-                  </span>
-                </label>
-              </>
+              <p className="ox-agent__note">
+                Linked Telegram {status.links[0].telegram_username ? `@${status.links[0].telegram_username}` : status.links[0].telegram_user_id}
+                {status.links[0].wallet_address ? ` · ${status.links[0].wallet_address.slice(0, 4)}…${status.links[0].wallet_address.slice(-4)}` : ""}
+              </p>
             ) : null}
+            <TelegramAutoBuyCard />
           </div>
         </section>
       ) : (
@@ -257,7 +250,9 @@ export default function TelegramOrbitX() {
           <div className="ox-agent__panel-b">
             <div className="ox-tg__quick">
               <p className="ox-tg__lead">
-                Buy $ORBITX with SOL from the wallet you linked. “Buy $1” converts USD → SOL at the live price, then opens Phantom.
+                {autoBuy
+                  ? "Auto-buy is ON. These buttons spend from the Auto-buy wallet — no Sign click."
+                  : "Buy $ORBITX with SOL from the wallet you linked. “Buy $1” converts USD → SOL at the live price, then opens a Jupiter Sign link. Toggle Auto-buy on the Link tab or /agent to skip Sign."}
               </p>
               <label className="ox-tg__toggle">
                 <input
@@ -266,7 +261,11 @@ export default function TelegramOrbitX() {
                   disabled={savingAuto || !user}
                   onChange={(e) => void onToggleAuto(e.target.checked)}
                 />
-                <span>Auto-sign — skip the extra confirm and open Phantom immediately</span>
+                <span>
+                  {autoBuy
+                    ? "Auto-buy ON — Telegram buy amount CA fills immediately"
+                    : "Auto-buy OFF — each buy needs a Jupiter Sign"}
+                </span>
               </label>
               <div className="ox-agent__btn-row">
                 <button
@@ -275,7 +274,7 @@ export default function TelegramOrbitX() {
                   disabled={running || !user}
                   onClick={() => run("orbitx_buy_orbitx", { amountUsd: 1, autoConfirm: autoBuy })}
                 >
-                  {running ? "Building swap…" : "Buy $1 $ORBITX"}
+                  {running ? (autoBuy ? "Buying…" : "Building swap…") : "Buy $1 $ORBITX"}
                 </button>
                 <button
                   type="button"
@@ -294,11 +293,13 @@ export default function TelegramOrbitX() {
                   Burn 1 day MCP
                 </button>
               </div>
-              {signHref ? (
+              {signHref || solscanHref ? (
                 <div className="ox-agent__btn-row">
-                  <a className="ox-agent__btn ox-agent__btn--primary" href={signHref} target="_blank" rel="noreferrer">
-                    {autoBuy ? "Auto-sign in Phantom" : "Sign in Phantom"}
-                  </a>
+                  {signHref ? (
+                    <a className="ox-agent__btn ox-agent__btn--primary" href={signHref} target="_blank" rel="noreferrer">
+                      Sign in Jupiter
+                    </a>
+                  ) : null}
                   {solscanHref ? (
                     <a className="ox-agent__btn" href={solscanHref} target="_blank" rel="noreferrer">
                       Solscan

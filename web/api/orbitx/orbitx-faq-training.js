@@ -404,7 +404,7 @@ export const ORBITX_FAQ_CHUNKS = [
       "linked",
       "theorbitxmcpbot",
     ],
-    text: `Official bot @theorbitxmcpbot. Groups: public intel. DMs: /login links THIS Telegram user to YOUR OrbitX wallet — nobody else can spend it. Trade alts with SOL or USD/USDC quotes (“buy <CA> with 10$ usdc”, “buy 0.1 sol of $ORBITX”). /autobuy on = Phantom auto-prompt (you still sign). /autobuy off = Sign each time. /shop burns 100 $ORBITX (1 day MCP) or 1,000 (7 days) or buys credits. /launch /mint /nft after login. /call name runs any live OrbitX tool. Never invent live prices — /token for quotes.`,
+    text: `Official bot @theorbitxmcpbot. Groups: public intel. DMs: /login links THIS Telegram user to YOUR OrbitX wallet — nobody else can spend it. Trade alts with SOL or USD/USDC quotes (“buy <CA> with 10$ usdc”, “buy 0.1 sol of $ORBITX”). Toggle Auto-buy on the MCP dashboard (/agent) or /autobuy on — then buy amount CA fills with no Sign click. /autobuy off = Jupiter Sign link each time. /shop burns 100 $ORBITX (1 day MCP) or 1,000 (7 days) or buys credits. /launch /mint /nft after login. /call name runs any live OrbitX tool. Never invent live prices — /token for quotes.`,
   },
   {
     id: "custody",

@@ -16,6 +16,8 @@ export type TelegramOrbitXStatus = {
   ok: boolean;
   bot: { username: string; name: string; about: string };
   signedIn?: boolean;
+  autoBuy?: boolean;
+  autoWallet?: string | null;
   links: TelegramOrbitXLink[];
   tools: number;
 };
@@ -125,10 +127,13 @@ export async function telegramOrbitXCall(
   return json as unknown as TelegramOrbitXCallResult;
 }
 
-export async function telegramOrbitXSetAutoBuy(enabled: boolean): Promise<{ autoBuy: boolean; message?: string }> {
+export async function telegramOrbitXSetAutoBuy(
+  enabled: boolean,
+): Promise<{ autoBuy: boolean; autoWallet?: string | null; message?: string }> {
   const json = await post({ action: "web.autobuy", enabled: Boolean(enabled) }, await requireAuthHeaders());
   return {
     autoBuy: Boolean(json.autoBuy),
+    autoWallet: typeof json.autoWallet === "string" ? json.autoWallet : null,
     message: typeof json.message === "string" ? json.message : undefined,
   };
 }

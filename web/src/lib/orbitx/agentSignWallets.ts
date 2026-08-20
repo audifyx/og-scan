@@ -1,8 +1,7 @@
 /**
- * Telegram /agent/sign auto-buy must use Phantom — never Jupiter.
- * WalletProvider autoConnect restores the last adapter from localStorage
- * (`walletName`). If that was Jupiter, connect() loads jup.ag/mobile and
- * the Phantom prompt never appears.
+ * Telegram /agent/sign auto-buy uses Jupiter Wallet only.
+ * Never auto-open jup.ag/mobile (Loadable connect hangs). Connect only when
+ * the Jupiter inject is Installed. Never wrap sign URLs in Phantom UL.
  */
 
 export function isJupiterAdapterName(name?: string | null): boolean {
@@ -14,20 +13,27 @@ export function isPhantomAdapterName(name?: string | null): boolean {
 }
 
 export function rankAgentSignWallet(name: string): number {
-  if (isPhantomAdapterName(name)) return 0;
-  if (isJupiterAdapterName(name)) return 2;
+  if (isJupiterAdapterName(name)) return 0;
+  if (isPhantomAdapterName(name)) return 2;
   return 1;
 }
 
-export function pickPhantomWallet<T extends { name: string }>(wallets: readonly T[]): T | null {
-  return wallets.find((w) => isPhantomAdapterName(w.name)) ?? null;
+export function isInstalledWallet(readyState?: string | null): boolean {
+  return String(readyState || "") === "Installed";
+}
+
+export function pickJupiterWallet<T extends { name: string; readyState?: string }>(
+  wallets: readonly T[],
+): T | null {
+  const jup = wallets.filter((w) => isJupiterAdapterName(w.name));
+  return jup.find((w) => isInstalledWallet(w.readyState)) ?? jup[0] ?? null;
 }
 
 export function sortAgentSignWallets<T extends { name: string }>(
   wallets: readonly T[],
-  hideJupiter: boolean,
+  hidePhantom: boolean,
 ): T[] {
-  const list = hideJupiter ? wallets.filter((w) => !isJupiterAdapterName(w.name)) : [...wallets];
+  const list = hidePhantom ? wallets.filter((w) => !isPhantomAdapterName(w.name)) : [...wallets];
   return [...list].sort(
     (a, b) => rankAgentSignWallet(a.name) - rankAgentSignWallet(b.name) || a.name.localeCompare(b.name),
   );
@@ -44,14 +50,14 @@ export function storedAdapterName(raw: string | null | undefined): string | null
   }
 }
 
-export function shouldClearStoredJupiter(raw: string | null | undefined): boolean {
-  return isJupiterAdapterName(storedAdapterName(raw));
+export function shouldClearStoredPhantom(raw: string | null | undefined): boolean {
+  return isPhantomAdapterName(storedAdapterName(raw));
 }
 
-export function clearStoredJupiterWallet(): void {
+export function clearStoredPhantomWallet(): void {
   try {
     if (typeof localStorage === "undefined") return;
-    if (shouldClearStoredJupiter(localStorage.getItem("walletName"))) {
+    if (shouldClearStoredPhantom(localStorage.getItem("walletName"))) {
       localStorage.removeItem("walletName");
     }
   } catch {
@@ -59,7 +65,7 @@ export function clearStoredJupiterWallet(): void {
   }
 }
 
-/** Skip WalletProvider autoConnect of Jupiter on Telegram auto-buy pages. */
+/** Skip WalletProvider autoConnect of Phantom on Telegram auto-buy pages. */
 export function shouldSkipWalletAutoConnect(
   adapterName: string,
   pathname: string,
@@ -69,7 +75,7 @@ export function shouldSkipWalletAutoConnect(
   const sp = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const auto = sp.get("auto") === "1" || sp.get("auto") === "true" || sp.get("autoconfirm") === "1";
   if (!auto) return false;
-  return isJupiterAdapterName(adapterName);
+  return isPhantomAdapterName(adapterName);
 }
 
 export function fetchTimeoutSignal(ms: number): AbortSignal {

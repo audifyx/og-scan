@@ -22,13 +22,13 @@ function mockWallet(name: string, ready: WalletReadyState, connected = false) {
 }
 
 describe("connectSolanaWallet", () => {
-  it("prefers Phantom when installed", () => {
+  it("prefers Jupiter when installed", () => {
     const wallets = [
-      mockWallet("Jupiter", WalletReadyState.NotDetected),
       mockWallet("Phantom", WalletReadyState.Installed),
+      mockWallet("Jupiter", WalletReadyState.Installed),
       mockWallet("Solflare", WalletReadyState.Loadable),
     ];
-    expect(findConnectableWallet(wallets)?.adapter.name).toBe("Phantom");
+    expect(findConnectableWallet(wallets)?.adapter.name).toBe("Jupiter");
   });
 
   it("does not fall through to Solflare when preferred wallet is missing", () => {
@@ -37,37 +37,37 @@ describe("connectSolanaWallet", () => {
       mockWallet("Jupiter", WalletReadyState.NotDetected),
       mockWallet("Solflare", WalletReadyState.Installed),
     ];
-    expect(findConnectableWallet(wallets, "Phantom")).toBeNull();
+    expect(findConnectableWallet(wallets, "Jupiter")).toBeNull();
     expect(findConnectableWallet(wallets, "Solflare")?.adapter.name).toBe("Solflare");
   });
 
   it("throws a clear install hint when nothing is ready", async () => {
-    const wallets = [mockWallet("Phantom", WalletReadyState.NotDetected)];
+    const wallets = [mockWallet("Jupiter", WalletReadyState.NotDetected)];
     await expect(
       connectSolanaWallet({
         wallets,
         select: vi.fn(),
         connect: vi.fn(async () => {}),
-        preferredName: "Phantom",
+        preferredName: "Jupiter",
       }),
     ).rejects.toThrow(/isn't detected/);
-    expect(phantomInstallHint("Phantom")).toMatch(/Install the Phantom extension/);
+    expect(phantomInstallHint("Jupiter")).toMatch(/Jupiter Wallet/);
   });
 
   it("falls back to adapter.connect when context connect no-ops", async () => {
-    const phantom = mockWallet("Phantom", WalletReadyState.Installed);
+    const jupiter = mockWallet("Jupiter", WalletReadyState.Installed);
     const select = vi.fn();
     const connect = vi.fn(async () => {
       /* WalletProvider no-op when wallet state not flushed */
     });
     const pk = await connectSolanaWallet({
-      wallets: [phantom],
+      wallets: [jupiter],
       select,
       connect,
-      preferredName: "Phantom",
+      preferredName: "Jupiter",
     });
-    expect(select).toHaveBeenCalledWith("Phantom");
-    expect(phantom.adapter.connect).toHaveBeenCalled();
-    expect(pk).toBe("PhantomPk");
+    expect(select).toHaveBeenCalledWith("Jupiter");
+    expect(jupiter.adapter.connect).toHaveBeenCalled();
+    expect(pk).toBe("JupiterPk");
   });
 });

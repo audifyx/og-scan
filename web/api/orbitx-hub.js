@@ -55,6 +55,11 @@ async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
 }
 
+/** Lazy — hot-wallet auto-buy must not crash MCP cold start. */
+async function telegramAutoTrade() {
+  return import("./orbitx/telegram-auto-trade.js");
+}
+
 /** Lazy — credits module (may pull Solana) must not crash MCP cold start. */
 async function xCredits() {
   return import("./orbitx/x-credits.js");
@@ -2207,7 +2212,7 @@ const CORE_TOOLS = [
         confirmMode: {
           type: "string",
           enum: ["sign", "auto"],
-          description: "sign = tap Sign on page; auto = open link and Phantom pops (chat auto-confirm)",
+        description: "sign = Jupiter Sign link; auto = Auto-buy wallet executes immediately (MCP dashboard toggle)",
         },
         autoConfirm: {
           type: "boolean",
@@ -2229,7 +2234,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_confirm_buy",
     description:
-      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after orbitx_buy_orbitx. Re-prepares the buy and returns autoSignUrl (Phantom auto-prompt). Pass amountSol if known; otherwise uses the last pending intent.",
+      "Chat confirm for a pending buy. With Auto-buy ON (MCP dashboard), this executes immediately with no Sign link. With Auto-buy OFF, returns a Jupiter Sign link. Pass amountSol if known; otherwise uses the last pending intent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2882,7 +2887,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_trade_auto",
     description:
-      "Enable or disable chat auto-buy for this linked wallet. Auto-buy still requires a Phantom signature; it skips the extra Telegram confirm step.",
+      "Enable or disable Telegram Auto-buy for this account. ON = next /buy amount CA executes from the Auto-buy wallet with no Sign link. Toggle lives on the MCP dashboard (/agent).",
     inputSchema: {
       type: "object",
       properties: {
@@ -3553,6 +3558,28 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     const confirmMode =
       args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || (preferAuto ? "auto" : "sign");
+    if ((confirmMode === "auto" || confirmMode === true) && auth?.userId) {
+      try {
+        const { tryAutoExecuteTrade } = await telegramAutoTrade();
+        const executed = await tryAutoExecuteTrade({
+          sb,
+          userId: auth.userId,
+          auto: true,
+          fetchJson,
+          base,
+          action: "buy",
+          mint: ORBITX_MINT,
+          amount: Number(amountSol),
+          slippage: Number(args.slippage) || 10,
+          pool: args.pool || "auto",
+          amountUsd: usdQuote?.amountUsd || args.amountUsd || null,
+          solUsd: usdQuote?.solUsd || null,
+        });
+        if (executed) return executed;
+      } catch {
+        /* fall through to unsigned Sign link */
+      }
+    }
     const out = await prepareBuyOrbitx({
       base,
       wallet,
@@ -3645,8 +3672,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       ok: true,
       autoBuy: on,
       message: on
-        ? "Auto-buy ON for this account. Next /buy sends a Phantom auto-prompt (no extra Telegram confirm). You still sign in Phantom."
-        : "Auto-buy OFF. Each /buy returns a Sign link; say confirm or /autobuy on to skip the extra step.",
+        ? "Auto-buy ON. Next /buy amount CA executes immediately from your Auto-buy wallet (MCP dashboard). No Sign link."
+        : "Auto-buy OFF. Each /buy returns a Jupiter Sign link.",
     };
   }
 
@@ -3672,6 +3699,39 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         message: "No pending buy. Send buy <CA> with 0.1 sol (or $10 usdc), then confirm — or pass amountSol.",
       };
     }
+    let preferAuto = false;
+    if (auth?.agentId) {
+      try {
+        preferAuto = await getChatTradeAuto(sb, auth.agentId);
+      } catch {
+        preferAuto = false;
+      }
+    }
+    const auto =
+      args.autoConfirm === true ||
+      args.auto === true ||
+      String(args.confirmMode || "").toLowerCase() === "auto" ||
+      preferAuto;
+    if (auto && auth?.userId) {
+      try {
+        const { tryAutoExecuteTrade } = await telegramAutoTrade();
+        const executed = await tryAutoExecuteTrade({
+          sb,
+          userId: auth.userId,
+          auto: true,
+          fetchJson,
+          base,
+          action: "buy",
+          mint,
+          amount: Number(amountSol),
+          slippage,
+          pool,
+        });
+        if (executed) return executed;
+      } catch {
+        /* fall through to unsigned Sign link */
+      }
+    }
     if (mint === ORBITX_MINT) {
       const out = await prepareBuyOrbitx({
         base,
@@ -3679,8 +3739,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         amountSol,
         slippage,
         pool,
-        confirmMode: "auto",
-        preferAuto: true,
+        confirmMode: auto ? "auto" : "sign",
+        preferAuto: auto,
         fetchJson,
       });
       if (out.ok && auth?.userId) {
@@ -3688,7 +3748,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
           await saveTradeIntent(sb, auth.userId, {
             mint: ORBITX_MINT,
             amountSol: out.amountSol,
-            confirmMode: "auto",
+            confirmMode: out.confirmMode,
             slippage: out.slippage,
             pool: out.pool,
           });
@@ -3698,7 +3758,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       }
       return out;
     }
-    args = { ...args, mint, amountSol, slippage, pool, autoConfirm: true };
+    args = { ...args, mint, amountSol, slippage, pool, autoConfirm: auto };
     return callTool("orbitx_prepare_buy", args, auth, base, req);
   }
 
@@ -3708,7 +3768,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         ok: false,
         error: "wallet_required",
         mint: String(args.mint || ORBITX_MINT),
-        message: "Link Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        message: "Connect a wallet on https://www.orbitx.world/telegram after /login, then send /buy again.",
         loginUrl: "https://www.orbitx.world/telegram",
       };
     }
@@ -3746,6 +3806,28 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     const slippage = Number(args.slippage) || 10;
     const pool = args.pool || "auto";
+    if (auto && action === "buy" && auth?.userId) {
+      try {
+        const { tryAutoExecuteTrade } = await telegramAutoTrade();
+        const executed = await tryAutoExecuteTrade({
+          sb,
+          userId: auth.userId,
+          auto: true,
+          fetchJson,
+          base,
+          action,
+          mint,
+          amount,
+          slippage,
+          pool,
+          amountUsd: usdQuote?.amountUsd || args.amountUsd || null,
+          solUsd: usdQuote?.solUsd || null,
+        });
+        if (executed) return executed;
+      } catch {
+        /* fall through to unsigned Sign link */
+      }
+    }
     const body = {
       publicKey: wallet,
       action,
@@ -3822,18 +3904,16 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       solscanAccount: wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : null,
       instructions: auto
         ? [
-            "Open autoSignUrl — Phantom pops immediately (auto-buy).",
-            "Approve in Phantom. OrbitX never holds keys or funds.",
-            "Trade is incomplete until Phantom confirms.",
+            "Auto-buy was off or could not send. Open signUrl and approve in Jupiter Wallet.",
           ]
         : [
-            "Open signUrl and tap Sign & send in Phantom.",
-            "Say confirm or /autobuy on to skip this extra Telegram step next time.",
+            "Open signUrl and tap Sign & send in Jupiter Wallet.",
+            "Turn Auto-buy on in the MCP dashboard to skip Sign links.",
             "Do NOT broadcast unsigned transactions.",
           ],
       note: auto
-        ? "Auto-buy: Phantom still must sign. Non-custodial."
-        : "Manual sign. Non-custodial. Route the user to signUrl.",
+        ? "Auto-buy did not fill. Sign in Jupiter Wallet or fund the Auto-buy wallet."
+        : "Manual sign in Jupiter Wallet.",
     };
   }
 

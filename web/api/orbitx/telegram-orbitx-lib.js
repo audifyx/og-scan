@@ -183,7 +183,7 @@ export const PRIVATE_COMMANDS = [
   { command: "nft", description: "NFT marketplace" },
   { command: "credits", description: "Buy credits with SOL (linked)" },
   { command: "orbitx", description: "Buy $ORBITX (linked)" },
-  { command: "autobuy", description: "Auto Phantom prompt on/off (linked)" },
+  { command: "autobuy", description: "Auto-buy on/off — no Sign when on (linked)" },
   { command: "confirm", description: "Confirm pending buy (linked)" },
   { command: "verify", description: "Admin: verify a mint (linked admin wallet)" },
 ];

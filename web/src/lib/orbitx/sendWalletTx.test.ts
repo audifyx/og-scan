@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Keypair, Transaction } from "@solana/web3.js";
 import {
+  JUPITER_ONLY_SIGN_ERROR,
   serializeSigned,
   sendWalletTransaction,
   shouldUseJupiterInject,
@@ -60,37 +61,18 @@ describe("shouldUseJupiterInject", () => {
     vi.mocked(jupiterProviderPublicKey).mockReturnValue(null);
   });
 
-  it("uses Jupiter when the adapter name is Jupiter and the inject exists", () => {
+  it("uses Jupiter inject for every adapter when it exists — including Phantom", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
     expect(shouldUseJupiterInject({ walletName: "Jupiter Wallet" })).toBe(true);
-    expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
-  });
-
-  it("never hijacks Phantom — even if Jupiter inject shares the same pubkey", () => {
-    vi.mocked(getJupiterProvider).mockReturnValue({
-      signAndSendTransaction: vi.fn(),
-    } as never);
-    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
-    expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(false);
-    expect(shouldUseJupiterInject({ walletName: "Phantom Wallet" }, OWNER)).toBe(false);
-    expect(shouldUseJupiterInject({ preferPhantom: true, walletName: "Jupiter" }, OWNER)).toBe(false);
-  });
-
-  it("uses Jupiter when the fee payer is the Jupiter inject and the adapter is not Phantom", () => {
-    vi.mocked(getJupiterProvider).mockReturnValue({
-      signAndSendTransaction: vi.fn(),
-    } as never);
-    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(true);
+    expect(shouldUseJupiterInject({ preferPhantom: true, walletName: "Phantom" })).toBe(true);
     expect(shouldUseJupiterInject({ walletName: "Solflare" }, OWNER)).toBe(true);
   });
 
-  it("does not steal Phantom sends when Jupiter is a different key", () => {
-    vi.mocked(getJupiterProvider).mockReturnValue({
-      signAndSendTransaction: vi.fn(),
-    } as never);
-    vi.mocked(jupiterProviderPublicKey).mockReturnValue("11111111111111111111111111111111");
+  it("does not use Jupiter inject when the provider is missing", () => {
+    expect(shouldUseJupiterInject({ walletName: "Jupiter" }, OWNER)).toBe(false);
     expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(false);
   });
 });
@@ -123,14 +105,14 @@ describe("sendWalletTransaction", () => {
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
   });
 
-  it("passes a versioned tx to adapter sendTransaction when Jupiter inject is absent", async () => {
+  it("passes a versioned tx to Jupiter adapter sendTransaction when inject is absent", async () => {
     const { tx } = unsignedTransfer();
     const sendTransaction = vi.fn().mockResolvedValue("ADAPTER_SIG");
     const connection = { sendRawTransaction: vi.fn() };
 
     const sig = await sendWalletTransaction(
       connection as never,
-      { walletName: "Phantom", sendTransaction },
+      { walletName: "Jupiter", sendTransaction },
       tx,
     );
 
@@ -140,32 +122,44 @@ describe("sendWalletTransaction", () => {
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
   });
 
-  it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
+  it("routes Phantom through Jupiter inject when present", async () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
-    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
-    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_SHOULD_NOT_RUN");
-    const sendTransaction = vi.fn().mockResolvedValue("PHANTOM_SIG");
+    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_SIG");
+    const sendTransaction = vi.fn().mockResolvedValue("PHANTOM_SHOULD_NOT_RUN");
     const { tx } = unsignedTransfer();
     const sig = await sendWalletTransaction(
       { sendRawTransaction: vi.fn() } as never,
       { walletName: "Phantom", preferPhantom: true, sendTransaction },
       tx,
     );
-    expect(sig).toBe("PHANTOM_SIG");
-    expect(jupiterSignAndSendTransaction).not.toHaveBeenCalled();
-    expect(sendTransaction).toHaveBeenCalled();
+    expect(sig).toBe("JUPITER_SIG");
+    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
   });
 
-  it("normalizes Phantom base64 sendTransaction results to base58", async () => {
+  it("refuses Phantom adapter sends when Jupiter inject is absent", async () => {
+    const sendTransaction = vi.fn().mockResolvedValue("PHANTOM_SIG");
+    const { tx } = unsignedTransfer();
+    await expect(
+      sendWalletTransaction(
+        { sendRawTransaction: vi.fn() } as never,
+        { walletName: "Phantom", sendTransaction },
+        tx,
+      ),
+    ).rejects.toThrow(JUPITER_ONLY_SIGN_ERROR);
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("normalizes Jupiter adapter base64 sendTransaction results to base58", async () => {
     const bytes = new Uint8Array(64).fill(9);
     const b64 = btoa(String.fromCharCode(...bytes));
     const sendTransaction = vi.fn().mockResolvedValue(b64);
     const { tx } = unsignedTransfer();
     const sig = await sendWalletTransaction(
       { sendRawTransaction: vi.fn() } as never,
-      { walletName: "Phantom", sendTransaction },
+      { walletName: "Jupiter", sendTransaction },
       tx,
     );
     expect(sig).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
