@@ -11,6 +11,7 @@ import {
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatTelegramStartGate,
+  formatHelpDesk,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
@@ -160,6 +161,20 @@ describe("official OrbitX Telegram bot", () => {
     expect(JSON.stringify(linked.reply_markup)).toContain("ox:desk");
     expect(inferPublicTool("shop hour")?.args).toMatchObject({ package: "hour" });
     expect(inferPublicTool("shop month")?.args).toMatchObject({ package: "month" });
+  });
+
+  it("shows the regular OrbitX Desk after code + login, not the lock gate", () => {
+    const desk = formatHelpDesk(true, true);
+    expect(desk.text).toContain("OrbitX Desk");
+    expect(desk.text).toContain("Account linked");
+    expect(desk.text).toContain("/trade");
+    expect(desk.text).not.toContain("This bot is locked");
+    const buttons = JSON.stringify(desk.reply_markup);
+    expect(buttons).toContain("ox:coins");
+    expect(buttons).toContain("ox:trade");
+    expect(buttons).toContain("ox:shop");
+    expect(buttons).not.toContain("ox:gate:code");
+    expect(buttons).not.toContain("ox:gate:beta");
   });
 
   it("handles public group triggers, forum threads, and anonymous admins", () => {
@@ -672,6 +687,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("isAllowedGatedDmCommand");
     expect(api).toContain("rejectLockedSender");
     expect(api).toContain("senderGate");
+    expect(api).toContain("sendUnlockedDesk");
+    expect(api).toContain("if (gate.unlocked)");
+    expect(api).toContain("formatHelpDesk(true, true)");
     expect(api).toContain("formatOrbitXTelegramResult");
     expect(api).toContain('bare === "login" || bare === "auth"');
     expect(api).toContain('bare === "check"');

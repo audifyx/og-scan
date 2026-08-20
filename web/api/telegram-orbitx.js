@@ -551,8 +551,16 @@ async function promptLoginAfterCode(chatId, from, extra, req) {
   );
 }
 
+async function sendUnlockedDesk(chatId, extra = {}) {
+  await sendCard(chatId, formatHelpDesk(true, true), extra);
+}
+
 async function handleStartDm(chatId, from, link, extra, req) {
   const gate = await senderGate(from, link);
+  if (gate.unlocked) {
+    await sendUnlockedDesk(chatId, extra);
+    return;
+  }
   if (gate.needsLogin) {
     await promptLoginAfterCode(chatId, from, extra, req);
     return;
@@ -563,7 +571,7 @@ async function handleStartDm(chatId, from, link, extra, req) {
     formatTelegramStartGate({
       remainingLabel: gate.accessActive ? gate.remainingLabel : "",
       linked: Boolean(link),
-      unlocked: gate.unlocked,
+      unlocked: false,
     }),
     extra,
   );
@@ -608,10 +616,11 @@ async function handleCode(chatId, text, { isGroup, from, link, extra, req }) {
   await sendLong(
     chatId,
     lifetime
-      ? `<b>${out.message || "Lifetime MCP unlocked"}</b>\n<b>Beta Access</b> is on your MCP profile.\nThis DM is live — /trade /shop /tweet.`
+      ? `<b>${out.message || "Lifetime MCP unlocked"}</b>\n<b>Beta Access</b> is on your MCP profile.`
       : `<b>Access unlocked</b>\nYou have <b>${out.remainingLabel}</b>.\n<b>Beta Access</b> is on your MCP profile.`,
     { parse_mode: "HTML", ...extra },
   );
+  await sendUnlockedDesk(chatId, extra);
 }
 
 async function startAccessBurn(chatId, from, packageId, { isGroup, req, link, extra }) {
@@ -1699,13 +1708,15 @@ async function handleWeb(req, res, body) {
       await grantMcpBetaAccessBadge(sb, user.id);
     }
     if (BOT_TOKEN) {
-      await tg("sendMessage", {
-        chat_id: telegramUserId,
-        text: accessOn
-          ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch. /autobuy on for Phantom auto-prompt."
-          : "OrbitX linked. Share ORBITX BETA here to unlock the bot (first 25 get lifetime), or burn $ORBITX on /start.",
-        parse_mode: "HTML",
-      });
+      if (accessOn) {
+        await sendUnlockedDesk(telegramUserId);
+      } else {
+        await tg("sendMessage", {
+          chat_id: telegramUserId,
+          text: "OrbitX linked. Send the invite code here to unlock the bot (first 25 get lifetime), or burn $ORBITX on /start.",
+          parse_mode: "HTML",
+        });
+      }
     }
     return json(res, { ok: true, link: { telegramUserId, wallet }, betaAccess: accessOn });
   }
