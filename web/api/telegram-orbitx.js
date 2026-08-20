@@ -66,6 +66,7 @@ import {
 import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/mcp-burn-access.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
+  TELEGRAM_NIM_FALLBACK_MODEL,
   formatOrbitXLinksHtml,
   OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
   ORBITX_GC,
@@ -958,15 +959,33 @@ async function askAi(prompt, { linked }) {
   const extra = linked
     ? "This user is linked to their OrbitX account in a private DM — they can /trade /buy /sell /tweet /post."
     : "This chat is public unless they /login in a private DM.";
-  const nim = await nvidiaChat({
-    system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}\n\n${orbitXFaqSystemAddon(prompt)}`,
-    user: String(prompt || "gm").slice(0, 6000),
-    model: process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL,
-    maxTokens: 900,
-    temperature: 0.45,
-  });
-  if (nim.ok && nim.content) return String(nim.content).replace(/```[\s\S]*?```/g, "").trim().slice(0, 3900);
-  return nim.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /token /chart /img /check /links.";
+  const system = `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}\n\n${orbitXFaqSystemAddon(prompt)}`;
+  const user = String(prompt || "gm").slice(0, 6000);
+  const preferred = process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL;
+  const models = [preferred];
+  if (preferred !== TELEGRAM_NIM_FALLBACK_MODEL) models.push(TELEGRAM_NIM_FALLBACK_MODEL);
+  let last = null;
+  for (const model of models) {
+    const nim = await nvidiaChat({
+      system,
+      user,
+      model,
+      maxTokens: 1600,
+      temperature: 0.28,
+    });
+    last = nim;
+    if (nim.ok && nim.content) {
+      const text = String(nim.content)
+        .replace(/```[\s\S]*?```/g, "")
+        .trim()
+        .slice(0, 3900);
+      if (text) return text;
+    }
+  }
+  return (
+    last?.message ||
+    "Lyra is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /faq /token /chart /img /check /links."
+  );
 }
 
 async function sendLinks(chatId, extra = {}) {

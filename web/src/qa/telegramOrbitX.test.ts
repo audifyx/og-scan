@@ -33,7 +33,8 @@ import {
   telegramChatExtras,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
 import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
-import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
+import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM, DEFAULT_TELEGRAM_NIM_MODEL } from "../../api/orbitx/orbitx-telegram-knowledge.js";
+import { ORBITX_AGENT_IDENTITY, ORBITX_AGENT_NAME, ORBITX_AGENT_ROLE } from "../../api/orbitx/orbitx-agent-persona.js";
 import { asTokenRecord } from "../../api/orbitx/telegram-payload.js";
 import {
   assembleTelegramSnapshot,
@@ -582,9 +583,10 @@ describe("official OrbitX Telegram bot", () => {
     const html = formatOrbitXLinksHtml();
     expect(html).toContain("t.me/orbitxwrld");
     expect(html).toContain("orbitx.world");
+    expect(html).toContain("orbitxtrade.world");
     expect(html).toContain("ORBITX_DEX");
     expect(html).toContain("Orbitxcity");
-    expect(html).toContain("ogscan.fun");
+    expect(html).not.toContain("ogscan.fun");
   });
 
   it("trains official Telegram AI on OrbitX FAQ hold/burn/MCP facts", () => {
@@ -592,7 +594,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(ORBITX_FAQ_CORE).toContain("100 $ORBITX");
     expect(ORBITX_FAQ_CORE).toContain("10,000");
     expect(ORBITX_FAQ_CORE).toContain("programs/betting/");
-    expect(ORBITX_FAQ_CORE).toContain("ogscan.fun");
+    expect(ORBITX_FAQ_CORE).toContain("orbitx.world");
+    expect(ORBITX_FAQ_CORE).toContain("orbitxtrade.world");
+    expect(ORBITX_FAQ_CORE).not.toContain("ogscan.fun");
     expect(ORBITX_FAQ_CORE).toContain("16 chain");
     expect(ORBITX_FAQ_CORE).toContain("not a separate standalone Solana-betting");
     expect(ORBITX_FAQ_CORE).not.toContain("$70k");
@@ -620,6 +624,7 @@ describe("official OrbitX Telegram bot", () => {
       "custody",
       "answers",
       "caveats",
+      "lyra",
     ]) {
       expect(ids).toContain(need);
     }
@@ -632,6 +637,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(selectOrbitXFaqChunks("how does burning work").some((c) => c.id === "burn")).toBe(true);
     expect(selectOrbitXFaqChunks("how do I connect MCP").some((c) => c.id === "mcp")).toBe(true);
     expect(selectOrbitXFaqChunks("what is OrbitX").some((c) => c.id === "what")).toBe(true);
+    expect(selectOrbitXFaqChunks("what is ogscan").some((c) => c.id === "what")).toBe(true);
     expect(selectOrbitXFaqChunks("what is the utility of $ORBITX").some((c) => c.id === "hold")).toBe(true);
     expect(selectOrbitXFaqChunks("is it custodial").some((c) => c.id === "custody")).toBe(true);
     expect(selectOrbitXFaqChunks("where is the code").some((c) => c.id === "stack")).toBe(true);
@@ -639,6 +645,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(selectOrbitXFaqChunks("prediction markets").some((c) => c.id === "predict")).toBe(true);
     expect(selectOrbitXFaqChunks("Coin AI analyst").some((c) => c.id === "coinai")).toBe(true);
     expect(selectOrbitXFaqChunks("wallet copy-tracking").some((c) => c.id === "wallet")).toBe(true);
+    expect(selectOrbitXFaqChunks("who are you").some((c) => c.id === "lyra")).toBe(true);
 
     const shop = orbitXFaqSystemAddon("how does the shop burn work");
     expect(shop).toContain("Jupiter");
@@ -647,14 +654,24 @@ describe("official OrbitX Telegram bot", () => {
     const faq = formatOrbitXFaqHtml("/faq mcp");
     expect(faq).toContain("/api/mcp");
     expect(faq).toContain("OrbitX FAQ");
-    expect(formatOrbitXFaqHtml("").toLowerCase()).toContain("hold");
-    expect(formatOrbitXFaqHtml("").length).toBeLessThan(4096);
+    const overview = formatOrbitXFaqHtml("");
+    expect(overview.toLowerCase()).toContain("hold");
+    expect(overview).toContain("orbitx.world");
+    expect(overview).toContain("orbitxtrade.world");
+    expect(overview).not.toContain("ogscan.fun");
+    expect(overview.length).toBeLessThan(4096);
 
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("$5");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("10,000");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("programs/betting/");
-    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("ogscan.fun");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("orbitx.world");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("orbitxtrade.world");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).not.toContain("https://ogscan.fun");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("/faq");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain(ORBITX_AGENT_NAME);
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain(ORBITX_AGENT_ROLE);
+    expect(ORBITX_AGENT_IDENTITY.toLowerCase()).toContain("never reply with idk");
+    expect(DEFAULT_TELEGRAM_NIM_MODEL).toContain("70b");
   });
 
   it("never commits a BotFather token and gates configure", () => {
