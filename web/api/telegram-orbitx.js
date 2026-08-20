@@ -28,6 +28,8 @@ import {
   formatHelpDesk,
   formatTelegramStartGate,
   formatTelegramGroupLockHtml,
+  formatTelegramLockedChatHtml,
+  INVITE_CODE_PROMPT_HTML,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
@@ -490,7 +492,7 @@ async function sendAccessStatus(chatId, from, extra = {}) {
   if (!status.active) {
     await sendLong(
       chatId,
-      "No access yet. Share <code>ORBITX BETA</code> on /start (first 25 get lifetime), or burn $ORBITX for timed access, then /verify the Solscan link.",
+      "No access yet. Send the invite code on /start (first 25 get lifetime), or burn $ORBITX for timed access, then /verify the Solscan link.",
       { parse_mode: "HTML", ...extra },
     );
     return status;
@@ -515,19 +517,12 @@ async function senderGate(from, link) {
   return telegramDmUnlockState(row, link);
 }
 
-async function rejectLockedSender(chatId, from, link, extra, req, isGroup) {
+async function rejectLockedSender(chatId, _from, _link, extra, _req, isGroup) {
   if (isGroup) {
     await sendLong(chatId, formatTelegramGroupLockHtml(), { parse_mode: "HTML", ...extra });
-    if (from?.id && String(from.id) !== String(chatId)) {
-      try {
-        await handleStartDm(from.id, from, link, {}, req);
-      } catch {
-        /* user may not have started the bot yet */
-      }
-    }
     return;
   }
-  await handleStartDm(chatId, from, link, extra, req);
+  await sendLong(chatId, formatTelegramLockedChatHtml(), { parse_mode: "HTML", ...extra });
 }
 
 async function promptLoginAfterCode(chatId, from, extra, req) {
@@ -557,7 +552,6 @@ async function handleStartDm(chatId, from, link, extra, req) {
     await promptLoginAfterCode(chatId, from, extra, req);
     return;
   }
-  if (gate.needsCode) awaitingCode.set(String(from?.id || ""), Date.now());
   await sendCard(
     chatId,
     formatTelegramStartGate({
@@ -581,7 +575,7 @@ async function handleCode(chatId, text, { isGroup, from, link, extra, req }) {
     awaitingCode.set(String(from.id), Date.now());
     await sendLong(
       chatId,
-      "Paste <code>ORBITX BETA</code> here, or send <code>/code ORBITX BETA</code>. First 25 get lifetime MCP.",
+      INVITE_CODE_PROMPT_HTML,
       { parse_mode: "HTML", ...extra },
     );
     return;
@@ -1147,17 +1141,13 @@ async function handleCallbackQuery(cq, req) {
     const chatType = String(cq?.message?.chat?.type || "");
     const isGroup = chatType === "group" || chatType === "supergroup";
     const link = from.id ? await loadLink(from.id) : null;
-    if (gate === "beta") {
-      await handleCode(chatId, "/code ORBITX BETA", { isGroup, from, link, extra, req });
-      return;
-    }
-    if (gate === "code") {
+    if (gate === "beta" || gate === "code") {
+      if (isGroup) {
+        await sendLong(chatId, "Redeem codes in a private DM with @theorbitxmcpbot: /code YOURCODE", extra);
+        return;
+      }
       awaitingCode.set(String(from.id), Date.now());
-      await sendLong(
-        chatId,
-        "Paste <code>ORBITX BETA</code> here, or send <code>/code ORBITX BETA</code>. First 25 supporters get lifetime MCP.",
-        { parse_mode: "HTML", ...extra },
-      );
+      await sendLong(chatId, INVITE_CODE_PROMPT_HTML, { parse_mode: "HTML", ...extra });
       return;
     }
     if (gate === "login") {
@@ -1252,7 +1242,8 @@ async function handleTelegramUpdate(update, req) {
       await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra, req });
       return;
     }
-    awaitingCode.delete(String(from.id));
+    await sendLong(chatId, INVITE_CODE_PROMPT_HTML, { parse_mode: "HTML", ...replyExtra });
+    return;
   }
 
   if (!isGroup && looksLikeSolanaTxRef(text) && !text.toLowerCase().startsWith("/token")) {
@@ -1275,8 +1266,7 @@ async function handleTelegramUpdate(update, req) {
     }
     if (!isPublicGroupTrigger(text, msg) && bare !== "start") return;
   } else if (!gate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
-    awaitingCode.set(String(from.id), Date.now());
-    await handleStartDm(chatId, from, link, replyExtra, req);
+    await sendLong(chatId, formatTelegramLockedChatHtml(), { parse_mode: "HTML", ...replyExtra });
     return;
   }
 
@@ -1703,7 +1693,7 @@ async function handleWeb(req, res, body) {
         chat_id: telegramUserId,
         text: accessOn
           ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch. /autobuy on for Phantom auto-prompt."
-          : "OrbitX linked. Share ORBITX BETA here to unlock the bot (first 25 get lifetime), or burn $ORBITX on /start.",
+          : "OrbitX linked. Send the invite code here to unlock the bot (first 25 get lifetime), or burn $ORBITX on /start.",
         parse_mode: "HTML",
       });
     }

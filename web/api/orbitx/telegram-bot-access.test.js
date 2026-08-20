@@ -19,7 +19,9 @@ describe("early access codes", () => {
     expect(normalizeEarlyAccessCode("  obx-alpha 1 ")).toBe("OBXALPHA1");
     expect(normalizeEarlyAccessCode("ORBITX BETA")).toBe("ORBITXBETA");
     expect(isOrbitXBetaCode("orbitx beta")).toBe(true);
+    expect(isOrbitXBetaCode("hey")).toBe(false);
     expect(looksLikeEarlyAccessCode("OBX7")).toBe(true);
+    expect(looksLikeEarlyAccessCode("hey")).toBe(false);
     expect(looksLikeEarlyAccessCode("no")).toBe(false);
   });
 });
@@ -195,6 +197,8 @@ describe("DM unlock gate", () => {
   });
 
   it("only allows onboarding commands while locked", () => {
+    expect(isAllowedGatedDmCommand("hey", "hey")).toBe(false);
+    expect(isAllowedGatedDmCommand("gm", "gm")).toBe(false);
     expect(isAllowedGatedDmCommand("token", "token CA")).toBe(false);
     expect(isAllowedGatedDmCommand("help", "/help")).toBe(false);
     expect(isAllowedGatedDmCommand("cmds", "/cmds")).toBe(false);
