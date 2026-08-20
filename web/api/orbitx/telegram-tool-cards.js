@@ -25,6 +25,15 @@ import { hasMarketSnapshot } from "./telegram-token-snapshot.js";
 
 export { telegramMessageParts };
 
+/** Open a dapp URL inside Phantom (Telegram in-app browser cannot sign). */
+export function phantomBrowseUrl(url, ref = "orbitx") {
+  const raw = String(url || "").trim();
+  if (!raw) return raw;
+  if (/phantom\.app\/ul\//i.test(raw)) return raw;
+  if (!/^https?:\/\//i.test(raw)) return raw;
+  return `https://phantom.app/ul/browse/${encodeURIComponent(raw)}?ref=${encodeURIComponent(ref)}`;
+}
+
 const JUPITER_TOKEN = "https://jup.ag/tokens/";
 const JUPITER_SWAP = "https://jup.ag/swap/SOL-";
 const BIRDEYE = "https://birdeye.so/token/";
@@ -778,7 +787,7 @@ function formatActionLinks(data) {
   const urls = [];
   if (data?.openUrl) urls.push(["Open", data.openUrl]);
   if (data?.autoSignUrl && data.autoSignUrl !== data.openUrl && data.autoSignUrl !== data.signUrl) {
-    urls.push(["Auto-sign", data.autoSignUrl]);
+    urls.push(["Auto-sign", phantomBrowseUrl(data.autoSignUrl)]);
   }
   if (data?.signUrl && data.signUrl !== data.openUrl) urls.push(["Sign", data.signUrl]);
   if (data?.reportUrl) urls.push(["Report", data.reportUrl]);
@@ -845,6 +854,7 @@ function formatTradeDeskCard(data, tool) {
   const auto =
     data.autoSignUrl ||
     (sign ? `${sign}${sign.includes("?") ? "&" : "?"}auto=1` : "");
+  const autoPhantom = auto ? phantomBrowseUrl(auto) : "";
   const telegramDash = `${ORBITX_HOST}/telegram`;
 
   if (err === "login_required") {
@@ -961,14 +971,14 @@ function formatTradeDeskCard(data, tool) {
 
   const buttons = [
     sign ? { text: "Sign in Phantom", url: sign } : null,
-    auto && auto !== sign ? { text: "Auto-sign", url: auto } : null,
+    auto && auto !== sign ? { text: "Auto-sign", url: autoPhantom || auto } : null,
     { text: "Solscan", url: solscanToken },
     { text: "OrbitX DEX", url: dex },
   ].filter(Boolean);
 
   const linkLine = [
     sign ? href(sign, "Sign in Phantom") : "",
-    auto && auto !== sign ? href(auto, "Auto-sign") : "",
+    auto && auto !== sign ? href(autoPhantom || auto, "Auto-sign") : "",
     href(solscanToken, "Token on Solscan"),
     solscanAccount ? href(solscanAccount, "Wallet on Solscan") : "",
     href(dex, "OrbitX DEX"),

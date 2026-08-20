@@ -20,6 +20,7 @@ import {
   jupiterSignAndSendTransaction,
   toVersionedTransaction,
 } from "@/lib/wallets/jupiterWalletAdapter";
+import { normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
 
 export type WalletSendCaps = {
   sendTransaction?: (
@@ -32,6 +33,8 @@ export type WalletSendCaps = {
   walletName?: string | null;
   /** Force the Jupiter inject even when the adapter name is missing. */
   preferJupiter?: boolean;
+  /** Sign page / Telegram auto-buy: never hijack Phantom sends into Jupiter. */
+  preferPhantom?: boolean;
 };
 
 export type WalletSendOptions = {
@@ -76,11 +79,17 @@ export function serializeSigned(signed: Transaction | VersionedTransaction): Uin
   return signed.serialize();
 }
 
+export function isPhantomWalletName(name?: string | null): boolean {
+  return Boolean(name && /phantom/i.test(name));
+}
+
 export function shouldUseJupiterInject(
-  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter">,
+  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter" | "preferPhantom">,
   feePayer?: string | null,
 ): boolean {
   if (!getJupiterProvider()?.signAndSendTransaction) return false;
+  if (wallet.preferPhantom) return false;
+  if (isPhantomWalletName(wallet.walletName)) return false;
   if (wallet.preferJupiter) return true;
   if (isJupiterWalletName(wallet.walletName)) return true;
   const jupiterPk = jupiterProviderPublicKey();
@@ -120,16 +129,58 @@ export async function sendWalletTransaction(
   const feePayer = transactionFeePayer(tx);
 
   if (shouldUseJupiterInject(wallet, feePayer)) {
-    return jupiterSignAndSendTransaction(tx, opts);
+    return normalizeTxSignatureBase58(await jupiterSignAndSendTransaction(tx, opts));
   }
 
   const versioned = toVersionedTransaction(tx);
   if (wallet.sendTransaction) {
-    return wallet.sendTransaction(versioned, connection, opts);
+    return normalizeTxSignatureBase58(await wallet.sendTransaction(versioned, connection, opts));
   }
   if (wallet.signTransaction) {
     const signed = await wallet.signTransaction(tx);
-    return connection.sendRawTransaction(serializeSigned(signed), opts);
+    return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
   }
-  throw new Error("This wallet can't sign here — connect Jupiter");
+  throw new Error("This wallet can't sign here — connect Phantom");
+}
+
+export type ConfirmSentOptions = {
+  blockhash?: string;
+  lastValidBlockHeight?: number;
+  commitment?: "processed" | "confirmed" | "finalized";
+};
+
+/**
+ * Confirm a wallet-sent tx. Always normalizes Phantom base64 signatures first.
+ * If the swap already landed, treat encoding / "already processed" as success
+ * so the sign page can finish the workflow.
+ */
+export async function confirmSentTransaction(
+  connection: Connection,
+  signature: unknown,
+  options?: ConfirmSentOptions,
+): Promise<string> {
+  const sig = normalizeTxSignatureBase58(signature);
+  const commitment = options?.commitment ?? "confirmed";
+  try {
+    if (options?.blockhash && options.lastValidBlockHeight != null) {
+      await connection.confirmTransaction(
+        { signature: sig, blockhash: options.blockhash, lastValidBlockHeight: options.lastValidBlockHeight },
+        commitment,
+      );
+    } else {
+      await connection.confirmTransaction(sig, commitment);
+    }
+    return sig;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/already been processed|already processed/i.test(msg)) return sig;
+    try {
+      const st = await connection.getSignatureStatus(sig);
+      if (st?.value && !st.value.err) return sig;
+    } catch {
+      /* RPC status is best-effort */
+    }
+    if (/base58/i.test(msg)) return sig;
+    throw error;
+  }
 }

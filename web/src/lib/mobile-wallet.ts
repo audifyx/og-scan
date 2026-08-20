@@ -13,9 +13,12 @@ export interface MobileWalletInfo {
 export function detectMobileWallet(): MobileWalletInfo {
   const ua = navigator.userAgent.toLowerCase();
   const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(ua);
-  const isPhantomBrowser = /phantom/.test(ua) || (window as any).phantom?.solana?.isPhantom;
-  const isInAppBrowser = /instagram|facebook|twitter|chrome\/[0-9].*\sEdge/.test(ua) || 
-    (!('chrome' in window) && !('safari' in window) && isMobile);
+  const isPhantomBrowser = /phantom/.test(ua) || Boolean((window as Window & { phantom?: { solana?: { isPhantom?: boolean } } }).phantom?.solana?.isPhantom);
+  const isTelegram = /telegram/i.test(ua) || Boolean((window as Window & { TelegramWebviewProxy?: unknown }).TelegramWebviewProxy);
+  const isInAppBrowser =
+    isTelegram ||
+    /instagram|facebook|twitter|line\//.test(ua) ||
+    (isMobile && !("chrome" in window) && !("safari" in window));
 
   return {
     isMobile,
@@ -30,9 +33,8 @@ export function detectMobileWallet(): MobileWalletInfo {
  * Opens Phantom app and navigates to the given dApp URL.
  */
 export function getPhantomDeepLink(dappUrl: string = window.location.href): string {
-  // Phantom mobile scheme: Opens Phantom and navigates to the URL
   const encodedUrl = encodeURIComponent(dappUrl);
-  return `https://phantom.app/ul/browse/${encodedUrl}?ref=ogscan`;
+  return `https://phantom.app/ul/browse/${encodedUrl}?ref=orbitx`;
 }
 
 /**

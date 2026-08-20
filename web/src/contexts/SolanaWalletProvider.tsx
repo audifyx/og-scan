@@ -11,6 +11,7 @@ import {
 import { HELIUS_RPC } from "@/lib/og";
 import { BackpackWalletAdapter } from "@/lib/wallets/backpackWalletAdapter";
 import { JupiterWalletAdapter } from "@/lib/wallets/jupiterWalletAdapter";
+import { shouldSkipWalletAutoConnect } from "@/lib/orbitx/agentSignWallets";
 
 interface Props {
   children: ReactNode;
@@ -57,7 +58,22 @@ export const SolanaWalletProvider: FC<Props> = ({ children }) => {
 
   return (
     <ConnectionProvider endpoint={HELIUS_RPC}>
-      <WalletProvider wallets={wallets} autoConnect onError={onError}>
+      <WalletProvider
+        wallets={wallets}
+        autoConnect={(adapter) => {
+          if (typeof window === "undefined") return true;
+          if (shouldSkipWalletAutoConnect(adapter.name, window.location.pathname, window.location.search)) {
+            try {
+              localStorage.removeItem("walletName");
+            } catch {
+              /* private mode */
+            }
+            return false;
+          }
+          return true;
+        }}
+        onError={onError}
+      >
         {children}
       </WalletProvider>
     </ConnectionProvider>

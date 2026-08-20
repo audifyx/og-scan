@@ -6,6 +6,7 @@ import {
   shouldUseJupiterInject,
   toVersionedTransaction,
   transactionFeePayer,
+  confirmSentTransaction,
 } from "./sendWalletTx";
 import {
   getJupiterProvider,
@@ -67,12 +68,22 @@ describe("shouldUseJupiterInject", () => {
     expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
   });
 
-  it("uses Jupiter when the fee payer is the Jupiter inject (not Phantom)", () => {
+  it("never hijacks Phantom — even if Jupiter inject shares the same pubkey", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
     vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
-    expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(true);
+    expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(false);
+    expect(shouldUseJupiterInject({ walletName: "Phantom Wallet" }, OWNER)).toBe(false);
+    expect(shouldUseJupiterInject({ preferPhantom: true, walletName: "Jupiter" }, OWNER)).toBe(false);
+  });
+
+  it("uses Jupiter when the fee payer is the Jupiter inject and the adapter is not Phantom", () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    expect(shouldUseJupiterInject({ walletName: "Solflare" }, OWNER)).toBe(true);
   });
 
   it("does not steal Phantom sends when Jupiter is a different key", () => {
@@ -127,5 +138,59 @@ describe("sendWalletTransaction", () => {
     const sent = sendTransaction.mock.calls[0]?.[0];
     expect(sent && "version" in sent).toBe(true);
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_SHOULD_NOT_RUN");
+    const sendTransaction = vi.fn().mockResolvedValue("PHANTOM_SIG");
+    const { tx } = unsignedTransfer();
+    const sig = await sendWalletTransaction(
+      { sendRawTransaction: vi.fn() } as never,
+      { walletName: "Phantom", preferPhantom: true, sendTransaction },
+      tx,
+    );
+    expect(sig).toBe("PHANTOM_SIG");
+    expect(jupiterSignAndSendTransaction).not.toHaveBeenCalled();
+    expect(sendTransaction).toHaveBeenCalled();
+  });
+
+  it("normalizes Phantom base64 sendTransaction results to base58", async () => {
+    const bytes = new Uint8Array(64).fill(9);
+    const b64 = btoa(String.fromCharCode(...bytes));
+    const sendTransaction = vi.fn().mockResolvedValue(b64);
+    const { tx } = unsignedTransfer();
+    const sig = await sendWalletTransaction(
+      { sendRawTransaction: vi.fn() } as never,
+      { walletName: "Phantom", sendTransaction },
+      tx,
+    );
+    expect(sig).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
+    expect(sig).not.toContain("/");
+  });
+});
+
+describe("confirmSentTransaction", () => {
+  it("confirms with a base58 signature even when Phantom returned base64", async () => {
+    const bytes = new Uint8Array(64).fill(3);
+    const b64 = btoa(String.fromCharCode(...bytes));
+    const confirmTransaction = vi.fn().mockResolvedValue({ value: { err: null } });
+    const connection = { confirmTransaction, getSignatureStatus: vi.fn() };
+    const sig = await confirmSentTransaction(connection as never, b64);
+    expect(sig).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
+    expect(confirmTransaction.mock.calls[0]?.[0]).toBe(sig);
+    expect(String(confirmTransaction.mock.calls[0]?.[0])).not.toContain("/");
+  });
+
+  it("treats a landed tx as success when confirm throws the base58 encoding error", async () => {
+    const bytes = new Uint8Array(64).fill(4);
+    const b64 = btoa(String.fromCharCode(...bytes));
+    const confirmTransaction = vi.fn().mockRejectedValue(new Error(`signature must be base58 encoded: ${b64}`));
+    const getSignatureStatus = vi.fn().mockResolvedValue({ value: { err: null, confirmationStatus: "confirmed" } });
+    const sig = await confirmSentTransaction({ confirmTransaction, getSignatureStatus } as never, b64);
+    expect(sig).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
   });
 });

@@ -11,7 +11,15 @@ import {
   confirmMcpAccessBurnUntilGranted,
   rememberPendingMcpBurn,
 } from "@/lib/mcpBurnAccess";
-import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
+import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
+import { detectMobileWallet, getPhantomDeepLink } from "@/lib/mobile-wallet";
+import {
+  clearStoredJupiterWallet,
+  fetchTimeoutSignal,
+  isJupiterAdapterName,
+  pickPhantomWallet,
+  sortAgentSignWallets,
+} from "@/lib/orbitx/agentSignWallets";
 
 type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access" | "shop";
 
@@ -24,24 +32,57 @@ function decodeTx(b64: string): VersionedTransaction | Transaction {
   }
 }
 
+const AUTO_LOCK_PREFIX = "orbitx:sign:auto:";
+
+function autoSignLockKey(parts: Array<string | number | boolean | null | undefined>): string {
+  return AUTO_LOCK_PREFIX + parts.map((p) => String(p ?? "")).join("|");
+}
+
+function readLock(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLock(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* private mode */
+  }
+}
+
+function dropAutoQuery(): void {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("auto");
+    url.searchParams.delete("autoconfirm");
+    const qs = url.searchParams.toString();
+    window.history.replaceState(null, "", `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`);
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
- * MCP handoff — rebuild unsigned tx (trade / credits / claim / burn / rent), sign in Jupiter.
+ * MCP / Telegram handoff — rebuild unsigned tx and sign in Phantom.
  * Query: kind, action, mint, amount, percent, publicKey, slippage, pool, auto
+ * Auto-sign never connects Jupiter (that loads jup.ag/mobile and never finishes).
  */
 export default function AgentSignPage() {
   const [params] = useSearchParams();
   const { connection } = useConnection();
   const { publicKey, signTransaction, sendTransaction, connected, wallet: adapterWallet } = useWallet();
-  const { pickable, signInWith, busy } = useWalletSignIn();
+  const { pickable, signInWith, busy, disconnect } = useWalletSignIn();
+  const walletName = adapterWallet?.adapter?.name ?? null;
   const walletCaps = {
     sendTransaction: sendTransaction ?? undefined,
     signTransaction: signTransaction ?? undefined,
-    walletName: adapterWallet?.adapter?.name ?? null,
+    walletName,
+    preferPhantom: true,
   };
-  const connectWallets = [...pickable].sort((a, b) => {
-    const rank = (n: string) => (/jupiter/i.test(n) ? 0 : /phantom/i.test(n) ? 2 : 1);
-    return rank(a.name) - rank(b.name);
-  });
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();
   const kind: Kind =
@@ -73,12 +114,17 @@ export default function AgentSignPage() {
     params.get("auto") === "1" ||
     params.get("auto") === "true" ||
     params.get("autoconfirm") === "1";
+  const connectWallets = sortAgentSignWallets(pickable, autoPrompt);
+  const jupiterSelected = isJupiterAdapterName(walletName);
 
   const [busyTrade, setBusyTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [extraNote, setExtraNote] = useState<string | null>(null);
   const autoStarted = useRef(false);
+  const autoConnectStarted = useRef(false);
+  const phantomRedirected = useRef(false);
+  const droppedJupiter = useRef(false);
 
   const wallet = publicKey?.toBase58() || "";
   const walletMismatch = Boolean(expectedWallet && wallet && expectedWallet !== wallet);
@@ -89,7 +135,7 @@ export default function AgentSignPage() {
       const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
-    if (kind === "shop") return sku ? `Desk shop ${sku} — Jupiter buy $ORBITX + burn` : "Desk shop buy & burn";
+    if (kind === "shop") return sku ? `Desk shop ${sku} — buy $ORBITX + burn` : "Desk shop buy & burn";
     if (kind === "mcp-access") {
       const tokens = packageId === "week" ? 1000 : 100;
       const label = packageId === "week" ? "1 week" : "1 day";
@@ -133,9 +179,10 @@ export default function AgentSignPage() {
                 ? "Buy & burn"
                 : action.toUpperCase();
 
+  const sendOpts = { skipPreflight: true as const };
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
-    return sendWalletTransaction(connection, walletCaps, tx);
+    return sendWalletTransaction(connection, walletCaps, tx, sendOpts);
   };
 
   const onSign = async () => {
@@ -147,7 +194,11 @@ export default function AgentSignPage() {
       return;
     }
     if (!connected || !publicKey) {
-      setError("Connect Jupiter first.");
+      setError("Connect Phantom first.");
+      return;
+    }
+    if (isJupiterAdapterName(walletName)) {
+      setError("Switching to Phantom — Auto-sign does not use Jupiter.");
       return;
     }
     if (walletMismatch) {
@@ -156,6 +207,12 @@ export default function AgentSignPage() {
     }
 
     setBusyTrade(true);
+    const lockKey = autoSignLockKey([kind, action, mint, amountRaw, percentRaw, sku, packageId, wallet]);
+    const finish = (sig: string) => {
+      writeLock(lockKey, "done");
+      dropAutoQuery();
+      setSignature(sig);
+    };
     try {
       const pk = publicKey.toBase58();
 
@@ -174,9 +231,9 @@ export default function AgentSignPage() {
             lamports,
           }),
         );
-        const sig = await sendWalletTransaction(connection, walletCaps, tx);
-        await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-        setSignature(sig);
+        const sig = await sendWalletTransaction(connection, walletCaps, tx, sendOpts);
+        await confirmSentTransaction(connection, sig, { blockhash, lastValidBlockHeight });
+        finish(sig);
 
         // Credit the account (session user, or wallet-linked agent user)
         try {
@@ -229,12 +286,12 @@ export default function AgentSignPage() {
             amountRaw: String(data.amountRaw),
             closesAccount: Boolean(data.closesAccount),
           });
-          sig = await sendWalletTransaction(connection, walletCaps, tx);
+          sig = await sendWalletTransaction(connection, walletCaps, tx, sendOpts);
         } else {
           throw new Error(data?.message || "Could not build access burn");
         }
-        await connection.confirmTransaction(sig, "confirmed");
-        setSignature(sig);
+        await confirmSentTransaction(connection, sig);
+        finish(sig);
         rememberPendingMcpBurn({ signature: sig, publicKey: pk, packageId: pkg });
         const granted = await confirmMcpAccessBurnUntilGranted({
           signature: sig,
@@ -259,8 +316,8 @@ export default function AgentSignPage() {
           throw new Error(prep?.error || prep?.message || "Could not build shop buy-and-burn");
         }
         const sig = await sendOne(prep.transaction);
-        await connection.confirmTransaction(sig, "confirmed");
-        setSignature(sig);
+        await confirmSentTransaction(connection, sig);
+        finish(sig);
         try {
           await fetch("/api/orbitx/shop", {
             method: "POST",
@@ -294,6 +351,7 @@ export default function AgentSignPage() {
         const res = await fetch("/api/ogdex/trade", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: fetchTimeoutSignal(20_000),
           body: JSON.stringify({
             publicKey: pk,
             action,
@@ -312,11 +370,11 @@ export default function AgentSignPage() {
         // Separate desk-fee tx when the API could not embed the SOL transfer
         if (typeof data.feeTx === "string" && data.feeTx.length > 0) {
           const feeSig = await sendOne(data.feeTx);
-          await connection.confirmTransaction(feeSig, "confirmed");
+          await confirmSentTransaction(connection, feeSig);
         }
         const sig = await sendOne(data.tx);
-        await connection.confirmTransaction(sig, "confirmed");
-        setSignature(sig);
+        await confirmSentTransaction(connection, sig);
+        finish(sig);
         const feeSol = data?.platformFee?.feeSol;
         const feeWallet = data?.platformFee?.wallet || PLATFORM_WALLET;
         if (feeSol) {
@@ -354,30 +412,85 @@ export default function AgentSignPage() {
       let lastSig = "";
       for (let i = 0; i < list.length; i++) {
         lastSig = await sendOne(list[i]);
-        await connection.confirmTransaction(lastSig, "confirmed");
+        await confirmSentTransaction(connection, lastSig);
       }
-      setSignature(lastSig);
+      finish(lastSig);
       if (list.length > 1) setExtraNote(`Signed ${list.length} transactions.`);
       if (data.reclaimableSol != null) {
         setExtraNote((n) => `${n ? `${n} ` : ""}~${data.reclaimableSol} SOL reclaimable.`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign failed");
+      const msg = e instanceof Error ? e.message : "Sign failed";
+      if (readLock(lockKey) === "pending") writeLock(lockKey, "");
+      autoStarted.current = false;
+      const timedOut = /aborted|timeout|timed out/i.test(msg) || (e instanceof DOMException && e.name === "AbortError");
+      if (timedOut) {
+        setError("Quote timed out. Tap Sign & send to retry — stay in Phantom.");
+      } else {
+        setError(/base58/i.test(msg) ? "Swap sent. Refresh this page — the signature is confirming on-chain." : msg);
+      }
     } finally {
       setBusyTrade(false);
     }
   };
 
   useEffect(() => {
-    if (!autoPrompt || autoStarted.current) return;
-    if (!valid || !connected || !publicKey || walletMismatch || busyTrade || signature) return;
-    autoStarted.current = true;
+    if (!autoPrompt) return;
+    clearStoredJupiterWallet();
+  }, [autoPrompt]);
+
+  useEffect(() => {
+    if (!autoPrompt || !valid || signature) return;
+    const info = detectMobileWallet();
+    const telegram =
+      typeof window !== "undefined" &&
+      (/Telegram/i.test(navigator.userAgent) || Boolean((window as Window & { TelegramWebviewProxy?: unknown }).TelegramWebviewProxy));
+    if (info.isPhantomBrowser) return;
+    if (!(telegram || (info.isMobile && info.isInAppBrowser))) return;
+    const flag = `orbitx:phantom-ul:${window.location.href}`;
+    if (phantomRedirected.current || readLock(flag) === "1") return;
+    phantomRedirected.current = true;
+    writeLock(flag, "1");
+    window.location.href = getPhantomDeepLink(window.location.href);
+  }, [autoPrompt, valid, signature]);
+
+  useEffect(() => {
+    if (!autoPrompt || signature || !jupiterSelected || droppedJupiter.current) return;
+    droppedJupiter.current = true;
+    autoConnectStarted.current = false;
+    autoStarted.current = false;
+    void disconnect().catch(() => {
+      /* switch to Phantom next tick */
+    });
+  }, [autoPrompt, jupiterSelected, disconnect, signature]);
+
+  useEffect(() => {
+    if (!autoPrompt || connected || autoConnectStarted.current || signature || jupiterSelected) return;
+    const info = detectMobileWallet();
+    if (info.isMobile && !info.isPhantomBrowser) return;
+    const phantom = pickPhantomWallet(connectWallets);
+    if (!phantom) return;
+    autoConnectStarted.current = true;
+    void signInWith(phantom.name, { connectOnly: true }).catch((e) => {
+      autoConnectStarted.current = false;
+      setError(e instanceof Error ? e.message : "Connect Phantom to auto-sign");
+    });
+  }, [autoPrompt, connected, connectWallets, signInWith, signature, jupiterSelected]);
+
+  useEffect(() => {
+    if (!autoPrompt || !valid || !connected || !wallet || walletMismatch || signature || jupiterSelected) return;
+    const lockKey = autoSignLockKey([kind, action, mint, amountRaw, percentRaw, sku, packageId, wallet]);
+    if (readLock(lockKey) === "done") return;
     const t = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      if (readLock(lockKey) === "done") return;
+      autoStarted.current = true;
+      writeLock(lockKey, "pending");
       void onSign();
-    }, 450);
+    }, 500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPrompt, valid, connected, publicKey, walletMismatch, busyTrade, signature]);
+  }, [autoPrompt, valid, connected, wallet, walletMismatch, signature, jupiterSelected, kind, action, mint, amountRaw, percentRaw, sku, packageId]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#070a10] p-4 text-white">
@@ -385,21 +498,21 @@ export default function AgentSignPage() {
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
           <h1 className="text-xl font-black tracking-tight">
-            {autoPrompt ? "Auto-confirm" : "Sign with Jupiter"}
+            {autoPrompt ? "Auto-confirm" : "Sign with Phantom"}
           </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
           {kind === "credits"
             ? autoPrompt
-              ? "Chat auto-confirm — Jupiter will send SOL to the OrbitX desk wallet, then credits apply."
+              ? "Chat auto-confirm — Phantom will send SOL to the OrbitX desk wallet, then credits apply."
               : "Approve the SOL transfer to the OrbitX desk wallet. Credits credit after confirmation."
             : kind === "mcp-access"
               ? autoPrompt
-                ? "Chat auto-confirm — Jupiter will burn the exact $ORBITX package amount, then MCP access starts."
-                : "Approve the $ORBITX burn in Jupiter. MCP access starts after confirmation and expires automatically."
+                ? "Chat auto-confirm — Phantom will burn the exact $ORBITX package amount, then MCP access starts."
+                : "Approve the $ORBITX burn in Phantom. MCP access starts after confirmation and expires automatically."
               : autoPrompt
-                ? "Chat auto-confirm — Jupiter will prompt as soon as your wallet is connected."
-                : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Jupiter — nothing broadcasts until you sign.`}
+                ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
+                : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
@@ -481,6 +594,12 @@ export default function AgentSignPage() {
                     Connect {w.name}
                   </button>
                 ))}
+                <a
+                  href={getPhantomDeepLink(typeof window !== "undefined" ? window.location.href : "https://www.orbitx.world/agent/sign")}
+                  className="rounded-xl border border-[#ab9ff2]/40 bg-[#ab9ff2]/15 px-3 py-2 text-xs font-semibold text-[#ab9ff2] hover:bg-[#ab9ff2]/25"
+                >
+                  Open in Phantom app
+                </a>
               </div>
             )}
             <button
@@ -490,7 +609,7 @@ export default function AgentSignPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab9ff2] px-4 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40"
             >
               {busyTrade ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-              {busyTrade ? "Waiting for Jupiter…" : `Sign & send ${title}`}
+              {busyTrade ? "Waiting for Phantom…" : `Sign & send ${title}`}
             </button>
           </>
         )}
