@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_MCP_ACCESS_PACKAGES,
+  MCP_ACCESS_TOKEN_AMOUNTS,
   MCP_BURN_MINT,
   clearPendingMcpBurn,
   mcpAccessSignUrl,
@@ -10,15 +11,15 @@ import {
 } from "./mcpBurnAccess";
 
 describe("mcpAccessSignUrl", () => {
-  it("builds a day-package burn handoff", () => {
+  it("builds an hour-package burn handoff", () => {
     const url = mcpAccessSignUrl({
-      packageId: "day",
+      packageId: "hour",
       publicKey: "11111111111111111111111111111111",
       origin: "https://www.orbitx.world",
     });
     expect(url).toContain("/agent/sign?");
     expect(url).toContain("kind=mcp-access");
-    expect(url).toContain("package=day");
+    expect(url).toContain("package=hour");
     expect(url).toContain("amount=100");
     expect(url).toContain(MCP_BURN_MINT);
   });
@@ -32,15 +33,18 @@ describe("mcpAccessSignUrl", () => {
     });
     expect(url.startsWith("https://www.orbitx.world/agent/sign?")).toBe(true);
     expect(url).toContain("package=week");
-    expect(url).toContain("amount=1000");
+    expect(url).toContain("amount=10000");
     expect(url).toContain("auto=1");
   });
 
   it("keeps the published package prices", () => {
     expect(DEFAULT_MCP_ACCESS_PACKAGES.map((p) => [p.id, p.tokens])).toEqual([
-      ["day", 100],
-      ["week", 1000],
+      ["hour", 100],
+      ["day", 1000],
+      ["week", 10_000],
+      ["month", 1_000_000],
     ]);
+    expect(MCP_ACCESS_TOKEN_AMOUNTS.month).toBe(1_000_000);
   });
 });
 
@@ -72,9 +76,11 @@ describe("pending burn handoff", () => {
 });
 
 describe("MCP shop catalog", () => {
-  it("lists both burn packages for the shared shop", () => {
-    expect(DEFAULT_MCP_ACCESS_PACKAGES).toHaveLength(2);
-    expect(DEFAULT_MCP_ACCESS_PACKAGES[0]).toMatchObject({ id: "day", tokens: 100 });
-    expect(DEFAULT_MCP_ACCESS_PACKAGES[1]).toMatchObject({ id: "week", tokens: 1000 });
+  it("lists hour/day/week/month burn packages for the shared shop", () => {
+    expect(DEFAULT_MCP_ACCESS_PACKAGES).toHaveLength(4);
+    expect(DEFAULT_MCP_ACCESS_PACKAGES[0]).toMatchObject({ id: "hour", tokens: 100 });
+    expect(DEFAULT_MCP_ACCESS_PACKAGES[1]).toMatchObject({ id: "day", tokens: 1000 });
+    expect(DEFAULT_MCP_ACCESS_PACKAGES[2]).toMatchObject({ id: "week", tokens: 10_000 });
+    expect(DEFAULT_MCP_ACCESS_PACKAGES[3]).toMatchObject({ id: "month", tokens: 1_000_000 });
   });
 });

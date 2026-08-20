@@ -63,7 +63,7 @@ TOKEN $ORBITX: mint ${ORBITX_MINT} · Solana Token-2022 (extensions noted on exp
 
 HOLD: ≥ $5 USD of $ORBITX → OrbitX AI + basic MCP. 10,000 $ORBITX → Pro/KOL DEX layer (higher-tier signals, KOL surfaces). Holding also gates higher-access City rooms, private events, exclusive surfaces. Checks are non-custodial (balance or cumulative buy history). Some internal agent caches use $10 + 24h; public messaging is ≥ $5 and 10k.
 
-BURN: 100 $ORBITX = 1 day MCP. 1,000 $ORBITX = 7 days MCP. Stackable (new duration extends from later of now or current expiry). Shop: one Phantom signature → Jupiter buys required $ORBITX with SOL → exact purchased supply burned in the same tx → Solscan link. Team does not take those funds as revenue. Items bind permanently to the purchasing wallet. Holding = persistent baseline; burning = time-limited or one-shot entitlements. Flywheel: more usage → more burns → less circulating supply. No extraction layer between platform activity and the burn address.
+BURN: 100 $ORBITX = 1 hour MCP. 1,000 $ORBITX = 1 day. 10,000 = 1 week. 1,000,000 (1000k) = 1 month. Stackable (new duration extends from later of now or current expiry). Shop / Telegram: one Jupiter signature → buys required $ORBITX with SOL → exact purchased supply burned in the same tx → Solscan link → /verify the link. Team does not take those funds as revenue. Items bind permanently to the purchasing wallet. Holding = persistent baseline; burning = time-limited or one-shot entitlements. Flywheel: more usage → more burns → less circulating supply. No extraction layer between platform activity and the burn address.
 
 MCP: Agent hub ${ORBITX_HOST}/agent · Agent MCP ${ORBITX_HOST}/api/mcp · also GET/POST /api/ogdex/mcp and /api/orbitx/... · X MCP ${ORBITX_HOST}/x and ${ORBITX_HOST}/api/x/mcp. Claude / ChatGPT / Grok / Cursor / custom agents. User still signs trades with their own wallet.
 
@@ -77,7 +77,7 @@ CODE: Vite+React SPA under web/ (not Next.js for the main app). Vercel functions
 
 QUICK ANSWERS
 - What is OrbitX? On-chain OS unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity. Live ${OGSCAN_HOST} / ${ORBITX_HOST}.
-- Utility? Hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 day MCP / 1,000 = 7 days (stackable); burn for shop seats, listings, intel, API keys; usage drives further burns.
+- Utility? Hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 hour MCP / 1,000 = 1 day / 10,000 = 1 week / 1,000,000 = 1 month (stackable); burn for shop seats, listings, intel, API keys; usage drives further burns.
 - Connect MCP? Hold required $ORBITX or burn a seat, then point any MCP client at /api/ogdex/mcp or /api/mcp via ${ORBITX_HOST}/agent.
 - Burning? On-chain burn of $ORBITX (direct time seats or Jupiter buy-and-burn for shop). Stackable for MCP. Solscan verification. Permanent supply cut.
 - Custodial? No. User always signs with their own wallet.
@@ -159,7 +159,7 @@ export const ORBITX_FAQ_CHUNKS = [
       "mcp access",
       "time burn",
     ],
-    text: `MCP time burns: 100 $ORBITX = 1 day of MCP access; 1,000 $ORBITX = 7 days. Burns are stackable — if you burn again before expiry, the new duration extends from the later of “now” or the current expiry (time is additive). Implemented via dedicated endpoints (mcp-burn-access flows, Supabase tables for grants/expiry). Burning does not grant permanent ownership of seats the way holding does; it grants time-limited or one-time entitlements that further burns can extend. Automatic / activity burns: platform usage is structured so certain actions contribute to burn pressure (exact automatic mechanisms vary by surface) as part of the stated flywheel. Verification: Solscan links. Gating/grants checked against on-chain state or indexed history + DB entitlements (with RLS). Summary: “Hold for access. Burn for temporary premium access. The more the ecosystem is used, the more $ORBITX is burned.”`,
+    text: `MCP time burns: 100 $ORBITX = 1 hour; 1,000 = 1 day; 10,000 = 1 week; 1,000,000 = 1 month. Burns are stackable — if you burn again before expiry, the new duration extends from the later of “now” or the current expiry (time is additive). Implemented via dedicated endpoints (mcp-burn-access flows, Supabase tables for grants/expiry). Burning does not grant permanent ownership of seats the way holding does; it grants time-limited or one-time entitlements that further burns can extend. Automatic / activity burns: platform usage is structured so certain actions contribute to burn pressure (exact automatic mechanisms vary by surface) as part of the stated flywheel. Verification: Solscan links. Gating/grants checked against on-chain state or indexed history + DB entitlements (with RLS). Summary: “Hold for access. Burn for temporary premium access. The more the ecosystem is used, the more $ORBITX is burned.”`,
   },
   {
     id: "shop",
@@ -404,7 +404,7 @@ export const ORBITX_FAQ_CHUNKS = [
       "linked",
       "theorbitxmcpbot",
     ],
-    text: `Official bot @theorbitxmcpbot. Groups: public intel. DMs: /login links THIS Telegram user to YOUR OrbitX wallet — nobody else can spend it. Trade alts with SOL or USD/USDC quotes (“buy <CA> with 10$ usdc”, “buy 0.1 sol of $ORBITX”). /autobuy on = Phantom auto-prompt (you still sign). /autobuy off = Sign each time. /shop burns 100 $ORBITX (1 day MCP) or 1,000 (7 days) or buys credits. /launch /mint /nft after login. /call name runs any live OrbitX tool. Never invent live prices — /token for quotes.`,
+    text: `Official bot @theorbitxmcpbot. Groups: public intel. DMs: /start introduces the bot, then asks for an early access code or a burn. /login links THIS Telegram user to YOUR OrbitX wallet — nobody else can spend it. /burn hour|day|week|month = Jupiter buy then burn; /verify plus the Solscan link grants timed access. Trade alts with SOL or USD/USDC quotes (“buy <CA> with 10$ usdc”, “buy 0.1 sol of $ORBITX”). /autobuy on = Phantom auto-prompt (you still sign). /shop burns 100 $ORBITX (1 hour), 1,000 (1 day), 10,000 (1 week), or 1,000,000 (1 month), or buys credits. /launch /mint /nft after login. /call name runs any live OrbitX tool. Never invent live prices — /token for quotes.`,
   },
   {
     id: "custody",
@@ -416,7 +416,7 @@ export const ORBITX_FAQ_CHUNKS = [
     id: "answers",
     title: "Common FAQ answers",
     keys: ["faq", "quick answer", "decision tree", "common question", "how do i"],
-    text: `Common answers: (1) OrbitX = on-chain OS for Solana crypto unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity — live ogscan.fun / orbitx.world. (2) Utility = hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 day MCP / 1,000 = 7 days (stackable); burn for shop seats/listings/intel/API keys; activity drives further burns. (3) MCP = hold required $ORBITX or burn a seat, then point any MCP client at /api/ogdex/mcp (or /api/mcp) / agent hub. (4) Burning = on-chain burn (direct time seats or Jupiter buy-and-burn for shop); stackable; Solscan; permanent supply cut. (5) Custodial? No. (6) Code: github.com/audifyx/og-scan including programs/betting/. (7) Free vanity launch to pump.fun with optional orbit/obx mint. (8) Predictions = native P2P-style markets + games via the betting program.`,
+    text: `Common answers: (1) OrbitX = on-chain OS for Solana crypto unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity — live ogscan.fun / orbitx.world. (2) Utility = hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 hour MCP / 1,000 = 1 day / 10,000 = 1 week / 1,000,000 = 1 month (stackable); burn for shop seats/listings/intel/API keys; activity drives further burns. (3) MCP = hold required $ORBITX or burn a seat, then point any MCP client at /api/ogdex/mcp (or /api/mcp) / agent hub. (4) Burning = on-chain burn (direct time seats or Jupiter buy-and-burn for shop); stackable; Solscan; permanent supply cut. (5) Custodial? No. (6) Code: github.com/audifyx/og-scan including programs/betting/. (7) Free vanity launch to pump.fun with optional orbit/obx mint. (8) Predictions = native P2P-style markets + games via the betting program.`,
   },
   {
     id: "caveats",
@@ -485,7 +485,7 @@ export function formatOrbitXFaqHtml(query) {
     return [
       "<b>OrbitX FAQ</b>",
       "On-chain OS for Solana crypto — DEX/forensics, launchpad, social, City, predictions, AI/MCP.",
-      "Hold ≥ $5 $ORBITX → AI + basic MCP. Hold 10,000 → Pro/KOL DEX. Burn 100 = 1 day MCP, 1,000 = 7 days (stackable).",
+      "Hold ≥ $5 $ORBITX → AI + basic MCP. Hold 10,000 → Pro/KOL DEX. Burn 100 = 1 hour, 1,000 = 1 day, 10,000 = 1 week, 1,000,000 = 1 month (stackable).",
       "Non-custodial. Live: https://www.orbitx.world · DEX: https://ogscan.fun · GC: https://t.me/orbitxwrld",
       "",
       "Ask /faq utility · /faq mcp · /faq burn · /faq shop · /faq hold · /faq launch · /faq city",

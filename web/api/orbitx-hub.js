@@ -75,7 +75,7 @@ async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}
       tool,
       hold,
       burn: access.burn,
-      fix: "Hold ≥$5 ORBITX, or burn 100 $ORBITX (1 day) / 1,000 $ORBITX (1 week) at https://www.orbitx.world/shop.",
+      fix: "Hold ≥$5 ORBITX, or burn 100 (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) at https://www.orbitx.world/shop.",
     }),
   };
 }
@@ -2160,18 +2160,18 @@ const CORE_TOOLS = [
   {
     name: "orbitx_mcp_access_status",
     description:
-      "Show temporary Agent MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 day = 100 tokens, 1 week = 1,000 tokens).",
+      "Show temporary Agent MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 hour = 100, 1 day = 1,000, 1 week = 10,000, 1 month = 1,000,000 tokens).",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "orbitx_mcp_access_buy",
     description:
-      "Buy temporary Agent MCP access by burning $ORBITX. Packages: day = 100 tokens (24h), week = 1,000 tokens (7d). Returns a Phantom signUrl. After the burn confirms, call orbitx_mcp_access_confirm with the signature.",
+      "Buy temporary Agent MCP access by burning $ORBITX. Packages: hour = 100 (1h), day = 1,000 (24h), week = 10,000 (7d), month = 1,000,000 (30d). Returns a Jupiter signUrl (buy then burn). After the tx lands, call orbitx_mcp_access_confirm with the signature or /verify the Solscan link in Telegram.",
     inputSchema: {
       type: "object",
       properties: {
-        package: { type: "string", enum: ["day", "week"], description: "Access package" },
-        packageId: { type: "string", enum: ["day", "week"] },
+        package: { type: "string", enum: ["hour", "day", "week", "month"], description: "Access package" },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
         publicKey: { type: "string", description: "Burner wallet (optional if linked on /agent)" },
         confirmMode: { type: "string", enum: ["sign", "auto"] },
         autoConfirm: { type: "boolean" },
@@ -2189,8 +2189,8 @@ const CORE_TOOLS = [
       properties: {
         signature: { type: "string" },
         txSignature: { type: "string" },
-        package: { type: "string", enum: ["day", "week"] },
-        packageId: { type: "string", enum: ["day", "week"] },
+        package: { type: "string", enum: ["hour", "day", "week", "month"] },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
       },
       additionalProperties: false,
     },
@@ -2870,11 +2870,11 @@ const CORE_TOOLS = [
   {
     name: "orbitx_shop",
     description:
-      "OrbitX Shop catalog: burn 100 $ORBITX for 1 day MCP, 1,000 for 7 days, or buy credits with SOL. Returns package list + Phantom openUrls.",
+      "OrbitX Shop catalog: burn 100 $ORBITX for 1 hour, 1,000 for 1 day, 10,000 for 1 week, 1,000,000 for 1 month, or buy credits with SOL. Returns package list + Jupiter openUrls.",
     inputSchema: {
       type: "object",
       properties: {
-        package: { type: "string", description: "day | week | credits" },
+        package: { type: "string", description: "hour | day | week | month | credits" },
         amountSol: { type: "number" },
       },
     },
@@ -3585,8 +3585,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
 
   if (name === "orbitx_shop") {
     const pack = String(args.package || args.item || "").toLowerCase();
-    if (pack === "day" || pack === "week" || pack === "access") {
-      return callTool("orbitx_mcp_access_buy", { ...args, package: pack === "week" ? "week" : "day" }, auth, base, req);
+    if (pack === "hour" || pack === "day" || pack === "week" || pack === "month" || pack === "access") {
+      return callTool("orbitx_mcp_access_buy", { ...args, package: pack === "access" ? "hour" : pack }, auth, base, req);
     }
     if (pack === "credits" || pack === "topup") {
       return callTool("orbitx_credits_buy", args, auth, base, req);
@@ -3624,10 +3624,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       shop: true,
       openUrl: `${base}/shop`,
       message:
-        "OrbitX Shop — burn $ORBITX for MCP seats or buy credits with SOL. Linked Telegram: /shop day · /shop week · /credits 0.1 sol",
+        "OrbitX Shop — burn $ORBITX for MCP seats or buy credits with SOL. Linked Telegram: /shop hour · /shop day · /shop week · /shop month · /credits 0.1 sol",
       packages: [
-        { id: "day", title: "1 Day MCP", cost: "100 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "day" } },
-        { id: "week", title: "1 Week MCP", cost: "1,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "week" } },
+        { id: "hour", title: "1 Hour MCP", cost: "100 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "hour" } },
+        { id: "day", title: "1 Day MCP", cost: "1,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "day" } },
+        { id: "week", title: "1 Week MCP", cost: "10,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "week" } },
+        { id: "month", title: "1 Month MCP", cost: "1,000,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "month" } },
         { id: "credits", title: "Credits", cost: "10,000 / 1 SOL", tool: "orbitx_credits_buy" },
       ],
       note: "Burns destroy supply. Credits are shared across Agent MCP + X MCP. Non-custodial Phantom sign.",
@@ -4725,7 +4727,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {} },
             serverInfo: { name: "OrbitX Agent MCP", version: "1.5.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. MCP access: when they say buy access / burn ORBITX for MCP / 1 day or 1 week access — ASK day (100 tokens) or week (1,000 tokens), call orbitx_mcp_access_buy, send openUrl/signUrl so Phantom burns the exact amount, then orbitx_mcp_access_confirm with the signature. Time remaining: orbitx_mcp_access_status. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. MCP access: when they say buy access / burn ORBITX — ASK hour (100), day (1,000), week (10,000), or month (1,000,000), call orbitx_mcp_access_buy, send openUrl/signUrl so Jupiter buys then burns, then orbitx_mcp_access_confirm with the signature. Time remaining: orbitx_mcp_access_status. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so they send SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
           },
         },
         200,

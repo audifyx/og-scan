@@ -9,7 +9,11 @@ import { supabase } from "@/lib/supabase";
 import {
   buildMcpAccessBurnTransaction,
   confirmMcpAccessBurnUntilGranted,
+  isMcpAccessPackageId,
+  MCP_ACCESS_DURATION_LABELS,
+  MCP_ACCESS_TOKEN_AMOUNTS,
   rememberPendingMcpBurn,
+  type McpAccessPackageId,
 } from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import { detectMobileWallet, getPhantomDeepLink } from "@/lib/mobile-wallet";
@@ -137,9 +141,11 @@ export default function AgentSignPage() {
     }
     if (kind === "shop") return sku ? `Desk shop ${sku} — buy $ORBITX + burn` : "Desk shop buy & burn";
     if (kind === "mcp-access") {
-      const tokens = packageId === "week" ? 1000 : 100;
-      const label = packageId === "week" ? "1 week" : "1 day";
-      return `Burn ${tokens.toLocaleString()} $ORBITX → ${label} MCP access`;
+      const pkg: McpAccessPackageId = isMcpAccessPackageId(packageId) ? packageId : "hour";
+      const fromAmount = Number(amountRaw);
+      const tokens = Number.isFinite(fromAmount) && fromAmount > 0 ? fromAmount : MCP_ACCESS_TOKEN_AMOUNTS[pkg];
+      const label = MCP_ACCESS_DURATION_LABELS[pkg];
+      return `Buy then burn ${tokens.toLocaleString()} $ORBITX → ${label} access`;
     }
     if (kind === "claim") return "creator fees";
     if (kind === "rent") return "close empty ATAs";
@@ -158,7 +164,7 @@ export default function AgentSignPage() {
       return Number.isFinite(sol) && sol >= 0.001;
     }
     if (kind === "shop") return Boolean(sku);
-    if (kind === "mcp-access") return packageId === "day" || packageId === "week";
+    if (kind === "mcp-access") return isMcpAccessPackageId(packageId);
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
@@ -265,7 +271,7 @@ export default function AgentSignPage() {
       }
 
       if (kind === "mcp-access") {
-        const pkg = packageId === "week" ? "week" : "day";
+        const pkg: McpAccessPackageId = isMcpAccessPackageId(packageId) ? packageId : "hour";
         const res = await fetch("/api/orbitx-agent/mcp-access/prepare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

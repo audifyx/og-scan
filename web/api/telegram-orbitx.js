@@ -26,6 +26,7 @@ import {
   formatFamilyMenu,
   formatGroupWelcomeHtml,
   formatHelpDesk,
+  formatTelegramStartGate,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
@@ -47,6 +48,17 @@ import {
   telegramMessageParts,
   TOKEN_INTEL_TOOLS,
 } from "./orbitx/telegram-orbitx-lib.js";
+import {
+  accessStatusFromRow,
+  loadTelegramBotAccess,
+  looksLikeEarlyAccessCode,
+  looksLikeSolanaTxRef,
+  parseSolanaTxSignature,
+  redeemEarlyAccessCode,
+  resolveBurnPackageFromText,
+  upsertTelegramBotAccess,
+} from "./orbitx/telegram-bot-access.js";
+import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/mcp-burn-access.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
   formatOrbitXLinksHtml,
@@ -373,30 +385,43 @@ async function buildBrandedScan(mint, { req, link, isGroup }) {
   });
 }
 
-async function handleVerify(chatId, text, { isGroup, link, extra }) {
+async function handleVerify(chatId, text, { isGroup, from, link, extra }) {
   if (isGroup) {
     await sendLong(
       chatId,
-      "Token verify is admin-only in a private DM after /login with the admin wallet.",
+      "Send /verify in a private DM with @theorbitxmcpbot — paste the Solscan burn link, or (admin) a mint CA.",
       extra,
     );
     return;
   }
+
+  const rest = String(text || "").replace(/^\S+\s*/, "").trim();
+  const sig = parseSolanaTxSignature(rest || text);
+  if (sig && (looksLikeSolanaTxRef(rest || text) || rest)) {
+    await verifyAccessBurn(chatId, sig, { from, link, extra });
+    return;
+  }
+
+  if (!rest) {
+    await sendAccessStatus(chatId, from, extra);
+    return;
+  }
+
   if (!link?.user_id) {
-    await sendLong(chatId, "Auth mode required. Send /login in this DM, then /verify CA.", extra);
+    await sendLong(chatId, "To verify a burn, paste the Solscan tx link. To admin-verify a mint, /login first.", extra);
     return;
   }
   if (!isTelegramAdminWallet(link.wallet_address)) {
     await sendLong(
       chatId,
-      "Only the OrbitX admin wallet can /verify a mint. Link that wallet with /login.",
+      "Paste the Solscan burn link after /verify (or send the tx signature). Mint /verify is admin-only.",
       extra,
     );
     return;
   }
   const mint = extractMint(text);
   if (!mint) {
-    await sendLong(chatId, "Usage: /verify CA", extra);
+    await sendLong(chatId, "Usage: /verify &lt;Solscan tx link&gt;  ·  or admin: /verify CA", extra);
     return;
   }
   let symbol = null;
@@ -447,6 +472,182 @@ async function handleVerify(chatId, text, { isGroup, link, extra }) {
       name ? `${name} · $${symbol || "TOKEN"}` : "",
       `<code>${mint}</code>`,
       "This badge now shows whenever the mint is scanned in Telegram (/token, CA drop, /scan, /xray).",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+}
+
+async function sendAccessStatus(chatId, from, extra = {}) {
+  const row = await loadTelegramBotAccess(sb, from?.id);
+  const status = accessStatusFromRow(row);
+  if (!status.active) {
+    await sendLong(
+      chatId,
+      "No timed access yet. Redeem <code>/code YOURCODE</code> or tap a burn on /start, then /verify the Solscan link.",
+      { parse_mode: "HTML", ...extra },
+    );
+    return status;
+  }
+  await sendLong(
+    chatId,
+    [
+      "<b>OrbitX access</b>",
+      `Time left: <b>${status.remainingLabel}</b>`,
+      status.source ? `Source: ${status.source}${status.packageId ? ` · ${status.packageId}` : ""}` : "",
+      "Public intel still works in groups. Linked DMs unlock /trade /shop /tweet while access is active.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+  return status;
+}
+
+async function handleStartDm(chatId, from, link, extra) {
+  const row = await loadTelegramBotAccess(sb, from?.id);
+  const status = accessStatusFromRow(row);
+  await sendCard(
+    chatId,
+    formatTelegramStartGate({
+      remainingLabel: status.active ? status.remainingLabel : "",
+      linked: Boolean(link),
+    }),
+    extra,
+  );
+}
+
+async function handleCode(chatId, text, { isGroup, from, link, extra }) {
+  if (isGroup) {
+    await sendLong(chatId, "Redeem codes in a private DM with @theorbitxmcpbot: /code YOURCODE", extra);
+    return;
+  }
+  const rest = String(text || "")
+    .replace(/^\/?(?:code|redeem)(?:@\w+)?\s*/i, "")
+    .trim();
+  if (!looksLikeEarlyAccessCode(rest)) {
+    awaitingCode.set(String(from.id), Date.now());
+    await sendLong(
+      chatId,
+      "Send your early access code as <code>/code YOURCODE</code> (letters and numbers, 4–24 characters).",
+      { parse_mode: "HTML", ...extra },
+    );
+    return;
+  }
+  awaitingCode.delete(String(from.id));
+  const out = await redeemEarlyAccessCode(sb, {
+    telegramUserId: String(from.id),
+    userId: link?.user_id || null,
+    wallet: link?.wallet_address || null,
+    code: rest,
+  });
+  if (!out.ok) {
+    await sendLong(chatId, out.message || "That code did not work. Try again or burn $ORBITX.", extra);
+    return;
+  }
+  await sendLong(
+    chatId,
+    `<b>Early access unlocked</b>\nYou have <b>${out.remainingLabel}</b>.\n/trade /shop /tweet work in this DM after /login.`,
+    { parse_mode: "HTML", ...extra },
+  );
+}
+
+async function startAccessBurn(chatId, from, packageId, { isGroup, req, link, extra }) {
+  if (isGroup) {
+    await sendLong(chatId, "Burns are private. DM @theorbitxmcpbot, /login, then tap a burn on /start.", extra);
+    return;
+  }
+  if (!link?.user_id || !link?.wallet_address) {
+    await sendLong(
+      chatId,
+      "First <code>/login</code> so the buy-and-burn is for YOUR wallet. Then tap the burn again.",
+      { parse_mode: "HTML", ...extra },
+    );
+    return;
+  }
+  const pkg = String(packageId || "").trim().toLowerCase();
+  if (!["hour", "day", "week", "month"].includes(pkg)) {
+    await handleStartDm(chatId, from, link, extra);
+    return;
+  }
+  pendingBurnPkg.set(String(from.id), pkg);
+  const out = prepareAccessMcpPurchase({
+    base: publicBase(req),
+    wallet: link.wallet_address,
+    packageId: pkg,
+  });
+  if (!out?.ok) {
+    await sendLong(chatId, out?.message || "Could not prepare the buy-and-burn. Try /login again.", extra);
+    return;
+  }
+  await sendCard(chatId, formatOrbitXTelegramResult(out, "orbitx_mcp_access_buy"), extra);
+  await sendLong(
+    chatId,
+    [
+      "One Jupiter sign <b>buys then burns</b> in the same transaction.",
+      "When it lands, copy the Solscan tx link and send:",
+      "<code>/verify https://solscan.io/tx/SIGNATURE</code>",
+      "I’ll confirm the burn and tell you how long you have left.",
+    ].join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+}
+
+async function handleBurn(chatId, text, { isGroup, from, req, link, extra }) {
+  if (isGroup) {
+    await sendLong(chatId, "Burns are private. DM @theorbitxmcpbot, /login, then /burn hour (or day / week / month).", extra);
+    return;
+  }
+  const pkg = resolveBurnPackageFromText(text);
+  if (!pkg?.id) {
+    await handleStartDm(chatId, from, link, extra);
+    return;
+  }
+  await startAccessBurn(chatId, from, pkg.id, { isGroup, req, link, extra });
+}
+
+async function verifyAccessBurn(chatId, signature, { from, link, extra }) {
+  const pkg = pendingBurnPkg.get(String(from?.id || "")) || null;
+  let confirmed;
+  try {
+    confirmed = await confirmAccessBurn(sb, {
+      userId: link?.user_id || null,
+      signature,
+      packageId: pkg,
+      wallet: link?.wallet_address || null,
+    });
+  } catch (error) {
+    await sendLong(chatId, `Could not verify that burn: ${error?.message || error}`, extra);
+    return;
+  }
+  if (!confirmed?.ok) {
+    await sendLong(chatId, confirmed?.message || "That transaction is not a matching $ORBITX burn yet. Wait a few seconds and /verify the Solscan link again.", extra);
+    return;
+  }
+  const saved = await upsertTelegramBotAccess(sb, {
+    telegram_user_id: String(from.id),
+    user_id: link?.user_id || null,
+    wallet_address: confirmed.walletAddress || confirmed.wallet || link?.wallet_address || null,
+    source: "burn",
+    package_id: confirmed.packageId || pkg,
+    tx_signature: signature,
+    expires_at: confirmed.expiresAt,
+  });
+  pendingBurnPkg.delete(String(from.id));
+  const explorer = confirmed.explorer || `https://solscan.io/tx/${signature}`;
+  const schemaNote =
+    saved?.error === "access_write_failed" || confirmed.schemaMissing
+      ? "\nApply the telegram_bot_access SQL migration if remaining time does not persist."
+      : "";
+  await sendLong(
+    chatId,
+    [
+      "<b>Burn verified</b>",
+      confirmed.message || "Access granted.",
+      confirmed.remainingLabel ? `Time left: <b>${confirmed.remainingLabel}</b>` : "",
+      `<a href="${explorer}">Solscan</a>`,
+      schemaNote,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -510,6 +711,8 @@ const mediaJobsByChat = new Map();
 const mediaJobsByTask = new Map();
 const scanCooldown = new Map();
 const seenUpdateIds = new Map();
+const awaitingCode = new Map();
+const pendingBurnPkg = new Map();
 
 function alreadyHandledUpdate(updateId) {
   const id = Number(updateId);
@@ -865,6 +1068,38 @@ async function handleCallbackQuery(cq, req) {
     }
     return;
   }
+  if (key.startsWith("gate:")) {
+    const gate = key.slice(5);
+    const chatType = String(cq?.message?.chat?.type || "");
+    const isGroup = chatType === "group" || chatType === "supergroup";
+    const link = from.id ? await loadLink(from.id) : null;
+    if (gate === "code") {
+      awaitingCode.set(String(from.id), Date.now());
+      await sendLong(
+        chatId,
+        "Send your early access code as <code>/code YOURCODE</code> — or just paste the code here.",
+        { parse_mode: "HTML", ...extra },
+      );
+      return;
+    }
+    if (gate === "login") {
+      if (isGroup) {
+        await sendLong(chatId, "Login is private. Message @theorbitxmcpbot and send /login.", extra);
+        return;
+      }
+      try {
+        const body = await startLogin(from, publicBase(req));
+        await sendLong(chatId, body, { parse_mode: "HTML", ...extra });
+      } catch (error) {
+        await sendLong(chatId, `Could not start login: ${error?.message || error}`, extra);
+      }
+      return;
+    }
+    if (["hour", "day", "week", "month"].includes(gate)) {
+      await startAccessBurn(chatId, from, gate, { isGroup, req, link, extra });
+      return;
+    }
+  }
   await sendCard(chatId, formatFamilyMenu(key), extra);
 }
 
@@ -927,6 +1162,20 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
+  if (!isGroup && awaitingCode.get(String(from.id)) && !text.startsWith("/")) {
+    if (looksLikeEarlyAccessCode(text)) {
+      awaitingCode.delete(String(from.id));
+      await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra });
+      return;
+    }
+    awaitingCode.delete(String(from.id));
+  }
+
+  if (!isGroup && looksLikeSolanaTxRef(text) && !text.toLowerCase().startsWith("/token")) {
+    await handleVerify(chatId, `/verify ${text}`, { isGroup, from, link, extra: replyExtra });
+    return;
+  }
+
   const bare = text.toLowerCase().split(/\s+/)[0].replace(/@.*$/, "").replace(/^\//, "");
 
   if (isGroup && !isPublicGroupTrigger(text, msg)) return;
@@ -934,7 +1183,16 @@ async function handleTelegramUpdate(update, req) {
   const hub = await import("./orbitx-hub.js");
   const tools = hub.listAllOrbitXTools();
 
-  if (bare === "start" || bare === "help") {
+  if (bare === "start") {
+    if (isGroup) {
+      await sendCard(chatId, helpText(false, Boolean(link)), replyExtra);
+      return;
+    }
+    await handleStartDm(chatId, from, link, replyExtra);
+    return;
+  }
+
+  if (bare === "help") {
     await sendCard(chatId, helpText(!isGroup, Boolean(link)), replyExtra);
     return;
   }
@@ -1004,7 +1262,26 @@ async function handleTelegramUpdate(update, req) {
   }
 
   if (bare === "verify") {
-    await handleVerify(chatId, text, { isGroup, link, extra: replyExtra });
+    await handleVerify(chatId, text, { isGroup, from, link, extra: replyExtra });
+    return;
+  }
+
+  if (bare === "code") {
+    await handleCode(chatId, text, { isGroup, from, link, extra: replyExtra });
+    return;
+  }
+
+  if (bare === "burn") {
+    await handleBurn(chatId, text, { isGroup, from, req, link, extra: replyExtra });
+    return;
+  }
+
+  if (bare === "access") {
+    if (isGroup) {
+      await sendLong(chatId, "Access status is private. DM @theorbitxmcpbot and send /access.", replyExtra);
+      return;
+    }
+    await sendAccessStatus(chatId, from, replyExtra);
     return;
   }
 
@@ -1072,6 +1349,13 @@ async function handleTelegramUpdate(update, req) {
         ...replyExtra,
       });
     }
+    return;
+  }
+
+  if (tool === "orbitx_mcp_access_buy" || (tool === "orbitx_shop" && ["hour", "day", "week", "month"].includes(String(args.package || args.packageId || "").trim()))) {
+    const pkg =
+      String(args.package || args.packageId || "").trim() || resolveBurnPackageFromText(text)?.id || "";
+    await startAccessBurn(chatId, from, pkg, { isGroup, req, link, extra: replyExtra });
     return;
   }
 

@@ -120,9 +120,17 @@ export function parseTradeIntent(text) {
       const sol = parseSolAmount(t);
       return { tool: "orbitx_credits_buy", args: sol ? { amountSol: sol } : {} };
     }
-    if (/\b(access|mcp|burn|day|week)\b/.test(compact)) {
-      const pack = /\b(week|7\s*d)/.test(compact) ? "week" : "day";
-      return { tool: "orbitx_mcp_access_buy", args: { package: pack } };
+    if (/\b(access|mcp|burn|hour|day|week|month)\b/.test(compact)) {
+      const pack = /\b(month|1000k|1,?000,?000)\b/.test(compact)
+        ? "month"
+        : /\b(week|10k|10,?000)\b/.test(compact)
+          ? "week"
+          : /\b(hour|1h|100)\b/.test(compact) && !/\bday\b/.test(compact)
+            ? "hour"
+            : /\b(day|1k|1,?000)\b/.test(compact)
+              ? "day"
+              : null;
+      return { tool: "orbitx_mcp_access_buy", args: pack ? { package: pack } : {} };
     }
     return { tool: "orbitx_shop", args: {} };
   }

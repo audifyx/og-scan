@@ -20,50 +20,67 @@ import {
 } from "./mcp-burn-access.js";
 
 describe("MCP burn access packages", () => {
-  it("prices 1 day at 100 tokens and 1 week at 1,000 tokens", () => {
-    expect(MCP_ACCESS_PACKAGES.day.tokens).toBe(100);
-    expect(MCP_ACCESS_PACKAGES.week.tokens).toBe(1000);
+  it("prices hour/day/week/month at 100 / 1,000 / 10,000 / 1,000,000 tokens", () => {
+    expect(MCP_ACCESS_PACKAGES.hour.tokens).toBe(100);
+    expect(MCP_ACCESS_PACKAGES.day.tokens).toBe(1000);
+    expect(MCP_ACCESS_PACKAGES.week.tokens).toBe(10_000);
+    expect(MCP_ACCESS_PACKAGES.month.tokens).toBe(1_000_000);
+    expect(MCP_ACCESS_PACKAGES.hour.durationMs).toBe(60 * 60 * 1000);
     expect(MCP_ACCESS_PACKAGES.day.durationMs).toBe(24 * 60 * 60 * 1000);
     expect(MCP_ACCESS_PACKAGES.week.durationMs).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(MCP_ACCESS_PACKAGES.month.durationMs).toBe(30 * 24 * 60 * 60 * 1000);
   });
 
   it("resolves package aliases", () => {
+    expect(resolvePackage("hour")?.id).toBe("hour");
+    expect(resolvePackage("1h")?.id).toBe("hour");
     expect(resolvePackage("day")?.id).toBe("day");
     expect(resolvePackage("1 Day")?.id).toBe("day");
-    expect(resolvePackage("option-a")?.id).toBe("day");
     expect(resolvePackage("week")?.id).toBe("week");
     expect(resolvePackage("7d")?.id).toBe("week");
-    expect(resolvePackage("option_b")?.id).toBe("week");
+    expect(resolvePackage("month")?.id).toBe("month");
+    expect(resolvePackage("1000k")?.id).toBe("month");
     expect(resolvePackage("nope")).toBeNull();
   });
 
   it("calculates the exact burn amount for the selected package", () => {
-    expect(calculateBurnAmount("day")).toMatchObject({
+    expect(calculateBurnAmount("hour")).toMatchObject({
       ok: true,
       tokens: 100,
+      packageId: "hour",
+    });
+    expect(calculateBurnAmount("day")).toMatchObject({
+      ok: true,
+      tokens: 1000,
       packageId: "day",
     });
     expect(calculateBurnAmount("week")).toMatchObject({
       ok: true,
-      tokens: 1000,
+      tokens: 10_000,
       packageId: "week",
+    });
+    expect(calculateBurnAmount("month")).toMatchObject({
+      ok: true,
+      tokens: 1_000_000,
+      packageId: "month",
     });
     expect(calculateBurnAmount("lifetime").ok).toBe(false);
   });
 
-  it("lists both purchasable packages", () => {
+  it("lists all purchasable packages", () => {
     const packages = listPackages();
-    expect(packages).toHaveLength(2);
-    expect(packages.map((p) => p.id)).toEqual(["day", "week"]);
-    expect(packages[0].tokens).toBe(100);
-    expect(packages[1].tokens).toBe(1000);
+    expect(packages).toHaveLength(4);
+    expect(packages.map((p) => p.id)).toEqual(["hour", "day", "week", "month"]);
+    expect(packages.map((p) => p.tokens)).toEqual([100, 1000, 10_000, 1_000_000]);
   });
 
   it("infers package from burned token count", () => {
     expect(inferPackageFromTokens(99)).toBeNull();
-    expect(inferPackageFromTokens(100)?.id).toBe("day");
-    expect(inferPackageFromTokens(999)?.id).toBe("day");
-    expect(inferPackageFromTokens(1000)?.id).toBe("week");
+    expect(inferPackageFromTokens(100)?.id).toBe("hour");
+    expect(inferPackageFromTokens(999)?.id).toBe("hour");
+    expect(inferPackageFromTokens(1000)?.id).toBe("day");
+    expect(inferPackageFromTokens(10_000)?.id).toBe("week");
+    expect(inferPackageFromTokens(1_000_000)?.id).toBe("month");
   });
 });
 
@@ -230,7 +247,7 @@ describe("verifyOrbitxBurn", () => {
     vi.unstubAllGlobals();
   });
 
-  it("accepts an exact 100-token ORBITX burn for the day package", async () => {
+  it("accepts an exact 100-token ORBITX burn for the hour package", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -265,10 +282,10 @@ describe("verifyOrbitxBurn", () => {
       ),
     );
 
-    const verified = await verifyOrbitxBurn("1".repeat(64), { packageId: "day" });
+    const verified = await verifyOrbitxBurn("1".repeat(64), { packageId: "hour" });
     expect(verified.ok).toBe(true);
     expect(verified.tokensBurned).toBe(100);
-    expect(verified.package.id).toBe("day");
+    expect(verified.package.id).toBe("hour");
   });
 
   it("rejects a 100-token burn when the week package is selected", async () => {
@@ -341,7 +358,7 @@ describe("verifyOrbitxBurn", () => {
     );
 
     const verified = await verifyOrbitxBurn("3".repeat(64), {
-      packageId: "day",
+      packageId: "hour",
       pollAttempts: 3,
       pollMs: 0,
     });
@@ -392,13 +409,13 @@ describe("confirmAccessBurn", () => {
 
     const out = await confirmAccessBurn(sb, {
       signature: "4".repeat(64),
-      packageId: "day",
+      packageId: "hour",
       wallet: "BurnerWallet111111111111111111111111111",
     });
 
     expect(out.ok).toBe(true);
     expect(out.active).toBe(true);
-    expect(out.packageId).toBe("day");
+    expect(out.packageId).toBe("hour");
     expect(out.remainingLabel).toMatch(/remaining/);
     expect(writes.some((w) => w.path === "mcp_burn_wallet_access" && w.method === "POST")).toBe(true);
   });
@@ -461,7 +478,7 @@ describe("confirmAccessBurn", () => {
           {
             id: "led-1",
             user_id: "other-user",
-            package_id: "week",
+            package_id: "day",
             expires_at: "2026-08-23T10:58:26.392Z",
             tokens_burned: 1000,
           },
@@ -472,14 +489,14 @@ describe("confirmAccessBurn", () => {
 
     const out = await confirmAccessBurn(sb, {
       signature: "13GCQvvZUGUWb4EAx2JHraKguMqQPuTrSjYGKGaFD74swjJhUVXjpy7DzF4MuApJJoabFU4niicajr68KrCWAkf",
-      packageId: "week",
+      packageId: "day",
       wallet: "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb",
     });
 
     expect(out.ok).toBe(true);
     expect(out.alreadyGranted).toBe(true);
     expect(out.active).toBe(true);
-    expect(out.packageId).toBe("week");
+    expect(out.packageId).toBe("day");
     expect(writes.some((w) => w.path === "mcp_burn_wallet_access" && w.method === "POST")).toBe(true);
   });
 });
@@ -489,8 +506,8 @@ describe("MCP access blocked payload", () => {
     const payload = accessBlockedPayload({ tool: "orbitx_prepare_buy" });
     expect(payload.ok).toBe(false);
     expect(payload.error).toBe("mcp_access_required");
-    expect(payload.packages).toHaveLength(2);
-    expect(payload.message).toMatch(/burn 100 ORBITX/);
+    expect(payload.packages).toHaveLength(4);
+    expect(payload.message).toMatch(/burn 100/);
     expect(payload.accessUrl).toContain("/shop");
     expect(payload.tool).toBe("orbitx_prepare_buy");
   });
@@ -533,7 +550,7 @@ describe("prepareAccessBurn (no Solana SDK)", () => {
 
     const out = await prepareAccessBurn({
       publicKey: "11111111111111111111111111111111",
-      packageId: "day",
+      packageId: "hour",
     });
     expect(out.ok).toBe(true);
     expect(out.tokens).toBe(100);
@@ -559,7 +576,7 @@ describe("prepareAccessBurn (no Solana SDK)", () => {
       packageId: "week",
     });
     expect(out.ok).toBe(false);
-    expect(out.error).toBe("no_balance");
+    expect(out.error).toBe("no_route");
   });
 });
 
@@ -587,7 +604,7 @@ describe("MCP access MCP purchase payloads", () => {
   it("returns a Phantom signUrl that confirms via the calling MCP", () => {
     const out = prepareAccessMcpPurchase({
       wallet: "11111111111111111111111111111111",
-      packageId: "day",
+      packageId: "hour",
       accessUrl: "https://www.orbitx.world/x?tab=shop",
       buyTool: "x_mcp_access_buy",
       confirmTool: "x_mcp_access_confirm",
@@ -596,9 +613,9 @@ describe("MCP access MCP purchase payloads", () => {
     expect(out.tokens).toBe(100);
     expect(out.signUrl).toContain("/agent/sign?");
     expect(out.signUrl).toContain("kind=mcp-access");
-    expect(out.signUrl).toContain("package=day");
+    expect(out.signUrl).toContain("package=hour");
     expect(out.accessUrl).toContain("/x");
     expect(out.tools.confirm).toBe("x_mcp_access_confirm");
-    expect(out.instructions.join(" ")).toContain("x_mcp_access_confirm");
+    expect(out.instructions.join(" ")).toContain("/verify");
   });
 });

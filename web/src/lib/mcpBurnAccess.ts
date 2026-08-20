@@ -6,7 +6,25 @@ import { AGENT_API } from "@/lib/orbitxMcp";
 
 export const MCP_BURN_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
-export type McpAccessPackageId = "day" | "week";
+export type McpAccessPackageId = "hour" | "day" | "week" | "month";
+
+export const MCP_ACCESS_TOKEN_AMOUNTS: Record<McpAccessPackageId, number> = {
+  hour: 100,
+  day: 1000,
+  week: 10_000,
+  month: 1_000_000,
+};
+
+export const MCP_ACCESS_DURATION_LABELS: Record<McpAccessPackageId, string> = {
+  hour: "1 hour",
+  day: "1 day",
+  week: "1 week",
+  month: "1 month",
+};
+
+export function isMcpAccessPackageId(id: string): id is McpAccessPackageId {
+  return id === "hour" || id === "day" || id === "week" || id === "month";
+}
 
 export type McpAccessPackage = {
   id: McpAccessPackageId;
@@ -301,7 +319,7 @@ export function mcpAccessSignUrl(opts: {
     package: opts.packageId,
     publicKey: opts.publicKey,
     mint: MCP_BURN_MINT,
-    amount: opts.packageId === "week" ? "1000" : "100",
+    amount: String(MCP_ACCESS_TOKEN_AMOUNTS[opts.packageId] || MCP_ACCESS_TOKEN_AMOUNTS.hour),
   });
   if (opts.auto) q.set("auto", "1");
   return `${base}/agent/sign?${q.toString()}`;
@@ -309,9 +327,19 @@ export function mcpAccessSignUrl(opts: {
 
 export const DEFAULT_MCP_ACCESS_PACKAGES: McpAccessPackage[] = [
   {
+    id: "hour",
+    label: "1 Hour Access",
+    tokens: 100,
+    durationMs: 60 * 60 * 1000,
+    durationSeconds: 60 * 60,
+    durationLabel: "1 hour",
+    mint: MCP_BURN_MINT,
+    symbol: "ORBITX",
+  },
+  {
     id: "day",
     label: "1 Day Access",
-    tokens: 100,
+    tokens: 1000,
     durationMs: 24 * 60 * 60 * 1000,
     durationSeconds: 24 * 60 * 60,
     durationLabel: "24 hours",
@@ -321,10 +349,20 @@ export const DEFAULT_MCP_ACCESS_PACKAGES: McpAccessPackage[] = [
   {
     id: "week",
     label: "1 Week Access",
-    tokens: 1000,
+    tokens: 10_000,
     durationMs: 7 * 24 * 60 * 60 * 1000,
     durationSeconds: 7 * 24 * 60 * 60,
     durationLabel: "7 days",
+    mint: MCP_BURN_MINT,
+    symbol: "ORBITX",
+  },
+  {
+    id: "month",
+    label: "1 Month Access",
+    tokens: 1_000_000,
+    durationMs: 30 * 24 * 60 * 60 * 1000,
+    durationSeconds: 30 * 24 * 60 * 60,
+    durationLabel: "30 days",
     mint: MCP_BURN_MINT,
     symbol: "ORBITX",
   },

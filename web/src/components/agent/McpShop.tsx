@@ -54,15 +54,27 @@ export function McpShop({
           <div className="ox-agent__pkg-grid">
             <div className="ox-agent__pkg">
               <span className="ox-agent__pkg-k">Access</span>
-              <strong className="ox-agent__pkg-title">1 Day</strong>
+              <strong className="ox-agent__pkg-title">1 Hour</strong>
               <span className="ox-agent__pkg-cost">100 $ORBITX</span>
+              <span className="ox-agent__pkg-meta">Burn · 1 hour</span>
+            </div>
+            <div className="ox-agent__pkg">
+              <span className="ox-agent__pkg-k">Access</span>
+              <strong className="ox-agent__pkg-title">1 Day</strong>
+              <span className="ox-agent__pkg-cost">1,000 $ORBITX</span>
               <span className="ox-agent__pkg-meta">Burn · 24 hours</span>
             </div>
             <div className="ox-agent__pkg">
               <span className="ox-agent__pkg-k">Access</span>
               <strong className="ox-agent__pkg-title">1 Week</strong>
-              <span className="ox-agent__pkg-cost">1,000 $ORBITX</span>
+              <span className="ox-agent__pkg-cost">10,000 $ORBITX</span>
               <span className="ox-agent__pkg-meta">Burn · 7 days</span>
+            </div>
+            <div className="ox-agent__pkg">
+              <span className="ox-agent__pkg-k">Access</span>
+              <strong className="ox-agent__pkg-title">1 Month</strong>
+              <span className="ox-agent__pkg-cost">1,000,000 $ORBITX</span>
+              <span className="ox-agent__pkg-meta">Burn · 30 days</span>
             </div>
             <div className="ox-agent__pkg">
               <span className="ox-agent__pkg-k">Credits</span>

@@ -527,19 +527,19 @@ const CORE_TOOLS = [
   {
     name: "x_mcp_access_status",
     description:
-      "Show temporary MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 day = 100 tokens, 1 week = 1,000 tokens). Call when the user asks about MCP access, burn access, or time remaining.",
+      "Show temporary MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 hour = 100, 1 day = 1,000, 1 week = 10,000, 1 month = 1,000,000 tokens). Call when the user asks about MCP access, burn access, or time remaining.",
     inputSchema: EMPTY_OBJECT_SCHEMA,
     annotations: { title: "MCP access status", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "x_mcp_access_buy",
     description:
-      "Buy temporary MCP access by burning $ORBITX. When the user says buy access / burn ORBITX for MCP / 1 day or 1 week access — ASK day (100 tokens) or week (1,000 tokens), then call this. Returns a Phantom signUrl. After the burn, call x_mcp_access_confirm with the signature.",
+      "Buy temporary MCP access by burning $ORBITX. When the user says buy access / burn ORBITX — ASK hour (100), day (1,000), week (10,000), or month (1,000,000), then call this. Returns a Jupiter signUrl (buy then burn). After the burn, call x_mcp_access_confirm with the signature.",
     inputSchema: {
       type: "object",
       properties: {
-        package: { type: "string", enum: ["day", "week"], description: "Access package" },
-        packageId: { type: "string", enum: ["day", "week"] },
+        package: { type: "string", enum: ["hour", "day", "week", "month"], description: "Access package" },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
         publicKey: { type: "string", description: "Burner wallet (optional if linked on /agent or /x)" },
         confirmMode: { type: "string", enum: ["sign", "auto"] },
         autoConfirm: { type: "boolean" },
@@ -558,8 +558,8 @@ const CORE_TOOLS = [
       properties: {
         signature: { type: "string" },
         txSignature: { type: "string" },
-        package: { type: "string", enum: ["day", "week"] },
-        packageId: { type: "string", enum: ["day", "week"] },
+        package: { type: "string", enum: ["hour", "day", "week", "month"] },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
       },
       additionalProperties: false,
     },
@@ -568,17 +568,17 @@ const CORE_TOOLS = [
   {
     name: "x_buy",
     description:
-      "PRIMARY BUY TOOL for Grok/Claude. Use this whenever the user wants to buy credits, buy ORBITX, or burn ORBITX for timed MCP access. Set what=credits|orbitx|access (ask if unclear). For credits pass credits or solAmount; for ORBITX pass solAmount; for access pass package=day|week. Returns a Phantom signUrl/openUrl. Prefer this over inventing names like XBuyTool.",
+      "PRIMARY BUY TOOL for Grok/Claude. Use this whenever the user wants to buy credits, buy ORBITX, or burn ORBITX for timed MCP access. Set what=credits|orbitx|access (ask if unclear). For credits pass credits or solAmount; for ORBITX pass solAmount; for access pass package=hour|day|week|month. Returns a Jupiter signUrl/openUrl. Prefer this over inventing names like XBuyTool.",
     inputSchema: {
       type: "object",
       properties: {
         what: {
           type: "string",
           enum: ["credits", "orbitx", "access", "ask"],
-          description: "credits = MCP credits (SOL to desk wallet); orbitx = buy ORBITX token; access = burn ORBITX for 1 day/1 week MCP access; ask = clarify",
+          description: "credits = MCP credits (SOL to desk wallet); orbitx = buy ORBITX token; access = burn ORBITX for timed MCP access; ask = clarify",
         },
-        package: { type: "string", enum: ["day", "week"], description: "MCP access package when what=access" },
-        packageId: { type: "string", enum: ["day", "week"] },
+        package: { type: "string", enum: ["hour", "day", "week", "month"], description: "MCP access package when what=access" },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
         solAmount: { type: "number", description: "SOL to spend" },
         credits: { type: "number", description: "Credit count (credits buy only)" },
         amount: { type: "number", description: "Alias amount" },
@@ -2146,7 +2146,7 @@ async function callTool(rawName, args, auth, req = null) {
         id: "access",
         title: "MCP access via $ORBITX burn",
         url: "https://www.orbitx.world/x?tab=shop",
-        text: "Burn 100 $ORBITX for 1 day or 1,000 for 1 week. Call x_mcp_access_buy → Phantom → x_mcp_access_confirm. Status: x_mcp_access_status.",
+        text: "Burn 100 $ORBITX for 1 hour, 1,000 for 1 day, 10,000 for 1 week, or 1,000,000 for 1 month. Call x_mcp_access_buy → Jupiter buy+burn → x_mcp_access_confirm. Status: x_mcp_access_status.",
       },
       {
         id: "usage",
@@ -2233,7 +2233,7 @@ async function callTool(rawName, args, auth, req = null) {
         "Use x_dm / x_dm_inbox / x_dm_group for DMs + group chats",
         "Use x_agent_run / x_agent_schedule or approve drafts in Queue",
         "Buy credits: ask how much SOL → x_credits_buy → user pays → x_credits_confirm",
-        "MCP access: ask day (100 $ORBITX) or week (1,000) → x_mcp_access_buy → Phantom burn → x_mcp_access_confirm",
+        "MCP access: ask hour (100 $ORBITX), day (1,000), week (10,000), or month (1,000,000) → x_mcp_access_buy → Jupiter buy+burn → x_mcp_access_confirm",
         "Advanced usage: x_credits_usage (also on /x Shop or /shop)",
       ],
       mcpAccess: {
@@ -2508,7 +2508,7 @@ async function callTool(rawName, args, auth, req = null) {
           ok: true,
           action: "ask_what",
           message:
-            "Ask whether they want MCP credits (SOL → desk wallet), ORBITX token, or timed MCP access (burn 100/1,000 $ORBITX). Then call x_buy again with what=credits|orbitx|access.",
+            "Ask whether they want MCP credits (SOL → desk wallet), ORBITX token, or timed MCP access (burn 100 / 1,000 / 10,000 / 1,000,000 $ORBITX). Then call x_buy again with what=credits|orbitx|access.",
           tools: {
             credits: "x_credits_buy",
             orbitx: "x_buy_orbitx",
@@ -4322,7 +4322,7 @@ async function handleMcp(req, res, parts) {
             },
             serverInfo: { name: "OrbitX X MCP", version: "1.6.0" },
             instructions:
-              "OrbitX X MCP — X analytics + post/DM + NVIDIA agent + linked GitHub repo + credits/ORBITX + timed MCP access. IMPORTANT: snake_case tool names only (never invent XBuyTool). REPO: a GitHub repo is linked for live reads while drafting posts — call x_repo_context or x_repo_read (do NOT ask the user to paste the GitHub URL every time). Link/change with x_repo_link (owner/repo or github.com URL). Default repo from server config. CHARTS: CA + chart → x_dex_chart. Menu → x_menu. authCode → x_auth_status then pass on every x_* tool. Buy: x_buy what=credits|orbitx|access. MCP access: ask day (100 $ORBITX) or week (1,000) → x_mcp_access_buy → Phantom burn → x_mcp_access_confirm. Status: x_mcp_access_status. Setup: https://www.orbitx.world/x",
+              "OrbitX X MCP — X analytics + post/DM + NVIDIA agent + linked GitHub repo + credits/ORBITX + timed MCP access. IMPORTANT: snake_case tool names only (never invent XBuyTool). REPO: a GitHub repo is linked for live reads while drafting posts — call x_repo_context or x_repo_read (do NOT ask the user to paste the GitHub URL every time). Link/change with x_repo_link (owner/repo or github.com URL). Default repo from server config. CHARTS: CA + chart → x_dex_chart. Menu → x_menu. authCode → x_auth_status then pass on every x_* tool. Buy: x_buy what=credits|orbitx|access. MCP access: ask hour (100 $ORBITX), day (1,000), week (10,000), or month (1,000,000) → x_mcp_access_buy → Jupiter buy+burn → x_mcp_access_confirm. Status: x_mcp_access_status. Setup: https://www.orbitx.world/x",
           },
         },
         200,

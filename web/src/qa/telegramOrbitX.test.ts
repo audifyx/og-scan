@@ -10,6 +10,7 @@ import {
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
+  formatTelegramStartGate,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
@@ -103,6 +104,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("group").kind).toBe("meta");
     expect(resolveOfficialCommand("menu").kind).toBe("meta");
     expect(resolveOfficialCommand("verify").kind).toBe("meta");
+    expect(resolveOfficialCommand("code").kind).toBe("meta");
+    expect(resolveOfficialCommand("burn").kind).toBe("meta");
+    expect(resolveOfficialCommand("access").kind).toBe("meta");
     expect(resolveOfficialCommand("faq").kind).toBe("meta");
     expect(argsFromCommand("faq", "/faq burn").q).toBe("burn");
     expect(inferPublicTool("faq mcp")?.meta).toBe("faq");
@@ -126,6 +130,26 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
+  });
+
+  it("introduces the bot and lists code + hour/day/week/month burns on /start", () => {
+    const card = formatTelegramStartGate({ remainingLabel: "", linked: false });
+    expect(card.text).toContain("early access code");
+    expect(card.text).toContain("1 hour");
+    expect(card.text).toContain("100 $ORBITX");
+    expect(card.text).toContain("1,000 $ORBITX");
+    expect(card.text).toContain("10,000 $ORBITX");
+    expect(card.text).toContain("1,000,000 $ORBITX");
+    expect(card.text).toContain("/verify");
+    expect(card.text).toContain("/login");
+    const buttons = JSON.stringify(card.reply_markup);
+    expect(buttons).toContain("ox:gate:code");
+    expect(buttons).toContain("ox:gate:hour");
+    expect(buttons).toContain("ox:gate:month");
+    const linked = formatTelegramStartGate({ remainingLabel: "5h 12m remaining", linked: true });
+    expect(linked.text).toContain("5h 12m remaining");
+    expect(inferPublicTool("shop hour")?.args).toMatchObject({ package: "hour" });
+    expect(inferPublicTool("shop month")?.args).toMatchObject({ package: "month" });
   });
 
   it("handles public group triggers, forum threads, and anonymous admins", () => {

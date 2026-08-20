@@ -1,7 +1,6 @@
 /**
- * Temporary Agent MCP access by burning $ORBITX.
- * Option A: 1 day  = 100 tokens
- * Option B: 1 week = 1,000 tokens
+ * Temporary Agent / Telegram bot access by burning $ORBITX.
+ * 1 hour = 100 · 1 day = 1,000 · 1 week = 10,000 · 1 month = 1,000,000 (1000k)
  *
  * Do NOT top-level import @solana/web3.js — same cold-start rule as x-credits / mcp-ops.
  */
@@ -9,13 +8,23 @@
 export const ORBITX_BURN_MINT =
   process.env.AGENT_GATE_MINT || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const ORBITX_DECIMALS = 6;
 
 export const MCP_ACCESS_PACKAGES = Object.freeze({
+  hour: Object.freeze({
+    id: "hour",
+    label: "1 Hour Access",
+    tokens: 100,
+    durationMs: HOUR_MS,
+    durationSeconds: 60 * 60,
+    durationLabel: "1 hour",
+  }),
   day: Object.freeze({
     id: "day",
     label: "1 Day Access",
-    tokens: 100,
+    tokens: 1000,
     durationMs: DAY_MS,
     durationSeconds: 24 * 60 * 60,
     durationLabel: "24 hours",
@@ -23,20 +32,33 @@ export const MCP_ACCESS_PACKAGES = Object.freeze({
   week: Object.freeze({
     id: "week",
     label: "1 Week Access",
-    tokens: 1000,
+    tokens: 10_000,
     durationMs: 7 * DAY_MS,
     durationSeconds: 7 * 24 * 60 * 60,
     durationLabel: "7 days",
   }),
+  month: Object.freeze({
+    id: "month",
+    label: "1 Month Access",
+    tokens: 1_000_000,
+    durationMs: 30 * DAY_MS,
+    durationSeconds: 30 * 24 * 60 * 60,
+    durationLabel: "30 days",
+  }),
 });
 
 const PACKAGE_ALIASES = {
+  hour: "hour",
+  "1h": "hour",
+  "1hr": "hour",
+  "1hour": "hour",
+  hr: "hour",
+  a: "hour",
+  optiona: "hour",
   day: "day",
   "1d": "day",
   "1day": "day",
   daily: "day",
-  a: "day",
-  optiona: "day",
   week: "week",
   "7d": "week",
   "1w": "week",
@@ -44,6 +66,13 @@ const PACKAGE_ALIASES = {
   weekly: "week",
   b: "week",
   optionb: "week",
+  month: "month",
+  "30d": "month",
+  "1m": "month",
+  "1mo": "month",
+  "1month": "month",
+  monthly: "month",
+  "1000k": "month",
 };
 
 function rpcUrl() {
@@ -70,8 +99,8 @@ async function rpc(method, params) {
 }
 
 export function listPackages() {
-  return [MCP_ACCESS_PACKAGES.day, MCP_ACCESS_PACKAGES.week].map((pkg) => ({
-    ...pkg,
+  return ["hour", "day", "week", "month"].map((id) => ({
+    ...MCP_ACCESS_PACKAGES[id],
     mint: ORBITX_BURN_MINT,
     symbol: "ORBITX",
   }));
@@ -93,7 +122,7 @@ export function calculateBurnAmount(packageId) {
     return {
       ok: false,
       error: "invalid_package",
-      message: "Choose package day (100 ORBITX) or week (1,000 ORBITX).",
+      message: "Choose hour (100), day (1,000), week (10,000), or month (1,000,000 $ORBITX).",
       packages: listPackages(),
     };
   }
@@ -150,8 +179,10 @@ export function remainingMs(expiresAt, now = Date.now()) {
 export function inferPackageFromTokens(tokensBurned) {
   const n = Number(tokensBurned);
   if (!Number.isFinite(n) || n <= 0) return null;
-  if (n + 1e-9 >= MCP_ACCESS_PACKAGES.week.tokens) return MCP_ACCESS_PACKAGES.week;
-  if (n + 1e-9 >= MCP_ACCESS_PACKAGES.day.tokens) return MCP_ACCESS_PACKAGES.day;
+  const ranked = Object.values(MCP_ACCESS_PACKAGES).sort((a, b) => b.tokens - a.tokens);
+  for (const pkg of ranked) {
+    if (n + 1e-9 >= pkg.tokens) return pkg;
+  }
   return null;
 }
 
@@ -165,7 +196,7 @@ export function accessBlockedPayload(extra = {}) {
     holdUrl: `https://www.orbitx.world/ORBITX_DEX/token/${ORBITX_BURN_MINT}`,
     buyUrl: `https://jup.ag/swap/SOL-${ORBITX_BURN_MINT}`,
     message:
-      "MCP access required. Hold ≥$5 ORBITX, or burn 100 ORBITX (1 day) / 1,000 ORBITX (1 week) at /shop.",
+      "MCP access required. Hold ≥$5 ORBITX, or burn 100 (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) at /shop.",
     ...extra,
   };
 }
@@ -406,25 +437,12 @@ export async function prepareAccessBurn({ publicKey, packageId }) {
   }
 
   if (!best) {
-    return {
-      ...quote,
-      ok: false,
-      error: "no_balance",
-      message: `This wallet has no $ORBITX to burn. Need ${quote.tokens} tokens.`,
-      mint: ORBITX_BURN_MINT,
-    };
+    return prepareAccessBuyAndBurn({ publicKey: pk, quote });
   }
 
   const amountRaw = BigInt(quote.tokens) * 10n ** BigInt(Math.max(0, best.decimals));
   if (amountRaw > best.balanceRaw) {
-    const have = Number(best.balanceRaw) / 10 ** best.decimals;
-    return {
-      ...quote,
-      ok: false,
-      error: "insufficient_balance",
-      message: `Need ${quote.tokens} $ORBITX. Wallet has ${have}.`,
-      mint: ORBITX_BURN_MINT,
-    };
+    return prepareAccessBuyAndBurn({ publicKey: pk, quote });
   }
 
   return {
@@ -441,6 +459,105 @@ export async function prepareAccessBurn({ publicKey, packageId }) {
     buildOnClient: true,
     note: `Burn ${quote.tokens} $ORBITX for ${quote.label}. Sign with the holder wallet.`,
   };
+}
+
+const JUP_SWAP = "https://lite-api.jup.ag";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+/** Jupiter buy exact $ORBITX then burn in the same tx (Token-2022). */
+export async function prepareAccessBuyAndBurn({ publicKey, quote }) {
+  const pk = String(publicKey || "").trim();
+  const amountRaw = BigInt(quote.tokens) * 10n ** BigInt(ORBITX_DECIMALS);
+  const quoteUrl =
+    `${JUP_SWAP}/swap/v1/quote?inputMint=${SOL_MINT}&outputMint=${ORBITX_BURN_MINT}` +
+    `&amount=${amountRaw.toString()}&swapMode=ExactOut&slippageBps=200&restrictIntermediateTokens=true`;
+  let jupQuote;
+  try {
+    const quoteRes = await fetch(quoteUrl);
+    jupQuote = await quoteRes.json().catch(() => ({}));
+    if (!quoteRes.ok || !jupQuote.outAmount) {
+      return {
+        ...quote,
+        ok: false,
+        error: "no_route",
+        message: "Jupiter could not quote a buy-and-burn for this access package. Try again, or buy $ORBITX first.",
+        mint: ORBITX_BURN_MINT,
+      };
+    }
+  } catch (e) {
+    return {
+      ...quote,
+      ok: false,
+      error: "quote_failed",
+      message: e instanceof Error ? e.message : "Jupiter quote failed",
+      mint: ORBITX_BURN_MINT,
+    };
+  }
+
+  const swapRes = await fetch(`${JUP_SWAP}/swap/v1/swap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quoteResponse: jupQuote,
+      userPublicKey: pk,
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      asLegacyTransaction: false,
+      prioritizationFeeLamports: "auto",
+    }),
+  });
+  const swap = await swapRes.json().catch(() => ({}));
+  if (!swapRes.ok || !swap.swapTransaction) {
+    return {
+      ...quote,
+      ok: false,
+      error: "swap_build_failed",
+      message: swap.error || "Jupiter could not build the buy-and-burn transaction.",
+      mint: ORBITX_BURN_MINT,
+    };
+  }
+
+  try {
+    const { attachMemoAndBurn } = await import("./desk-shop.js");
+    const transaction = await attachMemoAndBurn(swap.swapTransaction, {
+      owner: pk,
+      mint: ORBITX_BURN_MINT,
+      burnRaw: amountRaw.toString(),
+      memo: `orbitx:access:${quote.packageId}`,
+    });
+    return {
+      ok: true,
+      ...quote,
+      publicKey: pk,
+      mint: ORBITX_BURN_MINT,
+      transaction,
+      buyThenBurn: true,
+      buildOnClient: false,
+      amountRaw: amountRaw.toString(),
+      requiresSignature: true,
+      note: `One sign buys ${quote.tokens} $ORBITX and burns them for ${quote.label}. Then /verify the Solscan link.`,
+    };
+  } catch (e) {
+    return {
+      ...quote,
+      ok: false,
+      error: "attach_burn_failed",
+      message: e instanceof Error ? e.message : "Could not attach the $ORBITX burn to the Jupiter swap.",
+      mint: ORBITX_BURN_MINT,
+    };
+  }
+}
+
+/** Raw sig or Solscan / Explorer / SolanaFM URL. */
+export function parseSolanaTxSignature(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  const fromUrl = raw.match(
+    /(?:solscan\.io|explorer\.solana\.com|solana\.fm)\/tx\/([1-9A-HJ-NP-Za-km-z]{64,88})/i,
+  );
+  if (fromUrl?.[1]) return fromUrl[1];
+  const bare = raw.match(/[1-9A-HJ-NP-Za-km-z]{64,88}/);
+  return bare?.[0] || "";
 }
 
 function tokenUiAmount(entry) {
@@ -478,7 +595,7 @@ export async function verifyOrbitxBurn(
     return {
       ok: false,
       error: "invalid_package",
-      message: "Choose package day (100 ORBITX) or week (1,000 ORBITX).",
+      message: "Choose hour (100), day (1,000), week (10,000), or month (1,000,000 $ORBITX).",
       packages: listPackages(),
     };
   }
@@ -576,7 +693,7 @@ export async function verifyOrbitxBurn(
     return {
       ok: false,
       error: "amount_too_low",
-      message: `Burned ${burnedUi} ORBITX — need 100 (1 day) or 1,000 (1 week).`,
+      message: `Burned ${burnedUi} ORBITX — need 100 (1 hour), 1,000 (1 day), 10,000 (1 week), or 1,000,000 (1 month).`,
       tokensBurned: burnedUi,
       mint,
     };
@@ -846,7 +963,7 @@ export function accessBuyPrompt({
   return {
     ok: true,
     action: "ask_package",
-    message: `Ask which MCP access package they want: 1 day (100 $ORBITX) or 1 week (1,000 $ORBITX). Then call ${buyTool} with package=day or package=week.`,
+    message: `Ask which access package they want: 1 hour (100 $ORBITX), 1 day (1,000), 1 week (10,000), or 1 month (1,000,000). Then call ${buyTool} with package=hour|day|week|month.`,
     packages: listPackages(),
     mint: ORBITX_BURN_MINT,
     accessUrl,
@@ -911,13 +1028,13 @@ export function prepareAccessMcpPurchase({
       mode === "auto"
         ? [
             "Send the user openUrl as a clickable link.",
-            `Opening it auto-prompts Phantom to burn ${quote.tokens} $ORBITX.`,
-            `After Phantom confirms, call ${confirmTool} with the signature.`,
+            `One Jupiter sign buys ${quote.tokens} $ORBITX and burns them for ${quote.label}.`,
+            "After the tx lands, they send /verify plus the Solscan link.",
           ]
         : [
             "Send the user signUrl as a clickable link.",
-            `They approve burning ${quote.tokens} $ORBITX in Phantom.`,
-            `Then call ${confirmTool} with the signature (the sign page confirms if they are signed in).`,
+            `One Jupiter sign buys ${quote.tokens} $ORBITX and burns them for ${quote.label}.`,
+            "After the tx lands, they send /verify plus the Solscan link.",
           ],
     note: `Non-custodial. Exact burn of ${quote.tokens} $ORBITX unlocks ${quote.label}. Access expires automatically.`,
     accessUrl,

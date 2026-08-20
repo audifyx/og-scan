@@ -19,6 +19,7 @@ import {
   deskKeyboard,
   formatFamilyMenu,
   formatHelpDesk,
+  formatTelegramStartGate,
   formatMediaCountdown,
   formatOrbitXTelegramResult as formatResultImpl,
   formatTokenCard as formatTokenCardImpl,
@@ -184,8 +185,11 @@ export const PRIVATE_COMMANDS = [
   { command: "credits", description: "Buy credits with SOL (linked)" },
   { command: "orbitx", description: "Buy $ORBITX (linked)" },
   { command: "autobuy", description: "Auto Phantom prompt on/off (linked)" },
+  { command: "code", description: "Redeem an early access code" },
+  { command: "burn", description: "Buy then burn $ORBITX for timed bot access" },
+  { command: "access", description: "Show remaining bot access time" },
   { command: "confirm", description: "Confirm pending buy (linked)" },
-  { command: "verify", description: "Admin: verify a mint (linked admin wallet)" },
+  { command: "verify", description: "Verify a Solscan burn tx, or admin-verify a mint" },
 ];
 
 const PRIORITY_TOOL = {
@@ -202,6 +206,9 @@ const PRIORITY_TOOL = {
   logout: null,
   me: null,
   verify: null,
+  code: null,
+  burn: null,
+  access: null,
   ask: null,
   faq: null,
   img: "orbitx_generate_image",
@@ -317,6 +324,7 @@ export function argsFromCommand(command, text) {
     args.publicKey = args.address;
   }
   if (command === "verify" && rest && !args.mint) {
+    args.signature = rest;
     const token = rest.split(/\s+/)[0];
     args.mint = token;
     args.ca = token;
@@ -498,6 +506,7 @@ export {
   deskKeyboard,
   formatFamilyMenu,
   formatHelpDesk,
+  formatTelegramStartGate,
   formatMediaCountdown,
   formatToolMenu,
   missingToolInput,

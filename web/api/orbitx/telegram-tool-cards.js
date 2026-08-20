@@ -373,6 +373,52 @@ export function deskKeyboard() {
   ]);
 }
 
+export function startGateKeyboard() {
+  return inlineKeyboard([
+    [{ text: "I have a code", callback_data: "ox:gate:code" }],
+    [
+      { text: "Burn 1 hour · 100", callback_data: "ox:gate:hour" },
+      { text: "Burn 1 day · 1k", callback_data: "ox:gate:day" },
+    ],
+    [
+      { text: "Burn 1 week · 10k", callback_data: "ox:gate:week" },
+      { text: "Burn 1 month · 1000k", callback_data: "ox:gate:month" },
+    ],
+    [
+      { text: "Link wallet /login", callback_data: "ox:gate:login" },
+      { text: "Desk", callback_data: "ox:desk" },
+    ],
+  ]);
+}
+
+export function formatTelegramStartGate({ remainingLabel = "", linked = false } = {}) {
+  const accessLine = remainingLabel
+    ? `Access: <b>${tgEsc(remainingLabel)}</b>`
+    : "No access yet — redeem a code or burn $ORBITX.";
+  const text = [
+    "🚀 <b>OrbitX</b> · @theorbitxmcpbot",
+    "Official desk bot: live token intel, Dex charts, Grok image/video, and (after access) Jupiter buys, shop burns, and auto-buy.",
+    "",
+    accessLine,
+    "",
+    "<b>Do you have an early access code?</b>",
+    "Send <code>/code YOURCODE</code> — or burn $ORBITX:",
+    "",
+    "• <b>1 hour</b> — 100 $ORBITX",
+    "• <b>1 day</b> — 1,000 $ORBITX",
+    "• <b>1 week</b> — 10,000 $ORBITX",
+    "• <b>1 month</b> — 1,000,000 $ORBITX (1000k)",
+    "",
+    "Tap a burn. One Jupiter sign <b>buys then burns</b> in the same tx. Copy the Solscan link, then send <code>/verify</code> plus that link. I’ll confirm and tell you how long you have left.",
+    linked ? "" : "First <code>/login</code> so the burn is for YOUR wallet.",
+    "",
+    `${href(ORBITX_GC, "Community GC")} · ${href(ORBITX_HOST, "orbitx.world")}`,
+  ]
+    .filter((line, i, arr) => line !== "" || arr[i - 1] !== "")
+    .join("\n");
+  return { text, reply_markup: startGateKeyboard() };
+}
+
 function familyKeyboard(family) {
   return inlineKeyboard([
     [
@@ -422,7 +468,7 @@ function orbitxProjectSummary() {
     utility: [
       "Hold ≥ $5 USD of $ORBITX → OrbitX AI + basic MCP",
       "Hold 10,000 $ORBITX → Pro / KOL DEX layer",
-      "Burn 100 $ORBITX = 1 day MCP · 1,000 = 7 days (stackable)",
+      "Burn 100 $ORBITX = 1 hour · 1,000 = 1 day · 10,000 = 1 week · 1,000,000 = 1 month (stackable)",
       "Shop: one Phantom tx buys $ORBITX on Jupiter and burns it in the same transaction",
     ],
   };
@@ -768,7 +814,7 @@ function formatShopCard(data) {
   if (data.note) lines.push(`<i>${tgEsc(data.note)}</i>`);
   lines.push(
     "",
-    "/shop day · /shop week · /credits 0.1 sol",
+    "/shop hour · /shop day · /shop week · /shop month · /credits 0.1 sol",
     href(data.openUrl || `${ORBITX_HOST}/shop`, "Open full desk shop"),
   );
   return {
@@ -924,7 +970,7 @@ function formatTradeDeskCard(data, tool) {
     return {
       text: [
         "🛍️ <b>ORBITX · MCP burn</b>",
-        "Reply <code>/shop day</code> (100 $ORBITX) or <code>/shop week</code> (1,000). One Phantom sign burns the exact amount.",
+        "Reply <code>/shop hour</code> (100), <code>/shop day</code> (1,000), <code>/shop week</code> (10,000), or <code>/shop month</code> (1,000,000). One Jupiter sign buys then burns.",
         [href(solscanToken, "Solscan"), href(`${ORBITX_HOST}/shop`, "Desk shop")].join(" · "),
       ].join("\n"),
       reply_markup: inlineKeyboard([
@@ -1158,8 +1204,10 @@ const FAMILY_MENUS = {
   shop: () =>
     menuCard("shop", [
       "<b>/shop</b> — catalog",
-      "/shop day — burn 100 $ORBITX · 1 day MCP",
-      "/shop week — burn 1,000 $ORBITX · 7 days",
+      "/shop hour — burn 100 $ORBITX · 1 hour",
+      "/shop day — burn 1,000 $ORBITX · 1 day",
+      "/shop week — burn 10,000 $ORBITX · 1 week",
+      "/shop month — burn 1,000,000 $ORBITX · 1 month",
       "/credits 0.1 sol — top up",
       "",
       href(`${ORBITX_HOST}/shop`, "Full desk shop on the web"),
@@ -1275,7 +1323,7 @@ export function formatHelpDesk(isPrivate = false, linked = false) {
     "<b>🛡️ Scan</b> — /scan · /xray · /research",
     "<b>📡 Pulse</b> — /screen · /search",
     "<b>🎬 Grok</b> — /img · /vid · /check",
-    "<b>🛍️ Shop</b> — /shop day · /shop week",
+    "<b>🛍️ Shop</b> — /shop hour · /shop day · /shop week · /shop month",
     "<b>✦ Ask</b> — /faq · /ask · just type",
     "",
     tgEsc(gate),
