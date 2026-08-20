@@ -107,7 +107,7 @@ export function useActiveTradingWallet() {
    * Phantom only (no Solflare fallback).
    */
   const connectPhantom = useCallback(async () => {
-    return connectNamedWallet("Phantom");
+    return connectNamedWallet("Jupiter");
   }, [connectNamedWallet]);
 
   const sendTx = useCallback(
@@ -129,15 +129,13 @@ export function useActiveTradingWallet() {
           kp.secretKey.fill(0);
         }
       }
-      if (!sendTransaction && !signTransaction) {
-        throw new Error("This wallet can't sign here — connect Phantom or Jupiter");
-      }
       return sendWalletTransaction(
         connection,
         {
           sendTransaction: sendTransaction ?? undefined,
           signTransaction: signTransaction ?? undefined,
           walletName: adapterWallet?.adapter?.name ?? null,
+          preferJupiter: true,
         },
         tx,
         options,
@@ -164,7 +162,7 @@ export function useActiveTradingWallet() {
         }
       }
       if (!adapterSignMessage) {
-        throw new Error("This wallet can't sign messages — connect Phantom, Jupiter, or Solflare");
+        throw new Error("This wallet can't sign messages — connect Jupiter Wallet");
       }
       return normalizeSignatureBytes(await adapterSignMessage(message));
     },

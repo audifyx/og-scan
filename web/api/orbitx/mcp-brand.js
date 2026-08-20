@@ -61,7 +61,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     ``,
     `_Buy credits: say “buy 5000 credits” → orbitx_credits_buy → Phantom → desk wallet. Advanced usage: orbitx_credits_usage (24h/7d/30d)._`,
     `_MCP access: burn 100 $ORBITX (1 day) or 1,000 (1 week) → orbitx_mcp_access_buy → Phantom → orbitx_mcp_access_confirm. Time remaining: orbitx_mcp_access_status._`,
-    `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Say “confirm” / “auto” → Phantom auto-prompt._`,
+    `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Auto-buy ON (MCP dashboard) fills with no Sign. Otherwise confirm returns a Jupiter Sign link._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
 }

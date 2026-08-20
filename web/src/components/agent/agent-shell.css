@@ -683,6 +683,21 @@
   line-height: 1.5;
 }
 
+.ox-agent__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--oa-muted);
+}
+
+.ox-agent__toggle input {
+  margin-top: 3px;
+  accent-color: var(--oa-accent, #7dd3fc);
+}
+
 .ox-agent__ol {
   margin: 0 0 1rem;
   padding-left: 1.15rem;

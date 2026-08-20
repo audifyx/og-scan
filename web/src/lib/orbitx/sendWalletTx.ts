@@ -1,10 +1,10 @@
 /**
  * Shared wallet send helper for OrbitX Trade tools (burn, claim, rent, unwrap).
  *
- * Prefer Jupiter `signAndSendTransaction` (window.jupiter.solana) when the
- * connected wallet is Jupiter or the fee-payer matches the Jupiter inject.
- * Manual `signTransaction` + `sendRawTransaction` can return an unsigned
- * legacy tx from some adapters, which then throws:
+ * OrbitX transactions sign through Jupiter only (`window.jupiter.solana`
+ * signAndSendTransaction). Phantom adapters are refused. Manual
+ * `signTransaction` + `sendRawTransaction` can return an unsigned legacy tx
+ * from some adapters, which then throws:
  * "Signature verification failed. Missing signature for public key …"
  */
 import {
@@ -16,7 +16,6 @@ import {
 import {
   getJupiterProvider,
   isJupiterWalletName,
-  jupiterProviderPublicKey,
   jupiterSignAndSendTransaction,
   toVersionedTransaction,
 } from "@/lib/wallets/jupiterWalletAdapter";
@@ -33,7 +32,7 @@ export type WalletSendCaps = {
   walletName?: string | null;
   /** Force the Jupiter inject even when the adapter name is missing. */
   preferJupiter?: boolean;
-  /** Sign page / Telegram auto-buy: never hijack Phantom sends into Jupiter. */
+  /** @deprecated Ignored — OrbitX transactions always use Jupiter. */
   preferPhantom?: boolean;
 };
 
@@ -83,17 +82,18 @@ export function isPhantomWalletName(name?: string | null): boolean {
   return Boolean(name && /phantom/i.test(name));
 }
 
+export function isJupiterSignerName(name?: string | null): boolean {
+  return isJupiterWalletName(name) || /mobile wallet adapter/i.test(name || "");
+}
+
+export const JUPITER_ONLY_SIGN_ERROR =
+  "Connect Jupiter Wallet to sign — OrbitX transactions use Jupiter only";
+
 export function shouldUseJupiterInject(
-  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter" | "preferPhantom">,
-  feePayer?: string | null,
+  _wallet?: Pick<WalletSendCaps, "walletName" | "preferJupiter" | "preferPhantom">,
+  _feePayer?: string | null,
 ): boolean {
-  if (!getJupiterProvider()?.signAndSendTransaction) return false;
-  if (wallet.preferPhantom) return false;
-  if (isPhantomWalletName(wallet.walletName)) return false;
-  if (wallet.preferJupiter) return true;
-  if (isJupiterWalletName(wallet.walletName)) return true;
-  const jupiterPk = jupiterProviderPublicKey();
-  return Boolean(feePayer && jupiterPk && feePayer === jupiterPk);
+  return Boolean(getJupiterProvider()?.signAndSendTransaction);
 }
 
 /** Sign with a local Keypair and broadcast (no extension wallet). */
@@ -126,10 +126,12 @@ export async function sendWalletTransaction(
     skipPreflight: options?.skipPreflight ?? false,
     maxRetries: options?.maxRetries ?? 3,
   };
-  const feePayer = transactionFeePayer(tx);
-
-  if (shouldUseJupiterInject(wallet, feePayer)) {
+  if (shouldUseJupiterInject(wallet, transactionFeePayer(tx))) {
     return normalizeTxSignatureBase58(await jupiterSignAndSendTransaction(tx, opts));
+  }
+
+  if (isPhantomWalletName(wallet.walletName) || !isJupiterSignerName(wallet.walletName)) {
+    throw new Error(JUPITER_ONLY_SIGN_ERROR);
   }
 
   const versioned = toVersionedTransaction(tx);
@@ -140,7 +142,7 @@ export async function sendWalletTransaction(
     const signed = await wallet.signTransaction(tx);
     return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
   }
-  throw new Error("This wallet can't sign here — connect Phantom");
+  throw new Error(JUPITER_ONLY_SIGN_ERROR);
 }
 
 export type ConfirmSentOptions = {

@@ -501,7 +501,7 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(walletGate).not.toMatch(/No live DexScreener/);
     expect(walletGate).not.toMatch(/Live quote unavailable/);
-    expect(walletGate).toContain("Link Phantom");
+    expect(walletGate).toContain("Link Jupiter");
     expect(walletGate).toContain("solscan.io/token");
 
     const signBuy = cardText(
@@ -522,12 +522,48 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(signBuy).not.toMatch(/No live DexScreener/);
     expect(signBuy).not.toMatch(/Live quote unavailable/);
-    expect(signBuy).toContain("Sign in Phantom");
+    expect(signBuy).toContain("Sign in Jupiter");
     expect(signBuy).toContain("solscan.io/token");
     expect(signBuy).toContain("0.05 SOL");
-    expect(signBuy).toContain("Auto-sign");
-    expect(signBuy).toContain("phantom.app/ul/browse");
+    expect(signBuy).not.toContain("Auto-sign");
+    expect(signBuy).not.toContain("phantom.app/ul/browse");
     expect(signBuy).toContain("/agent/sign?action=buy");
+
+    const filled = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: true,
+          executed: true,
+          requiresSignature: false,
+          signature: "5".repeat(64),
+          solscan: "https://solscan.io/tx/" + "5".repeat(64),
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          amountSol: 0.05,
+          message: "Bought. Tx filled",
+        },
+        "orbitx_prepare_buy",
+      ),
+    );
+    expect(filled).toContain("Bought");
+    expect(filled).toContain("no Sign");
+    expect(filled).not.toContain("Sign in Jupiter");
+    expect(filled).not.toContain("phantom.app");
+
+    const unfunded = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: false,
+          error: "auto_wallet_unfunded",
+          requiresSignature: false,
+          wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+          message: "Auto-buy is ON. Send SOL to 4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd then send the buy again — no Sign link.",
+        },
+        "orbitx_prepare_buy",
+      ),
+    );
+    expect(unfunded).toContain("Auto-buy");
+    expect(unfunded).toContain("MCP dashboard");
+    expect(unfunded).not.toContain("Sign in Jupiter");
 
     const tick = cardText(
       formatMediaCountdown({
@@ -677,6 +713,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("handleAutoBuy");
     expect(api).toContain("auto_buy");
     expect(api).toContain("web.autobuy");
+    expect(api).toContain("setAutoBuyEnabled");
+    expect(api).toContain("autoWallet");
+    expect(api).toContain("No Sign link");
+    expect(api).not.toContain("opens Phantom immediately");
     expect(api).toContain("handleCallbackQuery");
     expect(api).toContain("formatToolMenu");
     expect(api).toContain("missingToolInput");
@@ -684,11 +724,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).not.toContain("8595161432");
   });
 
-  it("wraps Telegram Auto-sign links in Phantom browse URLs", () => {
+  it("does not wrap Telegram Auto-sign links in Phantom browse URLs", () => {
     const page = "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1";
     const wrapped = phantomBrowseUrl(page);
-    expect(wrapped.startsWith("https://phantom.app/ul/browse/")).toBe(true);
-    expect(wrapped).toContain(encodeURIComponent(page));
-    expect(phantomBrowseUrl(wrapped)).toBe(wrapped);
+    expect(wrapped).toBe(page);
+    expect(wrapped).not.toContain("phantom.app");
   });
 });

@@ -22,6 +22,7 @@ import {
 } from "@/lib/orbitxMcp";
 import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
 import { TelegramMcpCard } from "./TelegramMcpCard";
+import { TelegramAutoBuyCard } from "./TelegramAutoBuyCard";
 import { McpShop } from "./McpShop";
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
@@ -447,6 +448,7 @@ export function AgentDashboard() {
             </div>
           </section>
         </div>
+        <TelegramAutoBuyCard />
         </>
       )}
 

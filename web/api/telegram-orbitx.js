@@ -311,14 +311,30 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
         }).catch(() => null);
       }
     }
-    if (link.auto_buy && /buy|trade|swap|confirm_buy/.test(name)) {
-      if (cleanArgs.autoConfirm !== false) cleanArgs.autoConfirm = true;
+    if (/buy|trade|swap|confirm_buy/.test(name) && cleanArgs.autoConfirm !== false) {
+      if (link.auto_buy) cleanArgs.autoConfirm = true;
+      else {
+        try {
+          const { loadAutoTradeState } = await import("./orbitx/telegram-auto-trade.js");
+          const state = await loadAutoTradeState(sb, link.user_id);
+          if (state?.enabled) {
+            cleanArgs.autoConfirm = true;
+            link.auto_buy = true;
+          }
+        } catch {
+          /* Auto-buy table may be missing */
+        }
+      }
     }
-    if (!wallet && /buy|sell|launch|mint|credits|access|nft_prepare|nft_submit|burn|claim/.test(name)) {
+    if (
+      !wallet &&
+      !link.auto_buy &&
+      /buy|sell|launch|mint|credits|access|nft_prepare|nft_submit|burn|claim/.test(name)
+    ) {
       return {
         ok: false,
         error: "wallet_required",
-        message: "Connect Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        message: "Connect a wallet on https://www.orbitx.world/telegram after /login, then send /buy again. Or toggle Auto-buy on the MCP dashboard.",
         loginUrl: "https://www.orbitx.world/telegram",
       };
     }
@@ -635,19 +651,20 @@ async function markMediaJob(taskId, status) {
 }
 
 async function handleAutoBuy(chatId, text, { isGroup, link, extra = {} }) {
+  const { req, ...replyExtra } = extra;
   if (isGroup) {
     await tg("sendMessage", {
       chat_id: chatId,
-      text: "Auto-buy is private. DM @theorbitxmcpbot, /login, then /autobuy on or /autobuy off.",
-      ...extra,
+      text: "Auto-buy is private. DM @theorbitxmcpbot, /login, then toggle it on the MCP dashboard or /autobuy on.",
+      ...replyExtra,
     });
     return;
   }
   if (!link?.user_id) {
     await tg("sendMessage", {
       chat_id: chatId,
-      text: "Link YOUR wallet first: /login. Auto-buy only applies to this Telegram account.",
-      ...extra,
+      text: "Link YOUR wallet first: /login. Then toggle Auto-buy on https://www.orbitx.world/agent — next buy amount CA fills with no Sign click.",
+      ...replyExtra,
     });
     return;
   }
@@ -655,27 +672,38 @@ async function handleAutoBuy(chatId, text, { isGroup, link, extra = {} }) {
   let enabled = Boolean(link.auto_buy);
   if (/\b(off|disable|manual|sign)\b/.test(rest)) enabled = false;
   else if (/\b(on|enable|auto)\b/.test(rest) || rest === "") enabled = rest === "" ? !enabled : true;
+  let walletLine = "";
   try {
-    await sb(`telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(String(link.telegram_user_id))}`, {
-      method: "PATCH",
-      body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
-    });
+    const { setAutoBuyEnabled } = await import("./orbitx/telegram-auto-trade.js");
+    const saved = await setAutoBuyEnabled(sb, link.user_id, enabled);
+    if (saved.ok === false) {
+      walletLine = saved.message ? `\n${saved.message}` : "";
+    } else if (enabled && saved.publicKey) {
+      walletLine = `\nFund this Auto-buy wallet, then send <code>buy 0.05 CA</code> — it fills with no Sign link.\n<code>${saved.publicKey}</code>`;
+    }
   } catch {
-    /* column may not exist until migration */
+    try {
+      await sb(`telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(String(link.telegram_user_id))}`, {
+        method: "PATCH",
+        body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
+      });
+    } catch {
+      /* column may not exist until migration */
+    }
   }
   await runTool({
     tool: "orbitx_trade_auto",
     args: { enabled },
-    req: extra.req,
+    req,
     link,
     allowPrivileged: true,
   }).catch(() => null);
   await sendLong(
     chatId,
     enabled
-      ? "<b>Auto-buy ON</b>\nNext /buy or “buy CA with 10$ usdc” sends a Phantom auto-prompt. You still sign. OrbitX never holds keys.\n/autobuy off to require Sign each time."
-      : "<b>Auto-buy OFF</b>\nEach buy returns a Sign link. Say <b>confirm</b> after a quote, or /autobuy on.",
-    { parse_mode: "HTML", ...extra },
+      ? `<b>Auto-buy ON</b>\nNext /buy amount CA executes immediately. No Sign link.${walletLine}\n/autobuy off to go back to Jupiter Sign links.`
+      : "<b>Auto-buy OFF</b>\nEach buy returns a Jupiter Sign link. Toggle Auto-buy on in the MCP dashboard or /autobuy on.",
+    { parse_mode: "HTML", ...replyExtra },
   );
 }
 
@@ -976,7 +1004,7 @@ async function handleTelegramUpdate(update, req) {
     }
     await sendLong(
       chatId,
-      `<b>Linked OrbitX</b>\nuser: <code>${link.user_id}</code>\nwallet: <code>${link.wallet_address || "n/a"}</code>\nauto-buy: ${link.auto_buy ? "ON (Phantom auto-prompt)" : "OFF (sign each trade)"}\ntelegram: @${link.telegram_username || from.username || "user"}`,
+      `<b>Linked OrbitX</b>\nuser: <code>${link.user_id}</code>\nwallet: <code>${link.wallet_address || "n/a"}</code>\nauto-buy: ${link.auto_buy ? "ON (Telegram buy fills, no Sign)" : "OFF (Jupiter Sign link)"}\ntelegram: @${link.telegram_username || from.username || "user"}`,
       { parse_mode: "HTML" },
     );
     return;
@@ -1239,15 +1267,28 @@ async function handleWeb(req, res, body) {
 
   if (action === "web.status") {
     let links = [];
+    let autoBuy = false;
+    let autoWallet = null;
     if (user?.id) {
       links = await sb(
         `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,telegram_username,wallet_address,auto_buy,created_at&limit=5`,
       ).catch(() => []);
+      autoBuy = Boolean(Array.isArray(links) && links[0]?.auto_buy);
+      try {
+        const { loadAutoTradeState } = await import("./orbitx/telegram-auto-trade.js");
+        const state = await loadAutoTradeState(sb, user.id);
+        if (state?.publicKey) autoWallet = state.publicKey;
+        if (state?.enabled) autoBuy = true;
+      } catch {
+        /* table may be missing */
+      }
     }
     return json(res, {
       ok: true,
       bot: { username: OFFICIAL_BOT_USERNAME, name: OFFICIAL_BOT_NAME, about: OFFICIAL_BOT_SHORT },
       signedIn: Boolean(user?.id),
+      autoBuy,
+      autoWallet,
       links: Array.isArray(links) ? links : [],
       tools: hub.listAllOrbitXTools().length,
     });
@@ -1272,11 +1313,20 @@ async function handleWeb(req, res, body) {
     if (new Date(row.expires_at).getTime() <= Date.now()) return json(res, { error: "code_expired" }, 410);
     const telegramUserId = String(row.telegram_user_id);
     const wallet = await loadWallet(user.id);
+    let autoBuyPref = false;
+    try {
+      const { loadAutoTradeState } = await import("./orbitx/telegram-auto-trade.js");
+      const state = await loadAutoTradeState(sb, user.id);
+      autoBuyPref = Boolean(state?.enabled);
+    } catch {
+      /* ignore */
+    }
     const link = {
       telegram_user_id: telegramUserId,
       user_id: user.id,
       telegram_username: row.telegram_username,
       wallet_address: wallet,
+      auto_buy: autoBuyPref,
       updated_at: new Date().toISOString(),
     };
     await sb(
@@ -1299,7 +1349,7 @@ async function handleWeb(req, res, body) {
     if (BOT_TOKEN) {
       await tg("sendMessage", {
         chat_id: telegramUserId,
-        text: "OrbitX linked. This Telegram can now /buy /trade /orbitx /shop /launch /mint for YOUR wallet only. /autobuy on for Phantom auto-prompt.",
+        text: "OrbitX linked. /buy /trade /orbitx /shop /launch /mint spend for THIS account only. Toggle Auto-buy on https://www.orbitx.world/agent — then buy amount CA fills with no Sign click.",
       });
     }
     return json(res, { ok: true, link: { telegramUserId, wallet } });
@@ -1328,6 +1378,18 @@ async function handleWeb(req, res, body) {
           wallet_address: row.wallet_address || wallet,
           auto_buy: autoBuy,
         };
+      }
+      if (!autoBuy) {
+        try {
+          const { loadAutoTradeState } = await import("./orbitx/telegram-auto-trade.js");
+          const state = await loadAutoTradeState(sb, user.id);
+          if (state?.enabled) {
+            autoBuy = true;
+            if (tgLink) tgLink.auto_buy = true;
+          }
+        } catch {
+          /* ignore */
+        }
       }
     }
     const toolArgs = withTelegramToolArgs(tool, args);
@@ -1381,27 +1443,40 @@ async function handleWeb(req, res, body) {
   if (action === "web.autobuy") {
     if (!user?.id) return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet first." }, 401);
     const enabled = body.enabled === true || body.on === true;
+    let autoWallet = null;
     try {
-      await sb(`telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
-      });
-    } catch {
-      /* column may not exist until migration */
+      const { setAutoBuyEnabled } = await import("./orbitx/telegram-auto-trade.js");
+      const saved = await setAutoBuyEnabled(sb, user.id, enabled);
+      if (!saved.ok) {
+        return json(res, { error: saved.error || "auto_buy_failed", message: saved.message || "Could not save Auto-buy." }, 400);
+      }
+      autoWallet = saved.publicKey || null;
+    } catch (e) {
+      return json(
+        res,
+        {
+          error: "auto_buy_failed",
+          message: e instanceof Error ? e.message : "Could not save Auto-buy. Apply the auto-trade wallet migration.",
+        },
+        500,
+      );
     }
     await runTool({
       tool: "orbitx_trade_auto",
       args: { enabled },
       req,
-      link: { user_id: user.id, wallet_address: await loadWallet(user.id) },
+      link: { user_id: user.id, wallet_address: await loadWallet(user.id), auto_buy: enabled },
       allowPrivileged: true,
     }).catch(() => null);
     return json(res, {
       ok: true,
       autoBuy: enabled,
+      autoWallet,
       message: enabled
-        ? "Auto-sign ON. Next /buy opens Phantom immediately. You still approve in the wallet."
-        : "Auto-sign OFF. Each buy waits for you to tap Sign.",
+        ? autoWallet
+          ? `Auto-buy ON. Send SOL to ${autoWallet}, then in Telegram send buy 0.05 CA — it fills with no Sign click.`
+          : "Auto-buy ON. Next Telegram buy amount CA fills immediately. No Sign link."
+        : "Auto-buy OFF. Each buy returns a Jupiter Sign link.",
     });
   }
 
