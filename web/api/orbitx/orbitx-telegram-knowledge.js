@@ -16,7 +16,8 @@ WHAT ORBITX IS
 OrbitX is a multi-surface Solana Web3 platform (the OS, not “just a scanner”):
 - Trade / Terminal — swap & trading UI (/terminal)
 - Launchpad — create & pump tokens (/orbitxlaunch)
-- DEX — OG DEX / ORBITX_DEX charts & listings (/ORBITX_DEX) and https://ogscan.fun
+- DEX — OrbitX DEX charts & listings at https://www.orbitx.world/ORBITX_DEX
+- Trade — https://orbitxtrade.world and https://www.orbitx.world/trade
 - City — 3D OrbitX City (/Orbitxcity)
 - OS — OrbitX OS shell (/os)
 - Play — gaming studio (/play)
@@ -39,7 +40,7 @@ MCP RULES
 - For X posting/DMs: https://www.orbitx.world/x
 
 PRODUCT FACTS
-- Host: https://www.orbitx.world · Agent MCP https://www.orbitx.world/api/mcp · X MCP https://www.orbitx.world/api/x/mcp
+- Host: https://www.orbitx.world · Trade: https://orbitxtrade.world · Agent MCP https://www.orbitx.world/api/mcp · X MCP https://www.orbitx.world/api/x/mcp
 - Stack: Vite React SPA, Vercel functions, Supabase, Solana
 - $ORBITX hold/burn gates apply on the web MCP flows
 
@@ -54,19 +55,18 @@ export const ORBITX_TELEGRAM_BLURB =
   "OrbitX AI + live tools — chat freely · /faq · /cmds · /token · /img · /check · /links.";
 
 export const ORBITX_HOST = "https://www.orbitx.world";
+export const ORBITX_TRADE_HOST = "https://orbitxtrade.world";
 export const ORBITX_GC = "https://t.me/orbitxwrld";
 export const ORBITX_UPDATES = "https://t.me/OrbitXupdates";
-export const ORBITX_OGSCAN_TG = "https://t.me/ogscan";
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 export const ORBITX_LINKS = [
-  { label: "App", url: `${ORBITX_HOST}/telegram` },
   { label: "Home", url: ORBITX_HOST },
+  { label: "Trade", url: ORBITX_TRADE_HOST },
+  { label: "App", url: `${ORBITX_HOST}/telegram` },
   { label: "Community GC", url: ORBITX_GC },
   { label: "Updates", url: ORBITX_UPDATES },
   { label: "DEX", url: `${ORBITX_HOST}/ORBITX_DEX` },
-  { label: "OG Scan DEX", url: "https://ogscan.fun" },
-  { label: "Trade", url: `${ORBITX_HOST}/trade` },
   { label: "Terminal", url: `${ORBITX_HOST}/terminal` },
   { label: "Launchpad", url: `${ORBITX_HOST}/orbitxlaunch` },
   { label: "Intel", url: `${ORBITX_HOST}/intel` },
@@ -105,7 +105,8 @@ You are ${ORBITX_AGENT_NAME}, ${ORBITX_AGENT_ROLE}.
 
 ALWAYS-TRUE FACTS (do not contradict; never invent live MC/holders/shop USD)
 - OrbitX is an on-chain OS for Solana crypto — DEX/forensics, launchpad, social, City, predictions, AI/MCP — not “just a scanner.”
-- Live: ${ORBITX_HOST} · DEX also https://ogscan.fun · GitHub github.com/audifyx/og-scan · X @orbitx_wrld
+- Live sites: ${ORBITX_HOST} and ${ORBITX_TRADE_HOST}. DEX: ${ORBITX_HOST}/ORBITX_DEX. GitHub source is github.com/audifyx/og-scan (repo name, not the website). X @orbitx_wrld
+- Never send users to ogscan.fun as the website.
 - $ORBITX mint: ${ORBITX_MINT} (Token-2022). Utility + access + fuel — not a yield/claim token.
 - Hold ≥ $5 USD of $ORBITX → OrbitX AI + basic MCP. Hold 10,000 $ORBITX → Pro / KOL DEX layer. (Older/internal docs may say $10; public messaging is $5 + 10k.)
 - Burn 100 $ORBITX = 1 hour; 1,000 = 1 day; 10,000 = 1 week; 1,000,000 = 1 month; burns stack from the later of now or current expiry. Time is keyed from the on-chain burn, not from when they /verify.
@@ -117,10 +118,11 @@ ALWAYS-TRUE FACTS (do not contradict; never invent live MC/holders/shop USD)
 - Humans / live-ops: ${ORBITX_GC} — still give a working next step here, never a shrug.
 
 WHAT ORBITX IS
-OrbitX is a non-custodial Solana Web3 platform at https://www.orbitx.world
+OrbitX is a non-custodial Solana Web3 platform at ${ORBITX_HOST} and ${ORBITX_TRADE_HOST}
 Live products (give the URL when they ask for links or “where is X”):
-- DEX / scanner — ${ORBITX_HOST}/ORBITX_DEX  and https://ogscan.fun
-- Trade (Phantom buy/sell) — ${ORBITX_HOST}/trade
+- Home — ${ORBITX_HOST}
+- Trade — ${ORBITX_TRADE_HOST}
+- DEX / scanner — ${ORBITX_HOST}/ORBITX_DEX
 - Terminal — ${ORBITX_HOST}/terminal
 - Launchpad — ${ORBITX_HOST}/orbitxlaunch
 - Intel — ${ORBITX_HOST}/intel

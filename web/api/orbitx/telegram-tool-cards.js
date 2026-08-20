@@ -473,7 +473,7 @@ function orbitxProjectSummary() {
   return {
     lines: [
       "On-chain OS for Solana — forensic DEX intel, launchpad, City, Play, HQ, and MCP agents under one wallet identity.",
-      "Not a scanner skin. Live products at orbitx.world / ogscan.fun. Non-custodial — you always sign.",
+      "Not a scanner skin. Live products at orbitx.world and orbitxtrade.world. Non-custodial — you always sign.",
     ],
     utility: [
       "Hold ≥ $5 USD of $ORBITX → OrbitX AI + basic MCP",

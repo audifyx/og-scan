@@ -3,7 +3,7 @@
  *
  * Faithful synthesis of the OrbitX Comprehensive FAQ Training Report
  * (audifyx/og-scan docs, platform map, delivery summaries, architecture notes,
- * token-utility announcements, @orbitx_wrld, ogscan.fun / orbitx.world, Aug 2026).
+ * token-utility announcements, @orbitx_wrld, orbitx.world / orbitxtrade.world, Aug 2026).
  *
  * Injection for Llama 3.1 8B: CORE + top 3 chunks — never the full essay every turn.
  * Do not invent live MC / holders / shop USD or unreleased feats beyond this file.
@@ -11,7 +11,8 @@
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const ORBITX_HOST = "https://www.orbitx.world";
-export const OGSCAN_HOST = "https://ogscan.fun";
+export const ORBITX_TRADE_HOST = "https://orbitxtrade.world";
+export const OGSCAN_HOST = ORBITX_TRADE_HOST;
 export const ORBITX_GITHUB = "https://github.com/audifyx/og-scan";
 export const ORBITX_GC = "https://t.me/orbitxwrld";
 export const ORBITX_X = "https://x.com/orbitx_wrld";
@@ -54,11 +55,11 @@ export const ORBITX_FAQ_CORE = `ORBITX FACTS (do not invent beyond this)
 
 WHAT: OrbitX is an on-chain operating system for crypto — primarily Solana, with 16-chain data aggregation. One destination / unified desk that collapses scanners, DEX terminals, launchpads, Telegram, X, voice rooms, portfolio tools, and prediction sites into one wallet-identity-connected environment. Evolution / rebrand of OG Scan. Explicitly not “another scanner,” “another launchpad,” or “another terminal.”
 
-README CORE: OrbitX DEX (live at ogscan.fun) aggregates public blockchain and market data across 16 chains and surfaces what most tools hide: dev-wallet and dev-sold status, the first on-chain buyer, paid-listing status, whale/KOL holders, real all-time-high history, bundle/sniper detection, and wallet copy-tracking.
+README CORE: OrbitX DEX (live at ${ORBITX_HOST}/ORBITX_DEX and ${ORBITX_TRADE_HOST}) aggregates public blockchain and market data across 16 chains and surfaces what most tools hide: dev-wallet and dev-sold status, the first on-chain buyer, paid-listing status, whale/KOL holders, real all-time-high history, bundle/sniper detection, and wallet copy-tracking.
 
 TAGLINE: Forensic token intelligence · Social feed · Live voice & video · Prediction markets & games · Free token launchpad · Per-token AI analyst · Public MCP agent API · Non-custodial by design.
 
-LIVE: ${ORBITX_HOST} (prefer www) · DEX/scanner also ${OGSCAN_HOST} · GitHub ${ORBITX_GITHUB} · X @orbitx_wrld · GC ${ORBITX_GC}
+LIVE: ${ORBITX_HOST} (prefer www) · Trade ${ORBITX_TRADE_HOST} · DEX ${ORBITX_HOST}/ORBITX_DEX · GitHub ${ORBITX_GITHUB} (source repo name, not the public site) · X @orbitx_wrld · GC ${ORBITX_GC}
 
 TOKEN $ORBITX: mint ${ORBITX_MINT} · Solana Token-2022 (extensions noted on explorers) · mint authority described as renounced / Pump.fun origin in early data · single utility + access + fuel token · not a yield token · not a passive claim token. Never invent live MC/holders/price — tell them /token ${ORBITX_MINT} or paste a CA.
 
@@ -79,7 +80,7 @@ CODE: Vite+React SPA under web/ (not Next.js for the main app). Vercel functions
 AGENT: You are Lyra, Official OrbitX Desk Officer (@theorbitxmcpbot + OrbitX AI). Answer fully. Never reply idk. If a live number is missing, still explain the product and the command that fetches it.
 
 QUICK ANSWERS
-- What is OrbitX? On-chain OS unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity. Live ${OGSCAN_HOST} / ${ORBITX_HOST}.
+- What is OrbitX? On-chain OS unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity. Live ${ORBITX_HOST} / ${ORBITX_TRADE_HOST}.
 - Utility? Hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 hour MCP / 1,000 = 1 day / 10,000 = 1 week / 1,000,000 = 1 month (stackable); burn for shop seats, listings, intel, API keys; usage drives further burns.
 - Connect MCP? Hold required $ORBITX or burn a seat, then point any MCP client at /api/ogdex/mcp or /api/mcp via ${ORBITX_HOST}/agent.
 - Burning? On-chain burn of $ORBITX (direct time seats or Jupiter buy-and-burn for shop). Stackable for MCP. Solscan verification. Permanent supply cut.
@@ -106,7 +107,7 @@ export const ORBITX_FAQ_CHUNKS = [
       "rebrand",
       "definition",
     ],
-    text: `OrbitX is an on-chain OS for crypto, focused primarily on Solana but with multi-chain (16 chains) data aggregation. It is a single destination / unified desk that collapses the fragmented Solana trading stack (scanners, DEX terminals, launchpads, Telegram, X, voice rooms, portfolio tools, prediction sites) into one wallet-identity-connected environment. Official README: OrbitX DEX (live at ogscan.fun) aggregates public blockchain and market data across 16 chains and surfaces what most tools hide: dev-wallet and dev-sold status, the first on-chain buyer, paid-listing status, whale/KOL holders, real ATH history, bundle/sniper detection, and wallet copy-tracking. Tagline set: forensic intel, social feed, live voice & video, predictions & games, free launchpad, per-token AI analyst, public MCP, non-custodial. It is the evolution / rebrand of OG Scan. Live DEX/scanner: ogscan.fun. Broader platform/marketing: orbitx.world. Primary public source of truth: GitHub audifyx/og-scan (Vite+React frontend, Supabase, Vercel functions, Anchor programs, EVM curve contracts, docs, migrations). Explicitly not “another scanner / launchpad / terminal” — it is the OS layer where trading, launching, social, intelligence, AI agents, prediction markets, and a persistent 3D City coexist.`,
+    text: `OrbitX is an on-chain OS for crypto, focused primarily on Solana but with multi-chain (16 chains) data aggregation. It is a single destination / unified desk that collapses the fragmented Solana trading stack (scanners, DEX terminals, launchpads, Telegram, X, voice rooms, portfolio tools, prediction sites) into one wallet-identity-connected environment. Official sites: ${ORBITX_HOST} (platform / OS / DEX / agent) and ${ORBITX_TRADE_HOST} (trade). OrbitX DEX aggregates public blockchain and market data across 16 chains and surfaces what most tools hide: dev-wallet and dev-sold status, the first on-chain buyer, paid-listing status, whale/KOL holders, real ATH history, bundle/sniper detection, and wallet copy-tracking. Tagline set: forensic intel, social feed, live voice & video, predictions & games, free launchpad, per-token AI analyst, public MCP, non-custodial. If someone says “OG Scan,” that is the old product/GitHub name (audifyx/og-scan) — the public websites are orbitx.world and orbitxtrade.world, not ogscan.fun. Explicitly not “another scanner / launchpad / terminal” — it is the OS layer where trading, launching, social, intelligence, AI agents, prediction markets, and a persistent 3D City coexist.`,
   },
   {
     id: "lyra",
@@ -251,7 +252,7 @@ export const ORBITX_FAQ_CHUNKS = [
       "dev-sold",
       "first buyer",
     ],
-    text: `OrbitX DEX / screener: curated multi-chain (16) discovery with garbage filtering. Every token page includes trust verdict, dev-wallet / dev-sold status, first on-chain buyer, paid-listing flag, bundle/sniper detection, whale/KOL holders, real ATH history, proprietary Bubble Maps, OrbitX Score (on-chain metrics + holder quality + momentum + AI signals). Anti-vamp checks are first-class. In Telegram: drop a CA or /token /scan /xray /research /forensics for a branded card. Live: ${ORBITX_HOST}/ORBITX_DEX and ${OGSCAN_HOST}.`,
+    text: `OrbitX DEX / screener: curated multi-chain (16) discovery with garbage filtering. Every token page includes trust verdict, dev-wallet / dev-sold status, first on-chain buyer, paid-listing flag, bundle/sniper detection, whale/KOL holders, real ATH history, proprietary Bubble Maps, OrbitX Score (on-chain metrics + holder quality + momentum + AI signals). Anti-vamp checks are first-class. In Telegram: drop a CA or /token /scan /xray /research /forensics for a branded card. Live: ${ORBITX_HOST}/ORBITX_DEX and ${ORBITX_TRADE_HOST}.`,
   },
   {
     id: "wallet",
@@ -433,7 +434,7 @@ export const ORBITX_FAQ_CHUNKS = [
     id: "answers",
     title: "Common FAQ answers",
     keys: ["faq", "quick answer", "decision tree", "common question", "how do i"],
-    text: `Common answers: (1) OrbitX = on-chain OS for Solana crypto unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity — live ogscan.fun / orbitx.world. (2) Utility = hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 hour MCP / 1,000 = 1 day / 10,000 = 1 week / 1,000,000 = 1 month (stackable); burn for shop seats/listings/intel/API keys; activity drives further burns. (3) MCP = hold required $ORBITX or burn a seat, then point any MCP client at /api/ogdex/mcp (or /api/mcp) / agent hub. (4) Burning = on-chain burn (direct time seats or Jupiter buy-and-burn for shop); stackable; Solscan; permanent supply cut. (5) Custodial? No. (6) Code: github.com/audifyx/og-scan including programs/betting/. (7) Free vanity launch to pump.fun with optional orbit/obx mint. (8) Predictions = native P2P-style markets + games via the betting program.`,
+    text: `Common answers: (1) OrbitX = on-chain OS for Solana crypto unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity — live ${ORBITX_HOST} / ${ORBITX_TRADE_HOST}. (2) Utility = hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 hour MCP / 1,000 = 1 day / 10,000 = 1 week / 1,000,000 = 1 month (stackable); burn for shop seats/listings/intel/API keys; activity drives further burns. (3) MCP = hold required $ORBITX or burn a seat, then point any MCP client at /api/ogdex/mcp (or /api/mcp) / agent hub. (4) Burning = on-chain burn (direct time seats or Jupiter buy-and-burn for shop); stackable; Solscan; permanent supply cut. (5) Custodial? No. (6) Code: github.com/audifyx/og-scan including programs/betting/ (that is the GitHub repo, not the website). (7) Free vanity launch to pump.fun with optional orbit/obx mint. (8) Predictions = native P2P-style markets + games via the betting program.`,
   },
   {
     id: "caveats",
@@ -512,7 +513,7 @@ export function formatOrbitXFaqHtml(query) {
       "<b>OrbitX FAQ</b>",
       "On-chain OS for Solana crypto — DEX/forensics, launchpad, social, City, predictions, AI/MCP.",
       "Hold ≥ $5 $ORBITX → AI + basic MCP. Hold 10,000 → Pro/KOL DEX. Burn 100 = 1 hour, 1,000 = 1 day, 10,000 = 1 week, 1,000,000 = 1 month (stackable).",
-      "Non-custodial. Live: https://www.orbitx.world · DEX: https://ogscan.fun · GC: https://t.me/orbitxwrld",
+      "Non-custodial. Live: https://www.orbitx.world · Trade: https://orbitxtrade.world · GC: https://t.me/orbitxwrld",
       "",
       "Ask /faq utility · /faq mcp · /faq burn · /faq shop · /faq hold · /faq launch · /faq city",
       "Or chat: “what is OrbitX?”, “how does burning work?”, “how do I connect MCP?”",
@@ -525,6 +526,6 @@ export function formatOrbitXFaqHtml(query) {
     "<b>OrbitX FAQ</b>",
     ...chunks.flatMap((c) => ["", `<b>${c.title}</b>`, c.text]),
     "",
-    `Live site: ${ORBITX_HOST} · DEX: ${OGSCAN_HOST} · /token for live numbers`,
+    `Live site: ${ORBITX_HOST} · Trade: ${ORBITX_TRADE_HOST} · /token for live numbers`,
   ].join("\n");
 }

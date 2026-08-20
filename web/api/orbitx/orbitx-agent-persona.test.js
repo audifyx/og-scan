@@ -20,6 +20,9 @@ describe("Lyra desk officer", () => {
     expect(ORBITX_AGENT_IDENTITY).toContain(ORBITX_AGENT_NAME);
     expect(ORBITX_AGENT_IDENTITY).toContain(ORBITX_AGENT_ROLE);
     expect(ORBITX_AGENT_IDENTITY.toLowerCase()).toContain("never reply with idk");
+    expect(ORBITX_AGENT_IDENTITY).toContain("orbitx.world");
+    expect(ORBITX_AGENT_IDENTITY).toContain("orbitxtrade.world");
+    expect(ORBITX_AGENT_IDENTITY).not.toContain("https://ogscan.fun");
   });
 
   it("trains official + owner Telegram prompts as Lyra with full OrbitX memory", () => {
@@ -27,6 +30,8 @@ describe("Lyra desk officer", () => {
       expect(prompt).toContain("Lyra");
       expect(prompt).toContain("Desk Officer");
       expect(prompt).toContain("orbitx.world");
+      expect(prompt).toContain("orbitxtrade.world");
+      expect(prompt).not.toContain("https://ogscan.fun");
       expect(prompt.toLowerCase()).toContain("never reply with idk");
     }
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("$5");
