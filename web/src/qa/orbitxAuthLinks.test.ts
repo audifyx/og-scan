@@ -33,4 +33,10 @@ describe("OrbitX auth paste classifier", () => {
     expect(mcp.code).toBe("oxlink_abc123");
     expect(extractAgentLinkAuthCode("authCode: oxlink_from_dashboard")).toBe("oxlink_from_dashboard");
   });
+
+  it("keeps Telegram tool aliases imported so /api/mcp can boot", async () => {
+    const hub = await import("../../api/orbitx-hub.js");
+    expect(hub.resolveOrbitXToolName("orbitx_trade")).toBe("orbitx_prepare_buy");
+    expect(hub.listAllOrbitXTools().length).toBeGreaterThan(10);
+  });
 });

@@ -330,6 +330,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(app).toContain("RedirectPreserveSearch");
     const hub = readFileSync(resolve(WEB, "api/orbitx-hub.js"), "utf8");
     expect(hub).toContain("telegram_login_not_mcp");
+    expect(hub).toContain('from "./orbitx/telegram-trade-intent.js"');
+    expect(hub).toContain("TELEGRAM_TOOL_ALIASES");
   });
 
   it("renders token intel as a card instead of raw JSON", () => {

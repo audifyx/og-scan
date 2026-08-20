@@ -48,6 +48,7 @@ import {
   setChatTradeAuto,
   usdToSol,
 } from "./orbitx/buy-orbitx.js";
+import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias } from "./orbitx/telegram-trade-intent.js";
 import {
   classifyOrbitXAuthPaste,
   TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
