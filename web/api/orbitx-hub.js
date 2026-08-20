@@ -2213,6 +2213,10 @@ const CORE_TOOLS = [
           type: "boolean",
           description: "If true, same as confirmMode=auto",
         },
+        amountUsd: {
+          type: "number",
+          description: "USD to spend; converted to SOL from the live SOL/USD price",
+        },
         slippage: { type: "number", default: 10 },
         askOnly: {
           type: "boolean",
@@ -2935,6 +2939,12 @@ export function resolveOrbitXToolName(rawName) {
 }
 
 async function fetchJson(url, init) {
+  const href = String(url || "");
+  if (/\/api\/ogdex\/trade\/?(?:\?|$)/.test(href) && String(init?.method || "GET").toUpperCase() === "POST") {
+    const { buildUnsignedTrade } = await import("./ogdex/_routes/trade.js");
+    const body = typeof init?.body === "string" ? JSON.parse(init.body || "{}") : init?.body || {};
+    return buildUnsignedTrade(body);
+  }
   const r = await fetch(url, {
     ...init,
     headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(init?.headers || {}) },
@@ -3524,7 +3534,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   }
 
   if (name === "orbitx_buy_orbitx") {
-    const askOnly = args.askOnly === true || args.amountSol == null || args.amountSol === "";
+    let amountSol = args.amountSol ?? args.sol ?? args.amount;
+    let usdQuote = null;
+    if ((amountSol == null || amountSol === "") && args.amountUsd != null) {
+      usdQuote = await usdToSol(args.amountUsd);
+      if (!usdQuote.ok) return usdQuote;
+      amountSol = usdQuote.amountSol;
+    }
+    const askOnly = args.askOnly === true || amountSol == null || amountSol === "";
     if (askOnly) return askBuyOrbitxAmount();
     let preferAuto = false;
     if (auth?.agentId) {
@@ -3539,13 +3556,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const out = await prepareBuyOrbitx({
       base,
       wallet,
-      amountSol: args.amountSol ?? args.sol ?? args.amount,
+      amountSol,
       slippage: args.slippage,
       pool: args.pool || "auto",
       confirmMode,
       preferAuto,
       fetchJson,
     });
+    if (out.ok && usdQuote) {
+      out.amountUsd = usdQuote.amountUsd;
+      out.solUsd = usdQuote.solUsd;
+    }
     if (out.ok && auth?.userId) {
       try {
         await saveTradeIntent(sb, auth.userId, {
@@ -3569,6 +3590,34 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     if (pack === "credits" || pack === "topup") {
       return callTool("orbitx_credits_buy", args, auth, base, req);
+    }
+    if (pack) {
+      try {
+        const { prepareDeskShopBuy } = await import("./orbitx/desk-shop.js");
+        const out = await prepareDeskShopBuy({
+          wallet,
+          skuId: pack,
+          mint: args.mint,
+        });
+        if (out?.error !== "unknown_sku") {
+          if (out?.ok) {
+            const qs = new URLSearchParams({ kind: "shop", sku: pack, publicKey: wallet || "" });
+            if (args.mint) qs.set("mint", String(args.mint));
+            const signUrl = `${base}/agent/sign?${qs.toString()}`;
+            const autoSignUrl = `${signUrl}${signUrl.includes("?") ? "&" : "?"}auto=1`;
+            const auto = args.autoConfirm === true || args.auto === true;
+            out.signUrl = signUrl;
+            out.autoSignUrl = autoSignUrl;
+            out.openUrl = auto ? autoSignUrl : signUrl;
+            out.requiresSignature = true;
+            out.solscanToken = `https://solscan.io/token/${ORBITX_MINT}`;
+            if (wallet) out.solscanAccount = `https://solscan.io/account/${encodeURIComponent(wallet)}`;
+          }
+          return out;
+        }
+      } catch {
+        /* fall through to catalog */
+      }
     }
     return {
       ok: true,
@@ -3654,9 +3703,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   }
 
   if (name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_buy_auto" || name === "orbitx_trade" || name === "orbitx_swap" || name === "orbitx_prepare_sell") {
-    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
+    if (!wallet) {
+      return {
+        ok: false,
+        error: "wallet_required",
+        mint: String(args.mint || ORBITX_MINT),
+        message: "Link Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        loginUrl: "https://www.orbitx.world/telegram",
+      };
+    }
     const action = name === "orbitx_prepare_sell" ? "sell" : "buy";
-    const mint = String(args.mint || "");
+    const mint = String(args.mint || (action === "buy" ? ORBITX_MINT : "")).trim();
     if (action === "buy" && !mint) {
       return { ok: false, error: "mint_required", message: "Pass a mint / CA to buy, or say buy $ORBITX." };
     }
@@ -3761,6 +3818,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       routePool: data.pool || null,
       simulated: Boolean(data.simulated),
       hasUnsignedTx: true,
+      solscanToken: mint ? `https://solscan.io/token/${encodeURIComponent(mint)}` : null,
+      solscanAccount: wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : null,
       instructions: auto
         ? [
             "Open autoSignUrl — Phantom pops immediately (auto-buy).",
@@ -4997,7 +5056,15 @@ export async function runEmbeddedAgentTool({
   };
   const base = publicBase(req);
 
-  if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
+  const mintArg = String(args?.mint || args?.ca || "").trim();
+  const isOrbitxBuy =
+    name === "orbitx_buy_orbitx" ||
+    name === "orbitx_confirm_buy" ||
+    name === "orbitx_trade_auto" ||
+    name === "orbitx_credits_buy" ||
+    ((name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_trade" || name === "orbitx_swap") &&
+      (mintArg === ORBITX_MINT || !mintArg));
+  if (!isOrbitxBuy && (isHoldGatedTool(name) || isHoldGatedTool(rawName))) {
     const candidates = holdCandidateWallets(auth, args);
     const access = await requireMcpAccess({
       userId: uid,

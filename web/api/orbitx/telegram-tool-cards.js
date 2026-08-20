@@ -311,7 +311,7 @@ export function missingToolInput(tool, args = {}) {
   if (n === "orbitx_dex_chart" || n === "orbitx_get_chart" || n.startsWith("orbitx_chart_")) {
     if (!mint) return "mint";
   }
-  if (["orbitx_prepare_buy", "orbitx_prepare_sell", "orbitx_buy", "orbitx_sell", "orbitx_trade", "orbitx_swap", "orbitx_buy_auto", "orbitx_sell_pump"].includes(n)) {
+  if (["orbitx_prepare_sell", "orbitx_sell", "orbitx_sell_pump"].includes(n)) {
     if (!mint) return "mint";
   }
   if (n === "orbitx_generate_image" || n === "orbitx_generate_video" || n === "orbitx_grok_image" || n === "orbitx_grok_video") {
@@ -799,6 +799,201 @@ function formatActionLinks(data) {
   };
 }
 
+const TRADE_ERR = new Set([
+  "wallet_required",
+  "login_required",
+  "ask_amount",
+  "prepare_failed",
+  "amount_required",
+  "amount_too_low",
+  "amount_too_high",
+  "invalid_amount",
+  "invalid_usd",
+  "sol_price_unavailable",
+  "no_pending_buy",
+  "mint_required",
+  "token_hold_required",
+]);
+
+function isTradeLike(data, tool) {
+  if (!data || typeof data !== "object") return false;
+  const family = classifyTool(tool);
+  const err = String(data.error || "").toLowerCase();
+  const status = String(data.status || data.action || "").toLowerCase();
+  if (data.signUrl || data.autoSignUrl) return true;
+  if (data.transaction && (data.sku || data.burnRaw || data.orbitxBurned != null)) return true;
+  if (status === "ask_amount" || status === "ask_package") return true;
+  if (/awaiting_(auto_)?phantom/.test(status)) return true;
+  if (TRADE_ERR.has(err)) return true;
+  if ((family === "trade" || family === "shop") && data.requiresSignature) return true;
+  if (family === "trade" && (data.amountSol != null || data.amountUsd != null || data.amount != null)) return true;
+  return false;
+}
+
+function formatTradeDeskCard(data, tool) {
+  if (!isTradeLike(data, tool)) return null;
+  const err = String(data.error || "").toLowerCase();
+  const status = String(data.status || data.action || "").toLowerCase();
+  const mint = String(data.mint || data.ca || ORBITX_MINT).trim() || ORBITX_MINT;
+  const wallet = String(data.wallet || data.publicKey || data.address || "").trim();
+  const amountSol = data.amountSol ?? (data.denominatedInSol ? data.amount : null);
+  const amountUsd = data.amountUsd;
+  const solscanToken = data.solscanToken || `${SOLSCAN}${encodeURIComponent(mint)}`;
+  const solscanAccount = data.solscanAccount || (wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : "");
+  const dex = `${ORBITX_HOST}/ORBITX_DEX/token/${encodeURIComponent(mint)}`;
+  const sign = data.signUrl || data.openUrl || "";
+  const auto =
+    data.autoSignUrl ||
+    (sign ? `${sign}${sign.includes("?") ? "&" : "?"}auto=1` : "");
+  const telegramDash = `${ORBITX_HOST}/telegram`;
+
+  if (err === "login_required") {
+    return {
+      text: [
+        "🔒 <b>ORBITX · Sign in to trade</b>",
+        "DM /login then /buy. Groups stay public — swaps are wallet-gated.",
+        data.message ? `<i>${tgEsc(String(data.message).slice(0, 220))}</i>` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      reply_markup: inlineKeyboard([
+        [{ text: "Open bot DM", url: "https://t.me/theorbitxmcpbot" }, { text: "Link wallet", url: telegramDash }],
+        [{ text: "⌂ Desk", callback_data: "ox:desk" }],
+      ]),
+    };
+  }
+
+  if (err === "wallet_required") {
+    return {
+      text: [
+        "🔑 <b>ORBITX · Link Phantom</b>",
+        "Connect your wallet on orbitx.world/telegram, then send /buy again. SOL spends from that wallet.",
+        mint ? `<code>${tgEsc(mint)}</code>` : "",
+        [href(telegramDash, "Link wallet"), href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].filter(Boolean).join(" · "),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      reply_markup: inlineKeyboard([
+        [{ text: "Link Phantom", url: telegramDash }, { text: "Solscan", url: solscanToken }],
+        [{ text: "OrbitX DEX", url: dex }, { text: "⌂ Desk", callback_data: "ox:desk" }],
+      ]),
+    };
+  }
+
+  if (err === "token_hold_required") {
+    const buyUsd = `${ORBITX_HOST}/agent/sign?action=buy&mint=${encodeURIComponent(ORBITX_MINT)}&amount=0.05`;
+    return {
+      text: [
+        "🪙 <b>ORBITX · Hold to unlock extra tools</b>",
+        tgEsc(data.message || "Hold ≥ $5 of $ORBITX for gated MCP tools. Buying $ORBITX itself does not require a hold."),
+        "Tap Sign to buy $ORBITX with SOL from your linked wallet.",
+        [href(buyUsd, "Sign $ORBITX buy"), href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].join(" · "),
+      ].join("\n"),
+      reply_markup: inlineKeyboard([
+        [{ text: "Sign buy", url: buyUsd }, { text: "Solscan", url: solscanToken }],
+        [{ text: "OrbitX DEX", url: dex }],
+      ]),
+    };
+  }
+
+  if (err === "ask_amount" || status === "ask_amount") {
+    return {
+      text: [
+        "💰 <b>ORBITX · How much?</b>",
+        "Reply <code>/buy 0.05</code> or <code>buy $1 $ORBITX</code>. Spends SOL from your linked Phantom.",
+        [href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].join(" · "),
+      ].join("\n"),
+      reply_markup: inlineKeyboard([
+        [{ text: "Solscan", url: solscanToken }, { text: "OrbitX DEX", url: dex }],
+        [{ text: "⌂ Desk", callback_data: "ox:desk" }],
+      ]),
+    };
+  }
+
+  if (err === "ask_package" || status === "ask_package") {
+    return {
+      text: [
+        "🛍️ <b>ORBITX · MCP burn</b>",
+        "Reply <code>/shop day</code> (100 $ORBITX) or <code>/shop week</code> (1,000). One Phantom sign burns the exact amount.",
+        [href(solscanToken, "Solscan"), href(`${ORBITX_HOST}/shop`, "Desk shop")].join(" · "),
+      ].join("\n"),
+      reply_markup: inlineKeyboard([
+        [{ text: "Desk shop", url: `${ORBITX_HOST}/shop` }, { text: "Solscan", url: solscanToken }],
+      ]),
+    };
+  }
+
+  if (
+    data.ok === false &&
+    !sign &&
+    (err === "prepare_failed" || err === "sol_price_unavailable" || err === "amount_required" || err === "no_pending_buy" || data.status === "prepare_failed")
+  ) {
+    return {
+      text: [
+        "⚠️ <b>ORBITX · Couldn't build the swap</b>",
+        `<i>${tgEsc(String(data.detail || data.message || data.error || "Try /buy 0.05 again."))}</i>`,
+        [href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].join(" · "),
+      ].join("\n"),
+      reply_markup: inlineKeyboard([
+        [{ text: "Solscan", url: solscanToken }, { text: "OrbitX DEX", url: dex }],
+      ]),
+    };
+  }
+
+  const sku = data.sku || data.package || data.packageId;
+  const isBurn = Boolean(data.burnRaw || data.orbitxBurned != null || data.tokens || sku);
+  const amtBits = [];
+  if (amountSol != null && amountSol !== "") {
+    amtBits.push(`${tgEsc(String(amountSol))} SOL`);
+  }
+  if (amountUsd != null && amountUsd !== "") {
+    amtBits.push(`~$${tgEsc(String(Number(amountUsd).toFixed ? Number(amountUsd).toFixed(2) : amountUsd))}`);
+  }
+  const amtLine = amtBits.length
+    ? `Spending <b>${amtBits.join(" ")}</b> from your linked Phantom.`
+    : isBurn
+      ? `One Phantom sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
+      : "Unsigned Jupiter buy is ready. Tap Sign — Phantom opens the swap.";
+
+  const title = isBurn && !sign?.includes("action=buy")
+    ? "🛍️ <b>ORBITX · Buy &amp; burn</b>"
+    : "🟢 <b>ORBITX · Sign to buy</b>";
+
+  const buttons = [
+    sign ? { text: "Sign in Phantom", url: sign } : null,
+    auto && auto !== sign ? { text: "Auto-sign", url: auto } : null,
+    { text: "Solscan", url: solscanToken },
+    { text: "OrbitX DEX", url: dex },
+  ].filter(Boolean);
+
+  const linkLine = [
+    sign ? href(sign, "Sign in Phantom") : "",
+    auto && auto !== sign ? href(auto, "Auto-sign") : "",
+    href(solscanToken, "Token on Solscan"),
+    solscanAccount ? href(solscanAccount, "Wallet on Solscan") : "",
+    href(dex, "OrbitX DEX"),
+  ].filter(Boolean);
+
+  return {
+    text: [
+      title,
+      amtLine,
+      wallet ? `Wallet <code>${tgEsc(wallet)}</code>` : "",
+      data.outAmount ? `Est. out ${tgEsc(String(data.outAmount))} $ORBITX` : "",
+      mint ? `<code>${tgEsc(mint)}</code>` : "",
+      "After you confirm, the sign page shows the Solscan tx link.",
+      `🔗 ${linkLine.join(" · ")}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    reply_markup: inlineKeyboard([
+      buttons.slice(0, 2),
+      buttons.slice(2),
+      [{ text: "⌂ Desk", callback_data: "ox:desk" }],
+    ]),
+  };
+}
+
 export function formatMediaCountdown({
   kind = "image",
   taskId,
@@ -1188,8 +1383,20 @@ export function formatOrbitXTelegramResult(result, tool) {
   if (chart) return chart;
   const token = formatTokenCard(data);
   if (token) return token;
+  const trade = formatTradeDeskCard(data, tool);
+  if (trade) return trade;
   const mintOnly = String(data?.mint || data?.ca || data?.token?.mint || "").trim();
-  if (mintOnly && CA_RE.test(mintOnly) && !hasMarketSnapshot(data?.token || data) && !data?.packages && !data?.holdings) {
+  if (
+    mintOnly &&
+    CA_RE.test(mintOnly) &&
+    !hasMarketSnapshot(data?.token || data) &&
+    !data?.packages &&
+    !data?.holdings &&
+    !data?.signUrl &&
+    !data?.autoSignUrl &&
+    !data?.requiresSignature &&
+    !data?.error
+  ) {
     const dex = `https://dexscreener.com/solana/${encodeURIComponent(mintOnly)}`;
     const known = hydrateKnownMint(mintOnly);
     const title = known?.name ? `${known.name} · $${known.symbol || known.name}` : "Token intel";

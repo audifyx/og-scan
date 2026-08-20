@@ -151,9 +151,18 @@ export function parseTradeIntent(text) {
     /\b(buy|snipe|ape|accumulate)\b/.test(compact) ||
     (/\b(trade|swap)\b/.test(compact) && !selling);
 
-  if (selling && (mint || amountSol)) {
+  let sol = amountSol;
+  if (!sol && !amountUsd && buying) {
+    const bare = compact.match(/(?:^|\s)(\d+(?:\.\d+)?)(?:\s|$)/);
+    if (bare) {
+      const n = Number(bare[1]);
+      if (Number.isFinite(n) && n > 0 && n <= 50) sol = n;
+    }
+  }
+
+  if (selling && (mint || sol)) {
     const args = { mint, pool: "auto", autoConfirm: auto };
-    if (amountSol) args.amount = amountSol;
+    if (sol) args.amount = sol;
     else args.amount = "100%";
     return { tool: "orbitx_prepare_sell", args };
   }
@@ -161,12 +170,12 @@ export function parseTradeIntent(text) {
   if (buying) {
     const args = { pool: "auto", autoConfirm: auto };
     if (mint) args.mint = mint;
-    if (amountSol) args.amountSol = amountSol;
+    if (sol) args.amountSol = sol;
     if (amountUsd) args.amountUsd = amountUsd;
     if (mint === ORBITX_MINT || (isOrbitxTicker(t) && !extractMintFromText(t))) {
       return { tool: "orbitx_buy_orbitx", args };
     }
-    if (mint || amountSol || amountUsd) {
+    if (mint || sol || amountUsd) {
       return { tool: "orbitx_prepare_buy", args };
     }
     return { tool: "orbitx_buy_orbitx", args };

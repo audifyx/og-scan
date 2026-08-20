@@ -286,6 +286,15 @@ export const HOLD_GATED_TOOLS = new Set([
 export function isHoldGatedTool(name) {
   // Media (image/video) is not hold-gated — API keys already require hold to mint.
   if (/^orbitx_(generate_|grok_|gen_|media_)/.test(name)) return false;
+  // First-time $ORBITX buys must not require an existing hold.
+  if (
+    name === "orbitx_buy_orbitx" ||
+    name === "orbitx_confirm_buy" ||
+    name === "orbitx_trade_auto" ||
+    name === "orbitx_credits_buy"
+  ) {
+    return false;
+  }
   if (HOLD_GATED_TOOLS.has(name)) return true;
   if (/^orbitx_(buy|sell)_/.test(name)) return true;
   if (/^orbitx_create_token_/.test(name)) return true;

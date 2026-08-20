@@ -47,6 +47,7 @@ import {
   formatOrbitXLinksHtml,
   OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
   ORBITX_GC,
+  ORBITX_MINT,
 } from "./orbitx/orbitx-telegram-knowledge.js";
 import { fetchTelegramTokenSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
@@ -285,15 +286,22 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       cleanArgs.publicKey = wallet;
       cleanArgs.address = wallet;
       cleanArgs.buyerWallet = cleanArgs.buyerWallet || wallet;
+      if (!link.wallet_address && link.telegram_user_id) {
+        await sb(`telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(String(link.telegram_user_id))}`, {
+          method: "PATCH",
+          body: JSON.stringify({ wallet_address: wallet, updated_at: new Date().toISOString() }),
+        }).catch(() => null);
+      }
     }
-    if (link.auto_buy && /^orbitx_(prepare_buy|buy|buy_orbitx|buy_auto)$/.test(name)) {
+    if (link.auto_buy && /buy|trade|swap|confirm_buy/.test(name)) {
       if (cleanArgs.autoConfirm !== false) cleanArgs.autoConfirm = true;
     }
     if (!wallet && /buy|sell|launch|mint|credits|access|nft_prepare|nft_submit|burn|claim/.test(name)) {
       return {
         ok: false,
         error: "wallet_required",
-        message: "This OrbitX account has no Phantom wallet yet. Open https://www.orbitx.world/telegram after /login and connect Phantom.",
+        message: "Connect Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        loginUrl: "https://www.orbitx.world/telegram",
       };
     }
     return hub.runEmbeddedAgentTool({
@@ -1020,6 +1028,19 @@ async function handleTelegramUpdate(update, req) {
 
   const mintArg = String(args.mint || args.ca || extractMint(text) || "").trim();
   if (
+    (tool === "orbitx_prepare_buy" ||
+      tool === "orbitx_buy_orbitx" ||
+      tool === "orbitx_buy" ||
+      tool === "orbitx_trade" ||
+      tool === "orbitx_swap" ||
+      tool === "orbitx_confirm_buy") &&
+    !args.mint &&
+    !mintArg
+  ) {
+    args.mint = ORBITX_MINT;
+    args.ca = ORBITX_MINT;
+  }
+  if (
     (tool === "orbitx_get_wallet" || tool === "orbitx_get_swaps" || tool === "orbitx_get_balance") &&
     !args.address &&
     !args.publicKey &&
@@ -1162,7 +1183,7 @@ async function handleWeb(req, res, body) {
     let links = [];
     if (user?.id) {
       links = await sb(
-        `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,telegram_username,wallet_address,created_at&limit=5`,
+        `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,telegram_username,wallet_address,auto_buy,created_at&limit=5`,
       ).catch(() => []);
     }
     return json(res, {
@@ -1234,12 +1255,45 @@ async function handleWeb(req, res, body) {
       return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet to run this tool." }, 401);
     }
     const wallet = user?.id ? await loadWallet(user.id) : null;
+    let autoBuy = false;
+    let tgLink = user?.id ? { user_id: user.id, wallet_address: wallet } : null;
+    if (user?.id) {
+      const rows = await sb(
+        `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,user_id,wallet_address,auto_buy&limit=1`,
+      ).catch(() => []);
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (row) {
+        autoBuy = Boolean(row.auto_buy);
+        tgLink = {
+          telegram_user_id: row.telegram_user_id,
+          user_id: user.id,
+          wallet_address: row.wallet_address || wallet,
+          auto_buy: autoBuy,
+        };
+      }
+    }
     const toolArgs = withTelegramToolArgs(tool, args);
+    if (
+      (tool === "orbitx_prepare_buy" ||
+        tool === "orbitx_buy_orbitx" ||
+        tool === "orbitx_buy" ||
+        tool === "orbitx_trade" ||
+        tool === "orbitx_swap" ||
+        tool === "orbitx_confirm_buy") &&
+      !toolArgs.mint &&
+      !toolArgs.ca
+    ) {
+      toolArgs.mint = ORBITX_MINT;
+      toolArgs.ca = ORBITX_MINT;
+    }
+    if (autoBuy && /buy|trade|swap|confirm_buy/.test(tool) && toolArgs.autoConfirm !== false) {
+      toolArgs.autoConfirm = true;
+    }
     const mint = String(toolArgs.mint || toolArgs.ca || "").trim();
     if (TOKEN_INTEL_TOOLS.has(tool) && mint) {
       const merged = await buildBrandedScan(mint, {
         req,
-        link: user?.id ? { user_id: user.id, wallet_address: wallet } : null,
+        link: tgLink,
         isGroup: false,
       });
       return json(res, {
@@ -1254,7 +1308,7 @@ async function handleWeb(req, res, body) {
       tool,
       args: toolArgs,
       req,
-      link: user?.id ? { user_id: user.id, wallet_address: wallet } : null,
+      link: tgLink,
       allowPrivileged: Boolean(user?.id),
     });
     return json(res, {
@@ -1263,6 +1317,33 @@ async function handleWeb(req, res, body) {
       text: telegramMessageParts(formatOrbitXTelegramResult(result, tool)).text,
       imageUrls: collectMediaUrls(result),
       result,
+    });
+  }
+
+  if (action === "web.autobuy") {
+    if (!user?.id) return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet first." }, 401);
+    const enabled = body.enabled === true || body.on === true;
+    try {
+      await sb(`telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
+      });
+    } catch {
+      /* column may not exist until migration */
+    }
+    await runTool({
+      tool: "orbitx_trade_auto",
+      args: { enabled },
+      req,
+      link: { user_id: user.id, wallet_address: await loadWallet(user.id) },
+      allowPrivileged: true,
+    }).catch(() => null);
+    return json(res, {
+      ok: true,
+      autoBuy: enabled,
+      message: enabled
+        ? "Auto-sign ON. Next /buy opens Phantom immediately. You still approve in the wallet."
+        : "Auto-sign OFF. Each buy waits for you to tap Sign.",
     });
   }
 

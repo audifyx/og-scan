@@ -178,11 +178,19 @@ export function resolveOfficialCommand(cmd) {
 export const DEFAULT_TELEGRAM_BUY_SOL = 0.05;
 const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap"];
 const BUY_COMMANDS = ["buy", "trade", "swap"];
-const BUY_TOOLS = new Set(["orbitx_prepare_buy", "orbitx_buy", "orbitx_buy_auto", "orbitx_trade", "orbitx_swap"]);
+const BUY_TOOLS = new Set([
+  "orbitx_prepare_buy",
+  "orbitx_buy",
+  "orbitx_buy_auto",
+  "orbitx_trade",
+  "orbitx_swap",
+  "orbitx_buy_orbitx",
+]);
 
 export function applyDefaultBuyAmount(tool, args) {
   const next = { ...(args || {}) };
   if (!BUY_TOOLS.has(String(tool || "").trim())) return next;
+  if (next.amountUsd != null && Number(next.amountUsd) > 0) return next;
   const n = Number(next.amountSol);
   if (!Number.isFinite(n) || n <= 0) next.amountSol = DEFAULT_TELEGRAM_BUY_SOL;
   return next;
@@ -204,12 +212,19 @@ export function argsFromCommand(command, text) {
     !args.mint
   ) {
     const token = rest.split(/\s+/)[0];
-    args.mint = token;
-    args.ca = token;
+    if (PAYLOAD_CA_RE.test(token) && token.length >= 32) {
+      args.mint = token;
+      args.ca = token;
+    }
   }
-  if (BUY_COMMANDS.includes(command) && rest && args.amountSol == null) {
+  if (BUY_COMMANDS.includes(command) && rest && args.amountSol == null && args.amountUsd == null) {
     const parts = rest.split(/\s+/);
-    const maybeAmount = parts.find((part, i) => i > 0 && Number.isFinite(Number(part)) && Number(part) > 0);
+    const maybeAmount = parts.find((part) => {
+      if (PAYLOAD_CA_RE.test(part) && part.length >= 32) return false;
+      if (/\$/.test(part) || /usd|usdc/i.test(part)) return false;
+      const n = Number(part);
+      return Number.isFinite(n) && n > 0;
+    });
     if (maybeAmount) args.amountSol = Number(maybeAmount);
   }
   if (["buy", "sell", "trade", "swap", "orbitx", "credits", "shop", "launch", "mint"].includes(command)) {

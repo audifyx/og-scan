@@ -124,6 +124,13 @@ describe("official OrbitX Telegram bot", () => {
     expect(argsFromCommand("trade", `/trade ${mint} 0.1`)).toMatchObject({ mint, amountSol: 0.1 });
     expect(applyDefaultBuyAmount("orbitx_trade", { mint })).toMatchObject({ mint, amountSol: 0.05 });
     expect(applyDefaultBuyAmount("orbitx_prepare_buy", { mint, amountSol: 0.25 }).amountSol).toBe(0.25);
+    expect(applyDefaultBuyAmount("orbitx_buy_orbitx", { amountUsd: 1 }).amountSol).toBeUndefined();
+    expect(applyDefaultBuyAmount("orbitx_buy_orbitx", { amountUsd: 1 }).amountUsd).toBe(1);
+    expect(argsFromCommand("buy", "/buy $1").mint).toBeUndefined();
+    expect(argsFromCommand("buy", "/buy $1").amountUsd).toBe(1);
+    expect(argsFromCommand("buy", "/buy 0.05").amountSol).toBe(0.05);
+    expect(missingToolInput("orbitx_prepare_buy", {})).toBeNull();
+    expect(missingToolInput("orbitx_get_token", {})).toBe("mint");
     expect(isAgentTelegramToolAllowed("orbitx_trade")).toBe(false);
     expect(isAgentTelegramToolAllowed("orbitx_swap")).toBe(false);
     expect(isAgentTelegramToolAllowed("orbitx_prepare_buy")).toBe(false);
@@ -420,6 +427,43 @@ describe("official OrbitX Telegram bot", () => {
     expect(actions).toContain("https://www.orbitx.world/trade");
     expect(actions.startsWith("{")).toBe(false);
 
+    const walletGate = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: false,
+          error: "wallet_required",
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          token: "ORBITX",
+          message: "Connect Phantom on https://www.orbitx.world/telegram",
+        },
+        "orbitx_buy_orbitx",
+      ),
+    );
+    expect(walletGate).not.toMatch(/No live DexScreener/);
+    expect(walletGate).toContain("Link Phantom");
+    expect(walletGate).toContain("solscan.io/token");
+
+    const signBuy = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: true,
+          requiresSignature: true,
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          amountSol: 0.05,
+          amountUsd: 1,
+          wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+          signUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05",
+          autoSignUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1",
+          solscanToken: "https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        },
+        "orbitx_buy_orbitx",
+      ),
+    );
+    expect(signBuy).not.toMatch(/No live DexScreener/);
+    expect(signBuy).toContain("Sign in Phantom");
+    expect(signBuy).toContain("solscan.io/token");
+    expect(signBuy).toContain("0.05 SOL");
+
     const tick = cardText(
       formatMediaCountdown({
         kind: "video",
@@ -551,6 +595,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("resolveOrbitXToolName");
     expect(api).toContain("handleAutoBuy");
     expect(api).toContain("auto_buy");
+    expect(api).toContain("web.autobuy");
     expect(api).toContain("handleCallbackQuery");
     expect(api).toContain("formatToolMenu");
     expect(api).toContain("missingToolInput");

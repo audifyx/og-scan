@@ -8,6 +8,7 @@ export type TelegramOrbitXLink = {
   telegram_user_id: string;
   telegram_username?: string | null;
   wallet_address?: string | null;
+  auto_buy?: boolean | null;
   created_at?: string;
 };
 
@@ -122,4 +123,12 @@ export async function telegramOrbitXCall(
 ): Promise<TelegramOrbitXCallResult> {
   const json = await post({ action: "web.call", tool, args }, await optionalAuthHeaders());
   return json as unknown as TelegramOrbitXCallResult;
+}
+
+export async function telegramOrbitXSetAutoBuy(enabled: boolean): Promise<{ autoBuy: boolean; message?: string }> {
+  const json = await post({ action: "web.autobuy", enabled: Boolean(enabled) }, await requireAuthHeaders());
+  return {
+    autoBuy: Boolean(json.autoBuy),
+    message: typeof json.message === "string" ? json.message : undefined,
+  };
 }

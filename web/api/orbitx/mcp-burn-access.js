@@ -905,6 +905,8 @@ export function prepareAccessMcpPurchase({
     signUrl,
     autoSignUrl,
     openUrl: mode === "auto" ? autoSignUrl : signUrl,
+    solscanToken: `https://solscan.io/token/${ORBITX_BURN_MINT}`,
+    solscanAccount: pk ? `https://solscan.io/account/${pk}` : "",
     instructions:
       mode === "auto"
         ? [
