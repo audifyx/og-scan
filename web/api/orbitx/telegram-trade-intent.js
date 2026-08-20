@@ -101,6 +101,30 @@ function isCapabilityQuestion(compact) {
   return false;
 }
 
+/** Research / opinion — not an order. "is it a good buy" must not fire a swap. */
+export function isOpinionOrResearchAsk(text) {
+  const compact = String(text || "")
+    .toLowerCase()
+    .replace(/@\w+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!compact) return false;
+  return (
+    /\btell me about\b/.test(compact) ||
+    /\bwhat(?:'s| is) (?:this|it)(?:\s+(?:token|project|coin))?\b/.test(compact) ||
+    /\bis (?:it|this) a (?:good|bad|smart|dumb) buy\b/.test(compact) ||
+    /\b(?:good|bad|smart|dumb) buy\b/.test(compact) ||
+    /\bworth (?:buying|aping|it)\b/.test(compact) ||
+    /\bshould i (?:buy|ape|snipe)\b/.test(compact) ||
+    /\bwould you (?:buy|ape)\b/.test(compact) ||
+    /\bdyor\b/.test(compact)
+  );
+}
+
+export function hasExplicitTradeAmount(text) {
+  return Boolean(parseUsdAmount(text) || parseSolAmount(text));
+}
+
 /**
  * @returns {{ tool: string, args: Record<string, unknown>, meta?: string } | null}
  */
@@ -168,6 +192,10 @@ export function parseTradeIntent(text) {
     (/\b(trade|swap)\b/.test(compact) && !selling);
 
   if (buying && isCapabilityQuestion(compact) && !amountSol && !amountUsd && !extractMintFromText(t)) {
+    return null;
+  }
+
+  if (buying && isOpinionOrResearchAsk(t) && !amountSol && !amountUsd) {
     return null;
   }
 

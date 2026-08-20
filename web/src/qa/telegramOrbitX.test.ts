@@ -139,6 +139,14 @@ describe("official OrbitX Telegram bot", () => {
     expect(inferPublicTool(`can you tell me about ${ansem}`)?.meta).toBe("brief");
     expect(inferPublicTool(`can you tell me about ${ansem}`)?.args).toMatchObject({ mint: ansem });
     expect(inferPublicTool(`what is this project ${ansem}`)?.meta).toBe("brief");
+    const goodBuy = `Hey tell me about this is it a good buy?\n13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9`;
+    expect(isTokenProjectQuestion(goodBuy)).toBe(true);
+    expect(inferPublicTool(goodBuy)?.meta).toBe("brief");
+    expect(inferPublicTool(goodBuy)?.tool).toBeUndefined();
+    expect(inferPublicTool(goodBuy)?.args).toMatchObject({
+      mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    });
+    expect(inferPublicTool(`is it a good buy ${ansem}`)?.meta).toBe("brief");
     expect(inferPublicTool(ansem)?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool(`/token ${ansem}`)).toBeNull();
     const facts = compactTokenBriefFacts({

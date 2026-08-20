@@ -6,7 +6,7 @@
  */
 import { isHoldGatedTool } from "./token-hold.js";
 import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
-import { applyTelegramAlias, parseTradeIntent } from "./telegram-trade-intent.js";
+import { applyTelegramAlias, hasExplicitTradeAmount, parseTradeIntent } from "./telegram-trade-intent.js";
 import { ORBITX_MINT } from "./telegram-token-snapshot.js";
 import {
   CA_RE as PAYLOAD_CA_RE,
@@ -433,7 +433,7 @@ export function extractMint(text) {
 }
 
 const PROJECT_QUESTION_RE =
-  /\b(tell me about|tell me|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape)|is (?:it|this) legit)\b/i;
+  /\b(tell me about|tell me|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape|snipe)|is (?:it|this) legit|is (?:it|this) a (?:good|bad) buy|(?:good|bad) buy|worth (?:buying|aping)|would you (?:buy|ape))\b/i;
 
 /** Natural-language project ask (not /token). Needs a mint in the same message. */
 export function isTokenProjectQuestion(text) {
@@ -531,6 +531,11 @@ export function inferPublicTool(text) {
 
   if (/^(faq|faqs)\b/i.test(lower) && t.length < 120) {
     return { meta: "faq", args: { q: t.replace(/^(?:faq|faqs)\b[:\s-]*/i, "").trim() } };
+  }
+
+  const mintForBrief = extractMint(t);
+  if (mintForBrief && isTokenProjectQuestion(t) && !hasExplicitTradeAmount(t)) {
+    return { meta: "brief", args: { mint: mintForBrief } };
   }
 
   const trade = parseTradeIntent(t);
