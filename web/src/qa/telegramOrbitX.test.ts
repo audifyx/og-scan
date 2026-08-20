@@ -44,6 +44,7 @@ import {
   normalizeDexResponse,
   tokenFromGecko,
 } from "../../api/orbitx/telegram-token-snapshot.js";
+import { phantomBrowseUrl } from "../../api/orbitx/telegram-tool-cards.js";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
@@ -524,6 +525,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(signBuy).toContain("Sign in Phantom");
     expect(signBuy).toContain("solscan.io/token");
     expect(signBuy).toContain("0.05 SOL");
+    expect(signBuy).toContain("Auto-sign");
+    expect(signBuy).toContain("phantom.app/ul/browse");
+    expect(signBuy).toContain("/agent/sign?action=buy");
 
     const tick = cardText(
       formatMediaCountdown({
@@ -678,5 +682,13 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("missingToolInput");
     expect(api).toContain("sendCard");
     expect(api).not.toContain("8595161432");
+  });
+
+  it("wraps Telegram Auto-sign links in Phantom browse URLs", () => {
+    const page = "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1";
+    const wrapped = phantomBrowseUrl(page);
+    expect(wrapped.startsWith("https://phantom.app/ul/browse/")).toBe(true);
+    expect(wrapped).toContain(encodeURIComponent(page));
+    expect(phantomBrowseUrl(wrapped)).toBe(wrapped);
   });
 });

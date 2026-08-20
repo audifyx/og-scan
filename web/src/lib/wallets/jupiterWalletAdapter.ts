@@ -22,7 +22,7 @@ import {
 } from "@solana/wallet-adapter-base";
 import type { SendTransactionOptions, WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { PublicKey, VersionedTransaction, type Connection, type Transaction, type TransactionVersion } from "@solana/web3.js";
-import { coercePublicKey, normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
+import { coercePublicKey, normalizeSignatureBytes, normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
 
 export const JupiterWalletName = "Jupiter" as WalletName<"Jupiter">;
 
@@ -51,12 +51,12 @@ export function isJupiterWalletName(name?: string | null): boolean {
 }
 
 function extractJupiterSignature(result: unknown): string | null {
-  if (typeof result === "string" && result.length > 30) return result;
-  if (result && typeof result === "object" && "signature" in result) {
-    const sig = (result as { signature: unknown }).signature;
-    if (typeof sig === "string" && sig.length > 30) return sig;
+  try {
+    const sig = normalizeTxSignatureBase58(result);
+    return sig.length > 30 ? sig : null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 function isWalletUserRejection(error: unknown): boolean {
