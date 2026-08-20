@@ -2,8 +2,8 @@
  * OrbitX AI first-party backend.
  *
  * Auth: Supabase JWT.
- * Access: authoritative SIWS wallet identity holding >= $5 ORBITX, unexpired
- * $ORBITX burn access, or owner/platform exemptions.
+ * Access: launch MCP unlock (code "Orbitx mcp" for the first 25, or burn 500
+ * $ORBITX forever). Owner/platform wallets remain exempt.
  * Intelligence: NVIDIA NIM with the live OrbitX MCP tool catalog.
  * Media: Grok Imagine through the existing MCP media implementation.
  */
@@ -22,6 +22,17 @@ import {
 } from "./orbitx-hub.js";
 import { verifyTokenHold } from "./orbitx/token-hold.js";
 import { statusFromRow } from "./orbitx/mcp-burn-access.js";
+import {
+  MCP_LAUNCH_BURN_TOKENS,
+  MCP_LAUNCH_BUY_URL,
+  MCP_LAUNCH_CODE,
+  MCP_LAUNCH_DEX,
+  MCP_LAUNCH_X,
+  collectUnlockProbe,
+  getLaunchUnlock,
+  launchGatePayload,
+  tryLaunchUnlockFromText,
+} from "./orbitx/mcp-launch-gate.js";
 import {
   DEFAULT_NIM_MODEL,
   NIM_MODELS,
@@ -44,6 +55,28 @@ const CONFIRMATION_TTL_MS = 15 * 60_000;
 const FALLBACK_PUBLIC_BASE = "https://www.orbitx.world";
 const MEDIA_ASPECTS = new Set(["2:3", "3:2", "1:1", "9:16", "16:9"]);
 const VIDEO_MODES = new Set(["fun", "normal", "spicy"]);
+const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+async function launchSb(path, init = {}) {
+  if (!SUPA_URL || !SRK) throw new Error("supabase_not_configured");
+  const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: SRK,
+      Authorization: `Bearer ${SRK}`,
+      "Content-Type": "application/json",
+      Prefer: init.headers?.Prefer || "return=representation",
+      ...(init.headers || {}),
+    },
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => "");
+    throw new Error(`supabase ${r.status}: ${t.slice(0, 220)}`);
+  }
+  if (r.status === 204) return null;
+  return r.json();
+}
 
 const DIRECT_TOOL_NAMES = new Set([
   "orbitx_menu",
@@ -415,15 +448,41 @@ async function authenticatedContext(req) {
     /* table may not exist until migration is applied */
   }
 
+  let launch = { allowed: false, remainingFree: 25 };
+  try {
+    launch = await getLaunchUnlock(launchSb, { userId: id, wallet: walletAddress, email });
+  } catch {
+    launch = { allowed: false, remainingFree: 25 };
+  }
+  const launchUnlocked = Boolean(launch.allowed);
+
   return {
     userId: id,
     email,
     walletAddress,
     gate: {
       ...gate,
-      hasAccess: Boolean(gate.meetsRequirement || gate.exempt || burn.active),
+      hasAccess: launchUnlocked,
       mcpAccess: burn,
-      accessSource: gate.exempt ? "exempt" : burn.active ? "burn" : gate.meetsRequirement ? "hold" : null,
+      accessSource: launchUnlocked
+        ? launch.source || "launch"
+        : gate.exempt
+          ? "exempt"
+          : burn.active
+            ? "burn"
+            : gate.meetsRequirement
+              ? "hold"
+              : null,
+      launchLocked: !launchUnlocked,
+      launchCode: MCP_LAUNCH_CODE,
+      remainingFree: launch.remainingFree,
+      burnTokens: MCP_LAUNCH_BURN_TOKENS,
+      buyUrl: MCP_LAUNCH_BUY_URL,
+      dexUrl: MCP_LAUNCH_DEX,
+      xUrl: MCP_LAUNCH_X,
+      message: launchUnlocked
+        ? gate.message
+        : launchGatePayload({ remainingFree: launch.remainingFree }).message,
     },
     db,
   };
@@ -432,7 +491,8 @@ async function authenticatedContext(req) {
 function requireAccess(ctx) {
   if (ctx.gate.hasAccess) return;
   const error = new Error(
-    ctx.gate.message || "MCP access required — hold ≥$5 ORBITX or burn 100/1,000 tokens for timed access",
+    ctx.gate.message ||
+      "Please send the authorization code to gain access or get access right away by burning 500 $ORBITX.",
   );
   error.status = 403;
   error.payload = ctx.gate;
@@ -1297,6 +1357,50 @@ async function handleToolCancel(req, res, ctx, body) {
   return json(res, { ok: true, event });
 }
 
+async function handleUnlock(req, res, ctx, body) {
+  const identities = {
+    userId: ctx.userId,
+    wallet: ctx.walletAddress,
+    email: ctx.email,
+  };
+  const blob = collectUnlockProbe(body);
+  const probe = await tryLaunchUnlockFromText(launchSb, blob, identities);
+  const launch = await getLaunchUnlock(launchSb, identities);
+  const gate = {
+    ...ctx.gate,
+    hasAccess: Boolean(launch.allowed),
+    launchLocked: !launch.allowed,
+    remainingFree: launch.remainingFree,
+    accessSource: launch.allowed ? launch.source || "launch" : ctx.gate.accessSource,
+    message: launch.allowed
+      ? probe.result?.message || "MCP unlocked forever."
+      : launchGatePayload({ remainingFree: launch.remainingFree }).message,
+  };
+  if (!probe.handled) {
+    return json(
+      res,
+      {
+        ok: false,
+        error: "unlock_required",
+        ...launchGatePayload({ remainingFree: launch.remainingFree }),
+        gate,
+        walletAddress: ctx.walletAddress,
+      },
+      400,
+    );
+  }
+  return json(
+    res,
+    {
+      ok: Boolean(probe.granted),
+      ...probe.result,
+      gate,
+      walletAddress: ctx.walletAddress,
+    },
+    probe.granted ? 200 : 400,
+  );
+}
+
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   try {
@@ -1314,6 +1418,7 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
 
     const body = parseBody(req);
+    if (action === "unlock") return await handleUnlock(req, res, ctx, body);
     if (action === "chat") return await handleChat(req, res, ctx, body);
     if (action === "conversation") return await handleConversation(req, res, ctx, body);
     if (action === "media.generate") return await handleMediaGenerate(req, res, ctx, body);

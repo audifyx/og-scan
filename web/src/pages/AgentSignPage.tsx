@@ -88,8 +88,9 @@ export default function AgentSignPage() {
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
     if (kind === "mcp-access") {
-      const tokens = packageId === "week" ? 1000 : 100;
-      const label = packageId === "week" ? "1 week" : "1 day";
+      const forever = packageId === "forever" || packageId === "lifetime" || packageId === "launch";
+      const tokens = forever ? 500 : packageId === "week" ? 1000 : 100;
+      const label = forever ? "forever" : packageId === "week" ? "1 week" : "1 day";
       return `Burn ${tokens.toLocaleString()} $ORBITX → ${label} MCP access`;
     }
     if (kind === "claim") return "creator fees";
@@ -108,7 +109,9 @@ export default function AgentSignPage() {
       const sol = Number(amountRaw);
       return Number.isFinite(sol) && sol >= 0.001;
     }
-    if (kind === "mcp-access") return packageId === "day" || packageId === "week";
+    if (kind === "mcp-access") {
+      return packageId === "day" || packageId === "week" || packageId === "forever" || packageId === "lifetime" || packageId === "launch";
+    }
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
@@ -202,8 +205,12 @@ export default function AgentSignPage() {
       }
 
       if (kind === "mcp-access") {
-        const pkg = packageId === "week" ? "week" : "day";
-        const res = await fetch("/api/orbitx-agent/mcp-access/prepare", {
+        const forever = packageId === "forever" || packageId === "lifetime" || packageId === "launch";
+        const pkg = forever ? "forever" : packageId === "week" ? "week" : "day";
+        const preparePath = forever
+          ? "/api/orbitx-agent/mcp-unlock/prepare"
+          : "/api/orbitx-agent/mcp-access/prepare";
+        const res = await fetch(preparePath, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ publicKey: pk, packageId: pkg }),
@@ -229,6 +236,24 @@ export default function AgentSignPage() {
         }
         await connection.confirmTransaction(sig, "confirmed");
         setSignature(sig);
+        if (forever) {
+          const session = (await supabase.auth.getSession()).data.session;
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+          const confirmRes = await fetch("/api/orbitx-agent/mcp-unlock/confirm", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ signature: sig, publicKey: pk }),
+          });
+          const granted = await confirmRes.json().catch(() => ({}));
+          setExtraNote(
+            granted.message ||
+              (granted.ok
+                ? "Burn verified. MCP unlocked forever."
+                : "Burn sent. Paste the Solscan tx link in Telegram, Claude, or /ai if access does not appear."),
+          );
+          return;
+        }
         rememberPendingMcpBurn({ signature: sig, publicKey: pk, packageId: pkg });
         const granted = await confirmMcpAccessBurnUntilGranted({
           signature: sig,
@@ -353,7 +378,7 @@ export default function AgentSignPage() {
             : kind === "mcp-access"
               ? autoPrompt
                 ? "Chat auto-confirm — Jupiter will burn the exact $ORBITX package amount, then MCP access starts."
-                : "Approve the $ORBITX burn in Jupiter. MCP access starts after confirmation and expires automatically."
+                : "Approve the $ORBITX burn in Jupiter. Forever MCP unlocks after a 500-token burn; day/week packs expire automatically."
               : autoPrompt
                 ? "Chat auto-confirm — Jupiter will prompt as soon as your wallet is connected."
                 : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Jupiter — nothing broadcasts until you sign.`}

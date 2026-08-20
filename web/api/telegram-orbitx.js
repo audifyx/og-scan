@@ -51,6 +51,15 @@ import {
 import { fetchTelegramTokenSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
+import {
+  extractSolscanSignature,
+  getLaunchUnlock,
+  isLaunchCode,
+  launchGateHtml,
+  launchGateInlineKeyboard,
+  launchUnlockTelegramHtml,
+  tryLaunchUnlockFromText,
+} from "./orbitx/mcp-launch-gate.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -798,12 +807,50 @@ async function sendCard(chatId, formatted, extra = {}) {
   });
 }
 
+function telegramLaunchIdentities(from, link) {
+  return {
+    telegramUserId: from?.id != null ? String(from.id) : "",
+    userId: link?.user_id || "",
+    wallet: link?.wallet_address || "",
+  };
+}
+
+async function enforceTelegramLaunchGate({ from, link, text, chatId, replyExtra = {}, allowLogin = false }) {
+  const identities = telegramLaunchIdentities(from, link);
+  const status = await getLaunchUnlock(sb, identities);
+  if (status.allowed) return { allowed: true, status };
+  const probe = await tryLaunchUnlockFromText(sb, text, identities);
+  if (probe.handled) {
+    await sendLong(chatId, launchUnlockTelegramHtml(probe.result), {
+      parse_mode: "HTML",
+      reply_markup: probe.granted ? undefined : launchGateInlineKeyboard(),
+      ...replyExtra,
+    });
+    return { allowed: Boolean(probe.granted), handled: true, granted: Boolean(probe.granted), status };
+  }
+  if (allowLogin) return { allowed: false, status };
+  await sendLong(chatId, launchGateHtml(status), {
+    parse_mode: "HTML",
+    reply_markup: launchGateInlineKeyboard(),
+    ...replyExtra,
+  });
+  return { allowed: false, handled: true, status };
+}
+
 async function handleCallbackQuery(cq, req) {
   const data = String(cq?.data || "").trim();
   const chatId = cq?.message?.chat?.id;
   const from = cq?.from || {};
   if (cq?.id) await tg("answerCallbackQuery", { callback_query_id: cq.id });
   if (!chatId || !data.startsWith("ox:")) return;
+  const link = from.id ? await loadLink(from.id) : null;
+  const gate = await enforceTelegramLaunchGate({
+    from,
+    link,
+    text: "",
+    chatId,
+  });
+  if (!gate.allowed) return;
   const key = data.slice(3);
   if (key === "links") {
     await sendLinks(chatId, {});
@@ -872,10 +919,40 @@ async function handleTelegramUpdate(update, req) {
     new RegExp(`@${OFFICIAL_BOT_USERNAME}\\b`, "i").test(text) ||
     Boolean(msg.reply_to_message?.from?.username?.toLowerCase() === OFFICIAL_BOT_USERNAME);
 
-  if (isGroup && text && !text.startsWith("/") && !mentioned) return;
+  if (
+    isGroup &&
+    text &&
+    !text.startsWith("/") &&
+    !mentioned &&
+    !isLaunchCode(text) &&
+    !extractSolscanSignature(text) &&
+    !/solscan\.io\/tx\//i.test(text)
+  ) {
+    return;
+  }
 
   const hub = await import("./orbitx-hub.js");
   const tools = hub.listAllOrbitXTools();
+
+  const isLoginCmd = bare === "login" || bare === "auth";
+  const launchGate = await enforceTelegramLaunchGate({
+    from,
+    link,
+    text,
+    chatId,
+    replyExtra,
+    allowLogin: isLoginCmd && !isGroup,
+  });
+  if (launchGate.handled && launchGate.granted) return;
+  if (!launchGate.allowed && !isLoginCmd) return;
+  if (!launchGate.allowed && isLoginCmd && isGroup) {
+    await tg("sendMessage", {
+      chat_id: chatId,
+      text: "Login is private. Message @theorbitxmcpbot directly and send /login.",
+      ...replyExtra,
+    });
+    return;
+  }
 
   if (bare === "start" || bare === "help") {
     await sendCard(chatId, helpText(!isGroup, Boolean(link)), replyExtra);

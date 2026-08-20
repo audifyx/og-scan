@@ -59,6 +59,7 @@ function message(overrides: Partial<AiMessage>): AiMessage {
 
 const api = vi.hoisted(() => ({
   fetchAiGate: vi.fn(),
+  unlockOrbitXAi: vi.fn(),
   bootstrapOrbitXAi: vi.fn(),
   fetchAiMessages: vi.fn(),
   sendAiMessage: vi.fn(),
@@ -128,6 +129,27 @@ describe("/ai OrbitX AI page", () => {
     render(<OrbitXAI />);
     expect(await screen.findByPlaceholderText("Message OrbitX AI…")).toBeInTheDocument();
     expect(api.bootstrapOrbitXAi).toHaveBeenCalled();
+  });
+
+  it("asks for the authorization code before the AI boots", async () => {
+    api.fetchAiGate.mockResolvedValue({
+      gate: {
+        hasAccess: false,
+        meetsRequirement: false,
+        mint: "mint",
+        minUsd: 5,
+        launchCode: "Orbitx mcp",
+        remainingFree: 25,
+        burnTokens: 500,
+        message:
+          "Please send the authorization code to gain access or get access right away by burning 500 $ORBITX.",
+      },
+      walletAddress: conversation.walletAddress ?? null,
+    });
+    render(<OrbitXAI />);
+    expect(await screen.findByRole("button", { name: /Unlock with code/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/Please send the authorization code/i).length).toBeGreaterThan(0);
+    expect(api.bootstrapOrbitXAi).not.toHaveBeenCalled();
   });
 
   it("sends a message and renders the assistant reply", async () => {

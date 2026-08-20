@@ -13,9 +13,15 @@ export type AiGate = {
   holdingUsd?: number;
   buyUrl?: string;
   holdUrl?: string;
+  dexUrl?: string;
+  xUrl?: string;
   error?: string;
   message?: string;
-  accessSource?: "exempt" | "burn" | "hold" | null;
+  accessSource?: "exempt" | "burn" | "hold" | "launch" | "promo_code" | "burn_500" | null;
+  launchLocked?: boolean;
+  launchCode?: string;
+  remainingFree?: number;
+  burnTokens?: number;
   mcpAccess?: {
     active?: boolean;
     expired?: boolean;
@@ -178,6 +184,15 @@ function post<T>(action: string, body: object, timeoutMs?: number): Promise<T> {
 
 export async function fetchAiGate(): Promise<{ gate: AiGate; walletAddress: string | null }> {
   return request("?action=gate", { method: "GET" }, 30_000);
+}
+
+export async function unlockOrbitXAi(payload: {
+  code?: string;
+  signature?: string;
+  solscan?: string;
+  text?: string;
+}): Promise<{ ok: boolean; message?: string; gate?: AiGate }> {
+  return post("unlock", payload, 45_000);
 }
 
 export async function bootstrapOrbitXAi(): Promise<AiBootstrap> {

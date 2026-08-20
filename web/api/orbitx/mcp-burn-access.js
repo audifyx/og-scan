@@ -467,14 +467,15 @@ function sleep(ms) {
 
 export async function verifyOrbitxBurn(
   signature,
-  { packageId, wallet, pollAttempts = 8, pollMs = 750 } = {},
+  { packageId, wallet, pollAttempts = 8, pollMs = 750, minTokens } = {},
 ) {
   const sig = String(signature || "").trim();
   if (!sig || sig.length < 32) {
     return { ok: false, error: "signature_required", message: "Transaction signature is required" };
   }
-  const requested = packageId ? resolvePackage(packageId) : null;
-  if (packageId && !requested) {
+  const min = Number(minTokens) > 0 ? Number(minTokens) : 0;
+  const requested = !min && packageId ? resolvePackage(packageId) : null;
+  if (packageId && !min && !requested) {
     return {
       ok: false,
       error: "invalid_package",
@@ -568,6 +569,28 @@ export async function verifyOrbitxBurn(
       error: "wallet_mismatch",
       message: "Burn wallet does not match the connected wallet.",
       wallet: owner,
+    };
+  }
+
+  if (min > 0) {
+    if (burnedUi + 1e-6 < min) {
+      return {
+        ok: false,
+        error: "amount_too_low",
+        message: `Burned ${burnedUi} ORBITX — need ${min} for forever MCP access.`,
+        tokensBurned: burnedUi,
+        required: min,
+        mint,
+      };
+    }
+    return {
+      ok: true,
+      signature: sig,
+      mint,
+      wallet: owner || expectedWallet || null,
+      tokensBurned: burnedUi,
+      package: { id: "forever", tokens: min, label: "MCP forever", durationLabel: "forever" },
+      explorer: `https://solscan.io/tx/${sig}`,
     };
   }
 

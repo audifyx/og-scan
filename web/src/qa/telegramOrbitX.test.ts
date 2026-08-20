@@ -132,6 +132,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(hub).toContain('orbitx_trade: "orbitx_prepare_buy"');
     expect(hub).toContain('orbitx_swap: "orbitx_prepare_buy"');
     expect(hub).toContain("export function resolveEmbeddedAgentToolName");
+    expect(hub).toContain("orbitx_mcp_unlock");
+    expect(hub).toContain("mcp-launch-gate.js");
     const api = readFileSync(resolve(WEB, "api/telegram-orbitx.js"), "utf8");
     expect(api).toContain("resolveEmbeddedAgentToolName");
     expect(api).toContain("applyDefaultBuyAmount");
@@ -552,6 +554,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("handleAutoBuy");
     expect(api).toContain("auto_buy");
     expect(api).toContain("handleCallbackQuery");
+    expect(api).toContain("enforceTelegramLaunchGate");
+    expect(api).toContain("mcp-launch-gate.js");
     expect(api).toContain("formatToolMenu");
     expect(api).toContain("missingToolInput");
     expect(api).toContain("sendCard");
