@@ -373,8 +373,8 @@ export function deskKeyboard() {
   ]);
 }
 
-export function startGateKeyboard() {
-  return inlineKeyboard([
+export function startGateKeyboard({ unlocked = false } = {}) {
+  const rows = [
     [{ text: "Redeem ORBITX BETA", callback_data: "ox:gate:beta" }],
     [{ text: "I have a code", callback_data: "ox:gate:code" }],
     [
@@ -385,14 +385,15 @@ export function startGateKeyboard() {
       { text: "Burn 1 week · 10k", callback_data: "ox:gate:week" },
       { text: "Burn 1 month · 1000k", callback_data: "ox:gate:month" },
     ],
-    [
-      { text: "Link wallet /login", callback_data: "ox:gate:login" },
-      { text: "Desk", callback_data: "ox:desk" },
-    ],
-  ]);
+    [{ text: "Link wallet /login", callback_data: "ox:gate:login" }],
+  ];
+  if (unlocked) {
+    rows.push([{ text: "Desk", callback_data: "ox:desk" }]);
+  }
+  return inlineKeyboard(rows);
 }
 
-export function formatTelegramStartGate({ remainingLabel = "", linked = false } = {}) {
+export function formatTelegramStartGate({ remainingLabel = "", linked = false, unlocked = false } = {}) {
   const accessLine = remainingLabel
     ? `Access: <b>${tgEsc(remainingLabel)}</b>`
     : "";
@@ -401,7 +402,7 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false } 
     "",
     "Please share the access code <code>ORBITX BETA</code> to gain <b>lifetime MCP</b> access — an early thank you to our supporters. Only the <b>first 25</b> get in.",
     "",
-    "This bot does not reply until you share the code, then <code>/login</code>.",
+    "This bot is locked. It does not reply until you share the code, then <code>/login</code>.",
     "",
     "Or you can burn now and get timed access:",
     "",
@@ -418,7 +419,14 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false } 
   ]
     .filter((line, i, arr) => line !== "" || arr[i - 1] !== "")
     .join("\n");
-  return { text, reply_markup: startGateKeyboard() };
+  return { text, reply_markup: startGateKeyboard({ unlocked }) };
+}
+
+export function formatTelegramGroupLockHtml() {
+  return [
+    "This bot is <b>locked</b>.",
+    "DM @theorbitxmcpbot and share <code>ORBITX BETA</code> (first 25 get lifetime), then <code>/login</code>.",
+  ].join("\n");
 }
 
 function familyKeyboard(family) {

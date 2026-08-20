@@ -27,6 +27,7 @@ import {
   formatGroupWelcomeHtml,
   formatHelpDesk,
   formatTelegramStartGate,
+  formatTelegramGroupLockHtml,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
@@ -509,6 +510,26 @@ async function sendAccessStatus(chatId, from, extra = {}) {
   return status;
 }
 
+async function senderGate(from, link) {
+  const row = from?.id ? await loadTelegramBotAccess(sb, from.id) : null;
+  return telegramDmUnlockState(row, link);
+}
+
+async function rejectLockedSender(chatId, from, link, extra, req, isGroup) {
+  if (isGroup) {
+    await sendLong(chatId, formatTelegramGroupLockHtml(), { parse_mode: "HTML", ...extra });
+    if (from?.id && String(from.id) !== String(chatId)) {
+      try {
+        await handleStartDm(from.id, from, link, {}, req);
+      } catch {
+        /* user may not have started the bot yet */
+      }
+    }
+    return;
+  }
+  await handleStartDm(chatId, from, link, extra, req);
+}
+
 async function promptLoginAfterCode(chatId, from, extra, req) {
   let loginBody = "Send <code>/login</code> to bind this Telegram to YOUR wallet.";
   try {
@@ -531,22 +552,18 @@ async function promptLoginAfterCode(chatId, from, extra, req) {
 }
 
 async function handleStartDm(chatId, from, link, extra, req) {
-  const row = await loadTelegramBotAccess(sb, from?.id);
-  const gate = telegramDmUnlockState(row, link);
-  if (gate.unlocked) {
-    await sendCard(chatId, formatHelpDesk(true, true), extra);
-    return;
-  }
+  const gate = await senderGate(from, link);
   if (gate.needsLogin) {
     await promptLoginAfterCode(chatId, from, extra, req);
     return;
   }
-  awaitingCode.set(String(from?.id || ""), Date.now());
+  if (gate.needsCode) awaitingCode.set(String(from?.id || ""), Date.now());
   await sendCard(
     chatId,
     formatTelegramStartGate({
-      remainingLabel: "",
+      remainingLabel: gate.accessActive ? gate.remainingLabel : "",
       linked: Boolean(link),
+      unlocked: gate.unlocked,
     }),
     extra,
   );
@@ -1095,12 +1112,11 @@ async function handleCallbackQuery(cq, req) {
   const key = data.slice(3);
   const chatType = String(cq?.message?.chat?.type || "");
   const isGroupChat = chatType === "group" || chatType === "supergroup";
-  if (!isGroupChat && from.id && !key.startsWith("gate:")) {
-    const link = await loadLink(from.id);
-    const dmGate = telegramDmUnlockState(await loadTelegramBotAccess(sb, from.id), link);
+  const link = from.id ? await loadLink(from.id) : null;
+  if (from.id && !key.startsWith("gate:")) {
+    const dmGate = await senderGate(from, link);
     if (!dmGate.unlocked) {
-      if (dmGate.needsCode) await handleStartDm(chatId, from, link, extra, req);
-      else await promptLoginAfterCode(chatId, from, extra, req);
+      await rejectLockedSender(chatId, from, link, extra, req, isGroupChat);
       return;
     }
   }
@@ -1245,20 +1261,23 @@ async function handleTelegramUpdate(update, req) {
   }
 
   const bare = text.toLowerCase().split(/\s+/)[0].replace(/@.*$/, "").replace(/^\//, "");
+  const gate = await senderGate(from, link);
 
-  if (isGroup && !isPublicGroupTrigger(text, msg)) return;
-
-  if (!isGroup) {
-    const dmGate = telegramDmUnlockState(await loadTelegramBotAccess(sb, from.id), link);
-    if (!dmGate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
-      if (dmGate.needsCode) {
-        awaitingCode.set(String(from.id), Date.now());
-        await handleStartDm(chatId, from, link, replyExtra, req);
-      } else {
-        await promptLoginAfterCode(chatId, from, replyExtra, req);
-      }
+  if (isGroup) {
+    if (!gate.unlocked) {
+      const addressed =
+        bare === "start" ||
+        bare === "code" ||
+        isOrbitXBetaCode(text) ||
+        isPublicGroupTrigger(text, msg);
+      if (addressed) await rejectLockedSender(chatId, from, link, replyExtra, req, true);
       return;
     }
+    if (!isPublicGroupTrigger(text, msg) && bare !== "start") return;
+  } else if (!gate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
+    awaitingCode.set(String(from.id), Date.now());
+    await handleStartDm(chatId, from, link, replyExtra, req);
+    return;
   }
 
   const hub = await import("./orbitx-hub.js");
@@ -1266,7 +1285,11 @@ async function handleTelegramUpdate(update, req) {
 
   if (bare === "start") {
     if (isGroup) {
-      await sendCard(chatId, helpText(false, Boolean(link)), replyExtra);
+      await sendLong(
+        chatId,
+        "You're in. Drop a CA or /token /chart /scan.",
+        { parse_mode: "HTML", ...replyExtra },
+      );
       return;
     }
     await handleStartDm(chatId, from, link, replyExtra, req);
@@ -1274,7 +1297,11 @@ async function handleTelegramUpdate(update, req) {
   }
 
   if (bare === "help") {
-    await sendCard(chatId, helpText(!isGroup, Boolean(link)), replyExtra);
+    if (isGroup) {
+      await sendLong(chatId, "Drop a CA or /token /chart /scan. Trade is in a DM after /login.", replyExtra);
+      return;
+    }
+    await sendCard(chatId, helpText(true, Boolean(link)), replyExtra);
     return;
   }
 
@@ -1500,6 +1527,11 @@ async function handleTelegramUpdate(update, req) {
   );
   try {
     args = withTelegramToolArgs(tool, args);
+    const liveGate = await senderGate(from, link);
+    if (!liveGate.unlocked) {
+      await rejectLockedSender(chatId, from, link, replyExtra, req, isGroup);
+      return;
+    }
     const result = await runTool({
       tool,
       args,

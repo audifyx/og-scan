@@ -196,6 +196,8 @@ describe("DM unlock gate", () => {
 
   it("only allows onboarding commands while locked", () => {
     expect(isAllowedGatedDmCommand("token", "token CA")).toBe(false);
+    expect(isAllowedGatedDmCommand("help", "/help")).toBe(false);
+    expect(isAllowedGatedDmCommand("cmds", "/cmds")).toBe(false);
     expect(isAllowedGatedDmCommand("ask", "gm")).toBe(false);
     expect(isAllowedGatedDmCommand("help", "/help")).toBe(false);
     expect(isAllowedGatedDmCommand("start", "/start")).toBe(true);

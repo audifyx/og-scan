@@ -139,6 +139,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(card.text).toContain("lifetime MCP");
     expect(card.text).toContain("first 25");
     expect(card.text).toContain("does not reply until you share the code");
+    expect(card.text).toContain("This bot is locked");
     expect(card.text).toContain("burn now and get timed access");
     expect(card.text).toContain("1 hour");
     expect(card.text).toContain("100 $ORBITX");
@@ -152,9 +153,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(buttons).toContain("ox:gate:code");
     expect(buttons).toContain("ox:gate:hour");
     expect(buttons).toContain("ox:gate:month");
-    const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true });
+    expect(buttons).not.toContain("ox:desk");
+    const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true, unlocked: true });
     expect(linked.text).toContain("lifetime");
     expect(linked.text).not.toContain("Burns need");
+    expect(JSON.stringify(linked.reply_markup)).toContain("ox:desk");
     expect(inferPublicTool("shop hour")?.args).toMatchObject({ package: "hour" });
     expect(inferPublicTool("shop month")?.args).toMatchObject({ package: "month" });
   });
@@ -189,7 +192,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(extras.extra.allow_sending_without_reply).toBe(true);
     expect(extras.extra.message_thread_id).toBe(12);
     expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
-    expect(formatGroupWelcomeHtml()).toContain("/token");
+    expect(formatGroupWelcomeHtml()).toContain("locked");
+    expect(formatGroupWelcomeHtml()).toContain("ORBITX BETA");
   });
 
   it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
@@ -666,7 +670,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
     expect(api).toContain("telegramDmUnlockState");
     expect(api).toContain("isAllowedGatedDmCommand");
-    expect(api).toContain("grantMcpBetaAccessBadge");
+    expect(api).toContain("rejectLockedSender");
+    expect(api).toContain("senderGate");
     expect(api).toContain("formatOrbitXTelegramResult");
     expect(api).toContain('bare === "login" || bare === "auth"');
     expect(api).toContain('bare === "check"');
