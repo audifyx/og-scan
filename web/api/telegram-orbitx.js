@@ -49,7 +49,7 @@ import {
   ORBITX_GC,
   ORBITX_MINT,
 } from "./orbitx/orbitx-telegram-knowledge.js";
-import { fetchTelegramTokenSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
+import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
@@ -142,7 +142,8 @@ async function tg(method, body, { form } = {}) {
     headers: form ? undefined : { "Content-Type": "application/json" },
     body: form || JSON.stringify(body),
   });
-  return r.json().catch(() => ({ ok: false }));
+  const data = await r.json().catch(() => ({ ok: false }));
+  return { ...data, httpStatus: r.status };
 }
 
 async function sendLong(chatId, text, extra = {}) {
@@ -172,7 +173,8 @@ async function sendLong(chatId, text, extra = {}) {
     };
     if (reply_markup && i === chunks.length - 1) payload.reply_markup = reply_markup;
     last = await tg("sendMessage", payload);
-    if (!last?.ok && rest.parse_mode) {
+    const delivered = last?.ok === true || last?.httpStatus === 200;
+    if (!delivered && rest.parse_mode) {
       last = await tg("sendMessage", {
         chat_id: chatId,
         text: chunk.replace(/<[^>]+>/g, ""),
@@ -508,20 +510,31 @@ function alreadyHandledUpdate(updateId) {
   return false;
 }
 
+function scanCooldownKey(chatId, mint) {
+  return `${chatId}:${String(mint || "").trim().toLowerCase()}`;
+}
+
 function recentlyScanned(chatId, mint) {
   const id = String(mint || "").trim().toLowerCase();
   if (!id || chatId == null) return false;
-  const key = `${chatId}:${id}`;
-  const prev = scanCooldown.get(key);
-  if (prev && Date.now() - prev < 25_000) return true;
-  scanCooldown.set(key, Date.now());
+  const prev = scanCooldown.get(scanCooldownKey(chatId, mint));
+  return Boolean(prev && Date.now() - prev < 25_000);
+}
+
+function rememberSuccessfulScan(chatId, mint) {
+  const id = String(mint || "").trim().toLowerCase();
+  if (!id || chatId == null) return;
+  scanCooldown.set(scanCooldownKey(chatId, mint), Date.now());
   if (scanCooldown.size > 2000) {
     const cutoff = Date.now() - 90_000;
     for (const [k, ts] of scanCooldown) {
       if (ts < cutoff) scanCooldown.delete(k);
     }
   }
-  return false;
+}
+
+function forgetScan(chatId, mint) {
+  scanCooldown.delete(scanCooldownKey(chatId, mint));
 }
 
 function cacheMediaJob(job) {
@@ -739,7 +752,7 @@ async function handleCheck(chatId, text, { req, link, extra }) {
   const state = String(result?.state || result?.status || "").toLowerCase();
   const kind = job?.kind || result?.kind || "image";
   if (result?.error && !state) {
-    await sendCard(chatId, formatOrbitXTelegramResult(result), extra);
+    await sendCard(chatId, formatOrbitXTelegramResult(result, "orbitx_media_status"), extra);
     return;
   }
   if (state === "success" || state === "succeeded" || state === "completed" || state === "done") {
@@ -1055,13 +1068,18 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
   if (TOKEN_INTEL_TOOLS.has(tool) && mintArg) {
-    if (recentlyScanned(chatId, mintArg)) return;
     await tg("sendChatAction", { chat_id: chatId, action: "typing" });
     try {
       const merged = await buildBrandedScan(mintArg, { req, link, isGroup });
+      if (hasMarketSnapshot(merged?.token || merged)) {
+        rememberSuccessfulScan(chatId, mintArg);
+      } else {
+        forgetScan(chatId, mintArg);
+      }
       await sendCard(chatId, formatOrbitXTelegramResult(merged, tool), replyExtra);
       await sendMedia(chatId, collectMediaUrls(merged));
     } catch (error) {
+      forgetScan(chatId, mintArg);
       await tg("sendMessage", {
         chat_id: chatId,
         text: `OrbitX scan error: ${error?.message || error}`,

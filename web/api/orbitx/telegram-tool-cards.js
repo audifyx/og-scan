@@ -21,7 +21,7 @@ import {
   CA_RE,
 } from "./telegram-payload.js";
 import { ORBITX_GC, ORBITX_HOST, ORBITX_MINT } from "./orbitx-telegram-knowledge.js";
-import { hasMarketSnapshot, hydrateKnownMint } from "./telegram-token-snapshot.js";
+import { hasMarketSnapshot } from "./telegram-token-snapshot.js";
 
 export { telegramMessageParts };
 
@@ -1398,12 +1398,10 @@ export function formatOrbitXTelegramResult(result, tool) {
     !data?.error
   ) {
     const dex = `https://dexscreener.com/solana/${encodeURIComponent(mintOnly)}`;
-    const known = hydrateKnownMint(mintOnly);
-    const title = known?.name ? `${known.name} · $${known.symbol || known.name}` : "Token intel";
     return {
       text: [
-        `🚀 <b>${tgEsc(title)}</b>`,
-        "No live DexScreener/Jupiter quote yet. Won't invent a name, price, or whale count.",
+        "📡 <b>Live quote unavailable</b>",
+        "Couldn't reach DexScreener or Jupiter from this scan. Send /token again — OrbitX won't invent a name, price, or whale count.",
         data?.error && data.error !== "token_not_found" ? `<i>${tgEsc(String(data.error).slice(0, 160))}</i>` : "",
         `<code>${tgEsc(mintOnly)}</code>`,
         `${href(dex, "DexScreener")} · ${href(`https://jup.ag/tokens/${encodeURIComponent(mintOnly)}`, "Jupiter")} · ${href(`${ORBITX_HOST}/ORBITX_DEX/token/${encodeURIComponent(mintOnly)}`, "OrbitX DEX")} · /token`,
