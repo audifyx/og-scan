@@ -22,6 +22,8 @@ describe("early access codes", () => {
     expect(isOrbitXBetaCode("orbitx beta")).toBe(true);
     expect(looksLikeEarlyAccessCode("OBX7")).toBe(true);
     expect(looksLikeEarlyAccessCode("no")).toBe(false);
+    expect(looksLikeEarlyAccessCode("https://www.orbitx.world/telegram?code=ABCD2345")).toBe(false);
+    expect(looksLikeEarlyAccessCode("ORBITX BETA")).toBe(true);
   });
 });
 

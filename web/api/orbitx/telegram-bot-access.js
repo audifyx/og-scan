@@ -32,8 +32,11 @@ export function isOrbitXBetaCode(raw) {
 }
 
 export function looksLikeEarlyAccessCode(raw) {
-  const code = normalizeEarlyAccessCode(raw);
-  return code.length >= 4 && code.length <= 24 && /^[A-Z0-9]+$/.test(code);
+  const original = String(raw || "").trim();
+  if (!original) return false;
+  if (/https?:\/\//i.test(original) || /orbitx\.world\/telegram/i.test(original)) return false;
+  const stripped = original.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return stripped.length >= 4 && stripped.length <= 24 && /^[A-Z0-9]+$/.test(stripped);
 }
 
 export function resolveBurnPackageFromText(text) {

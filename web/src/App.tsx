@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { OrbitAtmosphereProvider } from "@/hooks/useOrbitAtmosphere";
@@ -74,6 +74,12 @@ import TradeWalletManager from "./trade/TradeWalletManager";
 function TradeMintRedirect() {
   const { mint } = useParams<{ mint: string }>();
   return <Navigate to={`/trade/token/${mint || ""}`} replace />;
+}
+
+/** Keep ?code= (and hash) when normalizing /Telegram → /telegram. */
+function RedirectPreserveSearch({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate to={{ pathname: to, search: location.search, hash: location.hash }} replace />;
 }
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
@@ -325,7 +331,7 @@ const App = () => (
 
             {/* ── Official Telegram bot companion ── */}
             <Route path="/telegram" element={<TelegramOrbitX />} />
-            <Route path="/Telegram" element={<Navigate to="/telegram" replace />} />
+            <Route path="/Telegram" element={<RedirectPreserveSearch to="/telegram" />} />
 
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route

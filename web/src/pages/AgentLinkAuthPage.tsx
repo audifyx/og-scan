@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { approveMcpLinkAuth, getMcpLinkStatus } from "@/lib/orbitxMcp";
 import { resolveAuthWallet } from "@/lib/agentTokenGate";
 import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
+import {
+  classifyOrbitXAuthPaste,
+  normalizeTelegramLoginCode,
+} from "../../api/orbitx/orbitx-auth-links.js";
 
 /** Clickable Grok link-auth for OrbitX Agent MCP. */
 export default function AgentLinkAuthPage() {
@@ -18,7 +22,17 @@ export default function AgentLinkAuthPage() {
   const [done, setDone] = useState(false);
   const [prestatus, setPrestatus] = useState<string | null>(null);
 
-  const code = (params.get("code") || "").trim();
+  const rawCode = (params.get("code") || "").trim();
+  const pasted = classifyOrbitXAuthPaste(
+    rawCode || (typeof window !== "undefined" ? window.location.href : ""),
+  );
+  const telegramCode =
+    pasted.kind === "telegram_login"
+      ? pasted.code
+      : /^oxlink/i.test(rawCode)
+        ? ""
+        : normalizeTelegramLoginCode(rawCode);
+  const code = telegramCode ? "" : rawCode;
   const walletAddress = useMemo(
     () =>
       resolveAuthWallet({
@@ -70,6 +84,10 @@ export default function AgentLinkAuthPage() {
       setSubmitting(false);
     }
   };
+
+  if (telegramCode) {
+    return <Navigate to={`/telegram?code=${encodeURIComponent(telegramCode)}`} replace />;
+  }
 
   if (authLoading) return <AgentLoading label="Loading session…" />;
 

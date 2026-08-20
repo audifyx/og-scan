@@ -12,6 +12,7 @@ import {
   telegramOrbitXStatus,
   type TelegramOrbitXStatus,
 } from "@/lib/telegramOrbitX";
+import { extractTelegramLoginCode } from "../../api/orbitx/orbitx-auth-links.js";
 import "./telegram-orbitx.css";
 
 type Tab = "link" | "tools";
@@ -19,13 +20,35 @@ const TABS: ShellTab[] = [
   { id: "link", label: "Link", ico: "◎" },
   { id: "tools", label: "Tools", ico: "✦" },
 ];
+const LOGIN_CODE_KEY = "orbitx_telegram_login_code";
+
+function readStoredLoginCode(): string {
+  try {
+    return extractTelegramLoginCode(sessionStorage.getItem(LOGIN_CODE_KEY) || "");
+  } catch {
+    return "";
+  }
+}
+
+function storeLoginCode(code: string) {
+  try {
+    if (code) sessionStorage.setItem(LOGIN_CODE_KEY, code);
+    else sessionStorage.removeItem(LOGIN_CODE_KEY);
+  } catch {
+    /* private mode */
+  }
+}
 
 export default function TelegramOrbitX() {
   const [params] = useSearchParams();
-  const code = (params.get("code") || "").trim().toUpperCase();
+  const [paste, setPaste] = useState("");
+  const fromQuery = extractTelegramLoginCode(params.get("code") || "") ||
+    (typeof window !== "undefined" ? extractTelegramLoginCode(window.location.href) : "");
+  const fromPaste = extractTelegramLoginCode(paste);
+  const code = fromPaste || fromQuery || readStoredLoginCode();
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
-  const [tab, setTab] = useState<Tab>(code ? "link" : "tools");
+  const [tab, setTab] = useState<Tab>("link");
   const [status, setStatus] = useState<TelegramOrbitXStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
@@ -55,6 +78,10 @@ export default function TelegramOrbitX() {
   }, [refresh, user?.id]);
 
   useEffect(() => {
+    if (code) storeLoginCode(code);
+  }, [code]);
+
+  useEffect(() => {
     let cancelled = false;
     telegramOrbitXCmds(query)
       .then((page) => {
@@ -71,7 +98,7 @@ export default function TelegramOrbitX() {
   const onLink = async () => {
     setError(null);
     if (!code) {
-      setError("Open this page from the /login link the bot sent you.");
+      setError("Paste the /login link (or 8-character code) the bot sent you, then confirm.");
       return;
     }
     if (!user) {
@@ -82,6 +109,7 @@ export default function TelegramOrbitX() {
     try {
       await telegramOrbitXLink(code);
       setLinked(true);
+      storeLoginCode("");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Link failed");
@@ -173,10 +201,25 @@ export default function TelegramOrbitX() {
           </div>
           <div className="ox-agent__panel-b">
             <p className="ox-tg__lead">
-              In Telegram, message the bot privately and send <code>/login</code>. Then confirm here with the same OrbitX wallet.
-              Groups stay public: <code>/cmds</code>, <code>/token</code>, <code>/chart</code>, <code>/img</code>, <code>/vid</code>, <code>/check</code>, <code>/links</code>.
-              Image and video take a few minutes — keep sending <code>/check</code> until the countdown hits ready.
+              In Telegram, message the bot privately and send <code>/login</code>. Open the link in{" "}
+              <b>Chrome or Edge</b> (not Telegram’s built-in browser), sign in with the same OrbitX wallet, then confirm.
+              If you pasted the link into the bot, that does not finish login — paste it here instead.
             </p>
+            {!code ? (
+              <label className="ox-tg__label">
+                Paste /login link or code
+                <input
+                  className="ox-tg__input"
+                  value={paste}
+                  onChange={(e) => setPaste(e.target.value)}
+                  placeholder="https://www.orbitx.world/telegram?code=… or 8-character code"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+            ) : (
+              <p className="ox-agent__note">Login code ready. Sign in, then confirm.</p>
+            )}
             <div className="ox-agent__btn-row">
               <a className="ox-agent__btn ox-agent__btn--primary" href={TELEGRAM_ORBITX_TME} target="_blank" rel="noreferrer">
                 Open @{TELEGRAM_ORBITX_BOT}
@@ -205,7 +248,7 @@ export default function TelegramOrbitX() {
             ) : (
               <div className="ox-agent__btn-row">
                 <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={linking || !code} onClick={onLink}>
-                  {linking ? "Linking…" : code ? "Confirm Telegram link" : "Need a /login code"}
+                  {linking ? "Linking…" : code ? "Confirm Telegram link" : "Paste the /login link"}
                 </button>
               </div>
             )}

@@ -15,6 +15,7 @@ import {
   unwrapToolPayload as payloadUnwrap,
   tgEsc,
 } from "./telegram-payload.js";
+import { telegramLoginUrl } from "./orbitx-auth-links.js";
 import { ORBITX_GC, ORBITX_GC_USERNAME, ORBITX_HOST } from "./orbitx-telegram-knowledge.js";
 import {
   cmdsPage as cmdsPageImpl,
@@ -675,6 +676,32 @@ export function loginCode() {
   for (let i = 0; i < 8; i += 1) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
 }
+
+/** HTML the bot sends for /login — clickable href so Telegram Desktop keeps ?code=. */
+export function formatTelegramLoginHtml({ url, code, base } = {}) {
+  const hrefRaw = url || telegramLoginUrl(code, base);
+  const href = String(hrefRaw || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;");
+  const shown = tgEsc(String(code || "").trim().toUpperCase());
+  return [
+    "<b>Link OrbitX on this computer</b>",
+    "Open this in <b>Chrome or Edge</b> with Phantom, Solflare, or Jupiter Wallet.",
+    "Telegram’s in-app browser cannot sign wallets. Do <b>not</b> paste this link back into the chat.",
+    "",
+    `<a href="${href}">Open OrbitX login</a>`,
+    shown ? `\nIf the page asks for a login code, paste: <code>${shown}</code>` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export {
+  classifyOrbitXAuthPaste,
+  extractTelegramLoginCode,
+  isTelegramLoginPaste,
+  telegramLoginUrl,
+} from "./orbitx-auth-links.js";
 
 export {
   deskKeyboard,

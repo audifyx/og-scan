@@ -48,7 +48,11 @@ import {
   setChatTradeAuto,
   usdToSol,
 } from "./orbitx/buy-orbitx.js";
-import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias } from "./orbitx/telegram-trade-intent.js";
+import {
+  classifyOrbitXAuthPaste,
+  TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
+  telegramLoginUrl,
+} from "./orbitx/orbitx-auth-links.js";
 import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -1147,7 +1151,18 @@ async function createAgentLinkAuthSession(req) {
 }
 
 async function getAgentLinkAuthStatus(authCode) {
-  const code = String(authCode || "").trim();
+  const parsed = classifyOrbitXAuthPaste(authCode);
+  if (parsed.kind === "telegram_login") {
+    return {
+      ok: false,
+      error: "telegram_login_not_mcp",
+      status: "wrong_link",
+      authCode: parsed.code || null,
+      url: parsed.url || telegramLoginUrl(parsed.code),
+      message: TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
+    };
+  }
+  const code = String(parsed.code || authCode || "").trim();
   if (!code) return { ok: false, error: "authCode_required", status: "unknown" };
   try {
     const rows = await sb(
@@ -1363,7 +1378,8 @@ async function enrichAuth(req, args = {}) {
     return withEmail;
   }
 
-  const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+  const parsedAuth = classifyOrbitXAuthPaste(args.authCode || args.orbitxAuthCode || "");
+  const authCode = parsedAuth.kind === "telegram_login" ? "" : String(parsedAuth.code || "").trim();
   const link = await resolveAgentLinkAuth({
     authCode,
     mcpSessionId: header(req, "mcp-session-id"),
@@ -1396,7 +1412,10 @@ async function enrichAuth(req, args = {}) {
     bearerPresent,
     bearerInvalid: bearerPresent,
     bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
-    authCode: authCode || null,
+    authCode:
+      parsedAuth.kind === "telegram_login"
+        ? String(args.authCode || args.orbitxAuthCode || "").trim()
+        : authCode || null,
   };
 }
 
@@ -4815,7 +4834,9 @@ async function handleMcp(req, res, parts) {
       const args = { ...rawArgs };
       if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
       if (rawName === "orbitx_buy_auto" && !args.pool) args.pool = "auto";
-      const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+      const rawAuthCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+      const parsedAuth = classifyOrbitXAuthPaste(rawAuthCode);
+      const authCode = parsedAuth.kind === "telegram_login" ? "" : String(parsedAuth.code || rawAuthCode).trim();
       // keep authCode on args for enrichAuth; strip before callTool for strict schemas
       const auth = await enrichAuth(req, args);
       delete args.authCode;
@@ -4833,6 +4854,28 @@ async function handleMcp(req, res, parts) {
         "orbitx_dex_chart",
         "orbitx_get_chart",
       ]);
+      if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
+        const link = {
+          ok: false,
+          error: "telegram_login_not_mcp",
+          message: TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
+          url: parsedAuth.url,
+          hintTool: "orbitx_auth_link",
+        };
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(link, null, 2) }],
+              structuredContent: link,
+              isError: true,
+            },
+          },
+          200,
+        );
+      }
       if (!identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = authCode
           ? {

@@ -43,6 +43,10 @@ import {
   isPublicTelegramTool,
   isTelegramAdminWallet,
   loginCode,
+  formatTelegramLoginHtml,
+  extractTelegramLoginCode,
+  isTelegramLoginPaste,
+  telegramLoginUrl,
   mediaEtaSeconds,
   mergeTokenScanPayloads,
   missingToolInput,
@@ -608,6 +612,10 @@ async function handleCode(chatId, text, { isGroup, from, link, extra, req }) {
   const rest = String(text || "")
     .replace(/^\/?(?:code|redeem)(?:@\w+)?\s*/i, "")
     .trim();
+  if (isTelegramLoginPaste(rest)) {
+    await explainTelegramLoginPaste(chatId, rest, extra);
+    return;
+  }
   if (!looksLikeEarlyAccessCode(rest)) {
     awaitingCode.set(String(from.id), Date.now());
     await sendLong(
@@ -1150,14 +1158,23 @@ async function startLogin(telegramUser, base) {
       expires_at: expires,
     }),
   });
-  const url = `${base}/telegram?code=${encodeURIComponent(code)}`;
-  return [
-    "<b>Link OrbitX</b>",
-    "1. Open the secure page (expires in 15 minutes)",
-    url,
-    "2. Sign in with the wallet you use on OrbitX",
-    "3. Confirm. Then /trade /buy /sell /tweet /post work in this DM.",
-  ].join("\n");
+  const origin = String(base || officialOrigin()).replace(/\/$/, "");
+  const url = telegramLoginUrl(code, origin);
+  return formatTelegramLoginHtml({ url, code, base: origin });
+}
+
+async function explainTelegramLoginPaste(chatId, text, extra = {}) {
+  const code = extractTelegramLoginCode(text);
+  const url = telegramLoginUrl(code, officialOrigin());
+  await sendLong(
+    chatId,
+    [
+      formatTelegramLoginHtml({ url, code }),
+      "",
+      "Pasting the login link here does nothing. Open it in a real browser on this PC, then tap <b>Confirm Telegram link</b>.",
+    ].join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
 }
 
 async function sendCard(chatId, formatted, extra = {}) {
@@ -1342,6 +1359,11 @@ async function handleTelegramUpdate(update, req) {
   );
   if (limit.limited) {
     await tg("sendMessage", { chat_id: chatId, text: "Slow down — too many OrbitX requests.", ...replyExtra });
+    return;
+  }
+
+  if (!isGroup && isTelegramLoginPaste(text)) {
+    await explainTelegramLoginPaste(chatId, text, replyExtra);
     return;
   }
 

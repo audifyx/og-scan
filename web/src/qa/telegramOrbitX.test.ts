@@ -25,6 +25,9 @@ import {
   isPublicTelegramTool,
   isTelegramAdminWallet,
   loginCode,
+  formatTelegramLoginHtml,
+  extractTelegramLoginCode,
+  isTelegramLoginPaste,
   mediaEtaSeconds,
   mergeTokenScanPayloads,
   missingToolInput,
@@ -300,6 +303,33 @@ describe("official OrbitX Telegram bot", () => {
   it("issues alphanumeric login codes without a bot token", () => {
     const code = loginCode();
     expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+  });
+
+  it("extracts Telegram /login codes from pasted PC URLs and never treats them as access codes", () => {
+    const code = "AB3DK2PQ";
+    const url = `https://www.orbitx.world/telegram?code=${code}`;
+    expect(extractTelegramLoginCode(url)).toBe(code);
+    expect(extractTelegramLoginCode(`Open this ${url} please`)).toBe(code);
+    expect(extractTelegramLoginCode("https://orbitx.world/telegram?code=ab3dk2pq")).toBe(code);
+    expect(extractTelegramLoginCode(code)).toBe(code);
+    expect(isTelegramLoginPaste(url)).toBe(true);
+    expect(isTelegramLoginPaste("ORBITX BETA")).toBe(false);
+    const html = formatTelegramLoginHtml({ url, code });
+    expect(html).toContain(`href="${url}"`);
+    expect(html).toContain("Open OrbitX login");
+    expect(html).toContain("Do <b>not</b> paste this link back into the chat");
+    expect(html).toContain(`<code>${code}</code>`);
+    const api = readFileSync(resolve(WEB, "api/telegram-orbitx.js"), "utf8");
+    expect(api).toContain("isTelegramLoginPaste");
+    expect(api).toContain("formatTelegramLoginHtml");
+    expect(api).toContain("explainTelegramLoginPaste");
+    const page = readFileSync(resolve(WEB, "src/pages/TelegramOrbitX.tsx"), "utf8");
+    expect(page).toContain("Paste /login link or code");
+    expect(page).not.toContain("Need a /login code");
+    const app = readFileSync(resolve(WEB, "src/App.tsx"), "utf8");
+    expect(app).toContain("RedirectPreserveSearch");
+    const hub = readFileSync(resolve(WEB, "api/orbitx-hub.js"), "utf8");
+    expect(hub).toContain("telegram_login_not_mcp");
   });
 
   it("renders token intel as a card instead of raw JSON", () => {
