@@ -51,7 +51,7 @@ import {
   normalizeDexResponse,
   tokenFromGecko,
 } from "../../api/orbitx/telegram-token-snapshot.js";
-import { phantomBrowseUrl } from "../../api/orbitx/telegram-tool-cards.js";
+import { phantomBrowseUrl, tokenCardKeyboard } from "../../api/orbitx/telegram-tool-cards.js";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
@@ -97,6 +97,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("/img@theorbitxmcpbot").tool).toBe("orbitx_generate_image");
     expect(resolveOfficialCommand("tweet").tool).toBe("x_post");
     expect(resolveOfficialCommand("buy").tool).toBe("orbitx_prepare_buy");
+    expect(resolveOfficialCommand("sell").tool).toBe("orbitx_prepare_sell");
     expect(resolveOfficialCommand("trade").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("swap").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("/trade@theorbitxmcpbot").tool).toBe("orbitx_prepare_buy");
@@ -273,6 +274,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(applyDefaultBuyAmount("orbitx_prepare_buy", { mint, amountSol: 0.25 }).amountSol).toBe(0.25);
     expect(applyDefaultBuyAmount("orbitx_buy_orbitx", { amountUsd: 1 }).amountSol).toBeUndefined();
     expect(applyDefaultBuyAmount("orbitx_buy_orbitx", { amountUsd: 1 }).amountUsd).toBe(1);
+    expect(argsFromCommand("sell", `/sell ${mint}`)).toMatchObject({ mint, amount: "100%" });
+    expect(argsFromCommand("sell", `/sell ${mint} 50%`)).toMatchObject({ mint, amount: "50%" });
+    expect(applyDefaultBuyAmount("orbitx_prepare_sell", { mint }).amount).toBe("100%");
+    expect(applyDefaultBuyAmount("orbitx_prepare_sell", { mint, amount: "25%" }).amount).toBe("25%");
+    expect(missingToolInput("orbitx_prepare_sell", {})).toBe("mint");
     expect(argsFromCommand("buy", "/buy $1").mint).toBeUndefined();
     expect(argsFromCommand("buy", "/buy $1").amountUsd).toBe(1);
     expect(argsFromCommand("buy", "/buy 0.05").amountSol).toBe(0.05);
@@ -342,6 +348,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(card).not.toContain('"holderCount"');
     expect(text).toBe(card);
     expect(text.startsWith("{")).toBe(false);
+    const keys = JSON.stringify(formatTokenCard(payload)?.reply_markup || tokenCardKeyboard(payload.mint));
+    expect(keys).toContain("ox:buy:13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
+    expect(keys).toContain("ox:sell:13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
+    expect(keys).toContain("Buy 0.05 SOL");
+    expect(keys).toContain("Sell 100%");
     expect(cardText(formatOrbitXTelegramResult({ ok: true, result: payload }))).toContain("Holders");
 
     const branded = cardText(
@@ -635,6 +646,26 @@ describe("official OrbitX Telegram bot", () => {
     expect(signBuy).not.toContain("Sign in Phantom");
     expect(signBuy).toContain("/agent/sign?action=buy");
 
+    const signSell = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: true,
+          action: "sell",
+          requiresSignature: true,
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          amount: "100%",
+          wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+          signUrl: "https://www.orbitx.world/agent/sign?action=sell&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=100%25",
+          solscanToken: "https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        },
+        "orbitx_prepare_sell",
+      ),
+    );
+    expect(signSell).toContain("Sign to sell");
+    expect(signSell).toContain("100%");
+    expect(signSell).not.toContain("Sign to buy");
+    expect(signSell).toContain("/agent/sign?action=sell");
+
     const tick = cardText(
       formatMediaCountdown({
         kind: "video",
@@ -807,6 +838,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(signPage).toContain("AUTO_SIGN_ENABLED = false");
     expect(signPage).toContain("dropAutoQuery");
     expect(api).toContain("handleCallbackQuery");
+    expect(api).toContain('key.startsWith("buy:")');
+    expect(api).toContain('key.startsWith("sell:")');
+    expect(api).toContain("orbitx_prepare_sell");
     expect(api).toContain("formatToolMenu");
     expect(api).toContain("missingToolInput");
     expect(api).toContain("sendCard");

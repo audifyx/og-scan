@@ -29,6 +29,7 @@ import {
   formatToolMenu,
   missingToolInput,
   telegramMessageParts,
+  tokenCardKeyboard,
   TOKEN_INTEL_TOOLS as CARD_TOKEN_INTEL_TOOLS,
 } from "./telegram-tool-cards.js";
 
@@ -340,6 +341,7 @@ export function resolveOfficialCommand(cmd) {
 }
 
 export const DEFAULT_TELEGRAM_BUY_SOL = 0.05;
+export const DEFAULT_TELEGRAM_SELL_AMOUNT = "100%";
 const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap"];
 const BUY_COMMANDS = ["buy", "trade", "swap"];
 const BUY_TOOLS = new Set([
@@ -350,10 +352,16 @@ const BUY_TOOLS = new Set([
   "orbitx_swap",
   "orbitx_buy_orbitx",
 ]);
+const SELL_TOOLS = new Set(["orbitx_prepare_sell", "orbitx_sell", "orbitx_sell_pump"]);
 
 export function applyDefaultBuyAmount(tool, args) {
   const next = { ...(args || {}) };
-  if (!BUY_TOOLS.has(String(tool || "").trim())) return next;
+  const name = String(tool || "").trim();
+  if (SELL_TOOLS.has(name)) {
+    if (next.amount == null || next.amount === "") next.amount = DEFAULT_TELEGRAM_SELL_AMOUNT;
+    return next;
+  }
+  if (!BUY_TOOLS.has(name)) return next;
   if (next.amountUsd != null && Number(next.amountUsd) > 0) return next;
   const n = Number(next.amountSol);
   if (!Number.isFinite(n) || n <= 0) next.amountSol = DEFAULT_TELEGRAM_BUY_SOL;
@@ -433,7 +441,7 @@ export function extractMint(text) {
 }
 
 const PROJECT_QUESTION_RE =
-  /\b(tell me about|tell me|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape|snipe)|is (?:it|this) legit|is (?:it|this) a (?:good|bad) buy|(?:good|bad) buy|worth (?:buying|aping)|would you (?:buy|ape))\b/i;
+  /\b(tell me about|tell me|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape|snipe|sell|dump)|is (?:it|this) legit|is (?:it|this) a (?:good|bad) (?:buy|sell)|(?:good|bad) buy|worth (?:buying|aping|selling)|would you (?:buy|ape|sell)|time to sell)\b/i;
 
 /** Natural-language project ask (not /token). Needs a mint in the same message. */
 export function isTokenProjectQuestion(text) {
@@ -678,6 +686,7 @@ export {
   formatToolMenu,
   missingToolInput,
   telegramMessageParts,
+  tokenCardKeyboard,
 };
 
 export {

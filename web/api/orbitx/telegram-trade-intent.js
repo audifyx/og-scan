@@ -55,6 +55,8 @@ export const TELEGRAM_TOOL_ALIASES = {
   portfolio: "orbitx_get_wallet",
   orbitx: "orbitx_buy_orbitx",
   buyorbitx: "orbitx_buy_orbitx",
+  sell: "orbitx_prepare_sell",
+  orbitx_sell: "orbitx_prepare_sell",
 };
 
 export function extractMintFromText(text) {
@@ -115,14 +117,34 @@ export function isOpinionOrResearchAsk(text) {
     /\bis (?:it|this) a (?:good|bad|smart|dumb) buy\b/.test(compact) ||
     /\b(?:good|bad|smart|dumb) buy\b/.test(compact) ||
     /\bworth (?:buying|aping|it)\b/.test(compact) ||
-    /\bshould i (?:buy|ape|snipe)\b/.test(compact) ||
-    /\bwould you (?:buy|ape)\b/.test(compact) ||
+    /\bshould i (?:buy|ape|snipe|sell|dump)\b/.test(compact) ||
+    /\bwould you (?:buy|ape|sell)\b/.test(compact) ||
+    /\b(?:good|bad) (?:time|idea) to sell\b/.test(compact) ||
+    /\btime to sell\b/.test(compact) ||
     /\bdyor\b/.test(compact)
   );
 }
 
+/** Percent of bag or token units — not SOL. "sell 50%" / "sell all" / "sell half". */
+export function parseSellAmount(text) {
+  const t = String(text || "");
+  const pct = t.match(/\b(\d+(?:\.\d+)?)\s*%/);
+  if (pct) {
+    const n = Number(pct[1]);
+    if (Number.isFinite(n) && n > 0 && n <= 100) return `${n}%`;
+  }
+  if (/\b(all|everything|entire bag|whole bag|full bag)\b/i.test(t)) return "100%";
+  if (/\bhalf\b/i.test(t)) return "50%";
+  const tokens = t.match(/\b(\d+(?:\.\d+)?)\s*(?:tokens?|coins?)\b/i);
+  if (tokens) {
+    const n = Number(tokens[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
 export function hasExplicitTradeAmount(text) {
-  return Boolean(parseUsdAmount(text) || parseSolAmount(text));
+  return Boolean(parseUsdAmount(text) || parseSolAmount(text) || parseSellAmount(text));
 }
 
 /**
@@ -199,6 +221,11 @@ export function parseTradeIntent(text) {
     return null;
   }
 
+  const sellAmount = parseSellAmount(t);
+  if (selling && isOpinionOrResearchAsk(t) && !sellAmount) {
+    return null;
+  }
+
   let sol = amountSol;
   if (!sol && !amountUsd && buying) {
     const bare = compact.match(/(?:^|\s)(\d+(?:\.\d+)?)(?:\s|$)/);
@@ -208,10 +235,8 @@ export function parseTradeIntent(text) {
     }
   }
 
-  if (selling && (mint || sol)) {
-    const args = { mint, pool: "auto", autoConfirm: auto };
-    if (sol) args.amount = sol;
-    else args.amount = "100%";
+  if (selling && mint) {
+    const args = { mint, pool: "auto", autoConfirm: auto, amount: sellAmount || "100%" };
     return { tool: "orbitx_prepare_sell", args };
   }
 

@@ -452,6 +452,10 @@ export function tokenCardKeyboard(mint, chain = "solana") {
   const enc = encodeURIComponent(m);
   return inlineKeyboard([
     [
+      { text: "Buy 0.05 SOL", callback_data: `ox:buy:${m}` },
+      { text: "Sell 100%", callback_data: `ox:sell:${m}` },
+    ],
+    [
       { text: "DexScreener", url: `${DEXSCREENER}${c}/${enc}` },
       { text: "Jupiter", url: `${JUPITER_SWAP}${enc}` },
     ],
@@ -920,7 +924,7 @@ function formatTradeDeskCard(data, tool) {
     return {
       text: [
         "🔒 <b>ORBITX · Sign in to trade</b>",
-        "DM /login then /buy. Groups stay public — swaps are wallet-gated.",
+        "DM /login then /buy or /sell. Groups stay public — swaps are wallet-gated.",
         data.message ? `<i>${tgEsc(String(data.message).slice(0, 220))}</i>` : "",
       ]
         .filter(Boolean)
@@ -936,7 +940,7 @@ function formatTradeDeskCard(data, tool) {
     return {
       text: [
         "🔑 <b>ORBITX · Link Jupiter</b>",
-        "Connect Jupiter Wallet on orbitx.world/telegram, then send /buy again. SOL spends from that wallet via Jupiter.",
+        "Connect Jupiter Wallet on orbitx.world/telegram, then send /buy or /sell again. SOL spends from that wallet via Jupiter.",
         mint ? `<code>${tgEsc(mint)}</code>` : "",
         [href(telegramDash, "Link wallet"), href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].filter(Boolean).join(" · "),
       ]
@@ -966,10 +970,13 @@ function formatTradeDeskCard(data, tool) {
   }
 
   if (err === "ask_amount" || status === "ask_amount") {
+    const sellHint = /sell/i.test(String(tool || "")) || String(data.action || "").toLowerCase() === "sell";
     return {
       text: [
         "💰 <b>ORBITX · How much?</b>",
-        "Reply <code>/buy 0.05</code> or <code>buy $1 $ORBITX</code>. Spends SOL from your linked Jupiter wallet.",
+        sellHint
+          ? "Reply <code>/sell 100%</code> or <code>/sell 50%</code> plus the CA. Sells the bag from your linked Jupiter wallet."
+          : "Reply <code>/buy 0.05</code> or <code>buy $1 $ORBITX</code>. Spends SOL from your linked Jupiter wallet.",
         [href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].join(" · "),
       ].join("\n"),
       reply_markup: inlineKeyboard([
@@ -1000,7 +1007,7 @@ function formatTradeDeskCard(data, tool) {
     return {
       text: [
         "⚠️ <b>ORBITX · Couldn't build the swap</b>",
-        `<i>${tgEsc(String(data.detail || data.message || data.error || "Try /buy 0.05 again."))}</i>`,
+        `<i>${tgEsc(String(data.detail || data.message || data.error || "Try /buy 0.05 or /sell 100% again."))}</i>`,
         [href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].join(" · "),
       ].join("\n"),
       reply_markup: inlineKeyboard([
@@ -1011,6 +1018,11 @@ function formatTradeDeskCard(data, tool) {
 
   const sku = data.sku || data.package || data.packageId;
   const isBurn = Boolean(data.burnRaw || data.orbitxBurned != null || data.tokens || sku);
+  const isSell =
+    String(data.action || "").toLowerCase() === "sell" ||
+    /sell/i.test(String(tool || "")) ||
+    (typeof sign === "string" && /[?&]action=sell\b/.test(sign));
+  const sellAmount = data.amount != null && data.amount !== "" ? String(data.amount) : "100%";
   const amtBits = [];
   if (amountSol != null && amountSol !== "") {
     amtBits.push(`${tgEsc(String(amountSol))} SOL`);
@@ -1018,15 +1030,19 @@ function formatTradeDeskCard(data, tool) {
   if (amountUsd != null && amountUsd !== "") {
     amtBits.push(`~$${tgEsc(String(Number(amountUsd).toFixed ? Number(amountUsd).toFixed(2) : amountUsd))}`);
   }
-  const amtLine = amtBits.length
-    ? `Spending <b>${amtBits.join(" ")}</b> from your linked Jupiter wallet.`
-    : isBurn
-      ? `One Jupiter sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
-      : "Unsigned Jupiter buy is ready. Tap Sign — approve in your browser wallet.";
+  const amtLine = isSell
+    ? `Selling <b>${tgEsc(sellAmount)}</b> of this token from your linked wallet for SOL.`
+    : amtBits.length
+      ? `Spending <b>${amtBits.join(" ")}</b> from your linked Jupiter wallet.`
+      : isBurn
+        ? `One Jupiter sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
+        : "Unsigned Jupiter buy is ready. Tap Sign — approve in your browser wallet.";
 
-  const title = isBurn && !sign?.includes("action=buy")
-    ? "🛍️ <b>ORBITX · Buy &amp; burn</b>"
-    : "🟢 <b>ORBITX · Sign to buy</b>";
+  const title = isSell
+    ? "🔴 <b>ORBITX · Sign to sell</b>"
+    : isBurn && !sign?.includes("action=buy")
+      ? "🛍️ <b>ORBITX · Buy &amp; burn</b>"
+      : "🟢 <b>ORBITX · Sign to buy</b>";
 
   const buttons = [
     sign ? { text: "Sign", url: sign } : null,
@@ -1207,7 +1223,8 @@ const FAMILY_MENUS = {
       "Private DM + <b>/login</b> first. Groups stay public.",
       "",
       "<b>/trade</b> <code>CA</code>  ·  optional amount (default 0.05 SOL)",
-      "<b>/buy</b> <code>CA 0.1</code>  ·  <b>/sell</b> <code>CA</code>",
+      "<b>/buy</b> <code>CA 0.1</code>  ·  <b>/sell</b> <code>CA</code> (default 100%)",
+      "<b>sell 50% CA</b>  ·  <b>dump $ORBITX</b>",
       "<b>/orbitx</b> — buy $ORBITX",
       "<b>/confirm</b> — last quote",
     ]),

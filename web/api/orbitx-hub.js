@@ -3727,17 +3727,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     return callTool("orbitx_prepare_buy", args, auth, base, req);
   }
 
-  if (name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_buy_auto" || name === "orbitx_trade" || name === "orbitx_swap" || name === "orbitx_prepare_sell") {
+  if (name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_buy_auto" || name === "orbitx_trade" || name === "orbitx_swap" || name === "orbitx_prepare_sell" || name === "orbitx_sell" || name === "orbitx_sell_pump") {
     if (!wallet) {
       return {
         ok: false,
         error: "wallet_required",
         mint: String(args.mint || ORBITX_MINT),
-        message: "Link Jupiter Wallet on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        message: "Link Jupiter Wallet on https://www.orbitx.world/telegram after /login, then send /buy or /sell again.",
         loginUrl: "https://www.orbitx.world/telegram",
       };
     }
-    const action = name === "orbitx_prepare_sell" ? "sell" : "buy";
+    const action = name === "orbitx_prepare_sell" || name === "orbitx_sell" || name === "orbitx_sell_pump" ? "sell" : "buy";
     const mint = String(args.mint || (action === "buy" ? ORBITX_MINT : "")).trim();
     if (action === "buy" && !mint) {
       return { ok: false, error: "mint_required", message: "Pass a mint / CA to buy, or say buy $ORBITX." };
@@ -3761,6 +3761,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       usdQuote = await usdToSol(args.amountUsd);
       if (!usdQuote.ok) return usdQuote;
       amount = usdQuote.amountSol;
+    }
+    if (action === "sell" && !mint) {
+      return { ok: false, error: "mint_required", message: "Pass a mint / CA to sell." };
+    }
+    if (action === "sell" && (amount == null || amount === "")) {
+      amount = "100%";
     }
     if (action === "buy" && (!Number.isFinite(amount) || amount <= 0)) {
       return {

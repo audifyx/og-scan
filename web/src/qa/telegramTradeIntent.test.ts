@@ -82,6 +82,16 @@ describe("official Telegram trade wiring", () => {
     expect(parseTradeIntent(`buy ${ORBITX} 0.05 sol`)?.tool).toBe("orbitx_buy_orbitx");
     expect(inferPublicTool(`buy ${ORBITX} 0.05 sol`)?.tool).toBe("orbitx_buy_orbitx");
     expect(inferPublicTool(ORBITX)?.tool).toBe("orbitx_get_token");
+
+    const sellAll = parseTradeIntent(`sell ${ORBITX}`);
+    expect(sellAll?.tool).toBe("orbitx_prepare_sell");
+    expect(sellAll?.args).toMatchObject({ mint: ORBITX, amount: "100%" });
+    expect(inferPublicTool(`sell ${ORBITX}`)?.tool).toBe("orbitx_prepare_sell");
+    expect(parseTradeIntent(`sell 50% ${ORBITX}`)?.args.amount).toBe("50%");
+    expect(parseTradeIntent(`dump half ${ORBITX}`)?.args.amount).toBe("50%");
+    expect(parseTradeIntent(`sell all $ORBITX`)?.args).toMatchObject({ mint: ORBITX, amount: "100%" });
+    expect(parseTradeIntent(`should I sell ${ORBITX}`)).toBeNull();
+    expect(inferPublicTool(`should I sell ${ORBITX}`)?.meta).toBe("brief");
   });
 
   it("exposes a 2500+ live OrbitX tool catalog", () => {

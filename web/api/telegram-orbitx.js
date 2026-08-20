@@ -53,6 +53,7 @@ import {
   telegramChatExtras,
   telegramMessageParts,
   TOKEN_INTEL_TOOLS,
+  tokenCardKeyboard,
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
   accessStatusFromRow,
@@ -270,6 +271,9 @@ const BUY_TOOL_ALIASES = {
   swap: "orbitx_prepare_buy",
   orbitx_buy: "orbitx_prepare_buy",
   orbitx_buy_auto: "orbitx_prepare_buy",
+  orbitx_sell: "orbitx_prepare_sell",
+  orbitx_sell_pump: "orbitx_prepare_sell",
+  sell: "orbitx_prepare_sell",
 };
 
 async function runTool({ tool, args, req, link, allowPrivileged }) {
@@ -341,7 +345,7 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       return {
         ok: false,
         error: "wallet_required",
-        message: "Connect Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        message: "Connect Jupiter Wallet on https://www.orbitx.world/telegram after /login, then send /buy or /sell again.",
         loginUrl: "https://www.orbitx.world/telegram",
       };
     }
@@ -1027,6 +1031,7 @@ async function handleTokenProjectBrief(chatId, mint, { extra, linked } = {}) {
       : fallbackProjectBrief(facts, name, symbol);
   await sendLong(chatId, formatTokenProjectBriefHtml({ mint: ca, name, symbol, summary }), {
     parse_mode: "HTML",
+    reply_markup: tokenCardKeyboard(ca),
     ...extra,
   });
 }
@@ -1201,6 +1206,37 @@ async function handleCallbackQuery(cq, req) {
       await sendCard(chatId, formatOrbitXTelegramResult(result, "orbitx_dex_chart"), extra);
     } catch (error) {
       await tg("sendMessage", { chat_id: chatId, text: `Chart error: ${error?.message || error}`, ...extra });
+    }
+    return;
+  }
+  if (key.startsWith("buy:") || key.startsWith("sell:")) {
+    const selling = key.startsWith("sell:");
+    const mint = key.slice(selling ? 5 : 4).trim();
+    if (!mint) return;
+    if (isGroupChat) {
+      await sendLong(
+        chatId,
+        "Trades stay in a DM with @theorbitxmcpbot after /login. Public intel stays on here.",
+        { parse_mode: "HTML", ...extra },
+      );
+      return;
+    }
+    const tool = selling ? "orbitx_prepare_sell" : "orbitx_prepare_buy";
+    const args = selling
+      ? { mint, ca: mint, amount: "100%", pool: "auto" }
+      : { mint, ca: mint, amountSol: 0.05, pool: "auto" };
+    await tg("sendChatAction", typingBody(chatId, extra));
+    try {
+      const result = await runTool({
+        tool,
+        args: withTelegramToolArgs(tool, args),
+        req,
+        link,
+        allowPrivileged: Boolean(link),
+      });
+      await sendCard(chatId, formatOrbitXTelegramResult(result, tool), extra);
+    } catch (error) {
+      await tg("sendMessage", { chat_id: chatId, text: `Trade error: ${error?.message || error}`, ...extra });
     }
     return;
   }
@@ -1555,6 +1591,14 @@ async function handleTelegramUpdate(update, req) {
   ) {
     args.mint = ORBITX_MINT;
     args.ca = ORBITX_MINT;
+  }
+  if (
+    (tool === "orbitx_prepare_sell" || tool === "orbitx_sell" || tool === "orbitx_sell_pump") &&
+    mintArg &&
+    !args.mint
+  ) {
+    args.mint = mintArg;
+    args.ca = mintArg;
   }
   if (
     (tool === "orbitx_get_wallet" || tool === "orbitx_get_swaps" || tool === "orbitx_get_balance") &&
