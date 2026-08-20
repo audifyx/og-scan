@@ -38,6 +38,7 @@ import {
   assembleTelegramSnapshot,
   hasMarketSnapshot,
   jupListFromRaw,
+  looksLikeFailedQuoteCard,
   looksLikeOrbitXCard,
   mergeTokenSnapshot,
   normalizeDexResponse,
@@ -409,7 +410,10 @@ describe("official OrbitX Telegram bot", () => {
     ].join("\n");
     expect(looksLikeOrbitXCard(oldStub)).toBe(true);
     expect(looksLikeOrbitXCard("🚀 ORBITX · $ORBITX\nNo live DexScreener/Jupiter quote yet.")).toBe(true);
+    expect(looksLikeFailedQuoteCard("🚀 ORBITX · $ORBITX\nNo live DexScreener/Jupiter quote yet.")).toBe(true);
     expect(looksLikeOrbitXCard("📡 Live quote unavailable\nCouldn't reach DexScreener or Jupiter from this scan.")).toBe(true);
+    expect(looksLikeFailedQuoteCard("📡 Live quote unavailable\nCouldn't reach DexScreener or Jupiter from this scan.")).toBe(true);
+    expect(looksLikeFailedQuoteCard("🚀 ORBITX · $ORBITX\nMarket Snapshot\nPrice $0.000075")).toBe(false);
     expect(looksLikeOrbitXCard("gm what is orbitx")).toBe(false);
   });
 
@@ -638,6 +642,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("rememberSuccessfulScan");
     expect(api).toContain("forgetScan");
     expect(api).toContain("looksLikeOrbitXCard");
+    expect(api).toContain("looksLikeFailedQuoteCard");
     expect(api).toContain("shouldSkipTelegramSender");
     expect(api).toContain("isPublicGroupTrigger");
     expect(api).toContain("handleMyChatMember");
@@ -651,6 +656,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(snap).toContain("fetchQuoteBundle");
     expect(snap).toContain("overlayJupiterPrice");
     expect(snap).toContain("JUP_PRICE_API");
+    expect(snap).toContain("price.jup.ag/v6");
+    expect(snap).not.toContain("OrbitXTelegram/1.0");
     const branded = api.slice(api.indexOf("async function buildBrandedScan"), api.indexOf("async function handleVerify"));
     expect(branded).toContain("fetchTelegramTokenSnapshot");
     expect(branded).not.toContain("orbitx_get_token");

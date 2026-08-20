@@ -54,7 +54,7 @@ import {
   ORBITX_GC,
   ORBITX_MINT,
 } from "./orbitx/orbitx-telegram-knowledge.js";
-import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
+import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
@@ -896,21 +896,25 @@ async function handleTelegramUpdate(update, req) {
   }
   const msg = update.message || update.edited_message || update.channel_post;
   if (!msg) return;
-  const text = String(msg.text || msg.caption || "").trim();
   const chatId = msg.chat?.id;
   if (!chatId) return;
   const from = msg.from || {};
   if (shouldSkipTelegramSender(msg)) return;
-  if (looksLikeOrbitXCard(text)) return;
+  let text = String(msg.text || msg.caption || "").trim();
   const quoted = String(msg.reply_to_message?.text || msg.reply_to_message?.caption || "");
+  const failedQuote = looksLikeFailedQuoteCard(text) || looksLikeFailedQuoteCard(quoted);
+  const stubMint = extractMint(text) || extractMint(quoted);
+  if (looksLikeOrbitXCard(text) && !failedQuote) return;
   if (
     quoted &&
     isOfficialBotUsername(msg.reply_to_message?.from?.username) &&
     looksLikeOrbitXCard(quoted) &&
+    !failedQuote &&
     (!text || extractMint(text) === extractMint(quoted))
   ) {
     return;
   }
+  if (failedQuote && stubMint) text = `/token ${stubMint}`;
   const { isGroup, extra: replyExtra } = telegramChatExtras(msg);
   const link = from.id ? await loadLink(from.id) : null;
   const limit = memoryRateLimit(

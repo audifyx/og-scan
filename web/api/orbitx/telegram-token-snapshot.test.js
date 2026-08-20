@@ -41,7 +41,7 @@ describe("telegram token snapshot quotes", () => {
           json: async () => [{ id: ORBITX_MINT, name: "ORBITX", symbol: "ORBITX" }],
         };
       }
-      if (href.includes("price/v3")) {
+      if (href.includes("price/v3") || href.includes("price.jup.ag")) {
         return {
           ok: true,
           json: async () => ({ [ORBITX_MINT]: { usdPrice: 0.000081, liquidity: 8000 } }),
@@ -55,5 +55,32 @@ describe("telegram token snapshot quotes", () => {
     expect(urls.some((u) => u.includes("token-pairs/v1"))).toBe(true);
     expect(hasMarketSnapshot(snap.token)).toBe(true);
     expect(snap.token.priceUsd).toBeCloseTo(0.000081);
+  });
+
+  it("overlays Jupiter v6 price when v3 and Dex are empty", () => {
+    const merged = assembleTelegramSnapshot(ORBITX_MINT, {
+      jupV6: { data: { [ORBITX_MINT]: { price: 0.00007512 } } },
+    });
+    expect(hasMarketSnapshot(merged.token)).toBe(true);
+    expect(merged.token.priceUsd).toBeCloseTo(0.00007512);
+  });
+
+  it("quotes with Accept-only headers like ogdex, not a custom bot UA", async () => {
+    const headersSeen = [];
+    vi.stubGlobal("fetch", async (url, init) => {
+      headersSeen.push(init?.headers || {});
+      const href = String(url);
+      if (href.includes("price/v3") || href.includes("price.jup.ag")) {
+        return {
+          ok: true,
+          json: async () => ({ [ORBITX_MINT]: { usdPrice: 0.00008 } }),
+        };
+      }
+      return { ok: false, status: 503, json: async () => ({}) };
+    });
+    const snap = await fetchTelegramTokenSnapshot(ORBITX_MINT);
+    expect(hasMarketSnapshot(snap.token)).toBe(true);
+    expect(headersSeen.some((h) => String(h["User-Agent"] || "").includes("OrbitXTelegram"))).toBe(false);
+    expect(headersSeen.some((h) => h.Accept === "application/json")).toBe(true);
   });
 });

@@ -14,14 +14,18 @@ const JUP_SEARCH_API = "https://api.jup.ag/tokens/v2/search?query=";
 const JUP_PRICE = "https://lite-api.jup.ag/price/v3?ids=";
 const JUP_PRICE_API = "https://api.jup.ag/price/v3?ids=";
 const GECKO = "https://api.geckoterminal.com/api/v2/networks/solana/tokens/";
-const QUOTE_MS = 5000;
+const JUP_PRICE_V6 = "https://price.jup.ag/v6/price?ids=";
+const QUOTE_MS = 3500;
 
 const FETCH_HEADERS = {
   Accept: "application/json",
-  "User-Agent": "OrbitXTelegram/1.0 (+https://www.orbitx.world)",
+};
+const BROWSER_HEADERS = {
+  Accept: "application/json",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
 };
 const GECKO_HEADERS = {
-  ...FETCH_HEADERS,
   Accept: "application/json;version=20230302",
 };
 
@@ -42,6 +46,16 @@ export function hydrateKnownMint(mint) {
   return KNOWN_MINTS[String(mint || "").trim()] || null;
 }
 
+export function looksLikeFailedQuoteCard(text) {
+  const t = String(text || "");
+  if (!t) return false;
+  if (/No live DexScreener\/Jupiter quote/i.test(t)) return true;
+  if (/Live quote unavailable/i.test(t)) return true;
+  if (/Couldn'?t reach DexScreener or Jupiter/i.test(t)) return true;
+  if (/Won'?t invent a name, price, or whale count/i.test(t)) return true;
+  return false;
+}
+
 export function looksLikeOrbitXCard(text) {
   const t = String(text || "");
   if (!t) return false;
@@ -50,9 +64,7 @@ export function looksLikeOrbitXCard(text) {
   if (/Whales\s+0 wallets/.test(t) && /DEX paid/.test(t) && /DexScreener/.test(t)) return true;
   if (/💰 Market Snapshot/.test(t) && /Security/.test(t)) return true;
   if (/^\$?TOKEN \(\$TOKEN\) is live on /i.test(t)) return true;
-  if (/No live DexScreener\/Jupiter quote/i.test(t)) return true;
-  if (/Live quote unavailable/i.test(t)) return true;
-  if (/Couldn'?t reach DexScreener or Jupiter/i.test(t)) return true;
+  if (looksLikeFailedQuoteCard(t)) return true;
   return false;
 }
 
@@ -75,15 +87,29 @@ export function hasTokenIdentity(token) {
   return !dummy(name) || !dummy(symbol);
 }
 
-async function fetchJson(url, ms = 8000, headers = FETCH_HEADERS) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), ms);
+async function fetchJson(url, ms = QUOTE_MS, headers = FETCH_HEADERS) {
+  const once = async (hdrs) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const r = await fetch(url, { headers: hdrs, signal: ctrl.signal });
+      if (!r.ok) {
+        const err = new Error(`http ${r.status}`);
+        err.status = r.status;
+        throw err;
+      }
+      return await r.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   try {
-    const r = await fetch(url, { headers, signal: ctrl.signal });
-    if (!r.ok) throw new Error(`http ${r.status}`);
-    return await r.json();
-  } finally {
-    clearTimeout(timer);
+    return await once(headers);
+  } catch (err) {
+    if (Number(err?.status) === 403 && headers !== BROWSER_HEADERS) {
+      return once(BROWSER_HEADERS);
+    }
+    throw err;
   }
 }
 
@@ -279,6 +305,7 @@ export function assembleTelegramSnapshot(id, bundle = {}) {
   if (merged?.token) {
     merged.token = overlayJupiterPrice(merged.token, bundle.jupPriceLite, id);
     merged.token = overlayJupiterPrice(merged.token, bundle.jupPriceApi, id);
+    merged.token = overlayJupiterPrice(merged.token, bundle.jupV6, id);
   }
   return merged;
 }
@@ -322,6 +349,7 @@ async function fetchQuoteBundle(id, urls) {
     ["jupSearch", fetchJson(`${urls.search}${q}`, QUOTE_MS)],
     ["jupPriceLite", fetchJson(`${urls.priceLite}${q}`, QUOTE_MS)],
     ["jupPriceApi", urls.priceApi ? fetchJson(`${urls.priceApi}${q}`, QUOTE_MS) : Promise.resolve(null)],
+    ["jupV6", fetchJson(`${JUP_PRICE_V6}${q}`, QUOTE_MS)],
     ["dexLatest", fetchJson(`${DEX_LATEST}${q}`, QUOTE_MS)],
     ["dexV1", fetchJson(`${DEX_V1}${q}`, QUOTE_MS)],
     ["dexPairs", fetchJson(`${DEX_PAIRS}${q}`, QUOTE_MS)],
