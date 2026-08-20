@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   clearStoredPhantomWallet,
   isJupiterAdapterName,
+  pickAutoSignWallet,
   pickJupiterWallet,
   pickPhantomWallet,
   rankAgentSignWallet,
@@ -24,12 +27,16 @@ describe("agentSignWallets", () => {
     expect(pickPhantomWallet([{ name: "Jupiter" }, { name: "Phantom" }])?.name).toBe("Phantom");
   });
 
-  it("hides Phantom on auto-sign connect lists", () => {
+  it("keeps Phantom on the browser connect list (Jupiter first)", () => {
     const sorted = sortAgentSignWallets(
       [{ name: "Jupiter" }, { name: "Solflare" }, { name: "Phantom" }],
-      true,
     );
-    expect(sorted.map((w) => w.name)).toEqual(["Jupiter", "Solflare"]);
+    expect(sorted.map((w) => w.name)).toEqual(["Jupiter", "Solflare", "Phantom"]);
+    expect(
+      sortAgentSignWallets([{ name: "Jupiter" }, { name: "Phantom" }], true).map((w) => w.name),
+    ).toEqual(["Jupiter"]);
+    expect(pickAutoSignWallet([{ name: "Phantom" }, { name: "Jupiter" }])?.name).toBe("Jupiter");
+    expect(pickAutoSignWallet([{ name: "Phantom" }, { name: "Solflare" }])?.name).toBe("Phantom");
   });
 
   it("detects WalletProvider's JSON-encoded Phantom localStorage value", () => {
@@ -39,13 +46,14 @@ describe("agentSignWallets", () => {
     expect(isJupiterAdapterName("Jupiter")).toBe(true);
   });
 
-  it("skips Phantom autoConnect only on /agent/sign?auto=1 — never skips Jupiter", () => {
-    expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "auto=1")).toBe(true);
-    expect(shouldSkipWalletAutoConnect("Phantom Wallet", "/agent/sign", "?auto=true")).toBe(true);
-    expect(shouldSkipWalletAutoConnect("Jupiter", "/agent/sign", "auto=1")).toBe(false);
+  it("skips Phantom autoConnect in Telegram in-app, not in desktop Chrome", () => {
+    expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "auto=1", "Mozilla/5.0 Chrome")).toBe(false);
+    expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "auto=1", "Telegram")).toBe(true);
+    expect(shouldSkipWalletAutoConnect("Phantom Wallet", "/agent/sign", "?auto=true", "TelegramBot")).toBe(true);
+    expect(shouldSkipWalletAutoConnect("Jupiter", "/agent/sign", "auto=1", "Telegram")).toBe(false);
     expect(shouldSkipWalletAutoConnect("Jupiter Wallet", "/agent/sign", "auto=1")).toBe(false);
     expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "")).toBe(false);
-    expect(shouldSkipWalletAutoConnect("Phantom", "/os", "auto=1")).toBe(false);
+    expect(shouldSkipWalletAutoConnect("Phantom", "/os", "auto=1", "Telegram")).toBe(false);
   });
 
   it("clears a stored Phantom adapter name so Jupiter can auto-connect", () => {
@@ -55,5 +63,13 @@ describe("agentSignWallets", () => {
     localStorage.setItem("walletName", JSON.stringify("Jupiter"));
     clearStoredPhantomWallet();
     expect(JSON.parse(localStorage.getItem("walletName") || "null")).toBe("Jupiter");
+  });
+
+  it("lets the sign page use browser wallets — no Jupiter-only lock", () => {
+    const src = readFileSync(resolve(__dirname, "../../pages/AgentSignPage.tsx"), "utf8");
+    expect(src).not.toContain("Switch to Jupiter Wallet");
+    expect(src).not.toContain("OrbitX swaps sign with Jupiter only");
+    expect(src).toContain("pickAutoSignWallet");
+    expect(src).toContain("Connect a wallet first");
   });
 });

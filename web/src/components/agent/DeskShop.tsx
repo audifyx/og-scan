@@ -113,7 +113,7 @@ export function DeskShop() {
           sendTransaction: sendTransaction ?? undefined,
           signTransaction: signTransaction ?? undefined,
           walletName: adapterWallet?.adapter?.name ?? null,
-          preferJupiter: true,
+          preferJupiter: /jupiter/i.test(String(adapterWallet?.adapter?.name || "")),
         },
         tx,
         { skipPreflight: true },

@@ -1,8 +1,6 @@
 /**
- * Telegram /agent/sign uses Jupiter only — never Phantom Connect.
- * Swaps are Jupiter aggregator routes; signing uses window.jupiter.solana
- * (Jupiter Wallet adapter). A stored Phantom adapter in localStorage would
- * steal autoConnect, so auto-sign clears Phantom and never skips Jupiter.
+ * /agent/sign: Jupiter Wallet in-app + browser extensions (Phantom, Solflare, …).
+ * Never Phantom Connect universal links. Telegram in-app cannot sign.
  */
 
 export function isJupiterAdapterName(name?: string | null): boolean {
@@ -23,13 +21,27 @@ export function pickJupiterWallet<T extends { name: string }>(wallets: readonly 
   return wallets.find((w) => isJupiterAdapterName(w.name)) ?? null;
 }
 
+export function pickAutoSignWallet<T extends { name: string }>(wallets: readonly T[]): T | null {
+  return pickJupiterWallet(wallets) || wallets[0] || null;
+}
+
 export function pickPhantomWallet<T extends { name: string }>(wallets: readonly T[]): T | null {
   return wallets.find((w) => isPhantomAdapterName(w.name)) ?? null;
 }
 
+export function isTelegramWebView(ua?: string | null): boolean {
+  const raw = ua ?? (typeof navigator !== "undefined" ? navigator.userAgent : "");
+  if (/telegram/i.test(raw)) return true;
+  try {
+    return Boolean((window as Window & { TelegramWebviewProxy?: unknown }).TelegramWebviewProxy);
+  } catch {
+    return false;
+  }
+}
+
 export function sortAgentSignWallets<T extends { name: string }>(
   wallets: readonly T[],
-  hidePhantom: boolean,
+  hidePhantom = false,
 ): T[] {
   const list = hidePhantom ? wallets.filter((w) => !isPhantomAdapterName(w.name)) : [...wallets];
   return [...list].sort(
@@ -80,20 +92,22 @@ export function clearStoredJupiterWallet(): void {
 }
 
 /**
- * Skip WalletProvider autoConnect of Phantom on Telegram auto-buy pages.
- * Never skip Jupiter — that is the only signer for /agent/sign.
+ * Skip WalletProvider autoConnect of Phantom inside Telegram's in-app browser
+ * (that path used to open Phantom Connect UL). Desktop Chrome + Phantom
+ * extension must auto-connect. Never skip Jupiter.
  */
 export function shouldSkipWalletAutoConnect(
   adapterName: string,
   pathname: string,
   search: string,
+  ua?: string | null,
 ): boolean {
   if (!/\/agent\/sign/i.test(pathname)) return false;
   const sp = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const auto = sp.get("auto") === "1" || sp.get("auto") === "true" || sp.get("autoconfirm") === "1";
   if (!auto) return false;
   if (isJupiterAdapterName(adapterName)) return false;
-  return isPhantomAdapterName(adapterName);
+  return isPhantomAdapterName(adapterName) && isTelegramWebView(ua);
 }
 
 export function fetchTimeoutSignal(ms: number): AbortSignal {

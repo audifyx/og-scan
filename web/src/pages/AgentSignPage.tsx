@@ -16,12 +16,12 @@ import {
   type McpAccessPackageId,
 } from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
-import { detectMobileWallet } from "@/lib/mobile-wallet";
 import {
   clearStoredPhantomWallet,
   fetchTimeoutSignal,
   isJupiterAdapterName,
-  pickJupiterWallet,
+  isTelegramWebView,
+  pickAutoSignWallet,
   sortAgentSignWallets,
 } from "@/lib/orbitx/agentSignWallets";
 
@@ -71,9 +71,9 @@ function dropAutoQuery(): void {
 }
 
 /**
- * MCP / Telegram handoff — rebuild unsigned Jupiter swap and sign in Jupiter Wallet.
- * Query: kind, action, mint, amount, percent, publicKey, slippage, pool, auto
- * Phantom Connect is never used. Auto-sign connects Jupiter only.
+ * MCP / Telegram handoff — rebuild the unsigned Jupiter swap and sign in the
+ * connected browser wallet (Phantom, Jupiter, Solflare, …). Phantom Connect UL
+ * is never used. Telegram's in-app browser cannot sign.
  */
 export default function AgentSignPage() {
   const [params] = useSearchParams();
@@ -85,7 +85,7 @@ export default function AgentSignPage() {
     sendTransaction: sendTransaction ?? undefined,
     signTransaction: signTransaction ?? undefined,
     walletName,
-    preferJupiter: true,
+    preferJupiter: !walletName || isJupiterAdapterName(walletName),
   };
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();
@@ -118,7 +118,7 @@ export default function AgentSignPage() {
     params.get("auto") === "1" ||
     params.get("auto") === "true" ||
     params.get("autoconfirm") === "1";
-  const connectWallets = sortAgentSignWallets(pickable, true);
+  const connectWallets = sortAgentSignWallets(pickable);
 
   const [busyTrade, setBusyTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,11 +197,7 @@ export default function AgentSignPage() {
       return;
     }
     if (!connected || !publicKey) {
-      setError("Connect Jupiter first.");
-      return;
-    }
-    if (walletName && !isJupiterAdapterName(walletName)) {
-      setError("Switch to Jupiter Wallet — OrbitX swaps sign with Jupiter only.");
+      setError("Connect a wallet first (Phantom, Jupiter, or Solflare in this browser).");
       return;
     }
     if (walletMismatch) {
@@ -428,7 +424,7 @@ export default function AgentSignPage() {
       autoStarted.current = false;
       const timedOut = /aborted|timeout|timed out/i.test(msg) || (e instanceof DOMException && e.name === "AbortError");
       if (timedOut) {
-        setError("Quote timed out. Tap Sign & send to retry — stay in Jupiter.");
+        setError("Quote timed out. Tap Sign & send to retry.");
       } else {
         setError(/base58/i.test(msg) ? "Swap sent. Refresh this page — the signature is confirming on-chain." : msg);
       }
@@ -439,35 +435,29 @@ export default function AgentSignPage() {
 
   useEffect(() => {
     if (!autoPrompt) return;
-    clearStoredPhantomWallet();
+    if (isTelegramWebView()) clearStoredPhantomWallet();
   }, [autoPrompt]);
 
   useEffect(() => {
     if (!autoPrompt || !valid || signature) return;
-    const info = detectMobileWallet();
-    const telegram =
-      typeof window !== "undefined" &&
-      (/Telegram/i.test(navigator.userAgent) ||
-        Boolean((window as Window & { TelegramWebviewProxy?: unknown }).TelegramWebviewProxy));
-    if (telegram || (info.isMobile && info.isInAppBrowser && !info.isPhantomBrowser)) {
-      setError("Open this page in Jupiter Wallet to sign. Telegram and Phantom Connect cannot sign OrbitX swaps.");
-    }
+    if (!isTelegramWebView()) return;
+    setError("Telegram's in-app browser can't sign. Open this link in Chrome, Jupiter Wallet, or Phantom.");
   }, [autoPrompt, valid, signature]);
 
   useEffect(() => {
     if (!autoPrompt || connected || autoConnectStarted.current || signature) return;
-    const jupiter = pickJupiterWallet(connectWallets);
-    if (!jupiter) return;
+    const target = pickAutoSignWallet(connectWallets);
+    if (!target) return;
     autoConnectStarted.current = true;
-    void signInWith(jupiter.name, { connectOnly: true }).catch((e) => {
+    void signInWith(target.name, { connectOnly: true }).catch((e) => {
       autoConnectStarted.current = false;
-      setError(e instanceof Error ? e.message : "Connect Jupiter Wallet to auto-sign");
+      setError(e instanceof Error ? e.message : "Connect a wallet to auto-sign");
     });
   }, [autoPrompt, connected, connectWallets, signInWith, signature]);
 
   useEffect(() => {
     if (!autoPrompt || !valid || !connected || !wallet || walletMismatch || signature) return;
-    if (walletName && !isJupiterAdapterName(walletName)) return;
+    if (walletName && isTelegramWebView() && !isJupiterAdapterName(walletName)) return;
     const lockKey = autoSignLockKey([kind, action, mint, amountRaw, percentRaw, sku, packageId, wallet]);
     if (readLock(lockKey) === "done") return;
     const t = window.setTimeout(() => {
@@ -487,21 +477,21 @@ export default function AgentSignPage() {
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
           <h1 className="text-xl font-black tracking-tight">
-            {autoPrompt ? "Auto-confirm" : "Sign with Jupiter"}
+            {autoPrompt ? "Auto-confirm" : "Sign swap"}
           </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
           {kind === "credits"
             ? autoPrompt
-              ? "Chat auto-confirm — Jupiter Wallet sends SOL to the OrbitX desk wallet, then credits apply."
-              : "Approve the SOL transfer in Jupiter Wallet. Credits apply after confirmation."
+              ? "Chat auto-confirm — your wallet sends SOL to the OrbitX desk wallet, then credits apply."
+              : "Approve the SOL transfer in your wallet. Credits apply after confirmation."
             : kind === "mcp-access"
               ? autoPrompt
                 ? "Chat auto-confirm — Jupiter buys the $ORBITX package and burns it in the same transaction."
                 : "Approve the Jupiter buy-and-burn. MCP access starts after confirmation and expires automatically."
               : autoPrompt
-                ? "Chat auto-confirm — Jupiter Wallet prompts as soon as it is connected. Phantom Connect is not used."
-                : `OrbitX prepared an unsigned Jupiter ${title.toLowerCase()}. Approve in Jupiter Wallet — nothing broadcasts until you sign.`}
+                ? "Chat auto-confirm — your browser wallet prompts as soon as it is connected. Phantom Connect is not used."
+                : `OrbitX prepared an unsigned Jupiter ${title.toLowerCase()}. Approve in this browser (Phantom, Jupiter, or Solflare) — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
@@ -600,7 +590,7 @@ export default function AgentSignPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab9ff2] px-4 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40"
             >
               {busyTrade ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-              {busyTrade ? "Waiting for Jupiter…" : `Sign & send ${title}`}
+              {busyTrade ? "Waiting for wallet…" : `Sign & send ${title}`}
             </button>
           </>
         )}

@@ -88,10 +88,12 @@ export function shouldUseJupiterInject(
   feePayer?: string | null,
 ): boolean {
   if (!getJupiterProvider()?.signAndSendTransaction) return false;
-  if (wallet.preferJupiter) return true;
-  if (wallet.preferPhantom) return false;
+  // Browser Phantom (and other named non-Jupiter adapters) must sign themselves.
+  // preferJupiter must not steal those sends when both extensions are installed.
   if (isPhantomWalletName(wallet.walletName)) return false;
+  if (wallet.preferPhantom) return false;
   if (isJupiterWalletName(wallet.walletName)) return true;
+  if (wallet.preferJupiter) return true;
   const jupiterPk = jupiterProviderPublicKey();
   return Boolean(feePayer && jupiterPk && feePayer === jupiterPk);
 }
@@ -140,7 +142,7 @@ export async function sendWalletTransaction(
     const signed = await wallet.signTransaction(tx);
     return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
   }
-  throw new Error("This wallet can't sign here — connect Jupiter Wallet");
+  throw new Error("This wallet can't sign here — connect Phantom, Jupiter, or Solflare in this browser");
 }
 
 export type ConfirmSentOptions = {

@@ -68,16 +68,17 @@ describe("shouldUseJupiterInject", () => {
     expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
   });
 
-  it("uses Jupiter inject when preferJupiter is set — even if Phantom was stored", () => {
+  it("uses Jupiter inject when preferJupiter is set and the adapter is not Phantom", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
     vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
-    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(true);
-    expect(shouldUseJupiterInject({ preferJupiter: true, preferPhantom: true, walletName: "Jupiter" })).toBe(true);
+    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Solflare" }, OWNER)).toBe(true);
+    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Jupiter" })).toBe(true);
+    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(false);
   });
 
-  it("never hijacks Phantom unless preferJupiter is set", () => {
+  it("never hijacks Phantom — even if preferJupiter is set", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -149,7 +150,7 @@ describe("sendWalletTransaction", () => {
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
   });
 
-  it("sends via Jupiter inject when preferJupiter is set even if Phantom adapter is named", async () => {
+  it("sends Phantom adapter txs even when preferJupiter is set", async () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -162,9 +163,9 @@ describe("sendWalletTransaction", () => {
       { walletName: "Phantom", preferJupiter: true, sendTransaction },
       tx,
     );
-    expect(sig).toBe("JUPITER_SIG");
-    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
-    expect(sendTransaction).not.toHaveBeenCalled();
+    expect(sig).toBe("PHANTOM_SIG");
+    expect(jupiterSignAndSendTransaction).not.toHaveBeenCalled();
+    expect(sendTransaction).toHaveBeenCalled();
   });
 
   it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
