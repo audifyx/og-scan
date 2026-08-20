@@ -33,7 +33,8 @@ import {
   telegramChatExtras,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
 import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
-import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
+import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM, DEFAULT_TELEGRAM_NIM_MODEL } from "../../api/orbitx/orbitx-telegram-knowledge.js";
+import { ORBITX_AGENT_IDENTITY, ORBITX_AGENT_NAME, ORBITX_AGENT_ROLE } from "../../api/orbitx/orbitx-agent-persona.js";
 import { asTokenRecord } from "../../api/orbitx/telegram-payload.js";
 import {
   assembleTelegramSnapshot,
@@ -620,6 +621,7 @@ describe("official OrbitX Telegram bot", () => {
       "custody",
       "answers",
       "caveats",
+      "lyra",
     ]) {
       expect(ids).toContain(need);
     }
@@ -639,6 +641,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(selectOrbitXFaqChunks("prediction markets").some((c) => c.id === "predict")).toBe(true);
     expect(selectOrbitXFaqChunks("Coin AI analyst").some((c) => c.id === "coinai")).toBe(true);
     expect(selectOrbitXFaqChunks("wallet copy-tracking").some((c) => c.id === "wallet")).toBe(true);
+    expect(selectOrbitXFaqChunks("who are you").some((c) => c.id === "lyra")).toBe(true);
 
     const shop = orbitXFaqSystemAddon("how does the shop burn work");
     expect(shop).toContain("Jupiter");
@@ -655,6 +658,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("programs/betting/");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("ogscan.fun");
     expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain("/faq");
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain(ORBITX_AGENT_NAME);
+    expect(OFFICIAL_ORBITX_TELEGRAM_SYSTEM).toContain(ORBITX_AGENT_ROLE);
+    expect(ORBITX_AGENT_IDENTITY.toLowerCase()).toContain("never reply with idk");
+    expect(DEFAULT_TELEGRAM_NIM_MODEL).toContain("70b");
   });
 
   it("never commits a BotFather token and gates configure", () => {

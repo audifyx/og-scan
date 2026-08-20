@@ -18,6 +18,7 @@ import {
   ORBITX_TELEGRAM_BLURB,
   ORBITX_TELEGRAM_SYSTEM,
 } from "./orbitx/orbitx-telegram-knowledge.js";
+import { orbitXFaqSystemAddon } from "./orbitx/orbitx-faq-training.js";
 import { nvidiaChat, NIM_MODELS, DEFAULT_NIM_MODEL } from "./orbitx/x-agent-lib.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
@@ -66,16 +67,16 @@ async function askOrbitxAi(text, bot) {
       (bot.persona ? `\nOwner persona notes: ${String(bot.persona).slice(0, 800)}` : "")
     : "";
 
-  const system = `${ORBITX_TELEGRAM_SYSTEM}${personaExtra}`;
+  const system = `${ORBITX_TELEGRAM_SYSTEM}${personaExtra}\n\n${orbitXFaqSystemAddon(text)}`;
   const model = resolveTelegramModel(bot.ai_model);
 
-  // Primary: free NVIDIA NIM (same API as Agent/X MCP backend).
+  // Primary: NVIDIA NIM (same API as Agent/X MCP backend).
   const nim = await nvidiaChat({
     system,
     user: String(text || "gm").slice(0, 6000),
     model,
-    maxTokens: 900,
-    temperature: 0.65,
+    maxTokens: 1600,
+    temperature: 0.28,
   });
   if (nim.ok && nim.content) return formatTelegramChatText(nim.content);
 

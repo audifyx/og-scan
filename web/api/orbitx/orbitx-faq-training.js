@@ -35,6 +35,7 @@ export const ORBITX_FAQ_SECTIONS = {
 /** Exact FAQ phrasings from the report — boost retrieval. */
 export const ORBITX_FAQ_ALIASES = [
   { id: "what", phrases: ["what is orbitx", "who is orbitx", "what is og scan", "ogscan"] },
+  { id: "lyra", phrases: ["who are you", "whats your name", "what's your name", "your name", "who is lyra", "desk officer"] },
   { id: "hold", phrases: ["what is the utility", "token utility", "how does holding", "utility of $orbitx", "utility of orbitx"] },
   { id: "mcp", phrases: ["how do i connect mcp", "how to connect mcp", "connect mcp", "mcp access"] },
   { id: "burn", phrases: ["how does burning work", "how does burn work", "how to burn"] },
@@ -75,6 +76,8 @@ LAUNCH: Free launch to pump.fun inside OrbitX (/orbitxlaunch). Optional vanity m
 
 CODE: Vite+React SPA under web/ (not Next.js for the main app). Vercel functions, Supabase, R3F City. Betting program programs/betting/. EVM curve contracts exist for multi-chain launch path.
 
+AGENT: You are Lyra, Official OrbitX Desk Officer (@theorbitxmcpbot + OrbitX AI). Answer fully. Never reply idk. If a live number is missing, still explain the product and the command that fetches it.
+
 QUICK ANSWERS
 - What is OrbitX? On-chain OS unifying DEX/forensics, launchpad, social, voice, predictions, gaming, AI agents, and City under one wallet identity. Live ${OGSCAN_HOST} / ${ORBITX_HOST}.
 - Utility? Hold ≥ $5 for AI + basic MCP; hold 10k for Pro/KOL DEX; burn 100 = 1 hour MCP / 1,000 = 1 day / 10,000 = 1 week / 1,000,000 = 1 month (stackable); burn for shop seats, listings, intel, API keys; usage drives further burns.
@@ -104,6 +107,20 @@ export const ORBITX_FAQ_CHUNKS = [
       "definition",
     ],
     text: `OrbitX is an on-chain OS for crypto, focused primarily on Solana but with multi-chain (16 chains) data aggregation. It is a single destination / unified desk that collapses the fragmented Solana trading stack (scanners, DEX terminals, launchpads, Telegram, X, voice rooms, portfolio tools, prediction sites) into one wallet-identity-connected environment. Official README: OrbitX DEX (live at ogscan.fun) aggregates public blockchain and market data across 16 chains and surfaces what most tools hide: dev-wallet and dev-sold status, the first on-chain buyer, paid-listing status, whale/KOL holders, real ATH history, bundle/sniper detection, and wallet copy-tracking. Tagline set: forensic intel, social feed, live voice & video, predictions & games, free launchpad, per-token AI analyst, public MCP, non-custodial. It is the evolution / rebrand of OG Scan. Live DEX/scanner: ogscan.fun. Broader platform/marketing: orbitx.world. Primary public source of truth: GitHub audifyx/og-scan (Vite+React frontend, Supabase, Vercel functions, Anchor programs, EVM curve contracts, docs, migrations). Explicitly not “another scanner / launchpad / terminal” — it is the OS layer where trading, launching, social, intelligence, AI agents, prediction markets, and a persistent 3D City coexist.`,
+  },
+  {
+    id: "lyra",
+    title: "Who is Lyra",
+    keys: [
+      "who are you",
+      "your name",
+      "lyra",
+      "desk officer",
+      "personality",
+      "introduce",
+      "what are you",
+    ],
+    text: `You are Lyra, Official OrbitX Desk Officer on @theorbitxmcpbot and inside OrbitX AI. You know the full OrbitX map (DEX/forensics, launchpad, City, OS, Play, Intel, HQ, MCP, shop burns, predictions, NFT, trade). Introduce yourself once if asked, then brief them completely: what it is, how it works, where to tap, one next command. Never shrug with idk. Never invent live prices — send /token. Never print invite codes. Humans: ${ORBITX_GC}.`,
   },
   {
     id: "token",
@@ -436,7 +453,7 @@ function normalizeFaqQuery(text) {
     .trim();
 }
 
-export function selectOrbitXFaqChunks(text, { limit = 3 } = {}) {
+export function selectOrbitXFaqChunks(text, { limit = 5 } = {}) {
   const q = normalizeFaqQuery(text);
   if (!q) return ORBITX_FAQ_CHUNKS.filter((c) => c.id === "what" || c.id === "answers").slice(0, 2);
 
@@ -464,15 +481,24 @@ export function selectOrbitXFaqChunks(text, { limit = 3 } = {}) {
   }));
   const picked = (scored.length ? scored : fallback).slice(0, limit).map((row) => row.chunk);
   const seen = new Set();
-  return picked.filter((chunk) => {
+  const unique = picked.filter((chunk) => {
     if (seen.has(chunk.id)) return false;
     seen.add(chunk.id);
     return true;
   });
+  for (const extraId of ["what", "answers"]) {
+    if (unique.length >= limit) break;
+    const extra = ORBITX_FAQ_CHUNKS.find((c) => c.id === extraId);
+    if (extra && !seen.has(extra.id)) {
+      unique.push(extra);
+      seen.add(extra.id);
+    }
+  }
+  return unique;
 }
 
 export function orbitXFaqSystemAddon(userText) {
-  const chunks = selectOrbitXFaqChunks(userText, { limit: 3 });
+  const chunks = selectOrbitXFaqChunks(userText, { limit: 5 });
   const body = chunks.map((c) => `[${c.title}]\n${c.text}`).join("\n\n");
   return `${ORBITX_FAQ_CORE}\n\nDEEP DIVES FOR THIS QUESTION:\n${body}`;
 }
