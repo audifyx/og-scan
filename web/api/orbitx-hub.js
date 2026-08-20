@@ -1965,7 +1965,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_prepare_buy",
     description:
-      "Prepare a BUY for Phantom signing. Returns signUrl — open it so the user signs in Phantom. Never broadcast unsigned. Purchase incomplete until Phantom confirms.",
+      "Prepare a BUY via Jupiter. Returns signUrl — open it so the user signs in Jupiter Wallet. Never broadcast unsigned. Purchase incomplete until Jupiter confirms. Do not use Phantom Connect.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1985,7 +1985,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_prepare_sell",
     description:
-      "Prepare a SELL for Phantom signing. Returns signUrl — open it so the user signs in Phantom. amount as tokens or '100%'. Never broadcast unsigned.",
+      "Prepare a SELL via Jupiter. Returns signUrl — open it so the user signs in Jupiter Wallet. amount as tokens or '100%'. Never broadcast unsigned.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2035,7 +2035,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_buy",
-    description: "Alias for orbitx_prepare_buy — returns Phantom signUrl.",
+    description: "Alias for orbitx_prepare_buy — returns Jupiter signUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2050,7 +2050,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_trade",
-    description: "Alias for orbitx_prepare_buy (/trade). Returns Phantom signUrl.",
+    description: "Alias for orbitx_prepare_buy (/trade). Returns Jupiter signUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2065,7 +2065,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_swap",
-    description: "Alias for orbitx_prepare_buy (/swap). Returns Phantom signUrl.",
+    description: "Alias for orbitx_prepare_buy (/swap). Returns Jupiter signUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2080,7 +2080,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_sell",
-    description: "Alias for orbitx_prepare_sell — returns Phantom signUrl.",
+    description: "Alias for orbitx_prepare_sell — returns Jupiter signUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2095,7 +2095,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_buy_auto",
-    description: "Buy with pool=auto — alias for orbitx_prepare_buy (Phantom signUrl).",
+    description: "Buy with pool=auto — alias for orbitx_prepare_buy (Jupiter signUrl).",
     inputSchema: {
       type: "object",
       properties: {
@@ -2110,7 +2110,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_credits_buy",
     description:
-      "Buy OrbitX MCP credits with SOL sent to the OrbitX desk wallet. When the user says buy credits / top up — ASK how many credits OR how much SOL, then call this. Returns a Phantom signUrl (or autoSignUrl) that starts the SOL transfer. After payment, call orbitx_credits_confirm with the signature (sign page often credits automatically).",
+      "Buy OrbitX MCP credits with SOL sent to the OrbitX desk wallet. When the user says buy credits / top up — ASK how many credits OR how much SOL, then call this. Returns a Jupiter signUrl (or autoSignUrl) that starts the SOL transfer. After payment, call orbitx_credits_confirm with the signature (sign page often credits automatically).",
     inputSchema: {
       type: "object",
       properties: {
@@ -2128,7 +2128,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_credits_confirm",
     description:
-      "Confirm a credits SOL payment to the desk wallet and credit the user's balance. Pass the Solana tx signature after Phantom confirms.",
+      "Confirm a credits SOL payment to the desk wallet and credit the user's balance. Pass the Solana tx signature after Jupiter confirms.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2183,7 +2183,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_mcp_access_confirm",
     description:
-      "Confirm an $ORBITX burn and grant MCP access for the matching package duration. Pass the Solana tx signature after Phantom confirms.",
+      "Confirm an $ORBITX burn and grant MCP access for the matching package duration. Pass the Solana tx signature after Jupiter confirms.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2198,7 +2198,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_buy_orbitx",
     description:
-      "Buy official $ORBITX with SOL. When the user says buy $ORBITX / buy orbitx — ASK how much SOL, then whether they want to sign manually or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Phantom immediately. Mint is fixed to official ORBITX.",
+      "Buy official $ORBITX with SOL. When the user says buy $ORBITX / buy orbitx — ASK how much SOL, then whether they want to sign manually or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Jupiter immediately. Mint is fixed to official ORBITX.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2207,7 +2207,7 @@ const CORE_TOOLS = [
         confirmMode: {
           type: "string",
           enum: ["sign", "auto"],
-          description: "sign = tap Sign on page; auto = open link and Phantom pops (chat auto-confirm)",
+          description: "sign = tap Sign on page; auto = open link and Jupiter prompts (chat auto-confirm)",
         },
         autoConfirm: {
           type: "boolean",
@@ -2229,7 +2229,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_confirm_buy",
     description:
-      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after orbitx_buy_orbitx. Re-prepares the buy and returns autoSignUrl (Phantom auto-prompt). Pass amountSol if known; otherwise uses the last pending intent.",
+      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after orbitx_buy_orbitx. Re-prepares the buy and returns autoSignUrl (Jupiter auto-prompt). Pass amountSol if known; otherwise uses the last pending intent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2882,7 +2882,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_trade_auto",
     description:
-      "Enable or disable chat auto-buy for this linked wallet. Auto-buy still requires a Phantom signature; it skips the extra Telegram confirm step.",
+      "Enable or disable chat auto-buy for this linked wallet. Auto-buy still requires a Jupiter Wallet signature; it skips the extra Telegram confirm step.",
     inputSchema: {
       type: "object",
       properties: {
@@ -3670,7 +3670,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       ok: true,
       autoBuy: on,
       message: on
-        ? "Auto-buy ON for this account. Next /buy sends a Phantom auto-prompt (no extra Telegram confirm). You still sign in Phantom."
+        ? "Auto-buy ON for this account. Next /buy sends a Jupiter auto-prompt (no extra Telegram confirm). You still sign in Jupiter Wallet."
         : "Auto-buy OFF. Each /buy returns a Sign link; say confirm or /autobuy on to skip the extra step.",
     };
   }
@@ -3733,7 +3733,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         ok: false,
         error: "wallet_required",
         mint: String(args.mint || ORBITX_MINT),
-        message: "Link Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        message: "Link Jupiter Wallet on https://www.orbitx.world/telegram after /login, then send /buy again.",
         loginUrl: "https://www.orbitx.world/telegram",
       };
     }
@@ -3825,7 +3825,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     return {
       ok: true,
-      status: auto ? "awaiting_auto_phantom" : "awaiting_phantom_signature",
+      status: auto ? "awaiting_auto_jupiter" : "awaiting_jupiter_signature",
       requiresSignature: true,
       confirmMode: auto ? "auto" : "sign",
       signUrl,
@@ -3847,17 +3847,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       solscanAccount: wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : null,
       instructions: auto
         ? [
-            "Open autoSignUrl — Phantom pops immediately (auto-buy).",
-            "Approve in Phantom. OrbitX never holds keys or funds.",
-            "Trade is incomplete until Phantom confirms.",
+            "Open autoSignUrl — Jupiter Wallet prompts immediately (auto-buy).",
+            "Approve in Jupiter Wallet. OrbitX never holds keys or funds.",
+            "Trade is incomplete until Jupiter confirms.",
           ]
         : [
-            "Open signUrl and tap Sign & send in Phantom.",
+            "Open signUrl and tap Sign & send in Jupiter Wallet.",
             "Say confirm or /autobuy on to skip this extra Telegram step next time.",
             "Do NOT broadcast unsigned transactions.",
           ],
       note: auto
-        ? "Auto-buy: Phantom still must sign. Non-custodial."
+        ? "Auto-buy: Jupiter Wallet still must sign. Non-custodial."
         : "Manual sign. Non-custodial. Route the user to signUrl.",
     };
   }
@@ -3931,14 +3931,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const q = new URLSearchParams({ kind: "claim", publicKey: wallet });
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: "awaiting_jupiter_signature",
       requiresSignature: true,
       signUrl: `${base}/agent/sign?${q.toString()}`,
       action: "claim_fees",
       wallet,
       instructions: [
         "Open signUrl in the browser.",
-        "Connect the creator wallet in Phantom and Sign.",
+        "Connect the creator wallet in Jupiter Wallet and Sign.",
         "Do not broadcast unsigned transactions yourself.",
       ],
     };
@@ -3949,14 +3949,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const q = new URLSearchParams({ kind: "rent", publicKey: wallet });
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: "awaiting_jupiter_signature",
       requiresSignature: true,
       signUrl: `${base}/agent/sign?${q.toString()}`,
       action: "rent_refund",
       wallet,
       instructions: [
         "Open signUrl — may require signing multiple close-account txs.",
-        "Connect Phantom and approve each batch.",
+        "Connect Jupiter Wallet and approve each batch.",
       ],
     };
   }
@@ -3973,13 +3973,13 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     else q.set("amount", String(args.amount));
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: "awaiting_jupiter_signature",
       requiresSignature: true,
       signUrl: `${base}/agent/sign?${q.toString()}`,
       action: "burn",
       wallet,
       mint: String(args.mint || ""),
-      instructions: ["Open signUrl", "Approve burn in Phantom", "Never submit unsigned burn txs yourself"],
+      instructions: ["Open signUrl", "Approve burn in Jupiter Wallet", "Never submit unsigned burn txs yourself"],
     };
   }
 

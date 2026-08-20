@@ -30,8 +30,8 @@ interface Props {
 export const SolanaWalletProvider: FC<Props> = ({ children }) => {
   const adapters = useMemo(
     () => [
-      new PhantomWalletAdapter(),
       new JupiterWalletAdapter(),
+      new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
       new BackpackWalletAdapter(),
       new TorusWalletAdapter(),

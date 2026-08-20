@@ -1,7 +1,8 @@
 /**
  * Shared $ORBITX buy prep for Agent MCP + X MCP.
- * Non-custodial: builds unsigned Jupiter/Pump trade → user signs in Phantom.
- * confirmMode "auto" adds ?auto=1 so the sign page opens Phantom immediately.
+ * Non-custodial: builds unsigned Jupiter swap → user signs in Jupiter Wallet.
+ * confirmMode "auto" adds ?auto=1 so the sign page opens Jupiter immediately.
+ * Phantom Connect is never used.
  */
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -19,12 +20,12 @@ export function askBuyOrbitxAmount() {
     token: ORBITX_SYMBOL,
     mint: ORBITX_MINT,
     message:
-      "Ask how much SOL they want to spend on $ORBITX (any amount). Also ask: sign manually, or auto-confirm (open link → Phantom pops immediately). Then call orbitx_buy_orbitx / x_buy_orbitx with amountSol + confirmMode.",
+      "Ask how much SOL they want to spend on $ORBITX (any amount). Also ask: sign manually, or auto-confirm (open link → Jupiter Wallet prompts). Then call orbitx_buy_orbitx / x_buy_orbitx with amountSol + confirmMode.",
     minSol: MIN_BUY_SOL,
     maxSol: MAX_BUY_SOL,
     confirmModes: {
-      sign: "Returns signUrl — user opens and taps Sign & send",
-      auto: "Returns autoSignUrl — opening the link auto-prompts Phantom (chat auto-confirm)",
+      sign: "Returns signUrl — user opens and taps Sign & send in Jupiter",
+      auto: "Returns autoSignUrl — opening the link auto-prompts Jupiter Wallet (chat auto-confirm)",
     },
     examples: [
       "buy 0.1 SOL of $ORBITX",
@@ -127,7 +128,7 @@ export async function prepareBuyOrbitx(opts) {
       error: "wallet_required",
       mint: ORBITX_MINT,
       token: ORBITX_SYMBOL,
-      message: "Link Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+      message: "Link Jupiter Wallet on https://www.orbitx.world/telegram after /login, then send /buy again.",
       loginUrl: "https://www.orbitx.world/telegram",
       fixUrl: "https://www.orbitx.world/telegram",
     };
@@ -201,7 +202,7 @@ export async function prepareBuyOrbitx(opts) {
 
   return {
     ok: true,
-    status: mode === "auto" ? "awaiting_auto_phantom" : "awaiting_phantom_signature",
+    status: mode === "auto" ? "awaiting_auto_jupiter" : "awaiting_jupiter_signature",
     requiresSignature: true,
     confirmMode: mode,
     token: ORBITX_SYMBOL,
@@ -225,21 +226,21 @@ export async function prepareBuyOrbitx(opts) {
       mode === "auto"
         ? [
             "Send the user the openUrl / autoSignUrl as a clickable link.",
-            "Opening it connects Phantom and prompts Sign automatically (chat auto-confirm).",
+            "Opening it connects Jupiter Wallet and prompts Sign automatically (chat auto-confirm).",
             `0.95% platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
             "If they prefer a button first, use signUrl instead.",
-            "Trade is incomplete until Phantom confirms.",
+            "Trade is incomplete until Jupiter confirms.",
           ]
         : [
             "Send the user the signUrl as a clickable link.",
-            "They connect Phantom and tap Sign & send.",
+            "They connect Jupiter Wallet and tap Sign & send.",
             `0.95% platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
-            "If they say yes / confirm / auto — call orbitx_confirm_buy (or x_confirm_buy) with the same amountSol for auto Phantom prompt.",
+            "If they say yes / confirm / auto — call orbitx_confirm_buy (or x_confirm_buy) with the same amountSol for auto Jupiter prompt.",
             "Do NOT broadcast unsigned transactions yourself.",
           ],
     note:
       mode === "auto"
-        ? `Chat auto-confirm: open autoSignUrl → Phantom pops. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`
+        ? `Chat auto-confirm: open autoSignUrl → Jupiter Wallet prompts. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`
         : `Manual sign: open signUrl. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`,
     jupiter: `https://jup.ag/swap/SOL-${ORBITX_MINT}`,
     dex: `https://www.orbitx.world/ORBITX_DEX/token/${ORBITX_MINT}`,

@@ -295,13 +295,13 @@ export function buildGeneratedTools() {
     );
   }
 
-  // 6) Buy/sell per pool → Phantom signUrl
+  // 6) Buy/sell per pool → Jupiter signUrl
   for (const pool of POOLS) {
     const p = pool.replace(/-/g, "_");
     push(
       tool(
         `orbitx_buy_${p}`,
-        `Prepare BUY via ${pool} pool → Phantom signUrl. Requires mint, amountSol, publicKey.`,
+        `Prepare BUY via ${pool} pool → Jupiter signUrl. Requires mint, amountSol, publicKey.`,
         {
           type: "object",
           properties: {
@@ -318,7 +318,7 @@ export function buildGeneratedTools() {
     push(
       tool(
         `orbitx_sell_${p}`,
-        `Prepare SELL via ${pool} pool → Phantom signUrl. Requires mint, amount, publicKey.`,
+        `Prepare SELL via ${pool} pool → Jupiter signUrl. Requires mint, amount, publicKey.`,
         {
           type: "object",
           properties: {

@@ -33,7 +33,7 @@ export type WalletSendCaps = {
   walletName?: string | null;
   /** Force the Jupiter inject even when the adapter name is missing. */
   preferJupiter?: boolean;
-  /** Sign page / Telegram auto-buy: never hijack Phantom sends into Jupiter. */
+  /** Legacy flag — ignored when preferJupiter is set. Sign page never uses Phantom Connect. */
   preferPhantom?: boolean;
 };
 
@@ -88,9 +88,9 @@ export function shouldUseJupiterInject(
   feePayer?: string | null,
 ): boolean {
   if (!getJupiterProvider()?.signAndSendTransaction) return false;
+  if (wallet.preferJupiter) return true;
   if (wallet.preferPhantom) return false;
   if (isPhantomWalletName(wallet.walletName)) return false;
-  if (wallet.preferJupiter) return true;
   if (isJupiterWalletName(wallet.walletName)) return true;
   const jupiterPk = jupiterProviderPublicKey();
   return Boolean(feePayer && jupiterPk && feePayer === jupiterPk);
@@ -140,7 +140,7 @@ export async function sendWalletTransaction(
     const signed = await wallet.signTransaction(tx);
     return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
   }
-  throw new Error("This wallet can't sign here — connect Phantom");
+  throw new Error("This wallet can't sign here — connect Jupiter Wallet");
 }
 
 export type ConfirmSentOptions = {

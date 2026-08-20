@@ -68,7 +68,16 @@ describe("shouldUseJupiterInject", () => {
     expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
   });
 
-  it("never hijacks Phantom — even if Jupiter inject shares the same pubkey", () => {
+  it("uses Jupiter inject when preferJupiter is set — even if Phantom was stored", () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(true);
+    expect(shouldUseJupiterInject({ preferJupiter: true, preferPhantom: true, walletName: "Jupiter" })).toBe(true);
+  });
+
+  it("never hijacks Phantom unless preferJupiter is set", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -138,6 +147,24 @@ describe("sendWalletTransaction", () => {
     const sent = sendTransaction.mock.calls[0]?.[0];
     expect(sent && "version" in sent).toBe(true);
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sends via Jupiter inject when preferJupiter is set even if Phantom adapter is named", async () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_SIG");
+    const sendTransaction = vi.fn().mockResolvedValue("PHANTOM_SIG");
+    const { tx } = unsignedTransfer();
+    const sig = await sendWalletTransaction(
+      { sendRawTransaction: vi.fn() } as never,
+      { walletName: "Phantom", preferJupiter: true, sendTransaction },
+      tx,
+    );
+    expect(sig).toBe("JUPITER_SIG");
+    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
   });
 
   it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
