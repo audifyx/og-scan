@@ -24,12 +24,15 @@ import {
   collectMediaUrls,
   extractMint,
   formatFamilyMenu,
+  formatGroupWelcomeHtml,
   formatHelpDesk,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatToolMenu,
   inferPublicTool,
+  isPublicGroupTrigger,
+  isOfficialBotUsername,
   orbitXFaqSystemAddon,
   isPrivilegedTelegramTool,
   isTelegramAdminWallet,
@@ -39,6 +42,8 @@ import {
   missingToolInput,
   parseCallInvocation,
   resolveOfficialCommand,
+  shouldSkipTelegramSender,
+  telegramChatExtras,
   telegramMessageParts,
   TOKEN_INTEL_TOOLS,
 } from "./orbitx/telegram-orbitx-lib.js";
@@ -47,8 +52,9 @@ import {
   formatOrbitXLinksHtml,
   OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
   ORBITX_GC,
+  ORBITX_MINT,
 } from "./orbitx/orbitx-telegram-knowledge.js";
-import { fetchTelegramTokenSnapshot, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
+import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
@@ -141,7 +147,8 @@ async function tg(method, body, { form } = {}) {
     headers: form ? undefined : { "Content-Type": "application/json" },
     body: form || JSON.stringify(body),
   });
-  return r.json().catch(() => ({ ok: false }));
+  const data = await r.json().catch(() => ({ ok: false }));
+  return { ...data, httpStatus: r.status };
 }
 
 async function sendLong(chatId, text, extra = {}) {
@@ -171,24 +178,36 @@ async function sendLong(chatId, text, extra = {}) {
     };
     if (reply_markup && i === chunks.length - 1) payload.reply_markup = reply_markup;
     last = await tg("sendMessage", payload);
-    if (!last?.ok && rest.parse_mode) {
+    const delivered = last?.ok === true || last?.httpStatus === 200;
+    if (!delivered && rest.parse_mode) {
       last = await tg("sendMessage", {
         chat_id: chatId,
         text: chunk.replace(/<[^>]+>/g, ""),
         disable_web_page_preview: true,
         ...(reply_markup && i === chunks.length - 1 ? { reply_markup } : {}),
+        ...(rest.message_thread_id != null ? { message_thread_id: rest.message_thread_id } : {}),
+        ...(rest.reply_to_message_id != null
+          ? { reply_to_message_id: rest.reply_to_message_id, allow_sending_without_reply: true }
+          : {}),
       });
     }
   }
   return last;
 }
 
-async function sendMedia(chatId, urls) {
+async function sendMedia(chatId, urls, extra = {}) {
+  const thread = extra.message_thread_id != null ? { message_thread_id: extra.message_thread_id } : {};
   for (const media of urls || []) {
     const isVid = /\.(mp4|webm|mov)(\?|$)/i.test(media) || /video/i.test(media);
-    if (isVid) await tg("sendVideo", { chat_id: chatId, video: media });
-    else await tg("sendPhoto", { chat_id: chatId, photo: media });
+    if (isVid) await tg("sendVideo", { chat_id: chatId, video: media, ...thread });
+    else await tg("sendPhoto", { chat_id: chatId, photo: media, ...thread });
   }
+}
+
+function typingBody(chatId, extra = {}, action = "typing") {
+  const body = { chat_id: chatId, action };
+  if (extra.message_thread_id != null) body.message_thread_id = extra.message_thread_id;
+  return body;
 }
 
 async function loadLink(telegramUserId) {
@@ -285,15 +304,22 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       cleanArgs.publicKey = wallet;
       cleanArgs.address = wallet;
       cleanArgs.buyerWallet = cleanArgs.buyerWallet || wallet;
+      if (!link.wallet_address && link.telegram_user_id) {
+        await sb(`telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(String(link.telegram_user_id))}`, {
+          method: "PATCH",
+          body: JSON.stringify({ wallet_address: wallet, updated_at: new Date().toISOString() }),
+        }).catch(() => null);
+      }
     }
-    if (link.auto_buy && /^orbitx_(prepare_buy|buy|buy_orbitx|buy_auto)$/.test(name)) {
+    if (link.auto_buy && /buy|trade|swap|confirm_buy/.test(name)) {
       if (cleanArgs.autoConfirm !== false) cleanArgs.autoConfirm = true;
     }
     if (!wallet && /buy|sell|launch|mint|credits|access|nft_prepare|nft_submit|burn|claim/.test(name)) {
       return {
         ok: false,
         error: "wallet_required",
-        message: "This OrbitX account has no Phantom wallet yet. Open https://www.orbitx.world/telegram after /login and connect Phantom.",
+        message: "Connect Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+        loginUrl: "https://www.orbitx.world/telegram",
       };
     }
     return hub.runEmbeddedAgentTool({
@@ -500,20 +526,31 @@ function alreadyHandledUpdate(updateId) {
   return false;
 }
 
+function scanCooldownKey(chatId, mint) {
+  return `${chatId}:${String(mint || "").trim().toLowerCase()}`;
+}
+
 function recentlyScanned(chatId, mint) {
   const id = String(mint || "").trim().toLowerCase();
   if (!id || chatId == null) return false;
-  const key = `${chatId}:${id}`;
-  const prev = scanCooldown.get(key);
-  if (prev && Date.now() - prev < 25_000) return true;
-  scanCooldown.set(key, Date.now());
+  const prev = scanCooldown.get(scanCooldownKey(chatId, mint));
+  return Boolean(prev && Date.now() - prev < 25_000);
+}
+
+function rememberSuccessfulScan(chatId, mint) {
+  const id = String(mint || "").trim().toLowerCase();
+  if (!id || chatId == null) return;
+  scanCooldown.set(scanCooldownKey(chatId, mint), Date.now());
   if (scanCooldown.size > 2000) {
     const cutoff = Date.now() - 90_000;
     for (const [k, ts] of scanCooldown) {
       if (ts < cutoff) scanCooldown.delete(k);
     }
   }
-  return false;
+}
+
+function forgetScan(chatId, mint) {
+  scanCooldown.delete(scanCooldownKey(chatId, mint));
 }
 
 function cacheMediaJob(job) {
@@ -699,7 +736,7 @@ async function replyToolResult(chatId, result, { tool, extra, job } = {}) {
         }
       : result;
   await sendCard(chatId, formatOrbitXTelegramResult(timed, tool), extra);
-  await sendMedia(chatId, collectMediaUrls(timed || result));
+  await sendMedia(chatId, collectMediaUrls(timed || result), extra);
 }
 
 async function handleCheck(chatId, text, { req, link, extra }) {
@@ -731,13 +768,13 @@ async function handleCheck(chatId, text, { req, link, extra }) {
   const state = String(result?.state || result?.status || "").toLowerCase();
   const kind = job?.kind || result?.kind || "image";
   if (result?.error && !state) {
-    await sendCard(chatId, formatOrbitXTelegramResult(result), extra);
+    await sendCard(chatId, formatOrbitXTelegramResult(result, "orbitx_media_status"), extra);
     return;
   }
   if (state === "success" || state === "succeeded" || state === "completed" || state === "done") {
     await markMediaJob(taskId, "succeeded");
     await sendCard(chatId, formatMediaCountdown({ kind, taskId, state: "success" }), extra);
-    await sendMedia(chatId, collectMediaUrls(result));
+    await sendMedia(chatId, collectMediaUrls(result), extra);
     return;
   }
   if (state === "fail" || state === "failed" || state === "error") {
@@ -802,17 +839,18 @@ async function handleCallbackQuery(cq, req) {
   const data = String(cq?.data || "").trim();
   const chatId = cq?.message?.chat?.id;
   const from = cq?.from || {};
+  const { extra } = telegramChatExtras(cq?.message);
   if (cq?.id) await tg("answerCallbackQuery", { callback_query_id: cq.id });
   if (!chatId || !data.startsWith("ox:")) return;
   const key = data.slice(3);
   if (key === "links") {
-    await sendLinks(chatId, {});
+    await sendLinks(chatId, extra);
     return;
   }
   if (key.startsWith("chart:")) {
     const mint = key.slice(6);
     if (!mint) return;
-    await tg("sendChatAction", { chat_id: chatId, action: "typing" });
+    await tg("sendChatAction", typingBody(chatId, extra));
     try {
       const result = await runTool({
         tool: "orbitx_dex_chart",
@@ -821,41 +859,63 @@ async function handleCallbackQuery(cq, req) {
         link: from.id ? await loadLink(from.id) : null,
         allowPrivileged: false,
       });
-      await sendCard(chatId, formatOrbitXTelegramResult(result, "orbitx_dex_chart"));
+      await sendCard(chatId, formatOrbitXTelegramResult(result, "orbitx_dex_chart"), extra);
     } catch (error) {
-      await tg("sendMessage", { chat_id: chatId, text: `Chart error: ${error?.message || error}` });
+      await tg("sendMessage", { chat_id: chatId, text: `Chart error: ${error?.message || error}`, ...extra });
     }
     return;
   }
-  await sendCard(chatId, formatFamilyMenu(key));
+  await sendCard(chatId, formatFamilyMenu(key), extra);
+}
+
+async function handleMyChatMember(update) {
+  const m = update?.my_chat_member;
+  if (!m) return;
+  const chat = m.chat || {};
+  const isGroup = chat.type === "group" || chat.type === "supergroup";
+  if (!isGroup || !chat.id) return;
+  const status = String(m.new_chat_member?.status || "");
+  const old = String(m.old_chat_member?.status || "");
+  if (!["member", "administrator"].includes(status)) return;
+  if (["member", "administrator"].includes(old)) return;
+  const extra = {};
+  const thread = Number(m.message_thread_id);
+  if (Number.isFinite(thread) && thread > 0) extra.message_thread_id = thread;
+  await sendLong(chat.id, formatGroupWelcomeHtml(), { parse_mode: "HTML", ...extra });
 }
 
 async function handleTelegramUpdate(update, req) {
   if (alreadyHandledUpdate(update?.update_id)) return;
+  if (update.my_chat_member) {
+    await handleMyChatMember(update);
+    return;
+  }
   if (update.callback_query) {
     await handleCallbackQuery(update.callback_query, req);
     return;
   }
   const msg = update.message || update.edited_message || update.channel_post;
   if (!msg) return;
-  const text = String(msg.text || msg.caption || "").trim();
   const chatId = msg.chat?.id;
   if (!chatId) return;
   const from = msg.from || {};
-  if (from.is_bot || String(from.username || "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase()) return;
-  if (looksLikeOrbitXCard(text)) return;
+  if (shouldSkipTelegramSender(msg)) return;
+  let text = String(msg.text || msg.caption || "").trim();
   const quoted = String(msg.reply_to_message?.text || msg.reply_to_message?.caption || "");
+  const failedQuote = looksLikeFailedQuoteCard(text) || looksLikeFailedQuoteCard(quoted);
+  const stubMint = extractMint(text) || extractMint(quoted);
+  if (looksLikeOrbitXCard(text) && !failedQuote) return;
   if (
     quoted &&
-    String(msg.reply_to_message?.from?.username || "").toLowerCase() === OFFICIAL_BOT_USERNAME.toLowerCase() &&
+    isOfficialBotUsername(msg.reply_to_message?.from?.username) &&
     looksLikeOrbitXCard(quoted) &&
+    !failedQuote &&
     (!text || extractMint(text) === extractMint(quoted))
   ) {
     return;
   }
-  const chatType = String(msg.chat?.type || "");
-  const isGroup = chatType === "group" || chatType === "supergroup";
-  const replyExtra = isGroup ? { reply_to_message_id: msg.message_id } : {};
+  if (failedQuote && stubMint) text = `/token ${stubMint}`;
+  const { isGroup, extra: replyExtra } = telegramChatExtras(msg);
   const link = from.id ? await loadLink(from.id) : null;
   const limit = memoryRateLimit(
     `tg-orbitx:${isGroup ? chatId : from.id || chatId}`,
@@ -868,11 +928,8 @@ async function handleTelegramUpdate(update, req) {
   }
 
   const bare = text.toLowerCase().split(/\s+/)[0].replace(/@.*$/, "").replace(/^\//, "");
-  const mentioned =
-    new RegExp(`@${OFFICIAL_BOT_USERNAME}\\b`, "i").test(text) ||
-    Boolean(msg.reply_to_message?.from?.username?.toLowerCase() === OFFICIAL_BOT_USERNAME);
 
-  if (isGroup && text && !text.startsWith("/") && !mentioned) return;
+  if (isGroup && !isPublicGroupTrigger(text, msg)) return;
 
   const hub = await import("./orbitx-hub.js");
   const tools = hub.listAllOrbitXTools();
@@ -992,7 +1049,7 @@ async function handleTelegramUpdate(update, req) {
       tool = inferred.tool;
       args = inferred.args;
     } else {
-      await tg("sendChatAction", { chat_id: chatId, action: "typing" });
+      await tg("sendChatAction", typingBody(chatId, replyExtra));
       const prompt = bare === "ask" ? text.replace(/^\S+\s*/, "").trim() || "gm" : text;
       const answer = await askAi(prompt, { linked: Boolean(link) });
       await sendLong(chatId, answer, replyExtra);
@@ -1020,6 +1077,19 @@ async function handleTelegramUpdate(update, req) {
 
   const mintArg = String(args.mint || args.ca || extractMint(text) || "").trim();
   if (
+    (tool === "orbitx_prepare_buy" ||
+      tool === "orbitx_buy_orbitx" ||
+      tool === "orbitx_buy" ||
+      tool === "orbitx_trade" ||
+      tool === "orbitx_swap" ||
+      tool === "orbitx_confirm_buy") &&
+    !args.mint &&
+    !mintArg
+  ) {
+    args.mint = ORBITX_MINT;
+    args.ca = ORBITX_MINT;
+  }
+  if (
     (tool === "orbitx_get_wallet" || tool === "orbitx_get_swaps" || tool === "orbitx_get_balance") &&
     !args.address &&
     !args.publicKey &&
@@ -1034,13 +1104,18 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
   if (TOKEN_INTEL_TOOLS.has(tool) && mintArg) {
-    if (recentlyScanned(chatId, mintArg)) return;
-    await tg("sendChatAction", { chat_id: chatId, action: "typing" });
+    await tg("sendChatAction", typingBody(chatId, replyExtra));
     try {
       const merged = await buildBrandedScan(mintArg, { req, link, isGroup });
+      if (hasMarketSnapshot(merged?.token || merged)) {
+        rememberSuccessfulScan(chatId, mintArg);
+      } else {
+        forgetScan(chatId, mintArg);
+      }
       await sendCard(chatId, formatOrbitXTelegramResult(merged, tool), replyExtra);
-      await sendMedia(chatId, collectMediaUrls(merged));
+      await sendMedia(chatId, collectMediaUrls(merged), replyExtra);
     } catch (error) {
+      forgetScan(chatId, mintArg);
       await tg("sendMessage", {
         chat_id: chatId,
         text: `OrbitX scan error: ${error?.message || error}`,
@@ -1050,10 +1125,14 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
-  await tg("sendChatAction", {
-    chat_id: chatId,
-    action: tool.includes("video") ? "upload_video" : tool.includes("image") || tool.includes("grok") ? "upload_photo" : "typing",
-  });
+  await tg(
+    "sendChatAction",
+    typingBody(
+      chatId,
+      replyExtra,
+      tool.includes("video") ? "upload_video" : tool.includes("image") || tool.includes("grok") ? "upload_photo" : "typing",
+    ),
+  );
   try {
     args = withTelegramToolArgs(tool, args);
     const result = await runTool({
@@ -1104,7 +1183,7 @@ async function configureBot(req) {
   const webhook = await tg("setWebhook", {
     url: webhookUrl,
     secret_token: process.env.TELEGRAM_ORBITX_WEBHOOK_SECRET || undefined,
-    allowed_updates: ["message", "edited_message", "channel_post", "callback_query"],
+    allowed_updates: ["message", "edited_message", "channel_post", "callback_query", "my_chat_member"],
     drop_pending_updates: false,
   });
   const photo = await setBotPhoto(base);
@@ -1162,7 +1241,7 @@ async function handleWeb(req, res, body) {
     let links = [];
     if (user?.id) {
       links = await sb(
-        `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,telegram_username,wallet_address,created_at&limit=5`,
+        `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,telegram_username,wallet_address,auto_buy,created_at&limit=5`,
       ).catch(() => []);
     }
     return json(res, {
@@ -1234,12 +1313,45 @@ async function handleWeb(req, res, body) {
       return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet to run this tool." }, 401);
     }
     const wallet = user?.id ? await loadWallet(user.id) : null;
+    let autoBuy = false;
+    let tgLink = user?.id ? { user_id: user.id, wallet_address: wallet } : null;
+    if (user?.id) {
+      const rows = await sb(
+        `telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}&select=telegram_user_id,user_id,wallet_address,auto_buy&limit=1`,
+      ).catch(() => []);
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (row) {
+        autoBuy = Boolean(row.auto_buy);
+        tgLink = {
+          telegram_user_id: row.telegram_user_id,
+          user_id: user.id,
+          wallet_address: row.wallet_address || wallet,
+          auto_buy: autoBuy,
+        };
+      }
+    }
     const toolArgs = withTelegramToolArgs(tool, args);
+    if (
+      (tool === "orbitx_prepare_buy" ||
+        tool === "orbitx_buy_orbitx" ||
+        tool === "orbitx_buy" ||
+        tool === "orbitx_trade" ||
+        tool === "orbitx_swap" ||
+        tool === "orbitx_confirm_buy") &&
+      !toolArgs.mint &&
+      !toolArgs.ca
+    ) {
+      toolArgs.mint = ORBITX_MINT;
+      toolArgs.ca = ORBITX_MINT;
+    }
+    if (autoBuy && /buy|trade|swap|confirm_buy/.test(tool) && toolArgs.autoConfirm !== false) {
+      toolArgs.autoConfirm = true;
+    }
     const mint = String(toolArgs.mint || toolArgs.ca || "").trim();
     if (TOKEN_INTEL_TOOLS.has(tool) && mint) {
       const merged = await buildBrandedScan(mint, {
         req,
-        link: user?.id ? { user_id: user.id, wallet_address: wallet } : null,
+        link: tgLink,
         isGroup: false,
       });
       return json(res, {
@@ -1254,7 +1366,7 @@ async function handleWeb(req, res, body) {
       tool,
       args: toolArgs,
       req,
-      link: user?.id ? { user_id: user.id, wallet_address: wallet } : null,
+      link: tgLink,
       allowPrivileged: Boolean(user?.id),
     });
     return json(res, {
@@ -1263,6 +1375,33 @@ async function handleWeb(req, res, body) {
       text: telegramMessageParts(formatOrbitXTelegramResult(result, tool)).text,
       imageUrls: collectMediaUrls(result),
       result,
+    });
+  }
+
+  if (action === "web.autobuy") {
+    if (!user?.id) return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet first." }, 401);
+    const enabled = body.enabled === true || body.on === true;
+    try {
+      await sb(`telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
+      });
+    } catch {
+      /* column may not exist until migration */
+    }
+    await runTool({
+      tool: "orbitx_trade_auto",
+      args: { enabled },
+      req,
+      link: { user_id: user.id, wallet_address: await loadWallet(user.id) },
+      allowPrivileged: true,
+    }).catch(() => null);
+    return json(res, {
+      ok: true,
+      autoBuy: enabled,
+      message: enabled
+        ? "Auto-sign ON. Next /buy opens Phantom immediately. You still approve in the wallet."
+        : "Auto-sign OFF. Each buy waits for you to tap Sign.",
     });
   }
 
@@ -1324,7 +1463,7 @@ export default async function handler(req, res) {
     }
 
     // Telegram webhook updates have update_id; never require JWT.
-    if (body.update_id != null || body.message || body.channel_post || body.callback_query) {
+    if (body.update_id != null || body.message || body.channel_post || body.callback_query || body.my_chat_member) {
       await handleTelegramUpdate(body, req);
       return ok(res);
     }

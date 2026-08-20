@@ -6,12 +6,14 @@ import {
   applyDefaultBuyAmount,
   cmdsPage,
   extractMint,
+  formatGroupWelcomeHtml,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
+  isPublicGroupTrigger,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
   isTelegramAdminWallet,
@@ -26,12 +28,17 @@ import {
   parseCallInvocation,
   resolveOfficialCommand,
   selectOrbitXFaqChunks,
+  shouldSkipTelegramSender,
+  telegramChatExtras,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
 import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
 import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
 import { asTokenRecord } from "../../api/orbitx/telegram-payload.js";
 import {
+  assembleTelegramSnapshot,
+  hasMarketSnapshot,
   jupListFromRaw,
+  looksLikeFailedQuoteCard,
   looksLikeOrbitXCard,
   mergeTokenSnapshot,
   normalizeDexResponse,
@@ -111,11 +118,46 @@ describe("official OrbitX Telegram bot", () => {
     expect(inferPublicTool("join the group")?.meta).toBe("links");
     expect(inferPublicTool("check")?.meta).toBe("check");
     expect(inferPublicTool("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")?.tool).toBe("orbitx_get_token");
+    expect(inferPublicTool("$ORBITX")?.tool).toBe("orbitx_get_token");
+    expect(inferPublicTool("$ORBITX")?.args).toMatchObject({ mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9" });
     expect(extractMint("scan this 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 please")).toBe(
       "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
     );
     expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
+  });
+
+  it("handles public group triggers, forum threads, and anonymous admins", () => {
+    const mint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+    expect(isPublicGroupTrigger(`/token ${mint}`)).toBe(true);
+    expect(isPublicGroupTrigger(`/token@theorbitxmcpbot ${mint}`)).toBe(true);
+    expect(isPublicGroupTrigger(`/token@otherbot ${mint}`)).toBe(false);
+    expect(isPublicGroupTrigger(mint)).toBe(true);
+    expect(isPublicGroupTrigger("$ORBITX")).toBe(true);
+    expect(isPublicGroupTrigger("buy $ORBITX")).toBe(true);
+    expect(isPublicGroupTrigger("orbitx is pumping")).toBe(false);
+    expect(isPublicGroupTrigger("gm what is lunch")).toBe(false);
+    expect(
+      isPublicGroupTrigger("chart please", {
+        reply_to_message: { from: { username: "theorbitxmcpbot" } },
+      }),
+    ).toBe(true);
+    expect(shouldSkipTelegramSender({ from: { is_bot: true, username: "SomeOtherBot" } })).toBe(true);
+    expect(shouldSkipTelegramSender({ from: { is_bot: true, username: "GroupAnonymousBot" } })).toBe(false);
+    expect(shouldSkipTelegramSender({ from: { is_bot: false, username: "alice" } })).toBe(false);
+    expect(shouldSkipTelegramSender({ from: { is_bot: true, username: "theorbitxmcpbot" } })).toBe(true);
+    const extras = telegramChatExtras({
+      chat: { type: "supergroup" },
+      message_id: 88,
+      message_thread_id: 12,
+      is_topic_message: true,
+    });
+    expect(extras.isGroup).toBe(true);
+    expect(extras.extra.reply_to_message_id).toBe(88);
+    expect(extras.extra.allow_sending_without_reply).toBe(true);
+    expect(extras.extra.message_thread_id).toBe(12);
+    expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
+    expect(formatGroupWelcomeHtml()).toContain("/token");
   });
 
   it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
@@ -124,6 +166,13 @@ describe("official OrbitX Telegram bot", () => {
     expect(argsFromCommand("trade", `/trade ${mint} 0.1`)).toMatchObject({ mint, amountSol: 0.1 });
     expect(applyDefaultBuyAmount("orbitx_trade", { mint })).toMatchObject({ mint, amountSol: 0.05 });
     expect(applyDefaultBuyAmount("orbitx_prepare_buy", { mint, amountSol: 0.25 }).amountSol).toBe(0.25);
+    expect(applyDefaultBuyAmount("orbitx_buy_orbitx", { amountUsd: 1 }).amountSol).toBeUndefined();
+    expect(applyDefaultBuyAmount("orbitx_buy_orbitx", { amountUsd: 1 }).amountUsd).toBe(1);
+    expect(argsFromCommand("buy", "/buy $1").mint).toBeUndefined();
+    expect(argsFromCommand("buy", "/buy $1").amountUsd).toBe(1);
+    expect(argsFromCommand("buy", "/buy 0.05").amountSol).toBe(0.05);
+    expect(missingToolInput("orbitx_prepare_buy", {})).toBeNull();
+    expect(missingToolInput("orbitx_get_token", {})).toBe("mint");
     expect(isAgentTelegramToolAllowed("orbitx_trade")).toBe(false);
     expect(isAgentTelegramToolAllowed("orbitx_swap")).toBe(false);
     expect(isAgentTelegramToolAllowed("orbitx_prepare_buy")).toBe(false);
@@ -245,8 +294,9 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(stub).not.toMatch(/TOKEN · \$TOKEN/);
     expect(stub).not.toMatch(/TOKEN \(\$TOKEN\) is live on/i);
-    expect(stub).toContain("ORBITX");
-    expect(stub).toContain("No live DexScreener/Jupiter quote");
+    expect(stub).not.toMatch(/🚀 ORBITX · \$ORBITX/);
+    expect(stub).toContain("Live quote unavailable");
+    expect(stub).toMatch(/DexScreener or Jupiter/);
     expect(stub).not.toContain("Whales    0");
     expect(stub).not.toContain("DEX paid  no");
     expect(stub).not.toContain("KOLs      none labeled");
@@ -329,6 +379,18 @@ describe("official OrbitX Telegram bot", () => {
     });
     expect(cardText(formatTokenCard(fromGecko))).toContain("$0.00007");
 
+    const priceOnly = assembleTelegramSnapshot(mint, {
+      jupSearch: [{ id: mint, name: "ORBITX", symbol: "ORBITX" }],
+      jupPriceLite: { [mint]: { usdPrice: 0.00007512, liquidity: 9411 } },
+      dexLatest: { pairs: [] },
+    });
+    expect(hasMarketSnapshot(priceOnly.token)).toBe(true);
+    const priceCard = cardText(formatTokenCard(priceOnly));
+    expect(priceCard).toContain("🚀");
+    expect(priceCard).toContain("ORBITX");
+    expect(priceCard).toContain("$0.000075");
+    expect(priceCard).not.toMatch(/Live quote unavailable/);
+
     const oldStub = [
       "TOKEN · $TOKEN",
       "solana",
@@ -348,6 +410,10 @@ describe("official OrbitX Telegram bot", () => {
     ].join("\n");
     expect(looksLikeOrbitXCard(oldStub)).toBe(true);
     expect(looksLikeOrbitXCard("🚀 ORBITX · $ORBITX\nNo live DexScreener/Jupiter quote yet.")).toBe(true);
+    expect(looksLikeFailedQuoteCard("🚀 ORBITX · $ORBITX\nNo live DexScreener/Jupiter quote yet.")).toBe(true);
+    expect(looksLikeOrbitXCard("📡 Live quote unavailable\nCouldn't reach DexScreener or Jupiter from this scan.")).toBe(true);
+    expect(looksLikeFailedQuoteCard("📡 Live quote unavailable\nCouldn't reach DexScreener or Jupiter from this scan.")).toBe(true);
+    expect(looksLikeFailedQuoteCard("🚀 ORBITX · $ORBITX\nMarket Snapshot\nPrice $0.000075")).toBe(false);
     expect(looksLikeOrbitXCard("gm what is orbitx")).toBe(false);
   });
 
@@ -419,6 +485,45 @@ describe("official OrbitX Telegram bot", () => {
     expect(actions).toContain("Sign");
     expect(actions).toContain("https://www.orbitx.world/trade");
     expect(actions.startsWith("{")).toBe(false);
+
+    const walletGate = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: false,
+          error: "wallet_required",
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          token: "ORBITX",
+          message: "Connect Phantom on https://www.orbitx.world/telegram",
+        },
+        "orbitx_buy_orbitx",
+      ),
+    );
+    expect(walletGate).not.toMatch(/No live DexScreener/);
+    expect(walletGate).not.toMatch(/Live quote unavailable/);
+    expect(walletGate).toContain("Link Phantom");
+    expect(walletGate).toContain("solscan.io/token");
+
+    const signBuy = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: true,
+          requiresSignature: true,
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          amountSol: 0.05,
+          amountUsd: 1,
+          wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+          signUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05",
+          autoSignUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1",
+          solscanToken: "https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        },
+        "orbitx_buy_orbitx",
+      ),
+    );
+    expect(signBuy).not.toMatch(/No live DexScreener/);
+    expect(signBuy).not.toMatch(/Live quote unavailable/);
+    expect(signBuy).toContain("Sign in Phantom");
+    expect(signBuy).toContain("solscan.io/token");
+    expect(signBuy).toContain("0.05 SOL");
 
     const tick = cardText(
       formatMediaCountdown({
@@ -534,9 +639,25 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("fetchTelegramTokenSnapshot");
     expect(api).toContain("alreadyHandledUpdate");
     expect(api).toContain("recentlyScanned");
+    expect(api).toContain("rememberSuccessfulScan");
+    expect(api).toContain("forgetScan");
     expect(api).toContain("looksLikeOrbitXCard");
-    expect(api).toContain("from.is_bot");
+    expect(api).toContain("looksLikeFailedQuoteCard");
+    expect(api).toContain("shouldSkipTelegramSender");
+    expect(api).toContain("isPublicGroupTrigger");
+    expect(api).toContain("handleMyChatMember");
+    expect(api).toContain("my_chat_member");
+    expect(api).toContain("message_thread_id");
+    expect(api).toContain("allow_sending_without_reply");
     expect(api).toContain('from "./orbitx/x-agent-lib.js"');
+    const snap = readFileSync(resolve(WEB, "api/orbitx/telegram-token-snapshot.js"), "utf8");
+    expect(snap).toContain("price/v3");
+    expect(snap).toContain("token-pairs/v1");
+    expect(snap).toContain("fetchQuoteBundle");
+    expect(snap).toContain("overlayJupiterPrice");
+    expect(snap).toContain("JUP_PRICE_API");
+    expect(snap).toContain("price.jup.ag/v6");
+    expect(snap).not.toContain("OrbitXTelegram/1.0");
     const branded = api.slice(api.indexOf("async function buildBrandedScan"), api.indexOf("async function handleVerify"));
     expect(branded).toContain("fetchTelegramTokenSnapshot");
     expect(branded).not.toContain("orbitx_get_token");
@@ -551,6 +672,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("resolveOrbitXToolName");
     expect(api).toContain("handleAutoBuy");
     expect(api).toContain("auto_buy");
+    expect(api).toContain("web.autobuy");
     expect(api).toContain("handleCallbackQuery");
     expect(api).toContain("formatToolMenu");
     expect(api).toContain("missingToolInput");

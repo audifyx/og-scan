@@ -125,8 +125,11 @@ export async function prepareBuyOrbitx(opts) {
     return {
       ok: false,
       error: "wallet_required",
-      message: "Link a Solana wallet on https://www.orbitx.world/agent (or pass publicKey).",
-      fixUrl: "https://www.orbitx.world/agent",
+      mint: ORBITX_MINT,
+      token: ORBITX_SYMBOL,
+      message: "Link Phantom on https://www.orbitx.world/telegram after /login, then send /buy again.",
+      loginUrl: "https://www.orbitx.world/telegram",
+      fixUrl: "https://www.orbitx.world/telegram",
     };
   }
 
@@ -216,6 +219,8 @@ export async function prepareBuyOrbitx(opts) {
     openUrl: primaryUrl,
     hasUnsignedTx: true,
     hasFeeTx: Boolean(data.feeTx),
+    solscanToken: `https://solscan.io/token/${ORBITX_MINT}`,
+    solscanAccount: `https://solscan.io/account/${pk}`,
     instructions:
       mode === "auto"
         ? [

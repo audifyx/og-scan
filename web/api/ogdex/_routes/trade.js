@@ -301,15 +301,7 @@ async function raceFirstTx(runners) {
   });
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return send(res, 405, { ok: false, error: "POST only" });
-  let body = {};
-  try {
-    body = await readBody(req);
-  } catch {
-    body = {};
-  }
-
+export async function buildUnsignedTrade(body = {}) {
   const publicKey = body.publicKey;
   const action = body.action === "sell" ? "sell" : "buy";
   const mint = body.mint;
@@ -332,20 +324,20 @@ export default async function handler(req, res) {
   const feeOn =
     PLATFORM_FEE_ENABLED && body.platformFee !== false && body.platformFee !== "false";
 
-  if (!isPubkey(publicKey)) return send(res, 400, { ok: false, error: "invalid publicKey" });
-  if (!isPubkey(mint)) return send(res, 400, { ok: false, error: "invalid mint" });
+  if (!isPubkey(publicKey)) return { ok: false, error: "invalid publicKey" };
+  if (!isPubkey(mint)) return { ok: false, error: "invalid mint" };
 
   let amt;
   const rawAmt = typeof body.amount === "string" ? body.amount.trim() : body.amount;
   if (action === "sell" && typeof rawAmt === "string" && rawAmt.endsWith("%")) {
     const pct = Number(rawAmt.slice(0, -1));
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
-      return send(res, 400, { ok: false, error: "invalid sell percentage" });
+      return { ok: false, error: "invalid sell percentage" };
     }
     amt = `${pct}%`;
   } else {
     const n = Number(rawAmt);
-    if (!Number.isFinite(n) || n <= 0) return send(res, 400, { ok: false, error: "invalid amount" });
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "invalid amount" };
     amt = n;
   }
 
@@ -414,7 +406,7 @@ export default async function handler(req, res) {
   }
 
   if (!out?.tx) {
-    return send(res, 200, { ok: false, error: out?.error || "Could not build a working trade" });
+    return { ok: false, error: out?.error || "Could not build a working trade" };
   }
 
   let feeAttached = false;
@@ -486,19 +478,32 @@ export default async function handler(req, res) {
   }
 
   if (!wantSim) {
-    return send(res, 200, payload);
+    return payload;
   }
 
   const sim = await simulate(out.tx);
   if (sim.ok && !sim.unknown) {
-    return send(res, 200, { ...payload, simulated: true });
+    return { ...payload, simulated: true };
   }
   if (sim.unknown) {
-    return send(res, 200, payload);
+    return payload;
   }
-  return send(res, 200, {
+  return {
     ...payload,
     simulated: false,
     warning: "Route simulation flagged a risk — confirm carefully in your wallet",
-  });
+  };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") return send(res, 405, { ok: false, error: "POST only" });
+  let body = {};
+  try {
+    body = await readBody(req);
+  } catch {
+    body = {};
+  }
+  const payload = await buildUnsignedTrade(body);
+  const invalid = payload?.ok === false && /^invalid /.test(String(payload.error || ""));
+  return send(res, invalid ? 400 : 200, payload);
 }

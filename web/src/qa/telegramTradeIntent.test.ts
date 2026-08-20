@@ -57,6 +57,15 @@ describe("official Telegram trade wiring", () => {
     expect(parseTradeIntent("/autobuy on")?.meta).toBe("autobuy");
     expect(inferPublicTool(`buy ${ORBITX} with 10$ usdc`)?.tool).toBe("orbitx_buy_orbitx");
     expect(inferPublicTool(ORBITX)?.tool).toBe("orbitx_get_token");
+
+    const usdChat = parseTradeIntent("buy $1 in Orbitx");
+    expect(usdChat?.tool).toBe("orbitx_buy_orbitx");
+    expect(usdChat?.args.amountUsd).toBe(1);
+    expect(usdChat?.args.mint).toBe(ORBITX);
+
+    const usdAlt = parseTradeIntent("buy 1$ in Orbitx");
+    expect(usdAlt?.tool).toBe("orbitx_buy_orbitx");
+    expect(usdAlt?.args.amountUsd).toBe(1);
   });
 
   it("exposes a 2500+ live OrbitX tool catalog", () => {

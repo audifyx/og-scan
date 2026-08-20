@@ -13,7 +13,7 @@ import {
 } from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 
-type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access";
+type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access" | "shop";
 
 function decodeTx(b64: string): VersionedTransaction | Transaction {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -52,13 +52,15 @@ export default function AgentSignPage() {
     kindParam === "credit" ||
     kindParam === "mcp-access" ||
     kindParam === "mcp_access" ||
-    kindParam === "access"
+    kindParam === "access" ||
+    kindParam === "shop"
       ? kindParam === "credit"
         ? "credits"
         : kindParam === "mcp_access" || kindParam === "access"
           ? "mcp-access"
           : kindParam
       : "trade";
+  const sku = (params.get("sku") || params.get("item") || "").trim();
   const packageId = (params.get("package") || params.get("packageId") || "").toLowerCase();
   const action = params.get("action") === "sell" ? "sell" : "buy";
   const mint = (params.get("mint") || "").trim();
@@ -87,6 +89,7 @@ export default function AgentSignPage() {
       const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
+    if (kind === "shop") return sku ? `Desk shop ${sku} — Jupiter buy $ORBITX + burn` : "Desk shop buy & burn";
     if (kind === "mcp-access") {
       const tokens = packageId === "week" ? 1000 : 100;
       const label = packageId === "week" ? "1 week" : "1 day";
@@ -101,18 +104,19 @@ export default function AgentSignPage() {
     if (!amountRaw) return "—";
     if (action === "buy") return `${amountRaw} SOL`;
     return amountRaw.endsWith("%") ? amountRaw : `${amountRaw} tokens`;
-  }, [kind, action, amountRaw, percentRaw, packageId]);
+  }, [kind, action, amountRaw, percentRaw, packageId, sku]);
 
   const valid = useMemo(() => {
     if (kind === "credits") {
       const sol = Number(amountRaw);
       return Number.isFinite(sol) && sol >= 0.001;
     }
+    if (kind === "shop") return Boolean(sku);
     if (kind === "mcp-access") return packageId === "day" || packageId === "week";
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
-  }, [kind, mint, amountRaw, percentRaw, packageId]);
+  }, [kind, mint, amountRaw, percentRaw, packageId, sku]);
 
   const title =
     kind === "credits"
@@ -125,7 +129,9 @@ export default function AgentSignPage() {
             ? "Burn tokens"
             : kind === "rent"
               ? "Rent refund"
-              : action.toUpperCase();
+              : kind === "shop"
+                ? "Buy & burn"
+                : action.toUpperCase();
 
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
@@ -238,6 +244,43 @@ export default function AgentSignPage() {
         setExtraNote(
           granted.message ||
             `${granted.remainingLabel || "Access granted"}. Timed MCP access is active now.`,
+        );
+        return;
+      }
+
+      if (kind === "shop") {
+        const prepRes = await fetch("/api/orbitx/shop/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wallet: pk, publicKey: pk, sku, mint }),
+        });
+        const prep = await prepRes.json().catch(() => ({}));
+        if (!prepRes.ok || prep?.ok === false || typeof prep.transaction !== "string") {
+          throw new Error(prep?.error || prep?.message || "Could not build shop buy-and-burn");
+        }
+        const sig = await sendOne(prep.transaction);
+        await connection.confirmTransaction(sig, "confirmed");
+        setSignature(sig);
+        try {
+          await fetch("/api/orbitx/shop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              wallet: pk,
+              sku,
+              signature: sig,
+              mint,
+              sol: prep.sol,
+              solUsd: prep.solUsd,
+              orbitxBurned: prep.orbitxBurned,
+            }),
+          });
+        } catch {
+          /* receipt is optional */
+        }
+        setExtraNote(
+          prep.message ||
+            "Buy-and-burn confirmed. Copy the Solscan link — 90% of the $ORBITX bought is burned in this tx.",
         );
         return;
       }

@@ -90,6 +90,17 @@
   background: #000;
 }
 
-.ox-tg__alert {
-  margin: 12px 16px 0;
+.ox-tg__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ox-muted, #9aa3b5);
+}
+
+.ox-tg__toggle input {
+  margin-top: 3px;
+  accent-color: #7dd3fc;
 }

@@ -210,6 +210,9 @@ export async function prepareDeskShopBuy({ wallet, skuId, mint }) {
     mint: ORBITX_MINT,
     transaction,
     needsMint: Boolean(item.needsMint),
+    requiresSignature: true,
+    solscanToken: `https://solscan.io/token/${ORBITX_MINT}`,
+    solscanAccount: `https://solscan.io/account/${wallet}`,
     message: `One Phantom sign buys $${item.usd} of $ORBITX and burns ${SHOP_BURN_BPS}% in the same tx.`,
   };
 }
