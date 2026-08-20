@@ -11,6 +11,10 @@ export const ORBITX_BURN_MINT =
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const ORBITX_DECIMALS = 6;
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+const B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const PACKAGE_RANK = ["month", "week", "day", "hour"];
 
 export const MCP_ACCESS_PACKAGES = Object.freeze({
   hour: Object.freeze({
@@ -184,6 +188,205 @@ export function inferPackageFromTokens(tokensBurned) {
     if (n + 1e-9 >= pkg.tokens) return pkg;
   }
   return null;
+}
+
+function tokensToRaw(tokens, decimals = ORBITX_DECIMALS) {
+  const n = Number(tokens);
+  if (!Number.isFinite(n) || n < 0) return 0n;
+  const scale = 10 ** decimals;
+  return BigInt(Math.round(n * scale));
+}
+
+function rawToUi(raw, decimals = ORBITX_DECIMALS) {
+  const scale = 10 ** decimals;
+  return Number(raw) / scale;
+}
+
+function formatGrantParts(counts) {
+  const parts = [];
+  for (const id of PACKAGE_RANK) {
+    const n = Number(counts?.[id] || 0);
+    if (n <= 0) continue;
+    if (id === "month") parts.push(n === 1 ? "1 month" : `${n} months`);
+    else if (id === "week") parts.push(n === 1 ? "1 week" : `${n} weeks`);
+    else if (id === "day") parts.push(n === 1 ? "1 day" : `${n} days`);
+    else parts.push(n === 1 ? "1 hour" : `${n} hours`);
+  }
+  return parts;
+}
+
+/** Stack packages largest-first so 1,000 tokens = 1 day, not 10 hours. Leftover below 100 is ignored. */
+export function grantFromBurnedRaw(rawAmount, decimals = ORBITX_DECIMALS) {
+  let remaining;
+  try {
+    remaining = BigInt(rawAmount);
+  } catch {
+    return null;
+  }
+  if (remaining <= 0n) return null;
+  const scale = 10n ** BigInt(Math.max(0, decimals));
+  const counts = { month: 0, week: 0, day: 0, hour: 0 };
+  for (const id of PACKAGE_RANK) {
+    const pkg = MCP_ACCESS_PACKAGES[id];
+    const cost = BigInt(pkg.tokens) * scale;
+    if (cost <= 0n) continue;
+    const n = remaining / cost;
+    counts[id] = Number(n);
+    remaining -= n * cost;
+  }
+  const durationMs =
+    counts.month * MCP_ACCESS_PACKAGES.month.durationMs +
+    counts.week * MCP_ACCESS_PACKAGES.week.durationMs +
+    counts.day * MCP_ACCESS_PACKAGES.day.durationMs +
+    counts.hour * MCP_ACCESS_PACKAGES.hour.durationMs;
+  if (durationMs <= 0) return null;
+  const packageId = PACKAGE_RANK.find((id) => counts[id] > 0) || "hour";
+  const pkg = MCP_ACCESS_PACKAGES[packageId];
+  const parts = formatGrantParts(counts);
+  const durationLabel = parts.join(" + ");
+  const countedRaw = BigInt(rawAmount) - remaining;
+  return {
+    packageId,
+    package: pkg,
+    counts,
+    durationMs,
+    durationSeconds: Math.round(durationMs / 1000),
+    durationLabel,
+    label: `${durationLabel} access`,
+    leftoverRaw: remaining.toString(),
+    tokensCounted: rawToUi(countedRaw, decimals),
+    tokensBurned: rawToUi(BigInt(rawAmount), decimals),
+    tokensBurnedRaw: String(rawAmount),
+  };
+}
+
+export function grantFromBurnedTokens(tokensBurned, decimals = ORBITX_DECIMALS) {
+  return grantFromBurnedRaw(tokensToRaw(tokensBurned, decimals), decimals);
+}
+
+export function onChainTimeMs(tx, fallbackMs = Date.now()) {
+  const bt = tx?.blockTime;
+  if (typeof bt === "number" && Number.isFinite(bt) && bt > 0) return bt * 1000;
+  const fallback = Number(fallbackMs);
+  return Number.isFinite(fallback) ? fallback : Date.now();
+}
+
+function decodeBase58(str) {
+  const s = String(str || "");
+  if (!s) return null;
+  const bytes = [0];
+  for (const ch of s) {
+    const val = B58_ALPHABET.indexOf(ch);
+    if (val < 0) return null;
+    for (let i = 0; i < bytes.length; i++) bytes[i] *= 58;
+    bytes[0] += val;
+    let carry = 0;
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] += carry;
+      carry = (bytes[i] / 256) | 0;
+      bytes[i] %= 256;
+    }
+    while (carry) {
+      bytes.push(carry % 256);
+      carry = (carry / 256) | 0;
+    }
+  }
+  for (const ch of s) {
+    if (ch !== "1") break;
+    bytes.push(0);
+  }
+  return Buffer.from(bytes.reverse());
+}
+
+function ixProgramId(ix) {
+  return String(ix?.programId || ix?.program || "");
+}
+
+function isTokenProgramId(id) {
+  return (
+    id === TOKEN_PROGRAM ||
+    id === TOKEN_2022_PROGRAM ||
+    id === "spl-token" ||
+    id === "spl-token-2022"
+  );
+}
+
+function accountKey(entry) {
+  if (!entry) return "";
+  if (typeof entry === "string") return entry;
+  return String(entry.pubkey || entry.publicKey || "");
+}
+
+function parsedBurnRaw(ix, mint) {
+  const parsed = ix?.parsed;
+  if (!parsed) return 0n;
+  const type = String(parsed.type || "").toLowerCase();
+  if (type !== "burn" && type !== "burnchecked") return 0n;
+  const info = parsed.info || {};
+  if (info.mint && info.mint !== mint) return 0n;
+  const amt = info.tokenAmount?.amount ?? info.amount;
+  if (amt != null && String(amt) !== "") {
+    try {
+      const raw = BigInt(String(amt));
+      return raw > 0n ? raw : 0n;
+    } catch {
+      /* fall through to uiAmount */
+    }
+  }
+  const ui = Number(info.tokenAmount?.uiAmount);
+  const decimals = Number(info.tokenAmount?.decimals);
+  const dec = Number.isFinite(decimals) && decimals >= 0 ? decimals : ORBITX_DECIMALS;
+  if (Number.isFinite(ui) && ui > 0) return tokensToRaw(ui, dec);
+  return 0n;
+}
+
+function unparsedBurnRaw(ix, mint) {
+  if (!isTokenProgramId(ixProgramId(ix))) return 0n;
+  const mintAcc = accountKey((ix.accounts || [])[1]);
+  if (mintAcc && mintAcc !== mint) return 0n;
+  const data = ix.data;
+  if (!data || typeof data !== "string") return 0n;
+  const raw = decodeBase58(data);
+  if (!raw || raw.length < 9) return 0n;
+  const disc = raw[0];
+  if (disc !== 8 && disc !== 15) return 0n;
+  try {
+    return raw.readBigUInt64LE(1);
+  } catch {
+    return 0n;
+  }
+}
+
+function burnAuthority(ix) {
+  const info = ix?.parsed?.info;
+  return info?.authority || info?.account || "";
+}
+
+/** Sum SPL / Token-2022 burn amounts for $ORBITX. Transfers do not count. */
+export function extractOrbitxBurnFromTx(tx, mint = ORBITX_BURN_MINT) {
+  let totalRaw = 0n;
+  let owner = null;
+  let sawBurn = false;
+  for (const ix of collectInstructions(tx)) {
+    const parsedRaw = parsedBurnRaw(ix, mint);
+    const raw = parsedRaw > 0n ? parsedRaw : unparsedBurnRaw(ix, mint);
+    if (raw <= 0n) continue;
+    sawBurn = true;
+    totalRaw += raw;
+    if (!owner) {
+      const auth = burnAuthority(ix);
+      if (auth) owner = auth;
+    }
+  }
+  const blockTime = typeof tx?.blockTime === "number" && tx.blockTime > 0 ? tx.blockTime : null;
+  return {
+    sawBurn,
+    raw: totalRaw,
+    tokensBurned: rawToUi(totalRaw),
+    owner,
+    blockTime,
+    blockTimeMs: blockTime != null ? blockTime * 1000 : null,
+  };
 }
 
 export function accessBlockedPayload(extra = {}) {
@@ -630,54 +833,36 @@ export async function verifyOrbitxBurn(
   }
 
   const mint = ORBITX_BURN_MINT;
+  const extracted = extractOrbitxBurnFromTx(tx, mint);
   const pre = (tx.meta?.preTokenBalances || []).filter((b) => b.mint === mint);
-  const postByIndex = new Map(
-    (tx.meta?.postTokenBalances || []).filter((b) => b.mint === mint).map((b) => [b.accountIndex, b]),
-  );
-
-  let burnedUi = 0;
-  let owner = null;
-  for (const row of pre) {
-    const after = postByIndex.get(row.accountIndex);
-    const delta = tokenUiAmount(row) - (after ? tokenUiAmount(after) : 0);
-    if (delta > burnedUi) {
-      burnedUi = delta;
-      owner = row.owner || owner;
-    }
-  }
-
-  let sawBurn = false;
-  for (const ix of collectInstructions(tx)) {
-    const parsed = ix?.parsed;
-    if (!parsed) continue;
-    const type = String(parsed.type || "").toLowerCase();
-    if (type !== "burn" && type !== "burnchecked") continue;
-    const info = parsed.info || {};
-    if (info.mint && info.mint !== mint) continue;
-    sawBurn = true;
-    if (!owner && info.authority) owner = info.authority;
-    const parsedUi = Number(info.tokenAmount?.uiAmount);
-    if (Number.isFinite(parsedUi) && parsedUi > burnedUi) burnedUi = parsedUi;
-    else {
-      const raw = Number(info.tokenAmount?.amount ?? info.amount);
-      const decimals = Number(info.tokenAmount?.decimals);
-      const dec = Number.isFinite(decimals) && decimals >= 0 ? decimals : 6;
-      if (Number.isFinite(raw) && raw > 0) {
-        const ui = raw / 10 ** dec;
-        if (ui > burnedUi) burnedUi = ui;
+  let balanceOwner = extracted.owner;
+  if (!balanceOwner) {
+    const postByIndex = new Map(
+      (tx.meta?.postTokenBalances || [])
+        .filter((b) => b.mint === mint)
+        .map((b) => [b.accountIndex, b]),
+    );
+    let bestDelta = 0;
+    for (const row of pre) {
+      const after = postByIndex.get(row.accountIndex);
+      const delta = tokenUiAmount(row) - (after ? tokenUiAmount(after) : 0);
+      if (delta > bestDelta) {
+        bestDelta = delta;
+        balanceOwner = row.owner || balanceOwner;
       }
     }
   }
 
-  if (burnedUi <= 0 && !sawBurn) {
+  if (!extracted.sawBurn || extracted.raw <= 0n) {
     return {
       ok: false,
       error: "not_a_burn",
-      message: "Transaction is not an $ORBITX burn.",
+      message: "Transaction is not an $ORBITX burn. Transfers do not grant access — supply must be destroyed on-chain.",
       mint,
     };
   }
 
+  const owner = extracted.owner || balanceOwner;
   const expectedWallet = String(wallet || "").trim();
   if (expectedWallet && owner && expectedWallet !== owner) {
     return {
@@ -688,8 +873,9 @@ export async function verifyOrbitxBurn(
     };
   }
 
-  const resolved = requested || inferPackageFromTokens(burnedUi);
-  if (!resolved) {
+  const grant = grantFromBurnedRaw(extracted.raw);
+  const burnedUi = extracted.tokensBurned;
+  if (!grant) {
     return {
       ok: false,
       error: "amount_too_low",
@@ -698,24 +884,37 @@ export async function verifyOrbitxBurn(
       mint,
     };
   }
-  if (burnedUi + 1e-6 < resolved.tokens * 0.999) {
-    return {
-      ok: false,
-      error: "amount_too_low",
-      message: `Burned ${burnedUi} ORBITX — ${resolved.label} requires ${resolved.tokens}.`,
-      tokensBurned: burnedUi,
-      packageId: resolved.id,
-      mint,
-    };
+  if (requested) {
+    const requiredRaw = tokensToRaw(requested.tokens);
+    if (extracted.raw < requiredRaw) {
+      return {
+        ok: false,
+        error: "amount_too_low",
+        message: `Burned ${burnedUi} ORBITX — ${requested.label} requires ${requested.tokens}.`,
+        tokensBurned: burnedUi,
+        packageId: requested.id,
+        mint,
+      };
+    }
   }
 
+  const blockTimeMs = extracted.blockTimeMs;
   return {
     ok: true,
     signature: sig,
     mint,
     wallet: owner || expectedWallet || null,
     tokensBurned: burnedUi,
-    package: resolved,
+    tokensBurnedRaw: extracted.raw.toString(),
+    package: grant.package,
+    packageId: grant.packageId,
+    grant,
+    durationMs: grant.durationMs,
+    durationSeconds: grant.durationSeconds,
+    durationLabel: grant.durationLabel,
+    blockTime: extracted.blockTime,
+    blockTimeMs,
+    blockTimeIso: blockTimeMs != null ? new Date(blockTimeMs).toISOString() : null,
     explorer: `https://solscan.io/tx/${sig}`,
   };
 }
@@ -832,17 +1031,23 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
     /* continue — unique check still applies on insert */
   }
 
-  const now = Date.now();
+  const wallNow = Date.now();
+  const chainNow = verified.blockTimeMs || wallNow;
   const currentUser = uid ? await getAccessRow(sb, uid).catch(() => null) : null;
   const currentWallet = burnWallet ? await getWalletAccessRow(sb, burnWallet).catch(() => null) : null;
   const current = pickBestAccessRow([currentUser, currentWallet]);
-  const pkg = verified.package;
-  const expiresAt = computeExpiresAt(now, current?.expires_at, pkg.durationMs);
+  const grant = verified.grant;
+  const pkg = grant?.package || verified.package;
+  const durationMs = grant?.durationMs || pkg.durationMs;
+  const durationSeconds = grant?.durationSeconds || pkg.durationSeconds;
+  const expiresAt = computeExpiresAt(chainNow, current?.expires_at, durationMs);
   const tokensBurned = Number(verified.tokensBurned);
   const lifetime =
     Number(currentUser?.lifetime_tokens_burned || currentWallet?.lifetime_tokens_burned || 0) +
     tokensBurned;
-  const iso = new Date(now).toISOString();
+  const iso = new Date(wallNow).toISOString();
+  const chainIso =
+    verified.blockTimeIso || (verified.blockTimeMs != null ? new Date(verified.blockTimeMs).toISOString() : null);
 
   const accessRow = {
     wallet_address: burnWallet || null,
@@ -887,12 +1092,21 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
         wallet_address: burnWallet || null,
         package_id: pkg.id,
         tokens_burned: tokensBurned,
-        duration_seconds: pkg.durationSeconds,
+        duration_seconds: durationSeconds,
         expires_at: expiresAt,
         tx_signature: verified.signature,
         meta: {
           mint: verified.mint,
-          label: pkg.label,
+          label: grant?.label || pkg.label,
+          durationLabel: grant?.durationLabel || pkg.durationLabel,
+          counts: grant?.counts || { [pkg.id]: 1 },
+          tokensBurnedRaw: verified.tokensBurnedRaw || null,
+          leftoverRaw: grant?.leftoverRaw || "0",
+          blockTime: verified.blockTime,
+          blockTimeMs: verified.blockTimeMs,
+          blockTimeIso: chainIso,
+          onChainExpiresAt: expiresAt,
+          requestedPackageId: packageId || null,
         },
       }),
       headers: { Prefer: "return=minimal" },
@@ -940,8 +1154,13 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
       wallet_address: burnWallet,
       last_tx_signature: verified.signature,
     },
-    now,
+    wallNow,
   );
+
+  const grantLabel = grant?.label || pkg.label;
+  const timeMessage = status.active
+    ? `${grantLabel} granted from on-chain burn. ${status.remainingLabel}.`
+    : `${grantLabel} recorded from on-chain time, but that access window has already ended.`;
 
   return {
     ok: true,
@@ -949,8 +1168,14 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
     ...status,
     signature: verified.signature,
     explorer: verified.explorer,
+    grant,
+    durationSeconds,
+    durationLabel: grant?.durationLabel || pkg.durationLabel,
+    blockTime: verified.blockTime,
+    blockTimeMs: verified.blockTimeMs,
+    blockTimeIso: chainIso,
     schemaMissing: schemaMissing || undefined,
-    message: `${pkg.label} granted. ${status.remainingLabel}.`,
+    message: timeMessage,
   };
 }
 
