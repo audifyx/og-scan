@@ -138,6 +138,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(card.text).toContain("ORBITX BETA");
     expect(card.text).toContain("lifetime MCP");
     expect(card.text).toContain("first 25");
+    expect(card.text).toContain("does not reply until you share the code");
     expect(card.text).toContain("burn now and get timed access");
     expect(card.text).toContain("1 hour");
     expect(card.text).toContain("100 $ORBITX");
@@ -663,6 +664,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
+    expect(api).toContain("telegramDmUnlockState");
+    expect(api).toContain("isAllowedGatedDmCommand");
+    expect(api).toContain("grantMcpBetaAccessBadge");
     expect(api).toContain("formatOrbitXTelegramResult");
     expect(api).toContain('bare === "login" || bare === "auth"');
     expect(api).toContain('bare === "check"');

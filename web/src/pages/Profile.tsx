@@ -164,6 +164,8 @@ const getBadgeGradient = (badge: string | null) => {
     case "diamond": return "from-cyan-400 to-blue-400";
     case "gold":    return "from-yellow-500 to-amber-500";
     case "silver":  return "from-gray-400 to-slate-400";
+    case "beta access":
+    case "beta":    return "from-violet-500 to-fuchsia-500";
     default:        return "from-primary to-secondary";
   }
 };

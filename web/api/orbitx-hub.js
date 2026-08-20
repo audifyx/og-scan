@@ -3108,6 +3108,23 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       email: session.email,
     });
 
+    let badge = null;
+    let mcpBetaAccess = false;
+    if (session.userId) {
+      try {
+        const rows = await sb(
+          `profiles?user_id=eq.${encodeURIComponent(session.userId)}&select=badge,mcp_beta_access,username,display_name&limit=1`,
+        );
+        const profile = Array.isArray(rows) ? rows[0] : null;
+        const rawBadge = String(profile?.badge || "").trim();
+        mcpBetaAccess =
+          Boolean(profile?.mcp_beta_access) || rawBadge.toLowerCase() === "beta access";
+        badge = mcpBetaAccess ? "beta access" : rawBadge || null;
+      } catch {
+        /* profiles column may be missing until migration */
+      }
+    }
+
     return {
       ok: true,
       userId: session.userId || null,
@@ -3119,6 +3136,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       bearerTokenPrefix: session.bearerTokenPrefix || null,
       mcpUrl,
       status,
+      badge,
+      mcpBetaAccess,
+      profile: {
+        badge,
+        mcpBetaAccess,
+      },
       fix:
         status === "authenticated" || status === "authenticated_with_wallet"
           ? null

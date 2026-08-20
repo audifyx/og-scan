@@ -401,6 +401,8 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false } 
     "",
     "Please share the access code <code>ORBITX BETA</code> to gain <b>lifetime MCP</b> access — an early thank you to our supporters. Only the <b>first 25</b> get in.",
     "",
+    "This bot does not reply until you share the code, then <code>/login</code>.",
+    "",
     "Or you can burn now and get timed access:",
     "",
     "• <b>1 hour</b> — 100 $ORBITX",

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   accessStatusFromRow,
+  grantMcpBetaAccessBadge,
+  isAllowedGatedDmCommand,
   isOrbitXBetaCode,
   LIFETIME_SECONDS,
   looksLikeEarlyAccessCode,
@@ -9,6 +11,7 @@ import {
   parseSolanaTxSignature,
   redeemEarlyAccessCode,
   resolveBurnPackageFromText,
+  telegramDmUnlockState,
 } from "./telegram-bot-access.js";
 
 describe("early access codes", () => {
@@ -166,5 +169,68 @@ describe("redeemEarlyAccessCode", () => {
     const late = await redeemEarlyAccessCode(sb, { telegramUserId: "26", code: "ORBITX BETA" });
     expect(late.ok).toBe(false);
     expect(late.error).toBe("code_exhausted");
+  });
+});
+
+describe("DM unlock gate", () => {
+  it("stays locked until code and linked wallet", () => {
+    const now = Date.parse("2026-08-20T12:00:00.000Z");
+    const none = telegramDmUnlockState(null, null, now);
+    expect(none.unlocked).toBe(false);
+    expect(none.needsCode).toBe(true);
+    const coded = telegramDmUnlockState(
+      { expires_at: "2026-08-21T12:00:00.000Z", package_id: "lifetime" },
+      null,
+      now,
+    );
+    expect(coded.accessActive).toBe(true);
+    expect(coded.needsLogin).toBe(true);
+    expect(coded.unlocked).toBe(false);
+    const ready = telegramDmUnlockState(
+      { expires_at: "2026-08-21T12:00:00.000Z", package_id: "lifetime" },
+      { user_id: "u1" },
+      now,
+    );
+    expect(ready.unlocked).toBe(true);
+  });
+
+  it("only allows onboarding commands while locked", () => {
+    expect(isAllowedGatedDmCommand("token", "token CA")).toBe(false);
+    expect(isAllowedGatedDmCommand("ask", "gm")).toBe(false);
+    expect(isAllowedGatedDmCommand("help", "/help")).toBe(false);
+    expect(isAllowedGatedDmCommand("start", "/start")).toBe(true);
+    expect(isAllowedGatedDmCommand("code", "/code ORBITX BETA")).toBe(true);
+    expect(isAllowedGatedDmCommand("login", "/login")).toBe(true);
+    expect(isAllowedGatedDmCommand("shop", "/shop hour")).toBe(true);
+    expect(isAllowedGatedDmCommand("shop", "/shop")).toBe(false);
+  });
+});
+
+describe("grantMcpBetaAccessBadge", () => {
+  it("sets mcp_beta_access and badge beta access when badge is empty", async () => {
+    let patched = null;
+    const sb = async (path, init) => {
+      if (!init?.method) {
+        return [{ user_id: "u1", badge: null, mcp_beta_access: false }];
+      }
+      patched = JSON.parse(init.body);
+      return [{ user_id: "u1", ...patched }];
+    };
+    const out = await grantMcpBetaAccessBadge(sb, "u1");
+    expect(out.ok).toBe(true);
+    expect(patched).toMatchObject({ mcp_beta_access: true, badge: "beta access" });
+  });
+
+  it("does not overwrite whale badges", async () => {
+    let patched = null;
+    const sb = async (path, init) => {
+      if (!init?.method) return [{ user_id: "u1", badge: "whale", mcp_beta_access: false }];
+      patched = JSON.parse(init.body);
+      return [patched];
+    };
+    const out = await grantMcpBetaAccessBadge(sb, "u1");
+    expect(out.ok).toBe(true);
+    expect(patched.mcp_beta_access).toBe(true);
+    expect(patched.badge).toBeUndefined();
   });
 });

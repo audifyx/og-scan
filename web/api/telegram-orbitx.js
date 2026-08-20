@@ -50,6 +50,8 @@ import {
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
   accessStatusFromRow,
+  grantMcpBetaAccessBadge,
+  isAllowedGatedDmCommand,
   isOrbitXBetaCode,
   loadTelegramBotAccess,
   looksLikeEarlyAccessCode,
@@ -57,6 +59,7 @@ import {
   parseSolanaTxSignature,
   redeemEarlyAccessCode,
   resolveBurnPackageFromText,
+  telegramDmUnlockState,
   upsertTelegramBotAccess,
 } from "./orbitx/telegram-bot-access.js";
 import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/mcp-burn-access.js";
@@ -506,20 +509,50 @@ async function sendAccessStatus(chatId, from, extra = {}) {
   return status;
 }
 
-async function handleStartDm(chatId, from, link, extra) {
+async function promptLoginAfterCode(chatId, from, extra, req) {
+  let loginBody = "Send <code>/login</code> to bind this Telegram to YOUR wallet.";
+  try {
+    loginBody = await startLogin(from, publicBase(req || {}));
+  } catch (error) {
+    loginBody = `Could not start login: ${error?.message || error}\nSend <code>/login</code> in this DM.`;
+  }
+  await sendLong(
+    chatId,
+    [
+      "<b>Code accepted.</b> Next: authenticate.",
+      "Link this Telegram to YOUR OrbitX wallet. Nobody else can trade for you.",
+      "",
+      loginBody,
+      "",
+      "After you sign in, <b>Beta Access</b> shows on your MCP profile at orbitx.world/agent.",
+    ].join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+}
+
+async function handleStartDm(chatId, from, link, extra, req) {
   const row = await loadTelegramBotAccess(sb, from?.id);
-  const status = accessStatusFromRow(row);
+  const gate = telegramDmUnlockState(row, link);
+  if (gate.unlocked) {
+    await sendCard(chatId, formatHelpDesk(true, true), extra);
+    return;
+  }
+  if (gate.needsLogin) {
+    await promptLoginAfterCode(chatId, from, extra, req);
+    return;
+  }
+  awaitingCode.set(String(from?.id || ""), Date.now());
   await sendCard(
     chatId,
     formatTelegramStartGate({
-      remainingLabel: status.active ? status.remainingLabel : "",
+      remainingLabel: "",
       linked: Boolean(link),
     }),
     extra,
   );
 }
 
-async function handleCode(chatId, text, { isGroup, from, link, extra }) {
+async function handleCode(chatId, text, { isGroup, from, link, extra, req }) {
   if (isGroup) {
     await sendLong(chatId, "Redeem codes in a private DM with @theorbitxmcpbot: /code YOURCODE", extra);
     return;
@@ -547,12 +580,19 @@ async function handleCode(chatId, text, { isGroup, from, link, extra }) {
     await sendLong(chatId, out.message || "That code did not work. Try again or burn $ORBITX.", extra);
     return;
   }
+  if (link?.user_id) {
+    await grantMcpBetaAccessBadge(sb, link.user_id);
+  }
+  if (!link?.user_id) {
+    await promptLoginAfterCode(chatId, from, extra, req);
+    return;
+  }
   const lifetime = out.packageId === "lifetime" || out.remainingLabel === "lifetime";
   await sendLong(
     chatId,
     lifetime
-      ? `<b>${out.message || "Lifetime MCP unlocked"}</b>\nYou have <b>lifetime</b> access.\n/trade /shop /tweet work in this DM after /login.`
-      : `<b>Access unlocked</b>\nYou have <b>${out.remainingLabel}</b>.\n/trade /shop /tweet work in this DM after /login.`,
+      ? `<b>${out.message || "Lifetime MCP unlocked"}</b>\n<b>Beta Access</b> is on your MCP profile.\nThis DM is live — /trade /shop /tweet.`
+      : `<b>Access unlocked</b>\nYou have <b>${out.remainingLabel}</b>.\n<b>Beta Access</b> is on your MCP profile.`,
     { parse_mode: "HTML", ...extra },
   );
 }
@@ -572,7 +612,7 @@ async function startAccessBurn(chatId, from, packageId, { isGroup, req, link, ex
   }
   const pkg = String(packageId || "").trim().toLowerCase();
   if (!["hour", "day", "week", "month"].includes(pkg)) {
-    await handleStartDm(chatId, from, link, extra);
+    await handleStartDm(chatId, from, link, extra, req);
     return;
   }
   pendingBurnPkg.set(String(from.id), pkg);
@@ -605,7 +645,7 @@ async function handleBurn(chatId, text, { isGroup, from, req, link, extra }) {
   }
   const pkg = resolveBurnPackageFromText(text);
   if (!pkg?.id) {
-    await handleStartDm(chatId, from, link, extra);
+    await handleStartDm(chatId, from, link, extra, req);
     return;
   }
   await startAccessBurn(chatId, from, pkg.id, { isGroup, req, link, extra });
@@ -639,6 +679,9 @@ async function verifyAccessBurn(chatId, signature, { from, link, extra }) {
     expires_at: confirmed.expiresAt,
   });
   pendingBurnPkg.delete(String(from.id));
+  if (link?.user_id) {
+    await grantMcpBetaAccessBadge(sb, link.user_id);
+  }
   const explorer = confirmed.explorer || `https://solscan.io/tx/${signature}`;
   const schemaNote =
     saved?.error === "access_write_failed" || confirmed.schemaMissing
@@ -1050,6 +1093,17 @@ async function handleCallbackQuery(cq, req) {
   if (cq?.id) await tg("answerCallbackQuery", { callback_query_id: cq.id });
   if (!chatId || !data.startsWith("ox:")) return;
   const key = data.slice(3);
+  const chatType = String(cq?.message?.chat?.type || "");
+  const isGroupChat = chatType === "group" || chatType === "supergroup";
+  if (!isGroupChat && from.id && !key.startsWith("gate:")) {
+    const link = await loadLink(from.id);
+    const dmGate = telegramDmUnlockState(await loadTelegramBotAccess(sb, from.id), link);
+    if (!dmGate.unlocked) {
+      if (dmGate.needsCode) await handleStartDm(chatId, from, link, extra, req);
+      else await promptLoginAfterCode(chatId, from, extra, req);
+      return;
+    }
+  }
   if (key === "links") {
     await sendLinks(chatId, extra);
     return;
@@ -1078,7 +1132,7 @@ async function handleCallbackQuery(cq, req) {
     const isGroup = chatType === "group" || chatType === "supergroup";
     const link = from.id ? await loadLink(from.id) : null;
     if (gate === "beta") {
-      await handleCode(chatId, "/code ORBITX BETA", { isGroup, from, link, extra });
+      await handleCode(chatId, "/code ORBITX BETA", { isGroup, from, link, extra, req });
       return;
     }
     if (gate === "code") {
@@ -1172,14 +1226,14 @@ async function handleTelegramUpdate(update, req) {
 
   if (!isGroup && !text.startsWith("/") && isOrbitXBetaCode(text)) {
     awaitingCode.delete(String(from.id));
-    await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra });
+    await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra, req });
     return;
   }
 
   if (!isGroup && awaitingCode.get(String(from.id)) && !text.startsWith("/")) {
     if (looksLikeEarlyAccessCode(text)) {
       awaitingCode.delete(String(from.id));
-      await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra });
+      await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra, req });
       return;
     }
     awaitingCode.delete(String(from.id));
@@ -1194,6 +1248,19 @@ async function handleTelegramUpdate(update, req) {
 
   if (isGroup && !isPublicGroupTrigger(text, msg)) return;
 
+  if (!isGroup) {
+    const dmGate = telegramDmUnlockState(await loadTelegramBotAccess(sb, from.id), link);
+    if (!dmGate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
+      if (dmGate.needsCode) {
+        awaitingCode.set(String(from.id), Date.now());
+        await handleStartDm(chatId, from, link, replyExtra, req);
+      } else {
+        await promptLoginAfterCode(chatId, from, replyExtra, req);
+      }
+      return;
+    }
+  }
+
   const hub = await import("./orbitx-hub.js");
   const tools = hub.listAllOrbitXTools();
 
@@ -1202,7 +1269,7 @@ async function handleTelegramUpdate(update, req) {
       await sendCard(chatId, helpText(false, Boolean(link)), replyExtra);
       return;
     }
-    await handleStartDm(chatId, from, link, replyExtra);
+    await handleStartDm(chatId, from, link, replyExtra, req);
     return;
   }
 
@@ -1281,7 +1348,7 @@ async function handleTelegramUpdate(update, req) {
   }
 
   if (bare === "code") {
-    await handleCode(chatId, text, { isGroup, from, link, extra: replyExtra });
+    await handleCode(chatId, text, { isGroup, from, link, extra: replyExtra, req });
     return;
   }
 
@@ -1594,13 +1661,21 @@ async function handleWeb(req, res, body) {
       method: "PATCH",
       body: JSON.stringify({ consumed_at: new Date().toISOString() }),
     });
+    const accessRow = await loadTelegramBotAccess(sb, telegramUserId);
+    const accessOn = telegramDmUnlockState(accessRow, { user_id: user.id }).accessActive;
+    if (accessOn) {
+      await grantMcpBetaAccessBadge(sb, user.id);
+    }
     if (BOT_TOKEN) {
       await tg("sendMessage", {
         chat_id: telegramUserId,
-        text: "OrbitX linked. This Telegram can now /buy /trade /orbitx /shop /launch /mint for YOUR wallet only. /autobuy on for Phantom auto-prompt.",
+        text: accessOn
+          ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch. /autobuy on for Phantom auto-prompt."
+          : "OrbitX linked. Share ORBITX BETA here to unlock the bot (first 25 get lifetime), or burn $ORBITX on /start.",
+        parse_mode: "HTML",
       });
     }
-    return json(res, { ok: true, link: { telegramUserId, wallet } });
+    return json(res, { ok: true, link: { telegramUserId, wallet }, betaAccess: accessOn });
   }
 
   if (action === "web.call") {

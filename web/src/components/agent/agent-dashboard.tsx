@@ -301,7 +301,12 @@ export function AgentDashboard() {
   }
 
   const burnActive = Boolean(boot?.mcpAccess?.active);
-  const statusLabel = exempt
+  const betaAccess =
+    Boolean((profile as { mcp_beta_access?: boolean | null; badge?: string | null } | null)?.mcp_beta_access) ||
+    String((profile as { badge?: string | null } | null)?.badge || "").toLowerCase() === "beta access";
+  const statusLabel = betaAccess
+    ? "Beta Access"
+    : exempt
     ? "Owner exempt"
     : burnActive
       ? boot?.mcpAccess?.remainingLabel || "Burn access"
@@ -336,6 +341,14 @@ export function AgentDashboard() {
           >
             <span className="ox-agent__kpi-k">Wallet</span>
             <span className="ox-agent__kpi-v">{linkedWallet ? "Linked" : "Connect"}</span>
+          </button>
+          <button
+            type="button"
+            className={`ox-agent__kpi${betaAccess ? " is-ok" : ""}`}
+            onClick={() => selectTab("setup")}
+          >
+            <span className="ox-agent__kpi-k">Access</span>
+            <span className="ox-agent__kpi-v">{betaAccess ? "Beta Access" : "Locked"}</span>
           </button>
           <button
             type="button"

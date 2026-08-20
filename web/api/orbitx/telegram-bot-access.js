@@ -280,3 +280,65 @@ export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet
 }
 
 export { parseSolanaTxSignature };
+
+export const BETA_ACCESS_BADGE = "beta access";
+
+export function telegramDmUnlockState(accessRow, link, now = Date.now()) {
+  const access = accessStatusFromRow(accessRow, now);
+  const linked = Boolean(link?.user_id);
+  return {
+    accessActive: access.active,
+    linked,
+    unlocked: Boolean(access.active && linked),
+    remainingLabel: access.remainingLabel,
+    needsCode: !access.active,
+    needsLogin: Boolean(access.active && !linked),
+    packageId: access.packageId || null,
+  };
+}
+
+export function isAllowedGatedDmCommand(bare, text = "") {
+  const cmd = String(bare || "")
+    .replace(/^\//, "")
+    .toLowerCase()
+    .replace(/@.*$/, "");
+  if (["start", "code", "burn", "verify", "login", "auth", "access", "logout"].includes(cmd)) return true;
+  if (cmd === "shop" && resolveBurnPackageFromText(text)) return true;
+  return false;
+}
+
+function isBetaAccessBadgeValue(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  return v === BETA_ACCESS_BADGE || v === "beta";
+}
+
+export async function grantMcpBetaAccessBadge(sb, userId) {
+  const id = String(userId || "").trim();
+  if (!id || typeof sb !== "function") return { ok: false, error: "invalid_user" };
+  try {
+    const rows = await sb(
+      `profiles?user_id=eq.${encodeURIComponent(id)}&select=user_id,badge,mcp_beta_access&limit=1`,
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row?.user_id) return { ok: false, error: "profile_missing" };
+    const patch = { mcp_beta_access: true };
+    if (!row.badge || isBetaAccessBadgeValue(row.badge)) {
+      patch.badge = BETA_ACCESS_BADGE;
+    }
+    try {
+      await sb(`profiles?user_id=eq.${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      const fallback = { badge: patch.badge || BETA_ACCESS_BADGE };
+      await sb(`profiles?user_id=eq.${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(fallback),
+      });
+    }
+    return { ok: true, badge: patch.badge || row.badge || BETA_ACCESS_BADGE };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "badge_failed" };
+  }
+}
