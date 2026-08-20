@@ -69,6 +69,7 @@ export const ORBITX_TELEGRAM_BLURB =
 
 export const ORBITX_HOST = "https://www.orbitx.world";
 export const ORBITX_GC = "https://t.me/orbitxwrld";
+export const ORBITX_GC_USERNAME = "orbitxwrld";
 export const ORBITX_UPDATES = "https://t.me/OrbitXupdates";
 export const ORBITX_OGSCAN_TG = "https://t.me/ogscan";
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -124,18 +125,19 @@ ALWAYS-TRUE FACTS (do not contradict; never invent live MC/holders/shop USD)
 - $ORBITX mint: ${ORBITX_MINT} (Token-2022). Utility + access + fuel — not a yield/claim token.
 - Hold ≥ $5 USD of $ORBITX → OrbitX AI + basic MCP. Hold 10,000 $ORBITX → Pro / KOL DEX layer. (Older/internal docs may say $10; public messaging is $5 + 10k.)
 - Burn 100 $ORBITX = 1 hour; 1,000 = 1 day; 10,000 = 1 week; 1,000,000 = 1 month; burns stack from the later of now or current expiry.
-- Shop: one Phantom tx = Jupiter buy $ORBITX with SOL + burn in the same tx. Team does not pocket those tokens. Items bind to the wallet. Solscan link for proof.
+- Shop: one Jupiter tx = buy $ORBITX with SOL + burn in the same tx. Team does not pocket those tokens. Items bind to the wallet. Solscan link for proof.
 - MCP: ${ORBITX_HOST}/agent · ${ORBITX_HOST}/api/mcp and ${ORBITX_HOST}/api/ogdex/mcp — Claude, ChatGPT, Grok, Cursor.
-- Telegram @theorbitxmcpbot: /login in DM binds YOUR wallet. /buy CA 0.1 sol or “buy CA with 10$ usdc”. /autobuy on = Phantom auto-prompt (you still sign). /shop /launch /mint. /call name for the live catalog (~2500 tools).
+- Telegram @theorbitxmcpbot: /login in DM binds YOUR wallet. /buy CA 0.1 sol or “buy CA with 10$ usdc”. /autobuy on = Jupiter Wallet auto-prompt (you still sign). /shop /launch /mint. /call name for the live catalog (~2500 tools).
 - Predictions: peer-to-peer markets; on-chain program is programs/betting/ inside audifyx/og-scan (not a separate solana-betting repo).
-- Non-custodial: OrbitX never holds keys or funds. User always signs (Phantom / Jupiter).
+- Non-custodial: OrbitX never holds keys or funds. User always signs in Jupiter Wallet. Do not send Phantom Connect links.
+- If they ask whether you can buy (yes/no, “can you buy things”): answer YES in words. Tell them to send /buy CA 0.05 sol or buy $1 $ORBITX. Do NOT open a sign card or invent a 0.05 SOL swap unless they named an amount and a mint.
 - Unsure / live-ops / human: ${ORBITX_GC}
 
 WHAT ORBITX IS
 OrbitX is a non-custodial Solana Web3 platform at https://www.orbitx.world
 Live products (give the URL when they ask for links or “where is X”):
 - DEX / scanner — ${ORBITX_HOST}/ORBITX_DEX  and https://ogscan.fun
-- Trade (Phantom buy/sell) — ${ORBITX_HOST}/trade
+- Trade (Jupiter buy/sell) — ${ORBITX_HOST}/trade
 - Terminal — ${ORBITX_HOST}/terminal
 - Launchpad — ${ORBITX_HOST}/orbitxlaunch
 - Intel — ${ORBITX_HOST}/intel

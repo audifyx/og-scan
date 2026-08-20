@@ -9,11 +9,13 @@ import {
   formatGroupWelcomeHtml,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
+  formatOrbitXHomeWelcomeHtml,
   formatOrbitXTelegramResult,
   formatTelegramStartGate,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
+  isOrbitXCommunityChat,
   isPublicGroupTrigger,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
@@ -194,6 +196,19 @@ describe("official OrbitX Telegram bot", () => {
     expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
     expect(formatGroupWelcomeHtml()).toContain("locked");
     expect(formatGroupWelcomeHtml()).toContain("ORBITX BETA");
+    expect(formatOrbitXHomeWelcomeHtml()).toContain("t.me/orbitxwrld");
+    expect(formatOrbitXHomeWelcomeHtml()).toContain("community desk is live");
+    expect(formatOrbitXHomeWelcomeHtml()).not.toContain("locked");
+    expect(isOrbitXCommunityChat({ username: "orbitxwrld" })).toBe(true);
+    expect(isOrbitXCommunityChat({ username: "OrbitXWrld" })).toBe(true);
+    expect(isOrbitXCommunityChat({ username: "randomgroup" })).toBe(false);
+    expect(formatGroupWelcomeHtml({ username: "orbitxwrld", type: "supergroup" })).toContain("community desk is live");
+    const homeExtras = telegramChatExtras({
+      chat: { type: "channel", username: "orbitxwrld", id: -100123 },
+      message_id: 9,
+    });
+    expect(homeExtras.isHome).toBe(true);
+    expect(homeExtras.isGroup).toBe(true);
   });
 
   it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
@@ -536,7 +551,7 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(walletGate).not.toMatch(/No live DexScreener/);
     expect(walletGate).not.toMatch(/Live quote unavailable/);
-    expect(walletGate).toContain("Link Phantom");
+    expect(walletGate).toContain("Link Jupiter");
     expect(walletGate).toContain("solscan.io/token");
 
     const signBuy = cardText(
@@ -557,11 +572,12 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(signBuy).not.toMatch(/No live DexScreener/);
     expect(signBuy).not.toMatch(/Live quote unavailable/);
-    expect(signBuy).toContain("Sign in Phantom");
+    expect(signBuy).toContain("Sign in Jupiter");
     expect(signBuy).toContain("solscan.io/token");
     expect(signBuy).toContain("0.05 SOL");
     expect(signBuy).toContain("Auto-sign");
-    expect(signBuy).toContain("phantom.app/ul/browse");
+    expect(signBuy).not.toContain("phantom.app/ul/browse");
+    expect(signBuy).not.toContain("Sign in Phantom");
     expect(signBuy).toContain("/agent/sign?action=buy");
 
     const tick = cardText(
@@ -688,6 +704,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("looksLikeFailedQuoteCard");
     expect(api).toContain("shouldSkipTelegramSender");
     expect(api).toContain("isPublicGroupTrigger");
+    expect(api).toContain("isOrbitXCommunityChat");
+    expect(api).toContain("pinOrbitXHomeChat");
+    expect(api).toContain("!gate.unlocked && !isHome");
+    expect(api).toContain("orbitxwrld");
     expect(api).toContain("handleMyChatMember");
     expect(api).toContain("my_chat_member");
     expect(api).toContain("message_thread_id");
@@ -723,11 +743,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).not.toContain("8595161432");
   });
 
-  it("wraps Telegram Auto-sign links in Phantom browse URLs", () => {
+  it("does not wrap Telegram sign links in Phantom Connect browse URLs", () => {
     const page = "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1";
-    const wrapped = phantomBrowseUrl(page);
-    expect(wrapped.startsWith("https://phantom.app/ul/browse/")).toBe(true);
-    expect(wrapped).toContain(encodeURIComponent(page));
-    expect(phantomBrowseUrl(wrapped)).toBe(wrapped);
+    expect(phantomBrowseUrl(page)).toBe(page);
+    expect(phantomBrowseUrl(page)).not.toContain("phantom.app/ul/browse");
   });
 });

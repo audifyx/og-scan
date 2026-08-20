@@ -25,13 +25,9 @@ import { hasMarketSnapshot } from "./telegram-token-snapshot.js";
 
 export { telegramMessageParts };
 
-/** Open a dapp URL inside Phantom (Telegram in-app browser cannot sign). */
-export function phantomBrowseUrl(url, ref = "orbitx") {
-  const raw = String(url || "").trim();
-  if (!raw) return raw;
-  if (/phantom\.app\/ul\//i.test(raw)) return raw;
-  if (!/^https?:\/\//i.test(raw)) return raw;
-  return `https://phantom.app/ul/browse/${encodeURIComponent(raw)}?ref=${encodeURIComponent(ref)}`;
+/** Sign URLs stay on OrbitX / Jupiter — never wrap in Phantom Connect browse UL. */
+export function phantomBrowseUrl(url, _ref = "orbitx") {
+  return String(url || "").trim();
 }
 
 const JUPITER_TOKEN = "https://jup.ag/tokens/";
@@ -81,7 +77,7 @@ const FAMILY_META = {
   trade: {
     emoji: "⚡",
     title: "Trade Desk",
-    blurb: "DM + /login. You sign in Phantom — OrbitX never holds keys.",
+    blurb: "DM + /login. You sign in Jupiter Wallet — OrbitX never holds keys.",
   },
   shop: {
     emoji: "🛍️",
@@ -144,8 +140,8 @@ const CORE_BLURBS = {
   orbitx_get_kols: "Labeled KOL wallets",
   orbitx_get_traders: "Top traders tape",
   orbitx_get_signals: "Desk signals feed",
-  orbitx_prepare_buy: "Quote a buy — you sign in Phantom",
-  orbitx_prepare_sell: "Quote a sell — you sign in Phantom",
+  orbitx_prepare_buy: "Quote a buy — you sign in Jupiter",
+  orbitx_prepare_sell: "Quote a sell — you sign in Jupiter",
   orbitx_buy: "Prepare buy (alias)",
   orbitx_trade: "Buy with SOL (linked DM)",
   orbitx_swap: "Same as /trade",
@@ -479,7 +475,7 @@ function orbitxProjectSummary() {
       "Hold ≥ $5 USD of $ORBITX → OrbitX AI + basic MCP",
       "Hold 10,000 $ORBITX → Pro / KOL DEX layer",
       "Burn 100 $ORBITX = 1 hour · 1,000 = 1 day · 10,000 = 1 week · 1,000,000 = 1 month (stackable)",
-      "Shop: one Phantom tx buys $ORBITX on Jupiter and burns it in the same transaction",
+      "Shop: one Jupiter tx buys $ORBITX and burns it in the same transaction",
     ],
   };
 }
@@ -843,7 +839,7 @@ function formatActionLinks(data) {
   const urls = [];
   if (data?.openUrl) urls.push(["Open", data.openUrl]);
   if (data?.autoSignUrl && data.autoSignUrl !== data.openUrl && data.autoSignUrl !== data.signUrl) {
-    urls.push(["Auto-sign", phantomBrowseUrl(data.autoSignUrl)]);
+    urls.push(["Auto-sign", data.autoSignUrl]);
   }
   if (data?.signUrl && data.signUrl !== data.openUrl) urls.push(["Sign", data.signUrl]);
   if (data?.reportUrl) urls.push(["Report", data.reportUrl]);
@@ -910,7 +906,7 @@ function formatTradeDeskCard(data, tool) {
   const auto =
     data.autoSignUrl ||
     (sign ? `${sign}${sign.includes("?") ? "&" : "?"}auto=1` : "");
-  const autoPhantom = auto ? phantomBrowseUrl(auto) : "";
+  const autoSign = auto || "";
   const telegramDash = `${ORBITX_HOST}/telegram`;
 
   if (err === "login_required") {
@@ -932,15 +928,15 @@ function formatTradeDeskCard(data, tool) {
   if (err === "wallet_required") {
     return {
       text: [
-        "🔑 <b>ORBITX · Link Phantom</b>",
-        "Connect your wallet on orbitx.world/telegram, then send /buy again. SOL spends from that wallet.",
+        "🔑 <b>ORBITX · Link Jupiter</b>",
+        "Connect Jupiter Wallet on orbitx.world/telegram, then send /buy again. SOL spends from that wallet via Jupiter.",
         mint ? `<code>${tgEsc(mint)}</code>` : "",
         [href(telegramDash, "Link wallet"), href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].filter(Boolean).join(" · "),
       ]
         .filter(Boolean)
         .join("\n"),
       reply_markup: inlineKeyboard([
-        [{ text: "Link Phantom", url: telegramDash }, { text: "Solscan", url: solscanToken }],
+        [{ text: "Link Jupiter", url: telegramDash }, { text: "Solscan", url: solscanToken }],
         [{ text: "OrbitX DEX", url: dex }, { text: "⌂ Desk", callback_data: "ox:desk" }],
       ]),
     };
@@ -966,7 +962,7 @@ function formatTradeDeskCard(data, tool) {
     return {
       text: [
         "💰 <b>ORBITX · How much?</b>",
-        "Reply <code>/buy 0.05</code> or <code>buy $1 $ORBITX</code>. Spends SOL from your linked Phantom.",
+        "Reply <code>/buy 0.05</code> or <code>buy $1 $ORBITX</code>. Spends SOL from your linked Jupiter wallet.",
         [href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].join(" · "),
       ].join("\n"),
       reply_markup: inlineKeyboard([
@@ -1016,25 +1012,25 @@ function formatTradeDeskCard(data, tool) {
     amtBits.push(`~$${tgEsc(String(Number(amountUsd).toFixed ? Number(amountUsd).toFixed(2) : amountUsd))}`);
   }
   const amtLine = amtBits.length
-    ? `Spending <b>${amtBits.join(" ")}</b> from your linked Phantom.`
+    ? `Spending <b>${amtBits.join(" ")}</b> from your linked Jupiter wallet.`
     : isBurn
-      ? `One Phantom sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
-      : "Unsigned Jupiter buy is ready. Tap Sign — Phantom opens the swap.";
+      ? `One Jupiter sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
+      : "Unsigned Jupiter buy is ready. Tap Sign — Jupiter Wallet opens the swap.";
 
   const title = isBurn && !sign?.includes("action=buy")
     ? "🛍️ <b>ORBITX · Buy &amp; burn</b>"
     : "🟢 <b>ORBITX · Sign to buy</b>";
 
   const buttons = [
-    sign ? { text: "Sign in Phantom", url: sign } : null,
-    auto && auto !== sign ? { text: "Auto-sign", url: autoPhantom || auto } : null,
+    sign ? { text: "Sign in Jupiter", url: sign } : null,
+    auto && auto !== sign ? { text: "Auto-sign", url: autoSign || auto } : null,
     { text: "Solscan", url: solscanToken },
     { text: "OrbitX DEX", url: dex },
   ].filter(Boolean);
 
   const linkLine = [
-    sign ? href(sign, "Sign in Phantom") : "",
-    auto && auto !== sign ? href(autoPhantom || auto, "Auto-sign") : "",
+    sign ? href(sign, "Sign in Jupiter") : "",
+    auto && auto !== sign ? href(autoSign || auto, "Auto-sign") : "",
     href(solscanToken, "Token on Solscan"),
     solscanAccount ? href(solscanAccount, "Wallet on Solscan") : "",
     href(dex, "OrbitX DEX"),
@@ -1208,7 +1204,7 @@ const FAMILY_MENUS = {
       "<b>/trade</b> <code>CA</code>  ·  optional amount (default 0.05 SOL)",
       "<b>/buy</b> <code>CA 0.1</code>  ·  <b>/sell</b> <code>CA</code>",
       "<b>/orbitx</b> — buy $ORBITX",
-      "<b>/autobuy</b> on — Phantom auto-prompt (you still sign)",
+      "<b>/autobuy</b> on — Jupiter Wallet auto-prompt (you still sign)",
       "<b>/confirm</b> — last quote",
     ]),
   shop: () =>
@@ -1326,7 +1322,7 @@ export function formatHelpDesk(isPrivate = false, linked = false) {
     : "Groups stay public. Drop a CA or $ORBITX here. /trade /buy /tweet only in DM after /login.";
   const text = [
     "🚀 <b>OrbitX Desk</b> · @theorbitxmcpbot",
-    "Premium intel · live charts · Grok · shop burns · Phantom trades",
+    "Premium intel · live charts · Grok · shop burns · Jupiter trades",
     "",
     "<b>💰 Coins</b> — drop a CA or /token mint",
     "<b>📈 Charts</b> — /chart CA",

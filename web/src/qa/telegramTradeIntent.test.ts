@@ -66,6 +66,12 @@ describe("official Telegram trade wiring", () => {
     const usdAlt = parseTradeIntent("buy 1$ in Orbitx");
     expect(usdAlt?.tool).toBe("orbitx_buy_orbitx");
     expect(usdAlt?.args.amountUsd).toBe(1);
+
+    expect(parseTradeIntent("Can you buy things yes or no")).toBeNull();
+    expect(inferPublicTool("Can you buy things yes or no")).toBeNull();
+    expect(parseTradeIntent("can you buy")).toBeNull();
+    expect(parseTradeIntent("do you buy tokens?")).toBeNull();
+    expect(parseTradeIntent(`buy ${ORBITX} 0.05 sol`)?.tool).toBe("orbitx_buy_orbitx");
   });
 
   it("exposes a 2500+ live OrbitX tool catalog", () => {

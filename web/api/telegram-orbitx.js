@@ -33,16 +33,19 @@ import {
   formatOrbitXTelegramResult,
   formatToolMenu,
   inferPublicTool,
+  isOrbitXCommunityChat,
   isPublicGroupTrigger,
   isOfficialBotUsername,
   orbitXFaqSystemAddon,
   isPrivilegedTelegramTool,
+  isPublicTelegramTool,
   isTelegramAdminWallet,
   loginCode,
   mediaEtaSeconds,
   mergeTokenScanPayloads,
   missingToolInput,
   parseCallInvocation,
+  rememberOrbitXHomeChat,
   resolveOfficialCommand,
   shouldSkipTelegramSender,
   telegramChatExtras,
@@ -69,6 +72,7 @@ import {
   formatOrbitXLinksHtml,
   OFFICIAL_ORBITX_TELEGRAM_SYSTEM,
   ORBITX_GC,
+  ORBITX_GC_USERNAME,
   ORBITX_MINT,
 } from "./orbitx/orbitx-telegram-knowledge.js";
 import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
@@ -1111,9 +1115,10 @@ async function handleCallbackQuery(cq, req) {
   if (!chatId || !data.startsWith("ox:")) return;
   const key = data.slice(3);
   const chatType = String(cq?.message?.chat?.type || "");
-  const isGroupChat = chatType === "group" || chatType === "supergroup";
+  const isGroupChat = chatType === "group" || chatType === "supergroup" || isOrbitXCommunityChat(cq?.message?.chat);
+  const isHome = isOrbitXCommunityChat(cq?.message?.chat);
   const link = from.id ? await loadLink(from.id) : null;
-  if (from.id && !key.startsWith("gate:")) {
+  if (from.id && !key.startsWith("gate:") && !isHome) {
     const dmGate = await senderGate(from, link);
     if (!dmGate.unlocked) {
       await rejectLockedSender(chatId, from, link, extra, req, isGroupChat);
@@ -1185,8 +1190,10 @@ async function handleMyChatMember(update) {
   const m = update?.my_chat_member;
   if (!m) return;
   const chat = m.chat || {};
-  const isGroup = chat.type === "group" || chat.type === "supergroup";
+  const isHome = isOrbitXCommunityChat(chat);
+  const isGroup = chat.type === "group" || chat.type === "supergroup" || (isHome && chat.type === "channel");
   if (!isGroup || !chat.id) return;
+  rememberOrbitXHomeChat(chat);
   const status = String(m.new_chat_member?.status || "");
   const old = String(m.old_chat_member?.status || "");
   if (!["member", "administrator"].includes(status)) return;
@@ -1194,11 +1201,12 @@ async function handleMyChatMember(update) {
   const extra = {};
   const thread = Number(m.message_thread_id);
   if (Number.isFinite(thread) && thread > 0) extra.message_thread_id = thread;
-  await sendLong(chat.id, formatGroupWelcomeHtml(), { parse_mode: "HTML", ...extra });
+  await sendLong(chat.id, formatGroupWelcomeHtml(chat), { parse_mode: "HTML", ...extra });
 }
 
 async function handleTelegramUpdate(update, req) {
   if (alreadyHandledUpdate(update?.update_id)) return;
+  await ensureHomeChatPinned();
   if (update.my_chat_member) {
     await handleMyChatMember(update);
     return;
@@ -1228,7 +1236,8 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
   if (failedQuote && stubMint) text = `/token ${stubMint}`;
-  const { isGroup, extra: replyExtra } = telegramChatExtras(msg);
+  const { isGroup, isHome, extra: replyExtra } = telegramChatExtras(msg);
+  rememberOrbitXHomeChat(msg.chat);
   const link = from.id ? await loadLink(from.id) : null;
   const limit = memoryRateLimit(
     `tg-orbitx:${isGroup ? chatId : from.id || chatId}`,
@@ -1264,7 +1273,7 @@ async function handleTelegramUpdate(update, req) {
   const gate = await senderGate(from, link);
 
   if (isGroup) {
-    if (!gate.unlocked) {
+    if (!gate.unlocked && !isHome) {
       const addressed =
         bare === "start" ||
         bare === "code" ||
@@ -1287,7 +1296,9 @@ async function handleTelegramUpdate(update, req) {
     if (isGroup) {
       await sendLong(
         chatId,
-        "You're in. Drop a CA or /token /chart /scan.",
+        isHome
+          ? "OrbitX desk is live in t.me/orbitxwrld. Drop a CA or /token /chart /scan. Trade is a DM after /login."
+          : "You're in. Drop a CA or /token /chart /scan.",
         { parse_mode: "HTML", ...replyExtra },
       );
       return;
@@ -1529,8 +1540,19 @@ async function handleTelegramUpdate(update, req) {
     args = withTelegramToolArgs(tool, args);
     const liveGate = await senderGate(from, link);
     if (!liveGate.unlocked) {
-      await rejectLockedSender(chatId, from, link, replyExtra, req, isGroup);
-      return;
+      const publicOk = isHome && isPublicTelegramTool(tool);
+      if (!publicOk) {
+        if (isHome && isGroup) {
+          await sendLong(
+            chatId,
+            "Trades stay in a DM with @theorbitxmcpbot after /login. Public intel stays on here.",
+            { parse_mode: "HTML", ...replyExtra },
+          );
+          return;
+        }
+        await rejectLockedSender(chatId, from, link, replyExtra, req, isGroup);
+        return;
+      }
     }
     const result = await runTool({
       tool,
@@ -1560,6 +1582,25 @@ async function handleTelegramUpdate(update, req) {
   }
 }
 
+async function pinOrbitXHomeChat() {
+  try {
+    const home = await tg("getChat", { chat_id: `@${ORBITX_GC_USERNAME}` });
+    if (home?.ok && home.result) rememberOrbitXHomeChat(home.result);
+    return home?.result || null;
+  } catch {
+    return null;
+  }
+}
+
+let lastHomePin = 0;
+const HOME_PIN_MS = 10 * 60_000;
+
+async function ensureHomeChatPinned() {
+  if (Date.now() - lastHomePin < HOME_PIN_MS) return;
+  lastHomePin = Date.now();
+  await pinOrbitXHomeChat();
+}
+
 async function configureBot(req) {
   if (!BOT_TOKEN) return { ok: false, error: "TELEGRAM_ORBITX_BOT_TOKEN is not set" };
   const base = officialOrigin();
@@ -1584,6 +1625,7 @@ async function configureBot(req) {
     drop_pending_updates: false,
   });
   const photo = await setBotPhoto(base);
+  const homeChat = await pinOrbitXHomeChat();
   return {
     ok: Boolean(me?.ok && webhook?.ok),
     me: me?.result || null,
@@ -1592,6 +1634,11 @@ async function configureBot(req) {
     short,
     about,
     photo,
+    homeChat: homeChat
+      ? { id: homeChat.id, username: homeChat.username || ORBITX_GC_USERNAME, title: homeChat.title || null, type: homeChat.type || null }
+      : { username: ORBITX_GC_USERNAME, error: "bot_not_in_orbitxwrld_yet" },
+    groupPrivacy:
+      "In @BotFather send /setprivacy → Disable so CA drops in t.me/orbitxwrld reach the bot (commands still work if privacy stays on).",
     groupCmds: groupCmds?.ok,
     privateCmds: privateCmds?.ok,
     defaultCmds: defaultCmds?.ok,

@@ -8,6 +8,7 @@ import { isHoldGatedTool } from "./token-hold.js";
 import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
 import { applyTelegramAlias, parseTradeIntent } from "./telegram-trade-intent.js";
 import { ORBITX_MINT } from "./telegram-token-snapshot.js";
+import { ORBITX_GC, ORBITX_GC_USERNAME } from "./orbitx-telegram-knowledge.js";
 import {
   CA_RE as PAYLOAD_CA_RE,
   extractMint as payloadExtractMint,
@@ -68,6 +69,49 @@ export function isAddressedToOfficialBot(text, msg) {
   return false;
 }
 
+const rememberedHomeChatIds = new Set();
+
+function chatUsername(chat) {
+  return String(chat?.username || "")
+    .replace(/^@/, "")
+    .trim()
+    .toLowerCase();
+}
+
+export function extraOrbitXHomeChatIds() {
+  return String(process.env.ORBITX_TELEGRAM_HOME_CHAT_IDS || "")
+    .split(/[\s,]+/)
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+}
+
+export function rememberOrbitXHomeChat(chat) {
+  const id = chat?.id == null ? "" : String(chat.id);
+  if (!id) return;
+  if (chatUsername(chat) === ORBITX_GC_USERNAME) rememberedHomeChatIds.add(id);
+}
+
+export function isOrbitXCommunityChat(chat) {
+  if (!chat || typeof chat !== "object") return false;
+  if (chatUsername(chat) === ORBITX_GC_USERNAME) {
+    rememberOrbitXHomeChat(chat);
+    return true;
+  }
+  const id = chat.id == null ? "" : String(chat.id);
+  if (!id) return false;
+  if (rememberedHomeChatIds.has(id)) return true;
+  return extraOrbitXHomeChatIds().includes(id);
+}
+
+export function formatOrbitXHomeWelcomeHtml() {
+  return [
+    "🚀 <b>OrbitX community desk is live</b>",
+    `Official group: ${ORBITX_GC}`,
+    "Drop a CA or /token /chart /scan — public intel stays on in this chat.",
+    "Trades / shop / tweet stay in a DM with @theorbitxmcpbot after /login.",
+  ].join("\n");
+}
+
 export function isPublicGroupTrigger(text, msg) {
   const t = String(text || "").trim();
   if (!t) return false;
@@ -88,19 +132,23 @@ export function shouldSkipTelegramSender(msg) {
 }
 
 export function telegramChatExtras(msg) {
-  const chatType = String(msg?.chat?.type || "");
-  const isGroup = chatType === "group" || chatType === "supergroup";
+  const chat = msg?.chat || {};
+  const chatType = String(chat.type || "");
+  const isHome = isOrbitXCommunityChat(chat);
+  const isGroup =
+    chatType === "group" || chatType === "supergroup" || (isHome && chatType === "channel");
   const extra = {};
-  if (isGroup && msg?.message_id) {
+  if (isGroup && msg?.message_id && chatType !== "channel") {
     extra.reply_to_message_id = msg.message_id;
     extra.allow_sending_without_reply = true;
   }
   const thread = Number(msg?.message_thread_id);
   if (Number.isFinite(thread) && thread > 0) extra.message_thread_id = thread;
-  return { isGroup, extra };
+  return { isGroup, isHome, extra };
 }
 
-export function formatGroupWelcomeHtml() {
+export function formatGroupWelcomeHtml(chat) {
+  if (isOrbitXCommunityChat(chat)) return formatOrbitXHomeWelcomeHtml();
   return [
     "🚀 <b>OrbitX is in this group</b>",
     "This bot is locked. Each person DMs @theorbitxmcpbot, shares <code>ORBITX BETA</code>, then <code>/login</code>.",

@@ -297,7 +297,7 @@ export default function TelegramOrbitX() {
               {signHref ? (
                 <div className="ox-agent__btn-row">
                   <a className="ox-agent__btn ox-agent__btn--primary" href={signHref} target="_blank" rel="noreferrer">
-                    {autoBuy ? "Auto-sign in Phantom" : "Sign in Phantom"}
+                    {autoBuy ? "Auto-sign in Jupiter" : "Sign in Jupiter"}
                   </a>
                   {solscanHref ? (
                     <a className="ox-agent__btn" href={solscanHref} target="_blank" rel="noreferrer">

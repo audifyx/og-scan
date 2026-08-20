@@ -93,6 +93,14 @@ function parseLaunchArgs(text) {
   return { name: rest.slice(0, 32), symbol: rest.replace(/[^A-Za-z0-9]/g, "").slice(0, 10).toUpperCase() || "OBX" };
 }
 
+function isCapabilityQuestion(compact) {
+  if (/\b(?:yes\s+or\s+no|y\s*\/\s*n)\b/.test(compact)) return true;
+  if (/\b(?:can|could|do|does|are|is|would)\s+(?:you|u|it|the\s+bot|orbitx)\b/.test(compact)) return true;
+  if (/\bare you able\b|\bis it possible\b/.test(compact)) return true;
+  if (/\bbuy things\b|\bbuy (?:tokens|coins|stuff)\b/.test(compact)) return true;
+  return false;
+}
+
 /**
  * @returns {{ tool: string, args: Record<string, unknown>, meta?: string } | null}
  */
@@ -159,6 +167,10 @@ export function parseTradeIntent(text) {
     /\b(buy|snipe|ape|accumulate)\b/.test(compact) ||
     (/\b(trade|swap)\b/.test(compact) && !selling);
 
+  if (buying && isCapabilityQuestion(compact) && !amountSol && !amountUsd && !extractMintFromText(t)) {
+    return null;
+  }
+
   let sol = amountSol;
   if (!sol && !amountUsd && buying) {
     const bare = compact.match(/(?:^|\s)(\d+(?:\.\d+)?)(?:\s|$)/);
@@ -186,7 +198,7 @@ export function parseTradeIntent(text) {
     if (mint || sol || amountUsd) {
       return { tool: "orbitx_prepare_buy", args };
     }
-    return { tool: "orbitx_buy_orbitx", args };
+    return null;
   }
 
   return null;
