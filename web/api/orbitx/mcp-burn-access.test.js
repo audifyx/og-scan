@@ -271,6 +271,81 @@ describe("verifyOrbitxBurn", () => {
     expect(verified.package.id).toBe("day");
   });
 
+  it("accepts a 500-token burn when minTokens is set for forever MCP unlock", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 800, amount: "800000000", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 300, amount: "300000000", decimals: 6 },
+                  },
+                ],
+                innerInstructions: [],
+              },
+              transaction: { message: { instructions: [] } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const low = await verifyOrbitxBurn("5".repeat(64), { minTokens: 500 });
+    expect(low.ok).toBe(true);
+    expect(low.tokensBurned).toBe(500);
+    expect(low.package.id).toBe("forever");
+  });
+
+  it("rejects a 100-token burn when forever minTokens is 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            result: {
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  {
+                    accountIndex: 1,
+                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+                    owner: "BurnerWallet111111111111111111111111111",
+                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
+                  },
+                ],
+                postTokenBalances: [],
+                innerInstructions: [],
+              },
+              transaction: { message: { instructions: [] } },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const verified = await verifyOrbitxBurn("6".repeat(64), { minTokens: 500 });
+    expect(verified.ok).toBe(false);
+    expect(verified.error).toBe("amount_too_low");
+    expect(verified.required).toBe(500);
+  });
+
   it("rejects a 100-token burn when the week package is selected", async () => {
     vi.stubGlobal(
       "fetch",

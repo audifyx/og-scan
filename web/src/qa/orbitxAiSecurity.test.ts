@@ -52,6 +52,7 @@ describe("OrbitX AI security guards", () => {
       "handleMediaStatus",
       "handleToolExecute",
       "handleToolCancel",
+      "handleUnlock",
     ]) {
       expect(dispatch).toContain(`return await ${handlerName}(`);
     }
@@ -69,6 +70,15 @@ describe("OrbitX AI security guards", () => {
     expect(page).toContain('id: "tools"');
     expect(page).toContain("<CommandCenter");
     expect(page).toContain("tool.requiresConfirmation");
+  });
+
+  it("front-doors /ai behind the launch MCP code or a 500 $ORBITX burn", () => {
+    expect(api).toContain("mcp-launch-gate.js");
+    expect(api).toContain("getLaunchUnlock");
+    expect(api).toContain('if (action === "unlock")');
+    expect(page).toContain("Orbitx mcp");
+    expect(page).toContain("burning 500 $ORBITX");
+    expect(page).toContain("unlockOrbitXAi");
   });
 
   it("renders structured results and a mobile quick-action menu", () => {

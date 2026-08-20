@@ -23,7 +23,6 @@ import ReactMarkdown from "react-markdown";
 import {
   ArrowUp,
   BarChart3,
-  Bot,
   Check,
   ChevronDown,
   CircleDollarSign,
@@ -34,7 +33,6 @@ import {
   ExternalLink,
   FileDown,
   Film,
-  GalleryHorizontalEnd,
   History,
   Image as ImageIcon,
   Loader2,
@@ -59,9 +57,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
-import { TokenGatingVerifier } from "@/components/agent/token-gating-verifier";
-import { McpBurnAccessCard } from "@/components/agent/McpBurnAccessCard";
-import { AGENT_HOLD_MIN_USD, AGENT_HOLD_MINT } from "@/lib/agentTokenGate";
+import { AGENT_HOLD_MINT } from "@/lib/agentTokenGate";
 import { OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 import {
   bootstrapOrbitXAi,
@@ -75,6 +71,7 @@ import {
   pollAiMedia,
   renameAiConversation,
   sendAiMessage,
+  unlockOrbitXAi,
   type AiBootstrap,
   type AiConversation,
   type AiGate,
@@ -235,6 +232,29 @@ function LockedScreen({
   error: string | null;
   onRetry: () => void;
 }) {
+  const [code, setCode] = useState("");
+  const [solscan, setSolscan] = useState("");
+  const [busy, setBusy] = useState(false);
+  const remaining = Number(gate?.remainingFree ?? 0);
+  const launchCode = gate?.launchCode || "Orbitx mcp";
+  const burnTokens = Number(gate?.burnTokens || 500);
+  const buyUrl = gate?.buyUrl || `https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`;
+  const xUrl = gate?.xUrl || "https://x.com/orbitx_wrld";
+  const signUrl = `/agent/sign?kind=mcp-access&package=forever&amount=${burnTokens}&mint=${AGENT_HOLD_MINT}`;
+
+  const submitUnlock = async (payload: { code?: string; solscan?: string; signature?: string }) => {
+    setBusy(true);
+    try {
+      const out = await unlockOrbitXAi(payload);
+      toast.success(out.message || "MCP unlocked forever");
+      onRetry();
+    } catch (unlockError) {
+      toast.error(unlockError instanceof Error ? unlockError.message : "Could not unlock MCP");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="oai-root oai-gate">
       <div className="oai-gate__glow oai-gate__glow--one" />
@@ -252,29 +272,18 @@ function LockedScreen({
       <main className="oai-gate__main">
         <section className="oai-gate__copy">
           <span className="oai-eyebrow">
-            <ShieldCheck size={13} /> Wallet-gated super app
+            <ShieldCheck size={13} /> MCP authorization
           </span>
           <h1>
-            One agent.
+            Unlock OrbitX MCP.
             <br />
-            <em>Every OrbitX tool.</em>
+            <em>Code first, or burn 500 $ORBITX.</em>
           </h1>
           <p>
-            Chat with NVIDIA intelligence, inspect live markets, sign non-custodial
-            transactions, create Grok media, and run your X agent from one mobile-first
-            command center.
+            Please send the authorization code to gain access or get access right away by
+            burning 500 $ORBITX. First 25 people unlock forever with the code. After that,
+            buy $ORBITX, burn 500, and paste the Solscan tx link.
           </p>
-          <div className="oai-gate__features">
-            <span>
-              <Bot /> MCP-native agent
-            </span>
-            <span>
-              <GalleryHorizontalEnd /> Image + video
-            </span>
-            <span>
-              <Wallet /> Secure wallet actions
-            </span>
-          </div>
         </section>
         <section className="oai-gate__card">
           <div className="oai-gate__card-top">
@@ -282,52 +291,78 @@ function LockedScreen({
               <span>OX</span>
             </div>
             <div>
-              <span className="oai-kicker">Access requirement</span>
-              <strong>Hold ${AGENT_HOLD_MIN_USD} in {OGSCAN_TOKEN_SYMBOL} or burn for timed access</strong>
+              <span className="oai-kicker">Authorization code</span>
+              <strong>{launchCode}</strong>
             </div>
             <span className="oai-live-pill">
-              <i /> Mainnet
+              <i /> {remaining > 0 ? `${remaining} free left` : "Burn 500"}
             </span>
-          </div>
-          <div className="oai-gate__meter">
-            <div>
-              <span>Your verified holding</span>
-              <strong>{formatUsd(gate?.holdingUsd)}</strong>
-            </div>
-            <div className="oai-gate__track">
-              <span
-                style={{
-                  width: `${Math.min(
-                    100,
-                    Math.max(4, ((gate?.holdingUsd || 0) / AGENT_HOLD_MIN_USD) * 100),
-                  )}%`,
-                }}
-              />
-            </div>
           </div>
           {(gate?.message || error) && (
             <div className="oai-gate__notice">{error || gate?.message}</div>
           )}
-          <div className="oai-gate__verify">
-            <TokenGatingVerifier onUnlocked={onRetry} />
-          </div>
-          <McpBurnAccessCard walletAddress={gate?.wallet} onAccessGranted={onRetry} compact />
+          <form
+            className="oai-gate__verify"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitUnlock({ code: code.trim() || launchCode });
+            }}
+          >
+            <label className="oai-kicker" htmlFor="oai-launch-code">
+              Send the code
+            </label>
+            <input
+              id="oai-launch-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder={launchCode}
+              autoComplete="off"
+              className="oai-input"
+            />
+            <button type="submit" className="oai-primary-btn" disabled={busy}>
+              {busy ? <Loader2 size={14} className="animate-spin" /> : null}
+              Unlock with code
+            </button>
+          </form>
+          <form
+            className="oai-gate__verify"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitUnlock({ solscan: solscan.trim() });
+            }}
+          >
+            <label className="oai-kicker" htmlFor="oai-launch-solscan">
+              Or paste Solscan after burning {burnTokens} $ORBITX
+            </label>
+            <input
+              id="oai-launch-solscan"
+              value={solscan}
+              onChange={(event) => setSolscan(event.target.value)}
+              placeholder="https://solscan.io/tx/…"
+              autoComplete="off"
+              className="oai-input"
+            />
+            <button type="submit" className="oai-secondary-btn" disabled={busy || !solscan.trim()}>
+              Verify burn
+            </button>
+          </form>
           <div className="oai-gate__actions">
-            <a
-              href={`https://jup.ag/swap/SOL-${AGENT_HOLD_MINT}`}
-              target="_blank"
-              rel="noreferrer"
-              className="oai-primary-btn"
-            >
+            <a href={buyUrl} target="_blank" rel="noreferrer" className="oai-primary-btn">
               Buy {OGSCAN_TOKEN_SYMBOL} <ExternalLink size={15} />
+            </a>
+            <a href={signUrl} className="oai-secondary-btn">
+              Burn {burnTokens} $ORBITX
             </a>
             <button type="button" className="oai-secondary-btn" onClick={onRetry}>
               <RefreshCw size={14} /> Recheck
             </button>
           </div>
           <p className="oai-gate__foot">
-            Owner wallets are recognized automatically. OrbitX never asks for private
-            keys or seed phrases.
+            If you have trouble, DM us on{" "}
+            <a href={xUrl} target="_blank" rel="noreferrer">
+              X @orbitx_wrld
+            </a>{" "}
+            and we will get it fixed. OrbitX never asks for private keys or seed phrases.
           </p>
         </section>
       </main>
