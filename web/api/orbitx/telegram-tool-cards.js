@@ -375,6 +375,7 @@ export function deskKeyboard() {
 
 export function startGateKeyboard() {
   return inlineKeyboard([
+    [{ text: "Redeem ORBITX BETA", callback_data: "ox:gate:beta" }],
     [{ text: "I have a code", callback_data: "ox:gate:code" }],
     [
       { text: "Burn 1 hour · 100", callback_data: "ox:gate:hour" },
@@ -394,23 +395,22 @@ export function startGateKeyboard() {
 export function formatTelegramStartGate({ remainingLabel = "", linked = false } = {}) {
   const accessLine = remainingLabel
     ? `Access: <b>${tgEsc(remainingLabel)}</b>`
-    : "No access yet — redeem a code or burn $ORBITX.";
+    : "";
   const text = [
-    "🚀 <b>OrbitX</b> · @theorbitxmcpbot",
-    "Official desk bot: live token intel, Dex charts, Grok image/video, and (after access) Jupiter buys, shop burns, and auto-buy.",
+    "Welcome to the <b>OrbitX MCP bot</b> on Telegram.",
     "",
-    accessLine,
+    "Please share the access code <code>ORBITX BETA</code> to gain <b>lifetime MCP</b> access — an early thank you to our supporters. Only the <b>first 25</b> get in.",
     "",
-    "<b>Do you have an early access code?</b>",
-    "Send <code>/code YOURCODE</code> — or burn $ORBITX:",
+    "Or you can burn now and get timed access:",
     "",
     "• <b>1 hour</b> — 100 $ORBITX",
     "• <b>1 day</b> — 1,000 $ORBITX",
     "• <b>1 week</b> — 10,000 $ORBITX",
-    "• <b>1 month</b> — 1,000,000 $ORBITX (1000k)",
+    "• <b>1 month</b> — 1,000,000 $ORBITX",
     "",
-    "Tap a burn. One Jupiter sign <b>buys then burns</b> in the same tx. Copy the Solscan link, then send <code>/verify</code> plus that link. I’ll confirm and tell you how long you have left.",
-    linked ? "" : "First <code>/login</code> so the burn is for YOUR wallet.",
+    "Tap <b>Redeem ORBITX BETA</b>, send <code>/code ORBITX BETA</code>, or tap a burn. After a burn, copy the Solscan link and send <code>/verify</code> plus that link.",
+    linked ? "" : "Burns need <code>/login</code> first so the tx is YOUR wallet.",
+    accessLine,
     "",
     `${href(ORBITX_GC, "Community GC")} · ${href(ORBITX_HOST, "orbitx.world")}`,
   ]

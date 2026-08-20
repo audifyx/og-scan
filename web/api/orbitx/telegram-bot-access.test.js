@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   accessStatusFromRow,
+  isOrbitXBetaCode,
+  LIFETIME_SECONDS,
   looksLikeEarlyAccessCode,
   looksLikeSolanaTxRef,
   normalizeEarlyAccessCode,
@@ -12,6 +14,8 @@ import {
 describe("early access codes", () => {
   it("normalizes and accepts 4–24 alphanumeric codes", () => {
     expect(normalizeEarlyAccessCode("  obx-alpha 1 ")).toBe("OBXALPHA1");
+    expect(normalizeEarlyAccessCode("ORBITX BETA")).toBe("ORBITXBETA");
+    expect(isOrbitXBetaCode("orbitx beta")).toBe(true);
     expect(looksLikeEarlyAccessCode("OBX7")).toBe(true);
     expect(looksLikeEarlyAccessCode("no")).toBe(false);
   });
@@ -52,6 +56,20 @@ describe("telegram bot access status", () => {
     expect(status.active).toBe(true);
     expect(status.remainingLabel).toBe("1h 0m remaining");
   });
+
+  it("labels far-future / lifetime package grants as lifetime", () => {
+    const now = Date.parse("2026-08-20T12:00:00.000Z");
+    const status = accessStatusFromRow(
+      {
+        expires_at: new Date(now + LIFETIME_SECONDS * 1000).toISOString(),
+        source: "code",
+        package_id: "lifetime",
+      },
+      now,
+    );
+    expect(status.active).toBe(true);
+    expect(status.remainingLabel).toBe("lifetime");
+  });
 });
 
 describe("redeemEarlyAccessCode", () => {
@@ -90,5 +108,63 @@ describe("redeemEarlyAccessCode", () => {
     const out = await redeemEarlyAccessCode(sb, { telegramUserId: "1", code: "NOPE99" });
     expect(out.ok).toBe(false);
     expect(out.error).toBe("unknown_code");
+  });
+
+  it("grants lifetime for ORBITX BETA, skips re-redeem uses, and caps at 25", async () => {
+    const codes = {
+      code: "ORBITXBETA",
+      duration_seconds: 7 * 24 * 3600,
+      max_uses: 25,
+      uses: 0,
+    };
+    const access = new Map();
+    const sb = async (path, init) => {
+      const method = init?.method || "GET";
+      if (String(path).startsWith("telegram_early_access_codes")) {
+        if (method === "PATCH") {
+          codes.uses = JSON.parse(init.body).uses;
+          return [codes];
+        }
+        return [{ ...codes }];
+      }
+      if (path === "telegram_bot_access" && method === "POST") {
+        const row = JSON.parse(init.body);
+        access.set(row.telegram_user_id, row);
+        return [row];
+      }
+      if (String(path).startsWith("telegram_bot_access")) {
+        const match = /telegram_user_id=eq\.([^&]+)/.exec(String(path));
+        const id = match ? decodeURIComponent(match[1]) : "";
+        if (method === "PATCH") {
+          const row = { ...access.get(id), ...JSON.parse(init.body) };
+          access.set(id, row);
+          return [row];
+        }
+        const row = access.get(id);
+        return row ? [row] : [];
+      }
+      return [];
+    };
+
+    const first = await redeemEarlyAccessCode(sb, { telegramUserId: "1", code: "ORBITX BETA" });
+    expect(first.ok).toBe(true);
+    expect(first.remainingLabel).toBe("lifetime");
+    expect(first.packageId).toBe("lifetime");
+    expect(codes.uses).toBe(1);
+
+    const again = await redeemEarlyAccessCode(sb, { telegramUserId: "1", code: "orbitx beta" });
+    expect(again.ok).toBe(true);
+    expect(again.already).toBe(true);
+    expect(again.remainingLabel).toBe("lifetime");
+    expect(codes.uses).toBe(1);
+
+    codes.uses = 25;
+    const still = await redeemEarlyAccessCode(sb, { telegramUserId: "1", code: "ORBITX BETA" });
+    expect(still.ok).toBe(true);
+    expect(still.already).toBe(true);
+
+    const late = await redeemEarlyAccessCode(sb, { telegramUserId: "26", code: "ORBITX BETA" });
+    expect(late.ok).toBe(false);
+    expect(late.error).toBe("code_exhausted");
   });
 });

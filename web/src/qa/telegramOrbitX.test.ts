@@ -132,9 +132,13 @@ describe("official OrbitX Telegram bot", () => {
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
   });
 
-  it("introduces the bot and lists code + hour/day/week/month burns on /start", () => {
+  it("starts with the MCP welcome, ORBITX BETA lifetime (first 25), and timed burns", () => {
     const card = formatTelegramStartGate({ remainingLabel: "", linked: false });
-    expect(card.text).toContain("early access code");
+    expect(card.text.startsWith("Welcome to the <b>OrbitX MCP bot</b> on Telegram.")).toBe(true);
+    expect(card.text).toContain("ORBITX BETA");
+    expect(card.text).toContain("lifetime MCP");
+    expect(card.text).toContain("first 25");
+    expect(card.text).toContain("burn now and get timed access");
     expect(card.text).toContain("1 hour");
     expect(card.text).toContain("100 $ORBITX");
     expect(card.text).toContain("1,000 $ORBITX");
@@ -143,11 +147,13 @@ describe("official OrbitX Telegram bot", () => {
     expect(card.text).toContain("/verify");
     expect(card.text).toContain("/login");
     const buttons = JSON.stringify(card.reply_markup);
+    expect(buttons).toContain("ox:gate:beta");
     expect(buttons).toContain("ox:gate:code");
     expect(buttons).toContain("ox:gate:hour");
     expect(buttons).toContain("ox:gate:month");
-    const linked = formatTelegramStartGate({ remainingLabel: "5h 12m remaining", linked: true });
-    expect(linked.text).toContain("5h 12m remaining");
+    const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true });
+    expect(linked.text).toContain("lifetime");
+    expect(linked.text).not.toContain("Burns need");
     expect(inferPublicTool("shop hour")?.args).toMatchObject({ package: "hour" });
     expect(inferPublicTool("shop month")?.args).toMatchObject({ package: "month" });
   });

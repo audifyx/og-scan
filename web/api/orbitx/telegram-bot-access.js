@@ -9,12 +9,24 @@ import {
   resolvePackage,
 } from "./mcp-burn-access.js";
 
+/** Public supporter code shown on /start. Normalizes from "ORBITX BETA". */
+export const ORBITX_BETA_CODE = "ORBITXBETA";
+export const ORBITX_BETA_CODE_DISPLAY = "ORBITX BETA";
+export const ORBITX_BETA_MAX_USES = 25;
+/** ~100 years — telegram_bot_access.expires_at is NOT NULL, so lifetime is a far-future grant. */
+export const LIFETIME_SECONDS = Math.round(100 * 365.25 * 24 * 60 * 60);
+const LIFETIME_LABEL_MS = 50 * 365.25 * 24 * 60 * 60 * 1000;
+
 export function normalizeEarlyAccessCode(raw) {
   return String(raw || "")
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 24);
+}
+
+export function isOrbitXBetaCode(raw) {
+  return normalizeEarlyAccessCode(raw) === ORBITX_BETA_CODE;
 }
 
 export function looksLikeEarlyAccessCode(raw) {
@@ -73,6 +85,16 @@ export async function loadTelegramBotAccess(sb, telegramUserId) {
   }
 }
 
+export function isLifetimeGrant(row, leftMs = 0) {
+  if (String(row?.package_id || "") === "lifetime") return true;
+  return Number(leftMs) >= LIFETIME_LABEL_MS;
+}
+
+export function remainingAccessLabel(row, leftMs) {
+  if (isLifetimeGrant(row, leftMs)) return "lifetime";
+  return formatRemaining(leftMs);
+}
+
 export function accessStatusFromRow(row, now = Date.now()) {
   if (!row) {
     return { active: false, remainingLabel: "No access", remainingMs: 0, expiresAt: null, source: null };
@@ -83,7 +105,7 @@ export function accessStatusFromRow(row, now = Date.now()) {
   return {
     active,
     remainingMs: left,
-    remainingLabel: active ? formatRemaining(left) : "Expired",
+    remainingLabel: active ? remainingAccessLabel(row, left) : "Expired",
     expiresAt,
     source: row.source || null,
     packageId: row.package_id || null,
@@ -109,6 +131,16 @@ export async function upsertTelegramBotAccess(sb, row) {
   try {
     const existing = await loadTelegramBotAccess(sb, payload.telegram_user_id);
     if (existing) {
+      const existingMs = Date.parse(existing.expires_at);
+      const nextMs = Date.parse(payload.expires_at);
+      if (Number.isFinite(existingMs) && Number.isFinite(nextMs) && existingMs > nextMs) {
+        payload.expires_at = existing.expires_at;
+        if (existing.package_id === "lifetime") {
+          payload.package_id = "lifetime";
+          payload.source = existing.source || payload.source;
+          payload.code = existing.code || payload.code;
+        }
+      }
       await sb(`telegram_bot_access?telegram_user_id=eq.${encodeURIComponent(payload.telegram_user_id)}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
@@ -125,14 +157,32 @@ export async function upsertTelegramBotAccess(sb, row) {
   }
 }
 
+function lifetimeUnlockMessage(already) {
+  return already
+    ? "You already have lifetime MCP access."
+    : "Lifetime MCP unlocked. Welcome in — you are one of the first 25 supporters.";
+}
+
+function codeExhaustedMessage(normalized) {
+  if (normalized === ORBITX_BETA_CODE) {
+    return "The first 25 lifetime codes are gone. Burn $ORBITX on /start for timed access.";
+  }
+  return "That early access code has no uses left.";
+}
+
 export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet, code } = {}) {
   const normalized = normalizeEarlyAccessCode(code);
   if (!looksLikeEarlyAccessCode(normalized)) {
     return { ok: false, error: "invalid_code", message: "Send /code YOURCODE — letters and numbers, 4–24 characters." };
   }
   const now = Date.now();
+  const current = await loadTelegramBotAccess(sb, telegramUserId);
+  const alreadyThisCode = Boolean(
+    current?.code === normalized && isAccessActive(current.expires_at, now),
+  );
   let durationSeconds = envCodeDurationSeconds();
   let fromTable = false;
+  let packageId = "code";
 
   try {
     const rows = await sb(
@@ -146,17 +196,40 @@ export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet
       }
       const max = row.max_uses == null ? null : Number(row.max_uses);
       const uses = Number(row.uses || 0);
-      if (max != null && Number.isFinite(max) && uses >= max) {
-        return { ok: false, error: "code_exhausted", message: "That early access code has no uses left." };
+      if (!alreadyThisCode && max != null && Number.isFinite(max) && uses >= max) {
+        return { ok: false, error: "code_exhausted", message: codeExhaustedMessage(normalized) };
       }
       durationSeconds = Number(row.duration_seconds) || durationSeconds;
-      await sb(`telegram_early_access_codes?code=eq.${encodeURIComponent(normalized)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ uses: uses + 1 }),
-      }).catch(() => null);
+      if (!alreadyThisCode) {
+        await sb(`telegram_early_access_codes?code=eq.${encodeURIComponent(normalized)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ uses: uses + 1 }),
+        }).catch(() => null);
+      }
     }
   } catch {
     /* table may be missing — fall through to env codes */
+  }
+
+  if (alreadyThisCode) {
+    const lifetime =
+      normalized === ORBITX_BETA_CODE ||
+      current.package_id === "lifetime" ||
+      isLifetimeGrant(current, remainingMs(current.expires_at, now));
+    if (lifetime) {
+      const status = accessStatusFromRow({ ...current, package_id: "lifetime" }, now);
+      return {
+        ok: true,
+        source: "code",
+        code: normalized,
+        expiresAt: current.expires_at,
+        already: true,
+        ...status,
+        remainingLabel: "lifetime",
+        packageId: "lifetime",
+        message: lifetimeUnlockMessage(true),
+      };
+    }
   }
 
   if (!fromTable) {
@@ -165,9 +238,13 @@ export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet
     }
   }
 
-  const current = await loadTelegramBotAccess(sb, telegramUserId);
+  if (normalized === ORBITX_BETA_CODE || durationSeconds >= LIFETIME_SECONDS / 2) {
+    durationSeconds = LIFETIME_SECONDS;
+    packageId = "lifetime";
+  }
+
   const currentMs = current?.expires_at && Date.parse(current.expires_at);
-  const base = Number.isFinite(currentMs) && currentMs > now ? currentMs : now;
+  const base = packageId === "lifetime" ? now : Number.isFinite(currentMs) && currentMs > now ? currentMs : now;
   const expiresAt = new Date(base + durationSeconds * 1000).toISOString();
   const saved = await upsertTelegramBotAccess(sb, {
     telegram_user_id: telegramUserId,
@@ -175,7 +252,7 @@ export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet
     wallet_address: wallet || null,
     source: "code",
     code: normalized,
-    package_id: "code",
+    package_id: packageId,
     expires_at: expiresAt,
   });
   if (!saved.ok && saved.error === "access_write_failed") {
@@ -185,14 +262,20 @@ export async function redeemEarlyAccessCode(sb, { telegramUserId, userId, wallet
       message: saved.message || "Apply telegram_bot_access migration, then send the code again.",
     };
   }
-  const status = accessStatusFromRow({ expires_at: expiresAt, source: "code", package_id: "code" }, now);
+  const status = accessStatusFromRow(
+    { expires_at: expiresAt, source: "code", package_id: packageId },
+    now,
+  );
   return {
     ok: true,
     source: "code",
     code: normalized,
     expiresAt,
     ...status,
-    message: `Early access unlocked. ${status.remainingLabel}.`,
+    message:
+      packageId === "lifetime"
+        ? lifetimeUnlockMessage(false)
+        : `Early access unlocked. ${status.remainingLabel}.`,
   };
 }
 

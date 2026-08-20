@@ -50,6 +50,7 @@ import {
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
   accessStatusFromRow,
+  isOrbitXBetaCode,
   loadTelegramBotAccess,
   looksLikeEarlyAccessCode,
   looksLikeSolanaTxRef,
@@ -485,7 +486,7 @@ async function sendAccessStatus(chatId, from, extra = {}) {
   if (!status.active) {
     await sendLong(
       chatId,
-      "No timed access yet. Redeem <code>/code YOURCODE</code> or tap a burn on /start, then /verify the Solscan link.",
+      "No access yet. Share <code>ORBITX BETA</code> on /start (first 25 get lifetime), or burn $ORBITX for timed access, then /verify the Solscan link.",
       { parse_mode: "HTML", ...extra },
     );
     return status;
@@ -530,7 +531,7 @@ async function handleCode(chatId, text, { isGroup, from, link, extra }) {
     awaitingCode.set(String(from.id), Date.now());
     await sendLong(
       chatId,
-      "Send your early access code as <code>/code YOURCODE</code> (letters and numbers, 4–24 characters).",
+      "Paste <code>ORBITX BETA</code> here, or send <code>/code ORBITX BETA</code>. First 25 get lifetime MCP.",
       { parse_mode: "HTML", ...extra },
     );
     return;
@@ -546,9 +547,12 @@ async function handleCode(chatId, text, { isGroup, from, link, extra }) {
     await sendLong(chatId, out.message || "That code did not work. Try again or burn $ORBITX.", extra);
     return;
   }
+  const lifetime = out.packageId === "lifetime" || out.remainingLabel === "lifetime";
   await sendLong(
     chatId,
-    `<b>Early access unlocked</b>\nYou have <b>${out.remainingLabel}</b>.\n/trade /shop /tweet work in this DM after /login.`,
+    lifetime
+      ? `<b>${out.message || "Lifetime MCP unlocked"}</b>\nYou have <b>lifetime</b> access.\n/trade /shop /tweet work in this DM after /login.`
+      : `<b>Access unlocked</b>\nYou have <b>${out.remainingLabel}</b>.\n/trade /shop /tweet work in this DM after /login.`,
     { parse_mode: "HTML", ...extra },
   );
 }
@@ -1073,11 +1077,15 @@ async function handleCallbackQuery(cq, req) {
     const chatType = String(cq?.message?.chat?.type || "");
     const isGroup = chatType === "group" || chatType === "supergroup";
     const link = from.id ? await loadLink(from.id) : null;
+    if (gate === "beta") {
+      await handleCode(chatId, "/code ORBITX BETA", { isGroup, from, link, extra });
+      return;
+    }
     if (gate === "code") {
       awaitingCode.set(String(from.id), Date.now());
       await sendLong(
         chatId,
-        "Send your early access code as <code>/code YOURCODE</code> — or just paste the code here.",
+        "Paste <code>ORBITX BETA</code> here, or send <code>/code ORBITX BETA</code>. First 25 supporters get lifetime MCP.",
         { parse_mode: "HTML", ...extra },
       );
       return;
@@ -1159,6 +1167,12 @@ async function handleTelegramUpdate(update, req) {
   );
   if (limit.limited) {
     await tg("sendMessage", { chat_id: chatId, text: "Slow down — too many OrbitX requests.", ...replyExtra });
+    return;
+  }
+
+  if (!isGroup && !text.startsWith("/") && isOrbitXBetaCode(text)) {
+    awaitingCode.delete(String(from.id));
+    await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra });
     return;
   }
 
