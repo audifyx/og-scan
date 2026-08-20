@@ -1008,6 +1008,10 @@ function formatTradeDeskCard(data, tool) {
 
   const sku = data.sku || data.package || data.packageId;
   const isBurn = Boolean(data.burnRaw || data.orbitxBurned != null || data.tokens || sku);
+  const autoMode =
+    String(data.confirmMode || "").toLowerCase() === "auto" ||
+    status === "awaiting_auto_phantom" ||
+    data.autoBuy === true;
   const amtBits = [];
   if (amountSol != null && amountSol !== "") {
     amtBits.push(`${tgEsc(String(amountSol))} SOL`);
@@ -1018,23 +1022,39 @@ function formatTradeDeskCard(data, tool) {
   const amtLine = amtBits.length
     ? `Spending <b>${amtBits.join(" ")}</b> from your linked Phantom.`
     : isBurn
-      ? `One Phantom sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
-      : "Unsigned Jupiter buy is ready. Tap Sign — Phantom opens the swap.";
+      ? `One Phantom send ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
+      : autoMode
+        ? "Auto-sign is on. Opening Phantom to send — OrbitX will not ask you to tap Sign."
+        : "Unsigned Jupiter buy is ready. Tap Sign — Phantom opens the swap.";
 
   const title = isBurn && !sign?.includes("action=buy")
     ? "🛍️ <b>ORBITX · Buy &amp; burn</b>"
-    : "🟢 <b>ORBITX · Sign to buy</b>";
+    : autoMode
+      ? "🟢 <b>ORBITX · Auto-sign</b>"
+      : "🟢 <b>ORBITX · Sign to buy</b>";
 
   const buttons = [
-    sign ? { text: "Sign in Phantom", url: sign } : null,
-    auto && auto !== sign ? { text: "Auto-sign", url: autoPhantom || auto } : null,
+    autoMode ? null : sign ? { text: "Sign in Phantom", url: sign } : null,
+    autoMode
+      ? auto
+        ? { text: "Send in Phantom", url: autoPhantom || auto }
+        : null
+      : auto && auto !== sign
+        ? { text: "Auto-sign", url: autoPhantom || auto }
+        : null,
     { text: "Solscan", url: solscanToken },
     { text: "OrbitX DEX", url: dex },
   ].filter(Boolean);
 
   const linkLine = [
-    sign ? href(sign, "Sign in Phantom") : "",
-    auto && auto !== sign ? href(autoPhantom || auto, "Auto-sign") : "",
+    autoMode ? "" : sign ? href(sign, "Sign in Phantom") : "",
+    autoMode
+      ? auto
+        ? href(autoPhantom || auto, "Send in Phantom")
+        : ""
+      : auto && auto !== sign
+        ? href(autoPhantom || auto, "Auto-sign")
+        : "",
     href(solscanToken, "Token on Solscan"),
     solscanAccount ? href(solscanAccount, "Wallet on Solscan") : "",
     href(dex, "OrbitX DEX"),
@@ -1047,7 +1067,9 @@ function formatTradeDeskCard(data, tool) {
       wallet ? `Wallet <code>${tgEsc(wallet)}</code>` : "",
       data.outAmount ? `Est. out ${tgEsc(String(data.outAmount))} $ORBITX` : "",
       mint ? `<code>${tgEsc(mint)}</code>` : "",
-      "After you confirm, the sign page shows the Solscan tx link.",
+      autoMode
+        ? "No extra Sign tap in chat. Open Phantom if it does not pop on its own."
+        : "After you confirm, the sign page shows the Solscan tx link.",
       `🔗 ${linkLine.join(" · ")}`,
     ]
       .filter(Boolean)
@@ -1208,7 +1230,7 @@ const FAMILY_MENUS = {
       "<b>/trade</b> <code>CA</code>  ·  optional amount (default 0.05 SOL)",
       "<b>/buy</b> <code>CA 0.1</code>  ·  <b>/sell</b> <code>CA</code>",
       "<b>/orbitx</b> — buy $ORBITX",
-      "<b>/autobuy</b> on — Phantom auto-prompt (you still sign)",
+      "<b>/autobuy</b> on — send buys without a Sign tap",
       "<b>/confirm</b> — last quote",
     ]),
   shop: () =>

@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { pickPhantomWallet } from "@/lib/orbitx/agentSignWallets";
+import {
+  agentSignPath,
+  isDashboardAutoBuyTool,
+  pickBuySignHref,
+  sendDashboardAutoBuy,
+} from "@/lib/orbitx/autoSignBuy";
 import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
 import {
   TELEGRAM_ORBITX_BOT,
@@ -22,10 +30,13 @@ const TABS: ShellTab[] = [
 ];
 
 export default function TelegramOrbitX() {
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const code = (params.get("code") || "").trim().toUpperCase();
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
+  const { connection } = useConnection();
+  const { publicKey, connected, signTransaction, sendTransaction, wallet: adapterWallet } = useWallet();
   const [tab, setTab] = useState<Tab>(code ? "link" : "tools");
   const [status, setStatus] = useState<TelegramOrbitXStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,18 +117,53 @@ export default function TelegramOrbitX() {
       setOutput(result.text || JSON.stringify(result.result || result, null, 2));
       setMedia(result.imageUrls || []);
       const payload = (result.result && typeof result.result === "object" ? result.result : {}) as Record<string, unknown>;
-      const open =
-        (typeof payload.openUrl === "string" && payload.openUrl) ||
-        (typeof payload.signUrl === "string" && payload.signUrl) ||
-        (typeof payload.autoSignUrl === "string" && payload.autoSignUrl) ||
-        "";
-      if (open) setSignHref(open);
+      const open = pickBuySignHref(payload, autoBuy);
       const scan =
         (typeof payload.solscan === "string" && payload.solscan) ||
         (typeof payload.solscanToken === "string" && payload.solscanToken) ||
         "";
       if (scan) setSolscanHref(scan);
       if (!result.ok && result.message) setError(result.message);
+
+      if (autoBuy && isDashboardAutoBuyTool(tool) && result.ok !== false) {
+        const walletCaps = {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+          walletName: adapterWallet?.adapter?.name ?? null,
+          preferPhantom: true,
+        };
+        if (connected && publicKey) {
+          try {
+            const sent = await sendDashboardAutoBuy({
+              connection,
+              walletCaps,
+              publicKey,
+              tool,
+              args,
+              payload,
+            });
+            setSignHref("");
+            setSolscanHref(sent.solscan);
+            setOutput(sent.note);
+            return;
+          } catch (sendErr) {
+            setError(sendErr instanceof Error ? sendErr.message : "Auto-sign send failed");
+          }
+        }
+        if (!connected) {
+          const phantom = pickPhantomWallet(pickable);
+          if (phantom) {
+            await signInWith(phantom.name, { connectOnly: true }).catch(() => null);
+          }
+        }
+        const path = agentSignPath(open);
+        if (path) {
+          setSignHref("");
+          navigate(path);
+          return;
+        }
+      }
+      if (open) setSignHref(open);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tool failed");
     } finally {
@@ -241,7 +287,7 @@ export default function TelegramOrbitX() {
                     onChange={(e) => void onToggleAuto(e.target.checked)}
                   />
                   <span>
-                    Auto-sign buys — Phantom prompts as soon as the swap is ready. You still approve in the wallet. OrbitX never holds keys.
+                    Auto-sign buys — send the swap as soon as it is quoted. OrbitX will not ask you to tap Sign.
                   </span>
                 </label>
               </>
@@ -257,7 +303,7 @@ export default function TelegramOrbitX() {
           <div className="ox-agent__panel-b">
             <div className="ox-tg__quick">
               <p className="ox-tg__lead">
-                Buy $ORBITX with SOL from the wallet you linked. “Buy $1” converts USD → SOL at the live price, then opens Phantom.
+                Buy $ORBITX with SOL from the wallet you linked. With auto-sign on, Buy sends immediately — no extra Sign page.
               </p>
               <label className="ox-tg__toggle">
                 <input
@@ -266,7 +312,7 @@ export default function TelegramOrbitX() {
                   disabled={savingAuto || !user}
                   onChange={(e) => void onToggleAuto(e.target.checked)}
                 />
-                <span>Auto-sign — skip the extra confirm and open Phantom immediately</span>
+                <span>Auto-sign — send buys without a Sign tap</span>
               </label>
               <div className="ox-agent__btn-row">
                 <button
@@ -294,16 +340,18 @@ export default function TelegramOrbitX() {
                   Burn 1 day MCP
                 </button>
               </div>
-              {signHref ? (
+              {signHref && !autoBuy ? (
                 <div className="ox-agent__btn-row">
                   <a className="ox-agent__btn ox-agent__btn--primary" href={signHref} target="_blank" rel="noreferrer">
-                    {autoBuy ? "Auto-sign in Phantom" : "Sign in Phantom"}
+                    Sign in Phantom
                   </a>
-                  {solscanHref ? (
-                    <a className="ox-agent__btn" href={solscanHref} target="_blank" rel="noreferrer">
-                      Solscan
-                    </a>
-                  ) : null}
+                </div>
+              ) : null}
+              {solscanHref ? (
+                <div className="ox-agent__btn-row">
+                  <a className="ox-agent__btn" href={solscanHref} target="_blank" rel="noreferrer">
+                    Solscan
+                  </a>
                 </div>
               ) : null}
               <textarea

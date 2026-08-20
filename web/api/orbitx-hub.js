@@ -3670,7 +3670,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       ok: true,
       autoBuy: on,
       message: on
-        ? "Auto-buy ON for this account. Next /buy sends a Phantom auto-prompt (no extra Telegram confirm). You still sign in Phantom."
+        ? "Auto-buy ON for this account. Next /buy sends without an extra Sign tap on OrbitX."
         : "Auto-buy OFF. Each /buy returns a Sign link; say confirm or /autobuy on to skip the extra step.",
     };
   }

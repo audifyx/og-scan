@@ -504,20 +504,20 @@ export default function AgentSignPage() {
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
           <h1 className="text-xl font-black tracking-tight">
-            {autoPrompt ? "Auto-confirm" : "Sign with Phantom"}
+            {autoPrompt ? "Sending buy" : "Sign with Phantom"}
           </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
           {kind === "credits"
             ? autoPrompt
-              ? "Chat auto-confirm — Phantom will send SOL to the OrbitX desk wallet, then credits apply."
+              ? "Auto-sign — sending SOL to the OrbitX desk wallet from your connected Phantom."
               : "Approve the SOL transfer to the OrbitX desk wallet. Credits credit after confirmation."
             : kind === "mcp-access"
               ? autoPrompt
-                ? "Chat auto-confirm — Phantom will burn the exact $ORBITX package amount, then MCP access starts."
+                ? "Auto-sign — burning the $ORBITX package from your connected wallet. OrbitX will not ask you to tap Sign."
                 : "Approve the $ORBITX burn in Phantom. MCP access starts after confirmation and expires automatically."
               : autoPrompt
-                ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
+                ? "Auto-sign — sending the swap from your connected wallet. OrbitX will not ask you to tap Sign."
                 : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
         </p>
 
@@ -608,15 +608,22 @@ export default function AgentSignPage() {
                 </a>
               </div>
             )}
-            <button
-              type="button"
-              disabled={!valid || busyTrade || !!busy || !connected || walletMismatch}
-              onClick={onSign}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab9ff2] px-4 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40"
-            >
-              {busyTrade ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-              {busyTrade ? "Waiting for Phantom…" : `Sign & send ${title}`}
-            </button>
+            {autoPrompt && !error ? (
+              <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#ab9ff2]/30 bg-[#ab9ff2]/10 px-4 py-3 text-sm font-bold text-[#ab9ff2]">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {connected ? "Sending…" : "Connecting Phantom…"}
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={!valid || busyTrade || !!busy || !connected || walletMismatch}
+                onClick={onSign}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab9ff2] px-4 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40"
+              >
+                {busyTrade ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                {busyTrade ? "Waiting for Phantom…" : autoPrompt ? `Retry send ${title}` : `Sign & send ${title}`}
+              </button>
+            )}
           </>
         )}
 

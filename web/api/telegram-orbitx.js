@@ -940,8 +940,8 @@ async function handleAutoBuy(chatId, text, { isGroup, link, extra = {} }) {
   await sendLong(
     chatId,
     enabled
-      ? "<b>Auto-buy ON</b>\nNext /buy or “buy CA with 10$ usdc” sends a Phantom auto-prompt. You still sign. OrbitX never holds keys.\n/autobuy off to require Sign each time."
-      : "<b>Auto-buy OFF</b>\nEach buy returns a Sign link. Say <b>confirm</b> after a quote, or /autobuy on.",
+      ? "<b>Auto-sign ON</b>\nNext /buy sends from your linked wallet. OrbitX will not ask you to tap Sign in chat.\n/autobuy off to require a Sign link each time."
+      : "<b>Auto-sign OFF</b>\nEach buy returns a Sign link. Say <b>confirm</b> after a quote, or /autobuy on.",
     { parse_mode: "HTML", ...extra },
   );
 }
@@ -1805,7 +1805,7 @@ async function handleWeb(req, res, body) {
       ok: true,
       autoBuy: enabled,
       message: enabled
-        ? "Auto-sign ON. Next /buy opens Phantom immediately. You still approve in the wallet."
+        ? "Auto-sign ON. Next buy sends without a Sign tap on OrbitX."
         : "Auto-sign OFF. Each buy waits for you to tap Sign.",
     });
   }

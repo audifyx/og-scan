@@ -564,6 +564,28 @@ describe("official OrbitX Telegram bot", () => {
     expect(signBuy).toContain("phantom.app/ul/browse");
     expect(signBuy).toContain("/agent/sign?action=buy");
 
+    const autoBuy = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: true,
+          requiresSignature: true,
+          confirmMode: "auto",
+          status: "awaiting_auto_phantom",
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          amountSol: 0.05,
+          wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
+          signUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05",
+          autoSignUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1",
+          solscanToken: "https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+        },
+        "orbitx_buy_orbitx",
+      ),
+    );
+    expect(autoBuy).toContain("Auto-sign");
+    expect(autoBuy).toContain("Send in Phantom");
+    expect(autoBuy).not.toContain("Sign in Phantom");
+    expect(autoBuy).toContain("No extra Sign tap");
+
     const tick = cardText(
       formatMediaCountdown({
         kind: "video",
