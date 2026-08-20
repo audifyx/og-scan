@@ -267,7 +267,6 @@ export const PRIVATE_COMMANDS = [
   { command: "nft", description: "NFT marketplace" },
   { command: "credits", description: "Buy credits with SOL (linked)" },
   { command: "orbitx", description: "Buy $ORBITX (linked)" },
-  { command: "autobuy", description: "Auto Phantom prompt on/off (linked)" },
   { command: "code", description: "Redeem an early access code" },
   { command: "burn", description: "Buy then burn $ORBITX for timed bot access" },
   { command: "access", description: "Show remaining bot access time" },

@@ -9,7 +9,6 @@ import {
   telegramOrbitXCall,
   telegramOrbitXCmds,
   telegramOrbitXLink,
-  telegramOrbitXSetAutoBuy,
   telegramOrbitXStatus,
   type TelegramOrbitXStatus,
 } from "@/lib/telegramOrbitX";
@@ -41,14 +40,11 @@ export default function TelegramOrbitX() {
   const [media, setMedia] = useState<string[]>([]);
   const [signHref, setSignHref] = useState<string>("");
   const [solscanHref, setSolscanHref] = useState<string>("");
-  const [autoBuy, setAutoBuy] = useState(false);
-  const [savingAuto, setSavingAuto] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const next = await telegramOrbitXStatus();
       setStatus(next);
-      setAutoBuy(Boolean(next.links?.[0]?.auto_buy));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load Telegram status");
     }
@@ -106,11 +102,11 @@ export default function TelegramOrbitX() {
       setOutput(result.text || JSON.stringify(result.result || result, null, 2));
       setMedia(result.imageUrls || []);
       const payload = (result.result && typeof result.result === "object" ? result.result : {}) as Record<string, unknown>;
-      const open =
-        (typeof payload.openUrl === "string" && payload.openUrl) ||
+      const rawOpen =
         (typeof payload.signUrl === "string" && payload.signUrl) ||
-        (typeof payload.autoSignUrl === "string" && payload.autoSignUrl) ||
+        (typeof payload.openUrl === "string" && payload.openUrl) ||
         "";
+      const open = rawOpen.replace(/([?&])auto(?:confirm)?=[^&]*/gi, "$1").replace(/[?&]$/, "");
       if (open) setSignHref(open);
       const scan =
         (typeof payload.solscan === "string" && payload.solscan) ||
@@ -122,19 +118,6 @@ export default function TelegramOrbitX() {
       setError(e instanceof Error ? e.message : "Tool failed");
     } finally {
       setRunning(false);
-    }
-  };
-
-  const onToggleAuto = async (enabled: boolean) => {
-    setError(null);
-    setSavingAuto(true);
-    try {
-      const next = await telegramOrbitXSetAutoBuy(enabled);
-      setAutoBuy(next.autoBuy);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save auto-sign");
-    } finally {
-      setSavingAuto(false);
     }
   };
 
@@ -233,17 +216,6 @@ export default function TelegramOrbitX() {
                   Linked Telegram {status.links[0].telegram_username ? `@${status.links[0].telegram_username}` : status.links[0].telegram_user_id}
                   {status.links[0].wallet_address ? ` · ${status.links[0].wallet_address.slice(0, 4)}…${status.links[0].wallet_address.slice(-4)}` : ""}
                 </p>
-                <label className="ox-tg__toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoBuy}
-                    disabled={savingAuto || !user}
-                    onChange={(e) => void onToggleAuto(e.target.checked)}
-                  />
-                  <span>
-                    Auto-sign buys — Phantom prompts as soon as the swap is ready. You still approve in the wallet. OrbitX never holds keys.
-                  </span>
-                </label>
               </>
             ) : null}
           </div>
@@ -257,23 +229,14 @@ export default function TelegramOrbitX() {
           <div className="ox-agent__panel-b">
             <div className="ox-tg__quick">
               <p className="ox-tg__lead">
-                Buy $ORBITX with SOL from the wallet you linked. “Buy $1” converts USD → SOL at the live price, then opens Phantom.
+                Buy $ORBITX with SOL from the wallet you linked. “Buy $1” converts USD → SOL at the live price, then opens the Sign page.
               </p>
-              <label className="ox-tg__toggle">
-                <input
-                  type="checkbox"
-                  checked={autoBuy}
-                  disabled={savingAuto || !user}
-                  onChange={(e) => void onToggleAuto(e.target.checked)}
-                />
-                <span>Auto-sign — skip the extra confirm and open Phantom immediately</span>
-              </label>
               <div className="ox-agent__btn-row">
                 <button
                   type="button"
                   className="ox-agent__btn ox-agent__btn--primary"
                   disabled={running || !user}
-                  onClick={() => run("orbitx_buy_orbitx", { amountUsd: 1, autoConfirm: autoBuy })}
+                  onClick={() => run("orbitx_buy_orbitx", { amountUsd: 1, autoConfirm: false })}
                 >
                   {running ? "Building swap…" : "Buy $1 $ORBITX"}
                 </button>
@@ -281,7 +244,7 @@ export default function TelegramOrbitX() {
                   type="button"
                   className="ox-agent__btn"
                   disabled={running || !user}
-                  onClick={() => run("orbitx_buy_orbitx", { amountSol: 0.05, autoConfirm: autoBuy })}
+                  onClick={() => run("orbitx_buy_orbitx", { amountSol: 0.05, autoConfirm: false })}
                 >
                   Buy 0.05 SOL
                 </button>
@@ -289,7 +252,7 @@ export default function TelegramOrbitX() {
                   type="button"
                   className="ox-agent__btn"
                   disabled={running || !user}
-                  onClick={() => run("orbitx_mcp_access_buy", { package: "day", autoConfirm: autoBuy })}
+                  onClick={() => run("orbitx_mcp_access_buy", { package: "day", autoConfirm: false })}
                 >
                   Burn 1 day MCP
                 </button>
@@ -297,7 +260,7 @@ export default function TelegramOrbitX() {
               {signHref ? (
                 <div className="ox-agent__btn-row">
                   <a className="ox-agent__btn ox-agent__btn--primary" href={signHref} target="_blank" rel="noreferrer">
-                    {autoBuy ? "Auto-sign in Jupiter" : "Sign in Jupiter"}
+                    Sign
                   </a>
                   {solscanHref ? (
                     <a className="ox-agent__btn" href={solscanHref} target="_blank" rel="noreferrer">

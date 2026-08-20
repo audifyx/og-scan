@@ -337,9 +337,6 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
         }).catch(() => null);
       }
     }
-    if (link.auto_buy && /buy|trade|swap|confirm_buy/.test(name)) {
-      if (cleanArgs.autoConfirm !== false) cleanArgs.autoConfirm = true;
-    }
     if (!wallet && /buy|sell|launch|mint|credits|access|nft_prepare|nft_submit|burn|claim/.test(name)) {
       return {
         ok: false,
@@ -935,43 +932,24 @@ async function handleAutoBuy(chatId, text, { isGroup, link, extra = {} }) {
   if (isGroup) {
     await tg("sendMessage", {
       chat_id: chatId,
-      text: "Auto-buy is private. DM @theorbitxmcpbot, /login, then /autobuy on or /autobuy off.",
+      text: "Auto-sign is paused. DM @theorbitxmcpbot, /login, then tap Sign on each buy.",
       ...extra,
     });
     return;
   }
-  if (!link?.user_id) {
-    await tg("sendMessage", {
-      chat_id: chatId,
-      text: "Link YOUR wallet first: /login. Auto-buy only applies to this Telegram account.",
-      ...extra,
-    });
-    return;
+  if (link?.user_id && link?.telegram_user_id) {
+    try {
+      await sb(`telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(String(link.telegram_user_id))}`, {
+        method: "PATCH",
+        body: JSON.stringify({ auto_buy: false, updated_at: new Date().toISOString() }),
+      });
+    } catch {
+      /* column may not exist until migration */
+    }
   }
-  const rest = String(text || "").replace(/^\S+\s*/, "").trim().toLowerCase();
-  let enabled = Boolean(link.auto_buy);
-  if (/\b(off|disable|manual|sign)\b/.test(rest)) enabled = false;
-  else if (/\b(on|enable|auto)\b/.test(rest) || rest === "") enabled = rest === "" ? !enabled : true;
-  try {
-    await sb(`telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(String(link.telegram_user_id))}`, {
-      method: "PATCH",
-      body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
-    });
-  } catch {
-    /* column may not exist until migration */
-  }
-  await runTool({
-    tool: "orbitx_trade_auto",
-    args: { enabled },
-    req: extra.req,
-    link,
-    allowPrivileged: true,
-  }).catch(() => null);
   await sendLong(
     chatId,
-    enabled
-      ? "<b>Auto-buy ON</b>\nNext /buy or “buy CA with 10$ usdc” sends a Phantom auto-prompt. You still sign. OrbitX never holds keys.\n/autobuy off to require Sign each time."
-      : "<b>Auto-buy OFF</b>\nEach buy returns a Sign link. Say <b>confirm</b> after a quote, or /autobuy on.",
+    "<b>Auto-sign is paused.</b>\nEach /buy returns a Sign link — approve in your browser wallet. Regular signing works.",
     { parse_mode: "HTML", ...extra },
   );
 }
@@ -1435,7 +1413,7 @@ async function handleTelegramUpdate(update, req) {
     }
     await sendLong(
       chatId,
-      `<b>Linked OrbitX</b>\nuser: <code>${link.user_id}</code>\nwallet: <code>${link.wallet_address || "n/a"}</code>\nauto-buy: ${link.auto_buy ? "ON (Phantom auto-prompt)" : "OFF (sign each trade)"}\ntelegram: @${link.telegram_username || from.username || "user"}`,
+      `<b>Linked OrbitX</b>\nuser: <code>${link.user_id}</code>\nwallet: <code>${link.wallet_address || "n/a"}</code>\ntelegram: @${link.telegram_username || from.username || "user"}`,
       { parse_mode: "HTML" },
     );
     return;
@@ -1851,7 +1829,7 @@ async function handleWeb(req, res, body) {
       await tg("sendMessage", {
         chat_id: telegramUserId,
         text: accessOn
-          ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch. /autobuy on for Phantom auto-prompt."
+          ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch."
           : "OrbitX linked. Type the access code you received from us to unlock the bot, or burn $ORBITX on /start. /reset starts over.",
         parse_mode: "HTML",
       });
@@ -1898,9 +1876,6 @@ async function handleWeb(req, res, body) {
       toolArgs.mint = ORBITX_MINT;
       toolArgs.ca = ORBITX_MINT;
     }
-    if (autoBuy && /buy|trade|swap|confirm_buy/.test(tool) && toolArgs.autoConfirm !== false) {
-      toolArgs.autoConfirm = true;
-    }
     const mint = String(toolArgs.mint || toolArgs.ca || "").trim();
     if (TOKEN_INTEL_TOOLS.has(tool) && mint) {
       const merged = await buildBrandedScan(mint, {
@@ -1934,28 +1909,18 @@ async function handleWeb(req, res, body) {
 
   if (action === "web.autobuy") {
     if (!user?.id) return json(res, { error: "unauthorized", message: "Sign in with your OrbitX wallet first." }, 401);
-    const enabled = body.enabled === true || body.on === true;
     try {
       await sb(`telegram_orbitx_links?user_id=eq.${encodeURIComponent(user.id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ auto_buy: enabled, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ auto_buy: false, updated_at: new Date().toISOString() }),
       });
     } catch {
       /* column may not exist until migration */
     }
-    await runTool({
-      tool: "orbitx_trade_auto",
-      args: { enabled },
-      req,
-      link: { user_id: user.id, wallet_address: await loadWallet(user.id) },
-      allowPrivileged: true,
-    }).catch(() => null);
     return json(res, {
       ok: true,
-      autoBuy: enabled,
-      message: enabled
-        ? "Auto-sign ON. Next /buy opens Phantom immediately. You still approve in the wallet."
-        : "Auto-sign OFF. Each buy waits for you to tap Sign.",
+      autoBuy: false,
+      message: "Auto-sign is paused. Tap Sign and approve in your browser wallet.",
     });
   }
 

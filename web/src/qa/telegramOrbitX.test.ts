@@ -618,10 +618,11 @@ describe("official OrbitX Telegram bot", () => {
     );
     expect(signBuy).not.toMatch(/No live DexScreener/);
     expect(signBuy).not.toMatch(/Live quote unavailable/);
-    expect(signBuy).toContain("Sign in Jupiter");
+    expect(signBuy).toContain("Sign");
     expect(signBuy).toContain("solscan.io/token");
     expect(signBuy).toContain("0.05 SOL");
-    expect(signBuy).toContain("Auto-sign");
+    expect(signBuy).not.toContain("Auto-sign");
+    expect(signBuy).not.toContain("auto=1");
     expect(signBuy).not.toContain("phantom.app/ul/browse");
     expect(signBuy).not.toContain("Sign in Phantom");
     expect(signBuy).toContain("/agent/sign?action=buy");
@@ -793,6 +794,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("handleAutoBuy");
     expect(api).toContain("auto_buy");
     expect(api).toContain("web.autobuy");
+    expect(api).toContain("Auto-sign is paused");
+    const signPage = readFileSync(resolve(WEB, "src/pages/AgentSignPage.tsx"), "utf8");
+    expect(signPage).toContain("AUTO_SIGN_ENABLED = false");
+    expect(signPage).toContain("dropAutoQuery");
     expect(api).toContain("handleCallbackQuery");
     expect(api).toContain("formatToolMenu");
     expect(api).toContain("missingToolInput");

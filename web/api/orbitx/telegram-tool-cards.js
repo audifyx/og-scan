@@ -836,13 +836,23 @@ function formatShopCard(data) {
   };
 }
 
+function stripAutoSignQuery(raw) {
+  const url = String(raw || "").trim();
+  if (!url) return "";
+  try {
+    const next = new URL(url);
+    next.searchParams.delete("auto");
+    next.searchParams.delete("autoconfirm");
+    return next.toString();
+  } catch {
+    return url.replace(/([?&])auto(?:confirm)?=[^&]*/gi, "$1").replace(/[?&]$/, "");
+  }
+}
+
 function formatActionLinks(data) {
   const urls = [];
-  if (data?.openUrl) urls.push(["Open", data.openUrl]);
-  if (data?.autoSignUrl && data.autoSignUrl !== data.openUrl && data.autoSignUrl !== data.signUrl) {
-    urls.push(["Auto-sign", data.autoSignUrl]);
-  }
-  if (data?.signUrl && data.signUrl !== data.openUrl) urls.push(["Sign", data.signUrl]);
+  const sign = stripAutoSignQuery(data?.signUrl || data?.openUrl || "");
+  if (sign) urls.push(["Sign", sign]);
   if (data?.reportUrl) urls.push(["Report", data.reportUrl]);
   if (data?.launchpadUrl) urls.push(["Launchpad", data.launchpadUrl]);
   if (data?.mcpUrl) urls.push(["MCP", data.mcpUrl]);
@@ -903,11 +913,7 @@ function formatTradeDeskCard(data, tool) {
   const solscanToken = data.solscanToken || `${SOLSCAN}${encodeURIComponent(mint)}`;
   const solscanAccount = data.solscanAccount || (wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : "");
   const dex = `${ORBITX_HOST}/ORBITX_DEX/token/${encodeURIComponent(mint)}`;
-  const sign = data.signUrl || data.openUrl || "";
-  const auto =
-    data.autoSignUrl ||
-    (sign ? `${sign}${sign.includes("?") ? "&" : "?"}auto=1` : "");
-  const autoSign = auto || "";
+  const sign = stripAutoSignQuery(data.signUrl || data.openUrl || "");
   const telegramDash = `${ORBITX_HOST}/telegram`;
 
   if (err === "login_required") {
@@ -1016,22 +1022,20 @@ function formatTradeDeskCard(data, tool) {
     ? `Spending <b>${amtBits.join(" ")}</b> from your linked Jupiter wallet.`
     : isBurn
       ? `One Jupiter sign ${sku ? `for <b>${tgEsc(String(sku))}</b>` : "to burn $ORBITX"} — Jupiter buy + burn in the same tx when it's a desk SKU.`
-      : "Unsigned Jupiter buy is ready. Tap Sign — Jupiter Wallet opens the swap.";
+      : "Unsigned Jupiter buy is ready. Tap Sign — approve in your browser wallet.";
 
   const title = isBurn && !sign?.includes("action=buy")
     ? "🛍️ <b>ORBITX · Buy &amp; burn</b>"
     : "🟢 <b>ORBITX · Sign to buy</b>";
 
   const buttons = [
-    sign ? { text: "Sign in Jupiter", url: sign } : null,
-    auto && auto !== sign ? { text: "Auto-sign", url: autoSign || auto } : null,
+    sign ? { text: "Sign", url: sign } : null,
     { text: "Solscan", url: solscanToken },
     { text: "OrbitX DEX", url: dex },
   ].filter(Boolean);
 
   const linkLine = [
-    sign ? href(sign, "Sign in Jupiter") : "",
-    auto && auto !== sign ? href(autoSign || auto, "Auto-sign") : "",
+    sign ? href(sign, "Sign") : "",
     href(solscanToken, "Token on Solscan"),
     solscanAccount ? href(solscanAccount, "Wallet on Solscan") : "",
     href(dex, "OrbitX DEX"),
@@ -1205,7 +1209,6 @@ const FAMILY_MENUS = {
       "<b>/trade</b> <code>CA</code>  ·  optional amount (default 0.05 SOL)",
       "<b>/buy</b> <code>CA 0.1</code>  ·  <b>/sell</b> <code>CA</code>",
       "<b>/orbitx</b> — buy $ORBITX",
-      "<b>/autobuy</b> on — Jupiter Wallet auto-prompt (you still sign)",
       "<b>/confirm</b> — last quote",
     ]),
   shop: () =>

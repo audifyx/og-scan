@@ -114,10 +114,12 @@ export default function AgentSignPage() {
   const expectedWallet = (params.get("publicKey") || "").trim();
   const slippage = Math.min(Math.max(Number(params.get("slippage")) || 10, 1), 50);
   const pool = params.get("pool") || "auto";
+  const AUTO_SIGN_ENABLED = false;
   const autoPrompt =
-    params.get("auto") === "1" ||
-    params.get("auto") === "true" ||
-    params.get("autoconfirm") === "1";
+    AUTO_SIGN_ENABLED &&
+    (params.get("auto") === "1" ||
+      params.get("auto") === "true" ||
+      params.get("autoconfirm") === "1");
   const connectWallets = sortAgentSignWallets(pickable);
 
   const [busyTrade, setBusyTrade] = useState(false);
@@ -166,6 +168,10 @@ export default function AgentSignPage() {
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
   }, [kind, mint, amountRaw, percentRaw, packageId, sku]);
+
+  useEffect(() => {
+    dropAutoQuery();
+  }, []);
 
   const title =
     kind === "credits"
