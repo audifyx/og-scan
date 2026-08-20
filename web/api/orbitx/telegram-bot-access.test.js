@@ -12,6 +12,7 @@ import {
   redeemEarlyAccessCode,
   resolveBurnPackageFromText,
   telegramDmUnlockState,
+  resetTelegramBotSession,
 } from "./telegram-bot-access.js";
 
 describe("early access codes", () => {
@@ -202,6 +203,7 @@ describe("DM unlock gate", () => {
     expect(isAllowedGatedDmCommand("help", "/help")).toBe(false);
     expect(isAllowedGatedDmCommand("start", "/start")).toBe(true);
     expect(isAllowedGatedDmCommand("code", "/code ORBITX BETA")).toBe(true);
+    expect(isAllowedGatedDmCommand("reset", "/reset")).toBe(true);
     expect(isAllowedGatedDmCommand("login", "/login")).toBe(true);
     expect(isAllowedGatedDmCommand("shop", "/shop hour")).toBe(true);
     expect(isAllowedGatedDmCommand("shop", "/shop")).toBe(false);
@@ -234,5 +236,22 @@ describe("grantMcpBetaAccessBadge", () => {
     expect(out.ok).toBe(true);
     expect(patched.mcp_beta_access).toBe(true);
     expect(patched.badge).toBeUndefined();
+  });
+});
+
+describe("resetTelegramBotSession", () => {
+  it("deletes link, access, and login codes for that Telegram user", async () => {
+    const calls = [];
+    const sb = async (path, init) => {
+      calls.push({ path, method: init?.method || "GET" });
+      return [];
+    };
+    const out = await resetTelegramBotSession(sb, "99");
+    expect(out.ok).toBe(true);
+    expect(calls).toEqual([
+      { path: "telegram_orbitx_links?telegram_user_id=eq.99", method: "DELETE" },
+      { path: "telegram_bot_access?telegram_user_id=eq.99", method: "DELETE" },
+      { path: "telegram_orbitx_login_codes?telegram_user_id=eq.99", method: "DELETE" },
+    ]);
   });
 });

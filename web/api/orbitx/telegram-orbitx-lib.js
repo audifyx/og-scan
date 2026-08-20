@@ -8,13 +8,14 @@ import { isHoldGatedTool } from "./token-hold.js";
 import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
 import { applyTelegramAlias, parseTradeIntent } from "./telegram-trade-intent.js";
 import { ORBITX_MINT } from "./telegram-token-snapshot.js";
-import { ORBITX_GC, ORBITX_GC_USERNAME } from "./orbitx-telegram-knowledge.js";
 import {
   CA_RE as PAYLOAD_CA_RE,
   extractMint as payloadExtractMint,
   mediaEtaSeconds as payloadMediaEtaSeconds,
   unwrapToolPayload as payloadUnwrap,
+  tgEsc,
 } from "./telegram-payload.js";
+import { ORBITX_GC, ORBITX_GC_USERNAME, ORBITX_HOST } from "./orbitx-telegram-knowledge.js";
 import {
   cmdsPage as cmdsPageImpl,
   deskKeyboard,
@@ -36,7 +37,7 @@ export const OFFICIAL_BOT_NAME = "OrbitX";
 export const OFFICIAL_BOT_SHORT =
   "Official OrbitX bot — charts, scans, Grok image/video, and (in DMs) trade, X, and your account.";
 export const OFFICIAL_BOT_ABOUT =
-  "OrbitX's official Telegram bot. Locked until you DM it, share ORBITX BETA, then /login. After that: token intel, Dex charts, Grok, and (in DMs) trade. Not an MCP connector — tools run natively on OrbitX.";
+  "OrbitX's official Telegram bot. Locked until you DM it, type the access code you received from us, then /login. After that: token intel, Dex charts, Grok, and (in DMs) trade. /reset starts you as a fresh user. Not an MCP connector — tools run natively on OrbitX.";
 
 const GROUP_ANON = "groupanonymousbot";
 
@@ -185,7 +186,7 @@ export function formatGroupWelcomeHtml(chat) {
   if (isOrbitXCommunityChat(chat)) return formatOrbitXHomeWelcomeHtml();
   return [
     "🚀 <b>OrbitX is in this group</b>",
-    "This bot is locked. Each person DMs @theorbitxmcpbot, shares <code>ORBITX BETA</code>, then <code>/login</code>.",
+    "This bot is locked. Each person DMs @theorbitxmcpbot, types the access code they received from us, then <code>/login</code>.",
     "After that, drop a CA or /token /chart /scan here.",
   ].join("\n");
 }
@@ -253,6 +254,7 @@ export const PRIVATE_COMMANDS = [
   { command: "login", description: "Link your OrbitX wallet" },
   { command: "auth", description: "Link your OrbitX wallet" },
   { command: "logout", description: "Unlink this Telegram account" },
+  { command: "reset", description: "Log out and start as a fresh user" },
   { command: "me", description: "Show linked OrbitX identity" },
   { command: "buy", description: "Prepare a token buy (linked)" },
   { command: "trade", description: "Buy a token with SOL (linked)" },
@@ -285,6 +287,7 @@ const PRIORITY_TOOL = {
   login: null,
   auth: null,
   logout: null,
+  reset: null,
   me: null,
   verify: null,
   code: null,
@@ -426,6 +429,87 @@ export function parseCallInvocation(text) {
   return { tool, args };
 }
 
+export function extractMint(text) {
+  return payloadExtractMint(text);
+}
+
+const PROJECT_QUESTION_RE =
+  /\b(tell me about|tell me|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape)|is (?:it|this) legit)\b/i;
+
+/** Natural-language project ask (not /token). Needs a mint in the same message. */
+export function isTokenProjectQuestion(text) {
+  const t = String(text || "").trim();
+  if (!t || t.startsWith("/")) return false;
+  if (!extractMint(t)) return false;
+  if (/^\s*(token|chart|scan|xray|research)\b/i.test(t)) return false;
+  return PROJECT_QUESTION_RE.test(t) || /\babout\b/i.test(t);
+}
+
+function briefHref(url, label) {
+  const u = String(url || "").trim();
+  if (!u) return "";
+  return `<a href="${tgEsc(u)}">${tgEsc(label || u)}</a>`;
+}
+
+export function compactTokenBriefFacts({ mint, snapshot, research } = {}) {
+  const ca = String(mint || research?.ca || snapshot?.mint || "").trim();
+  const token = snapshot?.token && typeof snapshot.token === "object" ? snapshot.token : {};
+  const meta = research?.meta && typeof research.meta === "object" ? research.meta : {};
+  const launch = research?.launch && typeof research.launch === "object" ? research.launch : {};
+  const social = research?.social && typeof research.social === "object" ? research.social : {};
+  const snapSocials = snapshot?.meta?.socials && typeof snapshot.meta.socials === "object" ? snapshot.meta.socials : {};
+  const links = {
+    ...snapSocials,
+    ...(meta.links && typeof meta.links === "object" ? meta.links : {}),
+  };
+  const name = String(meta.name || token.name || "").trim();
+  const symbol = String(meta.symbol || token.symbol || "").trim();
+  const desc = String(meta.description || launch.description || token.description || "").trim().slice(0, 500);
+  const tweets = Array.isArray(social.twitter?.posts)
+    ? social.twitter.posts.slice(0, 5).map((p) => `@${p.user || "x"}: ${String(p.text || "").replace(/\s+/g, " ").slice(0, 120)}`)
+    : [];
+  const mentioners = Array.isArray(social.twitter?.byUser)
+    ? social.twitter.byUser.slice(0, 6).map((u) => `@${u.user}×${u.count}`)
+    : [];
+  const reddit = Array.isArray(social.reddit?.posts)
+    ? social.reddit.posts.slice(0, 4).map((p) => String(p.title || "").slice(0, 100))
+    : [];
+  const lines = [
+    `mint ${ca}`,
+    name || symbol ? `name ${name}${symbol ? ` ($${symbol})` : ""}` : "",
+    desc ? `description ${desc}` : "description (none on-chain / pump.fun)",
+    links.website ? `website ${links.website}` : "",
+    links.twitter ? `twitter ${links.twitter}` : "",
+    links.telegram ? `telegram ${links.telegram}` : "",
+    launch.platform ? `launch ${launch.platform}${launch.deployer ? ` deployer ${launch.deployer}` : ""}` : "",
+    meta.mcap ? `mcap $${Number(meta.mcap).toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "",
+    meta.volume24h ? `vol24h $${Number(meta.volume24h).toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "",
+    meta.priceChange24h != null && meta.priceChange24h !== "" ? `chg24h ${Number(meta.priceChange24h).toFixed(1)}%` : "",
+    token.ageDays != null ? `age ${token.ageDays}d` : "",
+    social.twitter?.total != null ? `x_mentions ${social.twitter.total}` : "",
+    mentioners.length ? `x_accounts ${mentioners.join(", ")}` : "",
+    tweets.length ? `x_posts ${tweets.join(" | ")}` : "",
+    reddit.length ? `reddit ${reddit.join(" | ")}` : "",
+    `orbitx_dex ${ORBITX_HOST}/ORBITX_DEX/token/${ca}`,
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+export function formatTokenProjectBriefHtml({ mint, name, symbol, summary } = {}) {
+  const ca = String(mint || "").trim();
+  const title = [name, symbol ? `$${symbol}` : ""].filter(Boolean).join(" · ") || "Token";
+  const dex = `https://dexscreener.com/solana/${encodeURIComponent(ca)}`;
+  const bubble = `${ORBITX_HOST}/ORBITX_DEX/token/${encodeURIComponent(ca)}`;
+  return [
+    `🧠 <b>Project brief</b> · ${tgEsc(title)}`,
+    "",
+    tgEsc(String(summary || "").replace(/```[\s\S]*?```/g, "").trim()).slice(0, 2800),
+    "",
+    `<code>${tgEsc(ca)}</code>`,
+    `${briefHref(bubble, "OrbitX DEX")} · ${briefHref(dex, "DexScreener")} · /token for the market card`,
+  ].join("\n");
+}
+
 export function inferPublicTool(text) {
   const t = String(text || "").trim();
   const lower = t.toLowerCase();
@@ -464,6 +548,7 @@ export function inferPublicTool(text) {
   if (chart) return { tool: "orbitx_dex_chart", args: { ca: chart[1], mint: chart[1] } };
 
   const mint = extractMint(t);
+  if (mint && isTokenProjectQuestion(t)) return { meta: "brief", args: { mint } };
   if (mint) return { tool: "orbitx_get_token", args: { mint } };
   if (/^\$orbitx\b/i.test(t) || /^orbitx$/i.test(t)) {
     return { tool: "orbitx_get_token", args: { mint: ORBITX_MINT } };
@@ -474,10 +559,6 @@ export function inferPublicTool(text) {
 
 export const CA_RE = PAYLOAD_CA_RE;
 export const TOKEN_INTEL_TOOLS = CARD_TOKEN_INTEL_TOOLS;
-
-export function extractMint(text) {
-  return payloadExtractMint(text);
-}
 
 const ADMIN_WALLETS_BASE = [
   "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",

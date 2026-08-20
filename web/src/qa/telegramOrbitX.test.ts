@@ -5,6 +5,7 @@ import {
   argsFromCommand,
   applyDefaultBuyAmount,
   cmdsPage,
+  compactTokenBriefFacts,
   extractMint,
   formatGroupWelcomeHtml,
   formatMediaCountdown,
@@ -13,8 +14,10 @@ import {
   formatOrbitXTelegramResult,
   formatTelegramStartGate,
   formatTokenCard,
+  formatTokenProjectBriefHtml,
   formatToolMenu,
   inferPublicTool,
+  isTokenProjectQuestion,
   isOrbitXCommunityChat,
   rememberOrbitXHomeChat,
   isPublicGroupTrigger,
@@ -101,6 +104,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("autobuy").kind).toBe("meta");
     expect(resolveOfficialCommand("auth").kind).toBe("meta");
     expect(resolveOfficialCommand("login").kind).toBe("meta");
+    expect(resolveOfficialCommand("logout").kind).toBe("meta");
+    expect(resolveOfficialCommand("reset").kind).toBe("meta");
+    expect(resolveOfficialCommand("reset").tool).toBeNull();
     expect(resolveOfficialCommand("check").kind).toBe("meta");
     expect(resolveOfficialCommand("check").tool).toBeNull();
     expect(resolveOfficialCommand("links").kind).toBe("meta");
@@ -128,6 +134,27 @@ describe("official OrbitX Telegram bot", () => {
     expect(inferPublicTool("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool("$ORBITX")?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool("$ORBITX")?.args).toMatchObject({ mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9" });
+    const ansem = "9cRCn9rGT8V2imeM2Baks13yhMEais3ruM3rPvTGpump";
+    expect(isTokenProjectQuestion(`can you tell me about ${ansem}`)).toBe(true);
+    expect(inferPublicTool(`can you tell me about ${ansem}`)?.meta).toBe("brief");
+    expect(inferPublicTool(`can you tell me about ${ansem}`)?.args).toMatchObject({ mint: ansem });
+    expect(inferPublicTool(`what is this project ${ansem}`)?.meta).toBe("brief");
+    expect(inferPublicTool(ansem)?.tool).toBe("orbitx_get_token");
+    expect(inferPublicTool(`/token ${ansem}`)).toBeNull();
+    const facts = compactTokenBriefFacts({
+      mint: ansem,
+      snapshot: { mint: ansem, token: { name: "The Black Bull", symbol: "ANSEM" }, meta: { socials: { twitter: "https://x.com/x" } } },
+      research: {
+        ca: ansem,
+        meta: { name: "The Black Bull", symbol: "ANSEM", description: "meme token", links: { website: "https://example.com" } },
+        social: { twitter: { total: 3, posts: [{ user: "kol", text: "running" }], byUser: [{ user: "kol", count: 2 }] } },
+      },
+    });
+    expect(facts).toContain("The Black Bull");
+    expect(facts).toContain("meme token");
+    expect(facts).toContain("orbitx.world/ORBITX_DEX/token/");
+    expect(formatTokenProjectBriefHtml({ mint: ansem, name: "The Black Bull", symbol: "ANSEM", summary: "A meme." })).toContain("Project brief");
+    expect(formatTokenProjectBriefHtml({ mint: ansem, name: "The Black Bull", symbol: "ANSEM", summary: "A meme." })).toContain("/token for the market card");
     expect(extractMint("scan this 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 please")).toBe(
       "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
     );
@@ -135,15 +162,16 @@ describe("official OrbitX Telegram bot", () => {
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
   });
 
-  it("starts with the MCP welcome, ORBITX BETA lifetime (first 25), and timed burns", () => {
+  it("starts locked, never prints the access code, and offers /reset plus timed burns", () => {
     const card = formatTelegramStartGate({ remainingLabel: "", linked: false });
     expect(card.text.startsWith("Welcome to the <b>OrbitX MCP bot</b> on Telegram.")).toBe(true);
-    expect(card.text).toContain("ORBITX BETA");
-    expect(card.text).toContain("lifetime MCP");
+    expect(card.text).not.toContain("ORBITX BETA");
+    expect(card.text).not.toContain("ORBITXBETA");
+    expect(card.text).toContain("access code you received from us");
+    expect(card.text).toContain("We never print that code here");
     expect(card.text).toContain("first 25");
-    expect(card.text).toContain("does not reply until you share the code");
     expect(card.text).toContain("This bot is locked");
-    expect(card.text).toContain("burn now and get timed access");
+    expect(card.text).toContain("/reset");
     expect(card.text).toContain("1 hour");
     expect(card.text).toContain("100 $ORBITX");
     expect(card.text).toContain("1,000 $ORBITX");
@@ -152,8 +180,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(card.text).toContain("/verify");
     expect(card.text).toContain("/login");
     const buttons = JSON.stringify(card.reply_markup);
-    expect(buttons).toContain("ox:gate:beta");
+    expect(buttons).not.toContain("ox:gate:beta");
+    expect(buttons).not.toContain("ORBITX BETA");
     expect(buttons).toContain("ox:gate:code");
+    expect(buttons).toContain("ox:gate:reset");
     expect(buttons).toContain("ox:gate:hour");
     expect(buttons).toContain("ox:gate:month");
     expect(buttons).not.toContain("ox:desk");
@@ -196,7 +226,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(extras.extra.message_thread_id).toBe(12);
     expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
     expect(formatGroupWelcomeHtml()).toContain("locked");
-    expect(formatGroupWelcomeHtml()).toContain("ORBITX BETA");
+    expect(formatGroupWelcomeHtml()).not.toContain("ORBITX BETA");
+    expect(formatGroupWelcomeHtml()).toContain("access code they received from us");
     expect(formatOrbitXHomeWelcomeHtml()).toContain("t.me/orbitxwrld");
     expect(formatOrbitXHomeWelcomeHtml()).toContain("community desk is live");
     expect(formatOrbitXHomeWelcomeHtml()).not.toContain("locked");
@@ -707,6 +738,12 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("senderGate");
     expect(api).toContain("formatOrbitXTelegramResult");
     expect(api).toContain('bare === "login" || bare === "auth"');
+    expect(api).toContain('bare === "reset"');
+    expect(api).toContain("resetTelegramBotSession");
+    expect(api).toContain("handleTokenProjectBrief");
+    expect(api).toContain("TELEGRAM_CODE_PROMPT_HTML");
+    expect(api).not.toContain("ORBITX BETA");
+    expect(api).not.toContain("/code ORBITX");
     expect(api).toContain('bare === "check"');
     expect(api).toContain("OFFICIAL_ORBITX_TELEGRAM_SYSTEM");
     expect(api).toContain("wait: false");

@@ -371,7 +371,6 @@ export function deskKeyboard() {
 
 export function startGateKeyboard({ unlocked = false } = {}) {
   const rows = [
-    [{ text: "Redeem ORBITX BETA", callback_data: "ox:gate:beta" }],
     [{ text: "I have a code", callback_data: "ox:gate:code" }],
     [
       { text: "Burn 1 hour · 100", callback_data: "ox:gate:hour" },
@@ -382,6 +381,7 @@ export function startGateKeyboard({ unlocked = false } = {}) {
       { text: "Burn 1 month · 1000k", callback_data: "ox:gate:month" },
     ],
     [{ text: "Link wallet /login", callback_data: "ox:gate:login" }],
+    [{ text: "Start over /reset", callback_data: "ox:gate:reset" }],
   ];
   if (unlocked) {
     rows.push([{ text: "Desk", callback_data: "ox:desk" }]);
@@ -396,18 +396,19 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false, u
   const text = [
     "Welcome to the <b>OrbitX MCP bot</b> on Telegram.",
     "",
-    "Please share the access code <code>ORBITX BETA</code> to gain <b>lifetime MCP</b> access — an early thank you to our supporters. Only the <b>first 25</b> get in.",
+    "This bot is locked. Type the <b>access code you received from us</b>, then <code>/login</code>. We never print that code here.",
     "",
-    "This bot is locked. It does not reply until you share the code, then <code>/login</code>.",
+    "Lifetime MCP is limited to the first 25 codes we issued.",
     "",
-    "Or you can burn now and get timed access:",
+    "Or burn $ORBITX for timed access:",
     "",
     "• <b>1 hour</b> — 100 $ORBITX",
     "• <b>1 day</b> — 1,000 $ORBITX",
     "• <b>1 week</b> — 10,000 $ORBITX",
     "• <b>1 month</b> — 1,000,000 $ORBITX",
     "",
-    "Tap <b>Redeem ORBITX BETA</b>, send <code>/code ORBITX BETA</code>, or tap a burn. After a burn, copy the Solscan link and send <code>/verify</code> plus that link.",
+    "Tap <b>I have a code</b> and paste it, or tap a burn. After a burn, copy the Solscan link and send <code>/verify</code> plus that link.",
+    "<code>/reset</code> logs out and starts you as a fresh user.",
     linked ? "" : "Burns need <code>/login</code> first so the tx is YOUR wallet.",
     accessLine,
     "",
@@ -421,7 +422,7 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false, u
 export function formatTelegramGroupLockHtml() {
   return [
     "This bot is <b>locked</b>.",
-    "DM @theorbitxmcpbot and share <code>ORBITX BETA</code> (first 25 get lifetime), then <code>/login</code>.",
+    "DM @theorbitxmcpbot, type the access code you received from us, then <code>/login</code>.",
   ].join("\n");
 }
 
@@ -1317,8 +1318,8 @@ export function formatToolMenu(toolOrCmd) {
 export function formatHelpDesk(isPrivate = false, linked = false) {
   const gate = isPrivate
     ? linked
-      ? "Account linked. /trade /buy /orbitx /shop /launch are live in this DM."
-      : "/login binds THIS Telegram to YOUR wallet. Nobody else can trade for you."
+      ? "Account linked. /trade /buy /orbitx /shop /launch are live in this DM. /reset starts you as a fresh user."
+      : "/login binds THIS Telegram to YOUR wallet. /reset logs out and wipes access so you can start over."
     : "Groups stay public. Drop a CA or $ORBITX here. /trade /buy /tweet only in DM after /login.";
   const text = [
     "🚀 <b>OrbitX Desk</b> · @theorbitxmcpbot",

@@ -31,6 +31,8 @@ import {
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatToolMenu,
+  formatTokenProjectBriefHtml,
+  compactTokenBriefFacts,
   inferPublicTool,
   isOrbitXCommunityChat,
   isOrbitXCommunityMessage,
@@ -62,8 +64,10 @@ import {
   looksLikeSolanaTxRef,
   parseSolanaTxSignature,
   redeemEarlyAccessCode,
+  resetTelegramBotSession,
   resolveBurnPackageFromText,
   telegramDmUnlockState,
+  TELEGRAM_CODE_PROMPT_HTML,
   upsertTelegramBotAccess,
 } from "./orbitx/telegram-bot-access.js";
 import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/mcp-burn-access.js";
@@ -76,6 +80,7 @@ import {
   ORBITX_MINT,
 } from "./orbitx/orbitx-telegram-knowledge.js";
 import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
+import { fetchTokenProjectResearch } from "./orbitx/telegram-token-brief.js";
 import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
@@ -494,7 +499,7 @@ async function sendAccessStatus(chatId, from, extra = {}) {
   if (!status.active) {
     await sendLong(
       chatId,
-      "No access yet. Share <code>ORBITX BETA</code> on /start (first 25 get lifetime), or burn $ORBITX for timed access, then /verify the Solscan link.",
+      `No access yet. ${TELEGRAM_CODE_PROMPT_HTML} Or burn $ORBITX for timed access, then /verify the Solscan link.`,
       { parse_mode: "HTML", ...extra },
     );
     return status;
@@ -570,6 +575,30 @@ async function handleStartDm(chatId, from, link, extra, req) {
   );
 }
 
+async function handleReset(chatId, from, extra, req) {
+  const id = String(from?.id || "").trim();
+  if (!id) {
+    await sendLong(chatId, "Could not reset this chat.", extra);
+    return;
+  }
+  awaitingCode.delete(id);
+  pendingBurnPkg.delete(id);
+  const wiped = await resetTelegramBotSession(sb, id);
+  if (!wiped.ok && wiped.errors?.length) {
+    console.warn("[telegram-orbitx] reset", wiped.errors.join("; "));
+  }
+  awaitingCode.set(id, Date.now());
+  await sendLong(
+    chatId,
+    [
+      "<b>Reset.</b> This Telegram is a fresh user — wallet unlinked, access wiped, login codes cleared.",
+      "Type the access code you received from us, then <code>/login</code>.",
+    ].join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+  await handleStartDm(chatId, from, null, extra, req);
+}
+
 async function handleCode(chatId, text, { isGroup, from, link, extra, req }) {
   if (isGroup) {
     await sendLong(chatId, "Redeem codes in a private DM with @theorbitxmcpbot: /code YOURCODE", extra);
@@ -582,7 +611,7 @@ async function handleCode(chatId, text, { isGroup, from, link, extra, req }) {
     awaitingCode.set(String(from.id), Date.now());
     await sendLong(
       chatId,
-      "Paste <code>ORBITX BETA</code> here, or send <code>/code ORBITX BETA</code>. First 25 get lifetime MCP.",
+      TELEGRAM_CODE_PROMPT_HTML,
       { parse_mode: "HTML", ...extra },
     );
     return;
@@ -970,6 +999,60 @@ async function askAi(prompt, { linked }) {
   return nim.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /token /chart /img /check /links.";
 }
 
+function fallbackProjectBrief(facts, name, symbol) {
+  const lines = String(facts || "").split("\n");
+  const desc = lines.find((l) => l.startsWith("description ") && !l.includes("(none"));
+  const x = lines.find((l) => l.startsWith("x_mentions ") || l.startsWith("x_posts "));
+  const reddit = lines.find((l) => l.startsWith("reddit "));
+  const title = [name, symbol ? `$${symbol}` : ""].filter(Boolean).join(" ");
+  return [
+    title ? `${title} is a Solana token.` : "This is a Solana token.",
+    desc ? desc.replace(/^description /, "") : "Published metadata is thin — no project description on pump.fun / DexScreener.",
+    x ? `Social sample: ${x}` : reddit ? `Social sample: ${reddit}` : "No reliable X/reddit sample in this fetch.",
+    "Not a buy call. Send /token for the live market card.",
+  ].join(" ");
+}
+
+async function handleTokenProjectBrief(chatId, mint, { extra, linked } = {}) {
+  const ca = String(mint || "").trim();
+  if (!ca) {
+    await sendLong(chatId, "Need a mint. Try: tell me about <CA>", extra);
+    return;
+  }
+  await tg("sendChatAction", typingBody(chatId, extra));
+  let snapshot = null;
+  let research = null;
+  try {
+    snapshot = await raceTimeout(fetchTelegramTokenSnapshot(ca), 8_000);
+  } catch (error) {
+    console.warn("[telegram-orbitx] brief snapshot", error?.message || error);
+  }
+  try {
+    research = await raceTimeout(fetchTokenProjectResearch(ca, snapshot), 10_000);
+  } catch (error) {
+    console.warn("[telegram-orbitx] brief research", error?.message || error);
+  }
+  const facts = compactTokenBriefFacts({ mint: ca, snapshot, research });
+  const token = snapshot?.token && typeof snapshot.token === "object" ? snapshot.token : {};
+  const name = String(research?.meta?.name || token.name || "").trim();
+  const symbol = String(research?.meta?.symbol || token.symbol || "").trim();
+  const nim = await nvidiaChat({
+    system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\nPROJECT BRIEF MODE\nThe user asked what this project is — not for a /token market card.\nWrite 4–8 short Telegram sentences from the live facts only: what it claims to be, why it might be trending (use X/reddit if present), and obvious risks in the facts.\nDo not dump price/MC/holders tables. Do not invent team, listings, or catalysts. If metadata is thin, say so.\nNo code fences. Mention /token for the numbers card.`,
+    user: `User asked about this token.\nLinked DM: ${linked ? "yes" : "no"}\n${facts}`.slice(0, 7000),
+    model: process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL,
+    maxTokens: 700,
+    temperature: 0.35,
+  });
+  const summary =
+    nim.ok && nim.content
+      ? String(nim.content).replace(/```[\s\S]*?```/g, "").trim()
+      : fallbackProjectBrief(facts, name, symbol);
+  await sendLong(chatId, formatTokenProjectBriefHtml({ mint: ca, name, symbol, summary }), {
+    parse_mode: "HTML",
+    ...extra,
+  });
+}
+
 async function sendLinks(chatId, extra = {}) {
   await sendLong(
     chatId,
@@ -1148,17 +1231,13 @@ async function handleCallbackQuery(cq, req) {
     const chatType = String(cq?.message?.chat?.type || "");
     const isGroup = chatType === "group" || chatType === "supergroup";
     const link = from.id ? await loadLink(from.id) : null;
-    if (gate === "beta") {
-      await handleCode(chatId, "/code ORBITX BETA", { isGroup, from, link, extra, req });
+    if (gate === "beta" || gate === "code") {
+      awaitingCode.set(String(from.id), Date.now());
+      await sendLong(chatId, TELEGRAM_CODE_PROMPT_HTML, { parse_mode: "HTML", ...extra });
       return;
     }
-    if (gate === "code") {
-      awaitingCode.set(String(from.id), Date.now());
-      await sendLong(
-        chatId,
-        "Paste <code>ORBITX BETA</code> here, or send <code>/code ORBITX BETA</code>. First 25 supporters get lifetime MCP.",
-        { parse_mode: "HTML", ...extra },
-      );
+    if (gate === "reset") {
+      await handleReset(chatId, from, extra, req);
       return;
     }
     if (gate === "login") {
@@ -1331,6 +1410,15 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
+  if (bare === "reset") {
+    if (isGroup) {
+      await sendLong(chatId, "Reset is private. Message @theorbitxmcpbot and send /reset.", replyExtra);
+      return;
+    }
+    await handleReset(chatId, from, replyExtra, req);
+    return;
+  }
+
   if (bare === "logout") {
     if (isGroup) return;
     if (link) {
@@ -1433,6 +1521,10 @@ async function handleTelegramUpdate(update, req) {
     }
     if (inferred?.meta === "autobuy") {
       await handleAutoBuy(chatId, text, { isGroup, link, extra: { ...replyExtra, req } });
+      return;
+    }
+    if (inferred?.meta === "brief" && inferred.args?.mint) {
+      await handleTokenProjectBrief(chatId, inferred.args.mint, { extra: replyExtra, linked: Boolean(link) });
       return;
     }
     if (inferred?.tool) {
@@ -1760,7 +1852,7 @@ async function handleWeb(req, res, body) {
         chat_id: telegramUserId,
         text: accessOn
           ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch. /autobuy on for Phantom auto-prompt."
-          : "OrbitX linked. Share ORBITX BETA here to unlock the bot (first 25 get lifetime), or burn $ORBITX on /start.",
+          : "OrbitX linked. Type the access code you received from us to unlock the bot, or burn $ORBITX on /start. /reset starts over.",
         parse_mode: "HTML",
       });
     }

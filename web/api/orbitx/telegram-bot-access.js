@@ -9,10 +9,12 @@ import {
   resolvePackage,
 } from "./mcp-burn-access.js";
 
-/** Public supporter code shown on /start. Normalizes from "ORBITX BETA". */
+/** Secret supporter code. Never print this (or the spaced display form) in Telegram copy. */
 export const ORBITX_BETA_CODE = "ORBITXBETA";
 export const ORBITX_BETA_CODE_DISPLAY = "ORBITX BETA";
 export const ORBITX_BETA_MAX_USES = 25;
+export const TELEGRAM_CODE_PROMPT_HTML =
+  "Type the access code you received from us. Send it as a message, or <code>/code YOURCODE</code>.";
 /** ~100 years — telegram_bot_access.expires_at is NOT NULL, so lifetime is a far-future grant. */
 export const LIFETIME_SECONDS = Math.round(100 * 365.25 * 24 * 60 * 60);
 const LIFETIME_LABEL_MS = 50 * 365.25 * 24 * 60 * 60 * 1000;
@@ -283,6 +285,26 @@ export { parseSolanaTxSignature };
 
 export const BETA_ACCESS_BADGE = "beta access";
 
+/** Wipe link + access + unused login codes so this Telegram user is a fresh DM. */
+export async function resetTelegramBotSession(sb, telegramUserId) {
+  const id = String(telegramUserId || "").trim();
+  if (!id || typeof sb !== "function") return { ok: false, error: "invalid_user" };
+  const paths = [
+    `telegram_orbitx_links?telegram_user_id=eq.${encodeURIComponent(id)}`,
+    `telegram_bot_access?telegram_user_id=eq.${encodeURIComponent(id)}`,
+    `telegram_orbitx_login_codes?telegram_user_id=eq.${encodeURIComponent(id)}`,
+  ];
+  const errors = [];
+  for (const path of paths) {
+    try {
+      await sb(path, { method: "DELETE" });
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 export function telegramDmUnlockState(accessRow, link, now = Date.now()) {
   const access = accessStatusFromRow(accessRow, now);
   const linked = Boolean(link?.user_id);
@@ -302,7 +324,7 @@ export function isAllowedGatedDmCommand(bare, text = "") {
     .replace(/^\//, "")
     .toLowerCase()
     .replace(/@.*$/, "");
-  if (["start", "code", "burn", "verify", "login", "auth", "access", "logout"].includes(cmd)) return true;
+  if (["start", "code", "burn", "verify", "login", "auth", "access", "logout", "reset"].includes(cmd)) return true;
   if (cmd === "shop" && resolveBurnPackageFromText(text)) return true;
   return false;
 }
