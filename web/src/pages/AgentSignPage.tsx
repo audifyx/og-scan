@@ -13,6 +13,13 @@ import {
 } from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import { detectMobileWallet, getPhantomDeepLink } from "@/lib/mobile-wallet";
+import {
+  clearStoredJupiterWallet,
+  fetchTimeoutSignal,
+  isJupiterAdapterName,
+  pickPhantomWallet,
+  sortAgentSignWallets,
+} from "@/lib/orbitx/agentSignWallets";
 
 type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access" | "shop";
 
@@ -60,23 +67,22 @@ function dropAutoQuery(): void {
 }
 
 /**
- * MCP handoff — rebuild unsigned tx (trade / credits / claim / burn / rent), sign in Jupiter.
+ * MCP / Telegram handoff — rebuild unsigned tx and sign in Phantom.
  * Query: kind, action, mint, amount, percent, publicKey, slippage, pool, auto
+ * Auto-sign never connects Jupiter (that loads jup.ag/mobile and never finishes).
  */
 export default function AgentSignPage() {
   const [params] = useSearchParams();
   const { connection } = useConnection();
   const { publicKey, signTransaction, sendTransaction, connected, wallet: adapterWallet } = useWallet();
-  const { pickable, signInWith, busy } = useWalletSignIn();
+  const { pickable, signInWith, busy, disconnect } = useWalletSignIn();
+  const walletName = adapterWallet?.adapter?.name ?? null;
   const walletCaps = {
     sendTransaction: sendTransaction ?? undefined,
     signTransaction: signTransaction ?? undefined,
-    walletName: adapterWallet?.adapter?.name ?? null,
+    walletName,
+    preferPhantom: true,
   };
-  const connectWallets = [...pickable].sort((a, b) => {
-    const rank = (n: string) => (/jupiter/i.test(n) ? 0 : /phantom/i.test(n) ? 2 : 1);
-    return rank(a.name) - rank(b.name);
-  });
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();
   const kind: Kind =
@@ -108,6 +114,8 @@ export default function AgentSignPage() {
     params.get("auto") === "1" ||
     params.get("auto") === "true" ||
     params.get("autoconfirm") === "1";
+  const connectWallets = sortAgentSignWallets(pickable, autoPrompt);
+  const jupiterSelected = isJupiterAdapterName(walletName);
 
   const [busyTrade, setBusyTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +124,7 @@ export default function AgentSignPage() {
   const autoStarted = useRef(false);
   const autoConnectStarted = useRef(false);
   const phantomRedirected = useRef(false);
+  const droppedJupiter = useRef(false);
 
   const wallet = publicKey?.toBase58() || "";
   const walletMismatch = Boolean(expectedWallet && wallet && expectedWallet !== wallet);
@@ -126,7 +135,7 @@ export default function AgentSignPage() {
       const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
-    if (kind === "shop") return sku ? `Desk shop ${sku} — Jupiter buy $ORBITX + burn` : "Desk shop buy & burn";
+    if (kind === "shop") return sku ? `Desk shop ${sku} — buy $ORBITX + burn` : "Desk shop buy & burn";
     if (kind === "mcp-access") {
       const tokens = packageId === "week" ? 1000 : 100;
       const label = packageId === "week" ? "1 week" : "1 day";
@@ -170,9 +179,10 @@ export default function AgentSignPage() {
                 ? "Buy & burn"
                 : action.toUpperCase();
 
+  const sendOpts = { skipPreflight: true as const };
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
-    return sendWalletTransaction(connection, walletCaps, tx);
+    return sendWalletTransaction(connection, walletCaps, tx, sendOpts);
   };
 
   const onSign = async () => {
@@ -185,6 +195,10 @@ export default function AgentSignPage() {
     }
     if (!connected || !publicKey) {
       setError("Connect Phantom first.");
+      return;
+    }
+    if (isJupiterAdapterName(walletName)) {
+      setError("Switching to Phantom — Auto-sign does not use Jupiter.");
       return;
     }
     if (walletMismatch) {
@@ -217,7 +231,7 @@ export default function AgentSignPage() {
             lamports,
           }),
         );
-        const sig = await sendWalletTransaction(connection, walletCaps, tx);
+        const sig = await sendWalletTransaction(connection, walletCaps, tx, sendOpts);
         await confirmSentTransaction(connection, sig, { blockhash, lastValidBlockHeight });
         finish(sig);
 
@@ -272,7 +286,7 @@ export default function AgentSignPage() {
             amountRaw: String(data.amountRaw),
             closesAccount: Boolean(data.closesAccount),
           });
-          sig = await sendWalletTransaction(connection, walletCaps, tx);
+          sig = await sendWalletTransaction(connection, walletCaps, tx, sendOpts);
         } else {
           throw new Error(data?.message || "Could not build access burn");
         }
@@ -337,6 +351,7 @@ export default function AgentSignPage() {
         const res = await fetch("/api/ogdex/trade", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: fetchTimeoutSignal(20_000),
           body: JSON.stringify({
             publicKey: pk,
             action,
@@ -408,11 +423,21 @@ export default function AgentSignPage() {
       const msg = e instanceof Error ? e.message : "Sign failed";
       if (readLock(lockKey) === "pending") writeLock(lockKey, "");
       autoStarted.current = false;
-      setError(/base58/i.test(msg) ? "Swap sent. Refresh this page — the signature is confirming on-chain." : msg);
+      const timedOut = /aborted|timeout|timed out/i.test(msg) || (e instanceof DOMException && e.name === "AbortError");
+      if (timedOut) {
+        setError("Quote timed out. Tap Sign & send to retry — stay in Phantom.");
+      } else {
+        setError(/base58/i.test(msg) ? "Swap sent. Refresh this page — the signature is confirming on-chain." : msg);
+      }
     } finally {
       setBusyTrade(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoPrompt) return;
+    clearStoredJupiterWallet();
+  }, [autoPrompt]);
 
   useEffect(() => {
     if (!autoPrompt || !valid || signature) return;
@@ -430,31 +455,42 @@ export default function AgentSignPage() {
   }, [autoPrompt, valid, signature]);
 
   useEffect(() => {
-    if (!autoPrompt || connected || autoConnectStarted.current || signature) return;
+    if (!autoPrompt || signature || !jupiterSelected || droppedJupiter.current) return;
+    droppedJupiter.current = true;
+    autoConnectStarted.current = false;
+    autoStarted.current = false;
+    void disconnect().catch(() => {
+      /* switch to Phantom next tick */
+    });
+  }, [autoPrompt, jupiterSelected, disconnect, signature]);
+
+  useEffect(() => {
+    if (!autoPrompt || connected || autoConnectStarted.current || signature || jupiterSelected) return;
     const info = detectMobileWallet();
     if (info.isMobile && !info.isPhantomBrowser) return;
-    const phantom = connectWallets.find((w) => /phantom/i.test(w.name)) || connectWallets[0];
+    const phantom = pickPhantomWallet(connectWallets);
     if (!phantom) return;
     autoConnectStarted.current = true;
     void signInWith(phantom.name, { connectOnly: true }).catch((e) => {
+      autoConnectStarted.current = false;
       setError(e instanceof Error ? e.message : "Connect Phantom to auto-sign");
     });
-  }, [autoPrompt, connected, connectWallets, signInWith, signature]);
+  }, [autoPrompt, connected, connectWallets, signInWith, signature, jupiterSelected]);
 
   useEffect(() => {
-    if (!autoPrompt || !valid || !connected || !wallet || walletMismatch || signature) return;
+    if (!autoPrompt || !valid || !connected || !wallet || walletMismatch || signature || jupiterSelected) return;
     const lockKey = autoSignLockKey([kind, action, mint, amountRaw, percentRaw, sku, packageId, wallet]);
     if (readLock(lockKey) === "done") return;
     const t = window.setTimeout(() => {
       if (autoStarted.current) return;
-      if (readLock(lockKey) === "pending" || readLock(lockKey) === "done") return;
+      if (readLock(lockKey) === "done") return;
       autoStarted.current = true;
       writeLock(lockKey, "pending");
       void onSign();
     }, 500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPrompt, valid, connected, wallet, walletMismatch, signature, kind, action, mint, amountRaw, percentRaw, sku, packageId]);
+  }, [autoPrompt, valid, connected, wallet, walletMismatch, signature, jupiterSelected, kind, action, mint, amountRaw, percentRaw, sku, packageId]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#070a10] p-4 text-white">

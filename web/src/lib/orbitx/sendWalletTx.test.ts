@@ -68,12 +68,22 @@ describe("shouldUseJupiterInject", () => {
     expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
   });
 
-  it("uses Jupiter when the fee payer is the Jupiter inject (not Phantom)", () => {
+  it("never hijacks Phantom — even if Jupiter inject shares the same pubkey", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
     vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
-    expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(true);
+    expect(shouldUseJupiterInject({ walletName: "Phantom" }, OWNER)).toBe(false);
+    expect(shouldUseJupiterInject({ walletName: "Phantom Wallet" }, OWNER)).toBe(false);
+    expect(shouldUseJupiterInject({ preferPhantom: true, walletName: "Jupiter" }, OWNER)).toBe(false);
+  });
+
+  it("uses Jupiter when the fee payer is the Jupiter inject and the adapter is not Phantom", () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    expect(shouldUseJupiterInject({ walletName: "Solflare" }, OWNER)).toBe(true);
   });
 
   it("does not steal Phantom sends when Jupiter is a different key", () => {
@@ -130,7 +140,25 @@ describe("sendWalletTransaction", () => {
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
   });
 
-  it("converts Phantom base64 sendTransaction signatures to base58", async () => {
+  it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_SHOULD_NOT_RUN");
+    const sendTransaction = vi.fn().mockResolvedValue("PHANTOM_SIG");
+    const { tx } = unsignedTransfer();
+    const sig = await sendWalletTransaction(
+      { sendRawTransaction: vi.fn() } as never,
+      { walletName: "Phantom", preferPhantom: true, sendTransaction },
+      tx,
+    );
+    expect(sig).toBe("PHANTOM_SIG");
+    expect(jupiterSignAndSendTransaction).not.toHaveBeenCalled();
+    expect(sendTransaction).toHaveBeenCalled();
+  });
+
+  it("normalizes Phantom base64 sendTransaction results to base58", async () => {
     const bytes = new Uint8Array(64).fill(9);
     const b64 = btoa(String.fromCharCode(...bytes));
     const sendTransaction = vi.fn().mockResolvedValue(b64);

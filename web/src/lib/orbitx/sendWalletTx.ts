@@ -33,6 +33,8 @@ export type WalletSendCaps = {
   walletName?: string | null;
   /** Force the Jupiter inject even when the adapter name is missing. */
   preferJupiter?: boolean;
+  /** Sign page / Telegram auto-buy: never hijack Phantom sends into Jupiter. */
+  preferPhantom?: boolean;
 };
 
 export type WalletSendOptions = {
@@ -77,11 +79,17 @@ export function serializeSigned(signed: Transaction | VersionedTransaction): Uin
   return signed.serialize();
 }
 
+export function isPhantomWalletName(name?: string | null): boolean {
+  return Boolean(name && /phantom/i.test(name));
+}
+
 export function shouldUseJupiterInject(
-  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter">,
+  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter" | "preferPhantom">,
   feePayer?: string | null,
 ): boolean {
   if (!getJupiterProvider()?.signAndSendTransaction) return false;
+  if (wallet.preferPhantom) return false;
+  if (isPhantomWalletName(wallet.walletName)) return false;
   if (wallet.preferJupiter) return true;
   if (isJupiterWalletName(wallet.walletName)) return true;
   const jupiterPk = jupiterProviderPublicKey();
