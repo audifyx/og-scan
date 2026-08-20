@@ -12,6 +12,7 @@ import {
   formatOrbitXTelegramResult,
   formatTelegramStartGate,
   formatTelegramGroupLockHtml,
+  formatTelegramLockedChatHtml,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
@@ -168,6 +169,12 @@ describe("official OrbitX Telegram bot", () => {
     expect(formatTelegramGroupLockHtml()).not.toContain("ORBITX BETA");
     expect(OFFICIAL_BOT_ABOUT).toContain("invite code");
     expect(OFFICIAL_BOT_ABOUT).not.toContain("ORBITX BETA");
+    const lockedChat = formatTelegramLockedChatHtml();
+    expect(lockedChat).toContain("Casual chat does not unlock access");
+    expect(lockedChat).toContain("/start");
+    expect(lockedChat).not.toContain("ORBITX BETA");
+    expect(lockedChat).not.toContain("ORBITXBETA");
+    expect(lockedChat).not.toMatch(/Redeem/i);
     const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true, unlocked: true });
     expect(linked.text).toContain("lifetime");
     expect(linked.text).not.toContain("Burns need");
@@ -698,6 +705,14 @@ describe("official OrbitX Telegram bot", () => {
     expect(welcome.text).not.toMatch(/share the access code/i);
     expect(JSON.stringify(welcome.reply_markup)).toContain("Send invite code");
     expect(JSON.stringify(welcome.reply_markup)).not.toMatch(/Redeem/i);
+    expect(api).toContain("formatTelegramLockedChatHtml");
+    const rejectFn = api.slice(
+      api.indexOf("async function rejectLockedSender"),
+      api.indexOf("async function promptLoginAfterCode"),
+    );
+    expect(rejectFn).toContain("formatTelegramLockedChatHtml");
+    expect(rejectFn).not.toContain("handleStartDm");
+    expect(api).toContain("await sendLong(chatId, formatTelegramLockedChatHtml()");
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");

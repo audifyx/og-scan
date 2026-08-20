@@ -28,6 +28,7 @@ import {
   formatHelpDesk,
   formatTelegramStartGate,
   formatTelegramGroupLockHtml,
+  formatTelegramLockedChatHtml,
   INVITE_CODE_PROMPT_HTML,
   formatMediaCountdown,
   formatOrbitXFaqHtml,
@@ -516,19 +517,12 @@ async function senderGate(from, link) {
   return telegramDmUnlockState(row, link);
 }
 
-async function rejectLockedSender(chatId, from, link, extra, req, isGroup) {
+async function rejectLockedSender(chatId, _from, _link, extra, _req, isGroup) {
   if (isGroup) {
     await sendLong(chatId, formatTelegramGroupLockHtml(), { parse_mode: "HTML", ...extra });
-    if (from?.id && String(from.id) !== String(chatId)) {
-      try {
-        await handleStartDm(from.id, from, link, {}, req);
-      } catch {
-        /* user may not have started the bot yet */
-      }
-    }
     return;
   }
-  await handleStartDm(chatId, from, link, extra, req);
+  await sendLong(chatId, formatTelegramLockedChatHtml(), { parse_mode: "HTML", ...extra });
 }
 
 async function promptLoginAfterCode(chatId, from, extra, req) {
@@ -558,7 +552,6 @@ async function handleStartDm(chatId, from, link, extra, req) {
     await promptLoginAfterCode(chatId, from, extra, req);
     return;
   }
-  if (gate.needsCode) awaitingCode.set(String(from?.id || ""), Date.now());
   await sendCard(
     chatId,
     formatTelegramStartGate({
@@ -1249,7 +1242,8 @@ async function handleTelegramUpdate(update, req) {
       await handleCode(chatId, `/code ${text.trim()}`, { isGroup, from, link, extra: replyExtra, req });
       return;
     }
-    awaitingCode.delete(String(from.id));
+    await sendLong(chatId, INVITE_CODE_PROMPT_HTML, { parse_mode: "HTML", ...replyExtra });
+    return;
   }
 
   if (!isGroup && looksLikeSolanaTxRef(text) && !text.toLowerCase().startsWith("/token")) {
@@ -1272,8 +1266,7 @@ async function handleTelegramUpdate(update, req) {
     }
     if (!isPublicGroupTrigger(text, msg) && bare !== "start") return;
   } else if (!gate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
-    awaitingCode.set(String(from.id), Date.now());
-    await handleStartDm(chatId, from, link, replyExtra, req);
+    await sendLong(chatId, formatTelegramLockedChatHtml(), { parse_mode: "HTML", ...replyExtra });
     return;
   }
 

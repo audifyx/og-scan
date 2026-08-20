@@ -431,6 +431,15 @@ export function formatTelegramGroupLockHtml() {
   ].join("\n");
 }
 
+/** Locked DM chatter (e.g. "hey") — short lock, no redeem button, no desk. */
+export function formatTelegramLockedChatHtml() {
+  return [
+    "This bot is <b>locked</b>.",
+    "Casual chat does not unlock access.",
+    "Send <code>/start</code> for timed burns, or paste the invite code, then <code>/login</code>.",
+  ].join("\n");
+}
+
 function familyKeyboard(family) {
   return inlineKeyboard([
     [
