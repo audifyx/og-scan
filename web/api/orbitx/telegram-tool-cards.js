@@ -889,6 +889,7 @@ const TRADE_ERR = new Set([
   "no_pending_buy",
   "mint_required",
   "token_hold_required",
+  "no balance to sell",
 ]);
 
 function isTradeLike(data, tool) {
@@ -999,6 +1000,23 @@ function formatTradeDeskCard(data, tool) {
     };
   }
 
+  if (err === "no balance to sell" || /no balance to sell/.test(err)) {
+    return {
+      text: [
+        "🔴 <b>ORBITX · Nothing to sell in this wallet</b>",
+        "The linked wallet holds 0 of that token. Open Sign and switch to the wallet that holds it — then approve.",
+        mint ? `<code>${tgEsc(mint)}</code>` : "",
+        [sign ? href(sign, "Sign") : "", href(solscanToken, "Solscan"), href(dex, "OrbitX DEX")].filter(Boolean).join(" · "),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      reply_markup: inlineKeyboard([
+        [sign ? { text: "Sign", url: sign } : null, { text: "Solscan", url: solscanToken }].filter(Boolean),
+        [{ text: "OrbitX DEX", url: dex }, { text: "⌂ Desk", callback_data: "ox:desk" }],
+      ]),
+    };
+  }
+
   if (
     data.ok === false &&
     !sign &&
@@ -1061,6 +1079,8 @@ function formatTradeDeskCard(data, tool) {
     text: [
       title,
       amtLine,
+      data.message ? `<i>${tgEsc(String(data.message).slice(0, 280))}</i>` : "",
+      data.warning && data.warning !== data.message ? `<i>${tgEsc(String(data.warning).slice(0, 180))}</i>` : "",
       wallet ? `Wallet <code>${tgEsc(wallet)}</code>` : "",
       data.outAmount ? `Est. out ${tgEsc(String(data.outAmount))} $ORBITX` : "",
       mint ? `<code>${tgEsc(mint)}</code>` : "",

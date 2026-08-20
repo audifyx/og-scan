@@ -21,6 +21,7 @@ import {
   fetchTimeoutSignal,
   isJupiterAdapterName,
   isTelegramWebView,
+  parseAgentSignTradeAmount,
   pickAutoSignWallet,
   sortAgentSignWallets,
 } from "@/lib/orbitx/agentSignWallets";
@@ -348,9 +349,11 @@ export default function AgentSignPage() {
       }
 
       if (kind === "trade") {
-        const amount =
-          action === "sell" && amountRaw.endsWith("%") ? amountRaw : Number(amountRaw);
+        const amount = parseAgentSignTradeAmount(action, amountRaw);
         if (typeof amount === "number" && (!Number.isFinite(amount) || amount <= 0)) {
+          throw new Error("Invalid amount");
+        }
+        if (typeof amount === "string" && !amount) {
           throw new Error("Invalid amount");
         }
         const res = await fetch("/api/ogdex/trade", {
@@ -370,7 +373,11 @@ export default function AgentSignPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok || !data?.tx) {
-          throw new Error(data?.error || "Could not build trade transaction");
+          const why = String(data?.error || "Could not build trade transaction");
+          if (/no balance to sell/i.test(why)) {
+            throw new Error("This wallet holds 0 of that token. Switch to the wallet that holds it, then Sign.");
+          }
+          throw new Error(why);
         }
         // Separate desk-fee tx when the API could not embed the SOL transfer
         if (typeof data.feeTx === "string" && data.feeTx.length > 0) {

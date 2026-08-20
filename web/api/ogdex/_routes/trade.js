@@ -19,6 +19,7 @@ const isPubkey = (v) => typeof v === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 const PLATFORM_FEE_BPS = 95;
 const PLATFORM_FEE_ENABLED = true;
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 async function deriveFeeAccount(mint) {
@@ -130,25 +131,48 @@ async function simulate(txB64) {
 }
 
 async function tokenBalance(owner, mint) {
-  try {
-    const res = await rpc("getTokenAccountsByOwner", [
-      owner,
-      { mint },
-      { encoding: "jsonParsed" },
-    ]);
-    let raw = 0n;
-    let decimals = 0;
-    for (const a of res?.value || []) {
-      const ta = a.account?.data?.parsed?.info?.tokenAmount;
-      if (ta) {
-        raw += BigInt(ta.amount || "0");
-        decimals = Number(ta.decimals) || decimals;
+  const filters = [{ mint }, { programId: TOKEN_PROGRAM_ID }, { programId: TOKEN_2022_PROGRAM_ID }];
+  let raw = 0n;
+  let decimals = 0;
+  let queried = false;
+  for (const filter of filters) {
+    try {
+      const res = await rpc("getTokenAccountsByOwner", [owner, filter, { encoding: "jsonParsed" }]);
+      queried = true;
+      for (const a of res?.value || []) {
+        const info = a.account?.data?.parsed?.info;
+        if (!info) continue;
+        if (info.mint && info.mint !== mint) continue;
+        const ta = info.tokenAmount;
+        if (ta) {
+          raw += BigInt(ta.amount || "0");
+          decimals = Number(ta.decimals) || decimals;
+        }
       }
+      if (filter.mint && raw > 0n) break;
+    } catch {
+      /* try the next program / mint filter */
     }
-    return { raw, decimals };
-  } catch {
-    return { raw: 0n, decimals: 0 };
   }
+  return { raw, decimals, queried };
+}
+
+export function normalizeSellAmount(raw) {
+  const t = String(raw ?? "").trim();
+  if (!t) return raw;
+  let s = t;
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+    s = t.replace(/%25/gi, "%");
+  }
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%+/);
+  if (pct) return `${pct[1]}%`;
+  if (/%/.test(t)) {
+    const n = s.match(/^(\d+(?:\.\d+)?)/);
+    if (n) return `${n[1]}%`;
+  }
+  return s;
 }
 
 async function pumpPortalTx({ publicKey, action, mint, amt, denominatedInSol, slippage, priorityFee, pool }) {
@@ -216,15 +240,17 @@ async function jupiterTx({
       } else {
         inputMint = mint;
         outputMint = SOL;
-        const { raw, decimals } = await tokenBalance(publicKey, mint);
+        const { raw, decimals, queried } = await tokenBalance(publicKey, mint);
+        if (!queried) return { error: "could not read token balance" };
         if (raw <= 0n) return { error: "no balance to sell" };
-        if (typeof amt === "string" && amt.endsWith("%")) {
-          amount = Number((raw * BigInt(Math.round(Number(amt.slice(0, -1)))) / 100n).toString());
+        const sellAmt = normalizeSellAmount(amt);
+        if (typeof sellAmt === "string" && String(sellAmt).endsWith("%")) {
+          amount = (raw * BigInt(Math.round(Number(String(sellAmt).slice(0, -1)))) / 100n).toString();
         } else {
-          amount = Math.floor(Number(amt) * 10 ** decimals);
+          amount = Math.floor(Number(sellAmt) * 10 ** decimals).toString();
         }
       }
-      if (!amount || amount <= 0) return { error: "invalid amount" };
+      if (!amount || amount === "0") return { error: "invalid amount" };
       const feeQs =
         PLATFORM_FEE_ENABLED && withPlatformFee ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : "";
       q = await jup(
@@ -328,8 +354,8 @@ export async function buildUnsignedTrade(body = {}) {
   if (!isPubkey(mint)) return { ok: false, error: "invalid mint" };
 
   let amt;
-  const rawAmt = typeof body.amount === "string" ? body.amount.trim() : body.amount;
-  if (action === "sell" && typeof rawAmt === "string" && rawAmt.endsWith("%")) {
+  const rawAmt = normalizeSellAmount(typeof body.amount === "string" ? body.amount.trim() : body.amount);
+  if (action === "sell" && typeof rawAmt === "string" && String(rawAmt).endsWith("%")) {
     const pct = Number(rawAmt.slice(0, -1));
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
       return { ok: false, error: "invalid sell percentage" };

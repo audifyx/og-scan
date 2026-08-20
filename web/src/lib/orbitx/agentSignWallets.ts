@@ -17,6 +17,27 @@ export function rankAgentSignWallet(name: string): number {
   return 1;
 }
 
+/** Sell amounts are "50%" / "100%". URL encoding can leave "100%25". */
+export function parseAgentSignTradeAmount(action: string, raw: string): string | number {
+  const t = String(raw || "").trim();
+  if (action === "sell") {
+    let s = t;
+    try {
+      s = decodeURIComponent(s);
+    } catch {
+      s = t.replace(/%25/gi, "%");
+    }
+    const pct = s.match(/^(\d+(?:\.\d+)?)\s*%+/);
+    if (pct) return `${pct[1]}%`;
+    if (/%/.test(t)) {
+      const n = s.match(/^(\d+(?:\.\d+)?)/);
+      if (n) return `${n[1]}%`;
+    }
+  }
+  const n = Number(t);
+  return n;
+}
+
 export function pickJupiterWallet<T extends { name: string }>(wallets: readonly T[]): T | null {
   return wallets.find((w) => isJupiterAdapterName(w.name)) ?? null;
 }

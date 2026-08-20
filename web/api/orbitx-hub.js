@@ -3787,23 +3787,6 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       pool,
       platformFee: true,
     };
-    const data = await fetchJson(`${base}/api/ogdex/trade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!data?.ok || !data?.tx) {
-      return {
-        ok: false,
-        status: "prepare_failed",
-        requiresSignature: false,
-        error: data?.error || "Could not build trade",
-        action,
-        wallet,
-        mint,
-        amount,
-      };
-    }
     const signQs = new URLSearchParams({
       action,
       mint,
@@ -3816,6 +3799,51 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const autoQs = new URLSearchParams(signQs);
     autoQs.set("auto", "1");
     const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
+    let data = null;
+    try {
+      data = await fetchJson(`${base}/api/ogdex/trade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      data = { ok: false, error: error?.message || "Could not build trade" };
+    }
+    if (!data?.ok || !data?.tx) {
+      if (action === "sell") {
+        return {
+          ok: true,
+          status: "awaiting_jupiter_signature",
+          requiresSignature: true,
+          confirmMode: "sign",
+          signUrl,
+          autoSignUrl,
+          openUrl: signUrl,
+          action,
+          wallet,
+          mint,
+          amount,
+          slippage,
+          pool,
+          warning: data?.error || "Quote will refresh on the sign page",
+          message: data?.error === "no balance to sell"
+            ? "This linked wallet may hold 0 of that token. Open Sign and switch to the wallet that holds it."
+            : data?.error || "Open Sign — the quote is built in your browser wallet.",
+          solscanToken: mint ? `https://solscan.io/token/${encodeURIComponent(mint)}` : null,
+          solscanAccount: wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : null,
+        };
+      }
+      return {
+        ok: false,
+        status: "prepare_failed",
+        requiresSignature: false,
+        error: data?.error || "Could not build trade",
+        action,
+        wallet,
+        mint,
+        amount,
+      };
+    }
     if (action === "buy" && auth?.userId) {
       try {
         await saveTradeIntent(sb, auth.userId, {

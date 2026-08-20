@@ -7,6 +7,7 @@ import {
   pickAutoSignWallet,
   pickJupiterWallet,
   pickPhantomWallet,
+  parseAgentSignTradeAmount,
   rankAgentSignWallet,
   shouldClearStoredPhantom,
   shouldSkipWalletAutoConnect,
@@ -15,6 +16,12 @@ import {
 } from "./agentSignWallets";
 
 describe("agentSignWallets", () => {
+  it("parses sell percents even when the URL double-encodes %", () => {
+    expect(parseAgentSignTradeAmount("sell", "100%")).toBe("100%");
+    expect(parseAgentSignTradeAmount("sell", "100%25")).toBe("100%");
+    expect(parseAgentSignTradeAmount("sell", "50%")).toBe("50%");
+    expect(parseAgentSignTradeAmount("buy", "0.05")).toBe(0.05);
+  });
   it("ranks Jupiter first and Phantom last so auto-connect never prefers Phantom", () => {
     expect(rankAgentSignWallet("Jupiter")).toBeLessThan(rankAgentSignWallet("Solflare"));
     expect(rankAgentSignWallet("Solflare")).toBeLessThan(rankAgentSignWallet("Phantom"));

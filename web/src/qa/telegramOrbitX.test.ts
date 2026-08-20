@@ -666,6 +666,23 @@ describe("official OrbitX Telegram bot", () => {
     expect(signSell).not.toContain("Sign to buy");
     expect(signSell).toContain("/agent/sign?action=sell");
 
+    const noBal = cardText(
+      formatOrbitXTelegramResult(
+        {
+          ok: false,
+          error: "no balance to sell",
+          action: "sell",
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          amount: "100%",
+          signUrl: "https://www.orbitx.world/agent/sign?action=sell&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=100%25",
+        },
+        "orbitx_prepare_sell",
+      ),
+    );
+    expect(noBal).toContain("Nothing to sell");
+    expect(noBal).toContain("Sign");
+    expect(noBal).not.toContain("Couldn't build the swap");
+
     const tick = cardText(
       formatMediaCountdown({
         kind: "video",
