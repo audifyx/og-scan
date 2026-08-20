@@ -680,16 +680,24 @@ describe("official OrbitX Telegram bot", () => {
       expect(tokenPattern.test(text), file).toBe(false);
     }
     const api = readFileSync(resolve(WEB, "api/telegram-orbitx.js"), "utf8");
-    expect(api).not.toContain("ORBITX BETA");
-    expect(api).not.toContain("ORBITXBETA");
     expect(api).toContain("INVITE_CODE_PROMPT_HTML");
     expect(api).toContain('gate === "beta" || gate === "code"');
-    const cards = readFileSync(resolve(WEB, "api/orbitx/telegram-tool-cards.js"), "utf8");
-    expect(cards).not.toContain("ORBITX BETA");
-    expect(cards).not.toContain("ORBITXBETA");
-    const lib = readFileSync(resolve(WEB, "api/orbitx/telegram-orbitx-lib.js"), "utf8");
-    expect(lib).not.toContain("ORBITX BETA");
-    expect(lib).not.toContain("ORBITXBETA");
+    for (const rel of [
+      "api/telegram-orbitx.js",
+      "api/orbitx/telegram-tool-cards.js",
+      "api/orbitx/telegram-orbitx-lib.js",
+      "api/orbitx/orbitx-faq-training.js",
+      "api/orbitx/orbitx-telegram-knowledge.js",
+    ]) {
+      const text = readFileSync(resolve(WEB, rel), "utf8");
+      expect(text, rel).not.toContain("ORBITX BETA");
+      expect(text, rel).not.toContain("ORBITXBETA");
+    }
+    const welcome = formatTelegramStartGate({ remainingLabel: "", linked: false });
+    expect(welcome.text).toContain("Send the <b>invite code</b>");
+    expect(welcome.text).not.toMatch(/share the access code/i);
+    expect(JSON.stringify(welcome.reply_markup)).toContain("Send invite code");
+    expect(JSON.stringify(welcome.reply_markup)).not.toMatch(/Redeem/i);
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
