@@ -21,6 +21,7 @@ import {
   formatHelpDesk,
   formatTelegramStartGate,
   formatTelegramGroupLockHtml,
+  INVITE_CODE_PROMPT_HTML,
   formatMediaCountdown,
   formatOrbitXTelegramResult as formatResultImpl,
   formatTokenCard as formatTokenCardImpl,
@@ -35,7 +36,7 @@ export const OFFICIAL_BOT_NAME = "OrbitX";
 export const OFFICIAL_BOT_SHORT =
   "Official OrbitX bot — charts, scans, Grok image/video, and (in DMs) trade, X, and your account.";
 export const OFFICIAL_BOT_ABOUT =
-  "OrbitX's official Telegram bot. Locked until you DM it, share ORBITX BETA, then /login. After that: token intel, Dex charts, Grok, and (in DMs) trade. Not an MCP connector — tools run natively on OrbitX.";
+  "OrbitX's official Telegram bot. Locked until you DM it, send the invite code, then /login. After that: token intel, Dex charts, Grok, and (in DMs) trade. Not an MCP connector — tools run natively on OrbitX.";
 
 const GROUP_ANON = "groupanonymousbot";
 
@@ -103,7 +104,7 @@ export function telegramChatExtras(msg) {
 export function formatGroupWelcomeHtml() {
   return [
     "🚀 <b>OrbitX is in this group</b>",
-    "This bot is locked. Each person DMs @theorbitxmcpbot, shares <code>ORBITX BETA</code>, then <code>/login</code>.",
+    "This bot is locked. Each person DMs @theorbitxmcpbot, sends the invite code, then <code>/login</code>.",
     "After that, drop a CA or /token /chart /scan here.",
   ].join("\n");
 }
@@ -507,6 +508,7 @@ export {
   formatHelpDesk,
   formatTelegramStartGate,
   formatTelegramGroupLockHtml,
+  INVITE_CODE_PROMPT_HTML,
   formatMediaCountdown,
   formatToolMenu,
   missingToolInput,

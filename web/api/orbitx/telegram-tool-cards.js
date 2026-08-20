@@ -373,10 +373,12 @@ export function deskKeyboard() {
   ]);
 }
 
+export const INVITE_CODE_PROMPT_HTML =
+  "Send the <b>invite code</b> here, or send <code>/code YOURCODE</code>. First 25 supporters get lifetime MCP.";
+
 export function startGateKeyboard({ unlocked = false } = {}) {
   const rows = [
-    [{ text: "Redeem ORBITX BETA", callback_data: "ox:gate:beta" }],
-    [{ text: "I have a code", callback_data: "ox:gate:code" }],
+    [{ text: "Send invite code", callback_data: "ox:gate:code" }],
     [
       { text: "Burn 1 hour · 100", callback_data: "ox:gate:hour" },
       { text: "Burn 1 day · 1k", callback_data: "ox:gate:day" },
@@ -400,9 +402,9 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false, u
   const text = [
     "Welcome to the <b>OrbitX MCP bot</b> on Telegram.",
     "",
-    "Please share the access code <code>ORBITX BETA</code> to gain <b>lifetime MCP</b> access — an early thank you to our supporters. Only the <b>first 25</b> get in.",
+    "Send the <b>invite code</b> to gain <b>lifetime MCP</b> access — an early thank you to our supporters. Only the <b>first 25</b> get in.",
     "",
-    "This bot is locked. It does not reply until you share the code, then <code>/login</code>.",
+    "This bot is locked. It does not reply until you send the invite code, then <code>/login</code>.",
     "",
     "Or you can burn now and get timed access:",
     "",
@@ -411,7 +413,7 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false, u
     "• <b>1 week</b> — 10,000 $ORBITX",
     "• <b>1 month</b> — 1,000,000 $ORBITX",
     "",
-    "Tap <b>Redeem ORBITX BETA</b>, send <code>/code ORBITX BETA</code>, or tap a burn. After a burn, copy the Solscan link and send <code>/verify</code> plus that link.",
+    "Tap <b>Send invite code</b>, paste the code, or send <code>/code YOURCODE</code>. After a burn, copy the Solscan link and send <code>/verify</code> plus that link.",
     linked ? "" : "Burns need <code>/login</code> first so the tx is YOUR wallet.",
     accessLine,
     "",
@@ -425,7 +427,7 @@ export function formatTelegramStartGate({ remainingLabel = "", linked = false, u
 export function formatTelegramGroupLockHtml() {
   return [
     "This bot is <b>locked</b>.",
-    "DM @theorbitxmcpbot and share <code>ORBITX BETA</code> (first 25 get lifetime), then <code>/login</code>.",
+    "DM @theorbitxmcpbot and send the invite code (first 25 get lifetime), then <code>/login</code>.",
   ].join("\n");
 }
 

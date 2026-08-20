@@ -11,9 +11,11 @@ import {
   formatOrbitXFaqHtml,
   formatOrbitXTelegramResult,
   formatTelegramStartGate,
+  formatTelegramGroupLockHtml,
   formatTokenCard,
   formatToolMenu,
   inferPublicTool,
+  INVITE_CODE_PROMPT_HTML,
   isPublicGroupTrigger,
   isPrivilegedTelegramTool,
   isPublicTelegramTool,
@@ -22,6 +24,7 @@ import {
   mediaEtaSeconds,
   mergeTokenScanPayloads,
   missingToolInput,
+  OFFICIAL_BOT_ABOUT,
   ORBITX_FAQ_CHUNKS,
   ORBITX_FAQ_CORE,
   ORBITX_FAQ_SECTIONS,
@@ -132,13 +135,15 @@ describe("official OrbitX Telegram bot", () => {
     expect(isTelegramAdminWallet("So11111111111111111111111111111111111111112")).toBe(false);
   });
 
-  it("starts with the MCP welcome, ORBITX BETA lifetime (first 25), and timed burns", () => {
+  it("starts with the MCP welcome, invite-code lifetime (first 25), and timed burns — never prints the secret", () => {
     const card = formatTelegramStartGate({ remainingLabel: "", linked: false });
     expect(card.text.startsWith("Welcome to the <b>OrbitX MCP bot</b> on Telegram.")).toBe(true);
-    expect(card.text).toContain("ORBITX BETA");
+    expect(card.text).toContain("invite code");
+    expect(card.text).not.toContain("ORBITX BETA");
+    expect(card.text).not.toContain("ORBITXBETA");
     expect(card.text).toContain("lifetime MCP");
     expect(card.text).toContain("first 25");
-    expect(card.text).toContain("does not reply until you share the code");
+    expect(card.text).toContain("does not reply until you send the invite code");
     expect(card.text).toContain("This bot is locked");
     expect(card.text).toContain("burn now and get timed access");
     expect(card.text).toContain("1 hour");
@@ -148,12 +153,21 @@ describe("official OrbitX Telegram bot", () => {
     expect(card.text).toContain("1,000,000 $ORBITX");
     expect(card.text).toContain("/verify");
     expect(card.text).toContain("/login");
+    expect(card.text).toContain("Send invite code");
     const buttons = JSON.stringify(card.reply_markup);
-    expect(buttons).toContain("ox:gate:beta");
+    expect(buttons).toContain("Send invite code");
     expect(buttons).toContain("ox:gate:code");
+    expect(buttons).not.toContain("ox:gate:beta");
+    expect(buttons).not.toContain("ORBITX BETA");
     expect(buttons).toContain("ox:gate:hour");
     expect(buttons).toContain("ox:gate:month");
     expect(buttons).not.toContain("ox:desk");
+    expect(INVITE_CODE_PROMPT_HTML).toContain("invite code");
+    expect(INVITE_CODE_PROMPT_HTML).not.toContain("ORBITX BETA");
+    expect(formatTelegramGroupLockHtml()).toContain("invite code");
+    expect(formatTelegramGroupLockHtml()).not.toContain("ORBITX BETA");
+    expect(OFFICIAL_BOT_ABOUT).toContain("invite code");
+    expect(OFFICIAL_BOT_ABOUT).not.toContain("ORBITX BETA");
     const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true, unlocked: true });
     expect(linked.text).toContain("lifetime");
     expect(linked.text).not.toContain("Burns need");
@@ -193,7 +207,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(extras.extra.message_thread_id).toBe(12);
     expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
     expect(formatGroupWelcomeHtml()).toContain("locked");
-    expect(formatGroupWelcomeHtml()).toContain("ORBITX BETA");
+    expect(formatGroupWelcomeHtml()).toContain("invite code");
+    expect(formatGroupWelcomeHtml()).not.toContain("ORBITX BETA");
   });
 
   it("maps /trade CA to a real buy tool with mint + default SOL amount", () => {
@@ -665,6 +680,16 @@ describe("official OrbitX Telegram bot", () => {
       expect(tokenPattern.test(text), file).toBe(false);
     }
     const api = readFileSync(resolve(WEB, "api/telegram-orbitx.js"), "utf8");
+    expect(api).not.toContain("ORBITX BETA");
+    expect(api).not.toContain("ORBITXBETA");
+    expect(api).toContain("INVITE_CODE_PROMPT_HTML");
+    expect(api).toContain('gate === "beta" || gate === "code"');
+    const cards = readFileSync(resolve(WEB, "api/orbitx/telegram-tool-cards.js"), "utf8");
+    expect(cards).not.toContain("ORBITX BETA");
+    expect(cards).not.toContain("ORBITXBETA");
+    const lib = readFileSync(resolve(WEB, "api/orbitx/telegram-orbitx-lib.js"), "utf8");
+    expect(lib).not.toContain("ORBITX BETA");
+    expect(lib).not.toContain("ORBITXBETA");
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");

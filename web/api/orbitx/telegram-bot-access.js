@@ -9,7 +9,7 @@ import {
   resolvePackage,
 } from "./mcp-burn-access.js";
 
-/** Public supporter code shown on /start. Normalizes from "ORBITX BETA". */
+/** Secret invite code. Never print this in Telegram copy — users must already know it. */
 export const ORBITX_BETA_CODE = "ORBITXBETA";
 export const ORBITX_BETA_CODE_DISPLAY = "ORBITX BETA";
 export const ORBITX_BETA_MAX_USES = 25;
