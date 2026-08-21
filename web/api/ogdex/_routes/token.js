@@ -2,6 +2,12 @@ import { jup, callFn, send, cache, INTEL_FN } from "../_lib.js";
 import { getLabeledHolders } from "../_holders.js";
 import { normToken, num } from "../_normalize.js";
 import { evmTrades, evmSecurity } from "../_evm.js";
+import {
+  computeOrbitXTokenIntel,
+  snapshotFromDexSources,
+  toOgCompositeScore,
+  verdictFromIntel,
+} from "../../../shared/orbitx-token-score.js";
 
 const GT_HDR = { Accept: "application/json;version=20230302" };
 const GT = "https://api.geckoterminal.com/api/v2";
@@ -147,16 +153,33 @@ export default async function handler(req, res) {
         txnsBuys: p.txns?.h24?.buys || 0, txnsSells: p.txns?.h24?.sells || 0, chain: p.chainId,
       }));
 
+      const evmMeta = {
+        chain, socials: links.socials, banner: links.banner,
+        ageDays: token.ageDays, createdAt: token.createdAt,
+        securityUnavailable: sec.unsupported,
+      };
+      const evmFlags = { securityUnavailable: sec.unsupported };
+      const evmIntelScore = computeOrbitXTokenIntel(
+        snapshotFromDexSources({
+          mint,
+          token,
+          meta: evmMeta,
+          safety: sec.safety,
+          intel: { trades, holders: sec.holders },
+          flags: evmFlags,
+          pairs: pairsMapped,
+        }),
+      );
+      const evmScore = toOgCompositeScore(evmIntelScore, { isPumpFunClone: false, tripleSourceCreatedAt: token.createdAt });
+
       return send(res, 200, {
         mint, token, athPrice, athMcap, pairs: pairsMapped, chain,
         safety: sec.safety,
         intel: { trades, holders: sec.holders },
-        flags: { securityUnavailable: sec.unsupported },
-        meta: {
-          chain, socials: links.socials, banner: links.banner,
-          ageDays: token.ageDays, createdAt: token.createdAt,
-          securityUnavailable: sec.unsupported,
-        },
+        flags: evmFlags,
+        score: evmScore,
+        verdict: verdictFromIntel(evmIntelScore, evmFlags),
+        meta: evmMeta,
       });
     } catch (e) {
       return send(res, 200, { mint, error: String(e?.message || e) });
@@ -340,6 +363,24 @@ export default async function handler(req, res) {
       athPrice, athMcap,
     };
 
+    const flags = scan?.flags ?? null;
+    const safety = intel?.safety ?? intelOut?.safety ?? null;
+    const intelScore = computeOrbitXTokenIntel(
+      snapshotFromDexSources({
+        mint,
+        token: token || (scanMeta ? normMetaToken(scanMeta) : {}),
+        meta,
+        safety,
+        intel: intelOut || {},
+        flags: flags || {},
+        pairs: pairsMapped,
+      }),
+    );
+    const score = toOgCompositeScore(intelScore, {
+      isPumpFunClone: !!flags?.isPumpFun,
+      tripleSourceCreatedAt: meta.createdAt || null,
+    });
+
     return send(res, 200, {
       mint,
       token: token || (scanMeta ? normMetaToken(scanMeta) : null),
@@ -347,13 +388,13 @@ export default async function handler(req, res) {
       athPrice,
       athMcap,
       pairs: pairsMapped,
-      score:         scan?.score   ?? null,
-      flags:         scan?.flags   ?? null,
-      verdict:       scan?.verdict ?? null,
+      score,
+      flags,
+      verdict: verdictFromIntel(intelScore, flags || {}),
       momentum:      scanMeta?.momentum      ?? null,
       momentumLabel: scanMeta?.momentumLabel ?? null,
       intel:  intelOut,
-      safety: intel?.safety ?? null,
+      safety,
     });
   } catch (e) {
     return send(res, 200, { mint, error: String(e?.message || e) });

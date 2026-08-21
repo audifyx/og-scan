@@ -1,6 +1,12 @@
 // $OrbitX Scanner — API constants & helpers
 // Keys loaded from environment variables (set VITE_* in your deploy env). No secrets in source.
 
+import {
+  computeOrbitXTokenIntel,
+  snapshotFromJupToken,
+  toOgCompositeScore,
+} from "../../shared/orbitx-token-score.js";
+
 export const JUPITER_API_KEY = import.meta.env.VITE_JUPITER_API_KEY ?? "";
 // Birdeye fully replaced by Jupiter + GeckoTerminal (free, no compute-unit quota).
 // Kept only so existing imports resolve; no longer used for any request.
@@ -1706,16 +1712,24 @@ async function mintCreatedAt(mint: string): Promise<string | undefined> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type OgCompositeScore = {
-  /** 0–100 composite OG confidence score */
-  total: number;
+  /** 0–100 OrbitX Token Intelligence score (headline). Null when unknown. */
+  total: number | null;
   /** Individual signal contributions */
   signals: {
-    age: number;          // 0–100 — how old the mint is vs pool max
-    athMcap: number;      // 0–100 — how large the ATH market cap was
-    holderProfile: number; // 0–100 — holder count + distribution
-    deployPattern: number; // 0–100 — deployment authenticity
-    poolAge: number;       // 0–100 — age of first credible LP pool
+    age: number | null;
+    athMcap: number | null;
+    holderProfile: number | null;
+    deployPattern: number | null;
+    poolAge: number | null;
+    contract?: number | null;
+    liquidity?: number | null;
+    holders?: number | null;
+    developer?: number | null;
+    trading?: number | null;
+    maturity?: number | null;
   };
+  /** Full explainable intelligence payload */
+  intel?: unknown;
   /** ISO creation date from earliest of all 3 sources */
   tripleSourceCreatedAt?: string;
   /** Whether this token was detected as a pump.fun bonding curve mint */
@@ -1848,72 +1862,16 @@ function scoreDeployPattern(token: JupTokenInfo): number {
  * @param token       The candidate token (enriched)
  * @param oldestMintMs The oldest confirmed mint timestamp across all candidates (for relative age scoring)
  */
-export function computeOgCompositeScore(token: JupTokenInfo, oldestMintMs: number): OgCompositeScore {
-  // Canonical mints always win — return perfect score immediately
-  if (isKnownCanonicalMint(token.id)) {
-    return {
-      total: 100,
-      signals: { age: 100, athMcap: 100, holderProfile: 100, deployPattern: 100, poolAge: 100 },
-      tripleSourceCreatedAt: token.firstMintAt ?? token.onChainCreatedAt,
-      isPumpFunClone: false,
-    };
-  }
-
-  const mintMs     = tokenCreatedAtMs(token);
-  const poolMs     = tokenPoolCreatedAtMs(token);
-  const athUsd     = tokenAthMarketCapUsd(token);
-  const pumpClone  = isPumpFunToken(token);
-
-  // Use the earliest known creation date (triple-source result already stored in firstMintAt)
+export function computeOgCompositeScore(token: JupTokenInfo, _oldestMintMs: number): OgCompositeScore {
+  const pumpClone = isPumpFunToken(token);
   const tripleSourceCreatedAt = token.firstMintAt ?? token.onChainCreatedAt;
-
-  // ── Signal 1: Age (35%) ──────────────────────────────────────────────────
-  const ageScore = scoreAgeRelative(mintMs, oldestMintMs);
-
-  // ── Signal 2: ATH market cap (30%) ──────────────────────────────────────
-  const athScore = scoreAthMarketCap(athUsd);
-
-  // ── Signal 3: Holder profile (20%) ──────────────────────────────────────
-  const holderScore = scoreHolderProfile(token);
-
-  // ── Signal 4: Deployment pattern (10%) ──────────────────────────────────
-  const deployScore = scoreDeployPattern(token);
-
-  // ── Signal 5: Pool age (5%) ──────────────────────────────────────────────
-  let poolAgeScore = 20; // neutral
-  if (Number.isFinite(poolMs)) {
-    const poolAgeDays = Math.max(0, (Date.now() - poolMs) / 86_400_000);
-    if (poolAgeDays >= 365) poolAgeScore = 100;
-    else if (poolAgeDays >= 180) poolAgeScore = 85;
-    else if (poolAgeDays >= 90)  poolAgeScore = 68;
-    else if (poolAgeDays >= 30)  poolAgeScore = 50;
-    else if (poolAgeDays >= 7)   poolAgeScore = 35;
-    else poolAgeScore = 18;
-  }
-
-  // ── Weighted composite ───────────────────────────────────────────────────
-  const raw =
-    ageScore    * 0.35 +
-    athScore    * 0.30 +
-    holderScore * 0.20 +
-    deployScore * 0.10 +
-    poolAgeScore * 0.05;
-
-  // Penalty: if pump.fun clone AND very new (< 90 days), apply a hard deduction
-  const clonePenalty = pumpClone && (Date.now() - mintMs) / 86_400_000 < 90 ? 25 : 0;
-
-  return {
-    total: Math.max(0, Math.min(100, Math.round(raw - clonePenalty))),
-    signals: {
-      age:           Math.round(ageScore),
-      athMcap:       Math.round(athScore),
-      holderProfile: Math.round(holderScore),
-      deployPattern: Math.round(deployScore),
-      poolAge:       Math.round(poolAgeScore),
-    },
-    tripleSourceCreatedAt,
-    isPumpFunClone: pumpClone,
-  };
+  const intel = computeOrbitXTokenIntel(
+    snapshotFromJupToken(token, {
+      createdAtMs: tokenCreatedAtMs(token),
+      cloneHardMatch: pumpClone && !isKnownCanonicalMint(token.id) ? null : false,
+    }),
+  );
+  return toOgCompositeScore(intel, { isPumpFunClone: pumpClone, tripleSourceCreatedAt });
 }
 
 /**
@@ -1957,7 +1915,7 @@ export async function rankCandidatesByOgScore(
   }));
 
   // Step 4: Sort by composite score descending
-  scored.sort((a, b) => b.score.total - a.score.total);
+  scored.sort((a, b) => (b.score.total ?? -1) - (a.score.total ?? -1));
 
   return scored;
 }
