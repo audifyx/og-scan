@@ -6,7 +6,7 @@ Backend Architecture Team deliverables for OrbitX World (gaming + trading).
 - [DATABASE.md](./DATABASE.md)
 - [API_CONTRACTS.md](./API_CONTRACTS.md)
 - [SECURITY.md](./SECURITY.md)
-- [INFRASTRUCTURE.md](./INFRASTRUCTURE.md)
+- [OWNER_COMMAND_CENTER.md](./OWNER_COMMAND_CENTER.md) — owner dashboard, presence, fees, burns
 - [TEAM.md](./TEAM.md)
 
 **No frontend code in this package.** Frontend teams consume the HTTP/RPC contracts only.

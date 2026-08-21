@@ -5,18 +5,22 @@
  * Phantom/Jupiter can open for signing quickly. Simulation is opt-in
  * (local keypair path); extension wallets simulate themselves.
  *
- * Platform fee: 0.95% of SOL buys is routed to PLATFORM_FEE_WALLET
- * (45YR6f… desk / dev wallet) via:
+ * Platform fee: min(1.2% of notional USD, $10) routed to PLATFORM_FEE_WALLET
+ * (45YR6f… desk) via:
  *   1) SystemProgram.transfer prepended into the swap tx when possible
- *   2) Jupiter platformFeeBps + feeAccount (output-token ATA) as backup
+ *   2) Jupiter platformFeeBps + feeAccount (output-token ATA) as backup (bps only)
  */
 import { send, readBody, callFn, jup, PLATFORM_FEE_WALLET } from "../_lib.js";
+import {
+  applyPlatformFeeToSolAmount,
+  PLATFORM_TX_FEE_BPS,
+  quotePlatformTxFee,
+} from "../../../shared/platform-tx-fee.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const isPubkey = (v) => typeof v === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v);
 
-/** Keep in sync with web/src/lib/platformFee.ts */
-const PLATFORM_FEE_BPS = 95;
+const PLATFORM_FEE_BPS = PLATFORM_TX_FEE_BPS;
 const PLATFORM_FEE_ENABLED = true;
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
@@ -39,19 +43,13 @@ async function deriveFeeAccount(mint) {
   }
 }
 
-function computeBuyFee(amountSol) {
-  const lamportsIn = Math.floor(Number(amountSol) * 1e9);
-  if (!Number.isFinite(lamportsIn) || lamportsIn <= 0) {
-    return { feeLamports: 0, tradeSol: Number(amountSol), tradeLamports: lamportsIn };
-  }
-  const feeLamports = Math.floor((lamportsIn * PLATFORM_FEE_BPS) / 10_000);
-  const tradeLamports = Math.max(0, lamportsIn - feeLamports);
+async function computeBuyFee(amountSol) {
+  const quote = await quotePlatformTxFee({ amountSol });
+  const split = applyPlatformFeeToSolAmount(amountSol, quote);
   return {
-    feeLamports,
-    tradeLamports,
-    tradeSol: tradeLamports / 1e9,
-    feeSol: feeLamports / 1e9,
-    bps: PLATFORM_FEE_BPS,
+    ...quote,
+    ...split,
+    bps: quote.capApplied ? quote.feeBpsEffective : PLATFORM_FEE_BPS,
     wallet: PLATFORM_FEE_WALLET,
   };
 }
@@ -367,11 +365,11 @@ export async function buildUnsignedTrade(body = {}) {
     amt = n;
   }
 
-  // SOL buys: skim 0.95% to desk wallet, trade the remainder
+  // SOL buys: skim min(1.2% USD, $10) to desk wallet, trade the remainder
   let feeInfo = null;
   let tradeAmt = amt;
   if (feeOn && action === "buy" && denominatedInSol === "true" && typeof amt === "number") {
-    feeInfo = computeBuyFee(amt);
+    feeInfo = await computeBuyFee(amt);
     if (feeInfo.feeLamports > 0 && feeInfo.tradeSol > 0) {
       tradeAmt = feeInfo.tradeSol;
     } else {
@@ -456,6 +454,10 @@ export async function buildUnsignedTrade(body = {}) {
           bps: feeInfo.bps,
           wallet: PLATFORM_FEE_WALLET,
           feeSol: feeInfo.feeSol,
+          feeUsd: feeInfo.feeUsd,
+          capApplied: Boolean(feeInfo.capApplied),
+          capUsd: 10,
+          rateBps: 120,
           feeLamports: feeInfo.feeLamports,
           tradeSol: feeInfo.tradeSol,
           attached: feeAttached,

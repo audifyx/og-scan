@@ -1168,6 +1168,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             title: "Trade confirmed",
             description: `${sig.slice(0, 8)}?`,
           });
+          const { reportPlatformTx } = await import("@/lib/orbitx/ownerCommand");
+          void reportPlatformTx({
+            signature: sig,
+            wallet: tradePk?.toBase58?.() || pk58,
+            application: "dex",
+            txType: swapMode === "buy" ? "buy" : "sell",
+            mint: selectedMint,
+            path: window.location.pathname,
+          });
         } catch {
           setTradeStage("");
           // Signature was broadcast ? don't fake failure; explorer may still land.

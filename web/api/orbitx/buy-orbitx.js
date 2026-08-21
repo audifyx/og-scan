@@ -4,6 +4,7 @@
  * confirmMode "auto" adds ?auto=1 so the sign page opens Jupiter immediately.
  * Phantom Connect is never used.
  */
+import { PLATFORM_TX_FEE_BPS } from "../../shared/platform-tx-fee.js";
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const ORBITX_SYMBOL = "ORBITX";
@@ -11,7 +12,7 @@ export const MIN_BUY_SOL = 0.001;
 export const MAX_BUY_SOL = 50;
 /** Desk / dev wallet — platform fee from x_buy / orbitx_buy_orbitx SOL buys */
 export const PLATFORM_FEE_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
-export const PLATFORM_FEE_BPS = 95;
+export const PLATFORM_FEE_BPS = PLATFORM_TX_FEE_BPS;
 
 export function askBuyOrbitxAmount() {
   return {
@@ -227,21 +228,21 @@ export async function prepareBuyOrbitx(opts) {
         ? [
             "Send the user the openUrl / autoSignUrl as a clickable link.",
             "Opening it connects Jupiter Wallet and prompts Sign automatically (chat auto-confirm).",
-            `0.95% platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
+            `1.2% (max $10) platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
             "If they prefer a button first, use signUrl instead.",
             "Trade is incomplete until Jupiter confirms.",
           ]
         : [
             "Send the user the signUrl as a clickable link.",
             "They connect Jupiter Wallet and tap Sign & send.",
-            `0.95% platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
+            `1.2% (max $10) platform fee SOL routes to desk wallet ${PLATFORM_FEE_WALLET}.`,
             "If they say yes / confirm / auto — call orbitx_confirm_buy (or x_confirm_buy) with the same amountSol for auto Jupiter prompt.",
             "Do NOT broadcast unsigned transactions yourself.",
           ],
     note:
       mode === "auto"
-        ? `Chat auto-confirm: open autoSignUrl → Jupiter Wallet prompts. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`
-        : `Manual sign: open signUrl. Platform fee (0.95% SOL) → ${PLATFORM_FEE_WALLET}.`,
+        ? `Chat auto-confirm: open autoSignUrl → Jupiter Wallet prompts. Platform fee (1.2% (max $10) SOL) → ${PLATFORM_FEE_WALLET}.`
+        : `Manual sign: open signUrl. Platform fee (1.2% (max $10) SOL) → ${PLATFORM_FEE_WALLET}.`,
     jupiter: `https://jup.ag/swap/SOL-${ORBITX_MINT}`,
     dex: `https://www.orbitx.world/ORBITX_DEX/token/${ORBITX_MINT}`,
   };

@@ -14,9 +14,12 @@ import {
   ChevronLeft,
   Crown,
   FileText,
+  Flame,
+  Gamepad2,
   Globe2,
   Headphones,
   Headset,
+  HeartPulse,
   Image,
   KeyRound,
   LayoutDashboard,
@@ -24,6 +27,7 @@ import {
   MessageSquare,
   Mic,
   PanelTop,
+  Radio,
   Rocket,
   Settings,
   Shield,
@@ -42,9 +46,12 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Bell,
   Crown,
   FileText,
+  Flame,
+  Gamepad2,
   Globe2,
   Headphones,
   Headset,
+  HeartPulse,
   Image,
   KeyRound,
   LayoutDashboard,
@@ -52,6 +59,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   MessageSquare,
   Mic,
   PanelTop,
+  Radio,
   Rocket,
   Settings,
   Shield,
@@ -71,52 +79,55 @@ interface SectionItem {
 
 const SECTIONS: { group: string; items: SectionItem[] }[] = [
   {
-    group: "Dashboard",
+    group: "Command",
     items: [
-      { id: "overview",   label: "Overview",    icon: "LayoutDashboard" },
-      { id: "admin_apps", label: "Admin Apps",   icon: "PanelTop" },
-      { id: "analytics",  label: "Analytics",    icon: "TrendingUp" },
-      { id: "advanced_analytics", label: "Deep Analytics", icon: "BarChart3" },
-      { id: "activity",   label: "Activity Feed", icon: "Activity" },
-      { id: "tools",      label: "Admin Tools",  icon: "Wrench" },
+      { id: "overview", label: "Overview", icon: "LayoutDashboard" },
+      { id: "live_users", label: "Live Users", icon: "Radio" },
+      { id: "user_activity", label: "User Activity", icon: "Activity" },
+      { id: "users", label: "Users", icon: "Users" },
+      { id: "analytics", label: "Analytics", icon: "TrendingUp" },
     ],
   },
   {
-    group: "OGS Token",
+    group: "Money",
     items: [
-      { id: "tokens",     label: "Token Listings", icon: "Rocket" },
-      { id: "wallets",    label: "Wallets & Trades", icon: "Wallet" },
-      { id: "alerts",     label: "Price Alerts",   icon: "AlertTriangle" },
+      { id: "revenue", label: "Platform Revenue", icon: "BarChart3" },
+      { id: "fees", label: "Fees", icon: "Wallet" },
+      { id: "burns", label: "OrbitX Burns", icon: "Flame" },
+      { id: "transactions", label: "Transactions", icon: "Activity" },
+      { id: "jupiter", label: "Jupiter Transactions", icon: "Rocket" },
     ],
   },
   {
-    group: "People & Growth",
+    group: "Apps",
     items: [
-      { id: "users",         label: "Users",         icon: "Users" },
-      { id: "affiliates",    label: "Affiliates",    icon: "UserCheck" },
-      { id: "org_affiliates",label: "Org Affiliates",icon: "Crown" },
-      { id: "support",       label: "Support",       icon: "Headset" },
-    ],
-  },
-  {
-    group: "Content & Community",
-    items: [
-      { id: "communities",   label: "Communities",      icon: "Globe2" },
-      { id: "moderation",    label: "Moderation",       icon: "Shield" },
-      { id: "spaces",        label: "Spaces",           icon: "Mic" },
-      { id: "lobbies",       label: "Trading Lobbies",  icon: "Headphones" },
-      { id: "chat",          label: "Chat & AI",        icon: "MessageSquare" },
-      { id: "notifications", label: "Notifications",    icon: "Bell" },
-      { id: "announcements", label: "Announcements",   icon: "Megaphone" },
-      { id: "media",         label: "Media",            icon: "Image" },
+      { id: "trading", label: "Trading", icon: "TrendingUp" },
+      { id: "launches", label: "Token Launches", icon: "Rocket" },
+      { id: "apps", label: "Platform Apps", icon: "PanelTop" },
+      { id: "communities", label: "Communities", icon: "Globe2" },
+      { id: "games", label: "Games", icon: "Gamepad2" },
+      { id: "referrals", label: "Referrals", icon: "UserCheck" },
     ],
   },
   {
     group: "System",
     items: [
-      { id: "settings", label: "Settings",  icon: "Settings" },
-      { id: "audit",    label: "Audit Log", icon: "FileText" },
-      { id: "api",      label: "API Settings", icon: "KeyRound" },
+      { id: "health", label: "System Health", icon: "HeartPulse" },
+      { id: "security", label: "Security", icon: "Shield" },
+      { id: "audit", label: "Audit Logs", icon: "FileText" },
+      { id: "settings", label: "Admin Settings", icon: "Settings" },
+    ],
+  },
+  {
+    group: "Operations",
+    items: [
+      { id: "moderation", label: "Moderation", icon: "Shield" },
+      { id: "support", label: "Support", icon: "Headset" },
+      { id: "spaces", label: "Spaces", icon: "Mic" },
+      { id: "lobbies", label: "Trading Lobbies", icon: "Headphones" },
+      { id: "announcements", label: "Announcements", icon: "Megaphone" },
+      { id: "api", label: "API Settings", icon: "KeyRound" },
+      { id: "admin_apps", label: "Admin Apps", icon: "PanelTop" },
     ],
   },
 ];
@@ -138,8 +149,8 @@ export const AdminSidebar = ({ active, onChange, badges = {}, onBack }: Props) =
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-200/70">Owner console</p>
-            <h2 className="mt-1 text-base font-black tracking-tight text-white">OrbitX Admin</h2>
-            <p className="mt-1 text-xs leading-5 text-white/50">Control center for moderation, growth, admin apps, and platform operations.</p>
+            <h2 className="mt-1 text-base font-black tracking-tight text-white">OrbitX Command</h2>
+            <p className="mt-1 text-xs leading-5 text-white/50">One owner dashboard for presence, fees, burns, and verified activity.</p>
           </div>
         </div>
       </div>

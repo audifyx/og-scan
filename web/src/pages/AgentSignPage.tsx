@@ -387,6 +387,19 @@ export default function AgentSignPage() {
         const sig = await sendOne(data.tx);
         await confirmSentTransaction(connection, sig);
         finish(sig);
+        try {
+          const { reportPlatformTx } = await import("@/lib/orbitx/ownerCommand");
+          void reportPlatformTx({
+            signature: sig,
+            wallet: pk,
+            application: "agent",
+            txType: String(action || "swap"),
+            mint,
+            path: window.location.pathname,
+          });
+        } catch {
+          /* ledger report is best-effort */
+        }
         const feeSol = data?.platformFee?.feeSol;
         const feeWallet = data?.platformFee?.wallet || PLATFORM_WALLET;
         if (feeSol) {
@@ -517,7 +530,7 @@ export default function AgentSignPage() {
             <Row label="Mint" value={`${mint.slice(0, 6)}…${mint.slice(-4)}`} mono />
           ) : null}
           {kind === "trade" ? <Row label="Slippage" value={`${slippage}%`} /> : null}
-          {kind === "trade" ? <Row label="Platform fee" value="0.95% SOL → desk" /> : null}
+          {kind === "trade" ? <Row label="Platform fee" value="1.2% (max $10) → desk" /> : null}
           {expectedWallet ? (
             <Row label="Wallet" value={`${expectedWallet.slice(0, 4)}…${expectedWallet.slice(-4)}`} mono />
           ) : null}

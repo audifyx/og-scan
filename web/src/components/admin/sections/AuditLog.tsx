@@ -18,7 +18,7 @@ import { format, formatDistanceToNow, subDays } from "date-fns";
 import { shortId } from "../helpers";
 import {
   FileText, Search, Loader2, RefreshCw, Download, Eye,
-  Activity, Shield, Clock, Filter, Trash2,
+  Activity, Shield, Clock, Filter,
 } from "lucide-react";
 
 export const AuditLog = () => {
@@ -71,14 +71,6 @@ export const AuditLog = () => {
     toast.success("Exported");
   };
 
-  const clearOldLogs = async () => {
-    if (!window.confirm("Delete audit logs older than 90 days?")) return;
-    const cutoff = subDays(new Date(), 90).toISOString();
-    await supabase.from("admin_audit_log").delete().lt("created_at", cutoff);
-    toast.success("Old logs cleared");
-    fetch();
-  };
-
   const actionColor = (action: string) => {
     if (action?.includes("Delete") || action?.includes("delete") || action?.includes("Banned") || action?.includes("banned")) return "text-red-400";
     if (action?.includes("Created") || action?.includes("created") || action?.includes("Approved") || action?.includes("approved")) return "text-green-400";
@@ -97,7 +89,6 @@ export const AuditLog = () => {
         </div>
         <div className="flex gap-2">
           <Button onClick={exportCSV} variant="outline" size="sm" className="gap-2"><Download className="h-3.5 w-3.5" /> Export</Button>
-          <Button onClick={clearOldLogs} variant="outline" size="sm" className="gap-2 text-orange-400"><Trash2 className="h-3.5 w-3.5" /> Clear 90d+</Button>
           <Button onClick={fetch} variant="outline" size="sm"><RefreshCw className="h-3.5 w-3.5" /></Button>
         </div>
       </div>

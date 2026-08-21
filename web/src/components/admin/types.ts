@@ -181,12 +181,14 @@ export interface AdminRole {
 
 /* ── Section navigation ── */
 export type AdminSection =
-  | "overview" | "admin_apps" | "users" | "communities" | "moderation"
-  | "lobbies" | "tokens" | "spaces" | "support"
-  | "chat" | "notifications" | "alerts" | "wallets"
-  | "media" | "settings" | "audit" | "analytics" | "tools"
-  | "affiliates" | "org_affiliates" | "announcements"
-  | "advanced_analytics" | "activity" | "api";
+  | "overview" | "users" | "user_activity" | "live_users"
+  | "analytics" | "revenue" | "burns" | "transactions" | "jupiter"
+  | "trading" | "launches" | "apps" | "communities" | "games"
+  | "referrals" | "fees" | "health" | "security" | "audit" | "settings"
+  | "admin_apps" | "moderation" | "lobbies" | "tokens" | "spaces"
+  | "support" | "chat" | "notifications" | "alerts" | "wallets"
+  | "media" | "tools" | "affiliates" | "org_affiliates"
+  | "announcements" | "advanced_analytics" | "activity" | "api";
 
 export interface AdminSectionDef {
   id: AdminSection;
