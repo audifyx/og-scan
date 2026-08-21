@@ -6,6 +6,13 @@
 // POST { query }  (mint address or ticker/name)
 // -> { ok, token: {...}, score: {...}, flags: {...}, verdict }
 
+import {
+  computeOrbitXTokenIntel,
+  snapshotFromJupToken,
+  toOgCompositeScore,
+  verdictFromIntel,
+} from "../_shared/orbitx-token-score.js";
+
 const JUPITER_BASE = "https://lite-api.jup.ag";
 const MIN_OGSCAN_LIQUIDITY_USD = 1_000;
 
@@ -154,36 +161,18 @@ function scoreDeployPattern(t: Jt): number {
   if (t.pumpFun?.migrationAt) score -= 10;
   return Math.min(100, score);
 }
-function computeOgCompositeScore(t: Jt, oldestMintMs: number) {
-  if (isKnownCanonicalMint(t.id)) {
-    return { total: 100, signals: { age: 100, athMcap: 100, holderProfile: 100, deployPattern: 100, poolAge: 100 },
-      tripleSourceCreatedAt: t.firstMintAt ?? t.onChainCreatedAt, isPumpFunClone: false };
-  }
-  const mintMs = tokenCreatedAtMs(t);
-  const poolMs = tokenPoolCreatedAtMs(t);
-  const athUsd = tokenAthMarketCapUsd(t);
+function computeOgCompositeScore(t: Jt, _oldestMintMs: number) {
   const pumpClone = isPumpFunToken(t);
-  const ageScore = scoreAgeRelative(mintMs, oldestMintMs);
-  const athScore = scoreAthMarketCap(athUsd);
-  const holderScore = scoreHolderProfile(t);
-  const deployScore = scoreDeployPattern(t);
-  let poolAgeScore = 20;
-  if (Number.isFinite(poolMs)) {
-    const d = Math.max(0, (Date.now() - poolMs) / 86_400_000);
-    if (d >= 365) poolAgeScore = 100; else if (d >= 180) poolAgeScore = 85;
-    else if (d >= 90) poolAgeScore = 68; else if (d >= 30) poolAgeScore = 50;
-    else if (d >= 7) poolAgeScore = 35; else poolAgeScore = 18;
-  }
-  const raw = ageScore * 0.35 + athScore * 0.30 + holderScore * 0.20 + deployScore * 0.10 + poolAgeScore * 0.05;
-  const clonePenalty = pumpClone && (Date.now() - mintMs) / 86_400_000 < 90 ? 25 : 0;
-  return {
-    total: Math.max(0, Math.min(100, Math.round(raw - clonePenalty))),
-    signals: {
-      age: Math.round(ageScore), athMcap: Math.round(athScore), holderProfile: Math.round(holderScore),
-      deployPattern: Math.round(deployScore), poolAge: Math.round(poolAgeScore),
-    },
-    tripleSourceCreatedAt: t.firstMintAt ?? t.onChainCreatedAt, isPumpFunClone: pumpClone,
-  };
+  const intel = computeOrbitXTokenIntel(
+    snapshotFromJupToken(t, {
+      createdAtMs: tokenCreatedAtMs(t),
+      liquidityUsd: tokenEffectiveLiquidityUsd(t) || null,
+    }),
+  );
+  return toOgCompositeScore(intel, {
+    isPumpFunClone: pumpClone,
+    tripleSourceCreatedAt: t.firstMintAt ?? t.onChainCreatedAt,
+  });
 }
 
 function verdictFor(total: number, flags: { lpPulled: boolean; unsafeAuthority: boolean }): string {
@@ -326,7 +315,7 @@ Deno.serve(async (req) => {
         socials: soc,
       },
       score, flags,
-      verdict: verdictFor(score.total, flags),
+      verdict: verdictFromIntel(score.intel || {}, flags),
     };
     logScan(out, logCtx);
     return json(out);
