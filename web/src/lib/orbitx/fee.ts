@@ -2,7 +2,7 @@
 //   - trading: 0.45% on every buy/sell of OrbitX-launched tokens
 //     · 98.7% → creator (Claim Fees)
 //     · 1.3% → admin (Launchpad Admin / ROUTED_FEE_WALLET)
-//   - platform: 0.95% protocol-rate swap fee on in-app swaps
+//   - platform: min(1.2% of USD notional, $10) on in-app Jupiter/DEX swaps
 // plus one flat Orbitx launch fee, IDENTICAL on both lanes ($0.90, converted
 // to SOL live so it stays constant in dollar terms).
 import {

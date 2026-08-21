@@ -897,6 +897,21 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
       }),
       headers: { Prefer: "return=minimal" },
     });
+    try {
+      const { recordVerifiedBurn } = await import("./owner-command.js");
+      await recordVerifiedBurn(sb, {
+        user_id: uid || null,
+        wallet_address: burnWallet || null,
+        application: "agent",
+        tokens_burned: tokensBurned,
+        tx_signature: verified.signature,
+        mint: verified.mint,
+        source: "mcp_burn",
+        metadata: { package_id: pkg.id, label: pkg.label },
+      });
+    } catch {
+      /* owner command tables optional until migration is applied */
+    }
   } catch (e) {
     if (/23505|duplicate|unique/i.test(String(e?.code || e?.message || ""))) {
       const status = await getAccessStatus(sb, uid, { wallets: [burnWallet] });
