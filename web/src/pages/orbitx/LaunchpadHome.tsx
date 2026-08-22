@@ -184,6 +184,18 @@ export default function LaunchpadHome() {
 
   return (
     <div className="ox-launchboard space-y-4">
+      <div className="ox-panel ox-panel--gold pf-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="pf-mono text-[10px] uppercase tracking-[0.24em] text-[#F0C75E]">Launchpad V2</div>
+          <div className="font-display text-lg font-black text-white">Standard · Flywheel · Bagworking</div>
+          <p className="text-sm text-white/60">Real on-chain launches, X-verified promo rewards, and $25 creator-fee jobs.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/orbitxlaunch/launch" className="ox-btn ox-btn--blue text-sm">Launch</Link>
+          <Link to="/orbitxlaunch/bagworking" className="ox-btn text-sm">Bagworking</Link>
+          <Link to="/orbitxlaunch/how" className="ox-btn text-sm">How it works</Link>
+        </div>
+      </div>
       <div className="ox-board-head">
         <div>
           <div className="ox-board-kicker">Live token terminal</div>

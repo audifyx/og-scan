@@ -112,6 +112,14 @@ import LaunchpadApiLaunch from "./pages/orbitx/LaunchpadApiLaunch";
 import LaunchpadCurveEvm from "./pages/orbitx/LaunchpadCurveEvm";
 import LaunchpadCurveTrade from "./pages/orbitx/LaunchpadCurveTrade";
 import LaunchpadCurveMarkets from "./pages/orbitx/LaunchpadCurveMarkets";
+import {
+  LaunchpadV2Launch,
+  LaunchpadV2Types,
+  LaunchpadBagworking,
+  LaunchpadMyLaunches,
+  LaunchpadRewards,
+  LaunchpadHow,
+} from "./pages/orbitx/LaunchpadV2";
 import OrbitXAI from "./pages/OrbitXAI";
 import TelegramOrbitX from "./pages/TelegramOrbitX";
 const LaunchpadNftHub = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftHub"));
@@ -356,6 +364,13 @@ const App = () => (
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
             <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
               <Route index element={<LaunchpadHome />} />
+              <Route path="launch" element={<LaunchpadV2Launch />} />
+              <Route path="types" element={<LaunchpadV2Types />} />
+              <Route path="bagworking" element={<LaunchpadBagworking />} />
+              <Route path="bagworking/:campaignId" element={<LaunchpadBagworking />} />
+              <Route path="mine" element={<LaunchpadMyLaunches />} />
+              <Route path="rewards" element={<LaunchpadRewards />} />
+              <Route path="how" element={<LaunchpadHow />} />
               <Route path="create" element={<LaunchpadChoose />} />
               <Route path="create/custom" element={<LaunchpadCreate />} />
               <Route path="create/pump" element={<LaunchpadPump />} />

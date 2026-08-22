@@ -28,6 +28,19 @@ export default function LaunchpadChoose() {
         subtitle="Pump bonding curve or full-control custom mint — same fees, obx vanity CA, anti-vamp on both."
       />
 
+      <div className="ox-panel ox-panel--gold pf-card mb-6 grid gap-3 p-4 md:grid-cols-3">
+        {[
+          { kind: "standard", title: "Standard", to: "/orbitxlaunch/create/pump?kind=standard" },
+          { kind: "flywheel", title: "Flywheel", to: "/orbitxlaunch/create/pump?kind=flywheel" },
+          { kind: "bagworking", title: "Bagworking", to: "/orbitxlaunch/create/pump?kind=bagworking" },
+        ].map((k) => (
+          <Link key={k.kind} to={k.to} className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-center hover:border-[#F0C75E]/50">
+            <div className="pf-mono text-[9px] uppercase tracking-[0.24em] text-[#F0C75E]">{k.kind}</div>
+            <div className="font-display text-base font-black text-white">{k.title}</div>
+          </Link>
+        ))}
+      </div>
+
       <div className="ox-panel ox-panel--gold pf-card mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-3 font-mono text-[10px] uppercase tracking-widest">
         <span className="font-bold text-[#F0C75E]">Identical fees · both lanes</span>
         {isLaunchFeePromoActive() ? (

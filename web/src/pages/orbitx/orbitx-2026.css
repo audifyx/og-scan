@@ -1881,3 +1881,10 @@
     padding-bottom: 1.25rem;
   }
 }
+
+/* Launchpad V2 studio */
+.lp-classic .lp-v2 .ox-panel { border-radius: 16px; }
+.lp-classic .lp-v2 input[type="range"] { height: 4px; }
+@media (max-width: 640px) {
+  .lp-classic .lp-v2 .ox-btn { width: 100%; }
+}

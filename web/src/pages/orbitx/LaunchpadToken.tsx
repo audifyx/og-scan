@@ -17,6 +17,7 @@ import { shortAddr, timeAgo, SectionLabel, Pill, TokenLogo, useDocumentMeta, fmt
 import { fmtCompactUsd } from "./lpx";
 import TokenAnalytics from "./TokenAnalytics";
 import TokenChat from "./TokenChat";
+import { FeeBurnPanel } from "./LaunchpadV2";
 import { orbitScore } from "./orbitScore";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { toast } from "sonner";
@@ -533,6 +534,8 @@ export default function LaunchpadToken() {
           <a href={explorer} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-[rgba(192,198,210,0.2)] p-1.5 hover:bg-white/5" title="View on Solscan"><ExternalLink className="h-4 w-4" /></a>
         </div>
       </div>
+
+      {mint && <div className="mt-4"><FeeBurnPanel mint={mint} /></div>}
 
       <div className="ox-tok-statgrid mt-4">
         <StatBox label="Price" value={fmtPrice(priceUsd)} href={pair?.url} hint="live chart" />
