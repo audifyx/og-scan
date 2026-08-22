@@ -29,6 +29,7 @@ export const DESK_NAV: DeskNavGroup[] = [
       { id: "revenue", label: "Platform Revenue", icon: "BarChart3", short: "Rev" },
       { id: "fees", label: "Fees", icon: "Wallet" },
       { id: "burns", label: "OrbitX Burns", icon: "Flame", short: "Burns" },
+      { id: "onchain", label: "On-chain costs", icon: "Link2", short: "Chain" },
       { id: "transactions", label: "Transactions", icon: "Activity", short: "Tx" },
       { id: "jupiter", label: "Jupiter Transactions", icon: "Rocket" },
     ],

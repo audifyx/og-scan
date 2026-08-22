@@ -45,6 +45,7 @@ const Analytics = lazy(() => import("@/components/admin/sections/Analytics").the
 const ToolsSection = lazy(() => import("@/components/admin/sections/ToolsSection").then((m) => ({ default: m.ToolsSection })));
 const OrgAffiliates = lazy(() => import("@/components/admin/sections/OrgAffiliates").then((m) => ({ default: m.OrgAffiliates })));
 const AffiliateManagement = lazy(() => import("@/components/admin/sections/AffiliateManagement").then((m) => ({ default: m.AffiliateManagement })));
+const OnChainCostSection = lazy(() => import("@/components/admin/sections/OnChainCostSection").then((m) => ({ default: m.OnChainCostSection })));
 
 const Fallback = () => (
   <div className="flex h-64 items-center justify-center">
@@ -77,6 +78,11 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
     eyebrow: "Token",
     title: "OrbitX burns",
     description: "Counted only after on-chain verification (ox_admin_burns + mcp_burn_ledger).",
+  },
+  onchain: {
+    eyebrow: "Protocol",
+    title: "On-chain costs",
+    description: "Real Solana meta.fee from indexed signatures. Memo-only target is under 0.00001 SOL. Swaps and new accounts will exceed it.",
   },
   transactions: {
     eyebrow: "Ledger",
@@ -346,6 +352,8 @@ export default function Admin() {
         return <CommandFees />;
       case "burns":
         return <CommandTable action="burns" title="OrbitX burns" hint="Verified on-chain burns only. MCP access burns merge in after confirmation." />;
+      case "onchain":
+        return <OnChainCostSection />;
       case "transactions":
         return <CommandTable action="ledger" title="Transaction ledger" hint="Completed = status completed AND verified_onchain. Search a signature." />;
       case "jupiter":

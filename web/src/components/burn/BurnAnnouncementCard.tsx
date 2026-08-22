@@ -1,5 +1,5 @@
-import { Flame, X, ExternalLink } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Flame, X } from "lucide-react";
+import { OnChainBadge, SolscanLink } from "@/components/onchain";
 
 export interface BurnAnnouncementData {
   id: string;
@@ -117,17 +117,8 @@ export function BurnAnnouncementCard({
           </div>
 
           <div className="mt-2 flex items-center justify-between">
-            <Badge variant="outline" className="border-white/15 text-[9px] text-muted-foreground">
-              verified on-chain
-            </Badge>
-            <a
-              href={`https://solscan.io/tx/${data.txSignature}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] text-white/40 underline-offset-2 hover:text-white/70 hover:underline"
-            >
-              view tx <ExternalLink className="h-2.5 w-2.5" />
-            </a>
+            <OnChainBadge signature={data.txSignature} />
+            <SolscanLink signature={data.txSignature} className="text-[10px] text-white/40" />
           </div>
         </div>
       </div>

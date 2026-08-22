@@ -36,6 +36,7 @@ import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { consumeTokenCreatePrefill, peekTokenCreatePrefill } from "@/lib/orbitx/tokenCreatePrefill";
 import { supabase } from "@/lib/supabase";
 import { Confetti } from "./lpx";
+import { IndexOnChainTx, OnChainBadge, SolscanLink } from "@/components/onchain";
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -857,9 +858,11 @@ export default function LaunchpadCreate() {
               {launched.poolId && <Badge className="border-[hsl(var(--og-cyan))]/40 bg-[hsl(var(--og-cyan))]/10 text-[hsl(var(--og-cyan))]">Raydium pool live</Badge>}
               {launched.lpBurned && <Badge className="border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]">LP burned</Badge>}
             </div>
+            <div className="flex justify-center"><OnChainBadge signature={launched.sig} /></div>
+            <IndexOnChainTx signature={launched.sig} kind="launch" refId={launched.mint} />
             <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
-              <a href={`https://solscan.io/tx/${launched.sig}`} target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">Mint tx</a>
-              <a href={`https://solscan.io/token/${launched.mint}`} target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">Solscan</a>
+              <SolscanLink signature={launched.sig}>Mint tx</SolscanLink>
+              <SolscanLink mint={launched.mint}>Token on Solscan</SolscanLink>
               {launched.poolId && (
                 <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${launched.mint}`} target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">Trade on Raydium</a>
               )}

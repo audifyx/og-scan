@@ -6,7 +6,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  Coins, Wallet, Loader2, RefreshCw, ExternalLink, CheckCircle2, AlertTriangle, Rocket, HandCoins,
+  Coins, Wallet, Loader2, RefreshCw, CheckCircle2, AlertTriangle, Rocket, HandCoins,
 } from "lucide-react";
 import { listByCreator, type OrbitxToken } from "@/lib/orbitx/registry";
 import {
@@ -19,6 +19,7 @@ import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
+import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -265,10 +266,12 @@ export default function LaunchpadClaim() {
               </button>
             </div>
             {pumpSig && (
-              <a href={`https://solscan.io/tx/${pumpSig}`} target="_blank" rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-xs text-[#60A5FA] underline-offset-4 hover:underline">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
-              </a>
+              <div className="mt-3">
+                <IndexOnChainTx signature={pumpSig} kind="claim" />
+                <SolscanLink signature={pumpSig} className="inline-flex items-center gap-1 text-xs">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx
+                </SolscanLink>
+              </div>
             )}
             {pumpTokens.length > 0 && (
               <>
@@ -320,7 +323,7 @@ export default function LaunchpadClaim() {
                             <div className="flex items-center gap-2 text-sm font-semibold text-white">{t.name} <span className="text-[#A8B0BC]">${t.ticker}</span>
                               {isBuyback && <span className="ox-lane-badge border-[rgba(255,77,109,0.4)] bg-[rgba(255,77,109,0.1)] text-[#ff4d6d]"><AlertTriangle className="mr-1 inline h-3 w-3" /> flagged — fees → OBX buyback</span>}
                             </div>
-                            <a href={`https://solscan.io/token/${t.mint_address}`} target="_blank" rel="noopener noreferrer" className="pf-mono text-xs text-[#A8B0BC] hover:text-white">{short(t.mint_address)}</a>
+                            <SolscanLink mint={t.mint_address} className="pf-mono text-xs text-[#A8B0BC] hover:text-white">{short(t.mint_address)}</SolscanLink>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -338,10 +341,12 @@ export default function LaunchpadClaim() {
                         </div>
                       </div>
                       {sig && (
-                        <a href={`https://solscan.io/tx/${sig}`} target="_blank" rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-xs text-[#60A5FA] underline-offset-4 hover:underline">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <div className="mt-2">
+                          <IndexOnChainTx signature={sig} kind="claim" refId={t.mint_address} />
+                          <SolscanLink signature={sig} className="inline-flex items-center gap-1 text-xs">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx
+                          </SolscanLink>
+                        </div>
                       )}
                     </div>
                   );

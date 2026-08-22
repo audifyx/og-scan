@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction, VersionedTransaction } from "@solana/web3.js";
-import { Check, ExternalLink, Loader2, ShieldAlert, Wallet } from "lucide-react";
+import { Check, Loader2, ShieldAlert, Wallet } from "lucide-react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +16,7 @@ import {
   type McpAccessPackageId,
 } from "@/lib/mcpBurnAccess";
 import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
+import { TransactionStatus } from "@/components/onchain";
 import {
   clearStoredPhantomWallet,
   fetchTimeoutSignal,
@@ -561,14 +562,7 @@ export default function AgentSignPage() {
               <Check className="h-4 w-4" /> Confirmed on-chain
             </p>
             {extraNote && <p className="mb-2 text-[11px] text-white/50">{extraNote}</p>}
-            <a
-              href={`https://solscan.io/tx/${signature}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 break-all font-mono text-[11px] text-emerald-200/80 hover:underline"
-            >
-              {signature} <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
+            <TransactionStatus state="confirmed" signature={signature} />
             {kind === "credits" ? (
               <p className="mt-2 text-[11px] text-white/45">
                 <Link to="/shop" className="text-emerald-200/90 hover:underline">
