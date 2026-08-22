@@ -16,6 +16,7 @@ Last verified: 2026-07-25 after merging teams 1–5 into `main`.
 | Telegram | `/telegram` | `web/src/pages/TelegramOrbitX.tsx`, `web/api/telegram-orbitx.js` | Official @theorbitxmcpbot (groups public, DMs linked) |
 | Launchpad | `/orbitxlaunch` | `web/src/pages/orbitx/**` | Token launch |
 | Terminal | `/terminal` | `web/src/pages/orbitx/Terminal*` + `TradingTerminal` | Trade UI |
+| On-chain proof | `/onchain` | `web/src/pages/OnChainProofPage.tsx` | Verify signatures, memo attestations, rebuild index |
 
 ## Backend
 
@@ -37,6 +38,7 @@ Last verified: 2026-07-25 after merging teams 1–5 into `main`.
 - Crypto: `docs/crypto/INTELLIGENCE.md`
 - Social: `docs/social/PLATFORM.md`
 - QA Swarm: `docs/agents/QA_SWARM.md`
+- On-chain migration (A/B/C + program design): `docs/audit/ONCHAIN_MIGRATION.md`
 
 ## Stack reality
 

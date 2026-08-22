@@ -37,6 +37,7 @@ import {
   Users, ArrowLeft, RefreshCw, Search, ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { IndexOnChainTx, OnChainBadge, SolscanLink } from "@/components/onchain";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
@@ -769,6 +770,8 @@ Then try connecting again.`;
               </div>
               <h2 className="text-2xl font-black text-white mb-2">Token Launched! 🚀</h2>
               <p className="text-sm text-white/50 mb-6">Your token is now live on pump.fun</p>
+              <div className="mb-4 flex justify-center"><OnChainBadge signature={txSignature} /></div>
+              <IndexOnChainTx signature={txSignature} kind="launch" refId={mintAddress} />
 
               <div className="mb-4 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
                 <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Contract Address</p>
@@ -795,10 +798,7 @@ Then try connecting again.`;
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#ab9ff2] px-6 py-3 text-sm font-bold text-black hover:bg-[#b8aef5] transition-colors">
                   <ExternalLink className="h-4 w-4" /> View on Pump.fun
                 </a>
-                <a href={`https://solscan.io/tx/${txSignature}`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-sm font-bold text-white/60 hover:text-white hover:border-white/20 transition-colors">
-                  <ExternalLink className="h-4 w-4" /> Solscan
-                </a>
+                <SolscanLink signature={txSignature} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-sm font-bold text-white/60 hover:text-white hover:border-white/20 no-underline" />
                 <button onClick={() => { resetForm(); onSuccess(); }}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-sm font-bold text-white/60 hover:text-white hover:border-white/20 transition-colors">
                   <ArrowLeft className="h-4 w-4" /> View All Tokens
