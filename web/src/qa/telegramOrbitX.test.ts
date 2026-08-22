@@ -105,6 +105,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("swap").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("/trade@theorbitxmcpbot").tool).toBe("orbitx_prepare_buy");
     expect(resolveOfficialCommand("shop").tool).toBe("orbitx_shop");
+    expect(resolveOfficialCommand("launch").tool).toBe("orbitx_execute_launch");
+    expect(resolveOfficialCommand("mint").tool).toBe("orbitx_mint_nft");
+    expect(resolveOfficialCommand("wallet").tool).toBe("orbitx_get_wallet");
     expect(resolveOfficialCommand("autobuy").kind).toBe("meta");
     expect(resolveOfficialCommand("auth").kind).toBe("meta");
     expect(resolveOfficialCommand("login").kind).toBe("meta");
@@ -205,6 +208,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(JSON.stringify(linked.reply_markup)).toContain("ox:desk");
     expect(inferPublicTool("shop hour")?.args).toMatchObject({ package: "hour" });
     expect(inferPublicTool("shop month")?.args).toMatchObject({ package: "month" });
+    expect(inferPublicTool("Launch $STEVE")?.tool).toBe("orbitx_execute_launch");
+    expect(inferPublicTool("Launch an NFT")?.tool).toBe("orbitx_mint_nft");
+    expect(inferPublicTool("Show my portfolio")?.tool).toBe("orbitx_get_wallet");
+    expect(inferPublicTool("scan this token")?.tool).toBe("orbitx_crypto_scan");
   });
 
   it("handles public group triggers, forum threads, and anonymous admins", () => {
@@ -830,6 +837,12 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain('bare === "reset"');
     expect(api).toContain("resetTelegramBotSession");
     expect(api).toContain("handleTokenProjectBrief");
+    expect(api).toContain("telegram-launch-session.js");
+    expect(api).toContain("orbitx_launch_ipfs");
+    expect(api).toContain("orbitx_execute_launch");
+    expect(api).toContain("orbitx_mint_nft");
+    expect(api).toContain("web.sessioncomplete");
+    expect(api).not.toContain("fake signature");
     expect(api).toContain("TELEGRAM_CODE_PROMPT_HTML");
     expect(api).not.toContain("ORBITX BETA");
     expect(api).not.toContain("/code ORBITX");

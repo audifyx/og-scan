@@ -88,11 +88,28 @@ export function parseSolAmount(text) {
 }
 
 function parseLaunchArgs(text) {
-  const rest = String(text || "").replace(/^(?:\/)?(?:launch|create)(?:@\w+)?\s*/i, "").trim();
-  if (!rest) return {};
-  const named = rest.match(/^(.+?)\s+([A-Za-z0-9]{2,12})$/);
-  if (named) return { name: named[1].trim(), symbol: named[2].trim().toUpperCase() };
-  return { name: rest.slice(0, 32), symbol: rest.replace(/[^A-Za-z0-9]/g, "").slice(0, 10).toUpperCase() || "OBX" };
+  const rest = String(text || "")
+    .replace(/^(?:\/)?(?:launch|create)(?:@\w+)?(?:\s+(?:a\s+)?(?:token|coin|pump(?:\.fun)?))?\s*/i, "")
+    .trim();
+  if (!rest || /\bnft\b/i.test(rest)) return {};
+  const dollar = rest.match(/^\$([A-Za-z0-9]{2,12})\b/);
+  if (dollar) return { symbol: dollar[1].toUpperCase() };
+  const named = rest.match(/^(.+?)\s+\$?([A-Za-z0-9]{2,12})$/);
+  if (named && !/\s/.test(named[2])) {
+    const symbol = named[2].replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const name = named[1].replace(/^\$/, "").trim();
+    if (symbol && name && name.toUpperCase() !== symbol) return { name, symbol };
+    if (symbol) return { symbol };
+  }
+  const only = rest.replace(/[^A-Za-z0-9]/g, "").slice(0, 12).toUpperCase();
+  if (only && !/\s/.test(rest.replace(/^\$/, ""))) return { symbol: only };
+  return { name: rest.slice(0, 32) };
+}
+
+export function parseTickerHint(text) {
+  const m = String(text || "").match(/\$([A-Za-z0-9]{2,12})\b/);
+  if (!m) return "";
+  return m[1].toUpperCase();
 }
 
 function isCapabilityQuestion(compact) {
@@ -189,16 +206,25 @@ export function parseTradeIntent(text) {
     return { tool: "orbitx_shop", args: {} };
   }
 
-  if (/^(nft|nfts|marketplace)\b/.test(compact) && compact.length < 60) {
+  if (/^(show (?:me )?(?:my )?|my )?(portfolio|holdings|bag|wallet)\b/.test(compact) && compact.length < 80) {
+    return { tool: "orbitx_get_wallet", args: {} };
+  }
+
+  if (/^(scan|xray|analyze) (?:this |the |my )?(token|coin|ca|mint)\b/.test(compact)) {
+    const ca = extractMintFromText(t);
+    return { tool: "orbitx_crypto_scan", args: ca ? { mint: ca, ca } : {} };
+  }
+
+  if (/^(nft|nfts|marketplace)\b/.test(compact) && compact.length < 60 && !/\b(launch|mint|create)\b/.test(compact)) {
     return { tool: "orbitx_nft_listings", args: {} };
   }
 
-  if (/^(launch|create token|create coin)\b/.test(compact)) {
-    return { tool: "orbitx_execute_launch", args: parseLaunchArgs(t) };
+  if (/\b(launch|mint|create)\b.+\bnft\b/.test(compact) || /^(mint nft|nft mint|mint an nft|launch an nft|launch nft|create nft)\b/.test(compact)) {
+    return { tool: "orbitx_mint_nft", args: {} };
   }
 
-  if (/^(mint nft|nft mint|mint an nft)\b/.test(compact)) {
-    return { tool: "orbitx_mint_nft", args: {} };
+  if (/^(launch|create token|create coin|create a token|launch token|launch coin)\b/.test(compact) || /^launch\s+\$[a-z0-9]{2,12}\b/i.test(compact)) {
+    return { tool: "orbitx_execute_launch", args: parseLaunchArgs(t) };
   }
 
   const auto =

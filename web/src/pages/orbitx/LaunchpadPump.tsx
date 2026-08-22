@@ -32,6 +32,7 @@ import { setCollectionCoin } from "@/lib/orbitx/nftRegistry";
 import {
   consumeTokenCreatePrefill, peekTokenCreatePrefill, dataUrlToFile, urlToFile,
 } from "@/lib/orbitx/tokenCreatePrefill";
+import { notifyTelegramSessionComplete } from "@/lib/orbitx/telegramSessionComplete";
 import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
@@ -526,6 +527,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const { isAdmin } = useAdmin();
   const [params] = useSearchParams();
   const linkCollectionId = useRef<string | null>(null);
+  const telegramNotifyRef = useRef<{ telegramUserId: string; telegramChatId?: string; confirmNonce?: string } | null>(null);
   const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
 
   const [form, setForm] = useState<FormData>({
@@ -562,10 +564,18 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
   // Auto-fill from NFT / collection handoff
   useEffect(() => {
-    if (params.get("from") !== "nft" && !peekTokenCreatePrefill()) return;
+    const from = params.get("from");
+    if (from !== "nft" && from !== "mcp" && from !== "telegram" && !peekTokenCreatePrefill()) return;
     const draft = consumeTokenCreatePrefill();
     if (!draft) return;
     linkCollectionId.current = draft.collectionId ?? null;
+    if (draft.telegramUserId) {
+      telegramNotifyRef.current = {
+        telegramUserId: draft.telegramUserId,
+        telegramChatId: draft.telegramChatId || undefined,
+        confirmNonce: draft.confirmNonce || undefined,
+      };
+    }
     setForm((f) => ({
       ...f,
       name: draft.name || f.name,
@@ -585,7 +595,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           setImageFile(file);
           setImagePreview(draft.imageDataUrl || URL.createObjectURL(file));
         }
-        toast.success("NFT details pasted into Create Token — review and launch.");
+        toast.success(
+          draft.source === "telegram"
+            ? "Telegram launch details pasted — review the fee, then sign in Phantom."
+            : "NFT details pasted into Create Token — review and launch.",
+        );
       } catch (e) {
         console.warn("[orbitx] prefill image failed", e);
         toast.message("Name & ticker filled from NFT — upload the logo if it did not load.");
@@ -922,6 +936,21 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
       setStep("success");
       toast.success("Token launched! 🚀");
+      const tg = telegramNotifyRef.current;
+      if (tg?.telegramUserId) {
+        void notifyTelegramSessionComplete({
+          telegramUserId: tg.telegramUserId,
+          telegramChatId: tg.telegramChatId,
+          nonce: tg.confirmNonce,
+          kind: "token",
+          mint: mintAddr,
+          signature: sig,
+          name: form.name.trim(),
+          symbol: form.symbol.trim().toUpperCase(),
+          metadataUri: uri,
+          feePaid: LAUNCHPAD_FEE_USD > 0,
+        });
+      }
     } catch (err: any) {
       console.error("Launch error:", err);
       if (err.message?.includes("User rejected")) { setStep("form"); toast.error("Transaction cancelled"); return; }
