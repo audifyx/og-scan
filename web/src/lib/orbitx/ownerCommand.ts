@@ -83,6 +83,20 @@ export function fmtNum(n?: number | null): string {
   return Number(n || 0).toLocaleString();
 }
 
+export function fmtHours(n?: number | null): string {
+  const v = Number(n || 0);
+  if (!Number.isFinite(v) || v <= 0) return "0h";
+  return `${v.toFixed(v < 10 ? 1 : 0)}h`;
+}
+
+export function fmtClock(ms?: number | null): string {
+  const total = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h <= 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
 export function liveDot(status?: string | null): string {
   if (status === "online") return "bg-emerald-400";
   if (status === "away") return "bg-amber-400";

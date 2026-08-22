@@ -57,7 +57,7 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
   overview: {
     eyebrow: "Command center",
     title: "OrbitX owner dashboard",
-    description: "Live users, verified volume, platform fees, and OrbitX burns — one owner console.",
+    description: "Signups, 1-hour stay, hours online, verified volume, fees, and burns — one owner console.",
   },
   live_users: {
     eyebrow: "Presence",

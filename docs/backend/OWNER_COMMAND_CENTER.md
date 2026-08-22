@@ -13,6 +13,10 @@ Central owner dashboard at `/ox-desk-m4k9q`. The desk code and UI hide are **not
 | Burn | `ox_admin_burns.verified_onchain` or confirmed `mcp_burn_ledger` row |
 | Fee | `min(tx_usd × 0.012, $10)` from `web/shared/platform-tx-fee.js` |
 | DAU | distinct `user_activity.user_id` since UTC midnight |
+| Signed up today/week/month | `profiles.created_at` in the UTC calendar window (week starts Monday) |
+| Stayed longer than 1h | that signup's `ox_admin_presence.total_online_ms` ≥ 60 minutes (heartbeat-credited) |
+| Hours online | sum of `ox_admin_sessions` overlaps in the window; lifetime from `total_online_ms` |
+| This visit | now − `session_started_at` while the user is online/away |
 
 Zeros mean no verified rows. The UI never invents numbers.
 
@@ -28,6 +32,7 @@ Tables:
 - `ox_admin_burns` — verified burns only
 - `ox_admin_audit` — owner actions; no UPDATE/DELETE for `authenticated`
 - `ox_admin_daily` — reserved rollups
+- `ox_admin_sessions` — one row per browser `session_id` with start/end/duration (`20260822210000_orbitx_owner_sessions.sql`)
 
 RLS: users may upsert **their own** presence and insert **their own** events. Ledger, burns, audit, and daily are service-role only.
 
