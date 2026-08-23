@@ -1,11 +1,15 @@
 /**
- * Shared wallet send helper for OrbitX Trade tools (burn, claim, rent, unwrap).
+ * Shared wallet send helper for OrbitX Trade tools (buy, burn, claim, rent).
  *
  * Prefer Jupiter `signAndSendTransaction` (window.jupiter.solana) when the
  * connected wallet is Jupiter or the fee-payer matches the Jupiter inject.
  * Manual `signTransaction` + `sendRawTransaction` can return an unsigned
  * legacy tx from some adapters, which then throws:
  * "Signature verification failed. Missing signature for public key …"
+ *
+ * Chrome Phantom must use adapter `sendTransaction` (never Jupiter inject,
+ * never raw `serialize()` on a maybe-unsigned tx). Platform fee wallets
+ * are destinations only — never extra required signers.
  */
 import {
   Connection,
@@ -21,6 +25,11 @@ import {
   toVersionedTransaction,
 } from "@/lib/wallets/jupiterWalletAdapter";
 import { normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
+import { PLATFORM_WALLET } from "@/lib/platformFee";
+import { ROUTED_FEE_WALLET } from "@/lib/orbitx/feeRouting";
+
+/** Desk / owner wallets that receive SOL. They must never be required signers. */
+export const FEE_DESTINATION_WALLETS = [PLATFORM_WALLET, ROUTED_FEE_WALLET] as const;
 
 export type WalletSendCaps = {
   sendTransaction?: (
@@ -51,6 +60,28 @@ export function isVersionedTx(
   return "version" in tx;
 }
 
+/** Caps from `@solana/wallet-adapter-react` `useWallet()`. */
+export function walletCapsFromAdapter(wallet: {
+  sendTransaction?: WalletSendCaps["sendTransaction"] | null;
+  signTransaction?: WalletSendCaps["signTransaction"] | null;
+  wallet?: { adapter?: { name?: string | null } | null } | null;
+}): WalletSendCaps {
+  return {
+    sendTransaction: wallet.sendTransaction ?? undefined,
+    signTransaction: wallet.signTransaction ?? undefined,
+    walletName: wallet.wallet?.adapter?.name ?? null,
+  };
+}
+
+export function decodeBase64Transaction(b64: string): VersionedTransaction | Transaction {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  try {
+    return VersionedTransaction.deserialize(bytes);
+  } catch {
+    return Transaction.from(bytes);
+  }
+}
+
 export function transactionFeePayer(tx: Transaction | VersionedTransaction): string | null {
   if (isVersionedTx(tx)) {
     return tx.message.staticAccountKeys[0]?.toBase58() ?? null;
@@ -58,25 +89,86 @@ export function transactionFeePayer(tx: Transaction | VersionedTransaction): str
   return tx.feePayer?.toBase58() ?? null;
 }
 
+/** Required signers for a compiled message (fee payer first). */
+export function requiredSignerKeys(tx: Transaction | VersionedTransaction): string[] {
+  if (isVersionedTx(tx)) {
+    const n = tx.message.header.numRequiredSignatures;
+    return tx.message.staticAccountKeys.slice(0, n).map((k) => k.toBase58());
+  }
+  if (tx.signatures?.length) {
+    return tx.signatures.map((s) => s.publicKey.toBase58());
+  }
+  return tx.feePayer ? [tx.feePayer.toBase58()] : [];
+}
+
+/**
+ * A Chrome buy/swap may list the desk wallet as a writable destination.
+ * It must not list that wallet as a required signer unless it is the buyer.
+ */
+export function unexpectedFeeWalletSigners(
+  tx: Transaction | VersionedTransaction,
+  userPublicKey?: string | null,
+): string[] {
+  const user = userPublicKey || transactionFeePayer(tx);
+  return requiredSignerKeys(tx).filter(
+    (key) =>
+      (FEE_DESTINATION_WALLETS as readonly string[]).includes(key) && key !== user,
+  );
+}
+
+export function assertSwapSigners(
+  tx: Transaction | VersionedTransaction,
+  userPublicKey?: string | null,
+): void {
+  const extra = unexpectedFeeWalletSigners(tx, userPublicKey);
+  if (extra[0]) {
+    throw new Error(
+      `Buy transaction incorrectly requires a platform fee wallet to sign (${extra[0]}). Rebuild the swap — fee wallets are destinations only.`,
+    );
+  }
+}
+
+function rewriteMissingSignatureError(error: unknown): never {
+  const msg = error instanceof Error ? error.message : String(error);
+  const match = msg.match(/Missing signature for public key \[`?([^\]`]+)`?\]/i);
+  if (match?.[1]) {
+    throw new Error(
+      `Wallet returned an unsigned transaction (missing signature for ${match[1]}). Reconnect Phantom in Chrome and try Buy again.`,
+    );
+  }
+  throw error instanceof Error ? error : new Error(msg);
+}
+
 export function serializeSigned(signed: Transaction | VersionedTransaction): Uint8Array {
   if (isVersionedTx(signed)) {
     const missing = signed.signatures.some((s) => !s || s.every((b) => b === 0));
     if (missing) {
+      const payer = transactionFeePayer(signed);
       throw new Error(
-        "Wallet returned an unsigned versioned transaction. Reconnect Jupiter and try again.",
+        payer
+          ? `Wallet returned an unsigned transaction (missing signature for ${payer}). Reconnect Phantom in Chrome and try Buy again.`
+          : "Wallet returned an unsigned versioned transaction. Reconnect Phantom in Chrome and try again.",
       );
     }
-    return signed.serialize();
+    try {
+      return signed.serialize();
+    } catch (error) {
+      rewriteMissingSignatureError(error);
+    }
   }
   const sigs = signed.signatures ?? [];
   const missing = sigs.find((s) => !s.signature);
   const unsignedKey = missing?.publicKey ?? (sigs.length === 0 ? signed.feePayer : null);
   if (unsignedKey) {
     throw new Error(
-      `Wallet returned an unsigned transaction (missing signature for ${unsignedKey.toBase58()}). Reconnect Jupiter and try again.`,
+      `Wallet returned an unsigned transaction (missing signature for ${unsignedKey.toBase58()}). Reconnect Phantom in Chrome and try Buy again.`,
     );
   }
-  return signed.serialize();
+  try {
+    return signed.serialize();
+  } catch (error) {
+    rewriteMissingSignatureError(error);
+  }
 }
 
 export function isPhantomWalletName(name?: string | null): boolean {
@@ -129,6 +221,7 @@ export async function sendWalletTransaction(
     maxRetries: options?.maxRetries ?? 3,
   };
   const feePayer = transactionFeePayer(tx);
+  assertSwapSigners(tx, feePayer);
 
   if (shouldUseJupiterInject(wallet, feePayer)) {
     return normalizeTxSignatureBase58(await jupiterSignAndSendTransaction(tx, opts));
