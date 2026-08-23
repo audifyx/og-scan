@@ -24,6 +24,7 @@ Vercel CLI is not authenticated here (device OAuth required). Set these on Verce
 | `CRON_SECRET` | Required for `alerts-run` cron (`Authorization: Bearer …`) |
 | `OXW_WORKER_SECRET` | Must match the value set on Supabase secrets |
 | `HELIUS_WEBHOOK_SECRET` | Required for `/api/kol/webhook` (fail-closed if unset) |
+| `X_REPLY_BOT_SECRET` | Required on **Supabase** secrets for `x-reply-bot` + `ai-reply-webhook`. `OXW_WORKER_SECRET` is a legacy alias. |
 
 Cron callers must hit `alerts-run` with `CRON_SECRET` (or `OXW_WORKER_SECRET`). Do not call unprotected.
 
