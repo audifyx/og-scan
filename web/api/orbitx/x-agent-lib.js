@@ -1565,7 +1565,7 @@ export async function executeQueueItem(sb, item, resolveToken, uploadImage) {
     let mediaId = null;
     if (payload.imageUrl && uploadImage) {
       try {
-        mediaId = await uploadImage(String(payload.imageUrl));
+        mediaId = await uploadImage(String(payload.imageUrl), resolved.accessToken);
       } catch {
         /* continue without media */
       }
