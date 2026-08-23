@@ -114,7 +114,7 @@ npm install && npm run dev
 
 ### Admin
 
-- Route: `/admin` (PIN from `ADMIN_PANEL_SECRET`, default `0129`)
+- Route: `/admin` (PIN from `ADMIN_PANEL_SECRET` — no default)
 - Create/resolve markets, payout queue, withdrawals, maintenance toggle
 
 ### Cron

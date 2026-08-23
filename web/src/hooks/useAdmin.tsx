@@ -1,34 +1,23 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 import {
-  OWNER_DESK_UNLOCK_EVENT,
-  OWNER_DESK_UNLOCK_KEY,
-  OWNER_EMAIL,
-  isOwnerIdentity,
-} from "@/lib/ownerDesk";
+  DESK_UNLOCK_EVENT,
+  clearDeskUnlock,
+  hasDeskSession,
+} from "../../shared/desk-unlock-client.js";
 
-/** @deprecated use OWNER_DESK_UNLOCK_KEY — kept so old session keys clear cleanly */
-export const ADMIN_UNLOCK_KEY = OWNER_DESK_UNLOCK_KEY;
-export const ADMIN_UNLOCK_EVENT = OWNER_DESK_UNLOCK_EVENT;
+/** @deprecated use hasDeskSession — kept so old session keys clear cleanly */
+export const ADMIN_UNLOCK_KEY = "ox_desk_sess_v2";
+export const ADMIN_UNLOCK_EVENT = DESK_UNLOCK_EVENT;
 
 export function isAdminUnlocked(): boolean {
-  try {
-    return sessionStorage.getItem(OWNER_DESK_UNLOCK_KEY) === "true";
-  } catch {
-    return false;
-  }
+  return hasDeskSession();
 }
 
 export function setAdminUnlocked(unlocked: boolean): void {
-  try {
-    if (unlocked) sessionStorage.setItem(OWNER_DESK_UNLOCK_KEY, "true");
-    else sessionStorage.removeItem(OWNER_DESK_UNLOCK_KEY);
-    sessionStorage.removeItem("orbitx_admin_unlocked");
-    window.dispatchEvent(new Event(OWNER_DESK_UNLOCK_EVENT));
-  } catch {
-    /* storage unavailable */
-  }
+  if (!unlocked) clearDeskUnlock();
 }
 
 function walletFromUser(user: { email?: string | null; user_metadata?: Record<string, unknown> } | null, profile: { sol_wallet?: string | null } | null, connectedPk?: string | null): string | null {
@@ -48,10 +37,10 @@ export const useAdmin = () => {
 
   useEffect(() => {
     const sync = () => setUnlocked(isAdminUnlocked());
-    window.addEventListener(OWNER_DESK_UNLOCK_EVENT, sync);
+    window.addEventListener(DESK_UNLOCK_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
-      window.removeEventListener(OWNER_DESK_UNLOCK_EVENT, sync);
+      window.removeEventListener(DESK_UNLOCK_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
   }, []);

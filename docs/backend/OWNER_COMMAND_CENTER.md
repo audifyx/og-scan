@@ -62,7 +62,7 @@ Launchpad **creator** trading fee (0.45% with 1.3% platform skim) is a separate 
 
 ## Admin permissions
 
-Owner email `audifyx@gmail.com` and wallets in `TOKEN_GATE_EXEMPT_WALLETS_BASE` / `OWNER_WALLETS`. Desk code `0129` is UI obscurity only.
+Owner email and wallets are allowlisted in `TOKEN_GATE_EXEMPT_*`. The desk PIN lives only in Vercel `OWNER_DESK_CODE` (or `ADMIN_PASS`) and is checked at `/api/orbitx-desk-unlock`. The old client PIN is revoked.
 
 ## Event types
 

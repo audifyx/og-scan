@@ -1,44 +1,27 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Lock, Loader2 } from "lucide-react";
+import {
+  DESK_UNLOCK_EVENT,
+  clearDeskUnlock,
+  hasDeskSession,
+  persistDeskUnlock,
+  requestDeskUnlock,
+} from "../../../shared/desk-unlock-client.js";
 
-/** Must match web/src/lib/ownerDesk.ts (same-origin sessionStorage). */
-const OWNER_DESK_CODE = "0129";
-const OWNER_DESK_UNLOCK_KEY = "ox_desk_sess_v1";
-const OWNER_DESK_UNLOCK_EVENT = "ox-desk-unlock";
-const OWNER_EMAIL = "audifyx@gmail.com";
-
-function isUnlocked(): boolean {
-  try {
-    return sessionStorage.getItem(OWNER_DESK_UNLOCK_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function setUnlocked(v: boolean) {
-  try {
-    if (v) sessionStorage.setItem(OWNER_DESK_UNLOCK_KEY, "true");
-    else sessionStorage.removeItem(OWNER_DESK_UNLOCK_KEY);
-    sessionStorage.removeItem("orbitx_admin_unlocked");
-    window.dispatchEvent(new Event(OWNER_DESK_UNLOCK_EVENT));
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Soft UI gate for ORBITX_DEX owner desk — not API auth. */
+/** Soft UI gate for ORBITX_DEX owner desk — PIN is checked on Vercel, not here. */
 export default function OwnerDeskGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [ok, setOk] = useState(false);
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setOk(isUnlocked());
+    setOk(hasDeskSession());
     setReady(true);
-    const sync = () => setOk(isUnlocked());
-    window.addEventListener(OWNER_DESK_UNLOCK_EVENT, sync);
-    return () => window.removeEventListener(OWNER_DESK_UNLOCK_EVENT, sync);
+    const sync = () => setOk(hasDeskSession());
+    window.addEventListener(DESK_UNLOCK_EVENT, sync);
+    return () => window.removeEventListener(DESK_UNLOCK_EVENT, sync);
   }, []);
 
   if (!ready) {
@@ -58,15 +41,20 @@ export default function OwnerDeskGate({ children }: { children: ReactNode }) {
       </div>
       <p className="text-xs text-muted mb-4">Enter access code.</p>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          if (code.trim() === OWNER_DESK_CODE) {
-            setUnlocked(true);
+          setBusy(true);
+          setErr("");
+          try {
+            const token = await requestDeskUnlock(code.trim());
+            persistDeskUnlock(token);
             setOk(true);
-            setErr("");
-          } else {
-            setErr("Incorrect code");
+          } catch (error) {
+            clearDeskUnlock();
+            setErr(error instanceof Error ? error.message : "Incorrect code");
             setCode("");
+          } finally {
+            setBusy(false);
           }
         }}
       >
@@ -81,9 +69,10 @@ export default function OwnerDeskGate({ children }: { children: ReactNode }) {
           className="w-full bg-panel2 border border-line rounded-lg px-3 py-2.5 text-sm outline-none focus:border-accent/60"
         />
         {err && <div className="text-down text-xs mt-2">{err}</div>}
-        <button className="btn bg-accent text-black font-semibold w-full mt-3">Unlock</button>
+        <button className="btn bg-accent text-black font-semibold w-full mt-3" disabled={busy}>
+          {busy ? "Checking…" : "Unlock"}
+        </button>
       </form>
-      <p className="text-[10px] text-muted mt-3">Owner: {OWNER_EMAIL}</p>
     </div>
   );
 }

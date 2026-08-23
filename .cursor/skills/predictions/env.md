@@ -17,7 +17,7 @@
 | Variable | Purpose |
 |----------|---------|
 | `SOLANA_RPC_ENDPOINT` | Server RPC (fallback: `NEXT_PUBLIC_RPC_ENDPOINT`) |
-| `ADMIN_PANEL_SECRET` | Admin panel PIN (default `0129`) |
+| `ADMIN_PANEL_SECRET` | Admin panel PIN (required; no default) |
 | `CRON_SECRET` | Auth header for `/api/cron/resolve` |
 | `SPORTSDB_API_KEY` | TheSportsDB oracle (default `3`) |
 

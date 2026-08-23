@@ -17,8 +17,11 @@ export const OWNER_DESK_PATH = "ox-desk-m4k9q";
 export const OWNER_DESK_HREF = `/${OWNER_DESK_PATH}`;
 export const OWNER_DESK_DEX_HREF = `/ORBITX_DEX/${OWNER_DESK_PATH}`;
 
-/** Manual UI unlock code — client obscurity only; never use as server ADMIN_PASS. */
-export const OWNER_DESK_CODE = "0129";
+export {
+  DESK_SESS_KEY as OWNER_DESK_UNLOCK_KEY,
+  DESK_TOKEN_KEY as OWNER_DESK_TOKEN_KEY,
+  DESK_UNLOCK_EVENT as OWNER_DESK_UNLOCK_EVENT,
+} from "../../shared/desk-unlock-client.js";
 
 /** Sole owner email for desk UI + owner-gated APIs. */
 export const OWNER_EMAIL = TOKEN_GATE_EXEMPT_EMAILS_BASE[0] || "audifyx@gmail.com";
@@ -45,9 +48,6 @@ function parseOwnerWallets(): readonly string[] {
   return [...TOKEN_GATE_EXEMPT_WALLETS_BASE, ...extras].filter((w, i, arr) => arr.indexOf(w) === i);
 }
 export const OWNER_WALLETS = parseOwnerWallets();
-
-export const OWNER_DESK_UNLOCK_KEY = "ox_desk_sess_v1";
-export const OWNER_DESK_UNLOCK_EVENT = "ox-desk-unlock";
 
 /** True if this identity is the platform owner (email and/or wallet). */
 export function isOwnerIdentity(opts: {

@@ -8,7 +8,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}", "api/orbitx/**/*.test.js", "shared/**/*.test.js"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "api/orbitx/**/*.test.js", "api/*.test.js", "shared/**/*.test.js"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
