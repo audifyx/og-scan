@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { VersionedTransaction } from "@solana/web3.js";
 import { ExternalLink, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { jupQuote, jupSwapTransaction, SOL_MINT, type JupQuote } from "@/lib/og";
+import {
+  decodeBase64Transaction,
+  sendBuyTransaction,
+  walletCapsFromAdapter,
+} from "@/lib/orbitx/sendWalletTx";
 import { fetchTokenChart, fetchTokenDetail } from "@/lib/orbitxcity/tokenApi";
 import { fmtPct, fmtUsd, shortMint } from "@/lib/orbitxcity/marketData";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
@@ -105,26 +109,12 @@ export function TokenBuyPanel() {
     setBuying(true);
     try {
       const b64 = await jupSwapTransaction(quote, pk.toBase58());
-      const tx = VersionedTransaction.deserialize(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
-
-      let sig: string;
-      if (signTransaction) {
-        const signed = await signTransaction(tx);
-        sig = await connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else if (sendTransaction) {
-        sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
-      } else if (wallet?.adapter && "signTransaction" in wallet.adapter && typeof (wallet.adapter as { signTransaction?: unknown }).signTransaction === "function") {
-        const signed = await (wallet.adapter as { signTransaction: (t: VersionedTransaction) => Promise<VersionedTransaction> }).signTransaction(tx);
-        sig = await connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else {
-        throw new Error("This wallet can't sign transactions here — open OrbitX in your wallet app or try Phantom/Solflare");
-      }
+      const tx = decodeBase64Transaction(b64);
+      const sig = await sendBuyTransaction(
+        connection,
+        walletCapsFromAdapter({ sendTransaction, signTransaction, wallet }, { preferJupiter: true }),
+        tx,
+      );
 
       toast.success(`Bought $${token?.symbol ?? "token"}`, {
         description: `sig ${sig.slice(0, 8)}…`,

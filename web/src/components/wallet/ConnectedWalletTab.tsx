@@ -29,9 +29,13 @@ import {
   formatAddress, formatUsd
 } from "@/lib/solana-api";
 import { HELIUS_RPC, HELIUS_API_KEY, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
-import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED, deriveFeeAccount } from "@/lib/platformFee";
+import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED } from "@/lib/platformFee";
 import { formatDistanceToNow } from "date-fns";
-import { VersionedTransaction } from "@solana/web3.js";
+import {
+  decodeBase64Transaction,
+  sendBuyTransaction,
+  walletCapsFromAdapter,
+} from "@/lib/orbitx/sendWalletTx";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface RichToken {
@@ -64,22 +68,13 @@ type EnrichedTx = ParsedTransaction & {
 // Re-export WalletPnLSummary type alias
 type WalletPnL = WalletPnLSummary;
 
-/* ─── Phantom native swap ────────────────────────────────────────── */
-function base64ToUint8Array(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-async function phantomSwap(
+/* ─── Jupiter swap bytes — signed via Jupiter signAndSend (not Phantom) ─ */
+async function buildChromeSwapTx(
   fromMint: string, toMint: string, amountLamports: number,
   slippageBps: number, userPublicKey: string
 ): Promise<string> {
-  const phantom = (window as any).phantom?.solana;
-  if (!phantom?.isPhantom) throw new Error("Phantom wallet not detected");
   const quoteRes = await fetch(
-    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true${PLATFORM_FEE_ENABLED ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : ""}`,
+    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`,
     { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
   );
   if (!quoteRes.ok) throw new Error("Failed to get swap quote");
@@ -87,7 +82,13 @@ async function phantomSwap(
   const swapRes = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${JUPITER_API_KEY}` },
-    body: JSON.stringify({ quoteResponse: quote, userPublicKey, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: "auto", ...(PLATFORM_FEE_ENABLED ? { feeAccount: deriveFeeAccount(toMint) } : {}) }),
+    body: JSON.stringify({
+      quoteResponse: quote,
+      userPublicKey,
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      prioritizationFeeLamports: "auto",
+    }),
   });
   if (!swapRes.ok) throw new Error("Failed to build swap transaction");
   const { swapTransaction } = await swapRes.json();
@@ -141,7 +142,8 @@ function fmtNum(n: number) {
    Main Component
    ═══════════════════════════════════════════════════════════════════ */
 export function ConnectedWalletTab() {
-  const { publicKey, connect, disconnect, connected, wallet, wallets, select } = useWallet();
+  const adapterWallet = useWallet();
+  const { publicKey, connect, disconnect, connected, wallet, wallets, select, sendTransaction, signTransaction } = adapterWallet;
   const { connection } = useConnection();
 
   const [overview, setOverview] = useState<WalletOverview | null>(null);
@@ -391,16 +393,16 @@ export function ConnectedWalletTab() {
     if (!swapToken || !swapAmount || !publicKey) return;
     setSwapLoading(true);
     try {
-      const phantom = (window as any).phantom?.solana;
-      if (!phantom?.isPhantom) throw new Error("Phantom wallet not found. Please install Phantom.");
+      if (!sendTransaction && !signTransaction) {
+        throw new Error("Connect Jupiter Wallet in Chrome to buy — the wallet session is not ready to sign.");
+      }
       const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
       const outputMint = swapMode === "buy" ? swapToken.mint : SOL_MINT;
       const decimals = swapMode === "buy" ? 9 : swapToken.decimals;
       const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
-      const swapTxBase64 = await phantomSwap(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
-      const txBytes = base64ToUint8Array(swapTxBase64);
-      const tx = VersionedTransaction.deserialize(txBytes);
-      const { signature: sig } = await phantom.signAndSendTransaction(tx);
+      const swapTxBase64 = await buildChromeSwapTx(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
+      const tx = decodeBase64Transaction(swapTxBase64);
+      const sig = await sendBuyTransaction(connection, walletCapsFromAdapter(adapterWallet, { preferJupiter: true }), tx);
       toast({ title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`, description: `TX: ${formatAddress(sig, 6)}` });
       setSwapOpen(false); setSwapAmount("");
       setTimeout(() => loadData(address, true), 3000);

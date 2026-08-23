@@ -1,13 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Keypair, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
 import {
   serializeSigned,
   sendWalletTransaction,
+  sendBuyTransaction,
   shouldUseJupiterInject,
   toVersionedTransaction,
   transactionFeePayer,
   confirmSentTransaction,
+  requiredSignerKeys,
+  unexpectedFeeWalletSigners,
+  assertSwapSigners,
+  FEE_DESTINATION_WALLETS,
+  walletCapsFromAdapter,
 } from "./sendWalletTx";
+import { ROUTED_FEE_WALLET } from "./feeRouting";
+import { PLATFORM_WALLET } from "@/lib/platformFee";
 import {
   getJupiterProvider,
   jupiterProviderPublicKey,
@@ -35,6 +43,18 @@ function unsignedTransfer() {
   return { payer, tx };
 }
 
+/** Avoid SystemProgram.transfer in tests — Buffer/Uint8Array layout breaks in Vitest. */
+function transferLikeIx(from: PublicKey, to: PublicKey, fromSigns: boolean) {
+  return new TransactionInstruction({
+    programId: new PublicKey("11111111111111111111111111111111"),
+    keys: [
+      { pubkey: from, isSigner: fromSigns, isWritable: true },
+      { pubkey: to, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.alloc(0),
+  });
+}
+
 describe("toVersionedTransaction", () => {
   it("compiles a legacy burn-style tx so Jupiter does not serialize unsigned legacy bytes", () => {
     const { payer, tx } = unsignedTransfer();
@@ -52,6 +72,58 @@ describe("serializeSigned", () => {
     );
   });
 
+  it("rewrites the Chrome Phantom serialize error for the owner fee wallet", () => {
+    const feeWallet = new PublicKey(ROUTED_FEE_WALLET);
+    const tx = new Transaction({
+      feePayer: feeWallet,
+      recentBlockhash: "11111111111111111111111111111111",
+    });
+    expect(() => serializeSigned(tx)).toThrow(
+      /missing signature for jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb/,
+    );
+    expect(() => serializeSigned(tx)).toThrow(/Open Jupiter Wallet in Chrome/);
+  });
+});
+
+describe("swap signers — fee wallets are destinations only", () => {
+  it("does not require the routed fee wallet to sign a buy transfer to it", () => {
+    const buyer = Keypair.generate();
+    const tx = new Transaction({
+      feePayer: buyer.publicKey,
+      recentBlockhash: "11111111111111111111111111111111",
+    }).add(transferLikeIx(buyer.publicKey, new PublicKey(ROUTED_FEE_WALLET), true));
+    expect(requiredSignerKeys(tx)).toEqual([buyer.publicKey.toBase58()]);
+    expect(unexpectedFeeWalletSigners(tx, buyer.publicKey.toBase58())).toEqual([]);
+    expect(() => assertSwapSigners(tx, buyer.publicKey.toBase58())).not.toThrow();
+  });
+
+  it("rejects a buy tx that lists the owner fee wallet as an extra signer", () => {
+    const buyer = Keypair.generate();
+    const tx = new Transaction({
+      feePayer: buyer.publicKey,
+      recentBlockhash: "11111111111111111111111111111111",
+    }).add(transferLikeIx(new PublicKey(ROUTED_FEE_WALLET), buyer.publicKey, true));
+    expect(requiredSignerKeys(tx)).toContain(ROUTED_FEE_WALLET);
+    expect(unexpectedFeeWalletSigners(tx, buyer.publicKey.toBase58())).toEqual([ROUTED_FEE_WALLET]);
+    expect(() => assertSwapSigners(tx, buyer.publicKey.toBase58())).toThrow(
+      /platform fee wallet to sign/,
+    );
+  });
+
+  it("allows the owner wallet to buy when it is the fee payer (not an extra signer)", () => {
+    const owner = new PublicKey(ROUTED_FEE_WALLET);
+    const tx = new Transaction({
+      feePayer: owner,
+      recentBlockhash: "11111111111111111111111111111111",
+    }).add(transferLikeIx(owner, new PublicKey(PLATFORM_WALLET), true));
+    expect(unexpectedFeeWalletSigners(tx, ROUTED_FEE_WALLET)).toEqual([]);
+    expect(() => assertSwapSigners(tx, ROUTED_FEE_WALLET)).not.toThrow();
+  });
+
+  it("lists both desk wallets as destinations that must not extra-sign", () => {
+    expect(FEE_DESTINATION_WALLETS).toContain(ROUTED_FEE_WALLET);
+    expect(FEE_DESTINATION_WALLETS).toContain(PLATFORM_WALLET);
+  });
 });
 
 describe("shouldUseJupiterInject", () => {
@@ -68,17 +140,17 @@ describe("shouldUseJupiterInject", () => {
     expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
   });
 
-  it("uses Jupiter inject when preferJupiter is set and the adapter is not Phantom", () => {
+  it("uses Jupiter inject when preferJupiter is set — including Phantom adapter name", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
     vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
     expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Solflare" }, OWNER)).toBe(true);
     expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Jupiter" })).toBe(true);
-    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(false);
+    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(true);
   });
 
-  it("never hijacks Phantom — even if preferJupiter is set", () => {
+  it("does not use Jupiter for Phantom unless preferJupiter is set", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -150,7 +222,7 @@ describe("sendWalletTransaction", () => {
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
   });
 
-  it("sends Phantom adapter txs even when preferJupiter is set", async () => {
+  it("uses Jupiter signAndSend for Chrome buys even when the adapter says Phantom", async () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -163,9 +235,44 @@ describe("sendWalletTransaction", () => {
       { walletName: "Phantom", preferJupiter: true, sendTransaction },
       tx,
     );
-    expect(sig).toBe("PHANTOM_SIG");
-    expect(jupiterSignAndSendTransaction).not.toHaveBeenCalled();
-    expect(sendTransaction).toHaveBeenCalled();
+    expect(sig).toBe("JUPITER_SIG");
+    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sendBuyTransaction refuses Phantom serialize when Jupiter is missing", async () => {
+    const sendTransaction = vi.fn();
+    const { tx } = unsignedTransfer();
+    await expect(
+      sendBuyTransaction(
+        { sendRawTransaction: vi.fn() } as never,
+        { walletName: "Phantom", sendTransaction },
+        tx,
+      ),
+    ).rejects.toThrow(/Connect Jupiter Wallet in Chrome/);
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sendBuyTransaction uses Jupiter signAndSend for the owner wallet", async () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_BUY");
+    const owner = new PublicKey(OWNER);
+    const tx = new Transaction({
+      feePayer: owner,
+      recentBlockhash: "11111111111111111111111111111111",
+    });
+    const sendTransaction = vi.fn();
+    const sig = await sendBuyTransaction(
+      { sendRawTransaction: vi.fn() } as never,
+      { walletName: "Phantom", sendTransaction },
+      tx,
+    );
+    expect(sig).toBe("JUPITER_BUY");
+    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
   });
 
   it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
@@ -198,6 +305,38 @@ describe("sendWalletTransaction", () => {
     );
     expect(sig).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
     expect(sig).not.toContain("/");
+  });
+
+  it("refuses to send a buy that requires the owner fee wallet to co-sign", async () => {
+    const buyer = Keypair.generate();
+    const tx = new Transaction({
+      feePayer: buyer.publicKey,
+      recentBlockhash: "11111111111111111111111111111111",
+    }).add(transferLikeIx(new PublicKey(ROUTED_FEE_WALLET), buyer.publicKey, true));
+    const sendTransaction = vi.fn();
+    await expect(
+      sendWalletTransaction(
+        { sendRawTransaction: vi.fn() } as never,
+        { walletName: "Phantom", sendTransaction },
+        tx,
+      ),
+    ).rejects.toThrow(/platform fee wallet to sign/);
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("maps adapter caps with preferJupiter for Chrome buys", () => {
+    const sendTransaction = vi.fn();
+    const caps = walletCapsFromAdapter(
+      {
+        sendTransaction,
+        signTransaction: vi.fn(),
+        wallet: { adapter: { name: "Phantom" } },
+      },
+      { preferJupiter: true },
+    );
+    expect(caps.walletName).toBe("Phantom");
+    expect(caps.preferJupiter).toBe(true);
+    expect(caps.sendTransaction).toBe(sendTransaction);
   });
 });
 

@@ -23,7 +23,7 @@ import {
   loadDefaultLocalKeypair,
 } from "@/lib/tradeWallets/localTradingWallets";
 import {
-  sendWalletTransaction,
+  sendBuyTransaction,
   sendWithKeypair,
   type WalletSendOptions,
 } from "@/lib/orbitx/sendWalletTx";
@@ -130,14 +130,15 @@ export function useActiveTradingWallet() {
         }
       }
       if (!sendTransaction && !signTransaction) {
-        throw new Error("This wallet can't sign here — connect Phantom or Jupiter");
+        throw new Error("This wallet can't sign here — connect Jupiter Wallet in Chrome");
       }
-      return sendWalletTransaction(
+      return sendBuyTransaction(
         connection,
         {
           sendTransaction: sendTransaction ?? undefined,
           signTransaction: signTransaction ?? undefined,
           walletName: adapterWallet?.adapter?.name ?? null,
+          preferJupiter: true,
         },
         tx,
         options,
