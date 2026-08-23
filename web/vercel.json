@@ -6,6 +6,11 @@
       "source": "/AI",
       "destination": "/ai",
       "permanent": false
+    },
+    {
+      "source": "/predictions",
+      "destination": "https://orbitxtrade.world/",
+      "permanent": false
     }
   ],
   "rewrites": [
@@ -135,19 +140,7 @@
     },
     {
       "source": "/predictions/api/:path*",
-      "destination": "https://orbitx-prediction.fun/api/:path*"
-    },
-    {
-      "source": "/predictions/_next/:path*",
-      "destination": "https://orbitx-prediction.fun/_next/:path*"
-    },
-    {
-      "source": "/predictions",
-      "destination": "https://orbitx-prediction.fun/"
-    },
-    {
-      "source": "/predictions/:path*",
-      "destination": "https://orbitx-prediction.fun/:path*"
+      "destination": "https://orbitxtrade.world/api/:path*"
     },
     {
       "source": "/",

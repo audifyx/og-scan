@@ -1,6 +1,8 @@
 /**
  * Trade More — curated tools (no duplicates).
  */
+import { ORBITX_PREDICTIONS_URL } from "../../../shared/orbitx-predictions.js";
+
 
 export type ToolKind = "panel" | "advanced" | "link";
 
@@ -107,7 +109,7 @@ export const TRADE_TOOLS: TradeTool[] = [
   { id: "intel-whales", name: "Whale Intel", description: "Large wallet flows", category: "Platform", kind: "link", href: "/intel/whales" },
   { id: "social-hq", name: "Social HQ", description: "OrbitX social", category: "Platform", kind: "link", href: "/hq" },
   { id: "orbitx-city", name: "OrbitX City", description: "3D city", category: "Platform", kind: "link", href: "/Orbitxcity" },
-  { id: "predictions", name: "Predictions", description: "Prediction markets", category: "Platform", kind: "link", href: "/predictions" },
+  { id: "predictions", name: "Predictions", description: "Prediction markets", category: "Platform", kind: "link", href: ORBITX_PREDICTIONS_URL },
 ];
 
 export const TOOL_COUNT = TRADE_TOOLS.length;

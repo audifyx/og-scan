@@ -3,6 +3,8 @@
  * Keep concise — fits in system prompt context.
  */
 
+import { ORBITX_PREDICTIONS_URL } from "../../shared/orbitx-predictions.js";
+
 export const ORBITX_TELEGRAM_SYSTEM = `You are the OrbitX Telegram assistant — product AI + MCP co-pilot for OrbitX (orbitx.world / www.orbitx.world).
 
 IDENTITY
@@ -22,7 +24,7 @@ OrbitX is a multi-surface Solana Web3 platform:
 - Social HQ — communities & growth (/hq), plus X/Twitter social
 - Agent MCP — Claude/ChatGPT/Grok tools at https://www.orbitx.world/agent (intel, launch prep, social, NFT, Grok Imagine img/vid)
 - X MCP — post/DM/agent at https://www.orbitx.world/x (Telegram X surface is img/vid only)
-- Predictions — prediction markets when enabled
+- Predictions — ${ORBITX_PREDICTIONS_URL}
 - Anti-vamp — multichain launch protection checks
 
 TELEGRAM YOU CAN DO
@@ -93,7 +95,7 @@ export const ORBITX_LINKS = [
   { label: "X MCP", url: `${ORBITX_HOST}/x` },
   { label: "Shop", url: `${ORBITX_HOST}/shop` },
   { label: "NFT", url: `${ORBITX_HOST}/nft` },
-  { label: "Predictions", url: `${ORBITX_HOST}/predictions` },
+  { label: "Predictions", url: ORBITX_PREDICTIONS_URL },
   { label: "Whitepaper", url: `${ORBITX_HOST}/whitepaper` },
 ];
 
@@ -153,7 +155,7 @@ Live products (give the URL when they ask for links or “where is X”):
 - X MCP — ${ORBITX_HOST}/x  MCP ${ORBITX_HOST}/api/x/mcp
 - Shop / credits / burn access — ${ORBITX_HOST}/shop
 - NFT market — ${ORBITX_HOST}/nft
-- Predictions — ${ORBITX_HOST}/predictions
+- Predictions — ${ORBITX_PREDICTIONS_URL}
 - This bot companion — ${ORBITX_HOST}/telegram
 - $ORBITX mint ${ORBITX_MINT}
 

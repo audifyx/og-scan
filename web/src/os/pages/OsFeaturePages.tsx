@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
 import { OxButton, OxPanel } from "../components/primitives";
 import type { ReactNode } from "react";
+import { ORBITX_PREDICTIONS_URL } from "../../../shared/orbitx-predictions.js";
+import { SmartHref } from "../SmartHref";
 
 function FeatureShell({
   kicker,
@@ -29,17 +30,17 @@ function FeatureShell({
       </h1>
       <p className="ox-lead">{lead}</p>
       <div className="ox-cta-row">
-        <Link to={primaryHref}>
+        <SmartHref href={primaryHref}>
           <OxButton type="button" variant="primary">
             {primaryLabel}
           </OxButton>
-        </Link>
+        </SmartHref>
         {secondaryHref && secondaryLabel && (
-          <Link to={secondaryHref}>
+          <SmartHref href={secondaryHref}>
             <OxButton type="button" variant="ghost">
               {secondaryLabel}
             </OxButton>
-          </Link>
+          </SmartHref>
         )}
       </div>
       {children}
@@ -68,9 +69,9 @@ function PreviewFrame({ label, href }: { label: string; href: string }) {
         <div className="ox-scanline" />
         <div style={{ textAlign: "center", zIndex: 1 }}>
           <div style={{ fontFamily: "var(--ox-font-display)", letterSpacing: "0.08em" }}>{label}</div>
-          <Link to={href} style={{ color: "var(--ox-lime)", fontSize: "0.85rem" }}>
+          <SmartHref href={href} style={{ color: "var(--ox-lime)", fontSize: "0.85rem" }}>
             Open full module →
-          </Link>
+          </SmartHref>
         </div>
       </div>
     </OxPanel>
@@ -155,21 +156,21 @@ export function OsGamesPage() {
       secondaryLabel="Enter City"
     >
       <div className="ox-grid-apps">
-        <Link to="/games" className="ox-app-tile" style={{ ["--tile" as string]: "#17ff4d" }}>
+        <SmartHref href="/games" className="ox-app-tile" style={{ ["--tile" as string]: "#17ff4d" }}>
           <div className="ox-app-tile__icon">D</div>
           <strong>Degen Tower</strong>
           <span>Tap-to-earn arcade</span>
-        </Link>
-        <Link to="/os/predictions" className="ox-app-tile" style={{ ["--tile" as string]: "#f5c542" }}>
+        </SmartHref>
+        <SmartHref href={ORBITX_PREDICTIONS_URL} className="ox-app-tile" style={{ ["--tile" as string]: "#f5c542" }}>
           <div className="ox-app-tile__icon">P</div>
           <strong>Predictions</strong>
           <span>Markets & 1v1</span>
-        </Link>
-        <Link to="/os/lobbies" className="ox-app-tile" style={{ ["--tile" as string]: "#3de7ff" }}>
+        </SmartHref>
+        <SmartHref href="/os/lobbies" className="ox-app-tile" style={{ ["--tile" as string]: "#3de7ff" }}>
           <div className="ox-app-tile__icon">L</div>
           <strong>Lobbies</strong>
           <span>Matchmaking rooms</span>
-        </Link>
+        </SmartHref>
       </div>
     </FeatureShell>
   );
@@ -180,13 +181,13 @@ export function OsPredictionsPage() {
     <FeatureShell
       kicker="Prediction markets"
       title="Odds arena"
-      lead="OrbitX Predictions — on-chain markets linked to DEX intel. Launching soon."
-      primaryHref="/predictions"
-      primaryLabel="Coming soon page"
+      lead="OrbitX Predictions — live YES / NO markets at orbitxtrade.world."
+      primaryHref={ORBITX_PREDICTIONS_URL}
+      primaryLabel="Open Predictions"
       secondaryHref="/play"
       secondaryLabel="Play Studio"
     >
-      <PreviewFrame label="Prediction Board" href="/predictions" />
+      <PreviewFrame label="Prediction Board" href={ORBITX_PREDICTIONS_URL} />
     </FeatureShell>
   );
 }

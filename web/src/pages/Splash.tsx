@@ -24,7 +24,7 @@ const LINKS = {
   xOrbitXPredictionMarket: "https://x.com/orbitx-predictionbet",
   ogdex: "/ORBITX_DEX",
   launchpad: "/orbitxlaunch",
-  orbitxPrediction: "https://solno.fun",
+  orbitxPrediction: "https://orbitxtrade.world/",
   degen: "https://degen-tower.vercel.app",
   privacy: "/privacy",
   terms: "/terms",
@@ -90,7 +90,7 @@ const SHOWCASES: ProductShowcase[] = [
     title: "Markets & fair games.",
     copy: "Prediction markets plus Coinflip, Dice, Crash, Plinko — wired into the OrbitX stack.",
     href: LINKS.orbitxPrediction,
-    cta: "Open solno.fun",
+    cta: "Open Predictions",
     tone: "silver",
     shots: [
       { src: "/splash/predict-01.jpg", label: "Hero" },
@@ -724,7 +724,7 @@ export default function Splash() {
             <div className="sp-eco-icon"><span className="sp-card-ring" aria-hidden /><Icon name="target" /></div>
             <h3>Prediction Market</h3>
             <p>Markets + provably-fair 1v1 games.</p>
-            <span className="sp-eco-link">solno.fun →</span>
+            <span className="sp-eco-link">orbitxtrade.world →</span>
           </a>
         </div>
       </section>

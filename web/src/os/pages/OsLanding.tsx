@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { OxButton } from "../components/primitives";
 import { OS_APPS } from "../apps";
+import { SmartHref } from "../SmartHref";
 
 export function OsLandingPage() {
   return (
@@ -55,11 +56,11 @@ export function OsLandingPage() {
         </h2>
         <div className="ox-grid-apps">
           {OS_APPS.filter((a) => ["city", "dex", "launchpad", "games", "social", "voice"].includes(a.id)).map((app) => (
-            <Link key={app.id} to={app.href} className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
+            <SmartHref key={app.id} href={app.href} className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
               <div className="ox-app-tile__icon">{app.name.slice(0, 1)}</div>
               <strong>{app.name}</strong>
               <span>{app.blurb}</span>
-            </Link>
+            </SmartHref>
           ))}
         </div>
       </section>

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ORBITX_PREDICTIONS_URL } from "../../../../shared/orbitx-predictions.js";
 import { useGameProfile } from "../../state/useGameProfile";
 import { getClass } from "../../catalogs/classesItems";
 import { bumpMission } from "../../state/GameProfileStore";
@@ -79,6 +80,9 @@ export function PlayHomePage() {
           <Link to="/Orbitxcity" className="gx-btn gx-btn-primary">
             Enter OrbitX City
           </Link>
+          <a href={ORBITX_PREDICTIONS_URL} target="_blank" rel="noopener noreferrer" className="gx-btn gx-btn-ghost">
+            Predictions
+          </a>
           <Link to="/games" className="gx-btn gx-btn-ghost">
             Partner games
           </Link>

@@ -35,6 +35,7 @@ import {
 import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
 import { hasExplorerMapPerk } from "@/lib/orbitxcity/characterClasses";
 import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices, Wand2 } from "lucide-react";
+import { ORBITX_PREDICTIONS_URL } from "../../../../shared/orbitx-predictions.js";
 
 const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
   map: "World Map",
@@ -138,10 +139,12 @@ function GamesPanel() {
         <p>Call the next candle. Win the pot. Prediction Center rails.</p>
       </div>
       <div className="oxc-actions">
-        <Link className="oxc-btn primary" to="/games">
-          <Gamepad2 className="h-3.5 w-3.5" /> Open Games
+        <a className="oxc-btn primary" href={ORBITX_PREDICTIONS_URL} target="_blank" rel="noopener noreferrer">
+          <Gamepad2 className="h-3.5 w-3.5" /> Open Predictions
+        </a>
+        <Link className="oxc-btn ghost" to="/games">
+          Open Games
         </Link>
-        <Link className="oxc-btn ghost" to="/ORBITX_DEX">Trade instead</Link>
       </div>
     </div>
   );

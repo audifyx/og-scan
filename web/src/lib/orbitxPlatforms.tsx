@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ORBITX_PREDICTIONS_URL } from "../../shared/orbitx-predictions.js";
 
 /** Shared OrbitX platform catalog — /app home + mini menu stay in sync. */
 export type PlatformApp = {
@@ -200,7 +201,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
   { key: "play", name: "Play", caption: "Games & missions", href: "/play", tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #FF3EAA 48%, #9D174D 100%)", glyph: PlatformGlyph.play },
   { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, menu: false },
-  { key: "predict", name: "Predictions", caption: "Trade YES / NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F59E0B 48%, #B45309 100%)", glyph: PlatformGlyph.predict },
+  { key: "predict", name: "Predictions", caption: "Trade YES / NO", href: ORBITX_PREDICTIONS_URL, external: true, tone: "#FFC53D", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F59E0B 48%, #B45309 100%)", glyph: PlatformGlyph.predict },
   { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft },
   { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F0C75E 48%, #B8860B 100%)", glyph: PlatformGlyph.bagwork },
 ];
