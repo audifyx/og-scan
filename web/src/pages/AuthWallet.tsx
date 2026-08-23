@@ -1,4 +1,4 @@
-// OrbitX /auth — metal-theme sign-in (email preferred for owner tools, wallet for everyone).
+// OrbitX /auth — metal-theme sign-in (email or wallet).
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -11,7 +11,6 @@ import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { needsUsernameClaim } from "@/lib/usernameClaim";
-import { OWNER_EMAIL } from "@/lib/ownerDesk";
 import "./auth.css";
 
 type Tab = "email" | "wallet";
@@ -132,10 +131,7 @@ export default function AuthWallet() {
           <div className="ox-auth-kicker">Secure access</div>
           <h1 className="ox-auth-title">{signup ? "Create your account" : "Welcome back"}</h1>
           <p className="ox-auth-sub">
-            Email is best for owner tools. Wallet works for trading &amp; launches.
-            {next.includes("desk") || next.includes("admin") ? (
-              <> Prefer <span className="ox-auth-em">{OWNER_EMAIL}</span> for admin desks.</>
-            ) : null}
+            Email or wallet. Wallet works for trading and launches.
           </p>
 
           {waitingOnUsername ? (

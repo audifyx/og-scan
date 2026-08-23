@@ -13,7 +13,7 @@ import {
 import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { ADMIN_APPS } from "@/lib/adminApps";
-import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
+import { isOwnerIdentity } from "@/lib/ownerDesk";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
 import { HubSpaceBackground } from "@/components/hub/HubSpaceBackground";
@@ -495,7 +495,7 @@ export default function Hub() {
     const sections = [
       ...PLATFORM_SECTIONS,
       ...(showAdminApps
-        ? [{ id: "admin", title: "Owner Admin", subtitle: OWNER_EMAIL, keys: OWNER_ADMIN_APPS.map((a) => a.key) }]
+        ? [{ id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }]
         : []),
     ].filter((section) => matchQ(`${section.title} ${section.subtitle}`, q));
     const az = groupAppsByLetter(
@@ -760,7 +760,7 @@ export default function Hub() {
   } else if (top.id === "section") {
     const section =
       top.sectionId === "admin"
-        ? { id: "admin", title: "Owner Admin", subtitle: OWNER_EMAIL, keys: OWNER_ADMIN_APPS.map((a) => a.key) }
+        ? { id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }
         : PLATFORM_SECTIONS.find((s) => s.id === top.sectionId);
     const apps =
       top.sectionId === "admin"
