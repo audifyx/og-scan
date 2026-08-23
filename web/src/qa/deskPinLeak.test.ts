@@ -48,6 +48,9 @@ describe("desk PIN is Vercel-locked", () => {
       expect(src, file).not.toMatch(/VITE_ADMIN_PASS/);
       expect(src, file).not.toMatch(/VITE_REDESIGN_PASS/);
       expect(src, file).not.toMatch(/import\.meta\.env\.VITE_ADMIN/);
+      expect(src, file).not.toMatch(/connect owner wallet/i);
+      expect(src, file).not.toMatch(/After unlock, sign in as/i);
+      expect(src, file).not.toMatch(/Sign in with email first/i);
     }
   });
 
@@ -63,10 +66,16 @@ describe("desk PIN is Vercel-locked", () => {
   it("keeps the unlock route at top-level /api/orbitx-desk-unlock", () => {
     const api = readFileSync(resolve(__dirname, "../../api/orbitx-desk-unlock.js"), "utf8");
     expect(api).toContain("ADMIN_AUTH");
-    expect(api).toContain("requireOwnerUser");
+    expect(api).toContain("requireOwnerEmailUser");
     expect(api).toContain("not_configured");
     expect(api).not.toMatch(/\|\|\s*["']\d{4,}["']/);
     expect(api).toContain('purpose === "maintenance"');
+  });
+
+  it("does not print the owner email on the desk shell", () => {
+    const admin = readFileSync(resolve(__dirname, "../pages/Admin.tsx"), "utf8");
+    expect(admin).toContain('ownerLabel="Owner session"');
+    expect(admin).not.toMatch(/ownerLabel=\{user\?\.email/);
   });
 
   it("does not bind MCP identity from a raw publicKey", () => {

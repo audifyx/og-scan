@@ -11,9 +11,9 @@ interface AdminRouteProps {
 
 /**
  * Hidden owner desk gate.
- * Non-owners get a normal 404 — never reveal the owner email, wallet list, or PIN.
+ * Anyone not signed in with the owner email account gets a normal 404.
+ * Wallet connect is not admin. Never reveal the owner email or PIN.
  * Owner still enters the Vercel-locked code, then the desk.
- * Not a substitute for server ADMIN_AUTH / JWT on APIs.
  */
 export const AdminRoute = ({ children }: AdminRouteProps) => {
   const { isAdmin, isOwnerIdentity, loading } = useAdmin();

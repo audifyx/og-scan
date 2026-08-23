@@ -20,6 +20,30 @@ function mockRes() {
 }
 
 describe("POST /api/orbitx-desk-unlock", () => {
+  it("rejects wallet-only sessions for desk unlock", async () => {
+    const prevUrl = process.env.SUPABASE_URL;
+    const prevAnon = process.env.SUPABASE_ANON_KEY;
+    const prevFetch = globalThis.fetch;
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_ANON_KEY = "test-anon";
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        email: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd@wallet.orbitx.app",
+        user_metadata: { wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd" },
+      }),
+    });
+    const res = mockRes();
+    await handler({ method: "POST", headers: { authorization: "Bearer test" }, body: { code: "84829107" } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).error).toBe("denied");
+    globalThis.fetch = prevFetch;
+    if (prevUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = prevUrl;
+    if (prevAnon === undefined) delete process.env.SUPABASE_ANON_KEY;
+    else process.env.SUPABASE_ANON_KEY = prevAnon;
+  });
+
   it("rejects callers without an owner session", async () => {
     const res = mockRes();
     await handler({ method: "POST", headers: {}, body: { code: RETIRED } }, res);

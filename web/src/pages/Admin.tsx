@@ -7,7 +7,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { OwnerDeskShell } from "@/components/admin/OwnerDeskShell";
 import { AdminPassGate } from "@/components/AdminPassGate";
@@ -253,7 +252,6 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
 };
 
 export default function Admin() {
-  const { user } = useAuth();
   const { isAdmin, isOwnerIdentity, deskUnlocked, loading: adminLoading } = useAdmin();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
@@ -430,7 +428,7 @@ export default function Admin() {
       title={activeMeta.title}
       eyebrow={activeMeta.eyebrow}
       description={activeMeta.description}
-      ownerLabel={user?.email || "Owner session"}
+      ownerLabel="Owner session"
       pulse={pulse}
     >
       <Suspense fallback={<Fallback />}>

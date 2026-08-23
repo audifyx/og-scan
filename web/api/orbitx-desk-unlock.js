@@ -13,7 +13,7 @@ import {
   issueDeskSession,
   verifyDeskUnlockCode,
 } from "../shared/desk-unlock.js";
-import { requireOwnerUser } from "../shared/owner-identity.js";
+import { requireOwnerEmailUser } from "../shared/owner-identity.js";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     return json(res, 200, { ok: true, purpose: "maintenance" });
   }
 
-  const owner = await requireOwnerUser(req);
+  const owner = await requireOwnerEmailUser(req);
   if (!owner) return json(res, 403, { ok: false, error: "denied" });
 
   if (!deskUnlockConfigured()) {

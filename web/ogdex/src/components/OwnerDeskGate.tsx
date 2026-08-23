@@ -8,6 +8,18 @@ import {
   readOrbitXAccessToken,
   requestDeskUnlock,
 } from "../../../shared/desk-unlock-client.js";
+import { isOwnerEmail } from "../../../shared/owner-identity.js";
+
+function emailFromAccessToken(token: string): string {
+  try {
+    const part = String(token || "").split(".")[1];
+    if (!part) return "";
+    const json = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    return String(json.email || json.user_metadata?.email || "");
+  } catch {
+    return "";
+  }
+}
 
 /** Soft UI gate for ORBITX_DEX owner desk — PIN is checked on Vercel with owner JWT. */
 export default function OwnerDeskGate({ children }: { children: ReactNode }) {
@@ -20,7 +32,7 @@ export default function OwnerDeskGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setOk(hasDeskSession());
-    setSignedIn(Boolean(readOrbitXAccessToken()));
+    setSignedIn(isOwnerEmail(emailFromAccessToken(readOrbitXAccessToken())));
     setReady(true);
     const sync = () => setOk(hasDeskSession());
     window.addEventListener(DESK_UNLOCK_EVENT, sync);
@@ -35,15 +47,15 @@ export default function OwnerDeskGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (ok) return <>{children}</>;
-
   if (!signedIn) {
     return (
-      <div className="max-w-sm mx-auto card p-6 mt-16 text-center text-sm text-muted">
+      <div className="min-h-[50vh] grid place-items-center text-sm text-muted">
         Not found.
       </div>
     );
   }
+
+  if (ok) return <>{children}</>;
 
   return (
     <div className="max-w-sm mx-auto card p-6 mt-16">
