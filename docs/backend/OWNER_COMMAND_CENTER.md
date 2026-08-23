@@ -62,7 +62,7 @@ Launchpad **creator** trading fee (0.45% with 1.3% platform skim) is a separate 
 
 ## Admin permissions
 
-Owner email and wallets are allowlisted in `TOKEN_GATE_EXEMPT_*`. The desk PIN lives only in Vercel `ADMIN_AUTH` (legacy aliases: `OWNER_DESK_CODE`, `ADMIN_PASS`) and is checked at `/api/orbitx-desk-unlock`. Retired client PINs are rejected by digest and are not stored in this repo.
+Owner email and wallets are allowlisted in `TOKEN_GATE_EXEMPT_*`. The desk PIN lives only in `ADMIN_AUTH` on Vercel project **`rork-og-meme-coin-tracker`** (legacy aliases: `OWNER_DESK_CODE`, `ADMIN_PASS`) and is checked at `/api/orbitx-desk-unlock`. Retired client PINs are rejected by digest and are not stored in this repo. Do not set `ADMIN_AUTH` on the leftover `og-scan` Vercel project.
 
 ## Event types
 

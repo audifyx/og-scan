@@ -1,6 +1,7 @@
 /**
  * POST /api/orbitx-desk-unlock
- * Owner JWT + Vercel ADMIN_AUTH (legacy: OWNER_DESK_CODE / ADMIN_PASS).
+ * Owner JWT + ADMIN_AUTH on Vercel project rork-og-meme-coin-tracker
+ * (legacy aliases: OWNER_DESK_CODE / ADMIN_PASS).
  * Never return the PIN. purpose=maintenance checks the same secret without issuing a desk token.
  * Fail closed when env or owner session is missing.
  * NOT under /api/orbitx/* — that rewrite hits orbitx-hub.

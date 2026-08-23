@@ -43,6 +43,7 @@ Last verified: 2026-07-25 after merging teams 1–5 into `main`.
 ## Stack reality
 
 - Vite + React Router SPA under `web/` (not Next.js)
+- Production Vercel project: **`rork-og-meme-coin-tracker`** (not the leftover `og-scan` Vercel project)
 - R3F for City; Supabase Realtime; Solana/Jupiter
 - Unit tests: Vitest (`web/npm test`)
 

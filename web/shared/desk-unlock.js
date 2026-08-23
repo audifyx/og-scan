@@ -1,7 +1,9 @@
 /**
  * Owner desk PIN — server only.
- * Set Vercel env ADMIN_AUTH. OWNER_DESK_CODE / ADMIN_PASS are legacy aliases.
- * Never ship a default PIN. Retired codes are stored as SHA-256 digests only.
+ * Set ADMIN_AUTH on Vercel project rork-og-meme-coin-tracker (Production + Preview).
+ * Do not set it on the leftover og-scan Vercel project.
+ * OWNER_DESK_CODE / ADMIN_PASS are legacy aliases. Never ship a default PIN.
+ * Retired codes are stored as SHA-256 digests only.
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 

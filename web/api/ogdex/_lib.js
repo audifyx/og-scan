@@ -6,7 +6,7 @@ export const SUPA_FN = process.env.SUPABASE_FN_URL || SUPA_URL + "/functions/v1"
 export const ANON = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamlwbmtoY2VianZ0dGxpcHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1Mjc5NDgsImV4cCI6MjA5MzEwMzk0OH0.aXu8bbpVVwc8KOJf1-lHqO3cz_0GZD10_TE0GlKQ1BI";
 export const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 export const ADMIN_PASS = process.env.ADMIN_AUTH || process.env.ADMIN_PASS || "";
-/** Vercel ADMIN_AUTH (legacy OWNER_DESK_CODE) — no client default. */
+/** ADMIN_AUTH on Vercel project rork-og-meme-coin-tracker (legacy OWNER_DESK_CODE). */
 export const OWNER_DESK_CODE = process.env.ADMIN_AUTH || process.env.OWNER_DESK_CODE || "";
 /** True when Vercel ADMIN_AUTH (or a legacy alias) is set. Retired client PINs are rejected. */
 export function hasAdminPass() {

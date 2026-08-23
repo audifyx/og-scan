@@ -114,7 +114,7 @@ npm install && npm run dev
 
 ### Admin
 
-- Route: `/admin` (PIN from Vercel `ADMIN_AUTH` — no default)
+- Route: `/admin` (PIN from `ADMIN_AUTH` on Vercel project `rork-og-meme-coin-tracker` — no default)
 - Create/resolve markets, payout queue, withdrawals, maintenance toggle
 
 ### Cron

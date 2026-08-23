@@ -57,7 +57,7 @@ export async function requestDeskUnlock(code, bearer) {
   return json.token;
 }
 
-/** Site-wide maintenance unlock — same Vercel ADMIN_AUTH, no desk session. */
+/** Site-wide maintenance unlock — ADMIN_AUTH on rork-og-meme-coin-tracker, no desk session. */
 export async function requestMaintenanceUnlock(code) {
   let res;
   try {

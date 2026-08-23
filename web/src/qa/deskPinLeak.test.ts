@@ -21,7 +21,8 @@ function walkSource(dir: string, out: string[] = []): string[] {
 
 /**
  * CIRCUIT — the desk PIN must never ship in the browser bundle.
- * Unlock is POST /api/orbitx-desk-unlock against Vercel ADMIN_AUTH.
+ * Unlock is POST /api/orbitx-desk-unlock against ADMIN_AUTH
+ * on Vercel project rork-og-meme-coin-tracker.
  */
 const CLIENT_FILES = [
   resolve(__dirname, "../lib/ownerDesk.ts"),
@@ -48,6 +49,14 @@ describe("desk PIN is Vercel-locked", () => {
       expect(src, file).not.toMatch(/VITE_REDESIGN_PASS/);
       expect(src, file).not.toMatch(/import\.meta\.env\.VITE_ADMIN/);
     }
+  });
+
+  it("deploys only Vercel project rork-og-meme-coin-tracker", () => {
+    const cfg = readFileSync(resolve(__dirname, "../../vercel.json"), "utf8");
+    const gate = readFileSync(resolve(__dirname, "../../../scripts/vercel-only-rork.sh"), "utf8");
+    expect(cfg).toContain("vercel-only-rork.sh");
+    expect(gate).toContain("rork-og-meme-coin-tracker");
+    expect(gate).toContain("Skipping leftover Vercel project og-scan");
   });
 
   it("keeps the unlock route at top-level /api/orbitx-desk-unlock", () => {

@@ -46,7 +46,7 @@
 
   <h2>4. Ops requirements before production</h2>
   <ol>
-    <li>Set <code>ADMIN_PASS</code>, <code>VITE_ADMIN_PASS</code> (≥8 chars), <code>CRON_SECRET</code> in Vercel</li>
+    <li>Set <code>ADMIN_AUTH</code> (≥8 chars, never <code>VITE_*</code>) and <code>CRON_SECRET</code> on Vercel project <code>rork-og-meme-coin-tracker</code> only</li>
     <li>Apply migration <code>20260725220000_oxw_record_trade_ownership.sql</code></li>
     <li>Update cron caller to send secret header</li>
     <li>Continue 30/60/90 roadmap in <code>docs/audit/</code></li>

@@ -52,7 +52,7 @@ Postgres (oxw_*, communities, social, ogdex_*)
 ```
 
 ### Env vars observed (non-exhaustive)
-`ADMIN_PASS`, `CRON_SECRET`, `OXW_WORKER_SECRET`, `SUPABASE_*`, `HELIUS_*`, `VITE_ADMIN_PASS`, `VITE_HELIUS_API_KEY`, `VITE_LIVEKIT_URL`, `VITE_SENTRY_DSN`, Jupiter/Birdeye keys, …
+`ADMIN_AUTH` (server-only, Vercel project `rork-og-meme-coin-tracker`), `CRON_SECRET`, `OXW_WORKER_SECRET`, `SUPABASE_*`, `HELIUS_*`, `VITE_HELIUS_API_KEY`, `VITE_LIVEKIT_URL`, `VITE_SENTRY_DSN`, Jupiter/Birdeye keys, …
 
 ---
 
@@ -102,7 +102,7 @@ Expected: PASS on composeRisk, growth, progression, routeManifest, **client.cont
 | oxw_record_trade leak | possible | exception if other user owns sig |
 | Anti-vamp total outage | fail open | fail closed |
 
-**Remaining:** Set `ADMIN_PASS`, `VITE_ADMIN_PASS`, `CRON_SECRET`, and matching `OXW_WORKER_SECRET` in Vercel before relying on admin/cron/workers in production. Prod Supabase OXW migrations + `oxw-*` edge functions + `OXW_WORKER_SECRET` (Supabase side) are applied — see `docs/omega/OPS_APPLY_STATUS.md`.
+**Remaining:** Set `ADMIN_AUTH` (never `VITE_*`) and `CRON_SECRET` on Vercel project **`rork-og-meme-coin-tracker`**, plus matching `OXW_WORKER_SECRET`. Prod Supabase OXW migrations + `oxw-*` edge functions + `OXW_WORKER_SECRET` (Supabase side) are applied — see `docs/omega/OPS_APPLY_STATUS.md`.
 
 ---
 

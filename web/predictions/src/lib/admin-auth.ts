@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 
-// Server-only admin secret. Set ADMIN_AUTH in Vercel (ADMIN_PANEL_SECRET is a legacy alias).
+// Server-only admin secret. Set ADMIN_AUTH on Vercel project rork-og-meme-coin-tracker
+// (ADMIN_PANEL_SECRET is a legacy alias).
 // No default PIN — fail closed if unset.
 export const ADMIN_SECRET = process.env.ADMIN_AUTH || process.env.ADMIN_PANEL_SECRET || '';
 export const ADMIN_COOKIE = 'admin_auth';

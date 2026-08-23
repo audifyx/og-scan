@@ -83,4 +83,4 @@ New migration file: `supabase/migrations/<timestamp>_<snake_name>.sql`. Conventi
 
 ## Env vars (names)
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_FN_URL`, `VITE_SUPABASE_URL`; `HELIUS_API_KEY`, `BIRDEYE_API_KEY`, `JUPITER_API_KEY`; `NVIDIA_API_KEY/BASE_URL/MODEL`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`; `ORBITX_DEX_API_KEYS`, `ORBITX_DEX_INTEL_FN`, `ADMIN_AUTH`; `PINATA_JWT`; `UPSTASH_REDIS_REST_URL/TOKEN`; `DISCORD_PUBLIC_KEY`, `DISCORD_APP_ID`. Never expose keyed providers to the browser — proxy through an edge function or ogdex route.
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_FN_URL`, `VITE_SUPABASE_URL`; `HELIUS_API_KEY`, `BIRDEYE_API_KEY`, `JUPITER_API_KEY`; `NVIDIA_API_KEY/BASE_URL/MODEL`, `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`; `ORBITX_DEX_API_KEYS`, `ORBITX_DEX_INTEL_FN`, `ADMIN_AUTH` (Vercel project `rork-og-meme-coin-tracker` only); `PINATA_JWT`; `UPSTASH_REDIS_REST_URL/TOKEN`; `DISCORD_PUBLIC_KEY`, `DISCORD_APP_ID`. Never expose keyed providers to the browser — proxy through an edge function or ogdex route.
