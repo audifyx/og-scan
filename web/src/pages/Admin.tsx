@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { OwnerDeskShell } from "@/components/admin/OwnerDeskShell";
 import { AdminPassGate } from "@/components/AdminPassGate";
+import NotFound from "@/pages/NotFound";
 import type { AdminSection } from "@/components/admin/types";
 import {
   CommandApps,
@@ -253,7 +254,7 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
 
 export default function Admin() {
   const { user } = useAuth();
-  const { isAdmin, deskUnlocked, loading: adminLoading } = useAdmin();
+  const { isAdmin, isOwnerIdentity, deskUnlocked, loading: adminLoading } = useAdmin();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
   const [pulse, setPulse] = useState<{ users: number; posts24: number; liveSpaces: number; online: number } | null>(null);
@@ -300,7 +301,7 @@ export default function Admin() {
   }, [section]);
 
   // ── Owner-only gate ─────────────────────────────────────────────────────────
-  // ProtectedRoute only checks auth. We enforce owner-only here server-side style.
+  // Non-owners get a normal 404 — never mention the owner email or wallet list.
   if (adminLoading) {
     return (
       <div className="min-h-screen bg-[#020915] flex items-center justify-center">
@@ -308,22 +309,11 @@ export default function Admin() {
       </div>
     );
   }
-  if (!deskUnlocked) {
-    return <AdminPassGate />;
+  if (!isOwnerIdentity) {
+    return <NotFound />;
   }
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-[#020915] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          <h1 className="mb-2 text-lg font-bold text-white">Unavailable</h1>
-          <p className="text-sm text-white/45">
-            {user?.email
-              ? "This surface is limited to the owner account."
-              : "Sign in as the owner account, then reopen this page."}
-          </p>
-        </div>
-      </div>
-    );
+  if (!deskUnlocked || !isAdmin) {
+    return <AdminPassGate />;
   }
   // ────────────────────────────────────────────────────────────────────────────
 

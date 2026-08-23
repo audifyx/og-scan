@@ -1,13 +1,8 @@
-import { Loader2, Mail, Wallet } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
-import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { useAdmin } from "@/hooks/useAdmin";
 import { AdminPassGate } from "@/components/AdminPassGate";
-import { OWNER_EMAIL, OWNER_WALLETS } from "@/lib/ownerDesk";
+import NotFound from "@/pages/NotFound";
 import { useAuth } from "@/hooks/useAuth";
-import { useWalletSignIn } from "@/hooks/useWalletSignIn";
-import { WalletPickerModal } from "@/components/WalletPickerModal";
 import type { ReactNode } from "react";
 
 interface AdminRouteProps {
@@ -15,19 +10,14 @@ interface AdminRouteProps {
 }
 
 /**
- * Hidden owner desk gate:
- * 1) Manual code unlock (session)
- * 2) Signed in as OWNER_EMAIL — or owner wallet (VITE_OWNER_WALLETS)
- *
+ * Hidden owner desk gate.
+ * Non-owners get a normal 404 — never reveal the owner email or wallet list.
+ * Owner (email or allowlisted wallet) still enters the code, then the desk.
  * Not a substitute for server ADMIN_PASS / JWT on APIs.
  */
 export const AdminRoute = ({ children }: AdminRouteProps) => {
-  const { isAdmin, deskUnlocked, loading, ownerEmail } = useAdmin();
-  const { user, loading: authLoading } = useAuth();
-  const location = useLocation();
-  const next = `${location.pathname}${location.search}`;
-  const [picker, setPicker] = useState(false);
-  const { pickable, signInWith, busy } = useWalletSignIn();
+  const { isAdmin, isOwnerIdentity, loading } = useAdmin();
+  const { loading: authLoading } = useAuth();
 
   if (loading || authLoading) {
     return (
@@ -37,62 +27,13 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
     );
   }
 
-  if (!deskUnlocked) {
+  if (!isOwnerIdentity) {
+    return <NotFound />;
+  }
+
+  if (!isAdmin) {
     return <AdminPassGate>{children}</AdminPassGate>;
   }
 
-  if (isAdmin) return <>{children}</>;
-
-  const email = (user?.email || "").toLowerCase().trim();
-  const looksLikeWalletSession = /@wallet\.orbitx\.app$/i.test(email);
-
-  const onPick = async (name: string) => {
-    try {
-      await signInWith(name, { replaceEmailSession: true });
-      setPicker(false);
-      toast.success("Signed in with wallet");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Wallet sign-in failed");
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#020915] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
-        <h1 className="mb-2 text-lg font-bold text-white">Owner account required</h1>
-        <p className="mb-5 text-sm text-white/45">
-          {email ? (
-            <>
-              This session is <span className="font-mono text-white/70">{email}</span>
-              {looksLikeWalletSession ? (
-                <> — a wallet login. Sign in with email <span className="font-mono text-white/70">{OWNER_EMAIL}</span> to open the desk.</>
-              ) : (
-                <> — not the owner email (<span className="font-mono text-white/70">{ownerEmail}</span>).</>
-              )}
-            </>
-          ) : (
-            <>Sign in with email ({OWNER_EMAIL}) or an owner wallet.</>
-          )}
-        </p>
-        <div className="space-y-2.5">
-          <Link
-            to={`/auth?next=${encodeURIComponent(next)}`}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14F195] py-3 text-sm font-black text-black hover:brightness-110"
-          >
-            <Mail className="h-4 w-4" /> Sign in with {OWNER_EMAIL}
-          </Link>
-          <button
-            type="button"
-            onClick={() => setPicker(true)}
-            disabled={busy || OWNER_WALLETS.length === 0}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-bold text-white hover:bg-white/10 disabled:opacity-40"
-          >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-            {OWNER_WALLETS.length === 0 ? "Wallet (set VITE_OWNER_WALLETS)" : "Or connect owner wallet"}
-          </button>
-        </div>
-        <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
-      </div>
-    </div>
-  );
+  return <>{children}</>;
 };

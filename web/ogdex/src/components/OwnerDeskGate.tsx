@@ -5,7 +5,6 @@ import { Lock, Loader2 } from "lucide-react";
 const OWNER_DESK_CODE = "0129";
 const OWNER_DESK_UNLOCK_KEY = "ox_desk_sess_v1";
 const OWNER_DESK_UNLOCK_EVENT = "ox-desk-unlock";
-const OWNER_EMAIL = "audifyx@gmail.com";
 
 function isUnlocked(): boolean {
   try {
@@ -83,7 +82,6 @@ export default function OwnerDeskGate({ children }: { children: ReactNode }) {
         {err && <div className="text-down text-xs mt-2">{err}</div>}
         <button className="btn bg-accent text-black font-semibold w-full mt-3">Unlock</button>
       </form>
-      <p className="text-[10px] text-muted mt-3">Owner: {OWNER_EMAIL}</p>
     </div>
   );
 }
