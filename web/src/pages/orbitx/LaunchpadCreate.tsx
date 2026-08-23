@@ -31,6 +31,9 @@ import {
 } from "lucide-react";
 import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, BASE_LAUNCH_FEE_USD, type FeeBreakdown } from "@/lib/orbitx/fee";
 import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
+import { registerLaunch } from "@/lib/orbitx/launchpadV2";
+import { FlywheelEditor, LaunchKindBanner, useLaunchKindParam } from "./LaunchpadV2";
+import { validateFlywheel } from "../../../shared/launchpad-v2.js";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { consumeTokenCreatePrefill, peekTokenCreatePrefill } from "@/lib/orbitx/tokenCreatePrefill";
@@ -205,6 +208,7 @@ export default function LaunchpadCreate() {
   const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
   const [params] = useSearchParams();
+  const { kind, flywheel, setFlywheel } = useLaunchKindParam("custom");
   const [cfg, setCfg] = useState<LaunchConfig>(DEFAULT_CONFIG);
   const [active, setActive] = useState<SectionId>("identity");
   const [launching, setLaunching] = useState(false);
@@ -405,6 +409,10 @@ export default function LaunchpadCreate() {
     if (errors.length) { toast.error(errors[0]); return; }
     if (!connected || !publicKey || !signTransaction) { toast.error("Connect a wallet first"); return; }
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
+    if (kind === "flywheel" && !validateFlywheel(flywheel).ok) {
+      toast.error("Flywheel allocations must equal 100%");
+      return;
+    }
     setLaunching(true);
     try {
       /* 1 — OrbitX Anti-Vamp identity check. Hard-block only on real collisions.
@@ -533,6 +541,25 @@ export default function LaunchpadCreate() {
         });
         // Credit this launcher's referrer (if any) a share of the real launch fee paid.
         await recordReferralEarning(publicKey.toBase58(), mintAddr, ORBITX_FEE_USD);
+        try {
+          await registerLaunch({
+            mint: mintAddr,
+            signature: sig,
+            creator_wallet: publicKey.toBase58(),
+            name: cfg.name.trim(),
+            ticker: cfg.ticker.trim().toUpperCase(),
+            kind,
+            lane: "custom",
+            image_url: cfg.logoDataUrl,
+            website: cfg.website || null,
+            twitter: cfg.twitter || null,
+            telegram: cfg.telegram || null,
+            metadata_uri: uri,
+            flywheel: kind === "flywheel" ? flywheel : undefined,
+          });
+        } catch (v2Err) {
+          console.warn("[orbitx] launchpad v2 register failed", v2Err);
+        }
       } catch (regErr) {
         // token is live on-chain regardless — registry failure must not eat the launch
         console.warn("[orbitx] registry insert failed", regErr);
@@ -868,6 +895,14 @@ export default function LaunchpadCreate() {
               )}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+              {kind === "bagworking" && (
+                <Link to="/orbitxlaunch/mine">
+                  <Button className="w-full bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 sm:w-auto">Enable Bagworking</Button>
+                </Link>
+              )}
+              <Link to={`/orbitxlaunch/token/${launched.mint}`}>
+                <Button variant="outline" className="w-full border-white/15 sm:w-auto">Token page</Button>
+              </Link>
               {!launched.flagged && (
                 <Link to="/orbitxlaunch/claim">
                   <Button className="w-full bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 sm:w-auto"><Coins className="mr-2 h-4 w-4" /> Claim creator fees</Button>
@@ -925,6 +960,13 @@ export default function LaunchpadCreate() {
           </div>
         </div>
 
+        <div className="mb-4 space-y-3">
+          <LaunchKindBanner kind={kind} />
+          {kind === "flywheel" && <FlywheelEditor value={flywheel} onChange={setFlywheel} />}
+          {kind === "flywheel" && !validateFlywheel(flywheel).ok && (
+            <p className="text-sm text-[#ff4d6d]">Flywheel allocations must equal 100% before launch.</p>
+          )}
+        </div>
         <div className="grid gap-6 lg:grid-cols-[240px_1fr_320px]">
           {/* Section nav with completion ticks */}
           <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">

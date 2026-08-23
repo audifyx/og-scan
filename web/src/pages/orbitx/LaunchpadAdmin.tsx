@@ -25,6 +25,7 @@ import {
 import type { OrbitxToken } from "@/lib/orbitx/registry";
 import { TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { useSolUsd } from "./lpx";
+import { LaunchpadV2AdminPanel } from "./LaunchpadV2";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 
@@ -33,7 +34,7 @@ const fmtInt = (n: number) => n.toLocaleString();
 const fmtSol = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 3 });
 const fmtUsd = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
-type Tab = "overview" | "tokens";
+type Tab = "overview" | "tokens" | "v2";
 type Filter = "all" | "pump" | "custom" | "graduated" | "featured" | "hidden";
 
 function StatCard({ label, value, sub, icon: Icon, tone = "gold" }: {
@@ -311,11 +312,11 @@ export default function LaunchpadAdmin() {
 
       {/* Tabs */}
       <div className="flex gap-2">
-        {(["overview", "tokens"] as Tab[]).map((t) => (
+        {(["overview", "tokens", "v2"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold capitalize transition ${
               tab === t ? "border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))]" : "border-white/10 text-muted-foreground hover:text-foreground"}`}>
-            {t === "overview" ? <LayoutDashboard className="h-4 w-4" /> : <Coins className="h-4 w-4" />} {t}
+            {t === "overview" ? <LayoutDashboard className="h-4 w-4" /> : t === "v2" ? <Rocket className="h-4 w-4" /> : <Coins className="h-4 w-4" />} {t === "v2" ? "Launch V2" : t}
           </button>
         ))}
       </div>
@@ -501,6 +502,8 @@ export default function LaunchpadAdmin() {
           )}
         </div>
       )}
+
+      {tab === "v2" && <LaunchpadV2AdminPanel />}
     </div>
   );
 }

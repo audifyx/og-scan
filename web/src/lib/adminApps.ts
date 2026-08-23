@@ -58,7 +58,7 @@ export const ADMIN_APPS: AdminAppDef[] = [
     label: "Launchpad Desk",
     caption: "Tokens & fees",
     eyebrow: "OrbitX Launch",
-    description: "Feature/hide tokens, fee desk, and launchpad admin tools.",
+    description: "Feature/hide tokens, fee desk, Launch V2 / Bagworking moderation, and fee jobs.",
     group: "desks",
     icon: Rocket,
     tone: "#60A5FA",

@@ -28,6 +28,9 @@ import {
 import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft, CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { registerToken, checkAntiVamp, recordReferralEarning } from "@/lib/orbitx/registry";
+import { registerLaunch } from "@/lib/orbitx/launchpadV2";
+import { FlywheelEditor, LaunchKindBanner, useLaunchKindParam } from "./LaunchpadV2";
+import { validateFlywheel } from "../../../shared/launchpad-v2.js";
 import { setCollectionCoin } from "@/lib/orbitx/nftRegistry";
 import {
   consumeTokenCreatePrefill, peekTokenCreatePrefill, dataUrlToFile, urlToFile,
@@ -526,6 +529,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const { connection } = useConnection();
   const { isAdmin } = useAdmin();
   const [params] = useSearchParams();
+  const { kind, flywheel, setFlywheel } = useLaunchKindParam("pump");
   const linkCollectionId = useRef<string | null>(null);
   const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
 
@@ -724,10 +728,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const updateField = (field: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const flywheelOk = validateFlywheel(flywheel).ok;
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    !!imageFile && !nameTaken && !checkingName && !grinding;
+    !!imageFile && !nameTaken && !checkingName && !grinding && flywheelOk;
 
   /* Launch flow */
 
@@ -905,6 +910,25 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         });
         // Credit this launcher's referrer (if any) a share of the real launch fee paid.
         await recordReferralEarning(publicKey.toBase58(), mintAddr, LAUNCHPAD_FEE_USD);
+        try {
+          await registerLaunch({
+            mint: mintAddr,
+            signature: sig,
+            creator_wallet: publicKey.toBase58(),
+            name: form.name.trim(),
+            ticker: form.symbol.trim().toUpperCase(),
+            kind,
+            lane: "pump",
+            image_url: imagePreview,
+            website: form.website.trim() || null,
+            twitter: form.twitter.trim() || null,
+            telegram: form.telegram.trim() || null,
+            metadata_uri: uri,
+            flywheel,
+          });
+        } catch (v2Err) {
+          console.warn("[orbitx] launchpad v2 register failed", v2Err);
+        }
       } catch (regErr) {
         // duplicate names/tickers or transient registry errors must not eat a live launch
         console.warn("[orbitx] pump registry insert failed", regErr);
@@ -1015,6 +1039,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                {kind === "bagworking" && (
+                  <Link to="/orbitxlaunch/mine" className="pf-btn inline-flex items-center justify-center gap-2">
+                    Enable Bagworking
+                  </Link>
+                )}
+                <Link to={`/orbitxlaunch/token/${mintAddress}`} className="ox-btn inline-flex items-center justify-center gap-2">
+                  Token page
+                </Link>
                 <Link to="/orbitxlaunch/claim" className="pf-btn inline-flex items-center justify-center gap-2">
                   <DollarSign className="h-4 w-4" /> Claim Creator Fees
                 </Link>
@@ -1091,6 +1123,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         {/* ─── Form ──────────────────────────────────────────── */}
         {step === "form" && (
           <div className="space-y-5">
+            <LaunchKindBanner kind={kind} />
+            <FlywheelEditor value={flywheel} onChange={setFlywheel} />
+            <div className="ox-panel pf-card p-3 text-xs text-white/60">
+              Pump.fun locks supply at <span className="text-white">1,000,000,000</span> and decimals at <span className="text-white">6</span>.
+            </div>
             {nftPrefillBanner && (
               <div className="rounded-xl border border-[hsl(var(--pf-green))]/40 bg-[hsl(var(--pf-green))]/10 p-4 flex items-start gap-3">
                 <Sparkles className="h-5 w-5 text-[hsl(var(--pf-green))] flex-shrink-0 mt-0.5" />

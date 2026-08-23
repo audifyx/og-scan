@@ -11,7 +11,7 @@ import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { toast } from "sonner";
 import {
   Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Link2, Plus,
-  Twitter, Send, Github, ChevronRight,
+  Twitter, Send, Github, ChevronRight, Megaphone, Gift, BookOpen, Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
@@ -46,9 +46,21 @@ const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [
     id: "launch",
     label: "Launch",
     tabs: [
-      { to: "/orbitxlaunch/create", label: "Create", icon: PlusCircle, end: false, accent: "gold" },
+      { to: "/orbitxlaunch/launch", label: "Launch", icon: PlusCircle, end: false, accent: "gold" },
+      { to: "/orbitxlaunch/types", label: "Launch Types", icon: Layers, end: false },
+      { to: "/orbitxlaunch/create", label: "Lanes", icon: PlusCircle, end: false },
       { to: "/orbitxlaunch/claim", label: "Claim", icon: HandCoins, end: false, hot: true },
       { to: "/orbitxlaunch/rescue", label: "Rescue", icon: Flame, end: false, hot: true },
+    ],
+  },
+  {
+    id: "bagworking",
+    label: "Bagworking",
+    tabs: [
+      { to: "/orbitxlaunch/bagworking", label: "Bagworking", icon: Megaphone, end: false, accent: "gold" },
+      { to: "/orbitxlaunch/mine", label: "My Launches", icon: Briefcase, end: false },
+      { to: "/orbitxlaunch/rewards", label: "Rewards", icon: Gift, end: false },
+      { to: "/orbitxlaunch/how", label: "How It Works", icon: BookOpen, end: false },
     ],
   },
   {
@@ -73,9 +85,9 @@ type TabDef = {
 
 const MOBILE_TABS: IosTabItem[] = [
   { id: "board", to: "/orbitxlaunch", label: "Board", ico: "⌂", end: true },
-  { id: "create", to: "/orbitxlaunch/create", label: "Create", ico: "✦" },
+  { id: "create", to: "/orbitxlaunch/launch", label: "Launch", ico: "✦" },
   { id: "claim", to: "/orbitxlaunch/claim", label: "Claim", ico: "◎" },
-  { id: "bag", to: "/orbitxlaunch/portfolio", label: "Bag", ico: "▣" },
+  { id: "bag", to: "/orbitxlaunch/bagworking", label: "Bags", ico: "▣" },
   { id: "you", to: "/orbitxlaunch/profile", label: "You", ico: "◉" },
 ];
 
@@ -83,6 +95,12 @@ const ROOT_PATHS = new Set([
   "/orbitxlaunch",
   "/orbitxlaunch/",
   "/orbitxlaunch/leaderboard",
+  "/orbitxlaunch/launch",
+  "/orbitxlaunch/types",
+  "/orbitxlaunch/bagworking",
+  "/orbitxlaunch/mine",
+  "/orbitxlaunch/rewards",
+  "/orbitxlaunch/how",
   "/orbitxlaunch/create",
   "/orbitxlaunch/create/custom",
   "/orbitxlaunch/create/pump",
@@ -98,6 +116,12 @@ const ROOT_PATHS = new Set([
 ]);
 
 function titleFor(pathname: string): string {
+  if (pathname.startsWith("/orbitxlaunch/bagworking")) return "Bagworking";
+  if (pathname === "/orbitxlaunch/launch" || pathname === "/orbitxlaunch/launch/") return "Launch";
+  if (pathname.startsWith("/orbitxlaunch/types")) return "Launch Types";
+  if (pathname.startsWith("/orbitxlaunch/mine")) return "My Launches";
+  if (pathname.startsWith("/orbitxlaunch/rewards")) return "Rewards";
+  if (pathname.startsWith("/orbitxlaunch/how")) return "How It Works";
   if (pathname.startsWith("/orbitxlaunch/create/pump")) return "Pump launch";
   if (pathname.startsWith("/orbitxlaunch/create/custom")) return "Custom launch";
   if (pathname.startsWith("/orbitxlaunch/create/api")) return "API launch";
@@ -275,15 +299,15 @@ function LaunchpadFooter() {
         </div>
         <FooterCol title="Launchpad" links={[
           ["Board", "/orbitxlaunch"],
-          ["Leaders", "/orbitxlaunch/leaderboard"],
-          ["Portfolio", "/orbitxlaunch/portfolio"],
-          ["About", "/orbitxlaunch/about"],
+          ["Launch", "/orbitxlaunch/launch"],
+          ["Bagworking", "/orbitxlaunch/bagworking"],
+          ["My launches", "/orbitxlaunch/mine"],
         ]} />
         <FooterCol title="Create & claim" links={[
-          ["Create coin", "/orbitxlaunch/create"],
+          ["Launch types", "/orbitxlaunch/types"],
           ["Claim fees", "/orbitxlaunch/claim"],
-          ["Rescue", "/orbitxlaunch/rescue"],
-          ["Profile", "/orbitxlaunch/profile"],
+          ["Rewards", "/orbitxlaunch/rewards"],
+          ["How it works", "/orbitxlaunch/how"],
         ]} />
         <FooterCol title="Company" links={[
           ["App Hub", "/app"],
@@ -349,7 +373,13 @@ export default function LaunchpadLayout() {
               to={t.to}
               label={t.label}
               ico={<t.icon className="h-4 w-4" />}
-              active={t.end ? loc.pathname === t.to || loc.pathname === `${t.to}/` : loc.pathname.startsWith(t.to)}
+              active={
+                t.end
+                  ? loc.pathname === t.to || loc.pathname === `${t.to}/`
+                  : t.to === "/orbitxlaunch/launch"
+                    ? loc.pathname === t.to || loc.pathname === `${t.to}/`
+                    : loc.pathname === t.to || loc.pathname.startsWith(`${t.to}/`)
+              }
             />
           ))}
         </div>
