@@ -8,6 +8,25 @@ export const DEFAULT_LONG_MIN_CHARS = 200;
 export const DEFAULT_MAX_POSTS_PER_DAY = 10;
 export const LAUNCH_KINDS = ["standard", "flywheel", "bagworking"];
 
+/**
+ * Pump.fun-style launches always use the flywheel.
+ * `standard` on the pump lane remaps to flywheel so old links still attach it.
+ * Bagworking stays bagworking (campaign) but still stores flywheel allocations.
+ */
+export function resolveLaunchKind(raw, lane = "pump") {
+  const k = String(raw || "").toLowerCase();
+  if (LAUNCH_KINDS.includes(k)) {
+    if (lane === "pump" && k === "standard") return "flywheel";
+    return k;
+  }
+  return lane === "pump" ? "flywheel" : "standard";
+}
+
+/** Persist Community / Buy-Burn / Creator / Rewards for every pump launch. */
+export function shouldAttachFlywheel(kind, lane = "pump") {
+  return lane === "pump" || kind === "flywheel";
+}
+
 export const BAGWORKING_DEFAULTS = {
   short_reward_usd: DEFAULT_SHORT_USD,
   long_reward_usd: DEFAULT_LONG_USD,

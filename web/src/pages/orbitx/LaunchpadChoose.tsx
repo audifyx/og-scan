@@ -30,9 +30,9 @@ export default function LaunchpadChoose() {
 
       <div className="ox-panel ox-panel--gold pf-card mb-6 grid gap-3 p-4 md:grid-cols-3">
         {[
-          { kind: "standard", title: "Standard", to: "/orbitxlaunch/create/pump?kind=standard" },
-          { kind: "flywheel", title: "Flywheel", to: "/orbitxlaunch/create/pump?kind=flywheel" },
-          { kind: "bagworking", title: "Bagworking", to: "/orbitxlaunch/create/pump?kind=bagworking" },
+          { kind: "flywheel", title: "Flywheel (default)", to: "/orbitxlaunch/create/pump?kind=flywheel" },
+          { kind: "bagworking", title: "Bagworking + flywheel", to: "/orbitxlaunch/create/pump?kind=bagworking" },
+          { kind: "standard", title: "Custom only", to: "/orbitxlaunch/create/custom?kind=standard" },
         ].map((k) => (
           <Link key={k.kind} to={k.to} className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-center hover:border-[#F0C75E]/50">
             <div className="pf-mono text-[9px] uppercase tracking-[0.24em] text-[#F0C75E]">{k.kind}</div>
@@ -65,20 +65,21 @@ export default function LaunchpadChoose() {
             </div>
             <div>
               <div className="font-display text-lg font-black text-white">Pump lane</div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#A8B0BC]">bonding curve · fastest to trading</div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#A8B0BC]">bonding curve · flywheel default</div>
             </div>
           </div>
           <p className="mb-4 text-sm leading-relaxed text-[#A8B0BC]">
-            Launch instantly with <span className="text-white">zero liquidity to seed</span> — price builds from buys and sells, then auto-graduates to a real pool.
+            Launch instantly with <span className="text-white">zero liquidity to seed</span> — price builds from buys and sells, then auto-graduates. Every pump-style coin ships with the <span className="text-white">flywheel</span> (Community / Buy-Burn / Creator / Rewards).
           </p>
           <ul className="mb-6 space-y-2">
             <Spec>Zero seeded liquidity — just deploy</Spec>
             <Spec>{creatorPct}% trade fee every buy/sell ({splitLabel})</Spec>
             <Spec>One-click claim across all your pump coins</Spec>
+            <Spec>Flywheel allocations on every pump launch (must total 100%)</Spec>
             <Spec>Auto-ground <span className="font-bold text-[#F0C75E]">…obx</span> vanity contract address</Spec>
           </ul>
-          <Link to="/orbitxlaunch/create/pump" className="ox-btn ox-btn--blue mt-auto w-full">
-            <Zap className="h-4 w-4" /> Deploy pump-style <ArrowRight className="h-4 w-4" />
+          <Link to="/orbitxlaunch/create/pump?kind=flywheel" className="ox-btn ox-btn--blue mt-auto w-full">
+            <Zap className="h-4 w-4" /> Deploy pump + flywheel <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 

@@ -187,11 +187,11 @@ export default function LaunchpadHome() {
       <div className="ox-panel ox-panel--gold pf-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="pf-mono text-[10px] uppercase tracking-[0.24em] text-[#F0C75E]">Launchpad V2</div>
-          <div className="font-display text-lg font-black text-white">Standard · Flywheel · Bagworking</div>
-          <p className="text-sm text-white/60">Real on-chain launches, X-verified promo rewards, and $25 creator-fee jobs.</p>
+          <div className="font-display text-lg font-black text-white">Pump flywheel · Bagworking</div>
+          <p className="text-sm text-white/60">Pump.fun-style coins launch with the flywheel. X-verified promo rewards and $25 creator-fee jobs.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to="/orbitxlaunch/launch" className="ox-btn ox-btn--blue text-sm">Launch</Link>
+          <Link to="/orbitxlaunch/create/pump?kind=flywheel" className="ox-btn ox-btn--blue text-sm">Launch flywheel</Link>
           <Link to="/orbitxlaunch/bagworking" className="ox-btn text-sm">Bagworking</Link>
           <Link to="/orbitxlaunch/how" className="ox-btn text-sm">How it works</Link>
         </div>
@@ -316,7 +316,7 @@ export default function LaunchpadHome() {
           <Eye className="mx-auto mb-3 h-10 w-10 opacity-40" />
           <div className="text-base font-bold">No coins found</div>
           <p className="mt-1 text-sm text-white">Adjust filters or create the first one.</p>
-          <Link to="/orbitxlaunch/create" className="pf-btn mt-5 inline-flex">
+          <Link to="/orbitxlaunch/create/pump?kind=flywheel" className="pf-btn mt-5 inline-flex">
             <Plus className="h-4 w-4" /> Create coin
           </Link>
         </div>

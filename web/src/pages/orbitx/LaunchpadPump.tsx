@@ -529,7 +529,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const { connection } = useConnection();
   const { isAdmin } = useAdmin();
   const [params] = useSearchParams();
-  const { kind, flywheel, setFlywheel } = useLaunchKindParam();
+  const { kind, flywheel, setFlywheel } = useLaunchKindParam("pump");
   const linkCollectionId = useRef<string | null>(null);
   const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
 
@@ -728,7 +728,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const updateField = (field: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const flywheelOk = kind !== "flywheel" || validateFlywheel(flywheel).ok;
+  const flywheelOk = validateFlywheel(flywheel).ok;
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
@@ -924,7 +924,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             twitter: form.twitter.trim() || null,
             telegram: form.telegram.trim() || null,
             metadata_uri: uri,
-            flywheel: kind === "flywheel" ? flywheel : undefined,
+            flywheel,
           });
         } catch (v2Err) {
           console.warn("[orbitx] launchpad v2 register failed", v2Err);
@@ -1124,7 +1124,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         {step === "form" && (
           <div className="space-y-5">
             <LaunchKindBanner kind={kind} />
-            {kind === "flywheel" && <FlywheelEditor value={flywheel} onChange={setFlywheel} />}
+            <FlywheelEditor value={flywheel} onChange={setFlywheel} />
             <div className="ox-panel pf-card p-3 text-xs text-white/60">
               Pump.fun locks supply at <span className="text-white">1,000,000,000</span> and decimals at <span className="text-white">6</span>.
             </div>

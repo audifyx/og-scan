@@ -6,6 +6,8 @@ import {
   dailyLimitReached,
   defaultFlywheel,
   extractTweetId,
+  resolveLaunchKind,
+  shouldAttachFlywheel,
   FEE_THRESHOLD_USD,
   feeReady,
   progressToThreshold,
@@ -13,6 +15,27 @@ import {
   validateFlywheel,
   validateQualifyingText,
 } from "./launchpad-v2.js";
+
+describe("resolveLaunchKind — pump.fun-style uses flywheel", () => {
+  it("defaults pump launches to flywheel when kind is missing", () => {
+    expect(resolveLaunchKind(null, "pump")).toBe("flywheel");
+    expect(resolveLaunchKind("", "pump")).toBe("flywheel");
+    expect(resolveLaunchKind("standard", "pump")).toBe("flywheel");
+  });
+
+  it("keeps bagworking as the campaign kind while still attaching flywheel", () => {
+    expect(resolveLaunchKind("bagworking", "pump")).toBe("bagworking");
+    expect(shouldAttachFlywheel("bagworking", "pump")).toBe(true);
+    expect(shouldAttachFlywheel("flywheel", "pump")).toBe(true);
+  });
+
+  it("does not force flywheel on the custom lane unless asked", () => {
+    expect(resolveLaunchKind(null, "custom")).toBe("standard");
+    expect(resolveLaunchKind("standard", "custom")).toBe("standard");
+    expect(shouldAttachFlywheel("standard", "custom")).toBe(false);
+    expect(shouldAttachFlywheel("flywheel", "custom")).toBe(true);
+  });
+});
 
 describe("validateFlywheel", () => {
   it("accepts allocations that sum to 100%", () => {

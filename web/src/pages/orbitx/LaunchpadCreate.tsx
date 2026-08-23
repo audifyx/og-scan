@@ -208,7 +208,7 @@ export default function LaunchpadCreate() {
   const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
   const [params] = useSearchParams();
-  const { kind, flywheel, setFlywheel } = useLaunchKindParam();
+  const { kind, flywheel, setFlywheel } = useLaunchKindParam("custom");
   const [cfg, setCfg] = useState<LaunchConfig>(DEFAULT_CONFIG);
   const [active, setActive] = useState<SectionId>("identity");
   const [launching, setLaunching] = useState(false);

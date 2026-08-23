@@ -23,8 +23,8 @@ const KINDS: { id: LaunchKind; title: string; blurb: string; points: string[] }[
   {
     id: "flywheel",
     title: "Flywheel Launch",
-    blurb: "Same on-chain create, plus a 100% allocation that routes activity back into the token.",
-    points: ["Configurable Community / Buy-Burn / Creator / Rewards", "Allocations must total 100%", "Fee jobs flag buy/burn when vault ≥ $25"],
+    blurb: "Default for Pump.fun-style launches — same bonding-curve create, plus a 100% allocation that routes activity back into the token.",
+    points: ["Default on the pump lane", "Configurable Community / Buy-Burn / Creator / Rewards", "Fee jobs flag buy/burn when vault ≥ $25"],
   },
   {
     id: "bagworking",
@@ -101,7 +101,7 @@ export function LaunchpadV2Launch() {
         accent="gold"
         eyebrow="OrbitX Launch · V2"
         title="Create → Launch → Promote → Earn"
-        subtitle="Three real launch kinds on the existing Pump.fun and custom lanes. No mock buttons — every launch still signs on-chain."
+        subtitle="Pump.fun-style coins launch with the flywheel. Custom Token-22 stays optional. Every launch still signs on-chain."
       />
       <div className="grid gap-4 md:grid-cols-3">
         {KINDS.map((k) => (
@@ -561,9 +561,11 @@ export function LaunchpadV2AdminPanel() {
   );
 }
 
-export function useLaunchKindParam(): { kind: LaunchKind; flywheel: FlywheelAlloc; setFlywheel: (v: FlywheelAlloc) => void } {
+export function useLaunchKindParam(
+  lane: "pump" | "custom" = "pump",
+): { kind: LaunchKind; flywheel: FlywheelAlloc; setFlywheel: (v: FlywheelAlloc) => void } {
   const [params] = useSearchParams();
-  const kind = kindFromSearch(params.get("kind"));
+  const kind = kindFromSearch(params.get("kind"), lane);
   const [flywheel, setFlywheel] = useState<FlywheelAlloc>(() => defaultFlywheel());
   return { kind, flywheel, setFlywheel };
 }
@@ -575,8 +577,13 @@ export function LaunchKindBanner({ kind }: { kind: LaunchKind }) {
       <div className="pf-mono text-[10px] uppercase tracking-[0.24em] text-[#F0C75E]">Launch type · {kind}</div>
       <div className="mt-1 font-black text-white">{meta.title}</div>
       <p className="mt-1 text-sm text-white/65">{meta.blurb}</p>
+      {(kind === "flywheel" || kind === "bagworking") && (
+        <p className="mt-2 text-xs text-white/50">
+          Pump.fun-style launches store the flywheel (Community / Buy-Burn / Creator / Rewards = 100%). Supply 1B · decimals 6 stay locked by Pump.
+        </p>
+      )}
       {kind === "standard" && (
-        <p className="mt-2 text-xs text-white/50">Pump supply 1,000,000,000 · decimals 6 are locked by Pump.fun. Custom lane can set supply and authorities.</p>
+        <p className="mt-2 text-xs text-white/50">Custom lane can set supply and authorities. Pump.fun-style launches use the flywheel instead.</p>
       )}
     </div>
   );

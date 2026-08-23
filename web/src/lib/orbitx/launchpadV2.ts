@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { defaultFlywheel } from "../../../shared/launchpad-v2.js";
+import { defaultFlywheel, resolveLaunchKind } from "../../../shared/launchpad-v2.js";
 
 export type LaunchKind = "standard" | "flywheel" | "bagworking";
 
@@ -60,7 +60,7 @@ export async function registerLaunch(input: {
       creator_wallet: input.creator_wallet,
       name: input.name,
       ticker: input.ticker,
-      kind: input.kind,
+      kind: input.lane === "custom" ? input.kind : resolveLaunchKind(input.kind, "pump"),
       lane: input.lane || "pump",
       image_url: input.image_url,
       website: input.website,
@@ -76,10 +76,8 @@ export async function registerLaunch(input: {
   });
 }
 
-export function kindFromSearch(raw: string | null | undefined): LaunchKind {
-  const k = String(raw || "").toLowerCase();
-  if (k === "flywheel" || k === "bagworking") return k;
-  return "standard";
+export function kindFromSearch(raw: string | null | undefined, lane: "pump" | "custom" = "pump"): LaunchKind {
+  return resolveLaunchKind(raw, lane) as LaunchKind;
 }
 
-export { defaultFlywheel };
+export { defaultFlywheel, resolveLaunchKind };

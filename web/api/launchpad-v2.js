@@ -19,6 +19,8 @@ import {
   dailyLimitReached,
   defaultFlywheel,
   extractTweetId,
+  resolveLaunchKind,
+  shouldAttachFlywheel,
   FEE_THRESHOLD_USD,
   feeReady,
   LAUNCH_KINDS,
@@ -260,8 +262,8 @@ async function handleRegisterLaunch(req, res, sb, user) {
   const body = bodyOf(req);
   const mint = mintOk(body.mint);
   if (!mint) return json(res, 400, { ok: false, error: "Valid token mint required." });
-  const kind = LAUNCH_KINDS.includes(body.kind) ? body.kind : "standard";
   const lane = body.lane === "custom" ? "custom" : "pump";
+  const kind = resolveLaunchKind(body.kind, lane);
   const signature = String(body.signature || body.mint_signature || "").trim();
   if (!signature) return json(res, 400, { ok: false, error: "Confirmed launch signature required." });
 
@@ -271,13 +273,15 @@ async function handleRegisterLaunch(req, res, sb, user) {
 
   let flywheel = defaultFlywheel();
   let flyBps = null;
-  if (kind === "flywheel") {
-    const checked = validateFlywheel({
+  if (shouldAttachFlywheel(kind, lane)) {
+    const hasParts = [body.community, body.community_bps, body.buyBurn, body.buy_burn, body.creator, body.rewards]
+      .some((v) => v != null && v !== "");
+    const checked = validateFlywheel(hasParts ? {
       community: body.community ?? body.community_bps,
       buyBurn: body.buyBurn ?? body.buy_burn ?? body.buy_burn_bps,
       creator: body.creator ?? body.creator_bps,
       rewards: body.rewards ?? body.rewards_bps,
-    });
+    } : defaultFlywheel());
     if (!checked.ok) return json(res, 400, { ok: false, error: checked.error });
     flyBps = checked.bps;
     flywheel = {
@@ -310,7 +314,7 @@ async function handleRegisterLaunch(req, res, sb, user) {
     twitter: body.twitter ? String(body.twitter).slice(0, 200) : null,
     telegram: body.telegram ? String(body.telegram).slice(0, 200) : null,
     bagworking_eligible: kind === "bagworking",
-    auto_fee_claim: kind !== "standard",
+    auto_fee_claim: shouldAttachFlywheel(kind, lane) || kind === "bagworking",
     status: "live",
     updated_at: new Date().toISOString(),
   };
@@ -327,7 +331,7 @@ async function handleRegisterLaunch(req, res, sb, user) {
     launch = data;
   }
 
-  if (kind === "flywheel" && flyBps) {
+  if (shouldAttachFlywheel(kind, lane) && flyBps) {
     await sb.from("ox_lp_flywheel_configs").upsert({
       launch_id: launch.id,
       community_bps: flyBps.community,
@@ -361,7 +365,7 @@ async function handleRegisterLaunch(req, res, sb, user) {
   }
 
   await audit(sb, user.id, "register_launch", { mint, kind, signature });
-  return json(res, 200, { ok: true, launch, campaign, flywheel: kind === "flywheel" ? flywheel : null });
+  return json(res, 200, { ok: true, launch, campaign, flywheel: flyBps ? flywheel : null });
 }
 
 async function handleMyLaunches(_req, res, sb, user) {
