@@ -182,7 +182,7 @@ export interface AdminRole {
 /* ── Section navigation ── */
 export type AdminSection =
   | "overview" | "users" | "user_activity" | "live_users"
-  | "analytics" | "revenue" | "burns" | "transactions" | "jupiter"
+  | "analytics" | "revenue" | "burns" | "onchain" | "transactions" | "jupiter"
   | "trading" | "launches" | "apps" | "communities" | "games"
   | "referrals" | "fees" | "health" | "security" | "audit" | "settings"
   | "admin_apps" | "moderation" | "lobbies" | "tokens" | "spaces"

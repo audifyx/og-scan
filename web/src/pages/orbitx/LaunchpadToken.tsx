@@ -21,6 +21,9 @@ import { FeeBurnPanel } from "./LaunchpadV2";
 import { orbitScore } from "./orbitScore";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { toast } from "sonner";
+import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
+import { indexConfirmedTx } from "@/lib/orbitx/onchainAttest";
+import { solscanTxUrl } from "../../../shared/orbitx-onchain.js";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
   ArrowLeft, Coins, Zap, BadgeCheck, TrendingUp, TrendingDown, ArrowDownUp,
@@ -255,7 +258,8 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
       const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
       toast.success(`${side === "buy" ? "Buy" : "Sell"} submitted — confirming…`);
       await connection.confirmTransaction(sig, "confirmed");
-      toast.success(`${side === "buy" ? "Bought" : "Sold"} $${symbol}`, { description: "View on Solscan", action: { label: "Open", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") } });
+      void indexConfirmedTx({ signature: sig, kind: "swap", ref_id: mint });
+      toast.success(`${side === "buy" ? "Bought" : "Sold"} $${symbol}`, { description: "View on Solscan", action: { label: "Open", onClick: () => { const u = solscanTxUrl(sig); if (u) window.open(u, "_blank"); } } });
       balQ.refetch();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -616,7 +620,8 @@ export default function LaunchpadToken() {
                   <Row label="Creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[#60A5FA] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
                   <Row label="Launched">{timeAgo(t.created_at)}</Row>
                   {t.lp_pool_address && <Row label="LP pool">{shortAddr(t.lp_pool_address, 5)}</Row>}
-                  {t.mint_signature && <Row label="Mint tx"><a className="text-[#60A5FA] hover:underline" target="_blank" rel="noreferrer" href={`https://solscan.io/tx/${t.mint_signature}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`}>{shortAddr(t.mint_signature, 5)}</a></Row>}
+                  {t.mint_signature && <Row label="Mint tx"><SolscanLink signature={t.mint_signature} cluster={cluster}>{shortAddr(t.mint_signature, 5)}</SolscanLink></Row>}
+                  {t.mint_signature && <IndexOnChainTx signature={t.mint_signature} kind="launch" refId={mint} />}
                 </>
               ) : (
                 <>

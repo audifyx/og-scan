@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Confetti } from "./lpx";
+import { IndexOnChainTx, OnChainBadge, SolscanLink } from "@/components/onchain";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
@@ -1014,6 +1015,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
               <h2 className="font-display text-2xl font-black text-[#F0C75E] mb-2">Deployment complete</h2>
               <p className="text-sm text-white mb-6">Your token is now live on pump.fun</p>
+              <div className="mb-4 flex justify-center"><OnChainBadge signature={txSignature} /></div>
+              <IndexOnChainTx signature={txSignature} kind="launch" refId={mintAddress} />
 
               <div className="mb-4 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
                 <p className="text-[10px] text-white uppercase tracking-widest mb-1">Contract Address</p>
@@ -1051,10 +1054,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                   className="ox-btn ox-btn--blue inline-flex items-center justify-center gap-2">
                   <ExternalLink className="h-4 w-4" /> View on Pump.fun
                 </a>
-                <a href={`https://solscan.io/tx/${txSignature}`} target="_blank" rel="noopener noreferrer"
-                  className="ox-btn inline-flex items-center justify-center gap-2">
-                  <ExternalLink className="h-4 w-4" /> Solscan
-                </a>
+                <SolscanLink signature={txSignature} className="ox-btn inline-flex items-center justify-center gap-2 text-inherit no-underline" />
                 <button onClick={() => { resetForm(); onSuccess(); }}
                   className="ox-btn inline-flex items-center justify-center gap-2">
                   <ArrowLeft className="h-4 w-4" /> View All Tokens

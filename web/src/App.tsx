@@ -193,6 +193,7 @@ import XMcpAuthPage from "./pages/XMcpAuthPage";
 import XMcpLinkAuthPage from "./pages/XMcpLinkAuthPage";
 import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
+import OnChainProofPage from "./pages/OnChainProofPage";
 import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -670,6 +671,7 @@ const App = () => (
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/x" element={<XMcpPage />} />
             <Route path="/shop" element={<ShopPage />} />
+            <Route path="/onchain" element={<OnChainProofPage />} />
             <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
