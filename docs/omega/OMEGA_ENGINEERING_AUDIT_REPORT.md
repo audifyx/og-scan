@@ -60,7 +60,7 @@ Postgres (oxw_*, communities, social, ogdex_*)
 
 | ID | Sev | Fix | Files |
 |----|-----|-----|-------|
-| BUG-001 | S0 | Removed hardcoded admin `0129`; require `ADMIN_PASS` / `VITE_ADMIN_PASS` (≥8 chars) | `ogdex/_lib.js`, `admin.js`, `kols.js`, `AdminPassGate.tsx`, `MaintenanceLock.tsx` |
+| BUG-001 | S0 | Removed hardcoded leaked client admin PIN; require `ADMIN_AUTH` | `ogdex/_lib.js`, `admin.js`, `kols.js`, `AdminPassGate.tsx`, `MaintenanceLock.tsx` |
 | BUG-002 | S1 | `alerts-run` requires `CRON_SECRET` or `OXW_WORKER_SECRET`; removed from NO_LIMIT | `alerts-run.js`, `ogdex.js` |
 | BUG-003 | S1 | Screener client maps `rows\|tokens\|data\|items` | `crypto/api/client.ts` + contract tests |
 | BUG-004 | S1 | Nested token payload unwrap | `normalizeTokenPayload`, `scanTokenFull` |
@@ -97,7 +97,7 @@ Expected: PASS on composeRisk, growth, progression, routeManifest, **client.cont
 
 | Control | Before | After |
 |---------|--------|-------|
-| Default admin pass | `0129` | **none** — empty fails closed |
+| Default admin pass | leaked client PIN | **none** — empty fails closed |
 | alerts-run | public | secret required |
 | oxw_record_trade leak | possible | exception if other user owns sig |
 | Anti-vamp total outage | fail open | fail closed |

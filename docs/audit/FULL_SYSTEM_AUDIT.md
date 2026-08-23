@@ -14,7 +14,7 @@ OrbitX is an **ambitious multi-surface Web3 product** (City, OS, Play, Intel, So
 The core problem is not “missing ideas.” It is **fragmentation + trust gaps**:
 
 1. **Multiple overlapping products** for the same jobs (social ×4+, trading ×3+, intel DTO mismatches).
-2. **Critical security debt** (hardcoded admin pass `0129`).
+2. **Critical security debt** (hardcoded leaked client admin PIN).
 3. **New HQ/Play/Intel shells often demo/local**, while older systems already do the hard work.
 4. **Almost no automated test/CI coverage** relative to surface area.
 
@@ -82,7 +82,7 @@ Ready for continued build—but **not** ready to market as a unified “millions
 ## 2. Security report (Agent 6) — CRITICAL
 
 ### S0 — Fix immediately
-**Hardcoded OGDex admin pass `0129`**
+**Hardcoded OGDex admin PIN (leaked client default)**
 - `web/api/ogdex/_lib.js` (`ADMIN_PASS` fallback)
 - `web/src/components/AdminPassGate.tsx`
 - Related: `MaintenanceLock.tsx` same code

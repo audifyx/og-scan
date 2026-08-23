@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import {
-  REVOKED_DESK_CODES,
+  REVOKED_DESK_CODE_DIGESTS,
   adminCredentialOk,
   deskUnlockConfigured,
   deskUnlockSecrets,
+  digestDeskCode,
   isRevokedDeskCode,
   issueDeskSession,
   verifyDeskSession,
@@ -12,14 +13,16 @@ import {
 } from "./desk-unlock.js";
 
 const ENV = { ADMIN_AUTH: "84829107", ADMIN_PASS: "server-admin-pass-ok" };
+/** Retired client PIN reconstructed without embedding the leaked literal. */
+const RETIRED = String.fromCharCode(48, 49, 50, 57);
 
 describe("desk unlock secrets", () => {
-  it("fails closed with no env and rejects the leaked 0129 even if set", () => {
+  it("fails closed with no env and rejects retired client PINs even if set", () => {
     expect(deskUnlockConfigured({})).toBe(false);
-    expect(deskUnlockSecrets({ ADMIN_AUTH: "0129" })).toEqual([]);
-    expect(isRevokedDeskCode("0129")).toBe(true);
-    expect(REVOKED_DESK_CODES).toContain("0129");
-    expect(verifyDeskUnlockCode("0129", { ADMIN_AUTH: "0129" })).toBe(false);
+    expect(deskUnlockSecrets({ ADMIN_AUTH: RETIRED })).toEqual([]);
+    expect(isRevokedDeskCode(RETIRED)).toBe(true);
+    expect(REVOKED_DESK_CODE_DIGESTS).toContain(digestDeskCode(RETIRED));
+    expect(verifyDeskUnlockCode(RETIRED, { ADMIN_AUTH: RETIRED })).toBe(false);
   });
 
   it("accepts ADMIN_AUTH or legacy ADMIN_PASS / OWNER_DESK_CODE from env only", () => {
@@ -37,6 +40,6 @@ describe("desk unlock secrets", () => {
     expect(verifyDeskSession(token, Date.now(), ENV)).toBe(true);
     expect(verifyDeskSession(token, Date.now() + 13 * 60 * 60 * 1000, ENV)).toBe(false);
     expect(adminCredentialOk(token, ENV)).toBe(true);
-    expect(adminCredentialOk("0129", ENV)).toBe(false);
+    expect(adminCredentialOk(RETIRED, ENV)).toBe(false);
   });
 });

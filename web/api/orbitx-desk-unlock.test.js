@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import handler from "./orbitx-desk-unlock.js";
 
+const RETIRED = String.fromCharCode(48, 49, 50, 57);
+
 function mockRes() {
   const res = {
     statusCode: 0,
@@ -20,7 +22,7 @@ function mockRes() {
 describe("POST /api/orbitx-desk-unlock", () => {
   it("rejects callers without an owner session", async () => {
     const res = mockRes();
-    await handler({ method: "POST", headers: {}, body: { code: "0129" } }, res);
+    await handler({ method: "POST", headers: {}, body: { code: RETIRED } }, res);
     expect(res.statusCode).toBe(403);
     expect(JSON.parse(res.body).error).toBe("denied");
   });
@@ -44,7 +46,7 @@ describe("POST /api/orbitx-desk-unlock", () => {
 
     const denied = mockRes();
     await handler(
-      { method: "POST", headers: { authorization: "Bearer test" }, body: { code: "0129" } },
+      { method: "POST", headers: { authorization: "Bearer test" }, body: { code: RETIRED } },
       denied,
     );
     expect(denied.statusCode).toBe(401);

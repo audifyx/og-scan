@@ -4,7 +4,7 @@ Prioritized for engineering pickup. Severity: S0 (critical) → S4 (polish).
 
 | ID | Sev | Area | Title | Files / evidence | Suggested fix |
 |----|-----|------|-------|------------------|---------------|
-| BUG-001 | S0 | Security | Hardcoded admin pass `0129` | `web/api/ogdex/_lib.js`, `AdminPassGate.tsx`, `MaintenanceLock.tsx` | Env-only secret + Supabase admin JWT; remove fallback |
+| BUG-001 | S0 | Security | Hardcoded leaked client admin PIN | `web/api/ogdex/_lib.js`, `AdminPassGate.tsx`, `MaintenanceLock.tsx` | Env-only `ADMIN_AUTH` + Supabase admin JWT; remove fallback |
 | BUG-002 | S1 | Security | Public `alerts-run` fires webhooks | `ogdex/_routes/alerts-run.js`, `ogdex.js` NO_LIMIT | Require cron/worker secret |
 | BUG-003 | S1 | Intel | Screener UI expects `tokens`/`data`, API returns `rows` | `crypto/api/client.ts`, IntelHome/Trending/Sentiment, `screener.js` | Map `rows` in client |
 | BUG-004 | S1 | Intel | Token payload not unwrapped | `useTokenIntel.ts`, `crypto-scan.ts`, `token.js` response shape | Normalize to flat TokenPayload |

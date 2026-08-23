@@ -8,7 +8,7 @@ export const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 export const ADMIN_PASS = process.env.ADMIN_AUTH || process.env.ADMIN_PASS || "";
 /** Vercel ADMIN_AUTH (legacy OWNER_DESK_CODE) — no client default. */
 export const OWNER_DESK_CODE = process.env.ADMIN_AUTH || process.env.OWNER_DESK_CODE || "";
-/** True when Vercel ADMIN_AUTH (or a legacy alias) is set. 0129 is revoked. */
+/** True when Vercel ADMIN_AUTH (or a legacy alias) is set. Retired client PINs are rejected. */
 export function hasAdminPass() {
   return deskUnlockConfigured();
 }

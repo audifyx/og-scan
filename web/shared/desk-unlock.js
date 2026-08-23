@@ -1,14 +1,16 @@
 /**
  * Owner desk PIN — server only.
- * Set Vercel env ADMIN_AUTH (canonical). OWNER_DESK_CODE / ADMIN_PASS
- * are accepted only as legacy aliases so existing deploys keep working.
- * Never ship a default PIN. The old client value 0129 is revoked forever.
+ * Set Vercel env ADMIN_AUTH. OWNER_DESK_CODE / ADMIN_PASS are legacy aliases.
+ * Never ship a default PIN. Retired codes are stored as SHA-256 digests only.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export const DESK_SESSION_PREFIX = "oxdesk1";
 export const DESK_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-export const REVOKED_DESK_CODES = Object.freeze(["0129"]);
+/** SHA-256 hex of retired client PINs. Plaintext is not kept in this repo. */
+export const REVOKED_DESK_CODE_DIGESTS = Object.freeze([
+  "2d907c75aab224850b6b76d15e2fd471248edf715de8f79dc84c2d411f663f88",
+]);
 
 function trim(v) {
   return String(v || "").trim();
@@ -21,9 +23,14 @@ function safeEqual(a, b) {
   return timingSafeEqual(left, right);
 }
 
+export function digestDeskCode(code) {
+  return createHash("sha256").update(trim(code), "utf8").digest("hex");
+}
+
 export function isRevokedDeskCode(code) {
-  const c = trim(code);
-  return REVOKED_DESK_CODES.some((revoked) => safeEqual(c, revoked));
+  const digest = digestDeskCode(code);
+  if (!digest) return false;
+  return REVOKED_DESK_CODE_DIGESTS.some((revoked) => safeEqual(digest, revoked));
 }
 
 /** Secrets that may unlock the desk. Empty unless Vercel env is set. */

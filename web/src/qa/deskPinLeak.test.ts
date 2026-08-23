@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const RETIRED = String.fromCharCode(48, 49, 50, 57);
+const SKIP_DIR = new Set(["node_modules", "dist", ".git", "coverage"]);
+const SCAN_EXT = new Set([".js", ".ts", ".tsx", ".md", ".html", ".css"]);
+
+function walkSource(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (SKIP_DIR.has(name)) continue;
+    const full = join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) walkSource(full, out);
+    else if (SCAN_EXT.has(name.slice(name.lastIndexOf("."))) && !name.includes("midtown-buildings")) {
+      out.push(full);
+    }
+  }
+  return out;
+}
 
 /**
  * CIRCUIT — the desk PIN must never ship in the browser bundle.
@@ -22,10 +39,9 @@ const CLIENT_FILES = [
 ] as const;
 
 describe("desk PIN is Vercel-locked", () => {
-  it("does not hardcode 0129 or OWNER_DESK_CODE in client gates", () => {
+  it("does not hardcode a desk PIN or OWNER_DESK_CODE in client gates", () => {
     for (const file of CLIENT_FILES) {
       const src = readFileSync(file, "utf8");
-      expect(src, file).not.toContain("0129");
       expect(src, file).not.toMatch(/OWNER_DESK_CODE\s*=\s*["']/);
       expect(src, file).not.toMatch(/DESK_API_PASS\s*=\s*["']/);
       expect(src, file).not.toMatch(/VITE_ADMIN_PASS/);
@@ -39,7 +55,7 @@ describe("desk PIN is Vercel-locked", () => {
     expect(api).toContain("ADMIN_AUTH");
     expect(api).toContain("requireOwnerUser");
     expect(api).toContain("not_configured");
-    expect(api).not.toMatch(/\|\|\s*["']0129["']/);
+    expect(api).not.toMatch(/\|\|\s*["']\d{4,}["']/);
     expect(api).toContain('purpose === "maintenance"');
   });
 
@@ -50,6 +66,18 @@ describe("desk PIN is Vercel-locked", () => {
     const fn = hub.slice(start, end);
     expect(fn).toContain("never a login");
     expect(fn).not.toContain("resolveAgentByWallet");
+  });
+
+  it("does not keep the retired client PIN in source", () => {
+    const quoted = new RegExp(`["'\`]${RETIRED}["'\`]`);
+    const files = [
+      ...walkSource(resolve(__dirname, "../..")),
+      ...walkSource(resolve(__dirname, "../../../docs")),
+    ];
+    for (const file of files) {
+      const src = readFileSync(file, "utf8");
+      expect(src, file).not.toMatch(quoted);
+    }
   });
 
   it("does not grant MCP hold from raw tool-arg wallets", () => {
