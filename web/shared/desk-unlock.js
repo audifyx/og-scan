@@ -1,6 +1,7 @@
 /**
  * Owner desk PIN — server only.
- * Set Vercel env OWNER_DESK_CODE (preferred) and/or ADMIN_PASS.
+ * Set Vercel env ADMIN_AUTH (canonical). OWNER_DESK_CODE / ADMIN_PASS
+ * are accepted only as legacy aliases so existing deploys keep working.
  * Never ship a default PIN. The old client value 0129 is revoked forever.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -28,7 +29,7 @@ export function isRevokedDeskCode(code) {
 /** Secrets that may unlock the desk. Empty unless Vercel env is set. */
 export function deskUnlockSecrets(env = process.env) {
   const out = [];
-  for (const key of ["OWNER_DESK_CODE", "ADMIN_PASS"]) {
+  for (const key of ["ADMIN_AUTH", "OWNER_DESK_CODE", "ADMIN_PASS"]) {
     const s = trim(env[key]);
     if (!s || isRevokedDeskCode(s)) continue;
     if (!out.includes(s)) out.push(s);

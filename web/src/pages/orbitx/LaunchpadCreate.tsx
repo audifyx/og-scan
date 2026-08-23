@@ -37,6 +37,7 @@ import { consumeTokenCreatePrefill, peekTokenCreatePrefill } from "@/lib/orbitx/
 import { supabase } from "@/lib/supabase";
 import { Confetti } from "./lpx";
 import { IndexOnChainTx, OnChainBadge, SolscanLink } from "@/components/onchain";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -202,7 +203,7 @@ function humanTime(sec: number) {
 }
 
 export default function LaunchpadCreate() {
-  const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
+  const { connected, publicKey, connect, wallets, select, signTransaction, sendTransaction, signAllTransactions, wallet } = useWallet();
   const { connection } = useConnection();
   const [params] = useSearchParams();
   const [cfg, setCfg] = useState<LaunchConfig>(DEFAULT_CONFIG);
@@ -403,7 +404,11 @@ export default function LaunchpadCreate() {
 
   const handleLaunch = async () => {
     if (errors.length) { toast.error(errors[0]); return; }
-    if (!connected || !publicKey || !signTransaction) { toast.error("Connect a wallet first"); return; }
+    if (!connected || !publicKey || (!signTransaction && !sendTransaction)) { toast.error("Connect a wallet first"); return; }
+    const caps = walletCapsFromAdapter(wallet, {
+      sendTransaction: sendTransaction ?? undefined,
+      signTransaction: signTransaction ?? undefined,
+    });
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
@@ -466,11 +471,9 @@ export default function LaunchpadCreate() {
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
       tx.partialSign(mintKeypair);
-      const signed = await signTransaction(tx);
       setPhase("confirming"); setPhaseMsg("Broadcasting to Solana mainnet…");
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
-      const conf = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-      if (conf.value.err) throw new Error("Mint transaction failed on-chain: " + JSON.stringify(conf.value.err));
+      const sig = await sendWalletTransaction(connection, caps, tx);
+      await confirmSentTransaction(connection, sig, { blockhash, lastValidBlockHeight, commitment: "confirmed" });
 
       /* 5 — optional Raydium CPMM pool */
       let poolId: string | undefined; let poolTx: string | undefined; let lpBurned = false;
@@ -495,9 +498,8 @@ export default function LaunchpadCreate() {
             if (burn) {
               burn.tx.feePayer = publicKey;
               burn.tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
-              const signedBurn = await signTransaction(burn.tx);
-              const burnSig = await connection.sendRawTransaction(signedBurn.serialize(), { maxRetries: 3 });
-              await connection.confirmTransaction(burnSig, "confirmed");
+              const burnSig = await sendWalletTransaction(connection, caps, burn.tx);
+              await confirmSentTransaction(connection, burnSig, { commitment: "confirmed" });
               lpBurned = true;
             }
           }

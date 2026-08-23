@@ -87,7 +87,7 @@ export default function AgentSignPage() {
     sendTransaction: sendTransaction ?? undefined,
     signTransaction: signTransaction ?? undefined,
     walletName,
-    preferJupiter: !walletName || isJupiterAdapterName(walletName),
+    preferJupiter: isJupiterAdapterName(walletName),
   };
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();

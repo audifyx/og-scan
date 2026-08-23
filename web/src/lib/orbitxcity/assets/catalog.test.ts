@@ -4,6 +4,7 @@ import {
   CITY_PROP_RULES,
   FURNITURE_SETS,
   ORBITX_MODELS,
+  isRealModelResponse,
   ORBITX_PREFERRED_PATHS,
   getFurnitureSet,
   getPropRules,
@@ -31,6 +32,13 @@ describe("orbitxcity assets catalog", () => {
       expect(p.endsWith(".glb")).toBe(true);
     }
     expect(ORBITX_MODELS["character-trader"].preferred).toContain("orbitx_character_trader");
+  });
+
+  it("rejects SPA HTML fallbacks as missing OrbitX art", () => {
+    expect(isRealModelResponse({ ok: true, headers: { get: () => "text/html" } })).toBe(false);
+    expect(isRealModelResponse({ ok: true, headers: { get: () => "model/gltf-binary" } })).toBe(true);
+    expect(isRealModelResponse({ ok: true, headers: { get: () => "application/octet-stream" } })).toBe(true);
+    expect(isRealModelResponse({ ok: false, headers: { get: () => "model/gltf-binary" } })).toBe(false);
   });
 
   it("resolves to fallback when OrbitX art is missing", () => {

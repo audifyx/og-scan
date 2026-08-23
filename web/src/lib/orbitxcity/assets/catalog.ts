@@ -134,6 +134,14 @@ export const ALL_GLTF_PATHS: readonly string[] = [
 /** Preferred OrbitX paths (may 404 until art drops). */
 export const ORBITX_PREFERRED_PATHS: readonly string[] = Object.values(ORBITX_MODELS).map((e) => e.preferred);
 
+/** SPA catch-all returns 200 text/html for missing GLBs — do not treat that as art. */
+export function isRealModelResponse(res: { ok: boolean; headers: { get: (name: string) => string | null } }): boolean {
+  if (!res.ok) return false;
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (!ct || ct.includes("text/html") || ct.includes("text/plain")) return false;
+  return ct.includes("model") || ct.includes("octet-stream") || ct.includes("gltf") || ct.includes("glb");
+}
+
 /** Probe OrbitX preferred paths with HEAD; mark available ones for resolveModelPath. */
 export async function probeOrbitxModels(): Promise<string[]> {
   if (typeof window === "undefined") return [];
@@ -144,7 +152,7 @@ export async function probeOrbitxModels(): Promise<string[]> {
     ORBITX_PREFERRED_PATHS.map(async (path) => {
       try {
         const res = await fetch(path, { method: "HEAD", cache: "force-cache" });
-        if (res.ok) {
+        if (isRealModelResponse(res)) {
           availablePreferred.add(path);
           found.push(path);
         }

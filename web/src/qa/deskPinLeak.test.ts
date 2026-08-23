@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 /**
  * CIRCUIT — the desk PIN must never ship in the browser bundle.
- * Unlock is POST /api/orbitx-desk-unlock against Vercel OWNER_DESK_CODE.
+ * Unlock is POST /api/orbitx-desk-unlock against Vercel ADMIN_AUTH.
  */
 const CLIENT_FILES = [
   resolve(__dirname, "../lib/ownerDesk.ts"),
@@ -27,15 +27,18 @@ describe("desk PIN is Vercel-locked", () => {
       expect(src, file).not.toContain("0129");
       expect(src, file).not.toMatch(/OWNER_DESK_CODE\s*=\s*["']/);
       expect(src, file).not.toMatch(/DESK_API_PASS\s*=\s*["']/);
+      expect(src, file).not.toMatch(/VITE_ADMIN_PASS/);
+      expect(src, file).not.toMatch(/import\.meta\.env\.VITE_ADMIN/);
     }
   });
 
   it("keeps the unlock route at top-level /api/orbitx-desk-unlock", () => {
     const api = readFileSync(resolve(__dirname, "../../api/orbitx-desk-unlock.js"), "utf8");
-    expect(api).toContain("OWNER_DESK_CODE");
+    expect(api).toContain("ADMIN_AUTH");
     expect(api).toContain("requireOwnerUser");
     expect(api).toContain("not_configured");
     expect(api).not.toMatch(/\|\|\s*["']0129["']/);
+    expect(api).toContain('purpose === "maintenance"');
   });
 
   it("does not bind MCP identity from a raw publicKey", () => {

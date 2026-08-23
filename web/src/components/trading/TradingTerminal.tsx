@@ -52,7 +52,8 @@ import {
   type TokenAsset,
 } from "@/lib/solana-api";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
-import { connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
+import { adapterNameMatches, connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
+import { confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import ActiveTradingWalletChip from "@/trade/ActiveTradingWalletChip";
 export type TradeTerminalProps = {
   initialMint?: string | null;
@@ -1162,7 +1163,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
       void (async () => {
         try {
-          await connection.confirmTransaction(sig, "confirmed");
+          await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
           setTradeStage("");
           toast({
             title: "Trade confirmed",
@@ -1893,7 +1894,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
     // Not-installed rows toast a soft hint; never open adapter.url / jup.ag / solflare.com.
     const known = ["Phantom", "Jupiter", "Solflare"] as const;
     const rows = known.map((name) => {
-      const hit = wallets.find((w) => w.adapter.name === name);
+      const hit = wallets.find((w) => adapterNameMatches(String(w.adapter.name), name));
       const rs = hit ? String(hit.readyState) : "NotDetected";
       const ready = rs === "Installed" || rs === "Loadable";
       return { name, icon: hit?.adapter.icon, ready };

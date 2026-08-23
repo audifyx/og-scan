@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Scanlines } from "@/components/Scanlines";
 import { Shield, Lock, Wrench, KeyRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestMaintenanceUnlock } from "../../shared/desk-unlock-client.js";
 
-const ADMIN_CODE = (import.meta.env.VITE_ADMIN_PASS as string | undefined)?.trim() || "";
 const SESSION_KEY = "ogscan_admin_unlocked";
 
 export function MaintenanceLock({ children }: { children: React.ReactNode }) {
@@ -60,6 +60,7 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
   const [shaking, setShaking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Auto-focus input on mount
@@ -69,12 +70,16 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
     }
   }, [unlocked, maintenanceEnabled]);
 
-  const tryUnlock = (value: string) => {
+  const tryUnlock = async (value: string) => {
     const typed = value.trim();
-    if (ADMIN_CODE.length >= 8 && typed === ADMIN_CODE) {
+    if (!typed || submitting) return;
+    setSubmitting(true);
+    setError(false);
+    try {
+      await requestMaintenanceUnlock(typed);
       sessionStorage.setItem(SESSION_KEY, "true");
       setUnlocked(true);
-    } else {
+    } catch {
       setError(true);
       setShaking(true);
       setTimeout(() => {
@@ -83,21 +88,19 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
         setError(false);
         inputRef.current?.focus();
       }, 600);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setCode(val);
+    setCode(e.target.value);
     setError(false);
-    if (ADMIN_CODE.length >= 8 && val.trim() === ADMIN_CODE) {
-      tryUnlock(val);
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      tryUnlock(code);
+      void tryUnlock(code);
     }
   };
 
@@ -105,7 +108,7 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     const pasted = e.clipboardData.getData("text");
     setCode(pasted);
-    tryUnlock(pasted);
+    void tryUnlock(pasted);
   };
 
   // Still loading DB check

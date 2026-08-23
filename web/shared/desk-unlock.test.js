@@ -11,21 +11,22 @@ import {
   verifyDeskUnlockCode,
 } from "./desk-unlock.js";
 
-const ENV = { OWNER_DESK_CODE: "84829107", ADMIN_PASS: "server-admin-pass-ok" };
+const ENV = { ADMIN_AUTH: "84829107", ADMIN_PASS: "server-admin-pass-ok" };
 
 describe("desk unlock secrets", () => {
   it("fails closed with no env and rejects the leaked 0129 even if set", () => {
     expect(deskUnlockConfigured({})).toBe(false);
-    expect(deskUnlockSecrets({ OWNER_DESK_CODE: "0129" })).toEqual([]);
+    expect(deskUnlockSecrets({ ADMIN_AUTH: "0129" })).toEqual([]);
     expect(isRevokedDeskCode("0129")).toBe(true);
     expect(REVOKED_DESK_CODES).toContain("0129");
-    expect(verifyDeskUnlockCode("0129", { OWNER_DESK_CODE: "0129" })).toBe(false);
+    expect(verifyDeskUnlockCode("0129", { ADMIN_AUTH: "0129" })).toBe(false);
   });
 
-  it("accepts OWNER_DESK_CODE or ADMIN_PASS from env only", () => {
+  it("accepts ADMIN_AUTH or legacy ADMIN_PASS / OWNER_DESK_CODE from env only", () => {
     expect(deskUnlockConfigured(ENV)).toBe(true);
     expect(verifyDeskUnlockCode("84829107", ENV)).toBe(true);
     expect(verifyDeskUnlockCode("server-admin-pass-ok", ENV)).toBe(true);
+    expect(verifyDeskUnlockCode("legacy-desk", { OWNER_DESK_CODE: "legacy-desk" })).toBe(true);
     expect(verifyDeskUnlockCode("wrong", ENV)).toBe(false);
   });
 

@@ -17,6 +17,7 @@ import {
 import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
 import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
@@ -93,7 +94,7 @@ export default function LaunchpadClaim() {
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
       if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
       const sig = await sendTx(connection, plan.tx);
-      await connection.confirmTransaction(sig, "confirmed");
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
       setPumpSig(sig);
       const netSol = plan.netLamports / LAMPORTS_PER_SOL;
       toast.success(`Claimed ${netSol.toFixed(4)} SOL (${bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee routed)`);
@@ -110,7 +111,7 @@ export default function LaunchpadClaim() {
             const buySol = buyLamports / LAMPORTS_PER_SOL;
             const buyTx = await buildPumpBuyTransaction(publicKey, mint, buySol);
             const buySig = await sendTx(connection, buyTx);
-            await connection.confirmTransaction(buySig, "confirmed");
+            await confirmSentTransaction(connection, buySig, { commitment: "confirmed" });
             toast.success(`Bought back ${buySol.toFixed(4)} SOL of your coin`);
           } catch (e) {
             toast.error(e instanceof Error ? `Buyback failed: ${e.message}` : "Buyback failed");
@@ -143,12 +144,12 @@ export default function LaunchpadClaim() {
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
         lastSig = await sendTx(connection, tx);
-        await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
+        await confirmSentTransaction(connection, lastSig, { blockhash, lastValidBlockHeight, commitment: "confirmed" });
       }
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
         const swapSig = await sendTx(connection, plan.tx);
-        await connection.confirmTransaction(swapSig, "confirmed");
+        await confirmSentTransaction(connection, swapSig, { commitment: "confirmed" });
         lastSig = swapSig;
         toast.success(`${t.ticker} fees claimed & swapped to ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
       } catch (e) {

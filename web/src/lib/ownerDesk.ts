@@ -1,6 +1,6 @@
 /**
  * Owner desk — obscure UI entry (not a security boundary for APIs).
- * Server ADMIN_PASS / JWT owner checks remain the real API auth.
+ * Server ADMIN_AUTH / JWT owner checks remain the real API auth.
  *
  * Desk URL (bookmark this; it is not linked in the product):
  *   /ox-desk-m4k9q

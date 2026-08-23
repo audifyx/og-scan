@@ -760,11 +760,13 @@ export default function Hub() {
     body = tab === "home" ? rootHome : tab === "apps" ? rootApps : tab === "activity" ? rootActivity : rootAccount;
   } else if (top.id === "section") {
     const section =
-      top.sectionId === "admin"
+      top.sectionId === "admin" && showAdminApps
         ? { id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }
-        : PLATFORM_SECTIONS.find((s) => s.id === top.sectionId);
+        : top.sectionId === "admin"
+          ? null
+          : PLATFORM_SECTIONS.find((s) => s.id === top.sectionId);
     const apps =
-      top.sectionId === "admin"
+      top.sectionId === "admin" && showAdminApps
         ? OWNER_ADMIN_APPS
         : (section?.keys || []).map((k) => PLATFORM_BY_KEY[k]).filter(Boolean);
     body = (

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { Adapter, WalletName, WalletReadyState } from "@solana/wallet-adapter-base";
 import { signInWithWallet } from "@/lib/walletAuth";
-import { connectSolanaWallet } from "@/lib/connectSolanaWallet";
+import { adapterNameMatches, connectSolanaWallet } from "@/lib/connectSolanaWallet";
 import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 export interface PickableWallet { name: string; icon: string; readyState: WalletReadyState; adapter: Adapter }
@@ -21,13 +21,8 @@ async function signMessageBytes(adapter: SignMessageAdapter, message: Uint8Array
 }
 
 function findAdapter(wallets: ReturnType<typeof useWallet>["wallets"], name: string): SignMessageAdapter | null {
-  const exact = wallets.find((x) => x.adapter.name === name)?.adapter as SignMessageAdapter | undefined;
-  if (exact) return exact;
-  // Standard wallets sometimes register with a slightly different display name.
-  const soft = wallets.find((x) => String(x.adapter.name).toLowerCase() === name.toLowerCase())?.adapter as
-    | SignMessageAdapter
-    | undefined;
-  return soft ?? null;
+  const hit = wallets.find((x) => adapterNameMatches(String(x.adapter.name), name));
+  return (hit?.adapter as SignMessageAdapter | undefined) ?? null;
 }
 
 export function useWalletSignIn() {
@@ -71,16 +66,6 @@ export function useWalletSignIn() {
       await new Promise((r) => setTimeout(r, 60));
 
       const live = findAdapter(wallets, adapter.name) ?? adapter;
-      if (!live.connected) {
-        try {
-          await live.connect();
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (/reject|cancel|denied/i.test(msg)) throw new Error(`${name} connection was rejected`);
-          throw err;
-        }
-      }
-
       const pubkey = live.publicKey?.toBase58();
       if (!pubkey) throw new Error("wallet did not return a public key — unlock the extension and try again");
 

@@ -122,11 +122,11 @@ export function composeRisk(input: ComposeRiskInput): ComposedRisk {
     seen.add(id);
     factors.push({
       id,
-      label: s.explanation.slice(0, 80),
+      label: String(s.explanation || s.name || "").slice(0, 80),
       severity: s.severity as RiskFactor["severity"],
       weight: s.status === "critical" ? 1 : s.status === "risk" ? 0.7 : s.status === "positive" ? 0.2 : 0.4,
       points: s.status === "positive" ? 0 : Math.abs(Number(s.points) || 0) * 8,
-      detail: s.explanation,
+      detail: String(s.explanation || ""),
     });
   }
 

@@ -44,12 +44,37 @@ export function createNewProfile(name = "Traveler"): GameProfile {
   return profile;
 }
 
+function normalizeProfile(parsed: GameProfile): GameProfile {
+  const fresh = emptyProgression();
+  const prog = parsed.progression || fresh;
+  return {
+    ...parsed,
+    version: 1,
+    character: {
+      ...defaultCharacter(parsed.character?.name || "Traveler"),
+      ...parsed.character,
+      cosmetics: { ...defaultCharacter().cosmetics, ...(parsed.character?.cosmetics || {}) },
+      equipment: parsed.character?.equipment && typeof parsed.character.equipment === "object" ? parsed.character.equipment : {},
+    },
+    progression: {
+      ...fresh,
+      ...prog,
+      unlockedAchievements: Array.isArray(prog.unlockedAchievements) ? prog.unlockedAchievements : [],
+      claimedBattlePassTiers: Array.isArray(prog.claimedBattlePassTiers) ? prog.claimedBattlePassTiers : [],
+      missionProgress: prog.missionProgress && typeof prog.missionProgress === "object" ? { ...fresh.missionProgress, ...prog.missionProgress } : fresh.missionProgress,
+    },
+    inventory: Array.isArray(parsed.inventory) ? parsed.inventory : [],
+    friends: Array.isArray(parsed.friends) ? parsed.friends : [],
+    partyId: parsed.partyId ?? null,
+  };
+}
+
 export function loadProfile(): GameProfile {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as GameProfile;
-      if (parsed?.version === 1 && parsed.character && parsed.progression) return parsed;
+      if (parsed?.version === 1 && parsed.character && parsed.progression) return normalizeProfile(parsed);
     }
   } catch {
     /* ignore */
@@ -60,7 +85,11 @@ export function loadProfile(): GameProfile {
 }
 
 export function saveProfile(profile: GameProfile) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...profile, updatedAt: Date.now() }));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...profile, updatedAt: Date.now() }));
+  } catch {
+    /* quota / private mode */
+  }
 }
 
 export function loadNotifications(): GameNotification[] {

@@ -56,7 +56,8 @@ export function useActiveTradingWallet() {
 
   /** Prefer live localStorage so sign path can't drift from a stale React render. */
   const modeNow = getTradingWalletMode();
-  const localActive = mode === "local" || modeNow === "local";
+  const hasLocalWallet = Boolean(defaultWallet?.publicKey);
+  const localActive = (mode === "local" || modeNow === "local") && hasLocalWallet;
 
   const publicKey = useMemo(() => {
     if (localActive) {

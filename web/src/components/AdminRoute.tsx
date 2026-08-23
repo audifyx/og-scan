@@ -13,7 +13,7 @@ interface AdminRouteProps {
  * Hidden owner desk gate.
  * Non-owners get a normal 404 — never reveal the owner email, wallet list, or PIN.
  * Owner still enters the Vercel-locked code, then the desk.
- * Not a substitute for server ADMIN_PASS / JWT on APIs.
+ * Not a substitute for server ADMIN_AUTH / JWT on APIs.
  */
 export const AdminRoute = ({ children }: AdminRouteProps) => {
   const { isAdmin, isOwnerIdentity, loading } = useAdmin();

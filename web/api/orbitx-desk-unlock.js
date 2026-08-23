@@ -1,6 +1,7 @@
 /**
  * POST /api/orbitx-desk-unlock
- * Owner JWT + Vercel OWNER_DESK_CODE (or ADMIN_PASS). Never return the PIN.
+ * Owner JWT + Vercel ADMIN_AUTH (legacy: OWNER_DESK_CODE / ADMIN_PASS).
+ * Never return the PIN. purpose=maintenance checks the same secret without issuing a desk token.
  * Fail closed when env or owner session is missing.
  * NOT under /api/orbitx/* — that rewrite hits orbitx-hub.
  */
@@ -42,11 +43,23 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
 
   if (req.method === "GET") {
-    return json(res, 200, { ok: true, configured: deskUnlockConfigured() });
+    return json(res, 404, { ok: false, error: "not_found" });
   }
 
   if (req.method !== "POST") {
     return json(res, 405, { ok: false, error: "method_not_allowed" });
+  }
+
+  const body = bodyOf(req);
+  const purpose = String(body.purpose || "desk").trim();
+  const code = String(body.code || "").trim();
+
+  if (purpose === "maintenance") {
+    if (!deskUnlockConfigured()) return json(res, 503, { ok: false, error: "not_configured" });
+    if (!code) return json(res, 400, { ok: false, error: "denied" });
+    if (isRevokedDeskCode(code)) return json(res, 401, { ok: false, error: "revoked" });
+    if (!verifyDeskUnlockCode(code)) return json(res, 401, { ok: false, error: "denied" });
+    return json(res, 200, { ok: true, purpose: "maintenance" });
   }
 
   const owner = await requireOwnerUser(req);
@@ -56,7 +69,6 @@ export default async function handler(req, res) {
     return json(res, 503, { ok: false, error: "not_configured" });
   }
 
-  const code = String(bodyOf(req).code || "").trim();
   if (!code) return json(res, 400, { ok: false, error: "denied" });
   if (isRevokedDeskCode(code)) return json(res, 401, { ok: false, error: "revoked" });
   if (!verifyDeskUnlockCode(code)) return json(res, 401, { ok: false, error: "denied" });

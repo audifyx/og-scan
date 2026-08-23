@@ -20,6 +20,20 @@ export function readOrbitXAccessToken() {
   }
 }
 
+function unlockError(json) {
+  const err = new Error(
+    json.error === "not_configured"
+      ? "Access code is not set on the server."
+      : json.error === "revoked"
+        ? "That code is retired."
+        : json.error === "unavailable"
+          ? "Unlock is unavailable."
+          : "Incorrect code",
+  );
+  err.code = json.error || "denied";
+  return err;
+}
+
 export async function requestDeskUnlock(code, bearer) {
   const headers = { "Content-Type": "application/json" };
   const token = bearer || readOrbitXAccessToken();
@@ -38,19 +52,28 @@ export async function requestDeskUnlock(code, bearer) {
   }
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.ok || !json.token) {
-    const err = new Error(
-      json.error === "not_configured"
-        ? "Desk pin is not set on the server."
-        : json.error === "revoked"
-          ? "That code is retired."
-          : json.error === "unavailable"
-            ? "Desk unlock is unavailable."
-            : "Incorrect code",
-    );
-    err.code = json.error || "denied";
-    throw err;
+    throw unlockError(json);
   }
   return json.token;
+}
+
+/** Site-wide maintenance unlock — same Vercel ADMIN_AUTH, no desk session. */
+export async function requestMaintenanceUnlock(code) {
+  let res;
+  try {
+    res = await fetch(DESK_UNLOCK_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: String(code || "").trim(), purpose: "maintenance" }),
+    });
+  } catch {
+    const err = new Error("Unlock is unavailable.");
+    err.code = "unavailable";
+    throw err;
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok) throw unlockError(json);
+  return true;
 }
 
 export function persistDeskUnlock(token) {

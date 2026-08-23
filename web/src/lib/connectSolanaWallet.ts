@@ -15,6 +15,20 @@ export type WalletLike = {
 
 const PREFERRED = ["Phantom", "Jupiter", "Solflare", "Backpack"] as const;
 
+/** Wallet Standard registers "Jupiter Wallet"; legacy adapter is "Jupiter". */
+export function walletNameAliases(name?: string | null): string[] {
+  const raw = String(name || "").trim();
+  if (!raw) return [];
+  if (/^jupiter(\s+wallet)?$/i.test(raw)) return ["Jupiter", "Jupiter Wallet"];
+  return [raw];
+}
+
+export function adapterNameMatches(adapterName: string, preferred?: string | null): boolean {
+  if (!preferred) return false;
+  const left = String(adapterName || "").toLowerCase();
+  return walletNameAliases(preferred).some((alias) => alias.toLowerCase() === left);
+}
+
 function isReady(rs: string): boolean {
   return rs === WalletReadyState.Installed || rs === WalletReadyState.Loadable || rs === "Installed" || rs === "Loadable";
 }
@@ -26,12 +40,12 @@ export function findConnectableWallet(
   // When the user (or UI) names a wallet, connect ONLY that adapter — never
   // silently fall through to Solflare / whatever else happens to be installed.
   if (preferredName) {
-    const named = wallets.find((w) => w.adapter.name === preferredName);
+    const named = wallets.find((w) => adapterNameMatches(String(w.adapter.name), preferredName));
     if (named && isReady(String(named.readyState))) return named;
     return null;
   }
   for (const name of PREFERRED) {
-    const hit = wallets.find((w) => w.adapter.name === name && isReady(String(w.readyState)));
+    const hit = wallets.find((w) => adapterNameMatches(String(w.adapter.name), name) && isReady(String(w.readyState)));
     if (hit) return hit;
   }
   return wallets.find((w) => isReady(String(w.readyState))) ?? null;
@@ -50,7 +64,7 @@ export async function connectSolanaWallet(opts: {
   const pick = findConnectableWallet(opts.wallets, opts.preferredName);
   if (!pick) {
     const wanted = opts.preferredName || "Phantom";
-    const listed = opts.wallets.find((w) => w.adapter.name === wanted);
+    const listed = opts.wallets.find((w) => adapterNameMatches(String(w.adapter.name), wanted));
     if (listed && !isReady(String(listed.readyState))) {
       throw new Error(phantomInstallHint(wanted));
     }

@@ -26,14 +26,16 @@ describe("POST /api/orbitx-desk-unlock", () => {
   });
 
   it("rejects the leaked pin and accepts the env pin for an owner JWT", async () => {
+    const prevAuth = process.env.ADMIN_AUTH;
     const prevCode = process.env.OWNER_DESK_CODE;
     const prevPass = process.env.ADMIN_PASS;
     const prevUrl = process.env.SUPABASE_URL;
     const prevAnon = process.env.SUPABASE_ANON_KEY;
     const prevFetch = globalThis.fetch;
-    process.env.OWNER_DESK_CODE = "84829107";
+    process.env.ADMIN_AUTH = "84829107";
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_ANON_KEY = "test-anon";
+    delete process.env.OWNER_DESK_CODE;
     delete process.env.ADMIN_PASS;
     globalThis.fetch = async () => ({
       ok: true,
@@ -59,7 +61,20 @@ describe("POST /api/orbitx-desk-unlock", () => {
     expect(body.token).toMatch(/^oxdesk1\./);
     expect(JSON.stringify(body)).not.toContain("84829107");
 
+    const maint = mockRes();
+    await handler({ method: "POST", headers: {}, body: { code: "84829107", purpose: "maintenance" } }, maint);
+    expect(maint.statusCode).toBe(200);
+    expect(JSON.parse(maint.body).ok).toBe(true);
+    expect(JSON.parse(maint.body).token).toBeUndefined();
+
+    const probe = mockRes();
+    await handler({ method: "GET", headers: {} }, probe);
+    expect(probe.statusCode).toBe(404);
+    expect(JSON.parse(probe.body)).not.toHaveProperty("configured");
+
     globalThis.fetch = prevFetch;
+    if (prevAuth === undefined) delete process.env.ADMIN_AUTH;
+    else process.env.ADMIN_AUTH = prevAuth;
     if (prevCode === undefined) delete process.env.OWNER_DESK_CODE;
     else process.env.OWNER_DESK_CODE = prevCode;
     if (prevPass === undefined) delete process.env.ADMIN_PASS;

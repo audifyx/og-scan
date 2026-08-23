@@ -31,6 +31,15 @@ describe("connectSolanaWallet", () => {
     expect(findConnectableWallet(wallets)?.adapter.name).toBe("Phantom");
   });
 
+  it("matches Jupiter Wallet Standard name when UI asks for Jupiter", () => {
+    const wallets = [
+      mockWallet("Jupiter Wallet", WalletReadyState.Installed),
+      mockWallet("Phantom", WalletReadyState.NotDetected),
+    ];
+    expect(findConnectableWallet(wallets, "Jupiter")?.adapter.name).toBe("Jupiter Wallet");
+    expect(findConnectableWallet(wallets, "Jupiter Wallet")?.adapter.name).toBe("Jupiter Wallet");
+  });
+
   it("does not fall through to Solflare when preferred wallet is missing", () => {
     const wallets = [
       mockWallet("Phantom", WalletReadyState.NotDetected),

@@ -37,6 +37,17 @@ export type WalletSendCaps = {
   preferPhantom?: boolean;
 };
 
+export function walletCapsFromAdapter(
+  wallet: { adapter?: { name?: string } | null } | null | undefined,
+  caps: Pick<WalletSendCaps, "sendTransaction" | "signTransaction">,
+): WalletSendCaps {
+  return {
+    sendTransaction: caps.sendTransaction,
+    signTransaction: caps.signTransaction,
+    walletName: wallet?.adapter?.name ?? null,
+  };
+}
+
 export type WalletSendOptions = {
   /** When true, skip RPC preflight so the wallet prompt opens immediately. */
   skipPreflight?: boolean;
