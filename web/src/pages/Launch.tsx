@@ -29,6 +29,7 @@ import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD } from "@/lib/platformFee";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 import {
   Rocket, Upload, Globe, Twitter, Send,
   Loader2, CheckCircle, Copy, ExternalLink, Wallet, AlertTriangle,
@@ -480,7 +481,7 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
    ═══════════════════════════════════════════════════════════════════════ */
 
 function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess: () => void }) {
-  const { publicKey, signTransaction, sendTransaction, connected, connect, wallets, select } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected, connect, wallets, select, wallet } = useWallet();
   const { connection } = useConnection();
   const { isAdmin } = useAdmin();
 
@@ -555,14 +556,18 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const canLaunch =
-    connected && publicKey && signTransaction && sendTransaction &&
+    connected && publicKey && (signTransaction || sendTransaction) &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
     !!imageFile;
 
   /* ─── Launch flow ──────────────────────────────────────────────────── */
 
   const handleLaunch = async () => {
-    if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
+    if (!canLaunch || !publicKey || (!signTransaction && !sendTransaction) || !imageFile) return;
+    const caps = walletCapsFromAdapter(wallet, {
+      sendTransaction: sendTransaction ?? undefined,
+      signTransaction: signTransaction ?? undefined,
+    });
 
     try {
       /* Step 0 — Platform launch fee ($0.90 in SOL, Solana only) */
@@ -576,8 +581,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         );
         feeTx.feePayer = publicKey;
         feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-        const signedFee = await signTransaction(feeTx);
-        await connection.sendRawTransaction(signedFee.serialize());
+        await sendWalletTransaction(connection, caps, feeTx);
       }
 
       /* Step 1 — Upload to IPFS */
@@ -654,15 +658,13 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(txBytes);
       tx.sign([mintKeypair]);
-      const signedTx = await signTransaction(tx);
 
       /* Step 5 — Send */
       setStep("sending");
       setStatusMsg("Broadcasting to Solana…");
-      const sig = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await sendWalletTransaction(connection, caps, tx);
       setStatusMsg("Confirming…");
-      const confirmation = await connection.confirmTransaction(sig, "confirmed");
-      if (confirmation.value.err) throw new Error("Transaction failed on-chain: " + JSON.stringify(confirmation.value.err));
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
 
       setTxSignature(sig);
 

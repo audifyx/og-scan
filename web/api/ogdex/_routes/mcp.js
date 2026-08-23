@@ -2,7 +2,6 @@ import { send, readBody } from "../_lib.js";
 import {
   TOOLS,
   mcpManifest,
-  mcpAuthRequired,
   mcpAuthorized,
   isMcpEnabled,
   executeMcpTool,
@@ -41,7 +40,7 @@ export default async function mcpRoute(req, res) {
   }
 
   if (req.method === "POST") {
-    if (mcpAuthRequired() && !mcpAuthorized(req)) {
+    if (!mcpAuthorized(req)) {
       return send(res, 401, {
         ok: false,
         error: "Unauthorized — send Authorization: Bearer <key> or x-ogdex-key header",

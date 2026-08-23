@@ -29,6 +29,7 @@ import {
   type Token2022Metadata,
 } from "@/lib/metaplex-raw";
 import { cn } from "@/lib/utils";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 import {
   AlertCircle,
   ArrowLeft,
@@ -120,7 +121,7 @@ async function fetchTokensByAuthority(
 
 /* ─── Main Component ─── */
 export default function TokenManager() {
-  const { publicKey, signTransaction, connected, wallets, select, connect, disconnect, wallet, connecting } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected, wallets, select, connect, disconnect, wallet, connecting } = useWallet();
   const { connection } = useConnection();
   const availableWallets = wallets.filter(
     (w) => w.adapter.name === "Phantom",
@@ -603,9 +604,15 @@ export default function TokenManager() {
       tx.recentBlockhash = blockhash;
 
       // Sign & send
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-      await connection.confirmTransaction(sig, "confirmed");
+      const sig = await sendWalletTransaction(
+        connection,
+        walletCapsFromAdapter(wallet, {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+        }),
+        tx,
+      );
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
 
       setTxSig(sig);
       setPostStep("success");

@@ -1,37 +1,33 @@
 import { useState, useEffect } from "react";
 import { Lock } from "lucide-react";
-
-// Soft UI gate only — not a security boundary. Pass from VITE_REDESIGN_PASS (no hardcoded default).
-const GATE_PASS = (import.meta.env.VITE_REDESIGN_PASS as string | undefined)?.trim() || "";
+import { requestMaintenanceUnlock } from "../../../shared/desk-unlock-client.js";
 
 export default function PasswordGate({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!GATE_PASS) {
-      // Unconfigured → do not block the redesign surface
-      setUnlocked(true);
-      return;
-    }
     const stored = sessionStorage.getItem("og_unlocked");
     if (stored === "true") setUnlocked(true);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!GATE_PASS || GATE_PASS.length < 8) {
-      setError("Redesign gate is not configured.");
-      return;
-    }
-    if (password === GATE_PASS) {
-      setUnlocked(true);
+    const typed = password.trim();
+    if (!typed || submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await requestMaintenanceUnlock(typed);
       sessionStorage.setItem("og_unlocked", "true");
-      setError("");
-    } else {
+      setUnlocked(true);
+    } catch {
       setError("Incorrect password");
       setPassword("");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -60,9 +56,10 @@ export default function PasswordGate({ children }: { children: React.ReactNode }
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-accent text-bg rounded font-bold hover:bg-accent/90"
+              disabled={submitting}
+              className="w-full px-4 py-2 bg-accent text-bg rounded font-bold hover:bg-accent/90 disabled:opacity-60"
             >
-              Access
+              {submitting ? "Checking…" : "Access"}
             </button>
           </form>
         </div>

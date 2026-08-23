@@ -32,6 +32,8 @@ import { HELIUS_RPC, HELIUS_API_KEY, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } f
 import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED, deriveFeeAccount } from "@/lib/platformFee";
 import { formatDistanceToNow } from "date-fns";
 import { VersionedTransaction } from "@solana/web3.js";
+import { adapterNameMatches, connectSolanaWallet } from "@/lib/connectSolanaWallet";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface RichToken {
@@ -141,7 +143,7 @@ function fmtNum(n: number) {
    Main Component
    ═══════════════════════════════════════════════════════════════════ */
 export function ConnectedWalletTab() {
-  const { publicKey, connect, disconnect, connected, wallet, wallets, select } = useWallet();
+  const { publicKey, connect, disconnect, connected, wallet, wallets, select, sendTransaction, signTransaction } = useWallet();
   const { connection } = useConnection();
 
   const [overview, setOverview] = useState<WalletOverview | null>(null);
@@ -391,8 +393,6 @@ export function ConnectedWalletTab() {
     if (!swapToken || !swapAmount || !publicKey) return;
     setSwapLoading(true);
     try {
-      const phantom = (window as any).phantom?.solana;
-      if (!phantom?.isPhantom) throw new Error("Phantom wallet not found. Please install Phantom.");
       const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
       const outputMint = swapMode === "buy" ? swapToken.mint : SOL_MINT;
       const decimals = swapMode === "buy" ? 9 : swapToken.decimals;
@@ -400,7 +400,15 @@ export function ConnectedWalletTab() {
       const swapTxBase64 = await phantomSwap(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
       const txBytes = base64ToUint8Array(swapTxBase64);
       const tx = VersionedTransaction.deserialize(txBytes);
-      const { signature: sig } = await phantom.signAndSendTransaction(tx);
+      const sig = await sendWalletTransaction(
+        connection,
+        walletCapsFromAdapter(wallet, {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+        }),
+        tx,
+      );
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
       toast({ title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`, description: `TX: ${formatAddress(sig, 6)}` });
       setSwapOpen(false); setSwapAmount("");
       setTimeout(() => loadData(address, true), 3000);
@@ -443,15 +451,15 @@ export function ConnectedWalletTab() {
             </p>
           </div>
           <div className="flex flex-col gap-3">
-            {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).map(w => (
-              <button key={w.adapter.name} onClick={() => { select(w.adapter.name as any); setTimeout(() => connect().catch(() => {}), 100); }}
+            {wallets.filter(w => ["Phantom", "Jupiter", "Solflare"].some((n) => adapterNameMatches(String(w.adapter.name), n))).map(w => (
+              <button key={w.adapter.name} onClick={() => { void connectSolanaWallet({ wallets, select, connect, preferredName: w.adapter.name }).catch((e) => toast({ title: "Connect failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" })); }}
                 className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
                 {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-7 h-7 rounded-lg" />}
                 <span className="font-semibold text-sm">{w.adapter.name}</span>
                 <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">Connect →</span>
               </button>
             ))}
-            {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).length === 0 && (
+            {wallets.filter(w => ["Phantom", "Jupiter", "Solflare"].some((n) => adapterNameMatches(String(w.adapter.name), n))).length === 0 && (
               <div className="text-center text-sm text-white/40 py-4">
                 <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-yellow-500" />
                 No wallets detected. Install <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-lime))] underline">Phantom</a> first.

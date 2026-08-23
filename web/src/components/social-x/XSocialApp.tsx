@@ -91,8 +91,9 @@ function saveBookmarks(s: Set<string>) {
 /* Pull image URLs out of post text so they render as real media, X-style. */
 const IMG_URL_RE = /https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp)(?:\?[^\s]*)?/gi;
 function splitMedia(content: string): { text: string; imgs: string[] } {
-  const imgs = content.match(IMG_URL_RE) || [];
-  let text = content;
+  const safe = content || "";
+  const imgs = safe.match(IMG_URL_RE) || [];
+  let text = safe;
   for (const u of imgs) text = text.replace(u, "").trim();
   return { text, imgs: imgs.slice(0, 4) };
 }
@@ -574,7 +575,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   const trendingTags = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const p of posts) for (const t of (p.content.match(/[$#][A-Za-z][A-Za-z0-9_]{1,20}/g) || [])) counts.set(t.toUpperCase(), (counts.get(t.toUpperCase()) || 0) + 1);
+    for (const p of posts) for (const t of ((p.content || "").match(/[$#][A-Za-z][A-Za-z0-9_]{1,20}/g) || [])) counts.set(t.toUpperCase(), (counts.get(t.toUpperCase()) || 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
   }, [posts]);
 

@@ -18,6 +18,7 @@ const CLIENT_FILES = [
   resolve(__dirname, "../pages/Hub.tsx"),
   resolve(__dirname, "../components/admin/sections/AdminAppsSection.tsx"),
   resolve(__dirname, "../components/MaintenanceLock.tsx"),
+  resolve(__dirname, "../../ogdex/src/components/PasswordGate.tsx"),
 ] as const;
 
 describe("desk PIN is Vercel-locked", () => {
@@ -28,6 +29,7 @@ describe("desk PIN is Vercel-locked", () => {
       expect(src, file).not.toMatch(/OWNER_DESK_CODE\s*=\s*["']/);
       expect(src, file).not.toMatch(/DESK_API_PASS\s*=\s*["']/);
       expect(src, file).not.toMatch(/VITE_ADMIN_PASS/);
+      expect(src, file).not.toMatch(/VITE_REDESIGN_PASS/);
       expect(src, file).not.toMatch(/import\.meta\.env\.VITE_ADMIN/);
     }
   });
@@ -48,5 +50,15 @@ describe("desk PIN is Vercel-locked", () => {
     const fn = hub.slice(start, end);
     expect(fn).toContain("never a login");
     expect(fn).not.toContain("resolveAgentByWallet");
+  });
+
+  it("does not grant MCP hold from raw tool-arg wallets", () => {
+    const hub = readFileSync(resolve(__dirname, "../../api/orbitx-hub.js"), "utf8");
+    const start = hub.indexOf("function holdCandidateWallets");
+    const end = hub.indexOf("async function getUserId");
+    const fn = hub.slice(start, end);
+    expect(fn).toContain("auth?.walletAddress");
+    expect(fn).not.toContain("args.publicKey");
+    expect(fn).not.toContain("args.wallet");
   });
 });

@@ -341,19 +341,11 @@ async function withAuthEmail(auth) {
   return email ? { ...auth, email } : auth;
 }
 
-function holdCandidateWallets(auth, args = {}) {
-  return [
-    auth?.walletAddress,
-    args.publicKey,
-    args.address,
-    args.wallet,
-    args.buyerWallet,
-    args.sellerWallet,
-    args.bidderWallet,
-  ]
+/** Hold/exempt wallets come from the authenticated session only — never tool args. */
+function holdCandidateWallets(auth) {
+  return [auth?.walletAddress]
     .map((w) => normalizeGateWallet(w))
-    .filter(Boolean)
-    .filter((w, i, arr) => arr.indexOf(w) === i);
+    .filter(Boolean);
 }
 
 async function getUserId(req) {
@@ -4920,7 +4912,7 @@ async function handleMcp(req, res, parts) {
 
       // MCP access — write/tx tools require exempt, unexpired burn access, or ≥$5 ORBITX hold.
       if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
-        const candidates = holdCandidateWallets(auth, args);
+        const candidates = holdCandidateWallets(auth);
         const access = await requireMcpAccess({
           userId: auth?.userId,
           wallets: candidates,
@@ -5159,7 +5151,7 @@ export async function runEmbeddedAgentTool({
     ((name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_trade" || name === "orbitx_swap") &&
       (mintArg === ORBITX_MINT || !mintArg));
   if (!isOrbitxBuy && (isHoldGatedTool(name) || isHoldGatedTool(rawName))) {
-    const candidates = holdCandidateWallets(auth, args);
+    const candidates = holdCandidateWallets(auth);
     const access = await requireMcpAccess({
       userId: uid,
       wallets: candidates,
@@ -5197,7 +5189,7 @@ export async function runTelegramAgentTool(userId, toolName, args = {}, req = nu
   if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
     const access = await requireMcpAccess({
       userId: uid,
-      wallets: holdCandidateWallets(auth, args),
+      wallets: holdCandidateWallets(auth),
       email: auth.email,
       base,
       tool: name,

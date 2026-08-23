@@ -8,11 +8,7 @@
  * Actions: overview | search | user | presence | events | ledger | burns |
  * health | audit | daily
  */
-import {
-  TOKEN_GATE_EXEMPT_EMAILS_BASE,
-  TOKEN_GATE_EXEMPT_WALLETS_BASE,
-  isExemptEmailInList,
-} from "../shared/token-gate-exempt.js";
+import { requireOwnerUser } from "../shared/owner-identity.js";
 import {
   buildHealth,
   buildOverview,
@@ -26,32 +22,11 @@ export const config = { maxDuration: 30 };
 const SUPABASE_URL =
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-
-function ownerWallets() {
-  const extras = String(process.env.OWNER_WALLETS || process.env.VITE_OWNER_WALLETS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return [...TOKEN_GATE_EXEMPT_WALLETS_BASE, ...extras];
-}
-
-function isOwnerEmail(email) {
-  return isExemptEmailInList(email, TOKEN_GATE_EXEMPT_EMAILS_BASE, ownerWallets());
-}
 
 function json(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "application/json");
   return res.status(status).json(body);
-}
-
-async function emailFromToken(token) {
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: ANON_KEY },
-  });
-  if (!r.ok) return null;
-  return r.json().catch(() => null);
 }
 
 async function sb(path, init = {}) {
@@ -97,13 +72,8 @@ export default async function handler(req, res) {
   try {
     if (!SERVICE_KEY) return json(res, 500, { error: "Server not configured (missing service role key)" });
 
-    const auth = String(req.headers.authorization || "");
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-    if (!token) return json(res, 401, { error: "Missing auth token" });
-
-    const user = await emailFromToken(token);
-    const email = user?.email || null;
-    if (!isOwnerEmail(email)) return json(res, 403, { error: "Not authorized" });
+    const user = await requireOwnerUser(req);
+    if (!user) return json(res, 403, { error: "Not authorized" });
 
     const body = req.method === "GET" ? req.query || {} : typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
     const action = String(body.action || req.query?.action || "overview");

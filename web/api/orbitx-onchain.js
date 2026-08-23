@@ -23,8 +23,6 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Wallet",
 };
 
-const OWNER_EMAILS = ["audifyx@gmail.com"];
-
 function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -65,28 +63,6 @@ function bodyOf(req) {
     try { return JSON.parse(req.body || "{}"); } catch { return {}; }
   }
   return req.body && typeof req.body === "object" ? req.body : {};
-}
-
-function bearer(req) {
-  const h = req.headers.authorization || "";
-  const m = String(h).match(/^Bearer\s+(.+)$/i);
-  return m ? m[1].trim() : "";
-}
-
-async function authUser(req) {
-  const token = bearer(req);
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-  if (!token || !url || !anon) return null;
-  const r = await fetch(`${url}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: anon },
-  });
-  if (!r.ok) return null;
-  return r.json().catch(() => null);
-}
-
-function isOwner(user) {
-  return OWNER_EMAILS.includes(String(user?.email || "").toLowerCase());
 }
 
 function signerOf(tx) {
@@ -249,8 +225,7 @@ async function handleEvents(req, res, sb) {
   return json(res, 200, { ok: true, events: data || [] });
 }
 
-async function handleCosts(req, res, sb, user) {
-  if (!isOwner(user)) return json(res, 403, { ok: false, error: "Owner desk required." });
+async function handleCosts(req, res, sb) {
   const { data: events, error } = await sb
     .from("ox_onchain_events")
     .select("kind, fee_lamports, meets_cost_target, created_at, tx_signature")
@@ -299,7 +274,7 @@ export default async function handler(req, res) {
     if (action === "index") return await handleIndex(req, res, sb);
     if (action === "rebuild") return await handleRebuild(req, res, sb);
     if (action === "events") return await handleEvents(req, res, sb);
-    if (action === "costs") return await handleCosts(req, res, sb, owner);
+    if (action === "costs") return await handleCosts(req, res, sb);
     return json(res, 400, { ok: false, error: `Unknown action: ${action}` });
   } catch (e) {
     return json(res, 500, { ok: false, error: e instanceof Error ? e.message : "On-chain API failed." });
