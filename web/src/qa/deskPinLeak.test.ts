@@ -57,8 +57,7 @@ describe("desk PIN is Vercel-locked", () => {
     expect(cfg).toContain("vercel-only-rork.sh");
     expect(gate).toContain("rork-og-meme-coin-tracker");
     expect(gate).toContain("prj_c5AQF7gDGnrQWmKAznpQPf06GWi2");
-    expect(gate).toContain("prj_UhZ1QBFiEQSdm0bRlMK3Nf6KTqI4");
-    expect(gate).toContain("Skipping leftover Vercel project og-scan");
+    expect(gate).toContain("Only rork-og-meme-coin-tracker");
   });
 
   it("keeps the unlock route at top-level /api/orbitx-desk-unlock", () => {

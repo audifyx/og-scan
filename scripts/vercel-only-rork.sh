@@ -2,27 +2,27 @@
 # Vercel Ignored Build Step for audifyx/og-scan.
 # Exit 0 = skip this build. Exit 1 = continue.
 #
-# Production is Vercel project rork-og-meme-coin-tracker
+# The only allowed project is rork-og-meme-coin-tracker
 # (prj_c5AQF7gDGnrQWmKAznpQPf06GWi2 / beatsforsalebyauden).
-# The leftover og-scan project (prj_UhZ1QBFiEQSdm0bRlMK3Nf6KTqI4) must not build.
+# Any other hooked Vercel project (including leftover og-scan teams) is skipped.
 set -euo pipefail
 
 RORK_PROJECT_ID="prj_c5AQF7gDGnrQWmKAznpQPf06GWi2"
-LEFTOVER_OG_SCAN_ID="prj_UhZ1QBFiEQSdm0bRlMK3Nf6KTqI4"
 project_id="${VERCEL_PROJECT_ID:-}"
 haystack="${VERCEL_URL:-} ${VERCEL_BRANCH_URL:-} ${VERCEL_PROJECT_PRODUCTION_URL:-}"
-
-if [[ "$project_id" == "$LEFTOVER_OG_SCAN_ID" ]]; then
-  echo "Skipping leftover Vercel project og-scan ($LEFTOVER_OG_SCAN_ID). Production is rork-og-meme-coin-tracker."
-  exit 0
-fi
 
 if [[ "$project_id" == "$RORK_PROJECT_ID" ]]; then
   exit 1
 fi
 
+if [[ -n "$project_id" ]]; then
+  echo "Skipping Vercel project $project_id. Only rork-og-meme-coin-tracker ($RORK_PROJECT_ID) may build."
+  exit 0
+fi
+
+# System project id not exposed — do not skip custom-domain prod, but skip leftover og-scan URLs.
 if [[ "$haystack" == *og-scan* && "$haystack" != *rork-og-meme-coin-tracker* ]]; then
-  echo "Skipping leftover Vercel project og-scan. Production is rork-og-meme-coin-tracker."
+  echo "Skipping leftover Vercel project og-scan. Only rork-og-meme-coin-tracker may build."
   exit 0
 fi
 
