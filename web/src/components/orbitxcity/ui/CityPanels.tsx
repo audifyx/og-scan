@@ -373,7 +373,7 @@ function TradingPanel() {
       <LiveDataPanel />
       <div className="oxc-actions">
         <Link className="oxc-btn primary" to="/ORBITX_DEX">Trade on DEX</Link>
-        <Link className="oxc-btn ghost" to="/terminal">Terminal</Link>
+        <Link className="oxc-btn ghost" to="/trade">Trade</Link>
       </div>
     </div>
   );

@@ -1447,6 +1447,13 @@ const SESSION_TOOLS = new Set([
   "orbitx_social_leave",
   "orbitx_submit_listing",
   "orbitx_request_boost",
+  "orbitx_generate_image",
+  "orbitx_generate_video",
+  "orbitx_media_status",
+  "orbitx_grok_image",
+  "orbitx_grok_video",
+  "orbitx_gen_image",
+  "orbitx_gen_video",
 ]);
 
 async function getProfileForUser(userId) {

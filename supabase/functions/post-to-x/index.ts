@@ -2,9 +2,8 @@
  * post-to-x — Supabase Edge Function
  * Posts a tweet on behalf of an authenticated OG Scan user.
  *
- * Priority:
- *  1. User has OAuth 2.0 token in profiles → tweets as themselves
- *  2. Fallback: OAuth 1.0a app-owner tokens → from OG Scan official account
+ * Tweets only as the signed-in user (OAuth 2.0 on their profile).
+ * Official-account fallback is intentionally removed.
  *
  * Body: {
  *   text: string;
@@ -126,37 +125,6 @@ serve(async (req) => {
 
       const result = await postTweetOAuth2(accessToken, tweetText, mediaId);
       return json(result);
-    }
-
-    // ── Path 2: fallback — OAuth 1.0a from OG Scan official account ───────────
-    if (TWITTER_ACCESS_TOKEN && TWITTER_ACCESS_TOKEN_SECRET) {
-      const displayName = (profile?.username as string) ?? "an OG Scan user";
-      // For fallback account, truncate text to fit attribution
-      const attribution = `\n\n— @${displayName} on ogscan.fun`;
-      const reservedForAttr = attribution.length;
-      const reservedTotal = reservedForLinks + reservedForAttr;
-      const maxBody = 280 - reservedTotal - (appendLinks.length > 0 ? appendLinks.length : 0);
-      let fallbackText = rawText.slice(0, Math.max(maxBody, 30)) + attribution;
-      if (appendLinks.length > 0) {
-        fallbackText = fallbackText + "\n" + appendLinks.join("\n");
-      }
-
-      // Upload media if provided
-      let mediaId: string | null = null;
-      if (imageUrl || videoUrl) {
-        try {
-          if (imageUrl) {
-            mediaId = await uploadImageOAuth1a(imageUrl);
-          } else if (videoUrl) {
-            mediaId = await uploadVideoOAuth1a(videoUrl);
-          }
-        } catch (mediaErr) {
-          console.error("Media upload failed (fallback):", mediaErr);
-        }
-      }
-
-      const result = await postTweetOAuth1a(fallbackText, mediaId);
-      return json({ ...result, mode: "official_account" });
     }
 
     return json({ error: "X not connected. Go to Settings → Connections." }, 403);

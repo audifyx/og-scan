@@ -4450,11 +4450,6 @@ async function handleMcp(req, res, parts) {
         "x_tools_help",
         "x_pdf_scan",
         "x_dex_chart",
-        "x_repo",
-        "x_repo_read",
-        "x_repo_tree",
-        "x_repo_search",
-        "x_repo_context",
       ]);
       if (!auth?.userId && !publicTools.has(name)) {
         // Grok (and chat UIs) often ignore HTTP 401 — return a soft error with a fresh clickable auth link.

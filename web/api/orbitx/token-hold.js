@@ -284,7 +284,7 @@ export const HOLD_GATED_TOOLS = new Set([
 ]);
 
 export function isHoldGatedTool(name) {
-  // Media (image/video) is not hold-gated — API keys already require hold to mint.
+  // Telegram groups keep /img /vid public. MCP still requires a session (SESSION_TOOLS).
   if (/^orbitx_(generate_|grok_|gen_|media_)/.test(name)) return false;
   // First-time $ORBITX buys must not require an existing hold.
   if (

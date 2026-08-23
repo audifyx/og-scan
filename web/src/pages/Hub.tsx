@@ -19,10 +19,10 @@ import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
 import { HubSpaceBackground } from "@/components/hub/HubSpaceBackground";
 import { Ios27Island } from "@/components/hub/Ios27Island";
 import {
-  HOME_GRID_KEYS,
-  PLATFORM_APPS,
   PLATFORM_BY_KEY,
-  PLATFORM_SECTIONS,
+  visibleHomeGridKeys,
+  visiblePlatformApps,
+  visiblePlatformSections,
   type PlatformApp,
 } from "@/lib/orbitxPlatforms";
 import { groupAppsByLetter, islandQuickAccess } from "@/lib/hubIos";
@@ -154,7 +154,7 @@ function Badge({ bg, children }: { bg: string; children: ReactNode }) {
 export default function Hub() {
   const now = useClock();
   const { signOut, profile, user } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isOwnerIdentity } = useAdmin();
   const [tab, setTab] = useState<TabId>("home");
   const [stacks, setStacks] = useState<Record<TabId, Frame[]>>({
     home: [{ id: "root" }],
@@ -182,9 +182,13 @@ export default function Hub() {
   const { openTheme, themeOpen, closeTheme } = useOrbitAtmosphere();
 
   const showAdminApps = Boolean(isAdmin);
+  const showOwnerSurfaces = Boolean(isOwnerIdentity);
+  const catalogApps = useMemo(() => visiblePlatformApps(showOwnerSurfaces), [showOwnerSurfaces]);
+  const homeGridKeys = useMemo(() => visibleHomeGridKeys(showOwnerSurfaces), [showOwnerSurfaces]);
+  const platformSections = useMemo(() => visiblePlatformSections(showOwnerSurfaces), [showOwnerSurfaces]);
   const searchableApps = useMemo(
-    () => (showAdminApps ? [...PLATFORM_APPS, ...OWNER_ADMIN_APPS] : PLATFORM_APPS),
-    [showAdminApps],
+    () => (showAdminApps ? [...catalogApps, ...OWNER_ADMIN_APPS] : catalogApps),
+    [catalogApps, showAdminApps],
   );
 
   const stack = stacks[tab];
@@ -393,7 +397,7 @@ export default function Hub() {
 
   const navTitle = (() => {
     if (top.id === "app") return PLATFORM_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "App";
-    if (top.id === "section") return PLATFORM_SECTIONS.find((s) => s.id === top.sectionId)?.title || "Apps";
+    if (top.id === "section") return platformSections.find((s) => s.id === top.sectionId)?.title || "Apps";
     if (top.id === "widgets") return "Widgets";
     if (top.id === "wallpaper") return "Atmosphere";
     return TABS.find((t) => t.id === tab)?.label || "OrbitX";
@@ -470,10 +474,10 @@ export default function Hub() {
         })}
       </div>
       <section className="ox-deck__section">
-        <h2>All stations</h2>
-        <p>Every OrbitX surface, one orbit.</p>
+        <h2>OrbitX apps</h2>
+        <p>Trade, launch, intel, AI, city, and play — the live surfaces.</p>
         <div className="ox-stations">
-          {HOME_GRID_KEYS.filter((k) => !(GATE_KEYS as readonly string[]).includes(k)).map((k) => {
+          {homeGridKeys.filter((k) => !(GATE_KEYS as readonly string[]).includes(k)).map((k) => {
             const app = PLATFORM_BY_KEY[k];
             if (!app) return null;
             return (
@@ -494,7 +498,7 @@ export default function Hub() {
   const rootApps = (() => {
     const q = appsQ.trim().toLowerCase();
     const sections = [
-      ...PLATFORM_SECTIONS,
+      ...platformSections,
       ...(showAdminApps
         ? [{ id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }]
         : []),
@@ -640,7 +644,7 @@ export default function Hub() {
           </>
         )}
 
-        {(show("agent mcp claude chatgpt grok") || show("x mcp twitter") || show("shop credits burn")) && (
+        {(show("agent mcp claude chatgpt grok") || (showOwnerSurfaces && show("x mcp twitter")) || show("shop credits burn")) && (
           <>
             <div className="ios-group__head">Connectors</div>
             <div className="ios-group">
@@ -656,7 +660,7 @@ export default function Hub() {
                   <IosChevron />
                 </Link>
               )}
-              {show("x mcp twitter") && (
+              {showOwnerSurfaces && show("x mcp twitter") && (
                 <Link to="/x" className="ios-cell">
                   <Badge bg="linear-gradient(180deg,#52525b,#18181b)">
                     <svg viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -764,7 +768,7 @@ export default function Hub() {
         ? { id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }
         : top.sectionId === "admin"
           ? null
-          : PLATFORM_SECTIONS.find((s) => s.id === top.sectionId);
+          : platformSections.find((s) => s.id === top.sectionId);
     const apps =
       top.sectionId === "admin" && showAdminApps
         ? OWNER_ADMIN_APPS
@@ -798,7 +802,7 @@ export default function Hub() {
               <span className="ios-cell__title">Category</span>
             </span>
             <span className="ios-cell__value">
-              {PLATFORM_SECTIONS.find((s) => s.keys.includes(app.key))?.title || "OrbitX"}
+              {platformSections.find((s) => s.keys.includes(app.key))?.title || "OrbitX"}
             </span>
           </div>
           <div className="ios-cell ios-cell--bare" style={{ cursor: "default" }}>
@@ -873,7 +877,7 @@ export default function Hub() {
 
       <Ios27Island
         now={now}
-        apps={islandQuickAccess(PLATFORM_APPS, showAdminApps ? OWNER_ADMIN_APPS : [])}
+        apps={islandQuickAccess(catalogApps, showAdminApps ? OWNER_ADMIN_APPS : [])}
         open={islandOpen}
         onToggle={() => setIslandOpen((v) => !v)}
         onClose={() => setIslandOpen(false)}

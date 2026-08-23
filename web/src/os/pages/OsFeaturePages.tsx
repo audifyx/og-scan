@@ -96,8 +96,8 @@ export function OsTradingPage() {
       lead="Jump into OrbitX DEX for live screener, swaps, and portfolio — wrapped in the OS chrome."
       primaryHref="/ORBITX_DEX"
       primaryLabel="Open OrbitX DEX"
-      secondaryHref="/terminal"
-      secondaryLabel="Launch terminal"
+      secondaryHref="/trade"
+      secondaryLabel="Open Trade"
     >
       <div className="ox-stat-row">
         <div className="ox-stat">

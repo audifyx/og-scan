@@ -6,12 +6,18 @@ import {
   PLATFORM_MENU,
   PLATFORM_SECTIONS,
   matchPlatformPath,
+  publicPlatformApps,
+  visibleHomeGridKeys,
+  visiblePlatformApps,
+  visiblePlatformMenu,
+  visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-const REQUIRED = ["shop", "city", "os", "play", "intel", "hq", "predict", "agent", "dex"];
+const REQUIRED = ["shop", "city", "os", "play", "intel", "predict", "agent", "dex", "telegram", "trade"];
+const OWNER_ONLY = ["terminal", "scanner", "vamp", "koltracker", "pnltracker", "xmcp", "hq", "gaming"];
 
 describe("OrbitX platform catalog", () => {
-  it("lists the new world / MCP / intel platforms on /app", () => {
+  it("lists the live world / MCP / intel platforms on /app", () => {
     const keys = PLATFORM_APPS.map((a) => a.key);
     for (const key of REQUIRED) {
       expect(keys).toContain(key);
@@ -26,11 +32,26 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "telegram")?.href).toBe("/telegram");
   });
 
-  it("puts those platforms on the home grid and mini menu", () => {
+  it("puts live platforms on the public home grid and mini menu", () => {
     for (const key of REQUIRED) {
       expect(HOME_GRID_KEYS).toContain(key);
       expect(PLATFORM_MENU.some((a) => a.key === key)).toBe(true);
     }
+    for (const key of OWNER_ONLY) {
+      expect(HOME_GRID_KEYS).not.toContain(key);
+      expect(PLATFORM_MENU.some((a) => a.key === key)).toBe(false);
+    }
+  });
+
+  it("shows unfinished surfaces only to the owner", () => {
+    const publicKeys = publicPlatformApps().map((a) => a.key);
+    for (const key of OWNER_ONLY) {
+      expect(publicKeys).not.toContain(key);
+      expect(visiblePlatformApps(true).some((a) => a.key === key)).toBe(true);
+    }
+    expect(visibleHomeGridKeys(true)).toContain("terminal");
+    expect(visiblePlatformMenu(true).some((a) => a.key === "xmcp")).toBe(true);
+    expect(visiblePlatformSections(false).every((s) => s.keys.every((k) => !OWNER_ONLY.includes(k)))).toBe(true);
   });
 
   it("pins Shop, Agent, DEX, and City as command deck gates", () => {

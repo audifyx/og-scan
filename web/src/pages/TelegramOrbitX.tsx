@@ -224,8 +224,8 @@ export default function TelegramOrbitX() {
               <a className="ox-agent__btn ox-agent__btn--primary" href={TELEGRAM_ORBITX_TME} target="_blank" rel="noreferrer">
                 Open @{TELEGRAM_ORBITX_BOT}
               </a>
-              <Link className="ox-agent__btn" to="/x">
-                Connect X
+              <Link className="ox-agent__btn" to="/agent">
+                Agent MCP
               </Link>
             </div>
 

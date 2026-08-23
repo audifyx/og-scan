@@ -14,6 +14,8 @@ export type PlatformApp = {
   menu?: boolean;
   /** Pin as a command-deck gate on /app. */
   dock?: boolean;
+  /** Hidden from everyone except the signed-in owner email. */
+  visibility?: "public" | "admin";
 };
 
 function Svg({ children }: { children: ReactNode }) {
@@ -182,24 +184,24 @@ export const PlatformGlyph = {
 export const PLATFORM_APPS: PlatformApp[] = [
   { key: "dex", name: "OrbitX DEX", caption: "Scanner & trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(145deg, #5BA8FF 0%, #1A6CFF 48%, #0037A3 100%)", glyph: PlatformGlyph.dex, dock: true },
   { key: "trade", name: "Trade", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(145deg, #C9BFFF 0%, #AB9FF2 46%, #6B5FD4 100%)", glyph: PlatformGlyph.trade },
-  { key: "terminal", name: "Terminal", caption: "Pro trading desk", href: "/terminal", tone: "#60A5FA", iconBg: "linear-gradient(145deg, #93C5FD 0%, #3B82F6 50%, #1D4ED8 100%)", glyph: PlatformGlyph.terminal },
-  { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #00C6B8 48%, #00766E 100%)", glyph: PlatformGlyph.scanner },
+  { key: "terminal", name: "Terminal", caption: "Pro trading desk", href: "/terminal", tone: "#60A5FA", iconBg: "linear-gradient(145deg, #93C5FD 0%, #3B82F6 50%, #1D4ED8 100%)", glyph: PlatformGlyph.terminal, visibility: "admin" },
+  { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #00C6B8 48%, #00766E 100%)", glyph: PlatformGlyph.scanner, visibility: "admin" },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(145deg, #FFE08A 0%, #FFC53D 48%, #B8860B 100%)", glyph: PlatformGlyph.launchpad },
-  { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #67E8F9 48%, #0891B2 100%)", glyph: PlatformGlyph.vamp, menu: false },
+  { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #67E8F9 48%, #0891B2 100%)", glyph: PlatformGlyph.vamp, menu: false, visibility: "admin" },
   { key: "intel", name: "Intel", caption: "Crypto intelligence", href: "/intel", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #0EA5E9 50%, #0369A1 100%)", glyph: PlatformGlyph.intel },
-  { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, menu: false },
-  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, menu: false },
+  { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, menu: false, visibility: "admin" },
+  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, menu: false, visibility: "admin" },
   { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #38BDF8 48%, #0284C7 100%)", glyph: PlatformGlyph.ai },
   { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.agent, dock: true },
-  { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(145deg, #71717A 0%, #3F3F46 50%, #18181B 100%)", glyph: PlatformGlyph.x },
+  { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(145deg, #71717A 0%, #3F3F46 50%, #18181B 100%)", glyph: PlatformGlyph.x, visibility: "admin" },
   { key: "telegram", name: "Telegram", caption: "Official @theorbitxmcpbot", href: "/telegram", tone: "#2AABEE", iconBg: "linear-gradient(145deg, #6FD0FF 0%, #2AABEE 48%, #0B5F8A 100%)", glyph: PlatformGlyph.telegram },
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
-  { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq },
+  { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq, visibility: "admin" },
   { key: "os", name: "OrbitX OS", caption: "Desktop launcher", href: "/os", tone: "#17FF4D", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 46%, #14532D 100%)", glyph: PlatformGlyph.os },
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
   { key: "play", name: "Play", caption: "Games & missions", href: "/play", tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #FF3EAA 48%, #9D174D 100%)", glyph: PlatformGlyph.play },
-  { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, menu: false },
+  { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, menu: false, visibility: "admin" },
   { key: "predict", name: "Predictions", caption: "Trade YES / NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F59E0B 48%, #B45309 100%)", glyph: PlatformGlyph.predict },
   { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft },
   { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F0C75E 48%, #B8860B 100%)", glyph: PlatformGlyph.bagwork },
@@ -218,11 +220,41 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "play", title: "Play & Earn", subtitle: "Markets, NFTs, tasks", keys: ["predict", "nft", "bagwork"] },
 ];
 
-export const PLATFORM_MENU = PLATFORM_APPS.filter((a) => a.menu !== false);
+export function isPublicPlatformApp(app: PlatformApp): boolean {
+  return app.visibility !== "admin";
+}
+
+export function publicPlatformApps(): PlatformApp[] {
+  return PLATFORM_APPS.filter(isPublicPlatformApp);
+}
+
+/** Owner email (or desk-unlocked admin) sees unfinished surfaces. Everyone else gets the live apps. */
+export function visiblePlatformApps(showAdminSurfaces: boolean): PlatformApp[] {
+  return showAdminSurfaces ? PLATFORM_APPS : publicPlatformApps();
+}
+
+export function visiblePlatformMenu(showAdminSurfaces: boolean): PlatformApp[] {
+  return visiblePlatformApps(showAdminSurfaces).filter((a) => a.menu !== false);
+}
+
+export function visibleHomeGridKeys(showAdminSurfaces: boolean): string[] {
+  return visiblePlatformMenu(showAdminSurfaces).map((a) => a.key);
+}
+
+export function visiblePlatformSections(showAdminSurfaces: boolean): PlatformSection[] {
+  const allowed = new Set(visiblePlatformApps(showAdminSurfaces).map((a) => a.key));
+  return PLATFORM_SECTIONS.map((section) => ({
+    ...section,
+    keys: section.keys.filter((key) => allowed.has(key)),
+  })).filter((section) => section.keys.length > 0);
+}
+
+/** Public mini-menu — unfinished apps stay off the FAB for everyone except the owner. */
+export const PLATFORM_MENU = visiblePlatformMenu(false);
 
 export const HOME_DOCK = PLATFORM_APPS.filter((a) => a.dock);
 
-export const HOME_GRID_KEYS = PLATFORM_APPS.filter((a) => a.menu !== false).map((a) => a.key);
+export const HOME_GRID_KEYS = visibleHomeGridKeys(false);
 
 export function matchPlatformPath(href: string, pathname: string): boolean {
   if (href.startsWith("http")) return false;

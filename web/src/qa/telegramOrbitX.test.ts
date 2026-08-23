@@ -820,6 +820,8 @@ describe("official OrbitX Telegram bot", () => {
     const api = readFileSync(resolve(WEB, "api/telegram-orbitx.js"), "utf8");
     expect(api).toContain("process.env.TELEGRAM_ORBITX_BOT_TOKEN");
     expect(api).toContain('if (!WEBHOOK_SECRET || provided !== WEBHOOK_SECRET)');
+    expect(api).toContain("const strictSecret = process.env.TELEGRAM_ORBITX_WEBHOOK_SECRET || \"\"");
+    expect(api).toContain("if (secret !== strictSecret)");
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
     expect(api).toContain("telegramDmUnlockState");
     expect(api).toContain("isAllowedGatedDmCommand");
