@@ -3,6 +3,8 @@
  * Each tool maps to a real OG DEX / OrbitX endpoint or Phantom openUrl/signUrl.
  */
 
+import { ORBITX_PREDICTIONS_URL, isHttpUrl } from "../../shared/orbitx-predictions.js";
+
 /** Primary chains used by OG DEX screener / token APIs */
 const CHAINS = [
   "solana",
@@ -533,7 +535,12 @@ export async function dispatchGenerated(name, args, ctx) {
       };
     }
     case "open":
-      return { ok: true, openUrl: `${base}${meta.path}` };
+      return {
+        ok: true,
+        openUrl: isHttpUrl(meta.path) || meta.path === "/predictions" || String(meta.path || "").startsWith("/predictions/")
+          ? (isHttpUrl(meta.path) ? meta.path : ORBITX_PREDICTIONS_URL)
+          : `${base}${meta.path}`,
+      };
     case "create_token": {
       const tokName = String(args.name || "").trim();
       const symbol = String(args.symbol || "").trim().toUpperCase();

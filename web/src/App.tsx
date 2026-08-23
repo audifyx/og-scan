@@ -16,6 +16,7 @@ import { MaintenanceLock } from "@/components/MaintenanceLock";
 import { IntercomSync } from "@/components/IntercomSync";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ORBITX_PREDICTIONS_URL } from "../shared/orbitx-predictions.js";
 import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
 import Splash from "./pages/Splash";
@@ -229,20 +230,10 @@ function RouteFallback({ label }: { label: string }) {
 
 const SOCIAL_FALLBACK = <RouteFallback label="Social" />;
 
-// Redirect /predictions to the Next.js app (Vercel rewrite in prod; external URL locally).
+// Bookmarks to /predictions land on the live Predictions product.
 function PredictionsRedirect() {
   useEffect(() => {
-    const target = window.location.pathname + window.location.search + window.location.hash;
-    const isLocal =
-      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    if (isLocal) {
-      const rest = window.location.pathname.replace(/^\/predictions\/?/, "");
-      const path = rest ? `/${rest}` : "/";
-      window.location.replace(`https://orbitx-prediction.fun${path}${window.location.search}${window.location.hash}`);
-      return;
-    }
-    // Full navigation so Vercel edge rewrites proxy to the Next.js app.
-    window.location.href = target;
+    window.location.replace(ORBITX_PREDICTIONS_URL);
   }, []);
   return (
     <div className="flex min-h-[40vh] items-center justify-center bg-[#05080c] font-mono text-xs uppercase tracking-[0.18em] text-white/45">

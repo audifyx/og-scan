@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { OS_APPS } from "../apps";
+import { SmartHref } from "../SmartHref";
 import { OxButton, OxPanel, OxTabs } from "../components/primitives";
 import { MiniHud, PlayerProfileCard } from "../components/gaming";
 import { useMemo, useState } from "react";
@@ -48,11 +49,11 @@ export function OsDashboardPage() {
 
       <div className="ox-grid-apps">
         {apps.map((app) => (
-          <Link key={app.id} to={app.href} className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
+          <SmartHref key={app.id} href={app.href} className="ox-app-tile" style={{ ["--tile" as string]: app.accent }}>
             <div className="ox-app-tile__icon">{app.name.slice(0, 1)}</div>
             <strong>{app.name}</strong>
             <span>{app.blurb}</span>
-          </Link>
+          </SmartHref>
         ))}
       </div>
 

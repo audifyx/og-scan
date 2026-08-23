@@ -9,6 +9,8 @@
  * Do not invent live MC / holders / shop USD or unreleased feats beyond this file.
  */
 
+import { ORBITX_PREDICTIONS_URL } from "../../shared/orbitx-predictions.js";
+
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const ORBITX_HOST = "https://www.orbitx.world";
 /** Retired public domain — keep the export so old interpolations resolve to the live DEX. */
@@ -70,7 +72,7 @@ MCP: Agent hub ${ORBITX_HOST}/agent · Agent MCP ${ORBITX_HOST}/api/mcp · also 
 
 CUSTODY: Non-custodial. OrbitX never holds keys or funds. User signs in Jupiter Wallet.
 
-PREDICTIONS: Native markets/games. “Solana-betting” in this training maps to the Anchor program at programs/betting/ inside audifyx/og-scan — not a separate standalone Solana-betting repo under the same ownership. Peer-to-peer style, no house edge in the announced model. UI ${ORBITX_HOST}/predictions
+PREDICTIONS: Native markets/games. “Solana-betting” in this training maps to the Anchor program at programs/betting/ inside audifyx/og-scan — not a separate standalone Solana-betting repo under the same ownership. Peer-to-peer style, no house edge in the announced model. UI ${ORBITX_PREDICTIONS_URL}
 
 LAUNCH: Free launch to pump.fun inside OrbitX (/orbitxlaunch). Optional vanity mints ending orbit / obx.
 
@@ -354,7 +356,7 @@ export const ORBITX_FAQ_CHUNKS = [
       "parimutuel",
       "prop bet",
     ],
-    text: `Native prediction markets + provably-fair 1v1 games, leaderboards, achievements, wired into OrbitX insights. Backed by the on-chain Anchor program at programs/betting/ (Cargo.toml + src/) inside audifyx/og-scan. In this training corpus, “Solana-betting” maps to that program — there is no separate standalone Solana-betting repository under the same ownership. Public product description: pure peer-to-peer betting with no house edge in the announced model; real-time bets against friends or others; winner-takes-all for 2-party; proportional splits for multi-party; full refund if all parties choose the same outcome; minimal platform fees ($1–$10 range, refundable in some mutual-win cases). Users define market terms (real-world events, wild predictions, custom prop bets). Settlement/claims designed around on-chain vault / pro-rata logic. Additional gaming (Coinflip, Dice, Crash, Plinko style) is referenced in product messaging. UI ${ORBITX_HOST}/predictions.`,
+    text: `Native prediction markets + provably-fair 1v1 games, leaderboards, achievements, wired into OrbitX insights. Backed by the on-chain Anchor program at programs/betting/ (Cargo.toml + src/) inside audifyx/og-scan. In this training corpus, “Solana-betting” maps to that program — there is no separate standalone Solana-betting repository under the same ownership. Public product description: pure peer-to-peer betting with no house edge in the announced model; real-time bets against friends or others; winner-takes-all for 2-party; proportional splits for multi-party; full refund if all parties choose the same outcome; minimal platform fees ($1–$10 range, refundable in some mutual-win cases). Users define market terms (real-world events, wild predictions, custom prop bets). Settlement/claims designed around on-chain vault / pro-rata logic. Additional gaming (Coinflip, Dice, Crash, Plinko style) is referenced in product messaging. UI ${ORBITX_PREDICTIONS_URL}.`,
   },
   {
     id: "stack",

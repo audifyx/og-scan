@@ -71,6 +71,10 @@ export default function TradeMore() {
 
   const openTool = (tool: TradeTool) => {
     if (tool.kind === "link" && tool.href) {
+      if (/^https?:\/\//i.test(tool.href)) {
+        window.open(tool.href, "_blank", "noopener,noreferrer");
+        return;
+      }
       navigate(tool.href);
       return;
     }
