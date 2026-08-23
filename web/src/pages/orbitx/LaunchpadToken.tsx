@@ -26,7 +26,7 @@ import { solscanTxUrl } from "../../../shared/orbitx-onchain.js";
 import {
   confirmSentTransaction,
   decodeBase64Transaction,
-  sendWalletTransaction,
+  sendBuyTransaction,
   walletCapsFromAdapter,
 } from "@/lib/orbitx/sendWalletTx";
 import {
@@ -260,7 +260,7 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
     try {
       const b64 = await jupSwapTransaction(quote, publicKey.toBase58());
       const tx = decodeBase64Transaction(b64);
-      const sig = await sendWalletTransaction(connection, walletCapsFromAdapter(wallet), tx);
+      const sig = await sendBuyTransaction(connection, walletCapsFromAdapter(wallet, { preferJupiter: true }), tx);
       toast.success(`${side === "buy" ? "Buy" : "Sell"} submitted — confirming…`);
       await confirmSentTransaction(connection, sig);
       void indexConfirmedTx({ signature: sig, kind: "swap", ref_id: mint });

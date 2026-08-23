@@ -3,6 +3,7 @@ import { Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana
 import {
   serializeSigned,
   sendWalletTransaction,
+  sendBuyTransaction,
   shouldUseJupiterInject,
   toVersionedTransaction,
   transactionFeePayer,
@@ -80,7 +81,7 @@ describe("serializeSigned", () => {
     expect(() => serializeSigned(tx)).toThrow(
       /missing signature for jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb/,
     );
-    expect(() => serializeSigned(tx)).toThrow(/Reconnect Phantom in Chrome/);
+    expect(() => serializeSigned(tx)).toThrow(/Open Jupiter Wallet in Chrome/);
   });
 });
 
@@ -139,17 +140,17 @@ describe("shouldUseJupiterInject", () => {
     expect(shouldUseJupiterInject({ walletName: "Jupiter" })).toBe(true);
   });
 
-  it("uses Jupiter inject when preferJupiter is set and the adapter is not Phantom", () => {
+  it("uses Jupiter inject when preferJupiter is set — including Phantom adapter name", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
     vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
     expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Solflare" }, OWNER)).toBe(true);
     expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Jupiter" })).toBe(true);
-    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(false);
+    expect(shouldUseJupiterInject({ preferJupiter: true, walletName: "Phantom" }, OWNER)).toBe(true);
   });
 
-  it("never hijacks Phantom — even if preferJupiter is set", () => {
+  it("does not use Jupiter for Phantom unless preferJupiter is set", () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -221,7 +222,7 @@ describe("sendWalletTransaction", () => {
     expect(connection.sendRawTransaction).not.toHaveBeenCalled();
   });
 
-  it("sends Phantom adapter txs even when preferJupiter is set", async () => {
+  it("uses Jupiter signAndSend for Chrome buys even when the adapter says Phantom", async () => {
     vi.mocked(getJupiterProvider).mockReturnValue({
       signAndSendTransaction: vi.fn(),
     } as never);
@@ -234,9 +235,44 @@ describe("sendWalletTransaction", () => {
       { walletName: "Phantom", preferJupiter: true, sendTransaction },
       tx,
     );
-    expect(sig).toBe("PHANTOM_SIG");
-    expect(jupiterSignAndSendTransaction).not.toHaveBeenCalled();
-    expect(sendTransaction).toHaveBeenCalled();
+    expect(sig).toBe("JUPITER_SIG");
+    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sendBuyTransaction refuses Phantom serialize when Jupiter is missing", async () => {
+    const sendTransaction = vi.fn();
+    const { tx } = unsignedTransfer();
+    await expect(
+      sendBuyTransaction(
+        { sendRawTransaction: vi.fn() } as never,
+        { walletName: "Phantom", sendTransaction },
+        tx,
+      ),
+    ).rejects.toThrow(/Connect Jupiter Wallet in Chrome/);
+    expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sendBuyTransaction uses Jupiter signAndSend for the owner wallet", async () => {
+    vi.mocked(getJupiterProvider).mockReturnValue({
+      signAndSendTransaction: vi.fn(),
+    } as never);
+    vi.mocked(jupiterProviderPublicKey).mockReturnValue(OWNER);
+    vi.mocked(jupiterSignAndSendTransaction).mockResolvedValue("JUPITER_BUY");
+    const owner = new PublicKey(OWNER);
+    const tx = new Transaction({
+      feePayer: owner,
+      recentBlockhash: "11111111111111111111111111111111",
+    });
+    const sendTransaction = vi.fn();
+    const sig = await sendBuyTransaction(
+      { sendRawTransaction: vi.fn() } as never,
+      { walletName: "Phantom", sendTransaction },
+      tx,
+    );
+    expect(sig).toBe("JUPITER_BUY");
+    expect(jupiterSignAndSendTransaction).toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
   });
 
   it("sends Phantom adapter txs even when Jupiter inject is present", async () => {
@@ -288,14 +324,18 @@ describe("sendWalletTransaction", () => {
     expect(sendTransaction).not.toHaveBeenCalled();
   });
 
-  it("maps adapter caps so Chrome Phantom uses sendTransaction, not Jupiter inject", () => {
+  it("maps adapter caps with preferJupiter for Chrome buys", () => {
     const sendTransaction = vi.fn();
-    const caps = walletCapsFromAdapter({
-      sendTransaction,
-      signTransaction: vi.fn(),
-      wallet: { adapter: { name: "Phantom" } },
-    });
+    const caps = walletCapsFromAdapter(
+      {
+        sendTransaction,
+        signTransaction: vi.fn(),
+        wallet: { adapter: { name: "Phantom" } },
+      },
+      { preferJupiter: true },
+    );
     expect(caps.walletName).toBe("Phantom");
+    expect(caps.preferJupiter).toBe(true);
     expect(caps.sendTransaction).toBe(sendTransaction);
   });
 });

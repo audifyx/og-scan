@@ -33,7 +33,7 @@ import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED } from "@/lib/platformFee";
 import { formatDistanceToNow } from "date-fns";
 import {
   decodeBase64Transaction,
-  sendWalletTransaction,
+  sendBuyTransaction,
   walletCapsFromAdapter,
 } from "@/lib/orbitx/sendWalletTx";
 
@@ -68,7 +68,7 @@ type EnrichedTx = ParsedTransaction & {
 // Re-export WalletPnLSummary type alias
 type WalletPnL = WalletPnLSummary;
 
-/* ─── Jupiter swap bytes — signed via sendWalletTransaction (Chrome Phantom) ─ */
+/* ─── Jupiter swap bytes — signed via Jupiter signAndSend (not Phantom) ─ */
 async function buildChromeSwapTx(
   fromMint: string, toMint: string, amountLamports: number,
   slippageBps: number, userPublicKey: string
@@ -394,7 +394,7 @@ export function ConnectedWalletTab() {
     setSwapLoading(true);
     try {
       if (!sendTransaction && !signTransaction) {
-        throw new Error("Connect Phantom in Chrome to buy — the wallet session is not ready to sign.");
+        throw new Error("Connect Jupiter Wallet in Chrome to buy — the wallet session is not ready to sign.");
       }
       const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
       const outputMint = swapMode === "buy" ? swapToken.mint : SOL_MINT;
@@ -402,7 +402,7 @@ export function ConnectedWalletTab() {
       const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
       const swapTxBase64 = await buildChromeSwapTx(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
       const tx = decodeBase64Transaction(swapTxBase64);
-      const sig = await sendWalletTransaction(connection, walletCapsFromAdapter(adapterWallet), tx);
+      const sig = await sendBuyTransaction(connection, walletCapsFromAdapter(adapterWallet, { preferJupiter: true }), tx);
       toast({ title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`, description: `TX: ${formatAddress(sig, 6)}` });
       setSwapOpen(false); setSwapAmount("");
       setTimeout(() => loadData(address, true), 3000);

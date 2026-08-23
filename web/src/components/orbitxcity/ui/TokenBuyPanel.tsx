@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { jupQuote, jupSwapTransaction, SOL_MINT, type JupQuote } from "@/lib/og";
 import {
   decodeBase64Transaction,
-  sendWalletTransaction,
+  sendBuyTransaction,
   walletCapsFromAdapter,
 } from "@/lib/orbitx/sendWalletTx";
 import { fetchTokenChart, fetchTokenDetail } from "@/lib/orbitxcity/tokenApi";
@@ -110,9 +110,9 @@ export function TokenBuyPanel() {
     try {
       const b64 = await jupSwapTransaction(quote, pk.toBase58());
       const tx = decodeBase64Transaction(b64);
-      const sig = await sendWalletTransaction(
+      const sig = await sendBuyTransaction(
         connection,
-        walletCapsFromAdapter({ sendTransaction, signTransaction, wallet }),
+        walletCapsFromAdapter({ sendTransaction, signTransaction, wallet }, { preferJupiter: true }),
         tx,
       );
 

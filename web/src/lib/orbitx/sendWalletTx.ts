@@ -7,9 +7,10 @@
  * legacy tx from some adapters, which then throws:
  * "Signature verification failed. Missing signature for public key …"
  *
- * Chrome Phantom must use adapter `sendTransaction` (never Jupiter inject,
- * never raw `serialize()` on a maybe-unsigned tx). Platform fee wallets
- * are destinations only — never extra required signers.
+ * Chrome buys use Jupiter `signAndSendTransaction` (`preferJupiter`), never
+ * Phantom `signTransaction` + `serialize()` — that throws
+ * "Missing signature for public key [jYbHk588…]".
+ * Platform fee wallets are destinations only — never extra required signers.
  */
 import {
   Connection,
@@ -61,15 +62,20 @@ export function isVersionedTx(
 }
 
 /** Caps from `@solana/wallet-adapter-react` `useWallet()`. */
-export function walletCapsFromAdapter(wallet: {
-  sendTransaction?: WalletSendCaps["sendTransaction"] | null;
-  signTransaction?: WalletSendCaps["signTransaction"] | null;
-  wallet?: { adapter?: { name?: string | null } | null } | null;
-}): WalletSendCaps {
+export function walletCapsFromAdapter(
+  wallet: {
+    sendTransaction?: WalletSendCaps["sendTransaction"] | null;
+    signTransaction?: WalletSendCaps["signTransaction"] | null;
+    wallet?: { adapter?: { name?: string | null } | null } | null;
+  },
+  extras?: Pick<WalletSendCaps, "preferJupiter" | "preferPhantom">,
+): WalletSendCaps {
   return {
     sendTransaction: wallet.sendTransaction ?? undefined,
     signTransaction: wallet.signTransaction ?? undefined,
     walletName: wallet.wallet?.adapter?.name ?? null,
+    preferJupiter: extras?.preferJupiter,
+    preferPhantom: extras?.preferPhantom,
   };
 }
 
@@ -140,7 +146,7 @@ function rewriteMissingSignatureError(error: unknown): never {
   const match = msg.match(/Missing signature for public key \[`?([^\]`]+)`?\]/i);
   if (match?.[1]) {
     throw new Error(
-      `Wallet returned an unsigned transaction (missing signature for ${match[1]}). Reconnect Phantom in Chrome and try Buy again.`,
+      `Wallet returned an unsigned transaction (missing signature for ${match[1]}). Open Jupiter Wallet in Chrome and Buy again — do not use Phantom serialize.`,
     );
   }
   throw error instanceof Error ? error : new Error(msg);
@@ -153,8 +159,8 @@ export function serializeSigned(signed: Transaction | VersionedTransaction): Uin
       const payer = transactionFeePayer(signed);
       throw new Error(
         payer
-          ? `Wallet returned an unsigned transaction (missing signature for ${payer}). Reconnect Phantom in Chrome and try Buy again.`
-          : "Wallet returned an unsigned versioned transaction. Reconnect Phantom in Chrome and try again.",
+          ? `Wallet returned an unsigned transaction (missing signature for ${payer}). Open Jupiter Wallet in Chrome and Buy again — do not use Phantom serialize.`
+          : "Wallet returned an unsigned versioned transaction. Open Jupiter Wallet in Chrome and try again.",
       );
     }
     try {
@@ -168,7 +174,7 @@ export function serializeSigned(signed: Transaction | VersionedTransaction): Uin
   const unsignedKey = missing?.publicKey ?? (sigs.length === 0 ? signed.feePayer : null);
   if (unsignedKey) {
     throw new Error(
-      `Wallet returned an unsigned transaction (missing signature for ${unsignedKey.toBase58()}). Reconnect Phantom in Chrome and try Buy again.`,
+      `Wallet returned an unsigned transaction (missing signature for ${unsignedKey.toBase58()}). Open Jupiter Wallet in Chrome and Buy again — do not use Phantom serialize.`,
     );
   }
   try {
@@ -187,12 +193,12 @@ export function shouldUseJupiterInject(
   feePayer?: string | null,
 ): boolean {
   if (!getJupiterProvider()?.signAndSendTransaction) return false;
-  // Browser Phantom (and other named non-Jupiter adapters) must sign themselves.
-  // preferJupiter must not steal those sends when both extensions are installed.
-  if (isPhantomWalletName(wallet.walletName)) return false;
-  if (wallet.preferPhantom) return false;
-  if (isJupiterWalletName(wallet.walletName)) return true;
+  // Chrome buys set preferJupiter so Jupiter signs even when the adapter
+  // still says "Phantom" (both extensions installed).
   if (wallet.preferJupiter) return true;
+  if (wallet.preferPhantom) return false;
+  if (isPhantomWalletName(wallet.walletName)) return false;
+  if (isJupiterWalletName(wallet.walletName)) return true;
   const jupiterPk = jupiterProviderPublicKey();
   return Boolean(feePayer && jupiterPk && feePayer === jupiterPk);
 }
@@ -242,7 +248,36 @@ export async function sendWalletTransaction(
     const signed = await wallet.signTransaction(tx);
     return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
   }
-  throw new Error("This wallet can't sign here — connect Phantom, Jupiter, or Solflare in this browser");
+  throw new Error("This wallet can't sign here — connect Jupiter Wallet in Chrome");
+}
+
+/**
+ * Chrome buy/swap: Jupiter `signAndSend` only.
+ * Phantom `signTransaction` + `serialize()` is what throws
+ * "Missing signature for public key [jYbHk588…]".
+ */
+export async function sendBuyTransaction(
+  connection: Connection,
+  wallet: WalletSendCaps,
+  tx: Transaction | VersionedTransaction,
+  options?: WalletSendOptions,
+): Promise<string> {
+  if (!getJupiterProvider()?.signAndSendTransaction) {
+    throw new Error("Connect Jupiter Wallet in Chrome to buy. Phantom cannot serialize this swap.");
+  }
+  const feePayer = transactionFeePayer(tx);
+  const jupiterPk = jupiterProviderPublicKey();
+  if (feePayer && jupiterPk && jupiterPk !== feePayer) {
+    throw new Error(
+      `Jupiter is connected as ${jupiterPk.slice(0, 4)}…${jupiterPk.slice(-4)} but this buy needs ${feePayer.slice(0, 4)}…${feePayer.slice(-4)}. Switch Jupiter to that account.`,
+    );
+  }
+  return sendWalletTransaction(
+    connection,
+    { ...wallet, preferJupiter: true, preferPhantom: false },
+    tx,
+    options,
+  );
 }
 
 export type ConfirmSentOptions = {
