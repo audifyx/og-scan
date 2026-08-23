@@ -15,6 +15,9 @@ const CLIENT_FILES = [
   resolve(__dirname, "../../ogdex/src/components/OwnerDeskGate.tsx"),
   resolve(__dirname, "../../ogdex/src/pages/Admin.tsx"),
   resolve(__dirname, "../../shared/desk-unlock-client.js"),
+  resolve(__dirname, "../pages/Hub.tsx"),
+  resolve(__dirname, "../components/admin/sections/AdminAppsSection.tsx"),
+  resolve(__dirname, "../components/MaintenanceLock.tsx"),
 ] as const;
 
 describe("desk PIN is Vercel-locked", () => {
@@ -30,7 +33,17 @@ describe("desk PIN is Vercel-locked", () => {
   it("keeps the unlock route at top-level /api/orbitx-desk-unlock", () => {
     const api = readFileSync(resolve(__dirname, "../../api/orbitx-desk-unlock.js"), "utf8");
     expect(api).toContain("OWNER_DESK_CODE");
+    expect(api).toContain("requireOwnerUser");
     expect(api).toContain("not_configured");
     expect(api).not.toMatch(/\|\|\s*["']0129["']/);
+  });
+
+  it("does not bind MCP identity from a raw publicKey", () => {
+    const hub = readFileSync(resolve(__dirname, "../../api/orbitx-hub.js"), "utf8");
+    const start = hub.indexOf("async function enrichAuth");
+    const end = hub.indexOf("function wwwAuthenticate");
+    const fn = hub.slice(start, end);
+    expect(fn).toContain("never a login");
+    expect(fn).not.toContain("resolveAgentByWallet");
   });
 });

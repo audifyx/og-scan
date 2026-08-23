@@ -13,7 +13,7 @@ import {
 import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { ADMIN_APPS } from "@/lib/adminApps";
-import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
+import { useAdmin } from "@/hooks/useAdmin";
 import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { useOrbitAtmosphere } from "@/hooks/useOrbitAtmosphere";
 import { HubSpaceBackground } from "@/components/hub/HubSpaceBackground";
@@ -154,6 +154,7 @@ function Badge({ bg, children }: { bg: string; children: ReactNode }) {
 export default function Hub() {
   const now = useClock();
   const { signOut, profile, user } = useAuth();
+  const { isAdmin } = useAdmin();
   const [tab, setTab] = useState<TabId>("home");
   const [stacks, setStacks] = useState<Record<TabId, Frame[]>>({
     home: [{ id: "root" }],
@@ -180,7 +181,7 @@ export default function Hub() {
   const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
   const { openTheme, themeOpen, closeTheme } = useOrbitAtmosphere();
 
-  const showAdminApps = useMemo(() => isOwnerIdentity({ email: user?.email }), [user?.email]);
+  const showAdminApps = Boolean(isAdmin);
   const searchableApps = useMemo(
     () => (showAdminApps ? [...PLATFORM_APPS, ...OWNER_ADMIN_APPS] : PLATFORM_APPS),
     [showAdminApps],
@@ -495,7 +496,7 @@ export default function Hub() {
     const sections = [
       ...PLATFORM_SECTIONS,
       ...(showAdminApps
-        ? [{ id: "admin", title: "Owner Admin", subtitle: OWNER_EMAIL, keys: OWNER_ADMIN_APPS.map((a) => a.key) }]
+        ? [{ id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }]
         : []),
     ].filter((section) => matchQ(`${section.title} ${section.subtitle}`, q));
     const az = groupAppsByLetter(
@@ -760,7 +761,7 @@ export default function Hub() {
   } else if (top.id === "section") {
     const section =
       top.sectionId === "admin"
-        ? { id: "admin", title: "Owner Admin", subtitle: OWNER_EMAIL, keys: OWNER_ADMIN_APPS.map((a) => a.key) }
+        ? { id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }
         : PLATFORM_SECTIONS.find((s) => s.id === top.sectionId);
     const apps =
       top.sectionId === "admin"

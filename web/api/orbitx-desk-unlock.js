@@ -1,7 +1,7 @@
 /**
  * POST /api/orbitx-desk-unlock
- * Compare the typed PIN to Vercel OWNER_DESK_CODE (or ADMIN_PASS).
- * Never return the PIN. Fail closed when neither env is set.
+ * Owner JWT + Vercel OWNER_DESK_CODE (or ADMIN_PASS). Never return the PIN.
+ * Fail closed when env or owner session is missing.
  * NOT under /api/orbitx/* — that rewrite hits orbitx-hub.
  */
 import {
@@ -11,6 +11,7 @@ import {
   issueDeskSession,
   verifyDeskUnlockCode,
 } from "../shared/desk-unlock.js";
+import { requireOwnerUser } from "../shared/owner-identity.js";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +48,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return json(res, 405, { ok: false, error: "method_not_allowed" });
   }
+
+  const owner = await requireOwnerUser(req);
+  if (!owner) return json(res, 403, { ok: false, error: "denied" });
 
   if (!deskUnlockConfigured()) {
     return json(res, 503, { ok: false, error: "not_configured" });

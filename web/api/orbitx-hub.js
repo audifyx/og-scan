@@ -1392,17 +1392,8 @@ async function enrichAuth(req, args = {}) {
   const wallet = String(
     args.publicKey || args.address || args.wallet || args.buyerWallet || args.sellerWallet || "",
   ).trim();
-  if (wallet) {
-    const linked = await resolveAgentByWallet(wallet);
-    if (linked?.userId) {
-      return withAuthEmail({
-        ...linked,
-        bearerPresent,
-        bearerInvalid: bearerPresent,
-        bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
-      });
-    }
-  }
+  // A raw publicKey is a trade argument, never a login. Binding identity from
+  // wallet alone let anyone impersonate the owner (wallets are public).
 
   return {
     userId: null,
@@ -1562,7 +1553,7 @@ async function resolveSocialUser(auth, args) {
       walletAddress: auth.walletAddress || null,
     };
   }
-  return resolveAgentByWallet(args.publicKey || args.address || args.wallet || "");
+  return null;
 }
 
 const CORE_TOOLS = [
@@ -5192,16 +5183,30 @@ export async function runTelegramAgentTool(userId, toolName, args = {}, req = nu
   const uid = String(userId || "").trim();
   if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
   const agent = await ensureAgent(uid);
-  const auth = {
+  const auth = await withAuthEmail({
     userId: uid,
     agentId: agent.id,
     walletAddress: agent.wallet_address || null,
     agentName: agent.name || null,
     source: "telegram",
     bearerPresent: false,
-  };
+  });
   const base = publicBase(req);
-  return callTool(String(toolName || "").trim(), args || {}, auth, base, req);
+  const rawName = String(toolName || "").trim();
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
+    const access = await requireMcpAccess({
+      userId: uid,
+      wallets: holdCandidateWallets(auth, args),
+      email: auth.email,
+      base,
+      tool: name,
+    });
+    if (!access.allowed) {
+      return access.blocked || holdBlockedPayload({ tool: name, hold: access.hold });
+    }
+  }
+  return callTool(name, args || {}, auth, base, req);
 }
 
 export function listTelegramAgentCoreTools() {

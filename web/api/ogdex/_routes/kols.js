@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   if (req.method === "POST") return add(req, res);
   const sp = url.searchParams;
 
-  if (sp.get("pnl")) return pnlRefresh(res, sp);
+  if (sp.get("pnl")) return pnlRefresh(req, res, sp);
   if (sp.get("directory")) return directory(res);
   if (sp.get("feed")) return feed(res, sp);
   if (sp.get("activity")) return activity(res, sp);
@@ -222,8 +222,10 @@ async function ingestBatch(sp) {
   catch { for (const row of rows) { try { await dbInsert("kol_transactions", row); } catch {} } }
 }
 
-async function pnlRefresh(res, sp) {
-  if (!hasAdminPass() || !adminAuthorized(sp.get("pass"))) return send(res, 401, { ok: false, error: "unauthorized" });
+async function pnlRefresh(req, res, sp) {
+  const hdr = req.headers["authorization"] || req.headers["x-admin-pass"] || "";
+  const pass = String(hdr).replace(/^Bearer\s+/i, "").trim();
+  if (!hasAdminPass() || !adminAuthorized(pass)) return send(res, 401, { ok: false, error: "unauthorized" });
   const batch = Math.min(Number(sp.get("batch")) || 10, 14);
   const offset = Number(sp.get("offset")) || 0;
   try {

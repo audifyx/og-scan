@@ -15,6 +15,7 @@ import {
   solscanTxUrl,
   txFeeLamports,
 } from "../shared/orbitx-onchain.js";
+import { requireOwnerUser } from "../shared/owner-identity.js";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -293,13 +294,12 @@ export default async function handler(req, res) {
   try {
     if (action === "verify") return await handleVerify(req, res);
     if (!sb) return json(res, 503, { ok: false, error: "Supabase is not configured." });
+    const owner = await requireOwnerUser(req);
+    if (!owner) return json(res, 403, { ok: false, error: "denied" });
     if (action === "index") return await handleIndex(req, res, sb);
     if (action === "rebuild") return await handleRebuild(req, res, sb);
     if (action === "events") return await handleEvents(req, res, sb);
-    if (action === "costs") {
-      const user = await authUser(req);
-      return await handleCosts(req, res, sb, user);
-    }
+    if (action === "costs") return await handleCosts(req, res, sb, owner);
     return json(res, 400, { ok: false, error: `Unknown action: ${action}` });
   } catch (e) {
     return json(res, 500, { ok: false, error: e instanceof Error ? e.message : "On-chain API failed." });

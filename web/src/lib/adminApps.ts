@@ -36,7 +36,7 @@ export interface AdminAppDef {
   emoji?: string;
 }
 
-/** All owner-only admin apps. Visible on /app only for audifyx@gmail.com. */
+/** All owner-only admin apps. Visible on /app only after the owner desk is unlocked. */
 export const ADMIN_APPS: AdminAppDef[] = [
   // ── Platform desks ──
   {

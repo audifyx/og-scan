@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import { ADMIN_APPS, ADMIN_APP_GROUPS } from "@/lib/adminApps";
-import { OWNER_EMAIL } from "@/lib/ownerDesk";
 
 export const AdminAppsSection = () => {
   const navigate = useNavigate();
@@ -14,14 +13,14 @@ export const AdminAppsSection = () => {
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#F0C75E]/80">Admin apps hub</p>
           <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-[2rem]">Every owner app in one place.</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60">
-            Platform desks, ops tools, and Spaces/AI apps — also mirrored on <span className="text-white">/app</span> for {OWNER_EMAIL} only.
+            Platform desks, ops tools, and Spaces/AI apps — also mirrored on <span className="text-white">/app</span> for the owner identity only.
           </p>
         </div>
 
         <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6">
           <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">Access</p>
           <div className="mt-4 space-y-3 text-sm text-white/65">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">• /app icons: {OWNER_EMAIL} only</div>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">• /app icons: unlocked owner session only</div>
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">• Desk routes still use AdminRoute + owner gate</div>
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">• {ADMIN_APPS.length} admin apps registered</div>
           </div>

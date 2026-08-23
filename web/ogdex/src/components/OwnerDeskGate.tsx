@@ -5,19 +5,22 @@ import {
   clearDeskUnlock,
   hasDeskSession,
   persistDeskUnlock,
+  readOrbitXAccessToken,
   requestDeskUnlock,
 } from "../../../shared/desk-unlock-client.js";
 
-/** Soft UI gate for ORBITX_DEX owner desk — PIN is checked on Vercel, not here. */
+/** Soft UI gate for ORBITX_DEX owner desk — PIN is checked on Vercel with owner JWT. */
 export default function OwnerDeskGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [ok, setOk] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setOk(hasDeskSession());
+    setSignedIn(Boolean(readOrbitXAccessToken()));
     setReady(true);
     const sync = () => setOk(hasDeskSession());
     window.addEventListener(DESK_UNLOCK_EVENT, sync);
@@ -33,6 +36,14 @@ export default function OwnerDeskGate({ children }: { children: ReactNode }) {
   }
 
   if (ok) return <>{children}</>;
+
+  if (!signedIn) {
+    return (
+      <div className="max-w-sm mx-auto card p-6 mt-16 text-center text-sm text-muted">
+        Not found.
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-sm mx-auto card p-6 mt-16">

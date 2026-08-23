@@ -4,7 +4,6 @@ import { Shield, Lock, Wrench, KeyRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_CODE = (import.meta.env.VITE_ADMIN_PASS as string | undefined)?.trim() || "";
-const BETA_CODE = "OG";
 const SESSION_KEY = "ogscan_admin_unlocked";
 
 export function MaintenanceLock({ children }: { children: React.ReactNode }) {
@@ -71,8 +70,8 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
   }, [unlocked, maintenanceEnabled]);
 
   const tryUnlock = (value: string) => {
-    const upper = value.trim().toUpperCase();
-    if (upper === BETA_CODE || (ADMIN_CODE.length >= 8 && upper === ADMIN_CODE.toUpperCase())) {
+    const typed = value.trim();
+    if (ADMIN_CODE.length >= 8 && typed === ADMIN_CODE) {
       sessionStorage.setItem(SESSION_KEY, "true");
       setUnlocked(true);
     } else {
@@ -91,8 +90,7 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
     const val = e.target.value;
     setCode(val);
     setError(false);
-    // Auto-submit when they type "OG" (2 chars)
-    if (val.trim().toUpperCase() === BETA_CODE) {
+    if (ADMIN_CODE.length >= 8 && val.trim() === ADMIN_CODE) {
       tryUnlock(val);
     }
   };

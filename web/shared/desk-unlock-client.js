@@ -8,9 +8,22 @@ export const DESK_SESS_KEY = "ox_desk_sess_v2";
 export const DESK_UNLOCK_EVENT = "ox-desk-unlock";
 export const DESK_SESSION_PREFIX = "oxdesk1";
 
+/** Same storage key as web/src/lib/supabase.ts — DEX is same-origin. */
+export function readOrbitXAccessToken() {
+  try {
+    const raw = localStorage.getItem("sol-tools-auth");
+    if (!raw) return "";
+    const parsed = JSON.parse(raw);
+    return String(parsed?.access_token || parsed?.currentSession?.access_token || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 export async function requestDeskUnlock(code, bearer) {
   const headers = { "Content-Type": "application/json" };
-  if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  const token = bearer || readOrbitXAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   let res;
   try {
     res = await fetch(DESK_UNLOCK_PATH, {
