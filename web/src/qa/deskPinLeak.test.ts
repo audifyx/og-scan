@@ -56,6 +56,8 @@ describe("desk PIN is Vercel-locked", () => {
     const gate = readFileSync(resolve(__dirname, "../../../scripts/vercel-only-rork.sh"), "utf8");
     expect(cfg).toContain("vercel-only-rork.sh");
     expect(gate).toContain("rork-og-meme-coin-tracker");
+    expect(gate).toContain("prj_c5AQF7gDGnrQWmKAznpQPf06GWi2");
+    expect(gate).toContain("prj_UhZ1QBFiEQSdm0bRlMK3Nf6KTqI4");
     expect(gate).toContain("Skipping leftover Vercel project og-scan");
   });
 
