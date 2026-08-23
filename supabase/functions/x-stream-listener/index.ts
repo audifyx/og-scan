@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const BEARER_TOKEN = Deno.env.get("X_BEARER_TOKEN")!;
 const BOT_ENDPOINT = "https://ffjipnkhcebjvttliptb.functions.supabase.co/x-reply-bot";
+const BOT_SECRET =
+  Deno.env.get("X_REPLY_BOT_SECRET") ||
+  Deno.env.get("ORBITX_INTERNAL_SECRET") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  "";
 const BOT_USERNAME = "audifyx";
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 999;
@@ -40,10 +45,16 @@ async function connectStream() {
             const tweet = data.data;
             console.log(`[Stream] 📱 Mention: ${tweet.text.substring(0, 60)}...`);
             // Send to bot endpoint
+            if (!BOT_SECRET) {
+              console.error("[Stream] Missing X_REPLY_BOT_SECRET — will not call reply bot");
+              continue;
+            }
             await fetch(BOT_ENDPOINT, {
               method: "POST",
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${BOT_SECRET}`,
+                "x-orbitx-reply-secret": BOT_SECRET,
               },
               body: JSON.stringify({
                 type: "mention",

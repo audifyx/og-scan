@@ -7,10 +7,10 @@
  * Env (Vercel):
  *   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  *   TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET  (OAuth2 refresh)
- *   Optional media: TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET,
- *                   TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET
+ * Media uploads use the caller's own X OAuth2 token — never TWITTER_ACCESS_TOKEN.
  */
-import { createHash, createHmac, randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
+import { uploadImageWithUserOAuth2 } from "../shared/x-user-post.js";
 import {
   X_OAUTH_SCOPES,
   NIM_MODELS,
@@ -99,10 +99,6 @@ const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const TWITTER_CLIENT_ID =
   process.env.TWITTER_CLIENT_ID || process.env.VITE_TWITTER_CLIENT_ID || "";
 const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || "";
-const TWITTER_CONSUMER_KEY = process.env.TWITTER_CONSUMER_KEY || "";
-const TWITTER_CONSUMER_SECRET = process.env.TWITTER_CONSUMER_SECRET || "";
-const TWITTER_ACCESS_TOKEN = process.env.TWITTER_ACCESS_TOKEN || "";
-const TWITTER_ACCESS_TOKEN_SECRET = process.env.TWITTER_ACCESS_TOKEN_SECRET || "";
 
 const MCP_HOST = "https://www.orbitx.world";
 const MCP_URL = `${MCP_HOST}/api/x/mcp`;
@@ -1819,70 +1815,8 @@ async function resolveUserAccessToken(userId, { forceRefresh = false } = {}) {
   return { ok: true, accessToken, profile, ...xScopeInfo(profile) };
 }
 
-async function uploadImageOAuth1a(imageUrl) {
-  if (
-    !TWITTER_CONSUMER_KEY ||
-    !TWITTER_CONSUMER_SECRET ||
-    !TWITTER_ACCESS_TOKEN ||
-    !TWITTER_ACCESS_TOKEN_SECRET
-  ) {
-    throw new Error("Media upload not configured (TWITTER_CONSUMER_* / TWITTER_ACCESS_TOKEN* on Vercel)");
-  }
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error(`Could not fetch image: ${imgRes.status}`);
-  const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-  if (imgBuffer.byteLength > 5 * 1024 * 1024) throw new Error("Image exceeds 5MB Twitter limit");
-
-  const url = "https://upload.twitter.com/1.1/media/upload.json";
-  const boundary = `----ox${randomBytes(8).toString("hex")}`;
-  const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-  const preamble = Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="media"; filename="media"\r\nContent-Type: ${contentType}\r\n\r\n`,
-  );
-  const mid = Buffer.from(
-    `\r\n--${boundary}\r\nContent-Disposition: form-data; name="media_category"\r\n\r\ntweet_image\r\n--${boundary}--\r\n`,
-  );
-  const body = Buffer.concat([preamble, imgBuffer, mid]);
-
-  const oauthParams = {
-    oauth_consumer_key: TWITTER_CONSUMER_KEY,
-    oauth_nonce: randomBytes(16).toString("hex"),
-    oauth_signature_method: "HMAC-SHA1",
-    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-    oauth_token: TWITTER_ACCESS_TOKEN,
-    oauth_version: "1.0",
-  };
-  const sorted = Object.entries(oauthParams)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join("&");
-  const base = `POST&${encodeURIComponent(url)}&${encodeURIComponent(sorted)}`;
-  const signingKey = `${encodeURIComponent(TWITTER_CONSUMER_SECRET)}&${encodeURIComponent(TWITTER_ACCESS_TOKEN_SECRET)}`;
-  oauthParams.oauth_signature = createHmac("sha1", signingKey).update(base).digest("base64");
-  const authHeader =
-    "OAuth " +
-    Object.entries(oauthParams)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${encodeURIComponent(k)}="${encodeURIComponent(v)}"`)
-      .join(", ");
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: authHeader,
-      "Content-Type": `multipart/form-data; boundary=${boundary}`,
-      "Content-Length": String(body.length),
-    },
-    body,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Media upload failed: ${err.slice(0, 200)}`);
-  }
-  const data = await res.json();
-  const mediaId = data?.media_id_string;
-  if (!mediaId) throw new Error("No media_id from Twitter");
-  return mediaId;
+async function uploadImageForUser(imageUrl, accessToken) {
+  return uploadImageWithUserOAuth2(accessToken, imageUrl);
 }
 
 
@@ -2683,13 +2617,13 @@ async function callTool(rawName, args, auth, req = null) {
     let mediaId = null;
     if (a.imageUrl || a.image_url) {
       try {
-        mediaId = await uploadImageOAuth1a(String(a.imageUrl || a.image_url));
+        mediaId = await uploadImageForUser(String(a.imageUrl || a.image_url), resolved.accessToken);
       } catch (e) {
         return {
           ok: false,
           error: "media_upload_failed",
           message: e?.message || "Image upload failed",
-          hint: "Post without imageUrl, or set TWITTER_CONSUMER_* + TWITTER_ACCESS_TOKEN* on Vercel.",
+          hint: "Connect your own X account on https://orbitx.world/x — media posts as you, not the platform.",
         };
       }
     }
@@ -3041,7 +2975,7 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_agent_poll_replies") {
     try {
-      return await processAutoReplies(sb, resolveUserAccessToken, uploadImageOAuth1a, {
+      return await processAutoReplies(sb, resolveUserAccessToken, uploadImageForUser, {
         forceUserId: auth.userId,
       });
     } catch (e) {
@@ -3222,7 +3156,7 @@ async function callTool(rawName, args, auth, req = null) {
     if (!item) return { ok: false, error: "not_found", message: "Queue item not found" };
     const postNow = a.postNow !== false && a.post_now !== false;
     if (postNow) {
-      return executeQueueItem(sb, item, resolveUserAccessToken, uploadImageOAuth1a);
+      return executeQueueItem(sb, item, resolveUserAccessToken, uploadImageForUser);
     }
     const updated = await sb(`x_agent_queue?id=eq.${encodeURIComponent(id)}`, {
       method: "PATCH",
@@ -3509,7 +3443,7 @@ async function handleAgent(req, res, parts) {
       (!cronSecret && process.env.VERCEL !== "1");
     if (!ok) return json(res, { error: "unauthorized" }, 401);
     try {
-      const result = await runCronTick(sb, resolveUserAccessToken, uploadImageOAuth1a);
+      const result = await runCronTick(sb, resolveUserAccessToken, uploadImageForUser);
       return json(res, result);
     } catch (e) {
       return json(res, { error: e?.message || "cron_failed" }, 500);
@@ -3727,7 +3661,7 @@ async function handleAgent(req, res, parts) {
     const user = await getAuthUser(req);
     if (!user?.id) return json(res, { error: "unauthorized" }, 401);
     try {
-      const result = await processAutoReplies(sb, resolveUserAccessToken, uploadImageOAuth1a, {
+      const result = await processAutoReplies(sb, resolveUserAccessToken, uploadImageForUser, {
         forceUserId: user.id,
       });
       return json(res, result);
@@ -3903,7 +3837,7 @@ async function handleAgent(req, res, parts) {
       const item = Array.isArray(rows) ? rows[0] : null;
       if (!item) return json(res, { error: "not_found" }, 404);
       try {
-        const result = await executeQueueItem(sb, item, resolveUserAccessToken, uploadImageOAuth1a);
+        const result = await executeQueueItem(sb, item, resolveUserAccessToken, uploadImageForUser);
         return json(res, { ok: true, result });
       } catch (e) {
         return json(res, { error: e?.message || "approve_failed" }, 500);
