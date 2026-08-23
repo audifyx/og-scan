@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
 import {
   serializeSigned,
   sendWalletTransaction,
@@ -42,6 +42,18 @@ function unsignedTransfer() {
   return { payer, tx };
 }
 
+/** Avoid SystemProgram.transfer in tests — Buffer/Uint8Array layout breaks in Vitest. */
+function transferLikeIx(from: PublicKey, to: PublicKey, fromSigns: boolean) {
+  return new TransactionInstruction({
+    programId: new PublicKey("11111111111111111111111111111111"),
+    keys: [
+      { pubkey: from, isSigner: fromSigns, isWritable: true },
+      { pubkey: to, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.alloc(0),
+  });
+}
+
 describe("toVersionedTransaction", () => {
   it("compiles a legacy burn-style tx so Jupiter does not serialize unsigned legacy bytes", () => {
     const { payer, tx } = unsignedTransfer();
@@ -78,13 +90,7 @@ describe("swap signers — fee wallets are destinations only", () => {
     const tx = new Transaction({
       feePayer: buyer.publicKey,
       recentBlockhash: "11111111111111111111111111111111",
-    }).add(
-      SystemProgram.transfer({
-        fromPubkey: buyer.publicKey,
-        toPubkey: new PublicKey(ROUTED_FEE_WALLET),
-        lamports: 50_000,
-      }),
-    );
+    }).add(transferLikeIx(buyer.publicKey, new PublicKey(ROUTED_FEE_WALLET), true));
     expect(requiredSignerKeys(tx)).toEqual([buyer.publicKey.toBase58()]);
     expect(unexpectedFeeWalletSigners(tx, buyer.publicKey.toBase58())).toEqual([]);
     expect(() => assertSwapSigners(tx, buyer.publicKey.toBase58())).not.toThrow();
@@ -95,13 +101,7 @@ describe("swap signers — fee wallets are destinations only", () => {
     const tx = new Transaction({
       feePayer: buyer.publicKey,
       recentBlockhash: "11111111111111111111111111111111",
-    }).add(
-      SystemProgram.transfer({
-        fromPubkey: new PublicKey(ROUTED_FEE_WALLET),
-        toPubkey: buyer.publicKey,
-        lamports: 1,
-      }),
-    );
+    }).add(transferLikeIx(new PublicKey(ROUTED_FEE_WALLET), buyer.publicKey, true));
     expect(requiredSignerKeys(tx)).toContain(ROUTED_FEE_WALLET);
     expect(unexpectedFeeWalletSigners(tx, buyer.publicKey.toBase58())).toEqual([ROUTED_FEE_WALLET]);
     expect(() => assertSwapSigners(tx, buyer.publicKey.toBase58())).toThrow(
@@ -114,13 +114,7 @@ describe("swap signers — fee wallets are destinations only", () => {
     const tx = new Transaction({
       feePayer: owner,
       recentBlockhash: "11111111111111111111111111111111",
-    }).add(
-      SystemProgram.transfer({
-        fromPubkey: owner,
-        toPubkey: new PublicKey(PLATFORM_WALLET),
-        lamports: 1_000,
-      }),
-    );
+    }).add(transferLikeIx(owner, new PublicKey(PLATFORM_WALLET), true));
     expect(unexpectedFeeWalletSigners(tx, ROUTED_FEE_WALLET)).toEqual([]);
     expect(() => assertSwapSigners(tx, ROUTED_FEE_WALLET)).not.toThrow();
   });
@@ -282,13 +276,7 @@ describe("sendWalletTransaction", () => {
     const tx = new Transaction({
       feePayer: buyer.publicKey,
       recentBlockhash: "11111111111111111111111111111111",
-    }).add(
-      SystemProgram.transfer({
-        fromPubkey: new PublicKey(ROUTED_FEE_WALLET),
-        toPubkey: buyer.publicKey,
-        lamports: 1,
-      }),
-    );
+    }).add(transferLikeIx(new PublicKey(ROUTED_FEE_WALLET), buyer.publicKey, true));
     const sendTransaction = vi.fn();
     await expect(
       sendWalletTransaction(

@@ -95,10 +95,17 @@ export function requiredSignerKeys(tx: Transaction | VersionedTransaction): stri
     const n = tx.message.header.numRequiredSignatures;
     return tx.message.staticAccountKeys.slice(0, n).map((k) => k.toBase58());
   }
-  if (tx.signatures?.length) {
-    return tx.signatures.map((s) => s.publicKey.toBase58());
+  const keys = new Set<string>();
+  if (tx.feePayer) keys.add(tx.feePayer.toBase58());
+  for (const sig of tx.signatures ?? []) {
+    keys.add(sig.publicKey.toBase58());
   }
-  return tx.feePayer ? [tx.feePayer.toBase58()] : [];
+  for (const ix of tx.instructions ?? []) {
+    for (const meta of ix.keys ?? []) {
+      if (meta.isSigner) keys.add(meta.pubkey.toBase58());
+    }
+  }
+  return [...keys];
 }
 
 /**
