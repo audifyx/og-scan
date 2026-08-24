@@ -720,7 +720,7 @@ export default function Hub() {
           </>
         )}
 
-        {(show("profile") || show("preferences settings")) && (
+        {(show("profile") || show("preferences settings") || show("support help ticket")) && (
           <div className="ios-group">
             {show("profile") && (
               <Link to="/profile" className="ios-cell">
@@ -730,6 +730,18 @@ export default function Hub() {
                 <span className="ios-cell__meta">
                   <span className="ios-cell__title">Profile</span>
                 </span>
+                <IosChevron />
+              </Link>
+            )}
+            {show("support help ticket") && (
+              <Link to="/support" className="ios-cell">
+                <Badge bg="linear-gradient(180deg,#c4b5fd,#6d28d9)">
+                  <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="4.2" stroke="currentColor" strokeWidth="1.8" /><path d="M8 10v4c0 1.6 1.2 3 2.8 3H12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M16 10v3c0 2.2-1.8 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+                </Badge>
+                <span className="ios-cell__meta">
+                  <span className="ios-cell__title">Support</span>
+                </span>
+                <span className="ios-cell__value">Tickets</span>
                 <IosChevron />
               </Link>
             )}

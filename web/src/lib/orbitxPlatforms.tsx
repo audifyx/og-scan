@@ -179,6 +179,13 @@ export const PlatformGlyph = {
       <path d="M20 22l12-8-8 14" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" opacity=".7" />
     </Svg>
   ),
+  support: (
+    <Svg>
+      <circle cx="24" cy="20" r="9" stroke="currentColor" strokeWidth="3.5" />
+      <path d="M15 20v8c0 3 2 5 5 5h2" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+      <path d="M33 20v6c0 4-3 8-9 8" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+    </Svg>
+  ),
 };
 
 export const PLATFORM_APPS: PlatformApp[] = [
@@ -195,6 +202,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.agent, dock: true },
   { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(145deg, #71717A 0%, #3F3F46 50%, #18181B 100%)", glyph: PlatformGlyph.x, visibility: "admin" },
   { key: "telegram", name: "Telegram", caption: "Official @theorbitxmcpbot", href: "/telegram", tone: "#2AABEE", iconBg: "linear-gradient(145deg, #6FD0FF 0%, #2AABEE 48%, #0B5F8A 100%)", glyph: PlatformGlyph.telegram },
+  { key: "support", name: "Support", caption: "Live tickets & chat", href: "/support", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.support },
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
   { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq, visibility: "admin" },
@@ -216,7 +224,7 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Intel desk, wallets, PnL, AI", keys: ["intel", "koltracker", "pnltracker", "ai"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Agent, X, Telegram, and shop", keys: ["agent", "xmcp", "telegram", "shop"] },
-  { id: "social", title: "Social", subtitle: "Feed, HQ, and community", keys: ["social", "hq"] },
+  { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "Markets, NFTs, tasks", keys: ["predict", "nft", "bagwork"] },
 ];
 
@@ -267,6 +275,7 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
   if (href === "/x") return pathname === "/x" || pathname.startsWith("/x/");
   if (href === "/ai") return pathname.toLowerCase() === "/ai";
   if (href === "/telegram") return pathname.toLowerCase() === "/telegram";
+  if (href === "/support") return pathname === "/support" || pathname.startsWith("/support/");
   if (href === "/app") return pathname === "/app" || pathname.startsWith("/hub");
   return pathname === href || pathname.startsWith(`${href}/`);
 }

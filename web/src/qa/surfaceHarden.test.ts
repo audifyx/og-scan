@@ -21,6 +21,7 @@ describe("surface harden + leak scan", () => {
     expect(app).toContain("<Route path=\"/x\" element={<OwnerPreviewRoute>");
     expect(app).toContain("<Route path=\"/:toolSlug\" element={<OwnerPreviewRoute>");
     expect(app).toContain("to=\"/orbitx-social\"");
+    expect(app).toContain("<Route path=\"/support\" element={<SupportCenter />} />");
   });
 
   it("does not ship a hardcoded Supabase anon JWT", () => {

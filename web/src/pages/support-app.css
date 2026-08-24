@@ -1,0 +1,19 @@
+.ox-support-home,
+.ox-support-compose {
+  max-width: 720px;
+}
+
+.ox-support-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: min(72vh, 760px);
+  margin: 0 -2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  overflow: hidden;
+  background: rgba(8, 12, 22, 0.45);
+}
+
+.ox-support-chat > div:nth-child(2) {
+  flex: 1;
+}

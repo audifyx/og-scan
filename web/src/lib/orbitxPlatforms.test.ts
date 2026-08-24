@@ -13,7 +13,7 @@ import {
   visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-const REQUIRED = ["shop", "city", "os", "play", "intel", "predict", "agent", "dex", "telegram", "trade"];
+const REQUIRED = ["shop", "city", "os", "play", "intel", "predict", "agent", "dex", "telegram", "trade", "support"];
 const OWNER_ONLY = ["terminal", "scanner", "vamp", "koltracker", "pnltracker", "xmcp", "hq", "gaming"];
 
 describe("OrbitX platform catalog", () => {
@@ -30,6 +30,7 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "hq")?.href).toBe("/hq");
     expect(PLATFORM_APPS.find((a) => a.key === "predict")?.href).toBe("/predictions");
     expect(PLATFORM_APPS.find((a) => a.key === "telegram")?.href).toBe("/telegram");
+    expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
   });
 
   it("puts live platforms on the public home grid and mini menu", () => {

@@ -129,7 +129,6 @@ import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
 import SupportCenter from "./pages/SupportCenter";
-import SupportPage from "./pages/SupportPage";
 import VampPortal from "./pages/VampPortal";
 import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
@@ -570,7 +569,7 @@ const App = () => (
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+            <Route path="/support" element={<SupportCenter />} />
             <Route path="/listen/:spaceId" element={<SpaceReplay />} />
             {/* ── Public: Live space listener (no auth required) ── */}
             <Route path="/space/:spaceId" element={<PublicSpaceListen />} />
