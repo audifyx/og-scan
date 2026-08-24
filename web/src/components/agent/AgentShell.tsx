@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAdmin } from "@/hooks/useAdmin";
 import { PlatformThemeButton } from "@/components/theme/PlatformThemeButton";
 import { PlatformLinks } from "@/components/theme/PlatformDock";
 import {
@@ -66,6 +67,7 @@ export function AgentShell({
 }: Props) {
   const loc = useLocation();
   const navigate = useNavigate();
+  const { isOwnerIdentity } = useAdmin();
   const nav = (tabs?.length ? tabs : DEFAULT_TABS).map((t) => ({
     id: t.id,
     label: t.label,
@@ -75,7 +77,9 @@ export function AgentShell({
   const railSibling =
     brandHref === "/x"
       ? { href: "/agent", label: "Agent" }
-      : { href: "/x", label: "X MCP" };
+      : isOwnerIdentity
+        ? { href: "/x", label: "X MCP" }
+        : null;
 
   const title = showTabs
     ? nav.find((t) => t.id === activeTab)?.label || brandSub
@@ -113,9 +117,11 @@ export function AgentShell({
             {statusLabel}
           </span>
           <div className="flex flex-col gap-1 px-1 text-[12px]">
-            <Link to={railSibling.href} className="text-white/70 hover:text-white">
-              {railSibling.label}
-            </Link>
+            {railSibling ? (
+              <Link to={railSibling.href} className="text-white/70 hover:text-white">
+                {railSibling.label}
+              </Link>
+            ) : null}
             <Link to="/app" className="text-white/70 hover:text-white">
               Hub
             </Link>
@@ -155,9 +161,11 @@ export function AgentShell({
                     ↻
                   </button>
                 )}
-                <Link to={siblingHref} className="ios-nav__btn" aria-label={siblingLabel} title={siblingLabel}>
-                  {siblingIcon}
-                </Link>
+                {isOwnerIdentity ? (
+                  <Link to={siblingHref} className="ios-nav__btn" aria-label={siblingLabel} title={siblingLabel}>
+                    {siblingIcon}
+                  </Link>
+                ) : null}
                 <Link to="/app" className="ios-nav__btn hidden sm:inline-flex">
                   Hub
                 </Link>
@@ -180,7 +188,7 @@ export function AgentShell({
               <div className="ox-agent__footer-links">
                 <Link to="/app">Hub</Link>
                 <Link to="/agent">Agent</Link>
-                <Link to="/x">X MCP</Link>
+                {isOwnerIdentity ? <Link to="/x">X MCP</Link> : null}
                 <Link to="/shop">Shop</Link>
                 <a href="/ORBITX_DEX">DEX</a>
                 <Link to="/orbitxlaunch">Launch</Link>

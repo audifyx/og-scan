@@ -1117,7 +1117,7 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
 }
 
 export function MobileNav({ onOpenPanel }: { onOpenPanel: () => void }) {
-  const items = [{ label:'Hub',href:'/app'},{ label:'DEX',href:'/ORBITX_DEX'},{ label:'Social',href:'/orbitx-social'},{ label:'KOL',href:'/app/kol-tracker'},{ label:'Profile',href:'/profile'}];
+  const items = [{ label:'Hub',href:'/app'},{ label:'DEX',href:'/ORBITX_DEX'},{ label:'Social',href:'/orbitx-social'},{ label:'Intel',href:'/intel'},{ label:'Profile',href:'/profile'}];
   const icons = ['⊞','◈','◉','⬡','◎'];
   return (<nav className="mob-nav">{items.slice(0,2).map((it,idx) => <a key={it.label} href={it.href} className="mob-nav-btn"><span style={{ fontSize:18 }}>{icons[idx]}</span><span>{it.label}</span></a>)}<button className="mob-nav-plus" onClick={onOpenPanel}><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11H13V5a1 1 0 00-2 0v6H5a1 1 0 000 2h6v6a1 1 0 002 0v-6h6a1 1 0 000-2z"/></svg></button>{items.slice(2).map((it,idx) => <a key={it.label} href={it.href} className="mob-nav-btn"><span style={{ fontSize:18 }}>{icons[idx+2]}</span><span>{it.label}</span></a>)}</nav>);
 }

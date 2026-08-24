@@ -99,7 +99,7 @@ export const TRADE_TOOLS: TradeTool[] = [
   { id: "rescue-console", name: "Rescue Console", description: "Full rent + burn suite", category: "Launchpad", kind: "link", href: "/orbitxlaunch/rescue" },
   { id: "launchpad-claim", name: "Claim Desk", description: "Creator fee claim UI", category: "Launchpad", kind: "link", href: "/orbitxlaunch/claim" },
   { id: "launchpad-launch", name: "Token Launch", description: "Launch pump / custom", category: "Launchpad", kind: "link", href: "/orbitxlaunch" },
-  { id: "launch-terminal", name: "Launch Terminal", description: "Launch trading terminal", category: "Launchpad", kind: "link", href: "/terminal" },
+  { id: "launch-trade", name: "Trade Desk", description: "Phantom buy & sell", category: "Launchpad", kind: "link", href: "/trade" },
 
   // Platform (unique destinations only)
   { id: "orbitx-dex", name: "OrbitX DEX", description: "Full DEX experience", category: "Platform", kind: "link", href: "/ORBITX_DEX" },

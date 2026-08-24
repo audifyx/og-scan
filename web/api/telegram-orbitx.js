@@ -1766,7 +1766,7 @@ async function configureBot(req) {
   const defaultCmds = await tg("setMyCommands", { commands: GROUP_COMMANDS.slice(0, 100) });
   const webhook = await tg("setWebhook", {
     url: webhookUrl,
-    secret_token: process.env.TELEGRAM_ORBITX_WEBHOOK_SECRET || undefined,
+    secret_token: WEBHOOK_SECRET || undefined,
     allowed_updates: ["message", "edited_message", "channel_post", "callback_query", "my_chat_member"],
     drop_pending_updates: false,
   });
@@ -2042,7 +2042,13 @@ export default async function handler(req, res) {
       return handleWeb(req, res, body);
     }
 
-    if (WEBHOOK_SECRET && secret && secret !== WEBHOOK_SECRET) {
+    const strictSecret = process.env.TELEGRAM_ORBITX_WEBHOOK_SECRET || "";
+    if (strictSecret) {
+      if (secret !== strictSecret) {
+        res.statusCode = 403;
+        return res.end("forbidden");
+      }
+    } else if (WEBHOOK_SECRET && secret && secret !== WEBHOOK_SECRET) {
       res.statusCode = 403;
       return res.end("forbidden");
     }

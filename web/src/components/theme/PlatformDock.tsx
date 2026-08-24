@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { PLATFORM_MENU, matchPlatformPath, type PlatformApp } from "@/lib/orbitxPlatforms";
+import { useAdmin } from "@/hooks/useAdmin";
+import { matchPlatformPath, visiblePlatformMenu, type PlatformApp } from "@/lib/orbitxPlatforms";
 import "./platform-shell.css";
 
 const HUB_LINK: PlatformApp = {
@@ -17,7 +18,10 @@ const HUB_LINK: PlatformApp = {
   ),
 };
 
-const MENU_APPS: PlatformApp[] = [HUB_LINK, ...PLATFORM_MENU];
+function useMenuApps(): PlatformApp[] {
+  const { isOwnerIdentity } = useAdmin();
+  return useMemo(() => [HUB_LINK, ...visiblePlatformMenu(Boolean(isOwnerIdentity))], [isOwnerIdentity]);
+}
 
 /* Hide on marketing / auth / embeds — show FAB everywhere else in the app. */
 const HIDE_ON_EXACT = new Set([
@@ -93,9 +97,10 @@ function visibleOn(pathname: string) {
 }
 
 function PlatformLinkItems({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  const menuApps = useMenuApps();
   return (
     <div className="ox-platform-fab__grid">
-      {MENU_APPS.map((app) => {
+      {menuApps.map((app) => {
         const on = matchPlatformPath(app.href, pathname);
         const className = `ox-platform-fab__app${on ? " is-on" : ""}`;
         const inner = (
@@ -239,7 +244,7 @@ export function PlatformDock() {
         >
           <div className="ox-platform-fab__panel-title">OrbitX</div>
           <PlatformLinkItems pathname={pathname} onNavigate={() => setOpen(false)} />
-          <p className="ox-platform-fab__hint">Shop · City · OS · Play · Intel · HQ</p>
+          <p className="ox-platform-fab__hint">Shop · City · OS · Play · Intel · Trade</p>
         </nav>
       )}
 
@@ -262,9 +267,10 @@ export function PlatformDock() {
 /** Compact header chip row for desktop shells. */
 export function PlatformLinks({ className = "" }: { className?: string }) {
   const { pathname } = useLocation();
+  const menuApps = useMenuApps();
   return (
     <div className={`ox-platform-links ${className}`.trim()} aria-label="OrbitX apps">
-      {MENU_APPS.map((app) => {
+      {menuApps.map((app) => {
         const on = matchPlatformPath(app.href, pathname);
         const external = Boolean(app.external || app.href.startsWith("/ORBITX_DEX") || app.href.startsWith("http"));
         if (external) {
