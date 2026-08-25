@@ -125,8 +125,7 @@ export type BottomTab =
   | "recent"
   | "orbitx_activity"
   | "whale"
-  | "kol"
-  | "wallets";
+  | "kol";
 
 export type ViewOptions = {
   labels: boolean;

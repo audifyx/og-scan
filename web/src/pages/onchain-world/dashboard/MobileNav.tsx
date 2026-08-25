@@ -14,10 +14,7 @@ export function MobileNav() {
   const setPanel = useOrbitxStore((s) => s.setMobilePanel);
 
   return (
-    <nav
-      aria-label="On-chain pages"
-      className="flex h-16 shrink-0 items-stretch border-t border-line bg-bg-raised pb-[env(safe-area-inset-bottom)]"
-    >
+    <nav className="flex h-14 shrink-0 items-stretch border-t border-line bg-bg-raised lg:hidden">
       {ITEMS.map((item) => {
         const Icon = item.icon;
         const on = panel === item.id;
@@ -27,11 +24,11 @@ export function MobileNav() {
             type="button"
             onClick={() => setPanel(item.id)}
             className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-1 text-2xs font-medium tracking-wide",
-              on ? "text-accent shadow-[inset_0_2px_0_0_var(--color-accent)]" : "text-dim",
+              "flex flex-1 flex-col items-center justify-center gap-0.5 text-2xs font-medium tracking-wide",
+              on ? "text-accent" : "text-dim",
             )}
           >
-            <Icon className="size-5" />
+            <Icon className="size-4" />
             {item.label}
           </button>
         );

@@ -43,6 +43,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   -webkit-font-smoothing: antialiased;
+  isolation: isolate;
 }
 
 .ox-dash .font-display,

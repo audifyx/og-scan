@@ -11,7 +11,7 @@ export function StatusBar() {
   const wsOn = network.ws === "connected";
 
   return (
-    <footer className="flex h-8 shrink-0 items-center gap-3 overflow-x-auto border-t border-line bg-bg-raised px-3 text-2xs">
+    <footer className="flex h-9 shrink-0 items-center gap-3 overflow-x-auto border-t border-line bg-bg-raised px-3 text-2xs">
       <span className="flex items-center gap-1.5 text-muted">
         <Radio className="size-3 text-accent" />
         <span className="tracking-wider uppercase">{network.name}</span>
@@ -28,9 +28,7 @@ export function StatusBar() {
       </span>
       <span className="hidden text-muted lg:inline">
         Indexing delay{" "}
-        <span className="ox-stat text-fg">
-          {network.liveLabel && !network.live ? network.liveLabel : formatAge(network.indexingDelaySec)}
-        </span>
+        <span className="ox-stat text-fg">{formatAge(network.indexingDelaySec)}</span>
       </span>
       <span className="ml-auto flex items-center gap-1.5">
         {wsOn ? (
