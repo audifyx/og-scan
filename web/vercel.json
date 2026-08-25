@@ -83,6 +83,14 @@
       "destination": "/api/orbitx-hub"
     },
     {
+      "source": "/api/on-chain/(.*)",
+      "destination": "/api/on-chain?path=$1"
+    },
+    {
+      "source": "/api/on-chain",
+      "destination": "/api/on-chain"
+    },
+    {
       "source": "/api/ogdex/(.*)",
       "destination": "/api/ogdex?path=$1"
     },
@@ -328,6 +336,9 @@
     "api/orbitx-onchain.js": {
       "maxDuration": 60
     },
+    "api/on-chain.js": {
+      "maxDuration": 60
+    },
     "api/**/*.js": {
       "maxDuration": 30
     },
@@ -351,6 +362,10 @@
     {
       "path": "/api/x-mcp?path=agent/cron",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/on-chain?path=ingest&force=1",
+      "schedule": "* * * * *"
     }
   ]
 }

@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const WEB = resolve(__dirname, "../..");
+const REPO = resolve(WEB, "..");
+
+describe("OrbitX /on-chain world", () => {
+  it("exposes the living world as a public route and keeps /onchain proof owner-only", () => {
+    const app = readFileSync(resolve(WEB, "src/App.tsx"), "utf8");
+    expect(app).toContain('<Route path="/on-chain" element={<OnChainWorld />} />');
+    expect(app).toContain('<Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />');
+  });
+
+  it("routes API paths and cron through the on-chain indexer", () => {
+    const vercel = readFileSync(resolve(WEB, "vercel.json"), "utf8");
+    expect(vercel).toContain('"/api/on-chain/(.*)"');
+    expect(vercel).toContain('"/api/on-chain?path=ingest&force=1"');
+    expect(vercel).toContain('"api/on-chain.js"');
+    const api = readFileSync(resolve(WEB, "api/on-chain.js"), "utf8");
+    for (const path of ["live", "events", "wallet", "token", "transaction", "orbitx", "search", "flows", "ingest", "status"]) {
+      expect(api).toContain(path);
+    }
+    expect(api).not.toContain("sbp_");
+  });
+
+  it("stores a rebuildable chain cache instead of replacing ox_onchain_events", () => {
+    const sql = readFileSync(resolve(REPO, "supabase/migrations/20260825042130_orbitx_chain_world.sql"), "utf8");
+    expect(sql).toContain("ox_chain_events");
+    expect(sql).toContain("enable row level security");
+    expect(sql).toContain("revoke all on public.ox_chain_events from anon, authenticated");
+    expect(sql).toContain("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
+    expect(readFileSync(resolve(REPO, "supabase/migrations/20260822140000_orbitx_onchain_index.sql"), "utf8")).toContain("ox_onchain_events");
+  });
+});

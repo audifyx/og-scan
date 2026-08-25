@@ -17,6 +17,7 @@ Last verified: 2026-07-25 after merging teams 1–5 into `main`.
 | Launchpad | `/orbitxlaunch` | `web/src/pages/orbitx/**` | Token launch |
 | Terminal | `/terminal` | `web/src/pages/orbitx/Terminal*` + `TradingTerminal` | Trade UI |
 | On-chain proof | `/onchain` | `web/src/pages/OnChainProofPage.tsx` | Verify signatures, memo attestations, rebuild index |
+| On-Chain world | `/on-chain` | `web/src/pages/onchain-world/**`, `web/api/on-chain.js` | Live Solana intelligence terminal + 3D world |
 
 ## Backend
 
