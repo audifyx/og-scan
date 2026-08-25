@@ -66,16 +66,6 @@ class ErrorCatch extends Component<{ children: ReactNode; fallback: () => void }
   render() { return this.state.fail ? null : this.props.children; }
 }
 
-function canWebGL(): boolean {
-  if (typeof document === "undefined") return true;
-  try {
-    const c = document.createElement("canvas");
-    return Boolean(c.getContext("webgl2") || c.getContext("webgl"));
-  } catch {
-    return false;
-  }
-}
-
 function Kv({ k, v, href }: { k: string; v?: unknown; href?: string }) {
   const text = v == null || v === "" ? "UNKNOWN" : String(v);
   return (
@@ -110,7 +100,7 @@ export default function OnChainWorldApp() {
   const [intelTab, setIntelTab] = useState<IntelTab>("OVERVIEW");
   const [termTab, setTermTab] = useState<TermTab>("RECENT");
   const [err, setErr] = useState<string | null>(null);
-  const [worldOk, setWorldOk] = useState(() => canWebGL());
+  const [worldOk, setWorldOk] = useState(true);
   const [followId, setFollowId] = useState<string | null>(null);
   const [followWallet, setFollowWallet] = useState<string | null>(null);
   const [cinematic, setCinematic] = useState(true);
@@ -269,8 +259,7 @@ export default function OnChainWorldApp() {
   const series = live.eps_series || [];
   const maxEps = Math.max(...series.map((p) => p.eps), 0.01);
   const spark = series.map((p, i) => `${(i / Math.max(series.length - 1, 1)) * 260},${80 - (p.eps / maxEps) * 70}`).join(" ");
-  const showWorld = mode === "world" || mode === "orbitx";
-  const showMap = mode === "map" || (!worldOk && mode === "world");
+  const useMap = mode === "map";
 
   return (
     <div className="oxw">
@@ -393,10 +382,12 @@ export default function OnChainWorldApp() {
             }}>{m}</button>
           ))}
         </div>
-        {showWorld && worldOk && !showMap ? (
-          <div className="oxw-world">
+        <div className="oxw-world">
+          {useMap || !worldOk ? (
+            <LivingMap events={events} kols={roster} flows={flows} followWallet={followWallet} onWallet={openWallet} onEvent={openEvent} />
+          ) : (
             <ErrorCatch fallback={() => setWorldOk(false)}>
-              <Suspense fallback={null}>
+              <Suspense fallback={<div className="oxw-empty">INITIALIZING 3D CITY…</div>}>
                 <WorldCanvas
                   events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
                   kols={roster}
@@ -410,12 +401,8 @@ export default function OnChainWorldApp() {
                 />
               </Suspense>
             </ErrorCatch>
-          </div>
-        ) : (
-          <div className="oxw-world">
-            <LivingMap events={events} kols={roster} flows={flows} followWallet={followWallet} onWallet={openWallet} onEvent={openEvent} />
-          </div>
-        )}
+          )}
+        </div>
         <div className="oxw-cam">
           <button className="oxw-btn" type="button" onClick={() => { setCam({ kind: "reset" }); setFollowWallet(null); setFollowId(null); }}>Reset</button>
           <button className="oxw-btn" type="button" onClick={() => setCam({ kind: "orbitx" })}>Focus OrbitX</button>
