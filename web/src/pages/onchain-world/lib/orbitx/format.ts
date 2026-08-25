@@ -20,6 +20,17 @@ export function formatUsd(value: number | null | undefined): string {
   return `${sign}$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+export function formatPrice(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return DASH;
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1) return formatUsd(value);
+  if (abs >= 0.01) return `${sign}$${abs.toFixed(4)}`;
+  if (abs === 0) return DASH;
+  const decimals = Math.min(12, Math.max(4, -Math.floor(Math.log10(abs)) + 3));
+  return `${sign}$${abs.toFixed(decimals)}`;
+}
+
 export function formatToken(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined) return DASH;
   return value.toLocaleString("en-US", { maximumFractionDigits: digits });

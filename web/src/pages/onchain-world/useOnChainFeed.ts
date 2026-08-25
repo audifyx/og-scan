@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
-import { fetchDistricts, fetchKols, fetchLive, fetchToken, fetchTx, fetchWallet } from "./api";
+import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTx, fetchWallet } from "./api";
 import { liveToSnapshot, toWalletSnapshot } from "./lib/mapLive";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
@@ -31,6 +31,29 @@ function seedWallet(address: string, roster: KolCard[]): WalletPayload {
     label: known?.name || null,
     label_kind: known ? "KOL" : "Wallet",
   };
+}
+
+async function fetchConfirmedSlot(): Promise<number | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch("https://api.mainnet-beta.solana.com", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getSlot",
+        params: [{ commitment: "confirmed" }],
+      }),
+      signal: ctrl.signal,
+    });
+    window.clearTimeout(timer);
+    const j = (await r.json()) as { result?: number };
+    return typeof j.result === "number" ? j.result : null;
+  } catch {
+    return null;
+  }
 }
 
 function detectWebgl(): boolean {
@@ -68,7 +91,7 @@ export function useOnChainFeed() {
   const loadLive = useCallback(async () => {
     if (paused) return;
     try {
-      const [data, roster, city] = await Promise.all([
+      const [data, roster, city, orbitx, slot] = await Promise.all([
         fetchLive({
           type: "",
           orbitx: false,
@@ -83,6 +106,8 @@ export function useOnChainFeed() {
         }),
         fetchKols().catch(() => null),
         fetchDistricts().catch(() => null),
+        fetchOrbitx().catch(() => null),
+        fetchConfirmedSlot(),
       ]);
       const kols =
         roster?.ok && roster.kols.length
@@ -92,17 +117,34 @@ export function useOnChainFeed() {
             : DIRECTORY_KOLS;
       const districts = city?.ok || city?.tokens || city?.orbitx ? city : data.districts;
       const prevWallet = useOrbitxStore.getState().snapshot.wallet;
-      setSnapshot({
-        ...liveToSnapshot(data.ok ? data : { ...data, events: [], live: false }, null),
-        wallet: prevWallet,
-      });
+      const liveEvents = data.ok && data.events?.length ? data.events : [];
+      const orbitxEvents = orbitx?.ok && orbitx.events?.length ? orbitx.events : [];
+      const events = liveEvents.length ? liveEvents : orbitxEvents;
+      const payload = data.ok ? { ...data, events } : { ...data, events, live: false };
+      if (payload.chain_slot == null && slot != null) payload.chain_slot = slot;
+      const snapshot = liveToSnapshot(payload, null);
+      if (snapshot.ticker.block == null && slot != null) snapshot.ticker.block = slot;
+      if (snapshot.network.lastIndexedBlock == null && slot != null) {
+        snapshot.network.lastIndexedBlock = slot;
+      }
+      if (slot != null) snapshot.network.rpc = "healthy";
+      if (orbitx?.ok && orbitx.totals) {
+        const hasOx = Boolean(orbitx.burns?.length || orbitx.buys?.length || orbitx.events?.length);
+        if (snapshot.ticker.orbitxBurned == null && orbitx.totals.burned) {
+          snapshot.ticker.orbitxBurned = orbitx.totals.burned;
+        }
+        if (snapshot.ticker.activeWallets == null && hasOx && orbitx.totals.unique_wallets) {
+          snapshot.ticker.activeWallets = orbitx.totals.unique_wallets;
+        }
+      }
+      setSnapshot({ ...snapshot, wallet: prevWallet });
       patchCity({
         live: Boolean(data.ok && data.live),
         liveLabel: data.live_label || "INDEXING DELAY",
         liveReason: data.live_reason || (data.ok ? null : "Live feed failed."),
         kols,
         districts: districts || useOrbitxStore.getState().city.districts,
-        rawEvents: data.events || [],
+        rawEvents: events,
         flows: data.flows || [],
       });
     } catch (err) {

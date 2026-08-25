@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { formatPrice } from "../pages/onchain-world/lib/orbitx/format";
 import { eventKind, liveToSnapshot, toBreakdown } from "../pages/onchain-world/lib/mapLive";
 import type { ChainEvent, LivePayload } from "../pages/onchain-world/api";
 
@@ -61,6 +62,19 @@ describe("OrbitX /on-chain world", () => {
     const map = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/MapView.tsx"), "utf8");
     expect(map).toContain("LivingMap");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/LiveEvents.tsx"), "utf8")).toContain("INDEXING DELAY");
+    const oxView = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/OrbitxTokenView.tsx"), "utf8");
+    expect(oxView).toContain("districts.orbitx");
+    expect(oxView).toContain("formatPrice");
+    const wallets = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/WalletsView.tsx"), "utf8");
+    expect(wallets).toContain("city.kols");
+    expect(wallets).toContain("Assigned KOLs");
+    const analytics = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AnalyticsView.tsx"), "utf8");
+    expect(analytics).toContain("districts.tokens");
+    expect(analytics).toContain("DexScreener");
+    const feed = readFileSync(resolve(WEB, "src/pages/onchain-world/useOnChainFeed.ts"), "utf8");
+    expect(feed).toContain("fetchOrbitx");
+    expect(feed).toContain("getSlot");
+    expect(feed).toContain("loadCityDistricts");
   });
 
   it("renders wallets as characters and tokens as districts in the 3D world", () => {
@@ -143,5 +157,7 @@ describe("OrbitX /on-chain world", () => {
     expect(snap.events).toEqual([]);
     expect(snap.network.liveLabel).toBe("INDEXING DELAY");
     expect(toBreakdown([]).every((s) => s.pct === 0)).toBe(true);
+    expect(formatPrice(null)).toBe("—");
+    expect(formatPrice(0.00000966)).toMatch(/^\$0\.000009/);
   });
 });

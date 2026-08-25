@@ -15,7 +15,7 @@ import { OrbitxMark } from "@/pages/onchain-world/dashboard/OrbitxMark";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
 import { TOKEN_PADS, TRAILS, WORLD_NODES } from "@/pages/onchain-world/lib/orbitx/constants";
-import { formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
+import { formatPrice, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 
 function nodeById(id: string) {
@@ -35,6 +35,7 @@ export function WorldView() {
   const viewOptions = useOrbitxStore((s) => s.viewOptions);
   const toggleViewOption = useOrbitxStore((s) => s.toggleViewOption);
   const tokens = useOrbitxStore((s) => s.city.districts.tokens || []);
+  const orbitx = useOrbitxStore((s) => s.city.districts.orbitx);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
 
   const pads = TOKEN_PADS.map((pad) => {
@@ -168,6 +169,11 @@ export function WorldView() {
                       <span className="rounded-sm bg-bg-sunken/90 px-2 py-0.5 font-display text-xs font-semibold tracking-[0.2em] text-accent shadow-[0_0_0_1px_rgb(139_92_246_/_0.45)]">
                         {node.label}
                       </span>
+                      {orbitx?.price_usd != null ? (
+                        <span className="text-2xs tracking-wider text-muted">
+                          {formatPrice(orbitx.price_usd)}
+                        </span>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="rounded-sm bg-bg-sunken/88 px-2 py-1 text-center shadow-[0_0_0_1px_rgb(139_92_246_/_0.35),0_8px_20px_rgb(0_0_0_/_0.45)]">
