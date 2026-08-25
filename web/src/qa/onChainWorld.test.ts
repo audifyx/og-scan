@@ -47,11 +47,12 @@ describe("OrbitX /on-chain world", () => {
     expect(app).toContain("LIVE TAPE");
     expect(app).toContain("TRACKED");
     expect(app).toContain("Retry 3D");
-    expect(app).toContain("SOLANA MAINNET · 3D WORLD");
     expect(app).toContain("CssCity");
     const cssCity = readFileSync(resolve(WEB, "src/pages/onchain-world/CssCity.tsx"), "utf8");
     expect(cssCity).toContain("ORBITX");
     expect(cssCity).toContain("JUPITER DEX");
+    expect(cssCity).toContain("RAYDIUM DEX");
+    expect(cssCity).toContain("PUMP.FUN");
     expect(readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8")).toContain("frontend-api-v3.pump.fun");
     expect(readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8")).toContain("api.dexscreener.com");
   });

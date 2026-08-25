@@ -34,6 +34,7 @@ type Props = {
   cinematic?: boolean;
   cam?: CamCommand;
   onPick: (pick: WorldPick) => void;
+  onReady?: () => void;
 };
 
 const SEED_TOKENS: TokenDistrict[] = [
@@ -281,7 +282,7 @@ function TokenBuilding({ district, index, total, onPick }: { district: TokenDist
   const h = 1.35 + Math.min(5.4, Math.log10(Math.max(district.market_cap || district.volume_24h || 12, 12)) * 0.72);
   const tone = district.source === "pumpfun" ? "#fb923c" : "#67e8f9";
   const sub = district.market_cap != null ? fmtUsd(district.market_cap) : district.volume_24h != null ? `${fmtNum(district.volume_24h)} VOL` : "";
-  const label = `$${district.symbol || district.mint.slice(0, 4)}${sub ? `  ${sub}` : ""}`;
+  const label = `$${district.symbol || district.mint.slice(0, 4)}${sub ? ` (${sub})` : ""}`;
   return (
     <group position={pos} onClick={(e) => { e.stopPropagation(); onPick(); }}>
       <mesh position={[0, h / 2, 0]} castShadow>
@@ -575,6 +576,7 @@ export default function WorldCanvas(props: Props) {
       camera={{ position: [16.5, 11.5, 18.5], fov: 44 }}
       dpr={1}
       gl={{ antialias: false, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false, stencil: false }}
+      onCreated={() => props.onReady?.()}
     >
       <Scene {...props} />
     </Canvas>

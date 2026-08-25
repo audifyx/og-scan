@@ -148,11 +148,13 @@
 
 .oxw-world { position: absolute; inset: 0; }
 .oxw-world canvas { display: block; width: 100%; height: 100%; }
-.oxw-modes {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
-  display: flex; gap: 4px; padding: 4px; border-radius: 10px;
-  background: rgba(8,6,18,0.72); border: 1px solid var(--line); backdrop-filter: blur(16px);
+.oxw-iso { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+.oxw-iso:active { cursor: grabbing; }
+.oxw-gl {
+  position: absolute; inset: 0; z-index: 2;
+  opacity: 0; pointer-events: none;
 }
+.oxw-gl.on { opacity: 1; pointer-events: auto; }
 .oxw-cam {
   position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
   display: flex; gap: 4px; padding: 4px; border-radius: 10px;

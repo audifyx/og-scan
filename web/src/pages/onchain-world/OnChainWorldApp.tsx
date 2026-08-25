@@ -2,7 +2,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, use
 import { useNavigate, useParams } from "react-router-dom";
 import type { CamCommand, WorldPick } from "./WorldCanvas";
 import type { ChainEvent, CityDistricts, FilterState, KolCard, LivePayload, OrbitxPayload, TokenPayload, WalletPayload } from "./api";
-import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchSearch, fetchToken, fetchTx, fetchWallet } from "./api";
+import { fetchDistricts, fetchKols, fetchLive, fetchSearch, fetchToken, fetchTx, fetchWallet } from "./api";
 import { ago, clock, eventTitle, eventTone, fmtNum, fmtSol, fmtUsd, shortAddr, utcNow } from "./format";
 import CssCity from "./CssCity";
 import LivingMap from "./LivingMap";
@@ -159,6 +159,7 @@ export default function OnChainWorldApp() {
       return false;
     }
   });
+  const [webglLive, setWebglLive] = useState(false);
   const [worldKey, setWorldKey] = useState(0);
   const [followId, setFollowId] = useState<string | null>(null);
   const [followWallet, setFollowWallet] = useState<string | null>(DIRECTORY_KOLS[0]?.address || null);
@@ -431,40 +432,18 @@ export default function OnChainWorldApp() {
       </aside>
 
       <section className="oxw-world-wrap">
-        <div className="oxw-hud">SOLANA MAINNET · 3D WORLD</div>
-        <div className="oxw-modes">
-          {(["world", "terminal", "map", "orbitx", "wallets", "analytics"] as const).map((m) => (
-            <button key={m} className={`oxw-btn${mode === m ? " active" : ""}`} type="button" onClick={() => {
-              setMode(m);
-              if (m === "orbitx") void fetchOrbitx().then((data) => { if (data?.ok) setDetail({ kind: "orbitx", data }); }).catch(() => undefined);
-            }}>{m}</button>
-          ))}
-        </div>
         <div className="oxw-world">
           {useMap ? (
             <LivingMap events={events} kols={roster} flows={flows} followWallet={followWallet} onWallet={openWallet} onEvent={openEvent} />
-          ) : worldOk ? (
-            <ErrorCatch key={worldKey} fallback={() => setWorldOk(false)}>
-              <Suspense fallback={<div className="oxw-empty">INITIALIZING 3D CITY…</div>}>
-                <WorldCanvas
-                  events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
-                  kols={roster}
-                  flows={flows}
-                  districts={districts}
-                  followId={followId}
-                  followWallet={followWallet}
-                  cinematic={cinematic}
-                  cam={cam}
-                  onPick={onPick}
-                />
-              </Suspense>
-            </ErrorCatch>
           ) : (
             <>
               <CssCity
                 kols={roster}
                 districts={districts}
+                events={events}
                 followWallet={followWallet}
+                cinematic={cinematic && !webglLive}
+                paused={webglLive}
                 onWallet={openWallet}
                 onToken={(mint) => {
                   nav(`/on-chain/token/${mint}`);
@@ -472,10 +451,26 @@ export default function OnChainWorldApp() {
                   void fetchToken(mint).then((data) => { if (data?.ok) setDetail({ kind: "token", data }); }).catch(() => undefined);
                 }}
               />
-              <div className="oxw-soft">
-                SOFTWARE CITY · WEBGL UNAVAILABLE
-                <button className="oxw-btn" type="button" onClick={() => { setWorldOk(true); setWorldKey((k) => k + 1); }}>Retry 3D</button>
-              </div>
+              {worldOk ? (
+                <div className={`oxw-gl${webglLive ? " on" : ""}`}>
+                  <ErrorCatch key={worldKey} fallback={() => { setWorldOk(false); setWebglLive(false); }}>
+                    <Suspense fallback={null}>
+                      <WorldCanvas
+                        events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
+                        kols={roster}
+                        flows={flows}
+                        districts={districts}
+                        followId={followId}
+                        followWallet={followWallet}
+                        cinematic={cinematic}
+                        cam={cam}
+                        onPick={onPick}
+                        onReady={() => setWebglLive(true)}
+                      />
+                    </Suspense>
+                  </ErrorCatch>
+                </div>
+              ) : null}
             </>
           )}
         </div>
@@ -484,6 +479,10 @@ export default function OnChainWorldApp() {
           <button className="oxw-btn" type="button" onClick={() => setCam({ kind: "orbitx" })}>Focus OrbitX</button>
           <button className="oxw-btn" type="button" onClick={() => setCam({ kind: "follow" })}>Follow</button>
           <button className={`oxw-btn${cinematic ? " active" : ""}`} type="button" onClick={() => setCinematic((v) => !v)}>Cinematic</button>
+          <button className={`oxw-btn${mode === "map" ? " active" : ""}`} type="button" onClick={() => setMode((m) => m === "map" ? "world" : "map")}>Map</button>
+          {!worldOk ? (
+            <button className="oxw-btn" type="button" onClick={() => { setWorldOk(true); setWorldKey((k) => k + 1); }}>Retry 3D</button>
+          ) : null}
         </div>
       </section>
 
