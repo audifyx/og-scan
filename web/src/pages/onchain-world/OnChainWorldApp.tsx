@@ -180,9 +180,14 @@ export default function OnChainWorldApp() {
       </form>
 
       <div className="oxw-modes">
-        {(["world", "terminal", "orbitx", "wallets"] as Mode[]).map((m) => (
+        {([
+          ["world", "World"],
+          ["terminal", "Terminal"],
+          ["orbitx", "OrbitX"],
+          ["wallets", "Wallets"],
+        ] as [Mode, string][]).map(([m, label]) => (
           <button key={m} className={`oxw-btn${mode === m ? " active" : ""}`} onClick={() => (m === "orbitx" ? void openOrbitx() : setMode(m))}>
-            {m}
+            {label}
           </button>
         ))}
         <button className="oxw-btn" onClick={() => void loadLive()}>Refresh</button>

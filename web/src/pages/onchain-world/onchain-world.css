@@ -112,8 +112,11 @@
 
 .oxw-modes {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 10px 20px 0;
+  position: relative;
+  z-index: 2;
 }
 
 .oxw-body {
