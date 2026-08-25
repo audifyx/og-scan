@@ -18,7 +18,7 @@ describe("OrbitX /on-chain world", () => {
     expect(vercel).toContain('"/api/on-chain?path=ingest&force=1"');
     expect(vercel).toContain('"api/on-chain.js"');
     const api = readFileSync(resolve(WEB, "api/on-chain.js"), "utf8");
-    for (const path of ["live", "events", "wallet", "token", "transaction", "orbitx", "search", "flows", "ingest", "status", "kols"]) {
+    for (const path of ["live", "events", "wallet", "token", "transaction", "orbitx", "search", "flows", "ingest", "status", "kols", "districts"]) {
       expect(api).toContain(path);
     }
     expect(api).toContain("activeOrbitxKols");
@@ -28,14 +28,19 @@ describe("OrbitX /on-chain world", () => {
 
   it("renders wallets as characters and tokens as districts in the 3D world", () => {
     const canvas = readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8");
-    expect(canvas).toContain("function Character");
-    expect(canvas).toContain("function TokenDistrict");
+    expect(canvas).toContain("function Agent");
+    expect(canvas).toContain("function TokenBuilding");
     expect(canvas).toContain("function Transit");
+    expect(canvas).toContain("function OrbitXTower");
     expect(canvas).toContain("followWallet");
     const app = readFileSync(resolve(WEB, "src/pages/onchain-world/OnChainWorldApp.tsx"), "utf8");
     expect(app).toContain("KOL directory");
     expect(app).toContain("LivingMap");
     expect(app).toContain("activeOrbitxKols");
+    expect(app).toContain("Event breakdown");
+    expect(app).toContain("Wallet intelligence");
+    expect(readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8")).toContain("frontend-api-v3.pump.fun");
+    expect(readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8")).toContain("api.dexscreener.com");
   });
 
   it("stores a rebuildable chain cache instead of replacing ox_onchain_events", () => {

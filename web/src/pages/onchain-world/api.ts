@@ -92,6 +92,7 @@ export type LivePayload = {
   last_slot: number | null;
   lag_slots: number | null;
   last_ingest_at: string | null;
+  ingest_age_sec?: number | null;
   websocket_status: string;
   sol_usd: number | null;
   stats: {
@@ -103,11 +104,37 @@ export type LivePayload = {
     active_wallets: number;
     assigned_kols?: number;
   };
+  breakdown?: { kind: string; count: number; pct: number }[];
+  eps_series?: { t: number; eps: number }[];
+  districts?: CityDistricts;
   events: ChainEvent[];
   kols?: KolCard[];
   flows?: FlowRow[];
   note?: string;
   error?: string;
+};
+
+export type TokenDistrict = {
+  mint: string;
+  symbol?: string | null;
+  name?: string | null;
+  image?: string | null;
+  price_usd?: number | null;
+  market_cap?: number | null;
+  liquidity_usd?: number | null;
+  volume_24h?: number | null;
+  change_24h?: number | null;
+  dex?: string | null;
+  source?: string;
+  kind?: string;
+};
+
+export type DexHub = { id: string; label: string; kind: string; program?: string };
+
+export type CityDistricts = {
+  orbitx?: TokenDistrict;
+  hubs?: DexHub[];
+  tokens?: TokenDistrict[];
 };
 
 export type WalletPayload = {
@@ -175,10 +202,12 @@ export type FilterState = {
   orbitx: boolean;
   whale: boolean;
   kol: boolean;
+  tracked: boolean;
   minUsd: string;
   source: string;
   token: string;
   wallet: string;
+  window: string;
 };
 
 export function filtersToQuery(f: FilterState): string {
@@ -187,10 +216,12 @@ export function filtersToQuery(f: FilterState): string {
   if (f.orbitx) p.set("orbitx", "1");
   if (f.whale) p.set("whale", "1");
   if (f.kol) p.set("kol", "1");
+  if (f.tracked) p.set("tracked", "1");
   if (f.minUsd) p.set("min_usd", f.minUsd);
   if (f.source) p.set("source", f.source);
   if (f.token) p.set("token", f.token);
   if (f.wallet) p.set("wallet", f.wallet);
+  if (f.window && f.window !== "live") p.set("window", f.window);
   return p.toString();
 }
 
@@ -235,4 +266,8 @@ export function fetchStatus() {
 
 export function fetchKols() {
   return getJson<KolsPayload>("kols");
+}
+
+export function fetchDistricts() {
+  return getJson<CityDistricts & { ok: boolean }>("districts");
 }

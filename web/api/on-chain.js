@@ -29,6 +29,7 @@ import {
   kolWatchBatch,
   trackedRowsFromDirectory,
 } from "../shared/orbitx-kol-directory.js";
+import { epsSeries, eventBreakdown, loadCityDistricts } from "../shared/orbitx-chain-districts.js";
 
 export const config = { maxDuration: 60 };
 
@@ -42,6 +43,7 @@ const buckets = new Map();
 const metaCache = new Map();
 let solUsdCache = { at: 0, value: null };
 let ingestLock = 0;
+let districtCache = { at: 0, value: null };
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -491,7 +493,10 @@ function applyEventFilters(q, query) {
   const orbitx = query.orbitx === "1" || query.orbitx === "true";
   const whale = query.whale === "1" || query.whale === "true";
   const kol = query.kol === "1" || query.kol === "true";
+  const tracked = query.tracked === "1" || query.tracked === "true";
   const since = String(query.since || "").trim();
+  const windowKey = String(query.window || "").trim();
+  const WINDOWS = { "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3, "24h": 86400e3 };
   if (type) q = q.eq("event_type", type.toUpperCase());
   if (wallet) q = q.or(`wallet.eq.${wallet},source_wallet.eq.${wallet},destination_wallet.eq.${wallet}`);
   if (token) q = q.eq("token_ca", token);
@@ -499,9 +504,23 @@ function applyEventFilters(q, query) {
   if (minUsd != null) q = q.gte("usd_value", minUsd);
   if (orbitx) q = q.eq("orbitx_related", true);
   if (whale) q = q.eq("whale_related", true);
-  if (kol) q = q.eq("kol_related", true);
+  if (kol || tracked) q = q.eq("kol_related", true);
   if (since) q = q.gte("block_time", since);
+  else if (WINDOWS[windowKey]) {
+    q = q.gte("block_time", new Date(Date.now() - WINDOWS[windowKey]).toISOString());
+  }
   return q;
+}
+
+async function cityDistricts(extraMints = []) {
+  if (districtCache.value && Date.now() - districtCache.at < 90_000) return districtCache.value;
+  try {
+    const value = await loadCityDistricts(extraMints);
+    districtCache = { at: Date.now(), value };
+    return value;
+  } catch {
+    return districtCache.value || { orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" }, hubs: [], tokens: [] };
+  }
 }
 
 async function handleLive(req, res, sb) {
@@ -551,6 +570,16 @@ async function handleLive(req, res, sb) {
     };
   });
   const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
+  const extraMints = labeled.map((e) => e.token_ca).filter(Boolean);
+  const districts = districtCache.value || {
+    orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" },
+    hubs: [],
+    tokens: [],
+  };
+  if (!districtCache.value || Date.now() - districtCache.at > 80_000) {
+    void cityDistricts(extraMints);
+  }
+  const ingestAge = state?.last_ingest_at ? Math.max(0, (Date.now() - Date.parse(state.last_ingest_at)) / 1000) : null;
   return json(res, 200, {
     ok: true,
     live: live.live,
@@ -560,14 +589,23 @@ async function handleLive(req, res, sb) {
     last_slot: state?.last_slot ?? null,
     lag_slots: state?.lag_slots ?? null,
     last_ingest_at: state?.last_ingest_at ?? null,
+    ingest_age_sec: Number.isFinite(ingestAge) ? Number(ingestAge.toFixed(1)) : null,
     websocket_status: state?.websocket_status || "polling",
     sol_usd: await solUsd(),
     stats: { ...stats, assigned_kols: activeOrbitxKols().length },
+    breakdown: eventBreakdown(labeled),
+    eps_series: epsSeries(labeled),
+    districts,
     events: labeled,
     kols,
     flows: flows || [],
     note: "Events are reconstructed from observed Solana transactions. Empty means nothing indexed yet — not synthetic activity.",
   });
+}
+
+async function handleDistricts(req, res) {
+  const districts = await cityDistricts();
+  return json(res, 200, { ok: true, ...districts });
 }
 
 async function handleKols(req, res, sb) {
@@ -880,6 +918,7 @@ export default async function handler(req, res) {
     if (head === "orbitx" && a === "buyers") return await handleOrbitx(req, res, sb, "buyers");
     if (head === "search") return await handleSearch(req, res, sb);
     if (head === "kols") return await handleKols(req, res, sb);
+    if (head === "districts") return await handleDistricts(req, res);
     if (head === "flows" && a) return await handleFlows(req, res, sb, a);
     if (head === "status") return await handleStatus(req, res, sb);
     if (head === "ingest" && (req.method === "POST" || cronAuthorized(req) || req.query?.force === "1")) {
