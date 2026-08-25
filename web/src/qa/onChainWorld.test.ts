@@ -35,6 +35,7 @@ describe("OrbitX /on-chain world", () => {
     const app = readFileSync(resolve(WEB, "src/pages/onchain-world/OnChainWorldApp.tsx"), "utf8");
     expect(app).toContain("KOL directory");
     expect(app).toContain("LivingMap");
+    expect(app).toContain("activeOrbitxKols");
   });
 
   it("stores a rebuildable chain cache instead of replacing ox_onchain_events", () => {

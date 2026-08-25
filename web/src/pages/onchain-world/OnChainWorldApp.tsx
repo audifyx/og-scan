@@ -5,7 +5,20 @@ import { fetchKols, fetchLive, fetchOrbitx, fetchSearch, fetchToken, fetchTx, fe
 import { clock, eventTitle, eventTone, fmtNum, fmtSol, fmtUsd, shortAddr } from "./format";
 import LivingMap from "./LivingMap";
 import type { WorldPick } from "./WorldCanvas";
+import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import "./onchain-world.css";
+
+const DIRECTORY_KOLS: KolCard[] = activeOrbitxKols().map((k) => ({
+  address: k.address,
+  name: k.name,
+  twitter: k.twitter,
+  status: k.status,
+  hits: 0,
+  last_type: null,
+  last_token: null,
+  last_usd: null,
+  last_at: null,
+}));
 
 const WorldCanvas = lazy(() => import("./WorldCanvas"));
 
@@ -20,9 +33,9 @@ const EMPTY_LIVE: LivePayload = {
   last_ingest_at: null,
   websocket_status: "polling",
   sol_usd: null,
-  stats: { events_per_sec: 0, transactions_per_min: 0, orbitx_buys: 0, orbitx_burned: 0, whale_usd: 0, active_wallets: 0, assigned_kols: 0 },
+  stats: { events_per_sec: 0, transactions_per_min: 0, orbitx_buys: 0, orbitx_burned: 0, whale_usd: 0, active_wallets: 0, assigned_kols: DIRECTORY_KOLS.length },
   events: [],
-  kols: [],
+  kols: DIRECTORY_KOLS,
   flows: [],
 };
 
@@ -78,7 +91,7 @@ export default function OnChainWorldApp() {
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState<FilterState>(FILTER0);
   const [live, setLive] = useState<LivePayload>(EMPTY_LIVE);
-  const [kols, setKols] = useState<KolCard[]>([]);
+  const [kols, setKols] = useState<KolCard[]>(DIRECTORY_KOLS);
   const [detail, setDetail] = useState<Detail>(null);
   const [tab, setTab] = useState<Tab>("SUMMARY");
   const [err, setErr] = useState<string | null>(null);
@@ -93,9 +106,13 @@ export default function OnChainWorldApp() {
     if (paused) return;
     try {
       const [data, roster] = await Promise.all([fetchLive(filters), fetchKols().catch(() => null)]);
-      setLive(data.ok ? data : { ...EMPTY_LIVE, live_reason: data.error || "Indexer unavailable." });
-      if (roster?.ok) setKols(roster.kols);
+      setLive(data.ok ? data : {
+        ...EMPTY_LIVE,
+        live_reason: "Indexer has not completed a run. Assigned KOLs are still on the map.",
+      });
+      if (roster?.ok && roster.kols.length) setKols(roster.kols);
       else if (data.kols?.length) setKols(data.kols);
+      else setKols(DIRECTORY_KOLS);
       setErr(null);
       const news = new Set<string>();
       for (const ev of data.events || []) {
@@ -125,14 +142,37 @@ export default function OnChainWorldApp() {
 
   useEffect(() => {
     if (params.signature) {
-      void fetchTx(params.signature).then((data) => setDetail({ kind: "tx", data })).catch(() => setDetail(null));
-    } else if (params.address && location.pathname.includes("/wallet/")) {
-      void fetchWallet(params.address).then((data) => {
-        setDetail({ kind: "wallet", data });
-        setFollowWallet(params.address || null);
-      }).catch(() => setDetail(null));
-    } else if (params.address && location.pathname.includes("/token/")) {
-      void fetchToken(params.address).then((data) => setDetail({ kind: "token", data })).catch(() => setDetail(null));
+      void fetchTx(params.signature).then((data) => {
+        if (data && data.signature) setDetail({ kind: "tx", data });
+      }).catch(() => undefined);
+      return;
+    }
+    if (params.address && location.pathname.includes("/wallet/")) {
+      const address = params.address;
+      setFollowWallet(address);
+      const known = DIRECTORY_KOLS.find((k) => k.address === address);
+      if (known) {
+        setDetail({
+          kind: "wallet",
+          data: {
+            ok: false,
+            address,
+            kol: { address: known.address, name: known.name, twitter: known.twitter, status: known.status },
+            assigned_kol: true,
+            label: known.name,
+            label_kind: "KOL",
+          },
+        });
+      }
+      void fetchWallet(address).then((data) => {
+        if (data?.ok) setDetail({ kind: "wallet", data });
+      }).catch(() => undefined);
+      return;
+    }
+    if (params.address && location.pathname.includes("/token/")) {
+      void fetchToken(params.address).then((data) => {
+        if (data?.ok) setDetail({ kind: "token", data });
+      }).catch(() => undefined);
     }
   }, [params.address, params.signature]);
 
@@ -188,8 +228,20 @@ export default function OnChainWorldApp() {
     setFollowId(null);
     setTab("SUMMARY");
     nav(`/on-chain/wallet/${address}`);
-    void fetchWallet(address).then((data) => setDetail({ kind: "wallet", data })).catch(() => setDetail(null));
-  }, [nav]);
+    const known = DIRECTORY_KOLS.find((k) => k.address === address) || kols.find((k) => k.address === address);
+    const fallback: WalletPayload = {
+      ok: false,
+      address,
+      kol: known ? { address: known.address, name: known.name, twitter: known.twitter, status: known.status } : null,
+      assigned_kol: Boolean(known),
+      label: known?.name || null,
+      label_kind: known ? "KOL" : "Wallet",
+    };
+    setDetail({ kind: "wallet", data: fallback });
+    void fetchWallet(address).then((data) => {
+      if (data?.ok) setDetail({ kind: "wallet", data });
+    }).catch(() => undefined);
+  }, [nav, kols]);
 
   const onPick = useCallback((pick: WorldPick) => {
     if (pick.kind === "event") return openEvent(pick.event);
