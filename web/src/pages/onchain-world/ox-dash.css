@@ -1,0 +1,192 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Oxanium:wght@500;600;700&display=swap");
+
+.ox-dash {
+  --color-bg: #07080e;
+  --color-bg-raised: #0b0e16;
+  --color-bg-panel: #0c1018;
+  --color-bg-hover: #141825;
+  --color-bg-sunken: #080a10;
+  --color-fg: #e8eaf2;
+  --color-muted: #8b90a5;
+  --color-dim: #5c6178;
+  --color-faint: #3a3e52;
+  --color-line: rgb(139 92 246 / 0.2);
+  --color-line-strong: rgb(139 92 246 / 0.42);
+  --color-accent: #c4b5fd;
+  --color-accent-2: #8b5cf6;
+  --color-live: #34d399;
+  --color-cyan: #22d3ee;
+  --color-buy: #34d399;
+  --color-sell: #e879f9;
+  --color-burn: #fb923c;
+  --color-transfer: #38bdf8;
+  --color-whale: #c084fc;
+  --color-launch: #2dd4bf;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+  --color-slice-buy: #7c5cfc;
+  --color-slice-transfer: #3b82f6;
+  --color-slice-sell: #f59e0b;
+  --color-slice-orbitx: #a3e635;
+  --color-slice-burn: #14b8a6;
+  --color-slice-other: #475569;
+  --muted: 228 12% 60%;
+  --muted-foreground: 228 12% 60%;
+  --accent: 258 91% 76%;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Oxanium", "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-2xs: 0.625rem;
+  --shadow-panel: 0 0 0 1px rgb(139 92 246 / 0.16), 0 18px 40px rgb(0 0 0 / 0.45);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ox-dash .font-display,
+.ox-dash .ox-kicker {
+  font-family: var(--font-display);
+}
+
+.ox-dash .text-muted {
+  color: var(--color-muted);
+}
+
+.ox-dash .text-accent {
+  color: var(--color-accent);
+}
+
+.ox-dash .text-cyan {
+  color: var(--color-cyan);
+}
+
+.ox-dash .bg-cyan {
+  background-color: var(--color-cyan);
+}
+
+.ox-panel {
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-panel);
+  border-radius: 14px;
+}
+
+.ox-kicker {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ox-stat {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.ox-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(139 92 246 / 0.35) transparent;
+}
+
+.ox-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ox-scroll::-webkit-scrollbar-thumb {
+  background: rgb(139 92 246 / 0.35);
+  border-radius: 99px;
+}
+
+@keyframes ox-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes ox-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+@keyframes ox-radar {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.ox-live-dot {
+  animation: ox-pulse 1.8s ease-in-out infinite;
+}
+
+.ox-trail {
+  stroke-dasharray: 6 10;
+  animation: ox-dash 1.8s linear infinite;
+}
+
+.ox-radar-ring {
+  animation: ox-radar 2.4s var(--ease-out) infinite;
+}
+
+.ox-world-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: var(--color-bg-sunken);
+}
+
+.ox-world-stage .oxw-iso {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  z-index: 1;
+}
+
+.ox-world-stage .oxw-iso:active {
+  cursor: grabbing;
+}
+
+.ox-world-stage .oxw-gl {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ox-world-stage .oxw-gl canvas,
+.ox-world-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.ox-world-stage .oxw-map {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ox-live-dot,
+  .ox-trail,
+  .ox-radar-ring {
+    animation: none;
+  }
+}

@@ -17,8 +17,42 @@ export default {
       fontFamily: {
         mono: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
         display: ["'Space Mono'", "'JetBrains Mono'", "ui-monospace", "monospace"],
+        ox: ["Oxanium", "IBM Plex Sans", "ui-sans-serif", "sans-serif"],
+      },
+      fontSize: {
+        "2xs": ["0.625rem", { lineHeight: "0.875rem" }],
+        micro: ["0.6875rem", { lineHeight: "1rem" }],
       },
       colors: {
+        bg: {
+          DEFAULT: "#07080e",
+          raised: "#0b0e16",
+          panel: "#0c1018",
+          hover: "#141825",
+          sunken: "#080a10",
+        },
+        fg: "#e8eaf2",
+        dim: "#5c6178",
+        faint: "#3a3e52",
+        line: {
+          DEFAULT: "rgb(139 92 246 / 0.2)",
+          strong: "rgb(139 92 246 / 0.42)",
+        },
+        live: "#34d399",
+        buy: "#34d399",
+        sell: "#e879f9",
+        burn: "#fb923c",
+        transfer: "#38bdf8",
+        whale: "#c084fc",
+        launch: "#2dd4bf",
+        warn: "#fbbf24",
+        danger: "#f87171",
+        "slice-buy": "#7c5cfc",
+        "slice-transfer": "#3b82f6",
+        "slice-sell": "#f59e0b",
+        "slice-orbitx": "#a3e635",
+        "slice-burn": "#14b8a6",
+        "slice-other": "#475569",
         og: {
           ink: "hsl(var(--og-ink))",
           lime: "hsl(var(--og-lime))",
@@ -51,6 +85,7 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+          2: "#8b5cf6",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { eventKind, liveToSnapshot, toBreakdown } from "../pages/onchain-world/lib/mapLive";
+import type { ChainEvent, LivePayload } from "../pages/onchain-world/api";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
@@ -26,6 +28,35 @@ describe("OrbitX /on-chain world", () => {
     expect(api).not.toContain("sbp_");
   });
 
+  it("mounts the uploaded command-center dashboard around the living city", () => {
+    const shell = readFileSync(resolve(WEB, "src/pages/onchain-world/OnChainWorldApp.tsx"), "utf8");
+    expect(shell).toContain("useOnChainFeed");
+    expect(shell).toContain("<Dashboard />");
+    const dash = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/Dashboard.tsx"), "utf8");
+    expect(dash).toContain("ox-dash");
+    expect(dash).toContain("LiveEvents");
+    expect(dash).toContain("WalletPanel");
+    expect(dash).toContain("BottomPanel");
+    const world = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldView.tsx"), "utf8");
+    expect(world).toContain("CssCity");
+    expect(world).toContain("WorldCanvas");
+    expect(world).toContain("Retry 3D");
+    expect(world).toContain("world-city.jpg");
+    const wallet = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WalletPanel.tsx"), "utf8");
+    expect(wallet).toContain("KOL directory");
+    expect(wallet).toContain("TRACKED");
+    expect(wallet).toContain("Wallet intelligence");
+    const breakdown = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/EventBreakdown.tsx"), "utf8");
+    expect(breakdown).toContain("Event breakdown");
+    const bottom = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/BottomPanel.tsx"), "utf8");
+    expect(bottom).toContain("Live tape");
+    expect(bottom).toContain("KOLs");
+    expect(bottom).toContain("Wallets");
+    const map = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/MapView.tsx"), "utf8");
+    expect(map).toContain("LivingMap");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/LiveEvents.tsx"), "utf8")).toContain("INDEXING DELAY");
+  });
+
   it("renders wallets as characters and tokens as districts in the 3D world", () => {
     const canvas = readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8");
     expect(canvas).toContain("function Agent");
@@ -38,16 +69,6 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("EffectComposer");
     expect(canvas).not.toContain("<Line");
     expect(canvas).not.toContain("<Html");
-    const app = readFileSync(resolve(WEB, "src/pages/onchain-world/OnChainWorldApp.tsx"), "utf8");
-    expect(app).toContain("KOL directory");
-    expect(app).toContain("LivingMap");
-    expect(app).toContain("activeOrbitxKols");
-    expect(app).toContain("Event breakdown");
-    expect(app).toContain("Wallet intelligence");
-    expect(app).toContain("LIVE TAPE");
-    expect(app).toContain("TRACKED");
-    expect(app).toContain("Retry 3D");
-    expect(app).toContain("CssCity");
     const cssCity = readFileSync(resolve(WEB, "src/pages/onchain-world/CssCity.tsx"), "utf8");
     expect(cssCity).toContain("ORBITX");
     expect(cssCity).toContain("JUPITER DEX");
@@ -64,5 +85,57 @@ describe("OrbitX /on-chain world", () => {
     expect(sql).toContain("revoke all on public.ox_chain_events from anon, authenticated");
     expect(sql).toContain("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9");
     expect(readFileSync(resolve(REPO, "supabase/migrations/20260822140000_orbitx_onchain_index.sql"), "utf8")).toContain("ox_onchain_events");
+  });
+
+  it("maps confirmed indexer events without inventing USD or KOL labels", () => {
+    const ev = {
+      event_id: "e1",
+      signature: "sig",
+      slot: 1,
+      block_time: "2026-08-25T00:00:00.000Z",
+      event_type: "SOL_TRANSFER",
+      status: "confirmed",
+      source: null,
+      attribution: "chain",
+      wallet: "Abcdefghijklmnopqrstuvwxyz123456789",
+      counterparty: null,
+      source_wallet: null,
+      destination_wallet: null,
+      token_ca: null,
+      token_symbol: null,
+      token_name: null,
+      token_image: null,
+      amount: null,
+      sol_amount: 2,
+      usd_value: null,
+      market_cap: null,
+      orbitx_related: false,
+      kol_related: false,
+      whale_related: false,
+      importance: 1,
+      confidence: "confirmed",
+      description: null,
+    } satisfies ChainEvent;
+    expect(eventKind(ev)).toBe("sol_transfer");
+    expect(eventKind({ ...ev, kol_related: true, event_type: "BUY" })).toBe("kol_buy");
+    const idle: LivePayload = {
+      ok: true,
+      live: false,
+      live_label: "INDEXING DELAY",
+      live_reason: "Waiting for the first confirmed index run.",
+      chain_slot: null,
+      last_slot: null,
+      lag_slots: null,
+      last_ingest_at: null,
+      websocket_status: "polling",
+      sol_usd: null,
+      stats: { events_per_sec: 0, transactions_per_min: 0, orbitx_buys: 0, orbitx_burned: 0, whale_usd: 0, active_wallets: 0 },
+      events: [],
+    };
+    const snap = liveToSnapshot(idle);
+    expect(snap.ticker.eventsPerSec).toBeNull();
+    expect(snap.events).toEqual([]);
+    expect(snap.network.liveLabel).toBe("INDEXING DELAY");
+    expect(toBreakdown([]).every((s) => s.pct === 0)).toBe(true);
   });
 });
