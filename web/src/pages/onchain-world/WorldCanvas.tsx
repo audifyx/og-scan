@@ -571,7 +571,11 @@ function Scene({ events, kols, districts, followId, followWallet, cinematic, cam
 
 export default function WorldCanvas(props: Props) {
   return (
-    <Canvas camera={{ position: [16.5, 11.5, 18.5], fov: 44 }} dpr={[1, 1.75]} shadows gl={{ antialias: true, alpha: false }}>
+    <Canvas
+      camera={{ position: [16.5, 11.5, 18.5], fov: 44 }}
+      dpr={1}
+      gl={{ antialias: false, alpha: false, powerPreference: "default", failIfMajorPerformanceCaveat: false, stencil: false }}
+    >
       <Scene {...props} />
     </Canvas>
   );

@@ -221,6 +221,84 @@
   background: rgba(8,6,18,0.82); color: #e9d5ff; border: 1px solid rgba(192,132,252,0.3); white-space: nowrap; pointer-events: none;
 }
 .oxw-map { width: 100%; height: 100%; }
+.oxw-css {
+  position: absolute; inset: 0; overflow: hidden;
+  perspective: 980px;
+  background: radial-gradient(900px 520px at 50% 38%, #1a0a33 0%, #04020a 58%);
+}
+.oxw-css-scene {
+  position: absolute; left: 50%; top: 56%;
+  width: 0; height: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(62deg) rotateZ(-28deg);
+  animation: oxw-spin 64s linear infinite;
+}
+@keyframes oxw-spin {
+  from { transform: rotateX(62deg) rotateZ(-28deg); }
+  to { transform: rotateX(62deg) rotateZ(332deg); }
+}
+.oxw-css-ground {
+  position: absolute; width: 420px; height: 420px; margin: -210px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #160b28 0%, #070512 70%);
+  box-shadow: 0 0 80px rgba(124, 58, 237, 0.28);
+  transform: translateZ(-2px);
+}
+.oxw-css-ring {
+  position: absolute; border-radius: 50%; border: 2px solid rgba(192,132,252,0.28);
+}
+.oxw-css-ring.cyan { border-color: rgba(34,211,238,0.22); }
+.oxw-css-ring.amber { border-color: rgba(251,146,60,0.18); }
+.oxw-css-bldg {
+  position: absolute; width: 12px; margin-left: -6px; margin-top: -6px;
+  transform: translateZ(0) rotateX(-90deg);
+  transform-origin: bottom center;
+  border-radius: 2px 2px 0 0;
+}
+.oxw-css-tower {
+  position: absolute; left: 0; top: 0; width: 22px; height: 92px; margin: -11px 0 0 -11px;
+  border: 0; padding: 0; cursor: pointer; background: transparent; color: #f5d0fe;
+}
+.oxw-css-tower i {
+  display: block; width: 22px; height: 92px;
+  background: linear-gradient(#f5d0fe, #7c3aed 35%, #2e1064);
+  box-shadow: 0 0 24px #c084fc;
+  transform: rotateX(-90deg); transform-origin: bottom center;
+}
+.oxw-css-tower span, .oxw-css-hub b, .oxw-css-token em, .oxw-css-agent span {
+  position: absolute; left: 50%; top: -14px; transform: translateX(-50%) rotateX(-90deg);
+  font: 700 9px/1 "IBM Plex Mono", monospace; white-space: nowrap; letter-spacing: 0.08em;
+  text-shadow: 0 0 8px #05030c;
+}
+.oxw-css-hub {
+  position: absolute; width: 34px; height: 42px; margin: -17px 0 0 -17px;
+  background: linear-gradient(#22d3ee66, #10212a);
+  box-shadow: 0 0 16px #22d3ee66;
+  transform: rotateX(-90deg); transform-origin: bottom center;
+}
+.oxw-css-hub.ray { background: linear-gradient(#a78bfa66, #161325); box-shadow: 0 0 16px #a78bfa66; }
+.oxw-css-hub.pump { background: linear-gradient(#fb923c66, #23140c); box-shadow: 0 0 16px #fb923c66; }
+.oxw-css-token {
+  position: absolute; width: 14px; margin-left: -7px; border: 0; padding: 0; cursor: pointer;
+  background: linear-gradient(#67e8f966, #151226);
+  transform: rotateX(-90deg); transform-origin: bottom center;
+}
+.oxw-css-agent {
+  position: absolute; width: 18px; height: 18px; margin: -9px; border: 0; background: transparent;
+  color: #e879f9; cursor: pointer;
+}
+.oxw-css-agent i {
+  display: block; width: 10px; height: 10px; margin: 4px auto 0;
+  background: #e879f9; transform: rotate(45deg);
+  box-shadow: 0 0 10px #e879f9;
+}
+.oxw-css-agent.on i { background: #f0abfc; transform: rotate(45deg) scale(1.25); }
+.oxw-soft {
+  position: absolute; top: 10px; right: 10px; z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 0.56rem; letter-spacing: 0.12em; color: #c4b5fd;
+  padding: 4px 8px; border-radius: 7px; background: rgba(8,6,18,0.7); border: 1px solid var(--line);
+}
 .oxw-raw { margin: 0 10px 10px; padding: 10px; max-height: 28vh; overflow: auto; background: #070512; color: #a5b4fc; font-size: 0.68rem; border-radius: 8px; }
 
 @media (max-width: 1100px) {

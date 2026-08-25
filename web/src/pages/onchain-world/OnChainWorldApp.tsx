@@ -4,6 +4,7 @@ import type { CamCommand, WorldPick } from "./WorldCanvas";
 import type { ChainEvent, CityDistricts, FilterState, KolCard, LivePayload, OrbitxPayload, TokenPayload, WalletPayload } from "./api";
 import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchSearch, fetchToken, fetchTx, fetchWallet } from "./api";
 import { ago, clock, eventTitle, eventTone, fmtNum, fmtSol, fmtUsd, shortAddr, utcNow } from "./format";
+import CssCity from "./CssCity";
 import LivingMap from "./LivingMap";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
@@ -144,7 +145,20 @@ export default function OnChainWorldApp() {
   const [intelTab, setIntelTab] = useState<IntelTab>("OVERVIEW");
   const [termTab, setTermTab] = useState<TermTab>("TAPE");
   const [err, setErr] = useState<string | null>(null);
-  const [worldOk, setWorldOk] = useState(true);
+  const [worldOk, setWorldOk] = useState(() => {
+    if (typeof document === "undefined") return true;
+    try {
+      const c = document.createElement("canvas");
+      const gl = c.getContext("webgl2", { failIfMajorPerformanceCaveat: false })
+        || c.getContext("webgl", { failIfMajorPerformanceCaveat: false });
+      const ok = Boolean(gl);
+      const lose = gl && "getExtension" in gl ? gl.getExtension("WEBGL_lose_context") : null;
+      lose?.loseContext();
+      return ok;
+    } catch {
+      return false;
+    }
+  });
   const [worldKey, setWorldKey] = useState(0);
   const [followId, setFollowId] = useState<string | null>(null);
   const [followWallet, setFollowWallet] = useState<string | null>(DIRECTORY_KOLS[0]?.address || null);
@@ -429,32 +443,39 @@ export default function OnChainWorldApp() {
         <div className="oxw-world">
           {useMap ? (
             <LivingMap events={events} kols={roster} flows={flows} followWallet={followWallet} onWallet={openWallet} onEvent={openEvent} />
+          ) : worldOk ? (
+            <ErrorCatch key={worldKey} fallback={() => setWorldOk(false)}>
+              <Suspense fallback={<div className="oxw-empty">INITIALIZING 3D CITY…</div>}>
+                <WorldCanvas
+                  events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
+                  kols={roster}
+                  flows={flows}
+                  districts={districts}
+                  followId={followId}
+                  followWallet={followWallet}
+                  cinematic={cinematic}
+                  cam={cam}
+                  onPick={onPick}
+                />
+              </Suspense>
+            </ErrorCatch>
           ) : (
             <>
-              <ErrorCatch key={worldKey} fallback={() => setWorldOk(false)}>
-                <Suspense fallback={<div className="oxw-empty">INITIALIZING 3D CITY…</div>}>
-                  <WorldCanvas
-                    events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
-                    kols={roster}
-                    flows={flows}
-                    districts={districts}
-                    followId={followId}
-                    followWallet={followWallet}
-                    cinematic={cinematic}
-                    cam={cam}
-                    onPick={onPick}
-                  />
-                </Suspense>
-              </ErrorCatch>
-              {!worldOk ? (
-                <div className="oxw-fail">
-                  <div>WebGL city failed to initialize. The terminal stays live.</div>
-                  <div>
-                    <button className="oxw-btn" type="button" onClick={() => { setWorldOk(true); setWorldKey((k) => k + 1); }}>Retry 3D</button>
-                    <button className="oxw-btn" type="button" onClick={() => setMode("map")}>Open 2D map</button>
-                  </div>
-                </div>
-              ) : null}
+              <CssCity
+                kols={roster}
+                districts={districts}
+                followWallet={followWallet}
+                onWallet={openWallet}
+                onToken={(mint) => {
+                  nav(`/on-chain/token/${mint}`);
+                  setCam({ kind: "token", mint });
+                  void fetchToken(mint).then((data) => { if (data?.ok) setDetail({ kind: "token", data }); }).catch(() => undefined);
+                }}
+              />
+              <div className="oxw-soft">
+                SOFTWARE CITY · WEBGL UNAVAILABLE
+                <button className="oxw-btn" type="button" onClick={() => { setWorldOk(true); setWorldKey((k) => k + 1); }}>Retry 3D</button>
+              </div>
             </>
           )}
         </div>
