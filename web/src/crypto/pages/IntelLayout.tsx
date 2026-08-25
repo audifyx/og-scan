@@ -52,6 +52,9 @@ export default function IntelLayout() {
             <Link to="/agent" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Agent MCP →
             </Link>
+            <Link to="/on-chain" className="oxc-link" style={{ fontSize: "0.75rem" }}>
+              On-Chain world →
+            </Link>
           </div>
         </nav>
         <main className="oxc-main">

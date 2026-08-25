@@ -167,6 +167,13 @@ export const PlatformGlyph = {
       <path d="M24 10v4M24 34v4M10 24h4M34 24h4" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </Svg>
   ),
+  onchain: (
+    <Svg>
+      <circle cx="24" cy="24" r="13" stroke="currentColor" strokeWidth="3.2" />
+      <path d="M11 24h26M24 11a18 18 0 010 26M24 11a18 18 0 000 26" stroke="currentColor" strokeWidth="3" />
+      <circle cx="24" cy="24" r="3" fill="currentColor" />
+    </Svg>
+  ),
   terminal: (
     <Svg>
       <rect x="8" y="10" width="32" height="28" rx="6" stroke="currentColor" strokeWidth="3.5" />
@@ -196,6 +203,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(145deg, #FFE08A 0%, #FFC53D 48%, #B8860B 100%)", glyph: PlatformGlyph.launchpad },
   { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #67E8F9 48%, #0891B2 100%)", glyph: PlatformGlyph.vamp, menu: false, visibility: "admin" },
   { key: "intel", name: "Intel", caption: "Crypto intelligence", href: "/intel", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #0EA5E9 50%, #0369A1 100%)", glyph: PlatformGlyph.intel },
+  { key: "onchain", name: "On-Chain", caption: "Living chain world", href: "/on-chain", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.onchain, dock: true },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, menu: false, visibility: "admin" },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, menu: false, visibility: "admin" },
   { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #38BDF8 48%, #0284C7 100%)", glyph: PlatformGlyph.ai },
@@ -222,7 +230,7 @@ export type PlatformSection = { id: string; title: string; subtitle: string; key
 export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "world", title: "World", subtitle: "City, OS, and play surfaces", keys: ["city", "os", "play", "gaming"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
-  { id: "intel", title: "Intelligence", subtitle: "Intel desk, wallets, PnL, AI", keys: ["intel", "koltracker", "pnltracker", "ai"] },
+  { id: "intel", title: "Intelligence", subtitle: "Intel desk, chain world, wallets, AI", keys: ["intel", "onchain", "koltracker", "pnltracker", "ai"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Agent, X, Telegram, and shop", keys: ["agent", "xmcp", "telegram", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "Markets, NFTs, tasks", keys: ["predict", "nft", "bagwork"] },
@@ -272,6 +280,7 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
   if (href === "/os") return pathname === "/os" || pathname.startsWith("/os/");
   if (href === "/play") return pathname === "/play" || pathname.startsWith("/play/");
   if (href === "/intel") return pathname === "/intel" || pathname.startsWith("/intel/");
+  if (href === "/on-chain") return pathname === "/on-chain" || pathname.startsWith("/on-chain/");
   if (href === "/x") return pathname === "/x" || pathname.startsWith("/x/");
   if (href === "/ai") return pathname.toLowerCase() === "/ai";
   if (href === "/telegram") return pathname.toLowerCase() === "/telegram";
