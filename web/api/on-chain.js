@@ -21,6 +21,14 @@ import {
   statusFromLag,
   summarizeEvents,
 } from "../shared/orbitx-chain-intel.js";
+import {
+  ORBITX_KOLS,
+  activeOrbitxKols,
+  isAssignedKol,
+  kolByAddress,
+  kolWatchBatch,
+  trackedRowsFromDirectory,
+} from "../shared/orbitx-kol-directory.js";
 
 export const config = { maxDuration: 60 };
 
@@ -201,11 +209,28 @@ async function searchDex(symbol) {
   }
 }
 
+async function seedAssignedKols(sb) {
+  if (!sb) return;
+  try {
+    await sb.from("ox_chain_tracked").upsert(trackedRowsFromDirectory(), { onConflict: "address" });
+  } catch {
+    /* directory still used in-memory */
+  }
+}
+
 async function loadTracked(sb) {
-  if (!sb) return {};
-  const { data } = await sb.from("ox_chain_tracked").select("address,label,label_kind");
   const map = {};
-  for (const row of data || []) map[row.address] = row;
+  for (const k of activeOrbitxKols()) {
+    map[k.address] = { address: k.address, label: k.name, label_kind: "KOL", twitter: k.twitter };
+  }
+  if (!sb) return map;
+  const { data } = await sb.from("ox_chain_tracked").select("address,label,label_kind,notes");
+  for (const row of data || []) {
+    map[row.address] = {
+      ...row,
+      twitter: row.notes && String(row.notes).startsWith("@") ? row.notes : map[row.address]?.twitter || null,
+    };
+  }
   return map;
 }
 
@@ -417,14 +442,14 @@ async function ingestAddresses(sb, addresses, opts = {}) {
 async function ingestNow(sb, extra = []) {
   if (Date.now() - ingestLock < 7000) return { skipped: true, reason: "throttled" };
   ingestLock = Date.now();
-  const { data: trackedRows } = await sb.from("ox_chain_tracked").select("address");
+  await seedAssignedKols(sb);
   const watch = [
     ORBITX_MINT,
+    ...kolWatchBatch(10),
+    ...extra.filter(isLikelyAddress),
     JUPITER_V6,
     PUMP_FUN,
-    ...((trackedRows || []).map((r) => r.address)),
-    ...extra.filter(isLikelyAddress),
-  ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 12);
+  ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 16);
   let chainSlot = null;
   try { chainSlot = await rpc("getSlot", [{ commitment: "confirmed" }]); } catch { /* lag optional */ }
   let result;
@@ -496,6 +521,36 @@ async function handleLive(req, res, sb) {
   const { data: state } = await sb.from("ox_chain_index_state").select("*").eq("id", "solana-mainnet").maybeSingle();
   const live = statusFromLag(state?.lag_slots, state?.last_ingest_at);
   const stats = summarizeEvents(events || []);
+  const tracked = await loadTracked(sb);
+  const labeled = (events || []).map((e) => {
+    const kol = kolByAddress(e.wallet) || tracked[e.wallet];
+    return {
+      ...e,
+      kol_related: e.kol_related || isAssignedKol(e.wallet),
+      wallet_label: kol?.label || kol?.name || null,
+      wallet_twitter: kol?.twitter || null,
+    };
+  });
+  const latestByWallet = {};
+  for (const e of labeled) {
+    if (e.wallet && !latestByWallet[e.wallet]) latestByWallet[e.wallet] = e;
+  }
+  const kols = activeOrbitxKols().map((k) => {
+    const last = latestByWallet[k.address];
+    const hits = labeled.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
+    return {
+      address: k.address,
+      name: k.name,
+      twitter: k.twitter,
+      status: k.status,
+      hits,
+      last_type: last?.event_type || null,
+      last_token: last?.token_symbol || null,
+      last_usd: last?.usd_value ?? null,
+      last_at: last?.block_time || null,
+    };
+  });
+  const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
   return json(res, 200, {
     ok: true,
     live: live.live,
@@ -507,9 +562,37 @@ async function handleLive(req, res, sb) {
     last_ingest_at: state?.last_ingest_at ?? null,
     websocket_status: state?.websocket_status || "polling",
     sol_usd: await solUsd(),
-    stats,
-    events: events || [],
+    stats: { ...stats, assigned_kols: activeOrbitxKols().length },
+    events: labeled,
+    kols,
+    flows: flows || [],
     note: "Events are reconstructed from observed Solana transactions. Empty means nothing indexed yet — not synthetic activity.",
+  });
+}
+
+async function handleKols(req, res, sb) {
+  await seedAssignedKols(sb);
+  const tracked = await loadTracked(sb);
+  const addresses = activeOrbitxKols().map((k) => k.address);
+  let events = [];
+  if (addresses.length) {
+    const { data } = await sb
+      .from("ox_chain_events")
+      .select("*")
+      .in("wallet", addresses)
+      .order("block_time", { ascending: false })
+      .limit(120);
+    events = data || [];
+  }
+  return json(res, 200, {
+    ok: true,
+    count: activeOrbitxKols().length,
+    kols: activeOrbitxKols().map((k) => ({
+      ...k,
+      label_kind: "KOL",
+      tracked: Boolean(tracked[k.address]),
+    })),
+    events,
   });
 }
 
@@ -560,11 +643,25 @@ async function handleWallet(req, res, sb, address) {
     ok: true,
     address,
     kind: addressKind(address, { tracked: tracked ? { [address]: tracked } : {} }),
-    label: tracked?.label || wallet?.label || null,
-    label_kind: tracked?.label_kind || "Wallet",
+    kol: kolByAddress(address),
+    assigned_kol: isAssignedKol(address),
+    label: tracked?.label || kolByAddress(address)?.name || wallet?.label || null,
+    label_kind: isAssignedKol(address) ? "KOL" : (tracked?.label_kind || "Wallet"),
     sol: balances?.nativeBalance != null ? balances.nativeBalance / 1e9 : null,
     wallet,
     tokens: tokens || [],
+    orbitx: (() => {
+      const row = (tokens || []).find((t) => t.token_ca === ORBITX_MINT) || null;
+      const liveHold = holdings.find((h) => isOrbitxMint(h.mint));
+      if (!row && !liveHold) return null;
+      return {
+        ...(row || { wallet: address, token_ca: ORBITX_MINT, token_symbol: "ORBITX" }),
+        amount: liveHold?.amount ?? row?.balance ?? null,
+        bought: Number(row?.bought_amount || 0),
+        sold: Number(row?.sold_amount || 0),
+        burned: Number(row?.burned_amount || 0),
+      };
+    })(),
     holdings,
     events: events || [],
     flows: (flows || []).map((f) => ({
@@ -782,6 +879,7 @@ export default async function handler(req, res) {
     if (head === "orbitx" && a === "burns") return await handleOrbitx(req, res, sb, "burns");
     if (head === "orbitx" && a === "buyers") return await handleOrbitx(req, res, sb, "buyers");
     if (head === "search") return await handleSearch(req, res, sb);
+    if (head === "kols") return await handleKols(req, res, sb);
     if (head === "flows" && a) return await handleFlows(req, res, sb, a);
     if (head === "status") return await handleStatus(req, res, sb);
     if (head === "ingest" && (req.method === "POST" || cronAuthorized(req) || req.query?.force === "1")) {
