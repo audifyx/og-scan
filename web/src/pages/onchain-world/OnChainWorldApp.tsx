@@ -48,7 +48,7 @@ const FILTER0: FilterState = { type: "", orbitx: false, whale: false, kol: false
 
 type Mode = "world" | "terminal" | "map" | "orbitx" | "wallets" | "analytics";
 type IntelTab = "OVERVIEW" | "TX" | "TOKENS" | "ORBITX" | "FLOWS";
-type TermTab = "RECENT" | "ORBITX" | "WHALES" | "KOLS";
+type TermTab = "TAPE" | "ORBITX" | "WHALES" | "KOLS" | "WALLETS";
 type Detail =
   | { kind: "event"; event: ChainEvent }
   | { kind: "wallet"; data: WalletPayload }
@@ -85,6 +85,50 @@ function iconFor(type: string): string {
   return "•";
 }
 
+function Donut({ parts }: { parts: { kind: string; count: number; pct: number }[] }) {
+  const r = 36;
+  const c = 2 * Math.PI * r;
+  const total = parts.reduce((s, p) => s + p.count, 0);
+  let acc = 0;
+  return (
+    <svg className="oxw-donut-svg" viewBox="0 0 120 120" aria-label="Event breakdown">
+      <circle cx="60" cy="60" r={r} fill="none" stroke="#1a1430" strokeWidth="12" />
+      {total > 0 ? parts.filter((p) => p.count).map((p) => {
+        const len = (p.pct / 100) * c;
+        const rot = -90 + acc * 3.6;
+        acc += p.pct;
+        return (
+          <circle
+            key={p.kind}
+            cx="60"
+            cy="60"
+            r={r}
+            fill="none"
+            stroke={TONES[p.kind] || "#64748b"}
+            strokeWidth="12"
+            strokeDasharray={`${len} ${c - len}`}
+            strokeLinecap="butt"
+            transform={`rotate(${rot} 60 60)`}
+          />
+        );
+      }) : null}
+      <text x="60" y="56" textAnchor="middle" className="oxw-donut-n">{total}</text>
+      <text x="60" y="70" textAnchor="middle" className="oxw-donut-l">EVENTS</text>
+    </svg>
+  );
+}
+
+function seedWallet(k: KolCard): WalletPayload {
+  return {
+    ok: false,
+    address: k.address,
+    kol: { address: k.address, name: k.name, twitter: k.twitter, status: k.status },
+    assigned_kol: true,
+    label: k.name,
+    label_kind: "KOL",
+  };
+}
+
 export default function OnChainWorldApp() {
   const nav = useNavigate();
   const params = useParams();
@@ -96,13 +140,14 @@ export default function OnChainWorldApp() {
   const [live, setLive] = useState<LivePayload>(EMPTY_LIVE);
   const [kols, setKols] = useState<KolCard[]>(DIRECTORY_KOLS);
   const [districts, setDistricts] = useState<CityDistricts>(EMPTY_LIVE.districts || {});
-  const [detail, setDetail] = useState<Detail>(null);
+  const [detail, setDetail] = useState<Detail>(DIRECTORY_KOLS[0] ? { kind: "wallet", data: seedWallet(DIRECTORY_KOLS[0]) } : null);
   const [intelTab, setIntelTab] = useState<IntelTab>("OVERVIEW");
-  const [termTab, setTermTab] = useState<TermTab>("RECENT");
+  const [termTab, setTermTab] = useState<TermTab>("TAPE");
   const [err, setErr] = useState<string | null>(null);
   const [worldOk, setWorldOk] = useState(true);
+  const [worldKey, setWorldKey] = useState(0);
   const [followId, setFollowId] = useState<string | null>(null);
-  const [followWallet, setFollowWallet] = useState<string | null>(null);
+  const [followWallet, setFollowWallet] = useState<string | null>(DIRECTORY_KOLS[0]?.address || null);
   const [cinematic, setCinematic] = useState(true);
   const [cam, setCam] = useState<CamCommand>(null);
   const [clocks, setClocks] = useState(utcNow());
@@ -162,18 +207,19 @@ export default function OnChainWorldApp() {
       const address = params.address;
       setFollowWallet(address);
       const known = DIRECTORY_KOLS.find((k) => k.address === address);
-      if (known) {
-        setDetail({
-          kind: "wallet",
-          data: { ok: false, address, kol: known, assigned_kol: true, label: known.name, label_kind: "KOL" },
-        });
-      }
+      if (known) setDetail({ kind: "wallet", data: seedWallet(known) });
       void fetchWallet(address).then((data) => { if (data?.ok) setDetail({ kind: "wallet", data }); }).catch(() => undefined);
       return;
     }
     if (params.address && location.pathname.includes("/token/")) {
       void fetchToken(params.address).then((data) => { if (data?.ok) setDetail({ kind: "token", data }); }).catch(() => undefined);
     }
+  }, [params.address, params.signature]);
+
+  useEffect(() => {
+    const first = DIRECTORY_KOLS[0];
+    if (!first || params.address || params.signature) return;
+    void fetchWallet(first.address).then((data) => { if (data?.ok) setDetail({ kind: "wallet", data }); }).catch(() => undefined);
   }, [params.address, params.signature]);
 
   const events = live.events || [];
@@ -197,8 +243,11 @@ export default function OnChainWorldApp() {
     if (termTab === "ORBITX") return events.filter((e) => e.orbitx_related);
     if (termTab === "WHALES") return events.filter((e) => e.whale_related);
     if (termTab === "KOLS") return events.filter((e) => e.kol_related);
+    if (termTab === "WALLETS" && followWallet) {
+      return events.filter((e) => e.wallet === followWallet || e.source_wallet === followWallet || e.destination_wallet === followWallet);
+    }
     return events;
-  }, [events, termTab]);
+  }, [events, termTab, followWallet]);
 
   const openEvent = useCallback((event: ChainEvent) => {
     setDetail({ kind: "event", event });
@@ -218,14 +267,7 @@ export default function OnChainWorldApp() {
     const known = DIRECTORY_KOLS.find((k) => k.address === address) || kols.find((k) => k.address === address);
     setDetail({
       kind: "wallet",
-      data: {
-        ok: false,
-        address,
-        kol: known ? { address: known.address, name: known.name, twitter: known.twitter, status: known.status } : null,
-        assigned_kol: Boolean(known),
-        label: known?.name || null,
-        label_kind: known ? "KOL" : "Wallet",
-      },
+      data: known ? seedWallet(known) : { ok: false, address, assigned_kol: false, label: null, label_kind: "Wallet" },
     });
     void fetchWallet(address).then((data) => { if (data?.ok) setDetail({ kind: "wallet", data }); }).catch(() => undefined);
   }, [nav, kols]);
@@ -258,8 +300,12 @@ export default function OnChainWorldApp() {
   const breakdown = live.breakdown || [];
   const series = live.eps_series || [];
   const maxEps = Math.max(...series.map((p) => p.eps), 0.01);
-  const spark = series.map((p, i) => `${(i / Math.max(series.length - 1, 1)) * 260},${80 - (p.eps / maxEps) * 70}`).join(" ");
+  const spark = series.map((p, i) => `${(i / Math.max(series.length - 1, 1)) * 240},${86 - (p.eps / maxEps) * 68}`).join(" ");
+  const sparkArea = `0,86 ${spark || "0,86 240,86"} 240,86`;
+  const usdIndexed = events.reduce((s, e) => s + (typeof e.usd_value === "number" ? e.usd_value : 0), 0);
   const useMap = mode === "map";
+  const tokenCount = districts.tokens?.length || 0;
+  const balances = wallet?.holdings || [];
 
   return (
     <div className="oxw">
@@ -273,13 +319,12 @@ export default function OnChainWorldApp() {
           {live.live_label}
         </div>
         <div className="oxw-stats">
-          <div className="oxw-stat"><em>Block</em><b>{fmtNum(live.chain_slot, 0)}</b></div>
-          <div className="oxw-stat"><em>Events / sec</em><b>{fmtNum(live.stats.events_per_sec)}</b></div>
-          <div className="oxw-stat"><em>Tx / min</em><b>{fmtNum(live.stats.transactions_per_min, 0)}</b></div>
-          <div className="oxw-stat"><em>OrbitX buys</em><b>{fmtNum(live.stats.orbitx_buys, 0)}</b></div>
-          <div className="oxw-stat"><em>OrbitX burned</em><b>{fmtNum(live.stats.orbitx_burned)}</b></div>
-          <div className="oxw-stat"><em>Whale activity</em><b>{fmtUsd(live.stats.whale_usd)}</b></div>
-          <div className="oxw-stat"><em>Active wallets</em><b>{fmtNum(live.stats.active_wallets, 0)}</b></div>
+          <div className="oxw-stat"><em>Events</em><b>{fmtNum(events.length, 0)}</b></div>
+          <div className="oxw-stat"><em>EPS</em><b>{fmtNum(live.stats.events_per_sec)}</b></div>
+          <div className="oxw-stat"><em>Confirmed</em><b>{fmtNum(events.length, 0)}</b></div>
+          <div className="oxw-stat"><em>USD</em><b>{usdIndexed ? fmtUsd(usdIndexed) : events.length ? "UNKNOWN" : "0"}</b></div>
+          <div className="oxw-stat"><em>KOLs</em><b>{fmtNum(roster.length, 0)}</b></div>
+          <div className="oxw-stat"><em>Tokens</em><b>{fmtNum(tokenCount, 0)}</b></div>
         </div>
         <form className="oxw-search" onSubmit={onSearch}>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="wallet · CA · sig · $ORBITX" spellCheck={false} />
@@ -359,21 +404,20 @@ export default function OnChainWorldApp() {
         </div>
         <div className="oxw-break">
           <div className="oxw-pane-h"><span>Event breakdown</span></div>
-          <div className="oxw-donut">
-            {breakdown.map((b) => (
-              <i key={b.kind} style={{ width: `${b.pct}%`, background: TONES[b.kind] || "#64748b" }} />
-            ))}
-          </div>
-          <div className="oxw-leg">
-            {breakdown.filter((b) => b.count).map((b) => (
-              <span key={b.kind}>{b.kind} <b>{b.pct}%</b></span>
-            ))}
-            {!breakdown.some((b) => b.count) ? <span>No indexed composition yet.</span> : null}
+          <div className="oxw-donut-row">
+            <Donut parts={breakdown} />
+            <div className="oxw-leg">
+              {breakdown.filter((b) => b.count).map((b) => (
+                <span key={b.kind}><i style={{ background: TONES[b.kind] || "#64748b" }} />{b.kind} <b>{b.pct}%</b></span>
+              ))}
+              {!breakdown.some((b) => b.count) ? <span>No indexed composition yet.</span> : null}
+            </div>
           </div>
         </div>
       </aside>
 
       <section className="oxw-world-wrap">
+        <div className="oxw-hud">SOLANA MAINNET · 3D WORLD</div>
         <div className="oxw-modes">
           {(["world", "terminal", "map", "orbitx", "wallets", "analytics"] as const).map((m) => (
             <button key={m} className={`oxw-btn${mode === m ? " active" : ""}`} type="button" onClick={() => {
@@ -383,24 +427,35 @@ export default function OnChainWorldApp() {
           ))}
         </div>
         <div className="oxw-world">
-          {useMap || !worldOk ? (
+          {useMap ? (
             <LivingMap events={events} kols={roster} flows={flows} followWallet={followWallet} onWallet={openWallet} onEvent={openEvent} />
           ) : (
-            <ErrorCatch fallback={() => setWorldOk(false)}>
-              <Suspense fallback={<div className="oxw-empty">INITIALIZING 3D CITY…</div>}>
-                <WorldCanvas
-                  events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
-                  kols={roster}
-                  flows={flows}
-                  districts={districts}
-                  followId={followId}
-                  followWallet={followWallet}
-                  cinematic={cinematic}
-                  cam={cam}
-                  onPick={onPick}
-                />
-              </Suspense>
-            </ErrorCatch>
+            <>
+              <ErrorCatch key={worldKey} fallback={() => setWorldOk(false)}>
+                <Suspense fallback={<div className="oxw-empty">INITIALIZING 3D CITY…</div>}>
+                  <WorldCanvas
+                    events={mode === "orbitx" ? events.filter((e) => e.orbitx_related) : events}
+                    kols={roster}
+                    flows={flows}
+                    districts={districts}
+                    followId={followId}
+                    followWallet={followWallet}
+                    cinematic={cinematic}
+                    cam={cam}
+                    onPick={onPick}
+                  />
+                </Suspense>
+              </ErrorCatch>
+              {!worldOk ? (
+                <div className="oxw-fail">
+                  <div>WebGL city failed to initialize. The terminal stays live.</div>
+                  <div>
+                    <button className="oxw-btn" type="button" onClick={() => { setWorldOk(true); setWorldKey((k) => k + 1); }}>Retry 3D</button>
+                    <button className="oxw-btn" type="button" onClick={() => setMode("map")}>Open 2D map</button>
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
         <div className="oxw-cam">
@@ -414,61 +469,82 @@ export default function OnChainWorldApp() {
       <aside className="oxw-right">
         <div className="oxw-pane-h">
           <span>{wallet ? "Wallet intelligence" : token ? "Token intelligence" : orbitx ? "OrbitX layer" : "World intelligence"}</span>
+          {wallet?.assigned_kol ? <span className="oxw-badge">TRACKED</span> : null}
         </div>
+        {wallet ? (
+          <div className="oxw-subject">
+            <b>{wallet.kol?.name || wallet.label || shortAddr(wallet.address)}</b>
+            <i>{wallet.kol?.twitter || "UNKNOWN"}</i>
+            <i><a href={`https://solscan.io/account/${wallet.address}`} target="_blank" rel="noreferrer">{shortAddr(wallet.address, 6, 4)}</a> · {wallet.assigned_kol ? "ASSIGNED KOL" : wallet.label_kind || "Wallet"}</i>
+          </div>
+        ) : null}
         <div className="oxw-tabs">
           {(["OVERVIEW", "TX", "TOKENS", "ORBITX", "FLOWS"] as const).map((t) => (
             <button key={t} className={`oxw-btn${intelTab === t ? " active" : ""}`} type="button" onClick={() => setIntelTab(t)}>{t}</button>
           ))}
         </div>
         {intelTab === "OVERVIEW" && (
-          <div className="oxw-kvg">
+          <>
+            <div className="oxw-kvg">
+              {wallet ? (
+                <>
+                  <Kv k="SOL" v={fmtSol(wallet.sol)} />
+                  <Kv k="$ORBITX now" v={fmtNum(wallet.orbitx?.amount ?? wallet.orbitx?.balance)} />
+                  <Kv k="Holdings" v={fmtNum(wallet.holdings?.length, 0)} />
+                  <Kv k="Indexed txs" v={fmtNum(wallet.events?.length, 0)} />
+                </>
+              ) : selected ? (
+                <>
+                  <Kv k="Type" v={selected.event_type} />
+                  <Kv k="Amount" v={selected.amount != null ? `${fmtNum(selected.amount)} ${selected.token_symbol || ""}` : "UNKNOWN"} />
+                  <Kv k="USD" v={fmtUsd(selected.usd_value)} />
+                  <Kv k="From" v={shortAddr(selected.source_wallet || selected.wallet)} />
+                  <Kv k="To" v={shortAddr(selected.destination_wallet || selected.counterparty)} />
+                  <Kv k="Signature" v={shortAddr(selected.signature, 8, 6)} href={`https://solscan.io/tx/${selected.signature}`} />
+                </>
+              ) : token ? (
+                <>
+                  <Kv k="Token" v={token.token?.symbol || shortAddr(token.mint)} />
+                  <Kv k="Mint" v={shortAddr(token.mint, 8, 6)} href={`https://solscan.io/token/${token.mint}`} />
+                  <Kv k="Price" v={fmtUsd(token.token?.price_usd)} />
+                  <Kv k="Market cap" v={fmtUsd(token.token?.market_cap)} />
+                </>
+              ) : orbitx ? (
+                <>
+                  <Kv k="Burned" v={fmtNum(orbitx.totals?.burned)} />
+                  <Kv k="Burn events" v={fmtNum(orbitx.totals?.burn_events, 0)} />
+                  <Kv k="Buy USD" v={fmtUsd(orbitx.totals?.buy_usd)} />
+                  <Kv k="Sell USD" v={fmtUsd(orbitx.totals?.sell_usd)} />
+                </>
+              ) : (
+                <>
+                  <Kv k="Assigned KOLs" v={fmtNum(roster.length, 0)} />
+                  <Kv k="Token districts" v={fmtNum(tokenCount, 0)} />
+                  <Kv k="Indexed events" v={fmtNum(events.length, 0)} />
+                  <Kv k="SOL/USD" v={fmtUsd(live.sol_usd)} />
+                </>
+              )}
+            </div>
             {wallet ? (
               <>
-                <Kv k="Subject" v={wallet.kol?.name || wallet.label || shortAddr(wallet.address)} />
-                <Kv k="Kind" v={wallet.assigned_kol ? "ASSIGNED KOL" : wallet.label_kind || "Wallet"} />
-                <Kv k="Twitter" v={wallet.kol?.twitter || "UNKNOWN"} />
-                <Kv k="Address" v={shortAddr(wallet.address, 6, 4)} href={`https://solscan.io/account/${wallet.address}`} />
-                <Kv k="SOL" v={fmtSol(wallet.sol)} />
-                <Kv k="$ORBITX now" v={fmtNum(wallet.orbitx?.amount ?? wallet.orbitx?.balance)} />
-                <Kv k="Lifetime bought" v={fmtNum(wallet.orbitx?.bought ?? wallet.orbitx?.bought_amount)} />
-                <Kv k="Lifetime sold" v={fmtNum(wallet.orbitx?.sold ?? wallet.orbitx?.sold_amount)} />
-                <Kv k="Burned" v={fmtNum(wallet.orbitx?.burned ?? wallet.orbitx?.burned_amount)} />
-                <Kv k="Holdings known" v={fmtNum(wallet.holdings?.length, 0)} />
+                <div className="oxw-pane-h"><span>Balances</span></div>
+                <div className="oxw-hold">
+                  <div><span>SOL</span><b>{fmtSol(wallet.sol)}</b></div>
+                  <div><span>$ORBITX</span><b>{fmtNum(wallet.orbitx?.amount ?? wallet.orbitx?.balance)}</b></div>
+                  {balances.slice(0, 6).map((h) => (
+                    <div key={h.mint}><span>${h.symbol || shortAddr(h.mint)}</span><b>{fmtNum(h.amount)}</b></div>
+                  ))}
+                </div>
+                <div className="oxw-pane-h"><span>OrbitX lifetime</span></div>
+                <div className="oxw-kvg">
+                  <Kv k="Bought" v={fmtNum(wallet.orbitx?.bought ?? wallet.orbitx?.bought_amount)} />
+                  <Kv k="Sold" v={fmtNum(wallet.orbitx?.sold ?? wallet.orbitx?.sold_amount)} />
+                  <Kv k="Burned" v={fmtNum(wallet.orbitx?.burned ?? wallet.orbitx?.burned_amount)} />
+                  <Kv k="Counterparties" v={fmtNum(wallet.flows?.length, 0)} />
+                </div>
               </>
-            ) : selected ? (
-              <>
-                <Kv k="Type" v={selected.event_type} />
-                <Kv k="Amount" v={selected.amount != null ? `${fmtNum(selected.amount)} ${selected.token_symbol || ""}` : "UNKNOWN"} />
-                <Kv k="USD" v={fmtUsd(selected.usd_value)} />
-                <Kv k="From" v={shortAddr(selected.source_wallet || selected.wallet)} />
-                <Kv k="To" v={shortAddr(selected.destination_wallet || selected.counterparty)} />
-                <Kv k="Signature" v={shortAddr(selected.signature, 8, 6)} href={`https://solscan.io/tx/${selected.signature}`} />
-              </>
-            ) : token ? (
-              <>
-                <Kv k="Token" v={token.token?.symbol || shortAddr(token.mint)} />
-                <Kv k="Mint" v={shortAddr(token.mint, 8, 6)} href={`https://solscan.io/token/${token.mint}`} />
-                <Kv k="Price" v={fmtUsd(token.token?.price_usd)} />
-                <Kv k="Market cap" v={fmtUsd(token.token?.market_cap)} />
-                <Kv k="Indexed txs" v={fmtNum(token.events?.length, 0)} />
-              </>
-            ) : orbitx ? (
-              <>
-                <Kv k="Burned" v={fmtNum(orbitx.totals?.burned)} />
-                <Kv k="Burn events" v={fmtNum(orbitx.totals?.burn_events, 0)} />
-                <Kv k="Buy USD" v={fmtUsd(orbitx.totals?.buy_usd)} />
-                <Kv k="Sell USD" v={fmtUsd(orbitx.totals?.sell_usd)} />
-                <Kv k="Wallets" v={fmtNum(orbitx.totals?.unique_wallets, 0)} />
-              </>
-            ) : (
-              <>
-                <Kv k="Assigned KOLs" v={fmtNum(roster.length, 0)} />
-                <Kv k="Token districts" v={fmtNum(districts.tokens?.length, 0)} />
-                <Kv k="Indexed events" v={fmtNum(events.length, 0)} />
-                <Kv k="SOL/USD" v={fmtUsd(live.sol_usd)} />
-              </>
-            )}
-          </div>
+            ) : null}
+          </>
         )}
         {intelTab === "TOKENS" && (
           <div className="oxw-hold">
@@ -525,12 +601,12 @@ export default function OnChainWorldApp() {
       <section className="oxw-term">
         <div className="oxw-term-main">
           <div className="oxw-pane-h">
-            <span>Terminal</span>
-            <span>
-              {(["RECENT", "ORBITX", "WHALES", "KOLS"] as const).map((t) => (
-                <button key={t} className={`oxw-btn${termTab === t ? " active" : ""}`} type="button" onClick={() => setTermTab(t)}>{t === "RECENT" ? "Recent transactions" : t === "ORBITX" ? "OrbitX activity" : t === "WHALES" ? "Whale movements" : "KOL activity"}</button>
+            <span>Transaction terminal</span>
+            <div className="oxw-term-tabs">
+              {([["TAPE", "LIVE TAPE"], ["ORBITX", "ORBITX"], ["WHALES", "WHALES"], ["KOLS", "KOLS"], ["WALLETS", "WALLETS"]] as const).map(([t, label]) => (
+                <button key={t} className={termTab === t ? "active" : ""} type="button" onClick={() => setTermTab(t)}>{label}</button>
               ))}
-            </span>
+            </div>
           </div>
           <table className="oxw-table">
             <thead>
@@ -554,8 +630,9 @@ export default function OnChainWorldApp() {
         </div>
         <div className="oxw-term-chart">
           <div className="oxw-pane-h"><span>Events / second</span><span>{fmtNum(live.stats.events_per_sec)}</span></div>
-          <svg className="oxw-spark" viewBox="0 0 260 88" aria-label="Events per second">
-            <polyline points={spark || "0,80 260,80"} />
+          <svg className="oxw-spark" viewBox="0 0 240 92" aria-label="Events per second">
+            <polygon className="fill" points={sparkArea} />
+            <polyline className="line" points={spark || "0,86 240,86"} />
           </svg>
           <div className="oxw-leg">
             <span>Tx/min <b>{fmtNum(live.stats.transactions_per_min, 0)}</b></span>
@@ -571,7 +648,7 @@ export default function OnChainWorldApp() {
         <span>LAST INDEXED BLOCK <b>{fmtNum(live.last_slot ?? live.chain_slot, 0)}</b></span>
         <span>INDEXING DELAY <b className={delay ? "warn" : "ok"}>{delay ? live.live_label : `${live.ingest_age_sec ?? "UNKNOWN"}s`}</b></span>
         <span>WS CONNECTION <b>{live.websocket_status || "polling"}</b></span>
-        <span>ORBITX ON-CHAIN v1.0.0</span>
+        <span>ORBITX ON-CHAIN v1.1.0</span>
       </footer>
     </div>
   );
