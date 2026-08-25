@@ -32,6 +32,8 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("function TokenBuilding");
     expect(canvas).toContain("function Transit");
     expect(canvas).toContain("function OrbitXTower");
+    expect(canvas).toContain("function CityFill");
+    expect(canvas).toContain("DEX_HUBS");
     expect(canvas).toContain("followWallet");
     const app = readFileSync(resolve(WEB, "src/pages/onchain-world/OnChainWorldApp.tsx"), "utf8");
     expect(app).toContain("KOL directory");

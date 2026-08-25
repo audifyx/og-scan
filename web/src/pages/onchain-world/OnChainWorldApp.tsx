@@ -5,6 +5,7 @@ import type { ChainEvent, CityDistricts, FilterState, KolCard, LivePayload, Orbi
 import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchSearch, fetchToken, fetchTx, fetchWallet } from "./api";
 import { ago, clock, eventTitle, eventTone, fmtNum, fmtSol, fmtUsd, shortAddr, utcNow } from "./format";
 import LivingMap from "./LivingMap";
+import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import "./onchain-world.css";
 
@@ -65,9 +66,14 @@ class ErrorCatch extends Component<{ children: ReactNode; fallback: () => void }
   render() { return this.state.fail ? null : this.props.children; }
 }
 
-function isMobile() {
-  if (typeof window === "undefined") return true;
-  return window.innerWidth < 1100 || Boolean(window.matchMedia?.("(pointer: coarse)")?.matches);
+function canWebGL(): boolean {
+  if (typeof document === "undefined") return true;
+  try {
+    const c = document.createElement("canvas");
+    return Boolean(c.getContext("webgl2") || c.getContext("webgl"));
+  } catch {
+    return false;
+  }
 }
 
 function Kv({ k, v, href }: { k: string; v?: unknown; href?: string }) {
@@ -104,7 +110,7 @@ export default function OnChainWorldApp() {
   const [intelTab, setIntelTab] = useState<IntelTab>("OVERVIEW");
   const [termTab, setTermTab] = useState<TermTab>("RECENT");
   const [err, setErr] = useState<string | null>(null);
-  const [worldOk, setWorldOk] = useState(() => !isMobile());
+  const [worldOk, setWorldOk] = useState(() => canWebGL());
   const [followId, setFollowId] = useState<string | null>(null);
   const [followWallet, setFollowWallet] = useState<string | null>(null);
   const [cinematic, setCinematic] = useState(true);
@@ -152,9 +158,9 @@ export default function OnChainWorldApp() {
   }, []);
 
   useEffect(() => {
-    const onResize = () => { if (isMobile()) setWorldOk(false); };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    void loadCityDistricts().then((city) => {
+      if (city?.orbitx || city?.tokens?.length) setDistricts(city);
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -422,7 +428,7 @@ export default function OnChainWorldApp() {
         <div className="oxw-pane-h">
           <span>{wallet ? "Wallet intelligence" : token ? "Token intelligence" : orbitx ? "OrbitX layer" : "World intelligence"}</span>
         </div>
-        <div className="oxw-modes" style={{ position: "relative", inset: "auto", padding: "0 10px 8px" }}>
+        <div className="oxw-tabs">
           {(["OVERVIEW", "TX", "TOKENS", "ORBITX", "FLOWS"] as const).map((t) => (
             <button key={t} className={`oxw-btn${intelTab === t ? " active" : ""}`} type="button" onClick={() => setIntelTab(t)}>{t}</button>
           ))}

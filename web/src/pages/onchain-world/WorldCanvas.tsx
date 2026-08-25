@@ -6,6 +6,7 @@ import { Color, Vector3 } from "three";
 import type { ChainEvent, CityDistricts, FlowRow, KolCard, TokenDistrict } from "./api";
 import { fmtNum, fmtUsd } from "./format";
 import { isOrbitxMint, ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
+import { DEX_HUBS } from "../../../shared/orbitx-chain-districts.js";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 
 export type WorldPick =
@@ -78,18 +79,44 @@ function Ground() {
   return (
     <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[42, 96]} />
-        <meshStandardMaterial color="#070614" metalness={0.48} roughness={0.55} />
+        <circleGeometry args={[46, 96]} />
+        <meshStandardMaterial color="#070614" metalness={0.52} roughness={0.48} />
       </mesh>
-      <gridHelper args={[58, 58, "#2a1850", "#10081c"]} position={[0, 0.02, 0]} />
+      <gridHelper args={[62, 62, "#3b1d6e", "#12081c"]} position={[0, 0.02, 0]} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <ringGeometry args={[6.0, 6.35, 80]} />
-        <meshBasicMaterial color="#a855f7" transparent opacity={0.45} />
+        <ringGeometry args={[6.0, 6.4, 80]} />
+        <meshBasicMaterial color="#c084fc" transparent opacity={0.55} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <ringGeometry args={[10.9, 11.15, 80]} />
-        <meshBasicMaterial color="#22d3ee" transparent opacity={0.18} />
+        <ringGeometry args={[10.8, 11.15, 80]} />
+        <meshBasicMaterial color="#22d3ee" transparent opacity={0.22} />
       </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <ringGeometry args={[16.6, 16.95, 80]} />
+        <meshBasicMaterial color="#fb923c" transparent opacity={0.16} />
+      </mesh>
+    </>
+  );
+}
+
+function CityFill() {
+  const blocks = useMemo(() => Array.from({ length: 48 }, (_, i) => {
+    const a = (i / 48) * Math.PI * 2;
+    const r = 19 + (i % 6) * 1.15;
+    return {
+      key: `blk-${i}`,
+      pos: [Math.cos(a) * r, 0, Math.sin(a) * r] as [number, number, number],
+      h: 0.45 + (i % 9) * 0.28,
+    };
+  }), []);
+  return (
+    <>
+      {blocks.map((b) => (
+        <mesh key={b.key} position={[b.pos[0], b.h / 2, b.pos[2]]}>
+          <boxGeometry args={[0.62, b.h, 0.62]} />
+          <meshStandardMaterial color="#12101f" emissive="#2e1065" emissiveIntensity={0.2} metalness={0.35} roughness={0.5} />
+        </mesh>
+      ))}
     </>
   );
 }
@@ -281,6 +308,7 @@ function Scene({ events, kols, flows, districts, followId, followWallet, cinemat
     return m;
   }, [assigned]);
   const tokens = districts?.tokens || [];
+  const hubs = districts?.hubs?.length ? districts.hubs : DEX_HUBS;
   const tokenIndex = useMemo(() => {
     const m = new Map<string, [number, number, number]>();
     tokens.forEach((t, i) => m.set(t.mint, tokenPos(t.mint, i, tokens.length)));
@@ -317,10 +345,14 @@ function Scene({ events, kols, flows, districts, followId, followWallet, cinemat
       <directionalLight position={[9, 16, 6]} intensity={0.8} color="#ddd6fe" />
       <Stars radius={70} depth={30} count={1600} factor={2} fade speed={0.3} />
       <Ground />
+      <CityFill />
       <OrbitXTower district={districts?.orbitx} pulsing={burns.length > 0} onPick={() => onPick({ kind: "token", mint: ORBITX_MINT })} />
       {burns.length > 0 ? <Sparkles count={56} scale={[3.6, 5, 3.6]} size={4} color="#f59e0b" position={[0, 3.6, 0]} /> : null}
-      {(districts?.hubs || []).map((h) => (
-        <DexBuilding key={h.id} id={h.id} label={h.label} onPick={() => onPick({ kind: "hub", id: h.id })} />
+      {hubs.map((h) => (
+        <group key={h.id}>
+          <Line points={[[0, 0.08, 0], HUB_POS[h.id] || [12, 0, 0]]} color="#a855f7" transparent opacity={0.22} />
+          <DexBuilding id={h.id} label={h.label} onPick={() => onPick({ kind: "hub", id: h.id })} />
+        </group>
       ))}
       {tokens.filter((t) => !isOrbitxMint(t.mint)).map((t, i) => (
         <TokenBuilding key={t.mint} district={t} index={i} total={tokens.length} onPick={() => onPick({ kind: "token", mint: t.mint })} />
