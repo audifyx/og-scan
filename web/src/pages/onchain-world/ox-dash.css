@@ -183,6 +183,13 @@
   z-index: 1;
 }
 
+@media (max-width: 1023px) {
+  .ox-dash .ox-panel {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ox-live-dot,
   .ox-trail,

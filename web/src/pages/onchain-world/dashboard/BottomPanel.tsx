@@ -17,11 +17,10 @@ import type { BottomTab, EventKind } from "@/pages/onchain-world/lib/orbitx/type
 import { cn } from "@/lib/utils";
 
 const TABS: { id: BottomTab; label: string }[] = [
-  { id: "recent", label: "Live tape" },
-  { id: "orbitx_activity", label: "OrbitX" },
-  { id: "whale", label: "Whales" },
-  { id: "kol", label: "KOLs" },
-  { id: "wallets", label: "Wallets" },
+  { id: "recent", label: "Recent transactions" },
+  { id: "orbitx_activity", label: "OrbitX activity" },
+  { id: "whale", label: "Whale movements" },
+  { id: "kol", label: "KOL activity" },
 ];
 
 const KIND_MATCH: Record<BottomTab, EventKind[] | null> = {

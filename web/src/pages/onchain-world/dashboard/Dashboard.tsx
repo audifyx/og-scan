@@ -19,21 +19,23 @@ export function Dashboard() {
     <TooltipProvider>
       <div className="ox-dash flex h-dvh flex-col overflow-hidden bg-bg text-fg">
         <TopBar />
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 lg:grid-cols-[18rem_minmax(0,1fr)_17.5rem]">
-          <div
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 max-lg:gap-0 max-lg:p-0 lg:grid-cols-[18rem_minmax(0,1fr)_17.5rem]">
+          <section
+            aria-label="Events"
             className={cn(
-              "min-h-0 flex-col gap-2",
+              "min-h-0 h-full flex-col gap-2",
               mobile === "events" ? "flex" : "hidden",
               "lg:flex",
             )}
           >
             <LiveEvents />
             <EventBreakdown />
-          </div>
+          </section>
 
-          <div
+          <section
+            aria-label={mobile === "tx" ? "Transactions" : "World"}
             className={cn(
-              "min-h-0 flex-col gap-2",
+              "min-h-0 h-full flex-col gap-2",
               mobile === "world" || mobile === "tx" ? "flex" : "hidden",
               "lg:flex",
             )}
@@ -56,17 +58,18 @@ export function Dashboard() {
             >
               <BottomPanel />
             </div>
-          </div>
+          </section>
 
-          <div
+          <section
+            aria-label="Wallet"
             className={cn(
-              "min-h-0",
+              "min-h-0 h-full",
               mobile === "wallet" ? "flex flex-col" : "hidden",
               "lg:flex lg:flex-col",
             )}
           >
             <WalletPanel />
-          </div>
+          </section>
         </div>
         <StatusBar />
         <MobileNav />

@@ -19,6 +19,8 @@ const DIRECTORY_KOLS: KolCard[] = activeOrbitxKols().map((k) => ({
   last_at: null,
 }));
 
+useOrbitxStore.getState().patchCity({ kols: DIRECTORY_KOLS });
+
 function seedWallet(address: string, roster: KolCard[]): WalletPayload {
   const known = roster.find((k) => k.address === address);
   return {

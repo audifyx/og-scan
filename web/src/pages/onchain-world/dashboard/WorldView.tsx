@@ -1,6 +1,4 @@
-import { Component, lazy, Suspense, type PointerEvent, type ReactNode, type WheelEvent } from "react";
-import { useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, type PointerEvent, type ReactNode, type WheelEvent } from "react";
 import {
   Aperture,
   Crosshair,
@@ -17,29 +15,11 @@ import { OrbitxMark } from "@/pages/onchain-world/dashboard/OrbitxMark";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
 import { TOKEN_PADS, TRAILS, WORLD_NODES } from "@/pages/onchain-world/lib/orbitx/constants";
+import { formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
-import CssCity from "@/pages/onchain-world/CssCity";
-import type { WorldPick } from "@/pages/onchain-world/WorldCanvas";
-import { fetchToken } from "@/pages/onchain-world/api";
-import { fmtUsd } from "@/pages/onchain-world/format";
-
-const WorldCanvas = lazy(() => import("@/pages/onchain-world/WorldCanvas"));
 
 function nodeById(id: string) {
   return WORLD_NODES.find((n) => n.id === id);
-}
-
-class ErrorCatch extends Component<{ children: ReactNode; fallback: () => void }, { fail: boolean }> {
-  state = { fail: false };
-  static getDerivedStateFromError() {
-    return { fail: true };
-  }
-  componentDidCatch() {
-    this.props.fallback();
-  }
-  render() {
-    return this.state.fail ? null : this.props.children;
-  }
 }
 
 export function WorldView() {
@@ -54,56 +34,36 @@ export function WorldView() {
   const cycleSpeed = useOrbitxStore((s) => s.cycleSpeed);
   const viewOptions = useOrbitxStore((s) => s.viewOptions);
   const toggleViewOption = useOrbitxStore((s) => s.toggleViewOption);
-  const city = useOrbitxStore((s) => s.city);
-  const selectedWallet = useOrbitxStore((s) => s.selectedWallet);
-  const trackWallet = useOrbitxStore((s) => s.trackWallet);
-  const followId = useOrbitxStore((s) => s.followId);
-  const camCommand = useOrbitxStore((s) => s.camCommand);
-  const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
-  const patchCity = useOrbitxStore((s) => s.patchCity);
-  const nav = useNavigate();
+  const tokens = useOrbitxStore((s) => s.city.districts.tokens || []);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
 
-  const tokens = (city.districts.tokens || [])
-    .filter((t) => t.symbol)
-    .slice(0, 6)
-    .map((t, i) => ({
-      id: t.mint,
-      label: t.market_cap != null ? `$${t.symbol} (${fmtUsd(t.market_cap)})` : `$${t.symbol}`,
-      src: t.image || TOKEN_PADS[i % TOKEN_PADS.length]?.src,
-      x: TOKEN_PADS[i % TOKEN_PADS.length]?.x ?? 50 + i * 8,
-      y: TOKEN_PADS[i % TOKEN_PADS.length]?.y ?? 22,
-    }));
+  const pads = TOKEN_PADS.map((pad) => {
+    const live = tokens.find((t) => (t.symbol || "").toLowerCase() === pad.id);
+    const cap = live?.market_cap != null ? ` (${formatUsd(live.market_cap)})` : "";
+    return {
+      ...pad,
+      src: live?.image || pad.src,
+      label: `${pad.label}${cap}`,
+    };
+  });
 
-  function openWallet(address: string) {
-    trackWallet(address);
-    setCamCommand({ kind: "wallet", address });
-    nav(`/on-chain/wallet/${address}`);
-  }
-
-  function onPick(pick: WorldPick) {
-    if (pick.kind === "wallet") {
-      openWallet(pick.address);
-      return;
-    }
-    if (pick.kind === "event" && pick.event.wallet) {
-      openWallet(pick.event.wallet);
-      return;
-    }
-    if (pick.kind === "hub") {
-      setCamCommand({ kind: "reset" });
-      return;
-    }
-    if (pick.kind === "token") {
-      setCamCommand({ kind: "token", mint: pick.mint });
-      nav(`/on-chain/token/${pick.mint}`);
-      void fetchToken(pick.mint).catch(() => undefined);
-    }
-  }
+  useEffect(() => {
+    if (!follow || paused) return;
+    let frame = 0;
+    const id = window.setInterval(() => {
+      frame += 1;
+      const t = frame * 0.012 * speed;
+      setCamera({
+        x: Math.sin(t) * 28,
+        y: Math.cos(t * 0.7) * 16,
+        zoom: 1.12,
+      });
+    }, 40);
+    return () => window.clearInterval(id);
+  }, [follow, paused, speed, setCamera]);
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest("canvas")) return;
     drag.current = { x: e.clientX, y: e.clientY, cx: camera.x, cy: camera.y };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
@@ -122,7 +82,6 @@ export function WorldView() {
   }
 
   function onWheel(e: WheelEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).closest("canvas")) return;
     e.preventDefault();
     const next = Math.min(1.8, Math.max(0.75, camera.zoom + (e.deltaY > 0 ? -0.08 : 0.08)));
     setCamera({ ...camera, zoom: next });
@@ -130,60 +89,29 @@ export function WorldView() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="ox-world-stage" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
-        <img
-          src="/world-city.jpg"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-[center_40%] opacity-40"
-          draggable={false}
-        />
-        <CssCity
-          kols={city.kols}
-          districts={city.districts}
-          events={city.rawEvents}
-          followWallet={selectedWallet}
-          cinematic={follow && !city.webglLive}
-          paused={paused || city.webglLive}
-          onWallet={openWallet}
-          onToken={(mint) => {
-            nav(`/on-chain/token/${mint}`);
-            setCamCommand({ kind: "token", mint });
-            void fetchToken(mint).catch(() => undefined);
-          }}
-        />
-        {city.webglOk ? (
-          <div className={`oxw-gl${city.webglLive ? " on" : ""}`}>
-            <ErrorCatch
-              key={city.worldKey}
-              fallback={() => patchCity({ webglOk: false, webglLive: false })}
-            >
-              <Suspense fallback={null}>
-                <WorldCanvas
-                  events={city.rawEvents}
-                  kols={city.kols}
-                  flows={city.flows}
-                  districts={city.districts}
-                  followId={followId}
-                  followWallet={selectedWallet}
-                  cinematic={follow}
-                  cam={camCommand}
-                  onPick={onPick}
-                  onReady={() => patchCity({ webglLive: true })}
-                />
-              </Suspense>
-            </ErrorCatch>
-          </div>
-        ) : null}
-
+      <div
+        className="relative min-h-0 flex-1 cursor-grab overflow-hidden bg-bg-sunken touch-none active:cursor-grabbing"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onWheel={onWheel}
+      >
         <div
-          className="pointer-events-none absolute inset-0 origin-center will-change-transform"
+          className="absolute inset-0 origin-center will-change-transform"
           style={{
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
           }}
         >
+          <img
+            src="/world-city.jpg"
+            alt=""
+            className="h-full w-full object-cover object-[center_40%]"
+            draggable={false}
+          />
           {viewOptions.grid ? (
             <div
-              className="absolute inset-0 opacity-30 mix-blend-screen"
+              className="pointer-events-none absolute inset-0 opacity-30 mix-blend-screen"
               style={{
                 backgroundImage:
                   "linear-gradient(rgb(139 92 246 / 0.18) 1px, transparent 1px), linear-gradient(90deg, rgb(139 92 246 / 0.18) 1px, transparent 1px)",
@@ -194,7 +122,7 @@ export function WorldView() {
 
           {viewOptions.trails ? (
             <svg
-              className="absolute inset-0 h-full w-full"
+              className="pointer-events-none absolute inset-0 h-full w-full"
               viewBox="0 0 100 100"
               preserveAspectRatio="none"
             >
@@ -256,20 +184,18 @@ export function WorldView() {
             : null}
 
           {viewOptions.figures
-            ? tokens.map((pad) => (
+            ? pads.map((pad) => (
                 <div
                   key={pad.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 max-sm:hidden"
+                  className="absolute -translate-x-1/2 -translate-y-1/2"
                   style={{ left: `${pad.x}%`, top: `${pad.y}%` }}
                 >
                   <div className="flex flex-col items-center gap-1">
-                    {pad.src ? (
-                      <img
-                        src={pad.src}
-                        alt=""
-                        className="size-8 rounded-full object-cover shadow-[0_0_16px_rgb(0_0_0_/_0.55)] outline outline-1 -outline-offset-1 outline-white/15"
-                      />
-                    ) : null}
+                    <img
+                      src={pad.src}
+                      alt=""
+                      className="size-8 rounded-full object-cover shadow-[0_0_16px_rgb(0_0_0_/_0.55)] outline outline-1 -outline-offset-1 outline-white/15"
+                    />
                     <span className="rounded-sm bg-bg-sunken/88 px-1.5 py-0.5 font-display text-2xs tracking-wider text-fg shadow-[0_0_0_1px_rgb(255_255_255_/_0.08)]">
                       {pad.label}
                     </span>
@@ -279,23 +205,19 @@ export function WorldView() {
             : null}
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-[3] bg-[radial-gradient(ellipse_at_center,transparent_45%,rgb(7_8_14_/_0.55)_100%)]" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-20 bg-gradient-to-t from-bg-sunken to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgb(7_8_14_/_0.55)_100%)]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-bg-sunken to-transparent" />
       </div>
 
       <div className="flex h-11 shrink-0 items-center gap-2 border-t border-line bg-bg-raised/90 px-2">
-        <Button variant="ghost" size="xs" onClick={() => { resetCamera(); setCamCommand({ kind: "reset" }); }}>
+        <Button variant="ghost" size="xs" onClick={resetCamera}>
           <Aperture className="size-3.5" />
           Camera
         </Button>
         <Button
           variant={follow ? "subtle" : "ghost"}
           size="xs"
-          onClick={() => {
-            const next = !follow;
-            setFollow(next);
-            setCamCommand(next ? { kind: "follow" } : { kind: "reset" });
-          }}
+          onClick={() => setFollow(!follow)}
         >
           <Crosshair className="size-3.5" />
           Follow
@@ -363,15 +285,6 @@ export function WorldView() {
         </Popover>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {!city.webglOk ? (
-            <Button
-              variant="chip"
-              size="xs"
-              onClick={() => patchCity({ webglOk: true, worldKey: city.worldKey + 1 })}
-            >
-              Retry 3D
-            </Button>
-          ) : null}
           <span className="ox-kicker hidden sm:inline">Speed</span>
           <Button variant="chip" size="xs" onClick={cycleSpeed}>
             {speed}x
@@ -384,7 +297,7 @@ export function WorldView() {
           >
             {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
           </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="Reset view" onClick={() => { resetCamera(); setCamCommand({ kind: "reset" }); }}>
+          <Button variant="ghost" size="icon-xs" aria-label="Reset view" onClick={resetCamera}>
             <RotateCcw className="size-3.5" />
           </Button>
         </div>
@@ -401,8 +314,8 @@ function IconToggle({
 }: {
   pressed: boolean;
   label: string;
-  children: ReactNode;
   onClick: () => void;
+  children: ReactNode;
 }) {
   return (
     <Button

@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { MoreVertical, Search, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MoreVertical, Volume2, VolumeX } from "lucide-react";
 import { OrbitxMark } from "@/pages/onchain-world/dashboard/OrbitxMark";
 import { Badge } from "@/pages/onchain-world/dashboard/ui/badge";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
@@ -14,7 +13,6 @@ import {
 import { APP_NAME } from "@/pages/onchain-world/lib/orbitx/constants";
 import { formatAge, formatInt, formatUsd, utcClock } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
-import { fetchSearch } from "@/pages/onchain-world/api";
 
 function Stat({
   label,
@@ -42,11 +40,7 @@ export function TopBar() {
   const muted = useOrbitxStore((s) => s.muted);
   const setMuted = useOrbitxStore((s) => s.setMuted);
   const resetCamera = useOrbitxStore((s) => s.resetCamera);
-  const trackWallet = useOrbitxStore((s) => s.trackWallet);
-  const query = useOrbitxStore((s) => s.searchQuery);
-  const setQuery = useOrbitxStore((s) => s.setSearchQuery);
   const [now, setNow] = useState<string | null>(null);
-  const nav = useNavigate();
 
   useEffect(() => {
     const tick = () => setNow(utcClock(new Date()));
@@ -54,23 +48,6 @@ export function TopBar() {
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, []);
-
-  async function onSearch(e: FormEvent) {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    const data = await fetchSearch(q);
-    if (data.signature) {
-      nav(`/on-chain/tx/${String(data.signature)}`);
-      return;
-    }
-    if (data.address) {
-      trackWallet(String(data.address));
-      nav(`/on-chain/wallet/${String(data.address)}`);
-      return;
-    }
-    if (data.mint) nav(`/on-chain/token/${String(data.mint)}`);
-  }
 
   const live = Boolean(network.live);
   const liveLabel = network.liveLabel || (live ? "LIVE" : "IDLE");
@@ -106,7 +83,7 @@ export function TopBar() {
               ON-CHAIN
             </span>
             <Badge tone={live ? "live" : "idle"} className="gap-1">
-              <span className={`size-1.5 rounded-full ${live ? "bg-live" : "bg-warn"} ox-live-dot`} />
+              <span className={`size-1.5 rounded-full ox-live-dot ${live ? "bg-live" : "bg-warn"}`} />
               {liveLabel}
             </Badge>
           </div>
@@ -115,19 +92,6 @@ export function TopBar() {
         <div className="ox-scroll mx-auto hidden min-w-0 flex-1 items-stretch overflow-x-auto md:flex">
           <div className="mx-auto">{stats}</div>
         </div>
-
-        <form onSubmit={onSearch} className="hidden min-w-0 items-center gap-1 lg:flex">
-          <div className="flex h-8 items-center gap-1.5 rounded-md border border-line bg-bg-sunken px-2">
-            <Search className="size-3.5 text-dim" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="wallet · CA · sig"
-              spellCheck={false}
-              className="w-40 bg-transparent text-xs text-fg outline-none placeholder:text-dim"
-            />
-          </div>
-        </form>
 
         <div className="ml-auto flex items-center gap-1.5">
           <span className="ox-stat hidden min-w-28 text-right text-xs text-muted lg:inline">
