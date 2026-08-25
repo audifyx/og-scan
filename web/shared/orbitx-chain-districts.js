@@ -153,12 +153,20 @@ export function epsSeries(events, windowMs = 120_000, buckets = 12) {
 }
 
 export async function loadCityDistricts(extraMints = []) {
-  const boosts = await fetchDexBoosts().catch(() => []);
-  const pump = await fetchPumpTrending(14).catch(() => []);
-  const want = [...MAJOR_MINTS, ...boosts, ...extraMints, ...pump.map((d) => d.mint)];
+  const [orbitxDex, boosts, pump] = await Promise.all([
+    fetchDexPairs([ORBITX_MINT]).catch(() => []),
+    fetchDexBoosts().catch(() => []),
+    fetchPumpTrending(14).catch(() => []),
+  ]);
+  const want = [
+    ...MAJOR_MINTS.filter((m) => m !== ORBITX_MINT),
+    ...boosts,
+    ...extraMints,
+    ...pump.map((d) => d.mint),
+  ];
   const dex = await fetchDexPairs(want);
   const byMint = new Map();
-  for (const d of [...dex, ...pump]) {
+  for (const d of [...orbitxDex, ...dex, ...pump]) {
     if (!d?.mint || byMint.has(d.mint)) continue;
     byMint.set(d.mint, d);
   }

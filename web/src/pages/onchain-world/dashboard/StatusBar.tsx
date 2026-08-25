@@ -11,7 +11,7 @@ export function StatusBar() {
   const wsOn = network.ws === "connected";
 
   return (
-    <footer className="hidden h-9 shrink-0 items-center gap-3 overflow-x-auto border-t border-line bg-bg-raised px-3 text-2xs lg:flex">
+    <footer className="flex h-8 shrink-0 items-center gap-3 overflow-x-auto border-t border-line bg-bg-raised px-3 text-2xs">
       <span className="flex items-center gap-1.5 text-muted">
         <Radio className="size-3 text-accent" />
         <span className="tracking-wider uppercase">{network.name}</span>

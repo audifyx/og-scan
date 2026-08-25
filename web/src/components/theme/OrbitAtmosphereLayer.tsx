@@ -18,6 +18,7 @@ const EXCLUDE_PREFIXES = [
   "/auth",
   "/app",
   "/hub",
+  "/on-chain",
 ];
 
 function shouldShowAtmosphere(pathname: string): boolean {

@@ -50,8 +50,8 @@ export function BottomPanel() {
     rate.length > 0 ? rate : [{ t: "—", v: 0 }, { t: "—", v: 0 }];
 
   return (
-    <div className="grid min-h-0 grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.7fr)]">
-      <section className="ox-panel flex min-h-0 flex-col overflow-hidden">
+    <div className="grid h-full min-h-0 grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.7fr)]">
+      <section className="ox-panel flex h-full min-h-0 flex-col overflow-hidden">
         <header className="flex items-center gap-1 overflow-x-auto border-b border-line px-2">
           {TABS.map((item) => (
             <button

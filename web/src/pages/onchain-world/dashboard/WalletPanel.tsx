@@ -46,7 +46,7 @@ export function WalletPanel() {
   }
 
   return (
-    <aside className="ox-panel flex min-h-0 flex-col overflow-hidden">
+    <aside className="ox-panel flex h-full min-h-0 flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-line px-3 py-2.5">
         <h2 className="ox-kicker text-fg">Wallet intelligence</h2>
         {selected ? (

@@ -35,9 +35,11 @@ describe("OrbitX /on-chain world", () => {
     expect(shell).toContain("<Dashboard />");
     const dash = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/Dashboard.tsx"), "utf8");
     expect(dash).toContain("ox-dash");
+    expect(dash).toContain("fixed inset-0");
     expect(dash).toContain("LiveEvents");
     expect(dash).toContain("WalletPanel");
     expect(dash).toContain("BottomPanel");
+    expect(dash).toContain("MobileNav");
     const world = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldView.tsx"), "utf8");
     expect(world).toContain("world-city.jpg");
     expect(world).toContain("TOKEN_PADS");
@@ -47,7 +49,7 @@ describe("OrbitX /on-chain world", () => {
     expect(nav).toContain("Events");
     expect(nav).toContain("Tx");
     expect(nav).toContain("Wallet");
-    expect(nav).toContain("lg:hidden");
+    expect(nav).not.toContain("lg:hidden");
     const wallet = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WalletPanel.tsx"), "utf8");
     expect(wallet).toContain("KOL directory");
     expect(wallet).toContain("TRACKED");
@@ -60,7 +62,9 @@ describe("OrbitX /on-chain world", () => {
     expect(bottom).toContain("Whale movements");
     expect(bottom).toContain("KOL activity");
     const map = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/MapView.tsx"), "utf8");
-    expect(map).toContain("LivingMap");
+    expect(map).toContain("WORLD_NODES");
+    expect(map).toContain("city.kols");
+    expect(readFileSync(resolve(WEB, "src/components/theme/OrbitAtmosphereLayer.tsx"), "utf8")).toContain('"/on-chain"');
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/LiveEvents.tsx"), "utf8")).toContain("INDEXING DELAY");
     const oxView = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/OrbitxTokenView.tsx"), "utf8");
     expect(oxView).toContain("districts.orbitx");

@@ -16,7 +16,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="On-chain pages"
-      className="flex h-16 shrink-0 items-stretch border-t border-line bg-bg-raised pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="flex h-16 shrink-0 items-stretch border-t border-line bg-bg-raised pb-[env(safe-area-inset-bottom)]"
     >
       {ITEMS.map((item) => {
         const Icon = item.icon;

@@ -28,7 +28,7 @@ export function CenterStage() {
   const resetCamera = useOrbitxStore((s) => s.resetCamera);
 
   return (
-    <section className="ox-panel flex min-h-0 flex-1 flex-col overflow-hidden">
+    <section className="ox-panel flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <header className="flex h-11 shrink-0 items-center gap-1 border-b border-line px-2">
         <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
           {VIEWS.map((item) => (
