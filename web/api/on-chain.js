@@ -22,7 +22,6 @@ import {
   summarizeEvents,
 } from "../shared/orbitx-chain-intel.js";
 import {
-  ORBITX_KOLS,
   activeOrbitxKols,
   isAssignedKol,
   kolByAddress,
