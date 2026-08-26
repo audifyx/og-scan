@@ -1,9 +1,6 @@
 import { WORLD_NODES } from "@/pages/onchain-world/lib/orbitx/constants";
-import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 
 export function MapView() {
-  const kols = useOrbitxStore((s) => s.city.kols);
-
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden bg-bg-sunken">
       <div
@@ -49,21 +46,6 @@ export function MapView() {
             </text>
           </g>
         ))}
-        {kols.slice(0, 12).map((k, i) => {
-          const angle = (i / Math.max(kols.length, 1)) * Math.PI * 2;
-          const cx = 50 + Math.cos(angle) * 22;
-          const cy = 50 + Math.sin(angle) * 16;
-          return (
-            <circle
-              key={k.address}
-              cx={cx}
-              cy={cy}
-              r="1.1"
-              fill="var(--color-live)"
-              opacity="0.85"
-            />
-          );
-        })}
       </svg>
     </div>
   );

@@ -1,9 +1,8 @@
 import { useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
-import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
-import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTx, fetchWallet } from "./api";
+import { fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTx, fetchWallet } from "./api";
 import { liveToSnapshot, toWalletSnapshot } from "./lib/mapLive";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
@@ -21,6 +20,19 @@ const DIRECTORY_KOLS: KolCard[] = activeOrbitxKols().map((k) => ({
 
 useOrbitxStore.getState().patchCity({ kols: DIRECTORY_KOLS });
 
+const LIVE_FILTERS = {
+  type: "",
+  orbitx: false,
+  whale: false,
+  kol: false,
+  tracked: false,
+  minUsd: "",
+  source: "",
+  token: "",
+  wallet: "",
+  window: "live",
+};
+
 function seedWallet(address: string, roster: KolCard[]): WalletPayload {
   const known = roster.find((k) => k.address === address);
   return {
@@ -33,45 +45,6 @@ function seedWallet(address: string, roster: KolCard[]): WalletPayload {
   };
 }
 
-async function fetchConfirmedSlot(): Promise<number | null> {
-  try {
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 4000);
-    const r = await fetch("https://api.mainnet-beta.solana.com", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getSlot",
-        params: [{ commitment: "confirmed" }],
-      }),
-      signal: ctrl.signal,
-    });
-    window.clearTimeout(timer);
-    const j = (await r.json()) as { result?: number };
-    return typeof j.result === "number" ? j.result : null;
-  } catch {
-    return null;
-  }
-}
-
-function detectWebgl(): boolean {
-  if (typeof document === "undefined") return true;
-  try {
-    const c = document.createElement("canvas");
-    const gl =
-      c.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ||
-      c.getContext("webgl", { failIfMajorPerformanceCaveat: false });
-    const ok = Boolean(gl);
-    const lose = gl && "getExtension" in gl ? gl.getExtension("WEBGL_lose_context") : null;
-    lose?.loseContext();
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
 export function useOnChainFeed() {
   const params = useParams();
   const paused = useOrbitxStore((s) => s.paused);
@@ -81,33 +54,13 @@ export function useOnChainFeed() {
   const patchCity = useOrbitxStore((s) => s.patchCity);
   const trackWallet = useOrbitxStore((s) => s.trackWallet);
 
-  useEffect(() => {
-    patchCity({
-      kols: DIRECTORY_KOLS,
-      webglOk: detectWebgl(),
-    });
-  }, [patchCity]);
-
   const loadLive = useCallback(async () => {
     if (paused) return;
     try {
-      const [data, roster, city, orbitx, slot] = await Promise.all([
-        fetchLive({
-          type: "",
-          orbitx: false,
-          whale: false,
-          kol: false,
-          tracked: false,
-          minUsd: "",
-          source: "",
-          token: "",
-          wallet: "",
-          window: "live",
-        }),
+      const [data, roster, orbitx] = await Promise.all([
+        fetchLive(LIVE_FILTERS),
         fetchKols().catch(() => null),
-        fetchDistricts().catch(() => null),
         fetchOrbitx().catch(() => null),
-        fetchConfirmedSlot(),
       ]);
       const kols =
         roster?.ok && roster.kols.length
@@ -115,19 +68,11 @@ export function useOnChainFeed() {
           : data.kols?.length
             ? data.kols
             : DIRECTORY_KOLS;
-      const districts = city?.ok || city?.tokens || city?.orbitx ? city : data.districts;
       const prevWallet = useOrbitxStore.getState().snapshot.wallet;
       const liveEvents = data.ok && data.events?.length ? data.events : [];
       const orbitxEvents = orbitx?.ok && orbitx.events?.length ? orbitx.events : [];
       const events = liveEvents.length ? liveEvents : orbitxEvents;
-      const payload = data.ok ? { ...data, events } : { ...data, events, live: false };
-      if (payload.chain_slot == null && slot != null) payload.chain_slot = slot;
-      const snapshot = liveToSnapshot(payload, null);
-      if (snapshot.ticker.block == null && slot != null) snapshot.ticker.block = slot;
-      if (snapshot.network.lastIndexedBlock == null && slot != null) {
-        snapshot.network.lastIndexedBlock = slot;
-      }
-      if (slot != null) snapshot.network.rpc = "healthy";
+      const snapshot = liveToSnapshot({ ...data, events }, null);
       if (orbitx?.ok && orbitx.totals) {
         const hasOx = Boolean(orbitx.burns?.length || orbitx.buys?.length || orbitx.events?.length);
         if (snapshot.ticker.orbitxBurned == null && orbitx.totals.burned) {
@@ -143,7 +88,6 @@ export function useOnChainFeed() {
         liveLabel: data.live_label || "INDEXING DELAY",
         liveReason: data.live_reason || (data.ok ? null : "Live feed failed."),
         kols,
-        districts: districts || useOrbitxStore.getState().city.districts,
         rawEvents: events,
         flows: data.flows || [],
       });
@@ -159,14 +103,6 @@ export function useOnChainFeed() {
     const id = window.setInterval(() => void loadLive(), 5000);
     return () => window.clearInterval(id);
   }, [loadLive]);
-
-  useEffect(() => {
-    void loadCityDistricts()
-      .then((city) => {
-        if (city?.orbitx || city?.tokens?.length) patchCity({ districts: city });
-      })
-      .catch(() => undefined);
-  }, [patchCity]);
 
   useEffect(() => {
     if (params.signature) {

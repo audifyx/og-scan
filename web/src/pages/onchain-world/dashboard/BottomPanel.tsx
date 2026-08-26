@@ -28,7 +28,6 @@ const KIND_MATCH: Record<BottomTab, EventKind[] | null> = {
   orbitx_activity: ["orbitx_buy", "orbitx_burn"],
   whale: ["whale_sell"],
   kol: ["kol_buy"],
-  wallets: null,
 };
 
 export function BottomPanel() {
@@ -38,20 +37,13 @@ export function BottomPanel() {
   const rate = useOrbitxStore((s) => s.snapshot.eventRate);
   const last = useOrbitxStore((s) => s.snapshot.ticker.eventsPerSec);
   const match = KIND_MATCH[tab];
-  const selectedWallet = useOrbitxStore((s) => s.selectedWallet);
-  const visible = rows.filter((r) => {
-    if (match && !match.includes(r.kind)) return false;
-    if (tab === "wallets" && selectedWallet) {
-      return r.wallet === selectedWallet;
-    }
-    return true;
-  });
+  const visible = match ? rows.filter((r) => match.includes(r.kind)) : rows;
   const chartData =
     rate.length > 0 ? rate : [{ t: "—", v: 0 }, { t: "—", v: 0 }];
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.7fr)]">
-      <section className="ox-panel flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="grid min-h-0 grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.7fr)]">
+      <section className="ox-panel flex min-h-0 flex-col overflow-hidden">
         <header className="flex items-center gap-1 overflow-x-auto border-b border-line px-2">
           {TABS.map((item) => (
             <button
@@ -74,7 +66,7 @@ export function BottomPanel() {
             <EmptyState
               icon={<Activity className="size-5" />}
               title="No transactions"
-              body="No indexed rows in this layer yet."
+              body="Rows appear here once a feed writes into the snapshot."
               className="min-h-28 py-4"
             />
           ) : (
@@ -92,16 +84,7 @@ export function BottomPanel() {
               </thead>
               <tbody>
                 {visible.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="cursor-pointer border-b border-line/70 hover:bg-bg-hover"
-                    onClick={() => {
-                      if (row.wallet) {
-                        useOrbitxStore.getState().trackWallet(row.wallet);
-                        useOrbitxStore.getState().setFollowId(row.id);
-                      }
-                    }}
-                  >
+                  <tr key={row.id} className="border-b border-line/70 hover:bg-bg-hover">
                     <td className="ox-stat px-3 py-2 text-muted">{row.time}</td>
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1.5">
@@ -149,7 +132,7 @@ export function BottomPanel() {
                 axisLine={false}
                 tickLine={false}
                 width={28}
-                domain={[0, "auto"]}
+                domain={[0, 120]}
               />
               <RechartsTooltip
                 contentStyle={{

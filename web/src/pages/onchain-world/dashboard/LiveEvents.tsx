@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/d
 import { ALL_EVENT_KINDS, EVENT_META } from "@/pages/onchain-world/lib/orbitx/constants";
 import { formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
-import type { LiveEvent } from "@/pages/onchain-world/lib/orbitx/types";
+import type { EventKind } from "@/pages/onchain-world/lib/orbitx/types";
 import { cn } from "@/lib/utils";
 
 function relative(ts: number): string {
@@ -23,7 +23,8 @@ export function LiveEvents() {
   const filters = useOrbitxStore((s) => s.eventFilters);
   const toggleFilter = useOrbitxStore((s) => s.toggleFilter);
   const resetFilters = useOrbitxStore((s) => s.resetFilters);
-  const liveReason = useOrbitxStore((s) => s.snapshot.network.liveReason || s.city.liveReason);
+  const liveReason = useOrbitxStore((s) => s.snapshot.network.liveReason);
+
   const visible = events.filter((e) => filters.includes(e.kind));
 
   return (
@@ -76,7 +77,7 @@ export function LiveEvents() {
           <EmptyState
             icon={<Radio className="size-5" />}
             title="No live events"
-            body={liveReason || "INDEXING DELAY — waiting for confirmed Solana movement."}
+            body={liveReason || "The stream is idle. Wire a Solana feed into the store to populate this panel."}
           />
         ) : (
           <ul className="divide-y divide-line">
@@ -90,51 +91,55 @@ export function LiveEvents() {
   );
 }
 
-function EventRow({ event }: { event: LiveEvent }) {
+function EventRow({
+  event,
+}: {
+  event: {
+    id: string;
+    kind: EventKind;
+    title: string;
+    token?: string;
+    amountLabel?: string;
+    usd?: number | null;
+    detail?: string;
+    ts: number;
+  };
+}) {
   const meta = EVENT_META[event.kind];
-  const trackWallet = useOrbitxStore((s) => s.trackWallet);
-  const setFollowId = useOrbitxStore((s) => s.setFollowId);
-  const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   return (
-    <li>
-      <button
-        type="button"
-        className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-bg-hover"
-        onClick={() => {
-          setFollowId(event.id);
-          if (event.wallet) {
-            trackWallet(event.wallet);
-            setCamCommand({ kind: "wallet", address: event.wallet });
-          }
-        }}
-      >
-        <EventKindGlyph kind={event.kind} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-semibold tracking-wide text-fg">{meta.label}</span>
-                {event.token ? <span className="text-xs font-medium text-muted">{event.token}</span> : null}
-              </div>
-              {event.detail ? <p className="mt-0.5 truncate text-2xs text-dim">{event.detail}</p> : null}
-            </div>
-            <div className="shrink-0 text-right">
-              {event.usd != null ? (
-                <p className="ox-stat text-xs text-fg">{formatUsd(event.usd)}</p>
-              ) : event.amountLabel ? (
-                <p className="ox-stat text-xs text-fg">{event.amountLabel}</p>
+    <li className="flex items-start gap-2.5 px-3 py-2.5">
+      <EventKindGlyph kind={event.kind} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold tracking-wide text-fg">
+                {meta.label}
+              </span>
+              {event.token ? (
+                <span className="text-xs font-medium text-muted">{event.token}</span>
               ) : null}
-              <p className="text-2xs text-dim">{relative(event.ts)}</p>
             </div>
+            {event.detail ? (
+              <p className="mt-0.5 truncate text-2xs text-dim">{event.detail}</p>
+            ) : null}
           </div>
-          {event.amountLabel && event.usd != null ? (
-            <p className="mt-0.5 ox-stat text-2xs text-muted">{event.amountLabel}</p>
-          ) : null}
+          <div className="shrink-0 text-right">
+            {event.usd != null ? (
+              <p className="ox-stat text-xs text-fg">{formatUsd(event.usd)}</p>
+            ) : event.amountLabel ? (
+              <p className="ox-stat text-xs text-fg">{event.amountLabel}</p>
+            ) : null}
+            <p className="text-2xs text-dim">{relative(event.ts)}</p>
+          </div>
         </div>
-        <Badge tone={meta.tone} className="mt-0.5 hidden xl:inline-flex">
-          {meta.short}
-        </Badge>
-      </button>
+        {event.amountLabel && event.usd != null ? (
+          <p className="mt-0.5 ox-stat text-2xs text-muted">{event.amountLabel}</p>
+        ) : null}
+      </div>
+      <Badge tone={meta.tone} className="mt-0.5 hidden xl:inline-flex">
+        {meta.short}
+      </Badge>
     </li>
   );
 }

@@ -15,8 +15,8 @@ import { OrbitxMark } from "@/pages/onchain-world/dashboard/OrbitxMark";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
 import { TOKEN_PADS, TRAILS, WORLD_NODES } from "@/pages/onchain-world/lib/orbitx/constants";
-import { formatPrice, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
+
 
 function nodeById(id: string) {
   return WORLD_NODES.find((n) => n.id === id);
@@ -34,19 +34,7 @@ export function WorldView() {
   const cycleSpeed = useOrbitxStore((s) => s.cycleSpeed);
   const viewOptions = useOrbitxStore((s) => s.viewOptions);
   const toggleViewOption = useOrbitxStore((s) => s.toggleViewOption);
-  const tokens = useOrbitxStore((s) => s.city.districts.tokens || []);
-  const orbitx = useOrbitxStore((s) => s.city.districts.orbitx);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
-
-  const pads = TOKEN_PADS.map((pad) => {
-    const live = tokens.find((t) => (t.symbol || "").toLowerCase() === pad.id);
-    const cap = live?.market_cap != null ? ` (${formatUsd(live.market_cap)})` : "";
-    return {
-      ...pad,
-      src: live?.image || pad.src,
-      label: `${pad.label}${cap}`,
-    };
-  });
 
   useEffect(() => {
     if (!follow || paused) return;
@@ -169,11 +157,6 @@ export function WorldView() {
                       <span className="rounded-sm bg-bg-sunken/90 px-2 py-0.5 font-display text-xs font-semibold tracking-[0.2em] text-accent shadow-[0_0_0_1px_rgb(139_92_246_/_0.45)]">
                         {node.label}
                       </span>
-                      {orbitx?.price_usd != null ? (
-                        <span className="text-2xs tracking-wider text-muted">
-                          {formatPrice(orbitx.price_usd)}
-                        </span>
-                      ) : null}
                     </div>
                   ) : (
                     <div className="rounded-sm bg-bg-sunken/88 px-2 py-1 text-center shadow-[0_0_0_1px_rgb(139_92_246_/_0.35),0_8px_20px_rgb(0_0_0_/_0.45)]">
@@ -190,10 +173,10 @@ export function WorldView() {
             : null}
 
           {viewOptions.figures
-            ? pads.map((pad) => (
+            ? TOKEN_PADS.map((pad) => (
                 <div
                   key={pad.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                  className="absolute -translate-x-1/2 -translate-y-1/2 max-sm:hidden"
                   style={{ left: `${pad.x}%`, top: `${pad.y}%` }}
                 >
                   <div className="flex flex-col items-center gap-1">
@@ -335,3 +318,4 @@ function IconToggle({
     </Button>
   );
 }
+

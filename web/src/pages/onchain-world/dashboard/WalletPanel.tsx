@@ -1,5 +1,4 @@
 import { type FormEvent, type ReactNode, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -24,9 +23,6 @@ export function WalletPanel() {
   const selected = useOrbitxStore((s) => s.selectedWallet);
   const trackWallet = useOrbitxStore((s) => s.trackWallet);
   const wallet = useOrbitxStore((s) => s.snapshot.wallet);
-  const kols = useOrbitxStore((s) => s.city.kols);
-  const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
-  const nav = useNavigate();
   const [draft, setDraft] = useState("");
 
   function onTrack(e: FormEvent) {
@@ -34,26 +30,14 @@ export function WalletPanel() {
     const next = draft.trim();
     if (!next) return;
     trackWallet(next);
-    setCamCommand({ kind: "wallet", address: next });
-    nav(`/on-chain/wallet/${next}`);
     setDraft("");
   }
 
-  function pickKol(address: string) {
-    trackWallet(address);
-    setCamCommand({ kind: "wallet", address });
-    nav(`/on-chain/wallet/${address}`);
-  }
-
   return (
-    <aside className="ox-panel flex h-full min-h-0 flex-col overflow-hidden">
+    <aside className="ox-panel flex min-h-0 flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-line px-3 py-2.5">
         <h2 className="ox-kicker text-fg">Wallet intelligence</h2>
-        {selected ? (
-          <span className="text-2xs font-semibold tracking-wider text-live">TRACKED</span>
-        ) : (
-          <Bookmark className="size-3.5 text-dim" />
-        )}
+        <Bookmark className="size-3.5 text-dim" />
       </header>
 
       {!selected ? (
@@ -78,9 +62,8 @@ export function WalletPanel() {
           <EmptyState
             icon={<Wallet className="size-5" />}
             title="No wallet selected"
-            body="Paste an address or pick an assigned KOL. Balances stay blank until confirmed chain data lands."
+            body="Paste an address to pin balances, counterparties, and OrbitX flow. Fields stay blank until a feed fills the snapshot."
           />
-          <KolDirectory kols={kols} selected={selected} onPick={pickKol} />
         </div>
       ) : (
         <div className="ox-scroll min-h-0 flex-1 overflow-y-auto">
@@ -115,11 +98,13 @@ export function WalletPanel() {
             ) : (
               <ul className="divide-y divide-line">
                 {wallet?.balances.map((b) => (
-                  <li key={`${b.symbol}-${b.mint || "native"}`} className="flex items-center justify-between px-3 py-1.5">
+                  <li key={b.symbol} className="flex items-center justify-between px-3 py-1.5">
                     <span className="text-xs text-muted">{b.symbol}</span>
                     <span className="flex gap-4">
                       <span className="ox-stat text-xs text-fg">{formatToken(b.amount)}</span>
-                      <span className="ox-stat w-16 text-right text-xs text-muted">{formatUsd(b.usd)}</span>
+                      <span className="ox-stat w-16 text-right text-xs text-muted">
+                        {formatUsd(b.usd)}
+                      </span>
                     </span>
                   </li>
                 ))}
@@ -159,16 +144,7 @@ export function WalletPanel() {
               <ul className="divide-y divide-line">
                 {wallet?.counterparties.map((c) => (
                   <li key={c.address} className="flex items-center justify-between px-3 py-1.5">
-                    <button
-                      type="button"
-                      className="ox-stat text-xs text-fg hover:text-accent"
-                      onClick={() => {
-                        trackWallet(c.address);
-                        nav(`/on-chain/wallet/${c.address}`);
-                      }}
-                    >
-                      {formatAddress(c.address)}
-                    </button>
+                    <span className="ox-stat text-xs text-fg">{formatAddress(c.address)}</span>
                     <span className="ox-stat text-2xs text-muted">
                       {c.txs} txs · {c.sol} SOL
                     </span>
@@ -177,44 +153,9 @@ export function WalletPanel() {
               </ul>
             )}
           </Section>
-
-          <KolDirectory kols={kols} selected={selected} onPick={pickKol} />
         </div>
       )}
     </aside>
-  );
-}
-
-function KolDirectory({
-  kols,
-  selected,
-  onPick,
-}: {
-  kols: { address: string; name: string; twitter: string | null; hits?: number }[];
-  selected: string | null;
-  onPick: (address: string) => void;
-}) {
-  return (
-    <section className="border-t border-line">
-      <h3 className="ox-kicker px-3 pt-3 pb-1.5">KOL directory · {kols.length}</h3>
-      <ul className="divide-y divide-line">
-        {kols.map((k) => (
-          <li key={k.address}>
-            <button
-              type="button"
-              onClick={() => onPick(k.address)}
-              className={`flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-bg-hover ${selected === k.address ? "bg-bg-hover" : ""}`}
-            >
-              <span>
-                <span className="block text-xs font-medium text-fg">{k.name}</span>
-                <span className="block text-2xs text-dim">{k.twitter || formatAddress(k.address)}</span>
-              </span>
-              <span className="ox-stat text-2xs text-muted">{k.hits ?? 0}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 
