@@ -125,7 +125,6 @@ describe("OrbitX education catalog", () => {
     expect(edu).not.toContain("ogscan.fun");
     expect(edu).toContain("orbitx.world");
     expect(edu).toContain('to="/ORBITX_DEX"');
-    expect(edu).toContain("This route is off-chain");
   });
 });
 

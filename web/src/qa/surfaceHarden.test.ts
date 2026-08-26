@@ -28,6 +28,13 @@ describe("surface harden + leak scan", () => {
     expect(app).not.toContain("<Route path=\"/on-chain\" element={<OwnerPreviewRoute>");
   });
 
+  it("404s unknown routes back to orbitx.world DEX, not ogscan.fun", () => {
+    const nf = readFileSync(resolve(WEB, "src/pages/NotFound.tsx"), "utf8");
+    expect(nf).not.toContain("ogscan.fun");
+    expect(nf).toContain("orbitx.world");
+    expect(nf).toContain('to="/ORBITX_DEX"');
+  });
+
   it("does not ship a hardcoded Supabase anon JWT", () => {
     const lib = readFileSync(resolve(WEB, "api/ogdex/_lib.js"), "utf8");
     expect(lib).not.toMatch(/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9/);

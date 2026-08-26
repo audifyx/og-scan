@@ -138,14 +138,6 @@ function HitRow({ hit, onPick }: { hit: SearchHit; onPick: () => void }) {
   );
 }
 
-function LiveJump({ compact }: { compact?: boolean }) {
-  return (
-    <Link className={compact ? "ox-edu__live ox-edu__live--compact" : "ox-edu__live"} to="/ORBITX_DEX">
-      {compact ? "Live desk" : "Jump back to the live orbitx.world dashboard"}
-    </Link>
-  );
-}
-
 function Shell({ children, progress }: { children: ReactNode; progress: EducationProgress }) {
   const { pathname, hash } = useLocation();
   const stats = overallStats(progress, publishedNodes().length);
@@ -174,12 +166,10 @@ function Shell({ children, progress }: { children: ReactNode; progress: Educatio
           <div className="ox-edu__hud">
             {stats.completed} / {stats.total} · {stats.level}
           </div>
-          <LiveJump compact />
+          <Link className="ox-edu__live ox-edu__live--compact" to="/ORBITX_DEX">
+            DEX
+          </Link>
         </header>
-        <div className="ox-edu__offchain">
-          This route is off-chain.{" "}
-          <Link to="/ORBITX_DEX">Jump back to the live orbitx.world dashboard.</Link>
-        </div>
         </div>
         <main className="ox-edu__main">{children}</main>
         <nav className="ox-edu__mobnav" aria-label="Education">
@@ -238,11 +228,10 @@ function Home({ progress }: { progress: EducationProgress }) {
         <div className="ox-edu__kicker">ORBITX EDUCATION</div>
         <h1 className="ox-edu__h1">WELCOME TO THE ORBITX ECOSYSTEM</h1>
         <p className="ox-edu__lede">
-          Off-chain learning for the live orbitx.world desk — from your first trade to advanced workflows.
+          Everything you need to know about OrbitX — from your first trade to advanced on-chain workflows.
         </p>
         <SearchField autoFocus={false} />
         <div className="ox-edu__personas">
-          <LiveJump />
           <Link className="ox-edu__chip" to="/education/path/beginner">
             I&apos;m new to crypto
           </Link>
