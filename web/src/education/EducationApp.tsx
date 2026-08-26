@@ -138,6 +138,14 @@ function HitRow({ hit, onPick }: { hit: SearchHit; onPick: () => void }) {
   );
 }
 
+function LiveJump({ compact }: { compact?: boolean }) {
+  return (
+    <Link className={compact ? "ox-edu__live ox-edu__live--compact" : "ox-edu__live"} to="/ORBITX_DEX">
+      {compact ? "Live desk" : "Jump back to the live orbitx.world dashboard"}
+    </Link>
+  );
+}
+
 function Shell({ children, progress }: { children: ReactNode; progress: EducationProgress }) {
   const { pathname, hash } = useLocation();
   const stats = overallStats(progress, publishedNodes().length);
@@ -153,6 +161,7 @@ function Shell({ children, progress }: { children: ReactNode; progress: Educatio
   return (
     <div className="ox-edu">
       <div className="ox-edu__shell">
+        <div className="ox-edu__chrome">
         <header className="ox-edu__top">
           <Link className="ox-edu__brand" to="/education">
             <span className="ox-edu__mark" />
@@ -165,7 +174,13 @@ function Shell({ children, progress }: { children: ReactNode; progress: Educatio
           <div className="ox-edu__hud">
             {stats.completed} / {stats.total} · {stats.level}
           </div>
+          <LiveJump compact />
         </header>
+        <div className="ox-edu__offchain">
+          This route is off-chain.{" "}
+          <Link to="/ORBITX_DEX">Jump back to the live orbitx.world dashboard.</Link>
+        </div>
+        </div>
         <main className="ox-edu__main">{children}</main>
         <nav className="ox-edu__mobnav" aria-label="Education">
           <Link className={tab === "home" ? "on" : ""} to="/education">
@@ -223,10 +238,11 @@ function Home({ progress }: { progress: EducationProgress }) {
         <div className="ox-edu__kicker">ORBITX EDUCATION</div>
         <h1 className="ox-edu__h1">WELCOME TO THE ORBITX ECOSYSTEM</h1>
         <p className="ox-edu__lede">
-          Everything you need to know about OrbitX — from your first trade to advanced on-chain workflows.
+          Off-chain learning for the live orbitx.world desk — from your first trade to advanced workflows.
         </p>
         <SearchField autoFocus={false} />
         <div className="ox-edu__personas">
+          <LiveJump />
           <Link className="ox-edu__chip" to="/education/path/beginner">
             I&apos;m new to crypto
           </Link>

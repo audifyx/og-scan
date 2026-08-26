@@ -1,4 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   EDU_NODES,
   LEARNING_PATHS,
@@ -112,6 +114,18 @@ describe("OrbitX education catalog", () => {
       "mcp-advanced",
     ];
     for (const id of need) expect(getNode(id), id).toBeTruthy();
+  });
+
+  it("never uses the retired ogscan.fun domain", () => {
+    const edu = [
+      readFileSync(resolve(__dirname, "EducationApp.tsx"), "utf8"),
+      readFileSync(resolve(__dirname, "catalog.ts"), "utf8"),
+      readFileSync(resolve(__dirname, "DemoStage.tsx"), "utf8"),
+    ].join("\n");
+    expect(edu).not.toContain("ogscan.fun");
+    expect(edu).toContain("orbitx.world");
+    expect(edu).toContain('to="/ORBITX_DEX"');
+    expect(edu).toContain("This route is off-chain");
   });
 });
 

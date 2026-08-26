@@ -52,6 +52,7 @@ const HIDE_ON_PREFIX = [
   "/x/link-auth",
   "/x/mcp-auth",
   "/on-chain",
+  "/education",
 ];
 
 const POS_KEY = "orbitx.platformFab.pos.v2";
