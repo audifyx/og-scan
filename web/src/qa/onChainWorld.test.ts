@@ -56,6 +56,7 @@ describe("OrbitX /on-chain world", () => {
     const tokenPanel = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TokenPanel.tsx"), "utf8");
     expect(tokenPanel).toContain("banner");
     expect(tokenPanel).toContain("tokenLabel");
+    expect(tokenPanel).not.toMatch(/\?\?[^;\n]*\|\|/);
     const nav = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/MobileNav.tsx"), "utf8");
     expect(nav).toContain("World");
     expect(nav).toContain("Feed");

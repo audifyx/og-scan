@@ -70,7 +70,7 @@ export function TokenPanel() {
           <Stat label="Volume" value={formatUsd(token.volume_24h ?? null)} />
           <Stat label="Liquidity" value={formatUsd(token.liquidity_usd ?? null)} />
           <Stat label="Market cap" value={formatUsd(token.market_cap ?? null)} />
-          <Stat label="Holders" value={formatInt(token.holder_count ?? buyers.length || null)} />
+          <Stat label="Holders" value={formatInt(token.holder_count ?? null)} />
         </dl>
 
         <div className="flex items-center gap-1.5 border-b border-line px-3 py-2">
