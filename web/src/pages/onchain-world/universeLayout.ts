@@ -25,15 +25,15 @@ export const CLUSTER_META: Record<
   ClusterId,
   { label: string; center: [number, number, number]; spread: number; color: string }
 > = {
-  orbitx: { label: "ORBITX CORE", center: [0, 0, 0], spread: 8, color: "#e9d5ff" },
-  big_dawgs: { label: "BIG DAWGS", center: [118, 10, 28], spread: 28, color: "#fbbf24" },
-  high_cap: { label: "HIGH CAP", center: [42, 16, 112], spread: 32, color: "#67e8f9" },
-  mid_cap: { label: "MID CAP", center: [-98, 8, 64], spread: 34, color: "#a78bfa" },
-  low_cap: { label: "LOW CAP", center: [-52, -8, -118], spread: 38, color: "#818cf8" },
-  mini_dawgs: { label: "MINI DAWGS", center: [96, -10, -88], spread: 24, color: "#fb7185" },
-  trending: { label: "NEW / TRENDING", center: [8, 22, -132], spread: 30, color: "#34d399" },
-  active: { label: "HIGHLY ACTIVE", center: [142, 4, 86], spread: 26, color: "#22d3ee" },
-  dormant: { label: "DORMANT", center: [-138, -6, 18], spread: 36, color: "#64748b" },
+  orbitx: { label: "ORBITX CORE", center: [0, 0, 0], spread: 6, color: "#e9d5ff" },
+  big_dawgs: { label: "BIG DAWGS", center: [48, 6, 14], spread: 16, color: "#fbbf24" },
+  high_cap: { label: "HIGH CAP", center: [20, 9, 48], spread: 18, color: "#67e8f9" },
+  mid_cap: { label: "MID CAP", center: [-44, 5, 28], spread: 18, color: "#a78bfa" },
+  low_cap: { label: "LOW CAP", center: [-22, -5, -50], spread: 20, color: "#818cf8" },
+  mini_dawgs: { label: "MINI DAWGS", center: [40, -6, -36], spread: 14, color: "#fb7185" },
+  trending: { label: "NEW / TRENDING", center: [6, 10, -54], spread: 16, color: "#34d399" },
+  active: { label: "HIGHLY ACTIVE", center: [56, 3, 34], spread: 14, color: "#22d3ee" },
+  dormant: { label: "DORMANT", center: [-54, -4, 10], spread: 18, color: "#64748b" },
 };
 
 export const CLUSTER_ORDER: ClusterId[] = [
@@ -76,8 +76,8 @@ export function planetRadius(token: TokenDistrict, cluster: ClusterId): number {
   const vol = token.volume_24h || 0;
   const score = Math.log10(Math.max(cap, vol, 12));
   const floor =
-    cluster === "big_dawgs" ? 0.62 : cluster === "high_cap" ? 0.48 : cluster === "mid_cap" ? 0.28 : 0.12;
-  const ceil = cluster === "big_dawgs" || cluster === "high_cap" ? 2.05 : cluster === "mid_cap" ? 0.85 : 0.42;
+    cluster === "big_dawgs" ? 0.72 : cluster === "high_cap" ? 0.58 : cluster === "mid_cap" ? 0.42 : 0.34;
+  const ceil = cluster === "big_dawgs" || cluster === "high_cap" ? 2.2 : cluster === "mid_cap" ? 1.05 : 0.62;
   return Math.min(ceil, floor + score * 0.09);
 }
 
@@ -142,6 +142,42 @@ export function galaxyPos(mint: string, _index = 0, _total = 1): [number, number
   const r = 18 + t * 96 + ((h >> 4) % 28);
   const y = ((h % 21) - 10) * 1.1;
   return [Math.cos(spiral) * r, y, Math.sin(spiral) * r];
+}
+
+export function layoutBounds(layout: Map<string, UniverseNode>): { cx: number; cz: number; span: number } {
+  let minX = -12;
+  let maxX = 12;
+  let minZ = -12;
+  let maxZ = 12;
+  for (const node of layout.values()) {
+    minX = Math.min(minX, node.pos[0] - node.radius);
+    maxX = Math.max(maxX, node.pos[0] + node.radius);
+    minZ = Math.min(minZ, node.pos[2] - node.radius);
+    maxZ = Math.max(maxZ, node.pos[2] + node.radius);
+  }
+  for (const id of CLUSTER_ORDER) {
+    const c = CLUSTER_META[id];
+    minX = Math.min(minX, c.center[0] - c.spread * 0.55);
+    maxX = Math.max(maxX, c.center[0] + c.spread * 0.55);
+    minZ = Math.min(minZ, c.center[2] - c.spread * 0.55);
+    maxZ = Math.max(maxZ, c.center[2] + c.spread * 0.55);
+  }
+  return {
+    cx: (minX + maxX) / 2,
+    cz: (minZ + maxZ) / 2,
+    span: Math.max(maxX - minX, maxZ - minZ, 48),
+  };
+}
+
+export function projectToMap(
+  pos: [number, number, number],
+  bounds: { cx: number; cz: number; span: number },
+): { x: number; y: number } {
+  const span = Math.max(bounds.span, 1);
+  return {
+    x: 50 + ((pos[0] - bounds.cx) / span) * 84,
+    y: 50 + ((pos[2] - bounds.cz) / span) * 84,
+  };
 }
 
 export function clusterCounts(layout: Map<string, UniverseNode>): Record<ClusterId, number> {

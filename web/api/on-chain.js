@@ -677,8 +677,28 @@ async function cityDistricts(extraMints = []) {
     districtCache = { at: Date.now(), value };
     return value;
   } catch {
-    return districtCache.value || { orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" }, hubs: [], tokens: [] };
+    return districtCache.value || emptyCityDistricts();
   }
+}
+
+function emptyCityDistricts() {
+  return { orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" }, hubs: [], tokens: [] };
+}
+
+function peekCityDistricts() {
+  return districtCache.value || emptyCityDistricts();
+}
+
+function refreshCityDistricts(extraMints = []) {
+  void cityDistricts(extraMints);
+}
+
+async function cityDistrictsOrCache(extraMints = []) {
+  if (districtCache.value) {
+    if (Date.now() - districtCache.at >= 90_000) refreshCityDistricts(extraMints);
+    return districtCache.value;
+  }
+  return cityDistricts(extraMints);
 }
 
 async function handleLive(req, res, sb) {
@@ -743,7 +763,9 @@ async function handleLive(req, res, sb) {
   });
   const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
   const extraMints = labeled.map((e) => e.token_ca).filter(Boolean);
-  const districts = await cityDistricts(extraMints);
+  refreshCityDistricts(extraMints);
+  const districts = peekCityDistricts();
+  const oxLive = districts.orbitx?.buys_24h != null ? districts.orbitx : await tokenMeta(ORBITX_MINT).catch(() => districts.orbitx || {});
   const ingestAge = state?.last_ingest_at ? Math.max(0, (Date.now() - Date.parse(state.last_ingest_at)) / 1000) : null;
   return json(res, 200, {
     ok: true,
@@ -760,13 +782,16 @@ async function handleLive(req, res, sb) {
     stats: {
       ...stats,
       assigned_kols: allOrbitxKols().length,
-      orbitx_buys_24h: districts?.orbitx?.buys_24h ?? null,
-      orbitx_sells_24h: districts?.orbitx?.sells_24h ?? null,
-      orbitx_traders_24h: districts?.orbitx?.traders_24h ?? null,
+      orbitx_buys_24h: oxLive?.buys_24h ?? districts?.orbitx?.buys_24h ?? null,
+      orbitx_sells_24h: oxLive?.sells_24h ?? districts?.orbitx?.sells_24h ?? null,
+      orbitx_traders_24h: oxLive?.traders_24h ?? districts?.orbitx?.traders_24h ?? null,
     },
     breakdown: eventBreakdown(labeled),
     eps_series: epsSeries(labeled),
-    districts,
+    districts: {
+      ...districts,
+      orbitx: { ...(districts.orbitx || {}), ...(oxLive || {}), mint: ORBITX_MINT },
+    },
     events: labeled,
     kols,
     flows: flows || [],
@@ -775,12 +800,12 @@ async function handleLive(req, res, sb) {
 }
 
 async function handleDistricts(req, res) {
-  const districts = await cityDistricts();
+  const districts = await cityDistrictsOrCache();
   return json(res, 200, { ok: true, ...districts });
 }
 
 async function handleTrending(req, res) {
-  const districts = await cityDistricts();
+  const districts = await cityDistrictsOrCache();
   const tokens = Array.isArray(districts?.tokens) ? districts.tokens : [];
   return json(res, 200, {
     ok: true,
@@ -1009,7 +1034,8 @@ async function handleOrbitx(req, res, sb, sub) {
   const { data: tokens } = await sb.from("ox_chain_wallet_tokens").select("*").eq("token_ca", mint);
   const { data: token } = await sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle();
   const meta = await tokenMeta(mint);
-  const city = await cityDistricts([mint]).catch(() => null);
+  const oxCached = peekCityDistricts()?.orbitx || null;
+  refreshCityDistricts([mint]);
   const rows = events || [];
   const burns = rows.filter((e) => /BURN/.test(e.event_type || ""));
   const buys = rows.filter((e) => /BUY/.test(e.event_type || ""));
@@ -1022,9 +1048,9 @@ async function handleOrbitx(req, res, sb, sub) {
     token: cleanTokenFields({
       ...token,
       ...meta,
-      ...(city?.orbitx || {}),
+      ...(oxCached || {}),
       mint,
-      holder_count: city?.orbitx?.holder_count ?? meta.holder_count ?? asNumber(token?.holders),
+      holder_count: oxCached?.holder_count ?? meta.holder_count ?? asNumber(token?.holders),
     }),
     events: (sub === "burns" ? burns : sub === "buyers" ? buys : rows).map(publicEvent),
     burns: burns.map(publicEvent),

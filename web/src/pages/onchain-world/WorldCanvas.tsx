@@ -147,9 +147,9 @@ function NebulaField() {
         const meta = CLUSTER_META[id];
         return {
           position: meta.center,
-          scale: meta.spread * 1.55,
+          scale: meta.spread * 1.15,
           color: meta.color,
-          opacity: 0.028 + (i % 3) * 0.008,
+          opacity: 0.016 + (i % 3) * 0.006,
         };
       }),
     [],
@@ -291,7 +291,7 @@ function TokenStar({
   const body = useRef<Mesh>(null);
   const pos = node.pos;
   const volume = district.volume_24h || district.market_cap || 12;
-  const r = selected ? Math.max(node.radius, 0.55) : node.radius;
+  const r = selected ? Math.max(node.radius, 0.62) : Math.max(node.radius, lod === "galaxy" ? 0.48 : 0.34);
   const color = nodeColor(district.mint, volume);
   const name = tokenLabel(district);
   const ticker = tokenTicker(district);
@@ -492,7 +492,7 @@ function CameraRig({
     if (!dest || dest === lastKey.current) return;
     lastKey.current = dest;
     if (cam.kind === "reset") {
-      flyingTo.current = new Vector3(0, 48, 168);
+      flyingTo.current = new Vector3(0, 28, 78);
       if (controls.current) controls.current.target.set(0, 0, 0);
       return;
     }
@@ -556,13 +556,13 @@ function ClusterBeacon({
   return (
     <group position={meta.center}>
       <mesh>
-        <sphereGeometry args={[meta.spread * 0.42, 24, 24]} />
-        <meshBasicMaterial color={meta.color} transparent opacity={0.045} depthWrite={false} blending={AdditiveBlending} />
+        <sphereGeometry args={[meta.spread * 0.18, 24, 24]} />
+        <meshBasicMaterial color={meta.color} transparent opacity={0.022} depthWrite={false} blending={AdditiveBlending} />
       </mesh>
-      <Text position={[0, meta.spread * 0.22, 0]} fontSize={1.15} color={meta.color} anchorX="center" outlineWidth={0.04} outlineColor="#05030c">
+      <Text position={[0, meta.spread * 0.28, 0]} fontSize={0.72} color={meta.color} anchorX="center" outlineWidth={0.03} outlineColor="#05030c">
         {meta.label}
       </Text>
-      <Text position={[0, meta.spread * 0.22 - 1.4, 0]} fontSize={0.55} color="#cbd5e1" anchorX="center" outlineWidth={0.02} outlineColor="#05030c">
+      <Text position={[0, meta.spread * 0.28 - 0.95, 0]} fontSize={0.38} color="#cbd5e1" anchorX="center" outlineWidth={0.018} outlineColor="#05030c">
         {`${count} worlds`}
       </Text>
     </group>
@@ -574,7 +574,7 @@ function LodSampler({ onLod }: { onLod: (lod: "galaxy" | "cluster" | "local" | "
   const last = useRef("");
   useFrame(() => {
     const d = camera.position.length();
-    const next = d > 210 ? "galaxy" : d > 110 ? "cluster" : d > 36 ? "local" : "inspect";
+    const next = d > 150 ? "galaxy" : d > 78 ? "cluster" : d > 24 ? "local" : "inspect";
     if (next !== last.current) {
       last.current = next;
       onLod(next);
@@ -646,13 +646,7 @@ function Scene({
     if (lod === "galaxy") {
       return tokens.filter((t) => {
         const n = layout.get(t.mint);
-        return n && (n.cluster === "big_dawgs" || n.cluster === "high_cap" || n.rank === "planet");
-      });
-    }
-    if (lod === "cluster") {
-      return tokens.filter((t) => {
-        const n = layout.get(t.mint);
-        return n && n.cluster !== "dormant";
+        return n && (n.cluster === "big_dawgs" || n.cluster === "high_cap" || n.cluster === "mid_cap" || n.rank === "planet" || n.rank === "world");
       });
     }
     return tokens;
@@ -710,7 +704,7 @@ function Scene({
   return (
     <>
       <color attach="background" args={["#02010a"]} />
-      <fog attach="fog" args={["#070314", 80, 520]} />
+      <fog attach="fog" args={["#070314", 48, 260]} />
       <ambientLight intensity={0.22} color="#9bb6ff" />
       <directionalLight position={[40, 48, 22]} intensity={1.55} color="#fff4e0" />
       <directionalLight position={[-28, 12, -24]} intensity={0.28} color="#67e8f9" />
@@ -734,7 +728,7 @@ function Scene({
       />
       {(districts?.hubs?.length ? districts.hubs : DEX_HUBS).map((hub, i) => {
         const a = (i / 3) * Math.PI * 2;
-        const pos: [number, number, number] = [Math.cos(a) * 22, 1.8, Math.sin(a) * 22];
+        const pos: [number, number, number] = [Math.cos(a) * 16, 1.8, Math.sin(a) * 16];
         const color = hub.id === "jupiter" ? "#22d3ee" : hub.id === "raydium" ? "#a78bfa" : "#fb923c";
         return (
           <group key={hub.id} position={pos} onClick={(e) => { e.stopPropagation(); onPick({ kind: "hub", id: hub.id }); }}>
@@ -855,7 +849,7 @@ function Scene({
         panSpeed={1.15}
         rotateSpeed={0.72}
         enableRotate={!stickBusy}
-        maxDistance={420}
+        maxDistance={280}
         minDistance={1.6}
         autoRotate={false}
         screenSpacePanning
@@ -868,7 +862,7 @@ function Scene({
 export default function WorldCanvas(props: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 48, 168], fov: 50, near: 0.2, far: 900 }}
+      camera={{ position: [0, 28, 78], fov: 52, near: 0.2, far: 900 }}
       dpr={[1, 1.75]}
       gl={{
         antialias: true,

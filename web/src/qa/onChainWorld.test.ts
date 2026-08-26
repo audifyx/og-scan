@@ -32,6 +32,11 @@ describe("OrbitX /on-chain world", () => {
     expect(api).toContain("handleMedia");
     expect(api).toContain("rpcFallback: true");
     expect(api).toContain("orbitx_buys_24h");
+    expect(api).toContain("refreshCityDistricts");
+    expect(api).toContain("peekCityDistricts");
+    expect(api).toContain("void cityDistricts(");
+    expect(api).not.toContain("const city = await cityDistricts([mint])");
+    expect(api).not.toContain("const districts = await cityDistricts(extraMints)");
     expect(api).toContain("dexTokenImage");
     expect(api).toContain("publicEvent");
     expect(api).not.toContain("sbp_");
@@ -100,7 +105,12 @@ describe("OrbitX /on-chain world", () => {
     expect(bottom).toContain("KOL activity");
     const map = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/MapView.tsx"), "utf8");
     expect(map).toContain("layoutUniverse");
+    expect(map).toContain("layoutBounds");
+    expect(map).toContain("projectToMap");
+    expect(map).toContain("DEX_HUBS");
     expect(map).toContain("CLUSTER_META");
+    expect(map).not.toContain('clipPath="circle(50%)"');
+    expect(map).not.toContain("pos[0] * 0.26");
     expect(map).toContain("city.kols");
     expect(map).toContain("slice(0, 250)");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/TerminalView.tsx"), "utf8")).toContain("decoded rows");
@@ -123,6 +133,8 @@ describe("OrbitX /on-chain world", () => {
     expect(hook).toContain("getSlot");
     expect(hook).toContain("loadCityDistricts");
     expect(hook).toContain("allOrbitxKols");
+    expect(hook).toContain("mergeDistricts");
+    expect(hook).toContain("tokenCatalogSize");
     const top = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TopBar.tsx"), "utf8");
     expect(top).toContain("Search 250 trending");
     expect(top).toContain('label="OX 24h Buys"');
@@ -148,6 +160,9 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("CLUSTER_META");
     expect(canvas).toContain("autoRotate={false}");
     expect(canvas).toContain("speed={0}");
+    expect(canvas).toContain("[0, 28, 78]");
+    expect(canvas).not.toContain("[0, 48, 168]");
+    expect(canvas).toContain("spread * 0.18");
     expect(canvas).toContain("DEX_HUBS");
     expect(canvas).toContain("followWallet");
     expect(canvas).toContain("tokenLabel");
@@ -285,5 +300,28 @@ describe("OrbitX /on-chain world", () => {
     expect(totals.orbitx).toBe(1);
     expect(totals.kol).toBe(1);
     expect(buySellRatio(totals)).toBe("100 / 0");
+  });
+
+  it("fits cluster positions onto the 0-100 map and never wipes a loaded catalog", async () => {
+    const { layoutUniverse, layoutBounds, projectToMap, CLUSTER_META } = await import("../pages/onchain-world/universeLayout");
+    const { mergeDistricts, tokenCatalogSize } = await import("../pages/onchain-world/mergeDistricts");
+    const tokens = [
+      { mint: "Aaa1111111111111111111111111111111111111111", market_cap: 80_000_000, volume_24h: 1_000_000 },
+      { mint: "Bbb1111111111111111111111111111111111111111", market_cap: 2_000_000, volume_24h: 50_000 },
+      { mint: "Ccc1111111111111111111111111111111111111111", market_cap: 20_000, volume_24h: 400_000 },
+    ];
+    const layout = layoutUniverse(tokens);
+    const bounds = layoutBounds(layout);
+    const mapped = [...layout.values()].map((n) => projectToMap(n.pos, bounds));
+    expect(mapped.every((p) => p.x >= 6 && p.x <= 94 && p.y >= 6 && p.y <= 94)).toBe(true);
+    const dawgs = projectToMap(CLUSTER_META.big_dawgs.center, bounds);
+    expect(dawgs.x).toBeGreaterThan(50);
+    const kept = mergeDistricts(
+      { orbitx: { mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", buys_24h: 44, sells_24h: 44 }, tokens: [] },
+      { tokens: tokens as never },
+    );
+    expect(tokenCatalogSize(kept)).toBe(3);
+    expect(kept.orbitx?.buys_24h).toBe(44);
+    expect(mergeDistricts({ tokens: [] }, { tokens: tokens as never }).tokens).toHaveLength(3);
   });
 });

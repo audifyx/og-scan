@@ -7,6 +7,7 @@ import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchTo
 import { liveToSnapshot, mergeChainEvents, toWalletSnapshot } from "./lib/mapLive";
 import { tallyActivity } from "./activityStats";
 import { ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
+import { mergeDistricts, tokenCatalogSize } from "./mergeDistricts";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
 const DIRECTORY_KOLS: KolCard[] = allOrbitxKols().map((k) => ({
@@ -125,12 +126,20 @@ export function useOnChainFeed() {
           : data.kols?.length
             ? data.kols
             : DIRECTORY_KOLS;
-      const districts =
+      const districts = mergeDistricts(
         trending?.ok && trending.tokens?.length
-          ? { orbitx: trending.orbitx || city?.orbitx || data.districts?.orbitx, hubs: city?.hubs || data.districts?.hubs, tokens: trending.tokens, trending_count: trending.count, window: trending.window }
-          : city?.ok || city?.tokens || city?.orbitx
-            ? city
-            : data.districts;
+          ? {
+              orbitx: trending.orbitx || city?.orbitx || data.districts?.orbitx,
+              hubs: city?.hubs || data.districts?.hubs,
+              tokens: trending.tokens,
+              trending_count: trending.count,
+              window: trending.window,
+            }
+          : null,
+        tokenCatalogSize(city) ? city : null,
+        data.districts,
+        useOrbitxStore.getState().city.districts,
+      );
       const prevWallet = useOrbitxStore.getState().snapshot.wallet;
       const liveEvents = data.ok && data.events?.length ? data.events : [];
       const orbitxEvents = mergeChainEvents(
@@ -200,7 +209,9 @@ export function useOnChainFeed() {
     void loadCityDistricts()
       .then((city) => {
         if (city?.orbitx || city?.tokens?.length) {
-          patchCity({ districts: city });
+          patchCity({
+            districts: mergeDistricts(useOrbitxStore.getState().city.districts, city),
+          });
           const ticker = useOrbitxStore.getState().snapshot.ticker;
           if (city.orbitx?.buys_24h != null || city.orbitx?.sells_24h != null) {
             patchSnapshot({
