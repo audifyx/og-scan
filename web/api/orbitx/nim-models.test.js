@@ -30,13 +30,14 @@ describe("NVIDIA NIM catalog after Llama 3.1 8B EOL", () => {
   it("does not offer the retired 8B id as a live model", () => {
     expect(NIM_MODELS.map((m) => m.id)).not.toContain(RETIRED_8B);
     expect(NIM_MODELS.map((m) => m.id)).toContain(FAST_NIM_MODEL);
-    expect(FAST_NIM_MODEL).toBe("meta/llama-3.2-3b-instruct");
+    expect(FAST_NIM_MODEL).toBe("minimaxai/minimax-m3");
   });
 
-  it("remaps stored Llama 3.1 8B prefs and env to Llama 3.2 3B", () => {
+  it("remaps stored Llama 3.1 8B prefs and env to MiniMax M3", () => {
     expect(RETIRED_NIM_MODELS[RETIRED_8B]).toBe(FAST_NIM_MODEL);
     expect(resolveNimModel(RETIRED_8B)).toBe(FAST_NIM_MODEL);
-    expect(resolveNimModel(FAST_NIM_MODEL)).toBe(FAST_NIM_MODEL);
+    expect(resolveNimModel(" meta/llama-3.1-8b-instruct ")).toBe(FAST_NIM_MODEL);
+    expect(resolveNimModel("meta/llama-3.2-3b-instruct")).toBe(FAST_NIM_MODEL);
     expect(resolveNimModel(FALLBACK_NIM_MODEL)).toBe(FALLBACK_NIM_MODEL);
     expect(resolveNimModel("totally/unknown-model")).toBe(FALLBACK_NIM_MODEL);
   });

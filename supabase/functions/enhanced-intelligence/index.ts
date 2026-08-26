@@ -5,7 +5,7 @@ import { GRIM_BASE } from "../_shared/grim_base.ts";
 // ── Config ──────────────────────────────────────────────────────────────────
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_API_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-const MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
+const MODEL = resolveModel(Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct");
 
 const HELIUS_API_KEY = Deno.env.get("HELIUS_API_KEY") || "";
 const BIRDEYE_API_KEY = Deno.env.get("BIRDEYE_API_KEY") || "";

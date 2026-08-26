@@ -10,23 +10,25 @@ export const X_OAUTH_SCOPES =
 
 // Every id must exist in https://integrate.api.nvidia.com/v1/models — an id that
 // NIM has retired makes chat fail for anyone who picks it in the model menu.
-export const FAST_NIM_MODEL = "meta/llama-3.2-3b-instruct";
+// Fast slot must be a model NVIDIA still lists (Meta Llama 3.1 8B EOL 2026-08-26;
+// Llama 3.2 3B is not in the current integrate.api.nvidia.com catalog).
+export const FAST_NIM_MODEL = "minimaxai/minimax-m3";
 export const FALLBACK_NIM_MODEL = "meta/llama-3.3-70b-instruct";
 
 /** Retired NIM ids → live replacements. Stored prefs / env still holding these must remap. */
 export const RETIRED_NIM_MODELS = {
   "meta/llama-3.1-8b-instruct": FAST_NIM_MODEL,
+  "meta/llama-3.2-3b-instruct": FAST_NIM_MODEL,
 };
 
 export const NIM_MODELS = [
   { id: FALLBACK_NIM_MODEL, label: "Llama 3.3 70B" },
-  { id: FAST_NIM_MODEL, label: "Llama 3.2 3B" },
+  { id: FAST_NIM_MODEL, label: "MiniMax M3" },
   { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" },
   { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5", label: "Nemotron Super 49B" },
   { id: "deepseek-ai/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash" },
   { id: "mistralai/mistral-nemotron", label: "Mistral Nemotron" },
   { id: "moonshotai/kimi-k2.6", label: "Kimi K2" },
-  { id: "minimaxai/minimax-m3", label: "MiniMax M3" },
 ];
 
 export function isRetiredNimError(status, body) {
@@ -40,12 +42,23 @@ export function isRetiredNimError(status, body) {
   );
 }
 
+function normalizeNimId(requested) {
+  return String(requested || "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
 export function resolveNimModel(requested) {
-  let id = String(requested || "").trim();
+  let id = normalizeNimId(requested);
+  if (/llama-3\.1-8b/i.test(id) || /llama-3\.2-3b/i.test(id)) id = FAST_NIM_MODEL;
   if (RETIRED_NIM_MODELS[id]) id = RETIRED_NIM_MODELS[id];
   if (id && NIM_MODELS.some((m) => m.id === id)) return id;
-  const envDefault = String(process.env.NVIDIA_MODEL || "").trim();
-  const remappedEnv = RETIRED_NIM_MODELS[envDefault] || envDefault;
+  const envDefault = normalizeNimId(process.env.NVIDIA_MODEL);
+  let remappedEnv = envDefault;
+  if (/llama-3\.1-8b/i.test(remappedEnv) || /llama-3\.2-3b/i.test(remappedEnv)) {
+    remappedEnv = FAST_NIM_MODEL;
+  }
+  remappedEnv = RETIRED_NIM_MODELS[remappedEnv] || remappedEnv;
   if (remappedEnv && NIM_MODELS.some((m) => m.id === remappedEnv)) return remappedEnv;
   return FALLBACK_NIM_MODEL;
 }
@@ -58,6 +71,7 @@ const NVIDIA_BASE =
   process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
 
 async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key }) {
+  const liveModel = resolveNimModel(model);
   const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
     method: "POST",
     headers: {
@@ -65,7 +79,7 @@ async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
+      model: liveModel,
       messages: [
         ...(system ? [{ role: "system", content: system }] : []),
         { role: "user", content: user },
@@ -84,12 +98,12 @@ async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key
       status: res.status,
       message: `NVIDIA API ${res.status}: ${err.slice(0, 240)}`,
       body: err,
-      model,
+      model: liveModel,
     };
   }
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content || "";
-  return { ok: true, content, model, raw: data };
+  return { ok: true, content, model: liveModel, raw: data };
 }
 
 export async function nvidiaChat({ system, user, model, maxTokens = 512, temperature = 0.7 }) {
