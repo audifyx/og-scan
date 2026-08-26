@@ -35,6 +35,7 @@ describe("OrbitX /on-chain world", () => {
     expect(api).toContain("refreshCityDistricts");
     expect(api).toContain("peekCityDistricts");
     expect(api).toContain("void cityDistricts(");
+    expect(api).toContain("void ingestNow(sb)");
     expect(api).not.toContain("const city = await cityDistricts([mint])");
     expect(api).not.toContain("const districts = await cityDistricts(extraMints)");
     expect(api).toContain("dexTokenImage");
@@ -66,6 +67,8 @@ describe("OrbitX /on-chain world", () => {
     expect(world).toContain("onCamConsumed");
     expect(world).toContain("spin={follow}");
     expect(world).toContain("cinematic={false}");
+    expect(world).toContain("onContextLost");
+    expect(world).toContain("<MapView");
     expect(world).toContain("Spin");
     expect(world).not.toContain(">Orbit</");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8")).toContain("stick");
@@ -131,6 +134,8 @@ describe("OrbitX /on-chain world", () => {
     expect(hook).toContain("fetchOrbitx");
     expect(hook).toContain("fetchTrending");
     expect(hook).toContain("getSlot");
+    expect(hook).toContain("fetchStatus");
+    expect(hook).toContain("withTimeout");
     expect(hook).toContain("loadCityDistricts");
     expect(hook).toContain("allOrbitxKols");
     expect(hook).toContain("mergeDistricts");
@@ -160,7 +165,10 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("CLUSTER_META");
     expect(canvas).toContain("autoRotate={false}");
     expect(canvas).toContain("speed={0}");
-    expect(canvas).toContain("[0, 28, 78]");
+    expect(canvas).toContain("detectLiteGpu");
+    expect(canvas).toContain("absolute inset-0");
+    expect(canvas).toContain("webglcontextlost");
+    expect(canvas).toContain("lite ? 22 : 28");
     expect(canvas).not.toContain("[0, 48, 168]");
     expect(canvas).toContain("spread * 0.18");
     expect(canvas).toContain("DEX_HUBS");

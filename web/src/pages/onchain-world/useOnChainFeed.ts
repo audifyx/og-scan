@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { allOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
-import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
+import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchStatus, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
 import { liveToSnapshot, mergeChainEvents, toWalletSnapshot } from "./lib/mapLive";
 import { tallyActivity } from "./activityStats";
 import { ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
@@ -37,10 +37,17 @@ function seedWallet(address: string, roster: KolCard[]): WalletPayload {
   };
 }
 
-async function fetchConfirmedSlot(): Promise<number | null> {
+async function fetchChainSlot(): Promise<number | null> {
+  try {
+    const status = await withTimeout(fetchStatus(), 4000);
+    const slot = Number(status?.chain_slot ?? (status?.state as { chain_slot?: number } | undefined)?.chain_slot);
+    if (Number.isFinite(slot) && slot > 0) return slot;
+  } catch {
+    /* public RPC is a last resort */
+  }
   try {
     const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 4000);
+    const timer = window.setTimeout(() => ctrl.abort(), 2500);
     const r = await fetch("https://api.mainnet-beta.solana.com", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,6 +65,22 @@ async function fetchConfirmedSlot(): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = window.setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(id);
+        resolve(value);
+      },
+      (err) => {
+        window.clearTimeout(id);
+        reject(err);
+      },
+    );
+  });
 }
 
 function detectWebgl(): boolean {
@@ -100,48 +123,51 @@ export function useOnChainFeed() {
     if (paused) return;
     try {
       const [data, roster, city, orbitx, orbitxPage, oxToken, trending, slot] = await Promise.all([
-        fetchLive({
-          type: "",
-          orbitx: false,
-          whale: false,
-          kol: false,
-          tracked: false,
-          minUsd: "",
-          source: "",
-          token: "",
-          wallet: "",
-          window: "live",
-        }),
+        withTimeout(
+          fetchLive({
+            type: "",
+            orbitx: false,
+            whale: false,
+            kol: false,
+            tracked: false,
+            minUsd: "",
+            source: "",
+            token: "",
+            wallet: "",
+            window: "live",
+          }),
+          8000,
+        ).catch(() => null),
         fetchKols().catch(() => null),
         fetchDistricts().catch(() => null),
         fetchOrbitx().catch(() => null),
         fetchEvents("orbitx=1&limit=200").catch(() => null),
         fetchToken(ORBITX_MINT).catch(() => null),
         fetchTrending().catch(() => null),
-        fetchConfirmedSlot(),
+        fetchChainSlot(),
       ]);
       const kols =
         roster?.ok && roster.kols.length
           ? roster.kols
-          : data.kols?.length
+          : data?.kols?.length
             ? data.kols
             : DIRECTORY_KOLS;
       const districts = mergeDistricts(
         trending?.ok && trending.tokens?.length
           ? {
-              orbitx: trending.orbitx || city?.orbitx || data.districts?.orbitx,
-              hubs: city?.hubs || data.districts?.hubs,
+              orbitx: trending.orbitx || city?.orbitx || data?.districts?.orbitx,
+              hubs: city?.hubs || data?.districts?.hubs,
               tokens: trending.tokens,
               trending_count: trending.count,
               window: trending.window,
             }
           : null,
         tokenCatalogSize(city) ? city : null,
-        data.districts,
+        data?.districts,
         useOrbitxStore.getState().city.districts,
       );
       const prevWallet = useOrbitxStore.getState().snapshot.wallet;
-      const liveEvents = data.ok && data.events?.length ? data.events : [];
+      const liveEvents = data?.ok && data.events?.length ? data.events : [];
       const orbitxEvents = mergeChainEvents(
         orbitx?.ok ? orbitx.events : [],
         orbitx?.ok ? orbitx.buys : [],
@@ -151,7 +177,7 @@ export function useOnChainFeed() {
         oxToken?.ok ? oxToken.events : [],
       );
       const events = mergeChainEvents(liveEvents, orbitxEvents, roster?.ok ? roster.events : []);
-      const payload = data.ok ? { ...data, events } : { ...data, events, live: false };
+      const payload = data?.ok ? { ...data, events } : { ...(data || {}), events, live: false, ok: false };
       if (payload.chain_slot == null && slot != null) payload.chain_slot = slot;
       const snapshot = liveToSnapshot(payload, null);
       if (snapshot.ticker.block == null && slot != null) snapshot.ticker.block = slot;
@@ -166,7 +192,7 @@ export function useOnChainFeed() {
         if (oxSells) snapshot.ticker.orbitxSells = oxSells;
         if (orbitx?.totals?.burned) snapshot.ticker.orbitxBurned = orbitx.totals.burned;
       }
-      const oxDistrict = districts?.orbitx || city?.orbitx || data.districts?.orbitx;
+      const oxDistrict = districts?.orbitx || city?.orbitx || data?.districts?.orbitx;
       if (oxDistrict?.buys_24h != null) snapshot.ticker.orbitxBuys24h = oxDistrict.buys_24h;
       if (oxDistrict?.sells_24h != null) snapshot.ticker.orbitxSells24h = oxDistrict.sells_24h;
       if (oxDistrict?.traders_24h != null) snapshot.ticker.orbitxTraders24h = oxDistrict.traders_24h;
@@ -182,15 +208,15 @@ export function useOnChainFeed() {
       }
       setSnapshot({ ...snapshot, wallet: prevWallet });
       patchCity({
-        live: Boolean(data.ok && data.live),
-        liveLabel: data.live_label || "INDEXING DELAY",
-        liveReason: data.live_reason || (data.ok ? null : "Live feed failed."),
+        live: Boolean(data?.ok && data.live),
+        liveLabel: data?.live_label || "INDEXING DELAY",
+        liveReason: data?.live_reason || (data?.ok ? null : "Live feed delayed."),
         kols,
         districts: districts || useOrbitxStore.getState().city.districts,
         rawEvents: events,
         orbitxEvents,
         orbitxTotals: orbitx?.ok ? orbitx.totals || null : useOrbitxStore.getState().city.orbitxTotals,
-        flows: data.flows || [],
+        flows: data?.flows || [],
       });
     } catch (err) {
       patchCity({

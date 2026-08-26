@@ -83,7 +83,7 @@ export function MapView() {
   }
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden bg-[#05030c]">
+    <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-[#05030c]">
       <div
         className="absolute inset-0 opacity-35"
         style={{

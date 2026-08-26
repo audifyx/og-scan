@@ -702,9 +702,7 @@ async function cityDistrictsOrCache(extraMints = []) {
 }
 
 async function handleLive(req, res, sb) {
-  if (sb) {
-    try { await ingestNow(sb); } catch { /* still serve cache */ }
-  }
+  if (sb) void ingestNow(sb).catch(() => undefined);
   const limit = Math.min(Number(req.query?.limit) || 80, 200);
   let q = sb
     .from("ox_chain_events")

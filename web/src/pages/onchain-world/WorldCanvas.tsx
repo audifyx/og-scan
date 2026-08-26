@@ -21,7 +21,7 @@ import { fmtNum, fmtUsd } from "./format";
 import { isOrbitxMint, ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
 import { DEX_HUBS, tokenLabel, tokenTicker } from "../../../shared/orbitx-chain-districts.js";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
-import { usePlanetTexture } from "./planetTexture";
+import { detectLiteGpu } from "./detectLiteGpu";
 import type { FlightStick } from "./dashboard/WorldJoystick";
 import type { ViewOptions } from "./lib/orbitx/types";
 import {
@@ -68,6 +68,8 @@ type Props = {
   onPick: (pick: WorldPick) => void;
   onReady?: () => void;
   onCamConsumed?: () => void;
+  onContextLost?: () => void;
+  lite?: boolean;
 };
 
 const DEFAULT_VIEW: ViewOptions = { labels: true, trails: true, figures: true, grid: false };
@@ -128,12 +130,13 @@ function nodeColor(mint: string, volume: number): string {
   return h % 3 === 0 ? "#818cf8" : h % 3 === 1 ? "#22d3ee" : "#c084fc";
 }
 
-function Glow() {
+function Glow({ enabled }: { enabled: boolean }) {
+  if (!enabled) return null;
   return (
     <FxCatch>
-      <EffectComposer multisampling={2} disableNormalPass>
-        <Bloom intensity={0.72} luminanceThreshold={0.22} luminanceSmoothing={0.48} mipmapBlur />
-        <Vignette offset={0.28} darkness={0.62} />
+      <EffectComposer multisampling={0} disableNormalPass>
+        <Bloom intensity={0.55} luminanceThreshold={0.28} luminanceSmoothing={0.48} mipmapBlur />
+        <Vignette offset={0.22} darkness={0.38} />
       </EffectComposer>
     </FxCatch>
   );
@@ -214,7 +217,9 @@ function OrbitXCore({
   district,
   pulsing,
   paused,
+  spin,
   showLabel,
+  lite,
   onPick,
 }: {
   district?: TokenDistrict;
@@ -222,11 +227,12 @@ function OrbitXCore({
   paused: boolean;
   spin?: boolean;
   showLabel: boolean;
+  lite?: boolean;
   onPick: () => void;
 }) {
   const body = useRef<Mesh>(null);
   const glow = useRef<Mesh>(null);
-  const map = usePlanetTexture(district?.image || ORBITX_MARK, "#c084fc", "ORBITX", ORBITX_MINT, true, 10);
+  const map = usePlanetTexture(district?.image || ORBITX_MARK, "#c084fc", "ORBITX", ORBITX_MINT, !lite, 10);
   useFrame((_, dt) => {
     if (paused || !spin) return;
     if (body.current) body.current.rotation.y += dt * 0.08;
@@ -235,10 +241,11 @@ function OrbitXCore({
     glow.current.scale.setScalar(s);
   });
   const cap = district?.market_cap != null ? fmtUsd(district.market_cap) : null;
+  const segs = lite ? 24 : 64;
   return (
     <group onClick={(e) => { e.stopPropagation(); onPick(); }}>
       <mesh ref={body}>
-        <sphereGeometry args={[1.22, 64, 64]} />
+        <sphereGeometry args={[1.22, segs, segs]} />
         <meshStandardMaterial
           map={map}
           roughness={0.48}
@@ -249,15 +256,15 @@ function OrbitXCore({
         />
       </mesh>
       <mesh scale={1.08}>
-        <sphereGeometry args={[1.22, 40, 40]} />
+        <sphereGeometry args={[1.22, lite ? 16 : 40, lite ? 16 : 40]} />
         <meshBasicMaterial color="#c084fc" transparent opacity={0.16} side={BackSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh ref={glow}>
         <sphereGeometry args={[1.62, 32, 32]} />
         <meshBasicMaterial color="#a78bfa" transparent opacity={0.1} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
-      <Sparkles count={64} scale={[3.6, 3.6, 3.6]} size={3.2} color="#e9d5ff" />
-      <pointLight position={[0, 0.4, 0]} intensity={pulsing ? 62 : 40} distance={30} color="#c084fc" />
+      {lite ? null : <Sparkles count={64} scale={[3.6, 3.6, 3.6]} size={3.2} color="#e9d5ff" />}
+      <pointLight position={[0, 0.4, 0]} intensity={pulsing ? 42 : 28} distance={30} color="#c084fc" />
       {showLabel ? (
         <Text position={[0, 2.28, 0]} fontSize={0.36} color="#f5d0fe" anchorX="center" outlineWidth={0.025} outlineColor="#12081c">
           {cap ? `OrbitX  ${cap}` : "OrbitX"}
@@ -276,6 +283,7 @@ function TokenStar({
   spin,
   lod,
   activity,
+  lite,
   onPick,
 }: {
   district: TokenDistrict;
@@ -286,6 +294,7 @@ function TokenStar({
   spin?: boolean;
   lod: "galaxy" | "cluster" | "local" | "inspect";
   activity: number;
+  lite?: boolean;
   onPick: () => void;
 }) {
   const body = useRef<Mesh>(null);
@@ -296,8 +305,9 @@ function TokenStar({
   const name = tokenLabel(district);
   const ticker = tokenTicker(district);
   const hi = selected || lod === "inspect" || lod === "local";
+  const wantImage = Boolean(district.image) && (selected || (!lite && (hi || node.rank === "planet")));
   const map = usePlanetTexture(
-    district.image,
+    wantImage ? district.image : null,
     color,
     ticker || name.slice(0, 4),
     district.mint,
@@ -460,6 +470,7 @@ function CameraRig({
   cam,
   stick,
   speed,
+  lite,
   onConsumed,
 }: {
   flyTo: [number, number, number] | null;
@@ -467,6 +478,7 @@ function CameraRig({
   cam: CamCommand;
   stick: FlightStick;
   speed: number;
+  lite?: boolean;
   onConsumed?: () => void;
 }) {
   const { camera } = useThree();
@@ -492,7 +504,7 @@ function CameraRig({
     if (!dest || dest === lastKey.current) return;
     lastKey.current = dest;
     if (cam.kind === "reset") {
-      flyingTo.current = new Vector3(0, 28, 78);
+      flyingTo.current = new Vector3(0, lite ? 22 : 28, lite ? 58 : 78);
       if (controls.current) controls.current.target.set(0, 0, 0);
       return;
     }
@@ -503,7 +515,7 @@ function CameraRig({
     }
     flyingTo.current = new Vector3(flyTo![0] + 7.4, flyTo![1] + 4.2, flyTo![2] + 9.5);
     if (controls.current) controls.current.target.set(flyTo![0], flyTo![1], flyTo![2]);
-  }, [cam, flyTo, controls]);
+  }, [cam, flyTo, controls, lite]);
   useFrame((_, dt) => {
     const stickFly =
       Math.abs(stick.x) > 0.08 || Math.abs(stick.y) > 0.08 || Math.abs(stick.z) > 0.08;
@@ -596,6 +608,7 @@ function Scene({
   speed = 1,
   viewOptions = DEFAULT_VIEW,
   stick = { x: 0, y: 0, z: 0, boost: false },
+  lite = false,
   onPick,
   onCamConsumed,
 }: Props) {
@@ -704,13 +717,13 @@ function Scene({
   return (
     <>
       <color attach="background" args={["#02010a"]} />
-      <fog attach="fog" args={["#070314", 48, 260]} />
+      <fog attach="fog" args={lite ? ["#070314", 36, 170] : ["#070314", 48, 260]} />
       <ambientLight intensity={0.22} color="#9bb6ff" />
       <directionalLight position={[40, 48, 22]} intensity={1.55} color="#fff4e0" />
       <directionalLight position={[-28, 12, -24]} intensity={0.28} color="#67e8f9" />
       <pointLight position={[0, 2, 0]} intensity={22} distance={36} color="#c084fc" />
       <pointLight position={[40, -8, 24]} intensity={10} distance={54} color="#22d3ee" />
-      <Stars radius={380} depth={120} count={lod === "galaxy" ? 14000 : 9000} factor={3.4} saturation={0.18} fade speed={0} />
+      <Stars radius={lite ? 220 : 380} depth={80} count={lite ? 2200 : lod === "galaxy" ? 14000 : 9000} factor={lite ? 2.6 : 3.4} saturation={0.18} fade speed={0} />
       <NebulaField />
       <DustField />
       <StarGrid on={viewOptions.grid} />
@@ -723,6 +736,7 @@ function Scene({
         pulsing={burns.length > 0}
         paused={paused}
         spin={planetSpin}
+        lite={lite}
         showLabel={viewOptions.labels}
         onPick={() => onPick({ kind: "token", mint: ORBITX_MINT })}
       />
@@ -758,6 +772,7 @@ function Scene({
             spin={planetSpin}
             lod={lod}
             activity={activityMap.get(t.mint) || 0}
+            lite={lite}
             onPick={() => onPick({ kind: "token", mint: t.mint })}
           />
         );
@@ -839,7 +854,7 @@ function Scene({
           />
         );
       })}
-      <CameraRig flyTo={flyTo} controls={controls} cam={cam || null} stick={stick} speed={speed} onConsumed={onCamConsumed} />
+      <CameraRig flyTo={flyTo} controls={controls} cam={cam || null} stick={stick} speed={speed} lite={lite} onConsumed={onCamConsumed} />
       <OrbitControls
         ref={controls}
         enablePan
@@ -854,28 +869,40 @@ function Scene({
         autoRotate={false}
         screenSpacePanning
       />
-      <Glow />
+      <Glow enabled={!lite} />
     </>
   );
 }
 
 export default function WorldCanvas(props: Props) {
+  const lite = props.lite ?? detectLiteGpu();
+  const camZ = lite ? 58 : 78;
+  const camY = lite ? 22 : 28;
   return (
     <Canvas
-      camera={{ position: [0, 28, 78], fov: 52, near: 0.2, far: 900 }}
-      dpr={[1, 1.75]}
+      className="absolute inset-0 block h-full w-full"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
+      camera={{ position: [0, camY, camZ], fov: lite ? 58 : 52, near: 0.2, far: 900 }}
+      dpr={lite ? 1 : [1, 1.75]}
       gl={{
-        antialias: true,
+        antialias: !lite,
         alpha: false,
-        powerPreference: "high-performance",
+        powerPreference: lite ? "low-power" : "high-performance",
         failIfMajorPerformanceCaveat: false,
         stencil: false,
         toneMapping: ACESFilmicToneMapping,
-        toneMappingExposure: 1.12,
+        toneMappingExposure: lite ? 1.28 : 1.12,
       }}
-      onCreated={() => props.onReady?.()}
+      onCreated={({ gl }) => {
+        props.onReady?.();
+        const lost = (ev: Event) => {
+          ev.preventDefault();
+          props.onContextLost?.();
+        };
+        gl.domElement.addEventListener("webglcontextlost", lost, false);
+      }}
     >
-      <Scene {...props} />
+      <Scene {...props} lite={lite} />
     </Canvas>
   );
 }
