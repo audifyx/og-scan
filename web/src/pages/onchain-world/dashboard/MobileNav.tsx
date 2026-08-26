@@ -1,9 +1,10 @@
-import { Activity, Globe, List, Wallet } from "lucide-react";
+import { Activity, Globe, List, Search, Wallet } from "lucide-react";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { id: "world" as const, label: "World", icon: Globe },
+  { id: "feed" as const, label: "Feed", icon: Search },
   { id: "events" as const, label: "Events", icon: List },
   { id: "tx" as const, label: "Tx", icon: Activity },
   { id: "wallet" as const, label: "Wallet", icon: Wallet },
@@ -16,7 +17,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="On-chain pages"
-      className="flex h-16 shrink-0 items-stretch border-t border-line bg-bg-raised pb-[env(safe-area-inset-bottom)]"
+      className="flex h-16 shrink-0 items-stretch border-t border-line bg-bg-raised pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       {ITEMS.map((item) => {
         const Icon = item.icon;

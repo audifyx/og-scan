@@ -10,6 +10,7 @@ import type {
 } from "./orbitx/types";
 import type { ChainEvent, LivePayload, WalletPayload } from "../api";
 import { clock } from "../format";
+import { tokenDisplayName, tokenTicker } from "../../../../shared/orbitx-chain-districts.js";
 
 export function eventKind(ev: ChainEvent): EventKind {
   const t = String(ev.event_type || "").toUpperCase();
@@ -30,9 +31,11 @@ function eventTitle(ev: ChainEvent): string {
 }
 
 export function toLiveEvent(ev: ChainEvent): LiveEvent {
+  const name = tokenDisplayName({ name: ev.token_name, symbol: ev.token_symbol, mint: ev.token_ca });
+  const ticker = tokenTicker({ symbol: ev.token_symbol, mint: ev.token_ca });
   const amountLabel =
     ev.amount != null
-      ? `${ev.amount} ${ev.token_symbol || ""}`.trim()
+      ? `${ev.amount} ${ticker || ""}`.trim()
       : ev.sol_amount != null
         ? `${ev.sol_amount} SOL`
         : undefined;
@@ -40,7 +43,10 @@ export function toLiveEvent(ev: ChainEvent): LiveEvent {
     id: ev.event_id,
     kind: eventKind(ev),
     title: eventTitle(ev),
-    token: ev.token_symbol ? `$${ev.token_symbol}` : undefined,
+    token: name || (ticker ? `$${ticker}` : undefined),
+    tokenName: name,
+    tokenImage: ev.token_image,
+    mint: ev.token_ca,
     amountLabel,
     usd: ev.usd_value ?? null,
     detail: ev.description || ev.wallet_label || ev.wallet || ev.source_wallet || undefined,
@@ -61,7 +67,8 @@ export function toTransactionRow(ev: ChainEvent): TransactionRow {
     time: clock(ev.block_time),
     kind: eventKind(ev),
     wallet: ev.wallet || ev.source_wallet || "",
-    token: ev.token_symbol ? `$${ev.token_symbol}` : ev.event_type?.includes("SOL") ? "SOL" : "—",
+    token: tokenDisplayName({ name: ev.token_name, symbol: ev.token_symbol, mint: ev.token_ca })
+      || (tokenTicker({ symbol: ev.token_symbol, mint: ev.token_ca }) ? `$${tokenTicker({ symbol: ev.token_symbol, mint: ev.token_ca })}` : ev.event_type?.includes("SOL") ? "SOL" : "—"),
     amount,
     usd: ev.usd_value ?? null,
     signature: ev.signature || "",
@@ -116,7 +123,8 @@ export function toWalletSnapshot(data: WalletPayload): WalletSnapshot {
         usd: null,
       },
       ...holdings.map((h) => ({
-        symbol: h.symbol || h.mint.slice(0, 4),
+        symbol: tokenTicker(h) || "TOKEN",
+        name: tokenDisplayName(h),
         mint: h.mint,
         amount: h.amount ?? null,
         usd: h.price_usd != null ? h.price_usd * (h.amount || 0) : null,

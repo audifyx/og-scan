@@ -119,11 +119,14 @@ export type TokenDistrict = {
   symbol?: string | null;
   name?: string | null;
   image?: string | null;
+  banner?: string | null;
   price_usd?: number | null;
   market_cap?: number | null;
   liquidity_usd?: number | null;
   volume_24h?: number | null;
   change_24h?: number | null;
+  change_1h?: number | null;
+  holder_count?: number | null;
   dex?: string | null;
   source?: string;
   kind?: string;
@@ -135,6 +138,8 @@ export type CityDistricts = {
   orbitx?: TokenDistrict;
   hubs?: DexHub[];
   tokens?: TokenDistrict[];
+  trending_count?: number;
+  window?: string;
 };
 
 export type WalletPayload = {
@@ -161,11 +166,26 @@ export type TokenPayload = {
     mint?: string;
     symbol?: string | null;
     name?: string | null;
+    image?: string | null;
+    banner?: string | null;
     price_usd?: number | null;
     market_cap?: number | null;
+    liquidity_usd?: number | null;
+    volume_24h?: number | null;
+    change_24h?: number | null;
+    holder_count?: number | null;
   };
   events?: ChainEvent[];
   buyers?: WalletTokenRow[];
+  error?: string;
+};
+
+export type TrendingPayload = {
+  ok: boolean;
+  window?: string;
+  count: number;
+  orbitx?: TokenDistrict | null;
+  tokens: TokenDistrict[];
   error?: string;
 };
 
@@ -270,4 +290,8 @@ export function fetchKols() {
 
 export function fetchDistricts() {
   return getJson<CityDistricts & { ok: boolean }>("districts");
+}
+
+export function fetchTrending() {
+  return getJson<TrendingPayload>("trending");
 }

@@ -15,6 +15,9 @@ export type LiveEvent = {
   kind: EventKind;
   title: string;
   token?: string;
+  tokenName?: string | null;
+  tokenImage?: string | null;
+  mint?: string | null;
   amountLabel?: string;
   usd?: number | null;
   detail?: string;
@@ -47,9 +50,11 @@ export type TransactionRow = {
 export type WalletBalance = {
   symbol: string;
   mint?: string;
+  name?: string | null;
   amount: number | null;
   usd: number | null;
   icon?: string;
+  banner?: string;
 };
 
 export type Counterparty = {
