@@ -42,6 +42,84 @@ export function isRetiredNimError(status, body) {
   );
 }
 
+export function isNvidiaRateLimit(status, body) {
+  const code = Number(status);
+  const text = String(body || "").toLowerCase();
+  return (
+    code === 429 ||
+    text.includes("too many requests") ||
+    text.includes("rate limit") ||
+    text.includes("rate_limit")
+  );
+}
+
+export const NVIDIA_BUSY_MESSAGE =
+  "OrbitX AI is busy right now. Wait a few seconds and send that again. Slash commands still work: /cmds /token /chart /img.";
+
+export function publicNvidiaMessage(result) {
+  if (result?.ok) return result.content || "";
+  if (result?.error === "nvidia_missing") {
+    return result.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /token /chart /img /check /links.";
+  }
+  if (isNvidiaRateLimit(result?.status, result?.body || result?.message)) {
+    return NVIDIA_BUSY_MESSAGE;
+  }
+  return "OrbitX AI is offline right now. Slash commands still work: /cmds /token /chart /img /check /links.";
+}
+
+function parseRetryAfterMs(res, body) {
+  const header = String(res?.headers?.get?.("retry-after") || res?.headers?.get?.("Retry-After") || "").trim();
+  if (header === "0") return 0;
+  if (header) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(8_000, Math.max(400, Math.round(seconds * 1000)));
+    }
+    const when = Date.parse(header);
+    if (Number.isFinite(when)) {
+      return Math.min(8_000, Math.max(400, when - Date.now()));
+    }
+  }
+  const blob = String(body || "");
+  const retry = blob.match(/retry[-_ ]after["']?\s*[:=]\s*["']?(\d+)/i);
+  if (retry) {
+    const seconds = Number(retry[1]);
+    if (Number.isFinite(seconds)) return Math.min(8_000, Math.max(400, seconds * 1000));
+  }
+  return 1_200;
+}
+
+function sleep(ms) {
+  const wait = Number(ms);
+  if (!Number.isFinite(wait) || wait <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, wait));
+}
+
+function nvidiaFallbackModels(first) {
+  const ordered = [
+    first,
+    FALLBACK_NIM_MODEL,
+    "mistralai/mistral-nemotron",
+    "openai/gpt-oss-120b",
+    FAST_NIM_MODEL,
+  ];
+  const out = [];
+  for (const id of ordered) {
+    const live = resolveNimModel(id);
+    if (live && !out.includes(live)) out.push(live);
+  }
+  return out;
+}
+
+let lastNvidiaCallAt = 0;
+const NVIDIA_MIN_GAP_MS = 250;
+
+async function waitNvidiaGap() {
+  const wait = lastNvidiaCallAt + NVIDIA_MIN_GAP_MS - Date.now();
+  if (wait > 0) await sleep(wait);
+  lastNvidiaCallAt = Date.now();
+}
+
 function normalizeNimId(requested) {
   return String(requested || "")
     .trim()
@@ -71,6 +149,7 @@ const NVIDIA_BASE =
   process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
 
 async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key }) {
+  await waitNvidiaGap();
   const liveModel = resolveNimModel(model);
   const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
     method: "POST",
@@ -92,14 +171,16 @@ async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key
   });
   if (!res.ok) {
     const err = await res.text().catch(() => "");
-    return {
+    const failed = {
       ok: false,
-      error: "nvidia_failed",
+      error: isNvidiaRateLimit(res.status, err) ? "nvidia_rate_limited" : "nvidia_failed",
       status: res.status,
       message: `NVIDIA API ${res.status}: ${err.slice(0, 240)}`,
       body: err,
       model: liveModel,
+      retryAfterMs: parseRetryAfterMs(res, err),
     };
+    return failed;
   }
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content || "";
@@ -115,30 +196,38 @@ export async function nvidiaChat({ system, user, model, maxTokens = 512, tempera
       message: "NVIDIA_API_KEY not set on Vercel. Add it and redeploy.",
     };
   }
-  const useModel = resolveNimModel(model);
-  const first = await nvidiaChatOnce({
-    system,
-    user,
-    model: useModel,
-    maxTokens,
-    temperature,
-    key,
-  });
-  if (first.ok) return first;
-  const fallback = resolveNimModel(FALLBACK_NIM_MODEL);
-  if (useModel !== fallback && isRetiredNimError(first.status, first.body || first.message)) {
-    const retry = await nvidiaChatOnce({
-      system,
-      user,
-      model: fallback,
-      maxTokens,
-      temperature,
-      key,
-    });
-    if (retry.ok) return retry;
-    return retry;
+  const requested = resolveNimModel(model);
+  // At most two models (requested + one fallback) so a 429 storm cannot amplify itself.
+  const chain = nvidiaFallbackModels(requested).slice(0, 2);
+  let last = null;
+  for (let i = 0; i < chain.length; i++) {
+    const candidate = chain[i];
+    const attempts = i === 0 ? 2 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const result = await nvidiaChatOnce({
+        system,
+        user,
+        model: candidate,
+        maxTokens,
+        temperature,
+        key,
+      });
+      if (result.ok) return result;
+      last = result;
+      const retired = isRetiredNimError(result.status, result.body || result.message);
+      const limited = isNvidiaRateLimit(result.status, result.body || result.message);
+      if (limited && attempt < attempts - 1) {
+        await sleep(result.retryAfterMs ?? 1_200);
+        continue;
+      }
+      if (retired || limited) break;
+      return { ...result, message: publicNvidiaMessage(result) };
+    }
   }
-  return first;
+  return {
+    ...(last || { ok: false, error: "nvidia_failed", status: 502 }),
+    message: publicNvidiaMessage(last),
+  };
 }
 
 export function buildTweetText(rawText, linkUrl) {

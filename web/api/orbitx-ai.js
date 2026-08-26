@@ -25,6 +25,8 @@ import { statusFromRow } from "./orbitx/mcp-burn-access.js";
 import {
   DEFAULT_NIM_MODEL,
   NIM_MODELS,
+  NVIDIA_BUSY_MESSAGE,
+  isNvidiaRateLimit,
   isRetiredNimError,
   resolveNimModel,
 } from "./orbitx/x-agent-lib.js";
@@ -597,7 +599,15 @@ async function requestNvidia(messages, model, tools, timeoutMs, toolChoice = "au
       parsed?.detail ||
       raw.slice(0, 300) ||
       `NVIDIA error ${response.status}`;
-    throw Object.assign(new Error(text(message, 300)), { status: 502 });
+    const limited = isNvidiaRateLimit(response.status, message);
+    const retryAfter = Number(response.headers?.get?.("retry-after"));
+    throw Object.assign(
+      new Error(limited ? NVIDIA_BUSY_MESSAGE : text(String(message), 300)),
+      {
+        status: limited ? 429 : isRetiredNimError(response.status, message) ? 410 : 502,
+        retryAfter: Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 2,
+      },
+    );
   }
   const message = parsed?.choices?.[0]?.message;
   if (!message) {
@@ -609,6 +619,7 @@ async function requestNvidia(messages, model, tools, timeoutMs, toolChoice = "au
 /**
  * The published NIM catalog drifts. If the selected model id is retired, retry
  * once on the default model so a stale dropdown choice can never break chat.
+ * 429s get one short retry, then one fallback model — not a request storm.
  */
 async function callNvidia(
   messages,
@@ -617,12 +628,26 @@ async function callNvidia(
   timeoutMs = NVIDIA_TIMEOUT_MS,
   toolChoice = "auto",
 ) {
+  const run = (nextModel) => requestNvidia(messages, nextModel, tools, timeoutMs, toolChoice);
   try {
-    return await requestNvidia(messages, model, tools, timeoutMs, toolChoice);
+    return await run(model);
   } catch (error) {
+    if (error?.status === 429) {
+      const waitMs = Math.min(8_000, Math.max(400, Number(error.retryAfter || 2) * 1000));
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      try {
+        return await run(model);
+      } catch (retryError) {
+        if (model !== DEFAULT_NIM_MODEL && retryError?.status === 429) {
+          console.warn(`[orbitx-ai] rate limited on ${model}, retrying on ${DEFAULT_NIM_MODEL}`);
+          return run(DEFAULT_NIM_MODEL);
+        }
+        throw retryError;
+      }
+    }
     if (model === DEFAULT_NIM_MODEL || !isUnknownModelError(error)) throw error;
     console.warn(`[orbitx-ai] model ${model} unavailable, retrying on ${DEFAULT_NIM_MODEL}`);
-    return requestNvidia(messages, DEFAULT_NIM_MODEL, tools, timeoutMs, toolChoice);
+    return run(DEFAULT_NIM_MODEL);
   }
 }
 

@@ -86,7 +86,7 @@ import {
 } from "./orbitx/orbitx-telegram-knowledge.js";
 import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { fetchTokenProjectResearch } from "./orbitx/telegram-token-brief.js";
-import { nvidiaChat, postTweetOAuth2, resolveNimModel } from "./orbitx/x-agent-lib.js";
+import { nvidiaChat, postTweetOAuth2, publicNvidiaMessage, resolveNimModel } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
@@ -986,7 +986,7 @@ async function askAi(prompt, { linked }) {
     temperature: 0.45,
   });
   if (nim.ok && nim.content) return String(nim.content).replace(/```[\s\S]*?```/g, "").trim().slice(0, 3900);
-  return nim.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /token /chart /img /check /links.";
+  return publicNvidiaMessage(nim);
 }
 
 function fallbackProjectBrief(facts, name, symbol) {

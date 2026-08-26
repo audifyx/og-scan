@@ -18,7 +18,7 @@ import {
   ORBITX_TELEGRAM_BLURB,
   ORBITX_TELEGRAM_SYSTEM,
 } from "./orbitx/orbitx-telegram-knowledge.js";
-import { nvidiaChat, resolveNimModel, DEFAULT_NIM_MODEL } from "./orbitx/x-agent-lib.js";
+import { nvidiaChat, resolveNimModel, DEFAULT_NIM_MODEL, publicNvidiaMessage } from "./orbitx/x-agent-lib.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -105,8 +105,7 @@ async function askOrbitxAi(text, bot) {
   }
 
   return formatTelegramChatText(
-    nim.message ||
-      "OrbitX AI is offline (NVIDIA_API_KEY missing on Vercel). Add NVIDIA_API_KEY and redeploy, then try again.",
+    publicNvidiaMessage(nim),
   );
 }
 
