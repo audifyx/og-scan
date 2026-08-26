@@ -50,10 +50,15 @@ export const EVENT_META: Record<
   { label: string; tone: "buy" | "sell" | "burn" | "transfer" | "whale" | "launch" | "dim"; short: string }
 > = {
   kol_buy: { label: "KOL BUY", tone: "sell", short: "KOL" },
+  kol_sell: { label: "KOL SELL", tone: "whale", short: "KOL" },
   orbitx_buy: { label: "ORBITX BUY", tone: "buy", short: "BUY" },
-  sol_transfer: { label: "SOL TRANSFER", tone: "transfer", short: "XFER" },
+  orbitx_sell: { label: "ORBITX SELL", tone: "sell", short: "SELL" },
   orbitx_burn: { label: "ORBITX BURN", tone: "burn", short: "BURN" },
+  sol_transfer: { label: "SOL TRANSFER", tone: "transfer", short: "XFER" },
   whale_sell: { label: "WHALE SELL", tone: "whale", short: "WHALE" },
+  token_buy: { label: "BUY", tone: "buy", short: "BUY" },
+  token_sell: { label: "SELL", tone: "sell", short: "SELL" },
+  token_swap: { label: "SWAP", tone: "transfer", short: "SWAP" },
   token_launch: { label: "TOKEN LAUNCH", tone: "launch", short: "LAUNCH" },
   liquidity_add: { label: "LIQUIDITY ADD", tone: "launch", short: "LP" },
   other: { label: "OTHER", tone: "dim", short: "OTHER" },

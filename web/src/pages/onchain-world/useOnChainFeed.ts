@@ -3,8 +3,9 @@ import { useParams } from "react-router-dom";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
-import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
-import { liveToSnapshot, toWalletSnapshot } from "./lib/mapLive";
+import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
+import { liveToSnapshot, mergeChainEvents, toWalletSnapshot } from "./lib/mapLive";
+import { ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
 const DIRECTORY_KOLS: KolCard[] = activeOrbitxKols().map((k) => ({
@@ -94,7 +95,7 @@ export function useOnChainFeed() {
   const loadLive = useCallback(async () => {
     if (paused) return;
     try {
-      const [data, roster, city, orbitx, trending, slot] = await Promise.all([
+      const [data, roster, city, orbitx, orbitxPage, oxToken, trending, slot] = await Promise.all([
         fetchLive({
           type: "",
           orbitx: false,
@@ -110,6 +111,8 @@ export function useOnChainFeed() {
         fetchKols().catch(() => null),
         fetchDistricts().catch(() => null),
         fetchOrbitx().catch(() => null),
+        fetchEvents("orbitx=1&limit=200").catch(() => null),
+        fetchToken(ORBITX_MINT).catch(() => null),
         fetchTrending().catch(() => null),
         fetchConfirmedSlot(),
       ]);
@@ -127,8 +130,15 @@ export function useOnChainFeed() {
             : data.districts;
       const prevWallet = useOrbitxStore.getState().snapshot.wallet;
       const liveEvents = data.ok && data.events?.length ? data.events : [];
-      const orbitxEvents = orbitx?.ok && orbitx.events?.length ? orbitx.events : [];
-      const events = liveEvents.length ? liveEvents : orbitxEvents;
+      const orbitxEvents = mergeChainEvents(
+        orbitx?.ok ? orbitx.events : [],
+        orbitx?.ok ? orbitx.buys : [],
+        orbitx?.ok ? orbitx.sells : [],
+        orbitx?.ok ? orbitx.burns : [],
+        orbitxPage?.ok ? orbitxPage.events : [],
+        oxToken?.ok ? oxToken.events : [],
+      );
+      const events = mergeChainEvents(liveEvents, orbitxEvents);
       const payload = data.ok ? { ...data, events } : { ...data, events, live: false };
       if (payload.chain_slot == null && slot != null) payload.chain_slot = slot;
       const snapshot = liveToSnapshot(payload, null);
@@ -137,14 +147,11 @@ export function useOnChainFeed() {
         snapshot.network.lastIndexedBlock = slot;
       }
       if (slot != null) snapshot.network.rpc = "healthy";
-      if (orbitx?.ok && orbitx.totals) {
-        const hasOx = Boolean(orbitx.burns?.length || orbitx.buys?.length || orbitx.events?.length);
-        if (snapshot.ticker.orbitxBurned == null && orbitx.totals.burned) {
-          snapshot.ticker.orbitxBurned = orbitx.totals.burned;
-        }
-        if (snapshot.ticker.activeWallets == null && hasOx && orbitx.totals.unique_wallets) {
-          snapshot.ticker.activeWallets = orbitx.totals.unique_wallets;
-        }
+      if (orbitx?.ok || orbitxEvents.length) {
+        const oxBuys = (orbitx?.buys || []).length || orbitxEvents.filter((e) => /BUY/i.test(e.event_type || "")).length;
+        if (oxBuys) snapshot.ticker.orbitxBuys = oxBuys;
+        if (orbitx?.totals?.burned) snapshot.ticker.orbitxBurned = orbitx.totals.burned;
+        if (orbitx?.totals?.unique_wallets) snapshot.ticker.activeWallets = orbitx.totals.unique_wallets;
       }
       setSnapshot({ ...snapshot, wallet: prevWallet });
       patchCity({
@@ -154,6 +161,8 @@ export function useOnChainFeed() {
         kols,
         districts: districts || useOrbitxStore.getState().city.districts,
         rawEvents: events,
+        orbitxEvents,
+        orbitxTotals: orbitx?.ok ? orbitx.totals || null : useOrbitxStore.getState().city.orbitxTotals,
         flows: data.flows || [],
       });
     } catch (err) {

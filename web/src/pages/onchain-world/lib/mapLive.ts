@@ -11,18 +11,51 @@ import type {
 import type { ChainEvent, LivePayload, WalletPayload } from "../api";
 import { clock } from "../format";
 import { tokenDisplayName, tokenTicker } from "../../../../shared/orbitx-chain-districts.js";
+import { isOrbitxMint } from "../../../../shared/orbitx-chain-intel.js";
 
 export function eventKind(ev: ChainEvent): EventKind {
   const t = String(ev.event_type || "").toUpperCase();
+  if (ev.kol_related && t.includes("SELL")) return "kol_sell";
   if (ev.kol_related && t.includes("BUY")) return "kol_buy";
+  const ox = ev.orbitx_related || isOrbitxMint(ev.token_ca) || t.includes("ORBITX");
   if (t.includes("LAUNCH")) return "token_launch";
   if (t.includes("LIQUIDITY")) return "liquidity_add";
+  if (t.includes("BURN") && ox) return "orbitx_burn";
   if (t.includes("BURN")) return "orbitx_burn";
+  if (ox && t.includes("SELL")) return "orbitx_sell";
+  if (ox && t.includes("BUY")) return "orbitx_buy";
+  if (ox && t.includes("SWAP")) return "token_swap";
   if (ev.whale_related && (t.includes("SELL") || t.includes("SWAP"))) return "whale_sell";
-  if (t.includes("ORBITX") && t.includes("BUY")) return "orbitx_buy";
+  if (t.includes("SELL")) return "token_sell";
+  if (t.includes("BUY")) return "token_buy";
+  if (t.includes("SWAP")) return "token_swap";
   if (t.includes("SOL") || t.includes("TRANSFER")) return "sol_transfer";
-  if (ev.orbitx_related && t.includes("BUY")) return "orbitx_buy";
   return "other";
+}
+
+export function isOrbitxChainEvent(ev: ChainEvent | null | undefined): boolean {
+  if (!ev) return false;
+  if (ev.orbitx_related) return true;
+  if (isOrbitxMint(ev.token_ca)) return true;
+  const t = String(ev.event_type || "").toUpperCase();
+  if (t.includes("ORBITX")) return true;
+  if (/orbitx/i.test(String(ev.token_name || "")) || /orbitx/i.test(String(ev.token_symbol || ""))) return true;
+  return false;
+}
+
+export function mergeChainEvents(...lists: Array<ChainEvent[] | null | undefined>): ChainEvent[] {
+  const byId = new Map<string, ChainEvent>();
+  for (const list of lists) {
+    for (const ev of list || []) {
+      if (!ev?.event_id) continue;
+      byId.set(ev.event_id, ev);
+    }
+  }
+  return [...byId.values()].sort((a, b) => {
+    const tb = Date.parse(b.block_time || "") || 0;
+    const ta = Date.parse(a.block_time || "") || 0;
+    return tb - ta;
+  });
 }
 
 function eventTitle(ev: ChainEvent): string {

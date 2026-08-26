@@ -6,6 +6,7 @@ import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
 import { ALL_EVENT_KINDS, EVENT_META } from "@/pages/onchain-world/lib/orbitx/constants";
 import { formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
+import { toLiveEvent } from "@/pages/onchain-world/lib/mapLive";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import type { LiveEvent } from "@/pages/onchain-world/lib/orbitx/types";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,18 @@ function relative(ts: number): string {
 
 export function LiveEvents() {
   const events = useOrbitxStore((s) => s.snapshot.events);
+  const raw = useOrbitxStore((s) => s.city.rawEvents);
+  const ox = useOrbitxStore((s) => s.city.orbitxEvents);
   const filters = useOrbitxStore((s) => s.eventFilters);
   const toggleFilter = useOrbitxStore((s) => s.toggleFilter);
   const resetFilters = useOrbitxStore((s) => s.resetFilters);
   const liveReason = useOrbitxStore((s) => s.snapshot.network.liveReason || s.city.liveReason);
-  const visible = events.filter((e) => filters.includes(e.kind));
+  const merged = (() => {
+    const byId = new Map(events.map((e) => [e.id, e]));
+    for (const ev of [...ox, ...raw]) byId.set(ev.event_id, toLiveEvent(ev));
+    return [...byId.values()].sort((a, b) => b.ts - a.ts);
+  })();
+  const visible = merged.filter((e) => filters.includes(e.kind));
 
   return (
     <section className="ox-panel flex min-h-0 flex-1 flex-col overflow-hidden">

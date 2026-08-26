@@ -13,6 +13,7 @@ import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { EVENT_META } from "@/pages/onchain-world/lib/orbitx/constants";
 import { formatAddress, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
+import { toTransactionRow, isOrbitxChainEvent } from "@/pages/onchain-world/lib/mapLive";
 import type { BottomTab, EventKind } from "@/pages/onchain-world/lib/orbitx/types";
 import { cn } from "@/lib/utils";
 
@@ -25,21 +26,32 @@ const TABS: { id: BottomTab; label: string }[] = [
 
 const KIND_MATCH: Record<BottomTab, EventKind[] | null> = {
   recent: null,
-  orbitx_activity: ["orbitx_buy", "orbitx_burn"],
+  orbitx_activity: ["orbitx_buy", "orbitx_sell", "orbitx_burn"],
   whale: ["whale_sell"],
-  kol: ["kol_buy"],
+  kol: ["kol_buy", "kol_sell"],
   wallets: null,
 };
 
 export function BottomPanel() {
   const tab = useOrbitxStore((s) => s.bottomTab);
   const setTab = useOrbitxStore((s) => s.setBottomTab);
-  const rows = useOrbitxStore((s) => s.snapshot.transactions);
+  const snapRows = useOrbitxStore((s) => s.snapshot.transactions);
+  const raw = useOrbitxStore((s) => s.city.rawEvents);
+  const oxLedger = useOrbitxStore((s) => s.city.orbitxEvents);
   const rate = useOrbitxStore((s) => s.snapshot.eventRate);
   const last = useOrbitxStore((s) => s.snapshot.ticker.eventsPerSec);
   const match = KIND_MATCH[tab];
   const selectedWallet = useOrbitxStore((s) => s.selectedWallet);
+  const rows = (() => {
+    const byId = new Map(snapRows.map((r) => [r.id, r]));
+    for (const ev of [...oxLedger, ...raw]) byId.set(ev.event_id, toTransactionRow(ev));
+    return [...byId.values()];
+  })();
   const visible = rows.filter((r) => {
+    if (tab === "orbitx_activity") {
+      const src = [...oxLedger, ...raw].find((e) => e.event_id === r.id);
+      return Boolean(src && isOrbitxChainEvent(src)) || (match && match.includes(r.kind)) || /orbitx/i.test(r.token);
+    }
     if (match && !match.includes(r.kind)) return false;
     if (tab === "wallets" && selectedWallet) {
       return r.wallet === selectedWallet;
