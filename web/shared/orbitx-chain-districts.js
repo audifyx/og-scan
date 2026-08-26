@@ -409,9 +409,9 @@ export async function loadCityDistricts(extraMints = []) {
     fetchDexBoosts(50).catch(() => []),
     fetchDexBoostsLatest(40).catch(() => []),
     fetchDexProfiles().catch(() => []),
-    fetchPumpTrending(50).catch(() => []),
-    fetchGeckoTrending(4).catch(() => []),
-    fetchJupiterTopTraded(TRENDING_LIMIT).catch(() => []),
+    fetchPumpTrending(80).catch(() => []),
+    fetchGeckoTrending(6).catch(() => []),
+    fetchJupiterTopTraded(400).catch(() => []),
   ]);
 
   const want = [
