@@ -43,7 +43,22 @@ const buckets = new Map();
 const metaCache = new Map();
 let solUsdCache = { at: 0, value: null };
 let ingestLock = 0;
+let ingestInflight = null;
+let ingestStartedAt = 0;
+const INGEST_COOLDOWN_MS = 15_000;
+const INGEST_STUCK_MS = 60_000;
+const INGEST_BUDGET_MS = 9_000;
 let districtCache = { at: 0, value: null };
+
+function withDeadline(promise, ms, fallback) {
+  let timer = null;
+  const guard = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, guard]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -590,8 +605,24 @@ async function ingestAddresses(sb, addresses, opts = {}) {
 }
 
 async function ingestNow(sb, extra = []) {
-  if (Date.now() - ingestLock < 7000) return { skipped: true, reason: "throttled" };
+  // Share one ingest across concurrent requests instead of starting a new run
+  // every time. The old timestamp-only throttle let a second request begin
+  // while the first was still fetching, which stacked RPC work until the
+  // function hit the 60s Vercel timeout.
+  if (ingestInflight && Date.now() - ingestStartedAt < INGEST_STUCK_MS) return ingestInflight;
+  if (Date.now() - ingestLock < INGEST_COOLDOWN_MS) return { skipped: true, reason: "throttled" };
   ingestLock = Date.now();
+  ingestStartedAt = Date.now();
+  const run = runIngest(sb, extra).finally(() => {
+    ingestLock = Date.now();
+    if (ingestInflight === run) ingestInflight = null;
+  });
+  ingestInflight = run;
+  void run.catch(() => {});
+  return run;
+}
+
+async function runIngest(sb, extra = []) {
   await seedAssignedKols(sb);
   const watch = [
     ORBITX_MINT,
@@ -683,7 +714,12 @@ async function cityDistricts(extraMints = []) {
 
 async function handleLive(req, res, sb) {
   if (sb) {
-    try { await ingestNow(sb); } catch { /* still serve cache */ }
+    // Bounded: /live is polled every few seconds by every open tab, so it must
+    // answer from the indexed rows even when the ingest is slow. The ingest
+    // keeps running and its rows land in the next poll.
+    try {
+      await withDeadline(ingestNow(sb), INGEST_BUDGET_MS, { skipped: true, reason: "deadline" });
+    } catch { /* still serve cache */ }
   }
   const limit = Math.min(Number(req.query?.limit) || 80, 200);
   let q = sb

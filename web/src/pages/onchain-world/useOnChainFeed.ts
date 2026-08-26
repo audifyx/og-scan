@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { allOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
@@ -87,6 +87,7 @@ export function useOnChainFeed() {
   const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   const setTokenDetail = useOrbitxStore((s) => s.setTokenDetail);
   const selectedToken = useOrbitxStore((s) => s.selectedToken);
+  const liveInflight = useRef(false);
 
   useEffect(() => {
     patchCity({
@@ -97,6 +98,11 @@ export function useOnChainFeed() {
 
   const loadLive = useCallback(async () => {
     if (paused) return;
+    // The 5s interval must not stack. Each pass fans out to eight endpoints, so
+    // when the API is slow the old code piled up overlapping rounds and kept
+    // re-triggering the on-chain ingest.
+    if (liveInflight.current) return;
+    liveInflight.current = true;
     try {
       const [data, roster, city, orbitx, orbitxPage, oxToken, trending, slot] = await Promise.all([
         fetchLive({
@@ -187,6 +193,8 @@ export function useOnChainFeed() {
       patchCity({
         liveReason: err instanceof Error ? err.message : "Live feed failed.",
       });
+    } finally {
+      liveInflight.current = false;
     }
   }, [paused, patchCity, setSnapshot]);
 
