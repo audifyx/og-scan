@@ -5,7 +5,7 @@
  * (audifyx/og-scan docs, platform map, delivery summaries, architecture notes,
  * token-utility announcements, @orbitx_wrld, orbitx.world, Aug 2026).
  *
- * Injection for Llama 3.1 8B: CORE + top 3 chunks — never the full essay every turn.
+ * Injection for the fast NIM model: CORE + top 3 chunks — never the full essay every turn.
  * Do not invent live MC / holders / shop USD or unreleased feats beyond this file.
  */
 

@@ -29,7 +29,7 @@ async function parseConditions(nl: string): Promise<any[]> {
   try {
     const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
-      body: JSON.stringify({ model: "meta/llama-3.1-8b-instruct", messages: [{ role: "system", content: "Output only a JSON array." }, { role: "user", content: prompt }], temperature: 0.2, max_tokens: 500 }),
+      body: JSON.stringify({ model: "meta/llama-3.2-3b-instruct", messages: [{ role: "system", content: "Output only a JSON array." }, { role: "user", content: prompt }], temperature: 0.2, max_tokens: 500 }),
       signal: AbortSignal.timeout(20000),
     });
     const j = await r.json();

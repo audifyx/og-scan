@@ -61,7 +61,7 @@ FORMAT (CRITICAL — Telegram chat)
 
 You are fully connected to OrbitX knowledge and this owner's Telegram MCP. Be useful immediately.`;
 
-export const DEFAULT_TELEGRAM_NIM_MODEL = "meta/llama-3.1-8b-instruct"; // free, fast NVIDIA NIM
+export const DEFAULT_TELEGRAM_NIM_MODEL = "meta/llama-3.2-3b-instruct"; // free, fast NVIDIA NIM
 
 /** Short sticky facts for /start and status copy. */
 export const ORBITX_TELEGRAM_BLURB =

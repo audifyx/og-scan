@@ -18,7 +18,7 @@ import {
   ORBITX_TELEGRAM_BLURB,
   ORBITX_TELEGRAM_SYSTEM,
 } from "./orbitx/orbitx-telegram-knowledge.js";
-import { nvidiaChat, NIM_MODELS, DEFAULT_NIM_MODEL } from "./orbitx/x-agent-lib.js";
+import { nvidiaChat, resolveNimModel, DEFAULT_NIM_MODEL } from "./orbitx/x-agent-lib.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -26,9 +26,10 @@ const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 const FALLBACK = "https://www.orbitx.world";
 
 function resolveTelegramModel(requested) {
-  const id = String(requested || "").trim();
-  if (id && NIM_MODELS.some((m) => m.id === id)) return id;
-  return process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL || DEFAULT_NIM_MODEL;
+  const id = String(
+    requested || process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL || DEFAULT_NIM_MODEL,
+  ).trim();
+  return resolveNimModel(id);
 }
 
 /** Models love ``` fences — Telegram then shows the whole reply as code. Strip that. */

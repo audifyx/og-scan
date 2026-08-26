@@ -10,9 +10,17 @@ export const X_OAUTH_SCOPES =
 
 // Every id must exist in https://integrate.api.nvidia.com/v1/models — an id that
 // NIM has retired makes chat fail for anyone who picks it in the model menu.
+export const FAST_NIM_MODEL = "meta/llama-3.2-3b-instruct";
+export const FALLBACK_NIM_MODEL = "meta/llama-3.3-70b-instruct";
+
+/** Retired NIM ids → live replacements. Stored prefs / env still holding these must remap. */
+export const RETIRED_NIM_MODELS = {
+  "meta/llama-3.1-8b-instruct": FAST_NIM_MODEL,
+};
+
 export const NIM_MODELS = [
-  { id: "meta/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
-  { id: "meta/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
+  { id: FALLBACK_NIM_MODEL, label: "Llama 3.3 70B" },
+  { id: FAST_NIM_MODEL, label: "Llama 3.2 3B" },
   { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" },
   { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5", label: "Nemotron Super 49B" },
   { id: "deepseek-ai/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash" },
@@ -21,23 +29,35 @@ export const NIM_MODELS = [
   { id: "minimaxai/minimax-m3", label: "MiniMax M3" },
 ];
 
-export const DEFAULT_NIM_MODEL =
-  process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct";
+export function isRetiredNimError(status, body) {
+  const code = Number(status);
+  const text = String(body || "").toLowerCase();
+  return (
+    code === 410 ||
+    text.includes("end of life") ||
+    text.includes('"title":"gone"') ||
+    text.includes("no longer available")
+  );
+}
+
+export function resolveNimModel(requested) {
+  let id = String(requested || "").trim();
+  if (RETIRED_NIM_MODELS[id]) id = RETIRED_NIM_MODELS[id];
+  if (id && NIM_MODELS.some((m) => m.id === id)) return id;
+  const envDefault = String(process.env.NVIDIA_MODEL || "").trim();
+  const remappedEnv = RETIRED_NIM_MODELS[envDefault] || envDefault;
+  if (remappedEnv && NIM_MODELS.some((m) => m.id === remappedEnv)) return remappedEnv;
+  return FALLBACK_NIM_MODEL;
+}
+
+export const DEFAULT_NIM_MODEL = resolveNimModel(
+  process.env.NVIDIA_MODEL || FALLBACK_NIM_MODEL,
+);
 
 const NVIDIA_BASE =
   process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
 
-export async function nvidiaChat({ system, user, model, maxTokens = 512, temperature = 0.7 }) {
-  const key = process.env.NVIDIA_API_KEY;
-  if (!key) {
-    return {
-      ok: false,
-      error: "nvidia_missing",
-      message: "NVIDIA_API_KEY not set on Vercel. Add it and redeploy.",
-    };
-  }
-  const useModel =
-    NIM_MODELS.some((m) => m.id === model) ? model : DEFAULT_NIM_MODEL;
+async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key }) {
   const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
     method: "POST",
     headers: {
@@ -45,7 +65,7 @@ export async function nvidiaChat({ system, user, model, maxTokens = 512, tempera
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: useModel,
+      model,
       messages: [
         ...(system ? [{ role: "system", content: system }] : []),
         { role: "user", content: user },
@@ -61,12 +81,50 @@ export async function nvidiaChat({ system, user, model, maxTokens = 512, tempera
     return {
       ok: false,
       error: "nvidia_failed",
+      status: res.status,
       message: `NVIDIA API ${res.status}: ${err.slice(0, 240)}`,
+      body: err,
+      model,
     };
   }
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content || "";
-  return { ok: true, content, model: useModel, raw: data };
+  return { ok: true, content, model, raw: data };
+}
+
+export async function nvidiaChat({ system, user, model, maxTokens = 512, temperature = 0.7 }) {
+  const key = process.env.NVIDIA_API_KEY;
+  if (!key) {
+    return {
+      ok: false,
+      error: "nvidia_missing",
+      message: "NVIDIA_API_KEY not set on Vercel. Add it and redeploy.",
+    };
+  }
+  const useModel = resolveNimModel(model);
+  const first = await nvidiaChatOnce({
+    system,
+    user,
+    model: useModel,
+    maxTokens,
+    temperature,
+    key,
+  });
+  if (first.ok) return first;
+  const fallback = resolveNimModel(FALLBACK_NIM_MODEL);
+  if (useModel !== fallback && isRetiredNimError(first.status, first.body || first.message)) {
+    const retry = await nvidiaChatOnce({
+      system,
+      user,
+      model: fallback,
+      maxTokens,
+      temperature,
+      key,
+    });
+    if (retry.ok) return retry;
+    return retry;
+  }
+  return first;
 }
 
 export function buildTweetText(rawText, linkUrl) {

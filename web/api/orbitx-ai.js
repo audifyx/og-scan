@@ -25,6 +25,8 @@ import { statusFromRow } from "./orbitx/mcp-burn-access.js";
 import {
   DEFAULT_NIM_MODEL,
   NIM_MODELS,
+  isRetiredNimError,
+  resolveNimModel,
 } from "./orbitx/x-agent-lib.js";
 
 export const config = { maxDuration: 120 };
@@ -166,10 +168,7 @@ function trustedPublicBase() {
 }
 
 function modelId(requested) {
-  const candidate = text(requested, 160);
-  return NIM_MODELS.some((model) => model.id === candidate)
-    ? candidate
-    : DEFAULT_NIM_MODEL;
+  return resolveNimModel(text(requested, 160));
 }
 
 function requiresConfirmation(name) {
@@ -533,15 +532,18 @@ function directTools() {
 }
 
 function isUnknownModelError(error) {
-  const message = String(error?.message || "").toLowerCase();
+  const status = Number(error?.status);
+  const message = String(error?.message || "");
+  if (isRetiredNimError(status, message)) return true;
+  const lower = message.toLowerCase();
   return (
-    error?.status === 502 &&
-    (message.includes("model") &&
-      (message.includes("not found") ||
-        message.includes("does not exist") ||
-        message.includes("unknown") ||
-        message.includes("unavailable") ||
-        message.includes("invalid")))
+    lower.includes("model") &&
+    (lower.includes("not found") ||
+      lower.includes("does not exist") ||
+      lower.includes("unknown") ||
+      lower.includes("unavailable") ||
+      lower.includes("no longer available") ||
+      lower.includes("invalid"))
   );
 }
 

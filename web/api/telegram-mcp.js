@@ -247,7 +247,7 @@ async function handleDashboard(req, res, body) {
     const withMcp = {
       ...baseRow,
       ai_enabled: true,
-      ai_model: "meta/llama-3.1-8b-instruct",
+      ai_model: "meta/llama-3.2-3b-instruct",
       ...(kind === "x" ? { mcp_x_enabled: true, mcp_agent_enabled: false } : { mcp_agent_enabled: true, mcp_x_enabled: false }),
     };
 

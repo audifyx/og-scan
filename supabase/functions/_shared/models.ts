@@ -9,10 +9,16 @@ export interface BotModel {
 }
 
 export const DEFAULT_MODEL = "meta/llama-3.3-70b-instruct";
+export const FAST_MODEL = "meta/llama-3.2-3b-instruct";
+
+/** Retired NVIDIA NIM ids → live replacements (Llama 3.1 8B EOL 2026-08-26). */
+const RETIRED_MODELS: Record<string, string> = {
+  "meta/llama-3.1-8b-instruct": FAST_MODEL,
+};
 
 export const BOT_MODELS: BotModel[] = [
   { id: "meta/llama-3.3-70b-instruct",                 label: "Llama 3.3 70B",        desc: "Balanced default — great all-rounder" },
-  { id: "meta/llama-3.1-8b-instruct",                  label: "Llama 3.1 8B",         desc: "Fastest, lightweight replies" },
+  { id: "meta/llama-3.2-3b-instruct",                  label: "Llama 3.2 3B",         desc: "Fastest, lightweight replies" },
   { id: "meta/llama-4-maverick-17b-128e-instruct",     label: "Llama 4 Maverick",     desc: "Newest Llama, fast MoE" },
   { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",    label: "Nemotron Super 49B",   desc: "NVIDIA-tuned reasoning" },
   { id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",     label: "Nemotron Ultra 253B",  desc: "Most powerful, deepest reasoning" },
@@ -30,5 +36,6 @@ export function isValidModel(id?: string | null): boolean {
 
 // Always returns a safe, supported model id (falls back to the default).
 export function resolveModel(requested?: string | null): string {
-  return isValidModel(requested) ? (requested as string) : DEFAULT_MODEL;
+  const remapped = requested ? RETIRED_MODELS[requested] || requested : requested;
+  return isValidModel(remapped) ? (remapped as string) : DEFAULT_MODEL;
 }
