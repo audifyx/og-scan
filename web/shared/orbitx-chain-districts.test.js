@@ -1,11 +1,50 @@
 import { describe, expect, it } from "vitest";
-import { DEX_HUBS, MAJOR_MINTS, epsSeries, eventBreakdown } from "./orbitx-chain-districts.js";
+import {
+  DEX_HUBS,
+  MAJOR_MINTS,
+  TRENDING_LIMIT,
+  epsSeries,
+  eventBreakdown,
+  looksLikeMint,
+  matchTokenQuery,
+  rankTrending,
+  tokenDisplayName,
+  tokenLabel,
+  tokenTicker,
+} from "./orbitx-chain-districts.js";
 import { ORBITX_MINT } from "./orbitx-chain-intel.js";
 
 describe("orbitx-chain-districts", () => {
   it("keeps OrbitX and real DEX hubs in the city catalog", () => {
     expect(MAJOR_MINTS[0]).toBe(ORBITX_MINT);
     expect(DEX_HUBS.map((h) => h.id)).toEqual(["jupiter", "raydium", "pumpfun"]);
+    expect(TRENDING_LIMIT).toBe(250);
+  });
+
+  it("never uses a mint as the display name", () => {
+    const mint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+    expect(looksLikeMint(mint)).toBe(true);
+    expect(tokenDisplayName({ mint, name: mint, symbol: mint })).toBeNull();
+    expect(tokenLabel({ mint, name: mint })).toBe("Unnamed token");
+    expect(tokenDisplayName({ mint, name: "OrbitX", symbol: "ORBITX" })).toBe("OrbitX");
+    expect(tokenTicker({ mint, symbol: "ORBITX" })).toBe("ORBITX");
+    expect(tokenTicker({ mint, symbol: mint })).toBeNull();
+  });
+
+  it("ranks the day's high-volume coins and leaves OrbitX out of the 250", () => {
+    const rows = [
+      { mint: ORBITX_MINT, name: "OrbitX", symbol: "ORBITX", volume_24h: 9e9 },
+      { mint: "Aaa1111111111111111111111111111111111111111", name: "Alpha", symbol: "ALPHA", volume_24h: 80_000 },
+      { mint: "Bbb1111111111111111111111111111111111111111", name: "Beta", symbol: "BETA", volume_24h: 12_000 },
+      { mint: "Ccc1111111111111111111111111111111111111111", name: "Dust", symbol: "DUST", volume_24h: 10 },
+    ];
+    const ranked = rankTrending(rows, 2);
+    expect(ranked.map((t) => t.symbol)).toEqual(["ALPHA", "BETA"]);
+    expect(rankTrending(rows, 250).map((t) => t.symbol)).toEqual(["ALPHA", "BETA", "DUST"]);
+    expect(ranked.every((t) => t.mint !== ORBITX_MINT)).toBe(true);
+    expect(matchTokenQuery(ranked[0], "alp")).toBe(true);
+    expect(matchTokenQuery(ranked[0], "$alpha")).toBe(true);
+    expect(matchTokenQuery(ranked[0], "zzz")).toBe(false);
   });
 
   it("computes breakdown and eps only from supplied events", () => {

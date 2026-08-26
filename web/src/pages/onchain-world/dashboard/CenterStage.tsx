@@ -58,10 +58,10 @@ export function CenterStage() {
             <p className="ox-kicker mb-2">World layers</p>
             {(
               [
-                ["labels", "Venue labels"],
-                ["trails", "Route trails"],
-                ["figures", "Token pads"],
-                ["grid", "Reference grid"],
+                ["labels", "Token names"],
+                ["trails", "Swap trails"],
+                ["figures", "KOL nodes"],
+                ["grid", "Star grid"],
               ] as const
             ).map(([key, label]) => (
               <button

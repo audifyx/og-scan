@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { MoreVertical, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { MoreVertical, Search, Volume2, VolumeX } from "lucide-react";
 import { OrbitxMark } from "@/pages/onchain-world/dashboard/OrbitxMark";
 import { Badge } from "@/pages/onchain-world/dashboard/ui/badge";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
@@ -13,6 +14,7 @@ import {
 import { APP_NAME } from "@/pages/onchain-world/lib/orbitx/constants";
 import { formatAge, formatInt, formatUsd, utcClock } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
+import { matchTokenQuery, tokenLabel, tokenTicker } from "../../../../shared/orbitx-chain-districts.js";
 
 function Stat({
   label,
@@ -35,12 +37,26 @@ function Stat({
 }
 
 export function TopBar() {
+  const nav = useNavigate();
   const ticker = useOrbitxStore((s) => s.snapshot.ticker);
   const network = useOrbitxStore((s) => s.snapshot.network);
   const muted = useOrbitxStore((s) => s.muted);
   const setMuted = useOrbitxStore((s) => s.setMuted);
   const resetCamera = useOrbitxStore((s) => s.resetCamera);
+  const query = useOrbitxStore((s) => s.searchQuery);
+  const setSearchQuery = useOrbitxStore((s) => s.setSearchQuery);
+  const tokens = useOrbitxStore((s) => s.city.districts.tokens || []);
+  const orbitx = useOrbitxStore((s) => s.city.districts.orbitx);
+  const selectToken = useOrbitxStore((s) => s.selectToken);
+  const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   const [now, setNow] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const hits = useMemo(() => {
+    const catalog = [orbitx, ...tokens].filter(Boolean);
+    if (!query.trim()) return [];
+    return catalog.filter((t) => t && matchTokenQuery(t, query)).slice(0, 8);
+  }, [orbitx, tokens, query]);
 
   useEffect(() => {
     const tick = () => setNow(utcClock(new Date()));
@@ -93,7 +109,53 @@ export function TopBar() {
           <div className="mx-auto">{stats}</div>
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="relative ml-auto flex items-center gap-1.5">
+          <label className="hidden items-center gap-1.5 rounded-md border border-line bg-bg-sunken px-2 md:flex">
+            <Search className="size-3.5 text-dim" />
+            <input
+              value={query}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setOpen(true);
+              }}
+              onFocus={() => setOpen(true)}
+              onBlur={() => window.setTimeout(() => setOpen(false), 180)}
+              placeholder="Search 250 trending"
+              className="h-8 w-44 bg-transparent text-xs text-fg outline-none placeholder:text-dim lg:w-56"
+            />
+          </label>
+          {open && hits.length > 0 ? (
+            <div className="absolute right-0 top-11 z-20 w-72 overflow-hidden rounded-md border border-line bg-bg-panel shadow-[0_18px_40px_rgb(0_0_0_/_0.5)]">
+              {hits.map((t) =>
+                t ? (
+                  <button
+                    key={t.mint}
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-hover"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      selectToken(t.mint);
+                      setCamCommand({ kind: "token", mint: t.mint });
+                      nav(`/on-chain/token/${t.mint}`);
+                      setOpen(false);
+                    }}
+                  >
+                    {t.image ? (
+                      <img src={t.image} alt="" className="size-6 rounded-full object-cover" />
+                    ) : (
+                      <span className="size-6 rounded-full bg-bg-hover" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs text-fg">{tokenLabel(t)}</span>
+                      <span className="block truncate text-2xs text-dim">
+                        {tokenTicker(t) ? `$${tokenTicker(t)}` : "Solana"}
+                      </span>
+                    </span>
+                  </button>
+                ) : null,
+              )}
+            </div>
+          ) : null}
           <span className="ox-stat hidden min-w-28 text-right text-xs text-muted lg:inline">
             {now ?? "—"}
           </span>

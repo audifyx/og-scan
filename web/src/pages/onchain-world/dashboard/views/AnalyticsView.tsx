@@ -3,6 +3,7 @@ import { EmptyState } from "@/pages/onchain-world/dashboard/EmptyState";
 import { EventBreakdown } from "@/pages/onchain-world/dashboard/EventBreakdown";
 import { formatPct, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
+import { tokenLabel, tokenTicker } from "../../../../../shared/orbitx-chain-districts.js";
 
 export function AnalyticsView() {
   const rate = useOrbitxStore((s) => s.snapshot.eventRate);
@@ -29,7 +30,7 @@ export function AnalyticsView() {
 
       <section className="ox-panel mt-3 overflow-hidden">
         <header className="border-b border-line px-3 py-2.5">
-          <h3 className="ox-kicker text-fg">Markets · DexScreener / Pump.fun</h3>
+          <h3 className="ox-kicker text-fg">Markets · 250 trending</h3>
         </header>
         {rows.length === 0 ? (
           <p className="px-3 py-4 text-xs text-dim">No confirmed token districts yet.</p>
@@ -45,9 +46,11 @@ export function AnalyticsView() {
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-medium text-fg">
-                      ${t.symbol || "TOKEN"}
+                      {tokenLabel(t)}
                     </span>
-                    <span className="block truncate text-2xs text-dim">{t.name || t.mint}</span>
+                    <span className="block truncate text-2xs text-dim">
+                      {tokenTicker(t) ? `$${tokenTicker(t)}` : "Solana"}
+                    </span>
                   </span>
                   <span className="text-right">
                     <span className="ox-stat block text-xs text-fg">{formatUsd(t.market_cap ?? null)}</span>

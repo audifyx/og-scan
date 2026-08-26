@@ -442,7 +442,7 @@ export const EDU_NODES: EduNode[] = [
     title: "On-Chain world",
     slug: "on-chain",
     category: "onchain",
-    description: "Live Solana command center at /on-chain — events, world, tx tape, wallet intelligence.",
+    description: "Live Solana command center at /on-chain — 250 trending coins, 3D galaxy, events, tx tape, wallet intelligence.",
     difficulty: "trader",
     estimatedMinutes: 10,
     icon: "globe",
@@ -452,7 +452,7 @@ export const EDU_NODES: EduNode[] = [
     why: "See chain activity and OrbitX-related flow in one chrome.",
     when: "Watching live flow, pinning a wallet, or teaching someone the mesh.",
     steps: [
-      { title: "Open /on-chain", body: "Desktop: three columns. Mobile: World / Events / Tx / Wallet tabs." },
+      { title: "Open /on-chain", body: "Desktop: trending feed, 3D galaxy, token depth. Mobile: World / Feed / Events / Tx / Wallet." },
       { title: "Read idle honestly", body: "Dashes and INDEXING DELAY mean the indexer has not confirmed data." },
       { title: "Track a wallet", body: "Paste an address in Wallet intelligence." },
     ],

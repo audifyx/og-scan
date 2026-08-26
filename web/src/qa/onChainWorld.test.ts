@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { formatPrice } from "../pages/onchain-world/lib/orbitx/format";
-import { eventKind, liveToSnapshot, toBreakdown } from "../pages/onchain-world/lib/mapLive";
+import { eventKind, liveToSnapshot, toBreakdown, toLiveEvent } from "../pages/onchain-world/lib/mapLive";
 import type { ChainEvent, LivePayload } from "../pages/onchain-world/api";
 
 const WEB = resolve(__dirname, "../..");
@@ -21,35 +21,49 @@ describe("OrbitX /on-chain world", () => {
     expect(vercel).toContain('"/api/on-chain?path=ingest&force=1"');
     expect(vercel).toContain('"api/on-chain.js"');
     const api = readFileSync(resolve(WEB, "api/on-chain.js"), "utf8");
-    for (const path of ["live", "events", "wallet", "token", "transaction", "orbitx", "search", "flows", "ingest", "status", "kols", "districts"]) {
+    for (const path of ["live", "events", "wallet", "token", "transaction", "orbitx", "search", "flows", "ingest", "status", "kols", "districts", "trending"]) {
       expect(api).toContain(path);
     }
     expect(api).toContain("activeOrbitxKols");
     expect(api).toContain("assigned_kols");
+    expect(api).toContain("handleTrending");
+    expect(api).toContain("banner");
     expect(api).not.toContain("sbp_");
   });
 
-  it("mounts the uploaded command-center dashboard around the living city", () => {
+  it("mounts a DEX-style 250-coin desk around a 3D galaxy", () => {
     const shell = readFileSync(resolve(WEB, "src/pages/onchain-world/OnChainWorldApp.tsx"), "utf8");
     expect(shell).toContain("useOnChainFeed");
     expect(shell).toContain("<Dashboard />");
     const dash = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/Dashboard.tsx"), "utf8");
     expect(dash).toContain("ox-dash");
     expect(dash).toContain("fixed inset-0");
+    expect(dash).toContain("lg:grid-cols-[280px_minmax(0,1fr)_300px]");
     expect(dash).toContain("LiveEvents");
     expect(dash).toContain("WalletPanel");
+    expect(dash).toContain("TokenPanel");
+    expect(dash).toContain("TrendingFeed");
     expect(dash).toContain("BottomPanel");
     expect(dash).toContain("MobileNav");
     const world = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldView.tsx"), "utf8");
-    expect(world).toContain("world-city.jpg");
-    expect(world).toContain("TOKEN_PADS");
-    expect(world).toContain("WORLD_NODES");
+    expect(world).toContain("WorldCanvas");
+    expect(world).not.toContain("world-city.jpg");
+    expect(world).toContain("tokenLabel");
+    const feed = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TrendingFeed.tsx"), "utf8");
+    expect(feed).toContain("Show more");
+    expect(feed).toContain("tokenLabel");
+    expect(feed).not.toContain("t.mint.slice");
+    const tokenPanel = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TokenPanel.tsx"), "utf8");
+    expect(tokenPanel).toContain("banner");
+    expect(tokenPanel).toContain("tokenLabel");
+    expect(tokenPanel).not.toMatch(/\?\?[^;\n]*\|\|/);
     const nav = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/MobileNav.tsx"), "utf8");
     expect(nav).toContain("World");
+    expect(nav).toContain("Feed");
     expect(nav).toContain("Events");
     expect(nav).toContain("Tx");
     expect(nav).toContain("Wallet");
-    expect(nav).not.toContain("lg:hidden");
+    expect(nav).toContain("lg:hidden");
     const wallet = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WalletPanel.tsx"), "utf8");
     expect(wallet).toContain("KOL directory");
     expect(wallet).toContain("TRACKED");
@@ -74,32 +88,42 @@ describe("OrbitX /on-chain world", () => {
     expect(wallets).toContain("Assigned KOLs");
     const analytics = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AnalyticsView.tsx"), "utf8");
     expect(analytics).toContain("districts.tokens");
-    expect(analytics).toContain("DexScreener");
-    const feed = readFileSync(resolve(WEB, "src/pages/onchain-world/useOnChainFeed.ts"), "utf8");
-    expect(feed).toContain("fetchOrbitx");
-    expect(feed).toContain("getSlot");
-    expect(feed).toContain("loadCityDistricts");
+    expect(analytics).toContain("tokenLabel");
+    const hook = readFileSync(resolve(WEB, "src/pages/onchain-world/useOnChainFeed.ts"), "utf8");
+    expect(hook).toContain("fetchOrbitx");
+    expect(hook).toContain("fetchTrending");
+    expect(hook).toContain("getSlot");
+    expect(hook).toContain("loadCityDistricts");
+    const top = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TopBar.tsx"), "utf8");
+    expect(top).toContain("Search 250 trending");
   });
 
-  it("renders wallets as characters and tokens as districts in the 3D world", () => {
+  it("renders a 3D galaxy of token nodes, official KOLs, holders, and swaps", () => {
     const canvas = readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8");
     expect(canvas).toContain("function Agent");
-    expect(canvas).toContain("function TokenBuilding");
+    expect(canvas).toContain("function TokenStar");
     expect(canvas).toContain("function Transit");
-    expect(canvas).toContain("function OrbitXTower");
-    expect(canvas).toContain("function CityFill");
+    expect(canvas).toContain("function OrbitXCore");
+    expect(canvas).toContain("function galaxyPos");
     expect(canvas).toContain("DEX_HUBS");
     expect(canvas).toContain("followWallet");
+    expect(canvas).toContain("tokenLabel");
     expect(canvas).toContain("EffectComposer");
+    expect(canvas).toContain("holderPos");
     expect(canvas).not.toContain("<Line");
     expect(canvas).not.toContain("<Html");
+    expect(canvas).not.toContain("world-city.jpg");
     const cssCity = readFileSync(resolve(WEB, "src/pages/onchain-world/CssCity.tsx"), "utf8");
     expect(cssCity).toContain("ORBITX");
     expect(cssCity).toContain("JUPITER DEX");
     expect(cssCity).toContain("RAYDIUM DEX");
     expect(cssCity).toContain("PUMP.FUN");
-    expect(readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8")).toContain("frontend-api-v3.pump.fun");
-    expect(readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8")).toContain("api.dexscreener.com");
+    const districts = readFileSync(resolve(WEB, "shared/orbitx-chain-districts.js"), "utf8");
+    expect(districts).toContain("frontend-api-v3.pump.fun");
+    expect(districts).toContain("api.dexscreener.com");
+    expect(districts).toContain("TRENDING_LIMIT = 250");
+    expect(districts).toContain("token-profiles/latest");
+    expect(districts).toContain("toptraded/24h");
   });
 
   it("stores a rebuildable chain cache instead of replacing ox_onchain_events", () => {
@@ -125,9 +149,9 @@ describe("OrbitX /on-chain world", () => {
       counterparty: null,
       source_wallet: null,
       destination_wallet: null,
-      token_ca: null,
-      token_symbol: null,
-      token_name: null,
+      token_ca: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      token_symbol: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      token_name: "OrbitX",
       token_image: null,
       amount: null,
       sol_amount: 2,
@@ -142,6 +166,8 @@ describe("OrbitX /on-chain world", () => {
     } satisfies ChainEvent;
     expect(eventKind(ev)).toBe("sol_transfer");
     expect(eventKind({ ...ev, kol_related: true, event_type: "BUY" })).toBe("kol_buy");
+    expect(toLiveEvent(ev).token).toBe("OrbitX");
+    expect(toLiveEvent({ ...ev, token_name: ev.token_ca, token_symbol: ev.token_ca }).token).toBeUndefined();
     const idle: LivePayload = {
       ok: true,
       live: false,

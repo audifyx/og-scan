@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
-import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTx, fetchWallet } from "./api";
+import { fetchDistricts, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
 import { liveToSnapshot, toWalletSnapshot } from "./lib/mapLive";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
@@ -80,6 +80,9 @@ export function useOnChainFeed() {
   const patchSnapshot = useOrbitxStore((s) => s.patchSnapshot);
   const patchCity = useOrbitxStore((s) => s.patchCity);
   const trackWallet = useOrbitxStore((s) => s.trackWallet);
+  const selectToken = useOrbitxStore((s) => s.selectToken);
+  const setTokenDetail = useOrbitxStore((s) => s.setTokenDetail);
+  const selectedToken = useOrbitxStore((s) => s.selectedToken);
 
   useEffect(() => {
     patchCity({
@@ -91,7 +94,7 @@ export function useOnChainFeed() {
   const loadLive = useCallback(async () => {
     if (paused) return;
     try {
-      const [data, roster, city, orbitx, slot] = await Promise.all([
+      const [data, roster, city, orbitx, trending, slot] = await Promise.all([
         fetchLive({
           type: "",
           orbitx: false,
@@ -107,6 +110,7 @@ export function useOnChainFeed() {
         fetchKols().catch(() => null),
         fetchDistricts().catch(() => null),
         fetchOrbitx().catch(() => null),
+        fetchTrending().catch(() => null),
         fetchConfirmedSlot(),
       ]);
       const kols =
@@ -115,7 +119,12 @@ export function useOnChainFeed() {
           : data.kols?.length
             ? data.kols
             : DIRECTORY_KOLS;
-      const districts = city?.ok || city?.tokens || city?.orbitx ? city : data.districts;
+      const districts =
+        trending?.ok && trending.tokens?.length
+          ? { orbitx: trending.orbitx || city?.orbitx || data.districts?.orbitx, hubs: city?.hubs || data.districts?.hubs, tokens: trending.tokens, trending_count: trending.count, window: trending.window }
+          : city?.ok || city?.tokens || city?.orbitx
+            ? city
+            : data.districts;
       const prevWallet = useOrbitxStore.getState().snapshot.wallet;
       const liveEvents = data.ok && data.events?.length ? data.events : [];
       const orbitxEvents = orbitx?.ok && orbitx.events?.length ? orbitx.events : [];
@@ -178,9 +187,24 @@ export function useOnChainFeed() {
       return;
     }
     if (params.address && location.pathname.includes("/token/")) {
-      void fetchToken(params.address).catch(() => undefined);
+      selectToken(params.address);
+      void fetchToken(params.address)
+        .then((data) => {
+          if (data?.mint) setTokenDetail(data);
+        })
+        .catch(() => undefined);
     }
-  }, [params.address, params.signature, trackWallet]);
+  }, [params.address, params.signature, trackWallet, selectToken, setTokenDetail]);
+
+  useEffect(() => {
+    if (!selectedToken) return;
+    if (params.address === selectedToken) return;
+    void fetchToken(selectedToken)
+      .then((data) => {
+        if (data?.mint) setTokenDetail(data);
+      })
+      .catch(() => undefined);
+  }, [selectedToken, params.address, setTokenDetail]);
 
   useEffect(() => {
     if (!selectedWallet) {

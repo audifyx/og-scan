@@ -28,7 +28,7 @@ import {
   kolWatchBatch,
   trackedRowsFromDirectory,
 } from "../shared/orbitx-kol-directory.js";
-import { epsSeries, eventBreakdown, loadCityDistricts } from "../shared/orbitx-chain-districts.js";
+import { epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName } from "../shared/orbitx-chain-districts.js";
 
 export const config = { maxDuration: 60 };
 
@@ -184,6 +184,7 @@ async function tokenMeta(mint) {
       symbol: pair.baseToken?.symbol || null,
       name: pair.baseToken?.name || null,
       image: pair.info?.imageUrl || null,
+      banner: pair.info?.header || pair.info?.openGraph || null,
       website: pair.info?.websites?.[0]?.url || null,
       twitter: (pair.info?.socials || []).find((s) => s.type === "twitter")?.url || null,
       telegram: (pair.info?.socials || []).find((s) => s.type === "telegram")?.url || null,
@@ -191,6 +192,7 @@ async function tokenMeta(mint) {
       market_cap: asNumber(pair.marketCap) ?? asNumber(pair.fdv),
       liquidity_usd: asNumber(pair.liquidity?.usd),
       volume_24h: asNumber(pair.volume?.h24),
+      change_24h: asNumber(pair.priceChange?.h24),
       launch_platform: pair.dexId || null,
     };
     metaCache.set(mint, { at: Date.now(), value });
@@ -607,6 +609,18 @@ async function handleDistricts(req, res) {
   return json(res, 200, { ok: true, ...districts });
 }
 
+async function handleTrending(req, res) {
+  const districts = await cityDistricts();
+  const tokens = Array.isArray(districts?.tokens) ? districts.tokens : [];
+  return json(res, 200, {
+    ok: true,
+    window: districts?.window || "24h",
+    count: tokens.length,
+    orbitx: districts?.orbitx || null,
+    tokens,
+  });
+}
+
 async function handleKols(req, res, sb) {
   await seedAssignedKols(sb);
   const tracked = await loadTracked(sb);
@@ -847,9 +861,12 @@ async function handleSearch(req, res, sb) {
       pairs: pairs.map((p) => ({
         mint: p.baseToken?.address,
         symbol: p.baseToken?.symbol,
-        name: p.baseToken?.name,
+        name: tokenDisplayName({ name: p.baseToken?.name, symbol: p.baseToken?.symbol, mint: p.baseToken?.address }),
+        image: p.info?.imageUrl || null,
+        banner: p.info?.header || p.info?.openGraph || null,
         price_usd: asNumber(p.priceUsd),
         market_cap: asNumber(p.marketCap) ?? asNumber(p.fdv),
+        volume_24h: asNumber(p.volume?.h24),
         dex: p.dexId,
       })),
     });
@@ -918,6 +935,7 @@ export default async function handler(req, res) {
     if (head === "search") return await handleSearch(req, res, sb);
     if (head === "kols") return await handleKols(req, res, sb);
     if (head === "districts") return await handleDistricts(req, res);
+    if (head === "trending") return await handleTrending(req, res);
     if (head === "flows" && a) return await handleFlows(req, res, sb, a);
     if (head === "status") return await handleStatus(req, res, sb);
     if (head === "ingest" && (req.method === "POST" || cronAuthorized(req) || req.query?.force === "1")) {

@@ -9,7 +9,7 @@ import type {
   ViewOptions,
 } from "./types";
 import type { CamCommand } from "../../WorldCanvas";
-import type { ChainEvent, CityDistricts, FlowRow, KolCard } from "../../api";
+import type { ChainEvent, CityDistricts, FlowRow, KolCard, TokenPayload } from "../../api";
 
 export type CityLive = {
   live: boolean;
@@ -58,8 +58,16 @@ type OrbitxState = {
   setCamera: (camera: CameraState) => void;
   resetCamera: () => void;
 
-  mobilePanel: "world" | "events" | "tx" | "wallet";
-  setMobilePanel: (panel: "world" | "events" | "tx" | "wallet") => void;
+  mobilePanel: "world" | "feed" | "events" | "tx" | "wallet";
+  setMobilePanel: (panel: "world" | "feed" | "events" | "tx" | "wallet") => void;
+
+  selectedToken: string | null;
+  selectToken: (mint: string | null) => void;
+  tokenDetail: TokenPayload | null;
+  setTokenDetail: (detail: TokenPayload | null) => void;
+  feedLimit: number;
+  expandFeed: () => void;
+  collapseFeed: () => void;
 
   city: CityLive;
   patchCity: (patch: Partial<CityLive>) => void;
@@ -150,6 +158,22 @@ export const useOrbitxStore = create<OrbitxState>((set) => ({
 
   mobilePanel: "world",
   setMobilePanel: (mobilePanel) => set({ mobilePanel }),
+
+  selectedToken: null,
+  selectToken: (mint) =>
+    set((state) => ({
+      selectedToken: mint,
+      camCommand: mint ? { kind: "token", mint } : state.camCommand,
+      tokenDetail: mint && state.tokenDetail?.mint === mint ? state.tokenDetail : null,
+    })),
+  tokenDetail: null,
+  setTokenDetail: (tokenDetail) => set({ tokenDetail }),
+  feedLimit: 12,
+  expandFeed: () =>
+    set((state) => ({
+      feedLimit: state.feedLimit < 36 ? 36 : state.feedLimit < 80 ? 80 : 250,
+    })),
+  collapseFeed: () => set({ feedLimit: 12 }),
 
   city: EMPTY_CITY,
   patchCity: (patch) => set((state) => ({ city: { ...state.city, ...patch } })),
