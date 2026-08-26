@@ -3,7 +3,7 @@
    Links to all admin-only tools (AI Assistant, Simulcast, etc.)
    ══════════════════════════════════════════════════════════════ */
 import { useNavigate } from "react-router-dom";
-import { Brain, Sparkles, Signal, Building2, Code2, Radio, ExternalLink } from "lucide-react";
+import { Brain, Sparkles, Signal, Building2, Code2, Radio, ExternalLink, GraduationCap } from "lucide-react";
 
 interface ToolCard {
   to: string;
@@ -16,6 +16,15 @@ interface ToolCard {
 }
 
 const TOOLS: ToolCard[] = [
+  {
+    to: "/education",
+    icon: GraduationCap,
+    label: "Education hub",
+    description: "Public learning universe. Add lessons in web/src/education/catalog.ts — they appear in search, paths, and the tool index automatically.",
+    badge: "CMS",
+    color: "text-cyan-400",
+    borderColor: "border-cyan-500/20 hover:border-cyan-500/40",
+  },
   {
     to: "/discovery",
     icon: Radio,

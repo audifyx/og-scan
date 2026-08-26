@@ -187,6 +187,7 @@ import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
 import OnChainProofPage from "./pages/OnChainProofPage";
 import OnChainWorld from "./pages/OnChainWorld";
+import Education from "./pages/Education";
 import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -334,6 +335,10 @@ const App = () => (
             {/* ── Official Telegram bot companion ── */}
             <Route path="/telegram" element={<TelegramOrbitX />} />
             <Route path="/Telegram" element={<RedirectPreserveSearch to="/telegram" />} />
+
+            {/* ── Public education hub (must beat /:toolSlug owner-404) ── */}
+            <Route path="/education" element={<Education />} />
+            <Route path="/education/*" element={<Education />} />
 
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route

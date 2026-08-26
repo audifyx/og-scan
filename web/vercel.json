@@ -159,6 +159,14 @@
       "destination": "https://orbitx-prediction.fun/:path*"
     },
     {
+      "source": "/education",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/education/(.*)",
+      "destination": "/app.html"
+    },
+    {
       "source": "/",
       "destination": "/app.html"
     },

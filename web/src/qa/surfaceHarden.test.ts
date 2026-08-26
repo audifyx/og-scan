@@ -23,7 +23,16 @@ describe("surface harden + leak scan", () => {
     expect(app).toContain("to=\"/orbitx-social\"");
     expect(app).toContain("<Route path=\"/support\" element={<SupportCenter />} />");
     expect(app).toContain("<Route path=\"/on-chain\" element={<OnChainWorld />} />");
+    expect(app).toContain("<Route path=\"/education\" element={<Education />} />");
+    expect(app).not.toContain("<Route path=\"/education\" element={<OwnerPreviewRoute>");
     expect(app).not.toContain("<Route path=\"/on-chain\" element={<OwnerPreviewRoute>");
+  });
+
+  it("404s unknown routes back to orbitx.world DEX, not ogscan.fun", () => {
+    const nf = readFileSync(resolve(WEB, "src/pages/NotFound.tsx"), "utf8");
+    expect(nf).not.toContain("ogscan.fun");
+    expect(nf).toContain("orbitx.world");
+    expect(nf).toContain('to="/ORBITX_DEX"');
   });
 
   it("does not ship a hardcoded Supabase anon JWT", () => {

@@ -174,6 +174,13 @@ export const PlatformGlyph = {
       <circle cx="24" cy="24" r="3" fill="currentColor" />
     </Svg>
   ),
+  education: (
+    <Svg>
+      <path d="M8 20l16-8 16 8-16 8-16-8z" stroke="currentColor" strokeWidth="3.2" strokeLinejoin="round" />
+      <path d="M14 23v8c4 3 8 4 10 4s6-1 10-4v-8" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M40 20v12" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+    </Svg>
+  ),
   terminal: (
     <Svg>
       <rect x="8" y="10" width="32" height="28" rx="6" stroke="currentColor" strokeWidth="3.5" />
@@ -216,6 +223,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq, visibility: "admin" },
   { key: "os", name: "OrbitX OS", caption: "Desktop launcher", href: "/os", tone: "#17FF4D", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 46%, #14532D 100%)", glyph: PlatformGlyph.os },
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
+  { key: "education", name: "Education", caption: "Learn the ecosystem", href: "/education", tone: "#22D3EE", iconBg: "linear-gradient(145deg, #67E8F9 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.education, dock: true },
   { key: "play", name: "Play", caption: "Games & missions", href: "/play", tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #FF3EAA 48%, #9D174D 100%)", glyph: PlatformGlyph.play },
   { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, menu: false, visibility: "admin" },
   { key: "predict", name: "Predictions", caption: "Trade YES / NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F59E0B 48%, #B45309 100%)", glyph: PlatformGlyph.predict },
@@ -228,7 +236,7 @@ export const PLATFORM_BY_KEY = Object.fromEntries(PLATFORM_APPS.map((a) => [a.ke
 export type PlatformSection = { id: string; title: string; subtitle: string; keys: string[] };
 
 export const PLATFORM_SECTIONS: PlatformSection[] = [
-  { id: "world", title: "World", subtitle: "City, OS, and play surfaces", keys: ["city", "os", "play", "gaming"] },
+  { id: "world", title: "World", subtitle: "City, OS, play, and education", keys: ["city", "os", "play", "gaming", "education"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Intel desk, chain world, wallets, AI", keys: ["intel", "onchain", "koltracker", "pnltracker", "ai"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Agent, X, Telegram, and shop", keys: ["agent", "xmcp", "telegram", "shop"] },

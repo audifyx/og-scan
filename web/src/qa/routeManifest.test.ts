@@ -23,6 +23,12 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('import OnChainProofPage from "./pages/OnChainProofPage"');
     expect(app).toContain('path="/on-chain"');
     expect(app).toContain('import OnChainWorld from "./pages/OnChainWorld"');
+    expect(app).toContain('path="/education"');
+    expect(app).toContain('import Education from "./pages/Education"');
+    const eduAt = app.indexOf('<Route path="/education"');
+    const slugAt = app.indexOf('<Route path="/:toolSlug"');
+    expect(eduAt).toBeGreaterThan(0);
+    expect(eduAt).toBeLessThan(slugAt);
   });
 
   it("loads team apps and keeps OrbitX AI eager for route reliability", () => {
@@ -37,5 +43,12 @@ describe("OrbitX route manifest", () => {
   it("redirects legacy social aliases to live social app", () => {
     expect(app).toContain('path="/social"');
     expect(app).toContain('Navigate to="/orbitx-social"');
+  });
+
+  it("serves /education through the SPA on Vercel", () => {
+    const vercel = readFileSync(resolve(__dirname, "../../vercel.json"), "utf8");
+    expect(vercel).toContain('"/education"');
+    expect(vercel).toContain('"/education/(.*)"');
+    expect(vercel).toContain('"/app.html"');
   });
 });
