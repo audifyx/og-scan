@@ -336,6 +336,10 @@ const App = () => (
             <Route path="/telegram" element={<TelegramOrbitX />} />
             <Route path="/Telegram" element={<RedirectPreserveSearch to="/telegram" />} />
 
+            {/* ── Public education hub (must beat /:toolSlug owner-404) ── */}
+            <Route path="/education" element={<Education />} />
+            <Route path="/education/*" element={<Education />} />
+
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route
               path="/os/*"
@@ -664,8 +668,6 @@ const App = () => (
             <Route path="/on-chain/token/:address" element={<OnChainWorld />} />
             <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
             <Route path="/on-chain/block/:slot" element={<OnChainWorld />} />
-            <Route path="/education/*" element={<Education />} />
-            <Route path="/education" element={<Education />} />
             <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
