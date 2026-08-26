@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { allOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
@@ -7,7 +7,7 @@ import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchSt
 import { liveToSnapshot, mergeChainEvents, toWalletSnapshot } from "./lib/mapLive";
 import { tallyActivity } from "./activityStats";
 import { ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
-import { mergeDistricts, tokenCatalogSize } from "./mergeDistricts";
+import { keepTicker, mergeDistricts, tokenCatalogSize } from "./mergeDistricts";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
 const DIRECTORY_KOLS: KolCard[] = allOrbitxKols().map((k) => ({
@@ -109,6 +109,8 @@ export function useOnChainFeed() {
   const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   const setTokenDetail = useOrbitxStore((s) => s.setTokenDetail);
   const selectedToken = useOrbitxStore((s) => s.selectedToken);
+  const liveInflight = useRef(false);
+  const catalogInflight = useRef(false);
 
   useEffect(() => {
     patchCity({
@@ -117,10 +119,69 @@ export function useOnChainFeed() {
     });
   }, [patchCity]);
 
+  const applyCatalog = useCallback(
+    (
+      trending: Awaited<ReturnType<typeof fetchTrending>> | null,
+      city: Awaited<ReturnType<typeof fetchDistricts>> | null,
+      liveDistricts?: Parameters<typeof mergeDistricts>[0],
+    ) => {
+      const districts = mergeDistricts(
+        trending?.ok && trending.tokens?.length
+          ? {
+              orbitx: trending.orbitx || city?.orbitx || liveDistricts?.orbitx,
+              hubs: city?.hubs || liveDistricts?.hubs,
+              tokens: trending.tokens,
+              trending_count: trending.count,
+              window: trending.window,
+            }
+          : null,
+        tokenCatalogSize(city) ? city : null,
+        liveDistricts,
+        useOrbitxStore.getState().city.districts,
+      );
+      if (tokenCatalogSize(districts) || districts.orbitx) {
+        patchCity({ districts });
+        const ticker = useOrbitxStore.getState().snapshot.ticker;
+        if (districts.orbitx?.buys_24h != null || districts.orbitx?.sells_24h != null) {
+          patchSnapshot({
+            ticker: {
+              ...ticker,
+              orbitxBuys24h: districts.orbitx?.buys_24h ?? ticker.orbitxBuys24h,
+              orbitxSells24h: districts.orbitx?.sells_24h ?? ticker.orbitxSells24h,
+              orbitxTraders24h: districts.orbitx?.traders_24h ?? ticker.orbitxTraders24h,
+            },
+          });
+        }
+      }
+      return districts;
+    },
+    [patchCity, patchSnapshot],
+  );
+
+  const loadCatalog = useCallback(async () => {
+    if (catalogInflight.current) return;
+    catalogInflight.current = true;
+    try {
+      const [trending, city] = await Promise.all([
+        fetchTrending().catch(() => null),
+        fetchDistricts().catch(() => null),
+      ]);
+      applyCatalog(trending, city);
+    } catch {
+      /* keep whatever catalog is already on screen */
+    } finally {
+      catalogInflight.current = false;
+    }
+  }, [applyCatalog]);
+
   const loadLive = useCallback(async () => {
     if (paused) return;
+    // The 5s interval must not stack. Catalog and live are independent so a
+    // slow /live poll cannot drop the 250-coin universe.
+    if (liveInflight.current) return;
+    liveInflight.current = true;
     try {
-      const [data, roster, city, orbitx, orbitxPage, oxToken, trending, slot] = await Promise.all([
+      const [data, roster, orbitx, orbitxPage, oxToken, slot] = await Promise.all([
         withTimeout(
           fetchLive({
             type: "",
@@ -137,11 +198,9 @@ export function useOnChainFeed() {
           8000,
         ).catch(() => null),
         fetchKols().catch(() => null),
-        fetchDistricts().catch(() => null),
         fetchOrbitx().catch(() => null),
         fetchEvents("orbitx=1&limit=200").catch(() => null),
         fetchToken(ORBITX_MINT).catch(() => null),
-        fetchTrending().catch(() => null),
         fetchChainSlot(),
       ]);
       const kols =
@@ -151,20 +210,10 @@ export function useOnChainFeed() {
             ? data.kols
             : DIRECTORY_KOLS;
       const districts = mergeDistricts(
-        trending?.ok && trending.tokens?.length
-          ? {
-              orbitx: trending.orbitx || city?.orbitx || data?.districts?.orbitx,
-              hubs: city?.hubs || data?.districts?.hubs,
-              tokens: trending.tokens,
-              trending_count: trending.count,
-              window: trending.window,
-            }
-          : null,
-        tokenCatalogSize(city) ? city : null,
         data?.districts,
         useOrbitxStore.getState().city.districts,
       );
-      const prevWallet = useOrbitxStore.getState().snapshot.wallet;
+      const prev = useOrbitxStore.getState().snapshot;
       const liveEvents = data?.ok && data.events?.length ? data.events : [];
       const orbitxEvents = mergeChainEvents(
         orbitx?.ok ? orbitx.events : [],
@@ -178,6 +227,7 @@ export function useOnChainFeed() {
       const payload = data?.ok ? { ...data, events } : { ...(data || {}), events, live: false, ok: false };
       if (payload.chain_slot == null && slot != null) payload.chain_slot = slot;
       const snapshot = liveToSnapshot(payload, null);
+      snapshot.ticker = keepTicker(prev.ticker, snapshot.ticker);
       if (snapshot.ticker.block == null && slot != null) snapshot.ticker.block = slot;
       if (snapshot.network.lastIndexedBlock == null && slot != null) {
         snapshot.network.lastIndexedBlock = slot;
@@ -190,7 +240,7 @@ export function useOnChainFeed() {
         if (oxSells) snapshot.ticker.orbitxSells = oxSells;
         if (orbitx?.totals?.burned) snapshot.ticker.orbitxBurned = orbitx.totals.burned;
       }
-      const oxDistrict = districts?.orbitx || city?.orbitx || data?.districts?.orbitx;
+      const oxDistrict = districts?.orbitx || data?.districts?.orbitx;
       if (oxDistrict?.buys_24h != null) snapshot.ticker.orbitxBuys24h = oxDistrict.buys_24h;
       if (oxDistrict?.sells_24h != null) snapshot.ticker.orbitxSells24h = oxDistrict.sells_24h;
       if (oxDistrict?.traders_24h != null) snapshot.ticker.orbitxTraders24h = oxDistrict.traders_24h;
@@ -204,13 +254,13 @@ export function useOnChainFeed() {
         snapshot.ticker.kolEvents = activity.kol;
         snapshot.ticker.activeWallets = new Set(events.map((e) => e.wallet).filter(Boolean)).size;
       }
-      setSnapshot({ ...snapshot, wallet: prevWallet });
+      setSnapshot({ ...snapshot, wallet: prev.wallet });
       patchCity({
         live: Boolean(data?.ok && data.live),
         liveLabel: data?.live_label || "INDEXING DELAY",
         liveReason: data?.live_reason || (data?.ok ? null : "Live feed delayed."),
         kols,
-        districts: districts || useOrbitxStore.getState().city.districts,
+        districts,
         rawEvents: events,
         orbitxEvents,
         orbitxTotals: orbitx?.ok ? orbitx.totals || null : useOrbitxStore.getState().city.orbitxTotals,
@@ -220,14 +270,21 @@ export function useOnChainFeed() {
       patchCity({
         liveReason: err instanceof Error ? err.message : "Live feed failed.",
       });
+    } finally {
+      liveInflight.current = false;
     }
   }, [paused, patchCity, setSnapshot]);
 
   useEffect(() => {
+    void loadCatalog();
     void loadLive();
-    const id = window.setInterval(() => void loadLive(), 5000);
-    return () => window.clearInterval(id);
-  }, [loadLive]);
+    const liveId = window.setInterval(() => void loadLive(), 5000);
+    const catalogId = window.setInterval(() => void loadCatalog(), 60_000);
+    return () => {
+      window.clearInterval(liveId);
+      window.clearInterval(catalogId);
+    };
+  }, [loadCatalog, loadLive]);
 
   useEffect(() => {
     void loadCityDistricts()

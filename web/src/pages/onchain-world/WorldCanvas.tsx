@@ -22,6 +22,7 @@ import { isOrbitxMint, ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js
 import { DEX_HUBS, tokenLabel, tokenTicker } from "../../../shared/orbitx-chain-districts.js";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { detectLiteGpu } from "./detectLiteGpu";
+import { usePlanetTexture } from "./planetTexture";
 import type { FlightStick } from "./dashboard/WorldJoystick";
 import type { ViewOptions } from "./lib/orbitx/types";
 import {

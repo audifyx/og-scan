@@ -29,7 +29,7 @@ import {
   kolWatchBatch,
   trackedRowsFromDirectory,
 } from "../shared/orbitx-kol-directory.js";
-import { epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
+import { DEX_HUBS, epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
 
 export const config = { maxDuration: 60 };
 
@@ -43,7 +43,22 @@ const buckets = new Map();
 const metaCache = new Map();
 let solUsdCache = { at: 0, value: null };
 let ingestLock = 0;
+let ingestInflight = null;
+let ingestStartedAt = 0;
+const INGEST_COOLDOWN_MS = 15_000;
+const INGEST_STUCK_MS = 60_000;
+const INGEST_BUDGET_MS = 9_000;
 let districtCache = { at: 0, value: null };
+
+function withDeadline(promise, ms, fallback) {
+  let timer = null;
+  const guard = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, guard]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -590,8 +605,24 @@ async function ingestAddresses(sb, addresses, opts = {}) {
 }
 
 async function ingestNow(sb, extra = []) {
-  if (Date.now() - ingestLock < 7000) return { skipped: true, reason: "throttled" };
+  // Share one ingest across concurrent requests instead of starting a new run
+  // every time. The old timestamp-only throttle let a second request begin
+  // while the first was still fetching, which stacked RPC work until the
+  // function hit the 60s Vercel timeout.
+  if (ingestInflight && Date.now() - ingestStartedAt < INGEST_STUCK_MS) return ingestInflight;
+  if (Date.now() - ingestLock < INGEST_COOLDOWN_MS) return { skipped: true, reason: "throttled" };
   ingestLock = Date.now();
+  ingestStartedAt = Date.now();
+  const run = runIngest(sb, extra).finally(() => {
+    ingestLock = Date.now();
+    if (ingestInflight === run) ingestInflight = null;
+  });
+  ingestInflight = run;
+  void run.catch(() => {});
+  return run;
+}
+
+async function runIngest(sb, extra = []) {
   await seedAssignedKols(sb);
   const watch = [
     ORBITX_MINT,
@@ -670,35 +701,178 @@ function applyEventFilters(q, query) {
   return q;
 }
 
-async function cityDistricts(extraMints = []) {
+function emptyCityDistricts() {
+  return {
+    orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" },
+    hubs: DEX_HUBS,
+    tokens: [],
+  };
+}
+
+function districtToRow(token) {
+  const mint = String(token?.mint || "").trim();
+  const meta = token?.metadata && typeof token.metadata === "object" ? token.metadata : {};
+  return {
+    mint,
+    symbol: tokenTicker({ symbol: token?.symbol, mint }),
+    name: tokenDisplayName({ name: token?.name, symbol: token?.symbol, mint }),
+    image: token?.image || dexTokenImage(mint),
+    banner: token?.banner || null,
+    website: token?.website || null,
+    twitter: token?.twitter || null,
+    telegram: token?.telegram || null,
+    launch_platform: token?.launch_platform || null,
+    price_usd: token?.price_usd ?? null,
+    market_cap: token?.market_cap ?? null,
+    liquidity_usd: token?.liquidity_usd ?? null,
+    volume_24h: token?.volume_24h ?? null,
+    holders: token?.holder_count ?? token?.holders ?? null,
+    metadata: {
+      ...meta,
+      universe: true,
+      buys_24h: token?.buys_24h ?? null,
+      sells_24h: token?.sells_24h ?? null,
+      traders_24h: token?.traders_24h ?? null,
+      change_24h: token?.change_24h ?? null,
+      change_1h: token?.change_1h ?? null,
+      kind: token?.kind || (isOrbitxMint(mint) ? "orbitx" : "token"),
+      source: token?.source || null,
+      dex: token?.dex || null,
+      buy_volume_24h: token?.buy_volume_24h ?? null,
+      sell_volume_24h: token?.sell_volume_24h ?? null,
+    },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function rowToDistrict(row) {
+  if (!row?.mint) return null;
+  const meta = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  return cleanTokenFields({
+    mint: row.mint,
+    symbol: row.symbol,
+    name: row.name,
+    image: row.image,
+    banner: row.banner,
+    price_usd: asNumber(row.price_usd),
+    market_cap: asNumber(row.market_cap),
+    liquidity_usd: asNumber(row.liquidity_usd),
+    volume_24h: asNumber(row.volume_24h),
+    holder_count: asNumber(row.holders),
+    website: row.website,
+    twitter: row.twitter,
+    telegram: row.telegram,
+    launch_platform: row.launch_platform,
+    buys_24h: asNumber(meta.buys_24h),
+    sells_24h: asNumber(meta.sells_24h),
+    traders_24h: asNumber(meta.traders_24h),
+    change_24h: asNumber(meta.change_24h),
+    change_1h: asNumber(meta.change_1h),
+    buy_volume_24h: asNumber(meta.buy_volume_24h),
+    sell_volume_24h: asNumber(meta.sell_volume_24h),
+    kind: meta.kind || (isOrbitxMint(row.mint) ? "orbitx" : "token"),
+    source: meta.source || null,
+    dex: meta.dex || null,
+  });
+}
+
+async function persistUniverse(sb, districts) {
+  if (!sb || !districts) return;
+  const tokens = [];
+  if (districts.orbitx?.mint) tokens.push(districts.orbitx);
+  for (const token of districts.tokens || []) {
+    if (token?.mint && token.mint !== districts.orbitx?.mint) tokens.push(token);
+  }
+  const rows = tokens.filter((t) => t?.mint).map(districtToRow);
+  for (let i = 0; i < rows.length; i += 80) {
+    const chunk = rows.slice(i, i + 80);
+    const { error } = await sb.from("ox_chain_tokens").upsert(chunk);
+    if (error) console.error("persistUniverse", error.message);
+  }
+}
+
+async function readUniverse(sb) {
+  if (!sb) return null;
+  try {
+    const [{ data: universeRows }, { data: oxRow }] = await Promise.all([
+      sb.from("ox_chain_tokens").select("*").contains("metadata", { universe: true }).order("volume_24h", { ascending: false, nullsFirst: false }).limit(250),
+      sb.from("ox_chain_tokens").select("*").eq("mint", ORBITX_MINT).maybeSingle(),
+    ]);
+    let rows = Array.isArray(universeRows) ? universeRows : [];
+    if (!rows.length) {
+      const { data: fallback } = await sb.from("ox_chain_tokens").select("*").order("volume_24h", { ascending: false, nullsFirst: false }).limit(250);
+      rows = Array.isArray(fallback) ? fallback : [];
+    }
+    const tokens = rows.map(rowToDistrict).filter((t) => t && !isOrbitxMint(t.mint));
+    if (!tokens.length && !oxRow) return null;
+    const orbitx = rowToDistrict(oxRow) || emptyCityDistricts().orbitx;
+    orbitx.kind = "orbitx";
+    orbitx.name = "OrbitX";
+    orbitx.symbol = "ORBITX";
+    orbitx.mint = ORBITX_MINT;
+    return {
+      orbitx,
+      hubs: DEX_HUBS,
+      tokens,
+      trending_count: tokens.length,
+      window: "24h",
+    };
+  } catch (e) {
+    console.error("readUniverse", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function cityDistricts(extraMints = [], sb = null) {
   if (districtCache.value && Date.now() - districtCache.at < 90_000) return districtCache.value;
   try {
     const value = await loadCityDistricts(extraMints);
     districtCache = { at: Date.now(), value };
+    if (sb) void persistUniverse(sb, value).catch(() => undefined);
     return value;
   } catch {
+    const fromDb = await readUniverse(sb);
+    if (fromDb?.tokens?.length) {
+      districtCache = { at: Date.now(), value: fromDb };
+      return fromDb;
+    }
     return districtCache.value || emptyCityDistricts();
   }
-}
-
-function emptyCityDistricts() {
-  return { orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" }, hubs: [], tokens: [] };
 }
 
 function peekCityDistricts() {
   return districtCache.value || emptyCityDistricts();
 }
 
-function refreshCityDistricts(extraMints = []) {
-  void cityDistricts(extraMints);
+function refreshCityDistricts(extraMints = [], sb = null) {
+  void cityDistricts(extraMints, sb);
 }
 
-async function cityDistrictsOrCache(extraMints = []) {
+async function cityDistrictsOrCache(extraMints = [], sb = null) {
   if (districtCache.value) {
-    if (Date.now() - districtCache.at >= 90_000) refreshCityDistricts(extraMints);
+    if (Date.now() - districtCache.at >= 90_000) refreshCityDistricts(extraMints, sb);
     return districtCache.value;
   }
-  return cityDistricts(extraMints);
+  const fromDb = await readUniverse(sb);
+  if (fromDb?.tokens?.length) {
+    districtCache = { at: Date.now(), value: fromDb };
+    refreshCityDistricts(extraMints, sb);
+    return fromDb;
+  }
+  return cityDistricts(extraMints, sb);
+}
+
+async function peekOrReadDistricts(extraMints = [], sb = null) {
+  if (districtCache.value) {
+    if (Date.now() - districtCache.at >= 90_000) refreshCityDistricts(extraMints, sb);
+    return districtCache.value;
+  }
+  const fromDb = await readUniverse(sb);
+  if (fromDb?.tokens?.length) {
+    districtCache = { at: Date.now(), value: fromDb };
+  }
+  refreshCityDistricts(extraMints, sb);
+  return fromDb || peekCityDistricts();
 }
 
 async function handleLive(req, res, sb) {
@@ -761,8 +935,7 @@ async function handleLive(req, res, sb) {
   });
   const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
   const extraMints = labeled.map((e) => e.token_ca).filter(Boolean);
-  refreshCityDistricts(extraMints);
-  const districts = peekCityDistricts();
+  const districts = await peekOrReadDistricts(extraMints, sb);
   const oxLive = districts.orbitx?.buys_24h != null ? districts.orbitx : await tokenMeta(ORBITX_MINT).catch(() => districts.orbitx || {});
   const ingestAge = state?.last_ingest_at ? Math.max(0, (Date.now() - Date.parse(state.last_ingest_at)) / 1000) : null;
   return json(res, 200, {
@@ -797,13 +970,13 @@ async function handleLive(req, res, sb) {
   });
 }
 
-async function handleDistricts(req, res) {
-  const districts = await cityDistrictsOrCache();
+async function handleDistricts(req, res, sb) {
+  const districts = await cityDistrictsOrCache([], sb);
   return json(res, 200, { ok: true, ...districts });
 }
 
-async function handleTrending(req, res) {
-  const districts = await cityDistrictsOrCache();
+async function handleTrending(req, res, sb) {
+  const districts = await cityDistrictsOrCache([], sb);
   const tokens = Array.isArray(districts?.tokens) ? districts.tokens : [];
   return json(res, 200, {
     ok: true,
@@ -1032,8 +1205,7 @@ async function handleOrbitx(req, res, sb, sub) {
   const { data: tokens } = await sb.from("ox_chain_wallet_tokens").select("*").eq("token_ca", mint);
   const { data: token } = await sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle();
   const meta = await tokenMeta(mint);
-  const oxCached = peekCityDistricts()?.orbitx || null;
-  refreshCityDistricts([mint]);
+  const oxCached = (await peekOrReadDistricts([mint], sb))?.orbitx || peekCityDistricts()?.orbitx || null;
   const rows = events || [];
   const burns = rows.filter((e) => /BURN/.test(e.event_type || ""));
   const buys = rows.filter((e) => /BUY/.test(e.event_type || ""));
@@ -1174,8 +1346,8 @@ export default async function handler(req, res) {
     if (head === "orbitx" && a === "buyers") return await handleOrbitx(req, res, sb, "buyers");
     if (head === "search") return await handleSearch(req, res, sb);
     if (head === "kols") return await handleKols(req, res, sb);
-    if (head === "districts") return await handleDistricts(req, res);
-    if (head === "trending") return await handleTrending(req, res);
+    if (head === "districts") return await handleDistricts(req, res, sb);
+    if (head === "trending") return await handleTrending(req, res, sb);
     if (head === "flows" && a) return await handleFlows(req, res, sb, a);
     if (head === "status") return await handleStatus(req, res, sb);
     if (head === "ingest" && (req.method === "POST" || cronAuthorized(req) || req.query?.force === "1")) {
