@@ -5,9 +5,12 @@ import {
   FAST_NIM_MODEL,
   FALLBACK_NIM_MODEL,
   NIM_MODELS,
+  NVIDIA_BUSY_MESSAGE,
   RETIRED_NIM_MODELS,
+  isNvidiaRateLimit,
   isRetiredNimError,
   nvidiaChat,
+  publicNvidiaMessage,
   resolveNimModel,
 } from "./x-agent-lib.js";
 
@@ -88,6 +91,53 @@ describe("NVIDIA NIM catalog after Llama 3.1 8B EOL", () => {
     expect(result.ok).toBe(true);
     expect(result.content).toBe("fallback");
     expect(sent).toEqual([FAST_NIM_MODEL, FALLBACK_NIM_MODEL]);
+  });
+
+  it("retries a 429 then succeeds without leaking NVIDIA JSON", async () => {
+    process.env.NVIDIA_API_KEY = "test-key";
+    let n = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        n += 1;
+        if (n === 1) {
+          return {
+            ok: false,
+            status: 429,
+            headers: { get: (name) => (String(name).toLowerCase() === "retry-after" ? "0" : null) },
+            text: async () => JSON.stringify({ status: 429, title: "Too Many Requests" }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ choices: [{ message: { content: "recovered" } }] }),
+        };
+      }),
+    );
+    const result = await nvidiaChat({ user: "hi", model: FAST_NIM_MODEL });
+    expect(result.ok).toBe(true);
+    expect(result.content).toBe("recovered");
+    expect(n).toBe(2);
+  });
+
+  it("maps exhausted 429s to a user-safe busy message", async () => {
+    process.env.NVIDIA_API_KEY = "test-key";
+    const body = JSON.stringify({ status: 429, title: "Too Many Requests" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 429,
+        headers: { get: (name) => (String(name).toLowerCase() === "retry-after" ? "0" : null) },
+        text: async () => body,
+      })),
+    );
+    const result = await nvidiaChat({ user: "hi", model: FAST_NIM_MODEL });
+    expect(result.ok).toBe(false);
+    expect(isNvidiaRateLimit(result.status, result.body)).toBe(true);
+    expect(result.message).toBe(NVIDIA_BUSY_MESSAGE);
+    expect(publicNvidiaMessage(result)).not.toMatch(/Too Many Requests/);
+    expect(publicNvidiaMessage(result)).not.toMatch(/NVIDIA API 429/);
   });
 });
 
