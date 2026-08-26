@@ -1,4 +1,6 @@
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { WorldJoystick, type FlightStick } from "@/pages/onchain-world/dashboard/WorldJoystick";
 import {
   Aperture,
   Crosshair,
@@ -24,6 +26,7 @@ export function WorldView() {
   const speed = useOrbitxStore((s) => s.speed);
   const cycleSpeed = useOrbitxStore((s) => s.cycleSpeed);
   const resetCamera = useOrbitxStore((s) => s.resetCamera);
+  const viewOptions = useOrbitxStore((s) => s.viewOptions);
   const webglOk = useOrbitxStore((s) => s.city.webglOk);
   const events = useOrbitxStore((s) => s.city.rawEvents);
   const kols = useOrbitxStore((s) => s.city.kols);
@@ -38,6 +41,8 @@ export function WorldView() {
   const setFollowId = useOrbitxStore((s) => s.setFollowId);
   const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   const patchCity = useOrbitxStore((s) => s.patchCity);
+  const [stick, setStick] = useState<FlightStick>({ x: 0, y: 0, z: 0, boost: false });
+  const onStick = useCallback((next: FlightStick) => setStick(next), []);
 
   const focused =
     selectedToken === districts.orbitx?.mint || (selectedToken && isOrbitxMint(selectedToken))
@@ -73,7 +78,7 @@ export function WorldView() {
       <div className="relative min-h-0 flex-1 overflow-hidden bg-[#02010a]">
         {webglOk ? (
           <WorldCanvas
-            events={paused ? [] : events}
+            events={events}
             kols={kols}
             flows={flows}
             districts={districts}
@@ -82,6 +87,10 @@ export function WorldView() {
             selectedMint={selectedToken}
             cinematic={follow}
             cam={cam}
+            paused={paused}
+            speed={speed}
+            viewOptions={viewOptions}
+            stick={stick}
             onPick={onPick}
             onReady={() => patchCity({ webglLive: true })}
           />
@@ -97,6 +106,8 @@ export function WorldView() {
             onToken={(mint) => onPick({ kind: "token", mint })}
           />
         )}
+
+        <WorldJoystick value={stick} onChange={onStick} />
 
         {focused ? (
           <aside className="pointer-events-none absolute left-3 top-3 max-w-sm overflow-hidden rounded-md border border-line bg-bg-sunken/88 shadow-[0_18px_40px_rgb(0_0_0_/_0.45)]">
@@ -125,10 +136,10 @@ export function WorldView() {
           <aside className="pointer-events-none absolute left-3 top-3 rounded-md border border-line bg-bg-sunken/80 px-3 py-2">
             <p className="flex items-center gap-1.5 font-display text-2xs tracking-[0.16em] text-accent">
               <Sparkles className="size-3" />
-              GALAXY
+              GALAXY OF PLANETS
             </p>
             <p className="mt-0.5 text-2xs text-muted">
-              {(districts.tokens || []).length} trending coins · official KOLs · live swaps
+              {(districts.tokens || []).length} planets · WASD / stick to fly · Orbit is optional
             </p>
           </aside>
         )}

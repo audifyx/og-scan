@@ -9,7 +9,7 @@ import type {
   ViewOptions,
 } from "./types";
 import type { CamCommand } from "../../WorldCanvas";
-import type { ChainEvent, CityDistricts, FlowRow, KolCard, TokenPayload } from "../../api";
+import type { ChainEvent, CityDistricts, FlowRow, KolCard, OrbitxPayload, TokenPayload } from "../../api";
 
 export type CityLive = {
   live: boolean;
@@ -18,6 +18,8 @@ export type CityLive = {
   districts: CityDistricts;
   kols: KolCard[];
   rawEvents: ChainEvent[];
+  orbitxEvents: ChainEvent[];
+  orbitxTotals: OrbitxPayload["totals"] | null;
   flows: FlowRow[];
   webglOk: boolean;
   webglLive: boolean;
@@ -100,6 +102,8 @@ const EMPTY_CITY: CityLive = {
   },
   kols: [],
   rawEvents: [],
+  orbitxEvents: [],
+  orbitxTotals: null,
   flows: [],
   webglOk: true,
   webglLive: false,

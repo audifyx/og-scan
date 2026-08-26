@@ -1,9 +1,14 @@
 export type EventKind =
   | "kol_buy"
+  | "kol_sell"
   | "orbitx_buy"
-  | "sol_transfer"
+  | "orbitx_sell"
   | "orbitx_burn"
+  | "sol_transfer"
   | "whale_sell"
+  | "token_buy"
+  | "token_sell"
+  | "token_swap"
   | "token_launch"
   | "liquidity_add"
   | "other";

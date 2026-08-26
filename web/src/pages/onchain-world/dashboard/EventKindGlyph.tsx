@@ -14,10 +14,15 @@ import { cn } from "@/lib/utils";
 
 const ICONS: Record<EventKind, typeof ShoppingBag> = {
   kol_buy: Sparkles,
+  kol_sell: Sparkles,
   orbitx_buy: ShoppingBag,
+  orbitx_sell: TrendingDown,
   sol_transfer: ArrowLeftRight,
   orbitx_burn: Flame,
   whale_sell: TrendingDown,
+  token_buy: ShoppingBag,
+  token_sell: TrendingDown,
+  token_swap: ArrowLeftRight,
   token_launch: Rocket,
   liquidity_add: Droplets,
   other: Wallet,

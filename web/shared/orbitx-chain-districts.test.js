@@ -11,6 +11,8 @@ import {
   tokenDisplayName,
   tokenLabel,
   tokenTicker,
+  dexTokenImage,
+  cleanTokenFields,
 } from "./orbitx-chain-districts.js";
 import { ORBITX_MINT } from "./orbitx-chain-intel.js";
 
@@ -29,6 +31,9 @@ describe("orbitx-chain-districts", () => {
     expect(tokenDisplayName({ mint, name: "OrbitX", symbol: "ORBITX" })).toBe("OrbitX");
     expect(tokenTicker({ mint, symbol: "ORBITX" })).toBe("ORBITX");
     expect(tokenTicker({ mint, symbol: mint })).toBeNull();
+    expect(dexTokenImage(mint)).toBe(`https://dd.dexscreener.com/ds-data/tokens/solana/${mint}.png`);
+    expect(cleanTokenFields({ mint, name: mint, symbol: mint, image: null }).name).toBeNull();
+    expect(cleanTokenFields({ mint, name: mint, symbol: mint, image: null }).image).toBe(dexTokenImage(mint));
   });
 
   it("ranks the day's high-volume coins and leaves OrbitX out of the 250", () => {

@@ -28,7 +28,7 @@ import {
   kolWatchBatch,
   trackedRowsFromDirectory,
 } from "../shared/orbitx-kol-directory.js";
-import { epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName } from "../shared/orbitx-chain-districts.js";
+import { epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields } from "../shared/orbitx-chain-districts.js";
 
 export const config = { maxDuration: 60 };
 
@@ -50,6 +50,87 @@ function json(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
   res.end(JSON.stringify(body));
+}
+
+const MEDIA_HOST_SUFFIXES = [
+  "dexscreener.com",
+  "ipfs.io",
+  "cloudflare-ipfs.com",
+  "cf-ipfs.com",
+  "nftstorage.link",
+  "w3s.link",
+  "arweave.net",
+  "irys.xyz",
+  "pump.fun",
+  "mypinata.cloud",
+  "imgur.com",
+  "githubusercontent.com",
+  "jup.ag",
+  "solana.cloud",
+  "wrpcd.net",
+  "genesysgo.net",
+  "shadow.magicblock.app",
+];
+
+function mediaHostAllowed(host) {
+  const h = String(host || "").toLowerCase().replace(/\.$/, "");
+  if (!h || h === "localhost" || h.endsWith(".local")) return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+  return MEDIA_HOST_SUFFIXES.some((ok) => h === ok || h.endsWith(`.${ok}`));
+}
+
+function publicEvent(e) {
+  if (!e) return e;
+  const mint = e.token_ca || null;
+  const name = tokenDisplayName({ name: e.token_name, symbol: e.token_symbol, mint });
+  const symbol = tokenTicker({ symbol: e.token_symbol, mint });
+  return {
+    ...e,
+    token_name: name,
+    token_symbol: symbol,
+    token_image: e.token_image || dexTokenImage(mint),
+  };
+}
+
+async function handleMedia(req, res) {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return json(res, 405, { ok: false, error: "Media is GET only." });
+  }
+  const raw = String(req.query?.u || "").trim();
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return json(res, 400, { ok: false, error: "Valid image URL required." });
+  }
+  if (parsed.protocol !== "https:") return json(res, 400, { ok: false, error: "HTTPS image URL required." });
+  if (!mediaHostAllowed(parsed.hostname)) return json(res, 400, { ok: false, error: "Image host not allowed." });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(parsed.toString(), {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: { Accept: "image/*,*/*;q=0.8", "User-Agent": "OrbitXOnChain/1.0" },
+    });
+    let finalHost = parsed.hostname;
+    try { finalHost = new URL(r.url).hostname; } catch { /* keep */ }
+    if (!mediaHostAllowed(finalHost)) return json(res, 400, { ok: false, error: "Redirect host not allowed." });
+    const type = String(r.headers.get("content-type") || "").split(";")[0].trim();
+    if (!r.ok || !type.startsWith("image/")) return json(res, 404, { ok: false, error: "Image not found." });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 1_200_000) return json(res, 413, { ok: false, error: "Image too large." });
+    res.statusCode = 200;
+    res.setHeader("Content-Type", type);
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (req.method === "HEAD") return res.end();
+    return res.end(buf);
+  } catch {
+    return json(res, 502, { ok: false, error: "Image fetch failed." });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function admin() {
@@ -171,7 +252,7 @@ async function tokenMeta(mint) {
   const hit = metaCache.get(mint);
   if (hit && Date.now() - hit.at < 120_000) return hit.value;
   if (isOrbitxMint(mint)) {
-    const base = { symbol: "ORBITX", name: "OrbitX", decimals: 6, mint };
+    const base = { symbol: "ORBITX", name: "OrbitX", decimals: 6, mint, image: dexTokenImage(mint) };
     metaCache.set(mint, { at: Date.now(), value: base });
   }
   try {
@@ -181,9 +262,9 @@ async function tokenMeta(mint) {
     if (!pair) return metaCache.get(mint)?.value || {};
     const value = {
       mint,
-      symbol: pair.baseToken?.symbol || null,
-      name: pair.baseToken?.name || null,
-      image: pair.info?.imageUrl || null,
+      symbol: looksLikeMint(pair.baseToken?.symbol) ? null : (pair.baseToken?.symbol || null),
+      name: tokenDisplayName({ name: pair.baseToken?.name, symbol: pair.baseToken?.symbol, mint }),
+      image: pair.info?.imageUrl || dexTokenImage(mint),
       banner: pair.info?.header || pair.info?.openGraph || null,
       website: pair.info?.websites?.[0]?.url || null,
       twitter: (pair.info?.socials || []).find((s) => s.type === "twitter")?.url || null,
@@ -195,6 +276,11 @@ async function tokenMeta(mint) {
       change_24h: asNumber(pair.priceChange?.h24),
       launch_platform: pair.dexId || null,
     };
+    if (isOrbitxMint(mint)) {
+      value.symbol = "ORBITX";
+      value.name = "OrbitX";
+      value.image = pair.info?.imageUrl || dexTokenImage(mint);
+    }
     metaCache.set(mint, { at: Date.now(), value });
     return value;
   } catch {
@@ -282,9 +368,9 @@ async function persistEvents(sb, events, tokenMetaMap) {
     const meta = e.token_ca ? tokenMetaMap[e.token_ca] : null;
     return eventRow({
       ...e,
-      token_symbol: e.token_symbol || meta?.symbol || null,
-      token_name: e.token_name || meta?.name || null,
-      token_image: e.token_image || meta?.image || null,
+      token_symbol: tokenTicker({ symbol: e.token_symbol || meta?.symbol, mint: e.token_ca }) || null,
+      token_name: tokenDisplayName({ name: e.token_name || meta?.name, symbol: e.token_symbol || meta?.symbol, mint: e.token_ca }),
+      token_image: e.token_image || meta?.image || dexTokenImage(e.token_ca),
       market_cap: e.market_cap ?? meta?.market_cap ?? null,
     });
   });
@@ -392,9 +478,10 @@ async function rollup(sb, events) {
       if (meta.symbol || meta.price_usd) {
         await sb.from("ox_chain_tokens").upsert({
           mint: e.token_ca,
-          symbol: meta.symbol || e.token_symbol,
-          name: meta.name || e.token_name,
-          image: meta.image || e.token_image,
+          symbol: tokenTicker({ symbol: meta.symbol || e.token_symbol, mint: e.token_ca }),
+          name: tokenDisplayName({ name: meta.name || e.token_name, symbol: meta.symbol || e.token_symbol, mint: e.token_ca }),
+          image: meta.image || e.token_image || dexTokenImage(e.token_ca),
+          banner: meta.banner || null,
           decimals: e.token_decimals,
           website: meta.website || null,
           twitter: meta.twitter || null,
@@ -538,18 +625,28 @@ async function handleLive(req, res, sb) {
   q = applyEventFilters(q, req.query || {});
   const { data: events, error } = await q;
   if (error) return json(res, 503, { ok: false, error: error.message });
+  const [{ data: oxEvents }, { data: oxMintEvents }, { data: recent }] = await Promise.all([
+    sb.from("ox_chain_events").select("*").eq("orbitx_related", true).order("block_time", { ascending: false }).limit(200),
+    sb.from("ox_chain_events").select("*").eq("token_ca", ORBITX_MINT).order("block_time", { ascending: false }).limit(200),
+    sb.from("ox_chain_events").select("*").order("block_time", { ascending: false }).limit(Math.max(limit, 120)),
+  ]);
+  const merged = new Map();
+  for (const row of [...(oxEvents || []), ...(oxMintEvents || []), ...(recent || []), ...(events || [])]) {
+    if (row?.event_id) merged.set(row.event_id, row);
+  }
+  const combined = [...merged.values()].sort((a, b) => (Date.parse(b.block_time || "") || 0) - (Date.parse(a.block_time || "") || 0)).slice(0, 400);
   const { data: state } = await sb.from("ox_chain_index_state").select("*").eq("id", "solana-mainnet").maybeSingle();
   const live = statusFromLag(state?.lag_slots, state?.last_ingest_at);
-  const stats = summarizeEvents(events || []);
+  const stats = summarizeEvents(combined);
   const tracked = await loadTracked(sb);
-  const labeled = (events || []).map((e) => {
+  const labeled = combined.map((e) => {
     const kol = kolByAddress(e.wallet) || tracked[e.wallet];
-    return {
+    return publicEvent({
       ...e,
       kol_related: e.kol_related || isAssignedKol(e.wallet),
       wallet_label: kol?.label || kol?.name || null,
       wallet_twitter: kol?.twitter || null,
-    };
+    });
   });
   const latestByWallet = {};
   for (const e of labeled) {
@@ -565,7 +662,8 @@ async function handleLive(req, res, sb) {
       status: k.status,
       hits,
       last_type: last?.event_type || null,
-      last_token: last?.token_symbol || null,
+      last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
+        || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
       last_usd: last?.usd_value ?? null,
       last_at: last?.block_time || null,
     };
@@ -643,7 +741,7 @@ async function handleKols(req, res, sb) {
       label_kind: "KOL",
       tracked: Boolean(tracked[k.address]),
     })),
-    events,
+    events: events.map(publicEvent),
   });
 }
 
@@ -659,7 +757,7 @@ async function handleEvents(req, res, sb) {
   const page = rows.slice(0, limit);
   return json(res, 200, {
     ok: true,
-    events: page,
+    events: page.map(publicEvent),
     next_cursor: rows.length > limit ? page[page.length - 1]?.block_time || null : null,
   });
 }
@@ -683,9 +781,9 @@ async function handleWallet(req, res, sb, address) {
         mint: t.mint,
         amount: t.amount,
         decimals: t.decimals,
-        symbol: meta.symbol || (isOrbitxMint(t.mint) ? "ORBITX" : "UNKNOWN"),
-        name: meta.name || null,
-        image: meta.image || null,
+        symbol: tokenTicker({ symbol: meta.symbol, mint: t.mint }) || (isOrbitxMint(t.mint) ? "ORBITX" : null),
+        name: tokenDisplayName({ name: meta.name, symbol: meta.symbol, mint: t.mint }),
+        image: meta.image || dexTokenImage(t.mint),
         price_usd: meta.price_usd ?? null,
       });
     }
@@ -714,7 +812,7 @@ async function handleWallet(req, res, sb, address) {
       };
     })(),
     holdings,
-    events: events || [],
+    events: (events || []).map(publicEvent),
     flows: (flows || []).map((f) => ({
       ...f,
       from_kind: addressKind(f.from_address),
@@ -736,8 +834,8 @@ async function handleToken(req, res, sb, mint) {
   return json(res, 200, {
     ok: true,
     mint,
-    token: { ...meta, ...stored, mint },
-    events: events || [],
+    token: cleanTokenFields({ ...meta, ...stored, mint }),
+    events: (events || []).map(publicEvent),
     buyers: buyers || [],
   });
 }
@@ -799,7 +897,15 @@ async function handleBlock(req, res, slot) {
 async function handleOrbitx(req, res, sb, sub) {
   try { await ingestAddresses(sb, [ORBITX_MINT], { limit: 40 }); } catch { /* cache */ }
   const mint = ORBITX_MINT;
-  const { data: events } = await sb.from("ox_chain_events").select("*").eq("orbitx_related", true).order("block_time", { ascending: false }).limit(120);
+  const [{ data: related }, { data: byMint }] = await Promise.all([
+    sb.from("ox_chain_events").select("*").eq("orbitx_related", true).order("block_time", { ascending: false }).limit(400),
+    sb.from("ox_chain_events").select("*").eq("token_ca", mint).order("block_time", { ascending: false }).limit(400),
+  ]);
+  const byId = new Map();
+  for (const row of [...(related || []), ...(byMint || [])]) {
+    if (row?.event_id) byId.set(row.event_id, row);
+  }
+  const events = [...byId.values()].sort((a, b) => (Date.parse(b.block_time || "") || 0) - (Date.parse(a.block_time || "") || 0));
   const { data: daily } = await sb.from("ox_chain_orbitx_daily").select("*").order("day", { ascending: false }).limit(31);
   const { data: tokens } = await sb.from("ox_chain_wallet_tokens").select("*").eq("token_ca", mint);
   const { data: token } = await sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle();
@@ -813,11 +919,11 @@ async function handleOrbitx(req, res, sb, sub) {
   const payload = {
     ok: true,
     mint,
-    token: { ...meta, ...token, mint },
-    events: sub === "burns" ? burns : sub === "buyers" ? buys : rows,
-    burns,
-    buys,
-    sells,
+    token: cleanTokenFields({ ...meta, ...token, mint }),
+    events: (sub === "burns" ? burns : sub === "buyers" ? buys : rows).map(publicEvent),
+    burns: burns.map(publicEvent),
+    buys: buys.map(publicEvent),
+    sells: sells.map(publicEvent),
     burners,
     buyers,
     daily: daily || [],
@@ -915,13 +1021,17 @@ export default async function handler(req, res) {
     for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
     return res.end();
   }
+  const path = pathOf(req);
+  const [head, a] = path.split("/");
+  if (head === "media") {
+    if (!rateLimit(req, 240, 60_000)) return json(res, 429, { ok: false, error: "Rate limited." });
+    return await handleMedia(req, res);
+  }
   if (!rateLimit(req, cronAuthorized(req) ? 120 : 60, 60_000)) {
     return json(res, 429, { ok: false, error: "Rate limited." });
   }
   const sb = admin();
   if (!sb) return json(res, 503, { ok: false, error: "Supabase is not configured." });
-  const path = pathOf(req);
-  const [head, a] = path.split("/");
   try {
     if (!head || head === "live") return await handleLive(req, res, sb);
     if (head === "events") return await handleEvents(req, res, sb);

@@ -73,6 +73,27 @@ export function tokenLabel(token) {
   return tokenDisplayName(token) || "Unnamed token";
 }
 
+export function dexTokenImage(mint) {
+  const ca = String(mint || "").trim();
+  if (!looksLikeMint(ca)) return null;
+  return `https://dd.dexscreener.com/ds-data/tokens/solana/${ca}.png`;
+}
+
+export function cleanTokenFields(token) {
+  if (!token || typeof token !== "object") return token;
+  const mint = String(token.mint || token.token_ca || "").trim();
+  const name = tokenDisplayName({ ...token, mint });
+  const symbol = tokenTicker({ ...token, mint });
+  return {
+    ...token,
+    mint: mint || token.mint,
+    name: name || null,
+    symbol: symbol || null,
+    image: token.image || dexTokenImage(mint),
+    banner: token.banner || null,
+  };
+}
+
 function isStable(symbol) {
   return STABLES.has(String(symbol || "").toUpperCase());
 }
@@ -86,7 +107,7 @@ function pairToDistrict(pair, source) {
     mint,
     symbol,
     name: pair.baseToken?.name || null,
-    image: pair.info?.imageUrl || null,
+    image: pair.info?.imageUrl || dexTokenImage(mint),
     banner: pair.info?.header || pair.info?.openGraph || null,
     price_usd: asNumber(pair.priceUsd),
     market_cap: asNumber(pair.marketCap) ?? asNumber(pair.fdv),
@@ -109,7 +130,7 @@ function pumpToDistrict(coin) {
     mint,
     symbol: coin.symbol || null,
     name: coin.name || null,
-    image: coin.image_uri || coin.imageUri || coin.image || null,
+    image: coin.image_uri || coin.imageUri || coin.image || dexTokenImage(mint),
     banner: coin.banner_uri || coin.header || null,
     price_usd: asNumber(coin.usd_price) ?? asNumber(coin.price_usd),
     market_cap: asNumber(coin.usd_market_cap) ?? asNumber(coin.market_cap),
@@ -135,7 +156,7 @@ function jupToDistrict(row) {
     mint,
     symbol: row.symbol || null,
     name: row.name || null,
-    image: row.icon || row.logoURI || null,
+    image: row.icon || row.logoURI || dexTokenImage(mint),
     banner: null,
     price_usd: asNumber(row.usdPrice) ?? asNumber(row.price),
     market_cap: asNumber(row.mcap) ?? asNumber(row.fdv),
@@ -163,7 +184,7 @@ function geckoPoolToMint(item, tokenMap) {
     mint,
     symbol,
     name: bt.name || symbol,
-    image: bt.image_url || null,
+    image: bt.image_url || dexTokenImage(mint),
     banner: null,
     price_usd: asNumber(attrs.base_token_price_usd),
     market_cap: asNumber(attrs.market_cap_usd ?? attrs.fdv_usd),
@@ -180,8 +201,8 @@ function geckoPoolToMint(item, tokenMap) {
 
 export function mergeDistrict(prev, next) {
   if (!next?.mint) return prev || null;
-  if (!prev) return next;
-  return {
+  if (!prev) return cleanTokenFields(next);
+  return cleanTokenFields({
     ...prev,
     ...next,
     name: tokenDisplayName(next) ? next.name : prev.name,
@@ -198,7 +219,7 @@ export function mergeDistrict(prev, next) {
     dex: next.dex || prev.dex,
     source: next.source || prev.source,
     kind: isOrbitxMint(next.mint) ? "orbitx" : next.kind || prev.kind || "token",
-  };
+  });
 }
 
 export function rankTrending(tokens, limit = TRENDING_LIMIT) {
@@ -287,7 +308,7 @@ export async function fetchDexProfiles() {
     .filter((r) => r?.chainId === "solana" && r.tokenAddress)
     .map((r) => ({
       mint: r.tokenAddress,
-      image: r.icon || null,
+      image: r.icon || dexTokenImage(r.tokenAddress),
       banner: r.header || null,
       name: null,
       symbol: null,
@@ -388,7 +409,7 @@ function orbitxFallback() {
     mint: ORBITX_MINT,
     symbol: "ORBITX",
     name: "OrbitX",
-    image: null,
+    image: dexTokenImage(ORBITX_MINT),
     banner: null,
     price_usd: null,
     market_cap: null,

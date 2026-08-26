@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { formatPrice } from "../pages/onchain-world/lib/orbitx/format";
-import { eventKind, liveToSnapshot, toBreakdown, toLiveEvent } from "../pages/onchain-world/lib/mapLive";
+import { eventKind, isOrbitxChainEvent, liveToSnapshot, toBreakdown, toLiveEvent } from "../pages/onchain-world/lib/mapLive";
 import type { ChainEvent, LivePayload } from "../pages/onchain-world/api";
 
 const WEB = resolve(__dirname, "../..");
@@ -28,6 +28,9 @@ describe("OrbitX /on-chain world", () => {
     expect(api).toContain("assigned_kols");
     expect(api).toContain("handleTrending");
     expect(api).toContain("banner");
+    expect(api).toContain("handleMedia");
+    expect(api).toContain("dexTokenImage");
+    expect(api).toContain("publicEvent");
     expect(api).not.toContain("sbp_");
   });
 
@@ -49,6 +52,15 @@ describe("OrbitX /on-chain world", () => {
     expect(world).toContain("WorldCanvas");
     expect(world).not.toContain("world-city.jpg");
     expect(world).toContain("tokenLabel");
+    expect(world).toContain("viewOptions");
+    expect(world).toContain("WorldJoystick");
+    expect(world).toContain("stick={stick}");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8")).toContain("stick");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldJoystick.tsx"), "utf8")).toContain("WASD");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldJoystick.tsx"), "utf8")).toContain("SHIFT BOOST");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/useOnChainFeed.ts"), "utf8")).toContain("mergeChainEvents");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/useOnChainFeed.ts"), "utf8")).toContain("fetchEvents");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/useOnChainFeed.ts"), "utf8")).toContain("orbitxEvents");
     const feed = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TrendingFeed.tsx"), "utf8");
     expect(feed).toContain("Show more");
     expect(feed).toContain("tokenLabel");
@@ -78,6 +90,9 @@ describe("OrbitX /on-chain world", () => {
     const map = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/MapView.tsx"), "utf8");
     expect(map).toContain("WORLD_NODES");
     expect(map).toContain("city.kols");
+    expect(map).toContain("slice(0, 250)");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/TerminalView.tsx"), "utf8")).toContain("decoded rows");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/BottomPanel.tsx"), "utf8")).toContain("isOrbitxChainEvent");
     expect(readFileSync(resolve(WEB, "src/components/theme/OrbitAtmosphereLayer.tsx"), "utf8")).toContain('"/on-chain"');
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/LiveEvents.tsx"), "utf8")).toContain("INDEXING DELAY");
     const oxView = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/OrbitxTokenView.tsx"), "utf8");
@@ -102,6 +117,11 @@ describe("OrbitX /on-chain world", () => {
     const canvas = readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8");
     expect(canvas).toContain("function Agent");
     expect(canvas).toContain("function TokenStar");
+    expect(canvas).toContain("usePlanetTexture");
+    expect(canvas).toContain("map={map}");
+    expect(canvas).toContain("viewOptions");
+    expect(canvas).toContain("NebulaField");
+    expect(canvas).toContain("ACESFilmicToneMapping");
     expect(canvas).toContain("function Transit");
     expect(canvas).toContain("function OrbitXCore");
     expect(canvas).toContain("function galaxyPos");
@@ -124,6 +144,13 @@ describe("OrbitX /on-chain world", () => {
     expect(districts).toContain("TRENDING_LIMIT = 250");
     expect(districts).toContain("token-profiles/latest");
     expect(districts).toContain("toptraded/24h");
+    expect(districts).toContain("dexTokenImage");
+    expect(districts).toContain("dd.dexscreener.com/ds-data/tokens/solana");
+    const planet = readFileSync(resolve(WEB, "src/pages/onchain-world/planetTexture.ts"), "utf8");
+    expect(planet).toContain("planetMediaSrc");
+    expect(planet).toContain("/api/on-chain/media");
+    expect(planet).toContain("CanvasTexture");
+    expect(readFileSync(resolve(REPO, "supabase/migrations/20260826061200_ox_chain_tokens_banner.sql"), "utf8")).toContain("banner");
   });
 
   it("stores a rebuildable chain cache instead of replacing ox_onchain_events", () => {
@@ -166,6 +193,12 @@ describe("OrbitX /on-chain world", () => {
     } satisfies ChainEvent;
     expect(eventKind(ev)).toBe("sol_transfer");
     expect(eventKind({ ...ev, kol_related: true, event_type: "BUY" })).toBe("kol_buy");
+    expect(eventKind({ ...ev, event_type: "ORBITX_SELL", orbitx_related: true, token_name: "OrbitX" })).toBe("orbitx_sell");
+    expect(eventKind({ ...ev, event_type: "ORBITX_BUY", orbitx_related: true, token_name: "OrbitX" })).toBe("orbitx_buy");
+    expect(eventKind({ ...ev, event_type: "BUY", orbitx_related: false, token_name: "OrbitX" })).toBe("orbitx_buy");
+    expect(eventKind({ ...ev, event_type: "SELL", orbitx_related: false, token_name: "OrbitX" })).toBe("orbitx_sell");
+    expect(isOrbitxChainEvent({ ...ev, event_type: "BUY", orbitx_related: false })).toBe(true);
+    expect(eventKind({ ...ev, event_type: "BUY", token_name: "Jupiter", token_symbol: "JUP", token_ca: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN" })).toBe("token_buy");
     expect(toLiveEvent(ev).token).toBe("OrbitX");
     expect(toLiveEvent({ ...ev, token_name: ev.token_ca, token_symbol: ev.token_ca }).token).toBeUndefined();
     const idle: LivePayload = {

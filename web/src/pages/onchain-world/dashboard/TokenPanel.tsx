@@ -26,7 +26,7 @@ export function TokenPanel() {
         <EmptyState
           icon={<Radio className="size-5" />}
           title="Pick a coin"
-          body="Search or tap a star in the galaxy. The first slice is the day's 250 high-volume trending coins — open one for holders, KOL flow, and swaps."
+          body="Search or tap a planet in space. The first slice is the day's 250 high-volume trending coins — open one for holders, KOL flow, and swaps."
         />
       </aside>
     );

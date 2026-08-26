@@ -192,12 +192,20 @@ export type TrendingPayload = {
 export type OrbitxPayload = {
   ok: boolean;
   mint: string;
+  token?: TokenDistrict | null;
   events?: ChainEvent[];
   burns?: ChainEvent[];
   buys?: ChainEvent[];
   sells?: ChainEvent[];
   burners?: WalletTokenRow[];
   buyers?: WalletTokenRow[];
+  daily?: Array<{
+    day?: string;
+    buys?: number;
+    sells?: number;
+    burns?: number;
+    volume_usd?: number | null;
+  }>;
   totals?: {
     burned?: number;
     burn_events?: number;
@@ -274,6 +282,11 @@ export function fetchTx(signature: string) {
 
 export function fetchOrbitx() {
   return getJson<OrbitxPayload>("orbitx");
+}
+
+export function fetchEvents(query = "") {
+  const q = query.startsWith("?") || !query ? query : `?${query}`;
+  return getJson<{ ok: boolean; events?: ChainEvent[]; next_cursor?: string | null }>(`events${q}`);
 }
 
 export function fetchFlows(address: string) {
