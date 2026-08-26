@@ -23,6 +23,8 @@ describe("surface harden + leak scan", () => {
     expect(app).toContain("to=\"/orbitx-social\"");
     expect(app).toContain("<Route path=\"/support\" element={<SupportCenter />} />");
     expect(app).toContain("<Route path=\"/on-chain\" element={<OnChainWorld />} />");
+    expect(app).toContain("<Route path=\"/education\" element={<Education />} />");
+    expect(app).not.toContain("<Route path=\"/education\" element={<OwnerPreviewRoute>");
     expect(app).not.toContain("<Route path=\"/on-chain\" element={<OwnerPreviewRoute>");
   });
 

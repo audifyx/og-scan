@@ -187,6 +187,7 @@ import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
 import OnChainProofPage from "./pages/OnChainProofPage";
 import OnChainWorld from "./pages/OnChainWorld";
+import Education from "./pages/Education";
 import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -663,6 +664,8 @@ const App = () => (
             <Route path="/on-chain/token/:address" element={<OnChainWorld />} />
             <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
             <Route path="/on-chain/block/:slot" element={<OnChainWorld />} />
+            <Route path="/education/*" element={<Education />} />
+            <Route path="/education" element={<Education />} />
             <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />

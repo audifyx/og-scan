@@ -23,6 +23,8 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('import OnChainProofPage from "./pages/OnChainProofPage"');
     expect(app).toContain('path="/on-chain"');
     expect(app).toContain('import OnChainWorld from "./pages/OnChainWorld"');
+    expect(app).toContain('path="/education"');
+    expect(app).toContain('import Education from "./pages/Education"');
   });
 
   it("loads team apps and keeps OrbitX AI eager for route reliability", () => {

@@ -13,7 +13,7 @@ import {
   visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-const REQUIRED = ["shop", "city", "os", "play", "intel", "onchain", "predict", "agent", "dex", "telegram", "trade", "support"];
+const REQUIRED = ["shop", "city", "os", "play", "intel", "onchain", "predict", "agent", "dex", "telegram", "trade", "support", "education"];
 const OWNER_ONLY = ["terminal", "scanner", "vamp", "koltracker", "pnltracker", "xmcp", "hq", "gaming"];
 
 describe("OrbitX platform catalog", () => {
@@ -32,6 +32,7 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "telegram")?.href).toBe("/telegram");
     expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
     expect(PLATFORM_APPS.find((a) => a.key === "onchain")?.href).toBe("/on-chain");
+    expect(PLATFORM_APPS.find((a) => a.key === "education")?.href).toBe("/education");
   });
 
   it("puts live platforms on the public home grid and mini menu", () => {
@@ -56,8 +57,8 @@ describe("OrbitX platform catalog", () => {
     expect(visiblePlatformSections(false).every((s) => s.keys.every((k) => !OWNER_ONLY.includes(k)))).toBe(true);
   });
 
-  it("pins Shop, Agent, DEX, City, and On-Chain as command deck gates", () => {
-    expect(HOME_DOCK.map((a) => a.key)).toEqual(["dex", "onchain", "agent", "shop", "city"]);
+  it("pins Shop, Agent, DEX, City, On-Chain, and Education as command deck gates", () => {
+    expect(HOME_DOCK.map((a) => a.key)).toEqual(["dex", "onchain", "agent", "shop", "city", "education"]);
   });
 
   it("covers every catalog key in a section", () => {
