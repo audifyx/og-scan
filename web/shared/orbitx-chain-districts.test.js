@@ -38,8 +38,9 @@ describe("orbitx-chain-districts", () => {
       { mint: "Bbb1111111111111111111111111111111111111111", name: "Beta", symbol: "BETA", volume_24h: 12_000 },
       { mint: "Ccc1111111111111111111111111111111111111111", name: "Dust", symbol: "DUST", volume_24h: 10 },
     ];
-    const ranked = rankTrending(rows, 250);
+    const ranked = rankTrending(rows, 2);
     expect(ranked.map((t) => t.symbol)).toEqual(["ALPHA", "BETA"]);
+    expect(rankTrending(rows, 250).map((t) => t.symbol)).toEqual(["ALPHA", "BETA", "DUST"]);
     expect(ranked.every((t) => t.mint !== ORBITX_MINT)).toBe(true);
     expect(matchTokenQuery(ranked[0], "alp")).toBe(true);
     expect(matchTokenQuery(ranked[0], "$alpha")).toBe(true);

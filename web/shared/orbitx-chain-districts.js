@@ -207,14 +207,18 @@ export function rankTrending(tokens, limit = TRENDING_LIMIT) {
     if (!t?.mint || isOrbitxMint(t.mint)) continue;
     byMint.set(t.mint, mergeDistrict(byMint.get(t.mint), t));
   }
-  return [...byMint.values()]
-    .filter((t) => (asNumber(t.volume_24h) || 0) >= MIN_TRENDING_VOLUME || (asNumber(t.market_cap) || 0) >= 50_000)
-    .sort((a, b) => {
-      const vol = (asNumber(b.volume_24h) || 0) - (asNumber(a.volume_24h) || 0);
-      if (vol !== 0) return vol;
-      return (asNumber(b.market_cap) || 0) - (asNumber(a.market_cap) || 0);
-    })
-    .slice(0, limit);
+  const ranked = [...byMint.values()].sort((a, b) => {
+    const vol = (asNumber(b.volume_24h) || 0) - (asNumber(a.volume_24h) || 0);
+    if (vol !== 0) return vol;
+    return (asNumber(b.market_cap) || 0) - (asNumber(a.market_cap) || 0);
+  });
+  const primary = ranked.filter(
+    (t) => (asNumber(t.volume_24h) || 0) >= MIN_TRENDING_VOLUME || (asNumber(t.market_cap) || 0) >= 50_000,
+  );
+  if (primary.length >= limit) return primary.slice(0, limit);
+  const seen = new Set(primary.map((t) => t.mint));
+  const fill = ranked.filter((t) => !seen.has(t.mint));
+  return [...primary, ...fill].slice(0, limit);
 }
 
 export function matchTokenQuery(token, query) {
