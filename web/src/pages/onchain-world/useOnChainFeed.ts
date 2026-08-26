@@ -91,8 +91,6 @@ function detectWebgl(): boolean {
       c.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ||
       c.getContext("webgl", { failIfMajorPerformanceCaveat: false });
     const ok = Boolean(gl);
-    const lose = gl && "getExtension" in gl ? gl.getExtension("WEBGL_lose_context") : null;
-    lose?.loseContext();
     return ok;
   } catch {
     return false;

@@ -136,6 +136,7 @@ describe("OrbitX /on-chain world", () => {
     expect(hook).toContain("getSlot");
     expect(hook).toContain("fetchStatus");
     expect(hook).toContain("withTimeout");
+    expect(hook).not.toContain("loseContext");
     expect(hook).toContain("loadCityDistricts");
     expect(hook).toContain("allOrbitxKols");
     expect(hook).toContain("mergeDistricts");

@@ -53,7 +53,7 @@ export function WorldView() {
     if (!showGl) return undefined;
     const id = window.setTimeout(() => {
       if (!useOrbitxStore.getState().city.webglLive) setGlFail(true);
-    }, 4000);
+    }, 8000);
     return () => window.clearTimeout(id);
   }, [showGl]);
 
