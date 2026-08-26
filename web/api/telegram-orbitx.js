@@ -86,7 +86,7 @@ import {
 } from "./orbitx/orbitx-telegram-knowledge.js";
 import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/telegram-token-snapshot.js";
 import { fetchTokenProjectResearch } from "./orbitx/telegram-token-brief.js";
-import { nvidiaChat, postTweetOAuth2 } from "./orbitx/x-agent-lib.js";
+import { nvidiaChat, postTweetOAuth2, resolveNimModel } from "./orbitx/x-agent-lib.js";
 import { memoryRateLimit } from "./orbitx/ai-runtime.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
@@ -981,7 +981,7 @@ async function askAi(prompt, { linked }) {
   const nim = await nvidiaChat({
     system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\n${extra}\n\n${orbitXFaqSystemAddon(prompt)}`,
     user: String(prompt || "gm").slice(0, 6000),
-    model: process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL,
+    model: resolveNimModel(process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL),
     maxTokens: 900,
     temperature: 0.45,
   });
@@ -1029,7 +1029,7 @@ async function handleTokenProjectBrief(chatId, mint, { extra, linked } = {}) {
   const nim = await nvidiaChat({
     system: `${OFFICIAL_ORBITX_TELEGRAM_SYSTEM}\n\nPROJECT BRIEF MODE\nThe user asked what this project is — not for a /token market card.\nWrite 4–8 short Telegram sentences from the live facts only: what it claims to be, why it might be trending (use X/reddit if present), and obvious risks in the facts.\nDo not dump price/MC/holders tables. Do not invent team, listings, or catalysts. If metadata is thin, say so.\nNo code fences. Mention /token for the numbers card.`,
     user: `User asked about this token.\nLinked DM: ${linked ? "yes" : "no"}\n${facts}`.slice(0, 7000),
-    model: process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL,
+    model: resolveNimModel(process.env.TELEGRAM_NIM_MODEL || DEFAULT_TELEGRAM_NIM_MODEL),
     maxTokens: 700,
     temperature: 0.35,
   });

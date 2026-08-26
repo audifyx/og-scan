@@ -156,7 +156,7 @@ ${schema}`;
   // enhanced-intelligence agent — much faster and controllable for JSON output.
   const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
   const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-  const MODEL = Deno.env.get("NVIDIA_DOSSIER_MODEL") || "meta/llama-3.1-8b-instruct";
+  const MODEL = Deno.env.get("NVIDIA_DOSSIER_MODEL") || "minimaxai/minimax-m3";
   const tolerant = (raw: string): any => {
     let txt = String(raw || "").trim();
     const a = txt.indexOf("{"); if (a < 0) return null;

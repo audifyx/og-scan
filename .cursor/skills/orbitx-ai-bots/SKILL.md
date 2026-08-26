@@ -11,7 +11,7 @@ All AI runs server-side in Supabase Edge Functions. The house pattern: **ground 
 
 - Primary: **NVIDIA-hosted models** via OpenAI-compatible `chat/completions` (`NVIDIA_API_KEY`, `NVIDIA_BASE_URL`, `NVIDIA_MODEL`).
 - Fallback order in `ogdex-chat`: NVIDIA → Groq → Gemini → OpenRouter → deterministic on-chain snapshot text (never a hard failure).
-- Model catalog for bots: `supabase/functions/_shared/models.ts` — `BOT_MODELS`, `DEFAULT_MODEL = "meta/llama-3.3-70b-instruct"`, always run user-requested models through `resolveModel()`.
+- Model catalog for bots: `supabase/functions/_shared/models.ts` — `BOT_MODELS`, `DEFAULT_MODEL = "meta/llama-3.3-70b-instruct"`, fast slot `minimaxai/minimax-m3` (Llama 3.1 8B reached NVIDIA EOL 2026-08-26). Always run user-requested models through `resolveModel()`.
 - Persona: `_shared/grim_base.ts` exports `GRIM_BASE` (base64-decoded Grim persona/methodology), prefixed into `enhanced-intelligence` system prompts. New shared personas/prompts go in `_shared/`.
 - Code generation uses `qwen/qwen3-coder-480b-a35b-instruct` (see `vibe-code`).
 
