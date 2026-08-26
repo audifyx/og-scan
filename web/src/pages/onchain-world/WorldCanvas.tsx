@@ -28,9 +28,12 @@ import type { ViewOptions } from "./lib/orbitx/types";
 import {
   CLUSTER_META,
   CLUSTER_ORDER,
+  KOL_RING,
   galaxyPos,
   hashMint,
+  kolRingPos,
   layoutUniverse,
+  ringPoint,
   type ClusterId,
   type UniverseNode,
 } from "./universeLayout";
@@ -96,11 +99,13 @@ function ring(index: number, count: number, radius: number, y = 0.4): [number, n
 }
 
 function walletPos(address: string, kolIndex: number, kolCount: number, isKol: boolean): [number, number, number] {
-  if (isKol && kolIndex >= 0) return ring(kolIndex, kolCount, 3.4, 0.55);
+  if (isKol && kolIndex >= 0) return kolRingPos(kolIndex, kolCount);
+  // Unassigned wallets drift in a halo outside the outermost token ring so they
+  // never sit on top of a planet.
   const h = hash(address);
-  const a = (h % 360) * (Math.PI / 180);
-  const r = 31 + (h % 20) / 8;
-  return [Math.cos(a) * r, ((h % 13) - 6) * 0.2, Math.sin(a) * r];
+  const a = (h % 3600) * (Math.PI / 1800);
+  const r = 168 + (h % 40) / 2;
+  return [Math.cos(a) * r, ((h % 21) - 10) * 0.9, Math.sin(a) * r];
 }
 
 function holderPos(mint: string, index: number, around: [number, number, number]): [number, number, number] {
@@ -555,29 +560,61 @@ function CameraRig({
   return null;
 }
 
-function ClusterBeacon({
-  id,
-  count,
-  visible,
-}: {
-  id: ClusterId;
-  count: number;
-  visible: boolean;
-}) {
+function OrbitRing({ id, count, visible }: { id: ClusterId; count: number; visible: boolean }) {
   const meta = CLUSTER_META[id];
   if (!visible || id === "orbitx" || count <= 0) return null;
+  // The ring itself is drawn as a flat annulus rotated onto the ring's own
+  // inclination, so every tier reads as an orbit rather than a floating blob.
+  const label = ringPoint(meta.orbit, meta.tilt, meta.phase);
   return (
-    <group position={meta.center}>
-      <mesh>
-        <sphereGeometry args={[meta.spread * 0.18, 24, 24]} />
-        <meshBasicMaterial color={meta.color} transparent opacity={0.022} depthWrite={false} blending={AdditiveBlending} />
+    <group>
+      <mesh rotation={[Math.PI / 2 + meta.tilt, 0, 0]}>
+        <ringGeometry args={[meta.orbit - 0.12, meta.orbit + 0.12, 220]} />
+        <meshBasicMaterial
+          color={meta.color}
+          transparent
+          opacity={0.16}
+          side={DoubleSide}
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
       </mesh>
-      <Text position={[0, meta.spread * 0.28, 0]} fontSize={0.72} color={meta.color} anchorX="center" outlineWidth={0.03} outlineColor="#05030c">
-        {meta.label}
-      </Text>
-      <Text position={[0, meta.spread * 0.28 - 0.95, 0]} fontSize={0.38} color="#cbd5e1" anchorX="center" outlineWidth={0.018} outlineColor="#05030c">
-        {`${count} worlds`}
-      </Text>
+      <group position={[label[0], label[1] + meta.band * 1.5, label[2]]}>
+        <Text fontSize={2.1} color={meta.color} anchorX="center" outlineWidth={0.05} outlineColor="#05030c">
+          {meta.label}
+        </Text>
+        <Text position={[0, -2.0, 0]} fontSize={1.0} color="#cbd5e1" anchorX="center" outlineWidth={0.03} outlineColor="#05030c">
+          {`${count} worlds`}
+        </Text>
+      </group>
+    </group>
+  );
+}
+
+function KolOrbitRing({ count, visible }: { count: number; visible: boolean }) {
+  if (!visible || count <= 0) return null;
+  const label = ringPoint(KOL_RING.orbit, KOL_RING.tilt, KOL_RING.phase);
+  return (
+    <group>
+      <mesh rotation={[Math.PI / 2 + KOL_RING.tilt, 0, 0]}>
+        <ringGeometry args={[KOL_RING.orbit - 0.1, KOL_RING.orbit + 0.1, 200]} />
+        <meshBasicMaterial
+          color={KOL_RING.color}
+          transparent
+          opacity={0.22}
+          side={DoubleSide}
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
+      </mesh>
+      <group position={[label[0], label[1] + 3.4, label[2]]}>
+        <Text fontSize={1.5} color={KOL_RING.color} anchorX="center" outlineWidth={0.04} outlineColor="#05030c">
+          {KOL_RING.label}
+        </Text>
+        <Text position={[0, -1.5, 0]} fontSize={0.8} color="#cbd5e1" anchorX="center" outlineWidth={0.025} outlineColor="#05030c">
+          {`${count} tracked`}
+        </Text>
+      </group>
     </group>
   );
 }
@@ -649,7 +686,7 @@ function Scene({
     const set = new Set<string>();
     if (viewOptions.labels) {
       for (const node of layout.values()) {
-        if (node.rank === "planet" || node.rank === "core" || node.cluster === "big_dawgs") set.add(node.mint);
+        if (node.rank === "planet" || node.rank === "core" || node.cluster === "majors") set.add(node.mint);
       }
     }
     if (selectedMint) set.add(selectedMint);
@@ -660,7 +697,7 @@ function Scene({
     if (lod === "galaxy") {
       return tokens.filter((t) => {
         const n = layout.get(t.mint);
-        return n && (n.cluster === "big_dawgs" || n.cluster === "high_cap" || n.cluster === "mid_cap" || n.rank === "planet" || n.rank === "world");
+        return n && (n.cluster === "majors" || n.cluster === "established" || n.cluster === "trending" || n.rank === "planet" || n.rank === "world");
       });
     }
     return tokens;
@@ -730,8 +767,9 @@ function Scene({
       <StarGrid on={viewOptions.grid} />
       <LodSampler onLod={setLod} />
       {CLUSTER_ORDER.map((id) => (
-        <ClusterBeacon key={id} id={id} count={clusterSize[id] || 0} visible={lod === "galaxy" || lod === "cluster"} />
+        <OrbitRing key={id} id={id} count={clusterSize[id] || 0} visible={lod === "galaxy" || lod === "cluster"} />
       ))}
+      <KolOrbitRing count={assigned.length} visible={lod === "galaxy" || lod === "cluster"} />
       <OrbitXCore
         district={districts?.orbitx}
         pulsing={burns.length > 0}

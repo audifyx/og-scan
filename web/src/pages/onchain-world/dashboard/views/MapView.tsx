@@ -130,14 +130,24 @@ export function MapView() {
         </defs>
         {CLUSTER_ORDER.filter((id) => id !== "orbitx").map((id) => {
           const meta = CLUSTER_META[id];
-          const c = projectToMap(meta.center, bounds);
-          const r = (meta.spread / bounds.span) * 42;
+          // Draw the orbit itself, centred on the core, so the flat map reads
+          // as the same ringed system as the 3D world.
+          const c = projectToMap([0, 0, 0], bounds);
+          const r = (meta.orbit / bounds.span) * 84;
           return (
             <g key={id}>
-              <circle cx={c.x} cy={c.y} r={r} fill={meta.color} opacity="0.12" />
+              <circle
+                cx={c.x}
+                cy={c.y}
+                r={r}
+                fill="none"
+                stroke={meta.color}
+                strokeWidth="0.25"
+                opacity="0.35"
+              />
               <text
                 x={c.x}
-                y={c.y - r * 0.72}
+                y={c.y - r - 1.1}
                 textAnchor="middle"
                 fill={meta.color}
                 fontSize="2.6"

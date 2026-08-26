@@ -1,16 +1,29 @@
 import { isOrbitxMint, ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
 import type { TokenDistrict } from "./api";
 
+/**
+ * The universe is a set of concentric orbital rings around the ORBITX core,
+ * not a scatter of separate cluster blobs. Every ring is a tier:
+ *
+ *        core  ·  ORBITX
+ *      ring 1  ·  KOL wallets        (the inner circle)
+ *      ring 2  ·  majors
+ *      ring 3  ·  established
+ *      ring 4  ·  trending
+ *      ring 5  ·  new pairs
+ *      ring 6  ·  long tail
+ *
+ * Each ring is inclined on its own axis so the system reads as a solar system
+ * seen from an angle rather than a flat dartboard.
+ */
+
 export type ClusterId =
   | "orbitx"
-  | "big_dawgs"
-  | "high_cap"
-  | "mid_cap"
-  | "low_cap"
-  | "mini_dawgs"
+  | "majors"
+  | "established"
   | "trending"
-  | "active"
-  | "dormant";
+  | "fresh"
+  | "outer";
 
 export type UniverseNode = {
   mint: string;
@@ -19,33 +32,83 @@ export type UniverseNode = {
   radius: number;
   rank: "core" | "planet" | "world" | "moon";
   prominence: number;
+  /** Angle on its ring, radians. Lets callers draw orbit trails. */
+  theta: number;
 };
 
-export const CLUSTER_META: Record<
-  ClusterId,
-  { label: string; center: [number, number, number]; spread: number; color: string }
-> = {
-  orbitx: { label: "ORBITX CORE", center: [0, 0, 0], spread: 6, color: "#e9d5ff" },
-  big_dawgs: { label: "BIG DAWGS", center: [48, 6, 14], spread: 16, color: "#fbbf24" },
-  high_cap: { label: "HIGH CAP", center: [20, 9, 48], spread: 18, color: "#67e8f9" },
-  mid_cap: { label: "MID CAP", center: [-44, 5, 28], spread: 18, color: "#a78bfa" },
-  low_cap: { label: "LOW CAP", center: [-22, -5, -50], spread: 20, color: "#818cf8" },
-  mini_dawgs: { label: "MINI DAWGS", center: [40, -6, -36], spread: 14, color: "#fb7185" },
-  trending: { label: "NEW / TRENDING", center: [6, 10, -54], spread: 16, color: "#34d399" },
-  active: { label: "HIGHLY ACTIVE", center: [56, 3, 34], spread: 14, color: "#22d3ee" },
-  dormant: { label: "DORMANT", center: [-54, -4, 10], spread: 18, color: "#64748b" },
+export type RingMeta = {
+  label: string;
+  /** Orbit radius from the core. */
+  orbit: number;
+  /** Inclination of the ring plane, radians. */
+  tilt: number;
+  /** Rotation of the ring's starting angle, so rings don't line up radially. */
+  phase: number;
+  /** Half-thickness of the band planets scatter within. */
+  band: number;
+  color: string;
+  /** Anchor point for the ring's floating label. */
+  center: [number, number, number];
+  /** Retained for the 2D map + beacons, derived from the band. */
+  spread: number;
 };
 
+/** Where a point sits on an inclined ring. */
+export function ringPoint(
+  orbit: number,
+  tilt: number,
+  theta: number,
+): [number, number, number] {
+  const x = Math.cos(theta) * orbit;
+  const z0 = Math.sin(theta) * orbit;
+  return [x, -z0 * Math.sin(tilt), z0 * Math.cos(tilt)];
+}
+
+function meta(
+  label: string,
+  orbit: number,
+  tilt: number,
+  phase: number,
+  band: number,
+  color: string,
+): RingMeta {
+  return {
+    label,
+    orbit,
+    tilt,
+    phase,
+    band,
+    color,
+    center: ringPoint(orbit, tilt, phase),
+    spread: band * 2.6,
+  };
+}
+
+export const CLUSTER_META: Record<ClusterId, RingMeta> = {
+  orbitx: { label: "ORBITX CORE", orbit: 0, tilt: 0, phase: 0, band: 6, color: "#e9d5ff", center: [0, 0, 0], spread: 14 },
+  majors: meta("MAJORS", 46, 0.10, 0.0, 4.2, "#fbbf24"),
+  established: meta("ESTABLISHED", 68, -0.16, 0.9, 5.0, "#67e8f9"),
+  trending: meta("TRENDING", 92, 0.22, 1.9, 5.8, "#34d399"),
+  fresh: meta("NEW PAIRS", 116, -0.12, 2.8, 6.4, "#a78bfa"),
+  outer: meta("LONG TAIL", 142, 0.18, 3.9, 7.6, "#64748b"),
+};
+
+/** The KOL ring is wallets, not tokens, so WorldCanvas places it itself. */
+export const KOL_RING = { orbit: 28, tilt: -0.20, phase: 0.5, color: "#e879f9", label: "KOL ORBIT" };
+
+export function kolRingPos(index: number, count: number): [number, number, number] {
+  const theta = KOL_RING.phase + (index / Math.max(count, 1)) * Math.PI * 2;
+  return ringPoint(KOL_RING.orbit, KOL_RING.tilt, theta);
+}
+
+/** Inner to outer. Drives draw order and the legend. */
 export const CLUSTER_ORDER: ClusterId[] = [
   "orbitx",
-  "big_dawgs",
-  "high_cap",
-  "mid_cap",
-  "mini_dawgs",
-  "active",
+  "majors",
+  "established",
   "trending",
-  "low_cap",
-  "dormant",
+  "fresh",
+  "outer",
 ];
 
 export function hashMint(id: string): number {
@@ -60,32 +123,39 @@ export function classifyToken(token: TokenDistrict): ClusterId {
   const vol = token.volume_24h || 0;
   const chg = Math.abs(token.change_24h || 0);
   const ch1 = Math.abs(token.change_1h || 0);
-  if (cap >= 50_000_000 || vol >= 8_000_000) return "big_dawgs";
-  if (cap >= 10_000_000) return "high_cap";
-  if (cap >= 1_000_000) return "mid_cap";
-  if (cap > 0 && cap < 1_000_000 && vol >= 250_000) return "mini_dawgs";
-  if (vol >= 80_000 && (ch1 >= 8 || chg >= 25)) return "active";
-  if (vol >= 40_000 && (cap === 0 || cap < 500_000)) return "trending";
-  if (vol > 0 && vol < 15_000) return "dormant";
-  return "low_cap";
+  if (cap >= 50_000_000 || vol >= 8_000_000) return "majors";
+  if (cap >= 1_000_000) return "established";
+  // Heavy churn beats newness: a small cap doing real volume is trending, not
+  // a fresh pair. This ordering matters — the fresh rule below is broader.
+  if (vol >= 250_000) return "trending";
+  if (vol >= 80_000 && (ch1 >= 8 || chg >= 25)) return "trending";
+  if (vol >= 40_000 && (cap === 0 || cap < 500_000)) return "fresh";
+  return "outer";
 }
 
 export function planetRadius(token: TokenDistrict, cluster: ClusterId): number {
-  if (cluster === "orbitx") return 1.22;
+  if (cluster === "orbitx") return 1.35;
   const cap = token.market_cap || 0;
   const vol = token.volume_24h || 0;
   const score = Math.log10(Math.max(cap, vol, 12));
+  // Outer rings sit further from the camera, so their floor is lifted to keep
+  // every planet readable instead of shrinking to a speck.
   const floor =
-    cluster === "big_dawgs" ? 0.72 : cluster === "high_cap" ? 0.58 : cluster === "mid_cap" ? 0.42 : 0.34;
-  const ceil = cluster === "big_dawgs" || cluster === "high_cap" ? 2.2 : cluster === "mid_cap" ? 1.05 : 0.62;
-  return Math.min(ceil, floor + score * 0.09);
+    cluster === "majors" ? 0.95 : cluster === "established" ? 0.74 : cluster === "trending" ? 0.66 : cluster === "fresh" ? 0.62 : 0.58;
+  const ceil = cluster === "majors" ? 2.35 : cluster === "established" ? 1.65 : 1.25;
+  return Math.min(ceil, floor + score * 0.085);
 }
 
 function rankFor(cluster: ClusterId, radius: number): UniverseNode["rank"] {
   if (cluster === "orbitx") return "core";
-  if (cluster === "big_dawgs" || radius >= 0.85) return "planet";
-  if (cluster === "high_cap" || cluster === "mid_cap" || radius >= 0.32) return "world";
+  if (cluster === "majors" || radius >= 1.5) return "planet";
+  if (cluster === "established" || cluster === "trending" || radius >= 0.9) return "world";
   return "moon";
+}
+
+function prominenceOf(token: TokenDistrict): number {
+  const cap = token.market_cap || token.volume_24h || 12;
+  return Math.min(1, Math.log10(Math.max(cap, 12)) / 9);
 }
 
 export function layoutUniverse(tokens: TokenDistrict[]): Map<string, UniverseNode> {
@@ -94,10 +164,12 @@ export function layoutUniverse(tokens: TokenDistrict[]): Map<string, UniverseNod
     mint: ORBITX_MINT,
     cluster: "orbitx",
     pos: [0, 0, 0],
-    radius: 1.22,
+    radius: 1.35,
     rank: "core",
     prominence: 1,
+    theta: 0,
   });
+
   const buckets = new Map<ClusterId, TokenDistrict[]>();
   for (const token of tokens) {
     if (!token?.mint || isOrbitxMint(token.mint)) continue;
@@ -106,26 +178,43 @@ export function layoutUniverse(tokens: TokenDistrict[]): Map<string, UniverseNod
     list.push(token);
     buckets.set(cluster, list);
   }
+
   for (const cluster of CLUSTER_ORDER) {
-    const list = buckets.get(cluster) || [];
-    const meta = CLUSTER_META[cluster];
-    list.forEach((token) => {
+    if (cluster === "orbitx") continue;
+    const ring = CLUSTER_META[cluster];
+    // Heaviest first, then mint, so the ring order is stable across refreshes
+    // and re-ranking never teleports a planet to the far side.
+    const list = (buckets.get(cluster) || [])
+      .slice()
+      .sort((a, b) => prominenceOf(b) - prominenceOf(a) || (a.mint < b.mint ? -1 : 1));
+    const count = list.length;
+
+    list.forEach((token, i) => {
       const h = hashMint(token.mint);
-      const radius = planetRadius(token, cluster);
-      const cap = token.market_cap || token.volume_24h || 12;
-      const prominence = Math.min(1, Math.log10(Math.max(cap, 12)) / 9);
-      const a = ((h % 10_000) / 10_000) * Math.PI * 2;
-      const ring = 0.22 + ((h >>> 8) % 10_000) / 10_000 * 0.78;
-      const pull = 1 - prominence * 0.55;
-      const r = meta.spread * ring * pull;
-      const y = meta.center[1] + ((h % 21) - 10) * 0.55;
+      const slot = (i / Math.max(count, 1)) * Math.PI * 2;
+      // Jitter under half a slot keeps the circle legible while avoiding the
+      // mechanical look of perfectly even spacing.
+      const jitter = (((h % 1000) / 1000) - 0.5) * ((Math.PI * 2) / Math.max(count, 1)) * 0.55;
+      const theta = ring.phase + slot + jitter;
+
+      const prominence = prominenceOf(token);
+      // Bigger names ride slightly inside the band, small caps drift outside.
+      const lane = (1 - prominence) * ring.band - ring.band * 0.35;
+      const wobble = (((h >>> 9) % 1000) / 1000 - 0.5) * ring.band * 0.7;
+      const orbit = ring.orbit + lane + wobble;
+
+      const [x, y, z] = ringPoint(orbit, ring.tilt, theta);
+      const lift = (((h >>> 18) % 1000) / 1000 - 0.5) * ring.band * 0.85;
+      const size = planetRadius(token, cluster);
+
       nodes.set(token.mint, {
         mint: token.mint,
         cluster,
-        pos: [meta.center[0] + Math.cos(a) * r, y, meta.center[2] + Math.sin(a) * r],
-        radius,
-        rank: rankFor(cluster, radius),
+        pos: [x, y + lift, z],
+        radius: size,
+        rank: rankFor(cluster, size),
         prominence,
+        theta,
       });
     });
   }
@@ -136,12 +225,12 @@ export function layoutUniverse(tokens: TokenDistrict[]): Map<string, UniverseNod
 export function galaxyPos(mint: string, _index = 0, _total = 1): [number, number, number] {
   if (isOrbitxMint(mint)) return [0, 0, 0];
   const h = hashMint(mint);
-  const arm = h % 8;
-  const t = ((h >>> 8) % 10_000) / 10_000;
-  const spiral = t * Math.PI * 4.2 + arm * (Math.PI / 4);
-  const r = 18 + t * 96 + ((h >> 4) % 28);
-  const y = ((h % 21) - 10) * 1.1;
-  return [Math.cos(spiral) * r, y, Math.sin(spiral) * r];
+  const rings = CLUSTER_ORDER.filter((c) => c !== "orbitx");
+  const ring = CLUSTER_META[rings[h % rings.length]];
+  const theta = ring.phase + (((h >>> 8) % 10_000) / 10_000) * Math.PI * 2;
+  const orbit = ring.orbit + (((h >>> 17) % 1000) / 1000 - 0.5) * ring.band * 1.4;
+  const [x, y, z] = ringPoint(orbit, ring.tilt, theta);
+  return [x, y + (((h >>> 24) % 100) / 100 - 0.5) * ring.band, z];
 }
 
 export function layoutBounds(layout: Map<string, UniverseNode>): { cx: number; cz: number; span: number } {
@@ -155,12 +244,15 @@ export function layoutBounds(layout: Map<string, UniverseNode>): { cx: number; c
     minZ = Math.min(minZ, node.pos[2] - node.radius);
     maxZ = Math.max(maxZ, node.pos[2] + node.radius);
   }
+  // Rings define the outer edge even when a tier is empty, so the 2D map keeps
+  // a stable frame instead of snapping as tokens come and go.
   for (const id of CLUSTER_ORDER) {
     const c = CLUSTER_META[id];
-    minX = Math.min(minX, c.center[0] - c.spread * 0.55);
-    maxX = Math.max(maxX, c.center[0] + c.spread * 0.55);
-    minZ = Math.min(minZ, c.center[2] - c.spread * 0.55);
-    maxZ = Math.max(maxZ, c.center[2] + c.spread * 0.55);
+    const reach = c.orbit + c.band;
+    minX = Math.min(minX, -reach);
+    maxX = Math.max(maxX, reach);
+    minZ = Math.min(minZ, -reach);
+    maxZ = Math.max(maxZ, reach);
   }
   return {
     cx: (minX + maxX) / 2,

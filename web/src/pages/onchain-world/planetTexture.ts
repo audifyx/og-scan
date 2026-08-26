@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { CanvasTexture, SRGBColorSpace, Texture } from "three";
 
-const MAX_INFLIGHT = 8;
-const cache = new Map<string, Texture | null>();
+const MAX_INFLIGHT = 12;
+const MAX_ATTEMPTS = 3;
+const cache = new Map<string, Texture>();
+const misses = new Map<string, number>();
 const inflight = new Map<string, Promise<Texture | null>>();
 const fallbackCache = new Map<string, CanvasTexture>();
 
@@ -93,15 +95,8 @@ export function makeFallbackPlanetTexture(tint: string, ticker: string, seed = "
   ctx.fillStyle = poles;
   ctx.fillRect(0, 0, size, size);
 
-  const label = String(ticker || "").slice(0, 6).toUpperCase();
-  if (label) {
-    ctx.font = "700 42px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = "rgba(255,255,255,0.82)";
-    ctx.fillText(label, size / 2, size / 2);
-  }
-
+  // Deliberately no ticker text baked into the sphere. An unlabelled world
+  // reads as a planet; the name is drawn as a floating label by WorldCanvas.
   const tex = finishCanvas(canvas);
   fallbackCache.set(key, tex);
   return tex;
@@ -158,17 +153,28 @@ function pump(): void {
     const job = queue.shift();
     if (!job) break;
     running += 1;
-    void actuallyLoad(job.url, job.size, job.tint).then((tex) => {
-      cache.set(job.url, tex);
-      job.resolve(tex);
-      running -= 1;
-      pump();
-    });
+    void actuallyLoad(job.url, job.size, job.tint)
+      .catch(() => null)
+      .then((tex) => {
+        if (tex) {
+          cache.set(job.url, tex);
+          misses.delete(job.url);
+        } else {
+          misses.set(job.url, (misses.get(job.url) || 0) + 1);
+        }
+        job.resolve(tex);
+      })
+      .finally(() => {
+        running -= 1;
+        pump();
+      });
   }
 }
 
 function requestPlanetTexture(url: string, size: number, tint: string, ticker: string, priority: number): Promise<Texture | null> {
-  if (cache.has(url)) return Promise.resolve(cache.get(url) || null);
+  const hit = cache.get(url);
+  if (hit) return Promise.resolve(hit);
+  if ((misses.get(url) || 0) >= MAX_ATTEMPTS) return Promise.resolve(null);
   const pending = inflight.get(url);
   if (pending) return pending;
   const work = new Promise<Texture | null>((resolve) => {

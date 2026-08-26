@@ -86,12 +86,39 @@ const MEDIA_HOST_SUFFIXES = [
   "wrpcd.net",
   "genesysgo.net",
   "shadow.magicblock.app",
+  // Gateways and CDNs that token metadata actually points at. Without these the
+  // proxy answered 400 and every planet fell back to a blank texture.
+  "pinata.cloud",
+  "dweb.link",
+  "4everland.io",
+  "quicknode-ipfs.com",
+  "filebase.io",
+  "infura-ipfs.io",
+  "ipfs.nftstorage.link",
+  "helius.xyz",
+  "helius-rpc.com",
+  "solana.fm",
+  "coingecko.com",
+  "birdeye.so",
+  "raydium.io",
+  "b-cdn.net",
+  "cloudinary.com",
+  "googleusercontent.com",
+  "twimg.com",
+  "akamaized.net",
+  "cloudfront.net",
+  "supabase.co",
+  "r2.dev",
+  "bags.fm",
+  "letsbonk.fun",
+  "moonshot.money",
 ];
 
 function mediaHostAllowed(host) {
   const h = String(host || "").toLowerCase().replace(/\.$/, "");
-  if (!h || h === "localhost" || h.endsWith(".local")) return false;
+  if (!h || h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return false;
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+  if (h.includes(":") || h.startsWith("[")) return false;
   return MEDIA_HOST_SUFFIXES.some((ok) => h === ok || h.endsWith(`.${ok}`));
 }
 

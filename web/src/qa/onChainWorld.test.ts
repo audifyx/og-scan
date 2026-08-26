@@ -163,6 +163,8 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("function TokenStar");
     expect(canvas).toContain("usePlanetTexture");
     expect(canvas).toContain('from "./planetTexture"');
+    expect(canvas).toContain("function OrbitRing");
+    expect(canvas).toContain("function KolOrbitRing");
     expect(canvas).toContain("map={map}");
     expect(canvas).toContain("viewOptions");
     expect(canvas).toContain("NebulaField");
@@ -304,9 +306,10 @@ describe("OrbitX /on-chain world", () => {
     const { classifyToken } = await import("../pages/onchain-world/universeLayout");
     const { tallyActivity, buySellRatio } = await import("../pages/onchain-world/activityStats");
     expect(classifyToken({ mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", market_cap: 1 })).toBe("orbitx");
-    expect(classifyToken({ mint: "Aaa1111111111111111111111111111111111111111", market_cap: 80_000_000, volume_24h: 1 })).toBe("big_dawgs");
-    expect(classifyToken({ mint: "Bbb1111111111111111111111111111111111111111", market_cap: 2_000_000, volume_24h: 1 })).toBe("mid_cap");
-    expect(classifyToken({ mint: "Ccc1111111111111111111111111111111111111111", market_cap: 20_000, volume_24h: 400_000 })).toBe("mini_dawgs");
+    expect(classifyToken({ mint: "Aaa1111111111111111111111111111111111111111", market_cap: 80_000_000, volume_24h: 1 })).toBe("majors");
+    expect(classifyToken({ mint: "Bbb1111111111111111111111111111111111111111", market_cap: 2_000_000, volume_24h: 1 })).toBe("established");
+    expect(classifyToken({ mint: "Ccc1111111111111111111111111111111111111111", market_cap: 20_000, volume_24h: 400_000 })).toBe("trending");
+    expect(classifyToken({ mint: "Ddd1111111111111111111111111111111111111111", market_cap: 0, volume_24h: 60_000 })).toBe("fresh");
     const totals = tallyActivity([
       { event_id: "1", signature: "s", slot: 1, block_time: new Date().toISOString(), event_type: "BUY", status: "confirmed", source: null, attribution: "chain", wallet: "w1", counterparty: null, source_wallet: null, destination_wallet: null, token_ca: "m", token_symbol: "AAA", token_name: "Alpha", token_image: null, amount: 1, sol_amount: null, usd_value: null, market_cap: null, orbitx_related: false, kol_related: true, whale_related: false, importance: 1, confidence: "confirmed", description: null },
       { event_id: "2", signature: "s2", slot: 1, block_time: new Date().toISOString(), event_type: "ORBITX_BUY", status: "confirmed", source: null, attribution: "chain", wallet: "w2", counterparty: null, source_wallet: null, destination_wallet: null, token_ca: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", token_symbol: "ORBITX", token_name: "OrbitX", token_image: null, amount: 1, sol_amount: null, usd_value: null, market_cap: null, orbitx_related: true, kol_related: false, whale_related: false, importance: 1, confidence: "confirmed", description: null },
@@ -331,7 +334,7 @@ describe("OrbitX /on-chain world", () => {
     const bounds = layoutBounds(layout);
     const mapped = [...layout.values()].map((n) => projectToMap(n.pos, bounds));
     expect(mapped.every((p) => p.x >= 6 && p.x <= 94 && p.y >= 6 && p.y <= 94)).toBe(true);
-    const dawgs = projectToMap(CLUSTER_META.big_dawgs.center, bounds);
+    const dawgs = projectToMap(CLUSTER_META.majors.center, bounds);
     expect(dawgs.x).toBeGreaterThan(50);
     const kept = mergeDistricts(
       { orbitx: { mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", buys_24h: 44, sells_24h: 44 }, tokens: [] },
