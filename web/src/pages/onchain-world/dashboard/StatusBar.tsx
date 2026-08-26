@@ -9,6 +9,7 @@ export function StatusBar() {
   const rpcTone =
     network.rpc === "healthy" ? "text-live" : network.rpc === "idle" ? "text-warn" : "text-danger";
   const wsOn = network.ws === "connected";
+  const polling = !wsOn && (network.live || network.rpc === "healthy");
 
   return (
     <footer className="flex h-8 shrink-0 items-center gap-3 overflow-x-auto border-t border-line bg-bg-raised px-3 text-2xs">
@@ -19,7 +20,7 @@ export function StatusBar() {
       <span className="hidden h-3 w-px bg-line sm:block" />
       <span className={cn("flex items-center gap-1.5", rpcTone)}>
         <Activity className="size-3" />
-        RPC {network.rpc}
+        RPC {network.rpc === "healthy" ? "live" : network.rpc}
       </span>
       <span className="hidden h-3 w-px bg-line md:block" />
       <span className="hidden text-muted md:inline">
@@ -33,13 +34,13 @@ export function StatusBar() {
         </span>
       </span>
       <span className="ml-auto flex items-center gap-1.5">
-        {wsOn ? (
+        {wsOn || polling ? (
           <Wifi className="size-3 text-live" />
         ) : (
           <Unplug className="size-3 text-warn" />
         )}
-        <span className={wsOn ? "text-live" : "text-warn"}>
-          WS {wsOn ? "connected" : "disconnected"}
+        <span className={wsOn || polling ? "text-live" : "text-warn"}>
+          {wsOn ? "RPC polling" : polling ? "RPC polling" : "WS disconnected"}
         </span>
         <span className="ml-2 hidden text-dim sm:inline">
           {APP_NAME} {blank(APP_VERSION)}

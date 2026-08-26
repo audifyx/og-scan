@@ -133,7 +133,7 @@ function pill(ctx: CanvasRenderingContext2D, x: number, y: number, text: string,
   ctx.fillText(text, x - tw / 2, y + 2);
 }
 
-export default function CssCity({ kols, districts, events, followWallet, cinematic = true, paused = false, onWallet, onToken }: Props) {
+export default function CssCity({ kols, districts, events, followWallet, cinematic = false, paused = false, onWallet, onToken }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   const hits = useRef<Hit[]>([]);
   const az = useRef(0.72);

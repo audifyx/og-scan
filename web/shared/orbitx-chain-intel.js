@@ -613,7 +613,14 @@ export function summarizeEvents(events) {
   return {
     events_per_sec: Number((last60.length / 60).toFixed(2)),
     transactions_per_min: lastMin.length,
+    buys: rows.filter((e) => /BUY/.test(String(e.event_type || ""))).length,
+    sells: rows.filter((e) => /SELL/.test(String(e.event_type || ""))).length,
+    swaps: rows.filter((e) => /SWAP/.test(String(e.event_type || ""))).length,
+    transfers: rows.filter((e) => /TRANSFER|SOL/.test(String(e.event_type || ""))).length,
+    burns: burns.length,
+    kol_events: rows.filter((e) => e.kol_related).length,
     orbitx_buys: orbitx.filter((e) => /BUY/.test(e.event_type || "")).length,
+    orbitx_sells: orbitx.filter((e) => /SELL/.test(e.event_type || "")).length,
     orbitx_burned: burns
       .filter((e) => isOrbitxMint(e.token_ca))
       .reduce((s, e) => s + (asNumber(e.amount) || 0), 0),
@@ -628,8 +635,6 @@ export function statusFromLag(lagSlots, lastIngestAt) {
   if (!Number.isFinite(age) || age > 180_000) {
     return { live: false, label: "INDEXING DELAY", reason: "Last ingest is older than 3 minutes." };
   }
-  if (lagSlots != null && lagSlots > 80) {
-    return { live: false, label: "INDEXING DELAY", reason: `Indexer is ${lagSlots} slots behind the chain.` };
-  }
+  // Address-watch indexer is not sequential. A large lag_slots value does not mean the feed is dead.
   return { live: true, label: "LIVE", reason: null };
 }

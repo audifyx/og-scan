@@ -1,7 +1,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Sparkles, Stars, Text } from "@react-three/drei";
 import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
-import { Component, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { Group, Mesh, Points } from "three";
 import {
   AdditiveBlending,
@@ -24,6 +24,17 @@ import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { usePlanetTexture } from "./planetTexture";
 import type { FlightStick } from "./dashboard/WorldJoystick";
 import type { ViewOptions } from "./lib/orbitx/types";
+import {
+  CLUSTER_META,
+  CLUSTER_ORDER,
+  galaxyPos,
+  hashMint,
+  layoutUniverse,
+  type ClusterId,
+  type UniverseNode,
+} from "./universeLayout";
+
+export { galaxyPos };
 
 export type WorldPick =
   | { kind: "event"; event: ChainEvent }
@@ -48,6 +59,7 @@ type Props = {
   followWallet?: string | null;
   selectedMint?: string | null;
   cinematic?: boolean;
+  spin?: boolean;
   cam?: CamCommand;
   paused?: boolean;
   speed?: number;
@@ -55,6 +67,7 @@ type Props = {
   stick?: FlightStick;
   onPick: (pick: WorldPick) => void;
   onReady?: () => void;
+  onCamConsumed?: () => void;
 };
 
 const DEFAULT_VIEW: ViewOptions = { labels: true, trails: true, figures: true, grid: false };
@@ -71,20 +84,7 @@ class FxCatch extends Component<{ children: ReactNode }, { fail: boolean }> {
 }
 
 function hash(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
-export function galaxyPos(mint: string, _index = 0, _total = 1): [number, number, number] {
-  if (isOrbitxMint(mint)) return [0, 0, 0];
-  const h = hash(mint);
-  const arm = h % 4;
-  const t = ((h >>> 8) % 10_000) / 10_000;
-  const spiral = t * Math.PI * 3.8 + arm * (Math.PI / 2);
-  const r = 6.2 + t * 28 + ((h >> 4) % 18) / 12;
-  const y = ((h % 21) - 10) * 0.32;
-  return [Math.cos(spiral) * r, y, Math.sin(spiral) * r];
+  return hashMint(id);
 }
 
 function ring(index: number, count: number, radius: number, y = 0.4): [number, number, number] {
@@ -108,12 +108,15 @@ function holderPos(mint: string, index: number, around: [number, number, number]
 }
 
 function eventColor(type: string): string {
-  if (type.includes("BURN")) return "#f59e0b";
-  if (type.includes("BUY")) return "#34d399";
-  if (type.includes("SELL")) return "#fb7185";
-  if (type.includes("SOL")) return "#38bdf8";
-  if (type.includes("ORBITX")) return "#c084fc";
-  if (type.includes("SWAP")) return "#22d3ee";
+  const t = String(type || "").toUpperCase();
+  if (t.includes("LAUNCH")) return "#a3e635";
+  if (t.includes("LIQUIDITY")) return "#2dd4bf";
+  if (t.includes("BURN")) return "#f59e0b";
+  if (t.includes("BUY")) return "#34d399";
+  if (t.includes("SELL")) return "#fb7185";
+  if (t.includes("SWAP")) return "#22d3ee";
+  if (t.includes("TRANSFER") || t.includes("SOL")) return "#38bdf8";
+  if (t.includes("ORBITX")) return "#c084fc";
   return "#67e8f9";
 }
 
@@ -140,25 +143,24 @@ function NebulaField() {
   const group = useRef<Group>(null);
   const clouds = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, i) => {
-        const a = (i / 7) * Math.PI * 2;
+      CLUSTER_ORDER.filter((id) => id !== "orbitx").map((id, i) => {
+        const meta = CLUSTER_META[id];
         return {
-          position: [Math.cos(a) * (18 + i), (i % 3) * 4 - 3, Math.sin(a) * (16 + i * 0.6)] as [number, number, number],
-          scale: 7 + (i % 4) * 2.4,
-          color: ["#4c1d95", "#0e7490", "#6d28d9", "#155e75", "#7c3aed", "#164e63", "#5b21b6"][i],
-          opacity: 0.045 + (i % 3) * 0.012,
+          position: meta.center,
+          scale: meta.spread * 1.55,
+          color: meta.color,
+          opacity: 0.028 + (i % 3) * 0.008,
         };
       }),
     [],
   );
-  useFrame((_, dt) => {
-    if (!group.current) return;
-    group.current.rotation.y += dt * 0.008;
+  useFrame(() => {
+    /* Cluster clouds stay fixed so the camera never drifts on its own. */
   });
   return (
     <group ref={group}>
       {clouds.map((c) => (
-        <mesh key={c.color} position={c.position} scale={c.scale}>
+        <mesh key={c.color + c.position.join(",")} position={c.position} scale={c.scale}>
           <sphereGeometry args={[1, 24, 24]} />
           <meshBasicMaterial
             color={c.color}
@@ -179,18 +181,17 @@ function DustField() {
     const positions = new Float32Array(1800 * 3);
     for (let i = 0; i < 1800; i++) {
       const h = hash(`dust:${i}`);
-      positions[i * 3] = ((h % 900) - 450) / 10;
-      positions[i * 3 + 1] = (((h >> 8) % 280) - 140) / 12;
-      positions[i * 3 + 2] = (((h >> 16) % 900) - 450) / 10;
+      positions[i * 3] = ((h % 3600) - 1800) / 10;
+      positions[i * 3 + 1] = (((h >> 8) % 480) - 240) / 12;
+      positions[i * 3 + 2] = (((h >> 16) % 3600) - 1800) / 10;
     }
     const g = new BufferGeometry();
     g.setAttribute("position", new BufferAttribute(positions, 3));
     return g;
   }, []);
   useEffect(() => () => buffer.dispose(), [buffer]);
-  useFrame((_, dt) => {
-    if (!points.current) return;
-    points.current.rotation.y += dt * 0.01;
+  useFrame(() => {
+    /* Dust stays still unless the user flies. */
   });
   return (
     <points ref={points} geometry={buffer}>
@@ -201,7 +202,7 @@ function DustField() {
 
 function StarGrid({ on }: { on: boolean }) {
   const helper = useMemo(() => {
-    const g = new PolarGridHelper(42, 16, 8, 64, "#1e1b4b", "#312e81");
+    const g = new PolarGridHelper(180, 16, 8, 64, "#1e1b4b", "#312e81");
     g.position.y = -3.2;
     return g;
   }, []);
@@ -219,6 +220,7 @@ function OrbitXCore({
   district?: TokenDistrict;
   pulsing: boolean;
   paused: boolean;
+  spin?: boolean;
   showLabel: boolean;
   onPick: () => void;
 }) {
@@ -226,7 +228,7 @@ function OrbitXCore({
   const glow = useRef<Mesh>(null);
   const map = usePlanetTexture(district?.image || ORBITX_MARK, "#c084fc", "ORBITX", ORBITX_MINT, true, 10);
   useFrame((_, dt) => {
-    if (paused) return;
+    if (paused || !spin) return;
     if (body.current) body.current.rotation.y += dt * 0.08;
     if (!glow.current) return;
     const s = 1 + Math.sin(performance.now() / 550) * (pulsing ? 0.16 : 0.06);
@@ -267,45 +269,51 @@ function OrbitXCore({
 
 function TokenStar({
   district,
-  index,
-  total,
+  node,
   labeled,
   selected,
   paused,
+  spin,
+  lod,
+  activity,
   onPick,
 }: {
   district: TokenDistrict;
-  index: number;
-  total: number;
+  node: UniverseNode;
   labeled: boolean;
   selected: boolean;
   paused: boolean;
+  spin?: boolean;
+  lod: "galaxy" | "cluster" | "local" | "inspect";
+  activity: number;
   onPick: () => void;
 }) {
   const body = useRef<Mesh>(null);
-  const pos = useMemo(() => galaxyPos(district.mint, index, total), [district.mint, index, total]);
+  const pos = node.pos;
   const volume = district.volume_24h || district.market_cap || 12;
-  const r = selected ? 0.52 : Math.min(0.4, 0.13 + Math.log10(Math.max(volume, 12)) * 0.048);
+  const r = selected ? Math.max(node.radius, 0.55) : node.radius;
   const color = nodeColor(district.mint, volume);
   const name = tokenLabel(district);
   const ticker = tokenTicker(district);
+  const hi = selected || lod === "inspect" || lod === "local";
   const map = usePlanetTexture(
     district.image,
     color,
     ticker || name.slice(0, 4),
     district.mint,
     selected,
-    selected ? 9 : labeled ? 6 : Math.max(0, 4 - Math.floor(index / 40)),
+    selected ? 9 : labeled ? 6 : node.rank === "planet" ? 5 : 3,
   );
   const sub = district.volume_24h != null ? `${fmtNum(district.volume_24h)} VOL` : district.market_cap != null ? fmtUsd(district.market_cap) : "";
   useFrame((_, dt) => {
-    if (paused || !body.current) return;
+    if (paused || !spin || !body.current) return;
     body.current.rotation.y += dt * (selected ? 0.22 : 0.09 + (hash(district.mint) % 8) / 120);
   });
+  const segs = hi ? (selected ? 48 : 28) : 12;
   return (
     <group position={pos} onClick={(e) => { e.stopPropagation(); onPick(); }}>
       <mesh ref={body} scale={r}>
-        <sphereGeometry args={[1, selected ? 48 : 28, selected ? 48 : 28]} />
+        <sphereGeometry args={[1, segs, segs]} />
         <meshStandardMaterial
           map={map}
           roughness={0.52}
@@ -316,7 +324,7 @@ function TokenStar({
         />
       </mesh>
       <mesh scale={r * 1.16}>
-        <sphereGeometry args={[1, 20, 20]} />
+        <sphereGeometry args={[1, hi ? 20 : 10, hi ? 20 : 10]} />
         <meshBasicMaterial
           color={color}
           transparent
@@ -331,14 +339,19 @@ function TokenStar({
           <ringGeometry args={[r + 0.18, r + 0.32, 48]} />
           <meshBasicMaterial color={color} transparent opacity={0.78} side={DoubleSide} depthWrite={false} blending={AdditiveBlending} />
         </mesh>
+      ) : activity > 0 && lod !== "galaxy" ? (
+        <mesh rotation={[1.2, 0.15, 0.1]}>
+          <ringGeometry args={[r + 0.08, r + 0.12 + Math.min(activity, 24) * 0.008, 24]} />
+          <meshBasicMaterial color={color} transparent opacity={0.42} side={DoubleSide} depthWrite={false} blending={AdditiveBlending} />
+        </mesh>
       ) : null}
       {labeled ? (
-        <Text position={[0, r + 0.46, 0]} fontSize={selected ? 0.2 : 0.15} color="#eef2ff" anchorX="center" outlineWidth={0.014} outlineColor="#05030c">
+        <Text position={[0, r + 0.46, 0]} fontSize={selected ? 0.22 : 0.16} color="#eef2ff" anchorX="center" outlineWidth={0.014} outlineColor="#05030c">
           {name}
         </Text>
       ) : null}
       {selected && ticker ? (
-        <Text position={[0, r + 0.72, 0]} fontSize={0.13} color="#a5b4fc" anchorX="center" outlineWidth={0.01} outlineColor="#05030c">
+        <Text position={[0, r + 0.78, 0]} fontSize={0.14} color="#a5b4fc" anchorX="center" outlineWidth={0.01} outlineColor="#05030c">
           {`$${ticker}${sub ? ` · ${sub}` : ""}`}
         </Text>
       ) : null}
@@ -353,6 +366,7 @@ function Agent({
   followed,
   pos,
   paused,
+  spin,
   onPick,
 }: {
   label: string;
@@ -361,11 +375,12 @@ function Agent({
   followed: boolean;
   pos: [number, number, number];
   paused: boolean;
+  spin?: boolean;
   onPick: () => void;
 }) {
   const ref = useRef<Mesh>(null);
   useFrame(({ clock }) => {
-    if (!ref.current || paused) return;
+    if (!ref.current || paused || !spin) return;
     ref.current.position.y = pos[1] + Math.sin(clock.elapsedTime * 2.1 + pos[0]) * 0.08;
     ref.current.rotation.y += 0.014;
   });
@@ -440,50 +455,71 @@ function Transit({
 }
 
 function CameraRig({
-  target,
+  flyTo,
   controls,
   cam,
   stick,
   speed,
+  onConsumed,
 }: {
-  target: [number, number, number] | null;
+  flyTo: [number, number, number] | null;
   controls: RefObject<{ target: Vector3 } | null>;
   cam: CamCommand;
   stick: FlightStick;
   speed: number;
+  onConsumed?: () => void;
 }) {
   const { camera } = useThree();
-  const goal = useRef(new Vector3(0, 18, 48));
+  const vel = useRef(new Vector3());
   const dir = useRef(new Vector3());
   const right = useRef(new Vector3());
   const up = useRef(new Vector3(0, 1, 0));
-  const piloting = useRef(false);
+  const flyingTo = useRef<Vector3 | null>(null);
+  const lastKey = useRef("");
   useEffect(() => {
-    piloting.current = false;
-    if (cam?.kind === "reset") {
-      goal.current.set(0, 18, 48);
+    if (!cam) {
+      lastKey.current = "";
       return;
     }
-    if (cam?.kind === "orbitx") {
-      goal.current.set(4.2, 5.4, 8.6);
+    const dest =
+      cam.kind === "reset"
+        ? "reset"
+        : cam.kind === "orbitx"
+          ? "orbitx"
+          : flyTo
+            ? `${cam.kind}:${flyTo.join(",")}`
+            : "";
+    if (!dest || dest === lastKey.current) return;
+    lastKey.current = dest;
+    if (cam.kind === "reset") {
+      flyingTo.current = new Vector3(0, 48, 168);
+      if (controls.current) controls.current.target.set(0, 0, 0);
       return;
     }
-    if (target) {
-      goal.current.set(target[0] + 5.4, target[1] + 3.6, target[2] + 7.2);
+    if (cam.kind === "orbitx") {
+      flyingTo.current = new Vector3(6, 8, 14);
+      if (controls.current) controls.current.target.set(0, 0, 0);
+      return;
     }
-  }, [cam, target]);
+    flyingTo.current = new Vector3(flyTo![0] + 7.4, flyTo![1] + 4.2, flyTo![2] + 9.5);
+    if (controls.current) controls.current.target.set(flyTo![0], flyTo![1], flyTo![2]);
+  }, [cam, flyTo, controls]);
   useFrame((_, dt) => {
-    const flying =
-      Math.abs(stick.x) > 0.04 || Math.abs(stick.y) > 0.04 || Math.abs(stick.z) > 0.04;
-    if (flying) {
-      piloting.current = true;
+    const stickFly =
+      Math.abs(stick.x) > 0.08 || Math.abs(stick.y) > 0.08 || Math.abs(stick.z) > 0.08;
+    if (stickFly) {
+      if (flyingTo.current) {
+        flyingTo.current = null;
+        onConsumed?.();
+      }
       camera.getWorldDirection(dir.current);
       right.current.crossVectors(dir.current, camera.up).normalize();
-      const step = 28 * dt * Math.max(speed, 1) * (stick.boost ? 2.4 : 1);
-      camera.position.addScaledVector(dir.current, -stick.y * step);
-      camera.position.addScaledVector(right.current, stick.x * step);
-      camera.position.addScaledVector(up.current, stick.z * step * 0.85);
-      goal.current.copy(camera.position);
+      const step = 42 * dt * Math.max(speed, 1) * (stick.boost ? 3.1 : 1);
+      vel.current.addScaledVector(dir.current, -stick.y * step * 3.2);
+      vel.current.addScaledVector(right.current, stick.x * step * 3.2);
+      vel.current.addScaledVector(up.current, stick.z * step * 2.6);
+      camera.position.addScaledVector(vel.current, dt * 18);
+      vel.current.multiplyScalar(0.86);
       if (controls.current) {
         controls.current.target.addScaledVector(dir.current, -stick.y * step);
         controls.current.target.addScaledVector(right.current, stick.x * step);
@@ -491,10 +527,57 @@ function CameraRig({
       }
       return;
     }
-    if (piloting.current) return;
-    camera.position.lerp(goal.current, 0.045);
-    if (target && controls.current && cam?.kind !== "reset") {
-      controls.current.target.lerp(new Vector3(target[0], target[1], target[2]), 0.07);
+    vel.current.multiplyScalar(0.9);
+    if (vel.current.lengthSq() > 0.0004) {
+      camera.position.add(vel.current);
+    }
+    if (flyingTo.current) {
+      camera.position.lerp(flyingTo.current, 0.09);
+      if (camera.position.distanceTo(flyingTo.current) < 0.55) {
+        flyingTo.current = null;
+        onConsumed?.();
+      }
+    }
+  });
+  return null;
+}
+
+function ClusterBeacon({
+  id,
+  count,
+  visible,
+}: {
+  id: ClusterId;
+  count: number;
+  visible: boolean;
+}) {
+  const meta = CLUSTER_META[id];
+  if (!visible || id === "orbitx" || count <= 0) return null;
+  return (
+    <group position={meta.center}>
+      <mesh>
+        <sphereGeometry args={[meta.spread * 0.42, 24, 24]} />
+        <meshBasicMaterial color={meta.color} transparent opacity={0.045} depthWrite={false} blending={AdditiveBlending} />
+      </mesh>
+      <Text position={[0, meta.spread * 0.22, 0]} fontSize={1.15} color={meta.color} anchorX="center" outlineWidth={0.04} outlineColor="#05030c">
+        {meta.label}
+      </Text>
+      <Text position={[0, meta.spread * 0.22 - 1.4, 0]} fontSize={0.55} color="#cbd5e1" anchorX="center" outlineWidth={0.02} outlineColor="#05030c">
+        {`${count} worlds`}
+      </Text>
+    </group>
+  );
+}
+
+function LodSampler({ onLod }: { onLod: (lod: "galaxy" | "cluster" | "local" | "inspect") => void }) {
+  const { camera } = useThree();
+  const last = useRef("");
+  useFrame(() => {
+    const d = camera.position.length();
+    const next = d > 210 ? "galaxy" : d > 110 ? "cluster" : d > 36 ? "local" : "inspect";
+    if (next !== last.current) {
+      last.current = next;
+      onLod(next);
     }
   });
   return null;
@@ -507,15 +590,17 @@ function Scene({
   followId,
   followWallet,
   selectedMint,
-  cinematic,
+  spin,
   cam,
   paused = false,
   speed = 1,
   viewOptions = DEFAULT_VIEW,
   stick = { x: 0, y: 0, z: 0, boost: false },
   onPick,
+  onCamConsumed,
 }: Props) {
   const controls = useRef<{ target: Vector3 } | null>(null);
+  const [lod, setLod] = useState<"galaxy" | "cluster" | "local" | "inspect">("cluster");
   const assigned = useMemo(
     () => (kols?.length ? kols.filter((k) => k.status !== "disputed") : activeOrbitxKols()),
     [kols],
@@ -526,36 +611,65 @@ function Scene({
     return m;
   }, [assigned]);
   const tokens = useMemo(() => (districts?.tokens || []).slice(0, 250), [districts?.tokens]);
+  const layout = useMemo(() => layoutUniverse(tokens), [tokens]);
   const tokenIndex = useMemo(() => {
     const m = new Map<string, [number, number, number]>();
-    tokens.forEach((t, i) => m.set(t.mint, galaxyPos(t.mint, i, tokens.length)));
+    for (const node of layout.values()) m.set(node.mint, node.pos);
     m.set(ORBITX_MINT, [0, 0, 0]);
     return m;
-  }, [tokens]);
+  }, [layout]);
+  const clusterSize = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const node of layout.values()) out[node.cluster] = (out[node.cluster] || 0) + 1;
+    return out;
+  }, [layout]);
+  const activityMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of events) {
+      if (e.token_ca) m.set(e.token_ca, (m.get(e.token_ca) || 0) + 1);
+    }
+    return m;
+  }, [events]);
 
   const labeled = useMemo(() => {
     const set = new Set<string>();
     if (viewOptions.labels) {
-      [...tokens]
-        .sort((a, b) => (b.volume_24h || 0) - (a.volume_24h || 0))
-        .slice(0, 28)
-        .forEach((t) => set.add(t.mint));
+      for (const node of layout.values()) {
+        if (node.rank === "planet" || node.rank === "core" || node.cluster === "big_dawgs") set.add(node.mint);
+      }
     }
     if (selectedMint) set.add(selectedMint);
     return set;
-  }, [tokens, selectedMint, viewOptions.labels]);
+  }, [layout, selectedMint, viewOptions.labels]);
+
+  const visibleTokens = useMemo(() => {
+    if (lod === "galaxy") {
+      return tokens.filter((t) => {
+        const n = layout.get(t.mint);
+        return n && (n.cluster === "big_dawgs" || n.cluster === "high_cap" || n.rank === "planet");
+      });
+    }
+    if (lod === "cluster") {
+      return tokens.filter((t) => {
+        const n = layout.get(t.mint);
+        return n && n.cluster !== "dormant";
+      });
+    }
+    return tokens;
+  }, [tokens, layout, lod]);
 
   const extraWallets = useMemo(() => {
+    if (lod === "galaxy") return [];
     const set = new Set<string>();
     for (const e of events) {
       const addr = e.wallet || e.source_wallet;
       if (addr && !kolIndex.has(addr)) set.add(addr);
     }
-    return [...set].slice(0, 36);
-  }, [events, kolIndex]);
+    return [...set].slice(0, lod === "inspect" ? 36 : 12);
+  }, [events, kolIndex, lod]);
 
   const holders = useMemo(() => {
-    if (!selectedMint) return [];
+    if (lod === "galaxy" || lod === "cluster" || !selectedMint) return [];
     const around = tokenIndex.get(selectedMint);
     if (!around) return [];
     const seen = new Set<string>();
@@ -569,88 +683,111 @@ function Scene({
       }
     }
     return out.slice(0, 80);
-  }, [events, selectedMint, tokenIndex, kolIndex]);
+  }, [events, selectedMint, tokenIndex, kolIndex, lod]);
 
+  const visCap = lod === "galaxy" ? 18 : lod === "cluster" ? 48 : lod === "local" ? 90 : 140;
   const vis = viewOptions.trails
     ? events
-        .filter((e) => e.importance >= 4 || e.orbitx_related || e.kol_related || e.event_type.includes("SWAP") || e.event_type.includes("BUY") || e.event_type.includes("SELL"))
-        .slice(0, 140)
+        .filter((e) => e.importance >= 3 || e.orbitx_related || e.kol_related || /SWAP|BUY|SELL|TRANSFER|BURN|LAUNCH|LIQUIDITY/i.test(e.event_type || ""))
+        .slice(0, visCap)
     : [];
   const burns = events.filter((e) => e.event_type.includes("BURN") && e.orbitx_related);
 
-  const follow = followWallet
-    ? walletPos(followWallet, kolIndex.get(followWallet) ?? -1, assigned.length, kolIndex.has(followWallet))
-    : selectedMint && tokenIndex.get(selectedMint)
-      ? tokenIndex.get(selectedMint)!
-      : cam?.kind === "token" && cam.mint
-        ? tokenIndex.get(cam.mint) || [0, 0, 0]
+  const flyTo =
+    cam?.kind === "wallet" && followWallet
+      ? walletPos(followWallet, kolIndex.get(followWallet) ?? -1, assigned.length, kolIndex.has(followWallet))
+      : cam?.kind === "token" && cam.mint && tokenIndex.get(cam.mint)
+        ? tokenIndex.get(cam.mint)!
         : cam?.kind === "orbitx"
           ? ([0, 0, 0] as [number, number, number])
-          : null;
+          : cam?.kind === "reset"
+            ? ([0, 0, 0] as [number, number, number])
+            : null;
+
+  const stickBusy = Math.abs(stick.x) > 0.08 || Math.abs(stick.y) > 0.08 || Math.abs(stick.z) > 0.08;
+  const planetSpin = Boolean(spin) && !paused;
 
   return (
     <>
       <color attach="background" args={["#02010a"]} />
-      <fog attach="fog" args={["#070314", 28, 140]} />
+      <fog attach="fog" args={["#070314", 80, 520]} />
       <ambientLight intensity={0.22} color="#9bb6ff" />
-      <directionalLight position={[18, 22, 12]} intensity={1.55} color="#fff4e0" />
-      <directionalLight position={[-12, 6, -10]} intensity={0.28} color="#67e8f9" />
-      <pointLight position={[0, 2, 0]} intensity={22} distance={26} color="#c084fc" />
-      <pointLight position={[16, -4, 10]} intensity={10} distance={34} color="#22d3ee" />
-      <Stars radius={220} depth={90} count={11000} factor={3.2} saturation={0.18} fade speed={paused ? 0 : 0.12} />
+      <directionalLight position={[40, 48, 22]} intensity={1.55} color="#fff4e0" />
+      <directionalLight position={[-28, 12, -24]} intensity={0.28} color="#67e8f9" />
+      <pointLight position={[0, 2, 0]} intensity={22} distance={36} color="#c084fc" />
+      <pointLight position={[40, -8, 24]} intensity={10} distance={54} color="#22d3ee" />
+      <Stars radius={380} depth={120} count={lod === "galaxy" ? 14000 : 9000} factor={3.4} saturation={0.18} fade speed={0} />
       <NebulaField />
       <DustField />
       <StarGrid on={viewOptions.grid} />
+      <LodSampler onLod={setLod} />
+      {CLUSTER_ORDER.map((id) => (
+        <ClusterBeacon key={id} id={id} count={clusterSize[id] || 0} visible={lod === "galaxy" || lod === "cluster"} />
+      ))}
       <OrbitXCore
         district={districts?.orbitx}
         pulsing={burns.length > 0}
         paused={paused}
+        spin={planetSpin}
         showLabel={viewOptions.labels}
         onPick={() => onPick({ kind: "token", mint: ORBITX_MINT })}
       />
       {(districts?.hubs?.length ? districts.hubs : DEX_HUBS).map((hub, i) => {
         const a = (i / 3) * Math.PI * 2;
-        const pos: [number, number, number] = [Math.cos(a) * 18.5, 1.4, Math.sin(a) * 18.5];
+        const pos: [number, number, number] = [Math.cos(a) * 22, 1.8, Math.sin(a) * 22];
         const color = hub.id === "jupiter" ? "#22d3ee" : hub.id === "raydium" ? "#a78bfa" : "#fb923c";
         return (
           <group key={hub.id} position={pos} onClick={(e) => { e.stopPropagation(); onPick({ kind: "hub", id: hub.id }); }}>
             <mesh>
-              <octahedronGeometry args={[0.42, 0]} />
+              <octahedronGeometry args={[0.55, 0]} />
               <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.1} />
             </mesh>
             {viewOptions.labels ? (
-              <Text position={[0, 0.82, 0]} fontSize={0.2} color={color} anchorX="center" outlineWidth={0.012} outlineColor="#05030c">
+              <Text position={[0, 1.05, 0]} fontSize={0.24} color={color} anchorX="center" outlineWidth={0.012} outlineColor="#05030c">
                 {hub.label}
               </Text>
             ) : null}
           </group>
         );
       })}
-      {tokens.map((t, i) => (
-        <TokenStar
-          key={t.mint}
-          district={t}
-          index={i}
-          total={tokens.length}
-          labeled={labeled.has(t.mint)}
-          selected={selectedMint === t.mint}
-          paused={paused}
-          onPick={() => onPick({ kind: "token", mint: t.mint })}
-        />
-      ))}
-      {viewOptions.figures
-        ? assigned.map((k, i) => (
-            <Agent
-              key={k.address}
-              label={k.name}
-              kol
-              whale={false}
-              followed={followWallet === k.address}
-              pos={walletPos(k.address, i, assigned.length, true)}
-              paused={paused}
-              onPick={() => onPick({ kind: "wallet", address: k.address })}
-            />
-          ))
+      {visibleTokens.map((t) => {
+        const node = layout.get(t.mint);
+        if (!node) return null;
+        return (
+          <TokenStar
+            key={t.mint}
+            district={t}
+            node={node}
+            labeled={labeled.has(t.mint) && lod !== "galaxy"}
+            selected={selectedMint === t.mint}
+            paused={paused}
+            spin={planetSpin}
+            lod={lod}
+            activity={activityMap.get(t.mint) || 0}
+            onPick={() => onPick({ kind: "token", mint: t.mint })}
+          />
+        );
+      })}
+      {viewOptions.figures && lod !== "galaxy"
+        ? assigned.map((k, i) => {
+            const around = k.last_mint && tokenIndex.get(k.last_mint);
+            const pos = around
+              ? ([around[0] + Math.cos((i / Math.max(assigned.length, 1)) * Math.PI * 2) * 2.6, around[1] + 0.7, around[2] + Math.sin((i / Math.max(assigned.length, 1)) * Math.PI * 2) * 2.6] as [number, number, number])
+              : walletPos(k.address, i, assigned.length, true);
+            return (
+              <Agent
+                key={k.address}
+                label={k.name}
+                kol
+                whale={false}
+                followed={followWallet === k.address}
+                pos={pos}
+                paused={paused}
+                spin={planetSpin}
+                onPick={() => onPick({ kind: "wallet", address: k.address })}
+              />
+            );
+          })
         : null}
       {viewOptions.figures
         ? extraWallets.map((addr) => (
@@ -662,6 +799,7 @@ function Scene({
               followed={followWallet === addr}
               pos={walletPos(addr, -1, assigned.length, false)}
               paused={paused}
+              spin={planetSpin}
               onPick={() => onPick({ kind: "wallet", address: addr })}
             />
           ))
@@ -679,6 +817,7 @@ function Scene({
                 followed={followWallet === h.address}
                 pos={pos}
                 paused={paused}
+                spin={planetSpin}
                 onPick={() => onPick({ kind: "wallet", address: h.address })}
               />
             );
@@ -706,16 +845,20 @@ function Scene({
           />
         );
       })}
-      <CameraRig target={follow} controls={controls} cam={cam || null} stick={stick} speed={speed} />
+      <CameraRig flyTo={flyTo} controls={controls} cam={cam || null} stick={stick} speed={speed} onConsumed={onCamConsumed} />
       <OrbitControls
         ref={controls}
         enablePan
         enableZoom
-        enableRotate={Math.abs(stick.x) < 0.04 && Math.abs(stick.y) < 0.04}
-        maxDistance={180}
-        minDistance={2.4}
-        autoRotate={Boolean(cinematic) && !followWallet && !selectedMint && !paused && Math.abs(stick.x) < 0.04 && Math.abs(stick.y) < 0.04 && Math.abs(stick.z) < 0.04}
-        autoRotateSpeed={0.18 * Math.max(speed, 1)}
+        enableDamping={false}
+        zoomSpeed={1.35}
+        panSpeed={1.15}
+        rotateSpeed={0.72}
+        enableRotate={!stickBusy}
+        maxDistance={420}
+        minDistance={1.6}
+        autoRotate={false}
+        screenSpacePanning
       />
       <Glow />
     </>
@@ -725,7 +868,7 @@ function Scene({
 export default function WorldCanvas(props: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 18, 48], fov: 50, near: 0.1, far: 420 }}
+      camera={{ position: [0, 48, 168], fov: 50, near: 0.2, far: 900 }}
       dpr={[1, 1.75]}
       gl={{
         antialias: true,

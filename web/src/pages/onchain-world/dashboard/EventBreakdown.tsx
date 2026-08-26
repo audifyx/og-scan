@@ -5,18 +5,18 @@ import { cn } from "@/lib/utils";
 
 const SLICE: Record<BreakdownKey, string> = {
   buy: "var(--color-slice-buy)",
-  transfer: "var(--color-slice-transfer)",
   sell: "var(--color-slice-sell)",
-  orbitx: "var(--color-slice-orbitx)",
+  swap: "var(--color-slice-orbitx)",
+  transfer: "var(--color-slice-transfer)",
   burn: "var(--color-slice-burn)",
   other: "var(--color-slice-other)",
 };
 
 const DOT: Record<BreakdownKey, string> = {
   buy: "bg-slice-buy",
-  transfer: "bg-slice-transfer",
   sell: "bg-slice-sell",
-  orbitx: "bg-slice-orbitx",
+  swap: "bg-slice-orbitx",
+  transfer: "bg-slice-transfer",
   burn: "bg-slice-burn",
   other: "bg-slice-other",
 };

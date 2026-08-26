@@ -13,7 +13,7 @@ export type EventKind =
   | "liquidity_add"
   | "other";
 
-export type BreakdownKey = "buy" | "transfer" | "sell" | "orbitx" | "burn" | "other";
+export type BreakdownKey = "buy" | "sell" | "swap" | "transfer" | "burn" | "other";
 
 export type LiveEvent = {
   id: string;
@@ -35,7 +35,17 @@ export type TickerStats = {
   blockAgeSec: number | null;
   eventsPerSec: number | null;
   txPerMin: number | null;
+  buys: number | null;
+  sells: number | null;
+  swaps: number | null;
+  transfers: number | null;
+  burns: number | null;
+  kolEvents: number | null;
   orbitxBuys: number | null;
+  orbitxSells: number | null;
+  orbitxBuys24h: number | null;
+  orbitxSells24h: number | null;
+  orbitxTraders24h: number | null;
   orbitxBurned: number | null;
   whaleActivityUsd: number | null;
   activeWallets: number | null;

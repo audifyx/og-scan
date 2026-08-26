@@ -13,6 +13,7 @@ import {
   tokenTicker,
   dexTokenImage,
   cleanTokenFields,
+  mergeDistrict,
 } from "./orbitx-chain-districts.js";
 import { ORBITX_MINT } from "./orbitx-chain-intel.js";
 
@@ -59,8 +60,8 @@ describe("orbitx-chain-districts", () => {
       { event_type: "TOKEN_BURN", orbitx_related: false, block_time: new Date().toISOString() },
     ];
     const br = eventBreakdown(events);
-    expect(br.find((b) => b.kind === "BUY")?.count).toBe(1);
-    expect(br.find((b) => b.kind === "ORBITX")?.count).toBe(1);
+    expect(br.find((b) => b.kind === "BUY")?.count).toBe(2);
+    expect(br.find((b) => b.kind === "ORBITX")).toBeUndefined();
     expect(br.find((b) => b.kind === "BURN")?.count).toBe(1);
     expect(br.reduce((s, b) => s + b.count, 0)).toBe(3);
     const series = epsSeries(events, 120_000, 12);
@@ -71,5 +72,18 @@ describe("orbitx-chain-districts", () => {
   it("returns empty activity when there are no events", () => {
     expect(eventBreakdown([]).every((b) => b.count === 0 && b.pct === 0)).toBe(true);
     expect(epsSeries([], 120_000, 6).every((p) => p.eps === 0)).toBe(true);
+  });
+
+  it("keeps Jupiter 24h buy/sell counts when merging districts", () => {
+    const mint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+    const merged = mergeDistrict(
+      { mint, name: "OrbitX", symbol: "ORBITX", source: "dexscreener" },
+      { mint, buys_24h: 44, sells_24h: 44, traders_24h: 59, holder_count: 205, source: "jupiter" },
+    );
+    expect(merged.buys_24h).toBe(44);
+    expect(merged.sells_24h).toBe(44);
+    expect(merged.traders_24h).toBe(59);
+    expect(merged.holder_count).toBe(205);
+    expect(cleanTokenFields({ mint, holders: 205 }).holder_count).toBe(205);
   });
 });

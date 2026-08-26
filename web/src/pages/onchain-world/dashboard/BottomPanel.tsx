@@ -48,9 +48,15 @@ export function BottomPanel() {
     return [...byId.values()];
   })();
   const visible = rows.filter((r) => {
+    const src = [...oxLedger, ...raw].find((e) => e.event_id === r.id);
     if (tab === "orbitx_activity") {
-      const src = [...oxLedger, ...raw].find((e) => e.event_id === r.id);
       return Boolean(src && isOrbitxChainEvent(src)) || (match && match.includes(r.kind)) || /orbitx/i.test(r.token);
+    }
+    if (tab === "kol") {
+      return Boolean(src?.kol_related) || (match && match.includes(r.kind));
+    }
+    if (tab === "whale") {
+      return Boolean(src?.whale_related) || (match && match.includes(r.kind));
     }
     if (match && !match.includes(r.kind)) return false;
     if (tab === "wallets" && selectedWallet) {

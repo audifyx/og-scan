@@ -1,14 +1,15 @@
 import { useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
+import { allOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
 import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
 import { liveToSnapshot, mergeChainEvents, toWalletSnapshot } from "./lib/mapLive";
+import { tallyActivity } from "./activityStats";
 import { ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
 import { useOrbitxStore } from "./lib/orbitx/store";
 
-const DIRECTORY_KOLS: KolCard[] = activeOrbitxKols().map((k) => ({
+const DIRECTORY_KOLS: KolCard[] = allOrbitxKols().map((k) => ({
   address: k.address,
   name: k.name,
   twitter: k.twitter,
@@ -16,6 +17,7 @@ const DIRECTORY_KOLS: KolCard[] = activeOrbitxKols().map((k) => ({
   hits: 0,
   last_type: null,
   last_token: null,
+  last_mint: null,
   last_usd: null,
   last_at: null,
 }));
@@ -82,6 +84,7 @@ export function useOnChainFeed() {
   const patchCity = useOrbitxStore((s) => s.patchCity);
   const trackWallet = useOrbitxStore((s) => s.trackWallet);
   const selectToken = useOrbitxStore((s) => s.selectToken);
+  const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   const setTokenDetail = useOrbitxStore((s) => s.setTokenDetail);
   const selectedToken = useOrbitxStore((s) => s.selectedToken);
 
@@ -138,7 +141,7 @@ export function useOnChainFeed() {
         orbitxPage?.ok ? orbitxPage.events : [],
         oxToken?.ok ? oxToken.events : [],
       );
-      const events = mergeChainEvents(liveEvents, orbitxEvents);
+      const events = mergeChainEvents(liveEvents, orbitxEvents, roster?.ok ? roster.events : []);
       const payload = data.ok ? { ...data, events } : { ...data, events, live: false };
       if (payload.chain_slot == null && slot != null) payload.chain_slot = slot;
       const snapshot = liveToSnapshot(payload, null);
@@ -149,9 +152,24 @@ export function useOnChainFeed() {
       if (slot != null) snapshot.network.rpc = "healthy";
       if (orbitx?.ok || orbitxEvents.length) {
         const oxBuys = (orbitx?.buys || []).length || orbitxEvents.filter((e) => /BUY/i.test(e.event_type || "")).length;
+        const oxSells = (orbitx?.sells || []).length || orbitxEvents.filter((e) => /SELL/i.test(e.event_type || "")).length;
         if (oxBuys) snapshot.ticker.orbitxBuys = oxBuys;
+        if (oxSells) snapshot.ticker.orbitxSells = oxSells;
         if (orbitx?.totals?.burned) snapshot.ticker.orbitxBurned = orbitx.totals.burned;
-        if (orbitx?.totals?.unique_wallets) snapshot.ticker.activeWallets = orbitx.totals.unique_wallets;
+      }
+      const oxDistrict = districts?.orbitx || city?.orbitx || data.districts?.orbitx;
+      if (oxDistrict?.buys_24h != null) snapshot.ticker.orbitxBuys24h = oxDistrict.buys_24h;
+      if (oxDistrict?.sells_24h != null) snapshot.ticker.orbitxSells24h = oxDistrict.sells_24h;
+      if (oxDistrict?.traders_24h != null) snapshot.ticker.orbitxTraders24h = oxDistrict.traders_24h;
+      const activity = tallyActivity(events);
+      if (activity.total) {
+        snapshot.ticker.buys = activity.buys;
+        snapshot.ticker.sells = activity.sells;
+        snapshot.ticker.swaps = activity.swaps;
+        snapshot.ticker.transfers = activity.transfers;
+        snapshot.ticker.burns = activity.burns;
+        snapshot.ticker.kolEvents = activity.kol;
+        snapshot.ticker.activeWallets = new Set(events.map((e) => e.wallet).filter(Boolean)).size;
       }
       setSnapshot({ ...snapshot, wallet: prevWallet });
       patchCity({
@@ -181,10 +199,23 @@ export function useOnChainFeed() {
   useEffect(() => {
     void loadCityDistricts()
       .then((city) => {
-        if (city?.orbitx || city?.tokens?.length) patchCity({ districts: city });
+        if (city?.orbitx || city?.tokens?.length) {
+          patchCity({ districts: city });
+          const ticker = useOrbitxStore.getState().snapshot.ticker;
+          if (city.orbitx?.buys_24h != null || city.orbitx?.sells_24h != null) {
+            patchSnapshot({
+              ticker: {
+                ...ticker,
+                orbitxBuys24h: city.orbitx?.buys_24h ?? ticker.orbitxBuys24h,
+                orbitxSells24h: city.orbitx?.sells_24h ?? ticker.orbitxSells24h,
+                orbitxTraders24h: city.orbitx?.traders_24h ?? ticker.orbitxTraders24h,
+              },
+            });
+          }
+        }
       })
       .catch(() => undefined);
-  }, [patchCity]);
+  }, [patchCity, patchSnapshot]);
 
   useEffect(() => {
     if (params.signature) {
@@ -193,17 +224,19 @@ export function useOnChainFeed() {
     }
     if (params.address && location.pathname.includes("/wallet/")) {
       trackWallet(params.address);
+      setCamCommand({ kind: "wallet", address: params.address });
       return;
     }
     if (params.address && location.pathname.includes("/token/")) {
       selectToken(params.address);
+      setCamCommand({ kind: "token", mint: params.address });
       void fetchToken(params.address)
         .then((data) => {
           if (data?.mint) setTokenDetail(data);
         })
         .catch(() => undefined);
     }
-  }, [params.address, params.signature, trackWallet, selectToken, setTokenDetail]);
+  }, [params.address, params.signature, trackWallet, selectToken, setCamCommand, setTokenDetail]);
 
   useEffect(() => {
     if (!selectedToken) return;

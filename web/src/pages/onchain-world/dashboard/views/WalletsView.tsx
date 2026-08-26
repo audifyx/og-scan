@@ -53,12 +53,17 @@ export function WalletsView() {
                   }`}
                 >
                   <span>
-                    <span className="block text-xs font-medium text-fg">{k.name}</span>
+                    <span className="block text-xs font-medium text-fg">
+                      {k.name}
+                      {k.status === "disputed" ? " · listed" : k.hits ? "" : " · idle"}
+                    </span>
                     <span className="block text-2xs text-dim">
-                      {k.twitter || formatAddress(k.address)}
+                      {k.last_type
+                        ? `${k.last_type.replace(/_/g, " ")}${k.last_token ? ` · ${k.last_token}` : ""}`
+                        : k.twitter || formatAddress(k.address)}
                     </span>
                   </span>
-                  <span className="ox-stat text-2xs text-muted">{formatAddress(k.address)}</span>
+                  <span className="ox-stat text-2xs text-muted">{k.hits ?? 0} hits</span>
                 </button>
               </li>
             ))}

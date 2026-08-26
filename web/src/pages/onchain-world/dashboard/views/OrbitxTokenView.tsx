@@ -29,8 +29,14 @@ export function OrbitxTokenView() {
     { label: "Liquidity", value: formatUsd(ox?.liquidity_usd ?? null) },
     { label: "Volume 24h", value: formatUsd(ox?.volume_24h ?? null) },
     { label: "Change 24h", value: formatPct(ox?.change_24h ?? null) },
+    { label: "Holders", value: formatInt(ox?.holder_count ?? null) },
+    { label: "24h buys (Jupiter)", value: formatInt(ox?.buys_24h ?? ticker.orbitxBuys24h) },
+    { label: "24h sells (Jupiter)", value: formatInt(ox?.sells_24h ?? ticker.orbitxSells24h) },
+    { label: "24h traders", value: formatInt(ox?.traders_24h ?? ticker.orbitxTraders24h) },
+    { label: "Buy vol 24h", value: formatUsd(ox?.buy_volume_24h ?? null) },
+    { label: "Sell vol 24h", value: formatUsd(ox?.sell_volume_24h ?? null) },
     { label: "Buys (indexed)", value: formatInt(buys || ticker.orbitxBuys) },
-    { label: "Sells (indexed)", value: formatInt(sells) },
+    { label: "Sells (indexed)", value: formatInt(sells || ticker.orbitxSells) },
     { label: "Swaps (indexed)", value: formatInt(swaps) },
     { label: "Burned", value: formatInt(totals?.burned ?? ticker.orbitxBurned) },
     { label: "Active wallets", value: formatInt(totals?.unique_wallets ?? ticker.activeWallets) },
@@ -38,7 +44,7 @@ export function OrbitxTokenView() {
     { label: "Sell USD (indexed)", value: formatUsd(totals?.sell_usd ?? null) },
   ];
   const mint = ox?.mint || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
-  const source = ox?.price_usd != null ? ox.source || "DexScreener" : null;
+  const source = ox?.price_usd != null ? ox.source || "Jupiter / DexScreener" : null;
 
   return (
     <div className="ox-scroll min-h-0 flex-1 overflow-auto p-5">

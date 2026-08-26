@@ -37,6 +37,7 @@ export type KolCard = {
   hits?: number;
   last_type: string | null;
   last_token: string | null;
+  last_mint?: string | null;
   last_usd: number | null;
   last_at: string | null;
   tracked?: boolean;
@@ -98,7 +99,17 @@ export type LivePayload = {
   stats: {
     events_per_sec: number;
     transactions_per_min: number;
-    orbitx_buys: number;
+    buys?: number;
+    sells?: number;
+    swaps?: number;
+    transfers?: number;
+    burns?: number;
+    kol_events?: number;
+    orbitx_buys?: number;
+    orbitx_sells?: number;
+    orbitx_buys_24h?: number | null;
+    orbitx_sells_24h?: number | null;
+    orbitx_traders_24h?: number | null;
     orbitx_burned: number;
     whale_usd: number;
     active_wallets: number;
@@ -127,6 +138,15 @@ export type TokenDistrict = {
   change_24h?: number | null;
   change_1h?: number | null;
   holder_count?: number | null;
+  buys_24h?: number | null;
+  sells_24h?: number | null;
+  traders_24h?: number | null;
+  buy_volume_24h?: number | null;
+  sell_volume_24h?: number | null;
+  website?: string | null;
+  twitter?: string | null;
+  telegram?: string | null;
+  launch_platform?: string | null;
   dex?: string | null;
   source?: string;
   kind?: string;
@@ -162,19 +182,7 @@ export type WalletPayload = {
 export type TokenPayload = {
   ok: boolean;
   mint: string;
-  token?: {
-    mint?: string;
-    symbol?: string | null;
-    name?: string | null;
-    image?: string | null;
-    banner?: string | null;
-    price_usd?: number | null;
-    market_cap?: number | null;
-    liquidity_usd?: number | null;
-    volume_24h?: number | null;
-    change_24h?: number | null;
-    holder_count?: number | null;
-  };
+  token?: TokenDistrict;
   events?: ChainEvent[];
   buyers?: WalletTokenRow[];
   error?: string;

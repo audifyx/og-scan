@@ -75,11 +75,15 @@ export function TopBar() {
         value={formatInt(ticker.block)}
         delta={ticker.blockAgeSec != null ? `+${formatAge(ticker.blockAgeSec)}` : null}
       />
-      <Stat label="Events / Sec" value={formatInt(ticker.eventsPerSec)} />
       <Stat label="Tx / Min" value={formatInt(ticker.txPerMin)} />
-      <Stat label="OrbitX Buys" value={formatInt(ticker.orbitxBuys)} />
-      <Stat label="OrbitX Burned" value={formatInt(ticker.orbitxBurned)} />
-      <Stat label="Whale Activity" value={formatUsd(ticker.whaleActivityUsd)} />
+      <Stat label="Events / sec" value={ticker.eventsPerSec == null ? "—" : String(ticker.eventsPerSec)} />
+      <Stat label="OX 24h Buys" value={formatInt(ticker.orbitxBuys24h)} />
+      <Stat label="OX 24h Sells" value={formatInt(ticker.orbitxSells24h)} />
+      <Stat label="Buys" value={formatInt(ticker.buys)} />
+      <Stat label="Sells" value={formatInt(ticker.sells)} />
+      <Stat label="Swaps" value={formatInt(ticker.swaps)} />
+      <Stat label="Transfers" value={formatInt(ticker.transfers)} />
+      <Stat label="KOL hits" value={formatInt(ticker.kolEvents)} />
       <Stat label="Active Wallets" value={formatInt(ticker.activeWallets)} />
     </div>
   );

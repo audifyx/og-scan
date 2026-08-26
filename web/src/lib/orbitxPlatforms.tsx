@@ -288,7 +288,14 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
   if (href === "/os") return pathname === "/os" || pathname.startsWith("/os/");
   if (href === "/play") return pathname === "/play" || pathname.startsWith("/play/");
   if (href === "/intel") return pathname === "/intel" || pathname.startsWith("/intel/");
-  if (href === "/on-chain") return pathname === "/on-chain" || pathname.startsWith("/on-chain/");
+  if (href === "/on-chain") {
+    return (
+      pathname === "/on-chain" ||
+      pathname.startsWith("/on-chain/") ||
+      pathname === "/world" ||
+      pathname.startsWith("/world/")
+    );
+  }
   if (href === "/x") return pathname === "/x" || pathname.startsWith("/x/");
   if (href === "/ai") return pathname.toLowerCase() === "/ai";
   if (href === "/telegram") return pathname.toLowerCase() === "/telegram";

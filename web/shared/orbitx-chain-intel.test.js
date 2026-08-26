@@ -97,7 +97,7 @@ describe("orbitx-chain-intel", () => {
 
   it("marks indexing delay when ingest is stale", () => {
     expect(statusFromLag(0, null).live).toBe(false);
-    expect(statusFromLag(200, new Date().toISOString()).label).toBe("INDEXING DELAY");
+    expect(statusFromLag(200, new Date().toISOString()).live).toBe(true);
     expect(statusFromLag(2, new Date().toISOString()).live).toBe(true);
   });
 
@@ -112,8 +112,12 @@ describe("orbitx-chain-intel", () => {
   it("summarizes only provided rows", () => {
     const sum = summarizeEvents([
       { event_type: "ORBITX_BUY", orbitx_related: true, wallet: WALLET, block_time: new Date().toISOString() },
+      { event_type: "ORBITX_SELL", orbitx_related: true, wallet: WALLET, block_time: new Date().toISOString() },
     ]);
     expect(sum.orbitx_buys).toBe(1);
+    expect(sum.orbitx_sells).toBe(1);
+    expect(sum.buys).toBe(1);
+    expect(sum.sells).toBe(1);
     expect(sum.active_wallets).toBe(1);
   });
 });

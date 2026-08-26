@@ -108,15 +108,15 @@ export function toTransactionRow(ev: ChainEvent): TransactionRow {
   };
 }
 
-const BREAKDOWN_KEYS: BreakdownKey[] = ["buy", "transfer", "sell", "orbitx", "burn", "other"];
+const BREAKDOWN_KEYS: BreakdownKey[] = ["buy", "sell", "swap", "transfer", "burn", "other"];
 
 function breakdownKey(kind: string): BreakdownKey {
   const k = kind.toLowerCase();
   if ((BREAKDOWN_KEYS as string[]).includes(k)) return k as BreakdownKey;
   if (k.includes("buy")) return "buy";
-  if (k.includes("transfer")) return "transfer";
   if (k.includes("sell")) return "sell";
-  if (k.includes("orbitx")) return "orbitx";
+  if (k.includes("swap")) return "swap";
+  if (k.includes("transfer") || k.includes("sol")) return "transfer";
   if (k.includes("burn")) return "burn";
   return "other";
 }
@@ -195,7 +195,17 @@ export function liveToSnapshot(data: LivePayload, wallet?: WalletPayload | null)
       blockAgeSec: data.ingest_age_sec ?? null,
       eventsPerSec: confirmedNum(data.stats?.events_per_sec, live, hasEvents),
       txPerMin: confirmedNum(data.stats?.transactions_per_min, live, hasEvents),
+      buys: confirmedNum(data.stats?.buys, live, hasEvents),
+      sells: confirmedNum(data.stats?.sells, live, hasEvents),
+      swaps: confirmedNum(data.stats?.swaps, live, hasEvents),
+      transfers: confirmedNum(data.stats?.transfers, live, hasEvents),
+      burns: confirmedNum(data.stats?.burns, live, hasEvents),
+      kolEvents: confirmedNum(data.stats?.kol_events, live, hasEvents),
       orbitxBuys: confirmedNum(data.stats?.orbitx_buys, live, hasEvents),
+      orbitxSells: confirmedNum(data.stats?.orbitx_sells, live, hasEvents),
+      orbitxBuys24h: data.stats?.orbitx_buys_24h ?? data.districts?.orbitx?.buys_24h ?? null,
+      orbitxSells24h: data.stats?.orbitx_sells_24h ?? data.districts?.orbitx?.sells_24h ?? null,
+      orbitxTraders24h: data.stats?.orbitx_traders_24h ?? data.districts?.orbitx?.traders_24h ?? null,
       orbitxBurned: confirmedNum(data.stats?.orbitx_burned, live, hasEvents),
       whaleActivityUsd: confirmedNum(data.stats?.whale_usd, live, hasEvents),
       activeWallets: confirmedNum(data.stats?.active_wallets, live, hasEvents),
@@ -210,10 +220,12 @@ export function liveToSnapshot(data: LivePayload, wallet?: WalletPayload | null)
     wallet: wallet?.ok ? toWalletSnapshot(wallet) : wallet?.address ? toWalletSnapshot(wallet) : EMPTY_SNAPSHOT.wallet,
     network: {
       name: "Solana Mainnet",
-      rpc: data.chain_slot != null ? "healthy" : "idle",
+      rpc: data.chain_slot != null || live ? "healthy" : "idle",
       lastIndexedBlock: data.last_slot ?? data.chain_slot ?? null,
       indexingDelaySec: data.ingest_age_sec ?? null,
-      ws: wsRaw === "connected" ? "connected" : "disconnected",
+      ws: (wsRaw === "connected" || wsRaw === "polling") && (live || data.chain_slot != null)
+        ? "connected"
+        : "disconnected",
       version: APP_VERSION,
       live,
       liveLabel: data.live_label || (live ? "LIVE" : "INDEXING DELAY"),

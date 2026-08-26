@@ -43,6 +43,10 @@ export const ORBITX_KOLS = [
   { address: "GM7Hrz2bDq33ezMtL6KGidSWZXMWgZ6qBuugkb5H8NvN", name: "Beaver", twitter: "@beaverd", status: "active", tags: ["KOL"] },
 ];
 
+export function allOrbitxKols() {
+  return ORBITX_KOLS;
+}
+
 export function activeOrbitxKols() {
   return ORBITX_KOLS.filter((k) => k.status === "active");
 }

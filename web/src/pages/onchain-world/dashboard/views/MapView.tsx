@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { galaxyPos } from "@/pages/onchain-world/WorldCanvas";
-import { WORLD_NODES } from "@/pages/onchain-world/lib/orbitx/constants";
+import { CLUSTER_META, CLUSTER_ORDER, layoutUniverse } from "@/pages/onchain-world/universeLayout";
 import { formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { tokenLabel, tokenTicker } from "../../../../../shared/orbitx-chain-districts.js";
 import { ORBITX_MINT } from "../../../../../shared/orbitx-chain-intel.js";
+
+function toMap(pos: [number, number, number]): { x: number; y: number } {
+  return { x: 50 + pos[0] * 0.26, y: 50 + pos[2] * 0.26 };
+}
 
 export function MapView() {
   const nav = useNavigate();
@@ -21,22 +24,29 @@ export function MapView() {
   const [hover, setHover] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
 
+  const layout = useMemo(() => layoutUniverse(tokens.slice(0, 250)), [tokens]);
+
   const planets = useMemo(() => {
-    return tokens.slice(0, 250).map((t, i) => {
-      const pos = galaxyPos(t.mint, i, tokens.length);
+    return tokens.slice(0, 250).flatMap((t) => {
+      const node = layout.get(t.mint);
+      if (!node) return [];
+      const mapped = toMap(node.pos);
       const vol = t.volume_24h || 0;
-      return {
-        mint: t.mint,
-        label: tokenTicker(t) || tokenLabel(t),
-        name: tokenLabel(t),
-        image: t.image || null,
-        vol,
-        x: 50 + pos[0] * 1.15,
-        y: 50 + pos[2] * 1.15,
-        r: Math.min(2.4, 0.7 + Math.log10(Math.max(vol, 12)) * 0.28),
-      };
+      return [
+        {
+          mint: t.mint,
+          label: tokenTicker(t) || tokenLabel(t),
+          name: tokenLabel(t),
+          image: t.image || null,
+          cluster: node.cluster,
+          vol,
+          x: mapped.x,
+          y: mapped.y,
+          r: Math.min(2.6, 0.35 + node.radius * 1.15),
+        },
+      ];
     });
-  }, [tokens]);
+  }, [tokens, layout]);
 
   const sparks = useMemo(
     () =>
@@ -78,21 +88,28 @@ export function MapView() {
         preserveAspectRatio="xMidYMid meet"
         onWheel={(e) => {
           e.preventDefault();
-          setZoom((z) => Math.max(0.7, Math.min(3.2, z + (e.deltaY > 0 ? -0.12 : 0.12))));
+          setZoom((z) => Math.max(0.55, Math.min(4.2, z + (e.deltaY > 0 ? -0.12 : 0.12))));
         }}
       >
-        {WORLD_NODES.filter((n) => n.id !== "orbitx").map((node) => (
-          <line
-            key={node.id}
-            x1="50"
-            y1="50"
-            x2={node.x}
-            y2={node.y}
-            stroke="var(--color-accent-2)"
-            strokeWidth="0.25"
-            opacity="0.45"
-          />
-        ))}
+        {CLUSTER_ORDER.filter((id) => id !== "orbitx").map((id) => {
+          const meta = CLUSTER_META[id];
+          const c = toMap(meta.center);
+          return (
+            <g key={id}>
+              <circle cx={c.x} cy={c.y} r={meta.spread * 0.26} fill={meta.color} opacity="0.08" />
+              <text
+                x={c.x}
+                y={c.y - meta.spread * 0.22}
+                textAnchor="middle"
+                fill={meta.color}
+                fontSize="1.8"
+                fontFamily="Oxanium, sans-serif"
+              >
+                {meta.label}
+              </text>
+            </g>
+          );
+        })}
         {sparks.map((s) => (
           <circle key={s.id} cx={s.x} cy={s.y} r="0.35" fill={s.buy ? "#34d399" : "#fb7185"} opacity="0.85" />
         ))}
@@ -109,7 +126,7 @@ export function MapView() {
               cy={p.y}
               r={p.r}
               fill="#1e1b4b"
-              stroke={selected === p.mint || hover === p.mint ? "#f5d0fe" : "#a78bfa"}
+              stroke={selected === p.mint || hover === p.mint ? "#f5d0fe" : CLUSTER_META[p.cluster].color}
               strokeWidth={selected === p.mint ? 0.35 : 0.16}
             />
             {p.image ? (
@@ -125,44 +142,23 @@ export function MapView() {
             ) : null}
           </g>
         ))}
-        {WORLD_NODES.map((node) => (
-          <g
-            key={node.id}
-            className="cursor-pointer"
-            onClick={() => {
-              if (node.id === "orbitx") open(orbitx?.mint || ORBITX_MINT);
-            }}
-          >
-            <circle
-              cx={node.x}
-              cy={node.y}
-              r={"hub" in node && node.hub ? 3.2 : 2.1}
-              fill={"hub" in node && node.hub ? "var(--color-accent-2)" : "var(--color-bg-raised)"}
-              stroke="var(--color-accent)"
-              strokeWidth="0.35"
-            />
-            <text
-              x={node.x}
-              y={node.y + 6}
-              textAnchor="middle"
-              fill="var(--color-fg)"
-              fontSize="2.4"
-              fontFamily="Oxanium, sans-serif"
-            >
-              {node.label}
-            </text>
-          </g>
-        ))}
-        {kols.slice(0, 24).map((k, i) => {
-          const angle = (i / Math.max(kols.length, 1)) * Math.PI * 2;
-          const cx = 50 + Math.cos(angle) * 18;
-          const cy = 50 + Math.sin(angle) * 13;
+        <g className="cursor-pointer" onClick={() => open(orbitx?.mint || ORBITX_MINT)}>
+          <circle cx="50" cy="50" r="3.2" fill="var(--color-accent-2)" stroke="var(--color-accent)" strokeWidth="0.35" />
+          <text x="50" y="56" textAnchor="middle" fill="var(--color-fg)" fontSize="2.4" fontFamily="Oxanium, sans-serif">
+            ORBITX
+          </text>
+        </g>
+        {kols.slice(0, 24).map((k) => {
+          const host = k.last_mint ? planets.find((p) => p.mint === k.last_mint) : null;
+          const cx = host ? host.x + 1.8 : 50 + (hashAngle(k.address).x);
+          const cy = host ? host.y - 1.4 : 50 + (hashAngle(k.address).y);
           return (
             <g
               key={k.address}
               className="cursor-pointer"
               onClick={() => {
                 trackWallet(k.address);
+                setCamCommand({ kind: "wallet", address: k.address });
                 setView("wallets");
               }}
             >
@@ -183,9 +179,17 @@ export function MapView() {
           <p className="mt-1 text-2xs text-fg">
             {hovered.name}
             {hovered.vol ? ` · ${formatUsd(hovered.vol)} vol` : ""}
+            {` · ${CLUSTER_META[hovered.cluster].label}`}
           </p>
         ) : null}
       </div>
     </div>
   );
+}
+
+function hashAngle(id: string): { x: number; y: number } {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  const a = ((h >>> 0) % 10_000) / 10_000 * Math.PI * 2;
+  return { x: Math.cos(a) * 18, y: Math.sin(a) * 13 };
 }

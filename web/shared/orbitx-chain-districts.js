@@ -91,6 +91,12 @@ export function cleanTokenFields(token) {
     symbol: symbol || null,
     image: token.image || dexTokenImage(mint),
     banner: token.banner || null,
+    holder_count: asNumber(token.holder_count) ?? asNumber(token.holders),
+    buys_24h: asNumber(token.buys_24h) ?? asNumber(token.txns_buys_24h),
+    sells_24h: asNumber(token.sells_24h) ?? asNumber(token.txns_sells_24h),
+    traders_24h: asNumber(token.traders_24h),
+    buy_volume_24h: asNumber(token.buy_volume_24h),
+    sell_volume_24h: asNumber(token.sell_volume_24h),
   };
 }
 
@@ -116,6 +122,11 @@ function pairToDistrict(pair, source) {
     change_24h: asNumber(pair.priceChange?.h24),
     change_1h: asNumber(pair.priceChange?.h1),
     holder_count: null,
+    buys_24h: asNumber(pair.txns?.h24?.buys),
+    sells_24h: asNumber(pair.txns?.h24?.sells),
+    traders_24h: null,
+    buy_volume_24h: null,
+    sell_volume_24h: null,
     dex: pair.dexId || null,
     source,
     kind: isOrbitxMint(mint) ? "orbitx" : "token",
@@ -139,6 +150,11 @@ function pumpToDistrict(coin) {
     change_24h: null,
     change_1h: null,
     holder_count: asNumber(coin.holder_count),
+    buys_24h: null,
+    sells_24h: null,
+    traders_24h: null,
+    buy_volume_24h: null,
+    sell_volume_24h: null,
     dex: "pumpfun",
     source: "pumpfun",
     kind: "token",
@@ -163,9 +179,18 @@ function jupToDistrict(row) {
     liquidity_usd: asNumber(row.liquidity),
     volume_24h: asNumber(stats.volume) ?? (buyVol + sellVol || null),
     change_24h: asNumber(stats.priceChange) ?? asNumber(row.priceChange24h),
-    change_1h: asNumber(stats.priceChange1h),
-    holder_count: asNumber(row.holderCount),
-    dex: "jupiter",
+    change_1h: asNumber(stats.priceChange1h) ?? asNumber(row.stats1h?.priceChange),
+    holder_count: asNumber(row.holderCount) ?? asNumber(row.holder_count),
+    buys_24h: asNumber(stats.numBuys),
+    sells_24h: asNumber(stats.numSells),
+    traders_24h: asNumber(stats.numTraders),
+    buy_volume_24h: buyVol || null,
+    sell_volume_24h: sellVol || null,
+    website: row.website || row.websiteUrl || null,
+    twitter: row.twitter || row.twitterUrl || null,
+    telegram: row.telegram || row.telegramUrl || null,
+    launch_platform: row.launchpad || row.graduatedPool?.source || null,
+    dex: row.launchpad || "jupiter",
     source: "jupiter",
     kind: isOrbitxMint(mint) ? "orbitx" : "token",
   };
@@ -193,6 +218,11 @@ function geckoPoolToMint(item, tokenMap) {
     change_24h: asNumber(attrs.price_change_percentage?.h24),
     change_1h: asNumber(attrs.price_change_percentage?.h1),
     holder_count: null,
+    buys_24h: asNumber(attrs.transactions?.h24?.buys),
+    sells_24h: asNumber(attrs.transactions?.h24?.sells),
+    traders_24h: asNumber(attrs.transactions?.h24?.buyers) != null || asNumber(attrs.transactions?.h24?.sellers) != null
+      ? (asNumber(attrs.transactions?.h24?.buyers) || 0) + (asNumber(attrs.transactions?.h24?.sellers) || 0)
+      : null,
     dex: attrs.name || "geckoterminal",
     source: "geckoterminal",
     kind: "token",
@@ -216,6 +246,15 @@ export function mergeDistrict(prev, next) {
     change_24h: next.change_24h ?? prev.change_24h,
     change_1h: next.change_1h ?? prev.change_1h,
     holder_count: next.holder_count ?? prev.holder_count,
+    buys_24h: next.buys_24h ?? prev.buys_24h,
+    sells_24h: next.sells_24h ?? prev.sells_24h,
+    traders_24h: next.traders_24h ?? prev.traders_24h,
+    buy_volume_24h: next.buy_volume_24h ?? prev.buy_volume_24h,
+    sell_volume_24h: next.sell_volume_24h ?? prev.sell_volume_24h,
+    website: next.website || prev.website,
+    twitter: next.twitter || prev.twitter,
+    telegram: next.telegram || prev.telegram,
+    launch_platform: next.launch_platform || prev.launch_platform,
     dex: next.dex || prev.dex,
     source: next.source || prev.source,
     kind: isOrbitxMint(next.mint) ? "orbitx" : next.kind || prev.kind || "token",
@@ -346,6 +385,86 @@ export async function fetchJupiterTopTraded(limit = TRENDING_LIMIT) {
   return [];
 }
 
+export async function fetchJupiterToken(mint) {
+  const ca = String(mint || "").trim();
+  if (!looksLikeMint(ca)) return null;
+  const urls = [
+    `https://lite-api.jup.ag/tokens/v2/search?query=${encodeURIComponent(ca)}`,
+    `https://api.jup.ag/tokens/v2/search?query=${encodeURIComponent(ca)}`,
+  ];
+  for (const url of urls) {
+    const j = await timed(url, 6000);
+    const rows = Array.isArray(j) ? j : (j?.tokens || []);
+    const hit = rows.find((r) => (r.id || r.address || r.mint) === ca) || (rows.length === 1 ? rows[0] : null);
+    if (hit) return jupToDistrict(hit);
+  }
+  return null;
+}
+
+export async function fetchGeckoToken(mint) {
+  const ca = String(mint || "").trim();
+  if (!looksLikeMint(ca)) return null;
+  const j = await timed(`https://api.geckoterminal.com/api/v2/networks/solana/tokens/${encodeURIComponent(ca)}`, 5500);
+  const a = j?.data?.attributes;
+  if (!a) return null;
+  return cleanTokenFields({
+    mint: ca,
+    symbol: a.symbol || null,
+    name: a.name || null,
+    image: a.image_url || dexTokenImage(ca),
+    banner: a.banner_image_url || null,
+    price_usd: asNumber(a.price_usd),
+    market_cap: asNumber(a.market_cap_usd) ?? asNumber(a.fdv_usd),
+    liquidity_usd: asNumber(a.total_reserve_in_usd),
+    volume_24h: asNumber(a.volume_usd?.h24),
+    change_24h: null,
+    change_1h: null,
+    holder_count: asNumber(a.holders?.count),
+    buys_24h: null,
+    sells_24h: null,
+    traders_24h: null,
+    buy_volume_24h: null,
+    sell_volume_24h: null,
+    website: Array.isArray(a.websites) ? a.websites[0] : null,
+    twitter: a.twitter_handle ? `https://x.com/${a.twitter_handle}` : null,
+    telegram: a.telegram_handle ? `https://t.me/${a.telegram_handle}` : null,
+    dex: a.launchpad_details?.migrated_destination_pool_address ? "raydium" : "geckoterminal",
+    source: "geckoterminal",
+    kind: isOrbitxMint(ca) ? "orbitx" : "token",
+  });
+}
+
+export async function fetchCoinGeckoContract(mint) {
+  const ca = String(mint || "").trim();
+  if (!looksLikeMint(ca)) return null;
+  const j = await timed(
+    `https://api.coingecko.com/api/v3/coins/solana/contract/${encodeURIComponent(ca)}`,
+    5500,
+  );
+  const m = j?.market_data;
+  if (!m && !j?.name) return null;
+  return cleanTokenFields({
+    mint: ca,
+    symbol: j.symbol ? String(j.symbol).toUpperCase() : null,
+    name: j.name || null,
+    image: j.image?.small || j.image?.thumb || dexTokenImage(ca),
+    banner: null,
+    price_usd: asNumber(m?.current_price?.usd),
+    market_cap: asNumber(m?.market_cap?.usd),
+    liquidity_usd: null,
+    volume_24h: asNumber(m?.total_volume?.usd),
+    change_24h: asNumber(m?.price_change_percentage_24h),
+    change_1h: asNumber(m?.price_change_percentage_1h_in_currency?.usd),
+    holder_count: null,
+    website: j.links?.homepage?.[0] || null,
+    twitter: j.links?.twitter_screen_name ? `https://x.com/${j.links.twitter_screen_name}` : null,
+    telegram: j.links?.telegram_channel_identifier ? `https://t.me/${j.links.telegram_channel_identifier}` : null,
+    dex: "coingecko",
+    source: "coingecko",
+    kind: isOrbitxMint(ca) ? "orbitx" : "token",
+  });
+}
+
 export async function fetchGeckoTrending(pages = 4) {
   const out = [];
   for (let page = 1; page <= pages; page++) {
@@ -370,14 +489,14 @@ export async function fetchGeckoTrending(pages = 4) {
 
 export function eventBreakdown(events) {
   const rows = Array.isArray(events) ? events : [];
-  const buckets = { BUY: 0, TRANSFER: 0, SELL: 0, ORBITX: 0, BURN: 0, OTHER: 0 };
+  const buckets = { BUY: 0, SELL: 0, SWAP: 0, TRANSFER: 0, BURN: 0, OTHER: 0 };
   for (const e of rows) {
-    const t = String(e.event_type || "");
-    if (e.orbitx_related) buckets.ORBITX += 1;
-    else if (t.includes("BURN")) buckets.BURN += 1;
+    const t = String(e.event_type || "").toUpperCase();
+    if (t.includes("BURN")) buckets.BURN += 1;
     else if (t.includes("BUY")) buckets.BUY += 1;
     else if (t.includes("SELL")) buckets.SELL += 1;
-    else if (t.includes("TRANSFER")) buckets.TRANSFER += 1;
+    else if (t.includes("SWAP")) buckets.SWAP += 1;
+    else if (t.includes("TRANSFER") || t.includes("SOL")) buckets.TRANSFER += 1;
     else buckets.OTHER += 1;
   }
   const total = rows.length;
@@ -418,6 +537,11 @@ function orbitxFallback() {
     change_24h: null,
     change_1h: null,
     holder_count: null,
+    buys_24h: null,
+    sells_24h: null,
+    traders_24h: null,
+    buy_volume_24h: null,
+    sell_volume_24h: null,
     dex: null,
     source: "orbitx",
     kind: "orbitx",
@@ -425,8 +549,11 @@ function orbitxFallback() {
 }
 
 export async function loadCityDistricts(extraMints = []) {
-  const [orbitxDex, boosts, latestBoosts, profiles, pump, gecko, jupiter] = await Promise.all([
+  const [orbitxDex, orbitxJup, orbitxGecko, orbitxCg, boosts, latestBoosts, profiles, pump, gecko, jupiter] = await Promise.all([
     fetchDexPairs([ORBITX_MINT]).catch(() => []),
+    fetchJupiterToken(ORBITX_MINT).catch(() => null),
+    fetchGeckoToken(ORBITX_MINT).catch(() => null),
+    fetchCoinGeckoContract(ORBITX_MINT).catch(() => null),
     fetchDexBoosts(50).catch(() => []),
     fetchDexBoostsLatest(40).catch(() => []),
     fetchDexProfiles().catch(() => []),
@@ -448,7 +575,7 @@ export async function loadCityDistricts(extraMints = []) {
 
   const dex = await fetchDexPairs(want);
   const byMint = new Map();
-  for (const d of [...jupiter, ...gecko, ...pump, ...dex, ...profiles, ...orbitxDex]) {
+  for (const d of [orbitxJup, orbitxGecko, orbitxCg, ...jupiter, ...gecko, ...pump, ...dex, ...profiles, ...orbitxDex]) {
     if (!d?.mint) continue;
     byMint.set(d.mint, mergeDistrict(byMint.get(d.mint), d));
   }

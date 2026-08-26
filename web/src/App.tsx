@@ -663,6 +663,7 @@ const App = () => (
             <Route path="/x" element={<OwnerPreviewRoute><XMcpPage /></OwnerPreviewRoute>} />
             <Route path="/shop" element={<ShopPage />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
+            <Route path="/world" element={<Navigate to="/on-chain" replace />} />
             <Route path="/on-chain" element={<OnChainWorld />} />
             <Route path="/on-chain/wallet/:address" element={<OnChainWorld />} />
             <Route path="/on-chain/token/:address" element={<OnChainWorld />} />

@@ -167,7 +167,6 @@ export const useOrbitxStore = create<OrbitxState>((set) => ({
   selectToken: (mint) =>
     set((state) => ({
       selectedToken: mint,
-      camCommand: mint ? { kind: "token", mint } : state.camCommand,
       tokenDetail: mint && state.tokenDetail?.mint === mint ? state.tokenDetail : null,
     })),
   tokenDetail: null,

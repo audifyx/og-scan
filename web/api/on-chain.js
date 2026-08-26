@@ -23,12 +23,13 @@ import {
 } from "../shared/orbitx-chain-intel.js";
 import {
   activeOrbitxKols,
+  allOrbitxKols,
   isAssignedKol,
   kolByAddress,
   kolWatchBatch,
   trackedRowsFromDirectory,
 } from "../shared/orbitx-kol-directory.js";
-import { epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields } from "../shared/orbitx-chain-districts.js";
+import { epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
 
 export const config = { maxDuration: 60 };
 
@@ -250,41 +251,62 @@ async function solUsd() {
 async function tokenMeta(mint) {
   if (!mint) return {};
   const hit = metaCache.get(mint);
-  if (hit && Date.now() - hit.at < 120_000) return hit.value;
-  if (isOrbitxMint(mint)) {
-    const base = { symbol: "ORBITX", name: "OrbitX", decimals: 6, mint, image: dexTokenImage(mint) };
-    metaCache.set(mint, { at: Date.now(), value: base });
-  }
+  if (hit && Date.now() - hit.at < 90_000) return hit.value;
+  const seed = isOrbitxMint(mint)
+    ? { symbol: "ORBITX", name: "OrbitX", decimals: 6, mint, image: dexTokenImage(mint) }
+    : { mint };
   try {
-    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`);
-    const j = await r.json();
-    const pair = (j.pairs || []).find((p) => p?.chainId === "solana") || (j.pairs || [])[0];
-    if (!pair) return metaCache.get(mint)?.value || {};
-    const value = {
+    const [dexRes, jup] = await Promise.all([
+      fetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
+      fetchJupiterToken(mint).catch(() => null),
+    ]);
+    const pair = (dexRes?.pairs || []).find((p) => p?.chainId === "solana") || (dexRes?.pairs || [])[0];
+    const fromDex = pair
+      ? {
+          mint,
+          symbol: looksLikeMint(pair.baseToken?.symbol) ? null : (pair.baseToken?.symbol || null),
+          name: tokenDisplayName({ name: pair.baseToken?.name, symbol: pair.baseToken?.symbol, mint }),
+          image: pair.info?.imageUrl || dexTokenImage(mint),
+          banner: pair.info?.header || pair.info?.openGraph || null,
+          website: pair.info?.websites?.[0]?.url || null,
+          twitter: (pair.info?.socials || []).find((s) => s.type === "twitter")?.url || null,
+          telegram: (pair.info?.socials || []).find((s) => s.type === "telegram")?.url || null,
+          price_usd: asNumber(pair.priceUsd),
+          market_cap: asNumber(pair.marketCap) ?? asNumber(pair.fdv),
+          liquidity_usd: asNumber(pair.liquidity?.usd),
+          volume_24h: asNumber(pair.volume?.h24),
+          change_24h: asNumber(pair.priceChange?.h24),
+          buys_24h: asNumber(pair.txns?.h24?.buys),
+          sells_24h: asNumber(pair.txns?.h24?.sells),
+          launch_platform: pair.dexId || null,
+        }
+      : {};
+    const value = cleanTokenFields({
+      ...seed,
+      ...fromDex,
+      ...(jup || {}),
       mint,
-      symbol: looksLikeMint(pair.baseToken?.symbol) ? null : (pair.baseToken?.symbol || null),
-      name: tokenDisplayName({ name: pair.baseToken?.name, symbol: pair.baseToken?.symbol, mint }),
-      image: pair.info?.imageUrl || dexTokenImage(mint),
-      banner: pair.info?.header || pair.info?.openGraph || null,
-      website: pair.info?.websites?.[0]?.url || null,
-      twitter: (pair.info?.socials || []).find((s) => s.type === "twitter")?.url || null,
-      telegram: (pair.info?.socials || []).find((s) => s.type === "telegram")?.url || null,
-      price_usd: asNumber(pair.priceUsd),
-      market_cap: asNumber(pair.marketCap) ?? asNumber(pair.fdv),
-      liquidity_usd: asNumber(pair.liquidity?.usd),
-      volume_24h: asNumber(pair.volume?.h24),
-      change_24h: asNumber(pair.priceChange?.h24),
-      launch_platform: pair.dexId || null,
-    };
+      image: fromDex.image || jup?.image || seed.image || dexTokenImage(mint),
+      banner: fromDex.banner || jup?.banner || null,
+      website: jup?.website || fromDex.website || null,
+      twitter: jup?.twitter || fromDex.twitter || null,
+      telegram: jup?.telegram || fromDex.telegram || null,
+      buys_24h: jup?.buys_24h ?? fromDex.buys_24h ?? null,
+      sells_24h: jup?.sells_24h ?? fromDex.sells_24h ?? null,
+      traders_24h: jup?.traders_24h ?? null,
+      buy_volume_24h: jup?.buy_volume_24h ?? null,
+      sell_volume_24h: jup?.sell_volume_24h ?? null,
+      holder_count: jup?.holder_count ?? fromDex.holder_count ?? null,
+      launch_platform: jup?.launch_platform || fromDex.launch_platform || null,
+    });
     if (isOrbitxMint(mint)) {
       value.symbol = "ORBITX";
       value.name = "OrbitX";
-      value.image = pair.info?.imageUrl || dexTokenImage(mint);
     }
     metaCache.set(mint, { at: Date.now(), value });
     return value;
   } catch {
-    return metaCache.get(mint)?.value || {};
+    return metaCache.get(mint)?.value || seed;
   }
 }
 
@@ -491,11 +513,17 @@ async function rollup(sb, events) {
           market_cap: meta.market_cap ?? null,
           liquidity_usd: meta.liquidity_usd ?? null,
           volume_24h: meta.volume_24h ?? null,
+          holders: meta.holder_count ?? null,
           updated_at: new Date().toISOString(),
         });
       }
     }
   }
+}
+
+async function signaturesForAddress(address, limit = 40) {
+  const rows = await rpc("getSignaturesForAddress", [address, { limit: Math.min(limit, 50) }]);
+  return (Array.isArray(rows) ? rows : []).map((row) => row?.signature).filter(isLikelySignature);
 }
 
 async function ingestAddresses(sb, addresses, opts = {}) {
@@ -509,7 +537,39 @@ async function ingestAddresses(sb, addresses, opts = {}) {
   for (const address of addresses) {
     if (!address) continue;
     try {
-      const parsed = await heliusEnhanced(address, opts.limit || 20);
+      let parsed = [];
+      try {
+        parsed = await heliusEnhanced(address, opts.limit || 20);
+      } catch {
+        parsed = [];
+      }
+      if (!parsed.length && (isOrbitxMint(address) || opts.rpcFallback)) {
+        const sigs = await signaturesForAddress(address, isOrbitxMint(address) ? 50 : opts.limit || 20);
+        try {
+          parsed = await heliusParse(sigs);
+        } catch {
+          parsed = [];
+        }
+        if (!parsed.length) {
+          for (const sig of sigs.slice(0, 16)) {
+            if (seen.has(sig)) continue;
+            try {
+              const raw = await rpc("getTransaction", [
+                sig,
+                { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+              ]);
+              if (!raw) continue;
+              seen.add(sig);
+              txs += 1;
+              const events = classifyRpcTx(sig, raw, { tracked, solUsd: price, tokenMeta: tokenMetaMap });
+              stored += await persistEvents(sb, events, tokenMetaMap);
+            } catch {
+              failed += 1;
+            }
+          }
+          continue;
+        }
+      }
       txs += parsed.length;
       for (const tx of parsed) {
         if (!tx?.signature || seen.has(tx.signature)) continue;
@@ -542,9 +602,19 @@ async function ingestNow(sb, extra = []) {
   ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 16);
   let chainSlot = null;
   try { chainSlot = await rpc("getSlot", [{ commitment: "confirmed" }]); } catch { /* lag optional */ }
-  let result;
+  let result = { txs: 0, failed: 0, stored: 0, signatures: 0 };
   try {
-    result = await ingestAddresses(sb, watch, { limit: 18 });
+    const rest = watch.filter((a) => !isOrbitxMint(a));
+    const [ox, other] = await Promise.all([
+      ingestAddresses(sb, [ORBITX_MINT], { limit: 50, rpcFallback: true }),
+      ingestAddresses(sb, rest, { limit: 18, rpcFallback: false }),
+    ]);
+    result = {
+      txs: (ox.txs || 0) + (other.txs || 0),
+      failed: (ox.failed || 0) + (other.failed || 0),
+      stored: (ox.stored || 0) + (other.stored || 0),
+      signatures: (ox.signatures || 0) + (other.signatures || 0),
+    };
   } catch (e) {
     await sb.from("ox_chain_index_state").upsert({
       id: "solana-mainnet",
@@ -555,16 +625,16 @@ async function ingestNow(sb, extra = []) {
     throw e;
   }
   const { data: state } = await sb.from("ox_chain_index_state").select("*").eq("id", "solana-mainnet").maybeSingle();
-  const lastSlot = result.signatures ? chainSlot : state?.last_slot;
+  const lastSlot = chainSlot ?? state?.last_slot;
   await sb.from("ox_chain_index_state").upsert({
     id: "solana-mainnet",
-    last_slot: lastSlot ?? chainSlot,
+    last_slot: lastSlot,
     chain_slot: chainSlot,
     last_ingest_at: new Date().toISOString(),
     events_indexed: Number(state?.events_indexed || 0) + result.stored,
     txs_processed: Number(state?.txs_processed || 0) + result.txs,
     txs_failed: Number(state?.txs_failed || 0) + result.failed,
-    lag_slots: chainSlot != null && lastSlot != null ? Math.max(0, chainSlot - lastSlot) : state?.lag_slots ?? null,
+    lag_slots: 0,
     websocket_status: "polling",
     last_error: result.failed ? `${result.failed} address fetch(es) failed` : null,
     updated_at: new Date().toISOString(),
@@ -650,9 +720,11 @@ async function handleLive(req, res, sb) {
   });
   const latestByWallet = {};
   for (const e of labeled) {
-    if (e.wallet && !latestByWallet[e.wallet]) latestByWallet[e.wallet] = e;
+    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
+      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
+    }
   }
-  const kols = activeOrbitxKols().map((k) => {
+  const kols = allOrbitxKols().map((k) => {
     const last = latestByWallet[k.address];
     const hits = labeled.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
     return {
@@ -664,20 +736,14 @@ async function handleLive(req, res, sb) {
       last_type: last?.event_type || null,
       last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
         || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
+      last_mint: last?.token_ca || null,
       last_usd: last?.usd_value ?? null,
       last_at: last?.block_time || null,
     };
   });
   const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
   const extraMints = labeled.map((e) => e.token_ca).filter(Boolean);
-  const districts = districtCache.value || {
-    orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" },
-    hubs: [],
-    tokens: [],
-  };
-  if (!districtCache.value || Date.now() - districtCache.at > 80_000) {
-    void cityDistricts(extraMints);
-  }
+  const districts = await cityDistricts(extraMints);
   const ingestAge = state?.last_ingest_at ? Math.max(0, (Date.now() - Date.parse(state.last_ingest_at)) / 1000) : null;
   return json(res, 200, {
     ok: true,
@@ -691,7 +757,13 @@ async function handleLive(req, res, sb) {
     ingest_age_sec: Number.isFinite(ingestAge) ? Number(ingestAge.toFixed(1)) : null,
     websocket_status: state?.websocket_status || "polling",
     sol_usd: await solUsd(),
-    stats: { ...stats, assigned_kols: activeOrbitxKols().length },
+    stats: {
+      ...stats,
+      assigned_kols: allOrbitxKols().length,
+      orbitx_buys_24h: districts?.orbitx?.buys_24h ?? null,
+      orbitx_sells_24h: districts?.orbitx?.sells_24h ?? null,
+      orbitx_traders_24h: districts?.orbitx?.traders_24h ?? null,
+    },
     breakdown: eventBreakdown(labeled),
     eps_series: epsSeries(labeled),
     districts,
@@ -722,25 +794,47 @@ async function handleTrending(req, res) {
 async function handleKols(req, res, sb) {
   await seedAssignedKols(sb);
   const tracked = await loadTracked(sb);
-  const addresses = activeOrbitxKols().map((k) => k.address);
+  const addresses = allOrbitxKols().map((k) => k.address);
   let events = [];
   if (addresses.length) {
+    const orFilter = [
+      `wallet.in.(${addresses.join(",")})`,
+      `source_wallet.in.(${addresses.join(",")})`,
+      `destination_wallet.in.(${addresses.join(",")})`,
+    ].join(",");
     const { data } = await sb
       .from("ox_chain_events")
       .select("*")
-      .in("wallet", addresses)
+      .or(orFilter)
       .order("block_time", { ascending: false })
-      .limit(120);
+      .limit(400);
     events = data || [];
+  }
+  const latestByWallet = {};
+  for (const e of events) {
+    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
+      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
+    }
   }
   return json(res, 200, {
     ok: true,
-    count: activeOrbitxKols().length,
-    kols: activeOrbitxKols().map((k) => ({
-      ...k,
-      label_kind: "KOL",
-      tracked: Boolean(tracked[k.address]),
-    })),
+    count: allOrbitxKols().length,
+    kols: allOrbitxKols().map((k) => {
+      const last = latestByWallet[k.address];
+      const hits = events.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
+      return {
+        ...k,
+        label_kind: "KOL",
+        tracked: Boolean(tracked[k.address]),
+        hits,
+        last_type: last?.event_type || null,
+        last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
+          || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
+        last_mint: last?.token_ca || null,
+        last_usd: last?.usd_value ?? null,
+        last_at: last?.block_time || null,
+      };
+    }),
     events: events.map(publicEvent),
   });
 }
@@ -824,7 +918,7 @@ async function handleWallet(req, res, sb, address) {
 
 async function handleToken(req, res, sb, mint) {
   if (!isLikelyAddress(mint)) return json(res, 400, { ok: false, error: "Valid token mint required." });
-  try { await ingestAddresses(sb, [mint], { limit: 40 }); } catch { /* cache */ }
+  try { await ingestAddresses(sb, [mint], { limit: 40, rpcFallback: isOrbitxMint(mint) }); } catch { /* cache */ }
   const meta = await tokenMeta(mint);
   const [{ data: stored }, { data: events }, { data: buyers }] = await Promise.all([
     sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle(),
@@ -834,7 +928,12 @@ async function handleToken(req, res, sb, mint) {
   return json(res, 200, {
     ok: true,
     mint,
-    token: cleanTokenFields({ ...meta, ...stored, mint }),
+    token: cleanTokenFields({
+      ...stored,
+      ...meta,
+      mint,
+      holder_count: meta.holder_count ?? asNumber(stored?.holders) ?? asNumber(stored?.holder_count),
+    }),
     events: (events || []).map(publicEvent),
     buyers: buyers || [],
   });
@@ -895,7 +994,7 @@ async function handleBlock(req, res, slot) {
 }
 
 async function handleOrbitx(req, res, sb, sub) {
-  try { await ingestAddresses(sb, [ORBITX_MINT], { limit: 40 }); } catch { /* cache */ }
+  try { await ingestAddresses(sb, [ORBITX_MINT], { limit: 50, rpcFallback: true }); } catch { /* cache */ }
   const mint = ORBITX_MINT;
   const [{ data: related }, { data: byMint }] = await Promise.all([
     sb.from("ox_chain_events").select("*").eq("orbitx_related", true).order("block_time", { ascending: false }).limit(400),
@@ -910,6 +1009,7 @@ async function handleOrbitx(req, res, sb, sub) {
   const { data: tokens } = await sb.from("ox_chain_wallet_tokens").select("*").eq("token_ca", mint);
   const { data: token } = await sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle();
   const meta = await tokenMeta(mint);
+  const city = await cityDistricts([mint]).catch(() => null);
   const rows = events || [];
   const burns = rows.filter((e) => /BURN/.test(e.event_type || ""));
   const buys = rows.filter((e) => /BUY/.test(e.event_type || ""));
@@ -919,7 +1019,13 @@ async function handleOrbitx(req, res, sb, sub) {
   const payload = {
     ok: true,
     mint,
-    token: cleanTokenFields({ ...meta, ...token, mint }),
+    token: cleanTokenFields({
+      ...token,
+      ...meta,
+      ...(city?.orbitx || {}),
+      mint,
+      holder_count: city?.orbitx?.holder_count ?? meta.holder_count ?? asNumber(token?.holders),
+    }),
     events: (sub === "burns" ? burns : sub === "buyers" ? buys : rows).map(publicEvent),
     burns: burns.map(publicEvent),
     buys: buys.map(publicEvent),

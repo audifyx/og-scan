@@ -17,8 +17,10 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/pages/onchain-world/dashboard/EmptyState";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
+import { clock } from "@/pages/onchain-world/format";
 import { formatAddress, formatInt, formatToken, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
+import type { KolCard } from "@/pages/onchain-world/api";
 
 export function WalletPanel() {
   const selected = useOrbitxStore((s) => s.selectedWallet);
@@ -190,10 +192,21 @@ function KolDirectory({
   selected,
   onPick,
 }: {
-  kols: { address: string; name: string; twitter: string | null; hits?: number }[];
+  kols: KolCard[];
   selected: string | null;
   onPick: (address: string) => void;
 }) {
+  const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
+  const selectToken = useOrbitxStore((s) => s.selectToken);
+  const nav = useNavigate();
+  if (!kols.length) {
+    return (
+      <section className="border-t border-line px-3 py-3">
+        <h3 className="ox-kicker mb-1.5">KOL directory</h3>
+        <p className="text-2xs text-dim">Assigned KOL roster has not loaded yet.</p>
+      </section>
+    );
+  }
   return (
     <section className="border-t border-line">
       <h3 className="ox-kicker px-3 pt-3 pb-1.5">KOL directory · {kols.length}</h3>
@@ -205,12 +218,33 @@ function KolDirectory({
               onClick={() => onPick(k.address)}
               className={`flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-bg-hover ${selected === k.address ? "bg-bg-hover" : ""}`}
             >
-              <span>
-                <span className="block text-xs font-medium text-fg">{k.name}</span>
-                <span className="block text-2xs text-dim">{k.twitter || formatAddress(k.address)}</span>
+              <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium text-fg">
+                      {k.name}
+                      {k.status === "disputed" ? " · listed" : k.hits ? "" : " · idle"}
+                    </span>
+                <span className="block truncate text-2xs text-dim">
+                  {k.last_type
+                    ? `${k.last_type.replace(/_/g, " ")}${k.last_token ? ` · ${k.last_token}` : ""}`
+                    : k.twitter || formatAddress(k.address)}
+                </span>
+                {k.last_at ? <span className="block text-2xs text-dim">{clock(k.last_at)}</span> : null}
               </span>
-              <span className="ox-stat text-2xs text-muted">{k.hits ?? 0}</span>
+              <span className="ox-stat shrink-0 text-2xs text-muted">{k.hits ?? 0}</span>
             </button>
+            {k.last_mint ? (
+              <button
+                type="button"
+                className="w-full px-3 pb-1.5 text-left text-2xs text-cyan hover:text-fg"
+                onClick={() => {
+                  selectToken(k.last_mint!);
+                  setCamCommand({ kind: "token", mint: k.last_mint! });
+                  nav(`/on-chain/token/${k.last_mint}`);
+                }}
+              >
+                Last mint {formatAddress(k.last_mint)}
+              </button>
+            ) : null}
           </li>
         ))}
       </ul>

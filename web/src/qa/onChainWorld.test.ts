@@ -12,6 +12,7 @@ describe("OrbitX /on-chain world", () => {
   it("exposes the living world as a public route and keeps /onchain proof owner-only", () => {
     const app = readFileSync(resolve(WEB, "src/App.tsx"), "utf8");
     expect(app).toContain('<Route path="/on-chain" element={<OnChainWorld />} />');
+    expect(app).toContain('<Route path="/world" element={<Navigate to="/on-chain" replace />} />');
     expect(app).toContain('<Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />');
   });
 
@@ -29,6 +30,8 @@ describe("OrbitX /on-chain world", () => {
     expect(api).toContain("handleTrending");
     expect(api).toContain("banner");
     expect(api).toContain("handleMedia");
+    expect(api).toContain("rpcFallback: true");
+    expect(api).toContain("orbitx_buys_24h");
     expect(api).toContain("dexTokenImage");
     expect(api).toContain("publicEvent");
     expect(api).not.toContain("sbp_");
@@ -55,6 +58,11 @@ describe("OrbitX /on-chain world", () => {
     expect(world).toContain("viewOptions");
     expect(world).toContain("WorldJoystick");
     expect(world).toContain("stick={stick}");
+    expect(world).toContain("onCamConsumed");
+    expect(world).toContain("spin={follow}");
+    expect(world).toContain("cinematic={false}");
+    expect(world).toContain("Spin");
+    expect(world).not.toContain(">Orbit</");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/WorldCanvas.tsx"), "utf8")).toContain("stick");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldJoystick.tsx"), "utf8")).toContain("WASD");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WorldJoystick.tsx"), "utf8")).toContain("SHIFT BOOST");
@@ -68,6 +76,9 @@ describe("OrbitX /on-chain world", () => {
     const tokenPanel = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TokenPanel.tsx"), "utf8");
     expect(tokenPanel).toContain("banner");
     expect(tokenPanel).toContain("tokenLabel");
+    expect(tokenPanel).toContain("tokenActivity");
+    expect(tokenPanel).toContain("KOL interactions");
+    expect(tokenPanel).toContain("24h buys");
     expect(tokenPanel).not.toMatch(/\?\?[^;\n]*\|\|/);
     const nav = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/MobileNav.tsx"), "utf8");
     expect(nav).toContain("World");
@@ -88,7 +99,8 @@ describe("OrbitX /on-chain world", () => {
     expect(bottom).toContain("Whale movements");
     expect(bottom).toContain("KOL activity");
     const map = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/MapView.tsx"), "utf8");
-    expect(map).toContain("WORLD_NODES");
+    expect(map).toContain("layoutUniverse");
+    expect(map).toContain("CLUSTER_META");
     expect(map).toContain("city.kols");
     expect(map).toContain("slice(0, 250)");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/TerminalView.tsx"), "utf8")).toContain("decoded rows");
@@ -98,6 +110,7 @@ describe("OrbitX /on-chain world", () => {
     const oxView = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/OrbitxTokenView.tsx"), "utf8");
     expect(oxView).toContain("districts.orbitx");
     expect(oxView).toContain("formatPrice");
+    expect(oxView).toContain("24h buys (Jupiter)");
     const wallets = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/WalletsView.tsx"), "utf8");
     expect(wallets).toContain("city.kols");
     expect(wallets).toContain("Assigned KOLs");
@@ -109,8 +122,14 @@ describe("OrbitX /on-chain world", () => {
     expect(hook).toContain("fetchTrending");
     expect(hook).toContain("getSlot");
     expect(hook).toContain("loadCityDistricts");
+    expect(hook).toContain("allOrbitxKols");
     const top = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TopBar.tsx"), "utf8");
     expect(top).toContain("Search 250 trending");
+    expect(top).toContain('label="OX 24h Buys"');
+    expect(top).toContain('label="OX 24h Sells"');
+    expect(top).toContain('label="Buys"');
+    expect(top).toContain('label="Swaps"');
+    expect(top).not.toContain("OrbitX Buys");
   });
 
   it("renders a 3D galaxy of token nodes, official KOLs, holders, and swaps", () => {
@@ -124,7 +143,11 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("ACESFilmicToneMapping");
     expect(canvas).toContain("function Transit");
     expect(canvas).toContain("function OrbitXCore");
-    expect(canvas).toContain("function galaxyPos");
+    expect(canvas).toContain("export { galaxyPos }");
+    expect(canvas).toContain("layoutUniverse");
+    expect(canvas).toContain("CLUSTER_META");
+    expect(canvas).toContain("autoRotate={false}");
+    expect(canvas).toContain("speed={0}");
     expect(canvas).toContain("DEX_HUBS");
     expect(canvas).toContain("followWallet");
     expect(canvas).toContain("tokenLabel");
@@ -144,6 +167,9 @@ describe("OrbitX /on-chain world", () => {
     expect(districts).toContain("TRENDING_LIMIT = 250");
     expect(districts).toContain("token-profiles/latest");
     expect(districts).toContain("toptraded/24h");
+    expect(districts).toContain("fetchJupiterToken");
+    expect(districts).toContain("fetchCoinGeckoContract");
+    expect(districts).toContain("api.coingecko.com");
     expect(districts).toContain("dexTokenImage");
     expect(districts).toContain("dd.dexscreener.com/ds-data/tokens/solana");
     const planet = readFileSync(resolve(WEB, "src/pages/onchain-world/planetTexture.ts"), "utf8");
@@ -212,15 +238,52 @@ describe("OrbitX /on-chain world", () => {
       last_ingest_at: null,
       websocket_status: "polling",
       sol_usd: null,
-      stats: { events_per_sec: 0, transactions_per_min: 0, orbitx_buys: 0, orbitx_burned: 0, whale_usd: 0, active_wallets: 0 },
+      stats: { events_per_sec: 0, transactions_per_min: 0, buys: 0, sells: 0, swaps: 0, transfers: 0, orbitx_buys: 0, orbitx_burned: 0, whale_usd: 0, active_wallets: 0 },
       events: [],
     };
     const snap = liveToSnapshot(idle);
     expect(snap.ticker.eventsPerSec).toBeNull();
     expect(snap.events).toEqual([]);
     expect(snap.network.liveLabel).toBe("INDEXING DELAY");
+    expect(snap.network.ws).toBe("disconnected");
+    const liveOx = liveToSnapshot({
+      ...idle,
+      live: true,
+      live_label: "LIVE",
+      live_reason: null,
+      chain_slot: 441800000,
+      websocket_status: "polling",
+      stats: { ...idle.stats, orbitx_buys_24h: 44, orbitx_sells_24h: 44, orbitx_traders_24h: 59 },
+      districts: {
+        orbitx: { mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", buys_24h: 44, sells_24h: 44, traders_24h: 59 },
+        tokens: [],
+      },
+    });
+    expect(liveOx.ticker.orbitxBuys24h).toBe(44);
+    expect(liveOx.ticker.orbitxSells24h).toBe(44);
+    expect(liveOx.network.rpc).toBe("healthy");
+    expect(liveOx.network.ws).toBe("connected");
     expect(toBreakdown([]).every((s) => s.pct === 0)).toBe(true);
     expect(formatPrice(null)).toBe("—");
     expect(formatPrice(0.00000966)).toMatch(/^\$0\.000009/);
+  });
+
+  it("classifies universe clusters and tallies real event kinds", async () => {
+    const { classifyToken } = await import("../pages/onchain-world/universeLayout");
+    const { tallyActivity, buySellRatio } = await import("../pages/onchain-world/activityStats");
+    expect(classifyToken({ mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", market_cap: 1 })).toBe("orbitx");
+    expect(classifyToken({ mint: "Aaa1111111111111111111111111111111111111111", market_cap: 80_000_000, volume_24h: 1 })).toBe("big_dawgs");
+    expect(classifyToken({ mint: "Bbb1111111111111111111111111111111111111111", market_cap: 2_000_000, volume_24h: 1 })).toBe("mid_cap");
+    expect(classifyToken({ mint: "Ccc1111111111111111111111111111111111111111", market_cap: 20_000, volume_24h: 400_000 })).toBe("mini_dawgs");
+    const totals = tallyActivity([
+      { event_id: "1", signature: "s", slot: 1, block_time: new Date().toISOString(), event_type: "BUY", status: "confirmed", source: null, attribution: "chain", wallet: "w1", counterparty: null, source_wallet: null, destination_wallet: null, token_ca: "m", token_symbol: "AAA", token_name: "Alpha", token_image: null, amount: 1, sol_amount: null, usd_value: null, market_cap: null, orbitx_related: false, kol_related: true, whale_related: false, importance: 1, confidence: "confirmed", description: null },
+      { event_id: "2", signature: "s2", slot: 1, block_time: new Date().toISOString(), event_type: "ORBITX_BUY", status: "confirmed", source: null, attribution: "chain", wallet: "w2", counterparty: null, source_wallet: null, destination_wallet: null, token_ca: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", token_symbol: "ORBITX", token_name: "OrbitX", token_image: null, amount: 1, sol_amount: null, usd_value: null, market_cap: null, orbitx_related: true, kol_related: false, whale_related: false, importance: 1, confidence: "confirmed", description: null },
+      { event_id: "3", signature: "s3", slot: 1, block_time: new Date().toISOString(), event_type: "SWAP", status: "confirmed", source: null, attribution: "chain", wallet: "w3", counterparty: null, source_wallet: null, destination_wallet: null, token_ca: "m", token_symbol: "AAA", token_name: "Alpha", token_image: null, amount: 1, sol_amount: null, usd_value: null, market_cap: null, orbitx_related: false, kol_related: false, whale_related: false, importance: 1, confidence: "confirmed", description: null },
+    ]);
+    expect(totals.buys).toBe(2);
+    expect(totals.swaps).toBe(1);
+    expect(totals.orbitx).toBe(1);
+    expect(totals.kol).toBe(1);
+    expect(buySellRatio(totals)).toBe("100 / 0");
   });
 });

@@ -42,9 +42,15 @@ export function WorldJoystick({
     const pads = typeof navigator !== "undefined" ? navigator.getGamepads?.() || [] : [];
     for (const pad of pads) {
       if (!pad) continue;
-      x += pad.axes[0] || 0;
-      y += pad.axes[1] || 0;
-      z += -(pad.axes[3] || 0);
+      const ax = pad.axes[0] || 0;
+      const ay = pad.axes[1] || 0;
+      const az = -(pad.axes[3] || 0);
+      if (Math.hypot(ax, ay) < 0.22 && Math.abs(az) < 0.22 && !pad.buttons[0]?.pressed && !pad.buttons[7]?.pressed) {
+        continue;
+      }
+      x += ax;
+      y += ay;
+      z += az;
       if (pad.buttons[0]?.pressed || pad.buttons[7]?.pressed) {
         onChangeRef.current(clampStick(x, y, z, true));
         return;
@@ -137,14 +143,32 @@ export function WorldJoystick({
 
   useEffect(() => {
     let raf = 0;
+    let running = false;
     const loop = () => {
       const pads = typeof navigator !== "undefined" ? navigator.getGamepads?.() || [] : [];
-      const live = pads.some((p) => p && (Math.hypot(p.axes[0] || 0, p.axes[1] || 0) > 0.08 || Math.abs(p.axes[3] || 0) > 0.08 || p.buttons[0]?.pressed));
+      const live = pads.some(
+        (p) =>
+          p &&
+          (Math.hypot(p.axes[0] || 0, p.axes[1] || 0) > 0.22 ||
+            Math.abs(p.axes[3] || 0) > 0.22 ||
+            p.buttons[0]?.pressed ||
+            p.buttons[7]?.pressed),
+      );
       if (live) emitCombined();
+      if (running) raf = window.requestAnimationFrame(loop);
+    };
+    const start = () => {
+      if (running) return;
+      running = true;
       raf = window.requestAnimationFrame(loop);
     };
-    raf = window.requestAnimationFrame(loop);
-    return () => window.cancelAnimationFrame(raf);
+    if ([...(typeof navigator !== "undefined" ? navigator.getGamepads?.() || [] : [])].some(Boolean)) start();
+    window.addEventListener("gamepadconnected", start);
+    return () => {
+      running = false;
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("gamepadconnected", start);
+    };
   }, [emitCombined]);
 
   const knobX = value.x * 34;
