@@ -21,15 +21,19 @@ import { fmtNum, fmtUsd } from "./format";
 import { isOrbitxMint, ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
 import { DEX_HUBS, tokenLabel, tokenTicker } from "../../../shared/orbitx-chain-districts.js";
 import { activeOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
+import { detectLiteGpu } from "./detectLiteGpu";
 import { usePlanetTexture } from "./planetTexture";
 import type { FlightStick } from "./dashboard/WorldJoystick";
 import type { ViewOptions } from "./lib/orbitx/types";
 import {
   CLUSTER_META,
   CLUSTER_ORDER,
+  KOL_RING,
   galaxyPos,
   hashMint,
+  kolRingPos,
   layoutUniverse,
+  ringPoint,
   type ClusterId,
   type UniverseNode,
 } from "./universeLayout";
@@ -68,6 +72,8 @@ type Props = {
   onPick: (pick: WorldPick) => void;
   onReady?: () => void;
   onCamConsumed?: () => void;
+  onContextLost?: () => void;
+  lite?: boolean;
 };
 
 const DEFAULT_VIEW: ViewOptions = { labels: true, trails: true, figures: true, grid: false };
@@ -93,11 +99,13 @@ function ring(index: number, count: number, radius: number, y = 0.4): [number, n
 }
 
 function walletPos(address: string, kolIndex: number, kolCount: number, isKol: boolean): [number, number, number] {
-  if (isKol && kolIndex >= 0) return ring(kolIndex, kolCount, 3.4, 0.55);
+  if (isKol && kolIndex >= 0) return kolRingPos(kolIndex, kolCount);
+  // Unassigned wallets drift in a halo outside the outermost token ring so they
+  // never sit on top of a planet.
   const h = hash(address);
-  const a = (h % 360) * (Math.PI / 180);
-  const r = 31 + (h % 20) / 8;
-  return [Math.cos(a) * r, ((h % 13) - 6) * 0.2, Math.sin(a) * r];
+  const a = (h % 3600) * (Math.PI / 1800);
+  const r = 168 + (h % 40) / 2;
+  return [Math.cos(a) * r, ((h % 21) - 10) * 0.9, Math.sin(a) * r];
 }
 
 function holderPos(mint: string, index: number, around: [number, number, number]): [number, number, number] {
@@ -128,12 +136,13 @@ function nodeColor(mint: string, volume: number): string {
   return h % 3 === 0 ? "#818cf8" : h % 3 === 1 ? "#22d3ee" : "#c084fc";
 }
 
-function Glow() {
+function Glow({ enabled }: { enabled: boolean }) {
+  if (!enabled) return null;
   return (
     <FxCatch>
-      <EffectComposer multisampling={2} disableNormalPass>
-        <Bloom intensity={0.72} luminanceThreshold={0.22} luminanceSmoothing={0.48} mipmapBlur />
-        <Vignette offset={0.28} darkness={0.62} />
+      <EffectComposer multisampling={0} disableNormalPass>
+        <Bloom intensity={0.55} luminanceThreshold={0.28} luminanceSmoothing={0.48} mipmapBlur />
+        <Vignette offset={0.22} darkness={0.38} />
       </EffectComposer>
     </FxCatch>
   );
@@ -147,9 +156,9 @@ function NebulaField() {
         const meta = CLUSTER_META[id];
         return {
           position: meta.center,
-          scale: meta.spread * 1.55,
+          scale: meta.spread * 1.15,
           color: meta.color,
-          opacity: 0.028 + (i % 3) * 0.008,
+          opacity: 0.016 + (i % 3) * 0.006,
         };
       }),
     [],
@@ -214,7 +223,9 @@ function OrbitXCore({
   district,
   pulsing,
   paused,
+  spin,
   showLabel,
+  lite,
   onPick,
 }: {
   district?: TokenDistrict;
@@ -222,11 +233,12 @@ function OrbitXCore({
   paused: boolean;
   spin?: boolean;
   showLabel: boolean;
+  lite?: boolean;
   onPick: () => void;
 }) {
   const body = useRef<Mesh>(null);
   const glow = useRef<Mesh>(null);
-  const map = usePlanetTexture(district?.image || ORBITX_MARK, "#c084fc", "ORBITX", ORBITX_MINT, true, 10);
+  const map = usePlanetTexture(district?.image || ORBITX_MARK, "#c084fc", "ORBITX", ORBITX_MINT, !lite, 10);
   useFrame((_, dt) => {
     if (paused || !spin) return;
     if (body.current) body.current.rotation.y += dt * 0.08;
@@ -235,10 +247,11 @@ function OrbitXCore({
     glow.current.scale.setScalar(s);
   });
   const cap = district?.market_cap != null ? fmtUsd(district.market_cap) : null;
+  const segs = lite ? 24 : 64;
   return (
     <group onClick={(e) => { e.stopPropagation(); onPick(); }}>
       <mesh ref={body}>
-        <sphereGeometry args={[1.22, 64, 64]} />
+        <sphereGeometry args={[1.22, segs, segs]} />
         <meshStandardMaterial
           map={map}
           roughness={0.48}
@@ -249,15 +262,15 @@ function OrbitXCore({
         />
       </mesh>
       <mesh scale={1.08}>
-        <sphereGeometry args={[1.22, 40, 40]} />
+        <sphereGeometry args={[1.22, lite ? 16 : 40, lite ? 16 : 40]} />
         <meshBasicMaterial color="#c084fc" transparent opacity={0.16} side={BackSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh ref={glow}>
         <sphereGeometry args={[1.62, 32, 32]} />
         <meshBasicMaterial color="#a78bfa" transparent opacity={0.1} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
-      <Sparkles count={64} scale={[3.6, 3.6, 3.6]} size={3.2} color="#e9d5ff" />
-      <pointLight position={[0, 0.4, 0]} intensity={pulsing ? 62 : 40} distance={30} color="#c084fc" />
+      {lite ? null : <Sparkles count={64} scale={[3.6, 3.6, 3.6]} size={3.2} color="#e9d5ff" />}
+      <pointLight position={[0, 0.4, 0]} intensity={pulsing ? 42 : 28} distance={30} color="#c084fc" />
       {showLabel ? (
         <Text position={[0, 2.28, 0]} fontSize={0.36} color="#f5d0fe" anchorX="center" outlineWidth={0.025} outlineColor="#12081c">
           {cap ? `OrbitX  ${cap}` : "OrbitX"}
@@ -276,6 +289,7 @@ function TokenStar({
   spin,
   lod,
   activity,
+  lite,
   onPick,
 }: {
   district: TokenDistrict;
@@ -286,18 +300,20 @@ function TokenStar({
   spin?: boolean;
   lod: "galaxy" | "cluster" | "local" | "inspect";
   activity: number;
+  lite?: boolean;
   onPick: () => void;
 }) {
   const body = useRef<Mesh>(null);
   const pos = node.pos;
   const volume = district.volume_24h || district.market_cap || 12;
-  const r = selected ? Math.max(node.radius, 0.55) : node.radius;
+  const r = selected ? Math.max(node.radius, 0.62) : Math.max(node.radius, lod === "galaxy" ? 0.48 : 0.34);
   const color = nodeColor(district.mint, volume);
   const name = tokenLabel(district);
   const ticker = tokenTicker(district);
   const hi = selected || lod === "inspect" || lod === "local";
+  const wantImage = Boolean(district.image) && (selected || (!lite && (hi || node.rank === "planet")));
   const map = usePlanetTexture(
-    district.image,
+    wantImage ? district.image : null,
     color,
     ticker || name.slice(0, 4),
     district.mint,
@@ -460,6 +476,7 @@ function CameraRig({
   cam,
   stick,
   speed,
+  lite,
   onConsumed,
 }: {
   flyTo: [number, number, number] | null;
@@ -467,6 +484,7 @@ function CameraRig({
   cam: CamCommand;
   stick: FlightStick;
   speed: number;
+  lite?: boolean;
   onConsumed?: () => void;
 }) {
   const { camera } = useThree();
@@ -492,7 +510,7 @@ function CameraRig({
     if (!dest || dest === lastKey.current) return;
     lastKey.current = dest;
     if (cam.kind === "reset") {
-      flyingTo.current = new Vector3(0, 48, 168);
+      flyingTo.current = new Vector3(0, lite ? 22 : 28, lite ? 58 : 78);
       if (controls.current) controls.current.target.set(0, 0, 0);
       return;
     }
@@ -503,7 +521,7 @@ function CameraRig({
     }
     flyingTo.current = new Vector3(flyTo![0] + 7.4, flyTo![1] + 4.2, flyTo![2] + 9.5);
     if (controls.current) controls.current.target.set(flyTo![0], flyTo![1], flyTo![2]);
-  }, [cam, flyTo, controls]);
+  }, [cam, flyTo, controls, lite]);
   useFrame((_, dt) => {
     const stickFly =
       Math.abs(stick.x) > 0.08 || Math.abs(stick.y) > 0.08 || Math.abs(stick.z) > 0.08;
@@ -542,29 +560,61 @@ function CameraRig({
   return null;
 }
 
-function ClusterBeacon({
-  id,
-  count,
-  visible,
-}: {
-  id: ClusterId;
-  count: number;
-  visible: boolean;
-}) {
+function OrbitRing({ id, count, visible }: { id: ClusterId; count: number; visible: boolean }) {
   const meta = CLUSTER_META[id];
   if (!visible || id === "orbitx" || count <= 0) return null;
+  // The ring itself is drawn as a flat annulus rotated onto the ring's own
+  // inclination, so every tier reads as an orbit rather than a floating blob.
+  const label = ringPoint(meta.orbit, meta.tilt, meta.phase);
   return (
-    <group position={meta.center}>
-      <mesh>
-        <sphereGeometry args={[meta.spread * 0.42, 24, 24]} />
-        <meshBasicMaterial color={meta.color} transparent opacity={0.045} depthWrite={false} blending={AdditiveBlending} />
+    <group>
+      <mesh rotation={[Math.PI / 2 + meta.tilt, 0, 0]}>
+        <ringGeometry args={[meta.orbit - 0.12, meta.orbit + 0.12, 220]} />
+        <meshBasicMaterial
+          color={meta.color}
+          transparent
+          opacity={0.16}
+          side={DoubleSide}
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
       </mesh>
-      <Text position={[0, meta.spread * 0.22, 0]} fontSize={1.15} color={meta.color} anchorX="center" outlineWidth={0.04} outlineColor="#05030c">
-        {meta.label}
-      </Text>
-      <Text position={[0, meta.spread * 0.22 - 1.4, 0]} fontSize={0.55} color="#cbd5e1" anchorX="center" outlineWidth={0.02} outlineColor="#05030c">
-        {`${count} worlds`}
-      </Text>
+      <group position={[label[0], label[1] + meta.band * 1.5, label[2]]}>
+        <Text fontSize={2.1} color={meta.color} anchorX="center" outlineWidth={0.05} outlineColor="#05030c">
+          {meta.label}
+        </Text>
+        <Text position={[0, -2.0, 0]} fontSize={1.0} color="#cbd5e1" anchorX="center" outlineWidth={0.03} outlineColor="#05030c">
+          {`${count} worlds`}
+        </Text>
+      </group>
+    </group>
+  );
+}
+
+function KolOrbitRing({ count, visible }: { count: number; visible: boolean }) {
+  if (!visible || count <= 0) return null;
+  const label = ringPoint(KOL_RING.orbit, KOL_RING.tilt, KOL_RING.phase);
+  return (
+    <group>
+      <mesh rotation={[Math.PI / 2 + KOL_RING.tilt, 0, 0]}>
+        <ringGeometry args={[KOL_RING.orbit - 0.1, KOL_RING.orbit + 0.1, 200]} />
+        <meshBasicMaterial
+          color={KOL_RING.color}
+          transparent
+          opacity={0.22}
+          side={DoubleSide}
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
+      </mesh>
+      <group position={[label[0], label[1] + 3.4, label[2]]}>
+        <Text fontSize={1.5} color={KOL_RING.color} anchorX="center" outlineWidth={0.04} outlineColor="#05030c">
+          {KOL_RING.label}
+        </Text>
+        <Text position={[0, -1.5, 0]} fontSize={0.8} color="#cbd5e1" anchorX="center" outlineWidth={0.025} outlineColor="#05030c">
+          {`${count} tracked`}
+        </Text>
+      </group>
     </group>
   );
 }
@@ -574,7 +624,7 @@ function LodSampler({ onLod }: { onLod: (lod: "galaxy" | "cluster" | "local" | "
   const last = useRef("");
   useFrame(() => {
     const d = camera.position.length();
-    const next = d > 210 ? "galaxy" : d > 110 ? "cluster" : d > 36 ? "local" : "inspect";
+    const next = d > 150 ? "galaxy" : d > 78 ? "cluster" : d > 24 ? "local" : "inspect";
     if (next !== last.current) {
       last.current = next;
       onLod(next);
@@ -596,6 +646,7 @@ function Scene({
   speed = 1,
   viewOptions = DEFAULT_VIEW,
   stick = { x: 0, y: 0, z: 0, boost: false },
+  lite = false,
   onPick,
   onCamConsumed,
 }: Props) {
@@ -635,7 +686,7 @@ function Scene({
     const set = new Set<string>();
     if (viewOptions.labels) {
       for (const node of layout.values()) {
-        if (node.rank === "planet" || node.rank === "core" || node.cluster === "big_dawgs") set.add(node.mint);
+        if (node.rank === "planet" || node.rank === "core" || node.cluster === "majors") set.add(node.mint);
       }
     }
     if (selectedMint) set.add(selectedMint);
@@ -646,13 +697,7 @@ function Scene({
     if (lod === "galaxy") {
       return tokens.filter((t) => {
         const n = layout.get(t.mint);
-        return n && (n.cluster === "big_dawgs" || n.cluster === "high_cap" || n.rank === "planet");
-      });
-    }
-    if (lod === "cluster") {
-      return tokens.filter((t) => {
-        const n = layout.get(t.mint);
-        return n && n.cluster !== "dormant";
+        return n && (n.cluster === "majors" || n.cluster === "established" || n.cluster === "trending" || n.rank === "planet" || n.rank === "world");
       });
     }
     return tokens;
@@ -710,31 +755,33 @@ function Scene({
   return (
     <>
       <color attach="background" args={["#02010a"]} />
-      <fog attach="fog" args={["#070314", 80, 520]} />
+      <fog attach="fog" args={lite ? ["#070314", 36, 170] : ["#070314", 48, 260]} />
       <ambientLight intensity={0.22} color="#9bb6ff" />
       <directionalLight position={[40, 48, 22]} intensity={1.55} color="#fff4e0" />
       <directionalLight position={[-28, 12, -24]} intensity={0.28} color="#67e8f9" />
       <pointLight position={[0, 2, 0]} intensity={22} distance={36} color="#c084fc" />
       <pointLight position={[40, -8, 24]} intensity={10} distance={54} color="#22d3ee" />
-      <Stars radius={380} depth={120} count={lod === "galaxy" ? 14000 : 9000} factor={3.4} saturation={0.18} fade speed={0} />
+      <Stars radius={lite ? 220 : 380} depth={80} count={lite ? 2200 : lod === "galaxy" ? 14000 : 9000} factor={lite ? 2.6 : 3.4} saturation={0.18} fade speed={0} />
       <NebulaField />
       <DustField />
       <StarGrid on={viewOptions.grid} />
       <LodSampler onLod={setLod} />
       {CLUSTER_ORDER.map((id) => (
-        <ClusterBeacon key={id} id={id} count={clusterSize[id] || 0} visible={lod === "galaxy" || lod === "cluster"} />
+        <OrbitRing key={id} id={id} count={clusterSize[id] || 0} visible={lod === "galaxy" || lod === "cluster"} />
       ))}
+      <KolOrbitRing count={assigned.length} visible={lod === "galaxy" || lod === "cluster"} />
       <OrbitXCore
         district={districts?.orbitx}
         pulsing={burns.length > 0}
         paused={paused}
         spin={planetSpin}
+        lite={lite}
         showLabel={viewOptions.labels}
         onPick={() => onPick({ kind: "token", mint: ORBITX_MINT })}
       />
       {(districts?.hubs?.length ? districts.hubs : DEX_HUBS).map((hub, i) => {
         const a = (i / 3) * Math.PI * 2;
-        const pos: [number, number, number] = [Math.cos(a) * 22, 1.8, Math.sin(a) * 22];
+        const pos: [number, number, number] = [Math.cos(a) * 16, 1.8, Math.sin(a) * 16];
         const color = hub.id === "jupiter" ? "#22d3ee" : hub.id === "raydium" ? "#a78bfa" : "#fb923c";
         return (
           <group key={hub.id} position={pos} onClick={(e) => { e.stopPropagation(); onPick({ kind: "hub", id: hub.id }); }}>
@@ -764,6 +811,7 @@ function Scene({
             spin={planetSpin}
             lod={lod}
             activity={activityMap.get(t.mint) || 0}
+            lite={lite}
             onPick={() => onPick({ kind: "token", mint: t.mint })}
           />
         );
@@ -845,7 +893,7 @@ function Scene({
           />
         );
       })}
-      <CameraRig flyTo={flyTo} controls={controls} cam={cam || null} stick={stick} speed={speed} onConsumed={onCamConsumed} />
+      <CameraRig flyTo={flyTo} controls={controls} cam={cam || null} stick={stick} speed={speed} lite={lite} onConsumed={onCamConsumed} />
       <OrbitControls
         ref={controls}
         enablePan
@@ -855,33 +903,45 @@ function Scene({
         panSpeed={1.15}
         rotateSpeed={0.72}
         enableRotate={!stickBusy}
-        maxDistance={420}
+        maxDistance={280}
         minDistance={1.6}
         autoRotate={false}
         screenSpacePanning
       />
-      <Glow />
+      <Glow enabled={!lite} />
     </>
   );
 }
 
 export default function WorldCanvas(props: Props) {
+  const lite = props.lite ?? detectLiteGpu();
+  const camZ = lite ? 58 : 78;
+  const camY = lite ? 22 : 28;
   return (
     <Canvas
-      camera={{ position: [0, 48, 168], fov: 50, near: 0.2, far: 900 }}
-      dpr={[1, 1.75]}
+      className="absolute inset-0 block h-full w-full"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
+      camera={{ position: [0, camY, camZ], fov: lite ? 58 : 52, near: 0.2, far: 900 }}
+      dpr={lite ? 1 : [1, 1.75]}
       gl={{
-        antialias: true,
+        antialias: !lite,
         alpha: false,
-        powerPreference: "high-performance",
+        powerPreference: lite ? "low-power" : "high-performance",
         failIfMajorPerformanceCaveat: false,
         stencil: false,
         toneMapping: ACESFilmicToneMapping,
-        toneMappingExposure: 1.12,
+        toneMappingExposure: lite ? 1.28 : 1.12,
       }}
-      onCreated={() => props.onReady?.()}
+      onCreated={({ gl }) => {
+        props.onReady?.();
+        const lost = (ev: Event) => {
+          ev.preventDefault();
+          props.onContextLost?.();
+        };
+        gl.domElement.addEventListener("webglcontextlost", lost, false);
+      }}
     >
-      <Scene {...props} />
+      <Scene {...props} lite={lite} />
     </Canvas>
   );
 }

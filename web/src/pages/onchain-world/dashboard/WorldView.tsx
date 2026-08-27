@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WorldJoystick, type FlightStick } from "@/pages/onchain-world/dashboard/WorldJoystick";
 import {
@@ -10,7 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import WorldCanvas, { type WorldPick } from "@/pages/onchain-world/WorldCanvas";
-import CssCity from "@/pages/onchain-world/CssCity";
+import { MapView } from "@/pages/onchain-world/dashboard/views/MapView";
 import type { ChainEvent } from "@/pages/onchain-world/api";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { clock } from "@/pages/onchain-world/format";
@@ -45,7 +45,17 @@ export function WorldView() {
   const patchCity = useOrbitxStore((s) => s.patchCity);
   const [stick, setStick] = useState<FlightStick>({ x: 0, y: 0, z: 0, boost: false });
   const [inspect, setInspect] = useState<ChainEvent | null>(null);
+  const [glFail, setGlFail] = useState(false);
   const onStick = useCallback((next: FlightStick) => setStick(next), []);
+  const showGl = webglOk && !glFail;
+
+  useEffect(() => {
+    if (!showGl) return undefined;
+    const id = window.setTimeout(() => {
+      if (!useOrbitxStore.getState().city.webglLive) setGlFail(true);
+    }, 8000);
+    return () => window.clearTimeout(id);
+  }, [showGl]);
 
   const focused =
     selectedToken === districts.orbitx?.mint || (selectedToken && isOrbitxMint(selectedToken))
@@ -76,8 +86,8 @@ export function WorldView() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-[#02010a]">
-        {webglOk ? (
+      <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-[#02010a]">
+        {showGl ? (
           <WorldCanvas
             events={events}
             kols={kols}
@@ -95,19 +105,14 @@ export function WorldView() {
             stick={stick}
             onPick={onPick}
             onReady={() => patchCity({ webglLive: true })}
+            onContextLost={() => {
+              patchCity({ webglOk: false, webglLive: false });
+              setGlFail(true);
+            }}
             onCamConsumed={() => setCamCommand(null)}
           />
         ) : (
-          <CssCity
-            kols={kols}
-            districts={districts}
-            events={events}
-            followWallet={selectedWallet}
-            cinematic={false}
-            paused={paused}
-            onWallet={(address) => onPick({ kind: "wallet", address })}
-            onToken={(mint) => onPick({ kind: "token", mint })}
-          />
+          <MapView />
         )}
 
         <WorldJoystick value={stick} onChange={onStick} />
