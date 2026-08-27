@@ -64,7 +64,16 @@ function isWalletUserRejection(error: unknown): boolean {
   return /reject|cancel|denied|user.?refus/i.test(msg);
 }
 
-/** Legacy Transaction → VersionedTransaction. Jupiter signAndSend rejects unsigned legacy serialize. */
+/**
+ * Legacy Transaction → VersionedTransaction. Jupiter signAndSend rejects unsigned
+ * legacy serialize.
+ *
+ * compileMessage() builds a fresh message with an empty signature array, so any
+ * signature already applied — an ephemeral mint keypair, an ATA authority, any
+ * options.signers passed to sendTransaction — was silently discarded here. The
+ * transaction then reached Jupiter one signer short and the extension failed with
+ * "missing signature for public key". Carry the existing signatures over.
+ */
 export function toVersionedTransaction(
   transaction: Transaction | VersionedTransaction,
 ): VersionedTransaction {
@@ -72,7 +81,23 @@ export function toVersionedTransaction(
   const legacy = transaction as Transaction;
   if (!legacy.feePayer) throw new Error("Transaction is missing feePayer");
   if (!legacy.recentBlockhash) throw new Error("Transaction is missing recentBlockhash");
-  return new VersionedTransaction(legacy.compileMessage());
+  const versioned = new VersionedTransaction(legacy.compileMessage());
+  for (const { publicKey, signature } of legacy.signatures) {
+    if (signature) versioned.addSignature(publicKey, signature);
+  }
+  return versioned;
+}
+
+/**
+ * True when the failure suggests the transaction already reached the network.
+ * Retrying with the other argument shape after this would re-prompt the user and
+ * risk broadcasting the same transaction twice, so these must propagate.
+ */
+function isPostBroadcastError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /already (been )?processed|already in flight|duplicate|blockhash not found|block height exceeded|simulation failed|insufficient (funds|lamports)|timed? ?out|expired|confirmed/i.test(
+    msg,
+  );
 }
 
 /**
@@ -91,12 +116,27 @@ export async function jupiterSignAndSendTransaction(
   const versioned = toVersionedTransaction(transaction);
   const fn = wallet.signAndSendTransaction.bind(wallet);
 
+  // Only ONE of these shapes may ever be attempted per user approval. Retrying
+  // after a call that already reached the wallet re-prompts for a signature and
+  // can broadcast the same transaction twice.
+  let acceptedWithoutSignature = false;
   try {
     const objectResult = await fn({ transaction: versioned, options: sendOptions });
     const sig = extractJupiterSignature(objectResult);
     if (sig) return sig;
+    // Resolved, so the wallet took it. Do not send it a second time.
+    acceptedWithoutSignature = true;
   } catch (error) {
     if (isWalletUserRejection(error)) throw error;
+    // Older builds reject the object form outright, before any prompt — that is
+    // the case worth retrying positionally. Anything that looks like it already
+    // hit the network must not be retried.
+    if (isPostBroadcastError(error)) throw error;
+  }
+  if (acceptedWithoutSignature) {
+    throw new Error(
+      "Jupiter accepted the transaction but returned no signature — check your wallet activity before retrying",
+    );
   }
 
   const positional = await fn(versioned, sendOptions);
@@ -130,6 +170,13 @@ export function getJupiterProvider(): JupiterProvider | null {
 
 export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
   name = JupiterWalletName;
+  /**
+   * Marks this as the legacy window.jupiter inject. When the extension also
+   * registers over Wallet Standard both appear in the wallet list under the
+   * same name; the Standard one signs more reliably in Chrome, so the picker
+   * uses this flag to break the tie.
+   */
+  readonly isLegacyInject = true;
   /** Install / mobile page — never the jup.ag swap site (avoids trade→website confusion). */
   url = "https://jup.ag/mobile";
   icon = "https://jup.ag/favicon.ico";

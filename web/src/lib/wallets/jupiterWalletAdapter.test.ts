@@ -63,3 +63,30 @@ describe("jupiterSignAndSendTransaction", () => {
     expect(sig).toBe("JUP_POSITIONAL_SIGNATURE_0123456789ab");
   });
 });
+
+describe("jupiterSignAndSendTransaction double-send guard", () => {
+  it("does not retry after a failure that may have reached the network", async () => {
+    const signAndSendTransaction = vi.fn(async () => {
+      throw new Error("Transaction simulation failed: blockhash not found");
+    });
+    (window as Window & { jupiter?: { solana: { signAndSendTransaction: typeof signAndSendTransaction } } }).jupiter = {
+      solana: { signAndSendTransaction },
+    };
+
+    const { tx } = unsignedTransfer();
+    await expect(jupiterSignAndSendTransaction(toVersionedTransaction(tx))).rejects.toThrow(/blockhash/i);
+    // One prompt only — a second call would ask the user to sign again.
+    expect(signAndSendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry when the wallet accepted but returned no signature", async () => {
+    const signAndSendTransaction = vi.fn(async () => ({}));
+    (window as Window & { jupiter?: { solana: { signAndSendTransaction: typeof signAndSendTransaction } } }).jupiter = {
+      solana: { signAndSendTransaction },
+    };
+
+    const { tx } = unsignedTransfer();
+    await expect(jupiterSignAndSendTransaction(toVersionedTransaction(tx))).rejects.toThrow(/no signature/i);
+    expect(signAndSendTransaction).toHaveBeenCalledTimes(1);
+  });
+});
