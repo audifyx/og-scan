@@ -181,7 +181,10 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("webglcontextlost");
     expect(canvas).toContain("lite ? 22 : 28");
     expect(canvas).not.toContain("[0, 48, 168]");
-    expect(canvas).toContain("spread * 0.18");
+    // Cluster beacons were replaced by drawn orbit rings; assert the ring
+    // geometry is actually emitted rather than the old blob radius.
+    expect(canvas).toContain("ringGeometry");
+    expect(canvas).toContain("meta.orbit");
     expect(canvas).toContain("DEX_HUBS");
     expect(canvas).toContain("followWallet");
     expect(canvas).toContain("tokenLabel");
