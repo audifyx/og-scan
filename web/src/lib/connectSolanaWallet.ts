@@ -9,9 +9,19 @@ import type { Adapter, WalletName } from "@solana/wallet-adapter-base";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 
 export type WalletLike = {
-  adapter: Adapter;
+  adapter: Adapter & { isLegacyInject?: boolean };
   readyState: WalletReadyState | string;
 };
+
+/**
+ * The Jupiter extension can appear twice: once via our window.jupiter inject
+ * adapter and once via Wallet Standard. Standard signs more reliably in Chrome,
+ * so prefer it whenever both are ready under the same name.
+ */
+function preferStandard(matches: WalletLike[]): WalletLike | null {
+  if (!matches.length) return null;
+  return matches.find((w) => !w.adapter.isLegacyInject) ?? matches[0];
+}
 
 const PREFERRED = ["Phantom", "Jupiter", "Solflare", "Backpack"] as const;
 
@@ -40,12 +50,16 @@ export function findConnectableWallet(
   // When the user (or UI) names a wallet, connect ONLY that adapter — never
   // silently fall through to Solflare / whatever else happens to be installed.
   if (preferredName) {
-    const named = wallets.find((w) => adapterNameMatches(String(w.adapter.name), preferredName));
-    if (named && isReady(String(named.readyState))) return named;
-    return null;
+    const named = wallets.filter(
+      (w) => adapterNameMatches(String(w.adapter.name), preferredName) && isReady(String(w.readyState)),
+    );
+    return preferStandard(named);
   }
   for (const name of PREFERRED) {
-    const hit = wallets.find((w) => adapterNameMatches(String(w.adapter.name), name) && isReady(String(w.readyState)));
+    const hits = wallets.filter(
+      (w) => adapterNameMatches(String(w.adapter.name), name) && isReady(String(w.readyState)),
+    );
+    const hit = preferStandard(hits);
     if (hit) return hit;
   }
   return wallets.find((w) => isReady(String(w.readyState))) ?? null;

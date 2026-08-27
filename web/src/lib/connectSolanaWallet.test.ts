@@ -40,6 +40,16 @@ describe("connectSolanaWallet", () => {
     expect(findConnectableWallet(wallets, "Jupiter Wallet")?.adapter.name).toBe("Jupiter Wallet");
   });
 
+  it("prefers the Wallet Standard adapter when Jupiter is listed twice", () => {
+    const legacy = mockWallet("Jupiter", WalletReadyState.Installed);
+    (legacy.adapter as any).isLegacyInject = true;
+    const standard = mockWallet("Jupiter Wallet", WalletReadyState.Installed);
+    // Legacy inject first in the list — the Standard one must still win.
+    expect(findConnectableWallet([legacy, standard], "Jupiter")?.adapter.name).toBe("Jupiter Wallet");
+    // And it is still usable when it is the only one present.
+    expect(findConnectableWallet([legacy], "Jupiter")?.adapter.name).toBe("Jupiter");
+  });
+
   it("does not fall through to Solflare when preferred wallet is missing", () => {
     const wallets = [
       mockWallet("Phantom", WalletReadyState.NotDetected),
