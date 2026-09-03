@@ -479,7 +479,7 @@ describe("confirmAccessBurn", () => {
             id: "led-1",
             user_id: "other-user",
             package_id: "day",
-            expires_at: "2026-08-23T10:58:26.392Z",
+            expires_at: "2099-08-23T10:58:26.392Z",
             tokens_burned: 1000,
           },
         ];

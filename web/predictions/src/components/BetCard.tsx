@@ -70,7 +70,6 @@ export function BetCard({ bet, onClick, onPick }: Props) {
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-white/5 border border-white/10">
             {bet.image_url
-              /* eslint-disable-next-line @next/next/no-img-element */
               ? <img src={bet.image_url} alt="" className="w-full h-full object-cover" />
               : <div className="w-full h-full grid place-items-center text-cyan text-lg font-black">{(bet.category||'?')[0]?.toUpperCase()}</div>}
           </div>

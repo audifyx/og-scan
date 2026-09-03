@@ -13,12 +13,13 @@ describe("surface harden + leak scan", () => {
     expect(src).toContain("export function publicPlatformApps");
   });
 
-  it("404s unfinished product routes for everyone except the owner email", () => {
+  it("protects unfinished product routes while exposing the unified Super Computer", () => {
     const app = readFileSync(resolve(WEB, "src/App.tsx"), "utf8");
     expect(app).toContain("OwnerPreviewRoute");
     expect(app).toContain("<Route path=\"/terminal\" element={<OwnerPreviewRoute>");
     expect(app).toContain("<Route path=\"/vamp\" element={<OwnerPreviewRoute>");
-    expect(app).toContain("<Route path=\"/x\" element={<OwnerPreviewRoute>");
+    expect(app).toContain("<Route path=\"/supercomputer\" element={<McpSuperComputer />} />");
+    expect(app).not.toContain("<Route path=\"/x\" element={<OwnerPreviewRoute>");
     expect(app).toContain("<Route path=\"/:toolSlug\" element={<OwnerPreviewRoute>");
     expect(app).toContain("to=\"/orbitx-social\"");
     expect(app).toContain("<Route path=\"/support\" element={<SupportCenter />} />");

@@ -57,7 +57,8 @@ export async function requireUser(req: VercelRequest): Promise<{ id: string; cli
   const auth = bearer(req);
   if (!auth) throw Object.assign(new Error("unauthorized"), { status: 401 });
   const client = userClient(auth);
-  const { data, error } = await client.auth.getUser();
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) throw Object.assign(new Error("unauthorized"), { status: 401 });
   return { id: data.user.id, client };
 }

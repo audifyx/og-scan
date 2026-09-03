@@ -238,7 +238,7 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "world", title: "World", subtitle: "City, OS, play, and education", keys: ["city", "os", "play", "gaming", "education"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Intel desk, chain world, wallets, AI", keys: ["intel", "onchain", "koltracker", "pnltracker", "ai"] },
-  { id: "mcp", title: "AI Connectors", subtitle: "Agent, X, Telegram, and shop", keys: ["agent", "xmcp", "telegram", "shop"] },
+  { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "telegram", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "Markets, NFTs, tasks", keys: ["predict", "nft", "bagwork"] },
 ];

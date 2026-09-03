@@ -31,7 +31,7 @@ import {
   json,
   memoryRateLimit,
   requireUser,
-} from "./orbitx/world/_lib";
+} from "./orbitx/world/_lib.js";
 
 function pathParts(req: VercelRequest): string[] {
   const q = req.query.path;
