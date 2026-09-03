@@ -177,6 +177,7 @@ import PodcastPublisher from "./pages/PodcastPublisher";
 import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
 import AgentPage from "./pages/Agent";
+import McpSuperComputer from "./pages/McpSuperComputer";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
 import XMcpPage from "./pages/XMcpPage";
@@ -660,6 +661,8 @@ const App = () => (
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
+            <Route path="/supercomputer" element={<McpSuperComputer />} />
+            <Route path="/mcp" element={<Navigate to="/supercomputer" replace />} />
             <Route path="/x" element={<OwnerPreviewRoute><XMcpPage /></OwnerPreviewRoute>} />
             <Route path="/shop" element={<ShopPage />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
