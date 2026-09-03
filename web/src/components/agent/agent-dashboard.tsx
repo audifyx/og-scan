@@ -336,7 +336,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
       siblingLabel="X channel"
       siblingIcon="𝕏"
     >
-      <div className="ox-agent__hero">
+      <div className={`ox-agent__hero${embedded ? " ox-agent__hero--embedded" : ""}`}>
         <h1 className="ox-agent__title">OrbitX</h1>
         <p className="ox-agent__lead">
           OrbitX MCP workspace — connect Claude, ChatGPT, or Grok for research, trade, launch, mint, and social actions.

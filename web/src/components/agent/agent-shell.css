@@ -325,6 +325,10 @@
 }
 
 /* ── Hero / KPIs ── */
+.ox-agent__hero--embedded {
+  display: none;
+}
+
 .ox-agent__hero {
   margin-bottom: 1.25rem;
   position: relative;
