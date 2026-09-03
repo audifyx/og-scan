@@ -75,6 +75,7 @@ import {
   pollAiMedia,
   renameAiConversation,
   sendAiMessage,
+  setTradeConfirmationPreference,
   type AiBootstrap,
   type AiConversation,
   type AiGate,
@@ -484,6 +485,53 @@ function toolLabel(name: string | undefined | null): string {
   return String(name || "orbitx tool").replace(/^orbitx_/, "").replace(/_/g, " ");
 }
 
+function TradePreferenceCard({ result }: { result: Record<string, unknown> }) {
+  const prompt = asRecord(result.tradePreferencePrompt);
+  const options = Array.isArray(prompt.options)
+    ? prompt.options.map((item) => asRecord(item)).filter((item) => typeof item.id === "string")
+    : [];
+  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  if (options.length === 0) return null;
+
+  const choose = async (preference: "auto" | "sign") => {
+    setBusy(true);
+    try {
+      await setTradeConfirmationPreference(preference);
+      setSelected(preference);
+      toast.success(preference === "auto" ? "Auto-confirm enabled for this agent" : "Sign each time enabled for this agent");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save trade preference");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="oai-trade-preference">
+      <div className="oai-trade-preference__head"><span><ShieldCheck size={15} /> First-buy preference</span><small>Saved per agent</small></div>
+      <strong>{String(prompt.title || "How should future trades be confirmed?")}</strong>
+      <p>{String(prompt.message || "Choose once for future buy and sell commands.")}</p>
+      <div className="oai-trade-preference__choices">
+        {options.map((option) => {
+          const id = String(option.id);
+          const isAuto = id === "auto";
+          const chosen = selected === id;
+          return (
+            <button type="button" key={id} className={`oai-trade-preference__choice${chosen ? " is-selected" : ""}`} disabled={busy || Boolean(selected)} onClick={() => void choose(isAuto ? "auto" : "sign")}>
+              <span className="oai-trade-preference__choice-icon">{isAuto ? <Zap size={16} /> : <ShieldCheck size={16} />}</span>
+              <span><b>{String(option.label || id)}</b><small>{String(option.description || "")}</small></span>
+              {chosen ? <Check size={15} /> : <ChevronDown size={15} />}
+            </button>
+          );
+        })}
+      </div>
+      <small className="oai-trade-preference__note">Auto-confirm removes the second chat prompt only. Your connected wallet still approves every transaction.</small>
+    </div>
+  );
+}
+
 function ToolResultCard({
   event,
   busy,
@@ -621,6 +669,7 @@ function ToolResultCard({
       ) : (
         <>
           <StructuredToolResult event={event} />
+          <TradePreferenceCard result={result} />
           {isStaleExecuting && (
             <button
               type="button"

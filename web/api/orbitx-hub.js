@@ -44,11 +44,11 @@ import {
   prepareBuyOrbitx,
   saveTradeIntent,
   loadLatestTradeIntent,
-  getChatTradeAuto,
-  setChatTradeAuto,
+  getChatTradePreference,
+  setChatTradePreference,
   usdToSol,
 } from "./orbitx/buy-orbitx.js";
-import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias } from "./orbitx/telegram-trade-intent.js";
+import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias, parseTradeIntent } from "./orbitx/telegram-trade-intent.js";
 import {
   classifyOrbitXAuthPaste,
   TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
@@ -925,6 +925,41 @@ async function handleAgent(req, res, parts) {
     return json(res, {
       redirect: `${redirectUri}${sep}code=${encodeURIComponent(access)}&state=${encodeURIComponent(state)}`,
     });
+  }
+
+  // Mobile Trade Desk command bridge. It only prepares exact buy/sell intents;
+  // the linked wallet remains the final signing authority.
+  if (route === "command" && req.method === "POST") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { ok: false, error: "unauthorized", message: "Sign in before using the Trade Desk." }, 401);
+    const body = await readBody(req);
+    const text = String(body.text || body.command || "").trim();
+    if (!text) return json(res, { ok: false, error: "command_required", message: "Enter a buy or sell command." }, 400);
+    const intent = parseTradeIntent(text);
+    const allowed = new Set(["orbitx_prepare_buy", "orbitx_buy_orbitx", "orbitx_prepare_sell"]);
+    if (!intent?.tool || !allowed.has(intent.tool)) {
+      return json(res, {
+        ok: false,
+        error: "trade_command_not_understood",
+        message: "Use a concrete command such as: Buy $1 of TOKEN with CA <contract address>.",
+      }, 400);
+    }
+    const args = { ...(intent.args || {}), autoConfirm: false, auto: false, confirmMode: "sign" };
+    try {
+      const result = await runEmbeddedAgentTool({
+        userId: authUser.id,
+        // Do not trust a client-supplied wallet for execution. The linked agent
+        // wallet is authoritative and must be linked from the wallet screen.
+        walletAddress: null,
+        email: authUser.email,
+        toolName: intent.tool,
+        args,
+        req,
+      });
+      return json(res, { ...result, command: text, parsedTool: intent.tool }, result?.ok === false ? 400 : 200);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "trade_command_failed", message: e?.message || "Trade command failed" }, 400);
+    }
   }
 
   return json(res, { error: "not_found", route }, 404);
@@ -3576,14 +3611,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     const askOnly = args.askOnly === true || amountSol == null || amountSol === "";
     if (askOnly) return askBuyOrbitxAmount();
-    let preferAuto = false;
+    let tradePreference = null;
     if (auth?.agentId) {
       try {
-        preferAuto = await getChatTradeAuto(sb, auth.agentId);
+        tradePreference = await getChatTradePreference(sb, auth.agentId);
       } catch {
-        preferAuto = false;
+        tradePreference = null;
       }
     }
+    const preferAuto = tradePreference === "auto";
     const confirmMode =
       args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || (preferAuto ? "auto" : "sign");
     const out = await prepareBuyOrbitx({
@@ -3599,6 +3635,18 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     if (out.ok && usdQuote) {
       out.amountUsd = usdQuote.amountUsd;
       out.solUsd = usdQuote.solUsd;
+    }
+    if (out.ok && tradePreference == null && auth?.agentId) {
+      out.tradePreferencePrompt = {
+        title: "How should future trades be confirmed?",
+        message: "Choose once for this agent. Auto-confirm skips the second chat prompt; your connected wallet still approves every transaction.",
+        options: [
+          { id: "auto", label: "Auto-confirm", description: "Open the secure wallet signer automatically." },
+          { id: "sign", label: "Sign each time", description: "Show a fresh review step for every buy or sell." },
+        ],
+        setTool: "orbitx_trade_auto",
+        scope: "agent",
+      };
     }
     if (out.ok && auth?.userId) {
       try {
@@ -3671,17 +3719,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
 
   if (name === "orbitx_trade_auto") {
     const enabled = args.enabled === true || args.on === true || String(args.enabled || args.on || "").toLowerCase() === "true";
-    const off = args.enabled === false || args.on === false;
+    const off = args.enabled === false || args.on === false || String(args.mode || "").toLowerCase() === "sign";
     const on = off ? false : enabled || String(args.mode || "").toLowerCase() === "auto";
-    if (auth?.agentId) {
-      await setChatTradeAuto(sb, auth.agentId, on);
-    }
+    const preference = on ? "auto" : "sign";
+    const saved = auth?.agentId ? await setChatTradePreference(sb, auth.agentId, preference) : false;
     return {
-      ok: true,
+      ok: saved || !auth?.agentId,
       autoBuy: on,
+      tradeConfirmationPreference: preference,
       message: on
-        ? "Auto-buy ON for this account. Next /buy sends a Jupiter auto-prompt (no extra Telegram confirm). You still sign in Jupiter Wallet."
-        : "Auto-buy OFF. Each /buy returns a Sign link; say confirm or /autobuy on to skip the extra step.",
+        ? "Auto-confirm is ON for this agent. Future buy and sell commands skip the second chat prompt, then open the secure wallet signer. You still approve each transaction in your wallet."
+        : "Sign each time is ON for this agent. Every buy and sell command shows a fresh review step before the secure wallet signer.",
     };
   }
 
@@ -3752,14 +3800,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     if (action === "buy" && !mint) {
       return { ok: false, error: "mint_required", message: "Pass a mint / CA to buy, or say buy $ORBITX." };
     }
-    let preferAuto = false;
+    let tradePreference = null;
     if (auth?.agentId) {
       try {
-        preferAuto = await getChatTradeAuto(sb, auth.agentId);
+        tradePreference = await getChatTradePreference(sb, auth.agentId);
       } catch {
-        preferAuto = false;
+        tradePreference = null;
       }
     }
+    const preferAuto = tradePreference === "auto";
     const auto =
       args.autoConfirm === true ||
       args.auto === true ||
@@ -3867,7 +3916,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         /* optional */
       }
     }
-    return {
+    const out = {
       ok: true,
       status: auto ? "awaiting_auto_jupiter" : "awaiting_jupiter_signature",
       requiresSignature: true,
@@ -3904,6 +3953,19 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         ? "Auto-buy: Jupiter Wallet still must sign. Non-custodial."
         : "Manual sign. Non-custodial. Route the user to signUrl.",
     };
+    if (action === "buy" && tradePreference == null && auth?.agentId) {
+      out.tradePreferencePrompt = {
+        title: "How should future trades be confirmed?",
+        message: "Choose once for this agent. Auto-confirm skips the second chat prompt; your connected wallet still approves every transaction.",
+        options: [
+          { id: "auto", label: "Auto-confirm", description: "Open the secure wallet signer automatically." },
+          { id: "sign", label: "Sign each time", description: "Show a fresh review step for every buy or sell." },
+        ],
+        setTool: "orbitx_trade_auto",
+        scope: "agent",
+      };
+    }
+    return out;
   }
 
   if (name === "orbitx_launch_check") {
@@ -5117,6 +5179,13 @@ export async function runPublicOrbitXTool({ toolName, args = {}, req = null }) {
     bearerPresent: false,
   };
   return callTool(name, args || {}, auth, publicBase(req), req);
+}
+
+export async function getEmbeddedTradePreference(userId) {
+  const uid = String(userId || "").trim();
+  if (!uid) return null;
+  const agent = await ensureAgent(uid);
+  return getChatTradePreference(sb, agent.id);
 }
 
 export async function runEmbeddedAgentTool({

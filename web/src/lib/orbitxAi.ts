@@ -259,3 +259,12 @@ export async function cancelAiTool(payload: {
 }> {
   return post("tool.cancel", payload, 30_000);
 }
+
+export async function setTradeConfirmationPreference(preference: "auto" | "sign"): Promise<{
+  ok: boolean;
+  autoBuy?: boolean;
+  tradeConfirmationPreference?: "auto" | "sign";
+  message?: string;
+}> {
+  return post("trade.preference", { preference }, 30_000);
+}

@@ -18,6 +18,7 @@ import {
 import {
   hasEmbeddedAgentTool,
   listEmbeddedAgentTools,
+  getEmbeddedTradePreference,
   runEmbeddedAgentTool,
 } from "./orbitx-hub.js";
 import { verifyTokenHold } from "./orbitx/token-hold.js";
@@ -48,6 +49,19 @@ const CONFIRMATION_TTL_MS = 15 * 60_000;
 const FALLBACK_PUBLIC_BASE = "https://www.orbitx.world";
 const MEDIA_ASPECTS = new Set(["2:3", "3:2", "1:1", "9:16", "16:9"]);
 const VIDEO_MODES = new Set(["fun", "normal", "spicy"]);
+
+const TRADE_CONFIRMATION_TOOLS = new Set([
+  "orbitx_buy_orbitx",
+  "orbitx_prepare_buy",
+  "orbitx_buy",
+  "orbitx_buy_auto",
+  "orbitx_trade",
+  "orbitx_swap",
+  "orbitx_prepare_sell",
+  "orbitx_sell",
+  "orbitx_sell_pump",
+  "orbitx_confirm_buy",
+]);
 
 const DIRECT_TOOL_NAMES = new Set([
   "orbitx_menu",
@@ -697,6 +711,7 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
   const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
   const tools = directTools();
   const toolEvents = [];
+  const savedTradePreference = await getEmbeddedTradePreference(ctx.userId).catch(() => null);
   const deadline = Date.now() + CHAT_BUDGET_MS;
   const remainingBudget = () => Math.min(NVIDIA_TIMEOUT_MS, deadline - Date.now());
   let finalContent = "";
@@ -767,7 +782,10 @@ async function runChat(ctx, conversation, rows, selectedModel, req) {
       } else if (requiresConfirmation(resolved.name) && !confirmableArgs.ok) {
         event.status = "failed";
         event.result = { error: confirmableArgs.error };
-      } else if (requiresConfirmation(resolved.name)) {
+      } else if (
+        requiresConfirmation(resolved.name) &&
+        !(savedTradePreference === "auto" && TRADE_CONFIRMATION_TOOLS.has(resolved.name))
+      ) {
         event.status = "confirmation_required";
         event.expiresAt = new Date(Date.now() + CONFIRMATION_TTL_MS).toISOString();
         event.result = {
@@ -1347,6 +1365,21 @@ export default async function handler(req, res) {
     if (action === "media.status") return await handleMediaStatus(req, res, ctx, body);
     if (action === "tool.execute") return await handleToolExecute(req, res, ctx, body);
     if (action === "tool.cancel") return await handleToolCancel(req, res, ctx, body);
+    if (action === "trade.preference") {
+      const preference = text(body.preference, 20).toLowerCase();
+      if (preference !== "auto" && preference !== "sign") {
+        return json(res, { ok: false, error: "invalid_trade_preference" }, 400);
+      }
+      const result = await runEmbeddedAgentTool({
+        userId: ctx.userId,
+        walletAddress: ctx.walletAddress,
+        email: ctx.email,
+        toolName: "orbitx_trade_auto",
+        args: { mode: preference },
+        req,
+      });
+      return json(res, result, result?.ok === false ? 400 : 200);
+    }
     return json(res, { error: "unknown_action" }, 404);
   } catch (error) {
     const status =

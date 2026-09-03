@@ -314,29 +314,44 @@ export async function loadLatestTradeIntent(sb, userId, { mint } = {}) {
   }
 }
 
-export async function getChatTradeAuto(sb, agentId) {
-  if (!agentId || typeof sb !== "function") return false;
+export async function getChatTradePreference(sb, agentId) {
+  if (!agentId || typeof sb !== "function") return null;
   try {
     const rows = await sb(
-      `agent_settings?agent_id=eq.${encodeURIComponent(agentId)}&select=chat_trade_auto&limit=1`,
+      `agent_settings?agent_id=eq.${encodeURIComponent(agentId)}&select=trade_confirmation_preference,chat_trade_auto&limit=1`,
     );
-    return Boolean(Array.isArray(rows) && rows[0]?.chat_trade_auto);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (row?.trade_confirmation_preference === "auto" || row?.trade_confirmation_preference === "sign") {
+      return row.trade_confirmation_preference;
+    }
+    // Backward compatibility for agents created before the explicit choice UI.
+    if (row?.chat_trade_auto === true) return "auto";
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function setChatTradeAuto(sb, agentId, enabled) {
+export async function setChatTradePreference(sb, agentId, preference) {
   if (!agentId || typeof sb !== "function") return false;
-  const on = Boolean(enabled);
+  const value = preference === "auto" ? "auto" : preference === "sign" ? "sign" : null;
+  if (!value) return false;
   try {
     await sb(`agent_settings?agent_id=eq.${encodeURIComponent(agentId)}`, {
       method: "PATCH",
-      body: JSON.stringify({ chat_trade_auto: on }),
+      body: JSON.stringify({ trade_confirmation_preference: value, chat_trade_auto: value === "auto" }),
       headers: { Prefer: "return=minimal" },
     });
     return true;
   } catch {
     return false;
   }
+}
+
+export async function getChatTradeAuto(sb, agentId) {
+  return (await getChatTradePreference(sb, agentId)) === "auto";
+}
+
+export async function setChatTradeAuto(sb, agentId, enabled) {
+  return setChatTradePreference(sb, agentId, enabled ? "auto" : "sign");
 }
