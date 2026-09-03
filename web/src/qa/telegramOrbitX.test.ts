@@ -660,8 +660,8 @@ describe("official OrbitX Telegram bot", () => {
           amountSol: 0.05,
           amountUsd: 1,
           wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
-          signUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05",
-          autoSignUrl: "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1",
+          signUrl: "https://www.orbitx.world/supercomputer/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05",
+          autoSignUrl: "https://www.orbitx.world/supercomputer/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1",
           solscanToken: "https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
         },
         "orbitx_buy_orbitx",
@@ -676,7 +676,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(signBuy).not.toContain("auto=1");
     expect(signBuy).not.toContain("phantom.app/ul/browse");
     expect(signBuy).not.toContain("Sign in Phantom");
-    expect(signBuy).toContain("/agent/sign?action=buy");
+    expect(signBuy).toContain("/supercomputer/sign?action=buy");
 
     const signSell = cardText(
       formatOrbitXTelegramResult(
@@ -687,7 +687,7 @@ describe("official OrbitX Telegram bot", () => {
           mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
           amount: "100%",
           wallet: "4xT5QZnwtdZKAW5ZcRziEakTwNdnfKMgp1cEVaJmewxd",
-          signUrl: "https://www.orbitx.world/agent/sign?action=sell&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=100%25",
+          signUrl: "https://www.orbitx.world/supercomputer/sign?action=sell&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=100%25",
           solscanToken: "https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
         },
         "orbitx_prepare_sell",
@@ -696,7 +696,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(signSell).toContain("Sign to sell");
     expect(signSell).toContain("100%");
     expect(signSell).not.toContain("Sign to buy");
-    expect(signSell).toContain("/agent/sign?action=sell");
+    expect(signSell).toContain("/supercomputer/sign?action=sell");
 
     const noBal = cardText(
       formatOrbitXTelegramResult(
@@ -706,7 +706,7 @@ describe("official OrbitX Telegram bot", () => {
           action: "sell",
           mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
           amount: "100%",
-          signUrl: "https://www.orbitx.world/agent/sign?action=sell&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=100%25",
+          signUrl: "https://www.orbitx.world/supercomputer/sign?action=sell&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=100%25",
         },
         "orbitx_prepare_sell",
       ),
@@ -899,7 +899,7 @@ describe("official OrbitX Telegram bot", () => {
   });
 
   it("does not wrap Telegram sign links in Phantom Connect browse URLs", () => {
-    const page = "https://www.orbitx.world/agent/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1";
+    const page = "https://www.orbitx.world/supercomputer/sign?action=buy&mint=13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9&amount=0.05&auto=1";
     expect(phantomBrowseUrl(page)).toBe(page);
     expect(phantomBrowseUrl(page)).not.toContain("phantom.app/ul/browse");
   });

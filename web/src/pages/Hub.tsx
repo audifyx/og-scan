@@ -649,24 +649,24 @@ export default function Hub() {
             <div className="ios-group__head">Connectors</div>
             <div className="ios-group">
               {show("agent mcp claude chatgpt grok") && (
-                <Link to="/agent" className="ios-cell">
+                <Link to="/supercomputer?tab=workspace" className="ios-cell">
                   <Badge bg="linear-gradient(180deg,#2dd4bf,#0f766e)">
                     <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="6" width="14" height="12" rx="3" stroke="currentColor" strokeWidth="1.8" /><path d="M8 10h8M8 14h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
                   </Badge>
                   <span className="ios-cell__meta">
-                    <span className="ios-cell__title">Agent MCP</span>
+                    <span className="ios-cell__title">Super Computer</span>
                   </span>
                   <span className="ios-cell__value">Claude · GPT</span>
                   <IosChevron />
                 </Link>
               )}
               {showOwnerSurfaces && show("x mcp twitter") && (
-                <Link to="/x" className="ios-cell">
+                <Link to="/supercomputer?tab=channels" className="ios-cell">
                   <Badge bg="linear-gradient(180deg,#52525b,#18181b)">
                     <svg viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                   </Badge>
                   <span className="ios-cell__meta">
-                    <span className="ios-cell__title">X MCP</span>
+                    <span className="ios-cell__title">Channels</span>
                   </span>
                   <span className="ios-cell__value">Post</span>
                   <IosChevron />

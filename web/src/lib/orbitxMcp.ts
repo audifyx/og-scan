@@ -86,7 +86,7 @@ export function agentSignTradeUrl(opts: {
     slippage: String(opts.slippage ?? 10),
     pool: opts.pool || "auto",
   });
-  return `${base}/agent/sign?${q.toString()}`;
+  return `${base}/supercomputer/sign?${q.toString()}`;
 }
 
 export type AgentBootstrap = {

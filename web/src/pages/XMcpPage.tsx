@@ -143,17 +143,15 @@ function FieldRow({
   );
 }
 
-/** /x — same AgentShell UI as /agent, X MCP content */
-export default function XMcpPage() {
+/** X MCP workspace; embedded mode renders it inside /supercomputer. */
+export default function XMcpPage({ embedded = false, initialTab = "home", initialHomeSub = "post" }: { embedded?: boolean; initialTab?: XTab; initialHomeSub?: HomeSub }) {
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [searchParams, setSearchParams] = useSearchParams();
   const { publicKey } = useWallet();
 
-  const initialTab = parseXTab(searchParams.get("tab") || "");
-
-  const [tab, setTab] = useState<XTab>(initialTab);
-  const [homeSub, setHomeSub] = useState<HomeSub>("post");
+  const [tab, setTab] = useState<XTab>(() => embedded ? initialTab : parseXTab(searchParams.get("tab") || ""));
+  const [homeSub, setHomeSub] = useState<HomeSub>(initialHomeSub);
   const [boot, setBoot] = useState<XMcpBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -265,7 +263,7 @@ export default function XMcpPage() {
       // Don't block the shell on secondary loads
       void Promise.allSettled([refreshAgent(), refreshQueue(), refreshCredits()]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load X MCP");
+      setError(e instanceof Error ? e.message : "Failed to load X channel");
     } finally {
       setLoading(false);
     }
@@ -275,6 +273,7 @@ export default function XMcpPage() {
     (id: string) => {
       const next = parseXTab(id);
       setTab(next);
+      if (embedded) return;
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -285,14 +284,19 @@ export default function XMcpPage() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [embedded, setSearchParams],
   );
 
   useEffect(() => {
+    if (embedded) {
+      if (initialTab !== tab) setTab(initialTab);
+      if (initialHomeSub !== homeSub) setHomeSub(initialHomeSub);
+      return;
+    }
     const t = String(searchParams.get("tab") || "").toLowerCase();
     const next = parseXTab(t);
     if (next !== tab) setTab(next);
-  }, [searchParams, tab]);
+  }, [embedded, homeSub, initialHomeSub, initialTab, searchParams, tab]);
 
   useEffect(() => {
     try {
@@ -373,7 +377,7 @@ export default function XMcpPage() {
     setCreating(true);
     setError(null);
     try {
-      const minted = await createXMcpApiKey(keyName.trim() || "X MCP Key");
+      const minted = await createXMcpApiKey(keyName.trim() || "OrbitX channel key");
       setStoredKey(minted.key);
       setShowKeyPanel(true);
       try {
@@ -579,27 +583,28 @@ export default function XMcpPage() {
   };
 
   if (authLoading && !user) {
-    return <AgentLoading label="Opening X MCP…" />;
+    return <AgentLoading label="Opening X channel…" />;
   }
 
   if (!user) {
     return (
       <AgentShell
         showTabs={false}
-        brandHref="/x"
-        brandSub="X MCP"
-        footerBrand="OrbitX X MCP"
+        brandHref="/supercomputer"
+        brandSub="X channel"
+        footerBrand="OrbitX Super Computer"
         footerNote="Connect X. Train an agent. Post from Claude, ChatGPT, or Grok."
         mcpUrl={oauth.mcpUrl}
-        siblingHref="/agent"
-        siblingLabel="Agent MCP"
+        siblingHref="/supercomputer?tab=agent"
+        siblingLabel="Agent workspace"
         siblingIcon="◆"
         statusLabel="Sign in"
         statusWarn
+        embedded={embedded}
       >
         <div className="ox-agent__hero">
           <h1 className="ox-agent__title">OrbitX</h1>
-          <p className="ox-agent__lead">X MCP — connect X, train an agent, post from chat AI.</p>
+          <p className="ox-agent__lead">X channel — connect X, train an agent, and publish from chat AI.</p>
         </div>
         <section className="ox-agent__panel">
           <div className="ox-agent__panel-h">
@@ -628,7 +633,7 @@ export default function XMcpPage() {
               ))}
             </div>
             <p className="ox-agent__note">
-              Or <Link to="/auth?next=/x">sign in with email</Link>.
+              Or <Link to="/auth?next=/supercomputer%3Ftab%3Dx">sign in with email</Link>.
             </p>
             {error && <div className="ox-agent__alert">{error}</div>}
           </div>
@@ -642,19 +647,21 @@ export default function XMcpPage() {
       activeTab={tab}
       onTabChange={selectTab}
       tabs={X_TABS}
-      brandHref="/x"
-      brandSub="X MCP"
-      footerBrand="OrbitX X MCP"
+      brandHref="/supercomputer"
+      brandSub="X channel"
+      footerBrand="OrbitX Super Computer"
       footerNote="Post, DM, buy credits, and run your NVIDIA agent from Claude, ChatGPT, or Grok. Non-custodial X OAuth — you authorize scopes on X."
       mcpUrl={oauth.mcpUrl}
-      siblingHref="/agent"
-      siblingLabel="Agent MCP"
+      siblingHref="/supercomputer?tab=agent"
+      siblingLabel="Agent workspace"
       siblingIcon="◆"
-      topSubtitle="X MCP · Claude · ChatGPT · Grok"
+      topSubtitle="X channel · Claude · ChatGPT · Grok"
       statusLabel={statusLabel}
       statusWarn={!xConnected || !hasKey}
       onRefresh={refresh}
-    >
+      embedded={embedded}
+      >
+
       {loading && (
         <p className="ox-agent__note" style={{ marginTop: 0 }}>
           Syncing account…
@@ -667,7 +674,7 @@ export default function XMcpPage() {
           <div className="ox-agent__hero">
             <h1 className="ox-agent__title">OrbitX</h1>
             <p className="ox-agent__lead">
-              X MCP dashboard — post, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok.
+              X channel workspace — post, DM, and run your OrbitX agent from Claude, ChatGPT, or Grok.
             </p>
             <div className="ox-agent__kpis">
               <button
@@ -1744,7 +1751,7 @@ export default function XMcpPage() {
       {oauthGuide === "chatgpt" && (
         <div className="ox-agent__modal" onClick={() => setOauthGuide(null)}>
           <div className="ox-agent__modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2>ChatGPT · X MCP</h2>
+            <h2>ChatGPT · X channel</h2>
             <p className="ox-agent__note" style={{ marginTop: 0 }}>
               Paste into ChatGPT — leave client secret empty.
             </p>

@@ -322,7 +322,7 @@ export function mcpAccessSignUrl(opts: {
     amount: String(MCP_ACCESS_TOKEN_AMOUNTS[opts.packageId] || MCP_ACCESS_TOKEN_AMOUNTS.hour),
   });
   if (opts.auto) q.set("auto", "1");
-  return `${base}/agent/sign?${q.toString()}`;
+  return `${base}/supercomputer/sign?${q.toString()}`;
 }
 
 export const DEFAULT_MCP_ACCESS_PACKAGES: McpAccessPackage[] = [

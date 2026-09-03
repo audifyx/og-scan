@@ -54,12 +54,12 @@ describe("agentSignWallets", () => {
   });
 
   it("skips Phantom autoConnect in Telegram in-app, not in desktop Chrome", () => {
-    expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "auto=1", "Mozilla/5.0 Chrome")).toBe(false);
-    expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "auto=1", "Telegram")).toBe(true);
-    expect(shouldSkipWalletAutoConnect("Phantom Wallet", "/agent/sign", "?auto=true", "TelegramBot")).toBe(true);
-    expect(shouldSkipWalletAutoConnect("Jupiter", "/agent/sign", "auto=1", "Telegram")).toBe(false);
-    expect(shouldSkipWalletAutoConnect("Jupiter Wallet", "/agent/sign", "auto=1")).toBe(false);
-    expect(shouldSkipWalletAutoConnect("Phantom", "/agent/sign", "")).toBe(false);
+    expect(shouldSkipWalletAutoConnect("Phantom", "/supercomputer/sign", "auto=1", "Mozilla/5.0 Chrome")).toBe(false);
+    expect(shouldSkipWalletAutoConnect("Phantom", "/supercomputer/sign", "auto=1", "Telegram")).toBe(true);
+    expect(shouldSkipWalletAutoConnect("Phantom Wallet", "/supercomputer/sign", "?auto=true", "TelegramBot")).toBe(true);
+    expect(shouldSkipWalletAutoConnect("Jupiter", "/supercomputer/sign", "auto=1", "Telegram")).toBe(false);
+    expect(shouldSkipWalletAutoConnect("Jupiter Wallet", "/supercomputer/sign", "auto=1")).toBe(false);
+    expect(shouldSkipWalletAutoConnect("Phantom", "/supercomputer/sign", "")).toBe(false);
     expect(shouldSkipWalletAutoConnect("Phantom", "/os", "auto=1", "Telegram")).toBe(false);
   });
 

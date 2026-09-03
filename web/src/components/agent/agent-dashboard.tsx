@@ -111,13 +111,13 @@ function parseAgentTab(raw: string): AgentTabId {
   return AGENT_TABS.has(t as AgentTabId) ? (t as AgentTabId) : "setup";
 }
 
-export function AgentDashboard() {
+export function AgentDashboard({ embedded = false, initialTab = "setup" }: { embedded?: boolean; initialTab?: AgentTabId }) {
   const { user, profile } = useAuth();
   const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<AgentTabId>(() => parseAgentTab(searchParams.get("tab") || ""));
+  const [tab, setTab] = useState<AgentTabId>(() => embedded ? initialTab : parseAgentTab(searchParams.get("tab") || ""));
   const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
   const [boot, setBoot] = useState<AgentBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -189,6 +189,7 @@ export function AgentDashboard() {
     (id: string) => {
       const next = parseAgentTab(id);
       setTab(next);
+      if (embedded) return;
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -199,7 +200,7 @@ export function AgentDashboard() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [embedded, setSearchParams],
   );
 
   const refreshCredits = useCallback(async () => {
@@ -222,9 +223,13 @@ export function AgentDashboard() {
   }, [refresh]);
 
   useEffect(() => {
+    if (embedded) {
+      if (initialTab !== tab) setTab(initialTab);
+      return;
+    }
     const next = parseAgentTab(searchParams.get("tab") || "");
     if (next !== tab) setTab(next);
-  }, [searchParams, tab]);
+  }, [embedded, initialTab, searchParams, tab]);
 
   useEffect(() => {
     if (tab === "shop") void refreshCredits();
@@ -323,15 +328,16 @@ export function AgentDashboard() {
       statusLabel={statusLabel}
       statusWarn={!hasKey || !linkedWallet}
       onRefresh={refresh}
-      siblingHref="/x"
-      siblingLabel="X MCP"
-      siblingIcon="✕"
+      embedded={embedded}
+      siblingHref="/supercomputer?tab=x"
+      siblingLabel="X channel"
+      siblingIcon="𝕏"
     >
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">OrbitX</h1>
         <p className="ox-agent__lead">
-          Agent MCP dashboard — wire Claude, ChatGPT, or Grok. Trade, launch, mint, and social.
-          Non-custodial; you sign in your wallet.
+          OrbitX MCP workspace — connect Claude, ChatGPT, or Grok for research, trade, launch, mint, and social actions.
+          Non-custodial; you approve wallet actions yourself.
         </p>
         <div className="ox-agent__kpis">
           <button

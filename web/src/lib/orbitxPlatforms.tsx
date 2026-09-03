@@ -214,8 +214,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, menu: false, visibility: "admin" },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, menu: false, visibility: "admin" },
   { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #38BDF8 48%, #0284C7 100%)", glyph: PlatformGlyph.ai },
-  { key: "agent", name: "Agent MCP", caption: "Claude · ChatGPT · Grok", href: "/agent", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.agent, dock: true },
-  { key: "xmcp", name: "X MCP", caption: "Post & NVIDIA agent", href: "/x", tone: "#E7E9EA", iconBg: "linear-gradient(145deg, #71717A 0%, #3F3F46 50%, #18181B 100%)", glyph: PlatformGlyph.x, visibility: "admin" },
+  { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, dock: true },
   { key: "telegram", name: "Telegram", caption: "Official @theorbitxmcpbot", href: "/telegram", tone: "#2AABEE", iconBg: "linear-gradient(145deg, #6FD0FF 0%, #2AABEE 48%, #0B5F8A 100%)", glyph: PlatformGlyph.telegram },
   { key: "support", name: "Support", caption: "Live tickets & chat", href: "/support", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.support },
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
@@ -296,7 +295,6 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
       pathname.startsWith("/world/")
     );
   }
-  if (href === "/x") return pathname === "/x" || pathname.startsWith("/x/");
   if (href === "/ai") return pathname.toLowerCase() === "/ai";
   if (href === "/telegram") return pathname.toLowerCase() === "/telegram";
   if (href === "/support") return pathname === "/support" || pathname.startsWith("/support/");

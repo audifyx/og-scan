@@ -17,7 +17,7 @@ describe("mcpAccessSignUrl", () => {
       publicKey: "11111111111111111111111111111111",
       origin: "https://www.orbitx.world",
     });
-    expect(url).toContain("/agent/sign?");
+    expect(url).toContain("/supercomputer/sign?");
     expect(url).toContain("kind=mcp-access");
     expect(url).toContain("package=hour");
     expect(url).toContain("amount=100");
@@ -31,7 +31,7 @@ describe("mcpAccessSignUrl", () => {
       auto: true,
       origin: "https://orbitx.world",
     });
-    expect(url.startsWith("https://www.orbitx.world/agent/sign?")).toBe(true);
+    expect(url.startsWith("https://www.orbitx.world/supercomputer/sign?")).toBe(true);
     expect(url).toContain("package=week");
     expect(url).toContain("amount=10000");
     expect(url).toContain("auto=1");

@@ -77,7 +77,7 @@ export default function McpAuthPage() {
       const msg = e instanceof Error ? e.message : "Authorization failed";
       setError(
         /token_hold|ORBITX|hold/i.test(msg)
-          ? `${msg} Open /agent to verify your ORBITX hold, then try Authenticate again.`
+          ? `${msg} Open Super Computer Setup to verify your ORBITX hold, then try Authenticate again.`
           : msg,
       );
       setSubmitting(false);
@@ -93,7 +93,7 @@ export default function McpAuthPage() {
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">Authorize MCP</h1>
         <p className="ox-agent__lead">
-          Let {clientLabel} use your OrbitX agent. Non-custodial — revoke anytime on /agent.
+          Let {clientLabel} use your OrbitX workspace. Non-custodial — revoke anytime from Super Computer Setup.
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export default function McpAuthPage() {
           {!redirectUri && (
             <div className="ox-agent__alert" style={{ marginTop: 12 }}>
               Missing redirect_uri — open Authenticate from Grok/Claude/ChatGPT, or copy OAuth fields from{" "}
-              <Link to="/agent">/agent</Link>.
+              <Link to="/supercomputer?tab=setup">Super Computer Setup</Link>.
             </div>
           )}
 
@@ -184,7 +184,7 @@ export default function McpAuthPage() {
           )}
 
           <p className="ox-agent__note">
-            Revoke keys anytime on <Link to="/agent">/agent</Link>
+            Revoke keys anytime from <Link to="/supercomputer?tab=workspace&focus=keys">Super Computer Keys</Link>
             {!redirectUri && oauth.authorizationUrl ? (
               <span style={{ display: "block", marginTop: 6, opacity: 0.6 }}>
                 {oauth.authorizationUrl}

@@ -260,7 +260,7 @@ export default function AgentSignPage() {
             );
           } else {
             setExtraNote(
-              "Payment sent. Tell Grok your signature to finish crediting, or open /x Usage → Confirm payment.",
+              "Payment sent. Tell Grok your signature to finish crediting, or open Super Computer Access → Confirm payment.",
             );
           }
         } catch {
@@ -565,15 +565,15 @@ export default function AgentSignPage() {
             <TransactionStatus state="confirmed" signature={signature} />
             {kind === "credits" ? (
               <p className="mt-2 text-[11px] text-white/45">
-                <Link to="/shop" className="text-emerald-200/90 hover:underline">
-                  View shop / balance
+                <Link to="/supercomputer?tab=shop" className="text-emerald-200/90 hover:underline">
+                  View access / balance
                 </Link>
               </p>
             ) : null}
             {kind === "mcp-access" ? (
               <p className="mt-2 text-[11px] text-white/45">
-                <Link to="/shop" className="text-emerald-200/90 hover:underline">
-                  Open shop
+                <Link to="/supercomputer?tab=shop" className="text-emerald-200/90 hover:underline">
+                  Open access
                 </Link>
               </p>
             ) : null}
@@ -617,10 +617,10 @@ export default function AgentSignPage() {
 
         <p className="mt-4 text-center text-[11px] text-white/35">
           <Link
-            to={kind === "credits" || kind === "mcp-access" ? "/shop" : "/agent"}
+            to="/supercomputer"
             className="text-white/50 hover:underline"
           >
-            {kind === "credits" || kind === "mcp-access" ? "Back to Shop" : "Back to Agent MCP"}
+            Back to Super Computer
           </Link>
         </p>
       </div>

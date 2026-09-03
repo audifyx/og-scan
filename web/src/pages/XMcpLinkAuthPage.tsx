@@ -67,7 +67,7 @@ export default function XMcpLinkAuthPage() {
       showTabs={false}
       statusLabel="Grok link auth"
       statusWarn={!code}
-      brandHref="/x"
+      brandHref="/supercomputer"
       brandSub="X MCP"
       footerBrand="OrbitX X MCP"
       mcpUrl="https://www.orbitx.world/api/x/mcp"
@@ -95,8 +95,8 @@ export default function XMcpLinkAuthPage() {
 
           {done ? (
             <div className="ox-agent__btn-row">
-              <Link to="/x" className="ox-agent__btn ox-agent__btn--primary">
-                Open /x hub
+              <Link to="/supercomputer?tab=channels" className="ox-agent__btn ox-agent__btn--primary">
+                Open Channels workspace
               </Link>
             </div>
           ) : !user ? (
@@ -137,8 +137,8 @@ export default function XMcpLinkAuthPage() {
           )}
 
           <p className="ox-agent__note">
-            Make sure your X account is connected on <Link to="/x">/x</Link> so Grok can post and DM.
-            This is separate from Agent MCP on <Link to="/agent">/agent</Link>.
+            Make sure your X account is connected in the Super Computer Channels workspace so Grok can post and DM.
+            X is a channel inside the unified OrbitX MCP.
           </p>
         </div>
       </section>

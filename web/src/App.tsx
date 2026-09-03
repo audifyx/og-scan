@@ -176,21 +176,18 @@ import AutoTweet from "./pages/AutoTweet";
 import PodcastPublisher from "./pages/PodcastPublisher";
 import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
-import AgentPage from "./pages/Agent";
 import McpSuperComputer from "./pages/McpSuperComputer";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
-import XMcpPage from "./pages/XMcpPage";
-import ShopPage from "./pages/ShopPage";
 import XMcpAuthPage from "./pages/XMcpAuthPage";
 import XMcpLinkAuthPage from "./pages/XMcpLinkAuthPage";
 import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
+import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
+import AgentNftMintPage from "./pages/AgentNftMintPage";
 import OnChainProofPage from "./pages/OnChainProofPage";
 import OnChainWorld from "./pages/OnChainWorld";
 import Education from "./pages/Education";
-import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
-import AgentNftMintPage from "./pages/AgentNftMintPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PushNotificationPrompt } from "./components/notifications/PushNotificationPrompt";
@@ -662,9 +659,8 @@ const App = () => (
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/supercomputer" element={<McpSuperComputer />} />
-            <Route path="/mcp" element={<Navigate to="/supercomputer" replace />} />
-            <Route path="/x" element={<OwnerPreviewRoute><XMcpPage /></OwnerPreviewRoute>} />
-            <Route path="/shop" element={<ShopPage />} />
+            <Route path="/mcp" element={<RedirectPreserveSearch to="/supercomputer" />} />
+            <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
             <Route path="/world" element={<Navigate to="/on-chain" replace />} />
             <Route path="/on-chain" element={<OnChainWorld />} />
@@ -672,15 +668,14 @@ const App = () => (
             <Route path="/on-chain/token/:address" element={<OnChainWorld />} />
             <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
             <Route path="/on-chain/block/:slot" element={<OnChainWorld />} />
-            <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
-            <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
-            <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
-            <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
-            <Route path="/agent/link-auth" element={<AgentLinkAuthPage />} />
-            <Route path="/agent/sign" element={<AgentSignPage />} />
-            <Route path="/agent/create-token" element={<AgentCreateTokenPage />} />
-            <Route path="/agent/nft-mint" element={<AgentNftMintPage />} />
-            <Route path="/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
+            <Route path="/supercomputer/mcp-auth" element={<McpAuthPage />} />
+            <Route path="/supercomputer/x-mcp-auth" element={<XMcpAuthPage />} />
+            <Route path="/supercomputer/link-auth" element={<AgentLinkAuthPage />} />
+            <Route path="/supercomputer/x-link-auth" element={<XMcpLinkAuthPage />} />
+            <Route path="/supercomputer/sign" element={<AgentSignPage />} />
+            <Route path="/supercomputer/create-token" element={<AgentCreateTokenPage />} />
+            <Route path="/supercomputer/nft-mint" element={<AgentNftMintPage />} />
+            <Route path="/supercomputer/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
             <Route path="/:toolSlug" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

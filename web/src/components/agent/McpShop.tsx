@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { McpBurnAccessCard } from "./McpBurnAccessCard";
 import { McpCreditsBuyCard } from "./McpCreditsBuyCard";
 import type { McpBurnAccessStatus } from "@/lib/mcpBurnAccess";
@@ -30,17 +29,13 @@ export function McpShop({
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">{both ? "OrbitX Shop" : "Shop"}</h1>
         <p className="ox-agent__lead">
-          Buy timed MCP access by burning $ORBITX, or top up credits with SOL. One burn grant unlocks
-          Agent MCP and X MCP. Credits are shared across both connectors.
+          Buy timed OrbitX MCP access by burning $ORBITX, or top up credits with SOL. One grant unlocks
+          every connected channel. Credits are shared across the entire control plane.
         </p>
         {both && (
-          <div className="ox-agent__btn-row">
-            <Link to="/agent?tab=shop" className="ox-agent__btn">
-              Agent shop
-            </Link>
-            <Link to="/x?tab=shop" className="ox-agent__btn">
-              X shop
-            </Link>
+          <div className="ox-agent__steps">
+            <span className="ox-agent__chip is-ok">All-channel shared access</span>
+            <span className="ox-agent__chip">One checkout surface</span>
           </div>
         )}
       </div>
@@ -80,19 +75,19 @@ export function McpShop({
               <span className="ox-agent__pkg-k">Credits</span>
               <strong className="ox-agent__pkg-title">Any amount</strong>
               <span className="ox-agent__pkg-cost">10,000 / 1 SOL</span>
-              <span className="ox-agent__pkg-meta">Desk wallet · Agent + X</span>
+              <span className="ox-agent__pkg-meta">Desk wallet · all channels</span>
             </div>
           </div>
           <p className="ox-agent__note">
             {agentTools && (
               <>
-                Agent MCP: <code>orbitx_mcp_access_buy</code> · <code>orbitx_credits_buy</code>
+                OrbitX MCP: <code>orbitx_mcp_access_buy</code> · <code>orbitx_credits_buy</code>
                 {xTools ? " · " : ""}
               </>
             )}
             {xTools && (
               <>
-                X MCP: <code>x_mcp_access_buy</code> / <code>x_buy what=access</code> ·{" "}
+                Channel aliases: <code>x_mcp_access_buy</code> / <code>x_buy what=access</code> ·{" "}
                 <code>x_credits_buy</code>
               </>
             )}

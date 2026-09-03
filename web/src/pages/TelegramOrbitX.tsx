@@ -189,8 +189,8 @@ export default function TelegramOrbitX() {
       footerBrand="OrbitX Telegram"
       footerNote="Official @theorbitxmcpbot — groups are public; DMs unlock trade and X after /login."
       mcpUrl={TELEGRAM_ORBITX_TME}
-      siblingHref="/agent"
-      siblingLabel="Agent"
+      siblingHref="/supercomputer?tab=channels"
+      siblingLabel="Super Computer"
       topSubtitle="Official bot · not MCP OAuth"
     >
       {tab === "link" ? (
@@ -224,8 +224,8 @@ export default function TelegramOrbitX() {
               <a className="ox-agent__btn ox-agent__btn--primary" href={TELEGRAM_ORBITX_TME} target="_blank" rel="noreferrer">
                 Open @{TELEGRAM_ORBITX_BOT}
               </a>
-              <Link className="ox-agent__btn" to="/agent">
-                Agent MCP
+              <Link className="ox-agent__btn" to="/supercomputer?tab=channels">
+                Super Computer
               </Link>
             </div>
 

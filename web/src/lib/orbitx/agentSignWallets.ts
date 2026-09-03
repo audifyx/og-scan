@@ -1,5 +1,5 @@
 /**
- * /agent/sign: Jupiter Wallet in-app + browser extensions (Phantom, Solflare, …).
+ * /supercomputer/sign: Jupiter Wallet in-app + browser extensions (Phantom, Solflare, …).
  * Never Phantom Connect universal links. Telegram in-app cannot sign.
  */
 
@@ -123,7 +123,7 @@ export function shouldSkipWalletAutoConnect(
   search: string,
   ua?: string | null,
 ): boolean {
-  if (!/\/agent\/sign/i.test(pathname)) return false;
+  if (!/\/supercomputer\/sign/i.test(pathname)) return false;
   const sp = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const auto = sp.get("auto") === "1" || sp.get("auto") === "true" || sp.get("autoconfirm") === "1";
   if (!auto) return false;

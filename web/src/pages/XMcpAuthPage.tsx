@@ -69,7 +69,7 @@ export default function XMcpAuthPage() {
       showTabs={false}
       statusLabel="X MCP consent"
       statusWarn={!redirectUri}
-      brandHref="/x"
+      brandHref="/supercomputer"
       brandSub="X MCP"
       footerBrand="OrbitX X MCP"
       mcpUrl="https://www.orbitx.world/api/x/mcp"
@@ -77,7 +77,7 @@ export default function XMcpAuthPage() {
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">Authorize X MCP</h1>
         <p className="ox-agent__lead">
-          Let {clientLabel} post to your linked X account via OrbitX. Revoke anytime on /x.
+          Let {clientLabel} post to your linked X account via OrbitX. Revoke anytime from the Super Computer Channels workspace.
         </p>
       </div>
 
@@ -108,7 +108,7 @@ export default function XMcpAuthPage() {
           {!redirectUri && (
             <div className="ox-agent__alert" style={{ marginTop: 12 }}>
               Missing redirect_uri — open Authenticate from Grok/Claude/ChatGPT, or copy OAuth fields from{" "}
-              <Link to="/x">/x</Link>.
+              <Link to="/supercomputer?tab=channels">Super Computer Channels</Link>.
             </div>
           )}
 
@@ -150,8 +150,8 @@ export default function XMcpAuthPage() {
           )}
 
           <p className="ox-agent__note">
-            This is separate from Agent MCP on <Link to="/agent">/agent</Link>. Manage X posting on{" "}
-            <Link to="/x">/x</Link>
+            X is a channel inside the unified Super Computer. Manage X posting from the{" "}
+            <Link to="/supercomputer?tab=channels">Channels workspace</Link>
             {!redirectUri && oauth.authorizationUrl ? (
               <span style={{ display: "block", marginTop: 6, opacity: 0.6 }}>
                 {oauth.authorizationUrl}

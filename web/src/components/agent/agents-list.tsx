@@ -88,7 +88,7 @@ export function AgentsList({ refreshTrigger }: AgentsListProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {agents.map((agent) => (
-        <Link key={agent.id} to={`/agent/${agent.id}`}>
+        <Link key={agent.id} to="/supercomputer?tab=workspace&focus=setup">
           <div className="p-6 border border-border rounded-lg hover:border-primary transition cursor-pointer h-full">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold text-foreground">{agent.name}</h3>

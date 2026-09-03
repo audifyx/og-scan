@@ -1,30 +1,83 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { AgentShell } from "@/components/agent/AgentShell";
-import { McpShop } from "@/components/agent/McpShop";
+import { useSearchParams } from "react-router-dom";
+import { Activity, Bot, ChevronRight, CircleDollarSign, Code2, Command, Compass, Cpu, KeyRound, Layers3, MessageCircle, Radio, Settings2, ShieldCheck, Sparkles, Store, WalletCards, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { resolveAuthWallet } from "@/lib/agentTokenGate";
 import { isOwnerIdentity } from "@/lib/ownerDesk";
+import { AgentDashboard } from "@/components/agent/agent-dashboard";
+import { McpShop } from "@/components/agent/McpShop";
+import XMcpPage from "@/pages/XMcpPage";
+import {
+  IosAppShell,
+  IosNav,
+  IosRailBrand,
+  IosRailLink,
+  IosTabBar,
+  type IosTabItem,
+} from "@/components/app-shell/IosAppShell";
 import "./mcp-super-computer.css";
 
-type Tab = "overview" | "setup" | "channels" | "shop" | "tools";
+type MainTab = "home" | "setup" | "workspace" | "channels" | "shop";
+type AgentFocus = "setup" | "shop" | "wallet" | "keys" | "connect";
+type XFocus = "home" | "account" | "keys" | "connect";
+type XHomeSub = "post" | "agent" | "queue" | "messages" | "matrix";
 
-const tabs: Array<{ id: Tab; label: string; icon: string }> = [
-  { id: "overview", label: "Command center", icon: "⌁" },
-  { id: "setup", label: "First launch", icon: "↗" },
-  { id: "channels", label: "Channels", icon: "◌" },
-  { id: "shop", label: "Access & shop", icon: "◈" },
-  { id: "tools", label: "Tool deck", icon: "✦" },
+const mainTabs: Array<{ id: MainTab; label: string; short: string; icon: React.ReactNode }> = [
+  { id: "home", label: "Overview", short: "Home", icon: <Command size={18} /> },
+  { id: "setup", label: "Setup", short: "Setup", icon: <Sparkles size={18} /> },
+  { id: "workspace", label: "Agent", short: "Agent", icon: <Bot size={18} /> },
+  { id: "channels", label: "Channels", short: "Channels", icon: <Radio size={18} /> },
+  { id: "shop", label: "Access", short: "Shop", icon: <Store size={18} /> },
 ];
 
-function StatusTile({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: "neutral" | "ready" | "warn" }) {
+const agentTabs: Array<{ id: AgentFocus; label: string; icon: React.ReactNode }> = [
+  { id: "setup", label: "MCP setup", icon: <Sparkles size={15} /> },
+  { id: "wallet", label: "Wallet", icon: <WalletCards size={15} /> },
+  { id: "keys", label: "API keys", icon: <KeyRound size={15} /> },
+  { id: "connect", label: "Connect AI", icon: <Code2 size={15} /> },
+];
+
+const xTabs: Array<{ id: XFocus; label: string; icon: React.ReactNode }> = [
+  { id: "home", label: "Publish", icon: <MessageCircle size={15} /> },
+  { id: "account", label: "X account", icon: <X size={15} /> },
+  { id: "keys", label: "X keys", icon: <KeyRound size={15} /> },
+  { id: "connect", label: "Connect AI", icon: <Code2 size={15} /> },
+];
+
+function validMainTab(value: string | null): value is MainTab {
+  return mainTabs.some((item) => item.id === value);
+}
+
+function validAgentFocus(value: string | null): value is AgentFocus {
+  return agentTabs.some((item) => item.id === value);
+}
+
+function validXFocus(value: string | null): value is XFocus {
+  return xTabs.some((item) => item.id === value);
+}
+
+function StatusPill({ ready, children }: { ready: boolean; children: React.ReactNode }) {
+  return <span className={`supercomputer-status ${ready ? "is-ready" : "is-pending"}`}><i />{children}</span>;
+}
+
+function MetricCard({ icon, label, value, detail, onClick }: { icon: React.ReactNode; label: string; value: string; detail: string; onClick?: () => void }) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <div className={`super-status super-status--${tone}`}>
-      <div className="super-status__top"><span>{label}</span><i aria-hidden /></div>
-      <strong>{value}</strong>
-      <small>{detail}</small>
+    <Tag type={onClick ? "button" : undefined} className={`supercomputer-metric ${onClick ? "is-clickable" : ""}`} onClick={onClick}>
+      <div className="supercomputer-metric__icon">{icon}</div>
+      <div className="supercomputer-metric__copy"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>
+      {onClick ? <ChevronRight className="supercomputer-metric__chevron" size={16} /> : null}
+    </Tag>
+  );
+}
+
+function SectionHeader({ eyebrow, title, detail, action }: { eyebrow: string; title: string; detail: string; action?: React.ReactNode }) {
+  return (
+    <div className="supercomputer-section-head">
+      <div><p className="supercomputer-eyebrow">{eyebrow}</p><h2>{title}</h2><p>{detail}</p></div>
+      {action}
     </div>
   );
 }
@@ -32,31 +85,29 @@ function StatusTile({ label, value, detail, tone = "neutral" }: { label: string;
 export default function McpSuperComputer() {
   const { user, profile } = useAuth();
   const { publicKey } = useWallet();
-  const { pickable, signInWith, busy } = useWalletSignIn();
+  const { pickable } = useWalletSignIn();
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get("tab") as Tab | null;
-  const [tab, setTab] = useState<Tab>(tabs.some((item) => item.id === requestedTab) ? requestedTab! : "overview");
-  const [setupError, setSetupError] = useState<string | null>(null);
-  const setActiveTab = (next: string) => {
-    const value = tabs.some((item) => item.id === next) ? (next as Tab) : "overview";
-    setTab(value);
-    setSearchParams(value === "overview" ? {} : { tab: value }, { replace: true });
-  };
+  const queryTab = searchParams.get("tab");
+  const queryFocus = searchParams.get("focus");
+  const [tab, setTab] = useState<MainTab>(validMainTab(queryTab) ? queryTab : "home");
+  const [agentFocus, setAgentFocus] = useState<AgentFocus>(validAgentFocus(queryFocus) ? queryFocus : "setup");
+  const [xFocus, setXFocus] = useState<XFocus>(validXFocus(queryFocus) ? queryFocus : "home");
+  const [xHomeSub, setXHomeSub] = useState<XHomeSub>("post");
+
   useEffect(() => {
-    if (requestedTab && tabs.some((item) => item.id === requestedTab) && requestedTab !== tab) setTab(requestedTab);
-  }, [requestedTab, tab]);
-  const signIn = async () => {
-    const wallet = pickable[0];
-    if (!wallet) {
-      setSetupError("No compatible wallet detected. Install Phantom, Backpack, Solflare, or another Solana wallet first.");
-      return;
-    }
-    setSetupError(null);
-    try {
-      await signInWith(wallet.name);
-    } catch (error) {
-      setSetupError(error instanceof Error ? error.message : "Wallet sign-in failed");
-    }
+    if (validMainTab(queryTab) && queryTab !== tab) setTab(queryTab);
+    if (queryTab === "workspace" && validAgentFocus(queryFocus) && queryFocus !== agentFocus) setAgentFocus(queryFocus);
+    if (queryTab === "channels" && validXFocus(queryFocus) && queryFocus !== xFocus) setXFocus(queryFocus);
+  }, [agentFocus, queryFocus, queryTab, tab, xFocus]);
+
+  const go = (next: MainTab, focus?: string) => {
+    setTab(next);
+    if (next === "workspace" && validAgentFocus(focus ?? null)) setAgentFocus(focus as AgentFocus);
+    if (next === "channels" && validXFocus(focus ?? null)) setXFocus(focus as XFocus);
+    const params = new URLSearchParams();
+    if (next !== "home") params.set("tab", next);
+    if (focus) params.set("focus", focus);
+    setSearchParams(params, { replace: true });
   };
 
   const walletAddress = useMemo(() => resolveAuthWallet({
@@ -65,73 +116,60 @@ export default function McpSuperComputer() {
     userMetadata: (user?.user_metadata as Record<string, unknown> | undefined) ?? null,
     profileWallet: (profile as { wallet_address?: string | null; sol_wallet?: string | null } | null)?.wallet_address ||
       (profile as { sol_wallet?: string | null } | null)?.sol_wallet || null,
-  }), [publicKey, user?.email, user?.user_metadata, profile]);
-
-  const owner = isOwnerIdentity({ email: user?.email, wallet: walletAddress });
+  }), [profile, publicKey, user]);
   const walletReady = Boolean(walletAddress);
+  const owner = isOwnerIdentity({ email: user?.email, wallet: walletAddress });
+  const activeTitle = mainTabs.find((item) => item.id === tab)?.label || "Overview";
+  const bottomTabs: IosTabItem[] = mainTabs.map((item) => ({ id: item.id, label: item.short, ico: item.icon }));
+
+  const rail = (
+    <>
+      <IosRailBrand href="/supercomputer" title="OrbitX" subtitle="Super Computer" />
+      <div className="supercomputer-rail-label">Workspace</div>
+      {mainTabs.map((item) => <IosRailLink key={item.id} label={item.label} ico={item.icon} active={tab === item.id} onClick={() => go(item.id)} />)}
+      <div className="supercomputer-rail-divider" />
+      <div className="supercomputer-rail-label">System</div>
+      <IosRailLink label="MCP status" ico={<Activity size={16} />} active={tab === "home"} onClick={() => go("home")} />
+      <IosRailLink label="Safety & signing" ico={<ShieldCheck size={16} />} active={tab === "setup"} onClick={() => go("setup")} />
+      <div className="supercomputer-rail-spacer" />
+      <StatusPill ready={walletReady}>{walletReady ? "Wallet ready" : "Setup required"}</StatusPill>
+      <button type="button" className="supercomputer-rail-account" onClick={() => go("setup")}><span>{user ? "Signed in" : "Guest mode"}</span><small>{owner ? "Owner access" : walletReady ? "Identity connected" : "Start setup"}</small></button>
+    </>
+  );
 
   return (
-    <AgentShell
-      brandHref="/supercomputer"
-      brandSub="OrbitX Super Computer"
-      footerBrand="OrbitX Super Computer"
-      footerNote="One MCP command center for tools, agents, X, Telegram, wallet actions, access, and automation."
-      topSubtitle="One MCP · every channel · every capability"
-      statusLabel={walletReady ? "System ready" : "Setup required"}
-      statusWarn={!walletReady}
-      activeTab={tab}
-      onTabChange={setActiveTab}
-      tabs={tabs}
-      siblingHref="/mcp"
-      siblingLabel="Super Computer"
-      siblingIcon="⌁"
-    >
-      <section className="super-hero">
-        <div className="super-hero__eyebrow"><span className="super-live-dot" /> ORBITX MCP / UNIFIED CONTROL PLANE</div>
-        <h1>One command center.<br /><em>Every OrbitX capability.</em></h1>
-        <p>Connect your wallet, launch agents, wire in X and Telegram, manage access, and control the full OrbitX tool deck from one place.</p>
-        <div className="super-hero__actions">
-          <button className="super-button super-button--primary" type="button" onClick={() => setActiveTab(walletReady ? "tools" : "setup")}>
-            {walletReady ? "Open tool deck" : "Start setup"}<span>→</span>
-          </button>
-          <button className="super-button super-button--ghost" type="button" onClick={() => setActiveTab("channels")}>Connect a channel</button>
-        </div>
-        <div className="super-hero__meta"><span>Non-custodial by design</span><span>Wallet signs every transaction</span><span>Shared access across MCP + X</span></div>
-      </section>
+    <IosAppShell accent="teal" wide className="supercomputer-ios" stageClassName="supercomputer-stage">
+      <div className="supercomputer-frame">
+        <aside className="supercomputer-rail" aria-label="Super Computer navigation">{rail}</aside>
+        <div className="supercomputer-main">
+          <IosNav
+            title={activeTitle}
+            trail={<><StatusPill ready={walletReady}>{walletReady ? "Ready" : "Guest"}</StatusPill><button type="button" className="ios-nav__btn supercomputer-nav-action" onClick={() => go("setup")} aria-label="Open setup"><Settings2 size={17} /></button></>}
+          />
+          <main className="supercomputer-body">
+            <div className="supercomputer-mobile-brand"><div className="supercomputer-mobile-orb"><Cpu size={17} /></div><div><strong>OrbitX Super Computer</strong><span>One MCP · every capability</span></div></div>
 
-      <div className="super-grid super-grid--status">
-        <StatusTile label="Identity" value={user ? "Authenticated" : "Guest"} detail={user?.email || "Sign in to unlock your workspace"} tone={user ? "ready" : "warn"} />
-        <StatusTile label="Wallet" value={walletReady ? "Connected" : "Not connected"} detail={walletReady ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "Required for signing and access"} tone={walletReady ? "ready" : "warn"} />
-        <StatusTile label="Channels" value="2 surfaces" detail="X + Telegram ready to connect" tone="neutral" />
-        <StatusTile label="MCP endpoint" value="Online" detail="orbitx.world/api/mcp" tone="ready" />
+            {tab === "home" && (
+              <>
+                <section className="supercomputer-welcome">
+                  <div className="supercomputer-welcome__copy"><p className="supercomputer-eyebrow"><span className="supercomputer-live" /> ORBITX OPERATING LAYER</p><h1>One home for<br /><em>every MCP action.</em></h1><p>Wallet intelligence, agents, X, Telegram, keys, access, and signed execution—organized as one calm, focused control surface.</p><div className="supercomputer-welcome__actions"><button type="button" className="supercomputer-button supercomputer-button--primary" onClick={() => go(walletReady ? "workspace" : "setup", walletReady ? "setup" : undefined)}>{walletReady ? "Open workspace" : "Start setup"}<ChevronRight size={16} /></button><button type="button" className="supercomputer-button supercomputer-button--quiet" onClick={() => go("channels")}>Connect a channel</button></div></div><div className="supercomputer-orbit-card"><div className="supercomputer-orbit-card__ring supercomputer-orbit-card__ring--one" /><div className="supercomputer-orbit-card__ring supercomputer-orbit-card__ring--two" /><div className="supercomputer-orbit-card__core"><Cpu size={26} /><span>ORBITX</span></div><span className="supercomputer-orbit-card__label supercomputer-orbit-card__label--top">MCP ONLINE</span><span className="supercomputer-orbit-card__label supercomputer-orbit-card__label--right">TOOLS</span><span className="supercomputer-orbit-card__label supercomputer-orbit-card__label--bottom">SIGNED</span></div></section>
+                <div className="supercomputer-metrics"><MetricCard icon={<ShieldCheck size={18} />} label="Identity" value={user ? "Authenticated" : "Guest mode"} detail={user?.email || "Connect when you are ready"} onClick={() => go("setup")} /><MetricCard icon={<WalletCards size={18} />} label="Wallet" value={walletReady ? "Connected" : "Not connected"} detail={walletReady ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "Required for signing"} onClick={() => go("workspace", "wallet")} /><MetricCard icon={<Radio size={18} />} label="Channels" value="X + Telegram" detail="Connect once, operate everywhere" onClick={() => go("channels")} /><MetricCard icon={<Activity size={18} />} label="MCP endpoint" value="Online" detail="www.orbitx.world/api/mcp" /></div>
+                <div className="supercomputer-home-grid"><section className="supercomputer-card supercomputer-card--accent"><SectionHeader eyebrow="THE CONTROL PLANE" title="Stop switching apps." detail="The Super Computer is the layer behind your tools, agents, channels, wallet, and access." /><div className="supercomputer-capability-grid"><span><Layers3 size={15} />Research</span><span><Bot size={15} />Agents</span><span><MessageCircle size={15} />X + Telegram</span><span><WalletCards size={15} />Wallet actions</span><span><Code2 size={15} />API keys</span><span><Store size={15} />Access shop</span></div><button type="button" className="supercomputer-inline-link" onClick={() => go("setup")}>See the setup path <ChevronRight size={15} /></button></section><section className="supercomputer-card"><SectionHeader eyebrow="QUICK START" title="Your next best action" detail="A clear setup path, whether you are new or already connected." /><div className="supercomputer-next-list"><button type="button" onClick={() => go(walletReady ? "workspace" : "setup", walletReady ? "wallet" : undefined)}><span className="supercomputer-next-number">01</span><span><strong>{walletReady ? "Review wallet" : "Connect identity"}</strong><small>{walletReady ? "Your wallet can approve non-custodial actions." : "Start with a free signed message."}</small></span><ChevronRight size={16} /></button><button type="button" onClick={() => go("workspace", "keys")}><span className="supercomputer-next-number">02</span><span><strong>Create an MCP key</strong><small>One scoped key for Claude, ChatGPT, or Grok.</small></span><ChevronRight size={16} /></button><button type="button" onClick={() => go("channels", "home")}><span className="supercomputer-next-number">03</span><span><strong>Add a channel</strong><small>Bring X or Telegram into the same control plane.</small></span><ChevronRight size={16} /></button></div></section></div>
+              </>
+            )}
+
+            {tab === "setup" && <section className="supercomputer-workspace"><SectionHeader eyebrow="FIRST LAUNCH" title="Get the Super Computer online." detail="One shared foundation for identity, wallet signing, API keys, and connected channels." /><div className="supercomputer-setup-banner"><div className="supercomputer-setup-banner__icon"><Sparkles size={20} /></div><div><strong>Setup once. Operate everywhere.</strong><p>Nothing is custodial. Your wallet approves transactions, your keys stay scoped, and access works across the unified MCP.</p></div><StatusPill ready={walletReady}>{walletReady ? "Foundation ready" : "Foundation pending"}</StatusPill></div><div className="supercomputer-embedded"><AgentDashboard embedded initialTab="setup" /></div></section>}
+
+            {tab === "workspace" && <section className="supercomputer-workspace"><SectionHeader eyebrow="MCP WORKSPACE" title="Your MCP operating desk." detail="Manage identity, wallet signing, keys, and AI client connections from one place." action={<StatusPill ready={walletReady}>{walletReady ? "Workspace ready" : "Setup needed"}</StatusPill>} /><div className="supercomputer-segmented">{agentTabs.map((item) => <button type="button" key={item.id} className={agentFocus === item.id ? "is-active" : ""} onClick={() => go("workspace", item.id)}>{item.icon}{item.label}</button>)}</div><div className="supercomputer-embedded"><AgentDashboard key={`agent-${agentFocus}`} embedded initialTab={agentFocus} /></div></section>}
+
+            {tab === "channels" && <section className="supercomputer-workspace"><SectionHeader eyebrow="CONNECTED CHANNELS" title="One MCP. Every conversation surface." detail="X and Telegram are channels inside OrbitX now—not separate products." action={<StatusPill ready={xFocus !== "home"}>{xFocus === "home" ? "Choose a channel" : "Channel workspace"}</StatusPill>} /><div className="supercomputer-segmented">{xTabs.map((item) => <button type="button" key={item.id} className={xFocus === item.id ? "is-active" : ""} onClick={() => go("channels", item.id)}>{item.icon}{item.label}</button>)}</div><div className="supercomputer-channel-notice"><div className="supercomputer-channel-notice__icon"><Radio size={18} /></div><div><strong>X is a channel, not another MCP.</strong><p>Publishing, DMs, queues, agent training, X keys, and connector setup all live below in the same Super Computer workspace.</p></div></div><div className="supercomputer-embedded"><XMcpPage key={`x-${xFocus}-${xHomeSub}`} embedded initialTab={xFocus} initialHomeSub={xHomeSub} /></div></section>}
+
+            {tab === "shop" && <section className="supercomputer-workspace"><SectionHeader eyebrow="ACCESS + SHOP" title="Unlock the operating layer." detail="Timed access and credits are shared across every OrbitX capability and connected channel. One checkout, one control plane." action={<StatusPill ready={false}>Non-custodial</StatusPill>} /><div className="supercomputer-shop-intro"><div><CircleDollarSign size={20} /><strong>Shared access across every channel</strong><p>Burn $ORBITX for timed access or top up credits with SOL. Wallet approval is required for every transaction.</p></div><button type="button" className="supercomputer-button supercomputer-button--quiet" onClick={() => go("workspace", "wallet")}>Review wallet</button></div><div className="supercomputer-embedded"><McpShop variant="both" walletAddress={walletAddress} /></div></section>}
+          </main>
+          <IosTabBar tabs={bottomTabs} activeId={tab} onChange={(id) => go(id as MainTab)} className="supercomputer-tabbar" />
+          <div className="ios-home-ind" aria-hidden />
+        </div>
       </div>
-
-      {setupError && <div className="super-inline-error" role="alert">{setupError}</div>}
-
-      {tab === "overview" && (
-        <div className="super-section-grid">
-          <section className="super-panel super-panel--feature"><div className="super-panel__kicker">SYSTEM OVERVIEW</div><h2>The OrbitX operating layer.</h2><p>Stop thinking in separate apps. The Super Computer is the control layer behind your wallet, intelligence, agents, channels, and execution surfaces.</p><div className="super-capabilities"><span>Wallet intelligence</span><span>Token research</span><span>Agent automation</span><span>X publishing</span><span>Telegram control</span><span>Signed execution</span></div>        <button className="super-link" type="button" onClick={() => setActiveTab("setup")}>Run first-launch setup <span>→</span></button>
-</section>
-          <section className="super-panel"><div className="super-panel__kicker">QUICK START</div><div className="super-step"><b>01</b><span><strong>Connect identity</strong><small>Sign in and connect the wallet that will approve actions.</small></span></div><div className="super-step"><b>02</b><span><strong>Choose your channels</strong><small>Enable X or Telegram when you are ready to automate.</small></span></div><div className="super-step"><b>03</b><span><strong>Copy your MCP key</strong><small>Use the shared endpoint from Claude, ChatGPT, Grok, or your own client.</small></span></div><button className="super-link" type="button" onClick={() => setActiveTab("setup")}>Open setup checklist <span>→</span></button>
-</section>
-        </div>
-      )}
-
-      {tab === "setup" && (
-        <section className="super-panel super-panel--wide"><div className="super-panel__kicker">FIRST LAUNCH</div><h2>Get the Super Computer online.</h2><p className="super-muted">A single setup flow replaces the old split between Agent MCP and X MCP. Complete the shared foundation first, then add the channels you need.</p><div className="super-setup-grid"><div className={`super-setup-card ${user ? "is-ready" : ""}`}><span>01</span><h3>{user ? "Identity connected" : "Sign in"}</h3><p>{user ? "Your account is ready for MCP configuration." : "Sign in before creating keys or saving channel settings."}</p>{!user && <button className="super-button super-button--small" type="button" onClick={() => void signIn()}>{busy ? "Connecting…" : "Sign in"}</button>}</div><div className={`super-setup-card ${walletReady ? "is-ready" : ""}`}><span>02</span><h3>{walletReady ? "Wallet connected" : "Connect wallet"}</h3><p>{walletReady ? "Your wallet can approve non-custodial actions." : "Connect the wallet used for signing, access, and execution."}</p>{!walletReady && <Link className="super-button super-button--small" to="/auth-wallet">Connect wallet</Link>}</div><div className="super-setup-card"><span>03</span><h3>Create your key</h3><p>Generate one scoped MCP key for the clients and channels you choose.</p><Link className="super-button super-button--small" to="/agent?tab=keys">Open key desk</Link></div></div></section>
-      )}
-
-      {tab === "channels" && (
-        <div className="super-section-grid"><section className="super-panel super-channel-card"><div className="super-channel-mark super-channel-mark--x">𝕏</div><div className="super-panel__kicker">CHANNEL / X</div><h2>Publish and respond.</h2><p>Connect X, train your agent, manage the queue, send DMs, and expose the X tools through the same Super Computer access layer.</p><Link className="super-button super-button--primary" to="/x">Open X workspace <span>→</span></Link></section><section className="super-panel super-channel-card"><div className="super-channel-mark super-channel-mark--tg">↯</div><div className="super-panel__kicker">CHANNEL / TELEGRAM</div><h2>Operate from chat.</h2><p>Bring the same intelligence and tool access into Telegram for command-driven workflows and notifications.</p><Link className="super-button super-button--ghost" to="/telegram">Open Telegram <span>→</span></Link></section></div>
-      )}
-
-      {tab === "shop" && <McpShop variant="both" walletAddress={walletAddress} />}
-
-      {tab === "tools" && (
-        <section className="super-panel super-panel--wide"><div className="super-panel__kicker">TOOL DECK</div><h2>Choose the capability, not the app.</h2><p className="super-muted">The full MCP surface stays behind one endpoint. These entry points keep the most useful workflows visible and understandable.</p><div className="super-tool-grid">{[{ title: "Research", detail: "Token overview, safety, forensics, charts", href: "/intel" }, { title: "Wallet intelligence", detail: "Balances, swaps, holdings, history", href: "/wallets" }, { title: "Launchpad", detail: "Create and manage token launches", href: "/orbitxlaunch" }, { title: "Agent desk", detail: "Configure and train autonomous agents", href: "/agent" }, { title: "X channel", detail: "Posts, DMs, queue, and X MCP", href: "/x" }, { title: "Signing desk", detail: "Approve prepared non-custodial actions", href: "/agent/sign" }].map((tool) => <Link className="super-tool" to={tool.href} key={tool.title}><span className="super-tool__arrow">↗</span><strong>{tool.title}</strong><small>{tool.detail}</small></Link>)}</div></section>
-      )}
-
-      {owner && <div className="super-owner-note">Owner preview enabled · all Super Computer surfaces are visible.</div>}
-    </AgentShell>
+    </IosAppShell>
   );
 }
