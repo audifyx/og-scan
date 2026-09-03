@@ -25,6 +25,16 @@ function preferStandard(matches: WalletLike[]): WalletLike | null {
 
 const PREFERRED = ["Phantom", "Jupiter", "Solflare", "Backpack"] as const;
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => { globalThis.clearTimeout(timer); resolve(value); },
+      (error) => { globalThis.clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 /** Wallet Standard registers "Jupiter Wallet"; legacy adapter is "Jupiter". */
 export function walletNameAliases(name?: string | null): string[] {
   const raw = String(name || "").trim();
@@ -92,13 +102,13 @@ export async function connectSolanaWallet(opts: {
 
   if (!adapter.connected) {
     try {
-      await opts.connect();
+      await withTimeout(opts.connect(), 5000, `${adapter.name} did not respond. Try another detected wallet.`);
     } catch {
       /* context connect can race — fall through */
     }
   }
   if (!adapter.connected) {
-    await adapter.connect();
+    await withTimeout(adapter.connect(), 12000, `${adapter.name} timed out. Open its app or extension, then try again.`);
   }
   // Some Standard wallets set publicKey a tick after connect resolves.
   if (!adapter.publicKey) {

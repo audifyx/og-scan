@@ -17,7 +17,11 @@ async function signMessageBytes(adapter: SignMessageAdapter, message: Uint8Array
   if (typeof adapter.signMessage !== "function") {
     throw new Error("wallet does not support message signing");
   }
-  return normalizeSignatureBytes(await adapter.signMessage(message));
+  const signature = await Promise.race([
+    adapter.signMessage(message),
+    new Promise<never>((_, reject) => globalThis.setTimeout(() => reject(new Error(`${adapter.name} signature request timed out. Reopen the wallet and try again.`)), 30000)),
+  ]);
+  return normalizeSignatureBytes(signature);
 }
 
 function findAdapter(wallets: ReturnType<typeof useWallet>["wallets"], name: string): SignMessageAdapter | null {

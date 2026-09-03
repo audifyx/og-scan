@@ -73,6 +73,25 @@ describe("connectSolanaWallet", () => {
     expect(phantomInstallHint("Phantom")).toMatch(/Install the Phantom extension/);
   });
 
+  it("times out when a wallet adapter never responds", async () => {
+    vi.useFakeTimers();
+    try {
+      const wallet = mockWallet("Jupiter", WalletReadyState.Installed);
+      wallet.adapter.connect = vi.fn(() => new Promise<void>(() => {}));
+      const pending = connectSolanaWallet({
+        wallets: [wallet],
+        select: vi.fn(),
+        connect: vi.fn(() => new Promise<void>(() => {})),
+        preferredName: "Jupiter",
+      });
+      const assertion = expect(pending).rejects.toThrow(/timed out/i);
+      await vi.advanceTimersByTimeAsync(18_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("falls back to adapter.connect when context connect no-ops", async () => {
     const phantom = mockWallet("Phantom", WalletReadyState.Installed);
     const select = vi.fn();
