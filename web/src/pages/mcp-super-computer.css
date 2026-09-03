@@ -124,6 +124,10 @@
 @media (max-width: 899px) {
   .supercomputer-frame { display: block; }
   .supercomputer-rail { display: none; }
+  .supercomputer-main .ios-nav { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); min-height: 60px; padding-top: max(0.35rem, var(--ios-safe-t)); padding-bottom: 0.35rem; }
+  .supercomputer-main .ios-nav__title { min-width: 0; font-size: 0.98rem; }
+  .supercomputer-main .ios-nav__trail { min-width: 0; max-width: min(42vw, 152px); flex-wrap: nowrap; overflow: hidden; }
+  .supercomputer-main .ios-nav__trail .supercomputer-status { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
   .supercomputer-body { padding: 0.35rem 0.9rem calc(var(--ios-tab-h) + var(--super-safe-bottom) + 1.5rem); }
   .supercomputer-mobile-brand { display: flex; align-items: center; gap: 0.58rem; padding: 0.7rem 0.15rem 0.25rem; }
   .supercomputer-mobile-orb { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(94,234,212,0.35); border-radius: 10px; background: rgba(94,234,212,0.1); color: var(--super-teal); }
