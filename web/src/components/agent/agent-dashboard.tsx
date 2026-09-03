@@ -111,7 +111,7 @@ function parseAgentTab(raw: string): AgentTabId {
   return AGENT_TABS.has(t as AgentTabId) ? (t as AgentTabId) : "setup";
 }
 
-export function AgentDashboard({ embedded = false, initialTab = "setup" }: { embedded?: boolean; initialTab?: AgentTabId }) {
+export function AgentDashboard({ embedded = false, initialTab = "setup", onWorkspaceChange }: { embedded?: boolean; initialTab?: AgentTabId; onWorkspaceChange?: (tab: AgentTabId) => void }) {
   const { user, profile } = useAuth();
   const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
@@ -189,7 +189,10 @@ export function AgentDashboard({ embedded = false, initialTab = "setup" }: { emb
     (id: string) => {
       const next = parseAgentTab(id);
       setTab(next);
-      if (embedded) return;
+      if (embedded) {
+        onWorkspaceChange?.(next);
+        return;
+      }
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -200,7 +203,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup" }: { emb
         { replace: true },
       );
     },
-    [embedded, setSearchParams],
+    [embedded, onWorkspaceChange, setSearchParams],
   );
 
   const refreshCredits = useCallback(async () => {
