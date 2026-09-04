@@ -75,6 +75,29 @@ import {
   TELEGRAM_CODE_PROMPT_HTML,
   upsertTelegramBotAccess,
 } from "./orbitx/telegram-bot-access.js";
+import { parseTickerHint } from "./orbitx/telegram-trade-intent.js";
+import {
+  applyWizardImage,
+  applyWizardText,
+  appendTelegramHandoffParams,
+  beginConfirm,
+  clearActionSession,
+  createNftSession,
+  createTokenSession,
+  isLaunchCancel,
+  launchSuccessHtml,
+  loadActionSession,
+  markSigning,
+  markDone,
+  nftSuccessHtml,
+  parseLaunchSeed,
+  parseNftSeed,
+  releaseInFlight,
+  saveActionSession,
+  sessionAlive,
+  verifyLaunchOnchain,
+  wizardPrompt,
+} from "./orbitx/telegram-launch-session.js";
 import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/mcp-burn-access.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
@@ -261,6 +284,259 @@ async function loadLink(telegramUserId) {
   }
 }
 
+function largestTelegramPhoto(msg) {
+  const photos = Array.isArray(msg?.photo) ? msg.photo : [];
+  if (!photos.length) return null;
+  return photos.reduce((best, p) => ((p.width || 0) > (best.width || 0) ? p : best), photos[0]);
+}
+
+async function downloadTelegramFile(fileId) {
+  const id = String(fileId || "").trim();
+  if (!id || !BOT_TOKEN) return null;
+  const info = await tg("getFile", { file_id: id });
+  const path = info?.result?.file_path;
+  if (!path) return null;
+  const r = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${path}`);
+  if (!r.ok) return null;
+  const buf = Buffer.from(await r.arrayBuffer());
+  const mime = r.headers.get("content-type") || "image/jpeg";
+  return { fileId: id, base64: buf.toString("base64"), mime };
+}
+
+async function sendWizard(chatId, session, extra = {}) {
+  const card = wizardPrompt(session);
+  await sendLong(chatId, card.text, {
+    parse_mode: "HTML",
+    ...(card.reply_markup ? { reply_markup: card.reply_markup } : {}),
+    ...extra,
+  });
+}
+
+async function startTokenWizard(chatId, from, text, extra) {
+  const session = createTokenSession({
+    telegramUserId: from.id,
+    chatId,
+    seed: parseLaunchSeed(text),
+  });
+  await saveActionSession(sb, session);
+  await sendLong(
+    chatId,
+    [
+      "🚀 <b>OrbitX token launch</b>",
+      "Same Pump.fun + Phantom flow as orbitx.world. I will not invent a CA or signature.",
+      session.ticker ? `Ticker locked: <b>$${session.ticker}</b>` : "I'll collect ticker, name, image, website, X, and description.",
+      "Send <code>cancel</code> anytime.",
+    ].join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+  await sendWizard(chatId, session, extra);
+}
+
+async function startNftWizard(chatId, from, text, extra) {
+  const session = createNftSession({
+    telegramUserId: from.id,
+    chatId,
+    seed: parseNftSeed(text),
+  });
+  await saveActionSession(sb, session);
+  await sendLong(
+    chatId,
+    [
+      "🖼️ <b>OrbitX NFT mint</b>",
+      "Same Metaplex mint as /nft/create. Phantom signs in a real browser.",
+      "Send <code>cancel</code> anytime.",
+    ].join("\n"),
+    { parse_mode: "HTML", ...extra },
+  );
+  await sendWizard(chatId, session, extra);
+}
+
+async function continueWizard(chatId, from, msg, extra) {
+  const session = await loadActionSession(sb, from.id);
+  if (!session || !sessionAlive(session)) return false;
+  const text = String(msg.text || msg.caption || "").trim();
+  if (isLaunchCancel(text)) {
+    await clearActionSession(sb, from.id);
+    await sendLong(chatId, "Launch cancelled. Nothing was sent on-chain.", extra);
+    return true;
+  }
+  if (session.step === "signing" && looksLikeSolanaTxRef(text)) return false;
+  const photo = largestTelegramPhoto(msg);
+  if (photo?.file_id) {
+    const applied = applyWizardImage(session, { fileId: photo.file_id, mime: "image/jpeg" });
+    if (!applied.ok && applied.error === "not_image_step") {
+      await sendLong(chatId, "I already have an image. Reply with the next field, or send <code>cancel</code>.", {
+        parse_mode: "HTML",
+        ...extra,
+      });
+      return true;
+    }
+    if (!applied.ok) {
+      await sendLong(chatId, applied.prompt || "Send the image as a photo.", extra);
+      return true;
+    }
+    await saveActionSession(sb, session);
+    await sendWizard(chatId, session, extra);
+    return true;
+  }
+  if (session.step === "done" && session.signature && !session.mint && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text)) {
+    const verified = await verifyLaunchOnchain({ signature: session.signature, mint: text });
+    if (!verified.ok) {
+      await sendLong(chatId, `That mint is not on-chain yet (${verified.error}).`, extra);
+      return true;
+    }
+    markDone(session, { mint: text, signature: session.signature });
+    await saveActionSession(sb, session);
+    await sendLong(
+      chatId,
+      session.kind === "nft" ? nftSuccessHtml(session) : launchSuccessHtml(session),
+      { parse_mode: "HTML", ...extra },
+    );
+    return true;
+  }
+  if (!text || text.startsWith("/")) return false;
+  const applied = applyWizardText(session, text);
+  if (!applied.ok && applied.prompt) {
+    await sendLong(chatId, applied.prompt, { parse_mode: "HTML", ...extra });
+    return true;
+  }
+  if (!applied.ok && (applied.error === "signing" || applied.error === "done")) {
+    await sendWizard(chatId, session, extra);
+    return true;
+  }
+  if (!applied.ok) return false;
+  await saveActionSession(sb, session);
+  await sendWizard(chatId, session, extra);
+  return true;
+}
+
+async function executeConfirmedLaunch(chatId, from, session, { req, link, extra }) {
+  const started = beginConfirm(session, session.confirmNonce);
+  if (started.alreadyDone) {
+    await sendLong(
+      chatId,
+      session.kind === "nft" ? nftSuccessHtml(session) : launchSuccessHtml(session),
+      { parse_mode: "HTML", ...extra },
+    );
+    return;
+  }
+  if (started.alreadySigning) {
+    await sendWizard(chatId, session, extra);
+    return;
+  }
+  if (!started.ok) {
+    if (started.error === "in_flight" || started.error === "alreadySigning") {
+      await sendLong(chatId, "Launch already in progress — open the sign link. Extra taps do not send a second transaction.", extra);
+      return;
+    }
+    await sendLong(chatId, "That confirm button expired. Send /launch to start again.", extra);
+    return;
+  }
+  await saveActionSession(sb, session);
+
+  if (!link?.wallet_address && !link?.user_id) {
+    releaseInFlight(session);
+    await saveActionSession(sb, session);
+    await sendLong(chatId, "Link your OrbitX wallet first with /login, then tap Confirm again.", extra);
+    return;
+  }
+
+  try {
+    await tg("sendChatAction", typingBody(chatId, extra));
+    let image = session.imageBase64
+      ? { base64: session.imageBase64, mime: session.imageMime || "image/jpeg" }
+      : await downloadTelegramFile(session.imageFileId);
+    if (!image?.base64) throw new Error("Could not download the Telegram image for IPFS");
+
+    const ipfs = await runTool({
+      tool: "orbitx_launch_ipfs",
+      args: {
+        name: session.name,
+        symbol: session.ticker,
+        description: session.description || "",
+        imageBase64: image.base64,
+        imageMimeType: image.mime || "image/jpeg",
+        website: session.website || "",
+        twitter: session.twitter || "",
+        telegram: `https://t.me/${OFFICIAL_BOT_USERNAME}`,
+      },
+      req,
+      link,
+      allowPrivileged: true,
+    });
+    const metadataUri = String(ipfs?.metadataUri || ipfs?.uri || ipfs?.result?.metadataUri || "").trim();
+    if (!metadataUri) throw new Error(ipfs?.error || ipfs?.message || "IPFS upload failed");
+
+    const tool = session.kind === "nft" ? "orbitx_mint_nft" : "orbitx_execute_launch";
+    const args =
+      session.kind === "nft"
+        ? { name: session.name, symbol: session.ticker, uri: metadataUri, metadataUri, imageUrl: ipfs?.imageUrl }
+        : {
+            name: session.name,
+            symbol: session.ticker,
+            description: session.description || "",
+            website: session.website || "",
+            twitter: session.twitter || "",
+            metadataUri,
+            imageUrl: ipfs?.imageUrl || "",
+          };
+    const result = await runTool({ tool, args, req, link, allowPrivileged: true });
+    const openUrl = appendTelegramHandoffParams(result?.openUrl || result?.signUrl || "", session);
+    if (!openUrl) throw new Error(result?.error || result?.message || "Launch handoff URL missing");
+    markSigning(session, { openUrl, metadataUri });
+    await saveActionSession(sb, session);
+    await sendWizard(chatId, session, extra);
+  } catch (error) {
+    releaseInFlight(session);
+    await saveActionSession(sb, session);
+    await sendLong(
+      chatId,
+      `Launch did not start: ${error?.message || error}. Nothing was signed. Fix the image/details and tap Confirm again.`,
+      extra,
+    );
+  }
+}
+
+async function completeLaunchFromSignature(chatId, from, text, extra) {
+  const session = await loadActionSession(sb, from.id);
+  if (!session || (session.step !== "signing" && session.step !== "done")) return false;
+  const sig = parseSolanaTxSignature(text);
+  if (!sig) return false;
+  const verified = await verifyLaunchOnchain({ signature: sig, mint: session.mint || "" });
+  if (!verified.ok) {
+    await sendLong(
+      chatId,
+      `That transaction is not confirmed on-chain yet (${verified.error}). Wait for Solscan to show success, then paste it again. I will not invent a CA.`,
+      extra,
+    );
+    return true;
+  }
+  if (session.mint && verified.mint && session.mint !== verified.mint) {
+    await sendLong(chatId, "That signature does not match the mint from this launch session.", extra);
+    return true;
+  }
+  markDone(session, { mint: session.mint || verified.mint, signature: sig });
+  if (!session.mint) {
+    await sendLong(
+      chatId,
+      [
+        "Transaction is confirmed. Paste the token / NFT mint address (CA) so I can attach the real links.",
+        `<code>${sig}</code>`,
+      ].join("\n"),
+      { parse_mode: "HTML", ...extra },
+    );
+    await saveActionSession(sb, session);
+    return true;
+  }
+  await saveActionSession(sb, session);
+  await sendLong(
+    chatId,
+    session.kind === "nft" ? nftSuccessHtml(session) : launchSuccessHtml(session),
+    { parse_mode: "HTML", ...extra },
+  );
+  return true;
+}
+
 async function loadWallet(userId) {
   const rows = await sb(
     `wallet_identities?user_id=eq.${encodeURIComponent(userId)}&select=wallet&order=created_at.asc&limit=1`,
@@ -405,6 +681,13 @@ async function buildBrandedScan(mint, { req, link, isGroup }) {
 }
 
 async function handleVerify(chatId, text, { isGroup, from, link, extra }) {
+  if (!isGroup && from?.id) {
+    const session = await loadActionSession(sb, from.id);
+    if (session?.step === "signing") {
+      const launched = await completeLaunchFromSignature(chatId, from, text, extra);
+      if (launched) return;
+    }
+  }
   if (isGroup) {
     await sendLong(
       chatId,
@@ -1257,6 +1540,34 @@ async function handleCallbackQuery(cq, req) {
     }
     return;
   }
+  if (key.startsWith("launch:") || key.startsWith("nft:")) {
+    if (isGroupChat) {
+      await sendLong(chatId, "Launch and mint stay in a DM with @theorbitxmcpbot after /login.", extra);
+      return;
+    }
+    const nft = key.startsWith("nft:");
+    const action = key.slice(nft ? 4 : 7);
+    if (action === "no") {
+      await clearActionSession(sb, from.id);
+      await sendLong(chatId, "Cancelled. Nothing was sent on-chain.", extra);
+      return;
+    }
+    if (action.startsWith("go:")) {
+      const session = await loadActionSession(sb, from.id);
+      if (!session) {
+        await sendLong(chatId, "No launch in progress. Say Launch $TICKER or Launch an NFT.", extra);
+        return;
+      }
+      const nonce = action.slice(3);
+      if (nonce && session.confirmNonce && nonce !== session.confirmNonce) {
+        await sendLong(chatId, "That confirm button is stale. Use the latest confirmation card.", extra);
+        return;
+      }
+      await executeConfirmedLaunch(chatId, from, session, { req, link, extra });
+      return;
+    }
+    return;
+  }
   if (key.startsWith("gate:")) {
     const gate = key.slice(5);
     const chatType = String(cq?.message?.chat?.type || "");
@@ -1362,6 +1673,14 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
+  if (!isGroup && from.id) {
+    const existing = await loadActionSession(sb, from.id);
+    if (existing && (largestTelegramPhoto(msg) || (text && !text.startsWith("/")) || isLaunchCancel(text))) {
+      const handled = await continueWizard(chatId, from, msg, replyExtra);
+      if (handled) return;
+    }
+  }
+
   if (!isGroup && isTelegramLoginPaste(text)) {
     await explainTelegramLoginPaste(chatId, text, replyExtra);
     return;
@@ -1383,6 +1702,8 @@ async function handleTelegramUpdate(update, req) {
   }
 
   if (!isGroup && looksLikeSolanaTxRef(text) && !text.toLowerCase().startsWith("/token")) {
+    const launchDone = from.id ? await completeLaunchFromSignature(chatId, from, text, replyExtra) : false;
+    if (launchDone) return;
     await handleVerify(chatId, `/verify ${text}`, { isGroup, from, link, extra: replyExtra });
     return;
   }
@@ -1593,6 +1914,27 @@ async function handleTelegramUpdate(update, req) {
     return;
   }
 
+  if (tool === "orbitx_execute_launch") {
+    if (isGroup) {
+      await sendLong(
+        chatId,
+        "Token launches stay in a DM with @theorbitxmcpbot after /login. I use the same Pump.fun launch as orbitx.world.",
+        { parse_mode: "HTML", ...replyExtra },
+      );
+      return;
+    }
+    await startTokenWizard(chatId, from, text, replyExtra);
+    return;
+  }
+  if (tool === "orbitx_mint_nft") {
+    if (isGroup) {
+      await sendLong(chatId, "NFT mints stay in a DM with @theorbitxmcpbot after /login.", replyExtra);
+      return;
+    }
+    await startNftWizard(chatId, from, text, replyExtra);
+    return;
+  }
+
   if (tool === "orbitx_mcp_access_buy" || (tool === "orbitx_shop" && ["hour", "day", "week", "month"].includes(String(args.package || args.packageId || "").trim()))) {
     const pkg =
       String(args.package || args.packageId || "").trim() || resolveBurnPackageFromText(text)?.id || "";
@@ -1601,6 +1943,7 @@ async function handleTelegramUpdate(update, req) {
   }
 
   const mintArg = String(args.mint || args.ca || extractMint(text) || "").trim();
+  const tickerHint = parseTickerHint(text);
   if (
     (tool === "orbitx_prepare_buy" ||
       tool === "orbitx_buy_orbitx" ||
@@ -1611,8 +1954,24 @@ async function handleTelegramUpdate(update, req) {
     !args.mint &&
     !mintArg
   ) {
-    args.mint = ORBITX_MINT;
-    args.ca = ORBITX_MINT;
+    const launched =
+      from.id && tickerHint && tickerHint !== "ORBITX"
+        ? await loadActionSession(sb, from.id)
+        : null;
+    if (launched?.ticker === tickerHint && launched.mint) {
+      args.mint = launched.mint;
+      args.ca = launched.mint;
+    } else if (tickerHint && tickerHint !== "ORBITX") {
+      await sendLong(
+        chatId,
+        `Need the <b>$${tickerHint}</b> contract address to buy — I will not guess a CA. Paste the mint, or /token after launch confirms.`,
+        { parse_mode: "HTML", ...replyExtra },
+      );
+      return;
+    } else {
+      args.mint = ORBITX_MINT;
+      args.ca = ORBITX_MINT;
+    }
   }
   if (
     (tool === "orbitx_prepare_sell" || tool === "orbitx_sell" || tool === "orbitx_sell_pump") &&
@@ -1824,6 +2183,41 @@ async function ensureWebhook(req) {
 
 async function handleWeb(req, res, body) {
   const action = String(body.action || "").toLowerCase();
+
+  if (action === "web.sessioncomplete" || action === "web.session_complete") {
+    const telegramUserId = String(body.telegramUserId || body.telegramUser || "").trim();
+    const nonce = String(body.nonce || body.confirmNonce || "").trim();
+    const mint = String(body.mint || body.mintAddress || "").trim();
+    const signature = String(body.signature || body.tx || "").trim();
+    if (!telegramUserId || !mint || !signature) {
+      return json(res, { ok: false, error: "telegramUserId, mint, and signature required" }, 400);
+    }
+    const session = await loadActionSession(sb, telegramUserId);
+    if (!session) return json(res, { ok: false, error: "no_session" }, 404);
+    if (nonce && session.confirmNonce && nonce !== session.confirmNonce) {
+      return json(res, { ok: false, error: "stale_nonce" }, 409);
+    }
+    if (session.step === "done" && session.signature === signature && session.mint === mint) {
+      return json(res, { ok: true, alreadyDone: true, mint, signature });
+    }
+    const verified = await verifyLaunchOnchain({ signature, mint });
+    if (!verified.ok) return json(res, { ok: false, error: verified.error || "not_confirmed" }, 409);
+    markDone(session, { mint, signature, metadataUri: body.metadataUri });
+    await saveActionSession(sb, session);
+    const html =
+      session.kind === "nft"
+        ? nftSuccessHtml({ ...session, mint, signature })
+        : launchSuccessHtml({
+            ...session,
+            mint,
+            signature,
+            feePaid: body.feePaid,
+            orbitxBurnSignature: body.orbitxBurnSignature || "",
+          });
+    await sendLong(body.chatId || session.chatId, html, { parse_mode: "HTML" });
+    return json(res, { ok: true, mint, signature, notified: true });
+  }
+
   const user = await getJwtUser(req);
   const hub = await import("./orbitx-hub.js");
 

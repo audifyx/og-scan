@@ -12,7 +12,10 @@ export type TokenCreatePrefill = {
   imageUrl?: string | null;
   /** If set, successful pump launch will link coin_mint on this collection */
   collectionId?: string | null;
-  source?: "nft" | "collection";
+  source?: "nft" | "collection" | "telegram";
+  telegramUserId?: string | null;
+  telegramChatId?: string | null;
+  confirmNonce?: string | null;
 };
 
 const KEY = "orbitx_token_create_prefill";
@@ -27,6 +30,9 @@ export function saveTokenCreatePrefill(draft: TokenCreatePrefill): void {
       website: draft.website?.trim() ?? "",
       twitter: draft.twitter?.trim() ?? "",
       telegram: draft.telegram?.trim() ?? "",
+      telegramUserId: draft.telegramUserId || null,
+      telegramChatId: draft.telegramChatId || null,
+      confirmNonce: draft.confirmNonce || null,
     }));
   } catch {
     /* quota / private mode — non-fatal */

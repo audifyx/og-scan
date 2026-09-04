@@ -3,8 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Check, ExternalLink, Loader2, Sparkles, Wallet } from "lucide-react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import bs58 from "bs58";
 import { mintNft } from "@/lib/orbitx/nftMint";
 import { registerNft, registerNftCollection } from "@/lib/orbitx/nftRegistry";
+import { notifyTelegramSessionComplete } from "@/lib/orbitx/telegramSessionComplete";
 
 /**
  * MCP NFT mint handoff — Metaplex mint signed in Phantom, then optional OrbitX registry.
@@ -105,6 +107,21 @@ export default function AgentNftMintPage() {
       }
 
       setResult({ ...minted, registryId });
+      const telegramUserId = (params.get("telegramUser") || "").trim();
+      const signature = toSolanaTxSignature(minted.signature);
+      if (telegramUserId && minted.mintAddress && signature) {
+        void notifyTelegramSessionComplete({
+          telegramUserId,
+          telegramChatId: (params.get("chat") || "").trim() || null,
+          nonce: (params.get("nonce") || "").trim() || null,
+          kind: "nft",
+          mint: minted.mintAddress,
+          signature,
+          name,
+          symbol,
+          metadataUri: uri,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Mint failed");
     } finally {
@@ -202,6 +219,18 @@ export default function AgentNftMintPage() {
       </div>
     </div>
   );
+}
+
+function toSolanaTxSignature(raw: string): string {
+  const sig = String(raw || "").trim();
+  if (/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(sig)) return sig;
+  try {
+    const bytes = Uint8Array.from(atob(sig), (c) => c.charCodeAt(0));
+    const encoded = bs58.encode(bytes);
+    return encoded.length >= 64 ? encoded : "";
+  } catch {
+    return "";
+  }
 }
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {

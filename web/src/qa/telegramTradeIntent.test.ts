@@ -94,6 +94,18 @@ describe("official Telegram trade wiring", () => {
     expect(inferPublicTool(`should I sell ${ORBITX}`)?.meta).toBe("brief");
   });
 
+  it("routes launch / NFT / portfolio / scan chat into live hub tools", () => {
+    expect(parseTradeIntent("Launch $STEVE")?.tool).toBe("orbitx_execute_launch");
+    expect(parseTradeIntent("Launch $STEVE")?.args).toMatchObject({ symbol: "STEVE" });
+    expect(parseTradeIntent("Launch an NFT")?.tool).toBe("orbitx_mint_nft");
+    expect(parseTradeIntent("Show my portfolio")?.tool).toBe("orbitx_get_wallet");
+    expect(parseTradeIntent("scan this token")?.tool).toBe("orbitx_crypto_scan");
+    expect(inferPublicTool("Launch $STEVE")?.tool).toBe("orbitx_execute_launch");
+    expect(inferPublicTool("Show my portfolio")?.tool).toBe("orbitx_get_wallet");
+    expect(applyTelegramAlias("portfolio")).toBe("orbitx_get_wallet");
+    expect(applyTelegramAlias("launch")).toBe("orbitx_execute_launch");
+  });
+
   it("exposes a 2500+ live OrbitX tool catalog", () => {
     const tools = listAllOrbitXTools();
     expect(tools.length).toBeGreaterThanOrEqual(2500);

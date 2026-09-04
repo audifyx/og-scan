@@ -32,11 +32,15 @@ export default function AgentCreateTokenPage() {
       telegram: (params.get("telegram") || "").trim() || undefined,
       imageUrl,
       imageDataUrl,
-      source: "nft",
+      source: params.get("telegramUser") ? "telegram" : "nft",
+      telegramUserId: (params.get("telegramUser") || "").trim() || null,
+      telegramChatId: (params.get("chat") || "").trim() || null,
+      confirmNonce: (params.get("nonce") || "").trim() || null,
     });
 
     const lane = params.get("lane") === "custom" ? "custom" : "pump";
-    navigate(`/orbitxlaunch/create/${lane}?from=mcp`, { replace: true });
+    const from = params.get("telegramUser") ? "telegram" : "mcp";
+    navigate(`/orbitxlaunch/create/${lane}?from=${from}`, { replace: true });
   }, [params, navigate]);
 
   if (error) {
