@@ -748,7 +748,9 @@ async function verifyAccessBurn(chatId, signature, { from, link, extra }) {
     [
       "<b>Burn verified</b>",
       confirmed.message || "Access granted.",
+      confirmed.durationLabel ? `Granted: <b>${confirmed.durationLabel}</b>` : "",
       confirmed.remainingLabel ? `Time left: <b>${confirmed.remainingLabel}</b>` : "",
+      confirmed.blockTimeIso ? `On-chain: ${confirmed.blockTimeIso}` : "",
       `<a href="${explorer}">Solscan</a>`,
       schemaNote,
     ]

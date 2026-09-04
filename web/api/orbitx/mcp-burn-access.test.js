@@ -7,7 +7,10 @@ import {
   computeExpiresAt,
   confirmAccessBurn,
   evaluateMcpAccess,
+  extractOrbitxBurnFromTx,
   formatRemaining,
+  grantFromBurnedRaw,
+  grantFromBurnedTokens,
   inferPackageFromTokens,
   isAccessActive,
   listPackages,
@@ -18,6 +21,75 @@ import {
   statusFromRow,
   verifyOrbitxBurn,
 } from "./mcp-burn-access.js";
+
+const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const BURNER = "BurnerWallet111111111111111111111111111";
+
+function orbitxBurnIx({ amount = "100000000", authority = BURNER } = {}) {
+  return {
+    program: "spl-token-2022",
+    programId: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    parsed: {
+      type: "burn",
+      info: {
+        mint: ORBITX_MINT,
+        authority,
+        amount,
+        tokenAmount: { amount, decimals: 6, uiAmount: Number(amount) / 1e6 },
+      },
+    },
+  };
+}
+
+function rpcResult(tx) {
+  return new Response(JSON.stringify({ result: tx }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function mockBurnTx({
+  burnedRaw = "100000000",
+  owner = BURNER,
+  preRaw = null,
+  postRaw = null,
+  blockTime = Math.floor(Date.now() / 1000) - 60,
+  includeBurnIx = true,
+  inner = false,
+} = {}) {
+  const burned = BigInt(burnedRaw);
+  const pre = preRaw == null ? (burned * 2n).toString() : String(preRaw);
+  const post = postRaw == null ? (BigInt(pre) - burned).toString() : String(postRaw);
+  const ix = orbitxBurnIx({ amount: burnedRaw, authority: owner });
+  const preUi = Number(pre) / 1e6;
+  const postUi = Number(post) / 1e6;
+  return {
+    blockTime,
+    meta: {
+      err: null,
+      preTokenBalances: [
+        {
+          accountIndex: 1,
+          mint: ORBITX_MINT,
+          owner,
+          uiTokenAmount: { uiAmount: preUi, amount: pre, decimals: 6 },
+        },
+      ],
+      postTokenBalances: [
+        {
+          accountIndex: 1,
+          mint: ORBITX_MINT,
+          owner,
+          uiTokenAmount: { uiAmount: postUi, amount: post, decimals: 6 },
+        },
+      ],
+      innerInstructions: includeBurnIx && inner ? [{ instructions: [ix] }] : [],
+    },
+    transaction: {
+      message: { instructions: includeBurnIx && !inner ? [ix] : [] },
+    },
+  };
+}
 
 describe("MCP burn access packages", () => {
   it("prices hour/day/week/month at 100 / 1,000 / 10,000 / 1,000,000 tokens", () => {
@@ -74,13 +146,43 @@ describe("MCP burn access packages", () => {
     expect(packages.map((p) => p.tokens)).toEqual([100, 1000, 10_000, 1_000_000]);
   });
 
-  it("infers package from burned token count", () => {
+  it("infers the largest single package that fits (legacy helper)", () => {
     expect(inferPackageFromTokens(99)).toBeNull();
     expect(inferPackageFromTokens(100)?.id).toBe("hour");
     expect(inferPackageFromTokens(999)?.id).toBe("hour");
     expect(inferPackageFromTokens(1000)?.id).toBe("day");
     expect(inferPackageFromTokens(10_000)?.id).toBe("week");
     expect(inferPackageFromTokens(1_000_000)?.id).toBe("month");
+  });
+
+  it("grants stacked time from actual burned supply (1,000 = 1 day, not 10 hours)", () => {
+    expect(grantFromBurnedTokens(99)).toBeNull();
+    expect(grantFromBurnedTokens(100)).toMatchObject({
+      packageId: "hour",
+      durationMs: MCP_ACCESS_PACKAGES.hour.durationMs,
+      durationLabel: "1 hour",
+      counts: { month: 0, week: 0, day: 0, hour: 1 },
+    });
+    expect(grantFromBurnedTokens(1000)).toMatchObject({
+      packageId: "day",
+      durationMs: MCP_ACCESS_PACKAGES.day.durationMs,
+      durationLabel: "1 day",
+      counts: { month: 0, week: 0, day: 1, hour: 0 },
+    });
+    expect(grantFromBurnedTokens(1100)).toMatchObject({
+      packageId: "day",
+      durationMs: MCP_ACCESS_PACKAGES.day.durationMs + MCP_ACCESS_PACKAGES.hour.durationMs,
+      durationLabel: "1 day + 1 hour",
+      counts: { month: 0, week: 0, day: 1, hour: 1 },
+    });
+    expect(grantFromBurnedTokens(10_000)?.durationMs).toBe(MCP_ACCESS_PACKAGES.week.durationMs);
+    expect(grantFromBurnedRaw(1_100_000_000n)).toMatchObject({
+      packageId: "day",
+      durationLabel: "1 day + 1 hour",
+      leftoverRaw: "0",
+    });
+    expect(grantFromBurnedTokens(199)?.counts.hour).toBe(1);
+    expect(grantFromBurnedTokens(199)?.leftoverRaw).toBe("99000000");
   });
 });
 
@@ -102,6 +204,12 @@ describe("MCP burn access expiration", () => {
   it("starts expired or missing access from now", () => {
     const next = computeExpiresAt(now, "2026-08-16T10:00:00.000Z", MCP_ACCESS_PACKAGES.day.durationMs);
     expect(next).toBe("2026-08-17T12:00:00.000Z");
+  });
+
+  it("keys expiry from on-chain block time, not verify time", () => {
+    const chainMs = Date.parse("2026-08-16T11:10:00.000Z");
+    const next = computeExpiresAt(chainMs, null, MCP_ACCESS_PACKAGES.hour.durationMs);
+    expect(next).toBe("2026-08-16T12:10:00.000Z");
   });
 
   it("formats remaining time for the status display", () => {
@@ -248,77 +356,80 @@ describe("verifyOrbitxBurn", () => {
   });
 
   it("accepts an exact 100-token ORBITX burn for the hour package", async () => {
+    const blockTime = Math.floor(Date.now() / 1000) - 60;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            result: {
-              meta: {
-                err: null,
-                preTokenBalances: [
-                  {
-                    accountIndex: 1,
-                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-                    owner: "BurnerWallet111111111111111111111111111",
-                    uiTokenAmount: { uiAmount: 250, amount: "250000000", decimals: 6 },
-                  },
-                ],
-                postTokenBalances: [
-                  {
-                    accountIndex: 1,
-                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-                    owner: "BurnerWallet111111111111111111111111111",
-                    uiTokenAmount: { uiAmount: 150, amount: "150000000", decimals: 6 },
-                  },
-                ],
-                innerInstructions: [],
-              },
-              transaction: { message: { instructions: [] } },
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      ),
+      vi.fn(async () => rpcResult(mockBurnTx({ burnedRaw: "100000000", blockTime }))),
     );
 
     const verified = await verifyOrbitxBurn("1".repeat(64), { packageId: "hour" });
     expect(verified.ok).toBe(true);
     expect(verified.tokensBurned).toBe(100);
     expect(verified.package.id).toBe("hour");
+    expect(verified.blockTime).toBe(blockTime);
+    expect(verified.durationSeconds).toBe(3600);
   });
 
   it("rejects a 100-token burn when the week package is selected", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            result: {
-              meta: {
-                err: null,
-                preTokenBalances: [
-                  {
-                    accountIndex: 1,
-                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-                    owner: "BurnerWallet111111111111111111111111111",
-                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
-                  },
-                ],
-                postTokenBalances: [],
-                innerInstructions: [],
-              },
-              transaction: { message: { instructions: [] } },
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      ),
+      vi.fn(async () => rpcResult(mockBurnTx({ burnedRaw: "100000000", preRaw: "100000000", postRaw: "0" }))),
     );
 
     const verified = await verifyOrbitxBurn("2".repeat(64), { packageId: "week" });
     expect(verified.ok).toBe(false);
     expect(verified.error).toBe("amount_too_low");
+  });
+
+  it("grants a day when the user asked for an hour but burned 1,000", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => rpcResult(mockBurnTx({ burnedRaw: "1000000000" }))),
+    );
+    const verified = await verifyOrbitxBurn("a".repeat(64), { packageId: "hour" });
+    expect(verified.ok).toBe(true);
+    expect(verified.packageId).toBe("day");
+    expect(verified.durationMs).toBe(MCP_ACCESS_PACKAGES.day.durationMs);
+  });
+
+  it("counts Jupiter buy-then-burn when wallet delta is zero", async () => {
+    const tx = mockBurnTx({
+      burnedRaw: "100000000",
+      preRaw: "0",
+      postRaw: "0",
+      inner: true,
+    });
+    expect(extractOrbitxBurnFromTx(tx).tokensBurned).toBe(100);
+    vi.stubGlobal("fetch", vi.fn(async () => rpcResult(tx)));
+    const verified = await verifyOrbitxBurn("b".repeat(64), { packageId: "hour" });
+    expect(verified.ok).toBe(true);
+    expect(verified.tokensBurned).toBe(100);
+    expect(verified.grant.durationLabel).toBe("1 hour");
+  });
+
+  it("rejects a transfer that only moves ORBITX (no burn instruction)", async () => {
+    const tx = mockBurnTx({
+      burnedRaw: "100000000",
+      includeBurnIx: false,
+    });
+    expect(extractOrbitxBurnFromTx(tx).sawBurn).toBe(false);
+    vi.stubGlobal("fetch", vi.fn(async () => rpcResult(tx)));
+    const verified = await verifyOrbitxBurn("c".repeat(64), { packageId: "hour" });
+    expect(verified.ok).toBe(false);
+    expect(verified.error).toBe("not_a_burn");
+  });
+
+  it("stacks 1,100 burned tokens into 1 day + 1 hour", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => rpcResult(mockBurnTx({ burnedRaw: "1100000000" }))),
+    );
+    const verified = await verifyOrbitxBurn("d".repeat(64));
+    expect(verified.ok).toBe(true);
+    expect(verified.grant.durationLabel).toBe("1 day + 1 hour");
+    expect(verified.durationMs).toBe(
+      MCP_ACCESS_PACKAGES.day.durationMs + MCP_ACCESS_PACKAGES.hour.durationMs,
+    );
   });
 
   it("retries getTransaction until the burn is indexed", async () => {
@@ -333,27 +444,7 @@ describe("verifyOrbitxBurn", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
-        return new Response(
-          JSON.stringify({
-            result: {
-              meta: {
-                err: null,
-                preTokenBalances: [
-                  {
-                    accountIndex: 1,
-                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-                    owner: "BurnerWallet111111111111111111111111111",
-                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
-                  },
-                ],
-                postTokenBalances: [],
-                innerInstructions: [],
-              },
-              transaction: { message: { instructions: [] } },
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return rpcResult(mockBurnTx({ burnedRaw: "100000000", preRaw: "100000000", postRaw: "0" }));
       }),
     );
 
@@ -374,50 +465,43 @@ describe("confirmAccessBurn", () => {
   });
 
   it("grants timed access from the burn wallet without a signed-in user", async () => {
+    const blockTime = Math.floor(Date.now() / 1000) - 600;
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            result: {
-              meta: {
-                err: null,
-                preTokenBalances: [
-                  {
-                    accountIndex: 1,
-                    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
-                    owner: "BurnerWallet111111111111111111111111111",
-                    uiTokenAmount: { uiAmount: 100, amount: "100000000", decimals: 6 },
-                  },
-                ],
-                postTokenBalances: [],
-                innerInstructions: [],
-              },
-              transaction: { message: { instructions: [] } },
-            },
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
+        rpcResult(mockBurnTx({ burnedRaw: "100000000", preRaw: "100000000", postRaw: "0", blockTime })),
       ),
     );
 
     const writes = [];
     const sb = async (path, init) => {
-      writes.push({ path, method: init?.method || "GET" });
+      writes.push({ path, method: init?.method || "GET", body: init?.body });
       return [];
     };
 
     const out = await confirmAccessBurn(sb, {
       signature: "4".repeat(64),
       packageId: "hour",
-      wallet: "BurnerWallet111111111111111111111111111",
+      wallet: BURNER,
     });
 
     expect(out.ok).toBe(true);
     expect(out.active).toBe(true);
     expect(out.packageId).toBe("hour");
     expect(out.remainingLabel).toMatch(/remaining/);
+    expect(out.expiresAt).toBe(
+      new Date(blockTime * 1000 + MCP_ACCESS_PACKAGES.hour.durationMs).toISOString(),
+    );
+    expect(out.blockTime).toBe(blockTime);
+    expect(out.durationSeconds).toBe(3600);
     expect(writes.some((w) => w.path === "mcp_burn_wallet_access" && w.method === "POST")).toBe(true);
+    const ledger = writes.find((w) => w.path === "mcp_burn_ledger" && w.method === "POST");
+    expect(ledger).toBeTruthy();
+    const saved = JSON.parse(ledger.body);
+    expect(saved.duration_seconds).toBe(3600);
+    expect(saved.expires_at).toBe(out.expiresAt);
+    expect(saved.meta.blockTime).toBe(blockTime);
+    expect(saved.meta.onChainExpiresAt).toBe(out.expiresAt);
   });
 
   it("attaches an already-granted week burn to the wallet so shop can see it", async () => {
