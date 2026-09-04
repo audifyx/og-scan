@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { Adapter, WalletName, WalletReadyState } from "@solana/wallet-adapter-base";
 import { signInWithWallet } from "@/lib/walletAuth";
-import { adapterNameMatches, connectSolanaWallet } from "@/lib/connectSolanaWallet";
+import { adapterNameMatches, connectSolanaWallet, findConnectableWallet } from "@/lib/connectSolanaWallet";
 import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 export interface PickableWallet { name: string; icon: string; readyState: WalletReadyState; adapter: Adapter }
@@ -49,7 +49,11 @@ export function useWalletSignIn() {
   }, [wallets]);
 
   const signInWith = useCallback(async (name: string, opts?: { replaceEmailSession?: boolean; connectOnly?: boolean }): Promise<{ isNew: boolean }> => {
-    const adapter = findAdapter(wallets, name);
+    // Wallet Standard and legacy injection can expose duplicate adapters with the
+    // same name. Select the same preferred instance that the connection helper
+    // will connect, otherwise signing may run against the disconnected duplicate.
+    const selected = findConnectableWallet(wallets, name);
+    const adapter = (selected?.adapter as SignMessageAdapter | undefined) ?? findAdapter(wallets, name);
     if (!adapter) throw new Error(`${name} not found`);
     const listed = wallets.find((x) => x.adapter === adapter);
     const rs = String(listed?.readyState ?? "");
@@ -69,7 +73,7 @@ export function useWalletSignIn() {
       // Give WalletProvider a tick to expose connected publicKey / signMessage.
       await new Promise((r) => setTimeout(r, 60));
 
-      const live = findAdapter(wallets, adapter.name) ?? adapter;
+      const live = (findConnectableWallet(wallets, adapter.name)?.adapter as SignMessageAdapter | undefined) ?? adapter;
       const pubkey = live.publicKey?.toBase58();
       if (!pubkey) throw new Error("wallet did not return a public key — unlock the extension and try again");
 
