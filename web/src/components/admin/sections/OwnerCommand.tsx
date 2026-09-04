@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import type { AdminSection } from "../types";
 import {
+  fmtClock,
+  fmtHours,
   fmtNum,
   fmtUsd,
   liveDot,
@@ -36,6 +38,14 @@ type Overview = {
     newYesterday: number;
     newWeek: number;
     newMonth: number;
+    stayedHourToday: number;
+    stayedHourWeek: number;
+    stayedHourMonth: number;
+    hoursOnlineToday: number;
+    hoursOnlineWeek: number;
+    hoursOnlineMonth: number;
+    hoursOnlineAll: number;
+    onlineHoursNow: number;
     onlineNow: number;
     awayNow: number;
     dau: number;
@@ -158,9 +168,14 @@ export function CommandOverview({ onNavigate }: { onNavigate: (s: AdminSection) 
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Card label="Online now" value={fmtNum(o?.users.onlineNow)} hint={`${fmtNum(o?.users.awayNow)} away`} tone="text-emerald-300" />
-        <Card label="Total users" value={fmtNum(o?.users.total)} hint={`+${fmtNum(o?.users.newToday)} today`} tone="text-cyan-200" />
-        <Card label="DAU" value={fmtNum(o?.users.dau)} hint={`${fmtNum(o?.users.newWeek)} new this week`} />
+        <Card label="Online now" value={fmtNum(o?.users.onlineNow)} hint={`${fmtNum(o?.users.awayNow)} away · ${fmtHours(o?.users.onlineHoursNow)} this session`} tone="text-emerald-300" />
+        <Card label="Signed up today" value={fmtNum(o?.users.newToday)} hint={`${fmtNum(o?.users.stayedHourToday)} stayed longer than 1h`} tone="text-cyan-200" />
+        <Card label="Signed up this week" value={fmtNum(o?.users.newWeek)} hint={`${fmtNum(o?.users.stayedHourWeek)} stayed longer than 1h`} />
+        <Card label="Signed up this month" value={fmtNum(o?.users.newMonth)} hint={`${fmtNum(o?.users.stayedHourMonth)} stayed longer than 1h`} />
+        <Card label="Hours online today" value={fmtHours(o?.users.hoursOnlineToday)} hint={`${fmtHours(o?.users.hoursOnlineWeek)} this week`} tone="text-emerald-200" />
+        <Card label="Hours online this month" value={fmtHours(o?.users.hoursOnlineMonth)} hint={`${fmtHours(o?.users.hoursOnlineAll)} lifetime recorded`} />
+        <Card label="Total users" value={fmtNum(o?.users.total)} hint={`${fmtNum(o?.users.newYesterday)} yesterday`} tone="text-cyan-200" />
+        <Card label="DAU" value={fmtNum(o?.users.dau)} hint="Distinct activity since UTC midnight" />
         <Card label="Fees today" value={fmtUsd(o?.revenue.feesTodayUsd)} hint={`${fmtUsd(o?.revenue.feesMonthUsd)} / 30d`} tone="text-yellow-200" />
         <Card label="Volume today" value={fmtUsd(o?.activity.volumeTodayUsd)} hint={`${fmtNum(o?.activity.txToday)} verified txs`} />
         <Card label="Jupiter (30d)" value={fmtNum(o?.activity.jupiterMonth)} hint="Completed + on-chain verified" />
@@ -213,7 +228,7 @@ export function CommandLiveUsers({ onOpenUser }: { onOpenUser: (userId: string) 
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-black text-white">Live users</h2>
-        <p className="text-xs text-white/45">ONLINE = heartbeat &lt; 60s. AWAY = 60s–5m. Offline rows stay off this list.</p>
+        <p className="text-xs text-white/45">ONLINE = heartbeat &lt; 60s. Each row shows this visit and lifetime hours from heartbeats.</p>
       </div>
       {loading && !rows.length ? (
         <Loader2 className="h-6 w-6 animate-spin text-cyan-300" />
@@ -239,6 +254,11 @@ export function CommandLiveUsers({ onOpenUser }: { onOpenUser: (userId: string) 
                 <p className="truncate text-sm font-semibold text-white">{String(u.username || "anon")}</p>
                 <p className="truncate text-[11px] text-white/40">
                   {String(u.current_app || "app")} · {String(u.current_path || "/")} · {String(u.device || "—")}
+                </p>
+                <p className="mt-0.5 text-[11px] text-emerald-200/80">
+                  this visit {String(u.session_label || fmtClock(Number(u.session_ms || 0)))}
+                  {" · "}
+                  lifetime {String(u.total_label || fmtClock(Number(u.total_online_ms || 0)))}
                 </p>
               </div>
               <span className="text-[10px] uppercase tracking-wider text-white/35">{String(u.liveStatus)}</span>
@@ -572,8 +592,11 @@ export function OwnerUserHub({
               <span className={`mr-2 inline-block h-2 w-2 rounded-full ${liveDot(String(presence.liveStatus))}`} />
               {String(presence.liveStatus || "offline")} · {String(presence.current_app || "—")} ·{" "}
               {String(presence.current_path || "—")}
+              {presence.session_label ? ` · this visit ${String(presence.session_label)}` : ""}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Card label="This visit" value={fmtClock(stats.currentSessionMs)} />
+              <Card label="Hours online" value={fmtClock(stats.hoursOnlineMs)} />
               <Card label="Volume" value={fmtUsd(stats.volumeUsd)} />
               <Card label="Fees" value={fmtUsd(stats.feesUsd)} />
               <Card label="Burned" value={fmtNum(stats.burns)} />

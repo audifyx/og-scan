@@ -12,6 +12,8 @@
 
 export const PRESENCE_ONLINE_MS = 60_000;
 export const PRESENCE_AWAY_MS = 5 * 60_000;
+export const HEARTBEAT_CREDIT_MAX_MS = 20_000;
+export const HOUR_MS = 3_600_000;
 
 export function presenceStatus(lastHeartbeatAt, now = Date.now()) {
   const t = lastHeartbeatAt ? new Date(lastHeartbeatAt).getTime() : 0;
@@ -50,6 +52,79 @@ function startOfUtcDay(offset = 0) {
   d.setUTCHours(0, 0, 0, 0);
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString();
+}
+
+/** Calendar windows in UTC: today, week starting Monday, month starting the 1st. */
+export function calendarBounds(now = new Date()) {
+  const d = now instanceof Date ? now : new Date(now);
+  const today = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dow = today.getUTCDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const week = new Date(today);
+  week.setUTCDate(today.getUTCDate() + mondayOffset);
+  const month = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+  return {
+    today: today.toISOString(),
+    week: week.toISOString(),
+    month: month.toISOString(),
+  };
+}
+
+/** Credit only the gap since the last beat, capped, and never a 5min+ hole. */
+export function creditHeartbeatMs(prevHeartbeatAt, nowMs = Date.now(), maxMs = HEARTBEAT_CREDIT_MAX_MS) {
+  if (!prevHeartbeatAt) return 0;
+  const prev = new Date(prevHeartbeatAt).getTime();
+  if (!prev || Number.isNaN(prev)) return 0;
+  const delta = nowMs - prev;
+  if (delta <= 0) return 0;
+  if (delta > PRESENCE_AWAY_MS) return 0;
+  return Math.min(delta, maxMs);
+}
+
+export function sessionAgeMs(startedAt, nowMs = Date.now()) {
+  if (!startedAt) return 0;
+  const t = new Date(startedAt).getTime();
+  if (!t || Number.isNaN(t)) return 0;
+  return Math.max(0, nowMs - t);
+}
+
+export function sessionMsInWindow(session, fromIso, toMs = Date.now()) {
+  const start = new Date(session?.started_at || 0).getTime();
+  const end = session?.ended_at ? new Date(session.ended_at).getTime() : toMs;
+  const from = new Date(fromIso).getTime();
+  if (!start || Number.isNaN(start) || !from || Number.isNaN(from)) return 0;
+  const a = Math.max(start, from);
+  const b = Math.min(end || toMs, toMs);
+  return b > a ? b - a : 0;
+}
+
+export function hoursFromMs(ms) {
+  const n = Number(ms || 0);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.round((n / HOUR_MS) * 10) / 10;
+}
+
+export function formatClock(ms) {
+  const total = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h <= 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
+export function stayedLongerThanHour(totalOnlineMs) {
+  return Number(totalOnlineMs || 0) >= HOUR_MS;
+}
+
+export function stayedHourAmong(signups, presenceRows) {
+  const byId = Object.fromEntries(
+    list(presenceRows).map((p) => [p.user_id, Number(p.total_online_ms || 0)]),
+  );
+  return list(signups).filter((u) => stayedLongerThanHour(byId[u.user_id])).length;
+}
+
+export function sumMsInWindow(sessions, fromIso, toMs = Date.now()) {
+  return list(sessions).reduce((s, row) => s + sessionMsInWindow(row, fromIso, toMs), 0);
 }
 
 function list(v) {
@@ -150,14 +225,96 @@ export async function recordLedger(sb, row) {
   return true;
 }
 
+async function loadPresenceRow(sb, userId) {
+  try {
+    const rows = await sb(
+      `ox_admin_presence?user_id=eq.${encodeURIComponent(userId)}&select=user_id,session_id,session_started_at,last_heartbeat_at,total_online_ms&limit=1`,
+    );
+    return Array.isArray(rows) ? rows[0] || null : null;
+  } catch {
+    return null;
+  }
+}
+
+async function touchSession(sb, row) {
+  if (!row?.session_id) return;
+  const body = {
+    session_id: row.session_id,
+    user_id: row.user_id,
+    started_at: row.started_at,
+    last_heartbeat_at: row.last_heartbeat_at,
+    ended_at: row.ended_at || null,
+    duration_ms: Math.max(0, Number(row.duration_ms || 0)),
+    current_path: row.current_path || null,
+    current_app: row.current_app || null,
+    device: row.device || null,
+  };
+  try {
+    await sb("ox_admin_sessions", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    });
+  } catch {
+    try {
+      await sb(`ox_admin_sessions?session_id=eq.${encodeURIComponent(row.session_id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          last_heartbeat_at: body.last_heartbeat_at,
+          ended_at: body.ended_at,
+          duration_ms: body.duration_ms,
+          current_path: body.current_path,
+          current_app: body.current_app,
+          device: body.device,
+        }),
+        headers: { Prefer: "return=minimal" },
+      });
+    } catch {
+      /* session table may not exist yet */
+    }
+  }
+}
+
 export async function upsertPresence(sb, row) {
   if (typeof sb !== "function" || !row?.user_id) return null;
-  const now = new Date().toISOString();
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
   const offline = row.status === "offline";
+  const existing = await loadPresenceRow(sb, row.user_id);
+  const incomingSession = row.session_id || existing?.session_id || null;
+  const prevHb = existing?.last_heartbeat_at || null;
+  const prevAge = prevHb ? nowMs - new Date(prevHb).getTime() : Infinity;
+  const stale = !prevHb || prevAge > PRESENCE_AWAY_MS;
+  const sessionChanged = Boolean(
+    incomingSession && existing?.session_id && incomingSession !== existing.session_id,
+  );
+  const shouldClose = Boolean(existing?.session_id && (offline || stale || sessionChanged));
+
+  if (shouldClose && existing.session_id) {
+    const started = existing.session_started_at || existing.last_heartbeat_at || now;
+    const closedMs = Math.max(0, new Date(existing.last_heartbeat_at || now).getTime() - new Date(started).getTime());
+    await touchSession(sb, {
+      session_id: existing.session_id,
+      user_id: row.user_id,
+      started_at: started,
+      last_heartbeat_at: existing.last_heartbeat_at || now,
+      ended_at: now,
+      duration_ms: closedMs,
+      current_path: row.current_path,
+      current_app: row.current_app || appFromPath(row.current_path),
+      device: row.device,
+    });
+  }
+
   // Offline must not refresh heartbeat — readers use last_heartbeat_at, not status.
   const heartbeatAt = offline
-    ? new Date(Date.now() - PRESENCE_AWAY_MS - 1_000).toISOString()
+    ? new Date(nowMs - PRESENCE_AWAY_MS - 1_000).toISOString()
     : now;
+  const sessionStartedAt = offline || stale || sessionChanged || !existing?.session_started_at
+    ? (offline ? existing?.session_started_at || null : now)
+    : existing.session_started_at;
+  const credited = offline ? 0 : creditHeartbeatMs(prevHb, nowMs);
+  const totalOnlineMs = Math.max(0, Number(existing?.total_online_ms || 0) + credited);
   const body = {
     user_id: row.user_id,
     username: row.username || null,
@@ -170,7 +327,9 @@ export async function upsertPresence(sb, row) {
     current_app: row.current_app || appFromPath(row.current_path),
     device: row.device || null,
     user_agent: row.user_agent || null,
-    session_id: row.session_id || null,
+    session_id: incomingSession,
+    session_started_at: sessionStartedAt,
+    total_online_ms: totalOnlineMs,
     updated_at: now,
   };
   try {
@@ -187,16 +346,39 @@ export async function upsertPresence(sb, row) {
         headers: { Prefer: "return=minimal" },
       });
     } catch {
-      return null;
+      try {
+        const { session_started_at: _s, total_online_ms: _t, ...legacy } = body;
+        await sb(`ox_admin_presence?user_id=eq.${encodeURIComponent(row.user_id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(legacy),
+          headers: { Prefer: "return=minimal" },
+        });
+      } catch {
+        return null;
+      }
     }
+  }
+  if (!offline && incomingSession) {
+    const openMs = sessionAgeMs(sessionStartedAt, nowMs);
+    await touchSession(sb, {
+      session_id: incomingSession,
+      user_id: row.user_id,
+      started_at: sessionStartedAt || now,
+      last_heartbeat_at: heartbeatAt,
+      ended_at: null,
+      duration_ms: openMs,
+      current_path: body.current_path,
+      current_app: body.current_app,
+      device: body.device,
+    });
   }
   return true;
 }
 
 export async function buildOverview(sb) {
   const today = startOfUtcDay(0);
-  const week = isoDaysAgo(7);
-  const month = isoDaysAgo(30);
+  const monthRolling = isoDaysAgo(30);
+  const cal = calendarBounds();
   const now = Date.now();
 
   const [
@@ -206,6 +388,7 @@ export async function buildOverview(sb) {
     newWeek,
     newMonth,
     presence,
+    sessions,
     ledger,
     burns,
     mcpBurns,
@@ -213,22 +396,29 @@ export async function buildOverview(sb) {
     activityToday,
   ] = await Promise.all([
     sb("profiles?select=user_id,created_at&limit=20000").catch(() => []),
-    sb(`profiles?select=user_id&created_at=gte.${today}&limit=5000`).catch(() => []),
-    sb(`profiles?select=user_id&created_at=gte.${startOfUtcDay(-1)}&created_at=lt.${today}&limit=5000`).catch(() => []),
-    sb(`profiles?select=user_id&created_at=gte.${week}&limit=8000`).catch(() => []),
-    sb(`profiles?select=user_id&created_at=gte.${month}&limit=12000`).catch(() => []),
-    sb("ox_admin_presence?select=user_id,status,last_heartbeat_at,current_app,username,avatar_url,wallet_address,current_path,device,last_seen_at&limit=5000").catch(() => []),
-    sb(`ox_admin_ledger?select=id,status,value_usd,fee_usd_actual,fee_usd_calc,application,tx_type,verified_onchain,created_at,fee_cap_applied&created_at=gte.${month}&limit=8000`).catch(() => []),
-    sb(`ox_admin_burns?select=tokens_burned,verified_onchain,created_at,application&created_at=gte.${month}&limit=5000`).catch(() => []),
-    sb(`mcp_burn_ledger?select=tokens_burned,created_at,tx_signature&created_at=gte.${month}&limit=5000`).catch(() => []),
-    sb(`orbitx_tokens?select=id,created_at,launch_type&created_at=gte.${month}&limit=4000`).catch(() => []),
+    sb(`profiles?select=user_id,created_at&created_at=gte.${cal.today}&limit=5000`).catch(() => []),
+    sb(`profiles?select=user_id&created_at=gte.${startOfUtcDay(-1)}&created_at=lt.${cal.today}&limit=5000`).catch(() => []),
+    sb(`profiles?select=user_id,created_at&created_at=gte.${cal.week}&limit=8000`).catch(() => []),
+    sb(`profiles?select=user_id,created_at&created_at=gte.${cal.month}&limit=12000`).catch(() => []),
+    sb("ox_admin_presence?select=user_id,status,last_heartbeat_at,current_app,username,avatar_url,wallet_address,current_path,device,last_seen_at,session_id,session_started_at,total_online_ms&limit=5000").catch(() => []),
+    sb(`ox_admin_sessions?select=user_id,started_at,ended_at,duration_ms,last_heartbeat_at&last_heartbeat_at=gte.${cal.month}&limit=20000`).catch(() => []),
+    sb(`ox_admin_ledger?select=id,status,value_usd,fee_usd_actual,fee_usd_calc,application,tx_type,verified_onchain,created_at,fee_cap_applied&created_at=gte.${monthRolling}&limit=8000`).catch(() => []),
+    sb(`ox_admin_burns?select=tokens_burned,verified_onchain,created_at,application&created_at=gte.${monthRolling}&limit=5000`).catch(() => []),
+    sb(`mcp_burn_ledger?select=tokens_burned,created_at,tx_signature&created_at=gte.${monthRolling}&limit=5000`).catch(() => []),
+    sb(`orbitx_tokens?select=id,created_at,launch_type&created_at=gte.${monthRolling}&limit=4000`).catch(() => []),
     sb(`user_activity?select=user_id,created_at&created_at=gte.${today}&limit=8000`).catch(() => []),
   ]);
 
-  const live = list(presence).map((p) => ({
-    ...p,
-    liveStatus: presenceStatus(p.last_heartbeat_at, now),
-  }));
+  const live = list(presence).map((p) => {
+    const status = presenceStatus(p.last_heartbeat_at, now);
+    const sessionMs = status === "offline" ? 0 : sessionAgeMs(p.session_started_at, now);
+    return {
+      ...p,
+      liveStatus: status,
+      session_ms: sessionMs,
+      total_online_ms: Number(p.total_online_ms || 0),
+    };
+  });
   const online = live.filter((p) => p.liveStatus === "online");
   const away = live.filter((p) => p.liveStatus === "away");
   const completed = list(ledger).filter((r) => r.status === "completed" && r.verified_onchain);
@@ -256,6 +446,9 @@ export async function buildOverview(sb) {
       online: "heartbeat within 60s",
       away: "heartbeat 60s–5min",
       offline: "no heartbeat in 5min",
+      signup: "profiles.created_at in the UTC calendar window",
+      stayedHour: "that signup's accumulated heartbeat time is at least 60 minutes",
+      hoursOnline: "sum of session overlaps in the UTC window from heartbeats (not estimated)",
       completedTx: "ledger.status=completed AND verified_onchain",
       burn: "ox_admin_burns.verified_onchain or mcp_burn_ledger row",
       fee: "min(1.2% of USD notional, $10), backend-enforced",
@@ -266,9 +459,22 @@ export async function buildOverview(sb) {
       newYesterday: list(newYesterday).length,
       newWeek: list(newWeek).length,
       newMonth: list(newMonth).length,
+      stayedHourToday: stayedHourAmong(list(newToday), live),
+      stayedHourWeek: stayedHourAmong(list(newWeek), live),
+      stayedHourMonth: stayedHourAmong(list(newMonth), live),
+      hoursOnlineToday: hoursFromMs(sumMsInWindow(list(sessions), cal.today, now)),
+      hoursOnlineWeek: hoursFromMs(sumMsInWindow(list(sessions), cal.week, now)),
+      hoursOnlineMonth: hoursFromMs(sumMsInWindow(list(sessions), cal.month, now)),
+      hoursOnlineAll: hoursFromMs(sum(live, (p) => Number(p.total_online_ms || 0))),
+      onlineHoursNow: hoursFromMs(sum(online, (p) => Number(p.session_ms || 0))),
       onlineNow: online.length,
       awayNow: away.length,
       dau: new Set(list(activityToday).map((a) => a.user_id).filter(Boolean)).size,
+    },
+    windows: {
+      today: cal.today,
+      week: cal.week,
+      month: cal.month,
     },
     activity: {
       txMonth: completed.length,
@@ -285,7 +491,7 @@ export async function buildOverview(sb) {
     revenue: {
       feesMonthUsd: sum(completed, feeOf),
       feesTodayUsd: sum(completed.filter((r) => inRange(r.created_at, today)), feeOf),
-      feesWeekUsd: sum(completed.filter((r) => inRange(r.created_at, week)), feeOf),
+      feesWeekUsd: sum(completed.filter((r) => inRange(r.created_at, cal.week)), feeOf),
       feesByApp,
       avgFeeUsd: completed.length ? sum(completed, feeOf) / completed.length : 0,
       maxFeeUsd: completed.reduce((m, r) => Math.max(m, feeOf(r)), 0),
@@ -457,10 +663,10 @@ export async function searchOwnerUsers(sb, q, limit = 40) {
   if (!term) {
     const live = await safeList(
       sb,
-      "ox_admin_presence?select=user_id,username,avatar_url,wallet_address,status,last_heartbeat_at,last_seen_at,current_path,current_app,device&order=last_heartbeat_at.desc&limit=80",
+      "ox_admin_presence?select=user_id,username,avatar_url,wallet_address,status,last_heartbeat_at,last_seen_at,current_path,current_app,device,session_id,session_started_at,total_online_ms&order=last_heartbeat_at.desc&limit=80",
     );
     const now = Date.now();
-    return live.map((p) => ({ ...p, liveStatus: presenceStatus(p.last_heartbeat_at, now) }));
+    return live.map((p) => annotatePresence(p, now));
   }
   const like = `*${term.replace(/[,()*]/g, "")}*`;
   let path = `profiles?select=user_id,username,avatar_url,wallet_address,sol_wallet,created_at,xp,current_level,last_seen_at,last_active_at,is_online&or=(username.ilike.${encodeURIComponent(like)},wallet_address.ilike.${encodeURIComponent(like)})&limit=${n}`;
@@ -474,7 +680,7 @@ export async function searchOwnerUsers(sb, q, limit = 40) {
   const presence = ids.length
     ? await safeList(
         sb,
-        `ox_admin_presence?user_id=in.(${ids.map((id) => encodeURIComponent(id)).join(",")})&select=user_id,status,last_heartbeat_at,last_seen_at,current_path,current_app,device,wallet_address`,
+        `ox_admin_presence?user_id=in.(${ids.map((id) => encodeURIComponent(id)).join(",")})&select=user_id,status,last_heartbeat_at,last_seen_at,current_path,current_app,device,wallet_address,session_started_at,total_online_ms`,
       )
     : [];
   const byId = Object.fromEntries(presence.map((p) => [p.user_id, p]));
@@ -489,9 +695,23 @@ export async function searchOwnerUsers(sb, q, limit = 40) {
       current_app: hit.current_app || null,
       device: hit.device || null,
       last_heartbeat_at: hb,
-      liveStatus: presenceStatus(hb, now),
+      session_started_at: hit.session_started_at || null,
+      total_online_ms: Number(hit.total_online_ms || 0),
+      ...annotatePresence({ ...hit, last_heartbeat_at: hb }, now),
     };
   });
+}
+
+function annotatePresence(p, now = Date.now()) {
+  const status = presenceStatus(p?.last_heartbeat_at, now);
+  const sessionMs = status === "offline" ? 0 : sessionAgeMs(p?.session_started_at, now);
+  return {
+    liveStatus: status,
+    session_ms: sessionMs,
+    session_label: formatClock(sessionMs),
+    total_online_ms: Number(p?.total_online_ms || 0),
+    total_label: formatClock(Number(p?.total_online_ms || 0)),
+  };
 }
 
 export async function getOwnerUserHub(sb, userId) {
@@ -573,9 +793,9 @@ export async function getOwnerUserHub(sb, userId) {
       wallet_address: profile.wallet_address || profile.sol_wallet || presence?.wallet_address || null,
     },
     presence: presence
-      ? { ...presence, liveStatus: presenceStatus(presence.last_heartbeat_at) }
+      ? { ...presence, ...annotatePresence(presence) }
       : {
-          liveStatus: presenceStatus(profile.last_active_at || profile.last_seen_at),
+          ...annotatePresence({ last_heartbeat_at: profile.last_active_at || profile.last_seen_at }),
           last_seen_at: profile.last_seen_at,
         },
     stats: {
@@ -586,6 +806,11 @@ export async function getOwnerUserHub(sb, userId) {
       feesUsd: completed.reduce((s, r) => s + feeOf(r), 0),
       burns: verifiedBurns.reduce((s, b) => s + Number(b.tokens_burned || 0), 0),
       xp: Number(profile.xp || 0),
+      hoursOnlineMs: Number(presence?.total_online_ms || 0),
+      currentSessionMs:
+        presence && presenceStatus(presence.last_heartbeat_at) !== "offline"
+          ? sessionAgeMs(presence.session_started_at)
+          : 0,
     },
     timeline,
     ledger: completed,
