@@ -39,7 +39,13 @@ export async function signInWithWallet(
     return { isNew: false };
   }
 
-  const { message } = await post({ action: "nonce", pubkey });
+  const nonceResponse = await post({ action: "nonce", pubkey });
+  const message = typeof nonceResponse?.message === "string" ? nonceResponse.message : "";
+  if (!message) {
+    throw new Error("Wallet login could not request a nonce. Please reconnect your wallet and try again.");
+  }
+
+  // Never sign or verify until the nonce request has returned a complete SIWS message.
   const signed = await signMessage(new TextEncoder().encode(message));
   const signature = bs58.encode(signed);
   const { access_token, refresh_token, isNew } = await post({ action: "verify", pubkey, signature });

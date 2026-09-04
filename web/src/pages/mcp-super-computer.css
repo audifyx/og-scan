@@ -766,3 +766,531 @@
   .supercomputer-command-preview,
   .supercomputer-button { transition: none; }
 }
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SUPERCOMPUTER // MONOCHROME COMMAND DECK
+   Visual-only override layer. Existing structure, routes, and controls remain.
+   ───────────────────────────────────────────────────────────────────────────── */
+.supercomputer-ios {
+  --super-bg: #020202;
+  --super-card: rgba(15, 15, 15, 0.88);
+  --super-card-strong: rgba(24, 24, 24, 0.96);
+  --super-line: rgba(255, 255, 255, 0.16);
+  --super-line-soft: rgba(255, 255, 255, 0.08);
+  --super-text: #ffffff;
+  --super-muted: rgba(255, 255, 255, 0.62);
+  --super-faint: rgba(255, 255, 255, 0.36);
+  --super-teal: #ffffff;
+  --super-green: #ffffff;
+  --super-blue: #ffffff;
+  --super-pink: #ffffff;
+  --super-safe-bottom: env(safe-area-inset-bottom, 0px);
+  background:
+    radial-gradient(circle at 82% -8%, rgba(255, 255, 255, 0.12), transparent 22rem),
+    radial-gradient(circle at 7% 76%, rgba(255, 255, 255, 0.055), transparent 28rem),
+    #020202;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.supercomputer-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #020202 !important;
+}
+
+.supercomputer-stage::before {
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.42;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    repeating-linear-gradient(180deg, transparent 0, transparent 5px, rgba(255, 255, 255, 0.012) 6px);
+  background-size: 48px 48px, 48px 48px, 100% 7px;
+  mask-image: linear-gradient(to bottom, #000, transparent 92%);
+}
+
+.supercomputer-stage::after {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 34vw;
+  height: 34vw;
+  min-width: 240px;
+  min-height: 240px;
+  pointer-events: none;
+  content: "";
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  box-shadow: 0 0 0 24px rgba(255, 255, 255, 0.018), 0 0 0 48px rgba(255, 255, 255, 0.012);
+  transform: translate(-62%, -62%);
+}
+
+.supercomputer-frame {
+  grid-template-columns: 276px minmax(0, 1fr);
+}
+
+.supercomputer-rail {
+  position: relative;
+  z-index: 2;
+  gap: 0.45rem;
+  padding: 1.35rem 1rem 1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.98), rgba(2, 2, 2, 0.98));
+  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.38);
+}
+
+.supercomputer-rail::before {
+  position: absolute;
+  top: 0;
+  right: -1px;
+  width: 1px;
+  height: 120px;
+  content: "";
+  background: linear-gradient(#fff, transparent);
+  opacity: 0.85;
+}
+
+.supercomputer-rail-label {
+  margin: 1.35rem 0 0.4rem 0.72rem;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+}
+
+.supercomputer-rail-divider {
+  margin: 0.9rem 0.55rem 0;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ios-shell__rail-link {
+  position: relative;
+  min-height: 42px;
+  padding: 0.65rem 0.72rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 0.73rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  transition: 160ms ease-out;
+}
+
+.ios-shell__rail-link::after {
+  position: absolute;
+  top: 10px;
+  right: 9px;
+  width: 4px;
+  height: 4px;
+  content: "";
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.ios-shell__rail-link:hover,
+.ios-shell__rail-link:focus-visible {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  outline: none;
+}
+
+.ios-shell__rail-link.is-on {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 26px rgba(0, 0, 0, 0.26);
+}
+
+.ios-shell__rail-link.is-on::after { opacity: 1; }
+.ios-shell__rail-ico { color: inherit; }
+
+.supercomputer-rail-account {
+  margin-top: 0.85rem;
+  padding: 0.84rem 0.86rem;
+  border-color: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.supercomputer-rail-account:hover,
+.supercomputer-rail-account:focus-visible {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+  outline: none;
+}
+
+.supercomputer-rail-account:hover small,
+.supercomputer-rail-account:focus-visible small { color: rgba(0, 0, 0, 0.58); }
+
+.supercomputer-status {
+  padding: 0.34rem 0.58rem;
+  border-color: rgba(255, 255, 255, 0.22);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 0.59rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.supercomputer-status i,
+.supercomputer-status.is-ready i {
+  width: 0.35rem;
+  height: 0.35rem;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.supercomputer-status.is-ready { color: #fff; }
+
+.supercomputer-main {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.supercomputer-main::before {
+  width: 28rem;
+  height: 28rem;
+  right: -16rem;
+  top: 4rem;
+  background: rgba(255, 255, 255, 0.025);
+  filter: blur(1px);
+}
+
+.supercomputer-main::after {
+  width: 18rem;
+  height: 18rem;
+  left: -12rem;
+  bottom: 4rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.supercomputer-main .ios-nav {
+  position: relative;
+  width: calc(100% - 48px);
+  max-width: 1180px;
+  margin: 20px auto 0;
+  min-height: 58px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 8px;
+  background: rgba(4, 4, 4, 0.9);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.supercomputer-main .ios-nav::before {
+  position: absolute;
+  top: -1px;
+  left: 18px;
+  width: 76px;
+  height: 1px;
+  content: "";
+  background: #fff;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.7);
+}
+
+.supercomputer-main .ios-nav__title {
+  font-family: var(--oa-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.supercomputer-main .ios-nav__btn {
+  border-radius: 6px;
+  color: #fff;
+}
+
+.supercomputer-body {
+  width: min(1180px, 100%);
+  padding-top: 2.1rem;
+  padding-bottom: 4rem;
+}
+
+.supercomputer-mobile-brand {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.supercomputer-mobile-orb {
+  border-color: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 0 26px rgba(255, 255, 255, 0.12);
+}
+
+.supercomputer-eyebrow {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--oa-mono, ui-monospace, monospace);
+  font-size: 0.59rem;
+  letter-spacing: 0.22em;
+}
+
+.supercomputer-live {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 1px;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.supercomputer-welcome {
+  min-height: 370px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09), transparent 38%),
+    linear-gradient(180deg, rgba(12, 12, 12, 0.98), rgba(4, 4, 4, 0.92));
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.42), inset 0 1px rgba(255, 255, 255, 0.11);
+  overflow: hidden;
+}
+
+.supercomputer-welcome::after {
+  position: absolute;
+  right: 4%;
+  bottom: 0;
+  width: 58%;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+}
+
+.supercomputer-welcome h1 {
+  max-width: 10ch;
+  margin: 1rem 0 1.15rem;
+  font-family: var(--oa-mono, ui-monospace, monospace);
+  font-size: clamp(2.5rem, 5.5vw, 5.8rem);
+  font-weight: 700;
+  letter-spacing: -0.095em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.supercomputer-welcome h1 em { color: #fff; text-shadow: 0 0 26px rgba(255, 255, 255, 0.26); }
+.supercomputer-welcome__copy > p:not(.supercomputer-eyebrow) { color: rgba(255, 255, 255, 0.58); }
+
+.supercomputer-button {
+  min-height: 44px;
+  border-radius: 6px;
+  font-family: var(--oa-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.supercomputer-button--primary {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 12px 28px rgba(255, 255, 255, 0.11);
+}
+
+.supercomputer-button--primary:hover { background: #d8d8d8; }
+.supercomputer-button--quiet { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05); color: #fff; }
+.supercomputer-button--quiet:hover { border-color: #fff; background: rgba(255, 255, 255, 0.13); }
+
+.supercomputer-orbit-card {
+  border-color: rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.1), transparent 42%),
+    repeating-radial-gradient(circle at center, transparent 0 23px, rgba(255, 255, 255, 0.08) 24px 25px),
+    #050505;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.supercomputer-orbit-card::before { background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent 67%); }
+.supercomputer-orbit-card__ring { border-color: rgba(255, 255, 255, 0.6); }
+.supercomputer-orbit-card__ring--two { border-color: rgba(255, 255, 255, 0.24); }
+.supercomputer-orbit-card__core { border-color: #fff; background: #000; color: #fff; box-shadow: 0 0 34px rgba(255, 255, 255, 0.22); }
+.supercomputer-orbit-card__label { border-color: rgba(255, 255, 255, 0.26); border-radius: 4px; background: #050505; color: #fff; }
+
+.supercomputer-command-preview {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 8, 8, 0.9);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 16px 36px rgba(0, 0, 0, 0.32);
+}
+
+.supercomputer-command-preview:hover,
+.supercomputer-command-preview:focus-visible { border-color: #fff; background: rgba(255, 255, 255, 0.08); }
+.supercomputer-command-preview__top span:first-child { color: #fff; }
+.supercomputer-command-preview__prompt,
+.supercomputer-command-preview__cursor { color: #fff; background: #fff; }
+.supercomputer-command-preview__cursor { box-shadow: 0 0 12px rgba(255, 255, 255, 0.7); }
+
+.supercomputer-metrics { gap: 0.65rem; }
+.supercomputer-metric {
+  min-height: 92px;
+  border-color: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(12, 12, 12, 0.9);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.supercomputer-metric.is-clickable:hover { border-color: #fff; background: rgba(255, 255, 255, 0.08); transform: translateY(-2px); }
+.supercomputer-metric__icon { border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 5px; background: #fff; color: #000; }
+.supercomputer-metric__copy span { color: rgba(255, 255, 255, 0.44); font-family: var(--oa-mono, ui-monospace, monospace); letter-spacing: 0.13em; }
+.supercomputer-metric__copy small { color: rgba(255, 255, 255, 0.5); }
+.supercomputer-metric__chevron { color: rgba(255, 255, 255, 0.7); }
+
+.supercomputer-card,
+.supercomputer-workspace {
+  border-color: rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(10, 10, 10, 0.88);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.supercomputer-card { padding: 1.4rem; }
+.supercomputer-card--accent { background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(10, 10, 10, 0.9) 58%); }
+.supercomputer-section-head h2 { font-family: var(--oa-mono, ui-monospace, monospace); font-size: clamp(1.15rem, 2vw, 1.55rem); letter-spacing: -0.07em; text-transform: uppercase; }
+.supercomputer-section-head > div > p:last-child { color: rgba(255, 255, 255, 0.54); }
+.supercomputer-capability-grid span { color: rgba(255, 255, 255, 0.62); }
+.supercomputer-capability-grid svg { color: #fff; }
+.supercomputer-inline-link { color: #fff; font-family: var(--oa-mono, ui-monospace, monospace); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.supercomputer-inline-link:hover { text-decoration: underline; }
+
+.supercomputer-next-list button { border-bottom-color: rgba(255, 255, 255, 0.12); }
+.supercomputer-next-list button:hover strong { color: #fff; }
+.supercomputer-next-number { color: #fff; font-family: var(--oa-mono, ui-monospace, monospace); }
+.supercomputer-next-list small { color: rgba(255, 255, 255, 0.5); }
+
+.supercomputer-setup-banner,
+.supercomputer-channel-notice,
+.supercomputer-shop-intro {
+  border-color: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.supercomputer-setup-banner__icon,
+.supercomputer-channel-notice__icon { border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 5px; background: #fff; color: #000; }
+.supercomputer-setup-banner strong,
+.supercomputer-channel-notice strong,
+.supercomputer-shop-intro strong { font-family: var(--oa-mono, ui-monospace, monospace); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.supercomputer-setup-banner p,
+.supercomputer-channel-notice p,
+.supercomputer-shop-intro p { color: rgba(255, 255, 255, 0.54); }
+.supercomputer-shop-intro { background: rgba(255, 255, 255, 0.07); }
+.supercomputer-shop-intro > div > svg { color: #fff; }
+
+.supercomputer-segmented {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.supercomputer-segmented button {
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--oa-mono, ui-monospace, monospace);
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.supercomputer-segmented button.is-active { background: #fff; color: #000; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28); }
+.supercomputer-segmented button:hover { color: #fff; }
+.supercomputer-segmented button.is-active:hover { color: #000; }
+
+.supercomputer-embedded { border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 8px; background: rgba(0, 0, 0, 0.24); }
+.supercomputer-embedded .ox-agent__panel { border-color: rgba(255, 255, 255, 0.14); border-radius: 8px; background: rgba(255, 255, 255, 0.035); }
+.supercomputer-embedded .ox-agent__btn { border-color: rgba(255, 255, 255, 0.22); border-radius: 5px; background: #fff; color: #000; }
+.supercomputer-embedded .ox-agent__btn:hover { background: #d8d8d8; }
+
+.supercomputer-tab-footer {
+  border-color: rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(11, 11, 11, 0.9);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.supercomputer-tab-footer__mark { border-color: rgba(255, 255, 255, 0.3); border-radius: 5px; background: #fff; color: #000; }
+.supercomputer-tab-footer__copy span { color: rgba(255, 255, 255, 0.5); font-family: var(--oa-mono, ui-monospace, monospace); letter-spacing: 0.18em; }
+.supercomputer-tab-footer__copy p { color: rgba(255, 255, 255, 0.5); }
+
+.supercomputer-tabbar {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(5, 5, 5, 0.94);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.supercomputer-tabbar .ios-tab { border-radius: 5px; color: rgba(255, 255, 255, 0.48); font-family: var(--oa-mono, ui-monospace, monospace); text-transform: uppercase; }
+.supercomputer-tabbar .ios-tab.is-on { background: #fff; color: #000; box-shadow: none; }
+.supercomputer-tabbar .ios-tab:hover { color: #fff; }
+.supercomputer-tabbar .ios-tab.is-on:hover { color: #000; }
+
+.supercomputer-icon-button { border-color: rgba(255, 255, 255, 0.2); border-radius: 5px; background: rgba(255, 255, 255, 0.05); color: #fff; }
+.supercomputer-icon-button:hover { border-color: #fff; background: #fff; color: #000; }
+
+@keyframes supercomputer-command-scan {
+  0%, 100% { opacity: 0.3; transform: translateX(-35%); }
+  50% { opacity: 0.8; transform: translateX(35%); }
+}
+
+.supercomputer-welcome::after { animation: supercomputer-command-scan 7s ease-in-out infinite; }
+
+@media (max-width: 899px) {
+  .supercomputer-frame { display: block; }
+  .supercomputer-main .ios-nav { width: calc(100% - 18px); margin-top: 9px; border-radius: 7px; }
+  .supercomputer-body { padding: 0.7rem 0.9rem calc(var(--ios-tab-h) + var(--super-safe-bottom) + 2rem); }
+  .supercomputer-welcome { margin-top: 0.7rem; padding: 1.35rem 1rem 1.4rem; border-radius: 8px; }
+  .supercomputer-welcome h1 { font-size: clamp(2.35rem, 12vw, 4rem); }
+  .supercomputer-card, .supercomputer-workspace { border-radius: 8px; }
+  .supercomputer-tabbar { border-radius: 8px; }
+}
+
+@media (min-width: 900px) {
+  .supercomputer-main .ios-nav { width: calc(100% - 48px); max-width: 1180px; }
+  .supercomputer-body { padding-top: 2.1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .supercomputer-welcome::after { animation: none; }
+}
+
+
+.supercomputer-system-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem 1rem;
+  margin: 0.15rem 0 0.8rem;
+  padding: 0.48rem 0.65rem;
+  overflow: auto hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.43);
+  font-family: var(--oa-mono, ui-monospace, monospace);
+  font-size: 0.55rem;
+  letter-spacing: 0.13em;
+  line-height: 1;
+  text-transform: uppercase;
+  scrollbar-width: none;
+}
+
+.supercomputer-system-strip::-webkit-scrollbar { display: none; }
+.supercomputer-system-strip span { display: inline-flex; align-items: center; gap: 0.38rem; flex: 0 0 auto; white-space: nowrap; }
+.supercomputer-system-strip i { width: 0.34rem; height: 0.34rem; border-radius: 1px; background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.7); }
+.supercomputer-system-strip span:first-child { color: rgba(255, 255, 255, 0.78); }
+
+@media (max-width: 899px) {
+  .supercomputer-system-strip { margin-top: 0.35rem; margin-bottom: 0.55rem; padding-inline: 0.35rem; font-size: 0.5rem; }
+}

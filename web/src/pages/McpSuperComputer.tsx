@@ -159,6 +159,7 @@ export default function McpSuperComputer() {
           />
           <main className="supercomputer-body">
             <div className="supercomputer-mobile-brand"><div className="supercomputer-mobile-orb"><Cpu size={17} /></div><div><strong>OrbitX Super Computer</strong><span>One MCP · every capability</span></div><StatusPill ready={walletReady}>{walletReady ? "Live" : "Setup"}</StatusPill></div>
+            <div className="supercomputer-system-strip" aria-label="Super Computer telemetry"><span><i /> SYS / ORBITX-01</span><span>MODE / NON-CUSTODIAL</span><span>LINK / UNIFIED MCP</span><span>RUNTIME / {walletReady ? "LIVE" : "STANDBY"}</span></div>
 
             {tab === "home" && (
               <>
