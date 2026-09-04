@@ -102,7 +102,24 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
       setStage("Confirming on-chain…");
       const status = await confirmTx(signature);
       if (status === "failed") setErr("Transaction failed on-chain. Try a higher slippage and retry.");
-      else { setOk(true); setTimeout(loadBal, 2500); }
+      else {
+        setOk(true);
+        setTimeout(loadBal, 2500);
+        try {
+          await fetch("/api/orbitx-tx-report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              signature,
+              wallet: address,
+              application: "dex",
+              txType: side,
+              mint,
+              path: "/ORBITX_DEX",
+            }),
+          });
+        } catch { /* ledger is best-effort */ }
+      }
     } catch (e: any) {
       const m = e?.message || "Trade failed";
       setErr(/reject/i.test(m) ? "Transaction cancelled in Phantom" : m);

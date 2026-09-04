@@ -96,7 +96,6 @@ export default function BetDetailPage() {
       <div className="glass-card rounded-2xl overflow-hidden">
         {bet.image_url && (
           <div className="h-44 md:h-56 w-full overflow-hidden relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={bet.image_url} alt="" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e1c] to-transparent" />
           </div>

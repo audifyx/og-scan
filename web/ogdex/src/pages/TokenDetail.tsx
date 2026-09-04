@@ -37,6 +37,11 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function catPoints(c: { points?: number | null; max?: number | null; available?: boolean } | null | undefined): number | null {
+  if (!c || c.available === false || c.points == null || !c.max) return null;
+  return Math.round((Number(c.points) / Number(c.max)) * 100);
+}
+
 function symbolToRgb(sym: string, offset: number): string {
   let h = 0;
   for (let i = 0; i < sym.length; i++) h = (h * 31 + sym.charCodeAt(i)) >>> 0;
@@ -294,7 +299,7 @@ export default function TokenDetail() {
             ))}
             {score != null && (
               <span className={`pill text-[10px] font-bold ${scoreColor} ${score >= 70 ? "bg-up/10" : score >= 45 ? "bg-accent/10" : "bg-down/10"}`}>
-                OG {Math.round(score)}/100
+                OrbitX {Math.round(score)}/100
               </span>
             )}
           </div>
@@ -410,7 +415,7 @@ export default function TokenDetail() {
 
       {/* Tab content */}
       <ErrorBoundary key={tab} label="this tab">
-        {tab === "overview"   && <Overview d={d} t={t} meta={meta} safety={safety} trades={trades} ath={ath} score={score} whales={whales} />}
+        {tab === "overview"   && <Overview d={d} t={t} meta={meta} safety={safety} trades={trades} ath={ath} score={score} />}
         {tab === "chat"       && <CoinChat d={d} forensics={forensics} ath={ath} />}
         {tab === "predictive" && <PredictiveIntel d={d} />}
         {tab === "smartmoney" && <CapitalFlow d={d} />}
@@ -427,7 +432,7 @@ export default function TokenDetail() {
 /* ─────────────────────────────────────────────
    Overview tab  (includes OrbitX Score + Forensic Scores, no duplicates)
 ───────────────────────────────────────────── */
-function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
+function Overview({ d, t, meta, safety, trades, ath, score }: any) {
   const buyVol  = meta.buyVolume24h ?? t.buyVolume ?? 0;
   const sellVol = meta.sellVolume24h ?? t.sellVolume ?? 0;
   const total   = buyVol + sellVol || 1;
@@ -446,32 +451,42 @@ function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
         </div>
       )}
 
-      {/* OrbitX Score + Forensic Scores */}
+      {/* OrbitX Token Intelligence */}
       <div className="grid lg:grid-cols-3 gap-3">
         <div className="card p-5 flex flex-col items-center justify-center text-center">
           <div className="text-[10px] uppercase tracking-widest text-muted mb-3">OrbitX Score</div>
           <ScoreRing value={score} label="/ 100" size={120} />
-          {(d.momentumLabel || meta.momentumLabel) && (
-            <div className="mt-3 inline-flex pill bg-panel2 text-muted capitalize">
-              Momentum: {(d.momentumLabel || meta.momentumLabel)?.replace(/[^\w\s]/g, "")}
-            </div>
-          )}
+          <div className="mt-3 text-sm font-bold text-white">{d.score?.intel?.label || (score >= 70 ? "Good" : score >= 40 ? "Fair" : "Risk")}</div>
+          <div className="mt-2 grid grid-cols-3 gap-2 w-full text-[10px] uppercase tracking-wider text-muted">
+            <div>Safety<div className="text-white text-sm font-bold">{d.score?.intel?.safety_score ?? "—"}</div></div>
+            <div>Maturity<div className="text-white text-sm font-bold">{d.score?.intel?.maturity_score ?? "—"}</div></div>
+            <div>Quality<div className="text-white text-sm font-bold">{d.score?.intel?.quality_score ?? "—"}</div></div>
+          </div>
         </div>
         <div className="card p-5 lg:col-span-2">
-          <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /> Forensic Scores</div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {d.score?.signals && Object.entries(d.score.signals).map(([k, v]: any) => <MiniScore key={k} label={k} value={v} />)}
-            <MiniScore label="organic"  value={Math.round(t.organicScore ?? 0)} />
-            <MiniScore label="momentum" value={d.momentum ?? meta.momentum} />
-            <MiniScore label="risk"     value={safety?.riskScore} invert />
+          <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /> Score breakdown</div>
+          <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+            <MiniScore label="Contract" value={catPoints(d.score?.intel?.category_scores?.contract)} />
+            <MiniScore label="Liquidity" value={catPoints(d.score?.intel?.category_scores?.liquidity)} />
+            <MiniScore label="Holders" value={catPoints(d.score?.intel?.category_scores?.holders)} />
+            <MiniScore label="Developer" value={catPoints(d.score?.intel?.category_scores?.developer)} />
+            <MiniScore label="Trading" value={catPoints(d.score?.intel?.category_scores?.trading)} />
+            <MiniScore label="Maturity" value={d.score?.intel?.maturity_score} />
           </div>
           <div className="mt-4 pt-3 border-t border-line space-y-1.5 text-xs">
-            <Signal ok={d.flags?.mintAuthorityDisabled}   text="Mint authority renounced" />
-            <Signal ok={d.flags?.freezeAuthorityDisabled} text="Freeze authority renounced" />
-            <Signal ok={!d.flags?.lpPulled}               text="Liquidity intact — no LP pull detected" />
-            <Signal ok={d.flags?.minLiquidity}            text="Sufficient liquidity depth" />
-            <Signal ok={!d.score?.isPumpFunClone}         text="Original deployment — not a detected clone" />
-            <Signal ok={whales === 0}                     text={whales === 0 ? "No >5% whale concentration" : `${whales} whale wallet(s) hold >5%`} />
+            {(d.score?.intel?.positive_signals || []).slice(0, 4).map((s: any) => (
+              <Signal key={s.name} ok text={s.explanation} />
+            ))}
+            {(d.score?.intel?.risk_signals || []).slice(0, 3).map((s: any) => (
+              <Signal key={s.name} ok={false} text={s.explanation} />
+            ))}
+            {!d.score?.intel && (
+              <>
+                <Signal ok={d.flags?.mintAuthorityDisabled}   text="Mint authority renounced" />
+                <Signal ok={d.flags?.freezeAuthorityDisabled} text="Freeze authority renounced" />
+                <Signal ok={!d.flags?.lpPulled}               text="Liquidity intact — no LP pull detected" />
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -85,7 +85,7 @@ export function XCallbackPage() {
 
         setStatus("success");
         setTimeout(() => {
-          const returnTo = sessionStorage.getItem("x_return_to") || "/x";
+          const returnTo = sessionStorage.getItem("x_return_to") || "/supercomputer?tab=channels";
           sessionStorage.removeItem("x_return_to");
           navigate(returnTo);
         }, 1200);
@@ -122,10 +122,10 @@ export function XCallbackPage() {
             <div className="text-3xl">❌</div>
             <p className="text-red-400 font-bold text-sm">{errorMsg}</p>
             <button
-              onClick={() => navigate("/x")}
+              onClick={() => navigate("/supercomputer?tab=channels")}
               className="px-4 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-white/60 text-sm hover:bg-white/10 transition-colors"
             >
-              Back to /x
+              Back to Super Computer
             </button>
           </>
         )}

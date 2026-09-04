@@ -146,8 +146,8 @@ function BagworkFooter() {
 }
 
 export default function BagworkLayout() {
-  const { isAdmin, isOwnerIdentity } = useAdmin();
-  const showAdmin = isAdmin || isOwnerIdentity;
+  const { isAdmin } = useAdmin();
+  const showAdmin = isAdmin;
 
   return (
     <div className="bw-shell">

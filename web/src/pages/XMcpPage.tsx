@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
@@ -10,17 +9,16 @@ import {
   approveXAgentQueueItem,
   bootstrapXMcp,
   cancelXAgentQueueItem,
-  confirmXCreditsPurchase,
   createXMcpApiKey,
   disconnectXAccount,
   fetchXAgent,
   fetchXCreditsUsage,
+  fetchXMcpAccess,
   fetchXDmInbox,
   generateXAgentPost,
   listXAgentQueue,
   listXMcpApiKeys,
   pollXAgentReplies,
-  quoteXCreditsBuy,
   revokeXMcpApiKey,
   sendXDm,
   shortXKey,
@@ -35,27 +33,36 @@ import {
   type XAgentKnowledge,
   type XAgentQueueItem,
   type XCreditsUsage,
+  type XMcpAccessStatus,
   type XMcpBootstrap,
   type XMcpChatAuthMint,
   type XNimModel,
 } from "@/lib/xMcp";
 import { AgentLoading, AgentShell, type ShellTab } from "@/components/agent/AgentShell";
+import { TelegramMcpCard } from "@/components/agent/TelegramMcpCard";
+import { McpShop } from "@/components/agent/McpShop";
 import XMcpMatrix from "@/components/x/XMcpMatrix";
 import "./x-hub.css";
 
-/** Bottom tabs — Usage is the shop + advanced credits ledger. */
-type XTab = "home" | "usage" | "account" | "keys" | "connect";
+/** Bottom tabs — Shop is burn access + credits + usage ledger. */
+type XTab = "home" | "shop" | "account" | "keys" | "connect";
 type HomeSub = "post" | "agent" | "queue" | "messages" | "matrix";
 
 const X_TABS: ShellTab[] = [
   { id: "home", label: "Home", ico: "⌂" },
-  { id: "usage", label: "Usage", ico: "◈" },
+  { id: "shop", label: "Shop", ico: "◈" },
   { id: "account", label: "Account", ico: "◎" },
   { id: "keys", label: "Keys", ico: "✦" },
   { id: "connect", label: "Connect", ico: "⬡" },
 ];
 
-const VALID_TABS = new Set<XTab>(["home", "usage", "account", "keys", "connect"]);
+const VALID_TABS = new Set<XTab>(["home", "shop", "account", "keys", "connect"]);
+
+function parseXTab(raw: string): XTab {
+  const t = String(raw || "").toLowerCase();
+  if (t === "shop" || t === "credits" || t === "usage" || t === "access") return "shop";
+  return VALID_TABS.has(t as XTab) ? (t as XTab) : "home";
+}
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -136,31 +143,21 @@ function FieldRow({
   );
 }
 
-/** /x — same AgentShell UI as /agent, X MCP content */
-export default function XMcpPage() {
+/** X MCP workspace; embedded mode renders it inside /supercomputer. */
+export default function XMcpPage({ embedded = false, initialTab = "home", initialHomeSub = "post" }: { embedded?: boolean; initialTab?: XTab; initialHomeSub?: HomeSub }) {
   const { user, loading: authLoading } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction, connected: walletConnected } = useWallet();
+  const { publicKey } = useWallet();
 
-  const initialTab = (() => {
-    const t = String(searchParams.get("tab") || "").toLowerCase();
-    if (t === "shop" || t === "credits") return "usage" as XTab;
-    return VALID_TABS.has(t as XTab) ? (t as XTab) : "home";
-  })();
-
-  const [tab, setTab] = useState<XTab>(initialTab);
-  const [homeSub, setHomeSub] = useState<HomeSub>("post");
+  const [tab, setTab] = useState<XTab>(() => embedded ? initialTab : parseXTab(searchParams.get("tab") || ""));
+  const [homeSub, setHomeSub] = useState<HomeSub>(initialHomeSub);
   const [boot, setBoot] = useState<XMcpBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
+  const [mcpAccess, setMcpAccess] = useState<XMcpAccessStatus | null>(null);
   const [usagePeriod, setUsagePeriod] = useState<"24h" | "7d" | "30d" | "all">("30d");
-  const [buySol, setBuySol] = useState("0.1");
-  const [buyBusy, setBuyBusy] = useState(false);
-  const [buyNote, setBuyNote] = useState<string | null>(null);
-  const [manualSig, setManualSig] = useState("");
   const [keyName, setKeyName] = useState("Claude / ChatGPT X");
   const [creating, setCreating] = useState(false);
   const [storedKey, setStoredKey] = useState<string | null>(null);
@@ -224,10 +221,15 @@ export default function XMcpPage() {
     } catch {
       /* table may not be migrated yet — Usage tab still explains MCP buy */
     }
+    try {
+      setMcpAccess(await fetchXMcpAccess());
+    } catch {
+      /* mcp_burn_access migration may not be applied yet */
+    }
   }, [user, usagePeriod]);
 
   useEffect(() => {
-    if (tab === "usage" && user) void refreshCredits();
+    if (tab === "shop" && user) void refreshCredits();
   }, [tab, user, usagePeriod, refreshCredits]);
 
   const refresh = useCallback(async () => {
@@ -261,7 +263,7 @@ export default function XMcpPage() {
       // Don't block the shell on secondary loads
       void Promise.allSettled([refreshAgent(), refreshQueue(), refreshCredits()]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load X MCP");
+      setError(e instanceof Error ? e.message : "Failed to load X channel");
     } finally {
       setLoading(false);
     }
@@ -269,8 +271,9 @@ export default function XMcpPage() {
 
   const selectTab = useCallback(
     (id: string) => {
-      const next = VALID_TABS.has(id as XTab) ? (id as XTab) : "home";
+      const next = parseXTab(id);
       setTab(next);
+      if (embedded) return;
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -281,17 +284,19 @@ export default function XMcpPage() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [embedded, setSearchParams],
   );
 
   useEffect(() => {
-    const t = String(searchParams.get("tab") || "").toLowerCase();
-    if (t === "shop" || t === "credits") {
-      if (tab !== "usage") setTab("usage");
+    if (embedded) {
+      if (initialTab !== tab) setTab(initialTab);
+      if (initialHomeSub !== homeSub) setHomeSub(initialHomeSub);
       return;
     }
-    if (VALID_TABS.has(t as XTab) && t !== tab) setTab(t as XTab);
-  }, [searchParams, tab]);
+    const t = String(searchParams.get("tab") || "").toLowerCase();
+    const next = parseXTab(t);
+    if (next !== tab) setTab(next);
+  }, [embedded, homeSub, initialHomeSub, initialTab, searchParams, tab]);
 
   useEffect(() => {
     try {
@@ -343,69 +348,6 @@ export default function XMcpPage() {
     }
   };
 
-  const quotedCredits = useMemo(() => {
-    const sol = Number(buySol);
-    const rate = creditsUsage?.creditsPerSol || 10_000;
-    if (!Number.isFinite(sol) || sol <= 0) return 0;
-    return Math.floor(sol * rate);
-  }, [buySol, creditsUsage?.creditsPerSol]);
-
-  const onBuyCredits = async () => {
-    setBuyBusy(true);
-    setBuyNote(null);
-    setError(null);
-    try {
-      const sol = Number(buySol);
-      if (!Number.isFinite(sol) || sol < 0.001) {
-        throw new Error("Enter at least 0.001 SOL");
-      }
-      if (!publicKey || !walletConnected || !sendTransaction) {
-        throw new Error("Connect a Solana wallet first (same wallet you sign in with)");
-      }
-      const quote = await quoteXCreditsBuy(sol, publicKey.toBase58());
-      if (!quote.ok || !quote.lamports || !quote.payTo) {
-        throw new Error(quote.message || quote.error || "Could not quote purchase");
-      }
-      const tx = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: new PublicKey(quote.payTo || PLATFORM_WALLET),
-          lamports: quote.lamports,
-        }),
-      );
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = publicKey;
-      const signature = await sendTransaction(tx, connection);
-      await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-      const credited = await confirmXCreditsPurchase(signature);
-      setBuyNote(credited.message || `+${credited.creditsAdded ?? quote.credits} credits`);
-      await refreshCredits();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Purchase failed");
-    } finally {
-      setBuyBusy(false);
-    }
-  };
-
-  const onConfirmManualSig = async () => {
-    setBuyBusy(true);
-    setBuyNote(null);
-    setError(null);
-    try {
-      const sig = manualSig.trim();
-      if (!sig) throw new Error("Paste a transaction signature");
-      const credited = await confirmXCreditsPurchase(sig);
-      setBuyNote(credited.message || "Credits applied");
-      setManualSig("");
-      await refreshCredits();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Confirm failed");
-    } finally {
-      setBuyBusy(false);
-    }
-  };
-
   const onMintChatAuth = async () => {
     setMintingAuth(true);
     setError(null);
@@ -435,7 +377,7 @@ export default function XMcpPage() {
     setCreating(true);
     setError(null);
     try {
-      const minted = await createXMcpApiKey(keyName.trim() || "X MCP Key");
+      const minted = await createXMcpApiKey(keyName.trim() || "OrbitX channel key");
       setStoredKey(minted.key);
       setShowKeyPanel(true);
       try {
@@ -641,27 +583,28 @@ export default function XMcpPage() {
   };
 
   if (authLoading && !user) {
-    return <AgentLoading label="Opening X MCP…" />;
+    return <AgentLoading label="Opening X channel…" />;
   }
 
   if (!user) {
     return (
       <AgentShell
         showTabs={false}
-        brandHref="/x"
-        brandSub="X MCP"
-        footerBrand="OrbitX X MCP"
+        brandHref="/supercomputer"
+        brandSub="X channel"
+        footerBrand="OrbitX Super Computer"
         footerNote="Connect X. Train an agent. Post from Claude, ChatGPT, or Grok."
         mcpUrl={oauth.mcpUrl}
-        siblingHref="/agent"
-        siblingLabel="Agent MCP"
+        siblingHref="/supercomputer?tab=agent"
+        siblingLabel="Agent workspace"
         siblingIcon="◆"
         statusLabel="Sign in"
         statusWarn
+        embedded={embedded}
       >
         <div className="ox-agent__hero">
           <h1 className="ox-agent__title">OrbitX</h1>
-          <p className="ox-agent__lead">X MCP — connect X, train an agent, post from chat AI.</p>
+          <p className="ox-agent__lead">X channel — connect X, train an agent, and publish from chat AI.</p>
         </div>
         <section className="ox-agent__panel">
           <div className="ox-agent__panel-h">
@@ -690,7 +633,7 @@ export default function XMcpPage() {
               ))}
             </div>
             <p className="ox-agent__note">
-              Or <Link to="/auth?next=/x">sign in with email</Link>.
+              Or <Link to="/auth?next=/supercomputer%3Ftab%3Dx">sign in with email</Link>.
             </p>
             {error && <div className="ox-agent__alert">{error}</div>}
           </div>
@@ -704,19 +647,21 @@ export default function XMcpPage() {
       activeTab={tab}
       onTabChange={selectTab}
       tabs={X_TABS}
-      brandHref="/x"
-      brandSub="X MCP"
-      footerBrand="OrbitX X MCP"
+      brandHref="/supercomputer"
+      brandSub="X channel"
+      footerBrand="OrbitX Super Computer"
       footerNote="Post, DM, buy credits, and run your NVIDIA agent from Claude, ChatGPT, or Grok. Non-custodial X OAuth — you authorize scopes on X."
       mcpUrl={oauth.mcpUrl}
-      siblingHref="/agent"
-      siblingLabel="Agent MCP"
+      siblingHref="/supercomputer?tab=agent"
+      siblingLabel="Agent workspace"
       siblingIcon="◆"
-      topSubtitle="X MCP · Claude · ChatGPT · Grok"
+      topSubtitle="X channel · Claude · ChatGPT · Grok"
       statusLabel={statusLabel}
       statusWarn={!xConnected || !hasKey}
       onRefresh={refresh}
-    >
+      embedded={embedded}
+      >
+
       {loading && (
         <p className="ox-agent__note" style={{ marginTop: 0 }}>
           Syncing account…
@@ -729,7 +674,7 @@ export default function XMcpPage() {
           <div className="ox-agent__hero">
             <h1 className="ox-agent__title">OrbitX</h1>
             <p className="ox-agent__lead">
-              X MCP dashboard — post, DM, and run your NVIDIA agent from Claude, ChatGPT, or Grok.
+              X channel workspace — post, DM, and run your OrbitX agent from Claude, ChatGPT, or Grok.
             </p>
             <div className="ox-agent__kpis">
               <button
@@ -751,7 +696,7 @@ export default function XMcpPage() {
               <button
                 type="button"
                 className={`ox-agent__kpi${(creditsUsage?.balance ?? 0) > 0 || postCredits.remaining > 0 ? " is-ok" : ""}`}
-                onClick={() => selectTab("usage")}
+                onClick={() => selectTab("shop")}
                 title="Purchased + daily post credits"
               >
                 <span className="ox-agent__kpi-k">Credits</span>
@@ -767,13 +712,24 @@ export default function XMcpPage() {
                 <span className="ox-agent__kpi-k">Agent</span>
                 <span className="ox-agent__kpi-v">{xAgent?.enabled ? "On" : "Setup"}</span>
               </button>
+              <button
+                type="button"
+                className={`ox-agent__kpi${mcpAccess?.active ? " is-ok" : ""}`}
+                onClick={() => selectTab("shop")}
+                title="Timed MCP access from burning $ORBITX"
+              >
+                <span className="ox-agent__kpi-k">Access</span>
+                <span className="ox-agent__kpi-v">
+                  {mcpAccess?.active ? mcpAccess.remainingLabel : "Hold or burn"}
+                </span>
+              </button>
             </div>
 
             <section className="ox-agent__panel ox-x-credits">
               <div className="ox-agent__panel-h">
                 <h2 className="ox-agent__panel-title">Credits</h2>
-                <button type="button" className="ox-agent__panel-hint ox-agent__linkish" onClick={() => selectTab("usage")}>
-                  Usage / shop →
+                <button type="button" className="ox-agent__panel-hint ox-agent__linkish" onClick={() => selectTab("shop")}>
+                  Shop →
                 </button>
               </div>
               <div className="ox-agent__panel-b">
@@ -795,10 +751,16 @@ export default function XMcpPage() {
                   </div>
                 </div>
                 <p className="ox-agent__note" style={{ marginTop: "0.65rem", marginBottom: 0 }}>
-                  Buy any amount of SOL via Claude/Grok (`x_credits_buy`) or the Usage tab. Advanced ledger is on Usage.
+                  Buy credits or burn $ORBITX for timed MCP access on the Shop tab — or say “buy access” /
+                  “buy credits” in Claude/Grok.
                 </p>
               </div>
             </section>
+            <div className="ox-agent__btn-row" style={{ marginBottom: "0.75rem" }}>
+              <button type="button" className="ox-agent__btn ox-agent__btn--primary" onClick={() => selectTab("shop")}>
+                Open shop
+              </button>
+            </div>
             <div className="ox-agent__steps">
               <span className={`ox-agent__chip${xConnected ? " is-ok" : ""}`}>
                 {xConnected ? `@${xHandle}` : "X needed"}
@@ -809,6 +771,9 @@ export default function XMcpPage() {
               <span className={`ox-agent__chip${xAgent?.enabled ? " is-ok" : ""}`}>
                 {xAgent?.enabled ? "Agent on" : "Agent off"}
               </span>
+              {mcpAccess?.active && (
+                <span className="ox-agent__chip is-ok">{mcpAccess.remainingLabel}</span>
+              )}
             </div>
           </div>
 
@@ -953,8 +918,27 @@ export default function XMcpPage() {
           </section>
       )}
 
-      {tab === "usage" && (
+      {tab === "shop" && (
         <>
+          <McpShop
+            variant="x"
+            walletAddress={publicKey?.toBase58() || boot?.agent?.walletAddress}
+            creditsUsage={creditsUsage}
+            onAccessGranted={(status) =>
+              setMcpAccess({
+                ok: status.ok,
+                active: status.active,
+                expired: status.expired,
+                packageId: status.packageId,
+                expiresAt: status.expiresAt,
+                remainingMs: status.remainingMs,
+                remainingLabel: status.remainingLabel,
+                tokensBurned: status.tokensBurned,
+                lifetimeTokensBurned: status.lifetimeTokensBurned,
+              })
+            }
+            onCreditsPurchased={() => void refreshCredits()}
+          />
           <section className="ox-agent__panel ox-x-credits">
             <div className="ox-agent__panel-h">
               <h2 className="ox-agent__panel-title">Advanced usage</h2>
@@ -1058,92 +1042,6 @@ export default function XMcpPage() {
                 {copied === "payTo" ? " · copied" : ""}
                 {" · "}Ask Grok for <strong>advanced usage</strong>
               </p>
-            </div>
-          </section>
-
-          <section className="ox-agent__panel">
-            <div className="ox-agent__panel-h">
-              <h2 className="ox-agent__panel-title">Buy credits</h2>
-              <span className="ox-agent__panel-hint">packs · any amount</span>
-            </div>
-            <div className="ox-agent__panel-b">
-              <p className="ox-agent__note" style={{ marginTop: 0 }}>
-                In Grok/Claude say <strong>buy credits</strong> — or pick a pack / custom SOL here. Phantom sends SOL
-                to the OrbitX desk wallet; credits apply after confirm.
-              </p>
-              <div className="ox-x-packs">
-                {(creditsUsage?.advanced?.suggestedPacks || [
-                  { sol: 0.1, credits: 1000, label: "Starter" },
-                  { sol: 0.5, credits: 5000, label: "Standard" },
-                  { sol: 1, credits: 10000, label: "Pro" },
-                  { sol: 5, credits: 50000, label: "Whale" },
-                ]).map((p) => (
-                  <button
-                    key={p.sol}
-                    type="button"
-                    className={`ox-x-packs__btn${Number(buySol) === p.sol ? " is-on" : ""}`}
-                    onClick={() => setBuySol(String(p.sol))}
-                  >
-                    <span className="ox-x-packs__lbl">{p.label}</span>
-                    <span className="ox-x-packs__sol">{p.sol} SOL</span>
-                    <span className="ox-x-packs__cr">{p.credits.toLocaleString()} cr</span>
-                  </button>
-                ))}
-              </div>
-              <label className="ox-agent__label" htmlFor="ox-buy-sol">
-                Custom SOL
-              </label>
-              <div className="ox-x-buy__row">
-                <input
-                  id="ox-buy-sol"
-                  className="ox-agent__input"
-                  type="number"
-                  min={0.001}
-                  step={0.001}
-                  value={buySol}
-                  onChange={(e) => setBuySol(e.target.value)}
-                  placeholder="0.1"
-                />
-                <span className="ox-x-buy__quote">→ {quotedCredits.toLocaleString()} credits</span>
-              </div>
-              <div className="ox-agent__actions" style={{ marginTop: "0.75rem" }}>
-                <button
-                  type="button"
-                  className="ox-agent__btn"
-                  disabled={buyBusy}
-                  onClick={() => void onBuyCredits()}
-                >
-                  {buyBusy ? "Processing…" : walletConnected ? "Pay with wallet" : "Connect wallet to pay"}
-                </button>
-                <button
-                  type="button"
-                  className="ox-agent__btn ox-agent__btn--ghost"
-                  onClick={() => void refreshCredits()}
-                >
-                  Refresh
-                </button>
-              </div>
-              {buyNote && <p className="ox-agent__note ox-x-buy__ok">{buyNote}</p>}
-              <div className="ox-x-buy__manual">
-                <label className="ox-agent__label" htmlFor="ox-buy-sig">
-                  Already paid? Paste signature
-                </label>
-                <input
-                  id="ox-buy-sig"
-                  className="ox-agent__input"
-                  value={manualSig}
-                  onChange={(e) => setManualSig(e.target.value)}
-                  placeholder="Solana tx signature"
-                />
-                <button
-                  type="button"
-                  className="ox-agent__btn ox-agent__btn--ghost"
-                  disabled={buyBusy || !manualSig.trim()}
-                  onClick={() => void onConfirmManualSig()}
-                >
-                  Confirm payment
-                </button>
-              </div>
             </div>
           </section>
 
@@ -1844,6 +1742,8 @@ export default function XMcpPage() {
                 <FieldRow label="Scope" value={oauth.scope} copied={copied === "scope"} onCopy={() => copy("scope", oauth.scope)} />
               </>
             )}
+
+            <TelegramMcpCard kind="x" />
           </div>
         </section>
       )}
@@ -1851,7 +1751,7 @@ export default function XMcpPage() {
       {oauthGuide === "chatgpt" && (
         <div className="ox-agent__modal" onClick={() => setOauthGuide(null)}>
           <div className="ox-agent__modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2>ChatGPT · X MCP</h2>
+            <h2>ChatGPT · X channel</h2>
             <p className="ox-agent__note" style={{ marginTop: 0 }}>
               Paste into ChatGPT — leave client secret empty.
             </p>

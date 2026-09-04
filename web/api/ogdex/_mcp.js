@@ -166,7 +166,7 @@ export function extractMcpKey(req) {
 
 export function mcpAuthorized(req) {
   const keys = allowedKeys();
-  if (!keys.length) return true; // open when no keys configured
+  if (!keys.length) return false;
   const k = extractMcpKey(req);
   return !!k && keys.includes(k);
 }

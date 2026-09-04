@@ -5,20 +5,25 @@
  * Phantom/Jupiter can open for signing quickly. Simulation is opt-in
  * (local keypair path); extension wallets simulate themselves.
  *
- * Platform fee: 0.95% of SOL buys is routed to PLATFORM_FEE_WALLET
- * (45YR6f… desk / dev wallet) via:
+ * Platform fee: min(1.2% of notional USD, $10) routed to PLATFORM_FEE_WALLET
+ * (45YR6f… desk) via:
  *   1) SystemProgram.transfer prepended into the swap tx when possible
- *   2) Jupiter platformFeeBps + feeAccount (output-token ATA) as backup
+ *   2) Jupiter platformFeeBps + feeAccount (output-token ATA) as backup (bps only)
  */
 import { send, readBody, callFn, jup, PLATFORM_FEE_WALLET } from "../_lib.js";
+import {
+  applyPlatformFeeToSolAmount,
+  PLATFORM_TX_FEE_BPS,
+  quotePlatformTxFee,
+} from "../../../shared/platform-tx-fee.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const isPubkey = (v) => typeof v === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v);
 
-/** Keep in sync with web/src/lib/platformFee.ts */
-const PLATFORM_FEE_BPS = 95;
+const PLATFORM_FEE_BPS = PLATFORM_TX_FEE_BPS;
 const PLATFORM_FEE_ENABLED = true;
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM_ID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 async function deriveFeeAccount(mint) {
@@ -38,19 +43,13 @@ async function deriveFeeAccount(mint) {
   }
 }
 
-function computeBuyFee(amountSol) {
-  const lamportsIn = Math.floor(Number(amountSol) * 1e9);
-  if (!Number.isFinite(lamportsIn) || lamportsIn <= 0) {
-    return { feeLamports: 0, tradeSol: Number(amountSol), tradeLamports: lamportsIn };
-  }
-  const feeLamports = Math.floor((lamportsIn * PLATFORM_FEE_BPS) / 10_000);
-  const tradeLamports = Math.max(0, lamportsIn - feeLamports);
+async function computeBuyFee(amountSol) {
+  const quote = await quotePlatformTxFee({ amountSol });
+  const split = applyPlatformFeeToSolAmount(amountSol, quote);
   return {
-    feeLamports,
-    tradeLamports,
-    tradeSol: tradeLamports / 1e9,
-    feeSol: feeLamports / 1e9,
-    bps: PLATFORM_FEE_BPS,
+    ...quote,
+    ...split,
+    bps: quote.capApplied ? quote.feeBpsEffective : PLATFORM_FEE_BPS,
     wallet: PLATFORM_FEE_WALLET,
   };
 }
@@ -130,25 +129,48 @@ async function simulate(txB64) {
 }
 
 async function tokenBalance(owner, mint) {
-  try {
-    const res = await rpc("getTokenAccountsByOwner", [
-      owner,
-      { mint },
-      { encoding: "jsonParsed" },
-    ]);
-    let raw = 0n;
-    let decimals = 0;
-    for (const a of res?.value || []) {
-      const ta = a.account?.data?.parsed?.info?.tokenAmount;
-      if (ta) {
-        raw += BigInt(ta.amount || "0");
-        decimals = Number(ta.decimals) || decimals;
+  const filters = [{ mint }, { programId: TOKEN_PROGRAM_ID }, { programId: TOKEN_2022_PROGRAM_ID }];
+  let raw = 0n;
+  let decimals = 0;
+  let queried = false;
+  for (const filter of filters) {
+    try {
+      const res = await rpc("getTokenAccountsByOwner", [owner, filter, { encoding: "jsonParsed" }]);
+      queried = true;
+      for (const a of res?.value || []) {
+        const info = a.account?.data?.parsed?.info;
+        if (!info) continue;
+        if (info.mint && info.mint !== mint) continue;
+        const ta = info.tokenAmount;
+        if (ta) {
+          raw += BigInt(ta.amount || "0");
+          decimals = Number(ta.decimals) || decimals;
+        }
       }
+      if (filter.mint && raw > 0n) break;
+    } catch {
+      /* try the next program / mint filter */
     }
-    return { raw, decimals };
-  } catch {
-    return { raw: 0n, decimals: 0 };
   }
+  return { raw, decimals, queried };
+}
+
+export function normalizeSellAmount(raw) {
+  const t = String(raw ?? "").trim();
+  if (!t) return raw;
+  let s = t;
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+    s = t.replace(/%25/gi, "%");
+  }
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%+/);
+  if (pct) return `${pct[1]}%`;
+  if (/%/.test(t)) {
+    const n = s.match(/^(\d+(?:\.\d+)?)/);
+    if (n) return `${n[1]}%`;
+  }
+  return s;
 }
 
 async function pumpPortalTx({ publicKey, action, mint, amt, denominatedInSol, slippage, priorityFee, pool }) {
@@ -216,15 +238,17 @@ async function jupiterTx({
       } else {
         inputMint = mint;
         outputMint = SOL;
-        const { raw, decimals } = await tokenBalance(publicKey, mint);
+        const { raw, decimals, queried } = await tokenBalance(publicKey, mint);
+        if (!queried) return { error: "could not read token balance" };
         if (raw <= 0n) return { error: "no balance to sell" };
-        if (typeof amt === "string" && amt.endsWith("%")) {
-          amount = Number((raw * BigInt(Math.round(Number(amt.slice(0, -1)))) / 100n).toString());
+        const sellAmt = normalizeSellAmount(amt);
+        if (typeof sellAmt === "string" && String(sellAmt).endsWith("%")) {
+          amount = (raw * BigInt(Math.round(Number(String(sellAmt).slice(0, -1)))) / 100n).toString();
         } else {
-          amount = Math.floor(Number(amt) * 10 ** decimals);
+          amount = Math.floor(Number(sellAmt) * 10 ** decimals).toString();
         }
       }
-      if (!amount || amount <= 0) return { error: "invalid amount" };
+      if (!amount || amount === "0") return { error: "invalid amount" };
       const feeQs =
         PLATFORM_FEE_ENABLED && withPlatformFee ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : "";
       q = await jup(
@@ -301,15 +325,7 @@ async function raceFirstTx(runners) {
   });
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return send(res, 405, { ok: false, error: "POST only" });
-  let body = {};
-  try {
-    body = await readBody(req);
-  } catch {
-    body = {};
-  }
-
+export async function buildUnsignedTrade(body = {}) {
   const publicKey = body.publicKey;
   const action = body.action === "sell" ? "sell" : "buy";
   const mint = body.mint;
@@ -332,28 +348,28 @@ export default async function handler(req, res) {
   const feeOn =
     PLATFORM_FEE_ENABLED && body.platformFee !== false && body.platformFee !== "false";
 
-  if (!isPubkey(publicKey)) return send(res, 400, { ok: false, error: "invalid publicKey" });
-  if (!isPubkey(mint)) return send(res, 400, { ok: false, error: "invalid mint" });
+  if (!isPubkey(publicKey)) return { ok: false, error: "invalid publicKey" };
+  if (!isPubkey(mint)) return { ok: false, error: "invalid mint" };
 
   let amt;
-  const rawAmt = typeof body.amount === "string" ? body.amount.trim() : body.amount;
-  if (action === "sell" && typeof rawAmt === "string" && rawAmt.endsWith("%")) {
+  const rawAmt = normalizeSellAmount(typeof body.amount === "string" ? body.amount.trim() : body.amount);
+  if (action === "sell" && typeof rawAmt === "string" && String(rawAmt).endsWith("%")) {
     const pct = Number(rawAmt.slice(0, -1));
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
-      return send(res, 400, { ok: false, error: "invalid sell percentage" });
+      return { ok: false, error: "invalid sell percentage" };
     }
     amt = `${pct}%`;
   } else {
     const n = Number(rawAmt);
-    if (!Number.isFinite(n) || n <= 0) return send(res, 400, { ok: false, error: "invalid amount" });
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "invalid amount" };
     amt = n;
   }
 
-  // SOL buys: skim 0.95% to desk wallet, trade the remainder
+  // SOL buys: skim min(1.2% USD, $10) to desk wallet, trade the remainder
   let feeInfo = null;
   let tradeAmt = amt;
   if (feeOn && action === "buy" && denominatedInSol === "true" && typeof amt === "number") {
-    feeInfo = computeBuyFee(amt);
+    feeInfo = await computeBuyFee(amt);
     if (feeInfo.feeLamports > 0 && feeInfo.tradeSol > 0) {
       tradeAmt = feeInfo.tradeSol;
     } else {
@@ -414,7 +430,7 @@ export default async function handler(req, res) {
   }
 
   if (!out?.tx) {
-    return send(res, 200, { ok: false, error: out?.error || "Could not build a working trade" });
+    return { ok: false, error: out?.error || "Could not build a working trade" };
   }
 
   let feeAttached = false;
@@ -438,6 +454,10 @@ export default async function handler(req, res) {
           bps: feeInfo.bps,
           wallet: PLATFORM_FEE_WALLET,
           feeSol: feeInfo.feeSol,
+          feeUsd: feeInfo.feeUsd,
+          capApplied: Boolean(feeInfo.capApplied),
+          capUsd: 10,
+          rateBps: 120,
           feeLamports: feeInfo.feeLamports,
           tradeSol: feeInfo.tradeSol,
           attached: feeAttached,
@@ -486,19 +506,32 @@ export default async function handler(req, res) {
   }
 
   if (!wantSim) {
-    return send(res, 200, payload);
+    return payload;
   }
 
   const sim = await simulate(out.tx);
   if (sim.ok && !sim.unknown) {
-    return send(res, 200, { ...payload, simulated: true });
+    return { ...payload, simulated: true };
   }
   if (sim.unknown) {
-    return send(res, 200, payload);
+    return payload;
   }
-  return send(res, 200, {
+  return {
     ...payload,
     simulated: false,
     warning: "Route simulation flagged a risk — confirm carefully in your wallet",
-  });
+  };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") return send(res, 405, { ok: false, error: "POST only" });
+  let body = {};
+  try {
+    body = await readBody(req);
+  } catch {
+    body = {};
+  }
+  const payload = await buildUnsignedTrade(body);
+  const invalid = payload?.ok === false && /^invalid /.test(String(payload.error || ""));
+  return send(res, invalid ? 400 : 200, payload);
 }

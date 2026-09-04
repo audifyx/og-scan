@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { OrbitAtmosphereProvider } from "@/hooks/useOrbitAtmosphere";
@@ -12,6 +12,7 @@ import { OrbitAtmosphereLayer } from "@/components/theme/OrbitAtmosphereLayer";
 import { PlatformDock } from "@/components/theme/PlatformDock";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { OwnerPreviewRoute } from "@/components/OwnerPreviewRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
 import { IntercomSync } from "@/components/IntercomSync";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -75,6 +76,12 @@ function TradeMintRedirect() {
   const { mint } = useParams<{ mint: string }>();
   return <Navigate to={`/trade/token/${mint || ""}`} replace />;
 }
+
+/** Keep ?code= (and hash) when normalizing /Telegram → /telegram. */
+function RedirectPreserveSearch({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate to={{ pathname: to, search: location.search, hash: location.hash }} replace />;
+}
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
 const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
@@ -106,6 +113,8 @@ import LaunchpadApiLaunch from "./pages/orbitx/LaunchpadApiLaunch";
 import LaunchpadCurveEvm from "./pages/orbitx/LaunchpadCurveEvm";
 import LaunchpadCurveTrade from "./pages/orbitx/LaunchpadCurveTrade";
 import LaunchpadCurveMarkets from "./pages/orbitx/LaunchpadCurveMarkets";
+import OrbitXAI from "./pages/OrbitXAI";
+import TelegramOrbitX from "./pages/TelegramOrbitX";
 const LaunchpadNftHub = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftCreate"));
 const NftMarketLayout = lazyWithRetry(() => import("./pages/nft/MarketplaceLayout"));
@@ -120,7 +129,6 @@ import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
 import SupportCenter from "./pages/SupportCenter";
-import SupportPage from "./pages/SupportPage";
 import VampPortal from "./pages/VampPortal";
 import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
@@ -168,17 +176,18 @@ import AutoTweet from "./pages/AutoTweet";
 import PodcastPublisher from "./pages/PodcastPublisher";
 import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
-import AgentPage from "./pages/Agent";
+import McpSuperComputer from "./pages/McpSuperComputer";
 import AgentDetailPage from "./pages/AgentDetail";
 import McpAuthPage from "./pages/McpAuthPage";
-import XMcpPage from "./pages/XMcpPage";
-import SupercomputerPage from "./pages/SupercomputerPage";
 import XMcpAuthPage from "./pages/XMcpAuthPage";
 import XMcpLinkAuthPage from "./pages/XMcpLinkAuthPage";
 import AgentLinkAuthPage from "./pages/AgentLinkAuthPage";
 import AgentSignPage from "./pages/AgentSignPage";
 import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
+import OnChainProofPage from "./pages/OnChainProofPage";
+import OnChainWorld from "./pages/OnChainWorld";
+import Education from "./pages/Education";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PushNotificationPrompt } from "./components/notifications/PushNotificationPrompt";
@@ -289,7 +298,7 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
-            <Route path="/vamp" element={<VampPortal />} />
+            <Route path="/vamp" element={<OwnerPreviewRoute><VampPortal /></OwnerPreviewRoute>} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
             <Route path="/roadmap" element={<PlatformRoadmap />} />
             <Route path="/predictions/*" element={<PredictionsRedirect />} />
@@ -312,6 +321,22 @@ const App = () => (
               }
             />
             <Route path="/orbitxcity" element={<Navigate to="/Orbitxcity" replace />} />
+
+            {/* ── OrbitX AI — wallet-authenticated, token-gated super app ── */}
+            <Route
+              path="/ai"
+              caseSensitive
+              element={<OrbitXAI />}
+            />
+            <Route path="/AI" caseSensitive element={<Navigate to="/ai" replace />} />
+
+            {/* ── Official Telegram bot companion ── */}
+            <Route path="/telegram" element={<TelegramOrbitX />} />
+            <Route path="/Telegram" element={<RedirectPreserveSearch to="/telegram" />} />
+
+            {/* ── Public education hub (must beat /:toolSlug owner-404) ── */}
+            <Route path="/education" element={<Education />} />
+            <Route path="/education/*" element={<Education />} />
 
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route
@@ -394,7 +419,7 @@ const App = () => (
               <Route path=":mint" element={<TradeMintRedirect />} />
             </Route>
 
-            <Route path="/terminal" element={<LaunchpadTerminal />}>
+            <Route path="/terminal" element={<OwnerPreviewRoute><LaunchpadTerminal /></OwnerPreviewRoute>}>
               <Route index element={<TerminalHome />} />
               <Route path="trade" element={<TerminalTrade />} />
               <Route path="portfolio" element={<TerminalPortfolio />} />
@@ -448,14 +473,14 @@ const App = () => (
             <Route path="/hq/*" element={<Navigate to="/orbitx-social" replace />} />
 
             {/* ── Protected: App shell ── */}
-            <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
-            <Route path="/koltelebot" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
-            <Route path="/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
-            <Route path="/app/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
-            <Route path="/app/pnl-tracker" element={<ProtectedRoute><PnlTracker /></ProtectedRoute>} />
-            <Route path="/hub" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
-            <Route path="/command" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/app" element={<Hub />} />
+            <Route path="/koltelebot" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/kol-tracker" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/app/kol-tracker" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/app/pnl-tracker" element={<OwnerPreviewRoute><ProtectedRoute><PnlTracker /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/hub" element={<Hub />} />
+            <Route path="/command" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/home" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/our-coin" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/market-pulse" element={<OgdexRedirect to="/ORBITX_DEX/pulse" />} />
             <Route path="/market" element={<OgdexRedirect to="/ORBITX_DEX" />} />
@@ -473,7 +498,7 @@ const App = () => (
             <Route path="/migration-tool" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/migration-tracker" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/trending" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/communities" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/discover" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/whales" element={<OgdexRedirect to="/ORBITX_DEX/kol" />} />
             <Route path="/tx-feed" element={<OgdexRedirect to="/ORBITX_DEX" />} />
@@ -482,20 +507,20 @@ const App = () => (
             <Route path="/transaction-feed" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/swap" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
             <Route path="/news-signal" element={<OgdexRedirect to="/ORBITX_DEX/pulse" />} />
-            <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/memes" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/art-feed" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/spaces" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/listings" element={<OgdexRedirect to="/ORBITX_DEX/store" />} />
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />
-            <Route path="/community" element={<Navigate to="/community-classic" replace />} />
-            <Route path="/community-classic" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
-            <Route path="/community-hub" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
-            <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/community" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/community-classic" element={<OwnerPreviewRoute><ProtectedRoute><CommunityClassic /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/community-hub" element={<OwnerPreviewRoute><ProtectedRoute><CommunityClassic /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/voice-rooms" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/tech" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/page/:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/page-:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/app/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/page/:pageNumber" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/page-:pageNumber" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/app/:toolSlug" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/tool/:toolSlug" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
             <Route path="/tools/:toolSlug" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
 
@@ -506,7 +531,7 @@ const App = () => (
             <Route path="/reports" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             <Route path="/alerts" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             <Route path="/wallets" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
-            <Route path="/games" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/games" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             {/* Credits removed */}
 
@@ -522,13 +547,13 @@ const App = () => (
             <Route path="/callouts" element={<OgdexRedirect to="/ORBITX_DEX/callouts" />} />
 
             {/* ── Protected: Community ── */}
-            <Route path="/coin-communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/coin-communities" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/trading-lobbies" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/leaderboard" element={<OgdexRedirect to="/ORBITX_DEX/leaderboard" />} />
             <Route path="/invite" element={<ProtectedRoute><Invite /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><DirectMessagesPage /></ProtectedRoute>} />
-            <Route path="/rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
-            <Route path="/community-rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
+            <Route path="/rooms" element={<OwnerPreviewRoute><ProtectedRoute><CommunityRooms /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/community-rooms" element={<OwnerPreviewRoute><ProtectedRoute><CommunityRooms /></ProtectedRoute></OwnerPreviewRoute>} />
 
             {/* Premium removed */}
 
@@ -544,11 +569,11 @@ const App = () => (
             <Route path="/ox-desk-m4k9q" element={<AdminRoute><Admin /></AdminRoute>} />
             {/* Legacy /admin must NOT redirect to the desk */}
             <Route path="/admin" element={<NotFound />} />
-            <Route path="/art" element={<ProtectedRoute><Suspense fallback={null}><ArtFeedPage /></Suspense></ProtectedRoute>} />
+            <Route path="/art" element={<OwnerPreviewRoute><ProtectedRoute><Suspense fallback={null}><ArtFeedPage /></Suspense></ProtectedRoute></OwnerPreviewRoute>} />
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
+            <Route path="/support" element={<SupportCenter />} />
             <Route path="/listen/:spaceId" element={<SpaceReplay />} />
             {/* ── Public: Live space listener (no auth required) ── */}
             <Route path="/space/:spaceId" element={<PublicSpaceListen />} />
@@ -570,60 +595,60 @@ const App = () => (
             <Route path="/embed/w/:username" element={<EmbedCombined />} />
 
             {/* ── Protected: Spaces — advanced features ── */}
-            <Route path="/discovery" element={<ProtectedRoute><DiscoveryFeed /></ProtectedRoute>} />
-            <Route path="/spaces-discovery" element={<ProtectedRoute><DiscoveryFeed /></ProtectedRoute>} />
-            <Route path="/clips" element={<ProtectedRoute><SpaceClips /></ProtectedRoute>} />
-            <Route path="/space-clips" element={<ProtectedRoute><SpaceClips /></ProtectedRoute>} />
-            <Route path="/schedule" element={<ProtectedRoute><SpaceScheduler /></ProtectedRoute>} />
-            <Route path="/spaces-schedule" element={<ProtectedRoute><SpaceScheduler /></ProtectedRoute>} />
-            <Route path="/streams" element={<ProtectedRoute><ExternalStreams /></ProtectedRoute>} />
-            <Route path="/external-streams" element={<ProtectedRoute><ExternalStreams /></ProtectedRoute>} />
+            <Route path="/discovery" element={<OwnerPreviewRoute><ProtectedRoute><DiscoveryFeed /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/spaces-discovery" element={<OwnerPreviewRoute><ProtectedRoute><DiscoveryFeed /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/clips" element={<OwnerPreviewRoute><ProtectedRoute><SpaceClips /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/space-clips" element={<OwnerPreviewRoute><ProtectedRoute><SpaceClips /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/schedule" element={<OwnerPreviewRoute><ProtectedRoute><SpaceScheduler /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/spaces-schedule" element={<OwnerPreviewRoute><ProtectedRoute><SpaceScheduler /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/streams" element={<OwnerPreviewRoute><ProtectedRoute><ExternalStreams /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/external-streams" element={<OwnerPreviewRoute><ProtectedRoute><ExternalStreams /></ProtectedRoute></OwnerPreviewRoute>} />
 
             {/* ── Protected: Spaces — Phase 2: Analytics & Community ── */}
-            <Route path="/host-analytics" element={<ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute>} />
-            <Route path="/analytics/spaces" element={<ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute>} />
-            <Route path="/rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
-            <Route path="/community-rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
+            <Route path="/host-analytics" element={<OwnerPreviewRoute><ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/analytics/spaces" element={<OwnerPreviewRoute><ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/rooms" element={<OwnerPreviewRoute><ProtectedRoute><CommunityRooms /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/community-rooms" element={<OwnerPreviewRoute><ProtectedRoute><CommunityRooms /></ProtectedRoute></OwnerPreviewRoute>} />
 
             {/* ── Protected: Spaces — Phase 3: Shows + Co-hosting ── */}
-            <Route path="/shows" element={<ProtectedRoute><SpaceShows /></ProtectedRoute>} />
-            <Route path="/space-shows" element={<ProtectedRoute><SpaceShows /></ProtectedRoute>} />
-            <Route path="/spaces/:spaceId/cohosts" element={<ProtectedRoute><CoHostingManager /></ProtectedRoute>} />
-            <Route path="/co-hosting/:spaceId" element={<ProtectedRoute><CoHostingManager /></ProtectedRoute>} />
+            <Route path="/shows" element={<OwnerPreviewRoute><ProtectedRoute><SpaceShows /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/space-shows" element={<OwnerPreviewRoute><ProtectedRoute><SpaceShows /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/spaces/:spaceId/cohosts" element={<OwnerPreviewRoute><ProtectedRoute><CoHostingManager /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/co-hosting/:spaceId" element={<OwnerPreviewRoute><ProtectedRoute><CoHostingManager /></ProtectedRoute></OwnerPreviewRoute>} />
 
             {/* ── Protected: Platform — Phase 4: White-label & API ── */}
             <Route path="/white-label" element={<AdminRoute><WhiteLabelConfig /></AdminRoute>} />
             <Route path="/brand" element={<AdminRoute><WhiteLabelConfig /></AdminRoute>} />
-            <Route path="/developer" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
-            <Route path="/api-keys" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
-            <Route path="/dev-portal" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
-            <Route path="/marketplace" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
-            <Route path="/ai-assistant" element={<ProtectedRoute><AISpaceAssistant /></ProtectedRoute>} />
-            <Route path="/space-assistant" element={<ProtectedRoute><AISpaceAssistant /></ProtectedRoute>} />
-            <Route path="/host-copilot" element={<ProtectedRoute><AIHostCopilot /></ProtectedRoute>} />
-            <Route path="/ai-copilot" element={<ProtectedRoute><AIHostCopilot /></ProtectedRoute>} />
-            <Route path="/simulcast" element={<ProtectedRoute><Simulcast /></ProtectedRoute>} />
-            <Route path="/multistream" element={<ProtectedRoute><Simulcast /></ProtectedRoute>} />
+            <Route path="/developer" element={<OwnerPreviewRoute><ProtectedRoute><DevPortal /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/api-keys" element={<OwnerPreviewRoute><ProtectedRoute><DevPortal /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/dev-portal" element={<OwnerPreviewRoute><ProtectedRoute><DevPortal /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/marketplace" element={<OwnerPreviewRoute><ProtectedRoute><DevPortal /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/ai-assistant" element={<OwnerPreviewRoute><ProtectedRoute><AISpaceAssistant /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/space-assistant" element={<OwnerPreviewRoute><ProtectedRoute><AISpaceAssistant /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/host-copilot" element={<OwnerPreviewRoute><ProtectedRoute><AIHostCopilot /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/ai-copilot" element={<OwnerPreviewRoute><ProtectedRoute><AIHostCopilot /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/simulcast" element={<OwnerPreviewRoute><ProtectedRoute><Simulcast /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/multistream" element={<OwnerPreviewRoute><ProtectedRoute><Simulcast /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/enterprise" element={<AdminRoute><EnterpriseDashboard /></AdminRoute>} />
             <Route path="/compliance" element={<AdminRoute><EnterpriseDashboard /></AdminRoute>} />
             {/* Feature 16 — Native Mobile App */}
-            <Route path="/mobile-app" element={<MobileApp />} />
-            <Route path="/mobile" element={<MobileApp />} />
-            <Route path="/app-download" element={<MobileApp />} />
+            <Route path="/mobile-app" element={<OwnerPreviewRoute><MobileApp /></OwnerPreviewRoute>} />
+            <Route path="/mobile" element={<OwnerPreviewRoute><MobileApp /></OwnerPreviewRoute>} />
+            <Route path="/app-download" element={<OwnerPreviewRoute><MobileApp /></OwnerPreviewRoute>} />
             {/* Push/Email Reminders */}
-            <Route path="/reminders" element={<ProtectedRoute><SpaceReminders /></ProtectedRoute>} />
-            <Route path="/space-reminders" element={<ProtectedRoute><SpaceReminders /></ProtectedRoute>} />
+            <Route path="/reminders" element={<OwnerPreviewRoute><ProtectedRoute><SpaceReminders /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/space-reminders" element={<OwnerPreviewRoute><ProtectedRoute><SpaceReminders /></ProtectedRoute></OwnerPreviewRoute>} />
             {/* Auto-Tweet */}
-            <Route path="/auto-tweet" element={<ProtectedRoute><AutoTweet /></ProtectedRoute>} />
-            <Route path="/tweet-settings" element={<ProtectedRoute><AutoTweet /></ProtectedRoute>} />
+            <Route path="/auto-tweet" element={<OwnerPreviewRoute><ProtectedRoute><AutoTweet /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/tweet-settings" element={<OwnerPreviewRoute><ProtectedRoute><AutoTweet /></ProtectedRoute></OwnerPreviewRoute>} />
             {/* Podcast Publisher */}
-            <Route path="/podcasts" element={<ProtectedRoute><PodcastPublisher /></ProtectedRoute>} />
-            <Route path="/podcast-publisher" element={<ProtectedRoute><PodcastPublisher /></ProtectedRoute>} />
-            <Route path="/rss" element={<ProtectedRoute><PodcastPublisher /></ProtectedRoute>} />
+            <Route path="/podcasts" element={<OwnerPreviewRoute><ProtectedRoute><PodcastPublisher /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/podcast-publisher" element={<OwnerPreviewRoute><ProtectedRoute><PodcastPublisher /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/rss" element={<OwnerPreviewRoute><ProtectedRoute><PodcastPublisher /></ProtectedRoute></OwnerPreviewRoute>} />
             {/* Clip → Video Export */}
-            <Route path="/clip-export" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
-            <Route path="/video-export" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
-            <Route path="/export-clips" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
+            <Route path="/clip-export" element={<OwnerPreviewRoute><ProtectedRoute><ClipVideoExport /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/video-export" element={<OwnerPreviewRoute><ProtectedRoute><ClipVideoExport /></ProtectedRoute></OwnerPreviewRoute>} />
+            <Route path="/export-clips" element={<OwnerPreviewRoute><ProtectedRoute><ClipVideoExport /></ProtectedRoute></OwnerPreviewRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/intelligence" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
@@ -633,19 +658,25 @@ const App = () => (
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
-            <Route path="/x" element={<XMcpPage />} />
-            <Route path="/supercomputer" element={<SupercomputerPage />} />
-            <Route path="/shop" element={<Navigate to="/x?tab=usage" replace />} />
-            <Route path="/x/mcp-auth" element={<XMcpAuthPage />} />
-            <Route path="/x/link-auth" element={<XMcpLinkAuthPage />} />
-            <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
-            <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
-            <Route path="/agent/link-auth" element={<AgentLinkAuthPage />} />
-            <Route path="/agent/sign" element={<AgentSignPage />} />
-            <Route path="/agent/create-token" element={<AgentCreateTokenPage />} />
-            <Route path="/agent/nft-mint" element={<AgentNftMintPage />} />
-            <Route path="/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
-            <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/supercomputer" element={<McpSuperComputer />} />
+            <Route path="/mcp" element={<RedirectPreserveSearch to="/supercomputer" />} />
+            <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
+            <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
+            <Route path="/world" element={<Navigate to="/on-chain" replace />} />
+            <Route path="/on-chain" element={<OnChainWorld />} />
+            <Route path="/on-chain/wallet/:address" element={<OnChainWorld />} />
+            <Route path="/on-chain/token/:address" element={<OnChainWorld />} />
+            <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
+            <Route path="/on-chain/block/:slot" element={<OnChainWorld />} />
+            <Route path="/supercomputer/mcp-auth" element={<McpAuthPage />} />
+            <Route path="/supercomputer/x-mcp-auth" element={<XMcpAuthPage />} />
+            <Route path="/supercomputer/link-auth" element={<AgentLinkAuthPage />} />
+            <Route path="/supercomputer/x-link-auth" element={<XMcpLinkAuthPage />} />
+            <Route path="/supercomputer/sign" element={<AgentSignPage />} />
+            <Route path="/supercomputer/create-token" element={<AgentCreateTokenPage />} />
+            <Route path="/supercomputer/nft-mint" element={<AgentNftMintPage />} />
+            <Route path="/supercomputer/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
+            <Route path="/:toolSlug" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

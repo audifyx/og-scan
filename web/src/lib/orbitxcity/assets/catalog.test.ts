@@ -4,6 +4,7 @@ import {
   CITY_PROP_RULES,
   FURNITURE_SETS,
   ORBITX_MODELS,
+  isRealModelResponse,
   ORBITX_PREFERRED_PATHS,
   getFurnitureSet,
   getPropRules,
@@ -33,6 +34,13 @@ describe("orbitxcity assets catalog", () => {
     expect(ORBITX_MODELS["character-trader"].preferred).toContain("orbitx_character_trader");
   });
 
+  it("rejects SPA HTML fallbacks as missing OrbitX art", () => {
+    expect(isRealModelResponse({ ok: true, headers: { get: () => "text/html" } })).toBe(false);
+    expect(isRealModelResponse({ ok: true, headers: { get: () => "model/gltf-binary" } })).toBe(true);
+    expect(isRealModelResponse({ ok: true, headers: { get: () => "application/octet-stream" } })).toBe(true);
+    expect(isRealModelResponse({ ok: false, headers: { get: () => "model/gltf-binary" } })).toBe(false);
+  });
+
   it("resolves to fallback when OrbitX art is missing", () => {
     expect(resolveModelPath("character-trader")).toBeNull();
     expect(resolveModelPath("building-hq-tower")).toContain("building_C");
@@ -57,10 +65,11 @@ describe("orbitxcity assets catalog", () => {
     }
   });
 
-  it("assigns character kits per class", () => {
-    expect(getCharacterKit("trader").accessory).toBe("briefcase");
-    expect(getCharacterKit("gamer").accessory).toBe("headset");
-    expect(getCharacterGltfPath("trader")).toBeNull();
+  it("assigns character kits per mascot and alias", () => {
+    expect(getCharacterKit("pepe").accessory).toBe("briefcase");
+    expect(getCharacterKit("trader").classId).toBe("pepe");
+    expect(getCharacterKit("chad").accessory).toBe("headset");
+    expect(getCharacterGltfPath("pepe")).toBeNull();
   });
 
   it("assigns building kits by kind", () => {

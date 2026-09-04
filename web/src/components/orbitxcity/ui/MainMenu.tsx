@@ -1,179 +1,535 @@
-﻿/**
- * OrbitX City — Console title screen.
- * Full-bleed city art + brand + vertical nav. No tile dashboard.
+/**
+ * OrbitX City — GTA V pause-menu style launcher.
+ *
+ * Horizontal tab strip, a vertical list with a sliding inverted highlight bar,
+ * and a contextual detail pane on the right. Keyboard/gamepad-first: arrows
+ * move, Q/E swap tabs, Enter selects, Esc backs out.
  */
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
 import type { CityId } from "@/lib/orbitxcity/types";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
+import { resolveTitleTheme, titleCssVars } from "@/lib/orbitxcity/titleTheme";
+import {
+  buildServerRows,
+  occupancyLabel,
+  REGION_LABEL,
+  statusLabel,
+  totalPlayers as sumPlayers,
+  type ServerRow,
+} from "@/lib/orbitxcity/serverBrowser";
+import { watchLobbyDirectory, type DirectoryLobby } from "@/lib/orbitxcity/realtime";
+import {
+  CHARACTER_CLASSES,
+  appearanceFromClass,
+  classPowerIndex,
+  getRarityMeta,
+  resolveClassId,
+  type CharacterClassId,
+} from "@/lib/orbitxcity/characterClasses";
 import { MenuBackdrop } from "./MenuBackdrop";
+import { MascotPortrait } from "./MascotPortrait";
 import { AudioToggle } from "./AudioToggle";
 import { InstallCityPWA } from "./InstallCityPWA";
 
-type NavId = "play" | "multiplayer" | "settings" | "quick";
+type TabId = "play" | "operatives" | "settings" | "info";
 
-const NAV: { id: NavId; label: string; hint: string; primary?: boolean }[] = [
-  { id: "play", label: "Play", hint: "Choose operative", primary: true },
-  { id: "multiplayer", label: "Multiplayer", hint: "Lobbies & rooms" },
-  { id: "settings", label: "Settings", hint: "Audio · quality · touch" },
-  { id: "quick", label: "Quick Play", hint: "Skip setup · demo" },
+const TABS: { id: TabId; label: string }[] = [
+  { id: "play", label: "Play" },
+  { id: "operatives", label: "Operatives" },
+  { id: "settings", label: "Settings" },
+  { id: "info", label: "Info" },
 ];
 
 export function MainMenu() {
-  const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
-  const [visible, setVisible] = useState(false);
-  const [flash, setFlash] = useState(false);
-  const [focus, setFocus] = useState<NavId>("play");
-  const [isTouch, setIsTouch] = useState(
-    () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches,
-  );
+  const {
+    setGate,
+    setEntered,
+    setAvatar,
+    avatar,
+    selectedCityId,
+    setSelectedCityId,
+    quality,
+    setQuality,
+  } = useCity();
 
-  const activeCity = ORBITX_CITIES.find((c) => c.id === selectedCityId) ?? ORBITX_CITIES[0]!;
+  const [tab, setTab] = useState<TabId>("play");
+  const [index, setIndex] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [directory, setDirectory] = useState<DirectoryLobby[] | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const theme = resolveTitleTheme(selectedCityId);
+  const cssVars = useMemo(() => titleCssVars(theme) as CSSProperties, [theme]);
+
+  const servers = useMemo(() => buildServerRows(directory), [directory]);
+  const totalPlayers = sumPlayers(servers);
+  const liveCounts = servers.some((s) => s.live);
+
+  const selectedClassId = resolveClassId(avatar.classId);
+
+  /** Row count for the active tab, used by keyboard nav. */
+  const rowCount =
+    tab === "play"
+      ? servers.length
+      : tab === "operatives"
+        ? CHARACTER_CLASSES.length
+        : tab === "settings"
+          ? 3
+          : 0;
 
   useEffect(() => {
-    const t = requestAnimationFrame(() => setVisible(true));
-    const mq = window.matchMedia?.("(pointer: coarse)");
-    const onChange = () => setIsTouch(Boolean(mq?.matches));
-    mq?.addEventListener?.("change", onChange);
+    const raf = requestAnimationFrame(() => setVisible(true));
+    const stop = watchLobbyDirectory((lobbies) => setDirectory(lobbies));
     return () => {
-      cancelAnimationFrame(t);
-      mq?.removeEventListener?.("change", onChange);
+      cancelAnimationFrame(raf);
+      stop();
     };
   }, []);
 
-  const pulse = () => {
-    setFlash(true);
-    window.setTimeout(() => setFlash(false), 550);
-  };
-
-  const run = (id: NavId) => {
-    void cityAudio.unlock();
-    setFocus(id);
-    switch (id) {
-      case "play":
-        cityAudio.play("confirm");
-        pulse();
-        window.setTimeout(() => setGate("characters"), 160);
-        break;
-      case "multiplayer":
-        cityAudio.play("confirm");
-        pulse();
-        window.setTimeout(() => setGate("lobbies"), 160);
-        break;
-      case "settings":
-        cityAudio.play("enter");
-        pulse();
-        setGate("world");
-        setEntered(true);
-        openPanel("settings");
-        break;
-      case "quick":
-        cityAudio.play("enter");
-        pulse();
-        window.setTimeout(() => {
-          setGate("world");
-          setEntered(true);
-        }, 140);
-        break;
-      default:
-        break;
+  // Keep the highlighted row synced to the live selection when a tab opens.
+  useEffect(() => {
+    if (tab === "play") {
+      const i = servers.findIndex((s) => s.id === selectedCityId);
+      setIndex(i >= 0 ? i : 0);
+    } else if (tab === "operatives") {
+      const i = CHARACTER_CLASSES.findIndex((c) => c.id === selectedClassId);
+      setIndex(i >= 0 ? i : 0);
+    } else {
+      setIndex(0);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const connect = useCallback(() => {
+    if (connecting) return;
+    void cityAudio.unlock();
+    cityAudio.play("confirm");
+    setConnecting(true);
+    window.setTimeout(() => setGate("characters"), 640);
+  }, [connecting, setGate]);
+
+  const quickPlay = useCallback(() => {
+    void cityAudio.unlock();
+    cityAudio.play("enter");
+    setGate("world");
+    setEntered(true);
+  }, [setGate, setEntered]);
+
+  const activate = useCallback(() => {
+    void cityAudio.unlock();
+    if (tab === "play") {
+      const s = servers[index];
+      if (!s || s.status === "offline") return;
+      setSelectedCityId(s.id as CityId);
+      connect();
+    } else if (tab === "operatives") {
+      const c = CHARACTER_CLASSES[index];
+      if (!c) return;
+      cityAudio.play("confirm");
+      setAvatar(appearanceFromClass(c, avatar.name));
+      window.setTimeout(() => setGate("characters"), 160);
+    } else if (tab === "settings") {
+      cityAudio.play("ui");
+      if (index === 0) setQuality(quality === "high" ? "lite" : "high");
+      else if (index === 1) setGate("settings");
+      else quickPlay();
+    }
+  }, [
+    tab,
+    index,
+    servers,
+    setSelectedCityId,
+    connect,
+    setAvatar,
+    avatar.name,
+    setGate,
+    quality,
+    setQuality,
+    quickPlay,
+  ]);
+
+  // Keyboard / gamepad-style navigation.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+
+      const tabIdx = TABS.findIndex((t) => t.id === tab);
+
+      switch (e.key) {
+        case "ArrowDown":
+        case "s":
+          e.preventDefault();
+          if (rowCount) {
+            cityAudio.play("ui");
+            setIndex((i) => (i + 1) % rowCount);
+          }
+          break;
+        case "ArrowUp":
+        case "w":
+          e.preventDefault();
+          if (rowCount) {
+            cityAudio.play("ui");
+            setIndex((i) => (i - 1 + rowCount) % rowCount);
+          }
+          break;
+        case "ArrowRight":
+        case "e":
+          e.preventDefault();
+          cityAudio.play("ui");
+          setTab(TABS[(tabIdx + 1) % TABS.length]!.id);
+          break;
+        case "ArrowLeft":
+        case "q":
+          e.preventDefault();
+          cityAudio.play("ui");
+          setTab(TABS[(tabIdx - 1 + TABS.length) % TABS.length]!.id);
+          break;
+        case "Enter":
+          e.preventDefault();
+          activate();
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, rowCount, activate]);
+
+  // Keep the highlighted row in view on long lists.
+  useEffect(() => {
+    const el = listRef.current?.children[index] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [index]);
+
+  const activeServer = servers[index] ?? servers[0];
+  const activeClass = CHARACTER_CLASSES[index] ?? CHARACTER_CLASSES[0]!;
 
   return (
     <div
-      className={`oxc-menu ${visible ? "is-in" : ""}`}
-      style={{ ["--menu-accent" as string]: activeCity.accent }}
+      className={`oxc-gta ${visible ? "is-in" : ""} ${connecting ? "is-connecting" : ""}`}
+      style={cssVars}
     >
       <MenuBackdrop cityId={selectedCityId} intensity="title" />
-      <div className={`oxc-menu-flash ${flash ? "is-on" : ""}`} aria-hidden />
+      <div className="oxc-gta-wash" aria-hidden />
+      <div className="oxc-gta-scan" aria-hidden />
 
-      <div className="oxc-menu-corner oxc-menu-corner--left">
-        <AudioToggle />
-        <button
-          type="button"
-          className="oxc-menu-iconbtn"
-          onClick={() => {
-            void cityAudio.unlock();
-            cityAudio.nextTrack();
-          }}
-          title="Next theme track"
-          aria-label="Next song"
-        >
-          ♫
-        </button>
-      </div>
-      <div className="oxc-menu-corner oxc-menu-corner--right">
-        <InstallCityPWA />
-      </div>
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="oxc-gta-head">
+        <div className="oxc-gta-title">
+          <span className="oxc-gta-logo">
+            Orbit<em>X</em>
+          </span>
+          <span className="oxc-gta-city">CITY</span>
+        </div>
+        <div className="oxc-gta-headright">
+          <span className="oxc-gta-online" data-live={liveCounts}>
+            <i aria-hidden />
+            {liveCounts ? `${totalPlayers.toLocaleString()} online` : "Connecting…"}
+          </span>
+          <AudioToggle />
+          <button
+            type="button"
+            className="oxc-gta-ico"
+            aria-label="Next track"
+            title="Next theme track"
+            onClick={() => {
+              void cityAudio.unlock();
+              cityAudio.nextTrack();
+            }}
+          >
+            ♫
+          </button>
+          <InstallCityPWA />
+        </div>
+      </header>
 
-      <div className="oxc-menu-stage">
-        <header className="oxc-menu-brand">
-          <p className="oxc-menu-kicker">OrbitX · Live District</p>
-          <div className="oxc-menu-logo" aria-label="OrbitX City">
-            <span className="oxc-menu-logo-orbit">
-              Orbit<span className="oxc-menu-logo-x">X</span>
-            </span>
-            <span className="oxc-menu-logo-city">CITY</span>
-          </div>
-          <p className="oxc-menu-tag">{activeCity.tagline}. Walk Midtown. Trade. Launch. Play.</p>
-        </header>
+      {/* ── Tab strip ──────────────────────────────────────── */}
+      <nav className="oxc-gta-tabs" role="tablist" aria-label="Menu sections">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`oxc-gta-tab ${tab === t.id ? "is-on" : ""}`}
+            onClick={() => {
+              cityAudio.play("ui");
+              setTab(t.id);
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
 
-        <section className="oxc-menu-districts" aria-labelledby="oxc-district-label">
-          <div className="oxc-menu-section-label" id="oxc-district-label">
-            <span>District</span>
-            <em>{activeCity.name.replace(/^OrbitX\s+/i, "")}</em>
-          </div>
-          <div className="oxc-menu-cities" role="group" aria-label="City server">
-            {ORBITX_CITIES.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`oxc-menu-city ${selectedCityId === c.id ? "on" : ""}`}
-                style={{ ["--chip" as string]: c.accent }}
-                onClick={() => {
-                  cityAudio.play("ui");
-                  setSelectedCityId(c.id as CityId);
+      {/* ── Panel ──────────────────────────────────────────── */}
+      <div className="oxc-gta-panel">
+        <ul className="oxc-gta-list" ref={listRef} role="listbox" aria-label={tab}>
+          {tab === "play" &&
+            servers.map((s, i) => (
+              <ServerLine
+                key={s.id}
+                server={s}
+                on={i === index}
+                onHover={() => setIndex(i)}
+                onPick={() => {
+                  setIndex(i);
+                  setSelectedCityId(s.id as CityId);
+                  connect();
                 }}
-                aria-pressed={selectedCityId === c.id}
-              >
-                <span>{c.name.replace(/^OrbitX\s+/i, "")}</span>
-              </button>
+              />
             ))}
-          </div>
-        </section>
 
-        <nav className="oxc-menu-rail" aria-label="Main menu">
-          {NAV.map((item, i) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`oxc-menu-rail-item ${item.primary ? "is-primary" : ""} ${focus === item.id ? "is-focus" : ""}`}
-              style={{ animationDelay: `${90 + i * 55}ms` }}
-              onMouseEnter={() => setFocus(item.id)}
-              onFocus={() => setFocus(item.id)}
-              onClick={() => run(item.id)}
-            >
-              <span className="oxc-menu-rail-marker" aria-hidden>
-                {focus === item.id ? "▸" : "·"}
-              </span>
-              <span className="oxc-menu-rail-copy">
-                <span className="oxc-menu-rail-label">{item.label}</span>
-                <span className="oxc-menu-rail-hint">{item.hint}</span>
-              </span>
-            </button>
-          ))}
-        </nav>
+          {tab === "operatives" &&
+            CHARACTER_CLASSES.map((c, i) => {
+              const r = getRarityMeta(c.id);
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={i === index}
+                    className={`oxc-gta-row ${i === index ? "is-on" : ""}`}
+                    onMouseEnter={() => setIndex(i)}
+                    onClick={() => {
+                      setIndex(i);
+                      cityAudio.play("confirm");
+                      setAvatar(appearanceFromClass(c, avatar.name));
+                      window.setTimeout(() => setGate("characters"), 160);
+                    }}
+                  >
+                    <span className="oxc-gta-rowlabel">{c.name}</span>
+                    <span
+                      className="oxc-gta-rowval"
+                      style={{ color: r.color }}
+                    >
+                      {r.label}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+
+          {tab === "settings" && (
+            <>
+              <li>
+                <button
+                  type="button"
+                  className={`oxc-gta-row ${index === 0 ? "is-on" : ""}`}
+                  onMouseEnter={() => setIndex(0)}
+                  onClick={() => {
+                    setIndex(0);
+                    cityAudio.play("ui");
+                    setQuality(quality === "high" ? "lite" : "high");
+                  }}
+                >
+                  <span className="oxc-gta-rowlabel">Graphics</span>
+                  <span className="oxc-gta-rowval">
+                    ‹ {quality === "high" ? "High" : "Lite"} ›
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`oxc-gta-row ${index === 1 ? "is-on" : ""}`}
+                  onMouseEnter={() => setIndex(1)}
+                  onClick={() => {
+                    setIndex(1);
+                    cityAudio.play("ui");
+                    setGate("settings");
+                  }}
+                >
+                  <span className="oxc-gta-rowlabel">All Settings</span>
+                  <span className="oxc-gta-rowval">›</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className={`oxc-gta-row ${index === 2 ? "is-on" : ""}`}
+                  onMouseEnter={() => setIndex(2)}
+                  onClick={() => {
+                    setIndex(2);
+                    quickPlay();
+                  }}
+                >
+                  <span className="oxc-gta-rowlabel">Direct Connect</span>
+                  <span className="oxc-gta-rowval">Skip setup</span>
+                </button>
+              </li>
+            </>
+          )}
+
+          {tab === "info" && (
+            <li className="oxc-gta-static">
+              <p>
+                OrbitX City is a live crypto metaverse. Walk Midtown, trade from
+                in-world terminals, launch tokens at the arena, and meet other
+                operatives in voice plazas.
+              </p>
+              <p>
+                <strong>WASD</strong> move · <strong>Shift</strong> sprint ·{" "}
+                <strong>Space</strong> jump · <strong>E</strong> interact
+              </p>
+            </li>
+          )}
+        </ul>
+
+        {/* ── Detail pane ──────────────────────────────────── */}
+        <aside className="oxc-gta-detail">
+          {tab === "play" && activeServer && (
+            <>
+              <div className="oxc-gta-art" data-city={activeServer.id}>
+                <span>{REGION_LABEL[activeServer.region]}</span>
+              </div>
+              <h3>{activeServer.name}</h3>
+              <p className="oxc-gta-blurb">{activeServer.blurb}</p>
+              <dl className="oxc-gta-facts">
+                <div>
+                  <dt>Players</dt>
+                  <dd>{occupancyLabel(activeServer)}</dd>
+                </div>
+                <div>
+                  <dt>Region</dt>
+                  <dd>{REGION_LABEL[activeServer.region]}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd data-status={activeServer.status}>
+                    {statusLabel(activeServer.status)}
+                  </dd>
+                </div>
+              </dl>
+              <div className="oxc-gta-meter">
+                <span
+                  style={{
+                    width: `${(activeServer.players / activeServer.maxPlayers) * 100}%`,
+                  }}
+                />
+              </div>
+              <ul className="oxc-gta-tags">
+                {activeServer.tags.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {tab === "operatives" && (
+            <>
+              <div className="oxc-gta-portrait" data-rarity={activeClass.rarity}>
+                <MascotPortrait id={activeClass.id as CharacterClassId} />
+              </div>
+              <h3>{activeClass.name}</h3>
+              <p className="oxc-gta-blurb">{activeClass.tagline}</p>
+              <ul className="oxc-gta-stats">
+                {activeClass.stats.map((s) => (
+                  <li key={s.label}>
+                    <span>{s.label}</span>
+                    <i>
+                      <b style={{ width: `${s.value}%` }} />
+                    </i>
+                    <em>{s.value}</em>
+                  </li>
+                ))}
+              </ul>
+              <div className="oxc-gta-facts">
+                <div>
+                  <dt>Power</dt>
+                  <dd>{classPowerIndex(activeClass.id)}</dd>
+                </div>
+              </div>
+            </>
+          )}
+
+          {(tab === "settings" || tab === "info") && (
+            <div className="oxc-gta-art oxc-gta-art--plain">
+              <span>OrbitX City · Alpha</span>
+            </div>
+          )}
+        </aside>
       </div>
 
-      <footer className="oxc-menu-foot">
-        <span className="oxc-menu-meta">
-          {isTouch
-            ? "Joystick · Jump · Sprint · Tap E to interact"
-            : "WASD · E interact · Shift sprint · Space jump"}
+      {/* ── Button hints ───────────────────────────────────── */}
+      <footer className="oxc-gta-hints">
+        <span>
+          <kbd>↑↓</kbd> Navigate
         </span>
+        <span>
+          <kbd>Q</kbd>
+          <kbd>E</kbd> Tabs
+        </span>
+        <span>
+          <kbd>Enter</kbd> Select
+        </span>
+        <span className="oxc-gta-spacer" />
+        <button type="button" className="oxc-gta-cta" onClick={connect}>
+          Play Now
+        </button>
       </footer>
+
+      {connecting && (
+        <div className="oxc-gta-loading" role="status">
+          <div className="oxc-gta-bars" aria-hidden>
+            <i />
+            <i />
+            <i />
+          </div>
+          <p>Connecting to {activeServer?.name ?? "OrbitX City"}…</p>
+        </div>
+      )}
     </div>
+  );
+}
+
+function ServerLine({
+  server,
+  on,
+  onHover,
+  onPick,
+}: {
+  server: ServerRow;
+  on: boolean;
+  onHover: () => void;
+  onPick: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        role="option"
+        aria-selected={on}
+        className={`oxc-gta-row ${on ? "is-on" : ""}`}
+        data-status={server.status}
+        onMouseEnter={onHover}
+        onClick={onPick}
+      >
+        <span className="oxc-gta-rowtext">
+          <span className="oxc-gta-rowlabel">{server.name}</span>
+          <span className="oxc-gta-rowsub">{server.blurb}</span>
+        </span>
+        <span className="oxc-gta-rowmeta">
+          <span className="oxc-gta-rowval">{occupancyLabel(server)}</span>
+          <span className="oxc-gta-rowstate" data-status={server.status}>
+            {statusLabel(server.status)}
+          </span>
+        </span>
+      </button>
+    </li>
   );
 }

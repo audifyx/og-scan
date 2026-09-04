@@ -16,24 +16,27 @@ export function preloadCityAssets(): void {
 
   for (const path of ALL_GLTF_PATHS) {
     try {
-      useGLTF.preload(path);
+      if (typeof path === "string" && path.length > 0) useGLTF.preload(path);
     } catch {
-      /* HMR / SSR — ignore */
+      /* HMR / SSR / missing file — ignore */
     }
   }
 
   // Probe custom OrbitX GLBs; preload only those that exist.
-  probing = probeOrbitxModels().then((found) => {
-    for (const path of found) {
-      markModelAvailable(path);
-      try {
-        useGLTF.preload(path);
-      } catch {
-        /* ignore */
+  probing = probeOrbitxModels()
+    .then((found) => {
+      for (const path of found) {
+        if (!path) continue;
+        markModelAvailable(path);
+        try {
+          useGLTF.preload(path);
+        } catch {
+          /* ignore */
+        }
       }
-    }
-    return found;
-  });
+      return found;
+    })
+    .catch(() => [] as string[]);
 }
 
 export function getPreloadPaths(): readonly string[] {

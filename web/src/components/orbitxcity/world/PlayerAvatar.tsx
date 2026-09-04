@@ -14,8 +14,6 @@ import {
 import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
-import { CharacterGltf } from "./CharacterGltf";
-import { getCharacterGltfPath } from "@/lib/orbitxcity/assets/characterKits";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const WALK_SPEED = 7.5;
@@ -89,13 +87,14 @@ export function PlayerAvatar({
   const { camera } = useThree();
   const { quality } = useCity();
   useKeyboard();
-  const heroPath = quality === "high" ? getCharacterGltfPath(appearance.classId) : null;
 
   const spawn = block.spawn;
   const blockRef = useRef(block);
   blockRef.current = block;
   const ignoreRef = useRef(ignoreBuildingId);
   ignoreRef.current = ignoreBuildingId;
+  const lingerIgnore = useRef<string | null>(null);
+  if (ignoreBuildingId) lingerIgnore.current = ignoreBuildingId;
   const interiorRef = useRef(interiorBuilding);
   interiorRef.current = interiorBuilding;
   const onEnterRef = useRef(onEnterBuilding);
@@ -182,7 +181,7 @@ export function PlayerAvatar({
       const nextX = pos.current.x + nx * t;
       const nextZ = pos.current.z + nz * t;
       const world = blockRef.current;
-      const ignore = ignoreRef.current;
+      const ignore = ignoreRef.current ?? lingerIgnore.current;
       const interior = interiorRef.current;
       if (
         !collidesAt(nextX, pos.current.z, 0.45, world, ignore) &&
@@ -216,6 +215,20 @@ export function PlayerAvatar({
             transitionCd.current = 0.7;
             onExitRef.current?.();
           }
+        }
+      }
+      const linger = lingerIgnore.current;
+      if (linger && !ignoreRef.current) {
+        const left = world.buildings.find((b) => b.id === linger);
+        if (!left) lingerIgnore.current = null;
+        else {
+          const minX = left.position.x - left.size.width / 2 - 0.2;
+          const maxX = left.position.x + left.size.width / 2 + 0.2;
+          const minZ = left.position.z - left.size.depth / 2 - 0.2;
+          const maxZ = left.position.z + left.size.depth / 2 + 0.2;
+          const inside =
+            pos.current.x > minX && pos.current.x < maxX && pos.current.z > minZ && pos.current.z < maxZ;
+          if (!inside) lingerIgnore.current = null;
         }
       }
     } else {
@@ -303,10 +316,9 @@ export function PlayerAvatar({
 
   return (
     <group ref={group} position={[spawn.x, 0, spawn.z]}>
-      {heroPath ? (
-        <CharacterGltf path={heroPath} appearance={appearance} animation={characterAnimation.current} />
-      ) : (
-        <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
+      <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
+      {quality === "high" && (
+        <pointLight position={[0.35, 1.6, 0.55]} intensity={0.55} color="#e8d8b0" distance={4.5} decay={2} />
       )}
       <mesh ref={flame} position={[0, 1.05, -0.28]} rotation-x={Math.PI} visible={false}>
         <coneGeometry args={[0.14, 0.6, 10]} />
@@ -314,10 +326,10 @@ export function PlayerAvatar({
       </mesh>
       {/* Ground ring — Creator presence aura is a wider double ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <ringGeometry args={[0.45, 0.55, 32]} />
+        <ringGeometry args={[0.52, 0.64, 32]} />
         <meshBasicMaterial color={appearance.accentColor} transparent opacity={0.55} toneMapped={false} />
       </mesh>
-      {appearance.classId === "creator" && (
+      {(appearance.classId === "wojak" || appearance.classId === "creator") && (
         <>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
             <ringGeometry args={[0.7, 0.82, 40]} />

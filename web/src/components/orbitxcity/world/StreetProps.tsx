@@ -1,14 +1,10 @@
 import { useMemo } from "react";
-import { Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
-import { CITY_STREET_MODELS } from "@/lib/orbitxcity/assets/catalog";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
-
-const BENCH_PATH = CITY_STREET_MODELS.bench;
-useGLTF.preload(BENCH_PATH);
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const LAMP_SPACING = 16;
 
@@ -62,6 +58,43 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     <group>
       <primitive object={poles} />
       <primitive object={heads} />
+    </group>
+  );
+}
+
+function StreetLampLights({ block }: { block: WorldBlockConfig }) {
+  const { quality } = useCity();
+  const high = quality === "high";
+  const spots = useMemo(() => {
+    const streets = getWorldStreets(block.cityId);
+    const out: Array<[number, number]> = [];
+    const spacing = high ? 22 : 36;
+    for (const s of streets) {
+      const off = s.w / 2 + 1;
+      for (let t = s.from + 8; t <= s.to - 6; t += spacing) {
+        const p: [number, number] = s.o === "h" ? [t, s.at + off] : [s.at + off, t];
+        if (!collidesAt(p[0], p[1], 0.4, block)) out.push(p);
+      }
+    }
+    return out.slice(0, high ? 14 : 6);
+  }, [block, high]);
+
+  return (
+    <group>
+      {spots.map(([x, z], i) => (
+        <group key={`lamp-light-${i}`} position={[x, 4.6, z]}>
+          <mesh>
+            <sphereGeometry args={[0.12, 8, 8]} />
+            <meshBasicMaterial color="#f0e2b8" toneMapped={false} />
+          </mesh>
+          <pointLight
+            intensity={high ? 1.35 : 0.95}
+            color={i % 3 === 0 ? "#00ff9f" : "#f0d7a0"}
+            distance={high ? 18 : 14}
+            decay={2}
+          />
+        </group>
+      ))}
     </group>
   );
 }
@@ -139,25 +172,39 @@ function Crosswalks({ block }: { block: WorldBlockConfig }) {
   );
 }
 
+function StreetBench({ x, z, rot }: { x: number; z: number; rot: number }) {
+  return (
+    <group position={[x, 0, z]} rotation={[0, rot, 0]}>
+      {[-0.48, 0.48].map((ox) => (
+        <mesh key={ox} position={[ox, 0.18, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.36, 0.42]} />
+          <meshStandardMaterial color="#2a221c" roughness={0.72} metalness={0.15} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.4, 0]} castShadow>
+        <boxGeometry args={[1.45, 0.07, 0.44]} />
+        <meshStandardMaterial color="#6a5340" roughness={0.68} />
+      </mesh>
+      <mesh position={[0, 0.68, -0.18]} castShadow>
+        <boxGeometry args={[1.45, 0.42, 0.07]} />
+        <meshStandardMaterial color="#7a6250" roughness={0.65} />
+      </mesh>
+      <mesh position={[0, 0.42, 0.18]}>
+        <boxGeometry args={[1.35, 0.03, 0.03]} />
+        <meshStandardMaterial color="#00ff9f" emissive="#00ff9f" emissiveIntensity={0.35} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 function StreetFurniture({ block }: { block: WorldBlockConfig }) {
-  const { scene } = useGLTF(BENCH_PATH);
   return (
     <group>
       {block.zones.slice(0, 10).map((zone, i) => {
         const x = zone.position.x + (i % 2 === 0 ? 2.1 : -2.1);
         const z = zone.position.z + (i % 3 === 0 ? 1.2 : -1.2);
         if (collidesAt(x, z, 0.5, block)) return null;
-        return (
-          <Clone
-            key={`street-furniture-${zone.id}`}
-            object={scene}
-            position={[x, 0, z]}
-            rotation={[0, (i % 4) * (Math.PI / 2), 0]}
-            scale={1.35}
-            castShadow
-            receiveShadow
-          />
-        );
+        return <StreetBench key={`street-furniture-${zone.id}`} x={x} z={z} rot={(i % 4) * (Math.PI / 2)} />;
       })}
     </group>
   );
@@ -253,6 +300,7 @@ export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConf
   return (
     <group>
       <LampField block={block} />
+      <StreetLampLights block={block} />
       <Crosswalks block={block} />
       <SidewalkScatter block={block} />
       <StreetFurniture block={block} />

@@ -16,12 +16,11 @@ Last applied: 2026-07-25 (production Supabase project `ffjipnkhcebjvttliptb` / S
 
 ## Blocked from this environment (needs human / Vercel auth)
 
-Vercel CLI is not authenticated here (device OAuth required). Set these in the Vercel project (Production + Preview as needed):
+Vercel CLI is not authenticated here (device OAuth required). Set these on Vercel project **`rork-og-meme-coin-tracker`** only (Production + Preview). Do not set them on the leftover `og-scan` Vercel project.
 
 | Env var | Notes |
 |---------|-------|
-| `ADMIN_PASS` | ≥8 chars; **server-only** — never put this in any `VITE_*` var |
-| `VITE_ADMIN_PASS` | Optional soft UI gate only; use a **different** value from `ADMIN_PASS` (or omit). Real admin auth is `ADMIN_PASS` on the API |
+| `ADMIN_AUTH` | ≥8 chars; **server-only** desk/admin/maintenance PIN on `rork-og-meme-coin-tracker`. Never put this in any `VITE_*` var |
 | `CRON_SECRET` | Required for `alerts-run` cron (`Authorization: Bearer …`) |
 | `OXW_WORKER_SECRET` | Must match the value set on Supabase secrets |
 | `HELIUS_WEBHOOK_SECRET` | Required for `/api/kol/webhook` (fail-closed if unset) |

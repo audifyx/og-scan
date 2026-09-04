@@ -90,17 +90,7 @@ export default async function handler(req, res) {
       }
 
       if (peek && typeof peek === "object" && !peek.jsonrpc && peek.tool) {
-        const url = buildToolUrl(BASE, peek.tool, peek.params || {});
-        if (!url) {
-          return sendJson(res, { ok: false, error: `Unknown legacy tool: ${peek.tool}` }, 400);
-        }
-        try {
-          const r = await fetch(url, { headers: { "User-Agent": "OrbitX-MCP/1.0" } });
-          const data = await r.json();
-          return sendJson(res, { ok: true, tool: peek.tool, result: data });
-        } catch (e) {
-          return sendJson(res, { ok: false, tool: peek.tool, error: String(e?.message || e) }, 502);
-        }
+        return sendJson(res, { ok: false, error: "legacy_mcp_disabled" }, 401);
       }
     }
 

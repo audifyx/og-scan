@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { Loader2, Wallet, X } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
-import { connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
+import { adapterNameMatches, connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
 import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
 
 export const TRADE_WALLET_NAMES = ["Phantom", "Jupiter", "Solflare"] as const;
@@ -30,7 +30,7 @@ export function TradeWalletPickerModal({
 
   const rows = useMemo(() => {
     return TRADE_WALLET_NAMES.map((name) => {
-      const hit = wallets.find((w) => w.adapter.name === name);
+      const hit = wallets.find((w) => adapterNameMatches(String(w.adapter.name), name));
       const readyState = hit ? String(hit.readyState) : "NotDetected";
       return {
         name,

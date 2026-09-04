@@ -10,7 +10,7 @@ Branch: `cursor/orbitx-backend-security-scan-6aed`
 | S0 | Webhook SSRF via alerts | HTTPS-only + private IP block on create + deliver |
 | S0 | `launch-digest` fail-open + TG token relay | Require `CRON_SECRET`; POST uses `botId` from DB only |
 | S0 | `orbitx_tokens` open insert | Dropped; authenticated insert only |
-| S1 | Redesign `PasswordGate` hardcoded `0129` | `VITE_REDESIGN_PASS` or open |
+| S1 | Redesign `PasswordGate` hardcoded leaked client PIN | server `ADMIN_AUTH` only |
 | S1 | KOL Helius webhook fail-open | Require `HELIUS_WEBHOOK_SECRET` |
 | S1 | OXW RLS `USING (true)` holes | Membership helpers + tightened policies |
 | S1 | Inventory self-mint | INSERT policy removed |

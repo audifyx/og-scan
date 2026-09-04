@@ -3,27 +3,26 @@
    Cleaner admin shell with grouped sections and a single admin apps hub.
    ══════════════════════════════════════════════════════════════ */
 import { useState, useEffect, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
 import {
-  BellRing,
-  Film,
   Loader2,
-  Mic,
-  PanelLeft,
-  Shield,
-  Smartphone,
-  Sparkles,
-  Twitter,
 } from "lucide-react";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
-import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { OwnerDeskShell } from "@/components/admin/OwnerDeskShell";
 import { AdminPassGate } from "@/components/AdminPassGate";
+import NotFound from "@/pages/NotFound";
 import type { AdminSection } from "@/components/admin/types";
+import {
+  CommandApps,
+  CommandFees,
+  CommandHealth,
+  CommandLiveUsers,
+  CommandOverview,
+  CommandTable,
+  OwnerUserHub,
+} from "@/components/admin/sections/OwnerCommand";
+import { ownerCommand } from "@/lib/orbitx/ownerCommand";
 
-const OverviewSection = lazy(() => import("@/components/admin/sections/OverviewSection").then((m) => ({ default: m.OverviewSection })));
 const AdminAppsSection = lazy(() => import("@/components/admin/sections/AdminAppsSection").then((m) => ({ default: m.AdminAppsSection })));
 const UserManagement = lazy(() => import("@/components/admin/sections/UserManagement").then((m) => ({ default: m.UserManagement })));
 const CommunityManagement = lazy(() => import("@/components/admin/sections/CommunityManagement").then((m) => ({ default: m.CommunityManagement })));
@@ -36,7 +35,6 @@ const ChatManagement = lazy(() => import("@/components/admin/sections/ChatManage
 const NotificationsManager = lazy(() => import("@/components/admin/sections/NotificationsManager").then((m) => ({ default: m.NotificationsManager })));
 const AnnouncementManager = lazy(() => import("@/components/admin/sections/AnnouncementManager").then((m) => ({ default: m.AnnouncementManager })));
 const AdvancedAnalytics = lazy(() => import("@/components/admin/sections/AdvancedAnalytics").then((m) => ({ default: m.AdvancedAnalytics })));
-const ActivityFeed = lazy(() => import("@/components/admin/sections/ActivityFeed").then((m) => ({ default: m.ActivityFeed })));
 const ApiSettings = lazy(() => import("@/components/admin/sections/ApiSettings").then((m) => ({ default: m.ApiSettings })));
 const PriceAlerts = lazy(() => import("@/components/admin/sections/PriceAlerts").then((m) => ({ default: m.PriceAlerts })));
 const WalletTradeManagement = lazy(() => import("@/components/admin/sections/WalletTradeManagement").then((m) => ({ default: m.WalletTradeManagement })));
@@ -47,6 +45,7 @@ const Analytics = lazy(() => import("@/components/admin/sections/Analytics").the
 const ToolsSection = lazy(() => import("@/components/admin/sections/ToolsSection").then((m) => ({ default: m.ToolsSection })));
 const OrgAffiliates = lazy(() => import("@/components/admin/sections/OrgAffiliates").then((m) => ({ default: m.OrgAffiliates })));
 const AffiliateManagement = lazy(() => import("@/components/admin/sections/AffiliateManagement").then((m) => ({ default: m.AffiliateManagement })));
+const OnChainCostSection = lazy(() => import("@/components/admin/sections/OnChainCostSection").then((m) => ({ default: m.OnChainCostSection })));
 
 const Fallback = () => (
   <div className="flex h-64 items-center justify-center">
@@ -57,8 +56,83 @@ const Fallback = () => (
 const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; description: string }> = {
   overview: {
     eyebrow: "Command center",
-    title: "Admin dashboard",
-    description: "A cleaner control center for platform operations, moderation, growth, and owner workflows.",
+    title: "OrbitX owner dashboard",
+    description: "Live users, verified volume, platform fees, and OrbitX burns — one owner console.",
+  },
+  live_users: {
+    eyebrow: "Presence",
+    title: "Live users",
+    description: "Who is on OrbitX right now, which app they are in, and on which device.",
+  },
+  user_activity: {
+    eyebrow: "Live ops",
+    title: "User activity",
+    description: "Platform event stream. Filter by event type. Nothing here is estimated.",
+  },
+  revenue: {
+    eyebrow: "Revenue",
+    title: "Platform revenue",
+    description: "Fees from verified ledger rows only. Formula: min(1.2% of USD, $10).",
+  },
+  burns: {
+    eyebrow: "Token",
+    title: "OrbitX burns",
+    description: "Counted only after on-chain verification (ox_admin_burns + mcp_burn_ledger).",
+  },
+  onchain: {
+    eyebrow: "Protocol",
+    title: "On-chain costs",
+    description: "Real Solana meta.fee from indexed signatures. Memo-only target is under 0.00001 SOL. Swaps and new accounts will exceed it.",
+  },
+  transactions: {
+    eyebrow: "Ledger",
+    title: "Transactions",
+    description: "Completed requires verified_onchain. Search by signature, user, or status.",
+  },
+  jupiter: {
+    eyebrow: "Jupiter",
+    title: "Jupiter transactions",
+    description: "Swaps that flowed through the centralized OrbitX transaction service.",
+  },
+  trading: {
+    eyebrow: "Trading",
+    title: "Trading",
+    description: "Wallets, trades, and DEX activity for owner inspection.",
+  },
+  launches: {
+    eyebrow: "Launch",
+    title: "Token launches",
+    description: "OrbitX launch queue, listings, and launch-day counts from live registry data.",
+  },
+  apps: {
+    eyebrow: "Apps",
+    title: "Platform apps",
+    description: "Presence and fees broken down by OrbitX application.",
+  },
+  games: {
+    eyebrow: "Play",
+    title: "Games",
+    description: "Sessions and activity attributed to /play.",
+  },
+  referrals: {
+    eyebrow: "Growth",
+    title: "Referrals",
+    description: "Affiliate and referral programs.",
+  },
+  fees: {
+    eyebrow: "Fees",
+    title: "Fee engine",
+    description: "1.2% capped at $10, enforced in the backend fee module — not the client.",
+  },
+  health: {
+    eyebrow: "Reliability",
+    title: "System health",
+    description: "Database, Jupiter, RPC, failed txs, fee and burn processors.",
+  },
+  security: {
+    eyebrow: "Safety",
+    title: "Security",
+    description: "Moderation, enforcement, and owner security events.",
   },
   admin_apps: {
     eyebrow: "Owner workflows",
@@ -177,61 +251,38 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
   },
 };
 
-const APP_CHIPS = [
-  { label: "Mobile", icon: Smartphone },
-  { label: "Reminders", icon: BellRing },
-  { label: "Auto-Tweet", icon: Twitter },
-  { label: "Podcasts", icon: Mic },
-  { label: "Clip Export", icon: Film },
-];
-
 export default function Admin() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { isAdmin, deskUnlocked, loading: adminLoading } = useAdmin();
+  const { isAdmin, isOwnerIdentity, deskUnlocked, loading: adminLoading } = useAdmin();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
   const [pulse, setPulse] = useState<{ users: number; posts24: number; liveSpaces: number; online: number } | null>(null);
+  const [hubUserId, setHubUserId] = useState<string | null>(null);
+  const [hubOpen, setHubOpen] = useState(false);
 
   useEffect(() => {
     let on = true;
-    (async () => {
+    const load = async () => {
       try {
-        const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
-        const [u, p24, sp, onl] = await Promise.all([
-          supabase.from("profiles").select("user_id", { count: "exact", head: true }),
-          supabase.from("social_messages").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
-          supabase.from("spaces").select("id", { count: "exact", head: true }).eq("is_live", true),
-          supabase.from("profiles").select("user_id", { count: "exact", head: true }).gte("last_seen_at", new Date(Date.now() - 900_000).toISOString()),
-        ]);
-        if (on) setPulse({ users: u.count || 0, posts24: p24.count || 0, liveSpaces: sp.count || 0, online: onl.count || 0 });
-      } catch { /* stats are best-effort */ }
-    })();
-    return () => { on = false; };
-  }, []);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const media = window.matchMedia("(max-width: 767px)");
-    const syncLayout = (matches: boolean) => {
-      setIsMobile(matches);
-      setSidebarOpen(!matches);
+        const json = await ownerCommand<{ data: { users: { total: number; onlineNow: number; dau: number }; activity: { txToday: number } } }>("overview");
+        const d = json.data;
+        if (on && d) {
+          setPulse({
+            users: d.users.total || 0,
+            posts24: d.activity.txToday || 0,
+            liveSpaces: d.users.dau || 0,
+            online: d.users.onlineNow || 0,
+          });
+        }
+      } catch {
+        /* owner API requires JWT + owner allowlist */
+      }
     };
-
-    syncLayout(media.matches);
-
-    const handleChange = (event: MediaQueryListEvent) => syncLayout(event.matches);
-
-    if (typeof media.addEventListener === "function") {
-      media.addEventListener("change", handleChange);
-      return () => media.removeEventListener("change", handleChange);
-    }
-
-    media.addListener(handleChange);
-    return () => media.removeListener(handleChange);
+    void load();
+    const id = setInterval(load, 8000);
+    return () => {
+      on = false;
+      clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {
@@ -248,7 +299,6 @@ export default function Admin() {
   }, [section]);
 
   // ── Owner-only gate ─────────────────────────────────────────────────────────
-  // ProtectedRoute only checks auth. We enforce owner-only here server-side style.
   if (adminLoading) {
     return (
       <div className="min-h-screen bg-[#020915] flex items-center justify-center">
@@ -256,42 +306,67 @@ export default function Admin() {
       </div>
     );
   }
-  if (!deskUnlocked) {
-    return <AdminPassGate />;
+  if (!isOwnerIdentity) {
+    return <NotFound />;
   }
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-[#020915] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          <h1 className="mb-2 text-lg font-bold text-white">Unavailable</h1>
-          <p className="text-sm text-white/45">
-            {user?.email
-              ? "This surface is limited to the owner account."
-              : "Sign in as the owner account, then reopen this page."}
-          </p>
-        </div>
-      </div>
-    );
+  if (!deskUnlocked || !isAdmin) {
+    return <AdminPassGate />;
   }
   // ────────────────────────────────────────────────────────────────────────────
 
-  const activeMeta = SECTION_META[section];
+  const activeMeta = SECTION_META[section] || SECTION_META.overview;
 
   const renderActiveSection = () => {
     switch (section) {
       case "overview":
-        return <OverviewSection onNavigate={setSection} />;
+        return <CommandOverview onNavigate={setSection} />;
+      case "live_users":
+        return (
+          <CommandLiveUsers
+            onOpenUser={(id) => {
+              setHubUserId(id);
+              setHubOpen(true);
+              setSection("users");
+            }}
+          />
+        );
+      case "user_activity":
+      case "activity":
+        return <CommandTable action="events" title="Live activity" hint="Owner event stream. Filter by event type (USER_LOGIN, SWAP_COMPLETED, ORBITX_BURNED…)." />;
+      case "revenue":
+        return <CommandFees />;
+      case "fees":
+        return <CommandFees />;
+      case "burns":
+        return <CommandTable action="burns" title="OrbitX burns" hint="Verified on-chain burns only. MCP access burns merge in after confirmation." />;
+      case "onchain":
+        return <OnChainCostSection />;
+      case "transactions":
+        return <CommandTable action="ledger" title="Transaction ledger" hint="Completed = status completed AND verified_onchain. Search a signature." />;
+      case "jupiter":
+        return <CommandTable action="jupiter" title="Jupiter transactions" hint="Swap/buy/sell rows from the centralized ledger." />;
+      case "health":
+        return <CommandHealth />;
+      case "apps":
+      case "games":
+        return <CommandApps onNavigate={setSection} />;
+      case "users":
+        return hubOpen ? (
+          <OwnerUserHub openUserId={hubUserId} onClose={() => { setHubOpen(false); setHubUserId(null); }} />
+        ) : (
+          <UserManagement />
+        );
       case "admin_apps":
         return <AdminAppsSection />;
-      case "users":
-        return <UserManagement />;
       case "communities":
         return <CommunityManagement />;
       case "moderation":
+      case "security":
         return <ContentModeration />;
       case "lobbies":
         return <LobbyManagement />;
       case "tokens":
+      case "launches":
         return <TokenSubmissions />;
       case "spaces":
         return <SpacesManagement />;
@@ -305,156 +380,60 @@ export default function Admin() {
         return <AnnouncementManager />;
       case "advanced_analytics":
         return <AdvancedAnalytics />;
-      case "activity":
-        return <ActivityFeed />;
       case "api":
         return <ApiSettings />;
       case "alerts":
         return <PriceAlerts />;
       case "wallets":
+      case "trading":
         return <WalletTradeManagement />;
       case "media":
         return <MediaManagement />;
       case "settings":
         return <PlatformSettings />;
       case "audit":
-        return <AuditLog />;
+        return (
+          <div className="space-y-6">
+            <CommandTable action="audit" title="Owner audit" hint="Immutable ox_admin_audit rows. Lookups and config changes from this console." />
+            <AuditLog />
+          </div>
+        );
       case "analytics":
-        return <Analytics />;
+        return (
+          <div className="space-y-6">
+            <CommandOverview onNavigate={setSection} />
+            <Analytics />
+          </div>
+        );
       case "tools":
         return <ToolsSection />;
       case "org_affiliates":
         return <OrgAffiliates />;
       case "affiliates":
+      case "referrals":
         return <AffiliateManagement />;
       default:
-        return <OverviewSection onNavigate={setSection} />;
+        return <CommandOverview onNavigate={setSection} />;
     }
   };
 
   return (
-    <AppLayout>
-      <div className="relative flex h-[calc(100vh-60px)] overflow-hidden bg-[#050b12] text-white">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.09),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(236,72,153,0.06),transparent_24%)]" />
-
-        {isMobile && sidebarOpen && (
-          <button
-            type="button"
-            aria-label="Close admin navigation"
-            className="fixed inset-0 z-30 bg-black/55 backdrop-blur-sm md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        <div
-          className={[
-            "transition-all duration-300 flex-shrink-0",
-            isMobile
-              ? `fixed inset-y-0 left-0 z-40 w-[280px] ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
-              : "w-[300px]",
-          ].join(" ")}
-        >
-          <AdminSidebar
-            active={section}
-            onChange={(next) => {
-              setSection(next);
-              if (isMobile) setSidebarOpen(false);
-            }}
-            badges={badges}
-            onBack={() => navigate("/")}
-          />
-        </div>
-
-        <div className="relative z-10 flex-1 overflow-auto">
-          <div className="mx-auto max-w-[1500px] p-4 pt-16 sm:p-6 md:pt-6">
-            {isMobile && (
-              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 md:hidden">
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(true)}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[#0b1420] text-white/70 transition hover:bg-white/[0.06] hover:text-white"
-                  aria-label="Open admin navigation"
-                >
-                  <PanelLeft className="h-5 w-5" />
-                </button>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">Admin navigation</p>
-                  <p className="truncate text-sm font-semibold text-white/85">{activeMeta.title}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="mb-6 rounded-[32px] border border-white/[0.08] bg-[linear-gradient(135deg,rgba(8,16,27,0.95),rgba(14,27,41,0.96)_46%,rgba(34,211,238,0.10))] p-5 shadow-[0_30px_120px_-70px_rgba(34,211,238,0.75)] sm:p-7">
-              <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-                <div className="max-w-3xl">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/18 bg-cyan-300/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200/75">
-                    <Shield className="h-3.5 w-3.5" /> {activeMeta.eyebrow}
-                  </div>
-                  <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">{activeMeta.title}</h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60 sm:text-[15px]">{activeMeta.description}</p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[360px]">
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Owner mode</p>
-                    <p className="mt-2 text-sm font-semibold text-white/85">{user?.email || "Admin session"}</p>
-                    <p className="mt-1 text-xs text-white/40">Live control access enabled</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Open queue</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-200">
-                        Tickets {badges.support || 0}
-                      </span>
-                      <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                        Token reviews {badges.tokens || 0}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {pulse && (
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {[
-                    { label: "Total users", value: pulse.users, tone: "text-cyan-200", ring: "border-cyan-300/15 bg-cyan-300/[0.06]" },
-                    { label: "Online now", value: pulse.online, tone: "text-emerald-300", ring: "border-emerald-400/15 bg-emerald-400/[0.06]" },
-                    { label: "Posts 24h", value: pulse.posts24, tone: "text-violet-300", ring: "border-violet-400/15 bg-violet-400/[0.06]" },
-                    { label: "Live spaces", value: pulse.liveSpaces, tone: "text-rose-300", ring: "border-rose-400/15 bg-rose-400/[0.06]" },
-                  ].map((c) => (
-                    <div key={c.label} className={`rounded-2xl border px-4 py-3 ${c.ring}`}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">{c.label}</p>
-                      <p className={`mt-1 text-2xl font-black tabular-nums ${c.tone}`}>{c.value.toLocaleString()}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                {APP_CHIPS.map(({ label, icon: Icon }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setSection("admin_apps")}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-white/65 transition hover:border-cyan-300/20 hover:bg-cyan-300/10 hover:text-white"
-                  >
-                    <Icon className="h-3.5 w-3.5" /> {label}
-                  </button>
-                ))}
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white/40">
-                  <Sparkles className="h-3.5 w-3.5" /> cleaner admin shell live
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-white/[0.08] bg-[#07101a]/88 p-4 shadow-[0_30px_100px_-70px_rgba(0,0,0,0.95)] sm:p-6">
-              <Suspense fallback={<Fallback />}>
-                {renderActiveSection()}
-              </Suspense>
-            </div>
-          </div>
-        </div>
-      </div>
-    </AppLayout>
+    <OwnerDeskShell
+      active={section}
+      onChange={(next) => {
+        if (next === "users") setHubOpen(true);
+        setSection(next);
+      }}
+      badges={badges}
+      title={activeMeta.title}
+      eyebrow={activeMeta.eyebrow}
+      description={activeMeta.description}
+      ownerLabel="Owner session"
+      pulse={pulse}
+    >
+      <Suspense fallback={<Fallback />}>
+        {renderActiveSection()}
+      </Suspense>
+    </OwnerDeskShell>
   );
 }

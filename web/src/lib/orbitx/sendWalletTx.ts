@@ -1,12 +1,11 @@
 /**
  * Shared wallet send helper for OrbitX Trade tools (burn, claim, rent, unwrap).
  *
- * Prefer `sendTransaction` (Phantom/Jupiter `signAndSendTransaction`) — same path as
- * TradingTerminal. Manual `signTransaction` + `sendRawTransaction` can return an
- * unsigned tx from some adapters, which then throws:
- * "Signature verification failed. Missing signature for public key …" on serialize.
- *
- * Local trading wallets: pass a Keypair to `sendWithKeypair` (partialSign / sign + sendRaw).
+ * Prefer Jupiter `signAndSendTransaction` (window.jupiter.solana) when the
+ * connected wallet is Jupiter or the fee-payer matches the Jupiter inject.
+ * Manual `signTransaction` + `sendRawTransaction` can return an unsigned
+ * legacy tx from some adapters, which then throws:
+ * "Signature verification failed. Missing signature for public key …"
  */
 import {
   Connection,
@@ -14,6 +13,14 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
+import {
+  getJupiterProvider,
+  isJupiterWalletName,
+  jupiterProviderPublicKey,
+  jupiterSignAndSendTransaction,
+  toVersionedTransaction,
+} from "@/lib/wallets/jupiterWalletAdapter";
+import { normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
 
 export type WalletSendCaps = {
   sendTransaction?: (
@@ -22,7 +29,24 @@ export type WalletSendCaps = {
     options?: { skipPreflight?: boolean; maxRetries?: number },
   ) => Promise<string>;
   signTransaction?: <T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>;
+  /** Adapter display name — "Jupiter" / "Jupiter Wallet" routes to the Jupiter inject. */
+  walletName?: string | null;
+  /** Force the Jupiter inject even when the adapter name is missing. */
+  preferJupiter?: boolean;
+  /** Legacy flag — ignored when preferJupiter is set. Sign page never uses Phantom Connect. */
+  preferPhantom?: boolean;
 };
+
+export function walletCapsFromAdapter(
+  wallet: { adapter?: { name?: string } | null } | null | undefined,
+  caps: Pick<WalletSendCaps, "sendTransaction" | "signTransaction">,
+): WalletSendCaps {
+  return {
+    sendTransaction: caps.sendTransaction,
+    signTransaction: caps.signTransaction,
+    walletName: wallet?.adapter?.name ?? null,
+  };
+}
 
 export type WalletSendOptions = {
   /** When true, skip RPC preflight so the wallet prompt opens immediately. */
@@ -30,16 +54,59 @@ export type WalletSendOptions = {
   maxRetries?: number;
 };
 
-function serializeSigned(signed: Transaction | VersionedTransaction): Uint8Array {
-  if (signed instanceof VersionedTransaction) return signed.serialize();
+export { toVersionedTransaction };
+
+export function isVersionedTx(
+  tx: Transaction | VersionedTransaction,
+): tx is VersionedTransaction {
+  return "version" in tx;
+}
+
+export function transactionFeePayer(tx: Transaction | VersionedTransaction): string | null {
+  if (isVersionedTx(tx)) {
+    return tx.message.staticAccountKeys[0]?.toBase58() ?? null;
+  }
+  return tx.feePayer?.toBase58() ?? null;
+}
+
+export function serializeSigned(signed: Transaction | VersionedTransaction): Uint8Array {
+  if (isVersionedTx(signed)) {
+    const missing = signed.signatures.some((s) => !s || s.every((b) => b === 0));
+    if (missing) {
+      throw new Error(
+        "Wallet returned an unsigned versioned transaction. Reconnect Jupiter and try again.",
+      );
+    }
+    return signed.serialize();
+  }
   const sigs = signed.signatures ?? [];
   const missing = sigs.find((s) => !s.signature);
-  if (missing) {
+  const unsignedKey = missing?.publicKey ?? (sigs.length === 0 ? signed.feePayer : null);
+  if (unsignedKey) {
     throw new Error(
-      `Wallet returned an unsigned transaction (missing signature for ${missing.publicKey.toBase58()}). Reconnect Phantom/Jupiter and try again.`,
+      `Wallet returned an unsigned transaction (missing signature for ${unsignedKey.toBase58()}). Reconnect Jupiter and try again.`,
     );
   }
   return signed.serialize();
+}
+
+export function isPhantomWalletName(name?: string | null): boolean {
+  return Boolean(name && /phantom/i.test(name));
+}
+
+export function shouldUseJupiterInject(
+  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter" | "preferPhantom">,
+  feePayer?: string | null,
+): boolean {
+  if (!getJupiterProvider()?.signAndSendTransaction) return false;
+  // Browser Phantom (and other named non-Jupiter adapters) must sign themselves.
+  // preferJupiter must not steal those sends when both extensions are installed.
+  if (isPhantomWalletName(wallet.walletName)) return false;
+  if (wallet.preferPhantom) return false;
+  if (isJupiterWalletName(wallet.walletName)) return true;
+  if (wallet.preferJupiter) return true;
+  const jupiterPk = jupiterProviderPublicKey();
+  return Boolean(feePayer && jupiterPk && feePayer === jupiterPk);
 }
 
 /** Sign with a local Keypair and broadcast (no extension wallet). */
@@ -72,12 +139,61 @@ export async function sendWalletTransaction(
     skipPreflight: options?.skipPreflight ?? false,
     maxRetries: options?.maxRetries ?? 3,
   };
+  const feePayer = transactionFeePayer(tx);
+
+  if (shouldUseJupiterInject(wallet, feePayer)) {
+    return normalizeTxSignatureBase58(await jupiterSignAndSendTransaction(tx, opts));
+  }
+
+  const versioned = toVersionedTransaction(tx);
   if (wallet.sendTransaction) {
-    return wallet.sendTransaction(tx, connection, opts);
+    return normalizeTxSignatureBase58(await wallet.sendTransaction(versioned, connection, opts));
   }
   if (wallet.signTransaction) {
     const signed = await wallet.signTransaction(tx);
-    return connection.sendRawTransaction(serializeSigned(signed), opts);
+    return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
   }
-  throw new Error("This wallet can't sign here — connect Phantom or Jupiter");
+  throw new Error("This wallet can't sign here — connect Phantom, Jupiter, or Solflare in this browser");
+}
+
+export type ConfirmSentOptions = {
+  blockhash?: string;
+  lastValidBlockHeight?: number;
+  commitment?: "processed" | "confirmed" | "finalized";
+};
+
+/**
+ * Confirm a wallet-sent tx. Always normalizes Phantom base64 signatures first.
+ * If the swap already landed, treat encoding / "already processed" as success
+ * so the sign page can finish the workflow.
+ */
+export async function confirmSentTransaction(
+  connection: Connection,
+  signature: unknown,
+  options?: ConfirmSentOptions,
+): Promise<string> {
+  const sig = normalizeTxSignatureBase58(signature);
+  const commitment = options?.commitment ?? "confirmed";
+  try {
+    if (options?.blockhash && options.lastValidBlockHeight != null) {
+      await connection.confirmTransaction(
+        { signature: sig, blockhash: options.blockhash, lastValidBlockHeight: options.lastValidBlockHeight },
+        commitment,
+      );
+    } else {
+      await connection.confirmTransaction(sig, commitment);
+    }
+    return sig;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/already been processed|already processed/i.test(msg)) return sig;
+    try {
+      const st = await connection.getSignatureStatus(sig);
+      if (st?.value && !st.value.err) return sig;
+    } catch {
+      /* RPC status is best-effort */
+    }
+    if (/base58/i.test(msg)) return sig;
+    throw error;
+  }
 }

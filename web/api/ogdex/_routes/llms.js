@@ -53,7 +53,7 @@ Brand: https://www.orbitx.world  ·  Token page pattern: https://www.orbitx.worl
 
 ## Trading (non-custodial)
 - POST ${BASE}/trade  body: { "publicKey": "...", "action": "buy|sell", "mint": "...", "amount": 0.25, "denominatedInSol": "true", "slippage": 10, "pool": "auto" }
-  Returns a base64 transaction the USER signs in their own wallet (Phantom). OrbitX DEX never holds funds or keys. SOL buys include a 0.95% platform fee routed to PLATFORM_FEE_WALLET (45YR6f… desk).
+  Returns a base64 transaction the USER signs in their own wallet (Phantom). OrbitX DEX never holds funds or keys. SOL buys include a 1.2% platform fee capped at $10, routed to PLATFORM_FEE_WALLET (45YR6f… desk).
 
 ## Notes for agents / MCP
 - Ready-made MCP: GET ${BASE.replace("/api/ogdex","")}/api/mcp or GET ${BASE}/mcp for the tool manifest; POST the same URL with { "tool", "params" } to execute.

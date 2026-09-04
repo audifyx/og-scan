@@ -27,6 +27,7 @@ import { TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeShar
 import { useSolUsd } from "./lpx";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const fmtInt = (n: number) => n.toLocaleString();
@@ -56,7 +57,7 @@ const tooltipStyle = { background: "#0a0f1a", border: "1px solid rgba(255,255,25
 
 function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction, wallet } = useWallet();
   const { pickable, signInWith, busy: walletBusy } = useWalletSignIn();
   const [picker, setPicker] = useState(false);
   const [destination, setDestination] = useState("");
@@ -91,15 +92,21 @@ function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
   };
 
   const claimSweep = async () => {
-    if (!source || !publicKey || !signTransaction) return;
+    if (!source || !publicKey || (!signTransaction && !sendTransaction)) return;
     const dest = destination.trim();
     if (!dest) return toast.error("Enter a payout destination wallet");
     setClaiming("sweep");
     try {
       const { tx, sol, blockhash, lastValidBlockHeight } = await buildPlatformFeeSweepTx(connection, source.wallet, dest);
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
-      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      const sig = await sendWalletTransaction(
+        connection,
+        walletCapsFromAdapter(wallet, {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+        }),
+        tx,
+      );
+      await confirmSentTransaction(connection, sig, { blockhash, lastValidBlockHeight, commitment: "confirmed" });
       toast.success(`Claimed ${sol.toFixed(4)} SOL → ${short(dest)}`, {
         action: { label: "Solscan", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") },
       });
@@ -116,13 +123,19 @@ function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
   };
 
   const claimPump = async () => {
-    if (!source || !publicKey || !signTransaction) return;
+    if (!source || !publicKey || (!signTransaction && !sendTransaction)) return;
     setClaiming("pump");
     try {
       const tx = await buildPlatformPumpClaimTx(source.wallet);
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
-      await connection.confirmTransaction(sig, "confirmed");
+      const sig = await sendWalletTransaction(
+        connection,
+        walletCapsFromAdapter(wallet, {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+        }),
+        tx,
+      );
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
       toast.success("Claimed pump.fun creator fees into this fee wallet", {
         action: { label: "Solscan", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") },
       });

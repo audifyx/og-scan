@@ -16,6 +16,7 @@ export const CITY_BUILDING_MODELS = {
   d: `${BASE}/citybits/building_D.gltf`,
 } as const;
 
+/** Inventory only — runtime street cars/benches are procedural (missing Kenney textures + toy scale). */
 export const CITY_STREET_MODELS = {
   bench: `${BASE}/citybits/bench.gltf`,
   carSedan: `${BASE}/citybits/car_sedan.gltf`,
@@ -109,13 +110,18 @@ export function getPreferredAvailable(): readonly string[] {
 
 /**
  * Resolve a catalog model id to a loadable path.
- * Always returns Kenney fallback (OrbitX custom models not yet available).
+ * Prefers a probed OrbitX GLB; otherwise Kenney / null. Never throws.
  */
 export function resolveModelPath(id: OrbitxModelId | string): string | null {
-  const entry = ORBITX_MODELS[id as OrbitxModelId];
-  if (!entry) return null;
-  // For now, always use fallback since OrbitX custom GLBs are not available yet
-  return entry.fallback;
+  try {
+    if (!id) return null;
+    const entry = ORBITX_MODELS[id as OrbitxModelId];
+    if (!entry) return null;
+    if (availablePreferred.has(entry.preferred)) return entry.preferred;
+    return entry.fallback ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** All Kenney + confirmed OrbitX preferred paths for preload. */
@@ -128,6 +134,14 @@ export const ALL_GLTF_PATHS: readonly string[] = [
 /** Preferred OrbitX paths (may 404 until art drops). */
 export const ORBITX_PREFERRED_PATHS: readonly string[] = Object.values(ORBITX_MODELS).map((e) => e.preferred);
 
+/** SPA catch-all returns 200 text/html for missing GLBs — do not treat that as art. */
+export function isRealModelResponse(res: { ok: boolean; headers: { get: (name: string) => string | null } }): boolean {
+  if (!res.ok) return false;
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (!ct || ct.includes("text/html") || ct.includes("text/plain")) return false;
+  return ct.includes("model") || ct.includes("octet-stream") || ct.includes("gltf") || ct.includes("glb");
+}
+
 /** Probe OrbitX preferred paths with HEAD; mark available ones for resolveModelPath. */
 export async function probeOrbitxModels(): Promise<string[]> {
   if (typeof window === "undefined") return [];
@@ -138,7 +152,7 @@ export async function probeOrbitxModels(): Promise<string[]> {
     ORBITX_PREFERRED_PATHS.map(async (path) => {
       try {
         const res = await fetch(path, { method: "HEAD", cache: "force-cache" });
-        if (res.ok) {
+        if (isRealModelResponse(res)) {
           availablePreferred.add(path);
           found.push(path);
         }

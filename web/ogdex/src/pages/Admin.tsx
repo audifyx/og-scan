@@ -9,8 +9,7 @@ import {
   CheckSquare, XSquare, Wallet, LayoutDashboard, List, Mail, MessageSquare, LifeBuoy, Link2, Mic,
 } from "lucide-react";
 
-/** Desk unlock code doubles as API credential — no VITE_ADMIN_PASS / second password. */
-const DESK_API_PASS = "0129";
+import { clearDeskUnlock, readDeskSessionToken } from "../../../shared/desk-unlock-client.js";
 
 // ─── Tab type ─────────────────────────────────────────────────────────────────
 type Tab =
@@ -65,7 +64,7 @@ const CAT_LABEL: Record<Cat, string> = { dex: "OrbitX DEX", social: "Social" };
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function Admin() {
-  const pass = DESK_API_PASS;
+  const pass = readDeskSessionToken();
   const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState("");
@@ -99,10 +98,10 @@ export default function Admin() {
 
   const lockDesk = () => {
     try {
+      clearDeskUnlock();
       sessionStorage.removeItem("ox_desk_sess_v1");
       sessionStorage.removeItem("orbitx_admin_unlocked");
       localStorage.removeItem("ogdex_admin_pass");
-      window.dispatchEvent(new Event("ox-desk-unlock"));
     } catch {
       /* ignore */
     }

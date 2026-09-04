@@ -6,7 +6,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  Coins, Wallet, Loader2, RefreshCw, ExternalLink, CheckCircle2, AlertTriangle, Rocket, HandCoins,
+  Coins, Wallet, Loader2, RefreshCw, CheckCircle2, AlertTriangle, Rocket, HandCoins,
 } from "lucide-react";
 import { listByCreator, type OrbitxToken } from "@/lib/orbitx/registry";
 import {
@@ -17,8 +17,10 @@ import {
 import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
+import { confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
+import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -92,7 +94,7 @@ export default function LaunchpadClaim() {
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
       if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
       const sig = await sendTx(connection, plan.tx);
-      await connection.confirmTransaction(sig, "confirmed");
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
       setPumpSig(sig);
       const netSol = plan.netLamports / LAMPORTS_PER_SOL;
       toast.success(`Claimed ${netSol.toFixed(4)} SOL (${bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee routed)`);
@@ -109,7 +111,7 @@ export default function LaunchpadClaim() {
             const buySol = buyLamports / LAMPORTS_PER_SOL;
             const buyTx = await buildPumpBuyTransaction(publicKey, mint, buySol);
             const buySig = await sendTx(connection, buyTx);
-            await connection.confirmTransaction(buySig, "confirmed");
+            await confirmSentTransaction(connection, buySig, { commitment: "confirmed" });
             toast.success(`Bought back ${buySol.toFixed(4)} SOL of your coin`);
           } catch (e) {
             toast.error(e instanceof Error ? `Buyback failed: ${e.message}` : "Buyback failed");
@@ -142,12 +144,12 @@ export default function LaunchpadClaim() {
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
         tx.recentBlockhash = blockhash;
         lastSig = await sendTx(connection, tx);
-        await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
+        await confirmSentTransaction(connection, lastSig, { blockhash, lastValidBlockHeight, commitment: "confirmed" });
       }
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
         const swapSig = await sendTx(connection, plan.tx);
-        await connection.confirmTransaction(swapSig, "confirmed");
+        await confirmSentTransaction(connection, swapSig, { commitment: "confirmed" });
         lastSig = swapSig;
         toast.success(`${t.ticker} fees claimed & swapped to ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
       } catch (e) {
@@ -265,10 +267,12 @@ export default function LaunchpadClaim() {
               </button>
             </div>
             {pumpSig && (
-              <a href={`https://solscan.io/tx/${pumpSig}`} target="_blank" rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1 text-xs text-[#60A5FA] underline-offset-4 hover:underline">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
-              </a>
+              <div className="mt-3">
+                <IndexOnChainTx signature={pumpSig} kind="claim" />
+                <SolscanLink signature={pumpSig} className="inline-flex items-center gap-1 text-xs">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx
+                </SolscanLink>
+              </div>
             )}
             {pumpTokens.length > 0 && (
               <>
@@ -320,7 +324,7 @@ export default function LaunchpadClaim() {
                             <div className="flex items-center gap-2 text-sm font-semibold text-white">{t.name} <span className="text-[#A8B0BC]">${t.ticker}</span>
                               {isBuyback && <span className="ox-lane-badge border-[rgba(255,77,109,0.4)] bg-[rgba(255,77,109,0.1)] text-[#ff4d6d]"><AlertTriangle className="mr-1 inline h-3 w-3" /> flagged — fees → OBX buyback</span>}
                             </div>
-                            <a href={`https://solscan.io/token/${t.mint_address}`} target="_blank" rel="noopener noreferrer" className="pf-mono text-xs text-[#A8B0BC] hover:text-white">{short(t.mint_address)}</a>
+                            <SolscanLink mint={t.mint_address} className="pf-mono text-xs text-[#A8B0BC] hover:text-white">{short(t.mint_address)}</SolscanLink>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -338,10 +342,12 @@ export default function LaunchpadClaim() {
                         </div>
                       </div>
                       {sig && (
-                        <a href={`https://solscan.io/tx/${sig}`} target="_blank" rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-xs text-[#60A5FA] underline-offset-4 hover:underline">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <div className="mt-2">
+                          <IndexOnChainTx signature={sig} kind="claim" refId={t.mint_address} />
+                          <SolscanLink signature={sig} className="inline-flex items-center gap-1 text-xs">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx
+                          </SolscanLink>
+                        </div>
                       )}
                     </div>
                   );

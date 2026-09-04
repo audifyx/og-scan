@@ -50,6 +50,7 @@ function deriveSentiment(r: ScreenerRow): SentimentRow {
 export default function SentimentIntel() {
   const [rows, setRows] = useState<ScreenerRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +60,9 @@ export default function SentimentIntel() {
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -85,7 +89,8 @@ export default function SentimentIntel() {
 
       <div className="oxc-panel">
         {error && <p style={{ color: "var(--oxc-red)" }}>{error}</p>}
-        {!error && scored.length === 0 && <p className="oxc-empty oxc-pulse">Aggregating sentiment…</p>}
+        {!error && loading && <p className="oxc-empty oxc-pulse">Aggregating sentiment…</p>}
+        {!error && !loading && scored.length === 0 && <p className="oxc-empty">No sentiment rows yet.</p>}
         {scored.length > 0 && (
           <table className="oxc-table">
             <thead>

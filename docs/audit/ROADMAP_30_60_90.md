@@ -11,7 +11,7 @@ Principle: **fix trust + consolidate before expanding surface area.**
 
 | Week | Workstream | Deliverables |
 |------|------------|--------------|
-| 1 | Security | Remove `0129` defaults; JWT admin for OGDex admin; lock `alerts-run`; rotate secrets |
+| 1 | Security | Remove leaked client PIN defaults; JWT admin for OGDex admin; lock `alerts-run`; rotate secrets |
 | 1 | Intel DTO | Fix screener `rows` mapping; unwrap token payload in `useTokenIntel` / crypto-scan |
 | 1 | Links | Fix `/community` dead links; Suspense skeletons for `/intel` `/hq` |
 | 2 | Trade integrity | Connect `TradingTerminal` to `/api/ogdex/trade` or deep-link honesty in UI copy |

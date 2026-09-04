@@ -3,11 +3,14 @@
 // Reused by the token launchpad AND the NFT marketplace (one coin per collection).
 import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
+import { confirmSentTransaction, sendWalletTransaction, type WalletSendCaps } from "@/lib/orbitx/sendWalletTx";
 
 export interface PumpLaunchInput {
   connection: Connection;
   publicKey: { toBase58: () => string };
   signTransaction: <T extends VersionedTransaction>(tx: T) => Promise<T>;
+  sendTransaction?: WalletSendCaps["sendTransaction"];
+  walletName?: string | null;
   imageBase64: string;          // base64 (no data: prefix)
   imageMimeType: string;
   name: string;
@@ -23,7 +26,7 @@ export interface PumpLaunchInput {
 export interface PumpLaunchResult { mint: string; signature: string; metadataUri: string }
 
 export async function launchPumpCoin(input: PumpLaunchInput): Promise<PumpLaunchResult> {
-  const { connection, publicKey, signTransaction, onStatus } = input;
+  const { connection, publicKey, signTransaction, sendTransaction, walletName, onStatus } = input;
   const say = (m: string) => onStatus?.(m);
 
   // 1 — IPFS (image + metadata)
@@ -72,10 +75,13 @@ export async function launchPumpCoin(input: PumpLaunchInput): Promise<PumpLaunch
   const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
   const tx = VersionedTransaction.deserialize(txBytes);
   tx.sign([mintKeypair]);
-  const signed = await signTransaction(tx);
   say("Broadcasting…");
-  const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
-  await connection.confirmTransaction(sig, "confirmed");
+  const sig = await sendWalletTransaction(
+    connection,
+    { sendTransaction, signTransaction, walletName },
+    tx,
+  );
+  await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
   return { mint: mintKeypair.publicKey.toBase58(), signature: sig, metadataUri };
 }
 

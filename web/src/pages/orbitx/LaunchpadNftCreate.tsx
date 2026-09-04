@@ -48,7 +48,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
 const inputClass = "w-full rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-3 py-2 text-sm text-[hsl(var(--pf-ink))] outline-none focus:border-[hsl(var(--pf-green))]";
 
 export default function LaunchpadNftCreate() {
-  const { connected, publicKey, wallet } = useWallet();
+  const { connected, publicKey, wallet, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -182,7 +182,10 @@ export default function LaunchpadNftCreate() {
             r.onerror = reject; r.readAsDataURL(colBanner);
           });
           const { mint } = await launchPumpCoin({
-            connection, publicKey, signTransaction: wallet.adapter.signTransaction!.bind(wallet.adapter) as any,
+            connection, publicKey,
+            signTransaction: wallet.adapter.signTransaction!.bind(wallet.adapter) as any,
+            sendTransaction: sendTransaction ?? undefined,
+            walletName: wallet.adapter.name,
             imageBase64: b64, imageMimeType: colBanner.type || "image/png",
             name: name.trim(), symbol: symbol.trim().toUpperCase(), description: description.trim(),
             website: externalUrl.trim() || undefined, devBuySol: Number(coinDevBuy) || 0,

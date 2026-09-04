@@ -25,6 +25,10 @@ function levelFromXp(xp: number): number {
 export function usePresence() {
   const { user } = useAuth();
   const tokenRef = useRef<string | null>(null);
+  const pathRef = useRef<string>("");
+  const sessionRef = useRef<string>(
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `s-${Date.now()}`,
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +45,7 @@ export function usePresence() {
       if (stopped || document.hidden) return;
       void cacheToken(); // keep a fresh token around for the unload beacon
       const nowIso = new Date().toISOString();
+      const path = typeof window !== "undefined" ? window.location.pathname : "/";
       const updates: Record<string, unknown> = {
         is_online: true,
         last_seen_at: nowIso,
@@ -49,7 +54,7 @@ export function usePresence() {
       try {
         const { data } = await supabase
           .from("profiles")
-          .select("xp, current_level")
+          .select("xp, current_level, username, avatar_url, wallet_address")
           .eq("user_id", user.id)
           .single();
         if (data) {
@@ -57,6 +62,27 @@ export function usePresence() {
           if (correctLevel !== (data.current_level || 0)) updates.current_level = correctLevel;
         }
         await supabase.from("profiles").update(updates).eq("user_id", user.id);
+
+        const token = tokenRef.current;
+        if (token) {
+          const pageView = pathRef.current !== path;
+          pathRef.current = path;
+          void fetch("/api/orbitx-presence", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              path,
+              pageView,
+              username: data?.username || null,
+              avatarUrl: data?.avatar_url || null,
+              wallet: data?.wallet_address || null,
+              sessionId: sessionRef.current,
+            }),
+          });
+        }
       } catch { /* transient network issue — the staleness window covers us */ }
     };
 
@@ -76,6 +102,19 @@ export function usePresence() {
             Prefer: "return=minimal",
           },
           body: JSON.stringify({ is_online: false, last_seen_at: nowIso, last_active_at: nowIso }),
+        });
+        void fetch("/api/orbitx-presence", {
+          method: "POST",
+          keepalive: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            offline: true,
+            path: typeof window !== "undefined" ? window.location.pathname : "/",
+            sessionId: sessionRef.current,
+          }),
         });
       } catch { /* noop */ }
     };

@@ -31,6 +31,25 @@ describe("connectSolanaWallet", () => {
     expect(findConnectableWallet(wallets)?.adapter.name).toBe("Phantom");
   });
 
+  it("matches Jupiter Wallet Standard name when UI asks for Jupiter", () => {
+    const wallets = [
+      mockWallet("Jupiter Wallet", WalletReadyState.Installed),
+      mockWallet("Phantom", WalletReadyState.NotDetected),
+    ];
+    expect(findConnectableWallet(wallets, "Jupiter")?.adapter.name).toBe("Jupiter Wallet");
+    expect(findConnectableWallet(wallets, "Jupiter Wallet")?.adapter.name).toBe("Jupiter Wallet");
+  });
+
+  it("prefers the Wallet Standard adapter when Jupiter is listed twice", () => {
+    const legacy = mockWallet("Jupiter", WalletReadyState.Installed);
+    (legacy.adapter as any).isLegacyInject = true;
+    const standard = mockWallet("Jupiter Wallet", WalletReadyState.Installed);
+    // Legacy inject first in the list — the Standard one must still win.
+    expect(findConnectableWallet([legacy, standard], "Jupiter")?.adapter.name).toBe("Jupiter Wallet");
+    // And it is still usable when it is the only one present.
+    expect(findConnectableWallet([legacy], "Jupiter")?.adapter.name).toBe("Jupiter");
+  });
+
   it("does not fall through to Solflare when preferred wallet is missing", () => {
     const wallets = [
       mockWallet("Phantom", WalletReadyState.NotDetected),
@@ -52,6 +71,25 @@ describe("connectSolanaWallet", () => {
       }),
     ).rejects.toThrow(/isn't detected/);
     expect(phantomInstallHint("Phantom")).toMatch(/Install the Phantom extension/);
+  });
+
+  it("times out when a wallet adapter never responds", async () => {
+    vi.useFakeTimers();
+    try {
+      const wallet = mockWallet("Jupiter", WalletReadyState.Installed);
+      wallet.adapter.connect = vi.fn(() => new Promise<void>(() => {}));
+      const pending = connectSolanaWallet({
+        wallets: [wallet],
+        select: vi.fn(),
+        connect: vi.fn(() => new Promise<void>(() => {})),
+        preferredName: "Jupiter",
+      });
+      const assertion = expect(pending).rejects.toThrow(/timed out/i);
+      await vi.advanceTimersByTimeAsync(18_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("falls back to adapter.connect when context connect no-ops", async () => {

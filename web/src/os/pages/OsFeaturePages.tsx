@@ -1,6 +1,17 @@
 import { Link } from "react-router-dom";
 import { OxButton, OxPanel } from "../components/primitives";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+
+function isExternalAppHref(href: string): boolean {
+  return href.startsWith("/ORBITX_DEX") || href.startsWith("http");
+}
+
+function AppHref({ href, children, style }: { href: string; children: ReactNode; style?: CSSProperties }) {
+  if (isExternalAppHref(href)) {
+    return <a href={href} style={style}>{children}</a>;
+  }
+  return <Link to={href} style={style}>{children}</Link>;
+}
 
 function FeatureShell({
   kicker,
@@ -29,17 +40,17 @@ function FeatureShell({
       </h1>
       <p className="ox-lead">{lead}</p>
       <div className="ox-cta-row">
-        <Link to={primaryHref}>
+        <AppHref href={primaryHref}>
           <OxButton type="button" variant="primary">
             {primaryLabel}
           </OxButton>
-        </Link>
+        </AppHref>
         {secondaryHref && secondaryLabel && (
-          <Link to={secondaryHref}>
+          <AppHref href={secondaryHref}>
             <OxButton type="button" variant="ghost">
               {secondaryLabel}
             </OxButton>
-          </Link>
+          </AppHref>
         )}
       </div>
       {children}
@@ -68,9 +79,9 @@ function PreviewFrame({ label, href }: { label: string; href: string }) {
         <div className="ox-scanline" />
         <div style={{ textAlign: "center", zIndex: 1 }}>
           <div style={{ fontFamily: "var(--ox-font-display)", letterSpacing: "0.08em" }}>{label}</div>
-          <Link to={href} style={{ color: "var(--ox-lime)", fontSize: "0.85rem" }}>
+          <AppHref href={href} style={{ color: "var(--ox-lime)", fontSize: "0.85rem" }}>
             Open full module →
-          </Link>
+          </AppHref>
         </div>
       </div>
     </OxPanel>
@@ -85,8 +96,8 @@ export function OsTradingPage() {
       lead="Jump into OrbitX DEX for live screener, swaps, and portfolio — wrapped in the OS chrome."
       primaryHref="/ORBITX_DEX"
       primaryLabel="Open OrbitX DEX"
-      secondaryHref="/orbitx/terminal"
-      secondaryLabel="Launch terminal"
+      secondaryHref="/trade"
+      secondaryLabel="Open Trade"
     >
       <div className="ox-stat-row">
         <div className="ox-stat">
@@ -149,13 +160,13 @@ export function OsGamesPage() {
       kicker="Games hub"
       title="Play layer"
       lead="Degen Tower, prediction games, and OrbitX City multiplayer lobbies."
-      primaryHref="/games"
+      primaryHref="/play"
       primaryLabel="Open games"
       secondaryHref="/Orbitxcity"
       secondaryLabel="Enter City"
     >
       <div className="ox-grid-apps">
-        <Link to="/games" className="ox-app-tile" style={{ ["--tile" as string]: "#17ff4d" }}>
+        <Link to="/play" className="ox-app-tile" style={{ ["--tile" as string]: "#17ff4d" }}>
           <div className="ox-app-tile__icon">D</div>
           <strong>Degen Tower</strong>
           <span>Tap-to-earn arcade</span>

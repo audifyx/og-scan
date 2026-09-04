@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { resolveModel } from "../_shared/models.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const NVIDIA_MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
+const NVIDIA_MODEL = resolveModel(Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct");
 const NVIDIA_BASE_URL = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
 const NVIDIA_CODER_MODEL = Deno.env.get("NVIDIA_CODER_MODEL") || "qwen/qwen3-coder-480b-a35b-instruct";
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";

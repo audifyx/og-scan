@@ -27,7 +27,7 @@
   <h2>2. Critical fixes shipped</h2>
   <table>
     <tr><th>ID</th><th>Sev</th><th>Fix</th></tr>
-    <tr><td>BUG-001</td><td>S0</td><td>Remove hardcoded admin pass <code>0129</code>; require env</td></tr>
+    <tr><td>BUG-001</td><td>S0</td><td>Remove hardcoded leaked client admin PIN; require env <code>ADMIN_AUTH</code></td></tr>
     <tr><td>BUG-002</td><td>S1</td><td>Authenticate <code>alerts-run</code> with cron/worker secret</td></tr>
     <tr><td>BUG-003/004</td><td>S1</td><td>Normalize screener <code>rows</code> + nested token payloads</td></tr>
     <tr><td>BUG-005</td><td>S1</td><td><code>oxw_record_trade</code> ownership enforcement migration</td></tr>
@@ -46,7 +46,7 @@
 
   <h2>4. Ops requirements before production</h2>
   <ol>
-    <li>Set <code>ADMIN_PASS</code>, <code>VITE_ADMIN_PASS</code> (≥8 chars), <code>CRON_SECRET</code> in Vercel</li>
+    <li>Set <code>ADMIN_AUTH</code> (≥8 chars, never <code>VITE_*</code>) and <code>CRON_SECRET</code> on Vercel project <code>rork-og-meme-coin-tracker</code> only</li>
     <li>Apply migration <code>20260725220000_oxw_record_trade_ownership.sql</code></li>
     <li>Update cron caller to send secret header</li>
     <li>Continue 30/60/90 roadmap in <code>docs/audit/</code></li>

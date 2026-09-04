@@ -189,8 +189,10 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world", opt
     const holdingUsd = price != null ? amount * price : 0;
     const meets = price != null ? holdingUsd >= minUsd : amount > 0 && minUsd <= 0;
 
-    // If price is unavailable but they hold a meaningful amount, allow with caution threshold
-    const fallbackMeets = price == null && amount >= 1000;
+    // Legacy Agent surfaces permit a conservative token-count fallback when the
+    // price provider is unavailable. High-value gates can opt into fail-closed
+    // USD verification so an upstream outage cannot weaken the requirement.
+    const fallbackMeets = !opts.requireUsdPrice && price == null && amount >= 1000;
     const meetsRequirement = meets || fallbackMeets;
 
     return {
@@ -205,10 +207,16 @@ export async function verifyTokenHold(wallet, base = "https://orbitx.world", opt
       holdingUsd: Number(holdingUsd.toFixed(4)),
       holdUrl,
       buyUrl,
-      error: meetsRequirement ? undefined : "token_hold_required",
+      error: meetsRequirement
+        ? undefined
+        : price == null && opts.requireUsdPrice
+          ? "price_unavailable"
+          : "token_hold_required",
       message: meetsRequirement
         ? `Hold OK — ~$${holdingUsd.toFixed(2)} ORBITX.`
-        : `Need ≥$${minUsd} ORBITX. Current ~$${holdingUsd.toFixed(2)} (${amount.toFixed(2)} tokens). Buy then re-verify.`,
+        : price == null && opts.requireUsdPrice
+          ? "ORBITX USD pricing is temporarily unavailable, so access cannot be verified safely. Retry shortly."
+          : `Need ≥$${minUsd} ORBITX. Current ~$${holdingUsd.toFixed(2)} (${amount.toFixed(2)} tokens). Buy then re-verify.`,
     };
   } catch (e) {
     return {
@@ -242,6 +250,8 @@ export const HOLD_GATED_TOOLS = new Set([
   "orbitx_prepare_buy",
   "orbitx_prepare_sell",
   "orbitx_buy",
+  "orbitx_trade",
+  "orbitx_swap",
   "orbitx_sell",
   "orbitx_buy_auto",
   "orbitx_sell_pump",
@@ -274,8 +284,17 @@ export const HOLD_GATED_TOOLS = new Set([
 ]);
 
 export function isHoldGatedTool(name) {
-  // Media (image/video) is not hold-gated — API keys already require hold to mint.
+  // Telegram groups keep /img /vid public. MCP still requires a session (SESSION_TOOLS).
   if (/^orbitx_(generate_|grok_|gen_|media_)/.test(name)) return false;
+  // First-time $ORBITX buys must not require an existing hold.
+  if (
+    name === "orbitx_buy_orbitx" ||
+    name === "orbitx_confirm_buy" ||
+    name === "orbitx_trade_auto" ||
+    name === "orbitx_credits_buy"
+  ) {
+    return false;
+  }
   if (HOLD_GATED_TOOLS.has(name)) return true;
   if (/^orbitx_(buy|sell)_/.test(name)) return true;
   if (/^orbitx_create_token_/.test(name)) return true;

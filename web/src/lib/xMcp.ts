@@ -524,6 +524,22 @@ export async function fetchXCreditsBalance(): Promise<XCreditsBalance> {
   return (await xAgentFetch("/credits")) as unknown as XCreditsBalance;
 }
 
+export type XMcpAccessStatus = {
+  ok: boolean;
+  active: boolean;
+  expired: boolean;
+  packageId: "day" | "week" | null;
+  expiresAt: string | null;
+  remainingMs: number;
+  remainingLabel: string;
+  tokensBurned: number;
+  lifetimeTokensBurned: number;
+};
+
+export async function fetchXMcpAccess(): Promise<XMcpAccessStatus> {
+  return (await xAgentFetch("/mcp-access")) as unknown as XMcpAccessStatus;
+}
+
 export async function quoteXCreditsBuy(solAmount: number, publicKey?: string): Promise<XCreditsQuote> {
   return (await xAgentFetch("/credits/buy", {
     method: "POST",

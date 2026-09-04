@@ -12,12 +12,13 @@ import {
 } from "@/components/app-shell/IosAppShell";
 import "./agent-shell.css";
 
-export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";
+export type AgentTabId = "setup" | "shop" | "wallet" | "keys" | "connect" | "agent" | "queue";
 
 export type ShellTab = { id: string; label: string; ico?: string };
 
 const DEFAULT_TABS: ShellTab[] = [
   { id: "setup", label: "Home", ico: "⌂" },
+  { id: "shop", label: "Shop", ico: "◈" },
   { id: "wallet", label: "Wallet", ico: "◎" },
   { id: "keys", label: "Keys", ico: "✦" },
   { id: "connect", label: "Connect", ico: "⬡" },
@@ -36,11 +37,13 @@ type Props = {
   footerNote?: string;
   mcpUrl?: string;
   tabs?: ShellTab[];
-  /** Cross-link in the top bar (Agent ↔ X). */
+  /** Optional channel link retained only for legacy auth handoffs. */
   siblingHref?: string;
   siblingLabel?: string;
   siblingIcon?: string;
   topSubtitle?: string;
+  /** Render only the working content inside another product shell. */
+  embedded?: boolean;
   children: ReactNode;
 };
 
@@ -51,16 +54,17 @@ export function AgentShell({
   statusWarn = false,
   showTabs = true,
   onRefresh,
-  brandHref = "/agent",
+  brandHref = "/supercomputer",
   brandSub = "Agent MCP",
   footerBrand = "OrbitX Agent MCP",
   footerNote = "Non-custodial — keys stay on your device until you copy them. You sign every tx in your wallet.",
   mcpUrl = "https://www.orbitx.world/api/mcp",
   tabs,
-  siblingHref = "/x",
-  siblingLabel = "X MCP",
-  siblingIcon = "✕",
-  topSubtitle = "Dashboard · Claude · ChatGPT · Grok",
+  siblingHref,
+  siblingLabel,
+  siblingIcon = "·",
+  topSubtitle = "OrbitX Super Computer · Claude · ChatGPT · Grok",
+  embedded = false,
   children,
 }: Props) {
   const loc = useLocation();
@@ -71,16 +75,15 @@ export function AgentShell({
     ico: t.ico || DEFAULT_TABS.find((x) => x.id === t.id)?.ico || "·",
   }));
 
-  const railSibling =
-    brandHref === "/x"
-      ? { href: "/agent", label: "Agent" }
-      : { href: "/x", label: "X MCP" };
+  const railSibling = !embedded && siblingHref && siblingLabel
+    ? { href: siblingHref, label: siblingLabel }
+    : null;
 
   const title = showTabs
     ? nav.find((t) => t.id === activeTab)?.label || brandSub
     : brandSub;
 
-  const detailPaths = ["/agent/", "/x/"];
+  const detailPaths = ["/supercomputer/"];
   const isDetail =
     detailPaths.some((p) => loc.pathname.startsWith(p) && loc.pathname !== brandHref && loc.pathname !== `${brandHref}/`) &&
     !showTabs;
@@ -91,7 +94,7 @@ export function AgentShell({
     ico: t.ico,
   }));
 
-  const accent = brandHref === "/x" ? "teal" : "teal";
+  const accent = "teal" as const;
 
   const rail =
     showTabs && onTabChange ? (
@@ -112,9 +115,11 @@ export function AgentShell({
             {statusLabel}
           </span>
           <div className="flex flex-col gap-1 px-1 text-[12px]">
-            <Link to={railSibling.href} className="text-white/70 hover:text-white">
-              {railSibling.label}
-            </Link>
+            {railSibling ? (
+              <Link to={railSibling.href} className="text-white/70 hover:text-white">
+                {railSibling.label}
+              </Link>
+            ) : null}
             <Link to="/app" className="text-white/70 hover:text-white">
               Hub
             </Link>
@@ -123,6 +128,10 @@ export function AgentShell({
         </div>
       </>
     ) : null;
+
+  if (embedded) {
+    return <div className="ox-agent__embedded-content">{children}</div>;
+  }
 
   return (
     <IosAppShell accent={accent} wide className={`ox-agent ox-agent-ios${showTabs ? " ox-agent--dash" : " ox-agent--simple"}`}>
@@ -154,9 +163,11 @@ export function AgentShell({
                     ↻
                   </button>
                 )}
-                <Link to={siblingHref} className="ios-nav__btn" aria-label={siblingLabel} title={siblingLabel}>
-                  {siblingIcon}
-                </Link>
+                {!embedded && siblingHref && siblingLabel ? (
+                  <Link to={siblingHref} className="ios-nav__btn" aria-label={siblingLabel} title={siblingLabel}>
+                    {siblingIcon}
+                  </Link>
+                ) : null}
                 <Link to="/app" className="ios-nav__btn hidden sm:inline-flex">
                   Hub
                 </Link>
@@ -178,8 +189,7 @@ export function AgentShell({
               <div className="ox-agent__footer-brand">{footerBrand}</div>
               <div className="ox-agent__footer-links">
                 <Link to="/app">Hub</Link>
-                <Link to="/agent">Agent</Link>
-                <Link to="/x">X MCP</Link>
+                <Link to="/supercomputer">Super Computer</Link>
                 <Link to="/shop">Shop</Link>
                 <a href="/ORBITX_DEX">DEX</a>
                 <Link to="/orbitxlaunch">Launch</Link>

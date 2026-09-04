@@ -15,7 +15,6 @@ export default async function MaintenancePage() {
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center text-center px-6 bg-[#0b0f1a]">
       <div className="max-w-lg">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/orbitx-mark.png" alt="OrbitX" className="h-16 w-16 mx-auto mb-6" />
         <div className="inline-flex items-center gap-2 bg-cyan/10 border border-cyan/20 rounded-full px-4 py-1.5 mb-6">
           <span className="relative flex h-2 w-2">

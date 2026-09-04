@@ -2,12 +2,32 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction, VersionedTransaction } from "@solana/web3.js";
-import { Check, ExternalLink, Loader2, ShieldAlert, Wallet } from "lucide-react";
+import { Check, Loader2, ShieldAlert, Wallet } from "lucide-react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { PLATFORM_WALLET } from "@/lib/platformFee";
 import { supabase } from "@/lib/supabase";
+import {
+  buildMcpAccessBurnTransaction,
+  confirmMcpAccessBurnUntilGranted,
+  isMcpAccessPackageId,
+  MCP_ACCESS_DURATION_LABELS,
+  MCP_ACCESS_TOKEN_AMOUNTS,
+  rememberPendingMcpBurn,
+  type McpAccessPackageId,
+} from "@/lib/mcpBurnAccess";
+import { sendWalletTransaction, confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
+import { TransactionStatus } from "@/components/onchain";
+import {
+  clearStoredPhantomWallet,
+  fetchTimeoutSignal,
+  isJupiterAdapterName,
+  isTelegramWebView,
+  parseAgentSignTradeAmount,
+  pickAutoSignWallet,
+  sortAgentSignWallets,
+} from "@/lib/orbitx/agentSignWallets";
 
-type Kind = "trade" | "claim" | "burn" | "rent" | "credits";
+type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access" | "shop";
 
 function decodeTx(b64: string): VersionedTransaction | Transaction {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -18,15 +38,57 @@ function decodeTx(b64: string): VersionedTransaction | Transaction {
   }
 }
 
+const AUTO_LOCK_PREFIX = "orbitx:sign:auto:";
+
+function autoSignLockKey(parts: Array<string | number | boolean | null | undefined>): string {
+  return AUTO_LOCK_PREFIX + parts.map((p) => String(p ?? "")).join("|");
+}
+
+function readLock(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLock(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* private mode */
+  }
+}
+
+function dropAutoQuery(): void {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("auto");
+    url.searchParams.delete("autoconfirm");
+    const qs = url.searchParams.toString();
+    window.history.replaceState(null, "", `${url.pathname}${qs ? `?${qs}` : ""}${url.hash}`);
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
- * MCP handoff — rebuild unsigned tx (trade / credits / claim / burn / rent), sign in Phantom.
- * Query: kind, action, mint, amount, percent, publicKey, slippage, pool, auto
+ * MCP / Telegram handoff — rebuild the unsigned Jupiter swap and sign in the
+ * connected browser wallet (Phantom, Jupiter, Solflare, …). Phantom Connect UL
+ * is never used. Telegram's in-app browser cannot sign.
  */
 export default function AgentSignPage() {
   const [params] = useSearchParams();
   const { connection } = useConnection();
-  const { publicKey, signTransaction, sendTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected, wallet: adapterWallet } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
+  const walletName = adapterWallet?.adapter?.name ?? null;
+  const walletCaps = {
+    sendTransaction: sendTransaction ?? undefined,
+    signTransaction: signTransaction ?? undefined,
+    walletName,
+    preferJupiter: isJupiterAdapterName(walletName),
+  };
 
   const kindParam = (params.get("kind") || "trade").toLowerCase();
   const kind: Kind =
@@ -34,9 +96,19 @@ export default function AgentSignPage() {
     kindParam === "burn" ||
     kindParam === "rent" ||
     kindParam === "credits" ||
-    kindParam === "credit"
-      ? (kindParam === "credit" ? "credits" : kindParam)
+    kindParam === "credit" ||
+    kindParam === "mcp-access" ||
+    kindParam === "mcp_access" ||
+    kindParam === "access" ||
+    kindParam === "shop"
+      ? kindParam === "credit"
+        ? "credits"
+        : kindParam === "mcp_access" || kindParam === "access"
+          ? "mcp-access"
+          : kindParam
       : "trade";
+  const sku = (params.get("sku") || params.get("item") || "").trim();
+  const packageId = (params.get("package") || params.get("packageId") || "").toLowerCase();
   const action = params.get("action") === "sell" ? "sell" : "buy";
   const mint = (params.get("mint") || "").trim();
   const amountRaw = (params.get("amount") || "").trim();
@@ -44,16 +116,20 @@ export default function AgentSignPage() {
   const expectedWallet = (params.get("publicKey") || "").trim();
   const slippage = Math.min(Math.max(Number(params.get("slippage")) || 10, 1), 50);
   const pool = params.get("pool") || "auto";
+  const AUTO_SIGN_ENABLED = false;
   const autoPrompt =
-    params.get("auto") === "1" ||
-    params.get("auto") === "true" ||
-    params.get("autoconfirm") === "1";
+    AUTO_SIGN_ENABLED &&
+    (params.get("auto") === "1" ||
+      params.get("auto") === "true" ||
+      params.get("autoconfirm") === "1");
+  const connectWallets = sortAgentSignWallets(pickable);
 
   const [busyTrade, setBusyTrade] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [extraNote, setExtraNote] = useState<string | null>(null);
   const autoStarted = useRef(false);
+  const autoConnectStarted = useRef(false);
 
   const wallet = publicKey?.toBase58() || "";
   const walletMismatch = Boolean(expectedWallet && wallet && expectedWallet !== wallet);
@@ -64,6 +140,14 @@ export default function AgentSignPage() {
       const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
+    if (kind === "shop") return sku ? `Desk shop ${sku} — buy $ORBITX + burn` : "Desk shop buy & burn";
+    if (kind === "mcp-access") {
+      const pkg: McpAccessPackageId = isMcpAccessPackageId(packageId) ? packageId : "hour";
+      const fromAmount = Number(amountRaw);
+      const tokens = Number.isFinite(fromAmount) && fromAmount > 0 ? fromAmount : MCP_ACCESS_TOKEN_AMOUNTS[pkg];
+      const label = MCP_ACCESS_DURATION_LABELS[pkg];
+      return `Buy then burn ${tokens.toLocaleString()} $ORBITX → ${label} access`;
+    }
     if (kind === "claim") return "creator fees";
     if (kind === "rent") return "close empty ATAs";
     if (kind === "burn") {
@@ -73,46 +157,43 @@ export default function AgentSignPage() {
     if (!amountRaw) return "—";
     if (action === "buy") return `${amountRaw} SOL`;
     return amountRaw.endsWith("%") ? amountRaw : `${amountRaw} tokens`;
-  }, [kind, action, amountRaw, percentRaw]);
+  }, [kind, action, amountRaw, percentRaw, packageId, sku]);
 
   const valid = useMemo(() => {
     if (kind === "credits") {
       const sol = Number(amountRaw);
       return Number.isFinite(sol) && sol >= 0.001;
     }
+    if (kind === "shop") return Boolean(sku);
+    if (kind === "mcp-access") return isMcpAccessPackageId(packageId);
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
     return Boolean(mint && amountRaw && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint));
-  }, [kind, mint, amountRaw, percentRaw]);
+  }, [kind, mint, amountRaw, percentRaw, packageId, sku]);
+
+  useEffect(() => {
+    dropAutoQuery();
+  }, []);
 
   const title =
     kind === "credits"
       ? "Buy credits"
-      : kind === "claim"
-        ? "Claim fees"
-        : kind === "burn"
-          ? "Burn tokens"
-          : kind === "rent"
-            ? "Rent refund"
-            : action.toUpperCase();
+      : kind === "mcp-access"
+        ? "Burn for MCP access"
+        : kind === "claim"
+          ? "Claim fees"
+          : kind === "burn"
+            ? "Burn tokens"
+            : kind === "rent"
+              ? "Rent refund"
+              : kind === "shop"
+                ? "Buy & burn"
+                : action.toUpperCase();
 
+  const sendOpts = { skipPreflight: true as const };
   const sendOne = async (b64: string) => {
     const tx = decodeTx(b64);
-    if (sendTransaction) {
-      return sendTransaction(tx as VersionedTransaction, connection, {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
-    }
-    if (signTransaction) {
-      const signed = await signTransaction(tx as VersionedTransaction);
-      const raw =
-        signed instanceof VersionedTransaction
-          ? signed.serialize()
-          : (signed as Transaction).serialize();
-      return connection.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
-    }
-    throw new Error("This wallet cannot sign here — open in Phantom.");
+    return sendWalletTransaction(connection, walletCaps, tx, sendOpts);
   };
 
   const onSign = async () => {
@@ -124,7 +205,7 @@ export default function AgentSignPage() {
       return;
     }
     if (!connected || !publicKey) {
-      setError("Connect Phantom first.");
+      setError("Connect a wallet first (Phantom, Jupiter, or Solflare in this browser).");
       return;
     }
     if (walletMismatch) {
@@ -133,6 +214,12 @@ export default function AgentSignPage() {
     }
 
     setBusyTrade(true);
+    const lockKey = autoSignLockKey([kind, action, mint, amountRaw, percentRaw, sku, packageId, wallet]);
+    const finish = (sig: string) => {
+      writeLock(lockKey, "done");
+      dropAutoQuery();
+      setSignature(sig);
+    };
     try {
       const pk = publicKey.toBase58();
 
@@ -151,20 +238,9 @@ export default function AgentSignPage() {
             lamports,
           }),
         );
-        let sig: string;
-        if (sendTransaction) {
-          sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
-        } else if (signTransaction) {
-          const signed = await signTransaction(tx);
-          sig = await connection.sendRawTransaction(signed.serialize(), {
-            skipPreflight: false,
-            maxRetries: 3,
-          });
-        } else {
-          throw new Error("This wallet cannot sign here — open in Phantom.");
-        }
-        await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-        setSignature(sig);
+        const sig = await sendWalletTransaction(connection, walletCaps, tx, sendOpts);
+        await confirmSentTransaction(connection, sig, { blockhash, lastValidBlockHeight });
+        finish(sig);
 
         // Credit the account (session user, or wallet-linked agent user)
         try {
@@ -184,7 +260,7 @@ export default function AgentSignPage() {
             );
           } else {
             setExtraNote(
-              "Payment sent. Tell Grok your signature to finish crediting, or open /x Usage → Confirm payment.",
+              "Payment sent. Tell Grok your signature to finish crediting, or open Super Computer Access → Confirm payment.",
             );
           }
         } catch {
@@ -195,15 +271,96 @@ export default function AgentSignPage() {
         return;
       }
 
+      if (kind === "mcp-access") {
+        const pkg: McpAccessPackageId = isMcpAccessPackageId(packageId) ? packageId : "hour";
+        const res = await fetch("/api/orbitx-agent/mcp-access/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicKey: pk, packageId: pkg }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.ok === false) {
+          throw new Error(data?.error || data?.message || "Could not quote access burn");
+        }
+        let sig: string;
+        if (typeof data.transaction === "string" && data.transaction) {
+          sig = await sendOne(data.transaction);
+        } else if (data.tokenAccount && data.amountRaw && data.programId) {
+          const tx = await buildMcpAccessBurnTransaction(connection, publicKey, {
+            tokenAccount: String(data.tokenAccount),
+            mint: String(data.mint || mint),
+            programId: String(data.programId),
+            amountRaw: String(data.amountRaw),
+            closesAccount: Boolean(data.closesAccount),
+          });
+          sig = await sendWalletTransaction(connection, walletCaps, tx, sendOpts);
+        } else {
+          throw new Error(data?.message || "Could not build access burn");
+        }
+        await confirmSentTransaction(connection, sig);
+        finish(sig);
+        rememberPendingMcpBurn({ signature: sig, publicKey: pk, packageId: pkg });
+        const granted = await confirmMcpAccessBurnUntilGranted({
+          signature: sig,
+          publicKey: pk,
+          packageId: pkg,
+        });
+        setExtraNote(
+          granted.message ||
+            `${granted.remainingLabel || "Access granted"}. Timed MCP access is active now.`,
+        );
+        return;
+      }
+
+      if (kind === "shop") {
+        const prepRes = await fetch("/api/orbitx/shop/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wallet: pk, publicKey: pk, sku, mint }),
+        });
+        const prep = await prepRes.json().catch(() => ({}));
+        if (!prepRes.ok || prep?.ok === false || typeof prep.transaction !== "string") {
+          throw new Error(prep?.error || prep?.message || "Could not build shop buy-and-burn");
+        }
+        const sig = await sendOne(prep.transaction);
+        await confirmSentTransaction(connection, sig);
+        finish(sig);
+        try {
+          await fetch("/api/orbitx/shop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              wallet: pk,
+              sku,
+              signature: sig,
+              mint,
+              sol: prep.sol,
+              solUsd: prep.solUsd,
+              orbitxBurned: prep.orbitxBurned,
+            }),
+          });
+        } catch {
+          /* receipt is optional */
+        }
+        setExtraNote(
+          prep.message ||
+            "Buy-and-burn confirmed. Copy the Solscan link — 90% of the $ORBITX bought is burned in this tx.",
+        );
+        return;
+      }
+
       if (kind === "trade") {
-        const amount =
-          action === "sell" && amountRaw.endsWith("%") ? amountRaw : Number(amountRaw);
+        const amount = parseAgentSignTradeAmount(action, amountRaw);
         if (typeof amount === "number" && (!Number.isFinite(amount) || amount <= 0)) {
+          throw new Error("Invalid amount");
+        }
+        if (typeof amount === "string" && !amount) {
           throw new Error("Invalid amount");
         }
         const res = await fetch("/api/ogdex/trade", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: fetchTimeoutSignal(20_000),
           body: JSON.stringify({
             publicKey: pk,
             action,
@@ -217,16 +374,33 @@ export default function AgentSignPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok || !data?.tx) {
-          throw new Error(data?.error || "Could not build trade transaction");
+          const why = String(data?.error || "Could not build trade transaction");
+          if (/no balance to sell/i.test(why)) {
+            throw new Error("This wallet holds 0 of that token. Switch to the wallet that holds it, then Sign.");
+          }
+          throw new Error(why);
         }
         // Separate desk-fee tx when the API could not embed the SOL transfer
         if (typeof data.feeTx === "string" && data.feeTx.length > 0) {
           const feeSig = await sendOne(data.feeTx);
-          await connection.confirmTransaction(feeSig, "confirmed");
+          await confirmSentTransaction(connection, feeSig);
         }
         const sig = await sendOne(data.tx);
-        await connection.confirmTransaction(sig, "confirmed");
-        setSignature(sig);
+        await confirmSentTransaction(connection, sig);
+        finish(sig);
+        try {
+          const { reportPlatformTx } = await import("@/lib/orbitx/ownerCommand");
+          void reportPlatformTx({
+            signature: sig,
+            wallet: pk,
+            application: "agent",
+            txType: String(action || "swap"),
+            mint,
+            path: window.location.pathname,
+          });
+        } catch {
+          /* ledger report is best-effort */
+        }
         const feeSol = data?.platformFee?.feeSol;
         const feeWallet = data?.platformFee?.wallet || PLATFORM_WALLET;
         if (feeSol) {
@@ -264,30 +438,65 @@ export default function AgentSignPage() {
       let lastSig = "";
       for (let i = 0; i < list.length; i++) {
         lastSig = await sendOne(list[i]);
-        await connection.confirmTransaction(lastSig, "confirmed");
+        await confirmSentTransaction(connection, lastSig);
       }
-      setSignature(lastSig);
+      finish(lastSig);
       if (list.length > 1) setExtraNote(`Signed ${list.length} transactions.`);
       if (data.reclaimableSol != null) {
         setExtraNote((n) => `${n ? `${n} ` : ""}~${data.reclaimableSol} SOL reclaimable.`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign failed");
+      const msg = e instanceof Error ? e.message : "Sign failed";
+      if (readLock(lockKey) === "pending") writeLock(lockKey, "");
+      autoStarted.current = false;
+      const timedOut = /aborted|timeout|timed out/i.test(msg) || (e instanceof DOMException && e.name === "AbortError");
+      if (timedOut) {
+        setError("Quote timed out. Tap Sign & send to retry.");
+      } else {
+        setError(/base58/i.test(msg) ? "Swap sent. Refresh this page — the signature is confirming on-chain." : msg);
+      }
     } finally {
       setBusyTrade(false);
     }
   };
 
   useEffect(() => {
-    if (!autoPrompt || autoStarted.current) return;
-    if (!valid || !connected || !publicKey || walletMismatch || busyTrade || signature) return;
-    autoStarted.current = true;
+    if (!autoPrompt) return;
+    if (isTelegramWebView()) clearStoredPhantomWallet();
+  }, [autoPrompt]);
+
+  useEffect(() => {
+    if (!autoPrompt || !valid || signature) return;
+    if (!isTelegramWebView()) return;
+    setError("Telegram's in-app browser can't sign. Open this link in Chrome, Jupiter Wallet, or Phantom.");
+  }, [autoPrompt, valid, signature]);
+
+  useEffect(() => {
+    if (!autoPrompt || connected || autoConnectStarted.current || signature) return;
+    const target = pickAutoSignWallet(connectWallets);
+    if (!target) return;
+    autoConnectStarted.current = true;
+    void signInWith(target.name, { connectOnly: true }).catch((e) => {
+      autoConnectStarted.current = false;
+      setError(e instanceof Error ? e.message : "Connect a wallet to auto-sign");
+    });
+  }, [autoPrompt, connected, connectWallets, signInWith, signature]);
+
+  useEffect(() => {
+    if (!autoPrompt || !valid || !connected || !wallet || walletMismatch || signature) return;
+    if (walletName && isTelegramWebView() && !isJupiterAdapterName(walletName)) return;
+    const lockKey = autoSignLockKey([kind, action, mint, amountRaw, percentRaw, sku, packageId, wallet]);
+    if (readLock(lockKey) === "done") return;
     const t = window.setTimeout(() => {
+      if (autoStarted.current) return;
+      if (readLock(lockKey) === "done") return;
+      autoStarted.current = true;
+      writeLock(lockKey, "pending");
       void onSign();
-    }, 450);
+    }, 500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPrompt, valid, connected, publicKey, walletMismatch, busyTrade, signature]);
+  }, [autoPrompt, valid, connected, wallet, walletMismatch, signature, walletName, kind, action, mint, amountRaw, percentRaw, sku, packageId]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#070a10] p-4 text-white">
@@ -295,17 +504,21 @@ export default function AgentSignPage() {
         <div className="mb-1 flex items-center gap-2 text-emerald-300">
           <Wallet className="h-5 w-5" />
           <h1 className="text-xl font-black tracking-tight">
-            {autoPrompt ? "Auto-confirm" : "Sign with Phantom"}
+            {autoPrompt ? "Auto-confirm" : "Sign swap"}
           </h1>
         </div>
         <p className="mb-5 text-xs text-white/45">
           {kind === "credits"
             ? autoPrompt
-              ? "Chat auto-confirm — Phantom will send SOL to the OrbitX desk wallet, then credits apply."
-              : "Approve the SOL transfer to the OrbitX desk wallet. Credits credit after confirmation."
-            : autoPrompt
-              ? "Chat auto-confirm — Phantom will prompt as soon as your wallet is connected."
-              : `OrbitX prepared an unsigned ${title.toLowerCase()}. Approve in Phantom — nothing broadcasts until you sign.`}
+              ? "Chat auto-confirm — your wallet sends SOL to the OrbitX desk wallet, then credits apply."
+              : "Approve the SOL transfer in your wallet. Credits apply after confirmation."
+            : kind === "mcp-access"
+              ? autoPrompt
+                ? "Chat auto-confirm — Jupiter buys the $ORBITX package and burns it in the same transaction."
+                : "Approve the Jupiter buy-and-burn. MCP access starts after confirmation and expires automatically."
+              : autoPrompt
+                ? "Chat auto-confirm — your browser wallet prompts as soon as it is connected. Phantom Connect is not used."
+                : `OrbitX prepared an unsigned Jupiter ${title.toLowerCase()}. Approve in this browser (Phantom, Jupiter, or Solflare) — nothing broadcasts until you sign.`}
         </p>
 
         <div className="mb-4 space-y-2 rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm">
@@ -318,7 +531,7 @@ export default function AgentSignPage() {
             <Row label="Mint" value={`${mint.slice(0, 6)}…${mint.slice(-4)}`} mono />
           ) : null}
           {kind === "trade" ? <Row label="Slippage" value={`${slippage}%`} /> : null}
-          {kind === "trade" ? <Row label="Platform fee" value="0.95% SOL → desk" /> : null}
+          {kind === "trade" ? <Row label="Platform fee" value="1.2% (max $10) → desk" /> : null}
           {expectedWallet ? (
             <Row label="Wallet" value={`${expectedWallet.slice(0, 4)}…${expectedWallet.slice(-4)}`} mono />
           ) : null}
@@ -349,18 +562,18 @@ export default function AgentSignPage() {
               <Check className="h-4 w-4" /> Confirmed on-chain
             </p>
             {extraNote && <p className="mb-2 text-[11px] text-white/50">{extraNote}</p>}
-            <a
-              href={`https://solscan.io/tx/${signature}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 break-all font-mono text-[11px] text-emerald-200/80 hover:underline"
-            >
-              {signature} <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
+            <TransactionStatus state="confirmed" signature={signature} />
             {kind === "credits" ? (
               <p className="mt-2 text-[11px] text-white/45">
-                <Link to="/x?tab=usage" className="text-emerald-200/90 hover:underline">
-                  View usage / balance
+                <Link to="/supercomputer?tab=shop" className="text-emerald-200/90 hover:underline">
+                  View access / balance
+                </Link>
+              </p>
+            ) : null}
+            {kind === "mcp-access" ? (
+              <p className="mt-2 text-[11px] text-white/45">
+                <Link to="/supercomputer?tab=shop" className="text-emerald-200/90 hover:underline">
+                  Open access
                 </Link>
               </p>
             ) : null}
@@ -369,7 +582,7 @@ export default function AgentSignPage() {
           <>
             {!connected && (
               <div className="mb-3 flex flex-wrap gap-2">
-                {pickable.map((w) => (
+                {connectWallets.map((w) => (
                   <button
                     key={w.name}
                     type="button"
@@ -380,6 +593,14 @@ export default function AgentSignPage() {
                     Connect {w.name}
                   </button>
                 ))}
+                <a
+                  href="https://jup.ag/mobile"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-emerald-400/40 bg-emerald-400/15 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-400/25"
+                >
+                  Get Jupiter Wallet
+                </a>
               </div>
             )}
             <button
@@ -389,14 +610,17 @@ export default function AgentSignPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab9ff2] px-4 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-40"
             >
               {busyTrade ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-              {busyTrade ? "Waiting for Phantom…" : `Sign & send ${title}`}
+              {busyTrade ? "Waiting for wallet…" : `Sign & send ${title}`}
             </button>
           </>
         )}
 
         <p className="mt-4 text-center text-[11px] text-white/35">
-          <Link to={kind === "credits" ? "/x?tab=usage" : "/agent"} className="text-white/50 hover:underline">
-            {kind === "credits" ? "Back to Usage" : "Back to Agent MCP"}
+          <Link
+            to="/supercomputer"
+            className="text-white/50 hover:underline"
+          >
+            Back to Super Computer
           </Link>
         </p>
       </div>

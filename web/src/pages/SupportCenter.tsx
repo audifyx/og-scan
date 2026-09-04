@@ -12,13 +12,17 @@ import {
   User, Users, Inbox, Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { ReactNode } from "react";
 
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useAuth } from "@/hooks/useAuth";
+import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { notifyUser, notifyUsers } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
-import { cn, safeAvatarUrl } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import "@/components/agent/agent-shell.css";
+import "./support-app.css";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 interface Ticket {
@@ -85,12 +89,43 @@ const TypingDots = () => (
   </div>
 );
 
+function SupportAppShell({
+  children,
+  statusLabel,
+  statusWarn = false,
+  onRefresh,
+}: {
+  children: ReactNode;
+  statusLabel: string;
+  statusWarn?: boolean;
+  onRefresh?: () => void;
+}) {
+  return (
+    <AgentShell
+      showTabs={false}
+      brandHref="/support"
+      brandSub="Support"
+      footerBrand="OrbitX Support"
+      footerNote="Open a ticket and chat live with the OrbitX team. Agents see every conversation here."
+      siblingHref="/app"
+      siblingLabel="Hub"
+      siblingIcon="◈"
+      statusLabel={statusLabel}
+      statusWarn={statusWarn}
+      onRefresh={onRefresh}
+    >
+      {children}
+    </AgentShell>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════════════════════════════════ */
 const SupportCenter = () => {
   const { user, profile, loading: authLoading } = useAuth();
   const { isSupportAgent } = useAdmin();
+  const { pickable, signInWith, busy } = useWalletSignIn();
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -312,36 +347,40 @@ const SupportCenter = () => {
 
   /* ─── Loading / unauthenticated states ─── */
   if (authLoading) {
-    return (
-      <AppLayout>
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
-        </div>
-      </AppLayout>
-    );
+    return <AgentLoading label="Opening support…" />;
   }
 
   if (!user) {
     return (
-      <AppLayout>
-        <div className="mx-auto max-w-md px-4 py-20 text-center">
-          <div className="mb-5 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-              <Headset className="h-7 w-7" />
+      <SupportAppShell statusLabel="Sign in" statusWarn>
+        <section className="ox-agent__panel">
+          <div className="ox-agent__panel-h">
+            <h2 className="ox-agent__panel-title">OrbitX Support</h2>
+            <span className="ox-agent__panel-hint">live desk</span>
+          </div>
+          <div className="ox-agent__panel-b">
+            <p className="ox-agent__note" style={{ marginTop: 0 }}>
+              Sign in to open a ticket and chat with the team. Agents reply from this same app.
+            </p>
+            <div className="ox-agent__btn-row">
+              {pickable.slice(0, 3).map((w) => (
+                <button
+                  key={w.name}
+                  type="button"
+                  className="ox-agent__btn"
+                  disabled={busy === w.name}
+                  onClick={() => void signInWith(w.name, { replaceEmailSession: true })}
+                >
+                  {busy === w.name ? "Connecting…" : `Connect ${w.name}`}
+                </button>
+              ))}
+              <a className="ox-agent__btn ox-agent__btn--primary" href="/auth">
+                Sign in with email
+              </a>
             </div>
           </div>
-          <h1 className="text-2xl font-black text-foreground">Support Center</h1>
-          <p className="mt-3 text-[14px] text-muted-foreground/70 leading-relaxed">
-            Sign in to create a support ticket and chat with the team.
-          </p>
-          <button
-            onClick={() => (window.location.href = "/auth")}
-            className="mt-6 rounded-full bg-primary px-6 py-2.5 text-[14px] font-bold text-primary-foreground hover:bg-primary/80 transition"
-          >
-            Sign in
-          </button>
-        </div>
-      </AppLayout>
+        </section>
+      </SupportAppShell>
     );
   }
 
@@ -351,8 +390,11 @@ const SupportCenter = () => {
     const StatusIcon = meta.icon;
 
     return (
-      <AppLayout>
-        <div className="flex h-[calc(100vh-64px)] flex-col bg-background text-foreground">
+      <SupportAppShell
+        statusLabel={isSupportAgent ? "Inbox" : "Live chat"}
+        onRefresh={() => void refreshTickets(true)}
+      >
+        <div className="ox-support-chat">
           {/* Header */}
           <div className="flex items-center gap-3 border-b border-border/60 bg-card/60 px-4 py-3 backdrop-blur-sm">
             <button
@@ -515,15 +557,15 @@ const SupportCenter = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      </SupportAppShell>
     );
   }
 
   /* ═══ Create ticket modal ═══ */
   if (creating) {
     return (
-      <AppLayout>
-        <div className="mx-auto max-w-lg px-4 py-10">
+      <SupportAppShell statusLabel="New ticket">
+        <div className="ox-support-compose">
           <div className="rounded-3xl border border-border/60 bg-card/80 overflow-hidden shadow-2xl">
             <div className="border-b border-border/40 bg-muted/20 px-6 py-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 border border-primary/20 text-primary">
@@ -572,7 +614,7 @@ const SupportCenter = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      </SupportAppShell>
     );
   }
 
@@ -582,8 +624,11 @@ const SupportCenter = () => {
   const resolvedCount   = tickets.filter((t) => t.status === "resolved").length;
 
   return (
-    <AppLayout>
-      <div className="mx-auto max-w-4xl px-4 py-8">
+    <SupportAppShell
+      statusLabel={isSupportAgent ? "Inbox" : "Support ready"}
+      onRefresh={() => void refreshTickets(true)}
+    >
+      <div className="ox-support-home">
 
         {/* ══════════════════════════════════════════════════════════════
             AGENT / ADMIN HERO  (shown only to support agents & owner)
@@ -774,7 +819,7 @@ const SupportCenter = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+    </SupportAppShell>
   );
 };
 

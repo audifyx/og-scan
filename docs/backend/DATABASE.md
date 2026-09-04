@@ -3,7 +3,9 @@
 Migrations:
 
 1. `supabase/migrations/20260725190000_oxw_world_platform.sql` — tables, indexes, seeds
-2. `supabase/migrations/20260725190100_oxw_rls_and_rpcs.sql` — RLS + RPCs
+3. `supabase/migrations/20260821120000_orbitx_owner_command.sql` — owner command presence, events, ledger, burns, audit
+
+See also [OWNER_COMMAND_CENTER.md](./OWNER_COMMAND_CENTER.md).
 
 ## Tables (summary)
 

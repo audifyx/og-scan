@@ -52,7 +52,7 @@ Postgres (oxw_*, communities, social, ogdex_*)
 ```
 
 ### Env vars observed (non-exhaustive)
-`ADMIN_PASS`, `CRON_SECRET`, `OXW_WORKER_SECRET`, `SUPABASE_*`, `HELIUS_*`, `VITE_ADMIN_PASS`, `VITE_HELIUS_API_KEY`, `VITE_LIVEKIT_URL`, `VITE_SENTRY_DSN`, Jupiter/Birdeye keys, …
+`ADMIN_AUTH` (server-only, Vercel project `rork-og-meme-coin-tracker`), `CRON_SECRET`, `OXW_WORKER_SECRET`, `SUPABASE_*`, `HELIUS_*`, `VITE_HELIUS_API_KEY`, `VITE_LIVEKIT_URL`, `VITE_SENTRY_DSN`, Jupiter/Birdeye keys, …
 
 ---
 
@@ -60,7 +60,7 @@ Postgres (oxw_*, communities, social, ogdex_*)
 
 | ID | Sev | Fix | Files |
 |----|-----|-----|-------|
-| BUG-001 | S0 | Removed hardcoded admin `0129`; require `ADMIN_PASS` / `VITE_ADMIN_PASS` (≥8 chars) | `ogdex/_lib.js`, `admin.js`, `kols.js`, `AdminPassGate.tsx`, `MaintenanceLock.tsx` |
+| BUG-001 | S0 | Removed hardcoded leaked client admin PIN; require `ADMIN_AUTH` | `ogdex/_lib.js`, `admin.js`, `kols.js`, `AdminPassGate.tsx`, `MaintenanceLock.tsx` |
 | BUG-002 | S1 | `alerts-run` requires `CRON_SECRET` or `OXW_WORKER_SECRET`; removed from NO_LIMIT | `alerts-run.js`, `ogdex.js` |
 | BUG-003 | S1 | Screener client maps `rows\|tokens\|data\|items` | `crypto/api/client.ts` + contract tests |
 | BUG-004 | S1 | Nested token payload unwrap | `normalizeTokenPayload`, `scanTokenFull` |
@@ -97,12 +97,12 @@ Expected: PASS on composeRisk, growth, progression, routeManifest, **client.cont
 
 | Control | Before | After |
 |---------|--------|-------|
-| Default admin pass | `0129` | **none** — empty fails closed |
+| Default admin pass | leaked client PIN | **none** — empty fails closed |
 | alerts-run | public | secret required |
 | oxw_record_trade leak | possible | exception if other user owns sig |
 | Anti-vamp total outage | fail open | fail closed |
 
-**Remaining:** Set `ADMIN_PASS`, `VITE_ADMIN_PASS`, `CRON_SECRET`, and matching `OXW_WORKER_SECRET` in Vercel before relying on admin/cron/workers in production. Prod Supabase OXW migrations + `oxw-*` edge functions + `OXW_WORKER_SECRET` (Supabase side) are applied — see `docs/omega/OPS_APPLY_STATUS.md`.
+**Remaining:** Set `ADMIN_AUTH` (never `VITE_*`) and `CRON_SECRET` on Vercel project **`rork-og-meme-coin-tracker`**, plus matching `OXW_WORKER_SECRET`. Prod Supabase OXW migrations + `oxw-*` edge functions + `OXW_WORKER_SECRET` (Supabase side) are applied — see `docs/omega/OPS_APPLY_STATUS.md`.
 
 ---
 

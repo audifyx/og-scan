@@ -26,6 +26,8 @@ export interface Profile {
   daily_streak?: number | null;
   created_at: string;
   updated_at?: string;
+  badge?: string | null;
+  mcp_beta_access?: boolean | null;
 }
 
 interface AuthContextType {

@@ -1,141 +1,390 @@
-/** Character classes for OrbitX City — distinct silhouettes + palettes. */
+/**
+ * OrbitX City — playable crypto-native operatives.
+ *
+ * Six original mascots built on crypto-culture archetypes. Designs are
+ * OrbitX-original stylised meshes (blocky, Roblox-adjacent proportions), not
+ * reproductions of third-party meme artwork.
+ *
+ * Legacy save data (trader/builder/gamer/creator/explorer) resolves forward
+ * through CLASS_ALIASES.
+ */
 import type { AvatarAppearance } from "./types";
 
-export type CharacterClassId = "trader" | "builder" | "gamer" | "creator" | "explorer";
+export type CharacterClassId =
+  | "pepe"
+  | "wojak"
+  | "chad"
+  | "doge"
+  | "anon"
+  | "vitalik"
+  | "whale"
+  | "bot"
+  | "oracle"
+  | "miner";
+
+/** Legacy class ids still stored on interiors / old sessions. */
+export type LegacyClassId =
+  | "trader"
+  | "builder"
+  | "gamer"
+  | "creator"
+  | "explorer";
+
+export const CLASS_ALIASES: Record<LegacyClassId, CharacterClassId> = {
+  trader: "pepe",
+  builder: "anon",
+  gamer: "chad",
+  creator: "wojak",
+  explorer: "doge",
+};
+
+export type ClassRarity = "common" | "rare" | "epic" | "legendary";
+
+export const RARITY_META: Record<
+  ClassRarity,
+  { label: string; color: string; glow: string; order: number }
+> = {
+  common: { label: "Common", color: "#9aa4b2", glow: "rgba(154,164,178,0.45)", order: 0 },
+  rare: { label: "Rare", color: "#4aa3ff", glow: "rgba(74,163,255,0.50)", order: 1 },
+  epic: { label: "Epic", color: "#b76cff", glow: "rgba(183,108,255,0.55)", order: 2 },
+  legendary: { label: "Legendary", color: "#ffb427", glow: "rgba(255,180,39,0.60)", order: 3 },
+};
 
 export interface CharacterStat {
   label: string;
   value: number;
 }
 
+/** Silhouette recipe consumed by the blocky in-world mesh. */
+export interface CharacterBuild {
+  /** Head shape driver. */
+  head: "round" | "block" | "wide" | "tall" | "snout";
+  /** Torso mass. */
+  torso: "slim" | "regular" | "broad" | "bulk";
+  /** Signature headgear rendered above the head. */
+  headgear: "none" | "cap" | "hood" | "visor" | "crown" | "beanie";
+  /** Emissive eye treatment. */
+  eyes: "flat" | "laser" | "glow" | "shade";
+  /** Trailing accessory. */
+  trail: "none" | "scarf" | "tail" | "cape";
+}
+
 export interface CharacterClassDef {
   id: CharacterClassId;
   name: string;
+  handle: string;
   tagline: string;
+  rarity: ClassRarity;
   neon: string;
   gold: string;
   bodyColor: string;
   accentColor: string;
   skinColor: string;
-  /** Relative body scale for in-world mesh differentiation */
+  /** Secondary colour for trim, cuffs, headgear. */
+  trimColor: string;
+  /** Relative body scale for in-world mesh differentiation. */
   scale: { x: number; y: number; z: number };
+  /** Movement tuning multipliers applied by the player controller. */
+  movement: { speed: number; jump: number; accel: number };
+  build: CharacterBuild;
   stats: CharacterStat[];
 }
 
 export const CHARACTER_CLASSES: CharacterClassDef[] = [
   {
-    id: "trader",
-    name: "Trader",
-    tagline: "Market predator · execution first",
-    neon: "#c5a26f",
-    gold: "#e0c48a",
-    bodyColor: "#1a1f2a",
-    accentColor: "#c5a26f",
-    skinColor: "#e8d5c0",
-    scale: { x: 1, y: 1.02, z: 1 },
+    id: "pepe",
+    name: "Pip",
+    handle: "@pip.ox",
+    tagline: "Tape reader · lives on the 1-minute",
+    rarity: "rare",
+    neon: "#5cb85c",
+    gold: "#c5e07a",
+    bodyColor: "#2f6b34",
+    accentColor: "#c23b3b",
+    skinColor: "#63c264",
+    trimColor: "#8fd97a",
+    scale: { x: 1.08, y: 0.94, z: 1.08 },
+    movement: { speed: 1.0, jump: 1.06, accel: 1.12 },
+    build: { head: "wide", torso: "regular", headgear: "none", eyes: "flat", trail: "none" },
     stats: [
-      { label: "Instinct", value: 92 },
-      { label: "Speed", value: 78 },
-      { label: "Risk", value: 86 },
+      { label: "Instinct", value: 94 },
+      { label: "Degen", value: 96 },
+      { label: "Risk", value: 88 },
+      { label: "Focus", value: 71 },
+    ],
+  },
+  {
+    id: "wojak",
+    name: "Vex",
+    handle: "@vex.ox",
+    tagline: "Culture layer · turns rugs into lore",
+    rarity: "common",
+    neon: "#e8b4c8",
+    gold: "#c5a26f",
+    bodyColor: "#5b6472",
+    accentColor: "#e8b4c8",
+    skinColor: "#f0d2bd",
+    trimColor: "#8e99a8",
+    scale: { x: 0.95, y: 1.02, z: 0.95 },
+    movement: { speed: 0.98, jump: 1.0, accel: 1.0 },
+    build: { head: "round", torso: "slim", headgear: "beanie", eyes: "flat", trail: "scarf" },
+    stats: [
+      { label: "Reach", value: 92 },
+      { label: "Signal", value: 84 },
+      { label: "Resolve", value: 78 },
+      { label: "Focus", value: 66 },
+    ],
+  },
+  {
+    id: "chad",
+    name: "Titan",
+    handle: "@titan.ox",
+    tagline: "Clutch heat checks · never re-reads a chart",
+    rarity: "epic",
+    neon: "#f0c27a",
+    gold: "#ffd700",
+    bodyColor: "#1c1420",
+    accentColor: "#d4a017",
+    skinColor: "#d4a574",
+    trimColor: "#f2c96b",
+    scale: { x: 1.24, y: 1.12, z: 1.12 },
+    movement: { speed: 0.94, jump: 1.18, accel: 0.9 },
+    build: { head: "block", torso: "bulk", headgear: "none", eyes: "shade", trail: "none" },
+    stats: [
+      { label: "Aura", value: 99 },
+      { label: "Reflex", value: 91 },
+      { label: "Clutch", value: 93 },
       { label: "Focus", value: 80 },
     ],
   },
   {
-    id: "builder",
-    name: "Builder",
-    tagline: "Systems · protocols · craft",
-    neon: "#5b8def",
-    gold: "#8eb0ff",
-    bodyColor: "#243044",
-    accentColor: "#5b8def",
-    skinColor: "#c9a07a",
-    scale: { x: 1.18, y: 1.05, z: 1.12 },
+    id: "doge",
+    name: "Scout",
+    handle: "@scout.ox",
+    tagline: "Frontier runner · maps blocks nobody walks",
+    rarity: "rare",
+    neon: "#e8a54b",
+    gold: "#f5d08a",
+    bodyColor: "#c8802f",
+    accentColor: "#a8332a",
+    skinColor: "#e8a54b",
+    trimColor: "#f3c479",
+    scale: { x: 1.04, y: 0.9, z: 1.14 },
+    movement: { speed: 1.14, jump: 1.02, accel: 1.16 },
+    build: { head: "snout", torso: "regular", headgear: "none", eyes: "glow", trail: "tail" },
     stats: [
-      { label: "Craft", value: 90 },
-      { label: "Stamina", value: 84 },
-      { label: "Vision", value: 72 },
-      { label: "Focus", value: 88 },
-    ],
-  },
-  {
-    id: "gamer",
-    name: "Gamer",
-    tagline: "Arenas · streaks · clutch plays",
-    neon: "#ff4d6a",
-    gold: "#ffd700",
-    bodyColor: "#1c1420",
-    accentColor: "#ff4d6a",
-    skinColor: "#f0d5b8",
-    scale: { x: 0.92, y: 0.96, z: 0.92 },
-    stats: [
-      { label: "Reflex", value: 95 },
-      { label: "Speed", value: 90 },
-      { label: "Luck", value: 70 },
-      { label: "Focus", value: 82 },
-    ],
-  },
-  {
-    id: "creator",
-    name: "Creator",
-    tagline: "Signal · culture · narrative",
-    neon: "#b388ff",
-    gold: "#c5a26f",
-    bodyColor: "#2a1f36",
-    accentColor: "#b388ff",
-    skinColor: "#f2dcc8",
-    scale: { x: 0.98, y: 1.04, z: 0.98 },
-    stats: [
-      { label: "Style", value: 93 },
-      { label: "Reach", value: 85 },
-      { label: "Charm", value: 88 },
+      { label: "Range", value: 97 },
+      { label: "Pace", value: 93 },
+      { label: "Stamina", value: 86 },
       { label: "Focus", value: 74 },
     ],
   },
   {
-    id: "explorer",
-    name: "Explorer",
-    tagline: "Frontier routes · discovery",
-    neon: "#00ff9f",
-    gold: "#d4af37",
-    bodyColor: "#1e2a22",
-    accentColor: "#3d9a6a",
-    skinColor: "#8d5524",
-    scale: { x: 1.04, y: 1.08, z: 1.04 },
+    id: "anon",
+    name: "Nul",
+    handle: "@nul.ox",
+    tagline: "Ships rails · never doxxes",
+    rarity: "legendary",
+    neon: "#f7931a",
+    gold: "#f5c542",
+    bodyColor: "#0f1116",
+    accentColor: "#f7931a",
+    skinColor: "#1a1d24",
+    trimColor: "#f7931a",
+    scale: { x: 1.0, y: 1.06, z: 1.0 },
+    movement: { speed: 1.02, jump: 1.0, accel: 1.04 },
+    build: { head: "tall", torso: "slim", headgear: "hood", eyes: "laser", trail: "cape" },
     stats: [
-      { label: "Range", value: 91 },
-      { label: "Stamina", value: 87 },
-      { label: "Instinct", value: 80 },
-      { label: "Focus", value: 76 },
+      { label: "Craft", value: 91 },
+      { label: "Conviction", value: 98 },
+      { label: "Stealth", value: 95 },
+      { label: "Focus", value: 90 },
+    ],
+  },
+  {
+    id: "vitalik",
+    name: "Proto",
+    handle: "@proto.ox",
+    tagline: "Protocol architect · thinks in state trees",
+    rarity: "legendary",
+    neon: "#8a7dff",
+    gold: "#c3bcff",
+    bodyColor: "#221f3d",
+    accentColor: "#8a7dff",
+    skinColor: "#e7d9c4",
+    trimColor: "#a99dff",
+    scale: { x: 0.92, y: 1.1, z: 0.92 },
+    movement: { speed: 1.0, jump: 0.96, accel: 0.98 },
+    build: { head: "tall", torso: "slim", headgear: "visor", eyes: "glow", trail: "none" },
+    stats: [
+      { label: "Craft", value: 99 },
+      { label: "Insight", value: 96 },
+      { label: "Stamina", value: 70 },
+      { label: "Focus", value: 97 },
+    ],
+  },
+  {
+    id: "whale",
+    name: "Fathom",
+    handle: "@fathom.ox",
+    tagline: "Moves size · the chart moves after",
+    rarity: "legendary",
+    neon: "#3fa7d6",
+    gold: "#9fd8f0",
+    bodyColor: "#16394f",
+    accentColor: "#3fa7d6",
+    skinColor: "#5fb7d8",
+    trimColor: "#2c6b8a",
+    scale: { x: 1.3, y: 1.16, z: 1.22 },
+    movement: { speed: 0.86, jump: 0.92, accel: 0.78 },
+    build: { head: "wide", torso: "bulk", headgear: "crown", eyes: "glow", trail: "cape" },
+    stats: [
+      { label: "Weight", value: 99 },
+      { label: "Patience", value: 94 },
+      { label: "Pace", value: 58 },
+      { label: "Focus", value: 88 },
+    ],
+  },
+  {
+    id: "bot",
+    name: "Tick",
+    handle: "@tick.ox",
+    tagline: "Fills before you finish reading the tweet",
+    rarity: "epic",
+    neon: "#00e5c0",
+    gold: "#8ff5e4",
+    bodyColor: "#1b2b2e",
+    accentColor: "#00e5c0",
+    skinColor: "#7f8c92",
+    trimColor: "#37585c",
+    scale: { x: 0.94, y: 1.04, z: 0.94 },
+    movement: { speed: 1.22, jump: 1.02, accel: 1.3 },
+    build: { head: "block", torso: "slim", headgear: "visor", eyes: "laser", trail: "none" },
+    stats: [
+      { label: "Speed", value: 99 },
+      { label: "Precision", value: 95 },
+      { label: "Nerve", value: 62 },
+      { label: "Focus", value: 91 },
+    ],
+  },
+  {
+    id: "oracle",
+    name: "Sable",
+    handle: "@sable.ox",
+    tagline: "Prices truth · feeds the whole city",
+    rarity: "epic",
+    neon: "#d9a7ff",
+    gold: "#f0dcff",
+    bodyColor: "#2a1f3d",
+    accentColor: "#d9a7ff",
+    skinColor: "#d9c3b0",
+    trimColor: "#6b4f8a",
+    scale: { x: 0.96, y: 1.08, z: 0.96 },
+    movement: { speed: 0.98, jump: 1.0, accel: 0.96 },
+    build: { head: "tall", torso: "regular", headgear: "hood", eyes: "glow", trail: "cape" },
+    stats: [
+      { label: "Insight", value: 97 },
+      { label: "Signal", value: 93 },
+      { label: "Reach", value: 84 },
+      { label: "Focus", value: 92 },
+    ],
+  },
+  {
+    id: "miner",
+    name: "Grit",
+    handle: "@grit.ox",
+    tagline: "Was here before the chart · will be here after",
+    rarity: "rare",
+    neon: "#f2a13c",
+    gold: "#ffd08a",
+    bodyColor: "#4a3524",
+    accentColor: "#f2a13c",
+    skinColor: "#c08d5f",
+    trimColor: "#6b4f34",
+    scale: { x: 1.16, y: 1.02, z: 1.1 },
+    movement: { speed: 0.92, jump: 1.1, accel: 0.94 },
+    build: { head: "block", torso: "broad", headgear: "cap", eyes: "flat", trail: "none" },
+    stats: [
+      { label: "Stamina", value: 98 },
+      { label: "Grit", value: 96 },
+      { label: "Pace", value: 66 },
+      { label: "Focus", value: 83 },
     ],
   },
 ];
 
-export function getCharacterClass(id: CharacterClassId | string | undefined): CharacterClassDef {
-  return CHARACTER_CLASSES.find((c) => c.id === id) ?? CHARACTER_CLASSES[0]!;
+const VALID_IDS = new Set<string>(CHARACTER_CLASSES.map((c) => c.id));
+
+export function isCharacterClassId(
+  value: string | undefined | null,
+): value is CharacterClassId {
+  return typeof value === "string" && VALID_IDS.has(value);
 }
 
-/** Live class perks used by InteractionMarkers / Map panel. */
+export function resolveClassId(id: string | undefined | null): CharacterClassId {
+  if (isCharacterClassId(id)) return id;
+  if (id && id in CLASS_ALIASES) return CLASS_ALIASES[id as LegacyClassId];
+  return "pepe";
+}
+
+export function getCharacterClass(
+  id: CharacterClassId | string | undefined,
+): CharacterClassDef {
+  return (
+    CHARACTER_CLASSES.find((c) => c.id === resolveClassId(id)) ??
+    CHARACTER_CLASSES[0]!
+  );
+}
+
+export function getRarityMeta(id: CharacterClassId | string | undefined) {
+  return RARITY_META[getCharacterClass(id).rarity];
+}
+
+/** Overall power index (0-100) used for roster sorting and the compare bar. */
+export function classPowerIndex(id: CharacterClassId | string | undefined): number {
+  const stats = getCharacterClass(id).stats;
+  if (!stats.length) return 0;
+  return Math.round(stats.reduce((a, s) => a + s.value, 0) / stats.length);
+}
+
 export function hasGamerMarkerPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "gamer";
+  return resolveClassId(classId) === "chad";
 }
 
 export function hasExplorerMapPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "explorer";
+  return resolveClassId(classId) === "doge";
 }
 
 export function hasTraderTerminalPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "trader";
+  return resolveClassId(classId) === "pepe";
 }
 
 export function hasBuilderMissionPerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "builder";
+  const id = resolveClassId(classId);
+  return id === "anon" || id === "vitalik";
 }
 
 export function hasCreatorPresencePerk(classId?: CharacterClassId | string | null): boolean {
-  return classId === "creator";
+  return resolveClassId(classId) === "wojak";
 }
 
-/** City-board claim cooldown. Builder at HQ is nearly instant. */
+/** Proto reads contract internals at terminals without a scan cost. */
+/** Fathom's size shows a deeper order-book preview at terminals. */
+export function hasDepthPerk(classId?: CharacterClassId | string | null): boolean {
+  return resolveClassId(classId) === "whale";
+}
+
+/** Tick and Sable surface live signal markers across the district. */
+export function hasSignalPerk(classId?: CharacterClassId | string | null): boolean {
+  const id = resolveClassId(classId);
+  return id === "bot" || id === "oracle";
+}
+
+export function hasProtocolInspectPerk(classId?: CharacterClassId | string | null): boolean {
+  return resolveClassId(classId) === "vitalik";
+}
+
+/** City-board claim cooldown. Builder classes at HQ are nearly instant. */
 export function missionClaimCooldownMs(
   classId?: CharacterClassId | string | null,
   atHq = false,
@@ -144,32 +393,41 @@ export function missionClaimCooldownMs(
   return 30_000;
 }
 
-export function appearanceFromClass(cls: CharacterClassDef, name?: string): AvatarAppearance {
-  const hairByClass = {
-    trader: { hairStyle: "short" as const, hairColor: "#2a2218" },
-    builder: { hairStyle: "buzz" as const, hairColor: "#1a1814" },
-    gamer: { hairStyle: "mohawk" as const, hairColor: cls.accentColor },
-    creator: { hairStyle: "bun" as const, hairColor: "#c5a26f" },
-    explorer: { hairStyle: "long" as const, hairColor: "#3a2410" },
-  }[cls.id];
+export function appearanceFromClass(
+  cls: CharacterClassDef,
+  name?: string,
+): AvatarAppearance {
+  const look: Record<
+    CharacterClassId,
+    {
+      hairStyle: AvatarAppearance["hairStyle"];
+      hairColor: string;
+      outfit: AvatarAppearance["outfit"];
+      faceStyle: AvatarAppearance["faceStyle"];
+    }
+  > = {
+    pepe: { hairStyle: "short", hairColor: "#2f6b34", outfit: "street", faceStyle: "cool" },
+    wojak: { hairStyle: "buzz", hairColor: "#6b5344", outfit: "street", faceStyle: "neutral" },
+    chad: { hairStyle: "short", hairColor: "#1a1410", outfit: "sport", faceStyle: "cool" },
+    doge: { hairStyle: "short", hairColor: "#c47a28", outfit: "street", faceStyle: "smile" },
+    anon: { hairStyle: "buzz", hairColor: "#0f1116", outfit: "suit", faceStyle: "neutral" },
+    vitalik: { hairStyle: "short", hairColor: "#3b3468", outfit: "suit", faceStyle: "neutral" },
+    whale: { hairStyle: "buzz", hairColor: "#16394f", outfit: "suit", faceStyle: "cool" },
+    bot: { hairStyle: "buzz", hairColor: "#1b2b2e", outfit: "sport", faceStyle: "neutral" },
+    oracle: { hairStyle: "short", hairColor: "#2a1f3d", outfit: "suit", faceStyle: "neutral" },
+    miner: { hairStyle: "short", hairColor: "#4a3524", outfit: "street", faceStyle: "smile" },
+  };
 
-  const outfitByClass = {
-    trader: "suit" as const,
-    builder: "street" as const,
-    gamer: "sport" as const,
-    creator: "neon" as const,
-    explorer: "street" as const,
-  }[cls.id];
-
+  const kit = look[cls.id];
   return {
     name: name?.trim() || cls.name,
     bodyColor: cls.bodyColor,
     accentColor: cls.accentColor,
     skinColor: cls.skinColor,
     classId: cls.id,
-    hairStyle: hairByClass.hairStyle,
-    hairColor: hairByClass.hairColor,
-    outfit: outfitByClass,
-    faceStyle: cls.id === "creator" ? "smile" : cls.id === "gamer" ? "cool" : "neutral",
+    hairStyle: kit.hairStyle,
+    hairColor: kit.hairColor,
+    outfit: kit.outfit,
+    faceStyle: kit.faceStyle,
   };
 }

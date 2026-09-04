@@ -3,15 +3,16 @@
  * Rules from assets/catalog CITY_PROP_RULES.
  */
 import { useMemo } from "react";
-import { Clone, useGLTF } from "@react-three/drei";
+import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { collidesAt, hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
-import { CITY_STREET_MODELS, getPropRules, type PropKind } from "@/lib/orbitxcity/assets/catalog";
+import { getPropRules, type PropKind } from "@/lib/orbitxcity/assets/catalog";
 import { getWorldTheme } from "@/lib/orbitxcity/assets/worldThemes";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
+import { CITY_CAR_BODIES, CITY_CAR_GLOWS, CityCarMesh } from "./CityCarMesh";
 
-useGLTF.preload(CITY_STREET_MODELS.carSedan);
+const SIGN_WORDS = ["ORBITX", "SOL", "DEX", "LAUNCH", "WAGMI", "GM"] as const;
 
 function PalmTree({ x, z, accent }: { x: number; z: number; accent: string }) {
   return (
@@ -41,30 +42,37 @@ function PalmTree({ x, z, accent }: { x: number; z: number; accent: string }) {
 
 function NeonSign({ x, z, accent, label }: { x: number; z: number; accent: string; label: string }) {
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, 0, z]} userData={{ label }}>
       <mesh position={[0, 2.8, 0]} castShadow>
         <boxGeometry args={[0.08, 5.2, 0.08]} />
         <meshStandardMaterial color="#2a3038" metalness={0.5} roughness={0.45} />
       </mesh>
       <mesh position={[0, 4.2, 0.12]}>
         <boxGeometry args={[2.4, 0.55, 0.12]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.85} toneMapped={false} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.95} toneMapped={false} />
       </mesh>
       <mesh position={[0, 3.5, 0.12]}>
         <boxGeometry args={[1.8, 0.35, 0.1]} />
-        <meshStandardMaterial color="#00ff9f" emissive="#00ff9f" emissiveIntensity={0.55} toneMapped={false} />
+        <meshStandardMaterial color="#00ff9f" emissive="#00ff9f" emissiveIntensity={0.7} toneMapped={false} />
       </mesh>
-      {/* Simple readable block — full Text would need drei in every instance */}
-      <mesh position={[0, 4.2, 0.2]}>
-        <planeGeometry args={[2.2, 0.4]} />
-        <meshBasicMaterial color="#061018" transparent opacity={0.85} />
-      </mesh>
+      <Text
+        position={[0, 4.2, 0.22]}
+        fontSize={0.28}
+        color="#061018"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.01}
+        outlineColor={accent}
+      >
+        {label}
+      </Text>
+      <Text position={[0, 3.5, 0.2]} fontSize={0.16} color="#061018" anchorX="center" anchorY="middle">
+        ORBITX
+      </Text>
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[0.6, 12]} />
         <meshStandardMaterial color="#3a4048" roughness={0.9} />
       </mesh>
-      {/* label stored for a11y via userData */}
-      <group userData={{ label }} />
     </group>
   );
 }
@@ -116,19 +124,15 @@ function StageLight({ x, z, accent, rot }: { x: number; z: number; accent: strin
 }
 
 function ParkedCars({ spots }: { spots: Array<[number, number, number]> }) {
-  const { scene } = useGLTF(CITY_STREET_MODELS.carSedan);
   return (
     <group>
       {spots.map(([x, z, rot], i) => (
-        <Clone
-          key={`car-${i}-${x}-${z}`}
-          object={scene}
-          position={[x, 0, z]}
-          rotation={[0, rot, 0]}
-          scale={1.1}
-          castShadow
-          receiveShadow
-        />
+        <group key={`car-${i}-${x}-${z}`} position={[x, 0, z]} rotation={[0, rot, 0]}>
+          <CityCarMesh
+            glow={CITY_CAR_GLOWS[i % CITY_CAR_GLOWS.length]!}
+            body={CITY_CAR_BODIES[i % CITY_CAR_BODIES.length]!}
+          />
+        </group>
       ))}
     </group>
   );
@@ -164,6 +168,9 @@ function NewsKiosk({ x, z, accent }: { x: number; z: number; accent: string }) {
         <planeGeometry args={[0.9, 0.55]} />
         <meshStandardMaterial color="#061018" emissive={accent} emissiveIntensity={0.4} />
       </mesh>
+      <Text position={[0, 1.4, 0.4]} fontSize={0.16} color={accent} anchorX="center" anchorY="middle">
+        NEWS
+      </Text>
       <mesh position={[0, 1.95, 0]}>
         <boxGeometry args={[1.2, 0.08, 0.8]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} toneMapped={false} />
@@ -291,7 +298,14 @@ function PropMesh({
     case "palm-cluster":
       return <PalmCluster x={x} z={z} accent={accent} />;
     case "neon-sign":
-      return <NeonSign x={x} z={z} accent={accent} label="ORBITX" />;
+      return (
+        <NeonSign
+          x={x}
+          z={z}
+          accent={accent}
+          label={SIGN_WORDS[Math.abs(Math.round(x * 3 + z * 5)) % SIGN_WORDS.length]!}
+        />
+      );
     case "neon-blade":
       return <NeonBlade x={x} z={z} accent={accent} rot={rot} />;
     case "hydrant":
@@ -343,7 +357,8 @@ export function PropScatter({ block }: { block: WorldBlockConfig }) {
           for (const [x, z] of positions) {
             if (collidesAt(x, z, 0.6, block)) continue;
             if (rule.kind === "parked-car") {
-              cars.push([x, z, r() * Math.PI * 2]);
+              const yaw = (s.o === "h" ? Math.PI / 2 : 0) + (r() > 0.5 ? Math.PI : 0);
+              cars.push([x, z, yaw]);
             } else {
               propList.push({ kind: rule.kind, x, z, rot: r() * Math.PI * 2 });
             }

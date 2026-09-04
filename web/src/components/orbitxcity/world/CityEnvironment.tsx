@@ -13,6 +13,10 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { mulberry32, hashSeed } from "@/lib/orbitxcity/collision";
 import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
+import { BlockyBuildingMesh } from "./BlockyBuildingMesh";
+import { Baseplate } from "./BlockBuilding";
+import { CityFill } from "./CityFill";
+import { OrbitxBillboardRing } from "./OrbitxBillboard";
 import { BillboardMesh } from "./BillboardMesh";
 import { GraffitiLayer } from "./GraffitiLayer";
 import { Skyline } from "./Skyline";
@@ -21,6 +25,7 @@ import { NPCs } from "./NPCs";
 import { Drones } from "./Drones";
 import { RocketShow } from "./RocketShow";
 import { MegaScreen } from "./MegaScreen";
+import { ChartBoard, usePriceHistory } from "./ChartBoard";
 import { OxiGuide } from "./OxiGuide";
 import { Park } from "./Park";
 import { Traffic } from "./Traffic";
@@ -30,6 +35,14 @@ import { PropScatter } from "./PropScatter";
 import { LandmarkMesh } from "./LandmarkMesh";
 import { landmarkModelId } from "@/lib/orbitxcity/assets/catalog";
 import type { LandmarkDefinition } from "@/lib/orbitxcity/types";
+
+/**
+ * Blocky (Roblox-style) world render mode. Set VITE_OXC_BLOCKY=0 to fall back
+ * to the legacy Manhattan facade renderer. Collision is unaffected either way.
+ */
+const BLOCKY_WORLD: boolean =
+  (import.meta.env?.VITE_OXC_BLOCKY ?? "1") !== "0";
+
 
 function cityTheme(cityId: CityId) {
   return getWorldTheme(cityId);
@@ -242,10 +255,147 @@ function defaultLandmark(block: WorldBlockConfig): LandmarkDefinition {
 }
 
 /** Full scenic layer — env, districts, graffiti, screens, ambient life. */
+const ZONE_SIGN: Record<string, string> = {
+  games: "GAMES DISTRICT",
+  community: "COMMUNITY",
+  trading: "DEX FLOOR",
+  launch: "LAUNCH",
+  marketplace: "MARKET",
+  hq: "ORBITX HQ",
+  voice: "VOICE PLAZA",
+  nft: "NFT GALLERY",
+  token: "TOKEN DESK",
+};
+
+function ZoneLandmarkSigns({ block, lite }: { block: WorldBlockConfig; lite: boolean }) {
+  const picks = useMemo(() => {
+    const seen = new Set<string>();
+    const out: typeof block.zones = [];
+    for (const z of block.zones ?? []) {
+      if (seen.has(z.kind)) continue;
+      seen.add(z.kind);
+      out.push(z);
+    }
+    return out.slice(0, lite ? 5 : 8);
+  }, [block.zones, lite]);
+
+  return (
+    <group>
+      {picks.map((z) => (
+        <group key={`zone-sign-${z.id}`} position={[z.position.x, 5.6, z.position.z]}>
+          <mesh>
+            <boxGeometry args={[4.8, 0.72, 0.14]} />
+            <meshStandardMaterial
+              color="#0a1016"
+              emissive={z.kind === "hq" ? "#c5a26f" : "#00ff9f"}
+              emissiveIntensity={0.28}
+              metalness={0.3}
+              roughness={0.42}
+            />
+          </mesh>
+          <Text
+            position={[0, 0, 0.1]}
+            fontSize={0.28}
+            color="#e8fff4"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.02}
+            outlineColor="#05080c"
+            maxWidth={4.6}
+          >
+            {ZONE_SIGN[z.kind] ?? z.label.toUpperCase()}
+          </Text>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function DistrictBanners({ block }: { block: WorldBlockConfig }) {
+  return (
+    <group>
+      {(block.districts ?? []).map((d) => (
+        <group key={d.id} position={[d.center.x, 6.4, d.center.z]}>
+          <mesh position={[0, 0.55, 0]}>
+            <boxGeometry args={[Math.min(8.4, d.name.length * 0.42 + 1.6), 1.05, 0.18]} />
+            <meshStandardMaterial
+              color="#0a1016"
+              emissive="#00ff9f"
+              emissiveIntensity={0.22}
+              metalness={0.35}
+              roughness={0.4}
+            />
+          </mesh>
+          <Text
+            position={[0, 0.55, 0.12]}
+            fontSize={0.42}
+            color="#e8fff4"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.03}
+            outlineColor="#05080c"
+            maxWidth={8}
+          >
+            {d.name.toUpperCase()}
+          </Text>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/**
+ * Live chart boards mounted on market and trading venues. One board per
+ * trending token, hung on the facade of the matching building.
+ */
+function MarketBoards({
+  block,
+  rows,
+}: {
+  block: WorldBlockConfig;
+  rows: ScreenerRow[];
+}) {
+  const history = usePriceHistory(rows);
+
+  const venues = useMemo(
+    () =>
+      block.buildings.filter((b) =>
+        ["market", "marketplace", "trading_floor", "trading", "hq"].includes(b.kind),
+      ),
+    [block.buildings],
+  );
+
+  if (!venues.length) return null;
+
+  return (
+    <group name="oxc-market-boards">
+      {venues.map((b, i) => {
+        const row = rows[i % Math.max(1, rows.length)];
+        const key = row?.mint ?? row?.address ?? row?.symbol ?? "";
+        return (
+          <ChartBoard
+            key={b.id}
+            row={row}
+            history={history[key] ?? []}
+            position={[
+              b.position.x,
+              b.position.y + Math.min(b.size.height * 0.55, 16),
+              b.position.z + b.size.depth / 2 + 0.4,
+            ]}
+            width={Math.min(b.size.width * 0.68, 11)}
+            height={Math.min(b.size.width * 0.42, 6.8)}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
 export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { tickerRows: ScreenerRow[]; block?: WorldBlockConfig }) {
   const theme = cityTheme(block.cityId);
-  const { quality } = useCity();
+  const { quality, panel } = useCity();
   const high = quality === "high";
+  const paused = panel !== "none";
   const screens = high ? marketScreensFor(block.cityId) : marketScreensFor(block.cityId).slice(0, 1);
   const hq = block.buildings.find((b) => b.kind === "hq");
   const shardOrigin = hq?.position ?? block.spawn;
@@ -254,47 +404,71 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
   return (
     <group>
       <color attach="background" args={[theme.background]} />
-      <fog attach="fog" args={[theme.fog, high ? 42 : 32, high ? 165 : 110]} />
+      <fog attach="fog" args={[theme.fog, high ? 130 : 95, high ? 430 : 310]} />
 
       <SkyCycle block={block} />
-      <ambientLight intensity={0.22} />
-      {high && <directionalLight position={[-28, 22, -16]} intensity={0.22} color="#b8c4ce" />}
+      <ambientLight intensity={high ? 0.42 : 0.36} color="#c8d4de" />
+      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, high ? 0.55 : 0.42]} />
+      <directionalLight position={[-22, 28, 12]} intensity={high ? 0.62 : 0.48} color="#e8d8b0" />
+      {high && <directionalLight position={[18, 16, -10]} intensity={0.28} color="#8eb8ff" />}
 
-      {/* Neon atmosphere lights — cyan / gold / magenta */}
-      <pointLight position={[block.spawn.x, 7, block.spawn.z]} intensity={0.55} color={theme.secondary} distance={32} />
+      {/* Neon atmosphere lights — cyan / gold / magenta / lime */}
+      <pointLight position={[block.spawn.x, 8, block.spawn.z]} intensity={1.05} color={theme.secondary} distance={38} />
       <pointLight
         position={[shardOrigin.x + 8, 9, shardOrigin.z - 4]}
-        intensity={0.7}
+        intensity={1.15}
         color={theme.warm}
-        distance={36}
+        distance={40}
       />
       <pointLight
         position={[shardOrigin.x - 10, 8, shardOrigin.z + 6]}
-        intensity={0.55}
+        intensity={0.85}
         color={theme.magenta}
-        distance={30}
+        distance={34}
       />
       {high && (
         <pointLight
           position={[block.bounds.maxX * 0.35, 12, block.bounds.minZ * 0.2]}
-          intensity={0.4}
+          intensity={0.7}
           color={theme.primary}
-          distance={40}
+          distance={44}
         />
       )}
-      {/* Spec neon green accent fill */}
-      <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.35} color={theme.neon} distance={24} />
+      <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.7} color={theme.neon} distance={28} />
 
-      <Ground block={block} />
+      {BLOCKY_WORLD ? (
+        <>
+          <Baseplate size={900} color="#7fbf6a" grid="#6aa858" />
+          <Ground block={block} />
+          <CityFill
+            seed={`orbitx-${block.id ?? "nyc"}`}
+            lite={!high}
+            outerRadius={high ? 250 : 170}
+          />
+          <OrbitxBillboardRing
+            radius={high ? 150 : 110}
+            count={high ? 8 : 4}
+            lite={!high}
+          />
+        </>
+      ) : (
+        <Ground block={block} />
+      )}
       <UrbanNature block={block} lite={!high} />
-      {high && <Skyline block={block} />}
+      <Skyline block={block} lite={!high} />
       <StreetProps block={block} />
+      <DistrictBanners block={block} />
+      <ZoneLandmarkSigns block={block} lite={!high} />
       <PropScatter block={block} />
       {high && <GraffitiLayer block={block} />}
 
-      {block.buildings.map((b) => (
-        <BuildingMesh key={b.id} building={b} />
-      ))}
+      {block.buildings.map((b) =>
+        BLOCKY_WORLD ? (
+          <BlockyBuildingMesh key={b.id} building={b} />
+        ) : (
+          <BuildingMesh key={b.id} building={b} />
+        ),
+      )}
 
       {landmarks.map((lm) => (
         <LandmarkMesh key={lm.id} landmark={lm} />
@@ -308,16 +482,30 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
         <MegaScreen key={`screen-${index}`} rows={tickerRows} {...screen} />
       ))}
 
+      <MarketBoards block={block} rows={tickerRows} />
+
       <CentralPlaza block={block} />
       <HqBeacon block={block} />
       <GlassShards origin={shardOrigin} count={high ? 18 : 8} />
 
-      {high && <RocketShow />}
+      {high && !paused && (
+        <RocketShow
+          origin={
+            block.zones.find((z) => z.kind === "launch")?.position ?? {
+              x: block.spawn.x + 8,
+              z: block.spawn.z + 6,
+            }
+          }
+        />
+      )}
       <NPCs block={block} count={high ? 9 : 4} />
-      {high && <Drones />}
+      {high && !paused && <Drones origin={{ x: block.spawn.x, z: block.spawn.z }} />}
       {high && <OxiGuide spawn={block.spawn} />}
-      {high && block.cityId === "nyc" && <Park />}
-      <Traffic count={high ? 10 : 3} block={block} />
+      <Park
+        origin={{ x: block.bounds.minX + 22, z: block.bounds.minZ + 22 }}
+        lite={!high}
+      />
+      <Traffic count={high ? 10 : 3} block={block} paused={paused} />
     </group>
   );
 }

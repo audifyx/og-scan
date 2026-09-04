@@ -2,12 +2,13 @@
  * OrbitX hero character GLTF — plays idle / walk / dance when clips exist.
  * Falls back is handled by the parent (CharacterMesh when path is null).
  */
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarAppearance } from "@/lib/orbitxcity/types";
 import type { CharacterAnimationState } from "./CharacterMesh";
+import { CharacterMesh } from "./CharacterMesh";
 
 interface CharacterGltfProps {
   path: string;
@@ -91,10 +92,24 @@ function CharacterGltfInner({ path, appearance, animation }: CharacterGltfProps)
   );
 }
 
+class GltfSafeBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
 export function CharacterGltf(props: CharacterGltfProps) {
+  const fallback = <CharacterMesh appearance={props.appearance} animation={props.animation} />;
+  if (!props.path) return fallback;
   return (
-    <Suspense fallback={null}>
-      <CharacterGltfInner {...props} />
-    </Suspense>
+    <GltfSafeBoundary fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <CharacterGltfInner {...props} />
+      </Suspense>
+    </GltfSafeBoundary>
   );
 }

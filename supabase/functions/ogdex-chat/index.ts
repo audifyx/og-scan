@@ -5,9 +5,11 @@
 // is tried first; otherwise we feed DuckDuckGo results to NVIDIA Llama.
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
+import { resolveModel } from "../_shared/models.ts";
+
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_BASE_URL = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-const NVIDIA_MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
+const NVIDIA_MODEL = resolveModel(Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

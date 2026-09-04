@@ -65,4 +65,4 @@ catch status-aware → json(status, { error })
 4. Confirm vercel rewrite for `/api/orbitx-world/(.*)`
 5. Smoke: `GET /api/orbitx-world/health`
 6. Smoke: authenticated `POST /api/orbitx-world/bootstrap`
-7. Set Vercel `ADMIN_PASS` / `VITE_ADMIN_PASS` / `CRON_SECRET` (OMEGA; not settable without Vercel auth)
+7. Set `ADMIN_AUTH` / `CRON_SECRET` on Vercel project **`rork-og-meme-coin-tracker`** only (not the leftover `og-scan` project)

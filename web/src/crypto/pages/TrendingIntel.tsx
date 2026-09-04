@@ -19,6 +19,7 @@ function syntheticSeries(row: ScreenerRow): SeriesPoint[] {
 export default function TrendingIntel() {
   const [rows, setRows] = useState<Array<ScreenerRow & { velocity: number; why: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +44,9 @@ export default function TrendingIntel() {
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -58,7 +62,8 @@ export default function TrendingIntel() {
 
       <div className="oxc-panel">
         {error && <p style={{ color: "var(--oxc-red)" }}>{error}</p>}
-        {!error && rows.length === 0 && <p className="oxc-empty oxc-pulse">Scoring market…</p>}
+        {!error && loading && <p className="oxc-empty oxc-pulse">Scoring market…</p>}
+        {!error && !loading && rows.length === 0 && <p className="oxc-empty">No trending tokens yet.</p>}
         {rows.length > 0 && (
           <table className="oxc-table">
             <thead>

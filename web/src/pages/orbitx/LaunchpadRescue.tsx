@@ -36,6 +36,7 @@ import { sendWalletTransaction } from "@/lib/orbitx/sendWalletTx";
 import { supabase } from "@/lib/supabase";
 import { Panel, useSolUsd } from "./lpx";
 import { TabHero } from "./TabHero";
+import { IndexOnChainTx, OnChainBadge, SolscanLink } from "@/components/onchain";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const BURN_PRESETS = [10, 25, 35, 50, 75, 100];
@@ -305,11 +306,12 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
             </div>
           </div>
 
-          <div className="mt-4">
-            <a href={`https://solscan.io/tx/${data.sig}`} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-mono text-[11px] text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">
-              verify burn tx {short(data.sig)} <ExternalLink className="h-3 w-3" />
-            </a>
+          <div className="mt-4 space-y-2">
+            <OnChainBadge signature={data.sig} />
+            <IndexOnChainTx signature={data.sig} kind="burn" refId={data.mint} />
+            <SolscanLink signature={data.sig} className="font-mono text-[11px]">
+              verify burn tx {short(data.sig)}
+            </SolscanLink>
           </div>
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">

@@ -86,7 +86,7 @@ export function agentSignTradeUrl(opts: {
     slippage: String(opts.slippage ?? 10),
     pool: opts.pool || "auto",
   });
-  return `${base}/agent/sign?${q.toString()}`;
+  return `${base}/supercomputer/sign?${q.toString()}`;
 }
 
 export type AgentBootstrap = {
@@ -107,6 +107,15 @@ export type AgentBootstrap = {
     minUsd?: number;
     message?: string;
   };
+  mcpAccess?: {
+    active?: boolean;
+    expired?: boolean;
+    packageId?: string | null;
+    expiresAt?: string | null;
+    remainingMs?: number;
+    remainingLabel?: string;
+  };
+  accessSource?: string | null;
 };
 
 async function authHeaders(): Promise<HeadersInit> {

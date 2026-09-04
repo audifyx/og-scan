@@ -21,43 +21,162 @@ import {
   type WalletName,
 } from "@solana/wallet-adapter-base";
 import type { SendTransactionOptions, WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { PublicKey, type Connection, type Transaction, type TransactionVersion, type VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction, type Connection, type Transaction, type TransactionVersion } from "@solana/web3.js";
+import { coercePublicKey, normalizeSignatureBytes, normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
 
 export const JupiterWalletName = "Jupiter" as WalletName<"Jupiter">;
 
 type JupiterProvider = {
   isJupiter?: boolean;
   isConnected?: boolean;
-  publicKey: PublicKey | null;
-  connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: PublicKey }>;
+  publicKey: PublicKey | string | null;
+  connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: PublicKey | string } | void>;
   disconnect(): Promise<void>;
-  signMessage: (message: Uint8Array) => Promise<Uint8Array | { signature: Uint8Array }>;
+  signMessage: (message: Uint8Array) => Promise<unknown>;
   signTransaction?: <T extends Transaction | VersionedTransaction>(tx: T) => Promise<T>;
   signAllTransactions?: <T extends Transaction | VersionedTransaction>(txs: T[]) => Promise<T[]>;
   signAndSendTransaction?: (
-    tx: Transaction | VersionedTransaction,
+    txOrInput:
+      | Transaction
+      | VersionedTransaction
+      | { transaction: Transaction | VersionedTransaction; options?: SendTransactionOptions },
     opts?: SendTransactionOptions,
-  ) => Promise<{ signature: string }>;
+  ) => Promise<{ signature: string } | string>;
   on?: (event: "disconnect" | "accountChanged", handler: (...args: unknown[]) => void) => void;
   off?: (event: "disconnect" | "accountChanged", handler: (...args: unknown[]) => void) => void;
 };
 
+export function isJupiterWalletName(name?: string | null): boolean {
+  return Boolean(name && /jupiter/i.test(name));
+}
+
+function extractJupiterSignature(result: unknown): string | null {
+  try {
+    const sig = normalizeTxSignatureBase58(result);
+    return sig.length > 30 ? sig : null;
+  } catch {
+    return null;
+  }
+}
+
+function isWalletUserRejection(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /reject|cancel|denied|user.?refus/i.test(msg);
+}
+
+/**
+ * Legacy Transaction → VersionedTransaction. Jupiter signAndSend rejects unsigned
+ * legacy serialize.
+ *
+ * compileMessage() builds a fresh message with an empty signature array, so any
+ * signature already applied — an ephemeral mint keypair, an ATA authority, any
+ * options.signers passed to sendTransaction — was silently discarded here. The
+ * transaction then reached Jupiter one signer short and the extension failed with
+ * "missing signature for public key". Carry the existing signatures over.
+ */
+export function toVersionedTransaction(
+  transaction: Transaction | VersionedTransaction,
+): VersionedTransaction {
+  if ("version" in transaction) return transaction as VersionedTransaction;
+  const legacy = transaction as Transaction;
+  if (!legacy.feePayer) throw new Error("Transaction is missing feePayer");
+  if (!legacy.recentBlockhash) throw new Error("Transaction is missing recentBlockhash");
+  const versioned = new VersionedTransaction(legacy.compileMessage());
+  for (const { publicKey, signature } of legacy.signatures) {
+    if (signature) versioned.addSignature(publicKey, signature);
+  }
+  return versioned;
+}
+
+/**
+ * True when the failure suggests the transaction already reached the network.
+ * Retrying with the other argument shape after this would re-prompt the user and
+ * risk broadcasting the same transaction twice, so these must propagate.
+ */
+function isPostBroadcastError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /already (been )?processed|already in flight|duplicate|blockhash not found|block height exceeded|simulation failed|insufficient (funds|lamports)|timed? ?out|expired|confirmed/i.test(
+    msg,
+  );
+}
+
+/**
+ * Jupiter inject (window.jupiter.solana) — not Phantom's window.solana.
+ * Newer builds take `{ transaction, options }`; older builds take positional args.
+ */
+export async function jupiterSignAndSendTransaction(
+  transaction: Transaction | VersionedTransaction,
+  sendOptions?: SendTransactionOptions,
+): Promise<string> {
+  const wallet = getJupiterProvider();
+  if (!wallet) throw new Error("Jupiter wallet is not available in this browser");
+  if (!wallet.signAndSendTransaction) {
+    throw new Error("This Jupiter build cannot signAndSendTransaction — update the Jupiter extension");
+  }
+  const versioned = toVersionedTransaction(transaction);
+  const fn = wallet.signAndSendTransaction.bind(wallet);
+
+  // Only ONE of these shapes may ever be attempted per user approval. Retrying
+  // after a call that already reached the wallet re-prompts for a signature and
+  // can broadcast the same transaction twice.
+  let acceptedWithoutSignature = false;
+  try {
+    const objectResult = await fn({ transaction: versioned, options: sendOptions });
+    const sig = extractJupiterSignature(objectResult);
+    if (sig) return sig;
+    // Resolved, so the wallet took it. Do not send it a second time.
+    acceptedWithoutSignature = true;
+  } catch (error) {
+    if (isWalletUserRejection(error)) throw error;
+    // Older builds reject the object form outright, before any prompt — that is
+    // the case worth retrying positionally. Anything that looks like it already
+    // hit the network must not be retried.
+    if (isPostBroadcastError(error)) throw error;
+  }
+  if (acceptedWithoutSignature) {
+    throw new Error(
+      "Jupiter accepted the transaction but returned no signature — check your wallet activity before retrying",
+    );
+  }
+
+  const positional = await fn(versioned, sendOptions);
+  const sig = extractJupiterSignature(positional);
+  if (!sig) throw new Error("Jupiter did not return a transaction signature");
+  return sig;
+}
+
+export function jupiterProviderPublicKey(): string | null {
+  const wallet = getJupiterProvider();
+  if (!wallet?.publicKey) return null;
+  try {
+    return coercePublicKey(wallet.publicKey).toBase58();
+  } catch {
+    return null;
+  }
+}
+
 export function getJupiterProvider(): JupiterProvider | null {
   if (typeof window === "undefined") return null;
-  const w = window as Window & { jupiter?: { solana?: JupiterProvider }; solana?: JupiterProvider };
+  const w = window as Window & {
+    jupiter?: { solana?: JupiterProvider; isJupiter?: boolean };
+    solana?: JupiterProvider;
+  };
+  // Prefer dedicated Jupiter inject — never steal Phantom's window.solana.
   if (w.jupiter?.solana) return w.jupiter.solana;
+  if (w.jupiter && (w.jupiter as JupiterProvider).connect) return w.jupiter as JupiterProvider;
   if (w.solana?.isJupiter) return w.solana;
   return null;
 }
 
-function normalizeSignature(result: Uint8Array | { signature: Uint8Array }): Uint8Array {
-  if (result instanceof Uint8Array) return result;
-  if (result && typeof result === "object" && result.signature instanceof Uint8Array) return result.signature;
-  throw new Error("wallet returned an invalid signature");
-}
-
 export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
   name = JupiterWalletName;
+  /**
+   * Marks this as the legacy window.jupiter inject. When the extension also
+   * registers over Wallet Standard both appear in the wallet list under the
+   * same name; the Standard one signs more reliably in Chrome, so the picker
+   * uses this flag to break the tie.
+   */
+  readonly isLegacyInject = true;
   /** Install / mobile page — never the jup.ag swap site (avoids trade→website confusion). */
   url = "https://jup.ag/mobile";
   icon = "https://jup.ag/favicon.ico";
@@ -139,22 +258,23 @@ export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
       const wallet = getJupiterProvider();
       if (!wallet) throw new WalletNotReadyError();
 
-      if (!wallet.isConnected) {
-        try {
-          await wallet.connect();
-        } catch (error) {
-          throw new WalletConnectionError(error instanceof Error ? error.message : String(error), error);
-        }
+      let connectResult: { publicKey?: PublicKey | string } | void;
+      try {
+        connectResult = await wallet.connect();
+      } catch (error) {
+        throw new WalletConnectionError(error instanceof Error ? error.message : String(error), error);
       }
-
-      if (!wallet.publicKey) throw new WalletAccountError();
 
       let publicKey: PublicKey;
       try {
-        publicKey = new PublicKey(wallet.publicKey.toBytes());
+        publicKey = coercePublicKey(wallet.publicKey, connectResult);
       } catch (error) {
-        throw new WalletPublicKeyError(error instanceof Error ? error.message : String(error), error);
+        throw new WalletPublicKeyError(
+          error instanceof Error ? error.message : "Jupiter returned no public key",
+          error,
+        );
       }
+      if (!publicKey) throw new WalletAccountError();
 
       wallet.on?.("disconnect", this._disconnected);
       wallet.on?.("accountChanged", this._accountChanged);
@@ -208,8 +328,7 @@ export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
           signers?.length && transaction.partialSign(...signers);
         }
         sendOptions.preflightCommitment = sendOptions.preflightCommitment || connection.commitment;
-        const { signature } = await wallet.signAndSendTransaction(transaction, sendOptions);
-        return signature;
+        return jupiterSignAndSendTransaction(transaction, sendOptions);
       } catch (error) {
         if (error instanceof WalletError) throw error;
         throw new WalletSendTransactionError(error instanceof Error ? error.message : String(error), error);
@@ -229,6 +348,14 @@ export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
         // Never fall back to the unsigned input — that surfaces as
         // "missing signature for public key" on serialize/send.
         if (!signed) throw new Error("Jupiter wallet returned no signed transaction");
+        if (!("version" in signed)) {
+          const missing = (signed as Transaction).signatures?.find((s) => !s.signature);
+          if (missing) {
+            throw new Error(
+              `Jupiter returned an unsigned transaction (missing signature for ${missing.publicKey.toBase58()}). Reconnect Jupiter and use signAndSend.`,
+            );
+          }
+        }
         return signed;
       } catch (error) {
         throw new WalletSignTransactionError(error instanceof Error ? error.message : String(error), error);
@@ -261,7 +388,7 @@ export class JupiterWalletAdapter extends BaseMessageSignerWalletAdapter {
       const wallet = this._wallet;
       if (!wallet) throw new WalletNotConnectedError();
       try {
-        return normalizeSignature(await wallet.signMessage(message));
+        return normalizeSignatureBytes(await wallet.signMessage(message));
       } catch (error) {
         throw new WalletSignMessageError(error instanceof Error ? error.message : String(error), error);
       }

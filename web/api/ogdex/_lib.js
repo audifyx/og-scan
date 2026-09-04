@@ -1,27 +1,20 @@
 // Shared backend client — reuses the OG Scan (Soltools) Supabase backend.
-export const SUPA_URL = process.env.SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
-export const SUPA_FN = process.env.SUPABASE_FN_URL || SUPA_URL + "/functions/v1";
-export const ANON = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamlwbmtoY2VianZ0dGxpcHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1Mjc5NDgsImV4cCI6MjA5MzEwMzk0OH0.aXu8bbpVVwc8KOJf1-lHqO3cz_0GZD10_TE0GlKQ1BI";
+import { adminCredentialOk, deskUnlockConfigured } from "../../shared/desk-unlock.js";
+
+export const SUPA_URL = process.env.SUPABASE_URL || "";
+export const SUPA_FN = process.env.SUPABASE_FN_URL || (SUPA_URL ? SUPA_URL + "/functions/v1" : "");
+export const ANON = process.env.SUPABASE_ANON_KEY || "";
 export const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-export const ADMIN_PASS = process.env.ADMIN_PASS || "";
-/** Same soft desk unlock used by OwnerDeskGate / ownerDesk.ts (UI obscurity). */
-export const OWNER_DESK_CODE = process.env.OWNER_DESK_CODE || "0129";
-/** True when some admin credential is configured (ADMIN_PASS and/or desk code). */
+export const ADMIN_PASS = process.env.ADMIN_AUTH || process.env.ADMIN_PASS || "";
+/** ADMIN_AUTH on Vercel project rork-og-meme-coin-tracker (legacy OWNER_DESK_CODE). */
+export const OWNER_DESK_CODE = process.env.ADMIN_AUTH || process.env.OWNER_DESK_CODE || "";
+/** True when Vercel ADMIN_AUTH (or a legacy alias) is set. Retired client PINs are rejected. */
 export function hasAdminPass() {
-  return (
-    (typeof ADMIN_PASS === "string" && ADMIN_PASS.length >= 8) ||
-    (typeof OWNER_DESK_CODE === "string" && OWNER_DESK_CODE.length > 0)
-  );
+  return deskUnlockConfigured();
 }
-/** Accept server ADMIN_PASS or the owner desk unlock code (no VITE_ADMIN_PASS needed). */
+/** Accept env PIN or a session token from /api/orbitx-desk-unlock. */
 export function adminAuthorized(provided) {
-  const p = String(provided || "");
-  if (!p) return false;
-  if (typeof ADMIN_PASS === "string" && ADMIN_PASS.length >= 8 && p === ADMIN_PASS) return true;
-  if (typeof OWNER_DESK_CODE === "string" && OWNER_DESK_CODE.length > 0 && p === OWNER_DESK_CODE) {
-    return true;
-  }
-  return false;
+  return adminCredentialOk(provided);
 }
 export const PAY_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
 // Platform fee wallet — launchpad fee + trading fee route here specifically

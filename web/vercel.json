@@ -1,6 +1,14 @@
 {
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
+  "ignoreCommand": "bash ../scripts/vercel-only-rork.sh",
+  "redirects": [
+    {
+      "source": "/AI",
+      "destination": "/ai",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/ai-fn/(.*)",
@@ -87,6 +95,14 @@
       "destination": "/api/orbitx-hub"
     },
     {
+      "source": "/api/on-chain/(.*)",
+      "destination": "/api/on-chain?path=$1"
+    },
+    {
+      "source": "/api/on-chain",
+      "destination": "/api/on-chain"
+    },
+    {
       "source": "/api/ogdex/(.*)",
       "destination": "/api/ogdex?path=$1"
     },
@@ -155,6 +171,14 @@
       "destination": "https://orbitx-prediction.fun/:path*"
     },
     {
+      "source": "/education",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/education/(.*)",
+      "destination": "/app.html"
+    },
+    {
       "source": "/",
       "destination": "/app.html"
     },
@@ -164,6 +188,15 @@
     }
   ],
   "headers": [
+    {
+      "source": "/ai",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/ORBITX_DEX/assets/(.*)",
       "headers": [
@@ -302,10 +335,28 @@
     "api/orbitx-hub.js": {
       "maxDuration": 120
     },
+    "api/orbitx-ai.js": {
+      "maxDuration": 120
+    },
     "api/x-mcp.js": {
       "maxDuration": 60
     },
+    "api/telegram-mcp.js": {
+      "maxDuration": 120
+    },
+    "api/telegram-bot-hook.js": {
+      "maxDuration": 120
+    },
+    "api/telegram-orbitx.js": {
+      "maxDuration": 120
+    },
     "api/ogdex.js": {
+      "maxDuration": 60
+    },
+    "api/orbitx-onchain.js": {
+      "maxDuration": 60
+    },
+    "api/on-chain.js": {
       "maxDuration": 60
     },
     "api/**/*.js": {
@@ -322,7 +373,7 @@
     },
     {
       "path": "/api/ogdex/alerts-run",
-      "schedule": "* * * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/predictions/api/cron/resolve",
@@ -330,6 +381,10 @@
     },
     {
       "path": "/api/x-mcp?path=agent/cron",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/on-chain?path=ingest&force=1",
       "schedule": "* * * * *"
     }
   ]

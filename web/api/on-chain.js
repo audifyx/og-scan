@@ -1,0 +1,1390 @@
+/**
+ * OrbitX living on-chain intelligence API.
+ * Route: /api/on-chain  (NOT /api/orbitx/* — that rewrites to orbitx-hub)
+ *
+ * Solana / Helius is authority. This process indexes, never invents.
+ */
+import { createClient } from "@supabase/supabase-js";
+import {
+  ORBITX_MINT,
+  SOL_MINT,
+  JUPITER_V6,
+  PUMP_FUN,
+  addressKind,
+  asNumber,
+  classifyHeliusTx,
+  classifyRpcTx,
+  detectQueryKind,
+  isLikelyAddress,
+  isLikelySignature,
+  isOrbitxMint,
+  statusFromLag,
+  summarizeEvents,
+} from "../shared/orbitx-chain-intel.js";
+import {
+  activeOrbitxKols,
+  allOrbitxKols,
+  isAssignedKol,
+  kolByAddress,
+  kolWatchBatch,
+  trackedRowsFromDirectory,
+} from "../shared/orbitx-kol-directory.js";
+import { DEX_HUBS, epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
+
+export const config = { maxDuration: 60 };
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Wallet",
+};
+
+const buckets = new Map();
+const metaCache = new Map();
+let solUsdCache = { at: 0, value: null };
+let ingestLock = 0;
+let ingestInflight = null;
+let ingestStartedAt = 0;
+const INGEST_COOLDOWN_MS = 15_000;
+const INGEST_STUCK_MS = 60_000;
+const INGEST_BUDGET_MS = 9_000;
+let districtCache = { at: 0, value: null };
+
+function withDeadline(promise, ms, fallback) {
+  let timer = null;
+  const guard = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, guard]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function json(res, status, body) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
+  for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
+  res.end(JSON.stringify(body));
+}
+
+const MEDIA_HOST_SUFFIXES = [
+  "dexscreener.com",
+  "ipfs.io",
+  "cloudflare-ipfs.com",
+  "cf-ipfs.com",
+  "nftstorage.link",
+  "w3s.link",
+  "arweave.net",
+  "irys.xyz",
+  "pump.fun",
+  "mypinata.cloud",
+  "imgur.com",
+  "githubusercontent.com",
+  "jup.ag",
+  "solana.cloud",
+  "wrpcd.net",
+  "genesysgo.net",
+  "shadow.magicblock.app",
+  // Gateways and CDNs that token metadata actually points at. Without these the
+  // proxy answered 400 and every planet fell back to a blank texture.
+  "pinata.cloud",
+  "dweb.link",
+  "4everland.io",
+  "quicknode-ipfs.com",
+  "filebase.io",
+  "infura-ipfs.io",
+  "ipfs.nftstorage.link",
+  "helius.xyz",
+  "helius-rpc.com",
+  "solana.fm",
+  "coingecko.com",
+  "birdeye.so",
+  "raydium.io",
+  "b-cdn.net",
+  "cloudinary.com",
+  "googleusercontent.com",
+  "twimg.com",
+  "akamaized.net",
+  "cloudfront.net",
+  "supabase.co",
+  "r2.dev",
+  "bags.fm",
+  "letsbonk.fun",
+  "moonshot.money",
+];
+
+function mediaHostAllowed(host) {
+  const h = String(host || "").toLowerCase().replace(/\.$/, "");
+  if (!h || h === "localhost" || h.endsWith(".local") || h.endsWith(".internal")) return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+  if (h.includes(":") || h.startsWith("[")) return false;
+  return MEDIA_HOST_SUFFIXES.some((ok) => h === ok || h.endsWith(`.${ok}`));
+}
+
+function publicEvent(e) {
+  if (!e) return e;
+  const mint = e.token_ca || null;
+  const name = tokenDisplayName({ name: e.token_name, symbol: e.token_symbol, mint });
+  const symbol = tokenTicker({ symbol: e.token_symbol, mint });
+  return {
+    ...e,
+    token_name: name,
+    token_symbol: symbol,
+    token_image: e.token_image || dexTokenImage(mint),
+  };
+}
+
+async function handleMedia(req, res) {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return json(res, 405, { ok: false, error: "Media is GET only." });
+  }
+  const raw = String(req.query?.u || "").trim();
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return json(res, 400, { ok: false, error: "Valid image URL required." });
+  }
+  if (parsed.protocol !== "https:") return json(res, 400, { ok: false, error: "HTTPS image URL required." });
+  if (!mediaHostAllowed(parsed.hostname)) return json(res, 400, { ok: false, error: "Image host not allowed." });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(parsed.toString(), {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: { Accept: "image/*,*/*;q=0.8", "User-Agent": "OrbitXOnChain/1.0" },
+    });
+    let finalHost = parsed.hostname;
+    try { finalHost = new URL(r.url).hostname; } catch { /* keep */ }
+    if (!mediaHostAllowed(finalHost)) return json(res, 400, { ok: false, error: "Redirect host not allowed." });
+    const type = String(r.headers.get("content-type") || "").split(";")[0].trim();
+    if (!r.ok || !type.startsWith("image/")) return json(res, 404, { ok: false, error: "Image not found." });
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 1_200_000) return json(res, 413, { ok: false, error: "Image too large." });
+    res.statusCode = 200;
+    res.setHeader("Content-Type", type);
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    if (req.method === "HEAD") return res.end();
+    return res.end(buf);
+  } catch {
+    return json(res, 502, { ok: false, error: "Image fetch failed." });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function admin() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+function rpcUrl() {
+  return (
+    process.env.SOLANA_RPC_URL
+    || process.env.HELIUS_RPC_URL
+    || (process.env.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : "")
+    || "https://api.mainnet-beta.solana.com"
+  );
+}
+
+function heliusKey() {
+  return process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || "";
+}
+
+function clientIp(req) {
+  const xf = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
+  return xf || req.socket?.remoteAddress || "unknown";
+}
+
+function rateLimit(req, max, windowMs) {
+  const key = `${clientIp(req)}:${Math.floor(Date.now() / windowMs)}`;
+  const n = (buckets.get(key) || 0) + 1;
+  buckets.set(key, n);
+  if (buckets.size > 4000) {
+    const first = buckets.keys().next().value;
+    buckets.delete(first);
+  }
+  return n <= max;
+}
+
+function pathOf(req) {
+  const q = req.query || {};
+  if (q.path) return String(q.path).replace(/^\/+/, "");
+  const url = String(req.url || "");
+  const after = url.split("/api/on-chain")[1] || "";
+  return after.split("?")[0].replace(/^\/+/, "");
+}
+
+function bodyOf(req) {
+  if (typeof req.body === "string") {
+    try { return JSON.parse(req.body || "{}"); } catch { return {}; }
+  }
+  return req.body && typeof req.body === "object" ? req.body : {};
+}
+
+function cronAuthorized(req) {
+  const secret = process.env.CRON_SECRET || "";
+  if (!secret) return req.headers?.["user-agent"]?.includes("vercel-cron") || false;
+  return String(req.headers?.authorization || "") === `Bearer ${secret}`;
+}
+
+async function rpc(method, params) {
+  const r = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc_error");
+  return j.result;
+}
+
+async function heliusEnhanced(address, limit = 25) {
+  const key = heliusKey();
+  if (!key || !address) return [];
+  const url = `https://api.helius.xyz/v0/addresses/${encodeURIComponent(address)}/transactions?api-key=${encodeURIComponent(key)}&limit=${Math.min(limit, 50)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`helius ${r.status}`);
+  const data = await r.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function heliusParse(signatures) {
+  const key = heliusKey();
+  const sigs = (signatures || []).filter(isLikelySignature).slice(0, 20);
+  if (!key || !sigs.length) return [];
+  const r = await fetch(`https://api.helius.xyz/v0/transactions?api-key=${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transactions: sigs }),
+  });
+  if (!r.ok) throw new Error(`helius_parse ${r.status}`);
+  const data = await r.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function heliusBalances(address) {
+  const key = heliusKey();
+  if (!key || !isLikelyAddress(address)) return null;
+  const r = await fetch(`https://api.helius.xyz/v0/addresses/${encodeURIComponent(address)}/balances?api-key=${encodeURIComponent(key)}`);
+  if (!r.ok) return null;
+  return r.json().catch(() => null);
+}
+
+async function solUsd() {
+  if (Date.now() - solUsdCache.at < 30_000 && solUsdCache.value != null) return solUsdCache.value;
+  try {
+    const r = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + SOL_MINT);
+    const j = await r.json();
+    const pair = (j.pairs || []).find((p) => p?.chainId === "solana" && p?.priceUsd) || (j.pairs || [])[0];
+    const n = asNumber(pair?.priceUsd);
+    if (n != null) solUsdCache = { at: Date.now(), value: n };
+  } catch {
+    /* price optional */
+  }
+  return solUsdCache.value;
+}
+
+async function tokenMeta(mint) {
+  if (!mint) return {};
+  const hit = metaCache.get(mint);
+  if (hit && Date.now() - hit.at < 90_000) return hit.value;
+  const seed = isOrbitxMint(mint)
+    ? { symbol: "ORBITX", name: "OrbitX", decimals: 6, mint, image: dexTokenImage(mint) }
+    : { mint };
+  try {
+    const [dexRes, jup] = await Promise.all([
+      fetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(mint)}`).then((r) => r.json()).catch(() => null),
+      fetchJupiterToken(mint).catch(() => null),
+    ]);
+    const pair = (dexRes?.pairs || []).find((p) => p?.chainId === "solana") || (dexRes?.pairs || [])[0];
+    const fromDex = pair
+      ? {
+          mint,
+          symbol: looksLikeMint(pair.baseToken?.symbol) ? null : (pair.baseToken?.symbol || null),
+          name: tokenDisplayName({ name: pair.baseToken?.name, symbol: pair.baseToken?.symbol, mint }),
+          image: pair.info?.imageUrl || dexTokenImage(mint),
+          banner: pair.info?.header || pair.info?.openGraph || null,
+          website: pair.info?.websites?.[0]?.url || null,
+          twitter: (pair.info?.socials || []).find((s) => s.type === "twitter")?.url || null,
+          telegram: (pair.info?.socials || []).find((s) => s.type === "telegram")?.url || null,
+          price_usd: asNumber(pair.priceUsd),
+          market_cap: asNumber(pair.marketCap) ?? asNumber(pair.fdv),
+          liquidity_usd: asNumber(pair.liquidity?.usd),
+          volume_24h: asNumber(pair.volume?.h24),
+          change_24h: asNumber(pair.priceChange?.h24),
+          buys_24h: asNumber(pair.txns?.h24?.buys),
+          sells_24h: asNumber(pair.txns?.h24?.sells),
+          launch_platform: pair.dexId || null,
+        }
+      : {};
+    const value = cleanTokenFields({
+      ...seed,
+      ...fromDex,
+      ...(jup || {}),
+      mint,
+      image: fromDex.image || jup?.image || seed.image || dexTokenImage(mint),
+      banner: fromDex.banner || jup?.banner || null,
+      website: jup?.website || fromDex.website || null,
+      twitter: jup?.twitter || fromDex.twitter || null,
+      telegram: jup?.telegram || fromDex.telegram || null,
+      buys_24h: jup?.buys_24h ?? fromDex.buys_24h ?? null,
+      sells_24h: jup?.sells_24h ?? fromDex.sells_24h ?? null,
+      traders_24h: jup?.traders_24h ?? null,
+      buy_volume_24h: jup?.buy_volume_24h ?? null,
+      sell_volume_24h: jup?.sell_volume_24h ?? null,
+      holder_count: jup?.holder_count ?? fromDex.holder_count ?? null,
+      launch_platform: jup?.launch_platform || fromDex.launch_platform || null,
+    });
+    if (isOrbitxMint(mint)) {
+      value.symbol = "ORBITX";
+      value.name = "OrbitX";
+    }
+    metaCache.set(mint, { at: Date.now(), value });
+    return value;
+  } catch {
+    return metaCache.get(mint)?.value || seed;
+  }
+}
+
+async function searchDex(symbol) {
+  try {
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(symbol)}`);
+    const j = await r.json();
+    return (j.pairs || []).filter((p) => p.chainId === "solana").slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+async function seedAssignedKols(sb) {
+  if (!sb) return;
+  try {
+    await sb.from("ox_chain_tracked").upsert(trackedRowsFromDirectory(), { onConflict: "address" });
+  } catch {
+    /* directory still used in-memory */
+  }
+}
+
+async function loadTracked(sb) {
+  const map = {};
+  for (const k of activeOrbitxKols()) {
+    map[k.address] = { address: k.address, label: k.name, label_kind: "KOL", twitter: k.twitter };
+  }
+  if (!sb) return map;
+  const { data } = await sb.from("ox_chain_tracked").select("address,label,label_kind,notes");
+  for (const row of data || []) {
+    map[row.address] = {
+      ...row,
+      twitter: row.notes && String(row.notes).startsWith("@") ? row.notes : map[row.address]?.twitter || null,
+    };
+  }
+  return map;
+}
+
+function eventRow(event) {
+  return {
+    event_id: event.event_id,
+    signature: event.signature,
+    slot: event.slot,
+    block_time: event.block_time,
+    event_type: event.event_type,
+    status: event.status,
+    chain: event.chain,
+    program: event.program,
+    source: event.source,
+    attribution: event.attribution,
+    wallet: event.wallet,
+    counterparty: event.counterparty,
+    source_wallet: event.source_wallet,
+    destination_wallet: event.destination_wallet,
+    token_ca: event.token_ca,
+    token_symbol: event.token_symbol,
+    token_name: event.token_name,
+    token_image: event.token_image,
+    token_decimals: event.token_decimals,
+    amount: event.amount,
+    sol_amount: event.sol_amount,
+    usd_value: event.usd_value,
+    market_cap: event.market_cap,
+    wallet_balance_before: event.wallet_balance_before,
+    wallet_balance_after: event.wallet_balance_after,
+    transaction_fee: event.transaction_fee,
+    orbitx_related: event.orbitx_related,
+    orbitx_event_type: event.orbitx_event_type,
+    kol_related: event.kol_related,
+    whale_related: event.whale_related,
+    importance: event.importance,
+    confidence: event.confidence,
+    description: event.description,
+    metadata: event.metadata || {},
+  };
+}
+
+async function persistEvents(sb, events, tokenMetaMap) {
+  if (!sb || !events.length) return 0;
+  const rows = events.map((e) => {
+    const meta = e.token_ca ? tokenMetaMap[e.token_ca] : null;
+    return eventRow({
+      ...e,
+      token_symbol: tokenTicker({ symbol: e.token_symbol || meta?.symbol, mint: e.token_ca }) || null,
+      token_name: tokenDisplayName({ name: e.token_name || meta?.name, symbol: e.token_symbol || meta?.symbol, mint: e.token_ca }),
+      token_image: e.token_image || meta?.image || dexTokenImage(e.token_ca),
+      market_cap: e.market_cap ?? meta?.market_cap ?? null,
+    });
+  });
+  const { error } = await sb.from("ox_chain_events").upsert(rows, { onConflict: "event_id" });
+  if (error) throw new Error(error.message);
+  await rollup(sb, events);
+  return rows.length;
+}
+
+async function rollup(sb, events) {
+  for (const e of events) {
+    const t = e.block_time || new Date().toISOString();
+    if (e.wallet) {
+      const { data: existing } = await sb.from("ox_chain_wallets").select("*").eq("address", e.wallet).maybeSingle();
+      const solIn = e.event_type === "SOL_TRANSFER" && e.destination_wallet === e.wallet ? (asNumber(e.sol_amount) || 0) : 0;
+      const solOut = e.event_type === "SOL_TRANSFER" && e.source_wallet === e.wallet ? (asNumber(e.sol_amount) || 0) : 0;
+      await sb.from("ox_chain_wallets").upsert({
+        address: e.wallet,
+        first_seen: existing?.first_seen || t,
+        last_seen: t,
+        tx_count: (existing?.tx_count || 0) + 1,
+        sol_received: Number(existing?.sol_received || 0) + solIn,
+        sol_sent: Number(existing?.sol_sent || 0) + solOut,
+        sol_volume: Number(existing?.sol_volume || 0) + (asNumber(e.sol_amount) || 0),
+        estimated_usd_volume: Number(existing?.estimated_usd_volume || 0) + (asNumber(e.usd_value) || 0),
+        updated_at: new Date().toISOString(),
+      });
+    }
+    if (e.wallet && e.token_ca) {
+      const { data: wt } = await sb.from("ox_chain_wallet_tokens").select("*").eq("wallet", e.wallet).eq("token_ca", e.token_ca).maybeSingle();
+      const buy = /BUY/.test(e.event_type);
+      const sell = /SELL/.test(e.event_type);
+      const burn = /BURN/.test(e.event_type);
+      const amt = asNumber(e.amount) || 0;
+      const usd = asNumber(e.usd_value) || 0;
+      await sb.from("ox_chain_wallet_tokens").upsert({
+        wallet: e.wallet,
+        token_ca: e.token_ca,
+        token_symbol: e.token_symbol,
+        bought_amount: Number(wt?.bought_amount || 0) + (buy ? amt : 0),
+        sold_amount: Number(wt?.sold_amount || 0) + (sell ? amt : 0),
+        burned_amount: Number(wt?.burned_amount || 0) + (burn ? amt : 0),
+        bought_usd: Number(wt?.bought_usd || 0) + (buy ? usd : 0),
+        sold_usd: Number(wt?.sold_usd || 0) + (sell ? usd : 0),
+        last_event_at: t,
+      });
+    }
+    const from = e.source_wallet;
+    const to = e.destination_wallet || e.counterparty;
+    if (from && to && from !== to) {
+      const { data: flow } = await sb
+        .from("ox_chain_flows")
+        .select("*")
+        .eq("from_address", from)
+        .eq("to_address", to)
+        .is("token_ca", e.token_ca || null)
+        .maybeSingle();
+      if (flow) {
+        await sb.from("ox_chain_flows").update({
+          transfer_count: (flow.transfer_count || 0) + 1,
+          total_amount: Number(flow.total_amount || 0) + (asNumber(e.amount) || 0),
+          total_sol: Number(flow.total_sol || 0) + (asNumber(e.sol_amount) || 0),
+          total_usd: Number(flow.total_usd || 0) + (asNumber(e.usd_value) || 0),
+          last_seen: t,
+          last_signature: e.signature,
+        }).eq("id", flow.id);
+      } else {
+        await sb.from("ox_chain_flows").insert({
+          from_address: from,
+          to_address: to,
+          token_ca: e.token_ca || null,
+          token_symbol: e.token_symbol || null,
+          transfer_count: 1,
+          total_amount: asNumber(e.amount) || 0,
+          total_sol: asNumber(e.sol_amount) || 0,
+          total_usd: asNumber(e.usd_value) || 0,
+          first_seen: t,
+          last_seen: t,
+          last_signature: e.signature,
+        });
+      }
+    }
+    if (e.orbitx_related && e.block_time) {
+      const day = e.block_time.slice(0, 10);
+      const { data: daily } = await sb.from("ox_chain_orbitx_daily").select("*").eq("day", day).maybeSingle();
+      const buy = /BUY/.test(e.event_type);
+      const sell = /SELL/.test(e.event_type);
+      const burn = /BURN/.test(e.event_type);
+      await sb.from("ox_chain_orbitx_daily").upsert({
+        day,
+        buys: (daily?.buys || 0) + (buy ? 1 : 0),
+        sells: (daily?.sells || 0) + (sell ? 1 : 0),
+        burns: (daily?.burns || 0) + (burn ? 1 : 0),
+        transfers: (daily?.transfers || 0) + (/TRANSFER/.test(e.event_type) ? 1 : 0),
+        buy_amount: Number(daily?.buy_amount || 0) + (buy ? asNumber(e.amount) || 0 : 0),
+        sell_amount: Number(daily?.sell_amount || 0) + (sell ? asNumber(e.amount) || 0 : 0),
+        burn_amount: Number(daily?.burn_amount || 0) + (burn ? asNumber(e.amount) || 0 : 0),
+        buy_usd: Number(daily?.buy_usd || 0) + (buy ? asNumber(e.usd_value) || 0 : 0),
+        sell_usd: Number(daily?.sell_usd || 0) + (sell ? asNumber(e.usd_value) || 0 : 0),
+        updated_at: new Date().toISOString(),
+      });
+    }
+    if (e.token_ca) {
+      const meta = await tokenMeta(e.token_ca);
+      if (meta.symbol || meta.price_usd) {
+        await sb.from("ox_chain_tokens").upsert({
+          mint: e.token_ca,
+          symbol: tokenTicker({ symbol: meta.symbol || e.token_symbol, mint: e.token_ca }),
+          name: tokenDisplayName({ name: meta.name || e.token_name, symbol: meta.symbol || e.token_symbol, mint: e.token_ca }),
+          image: meta.image || e.token_image || dexTokenImage(e.token_ca),
+          banner: meta.banner || null,
+          decimals: e.token_decimals,
+          website: meta.website || null,
+          twitter: meta.twitter || null,
+          telegram: meta.telegram || null,
+          launch_platform: meta.launch_platform || null,
+          price_usd: meta.price_usd ?? null,
+          market_cap: meta.market_cap ?? null,
+          liquidity_usd: meta.liquidity_usd ?? null,
+          volume_24h: meta.volume_24h ?? null,
+          holders: meta.holder_count ?? null,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+}
+
+async function signaturesForAddress(address, limit = 40) {
+  const rows = await rpc("getSignaturesForAddress", [address, { limit: Math.min(limit, 50) }]);
+  return (Array.isArray(rows) ? rows : []).map((row) => row?.signature).filter(isLikelySignature);
+}
+
+async function ingestAddresses(sb, addresses, opts = {}) {
+  const tracked = await loadTracked(sb);
+  const price = await solUsd();
+  const tokenMetaMap = { [ORBITX_MINT]: await tokenMeta(ORBITX_MINT) };
+  let txs = 0;
+  let failed = 0;
+  let stored = 0;
+  const seen = new Set();
+  for (const address of addresses) {
+    if (!address) continue;
+    try {
+      let parsed = [];
+      try {
+        parsed = await heliusEnhanced(address, opts.limit || 20);
+      } catch {
+        parsed = [];
+      }
+      if (!parsed.length && (isOrbitxMint(address) || opts.rpcFallback)) {
+        const sigs = await signaturesForAddress(address, isOrbitxMint(address) ? 50 : opts.limit || 20);
+        try {
+          parsed = await heliusParse(sigs);
+        } catch {
+          parsed = [];
+        }
+        if (!parsed.length) {
+          for (const sig of sigs.slice(0, 16)) {
+            if (seen.has(sig)) continue;
+            try {
+              const raw = await rpc("getTransaction", [
+                sig,
+                { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+              ]);
+              if (!raw) continue;
+              seen.add(sig);
+              txs += 1;
+              const events = classifyRpcTx(sig, raw, { tracked, solUsd: price, tokenMeta: tokenMetaMap });
+              stored += await persistEvents(sb, events, tokenMetaMap);
+            } catch {
+              failed += 1;
+            }
+          }
+          continue;
+        }
+      }
+      txs += parsed.length;
+      for (const tx of parsed) {
+        if (!tx?.signature || seen.has(tx.signature)) continue;
+        seen.add(tx.signature);
+        const mintNeed = new Set();
+        for (const t of tx.tokenTransfers || []) if (t.mint) mintNeed.add(t.mint);
+        for (const mint of mintNeed) {
+          if (!tokenMetaMap[mint]) tokenMetaMap[mint] = await tokenMeta(mint);
+        }
+        const events = classifyHeliusTx(tx, { tracked, solUsd: price, tokenMeta: tokenMetaMap });
+        stored += await persistEvents(sb, events, tokenMetaMap);
+      }
+    } catch {
+      failed += 1;
+    }
+  }
+  return { txs, failed, stored, signatures: seen.size };
+}
+
+async function ingestNow(sb, extra = []) {
+  // Share one ingest across concurrent requests instead of starting a new run
+  // every time. The old timestamp-only throttle let a second request begin
+  // while the first was still fetching, which stacked RPC work until the
+  // function hit the 60s Vercel timeout.
+  if (ingestInflight && Date.now() - ingestStartedAt < INGEST_STUCK_MS) return ingestInflight;
+  if (Date.now() - ingestLock < INGEST_COOLDOWN_MS) return { skipped: true, reason: "throttled" };
+  ingestLock = Date.now();
+  ingestStartedAt = Date.now();
+  const run = runIngest(sb, extra).finally(() => {
+    ingestLock = Date.now();
+    if (ingestInflight === run) ingestInflight = null;
+  });
+  ingestInflight = run;
+  void run.catch(() => {});
+  return run;
+}
+
+async function runIngest(sb, extra = []) {
+  await seedAssignedKols(sb);
+  const watch = [
+    ORBITX_MINT,
+    ...kolWatchBatch(10),
+    ...extra.filter(isLikelyAddress),
+    JUPITER_V6,
+    PUMP_FUN,
+  ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 16);
+  let chainSlot = null;
+  try { chainSlot = await rpc("getSlot", [{ commitment: "confirmed" }]); } catch { /* lag optional */ }
+  let result = { txs: 0, failed: 0, stored: 0, signatures: 0 };
+  try {
+    const rest = watch.filter((a) => !isOrbitxMint(a));
+    const [ox, other] = await Promise.all([
+      ingestAddresses(sb, [ORBITX_MINT], { limit: 50, rpcFallback: true }),
+      ingestAddresses(sb, rest, { limit: 18, rpcFallback: false }),
+    ]);
+    result = {
+      txs: (ox.txs || 0) + (other.txs || 0),
+      failed: (ox.failed || 0) + (other.failed || 0),
+      stored: (ox.stored || 0) + (other.stored || 0),
+      signatures: (ox.signatures || 0) + (other.signatures || 0),
+    };
+  } catch (e) {
+    await sb.from("ox_chain_index_state").upsert({
+      id: "solana-mainnet",
+      rpc_failures: undefined,
+      last_error: e instanceof Error ? e.message : "ingest_failed",
+      updated_at: new Date().toISOString(),
+    });
+    throw e;
+  }
+  const { data: state } = await sb.from("ox_chain_index_state").select("*").eq("id", "solana-mainnet").maybeSingle();
+  const lastSlot = chainSlot ?? state?.last_slot;
+  await sb.from("ox_chain_index_state").upsert({
+    id: "solana-mainnet",
+    last_slot: lastSlot,
+    chain_slot: chainSlot,
+    last_ingest_at: new Date().toISOString(),
+    events_indexed: Number(state?.events_indexed || 0) + result.stored,
+    txs_processed: Number(state?.txs_processed || 0) + result.txs,
+    txs_failed: Number(state?.txs_failed || 0) + result.failed,
+    lag_slots: 0,
+    websocket_status: "polling",
+    last_error: result.failed ? `${result.failed} address fetch(es) failed` : null,
+    updated_at: new Date().toISOString(),
+  });
+  return { skipped: false, watch, chain_slot: chainSlot, ...result };
+}
+
+function applyEventFilters(q, query) {
+  const type = String(query.type || "").trim();
+  const wallet = String(query.wallet || "").trim();
+  const token = String(query.token || "").trim();
+  const source = String(query.source || "").trim();
+  const minUsd = asNumber(query.min_usd);
+  const orbitx = query.orbitx === "1" || query.orbitx === "true";
+  const whale = query.whale === "1" || query.whale === "true";
+  const kol = query.kol === "1" || query.kol === "true";
+  const tracked = query.tracked === "1" || query.tracked === "true";
+  const since = String(query.since || "").trim();
+  const windowKey = String(query.window || "").trim();
+  const WINDOWS = { "1m": 60e3, "5m": 300e3, "15m": 900e3, "1h": 3600e3, "24h": 86400e3 };
+  if (type) q = q.eq("event_type", type.toUpperCase());
+  if (wallet) q = q.or(`wallet.eq.${wallet},source_wallet.eq.${wallet},destination_wallet.eq.${wallet}`);
+  if (token) q = q.eq("token_ca", token);
+  if (source) q = q.ilike("source", source);
+  if (minUsd != null) q = q.gte("usd_value", minUsd);
+  if (orbitx) q = q.eq("orbitx_related", true);
+  if (whale) q = q.eq("whale_related", true);
+  if (kol || tracked) q = q.eq("kol_related", true);
+  if (since) q = q.gte("block_time", since);
+  else if (WINDOWS[windowKey]) {
+    q = q.gte("block_time", new Date(Date.now() - WINDOWS[windowKey]).toISOString());
+  }
+  return q;
+}
+
+function emptyCityDistricts() {
+  return {
+    orbitx: { mint: ORBITX_MINT, symbol: "ORBITX", name: "OrbitX", kind: "orbitx", source: "orbitx" },
+    hubs: DEX_HUBS,
+    tokens: [],
+  };
+}
+
+function districtToRow(token) {
+  const mint = String(token?.mint || "").trim();
+  const meta = token?.metadata && typeof token.metadata === "object" ? token.metadata : {};
+  return {
+    mint,
+    symbol: tokenTicker({ symbol: token?.symbol, mint }),
+    name: tokenDisplayName({ name: token?.name, symbol: token?.symbol, mint }),
+    image: token?.image || dexTokenImage(mint),
+    banner: token?.banner || null,
+    website: token?.website || null,
+    twitter: token?.twitter || null,
+    telegram: token?.telegram || null,
+    launch_platform: token?.launch_platform || null,
+    price_usd: token?.price_usd ?? null,
+    market_cap: token?.market_cap ?? null,
+    liquidity_usd: token?.liquidity_usd ?? null,
+    volume_24h: token?.volume_24h ?? null,
+    holders: token?.holder_count ?? token?.holders ?? null,
+    metadata: {
+      ...meta,
+      universe: true,
+      buys_24h: token?.buys_24h ?? null,
+      sells_24h: token?.sells_24h ?? null,
+      traders_24h: token?.traders_24h ?? null,
+      change_24h: token?.change_24h ?? null,
+      change_1h: token?.change_1h ?? null,
+      kind: token?.kind || (isOrbitxMint(mint) ? "orbitx" : "token"),
+      source: token?.source || null,
+      dex: token?.dex || null,
+      buy_volume_24h: token?.buy_volume_24h ?? null,
+      sell_volume_24h: token?.sell_volume_24h ?? null,
+    },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function rowToDistrict(row) {
+  if (!row?.mint) return null;
+  const meta = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  return cleanTokenFields({
+    mint: row.mint,
+    symbol: row.symbol,
+    name: row.name,
+    image: row.image,
+    banner: row.banner,
+    price_usd: asNumber(row.price_usd),
+    market_cap: asNumber(row.market_cap),
+    liquidity_usd: asNumber(row.liquidity_usd),
+    volume_24h: asNumber(row.volume_24h),
+    holder_count: asNumber(row.holders),
+    website: row.website,
+    twitter: row.twitter,
+    telegram: row.telegram,
+    launch_platform: row.launch_platform,
+    buys_24h: asNumber(meta.buys_24h),
+    sells_24h: asNumber(meta.sells_24h),
+    traders_24h: asNumber(meta.traders_24h),
+    change_24h: asNumber(meta.change_24h),
+    change_1h: asNumber(meta.change_1h),
+    buy_volume_24h: asNumber(meta.buy_volume_24h),
+    sell_volume_24h: asNumber(meta.sell_volume_24h),
+    kind: meta.kind || (isOrbitxMint(row.mint) ? "orbitx" : "token"),
+    source: meta.source || null,
+    dex: meta.dex || null,
+  });
+}
+
+async function persistUniverse(sb, districts) {
+  if (!sb || !districts) return;
+  const tokens = [];
+  if (districts.orbitx?.mint) tokens.push(districts.orbitx);
+  for (const token of districts.tokens || []) {
+    if (token?.mint && token.mint !== districts.orbitx?.mint) tokens.push(token);
+  }
+  const rows = tokens.filter((t) => t?.mint).map(districtToRow);
+  for (let i = 0; i < rows.length; i += 80) {
+    const chunk = rows.slice(i, i + 80);
+    const { error } = await sb.from("ox_chain_tokens").upsert(chunk);
+    if (error) console.error("persistUniverse", error.message);
+  }
+}
+
+async function readUniverse(sb) {
+  if (!sb) return null;
+  try {
+    const [{ data: universeRows }, { data: oxRow }] = await Promise.all([
+      sb.from("ox_chain_tokens").select("*").contains("metadata", { universe: true }).order("volume_24h", { ascending: false, nullsFirst: false }).limit(250),
+      sb.from("ox_chain_tokens").select("*").eq("mint", ORBITX_MINT).maybeSingle(),
+    ]);
+    let rows = Array.isArray(universeRows) ? universeRows : [];
+    if (!rows.length) {
+      const { data: fallback } = await sb.from("ox_chain_tokens").select("*").order("volume_24h", { ascending: false, nullsFirst: false }).limit(250);
+      rows = Array.isArray(fallback) ? fallback : [];
+    }
+    const tokens = rows.map(rowToDistrict).filter((t) => t && !isOrbitxMint(t.mint));
+    if (!tokens.length && !oxRow) return null;
+    const orbitx = rowToDistrict(oxRow) || emptyCityDistricts().orbitx;
+    orbitx.kind = "orbitx";
+    orbitx.name = "OrbitX";
+    orbitx.symbol = "ORBITX";
+    orbitx.mint = ORBITX_MINT;
+    return {
+      orbitx,
+      hubs: DEX_HUBS,
+      tokens,
+      trending_count: tokens.length,
+      window: "24h",
+    };
+  } catch (e) {
+    console.error("readUniverse", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function cityDistricts(extraMints = [], sb = null) {
+  if (districtCache.value && Date.now() - districtCache.at < 90_000) return districtCache.value;
+  try {
+    const value = await loadCityDistricts(extraMints);
+    districtCache = { at: Date.now(), value };
+    if (sb) void persistUniverse(sb, value).catch(() => undefined);
+    return value;
+  } catch {
+    const fromDb = await readUniverse(sb);
+    if (fromDb?.tokens?.length) {
+      districtCache = { at: Date.now(), value: fromDb };
+      return fromDb;
+    }
+    return districtCache.value || emptyCityDistricts();
+  }
+}
+
+function peekCityDistricts() {
+  return districtCache.value || emptyCityDistricts();
+}
+
+function refreshCityDistricts(extraMints = [], sb = null) {
+  void cityDistricts(extraMints, sb);
+}
+
+async function cityDistrictsOrCache(extraMints = [], sb = null) {
+  if (districtCache.value) {
+    if (Date.now() - districtCache.at >= 90_000) refreshCityDistricts(extraMints, sb);
+    return districtCache.value;
+  }
+  const fromDb = await readUniverse(sb);
+  if (fromDb?.tokens?.length) {
+    districtCache = { at: Date.now(), value: fromDb };
+    refreshCityDistricts(extraMints, sb);
+    return fromDb;
+  }
+  return cityDistricts(extraMints, sb);
+}
+
+async function peekOrReadDistricts(extraMints = [], sb = null) {
+  if (districtCache.value) {
+    if (Date.now() - districtCache.at >= 90_000) refreshCityDistricts(extraMints, sb);
+    return districtCache.value;
+  }
+  const fromDb = await readUniverse(sb);
+  if (fromDb?.tokens?.length) {
+    districtCache = { at: Date.now(), value: fromDb };
+  }
+  refreshCityDistricts(extraMints, sb);
+  return fromDb || peekCityDistricts();
+}
+
+async function handleLive(req, res, sb) {
+  if (sb) void ingestNow(sb).catch(() => undefined);
+  const limit = Math.min(Number(req.query?.limit) || 80, 200);
+  let q = sb
+    .from("ox_chain_events")
+    .select("*")
+    .order("importance", { ascending: false })
+    .order("block_time", { ascending: false })
+    .limit(limit);
+  q = applyEventFilters(q, req.query || {});
+  const { data: events, error } = await q;
+  if (error) return json(res, 503, { ok: false, error: error.message });
+  const [{ data: oxEvents }, { data: oxMintEvents }, { data: recent }] = await Promise.all([
+    sb.from("ox_chain_events").select("*").eq("orbitx_related", true).order("block_time", { ascending: false }).limit(200),
+    sb.from("ox_chain_events").select("*").eq("token_ca", ORBITX_MINT).order("block_time", { ascending: false }).limit(200),
+    sb.from("ox_chain_events").select("*").order("block_time", { ascending: false }).limit(Math.max(limit, 120)),
+  ]);
+  const merged = new Map();
+  for (const row of [...(oxEvents || []), ...(oxMintEvents || []), ...(recent || []), ...(events || [])]) {
+    if (row?.event_id) merged.set(row.event_id, row);
+  }
+  const combined = [...merged.values()].sort((a, b) => (Date.parse(b.block_time || "") || 0) - (Date.parse(a.block_time || "") || 0)).slice(0, 400);
+  const { data: state } = await sb.from("ox_chain_index_state").select("*").eq("id", "solana-mainnet").maybeSingle();
+  const live = statusFromLag(state?.lag_slots, state?.last_ingest_at);
+  const stats = summarizeEvents(combined);
+  const tracked = await loadTracked(sb);
+  const labeled = combined.map((e) => {
+    const kol = kolByAddress(e.wallet) || tracked[e.wallet];
+    return publicEvent({
+      ...e,
+      kol_related: e.kol_related || isAssignedKol(e.wallet),
+      wallet_label: kol?.label || kol?.name || null,
+      wallet_twitter: kol?.twitter || null,
+    });
+  });
+  const latestByWallet = {};
+  for (const e of labeled) {
+    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
+      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
+    }
+  }
+  const kols = allOrbitxKols().map((k) => {
+    const last = latestByWallet[k.address];
+    const hits = labeled.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
+    return {
+      address: k.address,
+      name: k.name,
+      twitter: k.twitter,
+      status: k.status,
+      hits,
+      last_type: last?.event_type || null,
+      last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
+        || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
+      last_mint: last?.token_ca || null,
+      last_usd: last?.usd_value ?? null,
+      last_at: last?.block_time || null,
+    };
+  });
+  const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
+  const extraMints = labeled.map((e) => e.token_ca).filter(Boolean);
+  const districts = await peekOrReadDistricts(extraMints, sb);
+  const oxLive = districts.orbitx?.buys_24h != null ? districts.orbitx : await tokenMeta(ORBITX_MINT).catch(() => districts.orbitx || {});
+  const ingestAge = state?.last_ingest_at ? Math.max(0, (Date.now() - Date.parse(state.last_ingest_at)) / 1000) : null;
+  return json(res, 200, {
+    ok: true,
+    live: live.live,
+    live_label: live.label,
+    live_reason: live.reason,
+    chain_slot: state?.chain_slot ?? null,
+    last_slot: state?.last_slot ?? null,
+    lag_slots: state?.lag_slots ?? null,
+    last_ingest_at: state?.last_ingest_at ?? null,
+    ingest_age_sec: Number.isFinite(ingestAge) ? Number(ingestAge.toFixed(1)) : null,
+    websocket_status: state?.websocket_status || "polling",
+    sol_usd: await solUsd(),
+    stats: {
+      ...stats,
+      assigned_kols: allOrbitxKols().length,
+      orbitx_buys_24h: oxLive?.buys_24h ?? districts?.orbitx?.buys_24h ?? null,
+      orbitx_sells_24h: oxLive?.sells_24h ?? districts?.orbitx?.sells_24h ?? null,
+      orbitx_traders_24h: oxLive?.traders_24h ?? districts?.orbitx?.traders_24h ?? null,
+    },
+    breakdown: eventBreakdown(labeled),
+    eps_series: epsSeries(labeled),
+    districts: {
+      ...districts,
+      orbitx: { ...(districts.orbitx || {}), ...(oxLive || {}), mint: ORBITX_MINT },
+    },
+    events: labeled,
+    kols,
+    flows: flows || [],
+    note: "Events are reconstructed from observed Solana transactions. Empty means nothing indexed yet — not synthetic activity.",
+  });
+}
+
+async function handleDistricts(req, res, sb) {
+  const districts = await cityDistrictsOrCache([], sb);
+  return json(res, 200, { ok: true, ...districts });
+}
+
+async function handleTrending(req, res, sb) {
+  const districts = await cityDistrictsOrCache([], sb);
+  const tokens = Array.isArray(districts?.tokens) ? districts.tokens : [];
+  return json(res, 200, {
+    ok: true,
+    window: districts?.window || "24h",
+    count: tokens.length,
+    orbitx: districts?.orbitx || null,
+    tokens,
+  });
+}
+
+async function handleKols(req, res, sb) {
+  await seedAssignedKols(sb);
+  const tracked = await loadTracked(sb);
+  const addresses = allOrbitxKols().map((k) => k.address);
+  let events = [];
+  if (addresses.length) {
+    const orFilter = [
+      `wallet.in.(${addresses.join(",")})`,
+      `source_wallet.in.(${addresses.join(",")})`,
+      `destination_wallet.in.(${addresses.join(",")})`,
+    ].join(",");
+    const { data } = await sb
+      .from("ox_chain_events")
+      .select("*")
+      .or(orFilter)
+      .order("block_time", { ascending: false })
+      .limit(400);
+    events = data || [];
+  }
+  const latestByWallet = {};
+  for (const e of events) {
+    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
+      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
+    }
+  }
+  return json(res, 200, {
+    ok: true,
+    count: allOrbitxKols().length,
+    kols: allOrbitxKols().map((k) => {
+      const last = latestByWallet[k.address];
+      const hits = events.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
+      return {
+        ...k,
+        label_kind: "KOL",
+        tracked: Boolean(tracked[k.address]),
+        hits,
+        last_type: last?.event_type || null,
+        last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
+          || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
+        last_mint: last?.token_ca || null,
+        last_usd: last?.usd_value ?? null,
+        last_at: last?.block_time || null,
+      };
+    }),
+    events: events.map(publicEvent),
+  });
+}
+
+async function handleEvents(req, res, sb) {
+  const limit = Math.min(Number(req.query?.limit) || 50, 200);
+  const cursor = String(req.query?.cursor || "").trim();
+  let q = sb.from("ox_chain_events").select("*").order("block_time", { ascending: false }).limit(limit + 1);
+  q = applyEventFilters(q, req.query || {});
+  if (cursor) q = q.lt("block_time", cursor);
+  const { data, error } = await q;
+  if (error) return json(res, 503, { ok: false, error: error.message });
+  const rows = data || [];
+  const page = rows.slice(0, limit);
+  return json(res, 200, {
+    ok: true,
+    events: page.map(publicEvent),
+    next_cursor: rows.length > limit ? page[page.length - 1]?.block_time || null : null,
+  });
+}
+
+async function handleWallet(req, res, sb, address) {
+  if (!isLikelyAddress(address)) return json(res, 400, { ok: false, error: "Valid wallet address required." });
+  try { await ingestAddresses(sb, [address], { limit: 40 }); } catch { /* serve what we have */ }
+  const [{ data: wallet }, { data: events }, { data: tokens }, { data: flows }, { data: tracked }, balances] = await Promise.all([
+    sb.from("ox_chain_wallets").select("*").eq("address", address).maybeSingle(),
+    sb.from("ox_chain_events").select("*").or(`wallet.eq.${address},source_wallet.eq.${address},destination_wallet.eq.${address}`).order("block_time", { ascending: false }).limit(80),
+    sb.from("ox_chain_wallet_tokens").select("*").eq("wallet", address),
+    sb.from("ox_chain_flows").select("*").or(`from_address.eq.${address},to_address.eq.${address}`).order("last_seen", { ascending: false }).limit(40),
+    sb.from("ox_chain_tracked").select("*").eq("address", address).maybeSingle(),
+    heliusBalances(address),
+  ]);
+  const holdings = [];
+  if (balances?.tokens) {
+    for (const t of balances.tokens.slice(0, 40)) {
+      const meta = await tokenMeta(t.mint);
+      holdings.push({
+        mint: t.mint,
+        amount: t.amount,
+        decimals: t.decimals,
+        symbol: tokenTicker({ symbol: meta.symbol, mint: t.mint }) || (isOrbitxMint(t.mint) ? "ORBITX" : null),
+        name: tokenDisplayName({ name: meta.name, symbol: meta.symbol, mint: t.mint }),
+        image: meta.image || dexTokenImage(t.mint),
+        price_usd: meta.price_usd ?? null,
+      });
+    }
+  }
+  return json(res, 200, {
+    ok: true,
+    address,
+    kind: addressKind(address, { tracked: tracked ? { [address]: tracked } : {} }),
+    kol: kolByAddress(address),
+    assigned_kol: isAssignedKol(address),
+    label: tracked?.label || kolByAddress(address)?.name || wallet?.label || null,
+    label_kind: isAssignedKol(address) ? "KOL" : (tracked?.label_kind || "Wallet"),
+    sol: balances?.nativeBalance != null ? balances.nativeBalance / 1e9 : null,
+    wallet,
+    tokens: tokens || [],
+    orbitx: (() => {
+      const row = (tokens || []).find((t) => t.token_ca === ORBITX_MINT) || null;
+      const liveHold = holdings.find((h) => isOrbitxMint(h.mint));
+      if (!row && !liveHold) return null;
+      return {
+        ...(row || { wallet: address, token_ca: ORBITX_MINT, token_symbol: "ORBITX" }),
+        amount: liveHold?.amount ?? row?.balance ?? null,
+        bought: Number(row?.bought_amount || 0),
+        sold: Number(row?.sold_amount || 0),
+        burned: Number(row?.burned_amount || 0),
+      };
+    })(),
+    holdings,
+    events: (events || []).map(publicEvent),
+    flows: (flows || []).map((f) => ({
+      ...f,
+      from_kind: addressKind(f.from_address),
+      to_kind: addressKind(f.to_address),
+    })),
+    note: "Balances come from Helius when configured. Missing fields are UNKNOWN, not estimated.",
+  });
+}
+
+async function handleToken(req, res, sb, mint) {
+  if (!isLikelyAddress(mint)) return json(res, 400, { ok: false, error: "Valid token mint required." });
+  try { await ingestAddresses(sb, [mint], { limit: 40, rpcFallback: isOrbitxMint(mint) }); } catch { /* cache */ }
+  const meta = await tokenMeta(mint);
+  const [{ data: stored }, { data: events }, { data: buyers }] = await Promise.all([
+    sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle(),
+    sb.from("ox_chain_events").select("*").eq("token_ca", mint).order("block_time", { ascending: false }).limit(80),
+    sb.from("ox_chain_wallet_tokens").select("*").eq("token_ca", mint).order("bought_usd", { ascending: false }).limit(20),
+  ]);
+  return json(res, 200, {
+    ok: true,
+    mint,
+    token: cleanTokenFields({
+      ...stored,
+      ...meta,
+      mint,
+      holder_count: meta.holder_count ?? asNumber(stored?.holders) ?? asNumber(stored?.holder_count),
+    }),
+    events: (events || []).map(publicEvent),
+    buyers: buyers || [],
+  });
+}
+
+async function handleTransaction(req, res, sb, signature) {
+  if (!isLikelySignature(signature)) return json(res, 400, { ok: false, error: "Valid transaction signature required." });
+  const { data: cached } = await sb.from("ox_chain_events").select("*").eq("signature", signature);
+  let parsed = [];
+  let raw = null;
+  try {
+    parsed = await heliusParse([signature]);
+  } catch { /* rpc fallback */ }
+  try {
+    raw = await rpc("getTransaction", [signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]);
+  } catch { /* keep cached */ }
+  const tracked = await loadTracked(sb);
+  const price = await solUsd();
+  let events = cached || [];
+  if (parsed[0]) {
+    events = classifyHeliusTx(parsed[0], { tracked, solUsd: price });
+    try { await persistEvents(sb, events, {}); } catch { /* read-only still ok */ }
+  } else if (raw && !events.length) {
+    events = classifyRpcTx(signature, raw, { tracked, solUsd: price });
+  }
+  if (!raw && !parsed[0] && !events.length) {
+    return json(res, 404, { ok: false, error: "Signature not found on-chain." });
+  }
+  return json(res, 200, {
+    ok: true,
+    signature,
+    slot: raw?.slot ?? events[0]?.slot ?? null,
+    block_time: raw?.blockTime ? new Date(raw.blockTime * 1000).toISOString() : events[0]?.block_time ?? null,
+    status: raw?.meta?.err ? "FAILED" : events[0]?.status || "confirmed",
+    fee: raw?.meta?.fee != null ? raw.meta.fee / 1e9 : events[0]?.transaction_fee ?? null,
+    events,
+    raw: raw || null,
+    parsed: parsed[0] || null,
+  });
+}
+
+async function handleBlock(req, res, slot) {
+  const n = Number(slot);
+  if (!Number.isFinite(n) || n < 0) return json(res, 400, { ok: false, error: "Valid slot required." });
+  try {
+    const block = await rpc("getBlock", [n, { transactionDetails: "signatures", rewards: false, maxSupportedTransactionVersion: 0 }]);
+    if (!block) return json(res, 404, { ok: false, error: "Slot not found." });
+    return json(res, 200, {
+      ok: true,
+      slot: n,
+      block_time: block.blockTime ? new Date(block.blockTime * 1000).toISOString() : null,
+      signatures: (block.signatures || []).slice(0, 80),
+      transaction_count: (block.signatures || []).length,
+    });
+  } catch (e) {
+    return json(res, 502, { ok: false, error: e instanceof Error ? e.message : "RPC failed." });
+  }
+}
+
+async function handleOrbitx(req, res, sb, sub) {
+  try { await ingestAddresses(sb, [ORBITX_MINT], { limit: 50, rpcFallback: true }); } catch { /* cache */ }
+  const mint = ORBITX_MINT;
+  const [{ data: related }, { data: byMint }] = await Promise.all([
+    sb.from("ox_chain_events").select("*").eq("orbitx_related", true).order("block_time", { ascending: false }).limit(400),
+    sb.from("ox_chain_events").select("*").eq("token_ca", mint).order("block_time", { ascending: false }).limit(400),
+  ]);
+  const byId = new Map();
+  for (const row of [...(related || []), ...(byMint || [])]) {
+    if (row?.event_id) byId.set(row.event_id, row);
+  }
+  const events = [...byId.values()].sort((a, b) => (Date.parse(b.block_time || "") || 0) - (Date.parse(a.block_time || "") || 0));
+  const { data: daily } = await sb.from("ox_chain_orbitx_daily").select("*").order("day", { ascending: false }).limit(31);
+  const { data: tokens } = await sb.from("ox_chain_wallet_tokens").select("*").eq("token_ca", mint);
+  const { data: token } = await sb.from("ox_chain_tokens").select("*").eq("mint", mint).maybeSingle();
+  const meta = await tokenMeta(mint);
+  const oxCached = (await peekOrReadDistricts([mint], sb))?.orbitx || peekCityDistricts()?.orbitx || null;
+  const rows = events || [];
+  const burns = rows.filter((e) => /BURN/.test(e.event_type || ""));
+  const buys = rows.filter((e) => /BUY/.test(e.event_type || ""));
+  const sells = rows.filter((e) => /SELL/.test(e.event_type || ""));
+  const burners = [...(tokens || [])].sort((a, b) => Number(b.burned_amount || 0) - Number(a.burned_amount || 0)).slice(0, 20);
+  const buyers = [...(tokens || [])].sort((a, b) => Number(b.bought_usd || 0) - Number(a.bought_usd || 0)).slice(0, 20);
+  const payload = {
+    ok: true,
+    mint,
+    token: cleanTokenFields({
+      ...token,
+      ...meta,
+      ...(oxCached || {}),
+      mint,
+      holder_count: oxCached?.holder_count ?? meta.holder_count ?? asNumber(token?.holders),
+    }),
+    events: (sub === "burns" ? burns : sub === "buyers" ? buys : rows).map(publicEvent),
+    burns: burns.map(publicEvent),
+    buys: buys.map(publicEvent),
+    sells: sells.map(publicEvent),
+    burners,
+    buyers,
+    daily: daily || [],
+    totals: {
+      burned: burns.reduce((s, e) => s + (asNumber(e.amount) || 0), 0) || (tokens || []).reduce((s, t) => s + Number(t.burned_amount || 0), 0),
+      burn_events: burns.length,
+      largest_burn: burns.reduce((m, e) => Math.max(m, asNumber(e.amount) || 0), 0),
+      unique_wallets: new Set(rows.map((e) => e.wallet).filter(Boolean)).size,
+      buy_usd: buys.reduce((s, e) => s + (asNumber(e.usd_value) || 0), 0),
+      sell_usd: sells.reduce((s, e) => s + (asNumber(e.usd_value) || 0), 0),
+    },
+  };
+  return json(res, 200, payload);
+}
+
+async function handleSearch(req, res, sb) {
+  const q = String(req.query?.q || bodyOf(req).q || "").trim();
+  const kind = detectQueryKind(q);
+  if (kind.kind === "empty") return json(res, 400, { ok: false, error: "Search query required." });
+  if (kind.kind === "signature") {
+    return handleTransaction(req, res, sb, kind.value);
+  }
+  if (kind.kind === "slot") {
+    return handleBlock(req, res, kind.value);
+  }
+  if (kind.kind === "address") {
+    const meta = await tokenMeta(kind.value);
+    const looksToken = Boolean(meta.symbol || meta.price_usd || isOrbitxMint(kind.value));
+    if (looksToken) return handleToken(req, res, sb, kind.value);
+    return handleWallet(req, res, sb, kind.value);
+  }
+  if (kind.kind === "symbol") {
+    if (kind.value === "ORBITX" || kind.value === "OX") return handleToken(req, res, sb, ORBITX_MINT);
+    const pairs = await searchDex(kind.value);
+    const { data: local } = await sb.from("ox_chain_tokens").select("*").ilike("symbol", kind.value).limit(8);
+    return json(res, 200, {
+      ok: true,
+      kind: "symbol",
+      query: kind.value,
+      tokens: local || [],
+      pairs: pairs.map((p) => ({
+        mint: p.baseToken?.address,
+        symbol: p.baseToken?.symbol,
+        name: tokenDisplayName({ name: p.baseToken?.name, symbol: p.baseToken?.symbol, mint: p.baseToken?.address }),
+        image: p.info?.imageUrl || null,
+        banner: p.info?.header || p.info?.openGraph || null,
+        price_usd: asNumber(p.priceUsd),
+        market_cap: asNumber(p.marketCap) ?? asNumber(p.fdv),
+        volume_24h: asNumber(p.volume?.h24),
+        dex: p.dexId,
+      })),
+    });
+  }
+  return json(res, 200, { ok: true, kind: kind.kind, query: kind.value, events: [] });
+}
+
+async function handleFlows(req, res, sb, address) {
+  if (!isLikelyAddress(address)) return json(res, 400, { ok: false, error: "Valid address required." });
+  const { data, error } = await sb
+    .from("ox_chain_flows")
+    .select("*")
+    .or(`from_address.eq.${address},to_address.eq.${address}`)
+    .order("last_seen", { ascending: false })
+    .limit(80);
+  if (error) return json(res, 503, { ok: false, error: error.message });
+  return json(res, 200, {
+    ok: true,
+    address,
+    flows: (data || []).map((f) => ({
+      ...f,
+      from_kind: addressKind(f.from_address),
+      to_kind: addressKind(f.to_address),
+    })),
+  });
+}
+
+async function handleStatus(req, res, sb) {
+  const { data: state } = await sb.from("ox_chain_index_state").select("*").eq("id", "solana-mainnet").maybeSingle();
+  const live = statusFromLag(state?.lag_slots, state?.last_ingest_at);
+  let chainSlot = state?.chain_slot ?? null;
+  try { chainSlot = await rpc("getSlot", [{ commitment: "confirmed" }]); } catch { /* keep */ }
+  return json(res, 200, {
+    ok: true,
+    ...live,
+    state,
+    chain_slot: chainSlot,
+    helius: Boolean(heliusKey()),
+    rpc: Boolean(rpcUrl()),
+  });
+}
+
+export default async function handler(req, res) {
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
+    return res.end();
+  }
+  const path = pathOf(req);
+  const [head, a] = path.split("/");
+  if (head === "media") {
+    if (!rateLimit(req, 240, 60_000)) return json(res, 429, { ok: false, error: "Rate limited." });
+    return await handleMedia(req, res);
+  }
+  if (!rateLimit(req, cronAuthorized(req) ? 120 : 60, 60_000)) {
+    return json(res, 429, { ok: false, error: "Rate limited." });
+  }
+  const sb = admin();
+  if (!sb) return json(res, 503, { ok: false, error: "Supabase is not configured." });
+  try {
+    if (!head || head === "live") return await handleLive(req, res, sb);
+    if (head === "events") return await handleEvents(req, res, sb);
+    if (head === "wallet" && a) return await handleWallet(req, res, sb, a);
+    if (head === "token" && a) return await handleToken(req, res, sb, a);
+    if ((head === "transaction" || head === "tx") && a) return await handleTransaction(req, res, sb, a);
+    if (head === "block" && a) return await handleBlock(req, res, a);
+    if (head === "orbitx" && !a) return await handleOrbitx(req, res, sb, "");
+    if (head === "orbitx" && a === "burns") return await handleOrbitx(req, res, sb, "burns");
+    if (head === "orbitx" && a === "buyers") return await handleOrbitx(req, res, sb, "buyers");
+    if (head === "search") return await handleSearch(req, res, sb);
+    if (head === "kols") return await handleKols(req, res, sb);
+    if (head === "districts") return await handleDistricts(req, res, sb);
+    if (head === "trending") return await handleTrending(req, res, sb);
+    if (head === "flows" && a) return await handleFlows(req, res, sb, a);
+    if (head === "status") return await handleStatus(req, res, sb);
+    if (head === "ingest" && (req.method === "POST" || cronAuthorized(req) || req.query?.force === "1")) {
+      const extra = [String(req.query?.address || bodyOf(req).address || "")];
+      const result = await ingestNow(sb, extra);
+      return json(res, 200, { ok: true, ...result });
+    }
+    if (head === "ingest") return json(res, 405, { ok: false, error: "Ingest is cron/POST only." });
+    return json(res, 404, { ok: false, error: `Unknown on-chain path: ${path || "/"}` });
+  } catch (e) {
+    return json(res, 500, { ok: false, error: e instanceof Error ? e.message : "On-chain API failed." });
+  }
+}

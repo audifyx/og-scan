@@ -195,8 +195,8 @@ export default function AgentNftMintPage() {
             Full NFT studio
           </Link>
           {" · "}
-          <Link to="/agent" className="text-white/50 hover:underline">
-            Agent MCP
+          <Link to="/supercomputer?tab=workspace" className="text-white/50 hover:underline">
+            Super Computer
           </Link>
         </p>
       </div>

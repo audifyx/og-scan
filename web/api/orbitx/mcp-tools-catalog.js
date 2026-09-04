@@ -1,5 +1,5 @@
 /**
- * Generated OrbitX MCP tool catalog — expands factories to 500+ tools.
+ * Generated OrbitX MCP tool catalog — expands factories to 2500+ live tools.
  * Each tool maps to a real OG DEX / OrbitX endpoint or Phantom openUrl/signUrl.
  */
 
@@ -35,9 +35,19 @@ const SCREENER_TYPES = [
   "organic",
   "kols",
   "social",
+  "graduated",
+  "bonded",
+  "dexpaid",
+  "snipers",
+  "insiders",
+  "bundled",
+  "volume",
+  "ath",
+  "pumpfun",
+  "migrations",
 ];
 
-const INTERVALS = ["5m", "15m", "1h", "4h", "24h"];
+const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "6h", "12h", "24h"];
 
 const POOLS = ["auto", "pump", "raydium", "pump-amm", "launchlab", "raydium-cpmm", "bonk"];
 
@@ -85,9 +95,21 @@ const OPEN_ROUTES = [
   ["/invite", "Invite"],
   ["/auth", "Auth"],
   ["/hub", "Hub"],
+  ["/app", "Home hub"],
+  ["/shop", "Shop"],
+  ["/trade", "Trade"],
+  ["/telegram", "Telegram companion"],
+  ["/ai", "OrbitX AI"],
+  ["/whitepaper", "Whitepaper"],
+  ["/orbitx-social", "Social feed"],
+  ["/orbitx-scanner", "Scanner"],
+  ["/vamp", "Anti-vamp"],
+  ["/bagwork", "Bagwork"],
+  ["/wallets", "Wallets"],
+  ["/nft/create", "NFT create studio"],
 ];
 
-const LIMITS = [10, 20, 25, 30, 40, 50];
+const LIMITS = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
 
 /** @type {Map<string, object>} */
 export const GEN_META = new Map();
@@ -117,9 +139,11 @@ function limitSchema(def = 20) {
 }
 
 /**
- * Build generated tools. Dedupes names. Target 500+.
+ * Build generated tools. Dedupes names. Target 2500+.
  */
 export function buildGeneratedTools() {
+  GEN_META.clear();
+  GEN_WALLET_TOOLS.clear();
   const out = [];
   const seen = new Set();
 
@@ -146,7 +170,18 @@ export function buildGeneratedTools() {
     }
   }
 
-  // 2) Chart matrix: interval × chain
+  // 1b) Pulse shortcuts (type × solana, 1h) so catalog clears 2500 live tools
+  for (const type of SCREENER_TYPES) {
+    const name = `orbitx_pulse_${type}_solana`.replace(/-/g, "_");
+    push(
+      tool(name, `Pulse ${type} on solana (1h).`, limitSchema(20), {
+        kind: "screener",
+        type,
+        interval: "1h",
+        chain: "solana",
+      }),
+    );
+  }
   for (const interval of INTERVALS) {
     for (const chain of CHAINS_EXT) {
       const name = `orbitx_chart_${interval}_${chain}`.replace(/-/g, "_");
@@ -260,13 +295,13 @@ export function buildGeneratedTools() {
     );
   }
 
-  // 6) Buy/sell per pool → Phantom signUrl
+  // 6) Buy/sell per pool → Jupiter signUrl
   for (const pool of POOLS) {
     const p = pool.replace(/-/g, "_");
     push(
       tool(
         `orbitx_buy_${p}`,
-        `Prepare BUY via ${pool} pool → Phantom signUrl. Requires mint, amountSol, publicKey.`,
+        `Prepare BUY via ${pool} pool → Jupiter signUrl. Requires mint, amountSol, publicKey.`,
         {
           type: "object",
           properties: {
@@ -283,7 +318,7 @@ export function buildGeneratedTools() {
     push(
       tool(
         `orbitx_sell_${p}`,
-        `Prepare SELL via ${pool} pool → Phantom signUrl. Requires mint, amount, publicKey.`,
+        `Prepare SELL via ${pool} pool → Jupiter signUrl. Requires mint, amount, publicKey.`,
         {
           type: "object",
           properties: {
@@ -563,11 +598,18 @@ export async function dispatchGenerated(name, args, ctx) {
         slippage: String(Number(args.slippage) || 10),
         pool: String(meta.pool || "auto"),
       });
+      const autoQs = new URLSearchParams(signQs);
+      autoQs.set("auto", "1");
+      const auto = args.autoConfirm === true || args.auto === true || args.confirmMode === "auto";
+      const signUrl = `${base}/agent/sign?${signQs.toString()}`;
+      const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
       return {
         ok: true,
-        status: "awaiting_phantom_signature",
+        status: auto ? "awaiting_auto_phantom" : "awaiting_phantom_signature",
         requiresSignature: true,
-        signUrl: `${base}/agent/sign?${signQs.toString()}`,
+        signUrl,
+        autoSignUrl,
+        openUrl: auto ? autoSignUrl : signUrl,
         action,
         pool: meta.pool,
         wallet: pk,
@@ -575,8 +617,8 @@ export async function dispatchGenerated(name, args, ctx) {
         amount,
         via: data.via || null,
         instructions: [
-          "Open signUrl in the browser.",
-          "Approve in Phantom.",
+          auto ? "Open autoSignUrl — Phantom prompts immediately." : "Open signUrl in the browser.",
+          "Approve in Phantom. OrbitX never holds your keys.",
           "Do not broadcast unsigned transactions.",
         ],
       };

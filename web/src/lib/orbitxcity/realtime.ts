@@ -9,7 +9,7 @@
  */
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
-import type { FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
+import type { AvatarAppearance, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
 
 export const REALTIME_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
@@ -23,6 +23,7 @@ export interface CityIdentity {
   hairColor?: string;
   outfit?: OutfitStyle;
   faceStyle?: FaceStyle;
+  classId?: AvatarAppearance["classId"];
 }
 
 export interface LobbyDescriptor {
@@ -38,6 +39,17 @@ export const MAIN_LOBBY: LobbyDescriptor = {
   label: "Main Lobby · NYC",
   isPrivate: false,
 };
+
+/** Public per-district rooms (`oxc-world-nyc` …). Custom/private use `oxc-lobby-`. */
+export function isDistrictLobby(id: string): boolean {
+  return typeof id === "string" && id.startsWith("oxc-world-");
+}
+
+export function districtLobby(cityId: string): LobbyDescriptor {
+  const id = cityId && cityId !== "nyc" ? `oxc-world-${cityId}` : MAIN_LOBBY.id;
+  if (id === MAIN_LOBBY.id) return MAIN_LOBBY;
+  return { id, label: `Main Lobby · ${cityId.toUpperCase()}`, isPrivate: false };
+}
 
 function slugify(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "lobby";
@@ -77,7 +89,11 @@ export type CityLobbyInput = LobbyDescriptor | string;
 export type CityLobbyMeta = Partial<Pick<LobbyDescriptor, "label" | "isPrivate">>;
 
 type PlayerPresenceMeta = Pick<CityIdentity, "name" | "accentColor" | "bodyColor" | "skinColor"> &
-  Partial<Pick<CityIdentity, "hairStyle" | "hairColor" | "outfit" | "faceStyle">>;
+  Partial<Pick<CityIdentity, "hairStyle" | "hairColor" | "outfit" | "faceStyle" | "classId">> & {
+    x?: number;
+    z?: number;
+    yaw?: number;
+  };
 
 type DirectoryPresenceMeta = {
   lobbyId?: string;
@@ -91,38 +107,56 @@ type DirectoryPresenceMeta = {
  * presence state yields the public lobby list with player counts.
  */
 export function watchLobbyDirectory(cb: (lobbies: DirectoryLobby[]) => void): () => void {
-  if (!REALTIME_ENABLED) {
-    cb([{ ...MAIN_LOBBY, count: 0 }]);
+  const fallback: DirectoryLobby[] = [{ ...MAIN_LOBBY, count: 0 }];
+  cb(fallback);
+  if (!REALTIME_ENABLED) return () => {};
+
+  let ch: RealtimeChannel | null = null;
+  try {
+    ch = supabase.channel("oxc-lobby-directory", {
+      config: { presence: { key: `watch-${Math.random().toString(36).slice(2, 10)}` } },
+    });
+    ch.on("presence", { event: "sync" }, () => {
+      try {
+        const state = ch!.presenceState<DirectoryPresenceMeta>();
+        const byId = new Map<string, DirectoryLobby>();
+        byId.set(MAIN_LOBBY.id, { ...MAIN_LOBBY, count: 0 });
+        for (const metas of Object.values(state)) {
+          for (const meta of metas) {
+            if (!meta?.lobbyId) continue;
+            const existing = byId.get(meta.lobbyId);
+            if (existing) {
+              existing.count += 1;
+            } else {
+              byId.set(meta.lobbyId, {
+                id: meta.lobbyId,
+                label: meta.label ?? "Custom Lobby",
+                isPrivate: Boolean(meta.isPrivate),
+                count: 1,
+              });
+            }
+          }
+        }
+        cb(Array.from(byId.values()).sort((a, b) => b.count - a.count));
+      } catch {
+        cb(fallback);
+      }
+    });
+    ch.subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") cb(fallback);
+    });
+  } catch {
+    cb(fallback);
     return () => {};
   }
-  const ch = supabase.channel("oxc-lobby-directory", {
-    config: { presence: { key: `watch-${Math.random().toString(36).slice(2, 10)}` } },
-  });
-  ch.on("presence", { event: "sync" }, () => {
-    const state = ch.presenceState<DirectoryPresenceMeta>();
-    const byId = new Map<string, DirectoryLobby>();
-    byId.set(MAIN_LOBBY.id, { ...MAIN_LOBBY, count: 0 });
-    for (const metas of Object.values(state)) {
-      for (const meta of metas) {
-        if (!meta?.lobbyId) continue;
-        const existing = byId.get(meta.lobbyId);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          byId.set(meta.lobbyId, {
-            id: meta.lobbyId,
-            label: meta.label ?? "Custom Lobby",
-            isPrivate: Boolean(meta.isPrivate),
-            count: 1,
-          });
-        }
-      }
-    }
-    cb(Array.from(byId.values()).sort((a, b) => b.count - a.count));
-  });
-  ch.subscribe();
+
   return () => {
-    supabase.removeChannel(ch);
+    if (!ch) return;
+    try {
+      supabase.removeChannel(ch);
+    } catch {
+      /* already gone */
+    }
   };
 }
 
@@ -136,6 +170,7 @@ export interface RemotePlayerState {
   hairColor?: string;
   outfit?: OutfitStyle;
   faceStyle?: FaceStyle;
+  classId?: AvatarAppearance["classId"];
   x: number;
   z: number;
   yaw: number;
@@ -168,6 +203,11 @@ export class CityRealtimeClient {
   private readonly lobby: LobbyDescriptor;
   private listeners = new Set<() => void>();
   private chatLog: WorldChatMessage[] = [];
+  private seenChat = new Set<string>();
+  private lastEmoteAt = 0;
+  private lastPosSend = 0;
+  private lastPos = { x: 0, z: 8, yaw: 0 };
+  private dead = false;
   private snapshot: { online: number; chat: WorldChatMessage[]; connected: boolean } = {
     online: 1,
     chat: [],
@@ -175,7 +215,7 @@ export class CityRealtimeClient {
   };
 
   constructor(
-    private readonly identity: CityIdentity,
+    private identity: CityIdentity,
     lobby: CityLobbyInput = MAIN_LOBBY,
     lobbyMeta: CityLobbyMeta = {},
   ) {
@@ -183,6 +223,7 @@ export class CityRealtimeClient {
   }
 
   connect(): void {
+    if (this.dead) this.dead = false;
     if (this.channel) return;
     if (!REALTIME_ENABLED) {
       // Local-only mode — chat + presence still work for solo demos
@@ -237,6 +278,12 @@ export class CityRealtimeClient {
           existing.hairColor = meta.hairColor ?? existing.hairColor;
           existing.outfit = meta.outfit ?? existing.outfit;
           existing.faceStyle = meta.faceStyle ?? existing.faceStyle;
+          existing.classId = meta.classId ?? existing.classId;
+          if (typeof meta.x === "number" && typeof meta.z === "number") {
+            existing.x = meta.x;
+            existing.z = meta.z;
+            if (typeof meta.yaw === "number") existing.yaw = meta.yaw;
+          }
         } else {
           this.players.set(id, {
             id,
@@ -248,10 +295,10 @@ export class CityRealtimeClient {
             hairColor: meta.hairColor,
             outfit: meta.outfit,
             faceStyle: meta.faceStyle,
-            // Spawn plaza until their first position packet lands
-            x: 0,
-            z: 8,
-            yaw: 0,
+            classId: meta.classId,
+            x: typeof meta.x === "number" ? meta.x : 0,
+            z: typeof meta.z === "number" ? meta.z : 8,
+            yaw: typeof meta.yaw === "number" ? meta.yaw : 0,
             updatedAt: Date.now(),
             chatText: null,
             chatAt: 0,
@@ -265,12 +312,36 @@ export class CityRealtimeClient {
     ch.on("broadcast", { event: "pos" }, ({ payload }) => {
       const p = payload as { id?: string; x?: number; z?: number; yaw?: number };
       if (!p?.id || p.id === this.identity.id) return;
-      const player = this.players.get(p.id);
-      if (!player) return;
-      if (typeof p.x === "number") player.x = p.x;
-      if (typeof p.z === "number") player.z = p.z;
-      if (typeof p.yaw === "number") player.yaw = p.yaw;
-      player.updatedAt = Date.now();
+      let player = this.players.get(p.id);
+      if (!player) {
+        player = {
+          id: p.id,
+          name: "Traveler",
+          accentColor: "#3de7ff",
+          bodyColor: "#1a2438",
+          skinColor: "#e8d5c0",
+          x: typeof p.x === "number" ? p.x : 0,
+          z: typeof p.z === "number" ? p.z : 8,
+          yaw: typeof p.yaw === "number" ? p.yaw : 0,
+          updatedAt: Date.now(),
+          chatText: null,
+          chatAt: 0,
+          emoteAt: 0,
+        };
+        this.players.set(p.id, player);
+        this.publish({ online: this.players.size + 1 });
+      } else {
+        if (typeof p.x === "number") player.x = p.x;
+        if (typeof p.z === "number") player.z = p.z;
+        if (typeof p.yaw === "number") player.yaw = p.yaw;
+        player.updatedAt = Date.now();
+      }
+    });
+
+    ch.on("broadcast", { event: "hello" }, ({ payload }) => {
+      const p = payload as { id?: string };
+      if (!p?.id || p.id === this.identity.id) return;
+      this.sendPosition(this.lastPos.x, this.lastPos.z, this.lastPos.yaw, true);
     });
 
     ch.on("broadcast", { event: "emote" }, ({ payload }) => {
@@ -297,6 +368,8 @@ export class CityRealtimeClient {
       if (status === "SUBSCRIBED") {
         await ch.track(this.playerPresence());
         this.publish({ connected: true });
+        this.sendPosition(this.lastPos.x, this.lastPos.z, this.lastPos.yaw, true);
+        void ch.send({ type: "broadcast", event: "hello", payload: { id: this.identity.id } });
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
         this.publish({ connected: false });
       }
@@ -307,20 +380,45 @@ export class CityRealtimeClient {
   }
 
   disconnect(): void {
-    if (this.channel) {
-      supabase.removeChannel(this.channel);
-      this.channel = null;
-    }
-    if (this.directoryChannel) {
-      void this.directoryChannel.untrack();
-      supabase.removeChannel(this.directoryChannel);
-      this.directoryChannel = null;
-    }
+    if (this.dead && !this.channel && !this.directoryChannel) return;
+    this.dead = true;
+    const world = this.channel;
+    const dir = this.directoryChannel;
+    this.channel = null;
+    this.directoryChannel = null;
     this.players.clear();
     this.publish({ online: 1, connected: false });
+    if (world) {
+      try {
+        void world.untrack();
+        supabase.removeChannel(world);
+      } catch {
+        /* already removed */
+      }
+    }
+    if (dir) {
+      try {
+        void dir.untrack();
+        supabase.removeChannel(dir);
+      } catch {
+        /* already removed */
+      }
+    }
   }
 
-  sendPosition(x: number, z: number, yaw: number): void {
+  /** Push latest cosmetics without tearing down the channel. */
+  setCosmetics(next: Partial<CityIdentity>): void {
+    this.identity = { ...this.identity, ...next };
+    if (!this.channel) return;
+    void this.channel.track(this.playerPresence());
+  }
+
+  sendPosition(x: number, z: number, yaw: number, force = false): void {
+    if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(yaw)) return;
+    this.lastPos = { x, z, yaw };
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (!force && now - this.lastPosSend < 140) return;
+    this.lastPosSend = now;
     this.channel?.send({
       type: "broadcast",
       event: "pos",
@@ -329,10 +427,13 @@ export class CityRealtimeClient {
   }
 
   sendEmote(): void {
+    const now = Date.now();
+    if (now - this.lastEmoteAt < 450) return;
+    this.lastEmoteAt = now;
     this.channel?.send({
       type: "broadcast",
       event: "emote",
-      payload: { id: this.identity.id, at: Date.now() },
+      payload: { id: this.identity.id, at: now },
     });
   }
 
@@ -370,10 +471,20 @@ export class CityRealtimeClient {
       hairColor: this.identity.hairColor,
       outfit: this.identity.outfit,
       faceStyle: this.identity.faceStyle,
+      classId: this.identity.classId,
+      x: round2(this.lastPos.x),
+      z: round2(this.lastPos.z),
+      yaw: round2(this.lastPos.yaw),
     };
   }
 
   private pushChat(msg: WorldChatMessage): void {
+    if (this.seenChat.has(msg.id)) return;
+    this.seenChat.add(msg.id);
+    if (this.seenChat.size > 400) {
+      const drop = [...this.seenChat].slice(0, 200);
+      for (const id of drop) this.seenChat.delete(id);
+    }
     this.chatLog = [...this.chatLog.slice(-(MAX_CHAT_LOG - 1)), msg];
     if (msg.senderId === this.identity.id) {
       this.localChat = { text: msg.text, at: msg.at };

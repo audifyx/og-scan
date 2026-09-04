@@ -61,9 +61,11 @@
     "@solana/wallet-adapter-phantom": "^0.9.29",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-wallets": "^0.19.38",
+    "@solana/wallet-standard-wallet-adapter-react": "^1.1.5",
     "@solana/web3.js": "^1.98.4",
     "@supabase/supabase-js": "^2.47.10",
     "@tanstack/react-query": "^5.83.0",
+    "@testing-library/dom": "^10.4.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "bn.js": "^5.2.1",
@@ -96,12 +98,14 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.170.0",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@types/bn.js": "^5.1.6",
@@ -127,6 +131,13 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
-    "axios": "1.13.2"
+    "axios": "1.13.2",
+    "uuid": "9.0.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "axios": "1.13.2",
+      "uuid": "9.0.1"
+    }
   }
 }

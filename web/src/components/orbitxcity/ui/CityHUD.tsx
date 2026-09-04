@@ -16,6 +16,7 @@ import { getNearestLandmark, getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
 import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
+import { resetVirtualInput } from "@/lib/orbitxcity/input";
 import { CityPanelHost, MOBILE_DOCK, MORE_PANELS, PANEL_NAV } from "./CityPanels";
 import { Minimap } from "./Minimap";
 import { TouchControls } from "./TouchControls";
@@ -195,7 +196,10 @@ export function CityHUD() {
   }, [interact, closePanel, openPanel, triggerEmote]);
 
   useEffect(() => {
-    if (panel !== "none") setMoreOpen(false);
+    if (panel !== "none") {
+      setMoreOpen(false);
+      resetVirtualInput();
+    }
   }, [panel]);
 
   return (
@@ -223,7 +227,10 @@ export function CityHUD() {
           <button
             type="button"
             className="oxc-toggle-btn"
-            onClick={exitToMenu}
+            onClick={() => {
+              resetVirtualInput();
+              exitToMenu();
+            }}
             title="Return to main menu"
           >
             Menu
@@ -387,7 +394,7 @@ export function CityHUD() {
         )}
       </nav>
 
-      {prompt && (
+      {prompt && panel === "none" && (
         <div className="oxc-prompt">
           <div className="oxc-prompt-key">E</div>
           <div className="oxc-prompt-copy">

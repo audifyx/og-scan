@@ -20,6 +20,7 @@ export default function MyBetsPage() {
   const { publicKey, connected } = useWallet();
   const { bets, loading } = useMyBets(publicKey?.toBase58() ?? null);
   const [tab, setTab] = useState<MyTab>('all');
+  const solPrice = useSolPrice();
 
   if (!connected) return (
     <div className="max-w-3xl mx-auto py-32 text-center space-y-4">
@@ -31,7 +32,6 @@ export default function MyBetsPage() {
     </div>
   );
 
-  const solPrice = useSolPrice();
   const totalStaked  = bets.reduce((s,b) => s + b.amount, 0);
   const totalWon     = bets.filter(b=>b.status==='won').reduce((s,b) => s + (b.payout||0), 0);
   const pnl          = totalWon - totalStaked;

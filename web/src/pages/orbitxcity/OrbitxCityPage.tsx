@@ -5,6 +5,7 @@ import { WorldCanvas } from "@/components/orbitxcity/WorldCanvas";
 import { MainMenu } from "@/components/orbitxcity/ui/MainMenu";
 import { CharacterSelect } from "@/components/orbitxcity/ui/CharacterSelect";
 import { LobbiesGate } from "@/components/orbitxcity/ui/LobbiesGate";
+import { SettingsGate } from "@/components/orbitxcity/ui/SettingsGate";
 import { CityHUD } from "@/components/orbitxcity/ui/CityHUD";
 import { CityAudioController } from "@/components/orbitxcity/ui/CityAudioController";
 import { fetchCityMarketSnapshot } from "@/lib/orbitxcity/marketData";
@@ -34,6 +35,7 @@ function CityShell() {
       {gate === "menu" && <MainMenu />}
       {gate === "characters" && <CharacterSelect />}
       {gate === "lobbies" && <LobbiesGate />}
+      {gate === "settings" && <SettingsGate />}
       {gate === "world" && entered && (
         <>
           <WorldCanvas tickerRows={market?.trending ?? []} />

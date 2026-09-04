@@ -5,6 +5,16 @@ function short(addr?: string | null) {
   return `${addr.slice(0, 4)}…${addr.slice(-4)}`;
 }
 
+function asFinite(n: unknown): number | null {
+  const v = typeof n === "number" ? n : typeof n === "string" && n.trim() !== "" ? Number(n) : NaN;
+  return Number.isFinite(v) ? v : null;
+}
+
+function fmtPct(n: unknown, digits: number): string | null {
+  const v = asFinite(n);
+  return v == null ? null : `${v.toFixed(digits)}%`;
+}
+
 function fmtUsd(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return "—";
   if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
@@ -107,7 +117,7 @@ export function TokenOverview({
         </div>
         <div className="oxc-factor">
           <span>LP locked</span>
-          <span>{forensics?.safetyFlags?.lpLockedPct != null ? `${forensics.safetyFlags.lpLockedPct.toFixed(0)}%` : "—"}</span>
+          <span>{fmtPct(forensics?.safetyFlags?.lpLockedPct, 0) ?? "—"}</span>
         </div>
         <div className="oxc-factor">
           <span>Jupiter route</span>
@@ -138,7 +148,7 @@ export function HolderTable({
     <div className="oxc-panel">
       <h3>Top holders</h3>
       <div className="oxc-muted" style={{ fontSize: "0.8rem", marginBottom: "0.75rem" }}>
-        Top 10 concentration: {forensics?.concentration?.top10Pct != null ? `${forensics.concentration.top10Pct.toFixed(1)}%` : "—"}
+        Top 10 concentration: {fmtPct(forensics?.concentration?.top10Pct, 1) ?? "—"}
         {" · "}
         Whales (≥1%): {forensics?.concentration?.whales ?? "—"}
         {" · "}
@@ -161,7 +171,7 @@ export function HolderTable({
               <tr key={h.owner || i}>
                 <td>{h.rank ?? i + 1}</td>
                 <td className="oxc-mono">{short(h.owner)}</td>
-                <td>{h.pct != null ? `${h.pct.toFixed(2)}%` : "—"}</td>
+                <td>{fmtPct(h.pct, 2) ?? "—"}</td>
                 <td>
                   {h.owner ? (
                     <a className="oxc-link" href={`/intel/wallet/${h.owner}`}>
@@ -205,7 +215,7 @@ export function DevHistoryPanel({ forensics }: { forensics: ForensicsPayload | n
           </div>
           <div className="oxc-factor">
             <span>Dev holding</span>
-            <span>{dev.holding?.pct != null ? `${dev.holding.pct.toFixed(2)}%` : dev.sold ? "Exited" : "—"}</span>
+            <span>{fmtPct(dev.holding?.pct, 2) ?? (dev.sold ? "Exited" : "—")}</span>
           </div>
           <div className="oxc-factor">
             <span>Dev sold</span>

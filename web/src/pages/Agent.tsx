@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { AgentDashboard } from "../components/agent/agent-dashboard";
 import { TokenGatingVerifier } from "../components/agent/token-gating-verifier";
+import { McpBurnAccessCard } from "../components/agent/McpBurnAccessCard";
 import { AgentLoading, AgentShell } from "../components/agent/AgentShell";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -64,8 +65,12 @@ function AgentPage() {
 
   if (gate === "blocked") {
     return (
-      <AgentShell showTabs={false} statusLabel="Hold required" statusWarn>
+      <AgentShell showTabs={false} statusLabel="Access required" statusWarn>
         <TokenGatingVerifier onUnlocked={() => setGate("open")} />
+        <McpBurnAccessCard
+          walletAddress={walletAddress}
+          onAccessGranted={() => setGate("open")}
+        />
       </AgentShell>
     );
   }

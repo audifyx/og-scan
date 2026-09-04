@@ -290,7 +290,7 @@ function LaunchpadFooter() {
           ["NFT Market", "/nft"],
           ["DEX", "/ORBITX_DEX"],
           ["Agent MCP", "/agent"],
-          ["X MCP", "/x"],
+          ["Support", "/support"],
           ["Social", "/orbitx-social"],
           ["Whitepaper", "/whitepaper"],
           ["Terms", "/terms"],

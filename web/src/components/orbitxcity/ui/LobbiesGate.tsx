@@ -11,8 +11,8 @@ export function LobbiesGate() {
     <div className="oxc-chars is-in oxc-lobbies-gate">
       <MenuBackdrop cityId={selectedCityId} intensity="chamber" />
       <header className="oxc-chars-bar">
-        <button type="button" className="oxc-chars-back" onClick={() => setGate("characters")}>
-          ← Operatives
+        <button type="button" className="oxc-chars-back" onClick={() => setGate("menu")}>
+          ← Title
         </button>
         <div className="oxc-chars-bar-center">
           <p className="oxc-chars-kicker">Multiplayer</p>

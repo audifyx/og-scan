@@ -23,6 +23,17 @@ import {
   verifyTokenHold,
 } from "./orbitx/token-hold.js";
 import {
+  accessBlockedPayload,
+  accessBuyPrompt,
+  calculateBurnAmount,
+  confirmAccessBurn,
+  evaluateMcpAccess,
+  getAccessStatus,
+  listPackages,
+  prepareAccessBurn,
+  prepareAccessMcpPurchase,
+} from "./orbitx/mcp-burn-access.js";
+import {
   agentMenuPayload,
   buildAgentAuthPasteMessages,
   wrapMcpToolContent,
@@ -33,8 +44,16 @@ import {
   prepareBuyOrbitx,
   saveTradeIntent,
   loadLatestTradeIntent,
-  getChatTradeAuto,
+  getChatTradePreference,
+  setChatTradePreference,
+  usdToSol,
 } from "./orbitx/buy-orbitx.js";
+import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias, parseTradeIntent } from "./orbitx/telegram-trade-intent.js";
+import {
+  classifyOrbitXAuthPaste,
+  TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
+  telegramLoginUrl,
+} from "./orbitx/orbitx-auth-links.js";
 import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
@@ -44,6 +63,26 @@ async function mcpOps() {
 /** Lazy — credits module (may pull Solana) must not crash MCP cold start. */
 async function xCredits() {
   return import("./orbitx/x-credits.js");
+}
+
+/** Combined MCP gate: exempt OR unexpired burn access OR $ORBITX hold. */
+async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}) {
+  const candidates = (wallets || []).map((w) => normalizeGateWallet(w)).filter(Boolean);
+  if (isTokenGateExemptAny({ wallets: candidates, email })) {
+    return { allowed: true, source: "exempt", hold: { exempt: true, meetsRequirement: true } };
+  }
+  const hold = await verifyTokenHold(candidates[0] || "", base, { email });
+  const access = await evaluateMcpAccess({ sb, userId, hold, wallets: candidates });
+  if (access.allowed) return access;
+  return {
+    ...access,
+    blocked: accessBlockedPayload({
+      tool,
+      hold,
+      burn: access.burn,
+      fix: "Hold ≥$5 ORBITX, or burn 100 (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) at https://www.orbitx.world/shop.",
+    }),
+  };
 }
 
 const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
@@ -302,19 +341,11 @@ async function withAuthEmail(auth) {
   return email ? { ...auth, email } : auth;
 }
 
-function holdCandidateWallets(auth, args = {}) {
-  return [
-    auth?.walletAddress,
-    args.publicKey,
-    args.address,
-    args.wallet,
-    args.buyerWallet,
-    args.sellerWallet,
-    args.bidderWallet,
-  ]
+/** Hold/exempt wallets come from the authenticated session only — never tool args. */
+function holdCandidateWallets(auth) {
+  return [auth?.walletAddress]
     .map((w) => normalizeGateWallet(w))
-    .filter(Boolean)
-    .filter((w, i, arr) => arr.indexOf(w) === i);
+    .filter(Boolean);
 }
 
 async function getUserId(req) {
@@ -510,6 +541,72 @@ async function handleAgent(req, res, parts) {
     }
   }
 
+  if (route === "mcp-access" && req.method === "GET") {
+    const authUser = await getAuthUser(req);
+    const u = new URL(req.url || "/", "http://x");
+    const walletPk = normalizeGateWallet(
+      u.searchParams.get("wallet") || u.searchParams.get("publicKey") || "",
+    );
+    if (!authUser?.id && !walletPk) return json(res, { error: "unauthorized" }, 401);
+    try {
+      return json(res, await getAccessStatus(sb, authUser?.id, { wallets: [walletPk] }));
+    } catch (e) {
+      return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
+    }
+  }
+
+  if (route === "mcp-access/prepare" && req.method === "POST") {
+    const body = await readBody(req);
+    const pk = normalizeGateWallet(body.publicKey || body.wallet || body.walletAddress || "");
+    const packageId = body.packageId || body.package || body.option;
+    try {
+      const out = await prepareAccessBurn({ publicKey: pk, packageId });
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "prepare_failed", ...calculateBurnAmount(packageId) }, 400);
+    }
+  }
+
+  if (route === "mcp-access/confirm" && req.method === "POST") {
+    const body = await readBody(req);
+    const signature = String(body.signature || body.txSignature || "").trim();
+    const walletPk = normalizeGateWallet(body.publicKey || body.wallet || body.walletAddress || "");
+    const packageId = body.packageId || body.package || body.option;
+    if (!signature) return json(res, { ok: false, error: "signature_required" }, 400);
+    let userId = null;
+    const authUser = await getAuthUser(req);
+    if (authUser?.id) userId = authUser.id;
+    if (!userId && walletPk) {
+      try {
+        const rows = await sb(
+          `agents?wallet_address=eq.${encodeURIComponent(walletPk)}&select=user_id&limit=1`,
+        );
+        userId = Array.isArray(rows) && rows[0]?.user_id ? rows[0].user_id : null;
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      const out = await confirmAccessBurn(sb, {
+        userId,
+        signature,
+        packageId,
+        wallet: walletPk,
+      });
+      return json(res, out, out.ok ? 200 : 400);
+    } catch (e) {
+      return json(
+        res,
+        {
+          ok: false,
+          error: e?.message || "confirm_failed",
+          message: e?.message || "Could not grant access — apply mcp_burn_access migration",
+        },
+        500,
+      );
+    }
+  }
+
   // Public prepare for /agent/sign (claim / burn / rent) — returns unsigned txs only.
   if (route === "ops-prepare" && req.method === "POST") {
     try {
@@ -545,7 +642,27 @@ async function handleAgent(req, res, parts) {
       wallet = normalizeGateWallet(agent.wallet_address);
     }
     const hold = await verifyTokenHold(wallet, base, { email: authUser.email });
-    return json(res, hold, hold.meetsRequirement ? 200 : 403);
+    const access = await evaluateMcpAccess({
+      sb,
+      userId: authUser.id,
+      hold,
+      wallets: [wallet, agent.wallet_address],
+    });
+    return json(
+      res,
+      {
+        ...hold,
+        ok: access.allowed,
+        meetsRequirement: access.allowed,
+        mcpAccess: access.burn,
+        accessSource: access.source,
+        message:
+          access.source === "burn"
+            ? `Burn access active — ${access.burn.remainingLabel}.`
+            : hold.message,
+      },
+      access.allowed ? 200 : 403,
+    );
   }
 
   if (route === "bootstrap" && req.method === "POST") {
@@ -555,10 +672,16 @@ async function handleAgent(req, res, parts) {
     const agent = await ensureAgent(userId);
     const { base, mcpUrl } = mcpUrls(req);
     const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
+    const access = await evaluateMcpAccess({
+      sb,
+      userId,
+      hold,
+      wallets: [agent.wallet_address],
+    });
     const keys = await listKeys(agent.id);
     let mintedKey = null;
-    // Only auto-mint a key when hold (or exempt) is satisfied.
-    if (keys.length === 0 && hold.meetsRequirement) {
+    // Only auto-mint a key when hold, burn access, or exempt is satisfied.
+    if (keys.length === 0 && access.allowed) {
       mintedKey = await createKey(agent.id, "Default MCP Key");
     }
     return json(res, {
@@ -572,6 +695,8 @@ async function handleAgent(req, res, parts) {
       mintedKey,
       mcpUrl,
       hold,
+      mcpAccess: access.burn,
+      accessSource: access.source,
     });
   }
 
@@ -599,9 +724,15 @@ async function handleAgent(req, res, parts) {
     const name = String(body.name || "").trim() || "MCP Key";
     const agent = await ensureAgent(userId);
     const { base } = mcpUrls(req);
-    const hold = await verifyTokenHold(agent.wallet_address, base, { email: authUser.email });
-    if (!hold.meetsRequirement) {
-      return json(res, holdBlockedPayload({ hold }), 403);
+    const access = await requireMcpAccess({
+      userId,
+      wallets: [agent.wallet_address],
+      email: authUser.email,
+      base,
+      tool: "create_key",
+    });
+    if (!access.allowed) {
+      return json(res, access.blocked || holdBlockedPayload({ hold: access.hold }), 403);
     }
     const minted = await createKey(agent.id, name);
     return json(
@@ -611,7 +742,9 @@ async function handleAgent(req, res, parts) {
         name: minted.name,
         key: minted.key,
         message: "Save this key securely. You will not be able to see it again.",
-        hold,
+        hold: access.hold,
+        mcpAccess: access.burn,
+        accessSource: access.source,
       },
       201,
     );
@@ -727,19 +860,15 @@ async function handleAgent(req, res, parts) {
     }
 
     const { base } = mcpUrls(req);
-    // Exempt if connected wallet, linked agent wallet, OR owner/SIWS email qualifies.
-    if (
-      !isTokenGateExemptAny({
-        wallets: [wallet, agent.wallet_address],
-        email: authUser.email,
-      })
-    ) {
-      const hold = await verifyTokenHold(wallet || agent.wallet_address, base, {
-        email: authUser.email,
-      });
-      if (!hold.meetsRequirement) {
-        return json(res, holdBlockedPayload({ hold }), 403);
-      }
+    const mcpAccess = await requireMcpAccess({
+      userId,
+      wallets: [wallet, agent.wallet_address],
+      email: authUser.email,
+      base,
+      tool: "oauth_approve",
+    });
+    if (!mcpAccess.allowed) {
+      return json(res, mcpAccess.blocked || holdBlockedPayload({ hold: mcpAccess.hold }), 403);
     }
 
     // Always mint a Bearer access token as API key (oxo_). Claude exchanges the
@@ -796,6 +925,41 @@ async function handleAgent(req, res, parts) {
     return json(res, {
       redirect: `${redirectUri}${sep}code=${encodeURIComponent(access)}&state=${encodeURIComponent(state)}`,
     });
+  }
+
+  // Mobile Trade Desk command bridge. It only prepares exact buy/sell intents;
+  // the linked wallet remains the final signing authority.
+  if (route === "command" && req.method === "POST") {
+    const authUser = await getAuthUser(req);
+    if (!authUser?.id) return json(res, { ok: false, error: "unauthorized", message: "Sign in before using the Trade Desk." }, 401);
+    const body = await readBody(req);
+    const text = String(body.text || body.command || "").trim();
+    if (!text) return json(res, { ok: false, error: "command_required", message: "Enter a buy or sell command." }, 400);
+    const intent = parseTradeIntent(text);
+    const allowed = new Set(["orbitx_prepare_buy", "orbitx_buy_orbitx", "orbitx_prepare_sell"]);
+    if (!intent?.tool || !allowed.has(intent.tool)) {
+      return json(res, {
+        ok: false,
+        error: "trade_command_not_understood",
+        message: "Use a concrete command such as: Buy $1 of TOKEN with CA <contract address>.",
+      }, 400);
+    }
+    const args = { ...(intent.args || {}), autoConfirm: false, auto: false, confirmMode: "sign" };
+    try {
+      const result = await runEmbeddedAgentTool({
+        userId: authUser.id,
+        // Do not trust a client-supplied wallet for execution. The linked agent
+        // wallet is authoritative and must be linked from the wallet screen.
+        walletAddress: null,
+        email: authUser.email,
+        toolName: intent.tool,
+        args,
+        req,
+      });
+      return json(res, { ...result, command: text, parsedTool: intent.tool }, result?.ok === false ? 400 : 200);
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "trade_command_failed", message: e?.message || "Trade command failed" }, 400);
+    }
   }
 
   return json(res, { error: "not_found", route }, 404);
@@ -1015,7 +1179,18 @@ async function createAgentLinkAuthSession(req) {
 }
 
 async function getAgentLinkAuthStatus(authCode) {
-  const code = String(authCode || "").trim();
+  const parsed = classifyOrbitXAuthPaste(authCode);
+  if (parsed.kind === "telegram_login") {
+    return {
+      ok: false,
+      error: "telegram_login_not_mcp",
+      status: "wrong_link",
+      authCode: parsed.code || null,
+      url: parsed.url || telegramLoginUrl(parsed.code),
+      message: TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
+    };
+  }
+  const code = String(parsed.code || authCode || "").trim();
   if (!code) return { ok: false, error: "authCode_required", status: "unknown" };
   try {
     const rows = await sb(
@@ -1231,7 +1406,8 @@ async function enrichAuth(req, args = {}) {
     return withEmail;
   }
 
-  const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+  const parsedAuth = classifyOrbitXAuthPaste(args.authCode || args.orbitxAuthCode || "");
+  const authCode = parsedAuth.kind === "telegram_login" ? "" : String(parsedAuth.code || "").trim();
   const link = await resolveAgentLinkAuth({
     authCode,
     mcpSessionId: header(req, "mcp-session-id"),
@@ -1243,17 +1419,8 @@ async function enrichAuth(req, args = {}) {
   const wallet = String(
     args.publicKey || args.address || args.wallet || args.buyerWallet || args.sellerWallet || "",
   ).trim();
-  if (wallet) {
-    const linked = await resolveAgentByWallet(wallet);
-    if (linked?.userId) {
-      return withAuthEmail({
-        ...linked,
-        bearerPresent,
-        bearerInvalid: bearerPresent,
-        bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
-      });
-    }
-  }
+  // A raw publicKey is a trade argument, never a login. Binding identity from
+  // wallet alone let anyone impersonate the owner (wallets are public).
 
   return {
     userId: null,
@@ -1264,7 +1431,10 @@ async function enrichAuth(req, args = {}) {
     bearerPresent,
     bearerInvalid: bearerPresent,
     bearerTokenPrefix: token ? `${token.slice(0, 8)}…` : null,
-    authCode: authCode || null,
+    authCode:
+      parsedAuth.kind === "telegram_login"
+        ? String(args.authCode || args.orbitxAuthCode || "").trim()
+        : authCode || null,
   };
 }
 
@@ -1312,6 +1482,13 @@ const SESSION_TOOLS = new Set([
   "orbitx_social_leave",
   "orbitx_submit_listing",
   "orbitx_request_boost",
+  "orbitx_generate_image",
+  "orbitx_generate_video",
+  "orbitx_media_status",
+  "orbitx_grok_image",
+  "orbitx_grok_video",
+  "orbitx_gen_image",
+  "orbitx_gen_video",
 ]);
 
 async function getProfileForUser(userId) {
@@ -1328,10 +1505,15 @@ async function getProfileForUser(userId) {
 }
 
 const TOOL_ALIASES = {
+  ...TELEGRAM_TOOL_ALIASES,
   "/": "orbitx_menu",
   menu: "orbitx_menu",
   help: "orbitx_menu",
   orbitx_buy: "orbitx_prepare_buy",
+  orbitx_trade: "orbitx_prepare_buy",
+  orbitx_swap: "orbitx_prepare_buy",
+  trade: "orbitx_prepare_buy",
+  swap: "orbitx_prepare_buy",
   orbitx_sell: "orbitx_prepare_sell",
   orbitx_buy_auto: "orbitx_prepare_buy",
   orbitx_sell_pump: "orbitx_prepare_sell",
@@ -1347,7 +1529,8 @@ const TOOL_ALIASES = {
   buycredits: "orbitx_credits_buy",
   topup: "orbitx_credits_buy",
   "top up": "orbitx_credits_buy",
-  shop: "orbitx_credits_buy",
+  shop: "orbitx_shop",
+  orbitx_shop: "orbitx_shop",
   "confirm credits": "orbitx_credits_confirm",
   credits_confirm: "orbitx_credits_confirm",
   credits: "orbitx_credits_balance",
@@ -1367,6 +1550,13 @@ const TOOL_ALIASES = {
   orbitx_chart_embed: "orbitx_dex_chart",
   orbitx_embed_chart: "orbitx_dex_chart",
   usage: "orbitx_credits_usage",
+  "mcp access": "orbitx_mcp_access_status",
+  "access status": "orbitx_mcp_access_status",
+  "burn access": "orbitx_mcp_access_buy",
+  "buy access": "orbitx_mcp_access_buy",
+  mcp_access: "orbitx_mcp_access_status",
+  mcp_access_buy: "orbitx_mcp_access_buy",
+  "confirm access": "orbitx_mcp_access_confirm",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_community: "orbitx_social_create_community",
   orbitx_post_community: "orbitx_social_post",
@@ -1397,7 +1587,7 @@ async function resolveSocialUser(auth, args) {
       walletAddress: auth.walletAddress || null,
     };
   }
-  return resolveAgentByWallet(args.publicKey || args.address || args.wallet || "");
+  return null;
 }
 
 const CORE_TOOLS = [
@@ -1820,7 +2010,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_prepare_buy",
     description:
-      "Prepare a BUY for Phantom signing. Returns signUrl — open it so the user signs in Phantom. Never broadcast unsigned. Purchase incomplete until Phantom confirms.",
+      "Prepare a BUY via Jupiter. Returns signUrl — open it so the user signs in Jupiter Wallet. Never broadcast unsigned. Purchase incomplete until Jupiter confirms. Do not use Phantom Connect.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1840,7 +2030,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_prepare_sell",
     description:
-      "Prepare a SELL for Phantom signing. Returns signUrl — open it so the user signs in Phantom. amount as tokens or '100%'. Never broadcast unsigned.",
+      "Prepare a SELL via Jupiter. Returns signUrl — open it so the user signs in Jupiter Wallet. amount as tokens or '100%'. Never broadcast unsigned.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1890,7 +2080,37 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_buy",
-    description: "Alias for orbitx_prepare_buy — returns Phantom signUrl.",
+    description: "Alias for orbitx_prepare_buy — returns Jupiter signUrl.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_trade",
+    description: "Alias for orbitx_prepare_buy (/trade). Returns Jupiter signUrl.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
+        slippage: { type: "number", default: 10 },
+        pool: { type: "string", default: "auto" },
+      },
+      required: ["mint", "amountSol", "publicKey"],
+    },
+  },
+  {
+    name: "orbitx_swap",
+    description: "Alias for orbitx_prepare_buy (/swap). Returns Jupiter signUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1905,7 +2125,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_sell",
-    description: "Alias for orbitx_prepare_sell — returns Phantom signUrl.",
+    description: "Alias for orbitx_prepare_sell — returns Jupiter signUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1920,7 +2140,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_buy_auto",
-    description: "Buy with pool=auto — alias for orbitx_prepare_buy (Phantom signUrl).",
+    description: "Buy with pool=auto — alias for orbitx_prepare_buy (Jupiter signUrl).",
     inputSchema: {
       type: "object",
       properties: {
@@ -1935,7 +2155,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_credits_buy",
     description:
-      "Buy OrbitX MCP credits with SOL sent to the OrbitX desk wallet. When the user says buy credits / top up — ASK how many credits OR how much SOL, then call this. Returns a Phantom signUrl (or autoSignUrl) that starts the SOL transfer. After payment, call orbitx_credits_confirm with the signature (sign page often credits automatically).",
+      "Buy OrbitX MCP credits with SOL sent to the OrbitX desk wallet. When the user says buy credits / top up — ASK how many credits OR how much SOL, then call this. Returns a Jupiter signUrl (or autoSignUrl) that starts the SOL transfer. After payment, call orbitx_credits_confirm with the signature (sign page often credits automatically).",
     inputSchema: {
       type: "object",
       properties: {
@@ -1953,7 +2173,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_credits_confirm",
     description:
-      "Confirm a credits SOL payment to the desk wallet and credit the user's balance. Pass the Solana tx signature after Phantom confirms.",
+      "Confirm a credits SOL payment to the desk wallet and credit the user's balance. Pass the Solana tx signature after Jupiter confirms.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1983,9 +2203,47 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_mcp_access_status",
+    description:
+      "Show temporary Agent MCP access purchased by burning $ORBITX — active/expired, time remaining, packages (1 hour = 100, 1 day = 1,000, 1 week = 10,000, 1 month = 1,000,000 tokens).",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_mcp_access_buy",
+    description:
+      "Buy temporary Agent MCP access by burning $ORBITX. Packages: hour = 100 (1h), day = 1,000 (24h), week = 10,000 (7d), month = 1,000,000 (30d). Returns a Jupiter signUrl (buy then burn). After the tx lands, call orbitx_mcp_access_confirm with the signature or /verify the Solscan link in Telegram.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        package: { type: "string", enum: ["hour", "day", "week", "month"], description: "Access package" },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
+        publicKey: { type: "string", description: "Burner wallet (optional if linked on /agent)" },
+        confirmMode: { type: "string", enum: ["sign", "auto"] },
+        autoConfirm: { type: "boolean" },
+        askOnly: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_mcp_access_confirm",
+    description:
+      "Confirm an $ORBITX burn and grant MCP access for the matching package duration. Pass the Solana tx signature after Jupiter confirms.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signature: { type: "string" },
+        txSignature: { type: "string" },
+        package: { type: "string", enum: ["hour", "day", "week", "month"] },
+        packageId: { type: "string", enum: ["hour", "day", "week", "month"] },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "orbitx_buy_orbitx",
     description:
-      "Buy official $ORBITX with SOL. When the user says buy $ORBITX / buy orbitx — ASK how much SOL, then whether they want to sign manually or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Phantom immediately. Mint is fixed to official ORBITX.",
+      "Buy official $ORBITX with SOL. When the user says buy $ORBITX / buy orbitx — ASK how much SOL, then whether they want to sign manually or auto-confirm in chat. confirmMode=sign → signUrl; confirmMode=auto → autoSignUrl opens Jupiter immediately. Mint is fixed to official ORBITX.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1994,11 +2252,15 @@ const CORE_TOOLS = [
         confirmMode: {
           type: "string",
           enum: ["sign", "auto"],
-          description: "sign = tap Sign on page; auto = open link and Phantom pops (chat auto-confirm)",
+          description: "sign = tap Sign on page; auto = open link and Jupiter prompts (chat auto-confirm)",
         },
         autoConfirm: {
           type: "boolean",
           description: "If true, same as confirmMode=auto",
+        },
+        amountUsd: {
+          type: "number",
+          description: "USD to spend; converted to SOL from the live SOL/USD price",
         },
         slippage: { type: "number", default: 10 },
         askOnly: {
@@ -2012,7 +2274,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_confirm_buy",
     description:
-      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after orbitx_buy_orbitx. Re-prepares the buy and returns autoSignUrl (Phantom auto-prompt). Pass amountSol if known; otherwise uses the last pending intent.",
+      "Chat confirm for a pending $ORBITX buy. Call when the user says yes / confirm / go ahead / auto after orbitx_buy_orbitx. Re-prepares the buy and returns autoSignUrl (Jupiter auto-prompt). Pass amountSol if known; otherwise uses the last pending intent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2651,9 +2913,33 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_shop",
+    description:
+      "OrbitX Shop catalog: burn 100 $ORBITX for 1 hour, 1,000 for 1 day, 10,000 for 1 week, 1,000,000 for 1 month, or buy credits with SOL. Returns package list + Jupiter openUrls.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        package: { type: "string", description: "hour | day | week | month | credits" },
+        amountSol: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "orbitx_trade_auto",
+    description:
+      "Enable or disable chat auto-buy for this linked wallet. Auto-buy still requires a Jupiter Wallet signature; it skips the extra Telegram confirm step.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        enabled: { type: "boolean" },
+        on: { type: "boolean" },
+      },
+    },
+  },
+  {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category + total count (500+ generated). Call when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (2500+ generated). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
@@ -2661,9 +2947,49 @@ const CORE_TOOLS = [
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
 const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
 const TOOLS = [...CORE_TOOLS, ..._generated];
+const TOOL_NAME_SET = new Set(TOOLS.map((t) => t.name));
 for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
 
+export function resolveOrbitXToolName(rawName) {
+  const raw = String(rawName || "").trim();
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  const prefixed =
+    !lower.startsWith("orbitx_") && lower !== "search" && lower !== "fetch" && !lower.startsWith("x_")
+      ? `orbitx_${lower}`
+      : "";
+  // Aliases first so names like orbitx_trade never win over orbitx_prepare_buy.
+  const guesses = [
+    TOOL_ALIASES[raw],
+    TOOL_ALIASES[lower],
+    applyTelegramAlias(raw),
+    applyTelegramAlias(lower),
+    prefixed ? TOOL_ALIASES[prefixed] : "",
+    prefixed ? applyTelegramAlias(prefixed) : "",
+    raw,
+    lower,
+    prefixed,
+  ];
+  for (const guess of guesses) {
+    if (!guess) continue;
+    if (TOOL_NAME_SET.has(guess)) {
+      const aliased = TOOL_ALIASES[guess] || applyTelegramAlias(guess);
+      if (aliased && aliased !== guess && TOOL_NAME_SET.has(aliased)) return aliased;
+      return guess;
+    }
+    const aliased = TOOL_ALIASES[guess] || applyTelegramAlias(guess);
+    if (aliased && TOOL_NAME_SET.has(aliased)) return aliased;
+  }
+  return "";
+}
+
 async function fetchJson(url, init) {
+  const href = String(url || "");
+  if (/\/api\/ogdex\/trade\/?(?:\?|$)/.test(href) && String(init?.method || "GET").toUpperCase() === "POST") {
+    const { buildUnsignedTrade } = await import("./ogdex/_routes/trade.js");
+    const body = typeof init?.body === "string" ? JSON.parse(init.body || "{}") : init?.body || {};
+    return buildUnsignedTrade(body);
+  }
   const r = await fetch(url, {
     ...init,
     headers: { "User-Agent": "OrbitX-MCP/1.0", Accept: "application/json", ...(init?.headers || {}) },
@@ -2685,7 +3011,7 @@ async function fetchJson(url, init) {
 }
 
 async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
-  const name = TOOL_ALIASES[rawName] || rawName;
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
   // Always advertise www /api/mcp — apex 308s break Claude POSTs; /api/orbitx-mcp is an alias only.
   const mcpUrl = mcpUrls(req).mcpUrl;
   const agentSetupUrl = "https://www.orbitx.world/agent";
@@ -2827,6 +3153,23 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       email: session.email,
     });
 
+    let badge = null;
+    let mcpBetaAccess = false;
+    if (session.userId) {
+      try {
+        const rows = await sb(
+          `profiles?user_id=eq.${encodeURIComponent(session.userId)}&select=badge,mcp_beta_access,username,display_name&limit=1`,
+        );
+        const profile = Array.isArray(rows) ? rows[0] : null;
+        const rawBadge = String(profile?.badge || "").trim();
+        mcpBetaAccess =
+          Boolean(profile?.mcp_beta_access) || rawBadge.toLowerCase() === "beta access";
+        badge = mcpBetaAccess ? "beta access" : rawBadge || null;
+      } catch {
+        /* profiles column may be missing until migration */
+      }
+    }
+
     return {
       ok: true,
       userId: session.userId || null,
@@ -2838,6 +3181,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       bearerTokenPrefix: session.bearerTokenPrefix || null,
       mcpUrl,
       status,
+      badge,
+      mcpBetaAccess,
+      profile: {
+        badge,
+        mcpBetaAccess,
+      },
       fix:
         status === "authenticated" || status === "authenticated_with_wallet"
           ? null
@@ -2869,7 +3218,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     orbitx_screen_tokens: () =>
       `${base}/api/ogdex/screener?type=${encodeURIComponent(String(args.type || "trending"))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 20}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
     orbitx_get_forensics: () =>
-      `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}`,
+      `${base}/api/ogdex/forensics?mint=${encodeURIComponent(String(args.mint || ""))}${
+        args.first === 0 || args.first === "0" ? "&first=0" : ""
+      }`,
     orbitx_get_safety: () =>
       `${base}/api/ogdex/safety?mint=${encodeURIComponent(String(args.mint || ""))}`,
     orbitx_crypto_scan: () =>
@@ -2930,6 +3281,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_create_token_custom",
       ],
       credits: ["orbitx_credits_buy", "orbitx_credits_confirm", "orbitx_credits_balance", "orbitx_credits_usage"],
+      mcpAccess: ["orbitx_mcp_access_status", "orbitx_mcp_access_buy", "orbitx_mcp_access_confirm"],
       trade: ["orbitx_buy_orbitx", "orbitx_confirm_buy", "orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
       media: [
@@ -3187,6 +3539,52 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
   }
 
+  if (name === "orbitx_mcp_access_status") {
+    try {
+      return await getAccessStatus(sb, auth?.userId, {
+        wallets: [wallet, args.publicKey, args.wallet, auth?.walletAddress],
+      });
+    } catch (e) {
+      return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
+    }
+  }
+
+  if (name === "orbitx_mcp_access_buy") {
+    const askOnly =
+      args.askOnly === true || (args.package == null && args.packageId == null && args.option == null);
+    if (askOnly) {
+      return accessBuyPrompt({ accessUrl: "https://www.orbitx.world/agent?tab=shop" });
+    }
+    return prepareAccessMcpPurchase({
+      base,
+      wallet: wallet || args.publicKey,
+      packageId: args.package || args.packageId || args.option,
+      confirmMode: args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || "sign",
+      accessUrl: "https://www.orbitx.world/agent?tab=shop",
+    });
+  }
+
+  if (name === "orbitx_mcp_access_confirm") {
+    const signature = String(args.signature || args.txSignature || args.tx_signature || args.sig || "").trim();
+    if (!signature) {
+      return { ok: false, error: "signature_required", message: "Pass the Solana transaction signature" };
+    }
+    try {
+      return await confirmAccessBurn(sb, {
+        userId: auth?.userId,
+        signature,
+        packageId: args.package || args.packageId,
+        wallet: wallet || args.publicKey || args.wallet,
+      });
+    } catch (e) {
+      return {
+        ok: false,
+        error: "confirm_failed",
+        message: e?.message || "Could not grant access — apply mcp_burn_access migration",
+      };
+    }
+  }
+
   if (name === "orbitx_credits_usage") {
     if (!auth?.userId) {
       return { ok: false, error: "session_required", message: "Authenticate to view credits usage" };
@@ -3204,28 +3602,52 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   }
 
   if (name === "orbitx_buy_orbitx") {
-    const askOnly = args.askOnly === true || args.amountSol == null || args.amountSol === "";
+    let amountSol = args.amountSol ?? args.sol ?? args.amount;
+    let usdQuote = null;
+    if ((amountSol == null || amountSol === "") && args.amountUsd != null) {
+      usdQuote = await usdToSol(args.amountUsd);
+      if (!usdQuote.ok) return usdQuote;
+      amountSol = usdQuote.amountSol;
+    }
+    const askOnly = args.askOnly === true || amountSol == null || amountSol === "";
     if (askOnly) return askBuyOrbitxAmount();
-    let preferAuto = false;
+    let tradePreference = null;
     if (auth?.agentId) {
       try {
-        preferAuto = await getChatTradeAuto(sb, auth.agentId);
+        tradePreference = await getChatTradePreference(sb, auth.agentId);
       } catch {
-        preferAuto = false;
+        tradePreference = null;
       }
     }
+    const preferAuto = tradePreference === "auto";
     const confirmMode =
       args.autoConfirm === true || args.auto === true ? "auto" : args.confirmMode || (preferAuto ? "auto" : "sign");
     const out = await prepareBuyOrbitx({
       base,
       wallet,
-      amountSol: args.amountSol ?? args.sol ?? args.amount,
+      amountSol,
       slippage: args.slippage,
       pool: args.pool || "auto",
       confirmMode,
       preferAuto,
       fetchJson,
     });
+    if (out.ok && usdQuote) {
+      out.amountUsd = usdQuote.amountUsd;
+      out.solUsd = usdQuote.solUsd;
+    }
+    if (out.ok && tradePreference == null && auth?.agentId) {
+      out.tradePreferencePrompt = {
+        title: "How should future trades be confirmed?",
+        message: "Choose once for this agent. Auto-confirm skips the second chat prompt; your connected wallet still approves every transaction.",
+        options: [
+          { id: "auto", label: "Auto-confirm", description: "Open the secure wallet signer automatically." },
+          { id: "sign", label: "Sign each time", description: "Show a fresh review step for every buy or sell." },
+        ],
+        setTool: "orbitx_trade_auto",
+        scope: "agent",
+      };
+    }
     if (out.ok && auth?.userId) {
       try {
         await saveTradeIntent(sb, auth.userId, {
@@ -3242,57 +3664,176 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     return out;
   }
 
+  if (name === "orbitx_shop") {
+    const pack = String(args.package || args.item || "").toLowerCase();
+    if (pack === "hour" || pack === "day" || pack === "week" || pack === "month" || pack === "access") {
+      return callTool("orbitx_mcp_access_buy", { ...args, package: pack === "access" ? "hour" : pack }, auth, base, req);
+    }
+    if (pack === "credits" || pack === "topup") {
+      return callTool("orbitx_credits_buy", args, auth, base, req);
+    }
+    if (pack) {
+      try {
+        const { prepareDeskShopBuy } = await import("./orbitx/desk-shop.js");
+        const out = await prepareDeskShopBuy({
+          wallet,
+          skuId: pack,
+          mint: args.mint,
+        });
+        if (out?.error !== "unknown_sku") {
+          if (out?.ok) {
+            const qs = new URLSearchParams({ kind: "shop", sku: pack, publicKey: wallet || "" });
+            if (args.mint) qs.set("mint", String(args.mint));
+            const signUrl = `${base}/agent/sign?${qs.toString()}`;
+            const autoSignUrl = `${signUrl}${signUrl.includes("?") ? "&" : "?"}auto=1`;
+            const auto = args.autoConfirm === true || args.auto === true;
+            out.signUrl = signUrl;
+            out.autoSignUrl = autoSignUrl;
+            out.openUrl = auto ? autoSignUrl : signUrl;
+            out.requiresSignature = true;
+            out.solscanToken = `https://solscan.io/token/${ORBITX_MINT}`;
+            if (wallet) out.solscanAccount = `https://solscan.io/account/${encodeURIComponent(wallet)}`;
+          }
+          return out;
+        }
+      } catch {
+        /* fall through to catalog */
+      }
+    }
+    return {
+      ok: true,
+      shop: true,
+      openUrl: `${base}/shop`,
+      message:
+        "OrbitX Shop — burn $ORBITX for MCP seats or buy credits with SOL. Linked Telegram: /shop hour · /shop day · /shop week · /shop month · /credits 0.1 sol",
+      packages: [
+        { id: "hour", title: "1 Hour MCP", cost: "100 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "hour" } },
+        { id: "day", title: "1 Day MCP", cost: "1,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "day" } },
+        { id: "week", title: "1 Week MCP", cost: "10,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "week" } },
+        { id: "month", title: "1 Month MCP", cost: "1,000,000 $ORBITX", tool: "orbitx_mcp_access_buy", args: { package: "month" } },
+        { id: "credits", title: "Credits", cost: "10,000 / 1 SOL", tool: "orbitx_credits_buy" },
+      ],
+      note: "Burns destroy supply. Credits are shared across Agent MCP + X MCP. Non-custodial Phantom sign.",
+    };
+  }
+
+  if (name === "orbitx_trade_auto") {
+    const enabled = args.enabled === true || args.on === true || String(args.enabled || args.on || "").toLowerCase() === "true";
+    const off = args.enabled === false || args.on === false || String(args.mode || "").toLowerCase() === "sign";
+    const on = off ? false : enabled || String(args.mode || "").toLowerCase() === "auto";
+    const preference = on ? "auto" : "sign";
+    const saved = auth?.agentId ? await setChatTradePreference(sb, auth.agentId, preference) : false;
+    return {
+      ok: saved || !auth?.agentId,
+      autoBuy: on,
+      tradeConfirmationPreference: preference,
+      message: on
+        ? "Auto-confirm is ON for this agent. Future buy and sell commands skip the second chat prompt, then open the secure wallet signer. You still approve each transaction in your wallet."
+        : "Sign each time is ON for this agent. Every buy and sell command shows a fresh review step before the secure wallet signer.",
+    };
+  }
+
   if (name === "orbitx_confirm_buy") {
     let amountSol = args.amountSol ?? args.sol ?? args.amount;
     let slippage = Number(args.slippage) || 10;
     let pool = args.pool || "auto";
-    if ((amountSol == null || amountSol === "") && auth?.userId) {
-      const intent = await loadLatestTradeIntent(sb, auth.userId, { mint: ORBITX_MINT });
+    let mint = String(args.mint || "").trim();
+    if (auth?.userId) {
+      const intent = await loadLatestTradeIntent(sb, auth.userId, mint ? { mint } : {});
       if (intent) {
-        amountSol = Number(intent.amount_sol);
+        if (amountSol == null || amountSol === "") amountSol = Number(intent.amount_sol);
         slippage = Number(intent.slippage) || slippage;
         pool = intent.pool || pool;
+        if (!mint) mint = String(intent.mint || "");
       }
     }
+    if (!mint) mint = ORBITX_MINT;
     if (amountSol == null || amountSol === "") {
       return {
         ok: false,
         error: "no_pending_buy",
-        message:
-          "No pending $ORBITX buy. Ask how much SOL, call orbitx_buy_orbitx, then confirm — or pass amountSol here.",
+        message: "No pending buy. Send buy <CA> with 0.1 sol (or $10 usdc), then confirm — or pass amountSol.",
       };
     }
-    const out = await prepareBuyOrbitx({
-      base,
-      wallet,
-      amountSol,
-      slippage,
-      pool,
-      confirmMode: "auto",
-      preferAuto: true,
-      fetchJson,
-    });
-    if (out.ok && auth?.userId) {
-      try {
-        await saveTradeIntent(sb, auth.userId, {
-          mint: ORBITX_MINT,
-          amountSol: out.amountSol,
-          confirmMode: "auto",
-          slippage: out.slippage,
-          pool: out.pool,
-        });
-      } catch {
-        /* optional */
+    if (mint === ORBITX_MINT) {
+      const out = await prepareBuyOrbitx({
+        base,
+        wallet,
+        amountSol,
+        slippage,
+        pool,
+        confirmMode: "auto",
+        preferAuto: true,
+        fetchJson,
+      });
+      if (out.ok && auth?.userId) {
+        try {
+          await saveTradeIntent(sb, auth.userId, {
+            mint: ORBITX_MINT,
+            amountSol: out.amountSol,
+            confirmMode: "auto",
+            slippage: out.slippage,
+            pool: out.pool,
+          });
+        } catch {
+          /* optional */
+        }
       }
+      return out;
     }
-    return out;
+    args = { ...args, mint, amountSol, slippage, pool, autoConfirm: true };
+    return callTool("orbitx_prepare_buy", args, auth, base, req);
   }
 
-  if (name === "orbitx_prepare_buy" || name === "orbitx_prepare_sell") {
-    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const action = name === "orbitx_prepare_buy" ? "buy" : "sell";
-    const mint = String(args.mint || "");
-    const amount = action === "buy" ? Number(args.amountSol) : args.amount;
+  if (name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_buy_auto" || name === "orbitx_trade" || name === "orbitx_swap" || name === "orbitx_prepare_sell" || name === "orbitx_sell" || name === "orbitx_sell_pump") {
+    if (!wallet) {
+      return {
+        ok: false,
+        error: "wallet_required",
+        mint: String(args.mint || ORBITX_MINT),
+        message: "Link Jupiter Wallet on https://www.orbitx.world/telegram after /login, then send /buy or /sell again.",
+        loginUrl: "https://www.orbitx.world/telegram",
+      };
+    }
+    const action = name === "orbitx_prepare_sell" || name === "orbitx_sell" || name === "orbitx_sell_pump" ? "sell" : "buy";
+    const mint = String(args.mint || (action === "buy" ? ORBITX_MINT : "")).trim();
+    if (action === "buy" && !mint) {
+      return { ok: false, error: "mint_required", message: "Pass a mint / CA to buy, or say buy $ORBITX." };
+    }
+    let tradePreference = null;
+    if (auth?.agentId) {
+      try {
+        tradePreference = await getChatTradePreference(sb, auth.agentId);
+      } catch {
+        tradePreference = null;
+      }
+    }
+    const preferAuto = tradePreference === "auto";
+    const auto =
+      args.autoConfirm === true ||
+      args.auto === true ||
+      String(args.confirmMode || "").toLowerCase() === "auto" ||
+      preferAuto;
+    let amount = action === "buy" ? Number(args.amountSol) : args.amount;
+    let usdQuote = null;
+    if (action === "buy" && (!Number.isFinite(amount) || amount <= 0) && args.amountUsd != null) {
+      usdQuote = await usdToSol(args.amountUsd);
+      if (!usdQuote.ok) return usdQuote;
+      amount = usdQuote.amountSol;
+    }
+    if (action === "sell" && !mint) {
+      return { ok: false, error: "mint_required", message: "Pass a mint / CA to sell." };
+    }
+    if (action === "sell" && (amount == null || amount === "")) {
+      amount = "100%";
+    }
+    if (action === "buy" && (!Number.isFinite(amount) || amount <= 0)) {
+      return {
+        ok: false,
+        error: "amount_required",
+        message: "How much? Example: buy <CA> with 0.1 sol  — or  buy <CA> with 10$ usdc",
+      };
+    }
     const slippage = Number(args.slippage) || 10;
     const pool = args.pool || "auto";
     const body = {
@@ -3303,24 +3844,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       denominatedInSol: action === "buy",
       slippage,
       pool,
+      platformFee: true,
     };
-    const data = await fetchJson(`${base}/api/ogdex/trade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!data?.ok || !data?.tx) {
-      return {
-        ok: false,
-        status: "prepare_failed",
-        requiresSignature: false,
-        error: data?.error || "Could not build trade",
-        action,
-        wallet,
-        mint,
-        amount,
-      };
-    }
     const signQs = new URLSearchParams({
       action,
       mint,
@@ -3333,31 +3858,114 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const autoQs = new URLSearchParams(signQs);
     autoQs.set("auto", "1");
     const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
-    // Do NOT return the raw base64 tx to the model — Claude may try to "buy" without Phantom.
-    return {
+    let data = null;
+    try {
+      data = await fetchJson(`${base}/api/ogdex/trade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      data = { ok: false, error: error?.message || "Could not build trade" };
+    }
+    if (!data?.ok || !data?.tx) {
+      if (action === "sell") {
+        return {
+          ok: true,
+          status: "awaiting_jupiter_signature",
+          requiresSignature: true,
+          confirmMode: "sign",
+          signUrl,
+          autoSignUrl,
+          openUrl: signUrl,
+          action,
+          wallet,
+          mint,
+          amount,
+          slippage,
+          pool,
+          warning: data?.error || "Quote will refresh on the sign page",
+          message: data?.error === "no balance to sell"
+            ? "This linked wallet may hold 0 of that token. Open Sign and switch to the wallet that holds it."
+            : data?.error || "Open Sign — the quote is built in your browser wallet.",
+          solscanToken: mint ? `https://solscan.io/token/${encodeURIComponent(mint)}` : null,
+          solscanAccount: wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : null,
+        };
+      }
+      return {
+        ok: false,
+        status: "prepare_failed",
+        requiresSignature: false,
+        error: data?.error || "Could not build trade",
+        action,
+        wallet,
+        mint,
+        amount,
+      };
+    }
+    if (action === "buy" && auth?.userId) {
+      try {
+        await saveTradeIntent(sb, auth.userId, {
+          mint,
+          amountSol: amount,
+          confirmMode: auto ? "auto" : "sign",
+          slippage,
+          pool,
+        });
+      } catch {
+        /* optional */
+      }
+    }
+    const out = {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: auto ? "awaiting_auto_jupiter" : "awaiting_jupiter_signature",
       requiresSignature: true,
+      confirmMode: auto ? "auto" : "sign",
       signUrl,
       autoSignUrl,
+      openUrl: auto ? autoSignUrl : signUrl,
       action,
       wallet,
       mint,
       amount,
+      amountUsd: usdQuote?.amountUsd || null,
+      solUsd: usdQuote?.solUsd || null,
       slippage,
       pool,
       via: data.via || null,
       routePool: data.pool || null,
       simulated: Boolean(data.simulated),
       hasUnsignedTx: true,
-      instructions: [
-        "Open signUrl in the user's browser (or autoSignUrl to auto-prompt Phantom).",
-        "User connects Phantom and clicks Sign & send (auto mode prompts immediately).",
-        "Do NOT broadcast or submit any unsigned transaction yourself.",
-        "Trade is incomplete until Phantom confirms a signature.",
-      ],
-      note: "Non-custodial. Route the user to signUrl for Phantom — never attempt an unsigned buy/sell.",
+      solscanToken: mint ? `https://solscan.io/token/${encodeURIComponent(mint)}` : null,
+      solscanAccount: wallet ? `https://solscan.io/account/${encodeURIComponent(wallet)}` : null,
+      instructions: auto
+        ? [
+            "Open autoSignUrl — Jupiter Wallet prompts immediately (auto-buy).",
+            "Approve in Jupiter Wallet. OrbitX never holds keys or funds.",
+            "Trade is incomplete until Jupiter confirms.",
+          ]
+        : [
+            "Open signUrl and tap Sign & send in Jupiter Wallet.",
+            "Say confirm or /autobuy on to skip this extra Telegram step next time.",
+            "Do NOT broadcast unsigned transactions.",
+          ],
+      note: auto
+        ? "Auto-buy: Jupiter Wallet still must sign. Non-custodial."
+        : "Manual sign. Non-custodial. Route the user to signUrl.",
     };
+    if (action === "buy" && tradePreference == null && auth?.agentId) {
+      out.tradePreferencePrompt = {
+        title: "How should future trades be confirmed?",
+        message: "Choose once for this agent. Auto-confirm skips the second chat prompt; your connected wallet still approves every transaction.",
+        options: [
+          { id: "auto", label: "Auto-confirm", description: "Open the secure wallet signer automatically." },
+          { id: "sign", label: "Sign each time", description: "Show a fresh review step for every buy or sell." },
+        ],
+        setTool: "orbitx_trade_auto",
+        scope: "agent",
+      };
+    }
+    return out;
   }
 
   if (name === "orbitx_launch_check") {
@@ -3429,14 +4037,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const q = new URLSearchParams({ kind: "claim", publicKey: wallet });
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: "awaiting_jupiter_signature",
       requiresSignature: true,
       signUrl: `${base}/agent/sign?${q.toString()}`,
       action: "claim_fees",
       wallet,
       instructions: [
         "Open signUrl in the browser.",
-        "Connect the creator wallet in Phantom and Sign.",
+        "Connect the creator wallet in Jupiter Wallet and Sign.",
         "Do not broadcast unsigned transactions yourself.",
       ],
     };
@@ -3447,14 +4055,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const q = new URLSearchParams({ kind: "rent", publicKey: wallet });
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: "awaiting_jupiter_signature",
       requiresSignature: true,
       signUrl: `${base}/agent/sign?${q.toString()}`,
       action: "rent_refund",
       wallet,
       instructions: [
         "Open signUrl — may require signing multiple close-account txs.",
-        "Connect Phantom and approve each batch.",
+        "Connect Jupiter Wallet and approve each batch.",
       ],
     };
   }
@@ -3471,13 +4079,13 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     else q.set("amount", String(args.amount));
     return {
       ok: true,
-      status: "awaiting_phantom_signature",
+      status: "awaiting_jupiter_signature",
       requiresSignature: true,
       signUrl: `${base}/agent/sign?${q.toString()}`,
       action: "burn",
       wallet,
       mint: String(args.mint || ""),
-      instructions: ["Open signUrl", "Approve burn in Phantom", "Never submit unsigned burn txs yourself"],
+      instructions: ["Open signUrl", "Approve burn in Jupiter Wallet", "Never submit unsigned burn txs yourself"],
     };
   }
 
@@ -4248,7 +4856,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {} },
             serverInfo: { name: "OrbitX Agent MCP", version: "1.5.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so Phantom sends SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. MCP access: when they say buy access / burn ORBITX — ASK hour (100), day (1,000), week (10,000), or month (1,000,000), call orbitx_mcp_access_buy, send openUrl/signUrl so Jupiter buys then burns, then orbitx_mcp_access_confirm with the signature. Time remaining: orbitx_mcp_access_status. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so they send SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -4274,12 +4882,14 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/call") {
       const rawName = String(params?.name || "");
-      const name = TOOL_ALIASES[rawName] || rawName;
+      const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
       const rawArgs = params?.arguments && typeof params.arguments === "object" ? params.arguments : {};
       const args = { ...rawArgs };
       if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
       if (rawName === "orbitx_buy_auto" && !args.pool) args.pool = "auto";
-      const authCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+      const rawAuthCode = String(args.authCode || args.orbitxAuthCode || "").trim();
+      const parsedAuth = classifyOrbitXAuthPaste(rawAuthCode);
+      const authCode = parsedAuth.kind === "telegram_login" ? "" : String(parsedAuth.code || rawAuthCode).trim();
       // keep authCode on args for enrichAuth; strip before callTool for strict schemas
       const auth = await enrichAuth(req, args);
       delete args.authCode;
@@ -4297,6 +4907,28 @@ async function handleMcp(req, res, parts) {
         "orbitx_dex_chart",
         "orbitx_get_chart",
       ]);
+      if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
+        const link = {
+          ok: false,
+          error: "telegram_login_not_mcp",
+          message: TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
+          url: parsedAuth.url,
+          hintTool: "orbitx_auth_link",
+        };
+        return json(
+          res,
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(link, null, 2) }],
+              structuredContent: link,
+              isError: true,
+            },
+          },
+          200,
+        );
+      }
       if (!identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = authCode
           ? {
@@ -4347,30 +4979,27 @@ async function handleMcp(req, res, parts) {
         ).trim(),
       );
 
-      // Token hold block — write/tx tools require ≥$5 ORBITX.
-      // Owner wallets + audifyx@gmail.com (resolved from API-key userId) skip entirely.
+      // MCP access — write/tx tools require exempt, unexpired burn access, or ≥$5 ORBITX hold.
       if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
-        const candidates = holdCandidateWallets(auth, args);
-        const holdWallet = candidates[0] || "";
-        const holdEmail = auth?.email || null;
-        if (!isTokenGateExemptAny({ wallets: candidates, email: holdEmail })) {
-          const hold = await verifyTokenHold(holdWallet, base, { email: holdEmail });
-          if (!hold.meetsRequirement) {
-            const tip = holdBlockedPayload({
-              tool: name,
-              hold,
-              fix: "Hold ≥$5 ORBITX, link wallet on https://www.orbitx.world/agent, then retry. Owner wallets (DEF / platform / jYbHk… fee) and audifyx@gmail.com skip this gate.",
-            });
-            return json(res, {
-              jsonrpc: "2.0",
-              id,
-              result: {
-                content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
-                structuredContent: tip,
-                isError: true,
-              },
-            });
-          }
+        const candidates = holdCandidateWallets(auth);
+        const access = await requireMcpAccess({
+          userId: auth?.userId,
+          wallets: candidates,
+          email: auth?.email || null,
+          base,
+          tool: name,
+        });
+        if (!access.allowed) {
+          const tip = access.blocked || holdBlockedPayload({ tool: name, hold: access.hold });
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+              structuredContent: tip,
+              isError: true,
+            },
+          });
         }
       }
 
@@ -4494,6 +5123,164 @@ async function handleCryptoScan(req, res) {
   return json(res, { ok: true, mint, safety, forensics, token });
 }
 
+/**
+ * Embedded OrbitX AI bridge — authenticated by the caller's Supabase session.
+ * Exposes the same live MCP catalog without forcing the first-party app through
+ * an OAuth/API-key round trip.
+ */
+export function listEmbeddedAgentTools({ includeGenerated = false } = {}) {
+  const source = includeGenerated ? TOOLS : CORE_TOOLS;
+  return source.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+  }));
+}
+
+export function resolveEmbeddedAgentToolName(toolName) {
+  return resolveOrbitXToolName(toolName) || String(toolName || "").trim();
+}
+
+export function hasEmbeddedAgentTool(toolName) {
+  return Boolean(resolveOrbitXToolName(toolName));
+}
+
+/** Full live catalog, including generated screeners / charts / mint intel. */
+export function listAllOrbitXTools() {
+  return TOOLS.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+  }));
+}
+
+/**
+ * Public Telegram / web runner — no OrbitX login required.
+ * Used for group chats and unauthenticated /telegram browse of read tools.
+ * Privileged (trade / X / social write) tools must go through runEmbeddedAgentTool.
+ */
+export async function runPublicOrbitXTool({ toolName, args = {}, req = null }) {
+  const rawName = String(toolName || "").trim();
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  if (!hasEmbeddedAgentTool(name)) {
+    throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
+  }
+  const { isPrivilegedTelegramTool } = await import("./orbitx/telegram-orbitx-lib.js");
+  if (isPrivilegedTelegramTool(name) || name === "x_post") {
+    throw Object.assign(new Error("login_required"), { status: 401 });
+  }
+  const auth = {
+    userId: null,
+    agentId: null,
+    walletAddress: null,
+    agentName: "OrbitX Telegram",
+    email: null,
+    source: "telegram_public",
+    bearerPresent: false,
+  };
+  return callTool(name, args || {}, auth, publicBase(req), req);
+}
+
+export async function getEmbeddedTradePreference(userId) {
+  const uid = String(userId || "").trim();
+  if (!uid) return null;
+  const agent = await ensureAgent(uid);
+  return getChatTradePreference(sb, agent.id);
+}
+
+export async function runEmbeddedAgentTool({
+  userId,
+  walletAddress = null,
+  email = null,
+  toolName,
+  args = {},
+  req = null,
+}) {
+  const uid = String(userId || "").trim();
+  if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
+
+  const rawName = String(toolName || "").trim();
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  if (!hasEmbeddedAgentTool(name)) {
+    throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
+  }
+
+  const agent = await ensureAgent(uid);
+  const authoritativeWallet = String(walletAddress || agent.wallet_address || "").trim() || null;
+  const auth = {
+    userId: uid,
+    agentId: agent.id,
+    walletAddress: authoritativeWallet,
+    agentName: agent.name || null,
+    email: String(email || "").trim() || null,
+    source: "orbitx_ai",
+    bearerPresent: true,
+  };
+  const base = publicBase(req);
+
+  const mintArg = String(args?.mint || args?.ca || "").trim();
+  const isOrbitxBuy =
+    name === "orbitx_buy_orbitx" ||
+    name === "orbitx_confirm_buy" ||
+    name === "orbitx_trade_auto" ||
+    name === "orbitx_credits_buy" ||
+    ((name === "orbitx_prepare_buy" || name === "orbitx_buy" || name === "orbitx_trade" || name === "orbitx_swap") &&
+      (mintArg === ORBITX_MINT || !mintArg));
+  if (!isOrbitxBuy && (isHoldGatedTool(name) || isHoldGatedTool(rawName))) {
+    const candidates = holdCandidateWallets(auth);
+    const access = await requireMcpAccess({
+      userId: uid,
+      wallets: candidates,
+      email: auth.email,
+      base,
+      tool: name,
+    });
+    if (!access.allowed) {
+      return access.blocked || holdBlockedPayload({ tool: name, hold: access.hold });
+    }
+  }
+
+  return callTool(name, args || {}, auth, base, req);
+}
+
+/**
+ * Telegram MCP bridge — dashboard-auth (bot owner userId), no auth-link tools.
+ * Used by /api/telegram-mcp. Trading / auth tools must be filtered by caller allowlist.
+ */
+export async function runTelegramAgentTool(userId, toolName, args = {}, req = null) {
+  const uid = String(userId || "").trim();
+  if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
+  const agent = await ensureAgent(uid);
+  const auth = await withAuthEmail({
+    userId: uid,
+    agentId: agent.id,
+    walletAddress: agent.wallet_address || null,
+    agentName: agent.name || null,
+    source: "telegram",
+    bearerPresent: false,
+  });
+  const base = publicBase(req);
+  const rawName = String(toolName || "").trim();
+  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  if (isHoldGatedTool(name) || isHoldGatedTool(rawName)) {
+    const access = await requireMcpAccess({
+      userId: uid,
+      wallets: holdCandidateWallets(auth),
+      email: auth.email,
+      base,
+      tool: name,
+    });
+    if (!access.allowed) {
+      return access.blocked || holdBlockedPayload({ tool: name, hold: access.hold });
+    }
+  }
+  return callTool(name, args || {}, auth, base, req);
+}
+
+export function listTelegramAgentCoreTools() {
+  return CORE_TOOLS.map((t) => ({ name: t.name, description: t.description }));
+}
+
 export default async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") {
@@ -4505,6 +5292,10 @@ export default async function handler(req, res) {
   const head = parts[0] || "";
 
   try {
+    if (head === "shop") {
+      const { handleDeskShop } = await import("./orbitx/desk-shop.js");
+      return handleDeskShop(req, res, parts, json);
+    }
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
@@ -4518,7 +5309,7 @@ export default async function handler(req, res) {
       return json(res, {
         ok: true,
         service: "orbitx",
-        routes: ["agent", "mcp", "crypto-scan", "anti-vamp-check"],
+        routes: ["agent", "mcp", "shop", "crypto-scan", "anti-vamp-check", "telegram-mcp"],
         agent: "/api/orbitx-agent",
         mcp: "/api/orbitx-mcp",
         antiVamp: "/api/orbitx/anti-vamp-check",

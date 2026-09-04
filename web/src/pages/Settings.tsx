@@ -1726,16 +1726,24 @@ function CustomCommands() {
 // Free NVIDIA-hosted models a bot owner can choose from (mirror of supabase/functions/_shared/models.ts)
 const BOT_MODELS: { id: string; label: string; desc: string }[] = [
   { id: "meta/llama-3.3-70b-instruct",              label: "Llama 3.3 70B",       desc: "Balanced default" },
-  { id: "meta/llama-3.1-8b-instruct",               label: "Llama 3.1 8B",        desc: "Fastest" },
+  { id: "minimaxai/minimax-m3",                     label: "MiniMax M3",          desc: "Fastest" },
   { id: "meta/llama-4-maverick-17b-128e-instruct",  label: "Llama 4 Maverick",    desc: "Newest Llama" },
   { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5", label: "Nemotron Super 49B",  desc: "NVIDIA reasoning" },
   { id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",  label: "Nemotron Ultra 253B", desc: "Most powerful" },
   { id: "deepseek-ai/deepseek-v4-pro",              label: "DeepSeek V4 Pro",     desc: "Strong analysis" },
   { id: "mistralai/mistral-nemotron",               label: "Mistral Nemotron",    desc: "Efficient" },
   { id: "moonshotai/kimi-k2.6",                     label: "Kimi K2",             desc: "Long context" },
-  { id: "minimaxai/minimax-m3",                     label: "MiniMax M3",          desc: "Fast + capable" },
 ];
 const DEFAULT_BOT_MODEL = "meta/llama-3.3-70b-instruct";
+const RETIRED_BOT_MODELS: Record<string, string> = {
+  "meta/llama-3.1-8b-instruct": "minimaxai/minimax-m3",
+  "meta/llama-3.2-3b-instruct": "minimaxai/minimax-m3",
+};
+
+function resolveBotModel(id?: string | null) {
+  const requested = RETIRED_BOT_MODELS[id || ""] || id || DEFAULT_BOT_MODEL;
+  return BOT_MODELS.some((m) => m.id === requested) ? requested : DEFAULT_BOT_MODEL;
+}
 
 function TelegramBotCard() {
   const [bot, setBot] = useState<any>(null);
@@ -1837,10 +1845,10 @@ function TelegramBotCard() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-white/80 text-[13px] font-semibold flex items-center gap-1.5">🧠 AI model</div>
-                    <div className="text-white/35 text-[11px]">{BOT_MODELS.find((m) => m.id === (bot.ai_model || DEFAULT_BOT_MODEL))?.desc || "Pick the AI brain your bot uses"}</div>
+                    <div className="text-white/35 text-[11px]">{BOT_MODELS.find((m) => m.id === resolveBotModel(bot.ai_model))?.desc || "Pick the AI brain your bot uses"}</div>
                   </div>
                   <select
-                    value={bot.ai_model || DEFAULT_BOT_MODEL}
+                    value={resolveBotModel(bot.ai_model)}
                     onChange={(e) => setSetting({ ai_model: e.target.value })}
                     disabled={!bot.ai_enabled}
                     className="shrink-0 rounded-lg bg-white/5 border border-white/10 text-white/80 text-[12px] px-2 py-1.5 outline-none focus:border-[#229ED9]/40 disabled:opacity-40 max-w-[150px]"

@@ -12,13 +12,13 @@ const NotFound = () => {
         <p className="font-mono text-[10px] uppercase tracking-[0.4em] text-og-cyan">signal lost</p>
         <h1 className="mt-2 font-display text-5xl font-bold text-og-gold text-glow-gold">404</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          This route is off-chain. Jump back to the live ogscan.fun dashboard.
+          This route is not live. Jump back to the orbitx.world desk.
         </p>
         <Link
-          to="/"
+          to="/ORBITX_DEX"
           className="mt-5 inline-flex border border-og-lime bg-og-lime px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-ink transition hover:bg-transparent hover:text-og-lime"
         >
-          Return to scanner
+          Return to OrbitX DEX
         </Link>
       </section>
     </main>

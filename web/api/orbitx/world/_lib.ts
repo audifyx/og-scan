@@ -57,9 +57,13 @@ export async function requireUser(req: VercelRequest): Promise<{ id: string; cli
   const auth = bearer(req);
   if (!auth) throw Object.assign(new Error("unauthorized"), { status: 401 });
   const client = userClient(auth);
-  const { data, error } = await client.auth.getUser();
-  if (error || !data.user) throw Object.assign(new Error("unauthorized"), { status: 401 });
-  return { id: data.user.id, client };
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${token}` },
+  });
+  const user = response.ok ? (await response.json() as { id?: string }) : null;
+  if (!user?.id) throw Object.assign(new Error("unauthorized"), { status: 401 });
+  return { id: user.id, client };
 }
 
 /** In-memory sliding window (per-instance). Prefer Upstash in production via /api/rate-limit. */

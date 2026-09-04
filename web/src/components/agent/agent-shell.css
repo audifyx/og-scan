@@ -325,6 +325,10 @@
 }
 
 /* ── Hero / KPIs ── */
+.ox-agent__hero--embedded {
+  display: none;
+}
+
 .ox-agent__hero {
   margin-bottom: 1.25rem;
   position: relative;
@@ -1080,4 +1084,200 @@
   .ox-agent-ios-body {
     padding-bottom: 1.25rem !important;
   }
+}
+
+/* ── MCP burn-access packages ── */
+.ox-agent__access-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--oa-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  margin-bottom: 1rem;
+}
+
+.ox-agent__access-status.is-ok {
+  border-color: rgba(134, 239, 172, 0.28);
+  background: rgba(134, 239, 172, 0.08);
+}
+
+.ox-agent__access-status.is-expired {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.ox-agent__access-time {
+  margin-top: 0.2rem;
+  font-size: 1.25rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.ox-agent__pkg-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.85rem 0 0.35rem;
+}
+
+@media (min-width: 640px) {
+  .ox-agent__pkg-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ox-agent__pkg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--oa-line);
+  background: rgba(0, 0, 0, 0.28);
+  color: inherit;
+  cursor: pointer;
+}
+
+.ox-agent__pkg:hover {
+  border-color: rgba(94, 234, 212, 0.35);
+}
+
+.ox-agent__pkg.is-on {
+  border-color: rgba(94, 234, 212, 0.55);
+  background: rgba(94, 234, 212, 0.1);
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.2);
+}
+
+.ox-agent__pkg-k {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oa-faint);
+}
+
+.ox-agent__pkg-title {
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.ox-agent__pkg-cost {
+  font-family: var(--oa-mono);
+  font-size: 0.86rem;
+  color: var(--oa-accent);
+}
+
+.ox-desk-shop__dock {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+@media (min-width: 800px) {
+  .ox-desk-shop__dock {
+    grid-template-columns: 1.4fr 0.8fr 0.6fr;
+  }
+}
+.ox-desk-shop__details {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  font-family: var(--oa-mono);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.ox-desk-shop__jump {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+.ox-desk-shop__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ox-desk-shop__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--oa-line);
+  background: transparent;
+  color: var(--oa-text);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.ox-desk-shop__pill span {
+  color: var(--oa-muted);
+  font-family: var(--oa-mono);
+  font-size: 0.72rem;
+}
+.ox-desk-shop__pill.is-on {
+  border-color: var(--oa-accent);
+  color: var(--oa-accent);
+}
+.ox-desk-shop__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 280px);
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scroll-snap-type: x mandatory;
+}
+.ox-desk-shop__card {
+  scroll-snap-align: start;
+  border: 1px solid var(--oa-line);
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(165deg, rgba(30, 27, 75, 0.55), rgba(7, 9, 12, 0.92));
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ox-desk-shop__kind {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--oa-muted);
+}
+.ox-desk-shop__price {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #f5d36c;
+}
+.ox-desk-shop__price span {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--oa-muted);
+  font-weight: 650;
+}
+.ox-desk-shop__card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+.ox-desk-shop__blurb {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--oa-muted);
+  line-height: 1.4;
+  flex: 1;
+}
+.ox-desk-shop__meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--oa-faint);
+}
+.ox-desk-shop__receipt textarea {
+  min-height: 220px;
 }

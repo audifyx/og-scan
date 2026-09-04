@@ -31,6 +31,7 @@ import { trackActivity } from "@/lib/trackActivity";
 import { CommunityReputation } from "@/components/communities-20x/CommunityReputation";
 import SpaceLeaderboard from "@/components/spaces/SpaceLeaderboard";
 import { xGetStoredUser, xIsConnected, xStartLogin } from "@/lib/xAuth";
+import { isOwnerIdentity } from "@/lib/ownerDesk";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -1619,10 +1620,10 @@ function NewsFeed({ user, onSelectPost, onOpenProfile }: { user: any; onSelectPo
                 </div>
               )}
               <p className="text-base font-bold text-white leading-tight">
-                {article.article_title || article.content.slice(0, 100)}
+                {article.article_title || (article.content || "").slice(0, 100)}
               </p>
               <p className="text-xs text-white/30 mt-1.5 line-clamp-2">
-                {article.content.slice(0, 200)}
+                {(article.content || "").slice(0, 200)}
               </p>
               <div className="flex items-center gap-2 mt-2">
                 <Avatar url={article.avatar_url} name={article.username} size="xs" onClick={(event) => {
@@ -1698,7 +1699,7 @@ function CommunityFeed({
   const [activeActionCard, setActiveActionCard] = useState<CommunityActionKey | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingActionCard, setSavingActionCard] = useState<CommunityActionKey | null>(null);
-  const isAppOwner = user?.email?.toLowerCase() === "audifyx@gmail.com";
+  const isAppOwner = isOwnerIdentity({ email: user?.email });
   const isAppTeam = isGlobalAdmin || isAppOwner;
   const canEditCommunity = myRole === "creator" || myRole === "moderator" || isAppTeam;
   const canManageModerators = myRole === "creator" || isAppTeam;
@@ -3076,16 +3077,17 @@ const SOL_CA_REGEX = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g;
 
 function PostContentRenderer({ content }: { content: string }) {
   const [activeCa, setActiveCa] = useState<string | null>(null);
+  const safe = content || "";
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   const regex = new RegExp(SOL_CA_REGEX.source, "g");
 
-  while ((match = regex.exec(content)) !== null) {
+  while ((match = regex.exec(safe)) !== null) {
     const ca = match[0];
     if (match.index > lastIndex) {
-      parts.push(content.slice(lastIndex, match.index));
+      parts.push(safe.slice(lastIndex, match.index));
     }
     parts.push(
       <button
@@ -3099,7 +3101,7 @@ function PostContentRenderer({ content }: { content: string }) {
     );
     lastIndex = match.index + ca.length;
   }
-  if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+  if (lastIndex < safe.length) parts.push(safe.slice(lastIndex));
 
   return (
     <>

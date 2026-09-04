@@ -4,7 +4,8 @@ import { mulberry32 } from "@/lib/orbitxcity/collision";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 
-const TOWER_COUNT = 96;
+const TOWER_COUNT_HIGH = 96;
+const TOWER_COUNT_LITE = 36;
 
 function cityPalette(cityId: string): { base: [number, number, number]; lit: [number, number, number] } {
   if (cityId === "miami") return { base: [0.18, 0.26, 0.3], lit: [0.55, 0.75, 0.72] };
@@ -14,8 +15,9 @@ function cityPalette(cityId: string): { base: [number, number, number]; lit: [nu
 }
 
 /** Distant tower ring — denser Midtown silhouettes with warm window tint. */
-export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
+export function Skyline({ block = NYC_DEMO_BLOCK, lite = false }: { block?: WorldBlockConfig; lite?: boolean }) {
   const towers = useMemo(() => {
+    const count = lite ? TOWER_COUNT_LITE : TOWER_COUNT_HIGH;
     const rand = mulberry32(0x0b17c17 ^ block.cityId.length * 17);
     const palette = cityPalette(block.cityId);
     const towerGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -23,15 +25,15 @@ export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }
       color: "#3a424a",
       metalness: 0.28,
       roughness: 0.72,
-      emissive: "#ffffff",
-      emissiveIntensity: 0.08,
+      emissive: "#f0d7a0",
+      emissiveIntensity: lite ? 0.18 : 0.28,
     });
-    const towersMesh = new THREE.InstancedMesh(towerGeo, towerMat, TOWER_COUNT);
+    const towersMesh = new THREE.InstancedMesh(towerGeo, towerMat, count);
 
     const m = new THREE.Matrix4();
     const color = new THREE.Color();
-    for (let i = 0; i < TOWER_COUNT; i++) {
-      const angle = (i / TOWER_COUNT) * Math.PI * 2 + rand() * 0.12;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + rand() * 0.12;
       const ring = i % 3;
       const radius = (ring === 0 ? 68 : ring === 1 ? 88 : 108) + rand() * 18;
       const x = Math.cos(angle) * radius;
@@ -65,7 +67,7 @@ export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }
     towersMesh.receiveShadow = false;
     towersMesh.frustumCulled = true;
     return towersMesh;
-  }, [block.cityId]);
+  }, [block.cityId, lite]);
 
   return <primitive object={towers} />;
 }

@@ -8,34 +8,149 @@
 export const X_OAUTH_SCOPES =
   "tweet.write tweet.read users.read follows.read list.read offline.access dm.read dm.write like.read";
 
+// Every id must exist in https://integrate.api.nvidia.com/v1/models — an id that
+// NIM has retired makes chat fail for anyone who picks it in the model menu.
+// Fast slot must be a model NVIDIA still lists (Meta Llama 3.1 8B EOL 2026-08-26;
+// Llama 3.2 3B is not in the current integrate.api.nvidia.com catalog).
+export const FAST_NIM_MODEL = "minimaxai/minimax-m3";
+export const FALLBACK_NIM_MODEL = "meta/llama-3.3-70b-instruct";
+
+/** Retired NIM ids → live replacements. Stored prefs / env still holding these must remap. */
+export const RETIRED_NIM_MODELS = {
+  "meta/llama-3.1-8b-instruct": FAST_NIM_MODEL,
+  "meta/llama-3.2-3b-instruct": FAST_NIM_MODEL,
+};
+
 export const NIM_MODELS = [
-  { id: "meta/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
-  { id: "meta/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
-  { id: "meta/llama-4-maverick-17b-128e-instruct", label: "Llama 4 Maverick" },
+  { id: FALLBACK_NIM_MODEL, label: "Llama 3.3 70B" },
+  { id: FAST_NIM_MODEL, label: "MiniMax M3" },
+  { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" },
   { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5", label: "Nemotron Super 49B" },
-  { id: "deepseek-ai/deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+  { id: "deepseek-ai/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash" },
   { id: "mistralai/mistral-nemotron", label: "Mistral Nemotron" },
   { id: "moonshotai/kimi-k2.6", label: "Kimi K2" },
-  { id: "minimaxai/minimax-m3", label: "MiniMax M3" },
 ];
 
-export const DEFAULT_NIM_MODEL =
-  process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct";
+export function isRetiredNimError(status, body) {
+  const code = Number(status);
+  const text = String(body || "").toLowerCase();
+  return (
+    code === 410 ||
+    text.includes("end of life") ||
+    text.includes('"title":"gone"') ||
+    text.includes("no longer available")
+  );
+}
+
+export function isNvidiaRateLimit(status, body) {
+  const code = Number(status);
+  const text = String(body || "").toLowerCase();
+  return (
+    code === 429 ||
+    text.includes("too many requests") ||
+    text.includes("rate limit") ||
+    text.includes("rate_limit")
+  );
+}
+
+export const NVIDIA_BUSY_MESSAGE =
+  "OrbitX AI is busy right now. Wait a few seconds and send that again. Slash commands still work: /cmds /token /chart /img.";
+
+export function publicNvidiaMessage(result) {
+  if (result?.ok) return result.content || "";
+  if (result?.error === "nvidia_missing") {
+    return result.message || "OrbitX AI is offline (NVIDIA_API_KEY). Slash commands still work: /cmds /token /chart /img /check /links.";
+  }
+  if (isNvidiaRateLimit(result?.status, result?.body || result?.message)) {
+    return NVIDIA_BUSY_MESSAGE;
+  }
+  return "OrbitX AI is offline right now. Slash commands still work: /cmds /token /chart /img /check /links.";
+}
+
+function parseRetryAfterMs(res, body) {
+  const header = String(res?.headers?.get?.("retry-after") || res?.headers?.get?.("Retry-After") || "").trim();
+  if (header === "0") return 0;
+  if (header) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(8_000, Math.max(400, Math.round(seconds * 1000)));
+    }
+    const when = Date.parse(header);
+    if (Number.isFinite(when)) {
+      return Math.min(8_000, Math.max(400, when - Date.now()));
+    }
+  }
+  const blob = String(body || "");
+  const retry = blob.match(/retry[-_ ]after["']?\s*[:=]\s*["']?(\d+)/i);
+  if (retry) {
+    const seconds = Number(retry[1]);
+    if (Number.isFinite(seconds)) return Math.min(8_000, Math.max(400, seconds * 1000));
+  }
+  return 1_200;
+}
+
+function sleep(ms) {
+  const wait = Number(ms);
+  if (!Number.isFinite(wait) || wait <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, wait));
+}
+
+function nvidiaFallbackModels(first) {
+  const ordered = [
+    first,
+    FALLBACK_NIM_MODEL,
+    "mistralai/mistral-nemotron",
+    "openai/gpt-oss-120b",
+    FAST_NIM_MODEL,
+  ];
+  const out = [];
+  for (const id of ordered) {
+    const live = resolveNimModel(id);
+    if (live && !out.includes(live)) out.push(live);
+  }
+  return out;
+}
+
+let lastNvidiaCallAt = 0;
+const NVIDIA_MIN_GAP_MS = 250;
+
+async function waitNvidiaGap() {
+  const wait = lastNvidiaCallAt + NVIDIA_MIN_GAP_MS - Date.now();
+  if (wait > 0) await sleep(wait);
+  lastNvidiaCallAt = Date.now();
+}
+
+function normalizeNimId(requested) {
+  return String(requested || "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
+export function resolveNimModel(requested) {
+  let id = normalizeNimId(requested);
+  if (/llama-3\.1-8b/i.test(id) || /llama-3\.2-3b/i.test(id)) id = FAST_NIM_MODEL;
+  if (RETIRED_NIM_MODELS[id]) id = RETIRED_NIM_MODELS[id];
+  if (id && NIM_MODELS.some((m) => m.id === id)) return id;
+  const envDefault = normalizeNimId(process.env.NVIDIA_MODEL);
+  let remappedEnv = envDefault;
+  if (/llama-3\.1-8b/i.test(remappedEnv) || /llama-3\.2-3b/i.test(remappedEnv)) {
+    remappedEnv = FAST_NIM_MODEL;
+  }
+  remappedEnv = RETIRED_NIM_MODELS[remappedEnv] || remappedEnv;
+  if (remappedEnv && NIM_MODELS.some((m) => m.id === remappedEnv)) return remappedEnv;
+  return FALLBACK_NIM_MODEL;
+}
+
+export const DEFAULT_NIM_MODEL = resolveNimModel(
+  process.env.NVIDIA_MODEL || FALLBACK_NIM_MODEL,
+);
 
 const NVIDIA_BASE =
   process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
 
-export async function nvidiaChat({ system, user, model, maxTokens = 512, temperature = 0.7 }) {
-  const key = process.env.NVIDIA_API_KEY;
-  if (!key) {
-    return {
-      ok: false,
-      error: "nvidia_missing",
-      message: "NVIDIA_API_KEY not set on Vercel. Add it and redeploy.",
-    };
-  }
-  const useModel =
-    NIM_MODELS.some((m) => m.id === model) ? model : DEFAULT_NIM_MODEL;
+async function nvidiaChatOnce({ system, user, model, maxTokens, temperature, key }) {
+  await waitNvidiaGap();
+  const liveModel = resolveNimModel(model);
   const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
     method: "POST",
     headers: {
@@ -43,7 +158,7 @@ export async function nvidiaChat({ system, user, model, maxTokens = 512, tempera
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: useModel,
+      model: liveModel,
       messages: [
         ...(system ? [{ role: "system", content: system }] : []),
         { role: "user", content: user },
@@ -56,15 +171,63 @@ export async function nvidiaChat({ system, user, model, maxTokens = 512, tempera
   });
   if (!res.ok) {
     const err = await res.text().catch(() => "");
-    return {
+    const failed = {
       ok: false,
-      error: "nvidia_failed",
+      error: isNvidiaRateLimit(res.status, err) ? "nvidia_rate_limited" : "nvidia_failed",
+      status: res.status,
       message: `NVIDIA API ${res.status}: ${err.slice(0, 240)}`,
+      body: err,
+      model: liveModel,
+      retryAfterMs: parseRetryAfterMs(res, err),
     };
+    return failed;
   }
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content || "";
-  return { ok: true, content, model: useModel, raw: data };
+  return { ok: true, content, model: liveModel, raw: data };
+}
+
+export async function nvidiaChat({ system, user, model, maxTokens = 512, temperature = 0.7 }) {
+  const key = process.env.NVIDIA_API_KEY;
+  if (!key) {
+    return {
+      ok: false,
+      error: "nvidia_missing",
+      message: "NVIDIA_API_KEY not set on Vercel. Add it and redeploy.",
+    };
+  }
+  const requested = resolveNimModel(model);
+  // At most two models (requested + one fallback) so a 429 storm cannot amplify itself.
+  const chain = nvidiaFallbackModels(requested).slice(0, 2);
+  let last = null;
+  for (let i = 0; i < chain.length; i++) {
+    const candidate = chain[i];
+    const attempts = i === 0 ? 2 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const result = await nvidiaChatOnce({
+        system,
+        user,
+        model: candidate,
+        maxTokens,
+        temperature,
+        key,
+      });
+      if (result.ok) return result;
+      last = result;
+      const retired = isRetiredNimError(result.status, result.body || result.message);
+      const limited = isNvidiaRateLimit(result.status, result.body || result.message);
+      if (limited && attempt < attempts - 1) {
+        await sleep(result.retryAfterMs ?? 1_200);
+        continue;
+      }
+      if (retired || limited) break;
+      return { ...result, message: publicNvidiaMessage(result) };
+    }
+  }
+  return {
+    ...(last || { ok: false, error: "nvidia_failed", status: 502 }),
+    message: publicNvidiaMessage(last),
+  };
 }
 
 export function buildTweetText(rawText, linkUrl) {

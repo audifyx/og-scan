@@ -5,9 +5,6 @@ import * as THREE from "three";
 import type { AvatarAppearance } from "@/lib/orbitxcity/types";
 import type { CityRealtimeClient, RemotePlayerState } from "@/lib/orbitxcity/realtime";
 import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
-import { CharacterGltf } from "./CharacterGltf";
-import { getCharacterGltfPath } from "@/lib/orbitxcity/assets/characterKits";
-import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const CHAT_TTL_MS = 4500;
 const SMOOTH = 10;
@@ -18,7 +15,6 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
   const characterAnimation = useRef<CharacterAnimationState>({});
   const [chat, setChat] = useState<string | null>(null);
   const lastChat = useRef<string | null>(null);
-  const { quality } = useCity();
   const appearanceSource = player as RemotePlayerState & Partial<AvatarAppearance>;
   const appearance: AvatarAppearance = {
     name: player.name,
@@ -29,9 +25,8 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
     hairColor: appearanceSource.hairColor ?? "#151018",
     outfit: appearanceSource.outfit ?? "street",
     faceStyle: appearanceSource.faceStyle ?? "cool",
-    classId: appearanceSource.classId,
+    classId: player.classId ?? appearanceSource.classId,
   };
-  const heroPath = quality === "high" ? getCharacterGltfPath(appearance.classId) : null;
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -67,17 +62,13 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
 
   return (
     <group ref={group} position={[player.x, 0, player.z]}>
-      {heroPath ? (
-        <CharacterGltf path={heroPath} appearance={appearance} animation={characterAnimation.current} />
-      ) : (
-        <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
-      )}
+      <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <ringGeometry args={[0.4, 0.5, 24]} />
         <meshBasicMaterial color={player.accentColor} transparent opacity={0.45} toneMapped={false} />
       </mesh>
 
-      <Billboard position={[0, 2.55, 0]}>
+      <Billboard position={[0, 2.85, 0]}>
         <Text
           fontSize={0.28}
           color={player.accentColor}

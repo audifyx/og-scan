@@ -5,6 +5,7 @@ import { fetchScreener, type ScreenerRow } from "../api/client";
 export default function IntelHome() {
   const [rows, setRows] = useState<ScreenerRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -16,6 +17,9 @@ export default function IntelHome() {
       })
       .catch((e) => {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -57,7 +61,8 @@ export default function IntelHome() {
       <div className="oxc-panel">
         <h2>Live screener pulse</h2>
         {err && <p className="oxc-empty">{err}</p>}
-        {!err && rows.length === 0 && <p className="oxc-empty oxc-pulse">Loading market pulse…</p>}
+        {!err && loading && <p className="oxc-empty oxc-pulse">Loading market pulse…</p>}
+        {!err && !loading && rows.length === 0 && <p className="oxc-empty">No market pulse yet.</p>}
         {rows.length > 0 && (
           <table className="oxc-table">
             <thead>

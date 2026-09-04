@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   // GET — dashboard data (prefer Authorization / x-admin-pass; query pass deprecated)
   const url = new URL(req.url, "http://x");
   const hdr = req.headers["authorization"] || req.headers["x-admin-pass"] || "";
-  const pass = String(hdr).replace(/^Bearer\s+/i, "").trim() || url.searchParams.get("pass");
+  const pass = String(hdr).replace(/^Bearer\s+/i, "").trim();
   if (!auth(pass)) return send(res, 401, { ok: false, error: "unauthorized" });
 
   try {

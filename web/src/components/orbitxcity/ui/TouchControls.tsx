@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Footprints, Hand, Music2, ZoomIn, ZoomOut } from "lucide-react";
-import { addZoom, clearAxis, queueJump, setAxis, setSprint } from "@/lib/orbitxcity/input";
+import { addZoom, clearAxis, queueJump, resetVirtualInput, setAxis, setSprint } from "@/lib/orbitxcity/input";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const STICK_RADIUS = 44;
@@ -11,7 +11,13 @@ const STICK_RADIUS = 44;
  * so it coexists with keyboard input on hybrid devices.
  */
 export function TouchControls() {
-  const { interact, activeZone, triggerEmote } = useCity();
+  const { interact, activeZone, triggerEmote, panel } = useCity();
+  const locked = panel !== "none";
+
+  useEffect(() => () => resetVirtualInput(), []);
+  useEffect(() => {
+    if (locked) resetVirtualInput();
+  }, [locked]);
   const baseRef = useRef<HTMLDivElement>(null);
   const [nub, setNub] = useState({ x: 0, y: 0, active: false });
   const [sprintOn, setSprintOn] = useState(false);
@@ -67,6 +73,8 @@ export function TouchControls() {
       return next;
     });
   }, []);
+
+  if (locked) return null;
 
   return (
     <div className="oxc-touch" aria-label="Touch controls">

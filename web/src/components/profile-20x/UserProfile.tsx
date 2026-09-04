@@ -77,6 +77,7 @@ interface ProfileData {
   banner_url?: string | null;
   bio?: string | null;
   badge?: string | null;
+  mcp_beta_access?: boolean | null;
   location?: string | null;
   website_url?: string | null;
   website?: string | null;
@@ -1032,7 +1033,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
     setLoading(true);
     try {
-      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, created_at, sol_wallet, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
+      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, mcp_beta_access, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, created_at, sol_wallet, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
       if (error) throw error;
       const profileRecord = applyOfficialBrand(profile as ProfileData);
       setProfileData(profileRecord);
@@ -1365,8 +1366,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     });
     list.push({
       key: "beta",
-      label: "Beta",
-      description: "Early beta tester badge given to all OrbitX signups.",
+      label: profileData?.mcp_beta_access || String(profileData?.badge || "").toLowerCase() === "beta access"
+        ? "Beta Access"
+        : "Beta",
+      description: profileData?.mcp_beta_access || String(profileData?.badge || "").toLowerCase() === "beta access"
+        ? "OrbitX MCP beta access — early supporter seat."
+        : "Early beta tester badge given to all OrbitX signups.",
       tone: "purple",
       icon: Sparkles,
     });
@@ -1417,7 +1422,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     }
 
     return list;
-  }, [isAdmin, isOwnProfile, isOwner, profileData?.affiliate_org_id, profileData?.is_official_account, profileData?.verified]);
+  }, [isAdmin, isOwnProfile, isOwner, profileData?.affiliate_org_id, profileData?.badge, profileData?.is_official_account, profileData?.mcp_beta_access, profileData?.verified]);
 
   const roleTags = identityBadges.slice(0, 5);
   const goldVerified = isGoldVerifiedProfile(profileData, Boolean(isOwnProfile && isOwner));

@@ -18,6 +18,7 @@ describe("composeRisk", () => {
       freezeRenounced: true,
       lpLockedPct: 95,
       liquidityUsd: 250_000,
+      marketCapUsd: 800_000,
       top10Pct: 18,
       holderEntropy: 78,
       cloneSimilarityMax: 0.1,
@@ -27,7 +28,7 @@ describe("composeRisk", () => {
     expect(r.tone).toBe("good");
   });
 
-  it("elevates serial deployer + clone", () => {
+  it("flags a hard clone without treating serial launches as an automatic rug", () => {
     const r = composeRisk({
       canBuy: true,
       canSell: true,
@@ -35,10 +36,12 @@ describe("composeRisk", () => {
       devSerial: true,
       cloneHardMatch: true,
       liquidityUsd: 8_000,
+      marketCapUsd: 24_000,
     });
-    expect(r.score).toBeGreaterThanOrEqual(55);
     expect(r.factors.some((f) => f.id === "clone_hard")).toBe(true);
     expect(r.factors.some((f) => f.id === "serial_dev")).toBe(true);
+    expect(r.rating).not.toBe("F");
+    expect(r.score).toBeLessThan(70);
   });
 
   it("returns unknown tone when no signals", () => {

@@ -10,10 +10,16 @@ const EXCLUDE_PREFIXES = [
   "/beta",
   "/Orbitxcity",
   "/orbitxcity",
+  "/AI",
+  "/ai",
   "/os",
   "/play",
   "/embed",
   "/auth",
+  "/app",
+  "/hub",
+  "/on-chain",
+  "/education",
 ];
 
 function shouldShowAtmosphere(pathname: string): boolean {

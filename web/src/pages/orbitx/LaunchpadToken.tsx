@@ -12,6 +12,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 import { getToken, markGraduated } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, TokenLogo, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
@@ -20,6 +21,9 @@ import TokenChat from "./TokenChat";
 import { orbitScore } from "./orbitScore";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { toast } from "sonner";
+import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
+import { indexConfirmedTx } from "@/lib/orbitx/onchainAttest";
+import { solscanTxUrl } from "../../../shared/orbitx-onchain.js";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
   ArrowLeft, Coins, Zap, BadgeCheck, TrendingUp, TrendingDown, ArrowDownUp,
@@ -212,7 +216,7 @@ function PositionPanel({ mint, symbol, priceUsd, solUsd }: { mint: string; symbo
 /* ═══════════════ Buy / Sell — Jupiter live quote, execute via Phantom ═══════════════ */
 
 function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol: string; decimals: number; solUsd: number | null }) {
-  const { connected, publicKey, signTransaction } = useWallet();
+  const { connected, publicKey, signTransaction, sendTransaction, wallet } = useWallet();
   const { connection } = useConnection();
   const balQ = usePositionBalance(mint);
   const [executing, setExecuting] = useState(false);
@@ -244,17 +248,24 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
   const sellQuick: [string, number][] = [["25%", 0.25], ["50%", 0.5], ["Max", 1]];
 
   const execute = async () => {
-    if (!connected || !publicKey || !signTransaction) { toast.error("Connect your wallet first"); return; }
+    if (!connected || !publicKey || (!signTransaction && !sendTransaction)) { toast.error("Connect your wallet first"); return; }
     if (!quote || rawAmount === "0") { toast.error("Enter an amount"); return; }
     setExecuting(true);
     try {
       const b64 = await jupSwapTransaction(quote, publicKey.toBase58());
       const tx = VersionedTransaction.deserialize(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const sig = await sendWalletTransaction(
+        connection,
+        walletCapsFromAdapter(wallet, {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+        }),
+        tx,
+      );
       toast.success(`${side === "buy" ? "Buy" : "Sell"} submitted — confirming…`);
-      await connection.confirmTransaction(sig, "confirmed");
-      toast.success(`${side === "buy" ? "Bought" : "Sold"} $${symbol}`, { description: "View on Solscan", action: { label: "Open", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") } });
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
+      void indexConfirmedTx({ signature: sig, kind: "swap", ref_id: mint });
+      toast.success(`${side === "buy" ? "Bought" : "Sold"} $${symbol}`, { description: "View on Solscan", action: { label: "Open", onClick: () => { const u = solscanTxUrl(sig); if (u) window.open(u, "_blank"); } } });
       balQ.refetch();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -613,7 +624,8 @@ export default function LaunchpadToken() {
                   <Row label="Creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[#60A5FA] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
                   <Row label="Launched">{timeAgo(t.created_at)}</Row>
                   {t.lp_pool_address && <Row label="LP pool">{shortAddr(t.lp_pool_address, 5)}</Row>}
-                  {t.mint_signature && <Row label="Mint tx"><a className="text-[#60A5FA] hover:underline" target="_blank" rel="noreferrer" href={`https://solscan.io/tx/${t.mint_signature}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`}>{shortAddr(t.mint_signature, 5)}</a></Row>}
+                  {t.mint_signature && <Row label="Mint tx"><SolscanLink signature={t.mint_signature} cluster={cluster}>{shortAddr(t.mint_signature, 5)}</SolscanLink></Row>}
+                  {t.mint_signature && <IndexOnChainTx signature={t.mint_signature} kind="launch" refId={mint} />}
                 </>
               ) : (
                 <>

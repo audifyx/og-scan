@@ -25,6 +25,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 
 ## Cursor Cloud specific instructions
 
+- Production Vercel project is **`rork-og-meme-coin-tracker`**. Set `ADMIN_AUTH` and every other server secret there (Production + Preview). Do **not** target the leftover `og-scan` Vercel project — `web/vercel.json` `ignoreCommand` skips those builds.
 - Primary dev app is `web/` (Vite + React SPA). All commands below run from `web/`.
 - Package manager is **pnpm** (matches `web/vercel.json` `installCommand`). `npm install` fails on peer-dependency conflicts (`react-native`/`expo` transitive deps pulled by `@react-three/fiber`). Use `pnpm install --no-frozen-lockfile`. pnpm intentionally skips native build scripts (esbuild, swc, etc.) — that is fine; those ship prebuilt binaries and the dev server/build still work.
 - Run dev server: `npm run dev` → Vite on `http://localhost:8080`. `/` serves the marketing Splash (`index.html`); the React SPA is served for app routes. Good no-backend smoke test: `/Orbitxcity` (fully client-side playable 3D demo).

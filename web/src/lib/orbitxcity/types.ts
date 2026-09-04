@@ -172,8 +172,8 @@ export interface AvatarAppearance {
   accentColor: string;
   skinColor: string;
   name: string;
-  /** Selected class from AAA character pods. */
-  classId?: "trader" | "builder" | "gamer" | "creator" | "explorer";
+  /** Selected mascot (crypto-native) or a legacy class alias. */
+  classId?: "pepe" | "wojak" | "chad" | "doge" | "anon" | "trader" | "builder" | "gamer" | "creator" | "explorer";
   /** Sims-style cosmetics rendered by CharacterMesh. */
   hairStyle: HairStyle;
   hairColor: string;
@@ -182,7 +182,7 @@ export interface AvatarAppearance {
 }
 
 /** Pre-world gate screens for AAA menu flow. */
-export type CityGate = "menu" | "characters" | "lobbies" | "world";
+export type CityGate = "menu" | "characters" | "lobbies" | "settings" | "world";
 
 
 export interface InventoryItem {

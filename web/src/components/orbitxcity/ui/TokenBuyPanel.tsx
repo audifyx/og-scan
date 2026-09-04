@@ -11,6 +11,7 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { Link } from "react-router-dom";
 import { getBuyPresets } from "@/trade/tradePresets";
+import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
 
 /** Real Jupiter buy flow for an in-world token (billboard / marketplace). */
 export function TokenBuyPanel() {
@@ -107,24 +108,15 @@ export function TokenBuyPanel() {
       const b64 = await jupSwapTransaction(quote, pk.toBase58());
       const tx = VersionedTransaction.deserialize(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
 
-      let sig: string;
-      if (signTransaction) {
-        const signed = await signTransaction(tx);
-        sig = await connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else if (sendTransaction) {
-        sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
-      } else if (wallet?.adapter && "signTransaction" in wallet.adapter && typeof (wallet.adapter as { signTransaction?: unknown }).signTransaction === "function") {
-        const signed = await (wallet.adapter as { signTransaction: (t: VersionedTransaction) => Promise<VersionedTransaction> }).signTransaction(tx);
-        sig = await connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else {
-        throw new Error("This wallet can't sign transactions here — open OrbitX in your wallet app or try Phantom/Solflare");
-      }
+      const sig = await sendWalletTransaction(
+        connection,
+        walletCapsFromAdapter(wallet, {
+          sendTransaction: sendTransaction ?? undefined,
+          signTransaction: signTransaction ?? undefined,
+        }),
+        tx,
+      );
+      await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
 
       toast.success(`Bought $${token?.symbol ?? "token"}`, {
         description: `sig ${sig.slice(0, 8)}…`,
@@ -167,10 +159,33 @@ export function TokenBuyPanel() {
         </div>
       </div>
 
-      <div className="oxc-stat-row">
+      <div className="oxc-stat-row dense">
         <div><small>MCAP</small><b>{fmtUsd(token?.mcap)}</b></div>
         <div><small>VOL 24H</small><b>{fmtUsd(token?.volume24h)}</b></div>
         <div><small>LIQ</small><b>{fmtUsd(token?.liquidity)}</b></div>
+        <div><small>FDV</small><b>{fmtUsd(token?.fdv)}</b></div>
+        <div><small>HOLDERS</small><b>{token?.holderCount != null ? token.holderCount.toLocaleString() : "—"}</b></div>
+        <div><small>CLUSTER</small><b>{token?.holderCount != null ? (token.holderCount > 2000 ? "Wide" : token.holderCount > 400 ? "Active" : "Thin") : "—"}</b></div>
+      </div>
+      <div className="oxc-token-links">
+        {token?.website && (
+          <a className="oxc-btn ghost compact" href={token.website} target="_blank" rel="noreferrer">
+            Site
+          </a>
+        )}
+        {token?.twitter && (
+          <a className="oxc-btn ghost compact" href={token.twitter} target="_blank" rel="noreferrer">
+            X
+          </a>
+        )}
+        <a
+          className="oxc-btn ghost compact"
+          href={`https://app.bubblemaps.io/sol/token/${selectedMint}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Bubblemaps
+        </a>
       </div>
 
       {spark.length > 1 && (

@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { approveMcpLinkAuth, getMcpLinkStatus } from "@/lib/orbitxMcp";
 import { resolveAuthWallet } from "@/lib/agentTokenGate";
 import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
+import {
+  classifyOrbitXAuthPaste,
+  normalizeTelegramLoginCode,
+} from "../../api/orbitx/orbitx-auth-links.js";
 
 /** Clickable Grok link-auth for OrbitX Agent MCP. */
 export default function AgentLinkAuthPage() {
@@ -18,7 +22,17 @@ export default function AgentLinkAuthPage() {
   const [done, setDone] = useState(false);
   const [prestatus, setPrestatus] = useState<string | null>(null);
 
-  const code = (params.get("code") || "").trim();
+  const rawCode = (params.get("code") || "").trim();
+  const pasted = classifyOrbitXAuthPaste(
+    rawCode || (typeof window !== "undefined" ? window.location.href : ""),
+  );
+  const telegramCode =
+    pasted.kind === "telegram_login"
+      ? pasted.code
+      : /^oxlink/i.test(rawCode)
+        ? ""
+        : normalizeTelegramLoginCode(rawCode);
+  const code = telegramCode ? "" : rawCode;
   const walletAddress = useMemo(
     () =>
       resolveAuthWallet({
@@ -71,6 +85,10 @@ export default function AgentLinkAuthPage() {
     }
   };
 
+  if (telegramCode) {
+    return <Navigate to={`/telegram?code=${encodeURIComponent(telegramCode)}`} replace />;
+  }
+
   if (authLoading) return <AgentLoading label="Loading session…" />;
 
   return (
@@ -106,8 +124,8 @@ export default function AgentLinkAuthPage() {
 
           {done ? (
             <div className="ox-agent__btn-row">
-              <Link to="/agent" className="ox-agent__btn ox-agent__btn--primary">
-                Open /agent
+              <Link to="/supercomputer?tab=workspace" className="ox-agent__btn ox-agent__btn--primary">
+                Open Super Computer
               </Link>
             </div>
           ) : !user ? (
@@ -148,8 +166,7 @@ export default function AgentLinkAuthPage() {
           )}
 
           <p className="ox-agent__note">
-            Manage keys on <Link to="/agent">/agent</Link>. X posting MCP is separate on{" "}
-            <Link to="/x">/x</Link>.
+            Manage keys and connected channels from the unified <Link to="/supercomputer?tab=workspace">Super Computer</Link>.
           </p>
         </div>
       </section>

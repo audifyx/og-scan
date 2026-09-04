@@ -1,0 +1,106 @@
+.ox-tg__panel {
+  margin-top: 8px;
+}
+
+.ox-tg__lead {
+  margin: 0 0 14px;
+  color: var(--ox-muted, #9aa3b5);
+  line-height: 1.45;
+}
+
+.ox-tg__lead code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #7dd3fc;
+}
+
+.ox-tg__ok {
+  margin: 14px 0 0;
+  color: #86efac;
+}
+
+.ox-tg__quick {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ox-tg__label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ox-muted, #9aa3b5);
+}
+
+.ox-tg__input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 10, 16, 0.7);
+  color: inherit;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.ox-tg__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.ox-tg__chip {
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  background: rgba(14, 22, 34, 0.8);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ox-tg__out {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #07090f;
+  color: #dbe4f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 13px;
+}
+
+.ox-tg__media {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ox-tg__media img,
+.ox-tg__media video {
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #000;
+}
+
+.ox-tg__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ox-muted, #9aa3b5);
+}
+
+.ox-tg__toggle input {
+  margin-top: 3px;
+  accent-color: #7dd3fc;
+}

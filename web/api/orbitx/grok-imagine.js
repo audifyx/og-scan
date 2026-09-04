@@ -241,12 +241,15 @@ export async function generateImage(args = {}) {
       kind: "image",
       taskId,
       state: "waiting",
+      pending: true,
+      startedAt,
+      etaSeconds: 180,
       provider: "grok-imagine",
       model: "grok-imagine/text-to-image",
       mode,
       aspect_ratio,
       expectedImages,
-      instructions: "Call orbitx_media_status with this taskId until state is success or fail.",
+      instructions: "Call orbitx_media_status with this taskId until state is success or fail. Keep /check in Telegram.",
     };
   }
 
@@ -327,13 +330,16 @@ export async function generateVideo(args = {}) {
     kind: "video",
     taskId,
     state: "waiting",
+    pending: true,
+    startedAt,
+    etaSeconds: 240,
     duration,
     resolution,
     mode,
     aspect_ratio,
     provider: "grok-imagine",
     model: "grok-imagine/text-to-video",
-    instructions: "Call orbitx_media_status with this taskId until state is success or fail.",
+    instructions: "Call orbitx_media_status with this taskId until state is success or fail. Keep /check in Telegram.",
   };
 }
 

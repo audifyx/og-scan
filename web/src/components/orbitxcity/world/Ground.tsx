@@ -198,7 +198,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
         <planeGeometry args={[worldSize * 1.2, worldSize * 1.2]} />
-        <meshStandardMaterial color="#3d4538" roughness={0.97} metalness={0.02} />
+        <meshStandardMaterial color="#4a5544" roughness={0.97} metalness={0.02} />
       </mesh>
 
       {/* Wet reflective city pad */}
@@ -219,7 +219,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
             mirror={0.18}
           />
         ) : (
-          <meshStandardMaterial map={asphaltMap} color="#222830" metalness={0.28} roughness={0.62} />
+          <meshStandardMaterial map={asphaltMap} color="#2a323c" metalness={0.28} roughness={0.62} />
         )}
       </mesh>
 

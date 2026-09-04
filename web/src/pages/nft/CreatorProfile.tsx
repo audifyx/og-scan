@@ -30,6 +30,13 @@ export default function CreatorProfile() {
   const [tab, setTab] = useState<Tab>((params.get("tab") as Tab) || "created");
   const [managing, setManaging] = useState<{ mint: string; name: string } | null>(null);
 
+  const queryWallet = wallet ?? "";
+  const queryEnabled = Boolean(wallet);
+  const { data: created } = useQuery({ queryKey: ["cp-created", queryWallet], enabled: queryEnabled, queryFn: () => listNftsByCreator(queryWallet) });
+  const { data: collections } = useQuery({ queryKey: ["cp-cols", queryWallet], enabled: queryEnabled, queryFn: () => listCollectionsByCreator(queryWallet) });
+  const { data: stats } = useQuery({ queryKey: ["cp-stats", queryWallet], enabled: queryEnabled, queryFn: () => getCreatorNftStats(queryWallet) });
+  const { data: owned } = useWalletNfts(wallet);
+
   if (!wallet) {
     return (
       <div className="mkt-panel flex flex-col items-center gap-3 px-6 py-16 text-center">
@@ -39,11 +46,6 @@ export default function CreatorProfile() {
       </div>
     );
   }
-
-  const { data: created } = useQuery({ queryKey: ["cp-created", wallet], queryFn: () => listNftsByCreator(wallet) });
-  const { data: collections } = useQuery({ queryKey: ["cp-cols", wallet], queryFn: () => listCollectionsByCreator(wallet) });
-  const { data: stats } = useQuery({ queryKey: ["cp-stats", wallet], queryFn: () => getCreatorNftStats(wallet) });
-  const { data: owned } = useWalletNfts(wallet);
 
   const setActive = (t: Tab) => { setTab(t); const n = new URLSearchParams(params); n.set("tab", t); setParams(n, { replace: true }); };
 
