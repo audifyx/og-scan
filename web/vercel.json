@@ -27,6 +27,14 @@
       "destination": "/api/mcp?path=mcp/$1"
     },
     {
+      "source": "/api/supercomputer-mcp/(.*)",
+      "destination": "/api/supercomputer-mcp?path=mcp/$1"
+    },
+    {
+      "source": "/api/supercomputer-mcp",
+      "destination": "/api/supercomputer-mcp?path=mcp"
+    },
+    {
       "source": "/api/x/mcp/(.*)",
       "destination": "/api/x-mcp?path=mcp/$1"
     },
