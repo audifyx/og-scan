@@ -67,6 +67,10 @@
       "destination": "/api/orbitx-anti-vamp-check"
     },
     {
+      "source": "/api/orbitx/delegated-wallet",
+      "destination": "/api/orbitx-delegated-wallet"
+    },
+    {
       "source": "/api/orbitx/(.*)",
       "destination": "/api/orbitx-hub?path=$1"
     },
