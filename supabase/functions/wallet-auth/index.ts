@@ -20,6 +20,24 @@ const admin = () => createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSe
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
 const walletEmail = (pk: string) => `${pk.toLowerCase()}@wallet.orbitx.app`;
 const randPass = () => bs58.encode(crypto.getRandomValues(new Uint8Array(32)));
+const NONCE_TTL_MS = 5 * 60_000;
+
+function base64Url(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function nonceMac(payload: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(SERVICE_ROLE),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return base64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload))));
+}
 
 function buildMessage(pubkey: string, nonce: string) {
   return `OrbitX — sign in with your wallet.\n\nWallet: ${pubkey}\nNonce: ${nonce}\n\nThis request will not trigger a transaction or cost any fees.`;
@@ -28,39 +46,45 @@ function buildMessage(pubkey: string, nonce: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    const { action, pubkey, signature, email, password } = await req.json();
+    const { action, pubkey, signature, nonce, email, password } = await req.json();
     const db = admin();
 
     if (action === "nonce") {
-      if (!pubkey) throw new Error("pubkey required");
-      const nonce = crypto.randomUUID();
-      const expires_at = new Date(Date.now() + 5 * 60_000).toISOString();
-      await db.from("wallet_auth_nonces").upsert({ pubkey, nonce, expires_at });
-      return json({ nonce, message: buildMessage(pubkey, nonce) });
+      const walletKey = typeof pubkey === "string" ? pubkey.trim() : "";
+      if (!walletKey) throw new Error("pubkey required");
+      const issuedAt = Date.now();
+      const random = crypto.randomUUID();
+      const payload = `${issuedAt}.${random}.${walletKey}`;
+      const nonce = `${issuedAt}.${random}.${await nonceMac(payload)}`;
+      return json({ nonce, message: buildMessage(walletKey, nonce) });
     }
 
     if (action === "verify") {
-      if (!pubkey || !signature) throw new Error("pubkey and signature required");
-      const { data: row } = await db.from("wallet_auth_nonces").select("nonce, expires_at").eq("pubkey", pubkey).maybeSingle();
-      if (!row) throw new Error("no nonce — request one first");
-      if (new Date(row.expires_at).getTime() < Date.now()) throw new Error("nonce expired");
+      const walletKey = typeof pubkey === "string" ? pubkey.trim() : "";
+      if (!walletKey || !signature || typeof nonce !== "string" || !nonce) throw new Error("pubkey, nonce, and signature required");
+      const parts = nonce.split(".");
+      if (parts.length !== 3) throw new Error("invalid nonce — request a new one");
+      const issuedAt = Number(parts[0]);
+      const random = parts[1];
+      const mac = parts[2];
+      if (!Number.isFinite(issuedAt) || Date.now() - issuedAt < 0 || Date.now() - issuedAt > NONCE_TTL_MS) throw new Error("nonce expired — request a new one");
+      const expectedMac = await nonceMac(`${issuedAt}.${random}.${walletKey}`);
+      if (mac !== expectedMac) throw new Error("invalid nonce — request a new one");
       const ok = nacl.sign.detached.verify(
-        new TextEncoder().encode(buildMessage(pubkey, row.nonce)),
+        new TextEncoder().encode(buildMessage(walletKey, nonce)),
         bs58.decode(signature),
-        bs58.decode(pubkey),
+        bs58.decode(walletKey),
       );
       if (!ok) throw new Error("invalid signature");
-      await db.from("wallet_auth_nonces").delete().eq("pubkey", pubkey);
-
       // resolve or create the wallet's auth user
       let userId: string | null = null;
       let isNew = false;
-      const { data: ident } = await db.from("wallet_identities").select("user_id").eq("wallet", pubkey).maybeSingle();
+      const { data: ident } = await db.from("wallet_identities").select("user_id").eq("wallet", walletKey).maybeSingle();
       if (ident?.user_id) {
         userId = ident.user_id;
       } else {
-        const email0 = walletEmail(pubkey);
-        const created = await db.auth.admin.createUser({ email: email0, password: randPass(), email_confirm: true, user_metadata: { wallet: pubkey, login: "wallet" } });
+        const email0 = walletEmail(walletKey);
+        const created = await db.auth.admin.createUser({ email: email0, password: randPass(), email_confirm: true, user_metadata: { wallet: walletKey, login: "wallet" } });
         if (created.error && !`${created.error.message}`.toLowerCase().includes("already")) throw created.error;
         userId = created.data?.user?.id ?? null;
         if (!userId) {
@@ -69,14 +93,14 @@ Deno.serve(async (req) => {
           userId = list.data.users.find((u) => u.email === email0)?.id ?? null;
         }
         if (!userId) throw new Error("could not resolve wallet user");
-        await db.from("wallet_identities").upsert({ wallet: pubkey, user_id: userId });
-        await db.from("profiles").upsert({ user_id: userId, username: pubkey.slice(0, 4) + pubkey.slice(-4) }, { onConflict: "user_id", ignoreDuplicates: true });
+        await db.from("wallet_identities").upsert({ wallet: walletKey, user_id: userId });
+        await db.from("profiles").upsert({ user_id: userId, username: walletKey.slice(0, 4) + walletKey.slice(-4) }, { onConflict: "user_id", ignoreDuplicates: true });
         isNew = true;
       }
 
       // mint a session: rotate password, sign in server-side
       const { data: u } = await db.auth.admin.getUserById(userId);
-      const loginEmail = u.user?.email ?? walletEmail(pubkey);
+      const loginEmail = u.user?.email ?? walletEmail(walletKey);
       const pass = randPass();
       await db.auth.admin.updateUserById(userId, { password: pass });
       const anonClient = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });

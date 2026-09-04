@@ -41,14 +41,15 @@ export async function signInWithWallet(
 
   const nonceResponse = await post({ action: "nonce", pubkey });
   const message = typeof nonceResponse?.message === "string" ? nonceResponse.message : "";
-  if (!message) {
+  const nonce = typeof nonceResponse?.nonce === "string" ? nonceResponse.nonce : "";
+  if (!message || !nonce) {
     throw new Error("Wallet login could not request a nonce. Please reconnect your wallet and try again.");
   }
 
   // Never sign or verify until the nonce request has returned a complete SIWS message.
   const signed = await signMessage(new TextEncoder().encode(message));
   const signature = bs58.encode(signed);
-  const { access_token, refresh_token, isNew } = await post({ action: "verify", pubkey, signature });
+  const { access_token, refresh_token, isNew } = await post({ action: "verify", pubkey, nonce, signature });
   const { error } = await supabase.auth.setSession({ access_token, refresh_token });
   if (error) throw error;
   return { isNew: !!isNew };

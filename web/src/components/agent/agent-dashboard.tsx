@@ -20,7 +20,7 @@ import {
   type AgentBootstrap,
   type McpChatAuthMint,
 } from "@/lib/orbitxMcp";
-import { AgentLoading, AgentShell, type AgentTabId } from "./AgentShell";
+import { AgentShell, type AgentTabId } from "./AgentShell";
 import { TelegramMcpCard } from "./TelegramMcpCard";
 import { McpShop } from "./McpShop";
 
@@ -304,10 +304,6 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
     }
   };
 
-  if (loading) {
-    return <AgentLoading label="Booting agent session…" />;
-  }
-
   const burnActive = Boolean(boot?.mcpAccess?.active);
   const betaAccess =
     Boolean((profile as { mcp_beta_access?: boolean | null; badge?: string | null } | null)?.mcp_beta_access) ||
@@ -336,6 +332,8 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
       siblingLabel="X channel"
       siblingIcon="𝕏"
     >
+      {loading && <div className="ox-agent__hydrating" role="status">Syncing agent data in the background…</div>}
+      {error && <div className="ox-agent__error" role="alert">{error}</div>}
       <div className={`ox-agent__hero${embedded ? " ox-agent__hero--embedded" : ""}`}>
         <h1 className="ox-agent__title">OrbitX</h1>
         <p className="ox-agent__lead">
