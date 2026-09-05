@@ -52,9 +52,8 @@ export default function AuthWallet() {
 
   useEffect(() => {
     if (loading || !user || waitingOnUsername) return;
-    if (user && !profile) return;
     navigate(next, { replace: true });
-  }, [user, profile, loading, next, navigate, waitingOnUsername]);
+  }, [user, loading, next, navigate, waitingOnUsername]);
 
   const onEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
