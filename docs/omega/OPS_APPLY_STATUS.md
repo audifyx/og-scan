@@ -1,6 +1,6 @@
 # OrbitX OMEGA — ops apply status
 
-Last applied: 2026-07-25 (production Supabase project `ffjipnkhcebjvttliptb` / Soltools).
+Last applied: 2026-09-05 (production Supabase project `ffjipnkhcebjvttliptb` / Soltools).
 
 ## Done (production Supabase)
 
@@ -10,8 +10,9 @@ Last applied: 2026-07-25 (production Supabase project `ffjipnkhcebjvttliptb` / S
 | `20260725190100_oxw_rls_and_rpcs.sql` | Applied + recorded |
 | `20260725220000_oxw_record_trade_ownership.sql` | Applied + recorded (`oxw_record_trade` rejects cross-user signature reuse) |
 | `20260726010000_backend_security_hardening.sql` | Applied + recorded (RLS / grants / membership helpers) |
-| `20260905190000_backend_auth_rls_hardening.sql` | **Apply in SQL editor** on `ffjipnkhcebjvttliptb` (wallet nonce consume, profile RPC revoke, OXW private joins, token-chat wallet bind). Idempotent. |
+| `20260905190000_backend_auth_rls_hardening.sql` | Applied + recorded (`wallet_auth_used_nonces`, own-row `profiles` writes, `orbitx_upsert_profile` revoke from anon, OXW private joins, token-chat wallet bind) |
 | Edge functions `oxw-award-xp`, `oxw-lobby-sync`, `oxw-trade-ingest`, `oxw-notification-dispatch`, `oxw-token-scan` | Deployed |
+| Edge functions `wallet-auth`, `signup-guard`, `auth-signup`, `auth-signin`, `livekit-token`, `voice-token`, `rpc-proxy`, `solana-rpc-proxy` | Deployed 2026-09-05 (`verify_jwt` from `config.toml`) |
 | `OXW_WORKER_SECRET` | Set on Supabase project secrets (value not stored in git) |
 | Duplicate `[functions.wallet-auth]` in `supabase/config.toml` | Removed (CLI link/push blocker) |
 
@@ -32,7 +33,7 @@ Cron callers must hit `alerts-run` with `CRON_SECRET` (or `OXW_WORKER_SECRET`). 
 
 ```bash
 # Migration versions present remotely
-supabase migration list --linked | grep 20260725
+supabase migration list --linked | grep -E '20260725|20260905190000'
 
 # Tables
 # oxw_trade_history, oxw_notifications, oxw_progression, … (full oxw_* set)
