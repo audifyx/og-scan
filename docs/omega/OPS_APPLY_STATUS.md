@@ -10,6 +10,7 @@ Last applied: 2026-07-25 (production Supabase project `ffjipnkhcebjvttliptb` / S
 | `20260725190100_oxw_rls_and_rpcs.sql` | Applied + recorded |
 | `20260725220000_oxw_record_trade_ownership.sql` | Applied + recorded (`oxw_record_trade` rejects cross-user signature reuse) |
 | `20260726010000_backend_security_hardening.sql` | Applied + recorded (RLS / grants / membership helpers) |
+| `20260905190000_backend_auth_rls_hardening.sql` | **Apply in SQL editor** on `ffjipnkhcebjvttliptb` (wallet nonce consume, profile RPC revoke, OXW private joins, token-chat wallet bind). Idempotent. |
 | Edge functions `oxw-award-xp`, `oxw-lobby-sync`, `oxw-trade-ingest`, `oxw-notification-dispatch`, `oxw-token-scan` | Deployed |
 | `OXW_WORKER_SECRET` | Set on Supabase project secrets (value not stored in git) |
 | Duplicate `[functions.wallet-auth]` in `supabase/config.toml` | Removed (CLI link/push blocker) |

@@ -114,6 +114,15 @@ begin
     $p$;
   end if;
 
+  for r in
+    select policyname
+    from pg_policies
+    where schemaname = 'public' and tablename = 'profiles' and cmd = 'UPDATE'
+      and coalesce(qual, '') in ('true', '(true)')
+  loop
+    execute format('drop policy if exists %I on public.profiles', r.policyname);
+  end loop;
+
   if not exists (
     select 1 from pg_policies
     where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_update_own'
@@ -277,3 +286,34 @@ begin
       )
   $p$;
 end $$;
+
+-- 5) Token chat: poster wallet must belong to the signed-in user.
+do $$
+begin
+  if to_regclass('public.orbitx_token_chat') is null then
+    return;
+  end if;
+  if to_regclass('public.wallet_identities') is null then
+    return;
+  end if;
+
+  execute 'drop policy if exists orbitx_token_chat_insert_all on public.orbitx_token_chat';
+  execute 'drop policy if exists orbitx_token_chat_insert_auth on public.orbitx_token_chat';
+
+  execute $p$
+    create policy orbitx_token_chat_insert_auth on public.orbitx_token_chat
+      for insert to authenticated
+      with check (
+        (select auth.uid()) is not null
+        and char_length(body) between 1 and 500
+        and exists (
+          select 1 from public.wallet_identities w
+          where w.user_id = (select auth.uid())
+            and lower(w.wallet) = lower(orbitx_token_chat.wallet)
+        )
+      )
+  $p$;
+end $$;
+
+comment on table public.wallet_auth_used_nonces is
+  'One-time SIWS nonces. Service-role only; wallet-auth inserts then rejects duplicates.';
