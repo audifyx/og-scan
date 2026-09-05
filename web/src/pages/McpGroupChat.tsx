@@ -33,11 +33,19 @@ export default function McpGroupChat() {
     try {
       const path = slug ? `/api/mcp-gc?slug=${encodeURIComponent(slug)}` : "/api/mcp-gc?slug=list";
       const r = await fetch(path);
-      const data = await r.json();
+      const text = await r.text();
+      let data: { ok?: boolean; message?: string; chats?: GcChat[]; messages?: GcMessage[] } = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        if (slug) setError("Group chat API is not available here (needs /api/mcp-gc).");
+        else setChats([]);
+        return;
+      }
       if (slug) {
         if (!data?.ok) setError(data?.message || "Group chat not found");
         else {
-          setChat(data);
+          setChat(data as GcChat);
           setMessages(Array.isArray(data?.messages) ? data.messages : []);
         }
       } else {

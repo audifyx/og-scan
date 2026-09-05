@@ -33,10 +33,18 @@ export default function McpVoiceRoom() {
     try {
       const path = slug ? `/api/mcp-vc?slug=${encodeURIComponent(slug)}` : "/api/mcp-vc?slug=list";
       const r = await fetch(path);
-      const data = await r.json();
+      const text = await r.text();
+      let data: { ok?: boolean; message?: string; rooms?: VcRoom[] } = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        if (slug) setError("Voice API is not available here (needs /api/mcp-vc).");
+        else setRooms([]);
+        return;
+      }
       if (slug) {
         if (!data?.ok) setError(data?.message || "VC not found");
-        else setRoom(data);
+        else setRoom(data as VcRoom);
       } else {
         setRooms(Array.isArray(data?.rooms) ? data.rooms : []);
       }
