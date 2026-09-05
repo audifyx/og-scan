@@ -314,11 +314,20 @@
 }
 .ox-auth-back:hover { color: #fff; }
 
-/* Compact /auth surface used by WalletPickerModal (portal). */
+/* Compact /auth surface used by WalletPickerModal (portal).
+   Vars live on .ox-auth, which this picker is not inside — copy them here
+   so gold/blue buttons don't render as empty black slots. */
 .ox-auth-picker {
+  --ox-gold: #d4af37;
+  --ox-gold-hi: #f0c75e;
+  --ox-blue: #3b82f6;
+  --ox-blue-hi: #60a5fa;
+  --ox-silver: #a8b0bc;
   position: relative;
   width: 100%;
   max-width: 400px;
+  color: #fff;
+  font-family: "Manrope", system-ui, sans-serif;
 }
 .ox-auth-picker .ox-auth-card {
   padding-top: 28px;
@@ -348,4 +357,20 @@
 }
 .ox-auth-picker .ox-auth-wallet .ox-auth-btn {
   margin-top: 0;
+}
+.ox-auth-picker .ox-auth-btn {
+  background: linear-gradient(180deg, #f0c75e, #d4af37);
+  color: #0a0a0a;
+}
+.ox-auth-picker .ox-auth-btn--blue {
+  background: linear-gradient(180deg, #60a5fa, #3b82f6);
+  color: #fff;
+}
+.ox-auth-picker .ox-auth-btn--x {
+  background: #0a0a0a;
+  color: #fff;
+}
+.ox-auth-picker .ox-auth-btn--ghost {
+  background: transparent;
+  color: #fff;
 }
