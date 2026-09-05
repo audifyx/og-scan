@@ -23,6 +23,7 @@ import {
   hubWalletFromName,
   injectInstallHint,
   isInjectWalletReady,
+  subscribeInjectWallets,
   type InjectWallet,
   type InjectWalletSession,
 } from "@/lib/injectWallets";
@@ -85,7 +86,7 @@ const ConnectionCtx = createContext<{ connection: Connection } | null>(null);
 
 const INSTALL = {
   phantom: "https://phantom.app",
-  jupiter: "https://jup.ag/mobile",
+  jupiter: "https://jup.ag",
 } as const;
 
 function displayName(name: InjectWallet): HubWalletName {
@@ -100,15 +101,10 @@ export function OrbitxWalletHub({ children }: { children: ReactNode }) {
   const [phantomOn, setPhantomOn] = useState(() => isInjectWalletReady("phantom"));
   const [jupiterOn, setJupiterOn] = useState(() => isInjectWalletReady("jupiter"));
 
-  useEffect(() => {
-    const tick = () => {
-      setPhantomOn(isInjectWalletReady("phantom"));
-      setJupiterOn(isInjectWalletReady("jupiter"));
-    };
-    tick();
-    const id = window.setInterval(tick, 500);
-    return () => window.clearInterval(id);
-  }, []);
+  useEffect(() => subscribeInjectWallets(() => {
+    setPhantomOn(isInjectWalletReady("phantom"));
+    setJupiterOn(isInjectWalletReady("jupiter"));
+  }), []);
 
   const connectNamed = useCallback(async (name: InjectWallet) => {
     setConnecting(true);
@@ -165,7 +161,7 @@ export function OrbitxWalletHub({ children }: { children: ReactNode }) {
       publicKey: pk,
       connected: Boolean(active),
       connecting: connecting && selected === name,
-      readyState: ready ? WalletReadyState.Installed : WalletReadyState.NotDetected,
+      readyState: ready ? WalletReadyState.Installed : WalletReadyState.Loadable,
       connect: () => connectNamed(name),
       disconnect,
       signMessage: active?.signMessage,
@@ -175,8 +171,8 @@ export function OrbitxWalletHub({ children }: { children: ReactNode }) {
   }, [connectNamed, connecting, disconnect, selected, session]);
 
   const wallets: HubWallet[] = useMemo(() => [
-    { adapter: makeAdapter("phantom", phantomOn), readyState: phantomOn ? WalletReadyState.Installed : WalletReadyState.NotDetected },
-    { adapter: makeAdapter("jupiter", jupiterOn), readyState: jupiterOn ? WalletReadyState.Installed : WalletReadyState.NotDetected },
+    { adapter: makeAdapter("phantom", phantomOn), readyState: phantomOn ? WalletReadyState.Installed : WalletReadyState.Loadable },
+    { adapter: makeAdapter("jupiter", jupiterOn), readyState: jupiterOn ? WalletReadyState.Installed : WalletReadyState.Loadable },
   ], [jupiterOn, makeAdapter, phantomOn]);
 
   const wallet = wallets.find((w) => w.adapter.name === displayName(selected)) ?? wallets[0];

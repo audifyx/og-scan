@@ -13,10 +13,6 @@ import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
 export const TRADE_WALLET_NAMES = ["Phantom", "Jupiter"] as const;
 export type TradeWalletName = (typeof TRADE_WALLET_NAMES)[number];
 
-function isReady(rs: string): boolean {
-  return rs === "Installed" || rs === "Loadable";
-}
-
 export function TradeWalletPickerModal({
   open,
   onClose,
@@ -31,24 +27,15 @@ export function TradeWalletPickerModal({
   const rows = useMemo(() => {
     return TRADE_WALLET_NAMES.map((name) => {
       const hit = wallets.find((w) => adapterNameMatches(String(w.adapter.name), name));
-      const readyState = hit ? String(hit.readyState) : "NotDetected";
       return {
         name,
         icon: hit?.adapter.icon,
-        ready: isReady(readyState),
       };
     });
   }, [wallets]);
 
   const onPick = useCallback(
     async (name: TradeWalletName) => {
-      const row = rows.find((r) => r.name === name);
-      if (!row?.ready) {
-        toast.message(`${name} not installed`, {
-          description: phantomInstallHint(name),
-        });
-        return;
-      }
       setBusy(name);
       setMode("connected");
       try {
@@ -67,7 +54,7 @@ export function TradeWalletPickerModal({
         setBusy(null);
       }
     },
-    [rows, wallets, select, connect, setMode, onClose],
+    [wallets, select, connect, setMode, onClose],
   );
 
   if (!open || typeof document === "undefined") return null;
@@ -92,7 +79,7 @@ export function TradeWalletPickerModal({
           </button>
         </div>
         <p className="text-xs text-white/40">
-          Choose Phantom, Jupiter, or Solflare. Trades sign in-app — we never open wallet marketing sites.
+          Choose Phantom or Jupiter. Trades sign in-app — we never open wallet marketing sites.
         </p>
         <div className="space-y-2">
           {rows.map((w) => (
@@ -111,13 +98,9 @@ export function TradeWalletPickerModal({
               <span className="flex-1 text-sm font-semibold text-white">{w.name}</span>
               {busy === w.name ? (
                 <Loader2 className="h-4 w-4 animate-spin text-white/50" />
-              ) : w.ready ? (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">
-                  Detected
-                </span>
               ) : (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">
-                  Not installed
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">
+                  Connect
                 </span>
               )}
             </button>

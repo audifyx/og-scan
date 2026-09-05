@@ -1899,14 +1899,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
       const ready = rs === "Installed" || rs === "Loadable";
       return { name, icon: hit?.adapter.icon, ready };
     });
-    const connectOne = async (name: string, ready: boolean) => {
-      if (!ready) {
-        toast({
-          title: `${name} not installed`,
-          description: phantomInstallHint(name),
-        });
-        return;
-      }
+    const connectOne = async (name: string, _ready: boolean) => {
       setWalletMode("connected");
       setShowWalletPicker(false);
       try {
@@ -1947,10 +1940,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               >
                 {w.icon ? <img src={w.icon} alt={w.name} className="w-8 h-8 rounded-lg" /> : <Wallet className="w-8 h-8 text-white/40" />}
                 <span className="font-semibold text-sm">{w.name}</span>
-                <span className={`ml-auto text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                  w.ready ? "text-emerald-400/80" : "text-white/35"
-                }`}>
-                  {w.ready ? "Detected" : "Not installed"}
+                <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">
+                  Connect
                 </span>
               </button>
             ))}

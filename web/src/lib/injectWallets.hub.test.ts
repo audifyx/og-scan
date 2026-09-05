@@ -7,6 +7,7 @@ describe("hubWalletFromName", () => {
     expect(hubWalletFromName("Phantom Wallet")).toBe("phantom");
     expect(hubWalletFromName("Jupiter")).toBe("jupiter");
     expect(hubWalletFromName("Jupiter Wallet")).toBe("jupiter");
+    expect(hubWalletFromName("Mobile Wallet Adapter")).toBe("jupiter");
   });
 
   it("rejects every other wallet", () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { signInWithInjectWallet, connectInjectWallet, isInjectWalletReady, hubWalletFromName, type InjectWallet } from "@/lib/injectWallets";
+import { signInWithInjectWallet, connectInjectWallet, isInjectWalletReady, hubWalletFromName, subscribeInjectWallets, type InjectWallet } from "@/lib/injectWallets";
 import { WalletReadyState } from "@/wallets/hub";
 
 export interface PickableWallet {
@@ -11,24 +11,19 @@ export interface PickableWallet {
 
 const HUB: Array<{ id: InjectWallet; name: string; url: string }> = [
   { id: "phantom", name: "Phantom", url: "https://phantom.app" },
-  { id: "jupiter", name: "Jupiter", url: "https://jup.ag/mobile" },
+  { id: "jupiter", name: "Jupiter", url: "https://jup.ag" },
 ];
 
 export function useWalletSignIn() {
   const [busy, setBusy] = useState<string | null>(null);
   const [readyAt, setReadyAt] = useState(0);
 
-  useEffect(() => {
-    const tick = () => setReadyAt((n) => n + 1);
-    tick();
-    const id = window.setInterval(tick, 400);
-    return () => window.clearInterval(id);
-  }, []);
+  useEffect(() => subscribeInjectWallets(() => setReadyAt((n) => n + 1)), []);
 
   const pickable: PickableWallet[] = useMemo(() => HUB.map((w) => ({
     name: w.name,
     icon: "",
-    readyState: isInjectWalletReady(w.id) ? WalletReadyState.Installed : WalletReadyState.NotDetected,
+    readyState: isInjectWalletReady(w.id) ? WalletReadyState.Installed : WalletReadyState.Loadable,
     adapter: { name: w.name, icon: "", url: w.url },
   })), [readyAt]);
 
