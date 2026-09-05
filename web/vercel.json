@@ -364,6 +364,9 @@
     },
     "api/kol.ts": {
       "maxDuration": 30
+    },
+    "api/auth-login.ts": {
+      "maxDuration": 25
     }
   },
   "crons": [

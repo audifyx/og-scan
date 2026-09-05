@@ -3,7 +3,7 @@ import { signInWithWallet } from "./walletAuth";
 
 const invokeEdgeFn = vi.fn();
 const getSession = vi.fn();
-const setSession = vi.fn();
+const installSupabaseSession = vi.fn();
 
 vi.mock("@/lib/edgeFn", () => ({
   invokeEdgeFn: (...args: unknown[]) => invokeEdgeFn(...args),
@@ -13,23 +13,26 @@ vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
       getSession: (...args: unknown[]) => getSession(...args),
-      setSession: (...args: unknown[]) => setSession(...args),
     },
   },
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_ANON_KEY: "anon-key",
 }));
 
+vi.mock("@/lib/authSession", () => ({
+  installSupabaseSession: (...args: unknown[]) => installSupabaseSession(...args),
+}));
+
 describe("signInWithWallet", () => {
   beforeEach(() => {
     invokeEdgeFn.mockReset();
     getSession.mockReset();
-    setSession.mockReset();
+    installSupabaseSession.mockReset();
     getSession.mockResolvedValue({ data: { session: null } });
-    setSession.mockResolvedValue({ error: null });
+    installSupabaseSession.mockResolvedValue(undefined);
   });
 
-  it("requests a nonce, then verifies with that nonce before setSession", async () => {
+  it("requests a nonce, then verifies with that nonce before persisting the session", async () => {
     invokeEdgeFn
       .mockResolvedValueOnce({ nonce: "n1", message: "sign this n1" })
       .mockResolvedValueOnce({ access_token: "at", refresh_token: "rt", isNew: false });
@@ -44,7 +47,7 @@ describe("signInWithWallet", () => {
       pubkey: "WalletPubkey111",
       nonce: "n1",
     });
-    expect(setSession).toHaveBeenCalledWith({ access_token: "at", refresh_token: "rt" });
+    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at", refresh_token: "rt" });
   });
 
   it("does not overwrite an existing email session", async () => {
@@ -69,6 +72,6 @@ describe("signInWithWallet", () => {
     expect(result.isNew).toBe(false);
     expect(getSession).not.toHaveBeenCalled();
     expect(invokeEdgeFn).toHaveBeenCalled();
-    expect(setSession).toHaveBeenCalledWith({ access_token: "at2", refresh_token: "rt2" });
+    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at2", refresh_token: "rt2" });
   });
 });

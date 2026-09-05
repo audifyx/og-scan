@@ -1,7 +1,4 @@
-import { supabase } from "@/lib/supabase";
-
 export const AUTH_STORAGE_KEY = "sol-tools-auth";
-export const SET_SESSION_TIMEOUT_MS = 8_000;
 
 export type SessionTokens = { access_token: string; refresh_token: string };
 
@@ -27,7 +24,7 @@ function jwtPayload(access: string): Record<string, unknown> | null {
   }
 }
 
-/** Write the same shape supabase-js persists, then reload so a hung auth lock cannot block login. */
+/** Write the same blob supabase-js reads on boot. Do not call setSession — it hits hung GoTrue. */
 export function persistSessionLocally(tokens: SessionTokens, user?: Record<string, unknown> | null): void {
   if (typeof localStorage === "undefined") return;
   const payload = jwtPayload(tokens.access_token);
@@ -50,18 +47,11 @@ export function persistSessionLocally(tokens: SessionTokens, user?: Record<strin
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
+/** Persist tokens and reload so boot hydrates from storage instead of waiting on GoTrue. */
 export async function installSupabaseSession(
   tokens: SessionTokens,
   user?: Record<string, unknown> | null,
 ): Promise<void> {
-  const attempt = supabase.auth.setSession(tokens);
-  const timed = await Promise.race([
-    attempt.then((r) => ({ timedOut: false as const, r })),
-    new Promise<{ timedOut: true }>((resolve) => {
-      globalThis.setTimeout(() => resolve({ timedOut: true }), SET_SESSION_TIMEOUT_MS);
-    }),
-  ]);
-  if (!timed.timedOut && !timed.r.error) return;
   persistSessionLocally(tokens, user);
   if (typeof window !== "undefined") window.location.reload();
 }

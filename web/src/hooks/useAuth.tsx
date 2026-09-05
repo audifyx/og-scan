@@ -51,6 +51,42 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function processPendingReferral(userId: string) {
+  const refCode = localStorage.getItem("og_ref_code");
+  if (!refCode) return;
+  localStorage.removeItem("og_ref_code");
+  void (async () => {
+    try {
+      const { error: fnErr } = await supabase.functions.invoke("process-referral", {
+        body: { inviteeId: userId, inviteCode: refCode },
+      });
+      if (fnErr) throw fnErr;
+    } catch (edgeFnErr) {
+      console.warn("Edge function failed, using direct referral insert:", edgeFnErr);
+      try {
+        const { data: inviter } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("referral_code", refCode)
+          .maybeSingle();
+        if (inviter && inviter.user_id !== userId) {
+          await supabase.from("referrals").insert({
+            inviter_id: inviter.user_id,
+            invitee_id: userId,
+            code: refCode,
+          });
+          await supabase
+            .from("profiles")
+            .update({ referred_by: inviter.user_id })
+            .eq("user_id", userId);
+        }
+      } catch (directErr) {
+        console.error("Direct referral insert also failed:", directErr);
+      }
+    }
+  })();
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -106,7 +142,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(sess?.user ?? null);
       if (sess?.user) {
         setSentryUser(sess.user.id, sess.user.user_metadata?.username);
-        setTimeout(() => fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata), 0);
+        setTimeout(() => {
+          fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata);
+          processPendingReferral(sess.user.id);
+        }, 0);
       } else {
         clearSentryUser();
         setProfile(null);
@@ -121,7 +160,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session: sess } }) => {
       setSession(sess);
       setUser(sess?.user ?? null);
-      if (sess?.user) fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata);
+      if (sess?.user) {
+        fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata);
+        processPendingReferral(sess.user.id);
+      }
       if (!resolved) {
         resolved = true;
         clearTimeout(safetyTimeout);
@@ -162,61 +204,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (signInErr) {
       return { error: signInErr instanceof Error ? signInErr : new Error(emailAuthErrorMessage(signInErr)), userId: null };
     }
-    const { data, error } = await supabase.auth.getSession();
-    const signedInUser = data?.session?.user ?? null;
-
-    // Process referral if ?ref= was captured
-    if (!error && signedInUser) {
-      const refCode = localStorage.getItem("og_ref_code");
-      if (refCode) {
-        localStorage.removeItem("og_ref_code");
-        // Try edge function first, fall back to direct insert
-        (async () => {
-          try {
-            const { error: fnErr } = await supabase.functions.invoke("process-referral", {
-              body: { inviteeId: signedInUser.id, inviteCode: refCode },
-            });
-            if (fnErr) throw fnErr;
-          } catch (edgeFnErr) {
-            console.warn("Edge function failed, using direct referral insert:", edgeFnErr);
-            try {
-              // Look up inviter by referral_code
-              const { data: inviter } = await supabase
-                .from("profiles")
-                .select("user_id")
-                .eq("referral_code", refCode)
-                .maybeSingle();
-              if (inviter && inviter.user_id !== signedInUser.id) {
-                // Insert referral directly (count-based, no points)
-                await supabase.from("referrals").insert({
-                  inviter_id: inviter.user_id,
-                  invitee_id: signedInUser.id,
-                  code: refCode,
-                });
-                // Set referred_by on invitee profile
-                await supabase
-                  .from("profiles")
-                  .update({ referred_by: inviter.user_id })
-                  .eq("user_id", signedInUser.id);
-              }
-            } catch (directErr) {
-              console.error("Direct referral insert also failed:", directErr);
-            }
-          }
-        })();
-      }
-      // Track sign-up event
-      trackActivity({
-        user_id: signedInUser.id,
-        activity_type: "auth.signup",
-        title: "Signed up",
-        description: `New account created with username ${cleanUsername}`,
-        data: { username: cleanUsername },
-        is_public: false,
-      });
-    }
-
-    return { error: error as Error | null, userId: signedInUser?.id ?? null };
+    // installSupabaseSession reloads; referral is processed after boot from og_ref_code.
+    return { error: null, userId: null };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -226,31 +215,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       return { error: err instanceof Error ? err : new Error(emailAuthErrorMessage(err)) };
     }
-    const { data } = await supabase.auth.getSession();
-    if (data?.session?.user) {
-      trackActivity({
-        user_id: data.session.user.id,
-        activity_type: "auth.signin",
-        title: "Signed in",
-        data: { method: "email" },
-        is_public: false,
-      });
-    }
     return { error: null };
   };
 
   const signOut = async () => {
-    // Track sign-out before clearing state
     if (user) {
-      await trackActivity({
+      void trackActivity({
         user_id: user.id,
         activity_type: "auth.signout",
         title: "Signed out",
         is_public: false,
       });
     }
-    await supabase.auth.signOut();
+    try { localStorage.removeItem("sol-tools-auth"); } catch { /* noop */ }
     setProfile(null);
+    setUser(null);
+    setSession(null);
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* hung GoTrue — local session already cleared */
+    }
   };
 
   const resetPassword = async (email: string) => {

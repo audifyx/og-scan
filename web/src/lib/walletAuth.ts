@@ -23,12 +23,21 @@ export async function signInWithWallet(
   // Explicit wallet login (e.g. /auth) must not wait on a hung getSession /
   // token refresh — we are about to overwrite the session anyway.
   if (opts?.replaceEmailSession !== true) {
-    const { data: { session: existing } } = await supabase.auth.getSession();
-    const existingEmail = existing?.user?.email || "";
-    const isEmailSession = !!existingEmail && !/@wallet\.orbitx\.app$/i.test(existingEmail);
-    if (isEmailSession) {
-      // Keep email login; caller can still use the connected wallet for txs.
-      return { isNew: false };
+    try {
+      const existing = await Promise.race([
+        supabase.auth.getSession().then((r) => r.data.session),
+        new Promise<null>((resolve) => {
+          globalThis.setTimeout(() => resolve(null), 2_000);
+        }),
+      ]);
+      const existingEmail = existing?.user?.email || "";
+      const isEmailSession = !!existingEmail && !/@wallet\.orbitx\.app$/i.test(existingEmail);
+      if (isEmailSession) {
+        // Keep email login; caller can still use the connected wallet for txs.
+        return { isNew: false };
+      }
+    } catch {
+      /* hung GoTrue — continue wallet login */
     }
   }
 

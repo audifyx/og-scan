@@ -1,6 +1,6 @@
 /** Bounded fetch so a hung GoTrue/auth call cannot hold the supabase-js lock forever. */
 
-export const AUTH_FETCH_TIMEOUT_MS = 12_000;
+export const AUTH_FETCH_TIMEOUT_MS = 4_000;
 export const EDGE_FN_TIMEOUT_MS = 20_000;
 export const EDGE_FN_PROXY_TIMEOUT_MS = 20_000;
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;

@@ -12,6 +12,10 @@ describe("fetchTimeout", () => {
     vi.useRealTimers();
   });
 
+  it("keeps GoTrue fetches under a short abort so boot cannot hang ~43s", () => {
+    expect(AUTH_FETCH_TIMEOUT_MS).toBe(4_000);
+  });
+
   it("recognizes GoTrue auth URLs", () => {
     expect(isAuthApiUrl("https://ffjipnkhcebjvttliptb.supabase.co/auth/v1/token?grant_type=password")).toBe(true);
     expect(isAuthApiUrl("https://ffjipnkhcebjvttliptb.supabase.co/rest/v1/profiles")).toBe(false);

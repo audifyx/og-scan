@@ -1,40 +1,91 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emailAuthErrorMessage, signInWithEmailPassword } from "./emailAuth";
 
-const signInWithPassword = vi.fn();
+const install = vi.fn();
+vi.mock("@/lib/authSession", async () => {
+  const actual = await vi.importActual<typeof import("./authSession")>("./authSession");
+  return {
+    ...actual,
+    installSupabaseSession: (...args: unknown[]) => install(...args),
+  };
+});
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      signInWithPassword: (...args: unknown[]) => signInWithPassword(...args),
-    },
-  },
-}));
-
-describe("emailAuth", () => {
+describe("signInWithEmailPassword", () => {
   beforeEach(() => {
-    signInWithPassword.mockReset();
+    install.mockReset();
+    install.mockResolvedValue(undefined);
+    vi.unstubAllGlobals();
   });
 
-  it("maps GoTrue credential errors to a friendly message", () => {
-    expect(emailAuthErrorMessage("Auth error: Invalid login credentials")).toBe("Invalid email or password");
-    expect(emailAuthErrorMessage("email not confirmed")).toMatch(/Confirm your email/i);
-  });
-
-  it("signs in with supabase.auth.signInWithPassword", async () => {
-    signInWithPassword.mockResolvedValue({
-      data: { session: { access_token: "at" }, user: { id: "u1" } },
-      error: null,
+  it("posts to same-origin /api/auth-login and persists tokens without calling GoTrue from the browser", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "at",
+        refresh_token: "rt",
+        user: { id: "u1", email: "me@orbitx.world" },
+      }),
     });
-    await signInWithEmailPassword("you@email.com", "secret");
-    expect(signInWithPassword).toHaveBeenCalledWith({ email: "you@email.com", password: "secret" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await signInWithEmailPassword("me@orbitx.world", "secret");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth-login",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body).toEqual({ email: "me@orbitx.world", password: "secret" });
+    expect(install).toHaveBeenCalledWith(
+      { access_token: "at", refresh_token: "rt" },
+      { id: "u1", email: "me@orbitx.world" },
+    );
   });
 
-  it("maps invalid credentials from GoTrue", async () => {
-    signInWithPassword.mockResolvedValue({
-      data: { session: null, user: null },
-      error: { message: "Invalid login credentials" },
-    });
-    await expect(signInWithEmailPassword("you@email.com", "nope")).rejects.toThrow("Invalid email or password");
+  it("throws a short error when the login API times out", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("Aborted", "AbortError")),
+    );
+    await expect(signInWithEmailPassword("me@orbitx.world", "secret")).rejects.toThrow(
+      /timed out/i,
+    );
+    expect(install).not.toHaveBeenCalled();
+  });
+
+  it("maps invalid credentials from the API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "INVALID_CREDENTIALS" }),
+      }),
+    );
+    await expect(signInWithEmailPassword("me@orbitx.world", "bad")).rejects.toThrow(
+      "Invalid email or password",
+    );
+  });
+});
+
+describe("emailAuthErrorMessage", () => {
+  it("maps invalid-login-credentials to a friendly sentence", () => {
+    expect(emailAuthErrorMessage({ message: "Invalid login credentials" })).toBe(
+      "Invalid email or password",
+    );
+  });
+
+  it("maps email-not-confirmed without dumping raw GoTrue text", () => {
+    expect(emailAuthErrorMessage({ message: "Email not confirmed" })).toBe(
+      "Confirm your email first — check your inbox",
+    );
+  });
+
+  it("falls back to a short unknown-error line", () => {
+    expect(emailAuthErrorMessage(null)).toBe("Sign-in failed");
   });
 });
