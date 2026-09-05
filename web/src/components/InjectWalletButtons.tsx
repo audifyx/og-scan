@@ -76,7 +76,7 @@ export function InjectWalletButtons({
         {jupiterOn ? "Connect Jupiter" : "Install Jupiter"}
       </button>
       <p className="ox-auth-sub" style={{ margin: "12px 0 0" }}>
-        Uses the Phantom / Jupiter extension directly — no wallet adapter.
+        Uses Phantom / Jupiter directly — custom hub, no wallet adapter.
       </p>
       {(!phantomOn || !jupiterOn) && (
         <div className="ox-auth-links" style={{ marginTop: 10 }}>

@@ -10,9 +10,10 @@
  * without a key (locked extension). Always wait/poll, and reconnect when
  * connected-but-keyless.
  */
-import type { Adapter, WalletName } from "@solana/wallet-adapter-base";
+import type { Adapter } from "@solana/wallet-adapter-base";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
+import { connectInjectWallet, hubWalletFromName } from "@/lib/injectWallets";
 
 export type WalletLike = {
   adapter: Adapter & { isLegacyInject?: boolean; connecting?: boolean };
@@ -207,79 +208,32 @@ export async function waitForPublicKey(
   }
 }
 
-async function disconnectQuietly(adapter: Adapter): Promise<void> {
-  try {
-    await adapter.disconnect();
-  } catch {
-    /* already disconnected / locked */
-  }
-}
-
 export async function connectSolanaWallet(opts: {
-  wallets: readonly WalletLike[];
-  select: (name: WalletName) => void;
-  connect: () => Promise<void>;
+  wallets?: readonly WalletLike[];
+  select?: (name: string) => void;
+  connect?: () => Promise<void>;
   preferredName?: string;
   getContextPublicKey?: () => string | null;
 }): Promise<string> {
-  const pick = findConnectableWallet(opts.wallets, opts.preferredName);
-  if (!pick) {
-    const wanted = opts.preferredName || "Phantom";
-    throw new Error(phantomInstallHint(wanted));
+  const wanted = opts.preferredName || "Phantom";
+  const mapped = hubWalletFromName(wanted);
+  if (!mapped) {
+    throw new Error("OrbitX wallet connect supports Phantom and Jupiter only.");
   }
-
-  const adapter = pick.adapter;
-  const extra = () => opts.getContextPublicKey?.() || null;
-  opts.select(adapter.name as WalletName);
-  // Allow WalletProvider to adopt the selected adapter before context.connect().
-  await sleep(100);
-
-  const connecting = Boolean(adapter.connecting);
-  if (connecting) {
-    const during = await waitForPublicKey(adapter, 8000, extra);
-    if (during) return during;
-  }
-
-  let pk = readAdapterPublicKey(adapter) || extra();
-  if (pk) return pk;
-
-  // Stale autoConnect: adapter.connected is true but the extension never
-  // handed over a public key (locked, or Standard accounts not hydrated).
-  if (adapter.connected || adapter.connecting) {
-    await disconnectQuietly(adapter);
-    await sleep(50);
-  }
-
-  if (!adapter.connected) {
+  opts.select?.(mapped === "jupiter" ? "Jupiter" : "Phantom");
+  if (opts.connect) {
     try {
-      await withTimeout(opts.connect(), 5000, `${adapter.name} did not respond. Try another detected wallet.`);
-    } catch {
-      /* context connect can race — fall through */
+      await withTimeout(opts.connect(), 20_000, `${wanted} timed out. Unlock the extension and retry.`);
+      const fromCtx = opts.getContextPublicKey?.();
+      if (fromCtx) return fromCtx;
+    } catch (err) {
+      const fromCtx = opts.getContextPublicKey?.();
+      if (fromCtx) return fromCtx;
+      throw err;
     }
   }
-
-  pk = readAdapterPublicKey(adapter) || extra();
-  if (pk) return pk;
-
-  // Standard adapters sometimes mark connected before accounts hydrate.
-  if (adapter.connected) {
-    pk = await waitForPublicKey(adapter, 400, extra);
-    if (pk) return pk;
-  }
-
-  if (!adapter.connected || !readAdapterPublicKey(adapter)) {
-    if (adapter.connecting || (adapter.connected && !readAdapterPublicKey(adapter))) {
-      await disconnectQuietly(adapter);
-      await sleep(50);
-    }
-    await withTimeout(adapter.connect(), 12000, `${adapter.name} timed out. Open its app or extension, then try again.`);
-  }
-
-  pk = await waitForPublicKey(adapter, 2500, extra);
-  if (!pk) {
-    throw new Error(`${adapter.name} connected but returned no public key — unlock the extension and retry`);
-  }
-  return pk;
+  const session = await connectInjectWallet(mapped);
+  return session.publicKey;
 }
 
 type InjectedProvider = {

@@ -1,119 +1,59 @@
-// Shared wallet connect + Sign-In-With-Solana hook. Works with any wallet the
-// adapter detects (Phantom, Jupiter, Solflare, Backpack, …) via Wallet Standard.
-import { useCallback, useMemo, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import type { Adapter, WalletName, WalletReadyState } from "@solana/wallet-adapter-base";
-import { signInWithWallet } from "@/lib/walletAuth";
-import { adapterNameMatches, collapseDuplicateWallets, connectInjectedWallet, connectSolanaWallet, findConnectableWallet, isInjectedWalletPresent } from "@/lib/connectSolanaWallet";
-import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { signInWithInjectWallet, connectInjectWallet, isInjectWalletReady, hubWalletFromName, type InjectWallet } from "@/lib/injectWallets";
+import { WalletReadyState } from "@/wallets/hub";
 
-export interface PickableWallet { name: string; icon: string; readyState: WalletReadyState; adapter: Adapter }
-
-type SignMessageAdapter = Adapter & {
-  signMessage?: (m: Uint8Array) => Promise<unknown>;
-};
-
-async function signMessageBytes(adapter: SignMessageAdapter, message: Uint8Array): Promise<Uint8Array> {
-  if (typeof adapter.signMessage !== "function") {
-    throw new Error("wallet does not support message signing");
-  }
-  const signature = await Promise.race([
-    adapter.signMessage(message),
-    new Promise<never>((_, reject) => globalThis.setTimeout(() => reject(new Error(`${adapter.name} signature request timed out. Reopen the wallet and try again.`)), 30000)),
-  ]);
-  return normalizeSignatureBytes(signature);
+export interface PickableWallet {
+  name: string;
+  icon: string;
+  readyState: WalletReadyState;
+  adapter: { name: string; icon: string; url: string };
 }
 
-function findAdapter(wallets: ReturnType<typeof useWallet>["wallets"], name: string): SignMessageAdapter | null {
-  const hit = wallets.find((x) => adapterNameMatches(String(x.adapter.name), name));
-  return (hit?.adapter as SignMessageAdapter | undefined) ?? null;
-}
+const HUB: Array<{ id: InjectWallet; name: string; url: string }> = [
+  { id: "phantom", name: "Phantom", url: "https://phantom.app" },
+  { id: "jupiter", name: "Jupiter", url: "https://jup.ag/mobile" },
+];
 
 export function useWalletSignIn() {
-  const { wallets, select, disconnect, connect } = useWallet();
   const [busy, setBusy] = useState<string | null>(null);
+  const [readyAt, setReadyAt] = useState(0);
 
-  // Installed / loadable wallets first. Collapse Phantom/Jupiter duplicates so
-  // the picker shows the Wallet Standard instance (Installed) instead of the
-  // legacy inject adapter (NotDetected) that used to win by list order.
-  const pickable: PickableWallet[] = useMemo(() => {
-    const rank = (s: string) => (s === "Installed" ? 0 : s === "Loadable" ? 1 : 2);
-    return collapseDuplicateWallets(wallets)
-      .map((w) => {
-        const name = String(w.adapter.name);
-        const readyState = isInjectedWalletPresent(name) ? "Installed" as WalletReadyState : w.readyState;
-        return { name, icon: w.adapter.icon, readyState, adapter: w.adapter };
-      })
-      .sort((a, b) => rank(String(a.readyState)) - rank(String(b.readyState)) || a.name.localeCompare(b.name));
-  }, [wallets]);
+  useEffect(() => {
+    const tick = () => setReadyAt((n) => n + 1);
+    tick();
+    const id = window.setInterval(tick, 400);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const pickable: PickableWallet[] = useMemo(() => HUB.map((w) => ({
+    name: w.name,
+    icon: "",
+    readyState: isInjectWalletReady(w.id) ? WalletReadyState.Installed : WalletReadyState.NotDetected,
+    adapter: { name: w.name, icon: "", url: w.url },
+  })), [readyAt]);
 
   const signInWith = useCallback(async (name: string, opts?: { replaceEmailSession?: boolean; connectOnly?: boolean }): Promise<{ isNew: boolean }> => {
+    const id = hubWalletFromName(name);
+    if (!id) throw new Error("OrbitX wallet connect supports Phantom and Jupiter only.");
     setBusy(name);
     try {
-      // Prefer the extension inject (window.solana / window.phantom / window.jupiter).
-      // Wallet-adapter often reports connected with no publicKey.
-      const injected = await connectInjectedWallet(name).catch((err) => {
-        if (isInjectedWalletPresent(name)) throw err;
-        return null;
-      });
-      if (injected) {
-        if (opts?.connectOnly) return { isNew: false };
-        try {
-          return await signInWithWallet(injected.publicKey, injected.signMessage, {
-            replaceEmailSession: opts?.replaceEmailSession,
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (/reject|cancel|denied/i.test(msg)) throw new Error(`${name} signature was rejected`);
-          if (/invalid signature/i.test(msg)) {
-            throw new Error(`${name} signed, but verification failed — reconnect ${name} and try again`);
-          }
-          throw err instanceof Error ? err : new Error(msg || "Sign-in failed");
-        }
+      if (opts?.connectOnly) {
+        await connectInjectWallet(id);
+        return { isNew: false };
       }
-
-      const selected = findConnectableWallet(wallets, name);
-      const adapter = (selected?.adapter as SignMessageAdapter | undefined) ?? findAdapter(wallets, name);
-      if (!adapter) throw new Error(`${name} isn't detected in this browser. Install the ${name} extension, then try again.`);
-      const listed = wallets.find((x) => x.adapter === adapter);
-      const rs = String(listed?.readyState ?? "");
-      if (rs !== "Installed" && rs !== "Loadable") {
-        throw new Error(`${name} isn't detected in this browser. Install the ${name} extension (or open OrbitX inside the ${name} app), then try again.`);
-      }
-
-      const pubkey = await connectSolanaWallet({
-        wallets,
-        select: select as (n: WalletName) => void,
-        connect,
-        preferredName: adapter.name,
-      });
-
-      await new Promise((r) => setTimeout(r, 60));
-
-      const live = (findConnectableWallet(wallets, adapter.name)?.adapter as SignMessageAdapter | undefined) ?? adapter;
-
-      if (opts?.connectOnly) return { isNew: false };
-
-      if (typeof live.signMessage !== "function") {
-        throw new Error(`${name} can't sign the login message here. Open OrbitX in a normal browser tab with the ${name} extension enabled.`);
-      }
-
-      try {
-        return await signInWithWallet(pubkey, (m) => signMessageBytes(live, m), {
-          replaceEmailSession: opts?.replaceEmailSession,
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/reject|cancel|denied/i.test(msg)) throw new Error(`${name} signature was rejected`);
-        if (/invalid signature/i.test(msg)) {
-          throw new Error(`${name} signed, but verification failed — reconnect ${name} and try again`);
-        }
-        throw err instanceof Error ? err : new Error(msg || "Sign-in failed");
-      }
+      return await signInWithInjectWallet(id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/reject|cancel|denied/i.test(msg)) throw new Error(`${id === "jupiter" ? "Jupiter" : "Phantom"} signature was rejected`);
+      throw err instanceof Error ? err : new Error(msg || "Sign-in failed");
     } finally {
       setBusy(null);
     }
-  }, [wallets, select, connect]);
+  }, []);
+
+  const disconnect = useCallback(async () => {
+    /* hub disconnect is owned by OrbitxWalletHub */
+  }, []);
 
   return { pickable, signInWith, busy, disconnect };
 }

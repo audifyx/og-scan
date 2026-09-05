@@ -11,6 +11,9 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}", "api/orbitx/**/*.test.js", "api/*.{test,spec}.{js,ts}", "shared/**/*.test.js"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      "@solana/wallet-adapter-react": path.resolve(__dirname, "./src/wallets/hub.tsx"),
+    },
   },
 });

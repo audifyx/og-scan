@@ -1,5 +1,5 @@
 /**
- * OrbitX Trade wallet chooser — Phantom / Jupiter / Solflare.
+ * OrbitX Trade wallet chooser — Phantom / Jupiter only.
  * User picks; we never auto-select Solflare (or any other) on Connect.
  */
 import { useCallback, useMemo, useState, type ReactNode } from "react";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { adapterNameMatches, connectSolanaWallet, phantomInstallHint } from "@/lib/connectSolanaWallet";
 import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
 
-export const TRADE_WALLET_NAMES = ["Phantom", "Jupiter", "Solflare"] as const;
+export const TRADE_WALLET_NAMES = ["Phantom", "Jupiter"] as const;
 export type TradeWalletName = (typeof TRADE_WALLET_NAMES)[number];
 
 function isReady(rs: string): boolean {

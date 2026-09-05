@@ -79,6 +79,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@solana/wallet-adapter-react": path.resolve(__dirname, "./src/wallets/hub.tsx"),
     },
   },
   optimizeDeps: {

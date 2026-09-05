@@ -18,7 +18,8 @@
     "noImplicitAny": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@solana/wallet-adapter-react": ["./src/wallets/hub.tsx"]
     }
   },
   "include": ["src"]

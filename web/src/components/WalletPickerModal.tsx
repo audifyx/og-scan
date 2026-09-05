@@ -1,5 +1,4 @@
-// Wallet chooser — lists every wallet the adapter detects (Phantom, Jupiter,
-// Solflare, Backpack, …). Installed wallets first.
+// Custom hub chooser — Phantom and Jupiter only (extension inject, no wallet-adapter).
 import { createPortal } from "react-dom";
 import { X, Loader2, Wallet, ExternalLink } from "lucide-react";
 import type { PickableWallet } from "@/hooks/useWalletSignIn";
@@ -10,26 +9,42 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
 }) {
   if (!open) return null;
   if (typeof document === "undefined") return null;
-  // Only Installed = extension actually present. Loadable (Ledger/Torus/Solflare
-  // without the extension) used to show as "Detected" and then connect with no key.
-  const installed = wallets.filter((w) => w.readyState === "Installed");
-  const loadable = wallets.filter((w) => w.readyState === "Loadable");
-  const rest = wallets.filter((w) => w.readyState !== "Installed" && w.readyState !== "Loadable");
+  const rows = (wallets.length ? wallets : [
+    { name: "Phantom", icon: "", readyState: "NotDetected" as const, adapter: { name: "Phantom", icon: "", url: "https://phantom.app" } },
+    { name: "Jupiter", icon: "", readyState: "NotDetected" as const, adapter: { name: "Jupiter", icon: "", url: "https://jup.ag/mobile" } },
+  ]).filter((w) => /phantom|jupiter/i.test(w.name));
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a1220] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-base font-black text-white"><Wallet className="h-4 w-4 text-og-cyan" /> Connect a wallet</h3>
-          <button onClick={onClose}><X className="h-4 w-4 text-white/50" /></button>
+          <button type="button" onClick={onClose}><X className="h-4 w-4 text-white/50" /></button>
         </div>
-        <p className="mb-4 text-[12px] text-white/50">Your wallet is your login. You'll sign a free message to prove ownership — no transaction, no fees.</p>
+        <p className="mb-4 text-[12px] text-white/50">Phantom or Jupiter. You&apos;ll sign a free message to log in — no transaction, no fees.</p>
         <div className="space-y-1.5">
-          {installed.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} kind="installed" />)}
-          {installed.length === 0 && <p className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-[12px] text-white/50">No Solana wallet detected. Install Phantom or Jupiter, then reload.</p>}
-          {loadable.length > 0 && <div className="pt-2 text-[10px] font-bold uppercase tracking-widest text-white/30">Other</div>}
-          {loadable.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} kind="loadable" />)}
-          {rest.length > 0 && <div className="pt-2 text-[10px] font-bold uppercase tracking-widest text-white/30">More</div>}
-          {rest.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} kind="missing" />)}
+          {rows.map((w) => {
+            const installed = w.readyState === "Installed";
+            const url = (w.adapter as { url?: string })?.url;
+            if (!installed) {
+              return (
+                <a key={w.name} href={url || "#"} target="_blank" rel="noreferrer"
+                  className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-left opacity-80 transition hover:opacity-100">
+                  <Wallet className="h-6 w-6 text-white/60" />
+                  <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-white/40">Install <ExternalLink className="h-3 w-3" /></span>
+                </a>
+              );
+            }
+            return (
+              <button key={w.name} type="button" onClick={() => onPick(w.name)} disabled={!!busy}
+                className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-og-cyan/50 hover:bg-white/[0.06] disabled:opacity-50">
+                <Wallet className="h-6 w-6 text-og-cyan" />
+                <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
+                {busy === w.name ? <Loader2 className="h-4 w-4 animate-spin text-og-cyan" /> :
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-og-lime">Detected</span>}
+              </button>
+            );
+          })}
         </div>
         <div className="mt-4 flex items-center justify-center gap-3 text-[11px] text-white/40">
           <a href="https://phantom.app" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-og-cyan">Get Phantom <ExternalLink className="h-3 w-3" /></a>
@@ -38,34 +53,5 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
       </div>
     </div>,
     document.body,
-  );
-}
-
-function Row({ w, onPick, busy, kind }: {
-  w: PickableWallet; onPick: (n: string) => void; busy: string | null; kind: "installed" | "loadable" | "missing";
-}) {
-  const url = (w.adapter as { url?: string })?.url;
-  if (kind === "missing") {
-    // Not installed — link to the wallet site instead of triggering the adapter's
-    // own website redirect on connect(). Keeps connect() in-app for real wallets.
-    return (
-      <a href={url || "#"} target="_blank" rel="noreferrer"
-        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-left opacity-70 transition hover:opacity-100">
-        {w.icon ? <img src={w.icon} alt="" className="h-6 w-6 rounded-md" /> : <Wallet className="h-6 w-6 text-white/60" />}
-        <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-white/40">Install <ExternalLink className="h-3 w-3" /></span>
-      </a>
-    );
-  }
-  return (
-    <button type="button" onClick={() => onPick(w.name)} disabled={!!busy}
-      className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-og-cyan/50 hover:bg-white/[0.06] disabled:opacity-50">
-      {w.icon ? <img src={w.icon} alt="" className="h-6 w-6 rounded-md" /> : <Wallet className="h-6 w-6 text-white/60" />}
-      <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
-      {busy === w.name ? <Loader2 className="h-4 w-4 animate-spin text-og-cyan" /> :
-        <span className={`text-[10px] font-bold uppercase tracking-widest ${kind === "installed" ? "text-og-lime" : "text-white/50"}`}>
-          {kind === "installed" ? "Detected" : "Connect"}
-        </span>}
-    </button>
   );
 }

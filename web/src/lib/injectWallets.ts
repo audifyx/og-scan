@@ -12,7 +12,11 @@ type InjectedProvider = {
   isJupiter?: boolean;
   publicKey?: unknown;
   connect?: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: unknown } | void>;
+  disconnect?: () => Promise<void>;
   signMessage?: (message: Uint8Array, encoding?: string) => Promise<unknown>;
+  signTransaction?: (tx: unknown) => Promise<unknown>;
+  signAllTransactions?: (txs: unknown[]) => Promise<unknown[]>;
+  signAndSendTransaction?: (tx: unknown, opts?: unknown) => Promise<unknown>;
 };
 
 function win(): {
@@ -73,10 +77,24 @@ export function injectInstallHint(name: InjectWallet): string {
   return "Phantom isn't detected. Install the Phantom extension, then refresh.";
 }
 
-export async function connectInjectWallet(name: InjectWallet): Promise<{
+export function hubWalletFromName(name?: string | null): InjectWallet | null {
+  const raw = String(name || "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.startsWith("jupiter")) return "jupiter";
+  if (raw.startsWith("phantom")) return "phantom";
+  return null;
+}
+
+export type InjectWalletSession = {
+  name: InjectWallet;
   publicKey: string;
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
-}> {
+  signTransaction: <T>(tx: T) => Promise<T>;
+  signAllTransactions: <T>(txs: T[]) => Promise<T[]>;
+  disconnect: () => Promise<void>;
+};
+
+export async function connectInjectWallet(name: InjectWallet): Promise<InjectWalletSession> {
   const label = name === "jupiter" ? "Jupiter" : "Phantom";
   const provider = name === "phantom" ? getPhantomProvider() : getJupiterProvider();
   if (!provider || typeof provider.connect !== "function") {
@@ -96,11 +114,29 @@ export async function connectInjectWallet(name: InjectWallet): Promise<{
     throw new Error(`${label} can't sign the login message in this tab. Open OrbitX in a normal browser window.`);
   }
   const sign = provider.signMessage.bind(provider);
+  const signTx = provider.signTransaction?.bind(provider);
+  const signAll = provider.signAllTransactions?.bind(provider);
+  const disc = provider.disconnect?.bind(provider);
   return {
+    name,
     publicKey,
     signMessage: async (message: Uint8Array) => {
       const raw = name === "phantom" ? await sign(message, "utf8") : await sign(message);
       return normalizeSignatureBytes(raw);
+    },
+    signTransaction: async <T>(tx: T) => {
+      if (!signTx) throw new Error(`${label} can't sign transactions in this tab.`);
+      return await signTx(tx) as T;
+    },
+    signAllTransactions: async <T>(txs: T[]) => {
+      if (signAll) return await signAll(txs) as T[];
+      if (!signTx) throw new Error(`${label} can't sign transactions in this tab.`);
+      const out: T[] = [];
+      for (const tx of txs) out.push(await signTx(tx) as T);
+      return out;
+    },
+    disconnect: async () => {
+      if (disc) await disc();
     },
   };
 }

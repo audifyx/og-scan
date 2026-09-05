@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, LogOut, Settings, Wallet, ChevronDown, Loader2, Image, GitMerge } from "lucide-react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet } from "@/wallets/hub";
 import { useAuth } from "@/hooks/useAuth";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { UsernameClaimModal } from "@/components/UsernameClaimModal";
