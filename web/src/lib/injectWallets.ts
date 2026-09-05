@@ -166,6 +166,27 @@ export type InjectWalletSession = {
   disconnect: () => Promise<void>;
 };
 
+type HubSessionListener = (session: InjectWalletSession) => void;
+const hubSessionListeners = new Set<HubSessionListener>();
+
+/** Lets OrbitxWalletHub adopt a session created outside `hub.connect()`. */
+export function subscribeHubWalletSession(cb: HubSessionListener): () => void {
+  hubSessionListeners.add(cb);
+  return () => {
+    hubSessionListeners.delete(cb);
+  };
+}
+
+function publishHubWalletSession(session: InjectWalletSession) {
+  for (const cb of hubSessionListeners) {
+    try {
+      cb(session);
+    } catch {
+      /* ignore listener errors */
+    }
+  }
+}
+
 function detectWaitMs(): number {
   try {
     if (typeof process !== "undefined" && process.env?.VITEST) return 0;
@@ -274,7 +295,10 @@ export async function connectInjectWallet(name: InjectWallet): Promise<InjectWal
   for (const attempt of order) {
     try {
       const session = await attempt();
-      if (session) return session;
+      if (session) {
+        publishHubWalletSession(session);
+        return session;
+      }
     } catch (err) {
       errors.push(err instanceof Error ? err : new Error(String(err)));
     }

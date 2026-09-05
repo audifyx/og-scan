@@ -249,7 +249,7 @@ export default function BagworkHome() {
 
   const openTask = (t: BagworkTask) => {
     if (!user?.id) {
-      toast.error("Connect Phantom or Jupiter to submit");
+      toast.error("Sign in to submit");
       setPicker(true);
       return;
     }
@@ -265,7 +265,7 @@ export default function BagworkHome() {
         <h1 className="bw-hero-title">Bag the work. Collect the USDC.</h1>
         <p className="bw-hero-sub">
           High-rarity task cards on the OrbitX metal desk — pick a card, complete the mission,
-          upload proof, get paid in USDC to your Solana wallet.
+          upload proof, get paid in USDC to your Solana wallet. Sign in with X, Phantom, Jupiter, or email.
         </p>
         <div className="bw-hero-stats">
           <div className="bw-stat">
@@ -283,7 +283,7 @@ export default function BagworkHome() {
         </div>
         {!connected && (
           <button type="button" className="bw-btn mt-5" onClick={() => setPicker(true)}>
-            <DollarSign className="h-4 w-4" /> Connect wallet to start
+            <DollarSign className="h-4 w-4" /> Sign in to start
           </button>
         )}
         {user?.id && (

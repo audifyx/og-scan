@@ -313,3 +313,39 @@
   text-decoration: none;
 }
 .ox-auth-back:hover { color: #fff; }
+
+/* Compact /auth surface used by WalletPickerModal (portal). */
+.ox-auth-picker {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+.ox-auth-picker .ox-auth-card {
+  padding-top: 28px;
+}
+.ox-auth-title--modal {
+  font-size: 1.35rem;
+}
+.ox-auth-picker-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  display: inline-flex;
+  color: var(--ox-silver);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.ox-auth-picker-close:hover { color: #fff; }
+.ox-auth-picker .ox-auth-btn--ghost {
+  text-decoration: none;
+}
+.ox-auth-picker .ox-auth-wallet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ox-auth-picker .ox-auth-wallet .ox-auth-btn {
+  margin-top: 0;
+}

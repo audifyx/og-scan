@@ -23,6 +23,7 @@ import {
   hubWalletFromName,
   injectInstallHint,
   isInjectWalletReady,
+  subscribeHubWalletSession,
   subscribeInjectWallets,
   type InjectWallet,
   type InjectWalletSession,
@@ -104,6 +105,11 @@ export function OrbitxWalletHub({ children }: { children: ReactNode }) {
   useEffect(() => subscribeInjectWallets(() => {
     setPhantomOn(isInjectWalletReady("phantom"));
     setJupiterOn(isInjectWalletReady("jupiter"));
+  }), []);
+
+  useEffect(() => subscribeHubWalletSession((next) => {
+    setSelected(next.name);
+    setSession(next);
   }), []);
 
   const connectNamed = useCallback(async (name: InjectWallet) => {

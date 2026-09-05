@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hubWalletFromName } from "./injectWallets";
+import { hubWalletFromName, subscribeHubWalletSession } from "./injectWallets";
 
 describe("hubWalletFromName", () => {
   it("maps Phantom and Jupiter family names", () => {
@@ -14,5 +14,11 @@ describe("hubWalletFromName", () => {
     expect(hubWalletFromName("Solflare")).toBeNull();
     expect(hubWalletFromName("Backpack")).toBeNull();
     expect(hubWalletFromName("Ledger")).toBeNull();
+  });
+
+  it("subscribeHubWalletSession unsubscribes", () => {
+    const unsub = subscribeHubWalletSession(() => {});
+    unsub();
+    expect(typeof unsub).toBe("function");
   });
 });

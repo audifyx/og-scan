@@ -39,7 +39,7 @@ function WalletBar() {
     return (
       <>
         <button type="button" className="bw-wallet-btn" onClick={() => setPicker(true)}>
-          <Wallet className="h-4 w-4" /> Connect
+          <Wallet className="h-4 w-4" /> {user ? "Connect" : "Sign in"}
         </button>
         <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
       </>

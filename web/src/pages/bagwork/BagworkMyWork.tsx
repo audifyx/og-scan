@@ -53,8 +53,8 @@ export default function BagworkMyWork() {
     return (
       <div className="bw-card py-16 text-center">
         <div className="bw-hero-kicker mb-2">My work</div>
-        <p className="mb-5 text-[#A8B0BC]">Connect with Phantom or Jupiter to view your submissions.</p>
-        <button type="button" className="bw-btn" onClick={() => setPicker(true)}>Connect wallet</button>
+        <p className="mb-5 text-[#A8B0BC]">Sign in with X, a Solana wallet, or email to view your submissions.</p>
+        <button type="button" className="bw-btn" onClick={() => setPicker(true)}>Sign in</button>
         <WalletPickerModal
           open={picker}
           onClose={() => setPicker(false)}

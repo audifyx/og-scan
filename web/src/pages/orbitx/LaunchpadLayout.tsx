@@ -144,7 +144,7 @@ function WalletConsole() {
     return (
       <>
         <button type="button" onClick={() => setPicker(true)} className="ox-wallet-btn">
-          <Wallet className="h-4 w-4" /> Connect
+          <Wallet className="h-4 w-4" /> {user ? "Connect" : "Sign in"}
         </button>
         <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
       </>
