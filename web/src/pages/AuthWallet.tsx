@@ -1,4 +1,4 @@
-// OrbitX /auth — Supabase email login. Wallet sign-in is coming soon.
+// OrbitX /auth — Supabase email login, or Phantom / Jupiter inject (no wallet-adapter).
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -7,6 +7,8 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { needsUsernameClaim } from "@/lib/usernameClaim";
+import { InjectWalletButtons } from "@/components/InjectWalletButtons";
+import { MergeAccountModal } from "@/components/MergeAccountModal";
 import "./auth.css";
 
 type Tab = "email" | "wallet";
@@ -18,7 +20,8 @@ export default function AuthWallet() {
   const next = params.get("next") || "/app";
   const modeParam = params.get("mode");
 
-  const [tab, setTab] = useState<Tab>("email");
+  const [tab, setTab] = useState<Tab>(modeParam === "wallet" ? "wallet" : "email");
+  const [merge, setMerge] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -118,7 +121,7 @@ export default function AuthWallet() {
           <div className="ox-auth-kicker">Secure access</div>
           <h1 className="ox-auth-title">{signup ? "Create your account" : "Welcome back"}</h1>
           <p className="ox-auth-sub">
-            Sign in with email. Wallet login is coming soon.
+            Email via Supabase, or Phantom / Jupiter extension (no wallet adapter).
           </p>
 
           {waitingOnUsername ? (
@@ -203,15 +206,7 @@ export default function AuthWallet() {
                   </div>
                 </form>
               ) : (
-                <div className="ox-auth-wallet">
-                  <p className="ox-auth-soon-badge">Coming soon</p>
-                  <p className="ox-auth-sub" style={{ margin: "0 0 1rem" }}>
-                    Wallet login is being rebuilt. Use email to sign in for now.
-                  </p>
-                  <button type="button" className="ox-auth-btn" onClick={() => setTab("email")}>
-                    <Mail className="h-4 w-4" /> Sign in with email
-                  </button>
-                </div>
+                <InjectWalletButtons onSignedIn={(isNew) => { if (isNew) setMerge(true); }} />
               )}
             </>
           )}
@@ -221,6 +216,7 @@ export default function AuthWallet() {
           Back to home <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
+      <MergeAccountModal open={merge} onClose={() => setMerge(false)} />
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function WalletConnectButton() {
     return (
       <button
         type="button"
-        onClick={() => navigate("/auth")}
+        onClick={() => navigate("/auth?mode=wallet")}
         className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-og-cyan/40 bg-og-cyan/10 px-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-og-cyan transition hover:border-og-cyan hover:bg-og-cyan/20 sm:px-4"
       >
         <Wallet className="h-3.5 w-3.5" /> Sign in
