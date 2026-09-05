@@ -71,7 +71,8 @@ export async function signInWithWallet(
   if (!access_token || !refresh_token) {
     throw new Error(typeof verified.error === "string" ? verified.error : "Wallet sign-in failed to create a session.");
   }
-  await installSupabaseSession({ access_token, refresh_token });
+  const user = verified.user && typeof verified.user === "object" ? verified.user as Record<string, unknown> : null;
+  await installSupabaseSession({ access_token, refresh_token }, user);
   return { isNew: !!verified.isNew };
 }
 

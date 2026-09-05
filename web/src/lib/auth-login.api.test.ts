@@ -66,7 +66,7 @@ describe("POST /api/auth-login", () => {
     );
     const res = mockRes();
     await handler(
-      { method: "POST", body: { email: "me@orbitx.world", password: "nope" } } as VercelRequest,
+      { method: "POST", headers: {}, body: { email: "me@orbitx.world", password: "nope" } } as VercelRequest,
       res,
     );
     expect(res.statusCode).toBe(400);
@@ -93,5 +93,43 @@ describe("POST /api/auth-login", () => {
     );
     expect(res.statusCode).toBe(503);
     expect(res.body).toEqual({ error: "Login service timed out. Please try again." });
+  });
+
+  it("rejects a disallowed Origin", async () => {
+    const res = mockRes();
+    await handler(
+      {
+        method: "POST",
+        headers: { origin: "https://evil.example" },
+        body: { email: "me@orbitx.world", password: "secret" },
+      } as unknown as VercelRequest,
+      res,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ error: "origin_not_allowed" });
+  });
+
+  it("rate-limits repeated login attempts for the same email and IP", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error_description: "Invalid login credentials" }),
+      }),
+    );
+    let last = mockRes();
+    for (let i = 0; i < 9; i++) {
+      last = mockRes();
+      await handler(
+        {
+          method: "POST",
+          headers: { "x-forwarded-for": "203.0.113.9" },
+          body: { email: "ratelimit@orbitx.world", password: "nope" },
+        } as unknown as VercelRequest,
+        last,
+      );
+    }
+    expect(last.statusCode).toBe(429);
   });
 });

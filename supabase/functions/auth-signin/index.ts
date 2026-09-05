@@ -1,19 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { authCors } from "../_shared/auth_cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
-
 Deno.serve(async (req) => {
+  const headers = authCors(req.headers.get("origin"));
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: cors });
+    return new Response("ok", { headers });
   }
   try {
     const { email, password } = await req.json();
@@ -53,7 +48,7 @@ Deno.serve(async (req) => {
         email: data.user.email,
         username: profile?.username || String(email).split("@")[0],
       },
-    }), { headers: cors });
+    }), { headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({
@@ -61,7 +56,7 @@ Deno.serve(async (req) => {
       error: message,
     }), {
       status: 400,
-      headers: cors,
+      headers,
     });
   }
 });

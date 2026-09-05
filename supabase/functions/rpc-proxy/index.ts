@@ -1,64 +1,68 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { SOLANA_RPC_ALLOWED, SOLANA_RPC_BATCH_MAX } from "../_shared/solana_rpc_allow.ts";
+
 const _alchemy = Deno.env.get("ALCHEMY_API_KEY") || "";
 const _helius = Deno.env.get("HELIUS_API_KEY") || "";
 const _quiknode = Deno.env.get("QUICKNODE_WSS") || "";
 const ALCHEMY_RPC = _alchemy ? (_alchemy.startsWith("http") ? _alchemy : `https://solana-mainnet.g.alchemy.com/v2/${_alchemy}`) : undefined;
 const HELIUS_RPC = _helius ? (_helius.startsWith("http") ? _helius : `https://mainnet.helius-rpc.com/?api-key=${_helius}`) : undefined;
 const QUIKNODE_RPC = _quiknode ? _quiknode.replace(/^wss:/, "https:") : undefined;
-Deno.serve(async (req)=>{
+
+const cors = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+
+function rpcUrl(provider: string) {
+  let url = ALCHEMY_RPC;
+  if (provider === "helios1" || provider === "helios2" || provider === "helios3" || provider === "helius") url = HELIUS_RPC;
+  if (provider === "quiknode") url = QUIKNODE_RPC;
+  return url;
+}
+
+async function callRpc(url: string, method: string, params: unknown[], id: unknown) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: id ?? 1, method, params }),
+  });
+  if (!response.ok) throw new Error(`RPC error: ${response.statusText}`);
+  return await response.json();
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
+    return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*" } });
   }
   try {
-    const { method, params = [], provider = 'alchemy', id = 1 } = await req.json();
-    let rpcUrl = ALCHEMY_RPC;
-    if (provider === 'helios1' || provider === 'helios2' || provider === 'helios3' || provider === 'helius') rpcUrl = HELIUS_RPC;
-    if (provider === 'quiknode') rpcUrl = QUIKNODE_RPC;
-    if (!rpcUrl) {
-      throw new Error(`RPC provider '${provider}' not configured`);
+    const body = await req.json();
+    const calls = Array.isArray(body) ? body : [body];
+    if (calls.length > SOLANA_RPC_BATCH_MAX) {
+      throw new Error(`batch too large (max ${SOLANA_RPC_BATCH_MAX})`);
     }
-    const response = await fetch(rpcUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: id,
-        method: method,
-        params: params
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`RPC error: ${response.statusText}`);
+    const provider = String((Array.isArray(body) ? undefined : body?.provider) || "alchemy");
+    const url = rpcUrl(provider);
+    if (!url) throw new Error(`RPC provider '${provider}' not configured`);
+
+    const results = [];
+    for (const item of calls) {
+      const method = typeof item?.method === "string" ? item.method : "";
+      if (!SOLANA_RPC_ALLOWED.has(method)) {
+        results.push({ jsonrpc: "2.0", id: item?.id ?? 1, error: { code: -32601, message: "method not allowed" } });
+        continue;
+      }
+      results.push(await callRpc(url, method, Array.isArray(item.params) ? item.params : [], item.id ?? 1));
     }
-    const data = await response.json();
+
+    const data = Array.isArray(body) ? results : results[0];
     return new Response(JSON.stringify({
       success: true,
-      data: data,
-      provider: provider,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
+      data,
+      provider,
+      timestamp: new Date().toISOString(),
+    }), { headers: cors });
   } catch (error) {
     console.error("Error:", error);
     return new Response(JSON.stringify({
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error"
-    }), {
-      status: 400,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
+      error: error instanceof Error ? error.message : "Unknown error",
+    }), { status: 400, headers: cors });
   }
 });

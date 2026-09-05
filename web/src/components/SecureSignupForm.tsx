@@ -21,6 +21,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase-ssr";
+import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import {
   validatePassword,
   getPasswordFeedback,
@@ -95,6 +96,7 @@ export function SecureSignupForm({ onSignupSuccess }: SignupFormProps) {
         body: JSON.stringify({
           email,
           password,
+          fingerprint: getDeviceFingerprint(),
           metadata: {
             signupAt: new Date().toISOString(),
           },

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { requireUser } from "../_shared/require_user.ts";
 const LIVEKIT_URL = Deno.env.get("LIVEKIT_URL");
 const LIVEKIT_API_KEY = Deno.env.get("LIVEKIT_API_KEY");
 const LIVEKIT_API_SECRET = Deno.env.get("LIVEKIT_API_SECRET");
@@ -52,10 +53,21 @@ Deno.serve(async (req)=>{
     });
   }
   try {
+    const user = await requireUser(req);
+    if (!user) {
+      return new Response(JSON.stringify({ error: "sign_in_required" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...CORS },
+      });
+    }
     const body = await req.json();
-    const identity = body.identity || body.userId || "anonymous";
-    const roomName = body.room_name || body.roomName || body.room;
-    const name = body.name || body.username || identity;
+    const requested = typeof body.identity === "string" ? body.identity.trim()
+      : typeof body.userId === "string" ? body.userId.trim() : "";
+    const identity = (requested === user.id || requested.startsWith(`${user.id}:`))
+      ? requested.slice(0, 128)
+      : user.id;
+    const roomName = String(body.room_name || body.roomName || body.room || "").slice(0, 128);
+    const name = String(body.name || body.username || user.email || identity).slice(0, 64);
     if (!roomName) throw new Error("room_name is required");
     if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET || !LIVEKIT_URL) throw new Error("LiveKit environment variables not configured");
     const token = await createLiveKitToken(identity, roomName, name);

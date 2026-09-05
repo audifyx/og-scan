@@ -112,7 +112,10 @@ export async function requireRole(
   const user = await verifyJwtAndGetUser(req);
   if (!user) return null;
 
-  const userRole = (user.user_metadata?.role || "user") as string;
+  const userRole = String(
+    (user.app_metadata as { role?: string } | undefined)?.role
+    || "user",
+  );
 
   // Role hierarchy: admin > moderator > user
   const roleHierarchy: Record<string, number> = { admin: 3, moderator: 2, user: 1 };

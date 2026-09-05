@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { clientIp, hitAuthLimit } from "../_authLimit";
 
 /**
  * Same-origin email login for /auth.
@@ -14,6 +15,28 @@ export const config = { maxDuration: 25 };
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const GOTRUE_TIMEOUT_MS = Number(process.env.AUTH_LOGIN_TIMEOUT_MS || 12_000) || 12_000;
+const LOGIN_MAX = 8;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+const AUTH_ORIGINS = new Set([
+  "https://orbitx.world",
+  "https://www.orbitx.world",
+  "https://ogscan.fun",
+  "https://www.ogscan.fun",
+]);
+
+function originAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (AUTH_ORIGINS.has(origin)) return true;
+  try {
+    const host = new URL(origin).hostname;
+    if (host === "localhost" || host === "127.0.0.1") return true;
+    if (host.endsWith(".vercel.app")) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 function send(res: VercelResponse, status: number, body: Record<string, unknown>) {
   res.setHeader("Content-Type", "application/json");
@@ -46,8 +69,9 @@ async function timedFetch(url: string, init: RequestInit, ms: number): Promise<R
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const origin = typeof req.headers?.origin === "string" ? req.headers.origin : "";
   if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", originAllowed(origin) ? (origin || "*") : "https://www.orbitx.world");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.status(200).end();
@@ -55,6 +79,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== "POST") {
     send(res, 405, { error: "Method not allowed" });
+    return;
+  }
+  if (origin && !originAllowed(origin)) {
+    send(res, 403, { error: "origin_not_allowed" });
     return;
   }
   if (!SUPABASE_URL || !ANON) {
@@ -66,6 +94,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
   if (!cleanEmail || typeof password !== "string" || !password) {
     send(res, 400, { error: "Email and password are required" });
+    return;
+  }
+
+  const ip = clientIp(req);
+  const limited = hitAuthLimit(`login:${cleanEmail}:${ip}`, LOGIN_MAX, LOGIN_WINDOW_MS);
+  if (limited.limited) {
+    res.setHeader("Retry-After", String(limited.retrySec));
+    send(res, 429, { error: "Too many login attempts. Try again in 15 minutes.", retryAfter: limited.retrySec });
     return;
   }
 

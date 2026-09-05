@@ -35,7 +35,7 @@ describe("signInWithWallet", () => {
   it("requests a nonce, then verifies with that nonce before persisting the session", async () => {
     invokeEdgeFn
       .mockResolvedValueOnce({ nonce: "n1", message: "sign this n1" })
-      .mockResolvedValueOnce({ access_token: "at", refresh_token: "rt", isNew: false });
+      .mockResolvedValueOnce({ access_token: "at", refresh_token: "rt", isNew: false, user: { id: "u1" } });
     const signed = new Uint8Array([1, 2, 3, 4]);
     const signMessage = vi.fn(async () => signed);
     const result = await signInWithWallet("WalletPubkey111", signMessage);
@@ -47,7 +47,7 @@ describe("signInWithWallet", () => {
       pubkey: "WalletPubkey111",
       nonce: "n1",
     });
-    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at", refresh_token: "rt" });
+    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at", refresh_token: "rt" }, { id: "u1" });
   });
 
   it("does not overwrite an existing email session", async () => {
@@ -72,6 +72,6 @@ describe("signInWithWallet", () => {
     expect(result.isNew).toBe(false);
     expect(getSession).not.toHaveBeenCalled();
     expect(invokeEdgeFn).toHaveBeenCalled();
-    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at2", refresh_token: "rt2" });
+    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at2", refresh_token: "rt2" }, null);
   });
 });
