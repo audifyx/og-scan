@@ -242,6 +242,20 @@
 .ox-auth-links a:hover,
 .ox-auth-links button:hover { color: var(--ox-blue-hi); }
 .ox-auth-wallet { margin-top: 16px; }
+.ox-auth-soon-badge {
+  display: inline-flex;
+  margin: 0 0 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 199, 94, 0.45);
+  background: rgba(240, 199, 94, 0.12);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ox-gold-hi, #f0c75e);
+}
 .ox-auth-bullets {
   margin-top: 14px;
   list-style: none;

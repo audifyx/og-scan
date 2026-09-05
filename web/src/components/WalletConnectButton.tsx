@@ -1,13 +1,10 @@
-// Global connect-wallet-to-login control. Drop it at the top of any page:
-// signed-out -> wallet picker + Sign-In-With-Solana; signed-in -> account menu.
+// Global sign-in control. Drop it at the top of any page:
+// signed-out -> /auth email login; signed-in -> account menu.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, LogOut, Settings, Wallet, ChevronDown, Loader2, Image, GitMerge } from "lucide-react";
-import { toast } from "sonner";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useWalletSignIn } from "@/hooks/useWalletSignIn";
-import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { UsernameClaimModal } from "@/components/UsernameClaimModal";
 import { needsUsernameClaim } from "@/lib/usernameClaim";
@@ -16,25 +13,10 @@ import { cn } from "@/lib/utils";
 export function WalletConnectButton() {
   const { user, profile, signOut, loading } = useAuth();
   const { disconnect, publicKey } = useWallet();
-  const { pickable, signInWith, busy } = useWalletSignIn();
   const navigate = useNavigate();
-  const [picker, setPicker] = useState(false);
   const [merge, setMerge] = useState(false);
   const [menu, setMenu] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
-
-  const onPick = async (name: string) => {
-    try {
-      const { isNew } = await signInWith(name, { replaceEmailSession: true });
-      setPicker(false);
-      toast.success("Signed in with wallet");
-      // UsernameClaimGate asks for a real username when the profile still has
-      // the wallet stub. Offer one-time merge for brand-new wallet accounts.
-      if (isNew) setMerge(true);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Sign-in failed");
-    }
-  };
 
   const doSignOut = async () => {
     await signOut().catch(() => {});
@@ -59,17 +41,13 @@ export function WalletConnectButton() {
 
   if (!user) {
     return (
-      <>
-        <button
-          type="button"
-          onClick={() => setPicker(true)}
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-og-cyan/40 bg-og-cyan/10 px-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-og-cyan transition hover:border-og-cyan hover:bg-og-cyan/20 sm:px-4"
-        >
-          <Wallet className="h-3.5 w-3.5" /> Connect wallet
-        </button>
-        <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
-        <MergeAccountModal open={merge} onClose={() => setMerge(false)} />
-      </>
+      <button
+        type="button"
+        onClick={() => navigate("/auth")}
+        className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-og-cyan/40 bg-og-cyan/10 px-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-og-cyan transition hover:border-og-cyan hover:bg-og-cyan/20 sm:px-4"
+      >
+        <Wallet className="h-3.5 w-3.5" /> Sign in
+      </button>
     );
   }
 

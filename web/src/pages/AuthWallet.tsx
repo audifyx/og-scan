@@ -1,15 +1,11 @@
-// OrbitX /auth — metal-theme sign-in (email preferred for owner tools, wallet for everyone).
+// OrbitX /auth — Supabase email login. Wallet sign-in is coming soon.
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Wallet, ShieldCheck, Loader2, GitMerge, ArrowRight, Mail, Eye, EyeOff, Lock, Rocket,
+  Wallet, ArrowRight, Mail, Eye, EyeOff, Lock, Rocket, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useWalletSignIn } from "@/hooks/useWalletSignIn";
-import { WalletPickerModal } from "@/components/WalletPickerModal";
-import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { needsUsernameClaim } from "@/lib/usernameClaim";
 import "./auth.css";
 
@@ -17,18 +13,12 @@ type Tab = "email" | "wallet";
 
 export default function AuthWallet() {
   const { user, profile, loading, signIn, signUp, signOut } = useAuth();
-  const { publicKey } = useWallet();
-  const { pickable, signInWith, busy } = useWalletSignIn();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = params.get("next") || "/app";
   const modeParam = params.get("mode");
 
-  const [tab, setTab] = useState<Tab>(modeParam === "wallet" ? "wallet" : "email");
-  const [picker, setPicker] = useState(false);
-  const [merge, setMerge] = useState(false);
-  const [pendingMerge, setPendingMerge] = useState(false);
-
+  const [tab, setTab] = useState<Tab>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -38,7 +28,6 @@ export default function AuthWallet() {
   const [username, setUsername] = useState("");
 
   const walletPk =
-    publicKey?.toBase58() ||
     (profile as { sol_wallet?: string | null } | null)?.sol_wallet ||
     (user?.user_metadata?.wallet as string | undefined) ||
     null;
@@ -59,24 +48,10 @@ export default function AuthWallet() {
   }, [next, params]);
 
   useEffect(() => {
-    if (loading || !user || merge || pendingMerge || waitingOnUsername) return;
+    if (loading || !user || waitingOnUsername) return;
     if (user && !profile) return;
     navigate(next, { replace: true });
-  }, [user, profile, loading, next, navigate, merge, pendingMerge, waitingOnUsername]);
-
-  const onPick = async (name: string) => {
-    try {
-      const { isNew } = await signInWith(name, { replaceEmailSession: true });
-      setPicker(false);
-      toast.success("Signed in with wallet");
-      if (isNew || pendingMerge) {
-        setMerge(true);
-        setPendingMerge(false);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Sign-in failed");
-    }
-  };
+  }, [user, profile, loading, next, navigate, waitingOnUsername]);
 
   const onEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +118,7 @@ export default function AuthWallet() {
           <div className="ox-auth-kicker">Secure access</div>
           <h1 className="ox-auth-title">{signup ? "Create your account" : "Welcome back"}</h1>
           <p className="ox-auth-sub">
-            Email or wallet. Wallet works for trading and launches.
+            Sign in with email. Wallet login is coming soon.
           </p>
 
           {waitingOnUsername ? (
@@ -229,27 +204,13 @@ export default function AuthWallet() {
                 </form>
               ) : (
                 <div className="ox-auth-wallet">
-                  <button
-                    type="button"
-                    className="ox-auth-btn ox-auth-btn--blue"
-                    disabled={!!busy}
-                    onClick={() => { setPendingMerge(false); setPicker(true); }}
-                  >
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                    Connect Phantom / Jupiter
+                  <p className="ox-auth-soon-badge">Coming soon</p>
+                  <p className="ox-auth-sub" style={{ margin: "0 0 1rem" }}>
+                    Wallet login is being rebuilt. Use email to sign in for now.
+                  </p>
+                  <button type="button" className="ox-auth-btn" onClick={() => setTab("email")}>
+                    <Mail className="h-4 w-4" /> Sign in with email
                   </button>
-                  <button
-                    type="button"
-                    className="ox-auth-btn ox-auth-btn--ghost"
-                    disabled={!!busy}
-                    onClick={() => { if (user) setMerge(true); else { setPendingMerge(true); setPicker(true); } }}
-                  >
-                    <GitMerge className="h-4 w-4" /> Merge legacy email account
-                  </button>
-                  <ul className="ox-auth-bullets">
-                    <li><ShieldCheck className="h-3.5 w-3.5" /> Free signature — no tx, no fees</li>
-                    <li><Wallet className="h-3.5 w-3.5" /> Phantom, Jupiter, Solflare &amp; more</li>
-                  </ul>
                 </div>
               )}
             </>
@@ -260,9 +221,6 @@ export default function AuthWallet() {
           Back to home <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
-
-      <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
-      <MergeAccountModal open={merge} onClose={() => setMerge(false)} />
     </div>
   );
 }
