@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { clientIp, hitAuthLimit } from "../_authLimit";
+import { clientIp, hitAuthLimit } from "./_authLimit";
 
 /**
  * Same-origin email login for /auth.
