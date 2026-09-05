@@ -367,6 +367,9 @@
     "api/on-chain.js": {
       "maxDuration": 60
     },
+    "api/mcp-life-tick.js": {
+      "maxDuration": 60
+    },
     "api/**/*.js": {
       "maxDuration": 30
     },
@@ -400,6 +403,10 @@
     {
       "path": "/api/on-chain?path=ingest&force=1",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/mcp-life-tick",
+      "schedule": "0 * * * *"
     }
   ]
 }

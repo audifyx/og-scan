@@ -60,6 +60,10 @@ import {
   maybeRelayGroupChat,
   resolveGcNaturalTool,
 } from "./orbitx/mcp-group-chat.js";
+import {
+  dispatchLifeTool,
+  resolveLifeNaturalTool,
+} from "./orbitx/mcp-life-agents.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
@@ -1554,6 +1558,13 @@ const TOOL_ALIASES = {
   start_group_chat: "orbitx_gc_start",
   start_gc: "orbitx_gc_start",
   create_group_chat: "orbitx_gc_start",
+  create_agent: "orbitx_life_create",
+  hire_agent: "orbitx_life_create",
+  life_agents: "orbitx_life_list",
+  talk_to_agent: "orbitx_life_talk",
+  ape_report: "orbitx_life_report",
+  hourly_report: "orbitx_life_report",
+  meet_agents: "orbitx_life_meet",
   any_group_chats: "orbitx_gc_list",
   group_chats: "orbitx_gc_list",
   hey_any_group_chats: "orbitx_gc_list",
@@ -1715,6 +1726,80 @@ const CORE_TOOLS = [
           description: "Optional Solana wallet linked on https://orbitx.world/agent",
         },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_create",
+    description:
+      "Create an autonomous Life Agent (name, gender, job, family, crew). When the user says let’s create an agent that scans X — call this. Agents run hourly with no further user work.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        gender: { type: "string", description: "female | male | unspecified" },
+        role: { type: "string", description: "Job on the desk" },
+        mission: { type: "string", description: "e.g. scans X and chain data for running memes" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_list",
+    description: "List living Life Agents. When the user says any agents / who’s on the desk — call this.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_talk",
+    description: "Talk to a named Life Agent. They already have a life, knowledge, and the latest ape tape.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        text: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_report",
+    description:
+      "Latest hourly ape report from a Life Agent (or the newest desk). What to ape, with mints and risk notes.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_meet",
+    description: "Introduce two Life Agents. They form a relationship and write it in their diaries.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, other: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_diary",
+    description: "Read an agent’s diary, family, and desk relationships.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_run",
+    description: "Run a Life Agent scan+report now instead of waiting for the hourly cron.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
       additionalProperties: false,
     },
   },
@@ -3415,7 +3500,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     name === "orbitx_gc_chat" ||
     name === "orbitx_gc_leave" ||
     name === "orbitx_gc_history" ||
-    name === "orbitx_gc_read"
+    name === "orbitx_gc_read" ||
+    name === "orbitx_life_create" ||
+    name === "orbitx_life_list" ||
+    name === "orbitx_life_talk" ||
+    name === "orbitx_life_report" ||
+    name === "orbitx_life_meet" ||
+    name === "orbitx_life_diary" ||
+    name === "orbitx_life_run" ||
+    name === "orbitx_life_pause"
   ) {
     return dispatchCookTool(name, args, { base, fetchJson, sb, wallet, auth });
   }
@@ -5148,9 +5241,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.6.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.7.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: orbitx_dex_chart. TRADE: quote with orbitx_trade_quote then orbitx_prepare_buy / prepare_sell (Jupiter signUrl). X: orbitx_x_connect → orbitx_x_status → orbitx_x_post (uses OrbitX X auth). VOICE: “start a VC named X” → orbitx_vc_start; “any open VC / send the link” → orbitx_vc_list (join URLs). GROUP CHAT: “start a group chat named Orbitx” → orbitx_gc_start; “hey any group chats” → orbitx_gc_list; “join Orbitx” → orbitx_gc_join; “I want to chat in the group chat” → orbitx_gc_focus then orbitx_gc_send for EVERY user message until “leave GC” / orbitx_gc_leave. They can join back anytime. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE AGENTS: “let’s create an agent that scans X” → orbitx_life_create (auto-hires a crew with name, gender, job, family). They scan social heat + chain data every hour, write ape reports, learn, and meet each other. Talk with orbitx_life_talk; latest tape orbitx_life_report. User only sets up and talks. CHARTS: orbitx_dex_chart. TRADE: quote with orbitx_trade_quote then orbitx_prepare_buy / prepare_sell. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start / vc_list. GROUP CHAT: orbitx_gc_start / join / focus / leave. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5183,6 +5276,11 @@ async function handleMcp(req, res, parts) {
       if (gcNat) {
         name = gcNat.name;
         Object.assign(args, gcNat.args);
+      }
+      const lifeNat = resolveLifeNaturalTool(rawName, args);
+      if (lifeNat) {
+        name = lifeNat.name;
+        Object.assign(args, lifeNat.args);
       }
       if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
       if (rawName === "orbitx_buy_auto" && !args.pool) args.pool = "auto";
@@ -5222,6 +5320,14 @@ async function handleMcp(req, res, parts) {
         "orbitx_gc_leave",
         "orbitx_gc_history",
         "orbitx_gc_read",
+        "orbitx_life_create",
+        "orbitx_life_list",
+        "orbitx_life_talk",
+        "orbitx_life_report",
+        "orbitx_life_meet",
+        "orbitx_life_diary",
+        "orbitx_life_run",
+        "orbitx_life_pause",
       ]);
       if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = {

@@ -48,6 +48,9 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     "║  X (TWITTER)                                         ║",
     "║    orbitx_x_connect · status · post / reply / quote  ║",
     "╠══════════════════════════════════════════════════╣",
+    "║  LIFE AGENTS                                         ║",
+    "║    create agent that scans X · talk · hourly report  ║",
+    "╠══════════════════════════════════════════════════╣",
     "║  VOICE (LiveKit)                                     ║",
     "║    orbitx_vc_start · vc_list · vc_join (anyone)      ║",
     "╠══════════════════════════════════════════════════╣",
@@ -73,6 +76,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `_MCP access: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → orbitx_mcp_access_buy → Jupiter buy+burn → orbitx_mcp_access_confirm. Time remaining: orbitx_mcp_access_status._`,
     `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Say “confirm” / “auto” → Phantom auto-prompt._`,
     `_Group chat: “start a group chat named Orbitx” → list with “hey any group chats” → “join Orbitx” → “I want to chat in the group chat”. Every message posts there until “leave GC”. Join back anytime._`,
+    `_Life Agents: “let’s create an agent that scans X” → they get a name, gender, job, family, and a crew. Hourly ape reports, they learn, they meet. You only talk. orbitx_life_talk / orbitx_life_report._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
 }

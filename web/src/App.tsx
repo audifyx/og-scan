@@ -196,6 +196,7 @@ import { SecurityTracker } from "./components/SecurityTracker";
 
 const McpVoiceRoom = lazyWithRetry(() => import("./pages/McpVoiceRoom"));
 const McpGroupChat = lazyWithRetry(() => import("./pages/McpGroupChat"));
+const McpLifeAgents = lazyWithRetry(() => import("./pages/McpLifeAgents"));
 
 const DirectMessagesPage = () => (
   <AppLayout>
@@ -667,6 +668,8 @@ const App = () => (
             <Route path="/vc/:slug" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/gc" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
             <Route path="/gc/:slug" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
+            <Route path="/life" element={<Suspense fallback={<RouteFallback label="Life Agents" />}><McpLifeAgents /></Suspense>} />
+            <Route path="/life/:slug" element={<Suspense fallback={<RouteFallback label="Life Agents" />}><McpLifeAgents /></Suspense>} />
             <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
             <Route path="/world" element={<Navigate to="/on-chain" replace />} />
