@@ -1719,6 +1719,214 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_gc_start",
+    description:
+      "Create a named group chat. When the user says start a group chat named Orbitx — call this with name. Anyone can list and join it.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "Group chat name" }, topic: { type: "string" } },
+      required: ["name"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_list",
+    description:
+      "List open group chats. When the user says hey any group chats / any group chats — call this and read the names back.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_join",
+    description:
+      "Join a group chat by name. When the user says join Orbitx — call this with name. Then they must say I want to chat in the group chat to enter sticky chat mode.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_focus",
+    description:
+      "Enter sticky group-chat mode. When the user says I want to chat in the group chat — call this. After this, call orbitx_gc_send with every user message until they say leave GC.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_send",
+    description:
+      "Post a message to the focused group chat and return the latest transcript. While in GC mode, send every user line here.",
+    inputSchema: {
+      type: "object",
+      properties: { text: { type: "string", description: "Message to post" } },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_chat",
+    description:
+      "Enter the group chat (same as focus). If text is set, also post it. Use when the user wants to talk in the GC.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        text: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_leave",
+    description:
+      "Leave sticky group-chat mode. When the user says leave GC / okay use tool leave GC — call this immediately. They can join back anytime.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_gc_history",
+    description: "Read recent messages in a group chat (or the focused one).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        limit: { type: "integer", default: 20 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_start",
+    description:
+      "Start a named LiveKit voice chat. When the user says start a VC named X — call this with name. Returns a join URL anyone can open.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Room name" },
+        topic: { type: "string" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_list",
+    description:
+      "List open LiveKit VCs with join links. When the user says any open VC / send the link — call this.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 12 } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_join",
+    description: "Get a join URL (and LiveKit token when configured) for a named or slug VC.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        displayName: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_link",
+    description: "Alias of orbitx_vc_join — return the public join link for a VC.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_end",
+    description: "End a live MCP voice chat by name or slug.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_x_connect",
+    description:
+      "Connect the user's X account to OrbitX so this MCP can post. Returns /auth (Supabase Continue with X) and /x (tweet.write) links.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_x_status",
+    description: "Show whether X is connected for this OrbitX user and if tweet.write is granted.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_x_post",
+    description:
+      "Post a tweet on the connected X account. Requires OrbitX auth + X connected via /auth Continue with X or /x.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "Tweet body" },
+        linkUrl: { type: "string" },
+        replyToTweetId: { type: "string" },
+        quoteTweetId: { type: "string" },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_x_reply",
+    description: "Reply to a tweet id from the connected X account.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        replyToTweetId: { type: "string" },
+      },
+      required: ["text", "replyToTweetId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_x_quote",
+    description: "Quote-tweet by id from the connected X account.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        quoteTweetId: { type: "string" },
+      },
+      required: ["text", "quoteTweetId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_trade_quote",
+    description:
+      "Jupiter quote SOL → mint (no signature). When the user asks price impact / how much they get — call this. Then orbitx_prepare_buy to sign.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number", description: "SOL to spend (default 0.1)" },
+        slippage: { type: "number", default: 10 },
+      },
+      required: ["mint"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "orbitx_search",
     description: "Search tokens by name, symbol, or mint address.",
     inputSchema: {
@@ -2987,214 +3195,6 @@ const CORE_TOOLS = [
         enabled: { type: "boolean" },
         on: { type: "boolean" },
       },
-    },
-  },
-  {
-    name: "orbitx_trade_quote",
-    description:
-      "Jupiter quote SOL → mint (no signature). When the user asks price impact / how much they get — call this. Then orbitx_prepare_buy to sign.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        mint: { type: "string" },
-        amountSol: { type: "number", description: "SOL to spend (default 0.1)" },
-        slippage: { type: "number", default: 10 },
-      },
-      required: ["mint"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_x_connect",
-    description:
-      "Connect the user's X account to OrbitX so this MCP can post. Returns /auth (Supabase Continue with X) and /x (tweet.write) links.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "orbitx_x_status",
-    description: "Show whether X is connected for this OrbitX user and if tweet.write is granted.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "orbitx_x_post",
-    description:
-      "Post a tweet on the connected X account. Requires OrbitX auth + X connected via /auth Continue with X or /x.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string", description: "Tweet body" },
-        linkUrl: { type: "string" },
-        replyToTweetId: { type: "string" },
-        quoteTweetId: { type: "string" },
-      },
-      required: ["text"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_x_reply",
-    description: "Reply to a tweet id from the connected X account.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string" },
-        replyToTweetId: { type: "string" },
-      },
-      required: ["text", "replyToTweetId"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_x_quote",
-    description: "Quote-tweet by id from the connected X account.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string" },
-        quoteTweetId: { type: "string" },
-      },
-      required: ["text", "quoteTweetId"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_vc_start",
-    description:
-      "Start a named LiveKit voice chat. When the user says start a VC named X — call this with name. Returns a join URL anyone can open.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Room name" },
-        topic: { type: "string" },
-      },
-      required: ["name"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_vc_list",
-    description:
-      "List open LiveKit VCs with join links. When the user says any open VC / send the link — call this.",
-    inputSchema: {
-      type: "object",
-      properties: { limit: { type: "integer", default: 12 } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_vc_join",
-    description: "Get a join URL (and LiveKit token when configured) for a named or slug VC.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        slug: { type: "string" },
-        displayName: { type: "string" },
-      },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_vc_link",
-    description: "Alias of orbitx_vc_join — return the public join link for a VC.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string" }, slug: { type: "string" } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_vc_end",
-    description: "End a live MCP voice chat by name or slug.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string" }, slug: { type: "string" } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_start",
-    description:
-      "Create a named group chat. When the user says start a group chat named Orbitx — call this with name. Anyone can list and join it.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string", description: "Group chat name" }, topic: { type: "string" } },
-      required: ["name"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_list",
-    description:
-      "List open group chats. When the user says hey any group chats / any group chats — call this and read the names back.",
-    inputSchema: {
-      type: "object",
-      properties: { limit: { type: "integer", default: 20 } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_join",
-    description:
-      "Join a group chat by name. When the user says join Orbitx — call this with name. Then they must say I want to chat in the group chat to enter sticky chat mode.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string" }, slug: { type: "string" } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_focus",
-    description:
-      "Enter sticky group-chat mode. When the user says I want to chat in the group chat — call this. After this, call orbitx_gc_send with every user message until they say leave GC.",
-    inputSchema: {
-      type: "object",
-      properties: { name: { type: "string" }, slug: { type: "string" } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_send",
-    description:
-      "Post a message to the focused group chat and return the latest transcript. While in GC mode, send every user line here.",
-    inputSchema: {
-      type: "object",
-      properties: { text: { type: "string", description: "Message to post" } },
-      required: ["text"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_chat",
-    description:
-      "Enter the group chat (same as focus). If text is set, also post it. Use when the user wants to talk in the GC.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        slug: { type: "string" },
-        text: { type: "string" },
-      },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_gc_leave",
-    description:
-      "Leave sticky group-chat mode. When the user says leave GC / okay use tool leave GC — call this immediately. They can join back anytime.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "orbitx_gc_history",
-    description: "Read recent messages in a group chat (or the focused one).",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        slug: { type: "string" },
-        limit: { type: "integer", default: 20 },
-      },
-      additionalProperties: false,
     },
   },
   {
