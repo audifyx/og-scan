@@ -55,6 +55,11 @@ import {
   telegramLoginUrl,
 } from "./orbitx/orbitx-auth-links.js";
 import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
+import { buildCookTools, dispatchCookTool, cookStats } from "./orbitx/mcp-cook-tools.js";
+import {
+  maybeRelayGroupChat,
+  resolveGcNaturalTool,
+} from "./orbitx/mcp-group-chat.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
@@ -179,7 +184,21 @@ function listLiveTools(cursor) {
   if (m) {
     const offset = Number(m[1]) || 0;
     const slice = _generated.slice(offset, offset + PAGE);
-    const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : undefined;
+    const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : (_cook.length ? "cook:0" : undefined);
+    return {
+      tools: slice.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+      })),
+      nextCursor: next,
+    };
+  }
+  const cook = String(cursor).match(/^cook:(\d+)$/);
+  if (cook) {
+    const offset = Number(cook[1]) || 0;
+    const slice = _cook.slice(offset, offset + PAGE);
+    const next = offset + PAGE < _cook.length ? `cook:${offset + PAGE}` : undefined;
     return {
       tools: slice.map((t) => ({
         name: t.name,
@@ -1489,6 +1508,12 @@ const SESSION_TOOLS = new Set([
   "orbitx_grok_video",
   "orbitx_gen_image",
   "orbitx_gen_video",
+  "orbitx_x_post",
+  "orbitx_x_reply",
+  "orbitx_x_quote",
+  "orbitx_vc_start",
+  "orbitx_vc_end",
+  "orbitx_gc_start",
 ]);
 
 async function getProfileForUser(userId) {
@@ -1517,6 +1542,34 @@ const TOOL_ALIASES = {
   orbitx_sell: "orbitx_prepare_sell",
   orbitx_buy_auto: "orbitx_prepare_buy",
   orbitx_sell_pump: "orbitx_prepare_sell",
+  orbitx_quote: "orbitx_trade_quote",
+  quote: "orbitx_trade_quote",
+  tweet: "orbitx_x_post",
+  post_to_x: "orbitx_x_post",
+  start_vc: "orbitx_vc_start",
+  open_vc: "orbitx_vc_start",
+  any_open_vc: "orbitx_vc_list",
+  join_vc: "orbitx_vc_join",
+  vc_link: "orbitx_vc_link",
+  start_group_chat: "orbitx_gc_start",
+  start_gc: "orbitx_gc_start",
+  create_group_chat: "orbitx_gc_start",
+  any_group_chats: "orbitx_gc_list",
+  group_chats: "orbitx_gc_list",
+  hey_any_group_chats: "orbitx_gc_list",
+  join_gc: "orbitx_gc_join",
+  join_group_chat: "orbitx_gc_join",
+  chat_in_gc: "orbitx_gc_focus",
+  chat_in_group: "orbitx_gc_focus",
+  chat_in_the_group_chat: "orbitx_gc_focus",
+  orbitx_gc_enter: "orbitx_gc_focus",
+  leave_gc: "orbitx_gc_leave",
+  "leave gc": "orbitx_gc_leave",
+  leave_group_chat: "orbitx_gc_leave",
+  orbitx_gc_exit: "orbitx_gc_leave",
+  gc_send: "orbitx_gc_send",
+  gc_history: "orbitx_gc_history",
+  orbitx_gc_read: "orbitx_gc_history",
   "buy orbitx": "orbitx_buy_orbitx",
   "buy $orbitx": "orbitx_buy_orbitx",
   buy_orbitx: "orbitx_buy_orbitx",
@@ -2937,16 +2990,225 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_trade_quote",
+    description:
+      "Jupiter quote SOL → mint (no signature). When the user asks price impact / how much they get — call this. Then orbitx_prepare_buy to sign.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number", description: "SOL to spend (default 0.1)" },
+        slippage: { type: "number", default: 10 },
+      },
+      required: ["mint"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_x_connect",
+    description:
+      "Connect the user's X account to OrbitX so this MCP can post. Returns /auth (Supabase Continue with X) and /x (tweet.write) links.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_x_status",
+    description: "Show whether X is connected for this OrbitX user and if tweet.write is granted.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_x_post",
+    description:
+      "Post a tweet on the connected X account. Requires OrbitX auth + X connected via /auth Continue with X or /x.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "Tweet body" },
+        linkUrl: { type: "string" },
+        replyToTweetId: { type: "string" },
+        quoteTweetId: { type: "string" },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_x_reply",
+    description: "Reply to a tweet id from the connected X account.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        replyToTweetId: { type: "string" },
+      },
+      required: ["text", "replyToTweetId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_x_quote",
+    description: "Quote-tweet by id from the connected X account.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        quoteTweetId: { type: "string" },
+      },
+      required: ["text", "quoteTweetId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_start",
+    description:
+      "Start a named LiveKit voice chat. When the user says start a VC named X — call this with name. Returns a join URL anyone can open.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Room name" },
+        topic: { type: "string" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_list",
+    description:
+      "List open LiveKit VCs with join links. When the user says any open VC / send the link — call this.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 12 } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_join",
+    description: "Get a join URL (and LiveKit token when configured) for a named or slug VC.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        displayName: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_link",
+    description: "Alias of orbitx_vc_join — return the public join link for a VC.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_vc_end",
+    description: "End a live MCP voice chat by name or slug.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_start",
+    description:
+      "Create a named group chat. When the user says start a group chat named Orbitx — call this with name. Anyone can list and join it.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "Group chat name" }, topic: { type: "string" } },
+      required: ["name"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_list",
+    description:
+      "List open group chats. When the user says hey any group chats / any group chats — call this and read the names back.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 20 } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_join",
+    description:
+      "Join a group chat by name. When the user says join Orbitx — call this with name. Then they must say I want to chat in the group chat to enter sticky chat mode.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_focus",
+    description:
+      "Enter sticky group-chat mode. When the user says I want to chat in the group chat — call this. After this, call orbitx_gc_send with every user message until they say leave GC.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_send",
+    description:
+      "Post a message to the focused group chat and return the latest transcript. While in GC mode, send every user line here.",
+    inputSchema: {
+      type: "object",
+      properties: { text: { type: "string", description: "Message to post" } },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_chat",
+    description:
+      "Enter the group chat (same as focus). If text is set, also post it. Use when the user wants to talk in the GC.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        text: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_gc_leave",
+    description:
+      "Leave sticky group-chat mode. When the user says leave GC / okay use tool leave GC — call this immediately. They can join back anytime.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_gc_history",
+    description: "Read recent messages in a group chat (or the focused one).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        limit: { type: "integer", default: 20 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category + total count (2500+ generated). Call when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (2500+ generated + 200 cook tools). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
 
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
 const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
-const TOOLS = [...CORE_TOOLS, ..._generated];
+const _cook = buildCookTools().filter((t) => !_coreNames.has(t.name) && !_generated.some((g) => g.name === t.name));
+const TOOLS = [...CORE_TOOLS, ..._generated, ..._cook];
 const TOOL_NAME_SET = new Set(TOOLS.map((t) => t.name));
 for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
 
@@ -3028,6 +3290,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   if (name === "orbitx_auth_status") {
     return getAgentLinkAuthStatus(args.authCode || auth?.authCode);
   }
+
+  const gcRelay = await maybeRelayGroupChat({ name, args, auth, sb });
+  if (gcRelay) return gcRelay;
 
   if (name === "search") {
     const q = String(args.query || "").trim().toLowerCase();
@@ -3129,6 +3394,33 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     auth,
   });
   if (generated !== null && generated !== undefined) return generated;
+
+  if (
+    name === "orbitx_trade_quote" ||
+    name === "orbitx_x_connect" ||
+    name === "orbitx_x_status" ||
+    name === "orbitx_x_post" ||
+    name === "orbitx_x_reply" ||
+    name === "orbitx_x_quote" ||
+    name === "orbitx_vc_start" ||
+    name === "orbitx_vc_list" ||
+    name === "orbitx_vc_join" ||
+    name === "orbitx_vc_link" ||
+    name === "orbitx_vc_end" ||
+    name === "orbitx_gc_start" ||
+    name === "orbitx_gc_list" ||
+    name === "orbitx_gc_join" ||
+    name === "orbitx_gc_focus" ||
+    name === "orbitx_gc_send" ||
+    name === "orbitx_gc_chat" ||
+    name === "orbitx_gc_leave" ||
+    name === "orbitx_gc_history" ||
+    name === "orbitx_gc_read"
+  ) {
+    return dispatchCookTool(name, args, { base, fetchJson, sb, wallet, auth });
+  }
+  const cooked = await dispatchCookTool(name, args, { base, fetchJson, sb, wallet, auth });
+  if (cooked !== null && cooked !== undefined) return cooked;
 
   if (name === "orbitx_whoami") {
     const session = await withAuthEmail(
@@ -3270,6 +3562,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       totalTools: TOOLS.length,
       coreTools: CORE_TOOLS.length,
       generatedTools: _generated.length,
+      cookTools: _cook.length,
+      cookStats: cookStats(),
       generatedStats: generatedStats(),
       categoryCounts: byPrefix,
       create: [
@@ -4854,9 +5148,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.5.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.6.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: when the user shares a CA/mint and asks for a chart, DexScreener, graph, or candles — call orbitx_dex_chart with ca=<address> and render the returned markdown (live embed + stats) in chat. MCP access: when they say buy access / burn ORBITX — ASK hour (100), day (1,000), week (10,000), or month (1,000,000), call orbitx_mcp_access_buy, send openUrl/signUrl so Jupiter buys then burns, then orbitx_mcp_access_confirm with the signature. Time remaining: orbitx_mcp_access_status. Buy credits: when they say buy credits / top up, ASK how many credits or SOL amount, call orbitx_credits_buy, send openUrl/signUrl so they send SOL to the desk wallet, then orbitx_credits_confirm with the signature. Buy $ORBITX: ASK SOL + sign vs auto → orbitx_buy_orbitx; yes/confirm → orbitx_confirm_buy. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. CHARTS: orbitx_dex_chart. TRADE: quote with orbitx_trade_quote then orbitx_prepare_buy / prepare_sell (Jupiter signUrl). X: orbitx_x_connect → orbitx_x_status → orbitx_x_post (uses OrbitX X auth). VOICE: “start a VC named X” → orbitx_vc_start; “any open VC / send the link” → orbitx_vc_list (join URLs). GROUP CHAT: “start a group chat named Orbitx” → orbitx_gc_start; “hey any group chats” → orbitx_gc_list; “join Orbitx” → orbitx_gc_join; “I want to chat in the group chat” → orbitx_gc_focus then orbitx_gc_send for EVERY user message until “leave GC” / orbitx_gc_leave. They can join back anytime. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -4882,9 +5176,14 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/call") {
       const rawName = String(params?.name || "");
-      const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+      let name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
       const rawArgs = params?.arguments && typeof params.arguments === "object" ? params.arguments : {};
       const args = { ...rawArgs };
+      const gcNat = resolveGcNaturalTool(rawName, args);
+      if (gcNat) {
+        name = gcNat.name;
+        Object.assign(args, gcNat.args);
+      }
       if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
       if (rawName === "orbitx_buy_auto" && !args.pool) args.pool = "auto";
       const rawAuthCode = String(args.authCode || args.orbitxAuthCode || "").trim();
@@ -4892,6 +5191,10 @@ async function handleMcp(req, res, parts) {
       const authCode = parsedAuth.kind === "telegram_login" ? "" : String(parsedAuth.code || rawAuthCode).trim();
       // keep authCode on args for enrichAuth; strip before callTool for strict schemas
       const auth = await enrichAuth(req, args);
+      if (auth) {
+        auth.mcpSessionId = header(req, "mcp-session-id") || auth.mcpSessionId || null;
+        auth.authCode = auth.authCode || authCode || null;
+      }
       delete args.authCode;
       delete args.orbitxAuthCode;
       const identified = Boolean(auth?.userId);
@@ -4906,6 +5209,19 @@ async function handleMcp(req, res, parts) {
         "orbitx_whoami",
         "orbitx_dex_chart",
         "orbitx_get_chart",
+        "orbitx_trade_quote",
+        "orbitx_x_connect",
+        "orbitx_vc_list",
+        "orbitx_vc_join",
+        "orbitx_vc_link",
+        "orbitx_gc_list",
+        "orbitx_gc_join",
+        "orbitx_gc_focus",
+        "orbitx_gc_send",
+        "orbitx_gc_chat",
+        "orbitx_gc_leave",
+        "orbitx_gc_history",
+        "orbitx_gc_read",
       ]);
       if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = {

@@ -194,6 +194,9 @@ import { PushNotificationPrompt } from "./components/notifications/PushNotificat
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
 import { SecurityTracker } from "./components/SecurityTracker";
 
+const McpVoiceRoom = lazyWithRetry(() => import("./pages/McpVoiceRoom"));
+const McpGroupChat = lazyWithRetry(() => import("./pages/McpGroupChat"));
+
 const DirectMessagesPage = () => (
   <AppLayout>
     <div className="h-[calc(100vh-68px)] lg:h-screen">
@@ -660,6 +663,10 @@ const App = () => (
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/supercomputer" element={<McpSuperComputer />} />
             <Route path="/mcp" element={<RedirectPreserveSearch to="/supercomputer" />} />
+            <Route path="/vc" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
+            <Route path="/vc/:slug" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
+            <Route path="/gc" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
+            <Route path="/gc/:slug" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
             <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
             <Route path="/world" element={<Navigate to="/on-chain" replace />} />

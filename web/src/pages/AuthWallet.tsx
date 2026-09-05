@@ -11,7 +11,7 @@ import { InjectWalletButtons } from "@/components/InjectWalletButtons";
 import { XSignInButton } from "@/components/XSignInButton";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { persistSessionLocally } from "@/lib/authSession";
-import { consumeOAuthHash, oauthErrorFromLocation, takeAuthNext } from "@/lib/xOAuth";
+import { consumeOAuthHash, consumeOAuthProviderTokens, oauthErrorFromLocation, takeAuthNext } from "@/lib/xOAuth";
 import "./auth.css";
 
 export default function AuthWallet() {
@@ -55,10 +55,28 @@ export default function AuthWallet() {
       toast.error(oauthErr);
       return;
     }
-    const tokens = consumeOAuthHash();
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const tokens = consumeOAuthHash(hash);
+    const provider = consumeOAuthProviderTokens(hash);
     if (tokens) {
       persistSessionLocally(tokens);
-      window.location.replace(takeAuthNext(next));
+      void (async () => {
+        if (provider?.provider_token) {
+          try {
+            await fetch("/api/x-session-sync", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${tokens.access_token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(provider),
+            });
+          } catch {
+            /* user can still Connect X on /x */
+          }
+        }
+        window.location.replace(takeAuthNext(next));
+      })();
     }
   }, [next, params]);
 

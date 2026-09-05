@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   consumeOAuthHash,
+  consumeOAuthProviderTokens,
   oauthErrorFromLocation,
   oauthRedirectTo,
   usernameFromSocialMeta,
@@ -20,6 +21,23 @@ describe("consumeOAuthHash", () => {
       refresh_token: "rt",
     });
     expect(consumeOAuthHash("#type=recovery")).toBeNull();
+  });
+});
+
+describe("consumeOAuthProviderTokens", () => {
+  it("reads X provider_token from the GoTrue hash", () => {
+    expect(
+      consumeOAuthProviderTokens("#access_token=at&refresh_token=rt&provider_token=xt&provider_refresh_token=xr&expires_in=7200"),
+    ).toEqual({
+      provider_token: "xt",
+      provider_refresh_token: "xr",
+      expires_in: 7200,
+      scope: undefined,
+    });
+    expect(consumeOAuthHash("#access_token=at&refresh_token=rt")).toEqual({
+      access_token: "at",
+      refresh_token: "rt",
+    });
   });
 });
 
