@@ -13,6 +13,7 @@ import {
   normalizeUsernameForPolicy,
 } from "@/lib/usernamePolicy";
 import { clearPersistedSession, readPersistedSession } from "@/lib/authSession";
+import { autoUsernameFromPubkey } from "@/lib/usernameClaim";
 
 export interface Profile {
   id: string;
@@ -121,12 +122,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } else if (error && error.code === "PGRST116") {
       const requestedUsername = typeof userMeta?.username === "string" ? normalizeUsernameForPolicy(userMeta.username) : null;
+      const walletPk = typeof userMeta?.wallet === "string" ? userMeta.wallet : null;
       const username = requestedUsername && (!isReservedUsername(requestedUsername) || canUseReservedUsername(userEmail))
         ? requestedUsername
-        : null;
+        : walletPk
+          ? autoUsernameFromPubkey(walletPk)
+          : null;
       const { data: newProfile } = await supabase
         .from("profiles")
-        .insert({ user_id: userId, username })
+        .insert({ user_id: userId, username, ...(walletPk ? { sol_wallet: walletPk } : {}) })
         .select()
         .single();
       if (newProfile) setProfile(newProfile as Profile);

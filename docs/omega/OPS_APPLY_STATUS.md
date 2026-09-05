@@ -13,6 +13,7 @@ Last applied: 2026-09-05 (production Supabase project `ffjipnkhcebjvttliptb` / S
 | `20260905190000_backend_auth_rls_hardening.sql` | Applied + recorded (`wallet_auth_used_nonces`, own-row `profiles` writes, `orbitx_upsert_profile` revoke from anon, OXW private joins, token-chat wallet bind) |
 | Edge functions `oxw-award-xp`, `oxw-lobby-sync`, `oxw-trade-ingest`, `oxw-notification-dispatch`, `oxw-token-scan` | Deployed |
 | Edge functions `wallet-auth`, `signup-guard`, `auth-signup`, `auth-signin`, `livekit-token`, `voice-token`, `rpc-proxy`, `solana-rpc-proxy` | Deployed 2026-09-05 (`verify_jwt` from `config.toml`) |
+| Auth Web3 Wallet provider (Solana + Ethereum) | Enabled 2026-09-05. App wallet login uses `/api/auth-web3` → `grant_type=web3` (legacy `wallet-auth` is fallback) |
 | `OXW_WORKER_SECRET` | Set on Supabase project secrets (value not stored in git) |
 | Duplicate `[functions.wallet-auth]` in `supabase/config.toml` | Removed (CLI link/push blocker) |
 
@@ -41,6 +42,15 @@ supabase migration list --linked | grep -E '20260725|20260905190000'
 # Smoke (app)
 bash scripts/qa/run-smoke.sh
 ```
+
+## Auth URL configuration (GoTrue)
+
+Web3 SIWS and password-reset links both require **Site URL** + **Redirect URLs** to include the www host. Apex `https://orbitx.world` 308s to www and drops recovery hashes.
+
+Intended production values (project `ffjipnkhcebjvttliptb`):
+
+- Site URL: `https://www.orbitx.world`
+- Redirect URLs: `https://www.orbitx.world/**`, `https://orbitx.world/**`, `https://ogscan.fun/**`, `https://www.ogscan.fun/**`, `https://orbitxcity.vercel.app/**`, `http://localhost:5173/**`, `http://localhost:3000/**`, `http://localhost:8080/**`
 
 ## Security notes
 

@@ -52,7 +52,7 @@ export function InjectWalletButtons({
         Connect Jupiter
       </button>
       <p className="ox-auth-sub" style={{ margin: "12px 0 0" }}>
-        Connect Phantom or Jupiter. You&apos;ll sign a free message to log in — no transaction, no fees.
+        Connect Phantom or Jupiter. Supabase Web3 verifies a free Sign-in-with-Solana message — no transaction, no fees.
       </p>
     </div>
   );

@@ -375,6 +375,9 @@
     },
     "api/auth-login.ts": {
       "maxDuration": 25
+    },
+    "api/auth-web3.ts": {
+      "maxDuration": 25
     }
   },
   "crons": [

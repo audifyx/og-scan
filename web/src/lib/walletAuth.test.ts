@@ -30,9 +30,51 @@ describe("signInWithWallet", () => {
     installSupabaseSession.mockReset();
     getSession.mockResolvedValue({ data: { session: null } });
     installSupabaseSession.mockResolvedValue(undefined);
+    vi.unstubAllGlobals();
   });
 
-  it("requests a nonce, then verifies with that nonce before persisting the session", async () => {
+  it("uses native Web3 via /api/auth-web3 and does not call wallet-auth when that succeeds", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "at",
+        refresh_token: "rt",
+        user: { id: "u1", created_at: "2024-01-01T00:00:00.000Z", last_sign_in_at: "2026-09-01T00:00:00.000Z" },
+      }),
+      headers: { get: () => "application/json" },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const signed = new Uint8Array([1, 2, 3, 4]);
+    const signMessage = vi.fn(async () => signed);
+    const result = await signInWithWallet("WalletPubkey111", signMessage);
+    expect(result.isNew).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth-web3");
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.chain).toBe("solana");
+    expect(body.message).toContain("wants you to sign in with your Solana account:");
+    expect(body.message).toContain("WalletPubkey111");
+    expect(invokeEdgeFn).not.toHaveBeenCalled();
+    expect(installSupabaseSession).toHaveBeenCalledWith(
+      { access_token: "at", refresh_token: "rt" },
+      expect.objectContaining({
+        id: "u1",
+        user_metadata: expect.objectContaining({ wallet: "WalletPubkey111", login: "web3" }),
+      }),
+    );
+  });
+
+  it("falls back to wallet-auth when Web3 is down", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: "Wallet login timed out. Please try again." }),
+        headers: { get: () => "application/json" },
+      }),
+    );
     invokeEdgeFn
       .mockResolvedValueOnce({ nonce: "n1", message: "sign this n1" })
       .mockResolvedValueOnce({ access_token: "at", refresh_token: "rt", isNew: false, user: { id: "u1" } });
@@ -63,15 +105,36 @@ describe("signInWithWallet", () => {
     getSession.mockResolvedValue({
       data: { session: { user: { email: "owner@orbitx.world" } } },
     });
-    invokeEdgeFn
-      .mockResolvedValueOnce({ nonce: "n2", message: "sign this n2" })
-      .mockResolvedValueOnce({ access_token: "at2", refresh_token: "rt2", isNew: false });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: "at2",
+          refresh_token: "rt2",
+          user: { id: "u2", created_at: new Date().toISOString() },
+        }),
+        headers: { get: () => "application/json" },
+      }),
+    );
     const result = await signInWithWallet("WalletPubkey111", async () => new Uint8Array([1]), {
       replaceEmailSession: true,
     });
-    expect(result.isNew).toBe(false);
+    expect(result.isNew).toBe(true);
     expect(getSession).not.toHaveBeenCalled();
-    expect(invokeEdgeFn).toHaveBeenCalled();
-    expect(installSupabaseSession).toHaveBeenCalledWith({ access_token: "at2", refresh_token: "rt2" }, null);
+    expect(invokeEdgeFn).not.toHaveBeenCalled();
+    expect(installSupabaseSession).toHaveBeenCalledWith(
+      { access_token: "at2", refresh_token: "rt2" },
+      expect.objectContaining({ id: "u2" }),
+    );
+  });
+
+  it("does not fall back to wallet-auth when the user rejects the Web3 signature", async () => {
+    const signMessage = vi.fn(async () => {
+      throw new Error("User rejected the request");
+    });
+    await expect(signInWithWallet("WalletPubkey111", signMessage)).rejects.toThrow(/reject/i);
+    expect(invokeEdgeFn).not.toHaveBeenCalled();
   });
 });

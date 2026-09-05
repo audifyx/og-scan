@@ -120,7 +120,7 @@ export default function AuthWallet() {
           <div className="ox-auth-kicker">Secure access</div>
           <h1 className="ox-auth-title">{signup ? "Create your account" : "Welcome back"}</h1>
           <p className="ox-auth-sub">
-            Email via Supabase, or Phantom / Jupiter extension (no wallet adapter).
+            Email, or Phantom / Jupiter via Supabase Web3 (sign a free message — no transaction).
           </p>
 
           {waitingOnUsername ? (

@@ -4,6 +4,7 @@ export const AUTH_ORIGINS = [
   "https://www.orbitx.world",
   "https://ogscan.fun",
   "https://www.ogscan.fun",
+  "https://orbitxcity.vercel.app",
 ];
 
 export function allowOrigin(origin: string | null): string | null {
