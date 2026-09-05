@@ -4,6 +4,7 @@
 import bs58 from "bs58";
 import { supabase } from "@/lib/supabase";
 import { invokeEdgeFn } from "@/lib/edgeFn";
+import { installSupabaseSession } from "@/lib/authSession";
 
 export type SignMessageFn = (message: Uint8Array) => Promise<Uint8Array>;
 
@@ -47,8 +48,7 @@ export async function signInWithWallet(
   if (!access_token || !refresh_token) {
     throw new Error(typeof verified.error === "string" ? verified.error : "Wallet sign-in failed to create a session.");
   }
-  const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-  if (error) throw error;
+  await installSupabaseSession({ access_token, refresh_token });
   return { isNew: !!verified.isNew };
 }
 

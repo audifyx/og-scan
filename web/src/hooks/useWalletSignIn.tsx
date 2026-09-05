@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { Adapter, WalletName, WalletReadyState } from "@solana/wallet-adapter-base";
 import { signInWithWallet } from "@/lib/walletAuth";
-import { adapterNameMatches, collapseDuplicateWallets, connectSolanaWallet, findConnectableWallet } from "@/lib/connectSolanaWallet";
+import { adapterNameMatches, collapseDuplicateWallets, connectInjectedWallet, connectSolanaWallet, findConnectableWallet, isInjectedWalletPresent } from "@/lib/connectSolanaWallet";
 import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 export interface PickableWallet { name: string; icon: string; readyState: WalletReadyState; adapter: Adapter }
@@ -39,25 +39,48 @@ export function useWalletSignIn() {
   const pickable: PickableWallet[] = useMemo(() => {
     const rank = (s: string) => (s === "Installed" ? 0 : s === "Loadable" ? 1 : 2);
     return collapseDuplicateWallets(wallets)
-      .map((w) => ({ name: w.adapter.name, icon: w.adapter.icon, readyState: w.readyState, adapter: w.adapter }))
+      .map((w) => {
+        const name = String(w.adapter.name);
+        const readyState = isInjectedWalletPresent(name) ? "Installed" as WalletReadyState : w.readyState;
+        return { name, icon: w.adapter.icon, readyState, adapter: w.adapter };
+      })
       .sort((a, b) => rank(String(a.readyState)) - rank(String(b.readyState)) || a.name.localeCompare(b.name));
   }, [wallets]);
 
   const signInWith = useCallback(async (name: string, opts?: { replaceEmailSession?: boolean; connectOnly?: boolean }): Promise<{ isNew: boolean }> => {
-    // Wallet Standard and legacy injection can expose duplicate adapters with the
-    // same name. Select the same preferred instance that the connection helper
-    // will connect, otherwise signing may run against the disconnected duplicate.
-    const selected = findConnectableWallet(wallets, name);
-    const adapter = (selected?.adapter as SignMessageAdapter | undefined) ?? findAdapter(wallets, name);
-    if (!adapter) throw new Error(`${name} not found`);
-    const listed = wallets.find((x) => x.adapter === adapter);
-    const rs = String(listed?.readyState ?? "");
-    if (rs !== "Installed" && rs !== "Loadable") {
-      throw new Error(`${name} isn't detected in this browser. Install the ${name} extension (or open OrbitX inside the ${name} app), then try again.`);
-    }
     setBusy(name);
     try {
-      // Reliable select → connect (handles WalletProvider race + adapter fallback).
+      // Prefer the extension inject (window.solana / window.phantom / window.jupiter).
+      // Wallet-adapter often reports connected with no publicKey.
+      const injected = await connectInjectedWallet(name).catch((err) => {
+        if (isInjectedWalletPresent(name)) throw err;
+        return null;
+      });
+      if (injected) {
+        if (opts?.connectOnly) return { isNew: false };
+        try {
+          return await signInWithWallet(injected.publicKey, injected.signMessage, {
+            replaceEmailSession: opts?.replaceEmailSession,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (/reject|cancel|denied/i.test(msg)) throw new Error(`${name} signature was rejected`);
+          if (/invalid signature/i.test(msg)) {
+            throw new Error(`${name} signed, but verification failed — reconnect ${name} and try again`);
+          }
+          throw err instanceof Error ? err : new Error(msg || "Sign-in failed");
+        }
+      }
+
+      const selected = findConnectableWallet(wallets, name);
+      const adapter = (selected?.adapter as SignMessageAdapter | undefined) ?? findAdapter(wallets, name);
+      if (!adapter) throw new Error(`${name} isn't detected in this browser. Install the ${name} extension, then try again.`);
+      const listed = wallets.find((x) => x.adapter === adapter);
+      const rs = String(listed?.readyState ?? "");
+      if (rs !== "Installed" && rs !== "Loadable") {
+        throw new Error(`${name} isn't detected in this browser. Install the ${name} extension (or open OrbitX inside the ${name} app), then try again.`);
+      }
+
       const pubkey = await connectSolanaWallet({
         wallets,
         select: select as (n: WalletName) => void,
@@ -65,7 +88,6 @@ export function useWalletSignIn() {
         preferredName: adapter.name,
       });
 
-      // Give WalletProvider a tick to expose connected publicKey / signMessage.
       await new Promise((r) => setTimeout(r, 60));
 
       const live = (findConnectableWallet(wallets, adapter.name)?.adapter as SignMessageAdapter | undefined) ?? adapter;

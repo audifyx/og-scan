@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import {
   collapseDuplicateWallets,
+  connectInjectedWallet,
   connectSolanaWallet,
   findConnectableWallet,
+  isInjectedWalletPresent,
   phantomInstallHint,
   waitForPublicKey,
 } from "./connectSolanaWallet";
@@ -154,6 +156,35 @@ describe("connectSolanaWallet", () => {
     expect(phantom.adapter.disconnect).toHaveBeenCalled();
     expect(phantom.adapter.connect).toHaveBeenCalled();
     expect(pk).toBe("ReconnectedPk11111111111111111111111111");
+  });
+
+  it("connectInjectedWallet uses window.phantom.solana and returns a signer", async () => {
+    const provider = {
+      publicKey: null as { toBase58: () => string } | null,
+      connect: vi.fn(async function (this: { publicKey: { toBase58: () => string } | null }) {
+        this.publicKey = { toBase58: () => "InjectedPk111111111111111111111111111" };
+        return { publicKey: this.publicKey };
+      }),
+      signMessage: vi.fn(async () => new Uint8Array([9, 8, 7])),
+    };
+    (window as unknown as { phantom?: { solana: typeof provider } }).phantom = { solana: provider };
+    try {
+      expect(isInjectedWalletPresent("Phantom")).toBe(true);
+      const injected = await connectInjectedWallet("Phantom");
+      expect(provider.connect).toHaveBeenCalled();
+      expect(injected?.publicKey).toBe("InjectedPk111111111111111111111111111");
+      const sig = await injected!.signMessage(new Uint8Array([1]));
+      expect(Array.from(sig)).toEqual([9, 8, 7]);
+    } finally {
+      delete (window as unknown as { phantom?: unknown }).phantom;
+    }
+  });
+
+  it("connectInjectedWallet returns null when no extension is present", async () => {
+    delete (window as unknown as { phantom?: unknown }).phantom;
+    delete (window as unknown as { solana?: unknown }).solana;
+    expect(isInjectedWalletPresent("Phantom")).toBe(false);
+    await expect(connectInjectedWallet("Phantom")).resolves.toBeNull();
   });
 
   it("collapseDuplicateWallets keeps Installed Wallet Standard over NotDetected legacy", () => {

@@ -12,6 +12,7 @@
  */
 import type { Adapter, WalletName } from "@solana/wallet-adapter-base";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
+import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 export type WalletLike = {
   adapter: Adapter & { isLegacyInject?: boolean; connecting?: boolean };
@@ -279,4 +280,66 @@ export async function connectSolanaWallet(opts: {
     throw new Error(`${adapter.name} connected but returned no public key — unlock the extension and retry`);
   }
   return pk;
+}
+
+type InjectedProvider = {
+  connect?: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: unknown } | void>;
+  publicKey?: unknown;
+  signMessage?: (message: Uint8Array, encoding?: string) => Promise<unknown>;
+};
+
+/** Direct extension inject — bypasses wallet-adapter races that report "connected" with no key. */
+export function getInjectedProvider(name?: string | null): InjectedProvider | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    solana?: InjectedProvider & { isPhantom?: boolean; isJupiter?: boolean; isSolflare?: boolean };
+    phantom?: { solana?: InjectedProvider };
+    jupiter?: { solana?: InjectedProvider } & InjectedProvider;
+    solflare?: InjectedProvider;
+    backpack?: InjectedProvider;
+  };
+  const want = String(name || "");
+  const phantom = w.phantom?.solana || (w.solana?.isPhantom ? w.solana : null);
+  const jupiter = w.jupiter?.solana || (w.jupiter && typeof w.jupiter.connect === "function" ? w.jupiter : null) || (w.solana?.isJupiter ? w.solana : null);
+  const solflare = w.solflare || (w.solana?.isSolflare ? w.solana : null);
+  const backpack = w.backpack;
+  if (/phantom/i.test(want)) return phantom || null;
+  if (/jupiter/i.test(want)) return jupiter || null;
+  if (/solflare/i.test(want)) return solflare || null;
+  if (/backpack/i.test(want)) return backpack || null;
+  if (!want) return phantom || jupiter || solflare || backpack || w.solana || null;
+  return null;
+}
+
+export function isInjectedWalletPresent(name: string): boolean {
+  const provider = getInjectedProvider(name);
+  return Boolean(provider && (typeof provider.connect === "function" || provider.publicKey));
+}
+
+export async function connectInjectedWallet(preferredName?: string): Promise<{
+  publicKey: string;
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>;
+} | null> {
+  const provider = getInjectedProvider(preferredName);
+  if (!provider) return null;
+  const label = preferredName || "Wallet";
+  if (typeof provider.connect === "function") {
+    try {
+      await withTimeout(provider.connect(), 15000, `${label} did not respond. Unlock the extension and retry.`);
+    } catch (err) {
+      if (!toBase58(provider.publicKey)) throw err;
+    }
+  }
+  const pk = toBase58(provider.publicKey);
+  if (!pk) {
+    throw new Error(`${label} connected but returned no public key — unlock the extension and retry`);
+  }
+  if (typeof provider.signMessage !== "function") {
+    throw new Error(`${label} can't sign the login message here. Open OrbitX in a normal browser tab with the extension enabled.`);
+  }
+  const sign = provider.signMessage.bind(provider);
+  return {
+    publicKey: pk,
+    signMessage: async (message: Uint8Array) => normalizeSignatureBytes(await sign(message)),
+  };
 }

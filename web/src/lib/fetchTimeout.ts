@@ -2,7 +2,7 @@
 
 export const AUTH_FETCH_TIMEOUT_MS = 12_000;
 export const EDGE_FN_TIMEOUT_MS = 20_000;
-export const EDGE_FN_PROXY_TIMEOUT_MS = 8_000;
+export const EDGE_FN_PROXY_TIMEOUT_MS = 20_000;
 export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 
 export function fetchWithTimeout(
