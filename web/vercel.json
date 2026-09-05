@@ -15,6 +15,14 @@
       "destination": "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/$1"
     },
     {
+      "source": "/api/auth-login",
+      "destination": "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/auth-signin"
+    },
+    {
+      "source": "/api/auth/signup",
+      "destination": "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/signup-guard"
+    },
+    {
       "source": "/mcp/.well-known/oauth-protected-resource",
       "destination": "/api/orbitx-hub?path=mcp/.well-known/oauth-protected-resource"
     },

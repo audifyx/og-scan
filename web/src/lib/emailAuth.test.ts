@@ -31,6 +31,7 @@ describe("signInWithEmailPassword", () => {
 
     await signInWithEmailPassword("me@orbitx.world", "secret");
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth-login",
       expect.objectContaining({
@@ -68,6 +69,37 @@ describe("signInWithEmailPassword", () => {
     );
     await expect(signInWithEmailPassword("me@orbitx.world", "bad")).rejects.toThrow(
       "Invalid email or password",
+    );
+  });
+
+  it("falls back to /ai-fn/auth-signin when /api/auth-login returns a platform 500", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        headers: { get: () => "text/plain" },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          access_token: "at2",
+          refresh_token: "rt2",
+          user: { id: "u2", email: "me@orbitx.world" },
+        }),
+        headers: { get: () => "application/json" },
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await signInWithEmailPassword("me@orbitx.world", "secret");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth-login");
+    expect(fetchMock.mock.calls[1][0]).toBe("/ai-fn/auth-signin");
+    expect(install).toHaveBeenCalledWith(
+      { access_token: "at2", refresh_token: "rt2" },
+      { id: "u2", email: "me@orbitx.world" },
     );
   });
 });

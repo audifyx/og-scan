@@ -15,7 +15,7 @@ export function emailAuthErrorMessage(raw: unknown): string {
   const text = errorText(raw).replace(/^Auth error:\s*/i, "");
   if (/invalid login|invalid credentials|INVALID_CREDENTIALS/i.test(text)) return "Invalid email or password";
   if (/email not confirmed/i.test(text)) return "Confirm your email first — check your inbox";
-  if (/timed out|timeout|503/i.test(text)) return "Login service timed out. Please try again.";
+  if (/timed out|timeout|503|FUNCTION_INVOCATION_FAILED/i.test(text)) return "Login service timed out. Please try again.";
   return text || "Sign-in failed";
 }
 
@@ -24,24 +24,39 @@ function isAbort(err: unknown): boolean {
     || (err instanceof Error && err.name === "AbortError");
 }
 
+function looksLikePlatformCrash(res: Response, json: Record<string, unknown>): boolean {
+  if (res.status >= 500) return true;
+  const ct = res.headers?.get?.("content-type") || "";
+  return !ct.includes("application/json") && Object.keys(json).length === 0;
+}
+
+async function postLogin(url: string, email: string, password: string): Promise<{ res: Response; json: Record<string, unknown> }> {
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+    18_000,
+  );
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { res, json };
+}
+
 /** Email login via same-origin /api/auth-login (never the hung public GoTrue /token). */
 export async function signInWithEmailPassword(email: string, password: string): Promise<void> {
   let res: Response;
+  let json: Record<string, unknown>;
   try {
-    res = await fetchWithTimeout(
-      "/api/auth-login",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      },
-      18_000,
-    );
+    ({ res, json } = await postLogin("/api/auth-login", email, password));
+    if (looksLikePlatformCrash(res, json)) {
+      ({ res, json } = await postLogin("/ai-fn/auth-signin", email, password));
+    }
   } catch (err) {
     if (isAbort(err)) throw new Error("Login service timed out. Please try again.");
     throw err;
   }
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || json.success === false) {
     throw new Error(emailAuthErrorMessage(json.error || json.msg || json.message || `Sign-in failed (${res.status})`));
   }
