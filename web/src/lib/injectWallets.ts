@@ -60,13 +60,27 @@ export function getPhantomProvider(): InjectedProvider | null {
   return null;
 }
 
+function looksLikeSolanaWallet(p: InjectedProvider | null | undefined): p is InjectedProvider {
+  if (!p) return false;
+  return Boolean(
+    p.isJupiter
+    || typeof p.signMessage === "function"
+    || typeof p.signTransaction === "function"
+    || p.publicKey != null,
+  );
+}
+
 export function getJupiterProvider(): InjectedProvider | null {
   startWalletStandardDiscovery();
   const w = win();
   if (providerUsable(w.jupiter?.solana)) return w.jupiter!.solana!;
-  if (w.jupiter && typeof w.jupiter.connect === "function") return w.jupiter;
+  // Do not treat window.jupiter.connect as a wallet — the swap widget also
+  // sets window.Jupiter/window.jupiter with a connect() that is not SIWS.
+  if (looksLikeSolanaWallet(w.jupiter) && typeof w.jupiter.connect === "function") return w.jupiter;
   if (w.solana?.isJupiter && providerUsable(w.solana)) return w.solana;
   // Jupiter in-app browser injects a generic window.solana without isJupiter.
+  // If Wallet Standard already found Jupiter, prefer that over a random inject.
+  if (findStandardWallet("jupiter")) return null;
   const generic = getGenericSolana();
   if (generic && !generic.isPhantom) return generic;
   return null;
@@ -203,10 +217,18 @@ async function connectInjectProvider(
   if (!publicKey) {
     throw new Error(`${label} connected but returned no public key — unlock the extension and retry`);
   }
-  if (typeof provider.signMessage !== "function") {
+  const signFn = typeof provider.signMessage === "function"
+    ? provider.signMessage.bind(provider)
+    : typeof provider.request === "function"
+      ? async (message: Uint8Array, encoding?: string) => provider.request!({
+          method: "signMessage",
+          params: { message, display: encoding || "utf8" },
+        })
+      : null;
+  if (!signFn) {
     throw new Error(`${label} can't sign the login message in this tab. Open OrbitX in a normal browser window.`);
   }
-  const sign = provider.signMessage.bind(provider);
+  const sign = signFn;
   const signTx = provider.signTransaction?.bind(provider);
   const signAll = provider.signAllTransactions?.bind(provider);
   const disc = provider.disconnect?.bind(provider);
@@ -236,12 +258,28 @@ async function connectInjectProvider(
 
 export async function connectInjectWallet(name: InjectWallet): Promise<InjectWalletSession> {
   const { inject, standard } = await waitForWallet(name);
-  if (inject) return connectInjectProvider(name, inject);
-  if (standard) {
+  const errors: Error[] = [];
+  const tryStandard = async (): Promise<InjectWalletSession | null> => {
+    if (!standard) return null;
     const wrapped = await connectStandardWallet(standard);
     return { name, ...wrapped };
+  };
+  const tryInject = async (): Promise<InjectWalletSession | null> => {
+    if (!inject) return null;
+    return connectInjectProvider(name, inject);
+  };
+  // Jupiter Chrome is Wallet Standard-first. A generic window.solana must not
+  // block it (Phantom often owns window.solana when both are installed).
+  const order = name === "jupiter" ? [tryStandard, tryInject] : [tryInject, tryStandard];
+  for (const attempt of order) {
+    try {
+      const session = await attempt();
+      if (session) return session;
+    } catch (err) {
+      errors.push(err instanceof Error ? err : new Error(String(err)));
+    }
   }
-  throw new Error(injectInstallHint(name));
+  throw errors[0] || new Error(injectInstallHint(name));
 }
 
 export async function signInWithInjectWallet(name: InjectWallet): Promise<{ isNew: boolean }> {

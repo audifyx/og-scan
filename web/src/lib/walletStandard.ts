@@ -37,9 +37,42 @@ function saveWallet(wallet: StandardWallet): void {
 }
 
 function onRegister(event: Event): void {
-  const detail = (event as CustomEvent<(cb: (wallet: StandardWallet) => void) => void>).detail;
+  const detail = (event as { detail?: unknown }).detail;
   if (typeof detail === "function") {
     try { detail(saveWallet); } catch { /* wallet callback threw */ }
+  }
+}
+
+/**
+ * Wallet Standard forbids CustomEvent here: browsers structured-clone `detail`
+ * and strip functions, so Jupiter/Phantom never receive `register()`.
+ * detail must be a callable with `.register` to cover both wallet shapes.
+ */
+function makeAppReadyDetail(): ((wallet: StandardWallet) => void) & { register: (wallet: StandardWallet) => void } {
+  const register = (wallet: StandardWallet) => { saveWallet(wallet); };
+  const api = register as typeof register & { register: typeof register };
+  api.register = register;
+  return api;
+}
+
+class WalletStandardAppReadyEvent extends Event {
+  readonly #detail = makeAppReadyDetail();
+  constructor() {
+    super("wallet-standard:app-ready", { bubbles: false, cancelable: false, composed: false });
+  }
+  get detail() {
+    return this.#detail;
+  }
+}
+
+function dispatchAppReady(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new WalletStandardAppReadyEvent());
+  } catch {
+    try {
+      window.dispatchEvent(new Event("wallet-standard:app-ready"));
+    } catch { /* ignore */ }
   }
 }
 
@@ -47,11 +80,14 @@ export function startWalletStandardDiscovery(): void {
   if (typeof window === "undefined" || started) return;
   started = true;
   window.addEventListener("wallet-standard:register-wallet", onRegister as EventListener);
-  try {
-    window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", { detail: saveWallet }));
-  } catch {
-    try { window.dispatchEvent(new Event("wallet-standard:app-ready")); } catch { /* ignore */ }
-  }
+  dispatchAppReady();
+  window.setTimeout(dispatchAppReady, 50);
+  window.setTimeout(dispatchAppReady, 400);
+  window.setTimeout(dispatchAppReady, 1200);
+}
+
+export function announceWalletsReady(): void {
+  dispatchAppReady();
 }
 
 export function subscribeWalletStandard(cb: () => void): () => void {

@@ -12,6 +12,7 @@ import {
   isReservedUsername,
   normalizeUsernameForPolicy,
 } from "@/lib/usernamePolicy";
+import { clearPersistedSession, readPersistedSession } from "@/lib/authSession";
 
 export interface Profile {
   id: string;
@@ -88,10 +89,19 @@ function processPendingReferral(userId: string) {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const boot = typeof window !== "undefined" ? readPersistedSession() : null;
+    return (boot?.user as User | undefined) ?? null;
+  });
+  const [session, setSession] = useState<Session | null>(() => {
+    const boot = typeof window !== "undefined" ? readPersistedSession() : null;
+    return (boot as Session | null);
+  });
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const boot = typeof window !== "undefined" ? readPersistedSession() : null;
+    return !boot?.user;
+  });
 
   const fetchProfile = async (userId: string, userEmail?: string, userMeta?: Record<string, unknown>) => {
     const { data, error } = await supabase
@@ -124,6 +134,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    const persisted = readPersistedSession();
+    if (persisted?.user?.id) {
+      fetchProfile(
+        String(persisted.user.id),
+        persisted.user.email as string | undefined,
+        persisted.user.user_metadata as Record<string, unknown> | undefined,
+      );
+    }
+
     let resolved = false;
 
     // Safety timeout — if Supabase auth doesn't resolve in 5s, unblock the app
@@ -137,6 +156,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, sess) => {
       if (event === "PASSWORD_RECOVERY") {
         try { sessionStorage.setItem("og_password_recovery", "1"); } catch { /* noop */ }
+      }
+      if ((event === "SIGNED_OUT" || !sess) && event !== "PASSWORD_RECOVERY") {
+        const persisted = readPersistedSession();
+        if (persisted?.user) {
+          setSession(persisted as Session);
+          setUser(persisted.user as User);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(safetyTimeout);
+          }
+          setLoading(false);
+          return;
+        }
       }
       setSession(sess);
       setUser(sess?.user ?? null);
@@ -158,6 +190,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     supabase.auth.getSession().then(({ data: { session: sess } }) => {
+      if (!sess) {
+        const persisted = readPersistedSession();
+        if (persisted?.user) {
+          setSession(persisted as Session);
+          setUser(persisted.user as User);
+          fetchProfile(String(persisted.user.id), persisted.user.email as string | undefined, persisted.user.user_metadata as Record<string, unknown> | undefined);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(safetyTimeout);
+          }
+          setLoading(false);
+          return;
+        }
+      }
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
@@ -227,7 +273,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         is_public: false,
       });
     }
-    try { localStorage.removeItem("sol-tools-auth"); } catch { /* noop */ }
+    try { clearPersistedSession(); } catch { /* noop */ }
     setProfile(null);
     setUser(null);
     setSession(null);

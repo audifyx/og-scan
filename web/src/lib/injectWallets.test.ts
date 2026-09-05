@@ -139,6 +139,36 @@ describe("injectWallets", () => {
     expect(connected.publicKey).toBe(VALID_PK);
   });
 
+  it("connects Jupiter through Wallet Standard even when a generic window.solana exists", async () => {
+    (window as unknown as { solana: { connect: () => Promise<void> } }).solana = {
+      connect: async () => {},
+    };
+    const connect = vi.fn(async () => ({ accounts: [{ address: VALID_PK }] }));
+    const signMessage = vi.fn(async () => [{ signature: new Uint8Array([3, 3]) }]);
+    window.dispatchEvent(new CustomEvent("wallet-standard:register-wallet", {
+      detail: (register: (wallet: unknown) => void) => register({
+        name: "Jupiter Wallet",
+        accounts: [],
+        features: {
+          "standard:connect": { connect },
+          "solana:signMessage": { signMessage },
+        },
+      }),
+    }));
+    const connected = await connectInjectWallet("jupiter");
+    expect(connect).toHaveBeenCalled();
+    expect(connected.publicKey).toBe(VALID_PK);
+  });
+
+  it("does not treat a Jupiter swap-widget connect() as a wallet", () => {
+    (window as unknown as { jupiter: { connect: () => Promise<void>; init: () => void } }).jupiter = {
+      connect: async () => {},
+      init: () => {},
+    };
+    expect(getJupiterProvider()).toBeNull();
+    expect(isInjectWalletReady("jupiter")).toBe(false);
+  });
+
   it("connects Phantom through Wallet Standard", async () => {
     const connect = vi.fn(async () => ({ accounts: [{ address: VALID_PK }] }));
     const signMessage = vi.fn(async () => [{ signature: new Uint8Array([9, 8]) }]);

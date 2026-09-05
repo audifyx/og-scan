@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installSupabaseSession, persistSessionLocally, tokensFromAuthPayload } from "./authSession";
+import { installSupabaseSession, persistSessionLocally, readPersistedSession, tokensFromAuthPayload } from "./authSession";
 
 describe("authSession", () => {
   beforeEach(() => {
@@ -38,6 +38,13 @@ describe("authSession", () => {
     const stored = JSON.parse(localStorage.getItem("sol-tools-auth") ?? "{}");
     expect(stored.access_token).toBe("access-token");
     expect(stored.refresh_token).toBe("refresh-token");
+    expect(localStorage.getItem("orbitx-auth-backup")).toBeTruthy();
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("readPersistedSession returns a backup session if supabase storage was wiped", () => {
+    persistSessionLocally({ access_token: "tok", refresh_token: "ref" }, { id: "u1" });
+    localStorage.removeItem("sol-tools-auth");
+    expect(readPersistedSession()?.user).toMatchObject({ id: "u1" });
   });
 });

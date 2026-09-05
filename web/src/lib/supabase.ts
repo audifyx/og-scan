@@ -32,7 +32,8 @@ export const supabase = createClient(
     storage: localStorage,
     storageKey: "sol-tools-auth",
     persistSession: true,
-    autoRefreshToken: true,
+    // Public GoTrue /token hangs; auto-refresh would abort and SIGN OUT, looping /auth.
+    autoRefreshToken: false,
     detectSessionInUrl: true,
   },
   realtime: {

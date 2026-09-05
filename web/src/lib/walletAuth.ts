@@ -8,6 +8,16 @@ import { installSupabaseSession } from "@/lib/authSession";
 
 export type SignMessageFn = (message: Uint8Array) => Promise<Uint8Array>;
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => { globalThis.clearTimeout(timer); resolve(value); },
+      (error) => { globalThis.clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 async function post(body: Record<string, unknown>, authToken?: string) {
   return invokeEdgeFn("wallet-auth", body, { authToken });
 }
@@ -49,7 +59,11 @@ export async function signInWithWallet(
   }
 
   // Never sign or verify until the nonce request has returned a complete SIWS message.
-  const signed = await signMessage(new TextEncoder().encode(message));
+  const signed = await withTimeout(
+    signMessage(new TextEncoder().encode(message)),
+    25_000,
+    "Wallet did not sign the login message. Unlock Jupiter or Phantom and retry.",
+  );
   const signature = bs58.encode(signed);
   const verified = await post({ action: "verify", pubkey, nonce, signature });
   const access_token = typeof verified.access_token === "string" ? verified.access_token : "";
