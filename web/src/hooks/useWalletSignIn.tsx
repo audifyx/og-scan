@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { Adapter, WalletName, WalletReadyState } from "@solana/wallet-adapter-base";
 import { signInWithWallet } from "@/lib/walletAuth";
-import { adapterNameMatches, connectSolanaWallet, findConnectableWallet } from "@/lib/connectSolanaWallet";
+import { adapterNameMatches, collapseDuplicateWallets, connectSolanaWallet, findConnectableWallet } from "@/lib/connectSolanaWallet";
 import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
 
 export interface PickableWallet { name: string; icon: string; readyState: WalletReadyState; adapter: Adapter }
@@ -33,18 +33,13 @@ export function useWalletSignIn() {
   const { wallets, select, disconnect, connect } = useWallet();
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Installed / loadable wallets first, then the rest.
+  // Installed / loadable wallets first. Collapse Phantom/Jupiter duplicates so
+  // the picker shows the Wallet Standard instance (Installed) instead of the
+  // legacy inject adapter (NotDetected) that used to win by list order.
   const pickable: PickableWallet[] = useMemo(() => {
     const rank = (s: string) => (s === "Installed" ? 0 : s === "Loadable" ? 1 : 2);
-    const seen = new Set<string>();
-    return [...wallets]
+    return collapseDuplicateWallets(wallets)
       .map((w) => ({ name: w.adapter.name, icon: w.adapter.icon, readyState: w.readyState, adapter: w.adapter }))
-      .filter((w) => {
-        const key = String(w.name).toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
       .sort((a, b) => rank(String(a.readyState)) - rank(String(b.readyState)) || a.name.localeCompare(b.name));
   }, [wallets]);
 
@@ -63,7 +58,7 @@ export function useWalletSignIn() {
     setBusy(name);
     try {
       // Reliable select → connect (handles WalletProvider race + adapter fallback).
-      await connectSolanaWallet({
+      const pubkey = await connectSolanaWallet({
         wallets,
         select: select as (n: WalletName) => void,
         connect,
@@ -74,8 +69,6 @@ export function useWalletSignIn() {
       await new Promise((r) => setTimeout(r, 60));
 
       const live = (findConnectableWallet(wallets, adapter.name)?.adapter as SignMessageAdapter | undefined) ?? adapter;
-      const pubkey = live.publicKey?.toBase58();
-      if (!pubkey) throw new Error("wallet did not return a public key — unlock the extension and try again");
 
       if (opts?.connectOnly) return { isNew: false };
 

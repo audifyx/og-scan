@@ -25,7 +25,7 @@ export function WalletConnectButton() {
 
   const onPick = async (name: string) => {
     try {
-      const { isNew } = await signInWith(name);
+      const { isNew } = await signInWith(name, { replaceEmailSession: true });
       setPicker(false);
       toast.success("Signed in with wallet");
       // UsernameClaimGate asks for a real username when the profile still has

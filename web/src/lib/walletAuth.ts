@@ -19,12 +19,16 @@ export async function signInWithWallet(
   signMessage: SignMessageFn,
   opts?: { replaceEmailSession?: boolean },
 ): Promise<{ isNew: boolean }> {
-  const { data: { session: existing } } = await supabase.auth.getSession();
-  const existingEmail = existing?.user?.email || "";
-  const isEmailSession = !!existingEmail && !/@wallet\.orbitx\.app$/i.test(existingEmail);
-  if (isEmailSession && opts?.replaceEmailSession !== true) {
-    // Keep email login; caller can still use the connected wallet for txs.
-    return { isNew: false };
+  // Explicit wallet login (e.g. /auth) must not wait on a hung getSession /
+  // token refresh — we are about to overwrite the session anyway.
+  if (opts?.replaceEmailSession !== true) {
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    const existingEmail = existing?.user?.email || "";
+    const isEmailSession = !!existingEmail && !/@wallet\.orbitx\.app$/i.test(existingEmail);
+    if (isEmailSession) {
+      // Keep email login; caller can still use the connected wallet for txs.
+      return { isNew: false };
+    }
   }
 
   const nonceResponse = await post({ action: "nonce", pubkey });

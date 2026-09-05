@@ -55,4 +55,20 @@ describe("signInWithWallet", () => {
     expect(result).toEqual({ isNew: false });
     expect(invokeEdgeFn).not.toHaveBeenCalled();
   });
+
+  it("skips getSession and overwrites email when replaceEmailSession is true", async () => {
+    getSession.mockResolvedValue({
+      data: { session: { user: { email: "owner@orbitx.world" } } },
+    });
+    invokeEdgeFn
+      .mockResolvedValueOnce({ nonce: "n2", message: "sign this n2" })
+      .mockResolvedValueOnce({ access_token: "at2", refresh_token: "rt2", isNew: false });
+    const result = await signInWithWallet("WalletPubkey111", async () => new Uint8Array([1]), {
+      replaceEmailSession: true,
+    });
+    expect(result.isNew).toBe(false);
+    expect(getSession).not.toHaveBeenCalled();
+    expect(invokeEdgeFn).toHaveBeenCalled();
+    expect(setSession).toHaveBeenCalledWith({ access_token: "at2", refresh_token: "rt2" });
+  });
 });

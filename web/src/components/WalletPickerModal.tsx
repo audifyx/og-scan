@@ -10,8 +10,11 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
 }) {
   if (!open) return null;
   if (typeof document === "undefined") return null;
-  const installed = wallets.filter((w) => w.readyState === "Installed" || w.readyState === "Loadable");
-  const rest = wallets.filter((w) => !(w.readyState === "Installed" || w.readyState === "Loadable"));
+  // Only Installed = extension actually present. Loadable (Ledger/Torus/Solflare
+  // without the extension) used to show as "Detected" and then connect with no key.
+  const installed = wallets.filter((w) => w.readyState === "Installed");
+  const loadable = wallets.filter((w) => w.readyState === "Loadable");
+  const rest = wallets.filter((w) => w.readyState !== "Installed" && w.readyState !== "Loadable");
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a1220] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -21,10 +24,12 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
         </div>
         <p className="mb-4 text-[12px] text-white/50">Your wallet is your login. You'll sign a free message to prove ownership — no transaction, no fees.</p>
         <div className="space-y-1.5">
-          {installed.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} />)}
+          {installed.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} kind="installed" />)}
           {installed.length === 0 && <p className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-[12px] text-white/50">No Solana wallet detected. Install Phantom or Jupiter, then reload.</p>}
+          {loadable.length > 0 && <div className="pt-2 text-[10px] font-bold uppercase tracking-widest text-white/30">Other</div>}
+          {loadable.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} kind="loadable" />)}
           {rest.length > 0 && <div className="pt-2 text-[10px] font-bold uppercase tracking-widest text-white/30">More</div>}
-          {rest.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} />)}
+          {rest.map((w) => <Row key={w.name} w={w} onPick={onPick} busy={busy} kind="missing" />)}
         </div>
         <div className="mt-4 flex items-center justify-center gap-3 text-[11px] text-white/40">
           <a href="https://phantom.app" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-og-cyan">Get Phantom <ExternalLink className="h-3 w-3" /></a>
@@ -36,10 +41,11 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
   );
 }
 
-function Row({ w, onPick, busy }: { w: PickableWallet; onPick: (n: string) => void; busy: string | null }) {
-  const detected = w.readyState === "Installed" || w.readyState === "Loadable";
-  const url = (w.adapter as any)?.url as string | undefined;
-  if (!detected) {
+function Row({ w, onPick, busy, kind }: {
+  w: PickableWallet; onPick: (n: string) => void; busy: string | null; kind: "installed" | "loadable" | "missing";
+}) {
+  const url = (w.adapter as { url?: string })?.url;
+  if (kind === "missing") {
     // Not installed — link to the wallet site instead of triggering the adapter's
     // own website redirect on connect(). Keeps connect() in-app for real wallets.
     return (
@@ -57,7 +63,9 @@ function Row({ w, onPick, busy }: { w: PickableWallet; onPick: (n: string) => vo
       {w.icon ? <img src={w.icon} alt="" className="h-6 w-6 rounded-md" /> : <Wallet className="h-6 w-6 text-white/60" />}
       <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
       {busy === w.name ? <Loader2 className="h-4 w-4 animate-spin text-og-cyan" /> :
-        <span className="text-[10px] font-bold uppercase tracking-widest text-og-lime">Detected</span>}
+        <span className={`text-[10px] font-bold uppercase tracking-widest ${kind === "installed" ? "text-og-lime" : "text-white/50"}`}>
+          {kind === "installed" ? "Detected" : "Connect"}
+        </span>}
     </button>
   );
 }

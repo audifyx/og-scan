@@ -62,6 +62,11 @@ export const SolanaWalletProvider: FC<Props> = ({ children }) => {
         wallets={wallets}
         autoConnect={(adapter) => {
           if (typeof window === "undefined") return true;
+          // Manual connect on login pages — autoConnect can leave the adapter
+          // `connecting` without a publicKey, which then no-ops adapter.connect().
+          if (/^\/auth(\/|$)/i.test(window.location.pathname) || /^\/os\/login/i.test(window.location.pathname)) {
+            return false;
+          }
           if (shouldSkipWalletAutoConnect(adapter.name, window.location.pathname, window.location.search)) {
             try {
               localStorage.removeItem("walletName");

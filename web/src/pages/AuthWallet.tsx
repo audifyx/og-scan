@@ -66,7 +66,7 @@ export default function AuthWallet() {
 
   const onPick = async (name: string) => {
     try {
-      const { isNew } = await signInWith(name);
+      const { isNew } = await signInWith(name, { replaceEmailSession: true });
       setPicker(false);
       toast.success("Signed in with wallet");
       if (isNew || pendingMerge) {

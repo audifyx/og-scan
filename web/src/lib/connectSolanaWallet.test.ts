@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import {
+  collapseDuplicateWallets,
   connectSolanaWallet,
   findConnectableWallet,
   phantomInstallHint,
+  waitForPublicKey,
 } from "./connectSolanaWallet";
 
 function mockWallet(name: string, ready: WalletReadyState, connected = false) {
@@ -85,7 +87,7 @@ describe("connectSolanaWallet", () => {
         preferredName: "Jupiter",
       });
       const assertion = expect(pending).rejects.toThrow(/timed out/i);
-      await vi.advanceTimersByTimeAsync(18_000);
+      await vi.advanceTimersByTimeAsync(20_000);
       await assertion;
     } finally {
       vi.useRealTimers();
@@ -107,5 +109,83 @@ describe("connectSolanaWallet", () => {
     expect(select).toHaveBeenCalledWith("Phantom");
     expect(phantom.adapter.connect).toHaveBeenCalled();
     expect(pk).toBe("PhantomPk");
+  });
+
+  it("waits for a public key that appears after connect resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      const phantom = mockWallet("Phantom", WalletReadyState.Installed);
+      phantom.adapter.connect = vi.fn(async function (this: { connected: boolean; publicKey: unknown }) {
+        this.connected = true;
+        this.publicKey = null;
+        globalThis.setTimeout(() => {
+          this.publicKey = { toBase58: () => "LatePhantomPk111111111111111111111111111" };
+        }, 200);
+      });
+      const pending = connectSolanaWallet({
+        wallets: [phantom],
+        select: vi.fn(),
+        connect: vi.fn(async () => {}),
+        preferredName: "Phantom",
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      await expect(pending).resolves.toBe("LatePhantomPk111111111111111111111111111");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reconnects when the adapter is already connected without a public key", async () => {
+    const phantom = mockWallet("Phantom", WalletReadyState.Installed, true);
+    phantom.adapter.publicKey = null;
+    phantom.adapter.disconnect = vi.fn(async function (this: { connected: boolean }) {
+      this.connected = false;
+    });
+    phantom.adapter.connect = vi.fn(async function (this: { connected: boolean; publicKey: unknown }) {
+      this.connected = true;
+      this.publicKey = { toBase58: () => "ReconnectedPk11111111111111111111111111" };
+    });
+    const pk = await connectSolanaWallet({
+      wallets: [phantom],
+      select: vi.fn(),
+      connect: vi.fn(async () => {}),
+      preferredName: "Phantom",
+    });
+    expect(phantom.adapter.disconnect).toHaveBeenCalled();
+    expect(phantom.adapter.connect).toHaveBeenCalled();
+    expect(pk).toBe("ReconnectedPk11111111111111111111111111");
+  });
+
+  it("collapseDuplicateWallets keeps Installed Wallet Standard over NotDetected legacy", () => {
+    const legacy = mockWallet("Phantom", WalletReadyState.NotDetected);
+    (legacy.adapter as { isLegacyInject?: boolean }).isLegacyInject = true;
+    const standard = mockWallet("Phantom", WalletReadyState.Installed);
+    const collapsed = collapseDuplicateWallets([legacy, standard]);
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0].readyState).toBe(WalletReadyState.Installed);
+    expect(collapsed[0].adapter.isLegacyInject).toBeFalsy();
+  });
+
+  it("collapseDuplicateWallets merges Jupiter and Jupiter Wallet", () => {
+    const legacy = mockWallet("Jupiter", WalletReadyState.NotDetected);
+    (legacy.adapter as { isLegacyInject?: boolean }).isLegacyInject = true;
+    const standard = mockWallet("Jupiter Wallet", WalletReadyState.Installed);
+    const collapsed = collapseDuplicateWallets([legacy, standard]);
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0].adapter.name).toBe("Jupiter Wallet");
+  });
+
+  it("waitForPublicKey returns null when the adapter never hydrates", async () => {
+    vi.useFakeTimers();
+    try {
+      const phantom = mockWallet("Phantom", WalletReadyState.Installed);
+      phantom.adapter.publicKey = null;
+      const pending = waitForPublicKey(phantom.adapter, 250);
+      const assertion = expect(pending).resolves.toBeNull();
+      await vi.advanceTimersByTimeAsync(400);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
