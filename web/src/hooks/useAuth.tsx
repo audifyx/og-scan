@@ -14,6 +14,7 @@ import {
 } from "@/lib/usernamePolicy";
 import { clearPersistedSession, readPersistedSession } from "@/lib/authSession";
 import { autoUsernameFromPubkey } from "@/lib/usernameClaim";
+import { usernameFromSocialMeta } from "@/lib/xOAuth";
 
 export interface Profile {
   id: string;
@@ -122,9 +123,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } else if (error && error.code === "PGRST116") {
       const requestedUsername = typeof userMeta?.username === "string" ? normalizeUsernameForPolicy(userMeta.username) : null;
+      const socialUsername = usernameFromSocialMeta(userMeta);
       const walletPk = typeof userMeta?.wallet === "string" ? userMeta.wallet : null;
-      const username = requestedUsername && (!isReservedUsername(requestedUsername) || canUseReservedUsername(userEmail))
-        ? requestedUsername
+      const picked = requestedUsername || socialUsername;
+      const username = picked && (!isReservedUsername(picked) || canUseReservedUsername(userEmail))
+        ? picked
         : walletPk
           ? autoUsernameFromPubkey(walletPk)
           : null;

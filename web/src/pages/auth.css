@@ -241,7 +241,38 @@
 }
 .ox-auth-links a:hover,
 .ox-auth-links button:hover { color: var(--ox-blue-hi); }
-.ox-auth-wallet { margin-top: 16px; }
+.ox-auth-wallet { margin-top: 0; }
+.ox-auth-social { margin-top: 20px; }
+.ox-auth-btn--x {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #0a0a0a;
+  color: #fff;
+  margin-top: 0;
+}
+.ox-auth-btn--x:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.4);
+  filter: none;
+  background: #111;
+}
+.ox-auth-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+}
+.ox-auth-or::before,
+.ox-auth-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(192, 198, 210, 0.16);
+}
 .ox-auth-soon-badge {
   display: inline-flex;
   margin: 0 0 10px;

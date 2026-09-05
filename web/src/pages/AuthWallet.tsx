@@ -1,17 +1,18 @@
-// OrbitX /auth — Supabase email login, or Phantom / Jupiter inject (no wallet-adapter).
+// OrbitX /auth — X (OAuth 2), Solana Web3, or email.
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Wallet, ArrowRight, Mail, Eye, EyeOff, Lock, Rocket, Loader2,
+  ArrowRight, Eye, EyeOff, Lock, Rocket, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { needsUsernameClaim } from "@/lib/usernameClaim";
 import { InjectWalletButtons } from "@/components/InjectWalletButtons";
+import { XSignInButton } from "@/components/XSignInButton";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
+import { persistSessionLocally } from "@/lib/authSession";
+import { consumeOAuthHash, oauthErrorFromLocation, takeAuthNext } from "@/lib/xOAuth";
 import "./auth.css";
-
-type Tab = "email" | "wallet";
 
 export default function AuthWallet() {
   const { user, profile, loading, signIn, signUp, signOut } = useAuth();
@@ -20,7 +21,6 @@ export default function AuthWallet() {
   const next = params.get("next") || "/app";
   const modeParam = params.get("mode");
 
-  const [tab, setTab] = useState<Tab>(modeParam === "wallet" ? "wallet" : "email");
   const [merge, setMerge] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,13 +47,25 @@ export default function AuthWallet() {
       const hash = window.location.hash || "";
       const nextQ = next && next !== "/app" ? `&next=${encodeURIComponent(next)}` : "";
       window.location.replace(`/auth/email?mode=update${nextQ}${hash}`);
+      return;
+    }
+    const oauthErr = oauthErrorFromLocation();
+    if (oauthErr) {
+      setFormError(oauthErr);
+      toast.error(oauthErr);
+      return;
+    }
+    const tokens = consumeOAuthHash();
+    if (tokens) {
+      persistSessionLocally(tokens);
+      window.location.replace(takeAuthNext(next));
     }
   }, [next, params]);
 
   useEffect(() => {
     if (loading || !user || waitingOnUsername) return;
     navigate(next, { replace: true });
-  }, [user, loading, next, navigate, waitingOnUsername]);
+  }, [user, loading, navigate, next, waitingOnUsername]);
 
   const onEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +132,7 @@ export default function AuthWallet() {
           <div className="ox-auth-kicker">Secure access</div>
           <h1 className="ox-auth-title">{signup ? "Create your account" : "Welcome back"}</h1>
           <p className="ox-auth-sub">
-            Email, or Phantom / Jupiter via Supabase Web3 (sign a free message — no transaction).
+            Continue with X, a Solana wallet, or email.
           </p>
 
           {waitingOnUsername ? (
@@ -139,74 +151,68 @@ export default function AuthWallet() {
             </div>
           ) : (
             <>
-              <div className="ox-auth-tabs">
-                <button type="button" className={tab === "email" ? "ox-auth-tab ox-auth-tab--on" : "ox-auth-tab"} onClick={() => setTab("email")}>
-                  <Mail className="h-3.5 w-3.5" /> Email
-                </button>
-                <button type="button" className={tab === "wallet" ? "ox-auth-tab ox-auth-tab--on" : "ox-auth-tab"} onClick={() => setTab("wallet")}>
-                  <Wallet className="h-3.5 w-3.5" /> Wallet
-                </button>
+              <div className="ox-auth-social">
+                <XSignInButton next={next} disabled={submitting} />
               </div>
 
-              {tab === "email" ? (
-                <form onSubmit={onEmailSubmit} className="ox-auth-form">
-                  {signup && (
-                    <label className="ox-auth-label">
-                      Username
-                      <input
-                        className="ox-auth-input"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="yourname"
-                        autoComplete="username"
-                      />
-                    </label>
-                  )}
+              <div className="ox-auth-or">or wallet</div>
+              <InjectWalletButtons onSignedIn={(isNew) => { if (isNew) setMerge(true); }} disabled={submitting} />
+
+              <div className="ox-auth-or">or email</div>
+              <form onSubmit={onEmailSubmit} className="ox-auth-form">
+                {signup && (
                   <label className="ox-auth-label">
-                    Email
+                    Username
                     <input
                       className="ox-auth-input"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@email.com"
-                      autoComplete="email"
-                      autoFocus
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="yourname"
+                      autoComplete="username"
                     />
                   </label>
-                  <label className="ox-auth-label">
-                    Password
-                    <div className="ox-auth-pw">
-                      <input
-                        className="ox-auth-input"
-                        type={showPw ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        autoComplete={signup ? "new-password" : "current-password"}
-                      />
-                      <button type="button" className="ox-auth-eye" onClick={() => setShowPw((v) => !v)} aria-label="Toggle password">
-                        {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </label>
-
-                  <button type="submit" className="ox-auth-btn" disabled={submitting}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                    {signup ? "Create account" : "Sign in with email"}
-                  </button>
-                  {formError && <p className="ox-auth-error" role="alert">{formError}</p>}
-
-                  <div className="ox-auth-links">
-                    <button type="button" onClick={() => setSignup((v) => !v)}>
-                      {signup ? "Already have an account? Sign in" : "Need an account? Sign up"}
+                )}
+                <label className="ox-auth-label">
+                  Email
+                  <input
+                    className="ox-auth-input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@email.com"
+                    autoComplete="email"
+                  />
+                </label>
+                <label className="ox-auth-label">
+                  Password
+                  <div className="ox-auth-pw">
+                    <input
+                      className="ox-auth-input"
+                      type={showPw ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete={signup ? "new-password" : "current-password"}
+                    />
+                    <button type="button" className="ox-auth-eye" onClick={() => setShowPw((v) => !v)} aria-label="Toggle password">
+                      {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
-                    <Link to={`/auth/email?mode=reset&next=${encodeURIComponent(next)}`}>Forgot password?</Link>
                   </div>
-                </form>
-              ) : (
-                <InjectWalletButtons onSignedIn={(isNew) => { if (isNew) setMerge(true); }} />
-              )}
+                </label>
+
+                <button type="submit" className="ox-auth-btn" disabled={submitting}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                  {signup ? "Create account" : "Sign in with email"}
+                </button>
+                {formError && <p className="ox-auth-error" role="alert">{formError}</p>}
+
+                <div className="ox-auth-links">
+                  <button type="button" onClick={() => setSignup((v) => !v)}>
+                    {signup ? "Already have an account? Sign in" : "Need an account? Sign up"}
+                  </button>
+                  <Link to={`/auth/email?mode=reset&next=${encodeURIComponent(next)}`}>Forgot password?</Link>
+                </div>
+              </form>
             </>
           )}
         </div>

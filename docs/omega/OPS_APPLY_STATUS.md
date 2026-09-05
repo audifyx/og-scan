@@ -14,6 +14,7 @@ Last applied: 2026-09-05 (production Supabase project `ffjipnkhcebjvttliptb` / S
 | Edge functions `oxw-award-xp`, `oxw-lobby-sync`, `oxw-trade-ingest`, `oxw-notification-dispatch`, `oxw-token-scan` | Deployed |
 | Edge functions `wallet-auth`, `signup-guard`, `auth-signup`, `auth-signin`, `livekit-token`, `voice-token`, `rpc-proxy`, `solana-rpc-proxy` | Deployed 2026-09-05 (`verify_jwt` from `config.toml`) |
 | Auth Web3 Wallet provider (Solana + Ethereum) | Enabled 2026-09-05. App wallet login uses `/api/auth-web3` → `grant_type=web3` (legacy `wallet-auth` is fallback) |
+| Auth X / Twitter (OAuth 2.0) | Enabled 2026-09-05 (`external_x_*`). `/auth` Continue with X → GoTrue `provider=x`, short `redirectTo` `/auth` |
 | `OXW_WORKER_SECRET` | Set on Supabase project secrets (value not stored in git) |
 | Duplicate `[functions.wallet-auth]` in `supabase/config.toml` | Removed (CLI link/push blocker) |
 
