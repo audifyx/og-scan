@@ -1,4 +1,6 @@
-/** In-memory auth rate limit (per isolate). Fail-closed locally; Vercel is ephemeral. */
+/** In-memory auth rate limit (per isolate). Fail-closed locally; Vercel is ephemeral.
+ *  Import as `./_authLimit.js` (ESM) so Vercel NFT traces the helper into the lambda. */
+
 const buckets = new Map<string, { count: number; reset: number }>();
 
 export function hitAuthLimit(

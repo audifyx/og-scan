@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
@@ -30,6 +33,14 @@ function mockRes() {
 }
 
 describe("POST /api/auth/signup", () => {
+  it("imports the rate-limit helper with a .js specifier so Vercel ESM can bundle it", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../../api/auth/signup.ts"),
+      "utf8",
+    );
+    expect(src).toMatch(/from ["']\.\.\/_authLimit\.js["']/);
+  });
+
   it("requires a device fingerprint instead of creating the user locally", async () => {
     const res = mockRes();
     await handler(

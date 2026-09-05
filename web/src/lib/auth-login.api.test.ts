@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
@@ -31,6 +34,14 @@ function mockRes() {
 }
 
 describe("POST /api/auth-login", () => {
+  it("imports the rate-limit helper with a .js specifier so Vercel ESM can bundle it", () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../../api/auth-login.ts"),
+      "utf8",
+    );
+    expect(src).toMatch(/from ["']\.\/_authLimit\.js["']/);
+  });
+
   beforeEach(() => {
     vi.unstubAllGlobals();
   });

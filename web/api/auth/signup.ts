@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { clientIp, hitAuthLimit } from "../_authLimit";
+import { clientIp, hitAuthLimit } from "../_authLimit.js";
 
 /**
  * Signup proxy — never create users here. Forwards to signup-guard
