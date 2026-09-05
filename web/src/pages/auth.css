@@ -101,8 +101,15 @@
   font-family: ui-monospace, monospace;
   color: #fff;
 }
-.ox-auth-wait {
+.ox-auth-wait-box {
   margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ox-auth-wait {
+  margin: 0;
   text-align: center;
   font-size: 13px;
   color: var(--ox-blue-hi);
@@ -194,6 +201,13 @@
 }
 .ox-auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .ox-auth-btn:hover:not(:disabled) { filter: brightness(1.05); }
+.ox-auth-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ff6b8a;
+  text-align: center;
+}
 .ox-auth-btn--blue {
   border-color: rgba(59, 130, 246, 0.5);
   background: linear-gradient(180deg, var(--ox-blue-hi), var(--ox-blue));

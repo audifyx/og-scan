@@ -153,14 +153,6 @@ const Auth = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="ox-auth flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#60A5FA]" />
-      </div>
-    );
-  }
-
   const titles: Record<AuthMode, string> = {
     signin: "Sign in with email",
     signup: "Create account",

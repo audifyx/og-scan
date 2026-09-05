@@ -6,7 +6,8 @@
 //  - merge  {email, password}  (Bearer wallet session) -> { ok, result }
 //
 // Session issuance keeps auth.uid() intact: each wallet maps to a real auth
-// user; we set a fresh random password and sign in server-side to mint tokens.
+// user. We mint a session via generateLink + verifyOtp (password grant is the
+// fallback) so a hung GoTrue /token endpoint cannot block wallet login.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
@@ -15,7 +16,12 @@ import bs58 from "npm:bs58@5.0.0";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, apikey", "Content-Type": "application/json" };
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Content-Type": "application/json",
+};
 const admin = () => createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
 const walletEmail = (pk: string) => `${pk.toLowerCase()}@wallet.orbitx.app`;
@@ -41,6 +47,30 @@ async function nonceMac(payload: string) {
 
 function buildMessage(pubkey: string, nonce: string) {
   return `OrbitX — sign in with your wallet.\n\nWallet: ${pubkey}\nNonce: ${nonce}\n\nThis request will not trigger a transaction or cost any fees.`;
+}
+
+async function mintWalletSession(loginEmail: string, userId: string) {
+  const db = admin();
+  const anonClient = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
+  const { data: link } = await db.auth.admin.generateLink({ type: "magiclink", email: loginEmail });
+  const hashed = link?.properties?.hashed_token;
+  if (hashed) {
+    for (const type of ["magiclink", "email"] as const) {
+      const { data: sess, error } = await anonClient.auth.verifyOtp({ type, token_hash: hashed });
+      if (!error && sess.session) return sess.session;
+    }
+  }
+  const pass = randPass();
+  const { error: updErr } = await db.auth.admin.updateUserById(userId, { password: pass });
+  if (updErr) throw updErr;
+  const { data: sess, error: sErr } = await anonClient.auth.signInWithPassword({ email: loginEmail, password: pass });
+  if (sErr || !sess.session) throw new Error(sErr?.message || "session issue failed");
+  return sess.session;
+}
+
+async function resolveExistingWalletUser(email0: string): Promise<string | null> {
+  const { data: link } = await admin().auth.admin.generateLink({ type: "magiclink", email: email0 });
+  return link?.user?.id ?? null;
 }
 
 Deno.serve(async (req) => {
@@ -88,9 +118,7 @@ Deno.serve(async (req) => {
         if (created.error && !`${created.error.message}`.toLowerCase().includes("already")) throw created.error;
         userId = created.data?.user?.id ?? null;
         if (!userId) {
-          // user existed already for this email — look it up
-          const list = await db.auth.admin.listUsers();
-          userId = list.data.users.find((u) => u.email === email0)?.id ?? null;
+          userId = await resolveExistingWalletUser(email0);
         }
         if (!userId) throw new Error("could not resolve wallet user");
         await db.from("wallet_identities").upsert({ wallet: walletKey, user_id: userId });
@@ -101,12 +129,8 @@ Deno.serve(async (req) => {
       // mint a session: rotate password, sign in server-side
       const { data: u } = await db.auth.admin.getUserById(userId);
       const loginEmail = u.user?.email ?? walletEmail(walletKey);
-      const pass = randPass();
-      await db.auth.admin.updateUserById(userId, { password: pass });
-      const anonClient = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
-      const { data: sess, error: sErr } = await anonClient.auth.signInWithPassword({ email: loginEmail, password: pass });
-      if (sErr || !sess.session) throw new Error(sErr?.message || "session issue failed");
-      return json({ access_token: sess.session.access_token, refresh_token: sess.session.refresh_token, isNew });
+      const sess = await mintWalletSession(loginEmail, userId);
+      return json({ access_token: sess.access_token, refresh_token: sess.refresh_token, isNew });
     }
 
     if (action === "merge") {

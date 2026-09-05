@@ -1,6 +1,8 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { signInWithEmailPassword, emailAuthErrorMessage } from "@/lib/emailAuth";
+import { invokeEdgeFn } from "@/lib/edgeFn";
 import { trackActivity } from "@/lib/trackActivity";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { setSentryUser, clearSentryUser } from "@/lib/sentry";
@@ -144,21 +146,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // signup is disabled). The edge function enforces 1 account per device
     // and 3 accounts per IP, then we establish the session here.
     const fingerprint = getDeviceFingerprint();
-    const { error: guardErr } = await supabase.functions.invoke("signup-guard", {
-      body: { email: cleanEmail, password, username: cleanUsername, fingerprint },
-    });
-    if (guardErr) {
-      let message = "Sign up failed";
-      try {
-        const body = await (guardErr as { context?: { json?: () => Promise<{ message?: string }> } })?.context?.json?.();
-        if (body?.message) message = body.message;
-      } catch { /* ignore */ }
+    try {
+      await invokeEdgeFn("signup-guard", {
+        email: cleanEmail,
+        password,
+        username: cleanUsername,
+        fingerprint,
+      });
+    } catch (guardErr) {
+      const message = guardErr instanceof Error && guardErr.message ? guardErr.message : "Sign up failed";
       return { error: new Error(message), userId: null };
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+    try {
+      await signInWithEmailPassword(cleanEmail, password);
+    } catch (signInErr) {
+      return { error: signInErr instanceof Error ? signInErr : new Error(emailAuthErrorMessage(signInErr)), userId: null };
+    }
+    const { data, error } = await supabase.auth.getSession();
+    const signedInUser = data?.session?.user ?? null;
 
     // Process referral if ?ref= was captured
-    if (!error && data?.user) {
+    if (!error && signedInUser) {
       const refCode = localStorage.getItem("og_ref_code");
       if (refCode) {
         localStorage.removeItem("og_ref_code");
@@ -166,7 +174,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         (async () => {
           try {
             const { error: fnErr } = await supabase.functions.invoke("process-referral", {
-              body: { inviteeId: data.user.id, inviteCode: refCode },
+              body: { inviteeId: signedInUser.id, inviteCode: refCode },
             });
             if (fnErr) throw fnErr;
           } catch (edgeFnErr) {
@@ -178,18 +186,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 .select("user_id")
                 .eq("referral_code", refCode)
                 .maybeSingle();
-              if (inviter && inviter.user_id !== data.user!.id) {
+              if (inviter && inviter.user_id !== signedInUser.id) {
                 // Insert referral directly (count-based, no points)
                 await supabase.from("referrals").insert({
                   inviter_id: inviter.user_id,
-                  invitee_id: data.user!.id,
+                  invitee_id: signedInUser.id,
                   code: refCode,
                 });
                 // Set referred_by on invitee profile
                 await supabase
                   .from("profiles")
                   .update({ referred_by: inviter.user_id })
-                  .eq("user_id", data.user!.id);
+                  .eq("user_id", signedInUser.id);
               }
             } catch (directErr) {
               console.error("Direct referral insert also failed:", directErr);
@@ -199,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       // Track sign-up event
       trackActivity({
-        user_id: data.user.id,
+        user_id: signedInUser.id,
         activity_type: "auth.signup",
         title: "Signed up",
         description: `New account created with username ${cleanUsername}`,
@@ -208,22 +216,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }
 
-    return { error: error as Error | null, userId: data?.user?.id ?? null };
+    return { error: error as Error | null, userId: signedInUser?.id ?? null };
   };
 
   const signIn = async (email: string, password: string) => {
     const clean = email.trim().toLowerCase();
-    const { data, error } = await supabase.auth.signInWithPassword({ email: clean, password });
-    if (!error && data?.user) {
+    try {
+      await signInWithEmailPassword(clean, password);
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error(emailAuthErrorMessage(err)) };
+    }
+    const { data } = await supabase.auth.getSession();
+    if (data?.session?.user) {
       trackActivity({
-        user_id: data.user.id,
+        user_id: data.session.user.id,
         activity_type: "auth.signin",
         title: "Signed in",
         data: { method: "email" },
         is_public: false,
       });
     }
-    return { error: error as Error | null };
+    return { error: null };
   };
 
   const signOut = async () => {

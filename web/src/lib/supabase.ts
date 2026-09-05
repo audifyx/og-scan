@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { supabaseAwareFetch } from "@/lib/fetchTimeout";
 
 // Shared Supabase project — syncs data across web + mobile
 // Project: ffjipnkhcebjvttliptb
@@ -24,6 +25,9 @@ export const supabase = createClient(
   SUPABASE_URL || "https://placeholder.supabase.co",
   SUPABASE_ANON_KEY || "placeholder-anon-key",
   {
+  global: {
+    fetch: supabaseAwareFetch,
+  },
   auth: {
     storage: localStorage,
     storageKey: "sol-tools-auth",

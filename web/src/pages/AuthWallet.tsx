@@ -16,7 +16,7 @@ import "./auth.css";
 type Tab = "email" | "wallet";
 
 export default function AuthWallet() {
-  const { user, profile, loading, signIn, signUp } = useAuth();
+  const { user, profile, loading, signIn, signUp, signOut } = useAuth();
   const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const navigate = useNavigate();
@@ -33,6 +33,7 @@ export default function AuthWallet() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [signup, setSignup] = useState(modeParam === "signup");
   const [username, setUsername] = useState("");
 
@@ -89,11 +90,14 @@ export default function AuthWallet() {
       return;
     }
     setSubmitting(true);
+    setFormError(null);
     try {
       if (signup) {
         const { error } = await signUp(cleanEmail, password, username.trim().replace(/^@/, ""));
         if (error) {
-          toast.error(error.message.includes("already registered") ? "This email is already registered — try signing in" : error.message);
+          const msg = error.message.includes("already registered") ? "This email is already registered — try signing in" : error.message;
+          setFormError(msg);
+          toast.error(msg);
           return;
         }
         toast.success("Account created — check your email to verify");
@@ -102,14 +106,22 @@ export default function AuthWallet() {
       }
       const { error } = await signIn(cleanEmail, password);
       if (error) {
-        const msg = error.message || "";
-        if (/invalid login|invalid credentials/i.test(msg)) toast.error("Invalid email or password");
-        else if (/email not confirmed/i.test(msg)) toast.error("Confirm your email first — check your inbox");
-        else toast.error(msg);
+        const raw = error.message || "Sign-in failed";
+        const msg = /invalid login|invalid credentials/i.test(raw)
+          ? "Invalid email or password"
+          : /email not confirmed/i.test(raw)
+            ? "Confirm your email first — check your inbox"
+            : raw;
+        setFormError(msg);
+        toast.error(msg);
         return;
       }
       toast.success("Welcome back");
       navigate(next, { replace: true });
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : "Sign-in failed";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -135,7 +147,19 @@ export default function AuthWallet() {
           </p>
 
           {waitingOnUsername ? (
-            <p className="ox-auth-wait">Pick a username in the popup to finish signing in…</p>
+            <div className="ox-auth-wait-box">
+              <p className="ox-auth-wait">Pick a username in the popup to finish signing in…</p>
+              <button
+                type="button"
+                className="ox-auth-btn ox-auth-btn--ghost"
+                onClick={async () => {
+                  await signOut();
+                  toast.success("Signed out — you can sign in with a different account");
+                }}
+              >
+                Use a different account
+              </button>
+            </div>
           ) : (
             <>
               <div className="ox-auth-tabs">
@@ -190,10 +214,11 @@ export default function AuthWallet() {
                     </div>
                   </label>
 
-                  <button type="submit" className="ox-auth-btn" disabled={submitting || loading}>
+                  <button type="submit" className="ox-auth-btn" disabled={submitting}>
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                     {signup ? "Create account" : "Sign in with email"}
                   </button>
+                  {formError && <p className="ox-auth-error" role="alert">{formError}</p>}
 
                   <div className="ox-auth-links">
                     <button type="button" onClick={() => setSignup((v) => !v)}>
@@ -207,7 +232,7 @@ export default function AuthWallet() {
                   <button
                     type="button"
                     className="ox-auth-btn ox-auth-btn--blue"
-                    disabled={loading || !!busy}
+                    disabled={!!busy}
                     onClick={() => { setPendingMerge(false); setPicker(true); }}
                   >
                     {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
@@ -216,7 +241,7 @@ export default function AuthWallet() {
                   <button
                     type="button"
                     className="ox-auth-btn ox-auth-btn--ghost"
-                    disabled={loading}
+                    disabled={!!busy}
                     onClick={() => { if (user) setMerge(true); else { setPendingMerge(true); setPicker(true); } }}
                   >
                     <GitMerge className="h-4 w-4" /> Merge legacy email account

@@ -55,6 +55,13 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      "/ai-fn": {
+        target: process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co",
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/ai-fn/, "/functions/v1"),
+      },
+    },
   },
   plugins: [
     react(),
