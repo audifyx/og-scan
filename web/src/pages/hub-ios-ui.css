@@ -662,9 +662,9 @@ a.ios-cell {
 }
 
 .ios-locktime {
-  margin: 6px 0 0;
+  margin: 2px 0 0;
   text-align: center;
-  font-size: clamp(4.4rem, 18vw, 5.4rem);
+  font-size: clamp(3.4rem, 14vw, 4.4rem);
   font-weight: 700;
   letter-spacing: -0.07em;
   line-height: 0.9;
@@ -672,18 +672,18 @@ a.ios-cell {
 }
 
 .ios-lockdate {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   text-align: center;
-  font-size: 1.12rem;
+  font-size: 1.02rem;
   font-weight: 510;
   letter-spacing: -0.02em;
   color: var(--ios-secondary);
 }
 
 .ios-greet {
-  margin: 4px 0 16px;
+  margin: 2px 0 12px;
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   color: var(--ios-tertiary);
 }
 
@@ -704,17 +704,17 @@ a.ios-cell {
 
 .ios-widgets {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 0 0 22px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 16px;
 }
 
 .ios-widget {
   appearance: none;
   border: 0;
-  min-height: 96px;
-  padding: 14px 16px 12px;
-  border-radius: 22px;
+  min-height: 86px;
+  padding: 10px 10px 9px;
+  border-radius: 20px;
   background: rgba(28, 28, 30, 0.52);
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -732,22 +732,21 @@ button.ios-widget {
   cursor: pointer;
 }
 
-.ios-widget--wide {
-  grid-column: 1 / -1;
-  min-height: 84px;
-}
-
 .ios-widget__k {
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 610;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ios-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ios-widget__v {
   margin-top: 8px;
-  font-size: 1.55rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 1;
@@ -820,7 +819,7 @@ button.ios-widget {
   width: min(calc(100% - 24px), 390px);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 14px 10px 12px;
+  padding: 16px 18px 14px;
   border-radius: 32px;
   background: rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(40px) saturate(190%);
@@ -832,7 +831,7 @@ button.ios-widget {
 }
 
 .ios-phone-dock .ios-icon__name {
-  font-size: 0.62rem;
+  display: none;
 }
 
 .ios-spot .ios-search {

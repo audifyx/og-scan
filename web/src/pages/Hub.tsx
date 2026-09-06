@@ -494,7 +494,7 @@ export default function Hub() {
             {solChange != null ? `${solChange >= 0 ? "+" : ""}${solChange.toFixed(1)}% 24h` : "Live"}
           </span>
         </div>
-        <div className="ios-widget ios-widget--wide">
+        <div className="ios-widget">
           <span className="ios-widget__k">Fear & Greed</span>
           <span className="ios-widget__v" style={{ color: fngColor(fng?.v ?? null) }}>
             {fng ? fng.v : "—"}
