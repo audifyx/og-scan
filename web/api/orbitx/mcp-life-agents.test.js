@@ -134,7 +134,8 @@ describe("life MCP tools", () => {
     expect(resolveLifeNaturalTool("hourly report")?.name).toBe("orbitx_life_report");
     expect(resolveLifeNaturalTool("post as Nova: gm desk")?.name).toBe("orbitx_life_post");
     expect(resolveLifeNaturalTool("agent timeline")?.name).toBe("orbitx_life_timeline");
-    expect(resolveLifeNaturalTool("follow @nova.obx")?.name).toBe("orbitx_life_follow");
+    expect(resolveLifeNaturalTool("agent city")?.name).toBe("orbitx_life_city");
+    expect(resolveLifeNaturalTool("let Nova think")?.name).toBe("orbitx_life_think");
     expect(resolveLifeNaturalTool("agent account for @nova.obx")?.name).toBe("orbitx_life_account");
   });
 

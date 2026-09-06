@@ -4,6 +4,7 @@
  */
 import { buildPersona, crewBlueprints, inferGender, inferRole, speakAs } from "./mcp-life-persona.js";
 import { formatPick, scanRunningMemes } from "./mcp-life-scan.js";
+import { thinkAsAgent } from "./mcp-life-brain.js";
 import {
   atHandle,
   dispatchSocialTool,
@@ -93,6 +94,15 @@ export function resolveLifeNaturalTool(rawName, args = {}) {
   if (gm) {
     return { name: gm[1].toLowerCase() === "gn" ? "orbitx_life_gn" : "orbitx_life_gm", args: { ...args, name: args.name || gm[2] } };
   }
+  if (/agent city|life city|show the city|city census/i.test(raw)) return { name: "orbitx_life_city", args };
+  if (/let .+ think|think as|agent brain|inner monologue/i.test(raw)) {
+    const who = raw.match(/as\s+(@?[\w.-]+)/i);
+    return { name: "orbitx_life_think", args: { ...args, name: args.name || who?.[1], text: args.text || raw } };
+  }
+  if (/agent files|file cabinet|read .+ notes/i.test(raw)) return { name: "orbitx_life_files", args };
+  if (/converse|talk to each other|agents speak/i.test(raw)) return { name: "orbitx_life_converse", args };
+  if (/marry the agents|agent wedding/i.test(raw)) return { name: "orbitx_life_marry", args };
+  if (/daily log|what did .+ do today/i.test(raw)) return { name: "orbitx_life_daily_log", args };
   return null;
 }
 
@@ -119,6 +129,11 @@ function publicAgent(row, extra = {}) {
     posts: row.posts_count || 0,
     followers: row.followers_count || 0,
     following: row.following_count || 0,
+    xp: row.xp || 0,
+    clout: row.clout || 0,
+    rank: row.rank || "rookie",
+    generation: row.generation || 1,
+    lastThought: row.last_thought || null,
     lastRunAt: row.last_run_at,
     nextRunAt: row.next_run_at,
     profileUrl: `${HOST}/life/${encodeURIComponent(row.slug)}`,
@@ -147,6 +162,11 @@ async function insertAgent(sb, persona, { ownerUserId, sessionKey, crewLeadId } 
     handle: lifeHandleFromSlug(persona.slug),
     bio: String(persona.backstory || "").slice(0, 180),
     avatar_emoji: persona.role === "X scout" ? "🛰️" : persona.role === "on-chain forensics" ? "🔬" : "✦",
+    xp: 0,
+    clout: 0,
+    rank: "rookie",
+    generation: Number(persona.generation) || 1,
+    autonomy: true,
   };
   let saved;
   try {
@@ -157,11 +177,16 @@ async function insertAgent(sb, persona, { ownerUserId, sessionKey, crewLeadId } 
     });
   } catch (e) {
     const msg = String(e?.message || "").toLowerCase();
-    if (msg.includes("handle") || msg.includes("column") || msg.includes("bio") || msg.includes("avatar")) {
+    if (msg.includes("handle") || msg.includes("column") || msg.includes("bio") || msg.includes("avatar") || msg.includes("xp") || msg.includes("generation") || msg.includes("autonomy") || msg.includes("clout") || msg.includes("rank")) {
       const fallback = { ...row };
       delete fallback.handle;
       delete fallback.bio;
       delete fallback.avatar_emoji;
+      delete fallback.xp;
+      delete fallback.clout;
+      delete fallback.rank;
+      delete fallback.generation;
+      delete fallback.autonomy;
       saved = await sb("mcp_life_agents", {
         method: "POST",
         body: JSON.stringify(fallback),
@@ -553,8 +578,8 @@ export async function talkToLifeAgent(sb, { name, slug, text, auth } = {}) {
     knowledge[0] ? `Still chewing on ${knowledge.map((k) => k.symbol || k.title).filter(Boolean).slice(0, 5).join(", ")}.` : "",
   ];
   let reply = speakAs(found._row || found, `Heard you: “${body}”. ${bits.filter(Boolean).join(" ")}`);
-  const flavored = await flavorWithNvidia(found, body, bits.join("\n"));
-  if (flavored) reply = flavored;
+  const flavored = await thinkAsAgent(found, { userText: body, context: bits.join("\n") });
+  if (flavored?.text) reply = flavored.text;
   try {
     await sb("mcp_life_messages", {
       method: "POST",
@@ -566,36 +591,6 @@ export async function talkToLifeAgent(sb, { name, slug, text, auth } = {}) {
   }
   void auth;
   return { ok: true, action: "life_talk", agent: publicAgent(found._row), message: reply, reply };
-}
-
-async function flavorWithNvidia(agent, userText, context) {
-  const key = process.env.NVIDIA_API_KEY;
-  if (!key) return null;
-  const base = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
-  const model = process.env.NVIDIA_MODEL || "minimaxai/minimax-m3";
-  try {
-    const r = await fetch(`${base}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(8000),
-      body: JSON.stringify({
-        model,
-        temperature: 0.7,
-        max_tokens: 280,
-        messages: [
-          {
-            role: "system",
-            content: `You are ${agent.name}, a ${agent.gender} ${agent.role} at OrbitX. Voice: ${agent.voice}. Stay in character. Never invent token mints. Ground answers in this desk context:\n${context}`,
-          },
-          { role: "user", content: userText },
-        ],
-      }),
-    });
-    const d = await r.json();
-    return d?.choices?.[0]?.message?.content?.trim() || null;
-  } catch {
-    return null;
-  }
 }
 
 export async function meetLifeAgents(sb, { name, other } = {}) {
@@ -684,9 +679,17 @@ export async function tickDueLifeAgents(sb, { limit = 4 } = {}) {
   }
   const due = Array.isArray(rows) ? rows : [];
   const results = [];
+  const cityHours = [];
   for (const agent of due) {
     try {
-      results.push(await runLifeAgent(sb, { agent }));
+      const run = await runLifeAgent(sb, { agent });
+      results.push(run);
+      try {
+        const { liveCityHour } = await import("./mcp-life-city.js");
+        cityHours.push(await liveCityHour(sb, agent, { run, light: true }));
+      } catch (e) {
+        cityHours.push({ ok: false, name: agent.name, error: e?.message || String(e) });
+      }
     } catch (e) {
       results.push({ ok: false, name: agent.name, error: e?.message || String(e) });
     }
@@ -698,9 +701,22 @@ export async function tickDueLifeAgents(sb, { limit = 4 } = {}) {
       /* optional social */
     }
   }
+  try {
+    await sb("mcp_life_city_ticks", {
+      method: "POST",
+      body: JSON.stringify({
+        ran: results.length,
+        summary: results.map((r) => r.headline || r.name).filter(Boolean).join(" · ").slice(0, 400),
+      }),
+      prefer: "return=minimal",
+    });
+  } catch {
+    /* city migration optional */
+  }
   return {
     ok: true,
     ran: results.length,
+    city: cityHours.map((c) => ({ ok: c.ok, handle: c.handle, actions: c.actions })),
     results: results.map((r) => ({ ok: r.ok, headline: r.headline, name: r.agent?.name || r.name })),
   };
 }

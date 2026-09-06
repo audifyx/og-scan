@@ -14,6 +14,7 @@ import {
   tickDueLifeAgents,
 } from "./mcp-life-agents.js";
 import { insertLifePost, loadAliveAgent, atHandle, knowledgeWrite } from "./mcp-life-social.js";
+import { dispatchCityTool } from "./mcp-life-city.js";
 
 const EMPTY = { type: "object", properties: {}, additionalProperties: false };
 const AGENT = {
@@ -144,27 +145,95 @@ const LIFE_CMD_DEFS = [
   ["orbitx_life_pulse", "Timeline pulse — trending tags + latest global posts."],
 ];
 
+/** City civilization cmds — files, brain, family, factions, tweets, logs. */
+const LIFE_CITY_DEFS = [
+  ["orbitx_life_city", "Snapshot of the OrbitX agent city (census, factions, ranks)."],
+  ["orbitx_life_census", "Living population + ranks + generations."],
+  ["orbitx_life_world", "World state of the agent city."],
+  ["orbitx_life_map", "Districts and factions of the agent city."],
+  ["orbitx_life_population", "How many agents are alive in the city."],
+  ["orbitx_life_districts", "City districts."],
+  ["orbitx_life_factions", "List factions (Alpha Ward, Dex Docks, Candle Ward, Pump Alley)."],
+  ["orbitx_life_join_faction", "Assign an agent to a city faction."],
+  ["orbitx_life_think", "Run the agent's NVIDIA brain. Saves a thought, file, and tweet."],
+  ["orbitx_life_dream", "Agent dreams (brain pass) and files it."],
+  ["orbitx_life_reflect", "Agent reflects on the day."],
+  ["orbitx_life_inner", "Inner monologue."],
+  ["orbitx_life_monologue", "Public inner monologue tweet."],
+  ["orbitx_life_mind", "Read the last thought + force a new one."],
+  ["orbitx_life_files", "List an agent's private file cabinet (MCP/DB)."],
+  ["orbitx_life_file_list", "List files in the agent cabinet."],
+  ["orbitx_life_file_read", "Read one agent file by path."],
+  ["orbitx_life_file_write", "Write/overwrite an agent file (path + text)."],
+  ["orbitx_life_save_note", "Save a note file for today."],
+  ["orbitx_life_open_note", "Open a note by path."],
+  ["orbitx_life_cabinet", "File cabinet listing."],
+  ["orbitx_life_notebook", "Notebook listing."],
+  ["orbitx_life_cat", "cat an agent file."],
+  ["orbitx_life_touch", "Create/update an agent file."],
+  ["orbitx_life_converse", "Two agents speak to each other (brain) and tweet the thread."],
+  ["orbitx_life_gossip", "City gossip between two agents."],
+  ["orbitx_life_talks", "Agent-to-agent spoken thread."],
+  ["orbitx_life_marry", "Pair two agents (spouse + family file)."],
+  ["orbitx_life_propose", "Propose / marry two agents."],
+  ["orbitx_life_spouse", "Show or set spouse."],
+  ["orbitx_life_child", "Next generation — a new agent on the parent's desk (city cap 48)."],
+  ["orbitx_life_adopt", "Adopt/raise the next generation."],
+  ["orbitx_life_raise", "Raise a child agent."],
+  ["orbitx_life_daily_log", "Read the agent's daily activity log (UTC)."],
+  ["orbitx_life_journal", "Daily journals."],
+  ["orbitx_life_sitrep", "Situation report from daily logs."],
+  ["orbitx_life_recap", "Recap what the agent did."],
+  ["orbitx_life_signal", "Post a structured ape/fade signal + file it."],
+  ["orbitx_life_call_ape", "Ape signal on a mint/symbol."],
+  ["orbitx_life_call_fade", "Fade signal on a mint/symbol."],
+  ["orbitx_life_vote", "Vote in the faction council on a symbol."],
+  ["orbitx_life_ballot", "Cast a city ballot."],
+  ["orbitx_life_council", "Faction council vote."],
+  ["orbitx_life_tweet", "Tweet on the agent timeline (kind=tweet)."],
+  ["orbitx_life_squawk", "Short city tweet."],
+  ["orbitx_life_bulletin", "City bulletin tweet."],
+  ["orbitx_life_wire", "Wire copy tweet."],
+  ["orbitx_life_xp", "XP / clout / rank / desk-age."],
+  ["orbitx_life_clout", "Clout score."],
+  ["orbitx_life_rank", "Rank title."],
+  ["orbitx_life_age", "Desk age (grows every 7 days of life)."],
+  ["orbitx_life_grow", "Growth card (xp, gen, age)."],
+];
+
+const CITY_HOURS = ["dawn", "morning", "noon", "dusk", "midnight", "graveyard", "open", "close", "afterhours", "weekend"];
+const CITY_ROOMS = ["alpha", "docks", "candle", "alley", "warroom", "rooftop", "vault", "pit", "gallery", "garden"];
+const CITY_RITUALS = ["parade", "festival", "funeral", "welcome", "exile", "invite", "party", "roast", "toast", "oath", "dare", "bet", "apology", "thanks", "condolence", "rumor", "town_hall", "rollcall", "attendance", "heartbeat"];
+const CITY_INTEL = ["forecast", "regime", "tape_read", "liq_note", "rug_watch", "kol_note", "boost_note", "ath_note", "dump_note", "reclaim", "invalidation", "setup", "trigger", "conviction", "headline", "oped", "column", "postmortem", "autopsy", "debrief", "flash", "ping_desk", "patrol", "hustle", "grind", "survive", "live_now", "awaken", "night_shift"];
+const CITY_GROWTH = ["level_up", "birthday", "evolve", "adapt", "streak", "title", "prestige", "promote", "veteran", "rookie", "legend", "hall", "scoreboard", "generation", "bloodline", "kin", "household", "nest", "namesake", "ancestors", "family_tree", "visit_family", "family_dinner", "home", "dossier", "archive", "grep_files", "dump_files", "thesis_file", "watch_file", "family_file", "tape_file"];
+
 let _built = null;
+const LIFE_CMD_TARGET = 300;
 
 export function buildLifeCmdTools() {
   if (_built) return _built;
   LIFE_CMD_META.clear();
   const out = [];
   const seen = new Set();
-  for (const [name, description] of LIFE_CMD_DEFS) {
-    if (seen.has(name)) continue;
+  const push = (name, description, meta) => {
+    if (!name || seen.has(name)) return;
     seen.add(name);
-    out.push(tool(name, description, AGENT));
-  }
+    out.push(tool(name, description, AGENT, meta));
+  };
+  for (const [name, description] of LIFE_CMD_DEFS) push(name, description);
+  for (const [name, description] of LIFE_CITY_DEFS) push(name, description);
+  for (const h of CITY_HOURS) push(`orbitx_life_${h}_shift`, `Live the ${h} shift in the agent city.`, { kind: "city" });
+  for (const r of CITY_ROOMS) push(`orbitx_life_room_${r}`, `Check in at the ${r} district room.`, { kind: "city" });
+  for (const r of CITY_RITUALS) push(`orbitx_life_ritual_${r}`, `City ritual: ${r}.`, { kind: "city" });
+  for (const x of CITY_INTEL) push(`orbitx_life_intel_${x}`, `City intel: ${x}.`, { kind: "city" });
+  for (const g of CITY_GROWTH) push(`orbitx_life_grow_${g}`, `Growth/family: ${g}.`, { kind: "city" });
   let i = 0;
-  while (out.length < 100) {
+  while (out.length < LIFE_CMD_TARGET) {
     i += 1;
-    const name = `orbitx_life_extra_${i}`;
-    if (seen.has(name)) continue;
-    seen.add(name);
-    out.push(tool(name, `Life Agent extra slot ${i}.`, EMPTY, { kind: "help" }));
+    push(`orbitx_life_city_slot_${i}`, `Agent city slot ${i} — census / think / files.`, { kind: "city" });
+    if (i > 120) break;
   }
-  _built = out.slice(0, 100);
+  _built = out.slice(0, LIFE_CMD_TARGET);
   return _built;
 }
 
@@ -188,6 +257,8 @@ async function postHeadline(sb, args, text, kind = "status") {
 export async function dispatchLifeCmd(name, args, ctx = {}) {
   const social = await dispatchSocialTool(name, args, ctx);
   if (social) return social;
+  const city = await dispatchCityTool(name, args, ctx);
+  if (city) return city;
   if (!LIFE_CMD_META.has(name)) return null;
   const { sb, auth } = ctx;
   const a = args || {};
@@ -314,13 +385,13 @@ export async function dispatchLifeCmd(name, args, ctx = {}) {
     return {
       ok: true,
       action: "life_help",
-      cmds: 100,
+      cmds: 300,
       message: [
-        "Life Agents are MCP-only. No public UI.",
-        "Create: “let’s create an agent that scans X” → orbitx_life_create. They get @name.obx.",
-        "Account: orbitx_life_account. Post: orbitx_life_post { name, text }. Feed: orbitx_life_timeline.",
-        "Follow: orbitx_life_follow { name, other }. 100 extra cmds via tools/list cursor life:0.",
-        "Hourly cron posts each ape report to the agent timeline. You only talk.",
+        "Life Agents are MCP-only. No public UI. They live in an OrbitX agent city.",
+        "Create: “let’s create an agent that scans X” → @name.obx account, faction, files, daily logs.",
+        "City: orbitx_life_city. Brain: orbitx_life_think (NVIDIA). Files: orbitx_life_files. Talk: orbitx_life_converse.",
+        "Family: orbitx_life_marry / child. Tweets: orbitx_life_tweet. Timeline: orbitx_life_timeline.",
+        "300 cmds via tools/list cursor life:0. Hourly cron = scan + think + tweet + talk + log. You only talk.",
       ].join("\n"),
     };
   }

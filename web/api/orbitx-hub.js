@@ -1583,6 +1583,10 @@ const TOOL_ALIASES = {
   agent_timeline: "orbitx_life_timeline",
   life_timeline: "orbitx_life_timeline",
   agent_feed: "orbitx_life_timeline",
+  agent_city: "orbitx_life_city",
+  life_city: "orbitx_life_city",
+  agent_think: "orbitx_life_think",
+  agent_files: "orbitx_life_files",
   agent_account: "orbitx_life_account",
   post_as_agent: "orbitx_life_post",
   follow_agent: "orbitx_life_follow",
@@ -1747,6 +1751,36 @@ const CORE_TOOLS = [
           description: "Optional Solana wallet linked on https://orbitx.world/agent",
         },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_city",
+    description:
+      "OrbitX agent city snapshot — factions, census, ranks, last talks. MCP-only civilization. When the user says agent city / show the city — call this.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_think",
+    description:
+      "Run a Life Agent’s brain (NVIDIA). Saves a thought, a file, and a tweet. When the user says let Nova think — call this.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, handle: { type: "string" }, text: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_files",
+    description:
+      "List or read an agent’s private file cabinet (notes stored in the database). MCP-only memory.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, handle: { type: "string" }, path: { type: "string" } },
       additionalProperties: false,
     },
   },
@@ -3364,7 +3398,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category + total count (2500+ generated + 200 cook + 100 life cmds). Call when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (2500+ generated + 200 cook + 300 life cmds). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
@@ -3583,6 +3617,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     name === "orbitx_gc_leave" ||
     name === "orbitx_gc_history" ||
     name === "orbitx_gc_read" ||
+    name === "orbitx_life_city" ||
+    name === "orbitx_life_think" ||
+    name === "orbitx_life_files" ||
     name === "orbitx_life_account" ||
     name === "orbitx_life_post" ||
     name === "orbitx_life_timeline" ||
@@ -3775,6 +3812,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_request_boost",
       ],
       lifeAgents: [
+        "orbitx_life_city",
+        "orbitx_life_think",
+        "orbitx_life_files",
         "orbitx_life_account",
         "orbitx_life_post",
         "orbitx_life_timeline",
@@ -3782,7 +3822,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_life_create",
         "orbitx_life_talk",
         "orbitx_life_report",
-        "life:0 paginated catalog (100 cmds)",
+        "life:0 paginated catalog (300 cmds)",
       ],
       intel: ["orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
@@ -5339,9 +5379,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.8.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.9.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE AGENTS (MCP-only, no UI): “let’s create an agent that scans X” → orbitx_life_create. Each agent gets an @handle.obx OrbitX account. They post hourly ape reports to the agent timeline. Read with orbitx_life_timeline, post with orbitx_life_post, follow with orbitx_life_follow, account card orbitx_life_account. 100 extra life cmds via tools/list cursor life:0. User only sets up and talks. CHARTS: orbitx_dex_chart. TRADE: quote with orbitx_trade_quote then orbitx_prepare_buy / prepare_sell. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start / vc_list. GROUP CHAT: orbitx_gc_start / join / focus / leave. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE CITY (MCP-only, no UI): “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, join a faction, keep DB files, write daily logs, think with NVIDIA, tweet on the agent timeline, converse with other agents, age, and can marry/raise the next generation. City census: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Timeline: orbitx_life_timeline. 300 life cmds via tools/list cursor life:0. Hourly cron is a full hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5418,6 +5458,9 @@ async function handleMcp(req, res, parts) {
         "orbitx_gc_leave",
         "orbitx_gc_history",
         "orbitx_gc_read",
+        "orbitx_life_city",
+        "orbitx_life_think",
+        "orbitx_life_files",
         "orbitx_life_account",
         "orbitx_life_post",
         "orbitx_life_timeline",

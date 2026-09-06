@@ -48,9 +48,9 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     "║  X (TWITTER)                                         ║",
     "║    orbitx_x_connect · status · post / reply / quote  ║",
     "╠══════════════════════════════════════════════════╣",
-    "║  LIFE AGENTS (MCP-only)                              ║",
-    "║    create · @handle.obx account · post · timeline    ║",
-    "║    follow · talk · hourly ape report                 ║",
+    "║  LIFE CITY (MCP-only)                                ║",
+    "║    create · city · think · files · tweet · converse  ║",
+    "║    @handle.obx · timeline · follow · marry · child   ║",
     "╠══════════════════════════════════════════════════╣",
     "║  VOICE (LiveKit)                                     ║",
     "║    orbitx_vc_start · vc_list · vc_join (anyone)      ║",
@@ -77,7 +77,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `_MCP access: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → orbitx_mcp_access_buy → Jupiter buy+burn → orbitx_mcp_access_confirm. Time remaining: orbitx_mcp_access_status._`,
     `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Say “confirm” / “auto” → Phantom auto-prompt._`,
     `_Group chat: “start a group chat named Orbitx” → list with “hey any group chats” → “join Orbitx” → “I want to chat in the group chat”. Every message posts there until “leave GC”. Join back anytime._`,
-    `_Life Agents (MCP-only, no UI): “let’s create an agent that scans X” → they get a name, gender, job, family, crew, and an @handle.obx OrbitX account. They post hourly ape reports to the agent timeline. orbitx_life_account / post / timeline / follow. You only talk._`,
+    `_Life City (MCP-only, no UI): “let’s create an agent that scans X” → @handle.obx, faction, NVIDIA brain, DB files, daily logs. They tweet, converse, age, marry, raise the next gen. orbitx_life_city / think / files / timeline. Hourly cron is a full hour of life. 300 cmds at life:0._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
 }
