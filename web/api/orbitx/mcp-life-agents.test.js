@@ -137,6 +137,8 @@ describe("life MCP tools", () => {
     expect(resolveLifeNaturalTool("agent city")?.name).toBe("orbitx_life_city");
     expect(resolveLifeNaturalTool("let Nova think")?.name).toBe("orbitx_life_think");
     expect(resolveLifeNaturalTool("agent account for @nova.obx")?.name).toBe("orbitx_life_account");
+    expect(resolveLifeNaturalTool("tweet this to x as Nova")?.name).toBe("orbitx_life_x_relay");
+    expect(resolveLifeNaturalTool("let the agents talk to each other")?.name).toBe("orbitx_life_converse");
   });
 
   it("creates a lead + crew without a live market scan failing the tool", async () => {

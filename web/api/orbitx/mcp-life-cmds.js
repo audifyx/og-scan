@@ -199,6 +199,7 @@ const LIFE_CITY_DEFS = [
   ["orbitx_life_rank", "Rank title."],
   ["orbitx_life_age", "Desk age (grows every 7 days of life)."],
   ["orbitx_life_grow", "Growth card (xp, gen, age)."],
+  ["orbitx_life_x_relay", "Post the agent's last thought to the owner's connected X (1/day)."],
 ];
 
 const CITY_HOURS = ["dawn", "morning", "noon", "dusk", "midnight", "graveyard", "open", "close", "afterhours", "weekend"];
@@ -390,8 +391,8 @@ export async function dispatchLifeCmd(name, args, ctx = {}) {
         "Life Agents are MCP-only. No public UI. They live in an OrbitX agent city.",
         "Create: “let’s create an agent that scans X” → @name.obx account, faction, files, daily logs.",
         "City: orbitx_life_city. Brain: orbitx_life_think (NVIDIA). Files: orbitx_life_files. Talk: orbitx_life_converse.",
-        "Family: orbitx_life_marry / child. Tweets: orbitx_life_tweet. Timeline: orbitx_life_timeline.",
-        "300 cmds via tools/list cursor life:0. Hourly cron = scan + think + tweet + talk + log. You only talk.",
+        "Family: orbitx_life_marry / child. Tweets: orbitx_life_tweet. Real X (1/day, owner connected): orbitx_life_x_relay.",
+        "300 cmds via tools/list cursor life:0. Hourly cron = scan + NVIDIA think + tweet + talk + files + daily log. You only talk.",
       ].join("\n"),
     };
   }

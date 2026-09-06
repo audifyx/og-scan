@@ -19,6 +19,8 @@ describe("life cmd catalog", () => {
     expect(names).toContain("orbitx_life_city");
     expect(names).toContain("orbitx_life_think");
     expect(names).toContain("orbitx_life_files");
+    expect(names).toContain("orbitx_life_x_relay");
+    expect(names).toContain("orbitx_life_converse");
   });
 
   it("mints .obx handles", () => {
@@ -35,7 +37,7 @@ describe("life cmd catalog", () => {
 });
 
 describe("life city", () => {
-  it("snapshots an empty city and thinks in template mode", async () => {
+  function citySb() {
     const db = {
       mcp_life_agents: [],
       mcp_life_factions: [],
@@ -54,24 +56,85 @@ describe("life city", () => {
       mcp_life_relationships: [],
     };
     let n = 0;
+    const match = (row, query) => {
+      const params = new URLSearchParams(query);
+      for (const [key, raw] of params.entries()) {
+        if (key === "select" || key === "order" || key === "limit" || key === "on_conflict") continue;
+        const eq = String(raw).startsWith("eq.") ? String(raw).slice(3) : null;
+        if (eq != null && String(row[key]) !== eq) return false;
+      }
+      return true;
+    };
     const sb = async (path, init = {}) => {
       const method = String(init.method || "GET").toUpperCase();
-      const table = String(path).split("?")[0];
+      const [table, query = ""] = String(path).split("?");
       if (!db[table]) throw new Error(`unknown table ${table}`);
-      if (method === "GET") return db[table];
+      if (method === "GET") {
+        let out = db[table].filter((r) => match(r, query));
+        const limit = Number(new URLSearchParams(query).get("limit") || 0);
+        if (limit) out = out.slice(0, limit);
+        return out;
+      }
       if (method === "POST") {
         n += 1;
         const body = JSON.parse(init.body);
-        const row = { id: body.id || `id-${n}`, created_at: new Date().toISOString(), ...body };
+        const row = { id: body.id || `id-${n}`, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...body };
         db[table].push(row);
         return [row];
       }
-      if (method === "PATCH") return [];
+      if (method === "PATCH") {
+        const body = JSON.parse(init.body);
+        const hits = db[table].filter((r) => match(r, query));
+        for (const h of hits) Object.assign(h, body);
+        return hits;
+      }
       return [];
     };
+    sb._db = db;
+    return sb;
+  }
+
+  it("snapshots an empty city and thinks in template mode", async () => {
+    const sb = citySb();
     const snap = await dispatchLifeCmd("orbitx_life_city", {}, { sb });
     expect(snap.ok).toBe(true);
     expect(snap.population).toBe(0);
     expect(snap.factions.length).toBeGreaterThanOrEqual(1);
+
+    sb._db.mcp_life_agents.push({
+      id: "agent-nova",
+      name: "Nova",
+      slug: "nova",
+      handle: "nova.obx",
+      status: "alive",
+      role: "X scout",
+      mood: "focused",
+      voice: "stoic",
+      personality: "dry",
+      day_of_life: 3,
+      xp: 0,
+      clout: 0,
+      generation: 1,
+      posts_count: 0,
+    });
+    const thought = await dispatchLifeCmd("orbitx_life_think", { name: "Nova", text: "what do you believe" }, { sb });
+    expect(thought.ok).toBe(true);
+    expect(thought.thought).toMatch(/Nova/i);
+    expect(sb._db.mcp_life_thoughts.length).toBeGreaterThan(0);
+    expect(sb._db.mcp_life_files.some((f) => f.path === "/memory.md")).toBe(true);
+
+    const wrote = await dispatchLifeCmd(
+      "orbitx_life_file_write",
+      { name: "Nova", path: "/memory.md", text: "second note" },
+      { sb },
+    );
+    expect(wrote.ok).toBe(true);
+    const read = await dispatchLifeCmd("orbitx_life_file_read", { name: "Nova", path: "/memory.md" }, { sb });
+    expect(read.ok).toBe(true);
+    expect(read.file.body).toMatch(/second note/);
+
+    const ritual = await dispatchLifeCmd("orbitx_life_dawn_shift", {}, { sb });
+    expect(ritual.ok).toBe(true);
+    expect(ritual.population).toBeGreaterThanOrEqual(1);
   });
 });

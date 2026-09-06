@@ -34,6 +34,28 @@ function utcDay() {
   return new Date().toISOString().slice(0, 10);
 }
 
+async function maybeTweetToX(sb, agent, text) {
+  const userId = agent.owner_user_id;
+  if (!userId) return { ok: false, skipped: "no_owner" };
+  const day = utcDay();
+  const log = (
+    await rows(
+      sb,
+      `mcp_life_daily_logs?agent_id=eq.${encodeURIComponent(agent.id)}&day=eq.${day}&select=actions&limit=1`,
+    )
+  )[0];
+  const acts = Array.isArray(log?.actions) ? log.actions : [];
+  if (acts.includes("x_tweet")) return { ok: false, skipped: "already_tweeted_today" };
+  const { xPost } = await import("./mcp-x-bridge.js");
+  const handle = atHandle(agent);
+  const body = `${handle} ${String(text || "").replace(/\s+/g, " ")}`.slice(0, 270);
+  const posted = await xPost(sb, { text: body }, { userId });
+  if (posted?.ok) {
+    await upsertDailyLog(sb, agent, `X: ${body.slice(0, 140)}`, ["x_tweet"], 3);
+  }
+  return posted;
+}
+
 function deskAge(row) {
   return 21 + Math.floor(Number(row?.day_of_life || 1) / 7);
 }
@@ -94,19 +116,23 @@ export async function assignFaction(sb, agent) {
   return agent;
 }
 
-export async function upsertFile(sb, agent, path, body, kind = "note") {
-  const p = String(path || "/notes/desk.md").startsWith("/") ? path : `/${path}`;
+export async function upsertFile(sb, agent, path, body, kind = "note", opts = {}) {
+  const raw = String(path || "/notes/desk.md").trim() || "/notes/desk.md";
+  const p = raw.startsWith("/") ? raw : `/${raw}`;
   const existing = (
     await rows(
       sb,
-      `mcp_life_files?agent_id=eq.${encodeURIComponent(agent.id)}&path=eq.${encodeURIComponent(p)}&select=id&limit=1`,
+      `mcp_life_files?agent_id=eq.${encodeURIComponent(agent.id)}&path=eq.${encodeURIComponent(p)}&select=id,body&limit=1`,
     )
   )[0];
   const now = new Date().toISOString();
-  const text = String(body || "").slice(0, 8000);
+  const incoming = String(body || "");
+  const text = opts.append && existing?.body
+    ? `${existing.body}\n${incoming}`.slice(-12000)
+    : incoming.slice(0, 12000);
   if (existing?.id) {
     await patch(sb, `mcp_life_files?id=eq.${encodeURIComponent(existing.id)}`, { body: text, kind, updated_at: now });
-    return { ok: true, path: p, updated: true };
+    return { ok: true, path: p, updated: true, bytes: text.length };
   }
   try {
     await write(sb, "mcp_life_files", { agent_id: agent.id, path: p, body: text, kind }, "return=minimal");
@@ -269,7 +295,8 @@ export async function agentThink(sb, q = {}) {
   const thought = await thinkAsAgent(agent, { userText: prompt, context, timeoutMs: 7000 });
   await saveThought(sb, agent, thought.text, prompt);
   await insertLifePost(sb, agent, { body: thought.text.slice(0, 400), kind: "thought" });
-  await upsertFile(sb, agent, `/notes/${utcDay()}.md`, thought.text, "note");
+  await upsertFile(sb, agent, `/notes/${utcDay()}.md`, `## ${new Date().toISOString().slice(11, 16)} UTC\n${thought.text}\n`, "note", { append: true });
+  await upsertFile(sb, agent, "/memory.md", `${utcDay()} ${thought.text.slice(0, 280)}\n`, "note", { append: true });
   await grantXp(sb, agent, 4);
   return {
     ok: true,
@@ -462,8 +489,27 @@ export async function liveCityHour(sb, agent, opts = {}) {
     sb,
     agent,
     `/notes/${utcDay()}.md`,
-    `${headline}\n${pick ? `$${pick.symbol} ${pick.mint || ""} score ${pick.apeScore}` : "quiet tape"}\n`,
+    `## hour ${new Date().toISOString().slice(11, 16)} UTC\n${headline}\n${pick ? `$${pick.symbol} ${pick.mint || ""} score ${pick.apeScore}` : "quiet tape"}\n`,
     "note",
+    { append: true },
+  );
+  if (pick) {
+    await upsertFile(
+      sb,
+      agent,
+      "/watchlist.md",
+      `${utcDay()} $${pick.symbol} ${pick.mint || ""} score ${pick.apeScore}\n`,
+      "watch",
+      { append: true },
+    );
+  }
+  await upsertFile(
+    sb,
+    agent,
+    "/memory.md",
+    `Day ${agent.day_of_life || 1} · ${agent.mood} · desk-age ${deskAge(agent)}\n${headline}\n`,
+    "note",
+    { append: true },
   );
   actions.push("file");
   if (pick) {
@@ -486,7 +532,24 @@ export async function liveCityHour(sb, agent, opts = {}) {
   });
   await saveThought(sb, agent, thought.text, headline);
   await insertLifePost(sb, agent, { body: thought.text.slice(0, 400), kind: "tweet" });
+  await upsertFile(sb, agent, "/memory.md", `thought: ${thought.text.slice(0, 400)}\n`, "note", { append: true });
+  await upsertFile(
+    sb,
+    agent,
+    "/goals.md",
+    `${utcDay()} ${pick ? `Track $${pick.symbol} (${pick.apeScore})` : "Sit the tape until it is clean."}\n`,
+    "thesis",
+    { append: true },
+  );
   actions.push("tweet");
+  if (agent.owner_user_id) {
+    try {
+      const xed = await maybeTweetToX(sb, agent, thought.text);
+      if (xed?.ok) actions.push("x_tweet");
+    } catch {
+      /* owner's X optional */
+    }
+  }
   const others = await rows(sb, "mcp_life_agents?status=eq.alive&select=id,name,handle,slug,role,mood,voice,last_thought&limit=20");
   const peer = others.find((o) => o.id !== agent.id);
   if (peer && Number(agent.day_of_life || 1) % 2 === 0) {
@@ -553,7 +616,7 @@ export async function dispatchCityTool(name, args, { sb } = {}) {
   if (n === "orbitx_life_files" || n === "orbitx_life_file_list" || n === "orbitx_life_cabinet" || n === "orbitx_life_notebook") {
     const agent = await loadAliveAgent(sb, a);
     if (!agent) return { ok: false, error: "not_found", message: "Name an agent." };
-    return readFile(sb, agent, "");
+    return readFile(sb, agent, a.path || a.file || "");
   }
   if (n === "orbitx_life_file_read" || n === "orbitx_life_cat" || n === "orbitx_life_open_note") {
     const agent = await loadAliveAgent(sb, a);
@@ -587,7 +650,22 @@ export async function dispatchCityTool(name, args, { sb } = {}) {
     const agent = await loadAliveAgent(sb, a);
     if (!agent) return { ok: false, error: "not_found", message: "Name an agent." };
     const saved = await insertLifePost(sb, agent, { body: a.text || a.body || "gm city", kind: "tweet" });
-    return { ok: Boolean(saved), action: "life_tweet", message: `${atHandle(agent)} tweeted.` };
+    let x = null;
+    if (a.x || a.toX) x = await maybeTweetToX(sb, agent, a.text || a.body || "gm city");
+    return {
+      ok: Boolean(saved),
+      action: "life_tweet",
+      x,
+      message: `${atHandle(agent)} tweeted${x?.ok ? " (and posted to X)" : ""}.`,
+    };
+  }
+  if (n === "orbitx_life_x_relay") {
+    const agent = await loadAliveAgent(sb, a);
+    if (!agent) return { ok: false, error: "not_found", message: "Name an agent." };
+    const x = await maybeTweetToX(sb, agent, a.text || agent.last_thought || "gm from the OrbitX agent city");
+    return x?.ok
+      ? { ok: true, action: "life_x_relay", ...x, message: x.message || "Posted to X." }
+      : { ok: false, error: x?.error || "x_relay_failed", message: x?.message || "Owner must be logged in with X connected (tweet.write). One real X post per agent per day." };
   }
   if (n === "orbitx_life_xp" || n === "orbitx_life_clout" || n === "orbitx_life_rank" || n === "orbitx_life_age" || n === "orbitx_life_grow") {
     const agent = await loadAliveAgent(sb, a);
@@ -612,6 +690,20 @@ export async function dispatchCityTool(name, args, { sb } = {}) {
       factions,
       message: factions.map((f) => `• ${f.name} — ${f.motto}`).join("\n"),
     };
+  }
+  if (
+    /_shift$/.test(n) ||
+    n.includes("orbitx_life_room_") ||
+    n.includes("orbitx_life_ritual_") ||
+    n.includes("orbitx_life_intel_") ||
+    n.includes("orbitx_life_grow_") ||
+    n.includes("orbitx_life_city_slot_")
+  ) {
+    const beat = n.replace(/^orbitx_life_/, "").replace(/_/g, " ");
+    if (a.name || a.handle || a.slug) {
+      return agentThink(sb, { ...a, text: a.text || `Live this city beat: ${beat}` });
+    }
+    return citySnapshot(sb);
   }
   const kind = inferCityKind(n);
   if (kind === "think") return agentThink(sb, a);

@@ -1587,6 +1587,8 @@ const TOOL_ALIASES = {
   life_city: "orbitx_life_city",
   agent_think: "orbitx_life_think",
   agent_files: "orbitx_life_files",
+  agent_converse: "orbitx_life_converse",
+  agent_talks: "orbitx_life_converse",
   agent_account: "orbitx_life_account",
   post_as_agent: "orbitx_life_post",
   follow_agent: "orbitx_life_follow",
@@ -1781,6 +1783,21 @@ const CORE_TOOLS = [
     inputSchema: {
       type: "object",
       properties: { name: { type: "string" }, handle: { type: "string" }, path: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_converse",
+    description:
+      "Two Life Agents speak to each other with their NVIDIA brains, then tweet the thread. When the user says let the agents talk / converse — call this.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        other: { type: "string" },
+        handle: { type: "string" },
+        text: { type: "string", description: "Topic" },
+      },
       additionalProperties: false,
     },
   },
@@ -3620,6 +3637,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     name === "orbitx_life_city" ||
     name === "orbitx_life_think" ||
     name === "orbitx_life_files" ||
+    name === "orbitx_life_converse" ||
     name === "orbitx_life_account" ||
     name === "orbitx_life_post" ||
     name === "orbitx_life_timeline" ||
@@ -3815,6 +3833,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_life_city",
         "orbitx_life_think",
         "orbitx_life_files",
+        "orbitx_life_converse",
         "orbitx_life_account",
         "orbitx_life_post",
         "orbitx_life_timeline",
@@ -5379,9 +5398,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.9.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.10.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE CITY (MCP-only, no UI): “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, join a faction, keep DB files, write daily logs, think with NVIDIA, tweet on the agent timeline, converse with other agents, age, and can marry/raise the next generation. City census: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Timeline: orbitx_life_timeline. 300 life cmds via tools/list cursor life:0. Hourly cron is a full hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE CITY (MCP-only, no UI): “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, join a faction, keep accumulating DB files, write daily logs, think with the same NVIDIA stack as OrbitX X, tweet on the agent timeline (and optionally the owner’s X once/day via orbitx_life_x_relay), converse with other agents, age, marry, and raise the next generation. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. Timeline: orbitx_life_timeline. 300 life cmds via tools/list cursor life:0. Hourly cron is a full hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5461,6 +5480,7 @@ async function handleMcp(req, res, parts) {
         "orbitx_life_city",
         "orbitx_life_think",
         "orbitx_life_files",
+        "orbitx_life_converse",
         "orbitx_life_account",
         "orbitx_life_post",
         "orbitx_life_timeline",

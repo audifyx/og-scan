@@ -368,7 +368,7 @@
       "maxDuration": 60
     },
     "api/mcp-life-tick.js": {
-      "maxDuration": 60
+      "maxDuration": 90
     },
     "api/**/*.js": {
       "maxDuration": 30

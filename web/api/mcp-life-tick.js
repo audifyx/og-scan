@@ -4,7 +4,7 @@
  */
 import { tickDueLifeAgents } from "./orbitx/mcp-life-agents.js";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 90 };
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     }
   }
   try {
-    const out = await tickDueLifeAgents(sb, { limit: 5 });
+    const out = await tickDueLifeAgents(sb, { limit: 6 });
     return json(res, out);
   } catch (e) {
     return json(res, { ok: false, error: "tick_failed", message: e?.message || String(e) }, 500);

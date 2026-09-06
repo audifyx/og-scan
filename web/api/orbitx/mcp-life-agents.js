@@ -103,6 +103,10 @@ export function resolveLifeNaturalTool(rawName, args = {}) {
   if (/converse|talk to each other|agents speak/i.test(raw)) return { name: "orbitx_life_converse", args };
   if (/marry the agents|agent wedding/i.test(raw)) return { name: "orbitx_life_marry", args };
   if (/daily log|what did .+ do today/i.test(raw)) return { name: "orbitx_life_daily_log", args };
+  if (/tweet (it |this )?to (x|twitter)|post to (x|twitter) as|relay to x/i.test(raw)) {
+    const who = raw.match(/as\s+(@?[\w.-]+)/i);
+    return { name: "orbitx_life_x_relay", args: { ...args, name: args.name || who?.[1], text: args.text || raw } };
+  }
   return null;
 }
 
