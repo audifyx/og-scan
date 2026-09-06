@@ -352,6 +352,14 @@ const App = () => (
             <Route path="/education" element={<Education />} />
             <Route path="/education/*" element={<Education />} />
 
+            {/* ── Public agent world (must beat /:toolSlug owner-404) ── */}
+            <Route path="/orbitxagents" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
+            <Route path="/orbitxagents/:slug" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
+            <Route path="/Orbitxagents" element={<Navigate to="/orbitxagents" replace />} />
+            <Route path="/Orbitxagents/:slug" element={<OrbitxAgentsSlugRedirect />} />
+            <Route path="/life" element={<Navigate to="/orbitxagents" replace />} />
+            <Route path="/life/:slug" element={<LifeSlugRedirect />} />
+
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route
               path="/os/*"
@@ -678,12 +686,6 @@ const App = () => (
             <Route path="/vc/:slug" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/gc" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
             <Route path="/gc/:slug" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
-            <Route path="/orbitxagents" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
-            <Route path="/orbitxagents/:slug" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
-            <Route path="/Orbitxagents" element={<Navigate to="/orbitxagents" replace />} />
-            <Route path="/Orbitxagents/:slug" element={<OrbitxAgentsSlugRedirect />} />
-            <Route path="/life" element={<Navigate to="/orbitxagents" replace />} />
-            <Route path="/life/:slug" element={<LifeSlugRedirect />} />
             <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
             <Route path="/world" element={<Navigate to="/on-chain" replace />} />

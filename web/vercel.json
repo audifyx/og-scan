@@ -187,6 +187,30 @@
       "destination": "/app.html"
     },
     {
+      "source": "/orbitxagents",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/orbitxagents/(.*)",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/Orbitxagents",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/Orbitxagents/(.*)",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/life",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/life/(.*)",
+      "destination": "/app.html"
+    },
+    {
       "source": "/",
       "destination": "/app.html"
     },

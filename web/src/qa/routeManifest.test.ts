@@ -29,9 +29,12 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('path="/education"');
     expect(app).toContain('import Education from "./pages/Education"');
     const eduAt = app.indexOf('<Route path="/education"');
+    const agentsAt = app.indexOf('<Route path="/orbitxagents"');
     const slugAt = app.indexOf('<Route path="/:toolSlug"');
     expect(eduAt).toBeGreaterThan(0);
+    expect(agentsAt).toBeGreaterThan(0);
     expect(eduAt).toBeLessThan(slugAt);
+    expect(agentsAt).toBeLessThan(slugAt);
   });
 
   it("loads team apps and keeps OrbitX AI eager for route reliability", () => {
@@ -52,6 +55,8 @@ describe("OrbitX route manifest", () => {
     const vercel = readFileSync(resolve(__dirname, "../../vercel.json"), "utf8");
     expect(vercel).toContain('"/education"');
     expect(vercel).toContain('"/education/(.*)"');
+    expect(vercel).toContain('"/orbitxagents"');
+    expect(vercel).toContain('"/orbitxagents/(.*)"');
     expect(vercel).toContain('"/app.html"');
   });
 });
