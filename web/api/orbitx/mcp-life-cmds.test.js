@@ -120,6 +120,7 @@ describe("life city", () => {
     const thought = await dispatchLifeCmd("orbitx_life_think", { name: "Nova", text: "what do you believe" }, { sb });
     expect(thought.ok).toBe(true);
     expect(thought.thought).toMatch(/Nova/i);
+    expect(thought.thought).not.toMatch(/free will this hour/i);
     expect(sb._db.mcp_life_thoughts.length).toBeGreaterThan(0);
     expect(sb._db.mcp_life_files.some((f) => f.path === "/memory.md")).toBe(true);
 

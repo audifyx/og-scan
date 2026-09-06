@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     }
   }
   try {
-    const out = await tickDueLifeAgents(sb, { limit: 6 });
+    const out = await tickDueLifeAgents(sb, { limit: 8 });
     return json(res, out);
   } catch (e) {
     return json(res, { ok: false, error: "tick_failed", message: e?.message || String(e) }, 500);
