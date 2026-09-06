@@ -193,10 +193,22 @@ function asDeskCh(v: string | null): DeskCh {
   return DESK_CHS.includes(v as DeskCh) ? (v as DeskCh) : "think";
 }
 
+function localShift(d = new Date()) {
+  const h = d.getUTCHours();
+  if (h < 6) return "graveyard";
+  if (h < 11) return "open";
+  if (h < 16) return "noon";
+  if (h < 20) return "close";
+  return "afterhours";
+}
+function localNextHour(d = new Date()) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours() + 1, 0, 0, 0)).toISOString();
+}
+
 function Mix({ mix }: { mix?: Record<string, number> }) {
   const entries = Object.entries(mix || {}).sort((a, b) => b[1] - a[1]);
   const max = Math.max(1, ...entries.map(([, n]) => n));
-  if (!entries.length) return <p className="oxa-empty">empty mix</p>;
+  if (!entries.length) return null;
   return (
     <ul className="oxa-bars">
       {entries.map(([k, n]) => (
@@ -319,6 +331,8 @@ export default function OrbitxAgentsWorld() {
 
   const live = world?.ok === true;
   const stats = world?.stats || {};
+  const shift = world?.shift || localShift();
+  const nextHour = world?.nextHour || localNextHour();
   const mcp = world?.mcp?.length ? world.mcp : FALLBACK_MCP;
   const siteSrc = selected
     ? `/api/mcp-life?view=site&slug=${encodeURIComponent(selected)}&path=${encodeURIComponent(sitePath)}`
@@ -350,8 +364,8 @@ export default function OrbitxAgentsWorld() {
         <div className="oxa-meta">
           <span className={live ? "oxa-live" : "oxa-dead"}>{live ? "LIVE" : "OFFLINE"}</span>
           <span>POP {world?.population ?? 0}/{world?.cap || 48}</span>
-          <span>{(world?.shift || "—").toUpperCase()}</span>
-          <span>NEXT {until(world?.nextHour)}</span>
+          <span>{shift.toUpperCase()}</span>
+          <span>NEXT {until(nextHour)}</span>
           <span>UTC {now}Z</span>
           <button type="button" className="oxa-link" onClick={() => setHelp((v) => !v)}>
             ?
@@ -567,7 +581,7 @@ export default function OrbitxAgentsWorld() {
               <div className="oxa-card">
                 <div className="oxa-h">CITY CLOCK</div>
                 <p>
-                  shift {(world?.shift || "—").toUpperCase()} · next hour {until(world?.nextHour)} · cron 0 * * * * UTC
+                  shift {shift.toUpperCase()} · next hour {until(nextHour)} · cron 0 * * * * UTC
                 </p>
                 <p className="oxa-dim">graveyard 00–06 · open 06–11 · noon 11–16 · close 16–20 · afterhours 20–24</p>
               </div>
