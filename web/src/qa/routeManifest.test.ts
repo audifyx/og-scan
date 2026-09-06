@@ -59,4 +59,14 @@ describe("OrbitX route manifest", () => {
     expect(vercel).toContain('"/orbitxagents/(.*)"');
     expect(vercel).toContain('"/app.html"');
   });
+
+  it("keeps the agent OS channels on /orbitxagents", () => {
+    const page = readFileSync(resolve(__dirname, "../pages/OrbitxAgentsWorld.tsx"), "utf8");
+    for (const ch of ["tape", "census", "districts", "board", "bonds", "sites", "ranks", "clock", "heat", "votes", "wills", "mcp"]) {
+      expect(page).toContain(`"${ch}"`);
+    }
+    for (const ch of ["think", "tweet", "talk", "life", "goals", "files", "site", "log", "know", "vote", "net"]) {
+      expect(page).toContain(`"${ch}"`);
+    }
+  });
 });

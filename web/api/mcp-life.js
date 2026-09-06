@@ -3,9 +3,11 @@
  * GET /api/mcp-life?view=world
  * GET /api/mcp-life?view=desk&slug=nova
  * GET /api/mcp-life?view=site&slug=nova&path=/sites/index.html
+ * GET /api/mcp-life?view=file&slug=nova&path=/memory.md
+ * GET /api/mcp-life?view=help
  */
 import { getLifeAgent, latestLifeReport, lifeDiary, listLifeAgents } from "./orbitx/mcp-life-agents.js";
-import { agentDesk, agentSite, worldSnapshot } from "./orbitx/mcp-life-world.js";
+import { agentDesk, agentFile, agentSite, worldSnapshot, MCP_HEADLINES } from "./orbitx/mcp-life-world.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -70,6 +72,15 @@ export default async function handler(req, res) {
       const out = await agentSite(sb, { slug, path: url.searchParams.get("path") || "/sites/index.html" });
       if (!out.ok) return json(res, out, 404);
       return html(res, out.html);
+    }
+
+    if (view === "file") {
+      const out = await agentFile(sb, { slug, path: url.searchParams.get("path") || "" });
+      return json(res, out, out.ok ? 200 : 404);
+    }
+
+    if (view === "help") {
+      return json(res, { ok: true, view: "help", cmds: MCP_HEADLINES });
     }
 
     if (view === "world" || slug === "world") {

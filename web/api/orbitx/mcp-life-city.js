@@ -292,7 +292,7 @@ export async function citySnapshot(sb) {
       .join("\n"),
     talks[0] ? `Last talk: ${talks[0].body}` : "",
     ticks[0] ? `Last city hour: ${ticks[0].summary}` : "City hour runs with the cron tick.",
-    "MCP-only. No UI. orbitx_life_think / files / converse / marry / city.",
+    "Watch live at https://www.orbitx.world/orbitxagents — orbitx_life_think / files / converse / marry / city.",
   ];
   return {
     ok: true,
