@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   HOME_DOCK,
   HOME_GRID_KEYS,
+  HOME_SPRING_DOCK_KEYS,
+  springboardDockApps,
+  springboardHomeGrid,
   PLATFORM_APPS,
   PLATFORM_MENU,
   PLATFORM_SECTIONS,
@@ -60,6 +63,18 @@ describe("OrbitX platform catalog", () => {
 
   it("pins Shop, Agent, DEX, City, On-Chain, and Education as command deck gates", () => {
     expect(HOME_DOCK.map((a) => a.key)).toEqual(["dex", "onchain", "supercomputer", "shop", "city", "education"]);
+  });
+
+  it("pins DEX, City, Agents, and Shop on the /app SpringBoard dock", () => {
+    expect([...HOME_SPRING_DOCK_KEYS]).toEqual(["dex", "city", "agents", "shop"]);
+    expect(springboardDockApps().map((a) => a.key)).toEqual(["dex", "city", "agents", "shop"]);
+    const grid = springboardHomeGrid(publicPlatformApps());
+    expect(grid.some((a) => a.key === "dex")).toBe(false);
+    expect(grid.some((a) => a.key === "city")).toBe(false);
+    expect(grid.some((a) => a.key === "agents")).toBe(false);
+    expect(grid.some((a) => a.key === "shop")).toBe(false);
+    expect(grid.some((a) => a.key === "trade")).toBe(true);
+    expect(grid.every((a) => a.visibility !== "admin")).toBe(true);
   });
 
   it("covers every catalog key in a section", () => {

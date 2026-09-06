@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { groupAppsByLetter, islandQuickAccess } from "./hubIos";
-import { PLATFORM_SECTIONS, publicPlatformApps, visiblePlatformApps } from "./orbitxPlatforms";
+import {
+  HOME_SPRING_DOCK_KEYS,
+  PLATFORM_SECTIONS,
+  publicPlatformApps,
+  springboardHomeGrid,
+  visiblePlatformApps,
+} from "./orbitxPlatforms";
 
 describe("iOS Apps library helpers", () => {
   it("groups catalog apps A–Z for the App Library list", () => {
@@ -26,5 +32,11 @@ describe("iOS Apps library helpers", () => {
     for (const section of PLATFORM_SECTIONS) {
       expect(section.keys.length).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps SpringBoard home icons out of the four-app dock", () => {
+    const grid = springboardHomeGrid(publicPlatformApps());
+    expect(grid.length).toBeGreaterThanOrEqual(12);
+    expect(grid.every((a) => !(HOME_SPRING_DOCK_KEYS as readonly string[]).includes(a.key))).toBe(true);
   });
 });

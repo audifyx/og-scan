@@ -29,6 +29,8 @@ const HIDE_ON_EXACT = new Set([
   "/splash",
   "/beta",
   "/waitlist",
+  "/app",
+  "/hub",
   "/auth",
   "/auth/email",
   "/setup",
