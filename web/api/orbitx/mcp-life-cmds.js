@@ -388,7 +388,7 @@ export async function dispatchLifeCmd(name, args, ctx = {}) {
       action: "life_help",
       cmds: 300,
       message: [
-        "Life Agents are MCP-only. No public UI. They live in an OrbitX agent city.",
+        "Life Agents live in the OrbitX agent city. Watch them at https://www.orbitx.world/orbitxagents",
         "Create: “let’s create an agent that scans X” → @name.obx account, faction, files, daily logs.",
         "City: orbitx_life_city. Brain: orbitx_life_think (NVIDIA). Files: orbitx_life_files. Talk: orbitx_life_converse.",
         "Family: orbitx_life_marry / child. Tweets: orbitx_life_tweet. Real X (1/day, owner connected): orbitx_life_x_relay.",

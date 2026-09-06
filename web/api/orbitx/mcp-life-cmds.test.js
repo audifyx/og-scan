@@ -32,7 +32,7 @@ describe("life cmd catalog", () => {
     const out = await dispatchLifeCmd("orbitx_life_help", {}, { sb: async () => [] });
     expect(out.ok).toBe(true);
     expect(out.cmds).toBe(300);
-    expect(out.message).toMatch(/MCP-only/i);
+    expect(out.message).toMatch(/orbitxagents/i);
   });
 });
 

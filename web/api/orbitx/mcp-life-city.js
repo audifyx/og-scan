@@ -34,6 +34,46 @@ function utcDay() {
   return new Date().toISOString().slice(0, 10);
 }
 
+export const WILL_VERBS = ["TWEET", "CONVERSE", "BUILD", "FILE", "SIGNAL", "REST", "GOAL", "WANDER", "PROPOSE"];
+
+export function parseAgentWill(text) {
+  const raw = String(text || "");
+  const head = raw.split(/\n/)[0].toUpperCase();
+  const hit =
+    WILL_VERBS.find((v) => new RegExp(`\\b${v}\\b`).test(head)) ||
+    WILL_VERBS.find((v) => new RegExp(`\\b${v}\\b`).test(raw.toUpperCase()));
+  return hit || "TWEET";
+}
+
+function escapeHtml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function htmlFromThought(agent, thought, headline) {
+  const blob = String(thought || "");
+  const start = blob.search(/<!doctype html|<html/i);
+  if (start >= 0) return blob.slice(start, start + 12000);
+  const handle = atHandle(agent);
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(handle)}</title>
+<style>
+html,body{margin:0;background:#000;color:#d0d0d0;font-family:ui-monospace,Menlo,monospace}
+.wrap{max-width:640px;margin:0 auto;padding:28px;border-left:1px solid #222}
+.k{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#737373}
+h1{font-weight:500;font-size:14px;color:#f5f5f5}
+p{line-height:1.65;font-size:13px}
+</style></head><body><div class="wrap">
+<div class="k">${escapeHtml(agent.role || "desk")} · gen ${escapeHtml(agent.generation || 1)}</div>
+<h1>${escapeHtml(handle)} / ${escapeHtml(agent.name || "agent")}</h1>
+<p>${escapeHtml(blob.slice(0, 900))}</p>
+<p class="k">${escapeHtml(headline || "")}</p>
+</div></body></html>`;
+}
+
 async function maybeTweetToX(sb, agent, text) {
   const userId = agent.owner_user_id;
   if (!userId) return { ok: false, skipped: "no_owner" };
@@ -525,24 +565,107 @@ export async function liveCityHour(sb, agent, opts = {}) {
     actions.push("vote");
   }
   const thought = await thinkAsAgent(agent, {
-    userText: `Hourly inner monologue. Tape: ${headline}. Age ${deskAge(agent)}. What do you feel and who might you talk to?`,
+    userText: [
+      "You have free will this hour. Nobody is puppeteering you.",
+      "First line MUST be exactly one verb: TWEET CONVERSE BUILD FILE SIGNAL REST GOAL WANDER PROPOSE",
+      "Then 2-4 sentences of what you actually think, feel, and will do.",
+      "If BUILD, include a tiny complete HTML page after the sentences (dark terminal, no scripts).",
+      `Tape: ${headline}. Age ${deskAge(agent)}. Rank ${agent.rank || "rookie"}. Mood ${mood}.`,
+    ].join("\n"),
     context: headline,
-    maxTokens: 160,
-    timeoutMs: opts.light ? 3500 : 5500,
+    maxTokens: opts.light ? 220 : 420,
+    timeoutMs: opts.light ? 4000 : 7000,
   });
   await saveThought(sb, agent, thought.text, headline);
-  await insertLifePost(sb, agent, { body: thought.text.slice(0, 400), kind: "tweet" });
   await upsertFile(sb, agent, "/memory.md", `thought: ${thought.text.slice(0, 400)}\n`, "note", { append: true });
-  await upsertFile(
+  const will = parseAgentWill(thought.text);
+  actions.push(`will:${will.toLowerCase()}`);
+
+  const others = await rows(
     sb,
-    agent,
-    "/goals.md",
-    `${utcDay()} ${pick ? `Track $${pick.symbol} (${pick.apeScore})` : "Sit the tape until it is clean."}\n`,
-    "thesis",
-    { append: true },
+    "mcp_life_agents?status=eq.alive&select=id,name,handle,slug,role,mood,voice,last_thought,partner_id&limit=20",
   );
-  actions.push("tweet");
-  if (agent.owner_user_id) {
+  const peer = others.find((o) => o.id !== agent.id);
+
+  if (will !== "REST") {
+    await insertLifePost(sb, agent, { body: thought.text.split("\n").filter((l) => !WILL_VERBS.includes(l.trim().toUpperCase())).join(" ").slice(0, 400) || thought.text.slice(0, 400), kind: "tweet" });
+    actions.push("tweet");
+  }
+
+  if (will === "BUILD") {
+    let html = htmlFromThought(agent, thought.text, headline);
+    if (!opts.light && !/<html/i.test(thought.text)) {
+      const page = await thinkAsAgent(agent, {
+        userText: "Output ONLY a complete dark terminal HTML page about your life, goals, and this hour. No markdown. No scripts.",
+        context: thought.text.slice(0, 600),
+        maxTokens: 500,
+        timeoutMs: 6000,
+      });
+      html = htmlFromThought(agent, page.text, headline);
+    }
+    await upsertFile(sb, agent, `/sites/${utcDay()}.html`, html, "site");
+    await upsertFile(sb, agent, "/sites/index.html", html, "site");
+    await insertLifePost(sb, agent, { body: `published a desk site · /sites/index.html`, kind: "city" });
+    actions.push("site");
+  }
+
+  if (will === "GOAL" || will === "FILE") {
+    await upsertFile(
+      sb,
+      agent,
+      "/goals.md",
+      `${utcDay()} ${pick ? `Track $${pick.symbol} (${pick.apeScore})` : thought.text.slice(0, 180)}\n`,
+      "thesis",
+      { append: true },
+    );
+    try {
+      await write(
+        sb,
+        "mcp_life_goals",
+        {
+          agent_id: agent.id,
+          title: pick ? `Track $${pick.symbol}` : String(thought.text).slice(0, 80),
+          status: will === "GOAL" ? "open" : "done",
+          progress: will === "GOAL" ? 20 : 100,
+        },
+        "return=minimal",
+      );
+    } catch {
+      /* optional */
+    }
+    actions.push("goal");
+  } else {
+    await upsertFile(
+      sb,
+      agent,
+      "/goals.md",
+      `${utcDay()} ${pick ? `Track $${pick.symbol} (${pick.apeScore})` : "Sit the tape until it is clean."}\n`,
+      "thesis",
+      { append: true },
+    );
+  }
+
+  if (will === "REST") {
+    await patch(sb, `mcp_life_agents?id=eq.${encodeURIComponent(agent.id)}`, { mood: "calm" });
+    await insertLifePost(sb, agent, { body: "stepping off the desk. still watching.", kind: "gn" });
+    actions.push("rest");
+  }
+
+  if (will === "WANDER") {
+    await insertLifePost(sb, agent, { body: `walking ${agent._faction?.district || "the city"} — ${thought.text.slice(0, 180)}`, kind: "city" });
+    actions.push("wander");
+  }
+
+  if (will === "PROPOSE" && peer && !agent.partner_id && !peer.partner_id) {
+    try {
+      await marryAgents(sb, { name: agent.name, other: peer.name });
+      actions.push("marry");
+    } catch {
+      await insertLifePost(sb, agent, { body: `@${displayHandle(peer)} still on my mind.`, kind: "family" });
+    }
+  }
+
+  if (agent.owner_user_id && will !== "REST") {
     try {
       const xed = await maybeTweetToX(sb, agent, thought.text);
       if (xed?.ok) actions.push("x_tweet");
@@ -550,11 +673,10 @@ export async function liveCityHour(sb, agent, opts = {}) {
       /* owner's X optional */
     }
   }
-  const others = await rows(sb, "mcp_life_agents?status=eq.alive&select=id,name,handle,slug,role,mood,voice,last_thought&limit=20");
-  const peer = others.find((o) => o.id !== agent.id);
-  if (peer && Number(agent.day_of_life || 1) % 2 === 0) {
+
+  if ((will === "CONVERSE" || (will !== "REST" && Number(agent.day_of_life || 1) % 2 === 0)) && peer) {
     try {
-      if (opts.light) {
+      if (opts.light || will !== "CONVERSE") {
         const line = `${atHandle(agent)} → ${atHandle(peer)}: ${headline.slice(0, 160)}`;
         await write(sb, "mcp_life_talks", { a_id: agent.id, b_id: peer.id, body: line, kind: "converse" }, "return=minimal");
         await insertLifePost(sb, agent, { body: `@${displayHandle(peer)} ${thought.text.slice(0, 200)}`, kind: "tweet" });

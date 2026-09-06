@@ -222,6 +222,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "hq", name: "HQ", caption: "Social headquarters", href: "/hq", tone: "#F472B6", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #EC4899 48%, #9D174D 100%)", glyph: PlatformGlyph.hq, visibility: "admin" },
   { key: "os", name: "OrbitX OS", caption: "Desktop launcher", href: "/os", tone: "#17FF4D", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 46%, #14532D 100%)", glyph: PlatformGlyph.os },
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
+  { key: "agents", name: "Agents", caption: "Live agent world", href: "/orbitxagents", tone: "#E5E5E5", iconBg: "linear-gradient(145deg, #A3A3A3 0%, #525252 50%, #0A0A0A 100%)", glyph: PlatformGlyph.terminal },
   { key: "education", name: "Education", caption: "Learn the ecosystem", href: "/education", tone: "#22D3EE", iconBg: "linear-gradient(145deg, #67E8F9 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.education, dock: true },
   { key: "play", name: "Play", caption: "Games & missions", href: "/play", tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #FF3EAA 48%, #9D174D 100%)", glyph: PlatformGlyph.play },
   { key: "gaming", name: "Degen Tower", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #FB7185 0%, #FF3EAA 48%, #B20067 100%)", glyph: PlatformGlyph.gaming, menu: false, visibility: "admin" },
@@ -235,7 +236,7 @@ export const PLATFORM_BY_KEY = Object.fromEntries(PLATFORM_APPS.map((a) => [a.ke
 export type PlatformSection = { id: string; title: string; subtitle: string; keys: string[] };
 
 export const PLATFORM_SECTIONS: PlatformSection[] = [
-  { id: "world", title: "World", subtitle: "City, OS, play, and education", keys: ["city", "os", "play", "gaming", "education"] },
+  { id: "world", title: "World", subtitle: "City, agents, OS, play, and education", keys: ["city", "agents", "os", "play", "gaming", "education"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Intel desk, chain world, wallets, AI", keys: ["intel", "onchain", "koltracker", "pnltracker", "ai"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "telegram", "shop"] },
@@ -283,6 +284,7 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
   if (href.startsWith("http")) return false;
   if (href === "/ORBITX_DEX") return pathname.startsWith("/ORBITX_DEX");
   if (href === "/Orbitxcity") return pathname.toLowerCase().startsWith("/orbitxcity");
+  if (href === "/orbitxagents") return pathname.toLowerCase().startsWith("/orbitxagents") || pathname.toLowerCase().startsWith("/life");
   if (href === "/hq") return pathname === "/hq" || pathname.startsWith("/hq/");
   if (href === "/os") return pathname === "/os" || pathname.startsWith("/os/");
   if (href === "/play") return pathname === "/play" || pathname.startsWith("/play/");

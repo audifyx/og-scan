@@ -140,7 +140,7 @@ function publicAgent(row, extra = {}) {
     lastThought: row.last_thought || null,
     lastRunAt: row.last_run_at,
     nextRunAt: row.next_run_at,
-    profileUrl: `${HOST}/life/${encodeURIComponent(row.slug)}`,
+    profileUrl: `${HOST}/orbitxagents/${encodeURIComponent(row.slug)}`,
     ...extra,
   };
 }

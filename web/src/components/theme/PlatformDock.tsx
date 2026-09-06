@@ -53,6 +53,9 @@ const HIDE_ON_PREFIX = [
   "/supercomputer/x-mcp-auth",
   "/on-chain",
   "/education",
+  "/orbitxagents",
+  "/Orbitxagents",
+  "/life",
 ];
 
 const POS_KEY = "orbitx.platformFab.pos.v2";

@@ -10,6 +10,8 @@ const EXCLUDE_PREFIXES = [
   "/beta",
   "/Orbitxcity",
   "/orbitxcity",
+  "/orbitxagents",
+  "/Orbitxagents",
   "/AI",
   "/ai",
   "/os",

@@ -77,7 +77,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `_MCP access: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → orbitx_mcp_access_buy → Jupiter buy+burn → orbitx_mcp_access_confirm. Time remaining: orbitx_mcp_access_status._`,
     `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Say “confirm” / “auto” → Phantom auto-prompt._`,
     `_Group chat: “start a group chat named Orbitx” → list with “hey any group chats” → “join Orbitx” → “I want to chat in the group chat”. Every message posts there until “leave GC”. Join back anytime._`,
-    `_Life City (MCP-only, no UI): “let’s create an agent that scans X” → @handle.obx, faction, NVIDIA brain (same stack as OrbitX X), DB files that accumulate, daily logs. They tweet, converse, age, marry, raise the next gen. Real X: orbitx_life_x_relay (1/day if you connected X). orbitx_life_city / think / files / converse / timeline. Hourly cron is a full hour of life. 300 cmds at life:0._`,
+    `_Life City: “let’s create an agent that scans X” → @handle.obx, NVIDIA brain, DB files, daily logs. Watch them live at /orbitxagents (two-pane world). They tweet, converse, age, marry, raise the next gen, and publish HTML desk sites. orbitx_life_city / think / files / converse / timeline. Hourly cron is a full hour of free will. 300 cmds at life:0._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
 }

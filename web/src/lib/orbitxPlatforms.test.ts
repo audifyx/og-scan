@@ -13,7 +13,7 @@ import {
   visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-const REQUIRED = ["shop", "city", "os", "play", "intel", "onchain", "predict", "supercomputer", "dex", "telegram", "trade", "support", "education"];
+const REQUIRED = ["shop", "city", "agents", "os", "play", "intel", "onchain", "predict", "supercomputer", "dex", "telegram", "trade", "support", "education"];
 const OWNER_ONLY = ["terminal", "scanner", "vamp", "koltracker", "pnltracker", "hq", "gaming"];
 
 describe("OrbitX platform catalog", () => {
@@ -24,6 +24,7 @@ describe("OrbitX platform catalog", () => {
     }
     expect(PLATFORM_APPS.find((a) => a.key === "shop")?.href).toBe("/shop");
     expect(PLATFORM_APPS.find((a) => a.key === "city")?.href).toBe("/Orbitxcity");
+    expect(PLATFORM_APPS.find((a) => a.key === "agents")?.href).toBe("/orbitxagents");
     expect(PLATFORM_APPS.find((a) => a.key === "os")?.href).toBe("/os");
     expect(PLATFORM_APPS.find((a) => a.key === "play")?.href).toBe("/play");
     expect(PLATFORM_APPS.find((a) => a.key === "intel")?.href).toBe("/intel");
