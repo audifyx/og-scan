@@ -629,11 +629,223 @@ a.ios-cell {
 }
 
 .ox-deck--ios .ox-deck__rail {
-  width: min(calc(100% - 16px), 460px);
-  padding: 5px 8px;
+  width: min(calc(100% - 16px), 430px);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px;
+  justify-content: space-around;
+  gap: 0;
 }
 
-.ox-deck--ios .ox-homebtn {
-  width: 50px;
-  height: 50px;
+.ox-deck--ios .ox-railbtn {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 2px 5px;
+}
+
+.ox-deck--ios .ox-railbtn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.ox-deck--ios.ox-deck--spring {
+  --deck-rail: 176px;
+}
+
+.ox-deck--ios:not(.ox-deck--spring) {
+  --deck-rail: 78px;
+}
+
+.ios-spring {
+  width: min(390px, 100%);
+  margin: 0 auto;
+  padding: 4px 4px 12px;
+}
+
+.ios-locktime {
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: clamp(3.4rem, 14vw, 4.4rem);
+  font-weight: 700;
+  letter-spacing: -0.07em;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.ios-lockdate {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 1.02rem;
+  font-weight: 510;
+  letter-spacing: -0.02em;
+  color: var(--ios-secondary);
+}
+
+.ios-greet {
+  margin: 2px 0 12px;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--ios-tertiary);
+}
+
+.ios-search--tap {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ios-secondary);
+  font: inherit;
+  font-size: 1.02rem;
+}
+
+.ios-search--tap span {
+  flex: 1;
+}
+
+.ios-widgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.ios-widget {
+  appearance: none;
+  border: 0;
+  min-height: 86px;
+  padding: 10px 10px 9px;
+  border-radius: 20px;
+  background: rgba(28, 28, 30, 0.52);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--ios-label);
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  cursor: default;
+}
+
+button.ios-widget {
+  cursor: pointer;
+}
+
+.ios-widget__k {
+  font-size: 0.62rem;
+  font-weight: 610;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ios-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ios-widget__v {
+  margin-top: 8px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ios-widget__m {
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ios-tertiary);
+}
+
+.ios-spring__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 6px;
+}
+
+.ios-icon {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ios-label);
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ios-icon:active .ios-icon__mark {
+  transform: scale(0.92);
+}
+
+.ios-icon__mark {
+  width: 60px;
+  height: 60px;
+  border-radius: 22.37%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.32);
+  transition: transform 0.12s ease;
+}
+
+.ios-icon__mark svg {
+  width: 32px;
+  height: 32px;
+}
+
+.ios-icon__name {
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-align: center;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ios-phone-dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 3;
+  width: min(calc(100% - 24px), 390px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 16px 18px 14px;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.ios-phone-dock .ios-icon__name {
+  display: none;
+}
+
+.ios-spot .ios-search {
+  margin: 4px 8px 12px;
+}
+
+.ios-spot .ios-cell {
+  border-radius: 12px;
+}
+
+@media (max-width: 420px) {
+  .ios-icon__mark,
+  .ios-phone-dock .ios-icon__mark {
+    width: 56px;
+    height: 56px;
+  }
 }

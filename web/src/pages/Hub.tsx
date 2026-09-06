@@ -20,7 +20,8 @@ import { HubSpaceBackground } from "@/components/hub/HubSpaceBackground";
 import { Ios27Island } from "@/components/hub/Ios27Island";
 import {
   PLATFORM_BY_KEY,
-  visibleHomeGridKeys,
+  springboardDockApps,
+  springboardHomeGrid,
   visiblePlatformApps,
   visiblePlatformSections,
   type PlatformApp,
@@ -54,36 +55,34 @@ type Frame =
   | { id: "wallpaper" };
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "home", label: "Deck" },
-  { id: "apps", label: "Apps" },
+  { id: "home", label: "Home" },
+  { id: "apps", label: "Library" },
   { id: "activity", label: "Pulse" },
-  { id: "account", label: "Settings" },
+  { id: "account", label: "You" },
 ];
-
-const GATE_KEYS = ["city", "dex", "agent", "shop"] as const;
-
-const GATE_COPY: Record<(typeof GATE_KEYS)[number], { kicker: string; line: string }> = {
-  city: { kicker: "01 · World", line: "Walk the living 3D city" },
-  dex: { kicker: "02 · Markets", line: "Scanner, tape, and execution" },
-  agent: { kicker: "03 · Mesh", line: "Claude, ChatGPT, and Grok" },
-  shop: { kicker: "04 · Access", line: "Credits and $ORBITX burn" },
-};
 
 const TAB_GLYPH: Record<TabId, ReactNode> = {
   home: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 4v2.2M12 17.8V20M4 12h2.2M17.8 12H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M4 11.2 12 4.6l8 6.6V20a1 1 0 0 1-1 1h-5.1v-6.4H9.1V21H5a1 1 0 0 1-1-1v-8.8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
     </svg>
   ),
   apps: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 4l7 4v8l-7 4-7-4V8l7-4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <rect x="4" y="4" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13" y="4" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="4" y="13" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13" y="13" width="7" height="7" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   ),
   activity: (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 16l5-6 4 3 7-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 13h3l2.2-5 3.1 10 2.4-6.4L16.4 13H21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
   account: (
@@ -110,8 +109,15 @@ function fmtPrice(n: number | null, digits = 2): string {
 }
 
 function changeColor(n: number | null): string {
-  if (n == null) return "var(--deck-ink)";
-  return n >= 0 ? "var(--deck-ok)" : "var(--deck-bad)";
+  if (n == null) return "var(--ios-label)";
+  return n >= 0 ? "var(--ios-green)" : "var(--ios-red)";
+}
+
+function fngColor(v: number | null): string {
+  if (v == null) return "var(--ios-label)";
+  if (v >= 60) return "var(--ios-green)";
+  if (v <= 40) return "var(--ios-red)";
+  return "var(--ios-orange)";
 }
 
 function IosChevron() {
@@ -126,10 +132,12 @@ function IosSearch({
   value,
   onChange,
   placeholder,
+  onFocus,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  onFocus?: () => void;
 }) {
   return (
     <label className="ios-search">
@@ -137,7 +145,12 @@ function IosSearch({
         <circle cx="11" cy="11" r="6.2" stroke="currentColor" strokeWidth="1.8" />
         <path d="M16 16.4 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        onFocus={onFocus}
+      />
     </label>
   );
 }
@@ -149,7 +162,6 @@ function Badge({ bg, children }: { bg: string; children: ReactNode }) {
     </span>
   );
 }
-
 
 export default function Hub() {
   const now = useClock();
@@ -184,16 +196,18 @@ export default function Hub() {
   const showAdminApps = Boolean(isAdmin);
   const showOwnerSurfaces = Boolean(isOwnerIdentity);
   const catalogApps = useMemo(() => visiblePlatformApps(showOwnerSurfaces), [showOwnerSurfaces]);
-  const homeGridKeys = useMemo(() => visibleHomeGridKeys(showOwnerSurfaces), [showOwnerSurfaces]);
   const platformSections = useMemo(() => visiblePlatformSections(showOwnerSurfaces), [showOwnerSurfaces]);
   const searchableApps = useMemo(
     () => (showAdminApps ? [...catalogApps, ...OWNER_ADMIN_APPS] : catalogApps),
     [catalogApps, showAdminApps],
   );
+  const springDock = useMemo(() => springboardDockApps(catalogApps), [catalogApps]);
+  const springGrid = useMemo(() => springboardHomeGrid(catalogApps), [catalogApps]);
 
   const stack = stacks[tab];
   const top = stack[stack.length - 1] || { id: "root" as const };
   const canBack = stack.length > 1;
+  const onSpringHome = tab === "home" && top.id === "root";
 
   const push = useCallback(
     (frame: Frame) => {
@@ -210,11 +224,6 @@ export default function Hub() {
     });
   }, [tab]);
 
-  const switchTab = (id: TabId) => {
-    setIslandOpen(false);
-    setTab(id);
-  };
-
   const goHome = useCallback(() => {
     setIslandOpen(false);
     setSpotOpen(false);
@@ -227,6 +236,15 @@ export default function Hub() {
       account: [{ id: "root" }],
     });
   }, []);
+
+  const switchTab = (id: TabId) => {
+    setIslandOpen(false);
+    if (id === "home" && tab === "home") {
+      goHome();
+      return;
+    }
+    setTab(id);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -376,7 +394,7 @@ export default function Hub() {
       } else {
         window.location.assign(app.href);
       }
-    }, 420);
+    }, 280);
   }, []);
 
   const logout = async () => {
@@ -393,11 +411,12 @@ export default function Hub() {
     return profile?.username ? `${part}, ${profile.username}` : part;
   })();
 
-  const utcClock = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const lockTime = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const lockDate = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
   const navTitle = (() => {
     if (top.id === "app") return PLATFORM_BY_KEY[top.appKey]?.name || searchableApps.find((a) => a.key === top.appKey)?.name || "App";
-    if (top.id === "section") return platformSections.find((s) => s.id === top.sectionId)?.title || "Apps";
+    if (top.id === "section") return platformSections.find((s) => s.id === top.sectionId)?.title || "Library";
     if (top.id === "widgets") return "Widgets";
     if (top.id === "wallpaper") return "Atmosphere";
     return TABS.find((t) => t.id === tab)?.label || "OrbitX";
@@ -409,10 +428,17 @@ export default function Hub() {
     </div>
   );
 
+  const appIcon = (app: AppItem, extraClass = "") => (
+    <button key={app.key} type="button" className={`ios-icon ${extraClass}`.trim()} onClick={() => openAppHref(app)}>
+      {renderMark(app, "ios-icon__mark")}
+      <span className="ios-icon__name">{app.name}</span>
+    </button>
+  );
+
   const appRows = (apps: AppItem[]) => (
     <div className="ios-group">
       {apps.map((app) => (
-        <button key={app.key} type="button" className="ios-cell" onClick={() => push({ id: "app", appKey: app.key })}>
+        <button key={app.key} type="button" className="ios-cell" onClick={() => openAppHref(app)}>
           {renderMark(app, "ios-appico")}
           <span className="ios-cell__meta">
             <span className="ios-cell__title">{app.name}</span>
@@ -427,71 +453,59 @@ export default function Hub() {
   const matchQ = (text: string, q: string) => !q || text.toLowerCase().includes(q);
 
   const rootHome = (
-    <div className="ox-deck__hero">
-      <div className="ox-deck__intro">
-        <h1>{greet}.</h1>
-        <p>Command deck over deep space. Four gates in front of you — City, DEX, Agent, Shop. Search any station with ⌘K.</p>
-      </div>
-      <aside className="ox-deck__ticker" aria-label="Live telemetry">
-        <button type="button" className="ox-tel" onClick={copyCA}>
-          <span className="ox-tel__k">$ORBITX</span>
-          <span className="ox-tel__v" style={{ color: changeColor(orbitxChange) }}>
+    <div className="ios-spring">
+      <p className="ios-locktime">{lockTime}</p>
+      <p className="ios-lockdate">{lockDate}</p>
+      <p className="ios-greet">{greet}</p>
+      <button
+        type="button"
+        className="ios-search ios-search--tap"
+        onClick={() => {
+          setSpotQ("");
+          setSpotOpen(true);
+        }}
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="11" cy="11" r="6.2" stroke="currentColor" strokeWidth="1.8" />
+          <path d="M16 16.4 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+        <span>Search OrbitX</span>
+      </button>
+      <div className="ios-widgets">
+        <button type="button" className="ios-widget" onClick={copyCA}>
+          <span className="ios-widget__k">$ORBITX</span>
+          <span className="ios-widget__v" style={{ color: changeColor(orbitxChange) }}>
             {fmtPrice(orbitxPrice, 6)}
           </span>
-          <span className="ox-tel__m">{caCopied ? "Contract copied" : "Tap to copy contract"}</span>
+          <span className="ios-widget__m">
+            {caCopied
+              ? "Contract copied"
+              : orbitxChange != null
+                ? `${orbitxChange >= 0 ? "+" : ""}${orbitxChange.toFixed(1)}% 24h`
+                : "Tap to copy"}
+          </span>
         </button>
-        <div className="ox-tel">
-          <span className="ox-tel__k">SOL</span>
-          <span className="ox-tel__v" style={{ color: changeColor(solChange) }}>
+        <div className="ios-widget">
+          <span className="ios-widget__k">SOL</span>
+          <span className="ios-widget__v" style={{ color: changeColor(solChange) }}>
             {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
           </span>
-          <span className="ox-tel__m">
-            {solChange != null ? `${solChange >= 0 ? "+" : ""}${solChange.toFixed(1)}% 24h` : "Live feed"}
+          <span className="ios-widget__m">
+            {solChange != null ? `${solChange >= 0 ? "+" : ""}${solChange.toFixed(1)}% 24h` : "Live"}
           </span>
         </div>
-        <div className="ox-tel">
-          <span className="ox-tel__k">Fear & Greed</span>
-          <span className="ox-tel__v">{fng ? fng.v : "—"}</span>
-          <span className="ox-tel__m">{fng?.label || "Market mood"}</span>
+        <div className="ios-widget">
+          <span className="ios-widget__k">Fear & Greed</span>
+          <span className="ios-widget__v" style={{ color: fngColor(fng?.v ?? null) }}>
+            {fng ? fng.v : "—"}
+          </span>
+          <span className="ios-widget__m">{fng?.label || "Market mood"}</span>
         </div>
-      </aside>
-      <div className="ox-deck__gates">
-        {GATE_KEYS.map((key) => {
-          const app = PLATFORM_BY_KEY[key];
-          if (!app) return null;
-          const copy = GATE_COPY[key];
-          return (
-            <button key={app.key} type="button" className="ox-gate" onClick={() => push({ id: "app", appKey: app.key })}>
-              {renderMark(app, "ox-gate__orb")}
-              <span className="ox-gate__copy">
-                <span className="ox-gate__kicker">{copy.kicker}</span>
-                <span className="ox-gate__name">{app.name}</span>
-              </span>
-              <span className="ox-gate__go">Enter</span>
-              <span className="ox-gate__cap">{copy.line}</span>
-            </button>
-          );
-        })}
       </div>
-      <section className="ox-deck__section">
-        <h2>OrbitX apps</h2>
-        <p>Trade, launch, intel, AI, city, and play — the live surfaces.</p>
-        <div className="ox-stations">
-          {homeGridKeys.filter((k) => !(GATE_KEYS as readonly string[]).includes(k)).map((k) => {
-            const app = PLATFORM_BY_KEY[k];
-            if (!app) return null;
-            return (
-              <button key={app.key} type="button" className="ox-station" onClick={() => push({ id: "app", appKey: app.key })}>
-                {renderMark(app, "ox-station__mark")}
-                <span>
-                  <span className="ox-station__name">{app.name}</span>
-                  <span className="ox-station__cap">{app.caption}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      <div className="ios-spring__grid">
+        {springGrid.map((app) => appIcon(app))}
+      </div>
+      {!springGrid.length && <div className="ios-hint">No apps match that search.</div>}
     </div>
   );
 
@@ -508,7 +522,7 @@ export default function Hub() {
     );
     return (
       <div className="ios-pane ios-pane--wide">
-        <h1 className="ios-large">Apps</h1>
+        <h1 className="ios-large">Library</h1>
         <IosSearch value={appsQ} onChange={setAppsQ} placeholder="Search" />
         <div className="ios-lib">
           {sections.map((section) => {
@@ -616,7 +630,7 @@ export default function Hub() {
     const initial = (profile?.username || user?.email || "O").slice(0, 1).toUpperCase();
     return (
       <div className="ios-pane">
-        <h1 className="ios-large">Settings</h1>
+        <h1 className="ios-large">You</h1>
         <IosSearch value={settingsQ} onChange={setSettingsQ} placeholder="Search" />
 
         {show("profile identity wallet") && (
@@ -716,7 +730,7 @@ export default function Hub() {
                 </button>
               )}
             </div>
-            <p className="ios-group__foot">The command deck keeps its 3D space. Atmosphere themes DEX, Launchpad, NFT, Agent, and X.</p>
+            <p className="ios-group__foot">Home keeps the space wallpaper. Atmosphere themes DEX, Launchpad, NFT, Agent, and X.</p>
           </>
         )}
 
@@ -801,27 +815,11 @@ export default function Hub() {
           <p>{app.caption}</p>
           <div className="ox-btn-row">
             <button type="button" className="ios-open" onClick={() => openAppHref(app)}>
-              {app.external ? "Open" : "Open"}
+              Open
             </button>
             <button type="button" className="ios-open ios-open--ghost" onClick={pop}>
               Cancel
             </button>
-          </div>
-        </div>
-        <div className="ios-group" style={{ marginTop: 28 }}>
-          <div className="ios-cell ios-cell--bare" style={{ cursor: "default" }}>
-            <span className="ios-cell__meta">
-              <span className="ios-cell__title">Category</span>
-            </span>
-            <span className="ios-cell__value">
-              {platformSections.find((s) => s.keys.includes(app.key))?.title || "OrbitX"}
-            </span>
-          </div>
-          <div className="ios-cell ios-cell--bare" style={{ cursor: "default" }}>
-            <span className="ios-cell__meta">
-              <span className="ios-cell__title">Destination</span>
-            </span>
-            <span className="ios-cell__value">{app.href}</span>
           </div>
         </div>
       </div>
@@ -872,15 +870,18 @@ export default function Hub() {
             <IosChevron />
           </button>
         </div>
-        <p className="ios-group__foot">This command deck keeps its 3D space background.</p>
+        <p className="ios-group__foot">Home keeps its space wallpaper.</p>
       </div>
     );
   }
 
-  const iosMode = tab !== "home" || top.id !== "root";
+  const spotHits = searchableApps.filter((a) => {
+    const q = spotQ.trim().toLowerCase();
+    return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
+  });
 
   return (
-    <div className={`ox-deck ios-hub${iosMode ? " ox-deck--ios" : ""}`}>
+    <div className={`ox-deck ios-hub ox-deck--ios${onSpringHome ? " ox-deck--spring" : ""}`}>
       <style>{aiWidgetCSS}</style>
       <div className="ox-deck__space" aria-hidden>
         <HubSpaceBackground />
@@ -900,7 +901,7 @@ export default function Hub() {
       />
 
       <div className="ox-deck__stage">
-        {iosMode && canBack ? (
+        {canBack ? (
           <header className="ios-nav">
             <button type="button" className="ios-nav__back" onClick={pop}>
               <svg viewBox="0 0 12 20" fill="none" aria-hidden>
@@ -911,58 +912,18 @@ export default function Hub() {
             <h1 className="ios-nav__title">{navTitle}</h1>
             <div className="ios-nav__trail" />
           </header>
-        ) : iosMode ? null : (
-          <header className="ox-deck__chrome">
-            <div className="ox-deck__brand">
-              <span className="ox-deck__mark" aria-hidden>
-                ◈
-              </span>
-              <span className="ox-deck__word">
-                <strong>OrbitX</strong>
-                <span className="ox-deck__live">
-                  <i />
-                  Live · {utcClock}
-                </span>
-              </span>
-            </div>
-            <div className="ox-deck__actions">
-              <span className="ox-deck__title">{navTitle}</span>
-              <button type="button" className="ox-deck__iconbtn" onClick={openTheme} aria-label="Theme">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
-                  <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </button>
-              <button type="button" className="ox-deck__iconbtn" onClick={() => setSpotOpen(true)} aria-label="Search">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
-                  <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M16 16.5 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          </header>
-        )}
+        ) : null}
         <div className="ox-deck__body">{body}</div>
       </div>
 
-      <nav className="ox-deck__rail" aria-label="OrbitX command rail">
-        {TABS.slice(0, 2).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`ox-railbtn${tab === t.id ? " is-on" : ""}`}
-            onClick={() => switchTab(t.id)}
-          >
-            {TAB_GLYPH[t.id]}
-            {t.label}
-          </button>
-        ))}
-        <button type="button" className="ox-homebtn" aria-label="Home" onClick={goHome}>
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M4 11.4 12 5l8 6.4V20a1 1 0 0 1-1 1h-5.2v-6.2H10.2V21H5a1 1 0 0 1-1-1v-8.6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-          </svg>
-        </button>
-        {TABS.slice(2).map((t) => (
+      {onSpringHome && (
+        <div className="ios-phone-dock" aria-label="Favorites">
+          {springDock.map((app) => appIcon(app))}
+        </div>
+      )}
+
+      <nav className="ox-deck__rail" aria-label="OrbitX tabs">
+        {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -977,42 +938,30 @@ export default function Hub() {
 
       {spotOpen && (
         <div className="ox-sheet" onClick={() => setSpotOpen(false)}>
-          <div className="ox-sheet__card" onClick={(e) => e.stopPropagation()}>
-            <div className="ox-sheet__search">
-              <input
-                className="ox-sheet__input"
-                autoFocus
-                value={spotQ}
-                onChange={(e) => setSpotQ(e.target.value)}
-                placeholder="Search apps…"
-              />
-              <button type="button" className="ox-btn ox-btn--ghost" onClick={() => setSpotOpen(false)}>
-                Close
+          <div className="ox-sheet__card ios-spot" onClick={(e) => e.stopPropagation()}>
+            <IosSearch
+              value={spotQ}
+              onChange={setSpotQ}
+              placeholder="Search apps"
+            />
+            {spotHits.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                className="ios-cell"
+                onClick={() => {
+                  setSpotOpen(false);
+                  openAppHref(a);
+                }}
+              >
+                {renderMark(a, "ios-appico")}
+                <span className="ios-cell__meta">
+                  <span className="ios-cell__title">{a.name}</span>
+                  <span className="ios-cell__sub">{a.caption}</span>
+                </span>
               </button>
-            </div>
-            {searchableApps
-              .filter((a) => {
-                const q = spotQ.trim().toLowerCase();
-                return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
-              })
-              .map((a) => (
-                <button
-                  key={a.key}
-                  type="button"
-                  className="ios-cell"
-                  onClick={() => {
-                    setSpotOpen(false);
-                    setTab("apps");
-                    setStacks((prev) => ({ ...prev, apps: [{ id: "root" }, { id: "app", appKey: a.key }] }));
-                  }}
-                >
-                  {renderMark(a, "ios-appico")}
-                  <span className="ios-cell__meta">
-                    <span className="ios-cell__title">{a.name}</span>
-                    <span className="ios-cell__sub">{a.caption}</span>
-                  </span>
-                </button>
-              ))}
+            ))}
+            {!spotHits.length && <div className="ios-hint">No apps match that search.</div>}
           </div>
         </div>
       )}

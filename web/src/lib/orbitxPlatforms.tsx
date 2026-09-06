@@ -278,6 +278,20 @@ export const PLATFORM_MENU = visiblePlatformMenu(false);
 
 export const HOME_DOCK = PLATFORM_APPS.filter((a) => a.dock);
 
+/** iPhone SpringBoard dock on /app — four frequent launches, not the six command-deck gates. */
+export const HOME_SPRING_DOCK_KEYS = ["dex", "city", "agents", "shop"] as const;
+
+export function springboardDockApps(apps: PlatformApp[] = PLATFORM_APPS): PlatformApp[] {
+  const byKey = Object.fromEntries(apps.map((a) => [a.key, a]));
+  return HOME_SPRING_DOCK_KEYS.map((key) => byKey[key]).filter(Boolean);
+}
+
+/** Public home icons that sit above the SpringBoard dock (dock apps are excluded). */
+export function springboardHomeGrid(apps: PlatformApp[]): PlatformApp[] {
+  const dock = new Set<string>(HOME_SPRING_DOCK_KEYS);
+  return apps.filter((a) => a.menu !== false && a.visibility !== "admin" && !dock.has(a.key));
+}
+
 export const HOME_GRID_KEYS = visibleHomeGridKeys(false);
 
 export function matchPlatformPath(href: string, pathname: string): boolean {
