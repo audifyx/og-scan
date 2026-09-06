@@ -34,6 +34,12 @@ function memorySb() {
     mcp_life_reports: [],
     mcp_life_messages: [],
     mcp_life_runs: [],
+    mcp_life_posts: [],
+    mcp_life_follows: [],
+    mcp_life_post_likes: [],
+    mcp_life_bookmarks: [],
+    mcp_life_dms: [],
+    mcp_life_notifications: [],
   };
   let n = 0;
   const sb = async (path, init = {}) => {
@@ -60,6 +66,12 @@ function memorySb() {
         day_of_life: 1,
         energy: 80,
         report_interval_min: 60,
+        likes_count: 0,
+        replies_count: 0,
+        reposts_count: 0,
+        posts_count: 0,
+        followers_count: 0,
+        following_count: 0,
         ...body,
       };
       db[table].push(row);
@@ -70,6 +82,16 @@ function memorySb() {
       const hits = db[table].filter((r) => matchRow(r, params));
       for (const h of hits) Object.assign(h, body);
       return hits;
+    }
+    if (method === "DELETE") {
+      const keep = [];
+      const removed = [];
+      for (const r of db[table]) {
+        if (matchRow(r, params)) removed.push(r);
+        else keep.push(r);
+      }
+      db[table] = keep;
+      return removed;
     }
     return [];
   };
@@ -106,10 +128,14 @@ describe("ape scoring", () => {
 });
 
 describe("life MCP tools", () => {
-  it("maps natural create / talk / report phrases", () => {
+  it("maps natural create / talk / report / social phrases", () => {
     expect(resolveLifeNaturalTool("lets create an agent that scans x")?.name).toBe("orbitx_life_create");
     expect(resolveLifeNaturalTool("talk to Nova: what do we ape")?.args?.name).toBe("Nova");
     expect(resolveLifeNaturalTool("hourly report")?.name).toBe("orbitx_life_report");
+    expect(resolveLifeNaturalTool("post as Nova: gm desk")?.name).toBe("orbitx_life_post");
+    expect(resolveLifeNaturalTool("agent timeline")?.name).toBe("orbitx_life_timeline");
+    expect(resolveLifeNaturalTool("follow @nova.obx")?.name).toBe("orbitx_life_follow");
+    expect(resolveLifeNaturalTool("agent account for @nova.obx")?.name).toBe("orbitx_life_account");
   });
 
   it("creates a lead + crew without a live market scan failing the tool", async () => {
@@ -124,9 +150,31 @@ describe("life MCP tools", () => {
       );
       expect(out.ok).toBe(true);
       expect(out.name).toBe("Nova");
+      expect(out.handle).toMatch(/\.obx$/);
       expect(out.crew.length).toBeGreaterThanOrEqual(1);
       const listed = await dispatchLifeTool("orbitx_life_list", {}, { sb, auth: {} });
       expect(listed.agents.some((a) => a.name === "Nova")).toBe(true);
+      const posted = await dispatchLifeTool(
+        "orbitx_life_post",
+        { name: "Nova", text: "tape is live" },
+        { sb, auth: {} },
+      );
+      expect(posted.ok).toBe(true);
+      const feed = await dispatchLifeTool("orbitx_life_timeline", {}, { sb, auth: {} });
+      expect(feed.ok).toBe(true);
+      expect(feed.posts.length).toBeGreaterThan(0);
+      const acc = await dispatchLifeTool("orbitx_life_account", { name: "Nova" }, { sb, auth: {} });
+      expect(acc.ok).toBe(true);
+      expect(acc.handle).toMatch(/@.*\.obx/);
+      const other = listed.agents.find((a) => a.name !== "Nova");
+      if (other) {
+        const fol = await dispatchLifeTool(
+          "orbitx_life_follow",
+          { name: "Nova", other: other.name },
+          { sb, auth: {} },
+        );
+        expect(fol.ok).toBe(true);
+      }
     } finally {
       globalThis.fetch = origFetch;
     }

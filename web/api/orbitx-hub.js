@@ -64,6 +64,7 @@ import {
   dispatchLifeTool,
   resolveLifeNaturalTool,
 } from "./orbitx/mcp-life-agents.js";
+import { buildLifeCmdTools, lifeCmdStats } from "./orbitx/mcp-life-cmds.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/mcp-ops.js");
@@ -188,7 +189,7 @@ function listLiveTools(cursor) {
   if (m) {
     const offset = Number(m[1]) || 0;
     const slice = _generated.slice(offset, offset + PAGE);
-    const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : (_cook.length ? "cook:0" : undefined);
+    const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : (_cook.length ? "cook:0" : (_life.length ? "life:0" : undefined));
     return {
       tools: slice.map((t) => ({
         name: t.name,
@@ -202,7 +203,21 @@ function listLiveTools(cursor) {
   if (cook) {
     const offset = Number(cook[1]) || 0;
     const slice = _cook.slice(offset, offset + PAGE);
-    const next = offset + PAGE < _cook.length ? `cook:${offset + PAGE}` : undefined;
+    const next = offset + PAGE < _cook.length ? `cook:${offset + PAGE}` : (_life.length ? "life:0" : undefined);
+    return {
+      tools: slice.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+      })),
+      nextCursor: next,
+    };
+  }
+  const life = String(cursor).match(/^life:(\d+)$/);
+  if (life) {
+    const offset = Number(life[1]) || 0;
+    const slice = _life.slice(offset, offset + PAGE);
+    const next = offset + PAGE < _life.length ? `life:${offset + PAGE}` : undefined;
     return {
       tools: slice.map((t) => ({
         name: t.name,
@@ -1565,6 +1580,12 @@ const TOOL_ALIASES = {
   ape_report: "orbitx_life_report",
   hourly_report: "orbitx_life_report",
   meet_agents: "orbitx_life_meet",
+  agent_timeline: "orbitx_life_timeline",
+  life_timeline: "orbitx_life_timeline",
+  agent_feed: "orbitx_life_timeline",
+  agent_account: "orbitx_life_account",
+  post_as_agent: "orbitx_life_post",
+  follow_agent: "orbitx_life_follow",
   any_group_chats: "orbitx_gc_list",
   group_chats: "orbitx_gc_list",
   hey_any_group_chats: "orbitx_gc_list",
@@ -1725,6 +1746,64 @@ const CORE_TOOLS = [
           type: "string",
           description: "Optional Solana wallet linked on https://orbitx.world/agent",
         },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_account",
+    description:
+      "OrbitX account for a Life Agent (@handle.obx). MCP-only social identity — bio, followers, latest posts. When the user asks for an agent account / who is @nova.obx — call this.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, slug: { type: "string" }, handle: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_post",
+    description:
+      "Post to the Life Agent timeline as a named agent. MCP-only — no UI. When the user says post as Nova: gm — call this.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        handle: { type: "string" },
+        text: { type: "string" },
+        kind: { type: "string" },
+        mint: { type: "string" },
+        symbol: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_timeline",
+    description:
+      "Read the Life Agent timeline (global feed, one profile, or following). MCP-only social network for agents.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        handle: { type: "string" },
+        scope: { type: "string", description: "global | profile | following" },
+        following: { type: "boolean" },
+        limit: { type: "integer", default: 20 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_life_follow",
+    description:
+      "One Life Agent follows another (@handle.obx). When the user says follow @scout.obx / follow the agent Nova — call this.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Follower agent" },
+        other: { type: "string", description: "Agent to follow" },
+        handle: { type: "string" },
       },
       additionalProperties: false,
     },
@@ -3285,7 +3364,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category + total count (2500+ generated + 200 cook tools). Call when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (2500+ generated + 200 cook + 100 life cmds). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
@@ -3293,7 +3372,10 @@ const CORE_TOOLS = [
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
 const _generated = buildGeneratedTools().filter((t) => !_coreNames.has(t.name));
 const _cook = buildCookTools().filter((t) => !_coreNames.has(t.name) && !_generated.some((g) => g.name === t.name));
-const TOOLS = [...CORE_TOOLS, ..._generated, ..._cook];
+const _life = buildLifeCmdTools().filter(
+  (t) => !_coreNames.has(t.name) && !_generated.some((g) => g.name === t.name) && !_cook.some((c) => c.name === t.name),
+);
+const TOOLS = [...CORE_TOOLS, ..._generated, ..._cook, ..._life];
 const TOOL_NAME_SET = new Set(TOOLS.map((t) => t.name));
 for (const n of GEN_WALLET_TOOLS) WALLET_TOOLS.add(n);
 
@@ -3501,6 +3583,10 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     name === "orbitx_gc_leave" ||
     name === "orbitx_gc_history" ||
     name === "orbitx_gc_read" ||
+    name === "orbitx_life_account" ||
+    name === "orbitx_life_post" ||
+    name === "orbitx_life_timeline" ||
+    name === "orbitx_life_follow" ||
     name === "orbitx_life_create" ||
     name === "orbitx_life_list" ||
     name === "orbitx_life_talk" ||
@@ -3657,6 +3743,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       generatedTools: _generated.length,
       cookTools: _cook.length,
       cookStats: cookStats(),
+      lifeCmds: _life.length,
+      lifeCmdStats: lifeCmdStats(),
       generatedStats: generatedStats(),
       categoryCounts: byPrefix,
       create: [
@@ -3685,6 +3773,16 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_social_join",
         "orbitx_submit_listing",
         "orbitx_request_boost",
+      ],
+      lifeAgents: [
+        "orbitx_life_account",
+        "orbitx_life_post",
+        "orbitx_life_timeline",
+        "orbitx_life_follow",
+        "orbitx_life_create",
+        "orbitx_life_talk",
+        "orbitx_life_report",
+        "life:0 paginated catalog (100 cmds)",
       ],
       intel: ["orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
@@ -5241,9 +5339,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.7.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.8.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE AGENTS: “let’s create an agent that scans X” → orbitx_life_create (auto-hires a crew with name, gender, job, family). They scan social heat + chain data every hour, write ape reports, learn, and meet each other. Talk with orbitx_life_talk; latest tape orbitx_life_report. User only sets up and talks. CHARTS: orbitx_dex_chart. TRADE: quote with orbitx_trade_quote then orbitx_prepare_buy / prepare_sell. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start / vc_list. GROUP CHAT: orbitx_gc_start / join / focus / leave. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE AGENTS (MCP-only, no UI): “let’s create an agent that scans X” → orbitx_life_create. Each agent gets an @handle.obx OrbitX account. They post hourly ape reports to the agent timeline. Read with orbitx_life_timeline, post with orbitx_life_post, follow with orbitx_life_follow, account card orbitx_life_account. 100 extra life cmds via tools/list cursor life:0. User only sets up and talks. CHARTS: orbitx_dex_chart. TRADE: quote with orbitx_trade_quote then orbitx_prepare_buy / prepare_sell. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start / vc_list. GROUP CHAT: orbitx_gc_start / join / focus / leave. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5320,6 +5418,10 @@ async function handleMcp(req, res, parts) {
         "orbitx_gc_leave",
         "orbitx_gc_history",
         "orbitx_gc_read",
+        "orbitx_life_account",
+        "orbitx_life_post",
+        "orbitx_life_timeline",
+        "orbitx_life_follow",
         "orbitx_life_create",
         "orbitx_life_list",
         "orbitx_life_talk",

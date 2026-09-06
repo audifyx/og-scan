@@ -6,6 +6,7 @@
 import { dispatchVoiceTool } from "./mcp-voice.js";
 import { dispatchGroupChatTool } from "./mcp-group-chat.js";
 import { dispatchLifeTool } from "./mcp-life-agents.js";
+import { dispatchLifeCmd } from "./mcp-life-cmds.js";
 
 async function xDispatch(name, args, ctx) {
   const { dispatchXTool } = await import("./mcp-x-bridge.js");
@@ -283,6 +284,8 @@ const INTEL_PATH = {
 export async function dispatchCookTool(name, args, ctx) {
   const life = await dispatchLifeTool(name, args, ctx);
   if (life) return life;
+  const lifeCmd = await dispatchLifeCmd(name, args, ctx);
+  if (lifeCmd) return lifeCmd;
   const gc = await dispatchGroupChatTool(name, args, ctx);
   if (gc) return gc;
   const voice = await dispatchVoiceTool(name, args, ctx);

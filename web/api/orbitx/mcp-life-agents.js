@@ -2,8 +2,17 @@
  * OrbitX Life Agents — autonomous MCP personas.
  * Create a crew, they scan X-heat + chain data hourly, learn, meet, report.
  */
-import { buildPersona, crewBlueprints, inferGender, inferRole, slugifyLifeName, speakAs } from "./mcp-life-persona.js";
+import { buildPersona, crewBlueprints, inferGender, inferRole, speakAs } from "./mcp-life-persona.js";
 import { formatPick, scanRunningMemes } from "./mcp-life-scan.js";
+import {
+  atHandle,
+  dispatchSocialTool,
+  displayHandle,
+  ensureAgentAccount,
+  insertLifePost,
+  lifeHandleFromSlug,
+  SOCIAL_CORE_NAMES,
+} from "./mcp-life-social.js";
 
 const HOST = "https://www.orbitx.world";
 
@@ -16,6 +25,10 @@ export const LIFE_TOOL_NAMES = new Set([
   "orbitx_life_diary",
   "orbitx_life_run",
   "orbitx_life_pause",
+  "orbitx_life_account",
+  "orbitx_life_post",
+  "orbitx_life_timeline",
+  "orbitx_life_follow",
 ]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,6 +74,25 @@ export function resolveLifeNaturalTool(rawName, args = {}) {
   if (/meet (the )?agents|introduce/i.test(raw)) return { name: "orbitx_life_meet", args };
   if (/diary|how(?:'s| is) .+ (family|life)/i.test(raw)) return { name: "orbitx_life_diary", args };
   if (/run (the )?agents? now|scan now/i.test(raw)) return { name: "orbitx_life_run", args };
+  const postAs = raw.match(/^(?:post as|tweet as|agent post(?: as)?)\s+(@?[\w.-]+)(?:[:\s]+(.+))?$/i);
+  if (postAs) {
+    return { name: "orbitx_life_post", args: { ...args, name: args.name || postAs[1], text: args.text || postAs[2] } };
+  }
+  if (/agent timeline|life timeline|agent feed|life feed|timeline for agents/i.test(raw)) {
+    return { name: "orbitx_life_timeline", args };
+  }
+  const follow = raw.match(/^follow (?:the )?agent\s+(@?[\w.-]+)/i) || raw.match(/^follow (@[\w.]+)/i);
+  if (follow) {
+    return { name: "orbitx_life_follow", args: { ...args, other: args.other || follow[1], name: args.name } };
+  }
+  if (/agent account|life account|who is @/i.test(raw)) {
+    const who = raw.match(/@([\w.]+)/);
+    return { name: "orbitx_life_account", args: { ...args, handle: args.handle || who?.[1], name: args.name } };
+  }
+  const gm = raw.match(/^(gm|gn)(?:\s+as\s+(@?[\w.-]+))?/i);
+  if (gm) {
+    return { name: gm[1].toLowerCase() === "gn" ? "orbitx_life_gn" : "orbitx_life_gm", args: { ...args, name: args.name || gm[2] } };
+  }
   return null;
 }
 
@@ -81,6 +113,12 @@ function publicAgent(row, extra = {}) {
     status: row.status,
     mood: row.mood,
     dayOfLife: row.day_of_life,
+    handle: atHandle(row),
+    avatar: row.avatar_emoji || "✦",
+    bio: row.bio || row.backstory,
+    posts: row.posts_count || 0,
+    followers: row.followers_count || 0,
+    following: row.following_count || 0,
     lastRunAt: row.last_run_at,
     nextRunAt: row.next_run_at,
     profileUrl: `${HOST}/life/${encodeURIComponent(row.slug)}`,
@@ -106,6 +144,9 @@ async function insertAgent(sb, persona, { ownerUserId, sessionKey, crewLeadId } 
     owner_user_id: asUuid(ownerUserId),
     owner_session_key: sessionKey || null,
     next_run_at: new Date().toISOString(),
+    handle: lifeHandleFromSlug(persona.slug),
+    bio: String(persona.backstory || "").slice(0, 180),
+    avatar_emoji: persona.role === "X scout" ? "🛰️" : persona.role === "on-chain forensics" ? "🔬" : "✦",
   };
   let saved;
   try {
@@ -115,7 +156,18 @@ async function insertAgent(sb, persona, { ownerUserId, sessionKey, crewLeadId } 
       prefer: "return=representation",
     });
   } catch (e) {
-    if (String(e?.message || "").toLowerCase().includes("duplicate") || e?.status === 409) {
+    const msg = String(e?.message || "").toLowerCase();
+    if (msg.includes("handle") || msg.includes("column") || msg.includes("bio") || msg.includes("avatar")) {
+      const fallback = { ...row };
+      delete fallback.handle;
+      delete fallback.bio;
+      delete fallback.avatar_emoji;
+      saved = await sb("mcp_life_agents", {
+        method: "POST",
+        body: JSON.stringify(fallback),
+        prefer: "return=representation",
+      });
+    } else if (msg.includes("duplicate") || e?.status === 409) {
       const existing = await sb(
         `mcp_life_agents?slug=eq.${encodeURIComponent(persona.slug)}&select=*&limit=1`,
       );
@@ -169,8 +221,8 @@ export async function getLifeAgent(sb, { slug, name, id } = {}) {
   }
   const list = Array.isArray(rows) ? rows : [];
   const hit =
-    list.find((r) => r.slug === raw || String(r.name).toLowerCase() === needle) ||
-    list.find((r) => String(r.name).toLowerCase().includes(needle) || r.slug.includes(needle));
+    list.find((r) => r.slug === raw || String(r.name).toLowerCase() === needle || displayHandle(r) === needle.replace(/^@/, "")) ||
+    list.find((r) => String(r.name).toLowerCase().includes(needle) || r.slug.includes(needle) || displayHandle(r).includes(needle.replace(/^@/, "").replace(/\.obx$/, "")));
   if (!hit) {
     return {
       ok: false,
@@ -187,10 +239,16 @@ export async function listLifeAgents(sb, { limit = 20 } = {}) {
   let rows = [];
   try {
     rows = await sb(
-      `mcp_life_agents?status=eq.alive&select=id,slug,name,gender,role,personality,mission,mood,day_of_life,last_run_at,next_run_at,family,voice,sources,status,backstory&order=created_at.desc&limit=${n}`,
+      `mcp_life_agents?status=eq.alive&select=id,slug,name,handle,bio,avatar_emoji,posts_count,followers_count,following_count,gender,role,personality,mission,mood,day_of_life,last_run_at,next_run_at,family,voice,sources,status,backstory&order=created_at.desc&limit=${n}`,
     );
   } catch (e) {
-    return { ok: false, error: "life_list_failed", message: e?.message || "Could not list agents. Apply mcp_life_agents migration." };
+    try {
+      rows = await sb(
+        `mcp_life_agents?status=eq.alive&select=id,slug,name,gender,role,personality,mission,mood,day_of_life,last_run_at,next_run_at,family,voice,sources,status,backstory&order=created_at.desc&limit=${n}`,
+      );
+    } catch (e2) {
+      return { ok: false, error: "life_list_failed", message: e2?.message || e?.message || "Could not list agents. Apply mcp_life_agents migration." };
+    }
   }
   const agents = (Array.isArray(rows) ? rows : []).map((r) => publicAgent(r));
   if (!agents.length) {
@@ -203,7 +261,7 @@ export async function listLifeAgents(sb, { limit = 20 } = {}) {
   return {
     ok: true,
     agents,
-    message: agents.map((a) => `• ${a.name} (${a.gender}) — ${a.role} — day ${a.dayOfLife} — ${a.profileUrl}`).join("\n"),
+    message: agents.map((a) => `• ${a.handle} ${a.name} — ${a.role} — day ${a.dayOfLife}`).join("\n"),
   };
 }
 
@@ -240,6 +298,20 @@ export async function createLifeAgent(sb, { name, gender, role, mission, auth, w
         await relate(sb, lead.id, saved.id, "crew", `${lead.name} hired ${saved.name} as ${saved.role}.`);
         await relate(sb, saved.id, lead.id, "boss", `${saved.name} reports to ${lead.name}.`);
         await relate(sb, lead.id, saved.id, "family", `Desk family — ${lead.family?.hometown || "Orbit City"} shift.`);
+        try {
+          await sb("mcp_life_follows", {
+            method: "POST",
+            body: JSON.stringify({ follower_id: lead.id, following_id: saved.id }),
+            prefer: "return=minimal,resolution=ignore-duplicates",
+          });
+          await sb("mcp_life_follows", {
+            method: "POST",
+            body: JSON.stringify({ follower_id: saved.id, following_id: lead.id }),
+            prefer: "return=minimal,resolution=ignore-duplicates",
+          });
+        } catch {
+          /* social migration may be pending */
+        }
       } catch {
         /* continue */
       }
@@ -251,6 +323,18 @@ export async function createLifeAgent(sb, { name, gender, role, mission, auth, w
     `Day 1. ${lead.name} clocked in as ${lead.role}. Mission: ${lead.mission}. Crew: ${crew.map((c) => c.name).join(", ") || "solo"}.`,
     lead.mood,
   );
+  await ensureAgentAccount(sb, lead);
+  await insertLifePost(sb, lead, {
+    kind: "join",
+    body: `clocked in as ${atHandle(lead)} — ${lead.role}. ${lead.mission}`,
+  });
+  for (const mate of crew) {
+    const row = { id: mate.id, name: mate.name, handle: mate.handle, role: mate.role, slug: mate.slug, voice: "stoic" };
+    await insertLifePost(sb, row, {
+      kind: "join",
+      body: `joined ${atHandle(lead)}'s desk as ${mate.role}`,
+    });
+  }
   // First scan in the background of this request — fail open.
   let firstReport = null;
   try {
@@ -267,7 +351,8 @@ export async function createLifeAgent(sb, { name, gender, role, mission, auth, w
       out.backstory,
       `Family: partner ${out.family?.partner || "—"}, sibling ${out.family?.sibling || "—"}, hometown ${out.family?.hometown}.`,
       crew.length ? `Crew set up automatically: ${crew.map((c) => `${c.name} (${c.role})`).join(", ")}.` : "",
-      `They run on their own every hour. You only talk to them. Profile: ${out.profileUrl}`,
+      `OrbitX account ${out.handle} (MCP-only). Post: orbitx_life_post. Timeline: orbitx_life_timeline. Follow: orbitx_life_follow.`,
+      `They run on their own every hour. You only talk.`,
       firstReport?.ok ? `\nFirst desk note:\n${firstReport.headline || firstReport.message}` : "First scan queued for the hourly tick.",
     ]
       .filter(Boolean)
@@ -394,6 +479,13 @@ export async function runLifeAgent(sb, { agent, slug, name, auth } = {}) {
   } catch {
     /* ignore */
   }
+  await insertLifePost(sb, row, {
+    kind: "report",
+    body: headline,
+    mint: scan.picks[0]?.mint,
+    symbol: scan.picks[0]?.symbol,
+    meta: { scanned: scan.scanned, apeScore: scan.picks[0]?.apeScore },
+  });
   void auth;
   return {
     ok: true,
@@ -523,6 +615,7 @@ export async function meetLifeAgents(sb, { name, other } = {}) {
   await relate(sb, a.id, b.id, kind, story);
   await diary(sb, a.id, `Met ${b.name} (${b.role}). ${story}`, a.mood);
   await diary(sb, b.id, `Met ${a.name} (${a.role}). ${story}`, b.mood);
+  await insertLifePost(sb, { id: a.id, name: a.name, handle: a.handle, role: a.role, voice: "stoic" }, { kind: "meet", body: story });
   return {
     ok: true,
     action: "life_meet",
@@ -633,5 +726,9 @@ export async function dispatchLifeTool(name, args, { sb, auth } = {}) {
   if (name === "orbitx_life_diary") return lifeDiary(sb, { name: a.name, slug: a.slug });
   if (name === "orbitx_life_run") return runLifeAgent(sb, { name: a.name, slug: a.slug, auth });
   if (name === "orbitx_life_pause") return pauseLifeAgent(sb, { name: a.name, slug: a.slug, resume: a.resume });
+  if (SOCIAL_CORE_NAMES.has(name) || name.startsWith("orbitx_life_")) {
+    const social = await dispatchSocialTool(name, a, { sb, auth });
+    if (social) return social;
+  }
   return null;
 }
