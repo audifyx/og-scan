@@ -13,8 +13,9 @@ import { formatAddress, formatPct, formatUsd } from "@/pages/onchain-world/lib/o
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { simulatePaperDesk } from "../../../../../shared/orbitx-paper-desk.js";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
-import { LiveAgentFeed } from "./LiveAgentFeed";
+import { LiveAgentFeed, HuntWatchBar } from "./LiveAgentFeed";
 import { LiveAgentCity } from "./LiveAgentCity";
+import { CopyMintButton } from "@/components/CopyMintButton";
 
 export function AgentsView() {
   const [desk, setDesk] = useState<"paper" | "live">("live");
@@ -183,11 +184,10 @@ function LiveDeskView() {
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
-          Three agents share one Solana wallet and rotate every tick — NEON, WARDEN, then RAID. Each fill is $
-          {clip.toFixed(2)}. Max one open position. They research every 5 minutes for early low-cap runners
-          (CatGPT/Nasduck-shaped before they go vertical), buy the dip, skip dumps and tops, and never buy what Jupiter
-          cannot sell. First take: sell 41% into strength, keep 59% for a short hold, then flatten the rest around +$0.30
-          (or +$1 if it rips). Not financial advice — this bank can go to zero.
+          Three agents share one Solana wallet and rotate every tick — NEON, WARDEN, then RAID. They hunt low-cap
+          tape every 5 minutes. Default fills are ${clip.toFixed(2)}; $ANONYMOUSE is a $1 hunt: buy it, sell 41% at $300k
+          MC (keep 59%), flatten at $600k. skip dumps and rugs. First take on other books is around $0.30. Not financial
+          advice — this bank can go to zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
           <span className="text-2xs text-dim">Deposit</span>
@@ -206,6 +206,7 @@ function LiveDeskView() {
           </a>
         </div>
         <p className="mt-2 text-2xs text-accent">{status}</p>
+        <HuntWatchBar hunts={snap?.hunt} />
         <dl className="mt-3 grid grid-cols-2 gap-px bg-line sm:grid-cols-4 lg:grid-cols-8">
           <Stat label="Started" value={money(startedUsd)} />
           <Stat label="Now" value={money(nowUsd)} />
@@ -225,9 +226,10 @@ function LiveDeskView() {
       {holding ? (
         <div className="border-b border-line px-4 py-2">
           <p className="ox-kicker mb-1.5">Currently holding</p>
+          <div className="flex items-stretch gap-2">
           <button
             type="button"
-            className="w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
+            className="min-w-0 flex-1 rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
             onClick={() => openMint(holding.mint)}
           >
             <p className="text-xs text-fg">
@@ -237,6 +239,16 @@ function LiveDeskView() {
             </p>
             <p className="mt-1 text-2xs leading-relaxed text-muted">{holding.thesis}</p>
           </button>
+          {holding.mint ? (
+            <CopyMintButton
+              mint={holding.mint}
+              label="CA"
+              copiedLabel="ok"
+              className="self-center rounded-md border-line px-2 py-2 text-[10px] text-dim hover:border-fg hover:text-fg"
+              iconClassName="h-3 w-3"
+            />
+          ) : null}
+          </div>
         </div>
       ) : (
         <p className="border-b border-line px-4 py-3 text-2xs text-dim">
@@ -286,6 +298,15 @@ function LiveDeskView() {
                     {row.usd != null ? ` · ${money(row.usd)}` : ""}
                     {row.pnl_usd != null ? ` · ${money(row.pnl_usd, true)}` : ""}
                   </button>
+                  {row.mint ? (
+                    <CopyMintButton
+                      mint={row.mint}
+                      label="CA"
+                      copiedLabel="ok"
+                      className="shrink-0 rounded-full border-line px-2 py-0.5 text-[10px] text-dim hover:border-fg hover:text-fg"
+                      iconClassName="h-3 w-3"
+                    />
+                  ) : null}
                   {row.signature ? (
                     <a
                       className="shrink-0 text-[10px] text-dim hover:text-fg"
@@ -363,6 +384,15 @@ function LiveDeskView() {
                     </p>
                     <p className="mt-1 text-2xs leading-relaxed text-muted">{a.open.thesis}</p>
                   </button>
+                  {a.open.mint ? (
+                    <CopyMintButton
+                      mint={a.open.mint}
+                      label="copy CA"
+                      copiedLabel="copied"
+                      className="mt-1 rounded-full border-line px-2 py-0.5 text-[10px] text-dim hover:border-fg hover:text-fg"
+                      iconClassName="h-3 w-3"
+                    />
+                  ) : null}
                 ) : null}
               </div>
             </div>
@@ -378,8 +408,19 @@ function LiveDeskView() {
               <button type="button" className="truncate text-left text-muted hover:text-fg" onClick={() => openMint(f.mint)}>
                 {(f.side || "").toUpperCase()} · ${f.symbol} · {f.reason || ""}
               </button>
-              <span className={Number(f.pnl_usd || 0) >= 0 ? "text-fg" : "text-dim"}>
-                {f.pnl_usd != null ? `${Number(f.pnl_usd) >= 0 ? "+" : ""}${formatUsd(f.pnl_usd)}` : formatUsd(f.usd_amount)}
+              <span className="flex shrink-0 items-center gap-2">
+                {f.mint ? (
+                  <CopyMintButton
+                    mint={f.mint}
+                    label="CA"
+                    copiedLabel="ok"
+                    className="rounded-full border-line px-1.5 py-0.5 text-[10px] text-dim hover:border-fg hover:text-fg"
+                    iconClassName="h-3 w-3"
+                  />
+                ) : null}
+                <span className={Number(f.pnl_usd || 0) >= 0 ? "text-fg" : "text-dim"}>
+                  {f.pnl_usd != null ? `${Number(f.pnl_usd) >= 0 ? "+" : ""}${formatUsd(f.pnl_usd)}` : formatUsd(f.usd_amount)}
+                </span>
               </span>
             </li>
           ))}

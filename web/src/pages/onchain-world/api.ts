@@ -407,6 +407,13 @@ export type LiveDeskPayload = {
   last_error?: string | null;
   fundUrl?: string;
   worldUrl?: string;
+  hunt?: Array<{
+    mint: string;
+    symbol?: string;
+    clipUsd?: number;
+    scaleMcap?: number;
+    flattenMcap?: number;
+  }>;
   ledger?: {
     started_usd?: number | null;
     started_sol?: number | null;

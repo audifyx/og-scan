@@ -551,6 +551,8 @@ describe("OrbitX /on-chain world", () => {
     const feedUi = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/LiveAgentFeed.tsx"), "utf8");
     expect(feedUi).toContain("solscan");
     expect(feedUi).toContain("What the desk is doing");
+    expect(feedUi).toContain("CopyMintButton");
+    expect(feedUi).toContain("copy CA");
     const stage = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/CenterStage.tsx"), "utf8");
     expect(stage).toContain('id: "feed"');
     expect(stage).toContain('id: "city"');

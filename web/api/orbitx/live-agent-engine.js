@@ -7,12 +7,17 @@ import { adminCredentialOk } from "../../shared/desk-unlock.js";
 import {
   LIVE_AGENTS,
   LIVE_DISCLAIMER,
+  LIVE_MAX_OPEN,
   LIVE_TRADE_USD,
   LIVE_WALLET_PUBKEY,
   SOL_MINT,
   decideLiveExit,
   emptyLiveDesk,
+  huntClipUsd,
   liveAgentById,
+  liveHunt,
+  liveHuntList,
+  liveHuntMints,
   nextLiveAgent,
   pickLiveToken,
   rankForLiveStyle,
@@ -334,7 +339,7 @@ export async function loadLiveTape() {
       url: `https://pump.fun/${mint}`,
     });
   }
-  const extra = await hydrateDex([...new Set(coins.map((c) => c.mint))].slice(0, 30));
+  const extra = await hydrateDex([...new Set([...liveHuntMints(), ...coins.map((c) => c.mint)])].slice(0, 30));
   coins.push(...extra);
   const byMint = new Map();
   for (const c of coins) {
@@ -365,9 +370,13 @@ export async function loadLiveTape() {
     row.boosted = Boolean(row.boosted || prev?.boosted || boosted.has(c.mint));
     byMint.set(c.mint, row);
   }
-  return [...byMint.values()]
+  const all = [...byMint.values()];
+  const hunts = all.filter((c) => liveHunt(c));
+  const rest = all
+    .filter((c) => !liveHunt(c))
     .sort((a, b) => num(b.volume_1h) - num(a.volume_1h) || num(b.volume_24h) - num(a.volume_24h))
-    .slice(0, 48);
+    .slice(0, Math.max(0, 48 - hunts.length));
+  return hunts.concat(rest);
 }
 
 async function pumpMeta(mint) {
@@ -390,18 +399,26 @@ async function markPriceUsd(mint) {
     const pairs = (j?.pairs || []).filter((p) => p?.chainId === "solana");
     pairs.sort((a, b) => num(b?.liquidity?.usd) - num(a?.liquidity?.usd));
     const px = num(pairs[0]?.priceUsd);
-    if (px > 0) return px;
+    const mcap = num(pairs[0]?.marketCap || pairs[0]?.fdv);
+    if (px > 0) return { price: px, mcap };
   } catch {
     /* ignore */
   }
   try {
     const j = await jget(`/price/v3?ids=${mint}`);
     const px = num(j?.[mint]?.usdPrice ?? j?.data?.[mint]?.price);
-    if (px > 0) return px;
+    if (px > 0) return { price: px, mcap: 0 };
   } catch {
     /* ignore */
   }
-  return 0;
+  return { price: 0, mcap: 0 };
+}
+
+function unwrapMark(raw) {
+  if (raw && typeof raw === "object") {
+    return { price: num(raw.price ?? raw.usd ?? raw.mark), mcap: num(raw.mcap ?? raw.market_cap ?? raw.marketCap) };
+  }
+  return { price: num(raw), mcap: 0 };
 }
 
 async function buildAndSignSwap({ quote, owner, keypair }) {
@@ -668,6 +685,7 @@ export async function snapshotLiveDesk(opts = {}) {
     events: publicEvents,
     chain,
     feed,
+    hunt: liveHuntList(),
     agents: ledger.books,
     last_tick_at: row.last_tick_at || lastActivity || null,
     last_activity_at: lastActivity,
@@ -781,13 +799,15 @@ export async function tickLiveDesk(opts = {}) {
   const fillsNow = await loadFills(sb).catch(() => []);
 
   for (const pos of open) {
-    const mark = await markFn(pos.mint).catch(() => 0);
+    const marked = unwrapMark(await markFn(pos.mint).catch(() => 0));
+    const mark = marked.price;
     const scaleFill = (fillsNow || []).find(
       (f) => f.mint === pos.mint && String(f.side) === "sell" && String(f.reason || "").includes("scale_out"),
     );
     const decision = decideLiveExit(pos, mark, Date.now(), {
       scaled: Boolean(scaleFill),
       scaledAt: scaleFill?.created_at,
+      marketCap: marked.mcap,
     });
     if (decision.action === "hold") continue;
     const raw = dry ? 1_000n : await tokenRawBalance(owner, pos.mint).catch(() => 0n);
@@ -878,9 +898,8 @@ export async function tickLiveDesk(opts = {}) {
     : open.filter(
         (p) => !actions.some((a) => a.type === "sell" && a.mint === p.mint && a.reason !== "scale_out"),
       );
-  const sized = sizeLiveBuy({ solBalance: bal, solUsd, openCount: stillOpen.length });
-  if (!sized.ok) {
-    await recordEvent(sb, { kind: "tick", reason: sized.skip, meta: { open: stillOpen.length } });
+  if (stillOpen.length >= LIVE_MAX_OPEN) {
+    await recordEvent(sb, { kind: "tick", reason: "max_open", meta: { open: stillOpen.length } });
     await upsertDesk(sb, {
       wallet_pubkey: owner,
       last_tick_at: new Date().toISOString(),
@@ -888,11 +907,13 @@ export async function tickLiveDesk(opts = {}) {
       last_error: null,
     }).catch(() => {});
     const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
-    return { ...snap, skipped: sized.skip, actions, dry };
+    return { ...snap, skipped: "max_open", actions, dry };
   }
 
   const tape = await raceMs(Promise.resolve().then(() => tapeFn()), 12_000, []);
   const ranked = rankForLiveStyle(agent.style, tape);
+  const huntsOnTape = ranked.filter((c) => liveHunt(c));
+  const pool = huntsOnTape.length ? huntsOnTape : ranked;
   let chosen = null;
   let safety = null;
   let probes = 0;
@@ -910,7 +931,7 @@ export async function tickLiveDesk(opts = {}) {
   }
   const cheapPass = [];
   let firstReject = null;
-  for (const coin of ranked.slice(0, 40)) {
+  for (const coin of pool.slice(0, 40)) {
     if (stillOpen.some((p) => p.mint === coin.mint)) continue;
     const cheap = screenLiveCandidate(coin, { canBuy: true, canSell: true });
     if (cheap.ok) {
@@ -960,6 +981,24 @@ export async function tickLiveDesk(opts = {}) {
     await upsertDesk(sb, { wallet_pubkey: owner, last_tick_at: new Date().toISOString(), last_agent_id: agent.id, last_error: null }).catch(() => {});
     const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
     return { ...snap, skipped: "no_clean_coin", actions, dry };
+  }
+
+  const sized = sizeLiveBuy({
+    solBalance: bal,
+    solUsd,
+    openCount: stillOpen.length,
+    tradeUsd: huntClipUsd(chosen),
+  });
+  if (!sized.ok) {
+    await recordEvent(sb, { kind: "skip", agent_id: agent.id, mint: chosen.mint, symbol: chosen.symbol, reason: sized.skip });
+    await upsertDesk(sb, {
+      wallet_pubkey: owner,
+      last_tick_at: new Date().toISOString(),
+      last_agent_id: agent.id,
+      last_error: null,
+    }).catch(() => {});
+    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
+    return { ...snap, skipped: sized.skip, actions, dry };
   }
 
   const thesis = writeLiveThesis(agent, chosen, safety, { usd: sized.usd, sol: sized.sol });

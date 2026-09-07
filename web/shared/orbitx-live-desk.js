@@ -3,11 +3,12 @@
  * Deposit address is public. The signing secret lives only in
  * LIVE_AGENT_WALLET_SECRET on Vercel. Never commit a key.
  *
- * Not financial advice. Caps: $1.50 per buy, 1 open book, scale 41% / keep 59%, then flatten.
+ * Not financial advice. Caps: $1.50 per buy ($1 hunt clips), 1 open book, scale 41% / keep 59%, then flatten.
  */
 import { layoutLiveCity } from "./orbitx-live-city.js";
 export const LIVE_WALLET_PUBKEY = "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj";
 export const LIVE_TRADE_USD = 1.5;
+export const LIVE_HUNT_USD = 1;
 export const LIVE_FEE_RESERVE_SOL = 0.004;
 export const LIVE_MAX_OPEN = 1;
 export const LIVE_STOP_PCT = -0.12;
@@ -83,6 +84,17 @@ export const LIVE_ALLOW_MINTS = new Set([
   "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN", // TRUMP
   "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", // PENGU
 ]);
+/** Names we buy on purpose. $1 clip. Scale 41% at 300k MC, flatten at 600k. */
+export const LIVE_HUNT = [
+  {
+    mint: "Aw6fiDPWLUnjSsJQtsyEMSaoPaKAUUrStAsYPiPwpump",
+    symbol: "ANONYMOUSE",
+    clipUsd: LIVE_HUNT_USD,
+    scaleMcap: 300_000,
+    flattenMcap: 600_000,
+  },
+];
+export const LIVE_HUNT_MINTS = new Map(LIVE_HUNT.map((h) => [h.mint, h]));
 export const LIVE_SKIP_SYMBOLS = new Set(["USDC", "USDT", "USD1", "PYUSD", "USDS", "DAI", "FDUSD", "USDH", "CASH", "USDG", "EURC"]);
 export const LIVE_SKIP_MINTS = new Set([
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
@@ -118,7 +130,25 @@ export const LIVE_AGENTS = [
 ];
 
 export const LIVE_DISCLAIMER =
-  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. NEON, WARDEN, and RAID rotate. They hunt early low-cap runners (CatGPT/Nasduck-shaped before they go vertical), buy dips, skip dumps and tops, and never buy what Jupiter cannot sell. First take: sell 41% into strength, keep 59% for a short hold, then flatten the rest. You can lose the whole bank.";
+  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. NEON, WARDEN, and RAID rotate. They hunt early low-cap runners, buy dips, skip dumps and tops, and never buy what Jupiter cannot sell. $ANONYMOUSE is a $1 clip: sell 41% at $300k MC, flatten the rest at $600k MC. You can lose the whole bank.";
+
+export function liveHunt(coinOrMint = {}) {
+  const mint = typeof coinOrMint === "string" ? coinOrMint : String(coinOrMint?.mint || "");
+  return LIVE_HUNT_MINTS.get(mint) || null;
+}
+
+export function liveHuntList() {
+  return LIVE_HUNT.map((h) => ({ ...h }));
+}
+
+export function liveHuntMints() {
+  return LIVE_HUNT.map((h) => h.mint);
+}
+
+export function huntClipUsd(coin = {}) {
+  const hunt = liveHunt(coin);
+  return hunt?.clipUsd || LIVE_TRADE_USD;
+}
 
 export function liveAgentById(id) {
   const needle = String(id || "").trim().toLowerCase();
@@ -226,6 +256,36 @@ export function isEarlyRunner(coin = {}) {
   return hasCommunity(coin) || hasOrganicFlow(coin);
 }
 
+/** Sideways digestion with tape still alive — watch, do not ape. */
+export function isAccumulating(coin = {}) {
+  if (isDumping(coin) || looksTopped(coin) || looksDead(coin)) return false;
+  const h1 = num(coin.change_1h);
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? null : num(coin.change_5m);
+  const buys = num(coin.buys_1h);
+  const sells = num(coin.sells_1h);
+  const tapeAlive =
+    num(coin.volume_1h) >= 8_000 || num(coin.txns_1h) >= 40 || buys + sells >= 40 || num(coin.volume_24h) >= LIVE_MIN_VOL_USD;
+  if (!tapeAlive) return false;
+  if (h1 > 18 || h1 < -12) return false;
+  if (m5 != null && (m5 >= 6 || m5 <= -4)) return false;
+  if (sells > 0 && buys > 0 && sells > buys * 1.15) return false;
+  return true;
+}
+
+/** Hunt names only: 5m turned up AND the hour is actually running, buy-led, not a top. */
+export function isConfirmedRun(coin = {}) {
+  if (isDumping(coin) || looksTopped(coin) || looksDead(coin)) return false;
+  const h1 = num(coin.change_1h);
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? null : num(coin.change_5m);
+  const buys = num(coin.buys_1h);
+  const sells = num(coin.sells_1h);
+  if (m5 == null || m5 < 2.5) return false;
+  if (h1 < 3 || h1 >= LIVE_MAX_1H_PUMP_PCT) return false;
+  if (num(coin.change_24h) >= LIVE_MAX_24H_PUMP_PCT) return false;
+  if (sells > 0 && buys > 0 && sells > buys) return false;
+  return hasCommunity(coin) || hasOrganicFlow(coin);
+}
+
 export function solForTradeUsd(usd, solUsd) {
   const price = num(solUsd);
   if (price <= 0) return 0;
@@ -281,6 +341,14 @@ export function screenLiveCandidate(coin = {}, safety = {}) {
   if (looksDead(coin)) reasons.push("no follow-through — wait");
   if (num(coin.change_1h) >= LIVE_MAX_1H_PUMP_PCT) reasons.push("already pumped");
   if (num(coin.change_24h) >= LIVE_MAX_24H_PUMP_PCT) reasons.push("already ran");
+  const hunt = liveHunt(coin);
+  if (hunt) {
+    const ignore = /topped|already pumped|already ran|no follow-through|accumulating|watching/;
+    for (let i = reasons.length - 1; i >= 0; i -= 1) {
+      if (ignore.test(reasons[i])) reasons.splice(i, 1);
+    }
+    if (mcap >= num(hunt.flattenMcap, 600_000)) reasons.push("already at 600k MC");
+  }
   if (coin.boosted && !hasCommunity(coin)) reasons.push("boosted, no community");
   if (!hasCommunity(coin) && !hasOrganicFlow(coin)) reasons.push("no social / no tape");
   if (safety.canBuy === false) reasons.push("no buy route");
@@ -323,6 +391,7 @@ export function scoreLiveCandidate(coin = {}, safety = {}) {
   if (safety.roundTripLossPct != null && num(safety.roundTripLossPct) < 6) s += 8;
   if (isHealthyDip(coin)) s += 18;
   if (isEarlyRunner(coin)) s += 16;
+  if (liveHunt(coin) && isConfirmedRun(coin)) s += 22;
   if (ch1 >= LIVE_MIN_MOVE_1H_PCT && ch1 <= 22) s += 8;
   if (m5 != null && m5 <= 1 && m5 > LIVE_MAX_5M_DUMP_PCT && ch1 >= 6) s += 10;
   if (ch24 <= -40) s -= 12;
@@ -360,11 +429,16 @@ export function liftLiveMajors(ranked) {
 
 export function liftLiveScalps(ranked) {
   const list = ranked || [];
+  const hunts = [];
   const early = [];
   const dips = [];
   const community = [];
   const rest = [];
   for (const c of list) {
+    if (liveHunt(c)) {
+      hunts.push(c);
+      continue;
+    }
     if (liveIsMajor(c) || num(c.market_cap ?? c.marketCap) > LIVE_MAX_MCAP_USD) {
       rest.push(c);
       continue;
@@ -379,9 +453,10 @@ export function liftLiveScalps(ranked) {
     else rest.push(c);
   }
   const byScore = (a, b) => scoreLiveCandidate(b, { canBuy: true, canSell: true }) - scoreLiveCandidate(a, { canBuy: true, canSell: true });
+  hunts.sort((a, b) => Number(isConfirmedRun(b)) - Number(isConfirmedRun(a)) || byScore(a, b));
   early.sort(byScore);
   dips.sort(byScore);
-  return early.concat(dips).concat(community).concat(rest);
+  return hunts.concat(early).concat(dips).concat(community).concat(rest);
 }
 
 export function pickLiveToken(agent, ranked) {
@@ -424,9 +499,29 @@ export function decideLiveExit(position = {}, markUsd, now = Date.now(), opts = 
   const scaled = opts.scaled === true || Boolean(position.scaled_at);
   const scaledAt = Date.parse(opts.scaledAt || position.scaled_at || "") || 0;
   const sinceScale = scaledAt > 0 ? Math.max(0, now - scaledAt) : heldMs;
+  const hunt = liveHunt(position);
+  const mcap = num(opts.marketCap ?? opts.mcap ?? position.mark_mcap ?? position.market_cap);
 
   if (pnlPct <= LIVE_STOP_PCT) {
     return { action: "stop", pnlPct, pnlUsd, reason: `${(pnlPct * 100).toFixed(1)}% — cut it, could be a rug/dump` };
+  }
+  if (hunt) {
+    const scaleAt = num(hunt.scaleMcap, 300_000);
+    const flatAt = num(hunt.flattenMcap, 600_000);
+    if (mcap >= flatAt) {
+      return { action: "take_profit", pnlPct, pnlUsd, reason: `hit $${Math.round(flatAt / 1000)}k MC — flatten the clip` };
+    }
+    if (!scaled && mcap >= scaleAt) {
+      return {
+        action: "scale_out",
+        pnlPct,
+        pnlUsd,
+        sellPct: LIVE_SCALE_SELL_PCT,
+        keepPct: LIVE_SCALE_KEEP_PCT,
+        reason: `hit $${Math.round(scaleAt / 1000)}k MC — sell ${(LIVE_SCALE_SELL_PCT * 100).toFixed(0)}%, hold the rest for $${Math.round(flatAt / 1000)}k`,
+      };
+    }
+    return { action: "hold", pnlPct, pnlUsd, reason: scaled ? "hold for 600k MC" : "hold for 300k MC" };
   }
   if (pnlUsd >= LIVE_TP_MAX_USD) {
     return { action: "take_profit", pnlPct, pnlUsd, reason: `+${pnlUsd.toFixed(2)} hit $1 cap — sell the rest of the clip` };
@@ -573,12 +668,15 @@ function tickSym(sym) {
 export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
   const voice = liveAgentVoice(agent);
   const t = tickSym(coin.symbol) || "this coin";
-  const usd = moneyTalk(size.usd ?? LIVE_TRADE_USD) || `$${LIVE_TRADE_USD.toFixed(2)}`;
+  const usd = moneyTalk(size.usd ?? huntClipUsd(coin)) || `$${huntClipUsd(coin).toFixed(2)}`;
   const tpCash = `$${LIVE_TP_USD.toFixed(2)}`;
   const ch1 = coin.change_1h != null ? `${num(coin.change_1h) >= 0 ? "+" : ""}${num(coin.change_1h).toFixed(1)}% this hour` : null;
   const ch24 = coin.change_24h != null ? `${num(coin.change_24h) >= 0 ? "+" : ""}${num(coin.change_24h).toFixed(1)}% on the day` : null;
   let why;
-  if (agent?.style === "mean_reversion") {
+  if (liveHunt(coin)) {
+    const hunt = liveHunt(coin);
+    why = `$${LIVE_HUNT_USD.toFixed(2)} into ${t} now. First take at $${Math.round(num(hunt.scaleMcap, 300_000) / 1000)}k MC, flatten at $${Math.round(num(hunt.flattenMcap, 600_000) / 1000)}k.`;
+  } else if (agent?.style === "mean_reversion") {
     why = ch24
       ? `${t} pulled back after ${ch24}. I'm buying the dip on a real book, not the dump.`
       : `${t} pulled back. Tight take, no hero trade.`;
@@ -598,6 +696,8 @@ export function humanSkipReason(reason) {
   const r = String(reason || "").toLowerCase();
   if (r.includes("cannot sell") || r.includes("honeypot")) return "Jupiter wouldn't give a sell route, so it stays on the sidelines.";
   if (r.includes("dumping")) return "It's dumping. We don't catch falling knives.";
+  if (r.includes("accumulating")) return "Letting it accumulate. We don't ape — wait and see if it actually runs.";
+  if (r.includes("watching") && r.includes("no run")) return "Still watching. No confirmed run yet, so we stay in cash.";
   if (r.includes("topped") || r.includes("don't chase")) return "Looks topped. Waiting for a dip, not the high.";
   if (r.includes("no follow-through")) return "No follow-through. Staying in cash until it actually looks like it will move.";
   if (r.includes("mcap too large")) return "Cap's already huge. We're hunting low-cap tapes we can actually scalp.";
@@ -730,6 +830,7 @@ export function emptyLiveDesk(extra = {}) {
     events: extra.events || [],
     chain: extra.chain || [],
     feed: extra.feed || [],
+    hunt: extra.hunt || liveHuntList(),
     world:
       extra.world ||
       buildLiveWorld({
