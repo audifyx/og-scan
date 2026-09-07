@@ -613,6 +613,8 @@ export function humanSkipReason(reason) {
   if (r.includes("max_open")) return "Already in a trade. One book at a time.";
   if (r.includes("fee_reserve")) return "Keeping SOL back for fees.";
   if (r.includes("stable")) return "That's a stable. We don't clip those.";
+  if (r.includes("empty tape")) return "Tape came back empty. Staying in cash this pass.";
+  if (r.includes("tick_error")) return "Tick hit an error mid-scan. I'll retry next pass.";
   if (r.includes("no_clean")) return "Looked at the tape and stayed in cash.";
   if (r.includes("no_buy_quote")) return "Couldn't get a buy quote. Left it.";
   if (r.includes("rpc_balance") || r.includes("rpc")) return "RPC went dark mid-tick. I'll retry next pass.";

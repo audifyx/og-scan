@@ -241,7 +241,7 @@ describe("live agent engine tick", () => {
     expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "ROOM" && a.usd === 1.5)).toBe(true);
     expect(buy.last_tick_at).toBeTruthy();
     expect(sb._tables.ox_live_desk[0].last_agent_id).toBe("neon-live");
-    expect(sb._tables.ox_live_events.some((e) => e.kind === "tick" && e.reason === "scan")).toBe(true);
+    expect(sb._tables.ox_live_events.some((e) => e.kind === "tick" && e.reason === "scan")).toBe(false);
     expect(buy.actions[0].thesis).toMatch(/\$0\.30/);
 
     sb._tables.ox_live_positions = [];

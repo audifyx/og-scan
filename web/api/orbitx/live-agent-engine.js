@@ -40,6 +40,20 @@ function num(v, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+async function raceMs(work, ms, fallback) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve(work),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function truthy(v) {
   const s = trim(v).toLowerCase();
   return s === "1" || s === "true" || s === "yes" || s === "on";
@@ -115,7 +129,7 @@ async function loadKeypair(secret) {
 
 async function solPriceUsd() {
   try {
-    const j = await jget(`/price/v3?ids=${SOL_MINT}`);
+    const j = await jget(`/price/v3?ids=${SOL_MINT}`, 5_000);
     const row = j?.[SOL_MINT] || j?.data?.[SOL_MINT] || j;
     const px = num(row?.usdPrice ?? row?.price ?? row?.usd);
     if (px > 0) return px;
@@ -123,7 +137,7 @@ async function solPriceUsd() {
     /* v2 fallback */
   }
   try {
-    const j = await jget(`/price/v2?ids=${SOL_MINT}`);
+    const j = await jget(`/price/v2?ids=${SOL_MINT}`, 5_000);
     const px = num(j?.data?.[SOL_MINT]?.price);
     if (px > 0) return px;
   } catch {
@@ -616,7 +630,9 @@ export async function snapshotLiveDesk(opts = {}) {
     equityUsd,
     realizedPnlUsd: realized,
   });
-  const publicEvents = events.map((e) => ({
+  const publicEvents = events
+    .filter((e) => !(e.kind === "tick" && String(e.reason || "") === "scan"))
+    .map((e) => ({
     id: e.id,
     created_at: e.created_at,
     kind: e.kind,
@@ -740,30 +756,21 @@ export async function tickLiveDesk(opts = {}) {
     last_agent_id: agent.id,
     last_error: null,
   }).catch(() => {});
-  await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "scan" });
 
-  let solUsd = opts.sol_usd || snap0.sol_usd || 0;
-  if (!(solUsd > 0)) {
-    try {
-      solUsd = await solPriceUsd();
-    } catch {
-      solUsd = 0;
-    }
-  }
+  try {
+  let solUsd = num(opts.sol_usd || snap0.sol_usd);
   let bal = opts.solBalance != null ? num(opts.solBalance) : null;
-  if (bal == null) {
-    try {
-      bal = await solBalance(owner);
-    } catch (e) {
-      await upsertDesk(sb, {
-        last_error: "rpc_balance",
-        last_tick_at: new Date().toISOString(),
-        last_agent_id: agent.id,
-      }).catch(() => {});
-      await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "rpc_balance" });
-      const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, skipChain: true });
-      return { ...snap, skipped: "rpc_balance", last_error: String(e?.message || e), actions, dry };
-    }
+  const [priceGot, balGot] = await Promise.all([
+    solUsd > 0 ? Promise.resolve(solUsd) : raceMs(solPriceUsd(), 5_000, 0),
+    bal != null ? Promise.resolve(bal) : raceMs(solBalance(owner).catch(() => 0), 8_000, 0),
+  ]);
+  solUsd = num(priceGot);
+  bal = num(balGot);
+  if (!(solUsd > 0)) {
+    await recordEvent(sb, { kind: "skip", agent_id: agent.id, reason: "no_sol_price" });
+    await upsertDesk(sb, { last_error: "no_sol_price", last_tick_at: new Date().toISOString(), last_agent_id: agent.id }).catch(() => {});
+    const snap = await snapshotLiveDesk({ sb, skipChain: true });
+    return { ...snap, skipped: "no_sol_price", actions, dry };
   }
 
   const swapFn = opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
@@ -880,11 +887,11 @@ export async function tickLiveDesk(opts = {}) {
       last_agent_id: agent.id,
       last_error: null,
     }).catch(() => {});
-    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
+    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
     return { ...snap, skipped: sized.skip, actions, dry };
   }
 
-  const tape = await tapeFn();
+  const tape = await raceMs(Promise.resolve().then(() => tapeFn()), 12_000, []);
   const ranked = rankForLiveStyle(agent.style, tape);
   let chosen = null;
   let safety = null;
@@ -943,9 +950,15 @@ export async function tickLiveDesk(opts = {}) {
   }
 
   if (!chosen) {
-    await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "no_clean_coin" });
+    if (!actions.some((a) => a.type === "screen")) {
+      await recordEvent(sb, {
+        kind: "skip",
+        agent_id: agent.id,
+        reason: Array.isArray(tape) && tape.length ? "no_clean_coin" : "empty tape",
+      });
+    }
     await upsertDesk(sb, { wallet_pubkey: owner, last_tick_at: new Date().toISOString(), last_agent_id: agent.id, last_error: null }).catch(() => {});
-    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
+    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
     return { ...snap, skipped: "no_clean_coin", actions, dry };
   }
 
@@ -966,7 +979,7 @@ export async function tickLiveDesk(opts = {}) {
   }
   if (!sent.ok) {
     await upsertDesk(sb, { last_error: sent.error || "buy_failed", last_tick_at: new Date().toISOString() }).catch(() => {});
-    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
+    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
     return { ...snap, skipped: "buy_failed", last_error: sent.error, actions, dry };
   }
 
@@ -1030,8 +1043,23 @@ export async function tickLiveDesk(opts = {}) {
     dry,
   });
 
-  const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
+  const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
   return { ...snap, actions, dry, skipped: null, trade_usd: LIVE_TRADE_USD };
+  } catch (e) {
+    await recordEvent(sb, {
+      kind: "skip",
+      agent_id: agent.id,
+      reason: `tick_error ${String(e?.message || e).slice(0, 80)}`,
+    }).catch(() => {});
+    await upsertDesk(sb, {
+      wallet_pubkey: owner,
+      last_tick_at: new Date().toISOString(),
+      last_agent_id: agent.id,
+      last_error: String(e?.message || e).slice(0, 180),
+    }).catch(() => {});
+    const snap = await snapshotLiveDesk({ sb, skipChain: true });
+    return { ...snap, skipped: "tick_error", last_error: String(e?.message || e), actions, dry };
+  }
 }
 
 export async function setLiveArmed({ armed, paused, sb } = {}) {
