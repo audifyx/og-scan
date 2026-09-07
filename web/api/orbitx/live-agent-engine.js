@@ -712,12 +712,16 @@ async function openPosition(sb, row) {
   return data;
 }
 
-async function tokenRawBalance(owner, mint) {
-  const parsed = await rpc("getTokenAccountsByOwner", [
-    owner,
-    { mint },
-    { encoding: "jsonParsed", commitment: "confirmed" },
-  ]);
+async function tokenRawBalance(owner, mint, usePublic = false) {
+  const params = [owner, { mint }, { encoding: "jsonParsed", commitment: "confirmed" }];
+  const parsed = usePublic
+    ? await fetch("https://api.mainnet-beta.solana.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTokenAccountsByOwner", params }),
+        signal: AbortSignal.timeout(12_000),
+      }).then((r) => r.json()).then((j) => { if (j.error) throw new Error(j.error.message); return j.result; })
+    : await rpc("getTokenAccountsByOwner", params);
   const accs = parsed?.value || [];
   let raw = 0n;
   for (const a of accs) {
@@ -725,6 +729,125 @@ async function tokenRawBalance(owner, mint) {
     if (amt) raw += BigInt(amt);
   }
   return raw;
+}
+
+/**
+ * Market-cap take-profit ladder (ox_live_tp_orders). Independent of the
+ * armed/paused hunt loop so owner exits fire every minute no matter what.
+ * Orders on the same mint fill lowest target first; sell_pct applies to the
+ * balance held at fill time (50% then 100% = half, then everything left).
+ */
+export async function runTakeProfitOrders(opts = {}) {
+  const sb = opts.sb === undefined ? adminSb() : opts.sb;
+  const out = { checked: 0, filled: [], failed: [], skipped: [] };
+  if (!sb) return { ...out, skipped: ["no_db"] };
+  const { data: orders } = await sb
+    .from("ox_live_tp_orders")
+    .select("*")
+    .eq("status", "open")
+    .order("target_mc_usd", { ascending: true });
+  if (!orders?.length) return out;
+
+  let keypair = opts.keypair || null;
+  if (!keypair) {
+    const secret = liveWalletSecret();
+    if (!secret) return { ...out, skipped: ["missing_wallet_secret"] };
+    keypair = await loadKeypair(secret);
+  }
+  const owner = keypair.publicKey?.toBase58?.() || LIVE_WALLET_PUBKEY;
+  const swapFn = opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
+  const markFn = opts.mark || markPriceUsd;
+  const solUsd = num(opts.sol_usd) || (await raceMs(solPriceUsd(), 5_000, 0));
+  const now = new Date().toISOString();
+  const marks = new Map();
+
+  for (const o of orders) {
+    out.checked += 1;
+    let marked = marks.get(o.mint);
+    if (!marked) {
+      marked = unwrapMark(await markFn(o.mint).catch(() => 0));
+      marks.set(o.mint, marked);
+    }
+    const mcap = num(marked.mcap);
+    await sb.from("ox_live_tp_orders").update({ last_mc_usd: mcap || null, last_checked_at: now }).eq("id", o.id).catch(() => {});
+    if (!(mcap > 0) || mcap < num(o.target_mc_usd)) continue;
+
+    let raw = 0n;
+    let readErr = null;
+    for (let i = 0; i < 3 && raw <= 0n; i += 1) {
+      try {
+        raw = await tokenRawBalance(owner, o.mint, i > 0);
+      } catch (e) {
+        readErr = String(e?.message || e);
+      }
+    }
+    if (raw <= 0n) {
+      // Never permanently fail on a read error — retry next minute.
+      await sb.from("ox_live_tp_orders").update({ last_error: readErr ? `balance_read: ${readErr}` : "no_tokens", attempts: num(o.attempts) + 1 }).eq("id", o.id).catch(() => {});
+      out.failed.push({ id: o.id, mint: o.mint, error: readErr || "no_tokens" });
+      continue;
+    }
+    const pct = Math.min(100, Math.max(0, num(o.sell_pct)));
+    const sellRaw = pct >= 100 ? raw : (raw * BigInt(Math.round(pct * 100))) / 10000n;
+    if (sellRaw <= 0n) continue;
+
+    let sent = { ok: false, error: "no_route" };
+    let quote = null;
+    for (const slip of [300, 800, 1500]) {
+      quote = await quoteSwap(o.mint, SOL_MINT, sellRaw.toString(), slip).catch(() => null);
+      if (!quote) continue;
+      sent = await swapFn({ quote, action: "sell", mint: o.mint }).catch((e) => ({ ok: false, error: String(e?.message || e) }));
+      if (sent.ok && sent.signature) {
+        const conf = await confirmSig(sent.signature).catch(() => ({ ok: true }));
+        if (conf.ok === false) { sent = { ok: false, error: "tx_err" }; continue; }
+        break;
+      }
+    }
+    if (!sent.ok) {
+      await sb.from("ox_live_tp_orders").update({ last_error: sent.error || "swap_failed", attempts: num(o.attempts) + 1 }).eq("id", o.id).catch(() => {});
+      out.failed.push({ id: o.id, mint: o.mint, error: sent.error });
+      continue;
+    }
+    const solOut = num(quote?.outAmount) / 1e9;
+    const usdOut = solOut * solUsd;
+    await sb.from("ox_live_tp_orders").update({
+      status: "filled",
+      filled_at: now,
+      signature: sent.signature,
+      sol_out: solOut,
+      usd_out: usdOut,
+      attempts: num(o.attempts) + 1,
+      last_error: null,
+    }).eq("id", o.id).catch(() => {});
+    await recordFill(sb, {
+      agent_id: "owner",
+      mint: o.mint,
+      symbol: o.symbol,
+      side: "sell",
+      sol_amount: solOut,
+      usd_amount: usdOut,
+      signature: sent.signature,
+      thesis: o.note || `take profit ${pct}% at $${num(o.target_mc_usd).toLocaleString()} MC`,
+      reason: "take_profit_mc",
+    }).catch(() => {});
+    await recordEvent(sb, {
+      kind: "sell",
+      side: "sell",
+      agent_id: "owner",
+      mint: o.mint,
+      symbol: o.symbol,
+      usd_amount: usdOut,
+      sol_amount: solOut,
+      signature: sent.signature,
+      reason: `take_profit_mc ${pct}% @ $${Math.round(mcap).toLocaleString()} MC`,
+    }).catch(() => {});
+    if (pct >= 100) {
+      await sb.from("ox_live_positions").update({ status: "closed", closed_at: now, exit_signature: sent.signature, exit_reason: "take_profit_mc" })
+        .eq("mint", o.mint).eq("status", "open").catch(() => {});
+    }
+    out.filled.push({ id: o.id, mint: o.mint, pct, mcap, signature: sent.signature, solOut });
+  }
+  return out;
 }
 
 export async function tickLiveDesk(opts = {}) {

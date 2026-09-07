@@ -6,7 +6,7 @@
  */
 import { adminCredentialOk } from "../shared/desk-unlock.js";
 import { LIVE_WALLET_PUBKEY } from "../shared/orbitx-live-desk.js";
-import { setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/live-agent-engine.js";
+import { runTakeProfitOrders, setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/live-agent-engine.js";
 import { pushLiveDeskToTelegram } from "./orbitx/calls-engine.js";
 
 export const config = { maxDuration: 90 };
@@ -79,8 +79,9 @@ export default async function handler(req, res) {
       if (!cronAuthorized(req) && !adminFrom(req)) {
         return json(res, 401, { ok: false, error: "cron_or_admin_required" });
       }
+      const tp = await runTakeProfitOrders().catch((e) => ({ error: String(e?.message || e) }));
       const out = await tickLiveDesk({ force: adminFrom(req) });
-      return json(res, 200, { ok: true, ...await withTelegram(out), wallet: out.wallet || LIVE_WALLET_PUBKEY });
+      return json(res, 200, { ok: true, ...await withTelegram(out), takeProfit: tp, wallet: out.wallet || LIVE_WALLET_PUBKEY });
     }
     if (req.method === "GET") {
       const snap = await snapshotLiveDesk();
