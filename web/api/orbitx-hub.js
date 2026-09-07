@@ -1615,6 +1615,11 @@ const TOOL_ALIASES = {
   live_agents: "orbitx_live_desk",
   real_sol_agents: "orbitx_live_desk",
   live_positions: "orbitx_live_positions",
+  live_feed: "orbitx_live_feed",
+  agent_tape: "orbitx_live_feed",
+  live_world: "orbitx_live_world",
+  live_city: "orbitx_live_world",
+  agent_city_live: "orbitx_live_world",
   any_group_chats: "orbitx_gc_list",
   group_chats: "orbitx_gc_list",
   hey_any_group_chats: "orbitx_gc_list",
@@ -3607,7 +3612,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         id: "live-desk",
         title: "Live desk",
         url: "https://www.orbitx.world/on-chain",
-        text: "Three live books share one hot wallet. Call orbitx_live_desk / orbitx_live_positions.",
+        text: "Three live books share one hot wallet. Call orbitx_live_desk / orbitx_live_feed / orbitx_live_world.",
       },
     ];
     const results = docs.filter(
@@ -3635,6 +3640,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     if (id === "live" || id === "live-desk" || id === "live_desk") {
       return callTool("orbitx_live_desk", args, auth, base, req);
+    }
+    if (id === "live-feed" || id === "live_feed") {
+      return callTool("orbitx_live_feed", args, auth, base, req);
+    }
+    if (id === "live-world" || id === "live_world" || id === "live-city") {
+      return callTool("orbitx_live_world", args, auth, base, req);
     }
     if (id.startsWith("tool:")) {
       const toolName = id.slice(5);
@@ -3908,7 +3919,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       ],
       intel: ["orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       paperDesk: ["orbitx_paper_desk", "orbitx_paper_agent", "orbitx_paper_buying"],
-      liveDesk: ["orbitx_live_desk", "orbitx_live_positions", "orbitx_live_agent"],
+      liveDesk: ["orbitx_live_desk", "orbitx_live_positions", "orbitx_live_agent", "orbitx_live_feed", "orbitx_live_world"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
       note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (Grok Imagine / KIE_API_KEY only). Tx tools return signUrl/openUrl.",
       mcpUrl: "https://www.orbitx.world/api/mcp",
@@ -5465,7 +5476,7 @@ async function handleMcp(req, res, parts) {
             capabilities: { tools: {} },
             serverInfo: { name: "OrbitX Agent MCP", version: "1.13.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys, one open book, full take-profit at 10–30% — orbitx_live_desk / orbitx_live_positions (read only, never executes). Watch at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys, one open book, full take-profit at 10–30% — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5574,6 +5585,8 @@ async function handleMcp(req, res, parts) {
         "orbitx_live_desk",
         "orbitx_live_positions",
         "orbitx_live_agent",
+        "orbitx_live_feed",
+        "orbitx_live_world",
       ]);
       if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = {

@@ -112,7 +112,7 @@ describe("live agent engine tick", () => {
     });
     expect(buy.actions.some((a) => a.type === "buy" && a.usd === 1.5)).toBe(true);
     expect(sb._tables.ox_live_events.some((e) => e.kind === "buy")).toBe(true);
-    expect(buy.actions[0].thesis).toMatch(/sell 100%/);
+    expect(buy.actions[0].thesis).toMatch(/whole clip/);
     expect(LIVE_AGENTS.map((a) => a.id)).toContain(buy.actions[0].agent_id);
 
     sb._tables.ox_live_positions.push({
@@ -176,7 +176,7 @@ describe("live agent engine tick", () => {
       swap: async () => ({ ok: true, signature: "sig-jup", outAmount: "1000" }),
     });
     expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "JUP" && a.usd === 1.5)).toBe(true);
-    expect(buy.actions[0].thesis).toMatch(/Liquid major/);
+    expect(buy.actions[0].thesis).toMatch(/liquid major/);
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
   });

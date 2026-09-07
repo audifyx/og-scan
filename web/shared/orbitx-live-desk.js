@@ -329,24 +329,236 @@ export function summarizeLiveLedger({
   };
 }
 
+export function liveAgentVoice(agent) {
+  const a = agent && typeof agent === "object" && agent.id ? agent : liveAgentById(agent) || {};
+  const handle = String(a.id || "desk").replace(/-live$/, "");
+  const first = String(a.name || "The desk").replace(/\s+LIVE$/i, "");
+  return {
+    id: a.id || null,
+    name: a.name || "LIVE",
+    first,
+    handle: `@${handle}`,
+    color: a.color || "#a3e635",
+    style: a.style || "momentum",
+    tpPct: a.tpPct ?? 0.1,
+  };
+}
+
+function moneyTalk(n, sign = false) {
+  if (n == null || !Number.isFinite(Number(n))) return null;
+  const v = Number(n);
+  const abs = Math.abs(v);
+  const body = abs >= 10 ? `$${abs.toFixed(0)}` : `$${abs.toFixed(2)}`;
+  if (!sign) return v < 0 ? `-${body}` : body;
+  return `${v >= 0 ? "+" : "-"}${body}`;
+}
+
+function tickSym(sym) {
+  const t = String(sym || "").replace(/^\$/, "").toUpperCase();
+  return t ? `$${t}` : null;
+}
+
 export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
-  const t = String(coin.symbol || "TOKEN").replace(/^\$/, "").toUpperCase();
-  const ch1 = coin.change_1h != null ? `${num(coin.change_1h) >= 0 ? "+" : ""}${num(coin.change_1h).toFixed(1)}% 1h` : "no 1h";
-  const ch24 = coin.change_24h != null ? `${num(coin.change_24h) >= 0 ? "+" : ""}${num(coin.change_24h).toFixed(1)}% 24h` : "no 24h";
-  const liq = coin.liquidity_usd != null ? `$${Math.round(num(coin.liquidity_usd)).toLocaleString()} liq` : "liq n/a";
-  const vol = coin.volume_24h != null ? `$${Math.round(num(coin.volume_24h)).toLocaleString()} vol` : "vol n/a";
-  const why =
-    agent?.style === "momentum"
-      ? "1h continuation with a confirmed Jupiter sell route"
-      : agent?.style === "mean_reversion"
-        ? "24h extension looks stretched; fade with a tight +10% full take"
-        : "listed pair with real depth; ride toward +30% then flatten";
-  const rt = safety.roundTripLossPct != null ? ` Round-trip ~${num(safety.roundTripLossPct).toFixed(1)}%.` : "";
-  const pump = coin.pump_complete === true ? " Pump.fun complete / DEX book." : coin.pump_complete === false ? " Still watching pump.fun tape; buy only because Jupiter can sell." : "";
-  const major = liveIsMajor(coin, safety) ? " Liquid major — high MC is allowed." : "";
-  const usd = size.usd != null ? `$${num(size.usd).toFixed(2)}` : `$${LIVE_TRADE_USD.toFixed(2)}`;
+  const voice = liveAgentVoice(agent);
+  const t = tickSym(coin.symbol) || "this coin";
+  const usd = moneyTalk(size.usd ?? LIVE_TRADE_USD) || `$${LIVE_TRADE_USD.toFixed(2)}`;
   const tp = `${Math.round(num(agent?.tpPct, 0.1) * 100)}%`;
-  return `${agent?.name || "LIVE"} is buying ${usd} of $${t} (${ch1}, ${ch24}, ${liq}, ${vol}). Thesis: ${why}.${rt}${pump}${major} Plan: sell 100% at +${tp}. Not financial advice.`;
+  const ch1 = coin.change_1h != null ? `${num(coin.change_1h) >= 0 ? "+" : ""}${num(coin.change_1h).toFixed(1)}% this hour` : null;
+  const ch24 = coin.change_24h != null ? `${num(coin.change_24h) >= 0 ? "+" : ""}${num(coin.change_24h).toFixed(1)}% on the day` : null;
+  let why;
+  if (agent?.style === "mean_reversion") {
+    why = ch24
+      ? `${t} looks stretched after ${ch24}. I'm fading it with a tight take.`
+      : `${t} looks stretched. I'm fading it with a tight take.`;
+  } else if (agent?.style === "fresh") {
+    why = `This book's young but the depth is real. I'm riding ${t} toward +${tp} then I'm gone.`;
+  } else {
+    why = ch1
+      ? `${t} is still pushing (${ch1}). I'm in because I can actually get out.`
+      : `I'm clipping ${t} because the book looks real and I can sell.`;
+  }
+  const major = liveIsMajor(coin, safety) ? " This is a liquid major — high cap is fine." : "";
+  const pump = coin.pump_complete === false ? " Still on the launch tape, but Jupiter will sell it." : "";
+  return `${voice.first} just put ${usd} into ${t}. ${why}${major}${pump} I'll sell the whole clip at +${tp}.`;
+}
+
+export function humanSkipReason(reason) {
+  const r = String(reason || "").toLowerCase();
+  if (r.includes("cannot sell") || r.includes("honeypot")) return "Jupiter wouldn't give a sell route, so it stays on the sidelines.";
+  if (r.includes("mcap too large")) return "Cap's huge. We take liquid majors, but this one didn't look clean.";
+  if (r.includes("mcap too small")) return "Too small. Not worth the heat.";
+  if (r.includes("thin") || r.includes("liq $")) return "The pool's too thin even for a $1.50 clip.";
+  if (r.includes("too new") || (r.includes("only") && r.includes("old"))) return "It's still wet paint.";
+  if (r.includes("bonding")) return "Still on the curve. Waiting for a real DEX book.";
+  if (r.includes("mint authority")) return "Mint authority is still live. Hard pass.";
+  if (r.includes("freeze")) return "Freeze authority is live. Not touching it.";
+  if (r.includes("max_open")) return "Already in a trade. One book at a time.";
+  if (r.includes("fee_reserve")) return "Keeping SOL back for fees.";
+  if (r.includes("stable")) return "That's a stable. We don't clip those.";
+  if (r.includes("no_clean")) return "Looked at the tape and stayed in cash.";
+  if (r.includes("no_buy_quote")) return "Couldn't get a buy quote. Left it.";
+  if (reason) return `Passed — ${String(reason).replace(/_/g, " ")}.`;
+  return "Didn't like the book.";
+}
+
+export function humanLivePost(row = {}, ctx = {}) {
+  const voice = liveAgentVoice(row.agent_id || ctx.agent);
+  const who = voice.first || "The desk";
+  const t = tickSym(row.symbol);
+  const usd = moneyTalk(row.usd);
+  const pnl = moneyTalk(row.pnl_usd, true);
+  const kind = String(row.kind || row.reason || "").toLowerCase();
+  if (kind === "buy") {
+    if (row.thesis && /just put/.test(row.thesis)) return row.thesis;
+    return `${who} just put ${usd || `$${LIVE_TRADE_USD.toFixed(2)}`} into ${t || "a live book"}. I'll sell the whole clip when it pays.`;
+  }
+  if (kind === "sell" || kind === "take_profit") {
+    const won = num(row.pnl_usd) > 0;
+    return won
+      ? `${who} sold ${t || "the bag"} and booked ${pnl}. That's a clean hit — flattened the whole clip.`
+      : `${who} got out of ${t || "the bag"}${pnl ? ` (${pnl})` : ""}. Cut it, don't marry it.`;
+  }
+  if (kind === "stop") {
+    return `${who} stopped out of ${t || "the bag"}${pnl ? `. ${pnl}` : ""}. The book went against us, so we're cash.`;
+  }
+  if (kind === "skip") {
+    return `${who} passed on ${t || "that name"}. ${humanSkipReason(row.reason)}`;
+  }
+  if (kind === "swap") {
+    return `On-chain swap just landed${t ? ` around ${t}` : ""}. Proof is on Solscan.`;
+  }
+  if (kind === "fail") {
+    return `A swap failed on-chain${t ? ` for ${t}` : ""}. Check the Solscan tx if you want the raw error.`;
+  }
+  if (kind === "tick") {
+    return `${who} looked at the tape and stayed in cash. ${humanSkipReason(row.reason)}`;
+  }
+  if (row.thesis) return row.thesis;
+  return `${who} is on the desk.`;
+}
+
+export function enrichLiveFeedRow(row = {}, ctx = {}) {
+  const wallet = ctx.wallet || LIVE_WALLET_PUBKEY;
+  const voice = liveAgentVoice(row.agent_id);
+  const kind = String(row.kind || "tick");
+  const text = row.text || humanLivePost(row, ctx);
+  return {
+    ...row,
+    kind,
+    text,
+    agent_name: voice.name,
+    agent_handle: voice.handle,
+    agent_color: voice.color,
+    solscan_tx: row.signature ? `https://solscan.io/tx/${row.signature}` : null,
+    solscan_token: row.mint ? `https://solscan.io/token/${row.mint}` : null,
+    solscan_account: `https://solscan.io/account/${wallet}`,
+    worldUrl: "https://www.orbitx.world/on-chain",
+  };
+}
+
+export function buildLiveWorld({
+  wallet = LIVE_WALLET_PUBKEY,
+  agents = LIVE_AGENTS,
+  open = [],
+  feed = [],
+  ledger = null,
+} = {}) {
+  const books = agents?.length ? agents : LIVE_AGENTS;
+  const coins = [];
+  const seen = new Set();
+  const addCoin = (c, extra = {}) => {
+    const mint = c?.mint;
+    if (!mint || seen.has(mint) || mint === SOL_MINT) return;
+    seen.add(mint);
+    const symbol = String(c.symbol || mint.slice(0, 4)).replace(/^\$/, "").toUpperCase();
+    coins.push({
+      id: `coin-${mint}`,
+      kind: "coin",
+      mint,
+      symbol,
+      name: c.name || symbol,
+      image: c.image || null,
+      holding: Boolean((open || []).some((p) => p.mint === mint)),
+      usd: c.usd != null ? num(c.usd) : c.usd_in != null ? num(c.usd_in) : c.usd_amount != null ? num(c.usd_amount) : null,
+      pnl_usd: c.pnl_usd != null ? num(c.pnl_usd) : null,
+      last_kind: extra.last_kind || null,
+      solscan: `https://solscan.io/token/${mint}`,
+    });
+  };
+  for (const p of open || []) addCoin(p, { last_kind: "hold" });
+  for (const row of feed || []) addCoin(row, { last_kind: row.kind });
+  const ring = coins.map((c, i) => {
+    const n = Math.max(coins.length, 1);
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const r = 11 + (c.holding ? 0 : 1.4);
+    const h = c.holding ? 9 : 4.5 + Math.min(6, i);
+    return { ...c, x: Math.cos(a) * r, z: Math.sin(a) * r, y: 0, height: h };
+  });
+  const buildings = [
+    {
+      id: "solscan",
+      kind: "solscan",
+      label: "SOLSCAN",
+      mint: null,
+      symbol: null,
+      x: 0,
+      z: 0,
+      y: 0,
+      height: 16,
+      url: `https://solscan.io/account/${wallet}`,
+      meta: "Every live fill, swap, and account move lands here as proof.",
+    },
+    {
+      id: "desk",
+      kind: "desk",
+      label: "LIVE DESK",
+      mint: null,
+      symbol: null,
+      x: 0,
+      z: 7.5,
+      y: 0,
+      height: 5,
+      url: "https://www.orbitx.world/on-chain",
+      meta: `$${LIVE_TRADE_USD.toFixed(2)} clips · max ${LIVE_MAX_OPEN} open`,
+    },
+    ...ring,
+  ];
+  const characters = books.map((a, i) => {
+    const hold = (open || []).find((p) => p.agent_id === a.id) || a.open || null;
+    const last = (feed || []).find((r) => r.agent_id === a.id) || null;
+    const target = hold ? `coin-${hold.mint}` : last?.mint ? `coin-${last.mint}` : last?.kind === "skip" ? "solscan" : "desk";
+    const dest = buildings.find((b) => b.id === target) || buildings[0];
+    const voice = liveAgentVoice(a);
+    const spread = (i - 1) * 1.6;
+    return {
+      id: a.id,
+      name: a.name,
+      first: voice.first,
+      handle: voice.handle,
+      color: a.color,
+      holding: hold ? `$${String(hold.symbol || "").replace(/^\$/, "")}` : "cash",
+      mint: hold?.mint || last?.mint || null,
+      action: last?.kind || (hold ? "hold" : "idle"),
+      text: last?.text || last?.thesis || `${voice.first} is on the floor.`,
+      made_usd: a.made_usd ?? null,
+      wins: a.wins ?? 0,
+      losses: a.losses ?? 0,
+      target,
+      x: dest.x + spread,
+      z: dest.z + 2.2,
+      y: 0,
+    };
+  });
+  return {
+    wallet,
+    worldUrl: "https://www.orbitx.world/on-chain",
+    fundUrl: `https://solscan.io/account/${wallet}`,
+    made_usd: ledger?.made_usd ?? null,
+    holding: ledger?.holding?.symbol || null,
+    buildings,
+    characters,
+    posts: (feed || []).slice(0, 40),
+  };
 }
 
 export function emptyLiveDesk(extra = {}) {
@@ -380,12 +592,21 @@ export function emptyLiveDesk(extra = {}) {
     events: extra.events || [],
     chain: extra.chain || [],
     feed: extra.feed || [],
+    world:
+      extra.world ||
+      buildLiveWorld({
+        wallet: extra.wallet || LIVE_WALLET_PUBKEY,
+        agents: extra.agents,
+        open: extra.open,
+        feed: extra.feed,
+        ledger: extra.ledger,
+      }),
     worldUrl: "https://www.orbitx.world/on-chain",
     fundUrl: `https://solscan.io/account/${extra.wallet || LIVE_WALLET_PUBKEY}`,
   };
 }
 
-export function mergeLiveFeed({ fills = [], events = [], chain = [] } = {}) {
+export function mergeLiveFeed({ fills = [], events = [], chain = [], wallet = LIVE_WALLET_PUBKEY } = {}) {
   const rows = [];
   for (const f of fills) {
     const side = String(f.side || "buy");
@@ -442,7 +663,7 @@ export function mergeLiveFeed({ fills = [], events = [], chain = [] } = {}) {
     const key = `${row.source}:${row.kind}:${row.signature || row.id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(row);
+    out.push(enrichLiveFeedRow(row, { wallet }));
   }
   return out.slice(0, 80);
 }

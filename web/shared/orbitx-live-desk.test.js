@@ -14,6 +14,8 @@ import {
   mergeLiveFeed,
   writeLiveThesis,
   liveIsMajor,
+  humanLivePost,
+  buildLiveWorld,
 } from "./orbitx-live-desk.js";
 
 const GOOD = {
@@ -62,9 +64,9 @@ describe("live agent desk rules", () => {
     expect(LIVE_AGENTS).toHaveLength(3);
     expect(LIVE_WALLET_PUBKEY).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
     const thesis = writeLiveThesis(LIVE_AGENTS[0], GOOD, SAFETY, { usd: 1.5 });
-    expect(thesis).toMatch(/NEON LIVE/);
+    expect(thesis).toMatch(/NEON/);
     expect(thesis).toMatch(/\$1\.50/);
-    expect(thesis).toMatch(/sell 100%/);
+    expect(thesis).toMatch(/whole clip/);
     expect(nextLiveAgent("neon-live").id).toBe("warden-live");
     const ranked = rankForLiveStyle("momentum", [GOOD, { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", change_1h: 18, symbol: "HOT" }]);
     expect(pickLiveToken(LIVE_AGENTS[0], ranked).symbol).toBe("HOT");
@@ -114,7 +116,7 @@ describe("live agent desk rules", () => {
       jup,
     ]);
     expect(ranked[0].symbol).toBe("JUP");
-    expect(writeLiveThesis(LIVE_AGENTS[0], jup, SAFETY, { usd: 1.5 })).toMatch(/Liquid major/);
+    expect(writeLiveThesis(LIVE_AGENTS[0], jup, SAFETY, { usd: 1.5 })).toMatch(/liquid major/);
   });
 
   it("rolls started vs now, wins, losses, and current hold per book", () => {
@@ -157,6 +159,28 @@ describe("live agent desk rules", () => {
     });
     expect(tape[0].kind).toBe("skip");
     expect(tape.some((r) => r.kind === "buy" && r.thesis === "buy thesis")).toBe(true);
+    expect(tape.some((r) => r.kind === "buy" && /just put/.test(r.text || ""))).toBe(true);
     expect(tape.some((r) => r.kind === "swap" && r.signature === "sig-buy")).toBe(true);
+    expect(tape.some((r) => r.solscan_tx && r.solscan_tx.includes("solscan.io/tx"))).toBe(true);
+    expect(tape[0].text).toMatch(/passed|sidelines|RUG/i);
+  });
+
+  it("writes human posts and a 3D city with a Solscan tower plus coin buildings", () => {
+    const buy = humanLivePost({ kind: "buy", agent_id: "neon-live", symbol: "JUP", usd: 1.5 });
+    expect(buy).toMatch(/NEON/);
+    expect(buy).not.toMatch(/confirmed Jupiter sell route/);
+    const sell = humanLivePost({ kind: "sell", agent_id: "warden-live", symbol: "USELESS", usd: 1.5, pnl_usd: 0.18 });
+    expect(sell).toMatch(/WARDEN/);
+    expect(sell).toMatch(/booked/);
+    const world = buildLiveWorld({
+      wallet: LIVE_WALLET_PUBKEY,
+      open: [{ agent_id: "neon-live", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", usd_in: 1.5 }],
+      feed: [{ kind: "buy", agent_id: "neon-live", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", usd: 1.5, text: "Neon just put $1.50 into $JUP." }],
+    });
+    expect(world.buildings.some((b) => b.kind === "solscan" && b.url.includes("solscan.io/account"))).toBe(true);
+    expect(world.buildings.some((b) => b.symbol === "JUP" && b.solscan.includes("/token/"))).toBe(true);
+    expect(world.characters).toHaveLength(3);
+    expect(world.characters.find((c) => c.id === "neon-live").holding).toBe("$JUP");
+    expect(emptyLiveDesk().world.buildings.some((b) => b.kind === "solscan")).toBe(true);
   });
 });

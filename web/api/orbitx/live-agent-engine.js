@@ -564,7 +564,7 @@ export async function snapshotLiveDesk(opts = {}) {
     reason: e.reason,
     signature: e.signature,
   }));
-  const feed = mergeLiveFeed({ fills: publicFills, events: publicEvents, chain });
+  const feed = mergeLiveFeed({ fills: publicFills, events: publicEvents, chain, wallet });
   return emptyLiveDesk({
     wallet,
     enabled,

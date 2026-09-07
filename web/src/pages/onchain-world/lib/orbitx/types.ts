@@ -143,7 +143,9 @@ export type CenterView =
   | "analytics"
   | "tx"
   | "block"
-  | "agents";
+  | "agents"
+  | "feed"
+  | "city";
 
 export type BottomTab =
   | "recent"

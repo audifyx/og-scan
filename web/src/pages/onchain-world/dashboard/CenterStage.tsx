@@ -7,6 +7,8 @@ import { OrbitxTokenView } from "@/pages/onchain-world/dashboard/views/OrbitxTok
 import { TerminalView } from "@/pages/onchain-world/dashboard/views/TerminalView";
 import { TxView } from "@/pages/onchain-world/dashboard/views/TxView";
 import { AgentsView } from "@/pages/onchain-world/dashboard/views/AgentsView";
+import { LiveAgentFeed } from "@/pages/onchain-world/dashboard/views/LiveAgentFeed";
+import { LiveAgentCity } from "@/pages/onchain-world/dashboard/views/LiveAgentCity";
 import { WalletsView } from "@/pages/onchain-world/dashboard/views/WalletsView";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
@@ -24,6 +26,8 @@ const VIEWS: { id: CenterView; label: string }[] = [
   { id: "tx", label: "Tx" },
   { id: "block", label: "Block" },
   { id: "agents", label: "Agents" },
+  { id: "feed", label: "Feed" },
+  { id: "city", label: "City" },
 ];
 
 export function CenterStage() {
@@ -98,6 +102,8 @@ export function CenterStage() {
       {view === "tx" ? <TxView /> : null}
       {view === "block" ? <BlockView /> : null}
       {view === "agents" ? <AgentsView /> : null}
+      {view === "feed" ? <LiveAgentFeed /> : null}
+      {view === "city" ? <LiveAgentCity /> : null}
     </section>
   );
 }

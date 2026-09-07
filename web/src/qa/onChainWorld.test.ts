@@ -526,6 +526,18 @@ describe("OrbitX /on-chain world", () => {
     expect(ui).toContain("thesis");
     expect(ui).toContain("JUP");
     expect(ui).toContain("USELESS");
+    expect(ui).toContain("LiveAgentFeed");
+    expect(ui).toContain("LiveAgentCity");
+    const city = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/LiveAgentCity.tsx"), "utf8");
+    expect(city).toContain("Solscan");
+    expect(city).toContain("AgentBody");
+    expect(city).toContain("CoinBuilding");
+    const feedUi = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/LiveAgentFeed.tsx"), "utf8");
+    expect(feedUi).toContain("solscan");
+    expect(feedUi).toContain("What the desk is doing");
+    const stage = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/CenterStage.tsx"), "utf8");
+    expect(stage).toContain('id: "feed"');
+    expect(stage).toContain('id: "city"');
     const eventsSql = readFileSync(resolve(REPO, "supabase/migrations/20260907073000_ox_live_events.sql"), "utf8");
     expect(eventsSql).toContain("ox_live_events");
     expect(vercel).toContain("*/2 * * * *");

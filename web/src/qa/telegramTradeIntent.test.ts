@@ -31,6 +31,8 @@ describe("official Telegram trade wiring", () => {
     expect(listAllOrbitXTools().some((t) => t.name === "orbitx_live_desk")).toBe(true);
     expect(resolveOrbitXToolName("paper_desk")).toBe("orbitx_paper_desk");
     expect(resolveOrbitXToolName("live_desk")).toBe("orbitx_live_desk");
+    expect(resolveOrbitXToolName("live_feed")).toBe("orbitx_live_feed");
+    expect(resolveOrbitXToolName("live_world")).toBe("orbitx_live_world");
     expect(resolveOrbitXToolName("mock_sol")).toBe("orbitx_paper_desk");
     expect(hasEmbeddedAgentTool("orbitx_shop")).toBe(true);
     expect(hasEmbeddedAgentTool("orbitx_prepare_buy")).toBe(true);

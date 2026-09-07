@@ -13,6 +13,8 @@ import { formatAddress, formatPct, formatUsd } from "@/pages/onchain-world/lib/o
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { simulatePaperDesk } from "../../../../../shared/orbitx-paper-desk.js";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
+import { LiveAgentFeed } from "./LiveAgentFeed";
+import { LiveAgentCity } from "./LiveAgentCity";
 
 export function AgentsView() {
   const [desk, setDesk] = useState<"paper" | "live">("live");
@@ -48,6 +50,7 @@ function LiveDeskView() {
   const [copied, setCopied] = useState(false);
   const [tapeFilter, setTapeFilter] = useState<"all" | "buy" | "sell" | "skip" | "swap">("all");
   const [now, setNow] = useState(() => Date.now());
+  const [pane, setPane] = useState<"desk" | "feed" | "city">("feed");
 
   useEffect(() => {
     let alive = true;
@@ -133,8 +136,45 @@ function LiveDeskView() {
     return `${v >= 0 ? "+" : "-"}${body}`;
   }
 
+  const paneTabs = (
+    <div className="flex gap-1 border-b border-line px-4 py-2">
+      {(["feed", "city", "desk"] as const).map((key) => (
+        <button
+          key={key}
+          type="button"
+          className={`rounded-full px-3 py-1 text-2xs font-semibold uppercase tracking-wide ${
+            pane === key ? "bg-fg text-bg" : "text-dim hover:text-fg"
+          }`}
+          onClick={() => setPane(key)}
+        >
+          {key === "feed" ? "Feed" : key === "city" ? "City" : "Desk"}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (pane === "feed") {
+    return (
+      <>
+        {paneTabs}
+        <LiveAgentFeed snap={snap} now={now} />
+      </>
+    );
+  }
+  if (pane === "city") {
+    return (
+      <>
+        {paneTabs}
+        <div className="min-h-[28rem] flex-1">
+          <LiveAgentCity snap={snap} />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
+      {paneTabs}
       <header className="border-b border-line px-4 py-3">
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>

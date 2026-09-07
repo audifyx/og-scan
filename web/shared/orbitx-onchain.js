@@ -166,6 +166,13 @@ export function solscanTokenUrl(mint, cluster = "mainnet-beta") {
   return `https://solscan.io/token/${m}${q}`;
 }
 
+export function solscanAccountUrl(address, cluster = "mainnet-beta") {
+  const a = String(address || "").trim();
+  if (!a) return null;
+  const q = cluster && cluster !== "mainnet-beta" ? `?cluster=${encodeURIComponent(cluster)}` : "";
+  return `https://solscan.io/account/${a}${q}`;
+}
+
 export function isLikelySignature(sig) {
   const s = String(sig || "").trim();
   return s.length >= 32 && s.length <= 128 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(s);
