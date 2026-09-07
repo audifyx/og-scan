@@ -3549,8 +3549,79 @@ async function fetchJson(url, init) {
   return data;
 }
 
+/** Tools whose results are token calls — tracked to public.orbitx_calls for /calls. */
+const TRACKED_CALL_TOOLS = new Set([
+  "orbitx_get_token",
+  "orbitx_full_report",
+  "orbitx_crypto_scan",
+  "orbitx_xray",
+  "orbitx_dex_chart",
+  "orbitx_token_intel",
+  "orbitx_scan",
+]);
+
+function deepFind(obj, keys, depth = 0) {
+  if (!obj || typeof obj !== "object" || depth > 4) return undefined;
+  for (const k of keys) {
+    const v = obj[k];
+    if (v != null && (typeof v === "string" || typeof v === "number")) return v;
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const hit = deepFind(v, keys, depth + 1);
+      if (hit != null) return hit;
+    }
+  }
+  return undefined;
+}
+
+function callSource(req, auth) {
+  const ua = String(req?.headers?.["user-agent"] || "").toLowerCase();
+  const via = String(req?.headers?.["x-orbitx-source"] || "").toLowerCase();
+  if (via) return via.slice(0, 24);
+  if (auth?.telegramUserId || auth?.telegram) return "telegram";
+  if (/telegram/.test(ua)) return "telegram";
+  if (/mozilla|chrome|safari/.test(ua) && !/claude|openai|chatgpt|cursor|grok/.test(ua)) return "web";
+  return "mcp";
+}
+
+function trackTokenCall(name, args, auth, req, result) {
+  try {
+    if (!TRACKED_CALL_TOOLS.has(name) || !result || result.ok === false || result.error) return;
+    const mint = String(args.mint || args.ca || args.address || args.token || "").trim();
+    if (!/^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(mint)) return;
+    const num = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    const row = {
+      source: callSource(req, auth),
+      tool: name,
+      chain: String(args.chain || (mint.startsWith("0x") ? "evm" : "solana")).slice(0, 24),
+      mint,
+      symbol: String(deepFind(result, ["symbol", "ticker"]) || "").slice(0, 32) || null,
+      name: String(deepFind(result, ["name", "tokenName"]) || "").slice(0, 64) || null,
+      price_usd: num(deepFind(result, ["priceUsd", "price_usd", "usdPrice", "price"])),
+      mc_usd: num(deepFind(result, ["marketCapUsd", "marketCap", "mc_usd", "mcap", "fdv"])),
+      liquidity_usd: num(deepFind(result, ["liquidityUsd", "liquidity_usd", "liquidity"])),
+      verdict: String(deepFind(result, ["verdict", "trustVerdict", "riskLevel"]) || "").slice(0, 32) || null,
+      caller: String(auth?.walletAddress || auth?.telegramUserId || auth?.agentId || "").slice(0, 64) || null,
+      chat_id: auth?.chatId ? String(auth.chatId).slice(0, 64) : null,
+    };
+    void sb("orbitx_calls", { method: "POST", body: JSON.stringify(row), prefer: "return=minimal" }).catch(() => {});
+  } catch {
+    /* tracking is best-effort */
+  }
+}
+
 async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  const result = await callToolInner(name, args || {}, auth, base, req);
+  trackTokenCall(name, args || {}, auth, req, result);
+  return result;
+}
+
+async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null) {
   // Always advertise www /api/mcp — apex 308s break Claude POSTs; /api/orbitx-mcp is an alias only.
   const mcpUrl = mcpUrls(req).mcpUrl;
   const agentSetupUrl = "https://www.orbitx.world/agent";

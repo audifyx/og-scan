@@ -209,6 +209,7 @@ import { SecurityTracker } from "./components/SecurityTracker";
 const McpVoiceRoom = lazyWithRetry(() => import("./pages/McpVoiceRoom"));
 const McpGroupChat = lazyWithRetry(() => import("./pages/McpGroupChat"));
 const OrbitxAgentsWorld = lazyWithRetry(() => import("./pages/OrbitxAgentsWorld"));
+const Calls = lazyWithRetry(() => import("./pages/Calls"));
 
 const DirectMessagesPage = () => (
   <AppLayout>
@@ -355,6 +356,7 @@ const App = () => (
             <Route path="/education/*" element={<Education />} />
 
             {/* ── Public agent world (must beat /:toolSlug owner-404) ── */}
+            <Route path="/calls" element={<Suspense fallback={<RouteFallback label="OrbitX Calls" />}><Calls /></Suspense>} />
             <Route path="/orbitxagents" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
             <Route path="/orbitxagents/:slug" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
             <Route path="/Orbitxagents" element={<Navigate to="/orbitxagents" replace />} />
