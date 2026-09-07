@@ -5,6 +5,7 @@
  *
  * Not financial advice. Caps: $1.50 per buy, 1 open book, full take-profit.
  */
+import { layoutLiveCity } from "./orbitx-live-city.js";
 export const LIVE_WALLET_PUBKEY = "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj";
 export const LIVE_TRADE_USD = 1.5;
 export const LIVE_FEE_RESERVE_SOL = 0.004;
@@ -456,109 +457,16 @@ export function enrichLiveFeedRow(row = {}, ctx = {}) {
   };
 }
 
-export function buildLiveWorld({
-  wallet = LIVE_WALLET_PUBKEY,
-  agents = LIVE_AGENTS,
-  open = [],
-  feed = [],
-  ledger = null,
-} = {}) {
-  const books = agents?.length ? agents : LIVE_AGENTS;
-  const coins = [];
-  const seen = new Set();
-  const addCoin = (c, extra = {}) => {
-    const mint = c?.mint;
-    if (!mint || seen.has(mint) || mint === SOL_MINT) return;
-    seen.add(mint);
-    const symbol = String(c.symbol || mint.slice(0, 4)).replace(/^\$/, "").toUpperCase();
-    coins.push({
-      id: `coin-${mint}`,
-      kind: "coin",
-      mint,
-      symbol,
-      name: c.name || symbol,
-      image: c.image || null,
-      holding: Boolean((open || []).some((p) => p.mint === mint)),
-      usd: c.usd != null ? num(c.usd) : c.usd_in != null ? num(c.usd_in) : c.usd_amount != null ? num(c.usd_amount) : null,
-      pnl_usd: c.pnl_usd != null ? num(c.pnl_usd) : null,
-      last_kind: extra.last_kind || null,
-      solscan: `https://solscan.io/token/${mint}`,
-    });
-  };
-  for (const p of open || []) addCoin(p, { last_kind: "hold" });
-  for (const row of feed || []) addCoin(row, { last_kind: row.kind });
-  const ring = coins.map((c, i) => {
-    const n = Math.max(coins.length, 1);
-    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-    const r = 11 + (c.holding ? 0 : 1.4);
-    const h = c.holding ? 9 : 4.5 + Math.min(6, i);
-    return { ...c, x: Math.cos(a) * r, z: Math.sin(a) * r, y: 0, height: h };
+export function buildLiveWorld(opts = {}) {
+  return layoutLiveCity({
+    wallet: opts.wallet || LIVE_WALLET_PUBKEY,
+    agents: opts.agents?.length ? opts.agents : LIVE_AGENTS,
+    open: opts.open,
+    feed: opts.feed,
+    fills: opts.fills,
+    ledger: opts.ledger,
+    now: opts.now,
   });
-  const buildings = [
-    {
-      id: "solscan",
-      kind: "solscan",
-      label: "SOLSCAN",
-      mint: null,
-      symbol: null,
-      x: 0,
-      z: 0,
-      y: 0,
-      height: 16,
-      url: `https://solscan.io/account/${wallet}`,
-      meta: "Every live fill, swap, and account move lands here as proof.",
-    },
-    {
-      id: "desk",
-      kind: "desk",
-      label: "LIVE DESK",
-      mint: null,
-      symbol: null,
-      x: 0,
-      z: 7.5,
-      y: 0,
-      height: 5,
-      url: "https://www.orbitx.world/on-chain",
-      meta: `$${LIVE_TRADE_USD.toFixed(2)} clips · max ${LIVE_MAX_OPEN} open`,
-    },
-    ...ring,
-  ];
-  const characters = books.map((a, i) => {
-    const hold = (open || []).find((p) => p.agent_id === a.id) || a.open || null;
-    const last = (feed || []).find((r) => r.agent_id === a.id) || null;
-    const target = hold ? `coin-${hold.mint}` : last?.mint ? `coin-${last.mint}` : last?.kind === "skip" ? "solscan" : "desk";
-    const dest = buildings.find((b) => b.id === target) || buildings[0];
-    const voice = liveAgentVoice(a);
-    const spread = (i - 1) * 1.6;
-    return {
-      id: a.id,
-      name: a.name,
-      first: voice.first,
-      handle: voice.handle,
-      color: a.color,
-      holding: hold ? `$${String(hold.symbol || "").replace(/^\$/, "")}` : "cash",
-      mint: hold?.mint || last?.mint || null,
-      action: last?.kind || (hold ? "hold" : "idle"),
-      text: last?.text || last?.thesis || `${voice.first} is on the floor.`,
-      made_usd: a.made_usd ?? null,
-      wins: a.wins ?? 0,
-      losses: a.losses ?? 0,
-      target,
-      x: dest.x + spread,
-      z: dest.z + 2.2,
-      y: 0,
-    };
-  });
-  return {
-    wallet,
-    worldUrl: "https://www.orbitx.world/on-chain",
-    fundUrl: `https://solscan.io/account/${wallet}`,
-    made_usd: ledger?.made_usd ?? null,
-    holding: ledger?.holding?.symbol || null,
-    buildings,
-    characters,
-    posts: (feed || []).slice(0, 40),
-  };
 }
 
 export function emptyLiveDesk(extra = {}) {
@@ -599,6 +507,7 @@ export function emptyLiveDesk(extra = {}) {
         agents: extra.agents,
         open: extra.open,
         feed: extra.feed,
+        fills: extra.fills,
         ledger: extra.ledger,
       }),
     worldUrl: "https://www.orbitx.world/on-chain",

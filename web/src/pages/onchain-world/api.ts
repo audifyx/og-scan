@@ -551,6 +551,15 @@ export type LiveDeskPayload = {
       z?: number;
     }>;
     posts?: LiveDeskPayload["feed"];
+    climate?: { phase?: string; hour?: number; rain?: boolean; fog?: boolean; wind?: number };
+    generation?: number;
+    span?: number;
+    unlocked?: number;
+    built?: number;
+    trees?: Array<{ id: string; x: number; z: number; h: number }>;
+    lamps?: Array<{ id: string; x: number; z: number }>;
+    roads?: Array<{ id: string; x: number; z: number; w: number; d: number }>;
+    parks?: Array<{ id: string; x: number; z: number; w?: number; d?: number }>;
   };
   error?: string;
 };

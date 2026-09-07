@@ -181,6 +181,19 @@ describe("live agent desk rules", () => {
     expect(world.buildings.some((b) => b.symbol === "JUP" && b.solscan.includes("/token/"))).toBe(true);
     expect(world.characters).toHaveLength(3);
     expect(world.characters.find((c) => c.id === "neon-live").holding).toBe("$JUP");
+    expect(world.climate.phase).toMatch(/dawn|day|dusk|night/);
+    expect(world.roads.length).toBeGreaterThan(4);
+    expect(world.trees.length).toBeGreaterThan(3);
+    expect(world.generation).toBeGreaterThanOrEqual(1);
+    expect(world.buildings.length).toBeGreaterThan(8);
+    const grown = buildLiveWorld({
+      fills: [
+        { side: "buy", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", usd_amount: 1.5, agent_id: "neon-live" },
+        { side: "buy", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", usd_amount: 1.5, agent_id: "raid-live" },
+      ],
+    });
+    expect(grown.built).toBeGreaterThanOrEqual(2);
+    expect(grown.generation).toBeGreaterThan(world.generation);
     expect(emptyLiveDesk().world.buildings.some((b) => b.kind === "solscan")).toBe(true);
   });
 });
