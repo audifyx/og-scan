@@ -13,6 +13,7 @@ import {
   summarizeLiveLedger,
   mergeLiveFeed,
   writeLiveThesis,
+  liveIsMajor,
 } from "./orbitx-live-desk.js";
 
 const GOOD = {
@@ -70,6 +71,50 @@ describe("live agent desk rules", () => {
     expect(emptyLiveDesk().disclaimer).toMatch(/Not financial advice/);
     expect(emptyLiveDesk().trade_usd).toBe(1.5);
     expect(emptyLiveDesk().max_open).toBe(1);
+  });
+
+  it("allows liquid high-MC majors like JUP and USELESS instead of skipping them", () => {
+    const jup = {
+      mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      symbol: "JUP",
+      change_1h: 4.2,
+      change_24h: -6,
+      volume_24h: 40_000_000,
+      liquidity_usd: 25_000_000,
+      market_cap: 1_200_000_000,
+      pair_age_min: 525_600,
+    };
+    const useless = {
+      mint: "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      symbol: "USELESS",
+      change_1h: 9,
+      change_24h: 18,
+      volume_24h: 8_000_000,
+      liquidity_usd: 4_000_000,
+      market_cap: 220_000_000,
+      pair_age_min: 40_000,
+    };
+    const jupScreen = screenLiveCandidate(jup, SAFETY);
+    const uselessScreen = screenLiveCandidate(useless, SAFETY);
+    expect(jupScreen.ok).toBe(true);
+    expect(jupScreen.major).toBe(true);
+    expect(uselessScreen.ok).toBe(true);
+    expect(uselessScreen.major).toBe(true);
+    expect(screenLiveCandidate(jup, { ...SAFETY, canSell: false }).ok).toBe(false);
+    expect(screenLiveCandidate({ ...jup, symbol: "USDC", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }, SAFETY).ok).toBe(false);
+    expect(
+      screenLiveCandidate(
+        { ...GOOD, symbol: "MEGA", market_cap: 60_000_000_000, liquidity_usd: 80_000, volume_24h: 50_000 },
+        SAFETY,
+      ).ok,
+    ).toBe(false);
+    expect(liveIsMajor({ mint: GOOD.mint, symbol: "PUMP", market_cap: 2_000_000, liquidity_usd: 1_500_000, volume_24h: 800_000 })).toBe(false);
+    const ranked = rankForLiveStyle("momentum", [
+      { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", symbol: "HOT", change_1h: 40 },
+      jup,
+    ]);
+    expect(ranked[0].symbol).toBe("JUP");
+    expect(writeLiveThesis(LIVE_AGENTS[0], jup, SAFETY, { usd: 1.5 })).toMatch(/Liquid major/);
   });
 
   it("rolls started vs now, wins, losses, and current hold per book", () => {

@@ -13,11 +13,63 @@ export const LIVE_STOP_PCT = -0.2;
 export const LIVE_MIN_LIQ_USD = 25_000;
 export const LIVE_MIN_VOL_USD = 40_000;
 export const LIVE_MIN_MCAP_USD = 80_000;
-export const LIVE_MAX_MCAP_USD = 80_000_000;
+export const LIVE_MAX_MCAP_USD = 50_000_000_000;
+export const LIVE_MAJOR_MCAP_USD = 80_000_000;
+export const LIVE_MAJOR_LIQ_USD = 250_000;
 export const LIVE_MAX_ROUND_TRIP_PCT = 12;
 export const LIVE_MAX_BUY_IMPACT_PCT = 4;
 export const LIVE_MIN_AGE_MIN = 45;
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
+/** Liquid majors the desk is allowed to buy — high MC is a feature, not a skip. */
+export const LIVE_ALLOW_SYMBOLS = new Set([
+  "JUP",
+  "JLP",
+  "USELESS",
+  "WIF",
+  "BONK",
+  "RAY",
+  "JTO",
+  "PYTH",
+  "ORCA",
+  "RENDER",
+  "W",
+  "MEW",
+  "POPCAT",
+  "PNUT",
+  "GOAT",
+  "FARTCOIN",
+  "TRUMP",
+  "PENGU",
+  "HYPE",
+  "ZEC",
+  "STONK",
+  "ANTFUN",
+]);
+export const LIVE_ALLOW_MINTS = new Set([
+  "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", // JUP
+  "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4", // JLP
+  "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk", // USELESS
+  "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", // BONK
+  "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", // WIF
+  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", // RAY
+  "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL", // JTO
+  "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3", // PYTH
+  "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE", // ORCA
+  "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof", // RENDER
+  "85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ", // W
+  "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5", // MEW
+  "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr", // POPCAT
+  "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump", // PNUT
+  "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", // FARTCOIN
+  "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN", // TRUMP
+  "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", // PENGU
+]);
+export const LIVE_SKIP_SYMBOLS = new Set(["USDC", "USDT", "USD1", "PYUSD", "USDS", "DAI", "FDUSD", "USDH", "CASH", "USDG", "EURC"]);
+export const LIVE_SKIP_MINTS = new Set([
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+  "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo", // PYUSD
+]);
 
 export const LIVE_AGENTS = [
   {
@@ -26,7 +78,7 @@ export const LIVE_AGENTS = [
     style: "momentum",
     tpPct: 0.12,
     color: "#34d399",
-    blurb: "Buys 1h continuation on sellable Jupiter books. Full sell at +12%.",
+    blurb: "Buys 1h continuation on sellable Jupiter books, including liquid majors. Full sell at +12%.",
   },
   {
     id: "warden-live",
@@ -34,7 +86,7 @@ export const LIVE_AGENTS = [
     style: "mean_reversion",
     tpPct: 0.1,
     color: "#fb7185",
-    blurb: "Fades stretched 24h prints. Takes +10% and walks.",
+    blurb: "Fades stretched 24h prints on sellable books, including JUP / USELESS-class majors. Takes +10% and walks.",
   },
   {
     id: "raid-live",
@@ -47,7 +99,7 @@ export const LIVE_AGENTS = [
 ];
 
 export const LIVE_DISCLAIMER =
-  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book at a time, full take-profit at 10–30%, skip anything that cannot sell. You can lose the whole bank.";
+  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book at a time, full take-profit at 10–30%. High-MC names like JUP and USELESS are allowed. Skip anything Jupiter cannot sell. You can lose the whole bank.";
 
 export function liveAgentById(id) {
   const needle = String(id || "").trim().toLowerCase();
@@ -83,31 +135,48 @@ export function sizeLiveBuy({ solBalance, solUsd, openCount, tradeUsd = LIVE_TRA
   return { ok: true, sol, usd: tradeUsd, lamports: Math.floor(sol * 1e9) };
 }
 
+export function liveIsMajor(coin = {}, safety = {}) {
+  if (safety.canSell === false) return false;
+  const mint = String(coin.mint || "");
+  const sym = String(coin.symbol || "").replace(/^\$/, "").toUpperCase();
+  if (LIVE_SKIP_MINTS.has(mint) || LIVE_SKIP_SYMBOLS.has(sym) || mint === SOL_MINT) return false;
+  const mcap = num(coin.market_cap ?? coin.marketCap);
+  const liq = num(coin.liquidity_usd ?? coin.liquidity);
+  const vol = num(coin.volume_24h ?? coin.volume);
+  if (LIVE_ALLOW_MINTS.has(mint)) return true;
+  if (LIVE_ALLOW_SYMBOLS.has(sym) && (mcap >= 20_000_000 || liq >= LIVE_MAJOR_LIQ_USD || vol >= 400_000)) return true;
+  if (mcap >= LIVE_MAJOR_MCAP_USD && (liq >= LIVE_MAJOR_LIQ_USD || vol >= 400_000)) return true;
+  return false;
+}
+
 export function screenLiveCandidate(coin = {}, safety = {}) {
   const reasons = [];
-  const liq = num(coin.liquidity_usd);
-  const vol = num(coin.volume_24h);
-  const mcap = num(coin.market_cap);
+  const liq = num(coin.liquidity_usd ?? coin.liquidity);
+  const vol = num(coin.volume_24h ?? coin.volume);
+  const mcap = num(coin.market_cap ?? coin.marketCap);
   const ageMin = coin.pair_age_min == null ? null : num(coin.pair_age_min);
   const mint = String(coin.mint || "");
+  const symbol = String(coin.symbol || mint.slice(0, 4)).replace(/^\$/, "").toUpperCase();
+  const major = liveIsMajor(coin, safety);
 
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) reasons.push("bad mint");
   if (mint === SOL_MINT) reasons.push("sol mint");
-  if (liq < LIVE_MIN_LIQ_USD) reasons.push(`liq $${Math.round(liq)} < $${LIVE_MIN_LIQ_USD}`);
-  if (vol < LIVE_MIN_VOL_USD) reasons.push(`vol $${Math.round(vol)} < $${LIVE_MIN_VOL_USD}`);
-  if (mcap > 0 && mcap < LIVE_MIN_MCAP_USD) reasons.push("mcap too small");
-  if (mcap > LIVE_MAX_MCAP_USD) reasons.push("mcap too large");
-  if (ageMin != null && ageMin < LIVE_MIN_AGE_MIN) reasons.push(`pair only ${Math.round(ageMin)}m old`);
+  if (LIVE_SKIP_MINTS.has(mint) || LIVE_SKIP_SYMBOLS.has(symbol)) reasons.push("stable / skip");
+  if (!major && liq < LIVE_MIN_LIQ_USD) reasons.push(`liq $${Math.round(liq)} < $${LIVE_MIN_LIQ_USD}`);
+  if (!major && vol < LIVE_MIN_VOL_USD) reasons.push(`vol $${Math.round(vol)} < $${LIVE_MIN_VOL_USD}`);
+  if (!major && mcap > 0 && mcap < LIVE_MIN_MCAP_USD) reasons.push("mcap too small");
+  if (!major && mcap > LIVE_MAX_MCAP_USD) reasons.push("mcap too large");
+  if (!major && ageMin != null && ageMin < LIVE_MIN_AGE_MIN) reasons.push(`pair only ${Math.round(ageMin)}m old`);
   if (safety.canBuy === false) reasons.push("no buy route");
   if (safety.canSell === false) reasons.push("cannot sell — skip as rug/honeypot");
-  if (safety.roundTripLossPct != null && num(safety.roundTripLossPct) >= LIVE_MAX_ROUND_TRIP_PCT) {
+  if (!major && safety.roundTripLossPct != null && num(safety.roundTripLossPct) >= LIVE_MAX_ROUND_TRIP_PCT) {
     reasons.push(`round-trip ${num(safety.roundTripLossPct).toFixed(0)}%`);
   }
-  if (safety.buyImpactPct != null && num(safety.buyImpactPct) >= LIVE_MAX_BUY_IMPACT_PCT) {
+  if (!major && safety.buyImpactPct != null && num(safety.buyImpactPct) >= LIVE_MAX_BUY_IMPACT_PCT) {
     reasons.push(`buy impact ${num(safety.buyImpactPct).toFixed(1)}%`);
   }
-  if (safety.mintAuthorityActive === true) reasons.push("mint authority live");
-  if (safety.freezeAuthorityActive === true) reasons.push("freeze authority live");
+  if (!major && safety.mintAuthorityActive === true) reasons.push("mint authority live");
+  if (!major && safety.freezeAuthorityActive === true) reasons.push("freeze authority live");
   if (coin.honeypot === true || safety.honeypot === true) reasons.push("honeypot flag");
   if (safety.bondingOnly === true) reasons.push("bonding-curve only — wait for a DEX sell route");
 
@@ -116,7 +185,8 @@ export function screenLiveCandidate(coin = {}, safety = {}) {
     reasons,
     score: scoreLiveCandidate(coin, safety),
     mint,
-    symbol: String(coin.symbol || mint.slice(0, 4)).toUpperCase(),
+    symbol,
+    major,
   };
 }
 
@@ -135,6 +205,7 @@ export function scoreLiveCandidate(coin = {}, safety = {}) {
   if (Math.abs(ch1) >= 4 && Math.abs(ch1) <= 25) s += 6;
   if (ch24 <= -40) s -= 12;
   if (ch1 >= 80) s -= 10;
+  if (liveIsMajor(coin, safety)) s += 14;
   return s;
 }
 
@@ -150,7 +221,20 @@ export function rankForLiveStyle(style, coins) {
         num(b.volume_24h) - num(a.volume_24h),
     );
   } else copy.sort((a, b) => num(b.volume_24h) - num(a.volume_24h));
-  return copy;
+  return liftLiveMajors(copy, style);
+}
+
+export function liftLiveMajors(ranked, style) {
+  const list = ranked || [];
+  const majors = [];
+  const rest = [];
+  for (const c of list) {
+    if (liveIsMajor(c)) majors.push(c);
+    else rest.push(c);
+  }
+  if (!majors.length) return list;
+  if (style === "fresh") return [...majors.slice(0, 2), ...rest, ...majors.slice(2)];
+  return majors.concat(rest);
 }
 
 export function pickLiveToken(agent, ranked) {
@@ -259,9 +343,10 @@ export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
         : "listed pair with real depth; ride toward +30% then flatten";
   const rt = safety.roundTripLossPct != null ? ` Round-trip ~${num(safety.roundTripLossPct).toFixed(1)}%.` : "";
   const pump = coin.pump_complete === true ? " Pump.fun complete / DEX book." : coin.pump_complete === false ? " Still watching pump.fun tape; buy only because Jupiter can sell." : "";
+  const major = liveIsMajor(coin, safety) ? " Liquid major — high MC is allowed." : "";
   const usd = size.usd != null ? `$${num(size.usd).toFixed(2)}` : `$${LIVE_TRADE_USD.toFixed(2)}`;
   const tp = `${Math.round(num(agent?.tpPct, 0.1) * 100)}%`;
-  return `${agent?.name || "LIVE"} is buying ${usd} of $${t} (${ch1}, ${ch24}, ${liq}, ${vol}). Thesis: ${why}.${rt}${pump} Plan: sell 100% at +${tp}. Not financial advice.`;
+  return `${agent?.name || "LIVE"} is buying ${usd} of $${t} (${ch1}, ${ch24}, ${liq}, ${vol}). Thesis: ${why}.${rt}${pump}${major} Plan: sell 100% at +${tp}. Not financial advice.`;
 }
 
 export function emptyLiveDesk(extra = {}) {

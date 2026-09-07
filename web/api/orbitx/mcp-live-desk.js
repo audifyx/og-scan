@@ -13,7 +13,7 @@ export const LIVE_CORE_TOOLS = [
   {
     name: "orbitx_live_desk",
     description:
-      "Real-SOL live agent desk on /on-chain. Three books share one hot wallet, $1.50 buys, one open book, full take-profit at 10–30%. READ ONLY — does not trade. When the user says live desk / real agents / funded wallet — call this.",
+      "Real-SOL live agent desk on /on-chain. Three books share one hot wallet, $1.50 buys, one open book, full take-profit at 10–30%. High-MC names like JUP and USELESS are allowed. READ ONLY — does not trade. When the user says live desk / real agents / funded wallet — call this.",
     inputSchema: EMPTY,
   },
   {

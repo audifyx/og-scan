@@ -145,4 +145,39 @@ describe("live agent engine tick", () => {
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
   });
+
+  it("buys a high-MC major like JUP instead of skipping mcap too large", async () => {
+    const prev = process.env.LIVE_AGENT_ENABLED;
+    process.env.LIVE_AGENT_ENABLED = "1";
+    const sb = memSb();
+    const jup = {
+      mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      symbol: "JUP",
+      name: "Jupiter",
+      change_1h: 5,
+      change_24h: -8,
+      volume_24h: 40_000_000,
+      liquidity_usd: 25_000_000,
+      market_cap: 1_200_000_000,
+      pair_age_min: 525_600,
+      price_usd: 0.4,
+    };
+    const buy = await tickLiveDesk({
+      sb,
+      force: true,
+      dryRun: true,
+      sol_usd: 150,
+      solBalance: 0.05,
+      keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
+      owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
+      tape: async () => [jup],
+      safety: async () => ({ canBuy: true, canSell: true, roundTripLossPct: 1.2, buyImpactPct: 0.1 }),
+      mark: async () => 0.4,
+      swap: async () => ({ ok: true, signature: "sig-jup", outAmount: "1000" }),
+    });
+    expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "JUP" && a.usd === 1.5)).toBe(true);
+    expect(buy.actions[0].thesis).toMatch(/Liquid major/);
+    if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
+    else process.env.LIVE_AGENT_ENABLED = prev;
+  });
 });

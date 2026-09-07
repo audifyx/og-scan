@@ -524,6 +524,8 @@ describe("OrbitX /on-chain world", () => {
     expect(ui).toContain("one book at a time");
     expect(ui).toContain("Live tape");
     expect(ui).toContain("thesis");
+    expect(ui).toContain("JUP");
+    expect(ui).toContain("USELESS");
     const eventsSql = readFileSync(resolve(REPO, "supabase/migrations/20260907073000_ox_live_events.sql"), "utf8");
     expect(eventsSql).toContain("ox_live_events");
     expect(vercel).toContain("*/2 * * * *");

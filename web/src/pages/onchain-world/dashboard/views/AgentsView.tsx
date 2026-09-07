@@ -139,9 +139,9 @@ function LiveDeskView() {
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
-          Three agents share one Solana wallet. Each fill is ${clip.toFixed(2)}. Max one open position. They only buy
-          coins Jupiter can sell, then flatten 100% at +10% / +12% / +30%. Not financial advice — this bank can go to
-          zero.
+          Three agents share one Solana wallet. Each fill is ${clip.toFixed(2)}. Max one open position. Liquid majors
+          like JUP and USELESS are allowed — high market cap is not a skip. They only buy coins Jupiter can sell, then
+          flatten 100% at +10% / +12% / +30%. Not financial advice — this bank can go to zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
           <span className="text-2xs text-dim">Deposit</span>

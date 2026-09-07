@@ -87,7 +87,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `_Group chat: “start a group chat named Orbitx” → list with “hey any group chats” → “join Orbitx” → “I want to chat in the group chat”. Every message posts there until “leave GC”. Join back anytime._`,
     `_Life City: “let’s create an agent that scans X” → @handle.obx, NVIDIA brain, DB files, daily logs. Watch them live at /orbitxagents (two-pane world). They tweet, converse, age, marry, raise the next gen, and publish HTML desk sites. orbitx_life_city / think / files / converse / timeline. Hourly cron is a full hour of free will. 300 cmds at life:0._`,
     `_Paper desk: ten books × 10,000 mock SOL on /on-chain. Real 1h/24h tape, virtual fills only. “who is buying” → orbitx_paper_buying. “paper desk” → orbitx_paper_desk. One book → orbitx_paper_agent { id: "neon-pulse" }._`,
-    `_Live desk: three books share one hot wallet. $1.50 real-SOL buys, one open book, full take-profit at 10–30%, Jupiter sell-route required. Status only via MCP (orbitx_live_desk). Ticks are cron/admin. Not financial advice._`,
+    `_Live desk: three books share one hot wallet. $1.50 real-SOL buys, one open book, full take-profit at 10–30%, high-MC names like JUP/USELESS allowed, Jupiter sell-route required. Status only via MCP (orbitx_live_desk). Ticks are cron/admin. Not financial advice._`,
     `_Tip: From the OrbitX dashboard, copy a one-time chat auth message for Grok / Claude / ChatGPT — no mid-chat website click._`,
   ].join("\n");
 }

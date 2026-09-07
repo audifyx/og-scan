@@ -21,6 +21,7 @@ import {
   summarizeLiveLedger,
   mergeLiveFeed,
   writeLiveThesis,
+  LIVE_ALLOW_MINTS,
 } from "../../shared/orbitx-live-desk.js";
 
 const JUP = "https://lite-api.jup.ag";
@@ -266,7 +267,7 @@ export async function loadLiveTape() {
   } catch {
     /* pump optional */
   }
-  const extra = await hydrateDex([...new Set(coins.map((c) => c.mint))].slice(0, 28));
+  const extra = await hydrateDex([...new Set([...LIVE_ALLOW_MINTS, ...coins.map((c) => c.mint)])].slice(0, 30));
   coins.push(...extra);
   const byMint = new Map();
   for (const c of coins) {
@@ -757,7 +758,7 @@ export async function tickLiveDesk(opts = {}) {
   const ranked = rankForLiveStyle(agent.style, tape);
   let chosen = null;
   let safety = null;
-  for (const coin of ranked.slice(0, 12)) {
+  for (const coin of ranked.slice(0, 24)) {
     if (stillOpen.some((p) => p.mint === coin.mint)) continue;
     let pump = null;
     if (!dry && !opts.tape) {
