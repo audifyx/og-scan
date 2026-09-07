@@ -382,8 +382,83 @@ export type PaperDeskPayload = {
   error?: string;
 };
 
+export type LiveDeskPayload = {
+  ok?: boolean;
+  live?: boolean;
+  mock?: boolean;
+  disclaimer?: string;
+  wallet?: string;
+  enabled?: boolean;
+  armed?: boolean;
+  paused?: boolean;
+  configured?: boolean;
+  skipped?: string | null;
+  trade_usd?: number;
+  max_open?: number;
+  sol_usd?: number | null;
+  sol_balance?: number | null;
+  usd_balance?: number | null;
+  equity_usd?: number | null;
+  realized_pnl_usd?: number | null;
+  last_tick_at?: string | null;
+  last_error?: string | null;
+  fundUrl?: string;
+  worldUrl?: string;
+  open?: Array<{
+    id?: string;
+    agent_id?: string;
+    agent_name?: string;
+    mint?: string;
+    symbol?: string;
+    usd_in?: number;
+    sol_in?: number;
+    entry_price_usd?: number;
+    mark_usd?: number | null;
+    pnl_pct?: number | null;
+    tp_pct?: number;
+    thesis?: string;
+    signature?: string;
+  }>;
+  fills?: Array<{
+    id?: string;
+    agent_id?: string;
+    mint?: string;
+    symbol?: string;
+    side?: string;
+    usd_amount?: number;
+    pnl_usd?: number | null;
+    pnl_pct?: number | null;
+    reason?: string;
+    thesis?: string;
+    signature?: string;
+    created_at?: string;
+  }>;
+  agents?: Array<{
+    id: string;
+    name: string;
+    style: string;
+    tpPct: number;
+    color: string;
+    blurb?: string;
+    open?: LiveDeskPayload["open"] extends (infer T)[] | undefined ? T | null : null;
+    last?: unknown;
+  }>;
+  error?: string;
+};
+
 export function fetchAgents() {
   return getJson<PaperDeskPayload>("agents");
+}
+
+export async function fetchLiveDesk() {
+  try {
+    const r = await fetch("/api/live-agents", { cache: "no-store" });
+    const j = (await r.json()) as LiveDeskPayload;
+    if (j && (j.ok || j.wallet)) return j;
+  } catch {
+    /* vite has no /api */
+  }
+  return getJson<LiveDeskPayload>("live-desk");
 }
 
 export function fetchOrbitx() {

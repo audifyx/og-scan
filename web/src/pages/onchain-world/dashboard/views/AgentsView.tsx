@@ -1,12 +1,220 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, Crosshair } from "lucide-react";
-import { fetchAgents, type PaperAgent, type PaperDeskPayload, type PaperFill } from "@/pages/onchain-world/api";
+import { Bot, Copy, Crosshair, ExternalLink } from "lucide-react";
+import {
+  fetchAgents,
+  fetchLiveDesk,
+  type LiveDeskPayload,
+  type PaperAgent,
+  type PaperDeskPayload,
+  type PaperFill,
+} from "@/pages/onchain-world/api";
 import { formatAddress, formatPct, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { simulatePaperDesk } from "../../../../../shared/orbitx-paper-desk.js";
+import { LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
 
 export function AgentsView() {
+  const [desk, setDesk] = useState<"paper" | "live">("live");
+  return (
+    <div className="ox-scroll min-h-0 flex-1 overflow-auto bg-black">
+      <div className="flex gap-1 border-b border-line px-4 py-2">
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1 text-2xs font-semibold uppercase tracking-wide ${desk === "live" ? "bg-fg text-bg" : "text-dim hover:text-fg"}`}
+          onClick={() => setDesk("live")}
+        >
+          Live SOL
+        </button>
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1 text-2xs font-semibold uppercase tracking-wide ${desk === "paper" ? "bg-fg text-bg" : "text-dim hover:text-fg"}`}
+          onClick={() => setDesk("paper")}
+        >
+          Paper 10k
+        </button>
+      </div>
+      {desk === "live" ? <LiveDeskView /> : <PaperDeskView />}
+    </div>
+  );
+}
+
+function LiveDeskView() {
+  const nav = useNavigate();
+  const selectToken = useOrbitxStore((s) => s.selectToken);
+  const setCam = useOrbitxStore((s) => s.setCamCommand);
+  const setView = useOrbitxStore((s) => s.setActiveView);
+  const [snap, setSnap] = useState<LiveDeskPayload | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const pull = () => {
+      void fetchLiveDesk()
+        .then((data) => {
+          if (alive && data) setSnap(data);
+        })
+        .catch(() => undefined);
+    };
+    pull();
+    const id = window.setInterval(pull, 20_000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const wallet = snap?.wallet || LIVE_WALLET_PUBKEY;
+  const open = snap?.open || [];
+  const fills = snap?.fills || [];
+  const agents = snap?.agents?.length ? snap.agents : [];
+
+  function openMint(mint?: string | null) {
+    if (!mint) return;
+    selectToken(mint);
+    setCam({ kind: "token", mint });
+    setView("world");
+    nav(`/on-chain/token/${mint}`);
+  }
+
+  async function copyWallet() {
+    try {
+      await navigator.clipboard.writeText(wallet);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const status = !snap?.configured
+    ? "Wallet secret not on the server yet"
+    : !snap.enabled
+      ? "Armed only after LIVE_AGENT_ENABLED=1"
+      : snap.paused
+        ? "Paused"
+        : snap.armed
+          ? "Live — scanning for $2 entries"
+          : "Funded wallet waiting to arm";
+
+  return (
+    <>
+      <header className="border-b border-line px-4 py-3">
+        <p className="ox-kicker text-accent">Live desk · real SOL</p>
+        <h2 className="font-display text-lg text-fg">$2 agent books on a shared hot wallet</h2>
+        <p className="mt-1 max-w-3xl text-2xs text-muted">
+          Three agents share one Solana wallet. Each fill is about $2. They only buy coins Jupiter can sell,
+          then flatten 100% at +10% / +12% / +30%. Not financial advice — this bank can go to zero.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
+          <span className="text-2xs text-dim">Deposit</span>
+          <code className="text-2xs text-fg">{wallet}</code>
+          <button type="button" className="text-dim hover:text-fg" onClick={() => void copyWallet()} aria-label="Copy wallet">
+            <Copy className="size-3.5" />
+          </button>
+          {copied ? <span className="text-2xs text-live">copied</span> : null}
+          <a
+            className="ml-auto inline-flex items-center gap-1 text-2xs text-muted hover:text-fg"
+            href={snap?.fundUrl || `https://solscan.io/account/${wallet}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Solscan <ExternalLink className="size-3" />
+          </a>
+        </div>
+        <p className="mt-2 text-2xs text-accent">{status}</p>
+        <dl className="mt-3 grid grid-cols-2 gap-px bg-line sm:grid-cols-5">
+          <Stat label="SOL" value={snap?.sol_balance != null ? snap.sol_balance.toFixed(4) : "—"} />
+          <Stat label="USD" value={snap?.usd_balance != null ? formatUsd(snap.usd_balance) : "—"} />
+          <Stat label="Open" value={String(open.length)} />
+          <Stat
+            label="Realized"
+            value={
+              snap?.realized_pnl_usd != null
+                ? `${snap.realized_pnl_usd >= 0 ? "+" : ""}${formatUsd(snap.realized_pnl_usd)}`
+                : "—"
+            }
+          />
+          <Stat label="Size" value="$2" />
+        </dl>
+      </header>
+
+      {open.length ? (
+        <div className="border-b border-line px-4 py-2">
+          <p className="ox-kicker mb-1.5">Open books</p>
+          <ul className="space-y-2">
+            {open.map((p) => (
+              <li key={p.id || p.mint}>
+                <button
+                  type="button"
+                  className="w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
+                  onClick={() => openMint(p.mint)}
+                >
+                  <p className="text-xs text-fg">
+                    ${p.symbol} · {p.agent_name || p.agent_id} · ${Number(p.usd_in || 0).toFixed(2)}
+                    {p.pnl_pct != null ? ` · ${p.pnl_pct >= 0 ? "+" : ""}${p.pnl_pct.toFixed(1)}%` : ""}
+                    {p.tp_pct != null ? ` · TP +${Number(p.tp_pct).toFixed(0)}%` : ""}
+                  </p>
+                  <p className="mt-1 text-2xs leading-relaxed text-muted">{p.thesis}</p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="border-b border-line px-4 py-3 text-2xs text-dim">
+          No open live book. Send ~$7 of SOL to the deposit address, set LIVE_AGENT_WALLET_SECRET and
+          LIVE_AGENT_ENABLED=1 on Vercel, then arm. Ticks run every 5 minutes.
+        </p>
+      )}
+
+      <ul className="divide-y divide-line">
+        {(agents.length ? agents : [{ id: "neon-live", name: "NEON LIVE", style: "momentum", tpPct: 0.12, color: "#34d399", blurb: "…" }]).map(
+          (a, i) => (
+            <li key={a.id} className="px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: `${a.color}22`, color: a.color }}
+                >
+                  <Bot className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display text-sm text-fg">
+                    <span className="mr-2 text-2xs text-dim">#{i + 1}</span>
+                    {a.name}
+                  </h3>
+                  <p className="text-2xs text-dim">
+                    {a.blurb} · TP +{Math.round((a.tpPct || 0.1) * 100)}% full sell · $2 clips
+                  </p>
+                </div>
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
+
+      {fills.length ? (
+        <ol className="border-t border-line px-4 py-3 space-y-1">
+          <p className="ox-kicker mb-1">Fills</p>
+          {fills.slice(0, 12).map((f) => (
+            <li key={f.id || `${f.signature}-${f.created_at}`} className="flex justify-between gap-2 text-2xs">
+              <button type="button" className="truncate text-left text-muted hover:text-fg" onClick={() => openMint(f.mint)}>
+                {(f.side || "").toUpperCase()} · ${f.symbol} · {f.reason || ""}
+              </button>
+              <span className={Number(f.pnl_usd || 0) >= 0 ? "text-fg" : "text-dim"}>
+                {f.pnl_usd != null ? `${Number(f.pnl_usd) >= 0 ? "+" : ""}${formatUsd(f.pnl_usd)}` : formatUsd(f.usd_amount)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      <p className="px-4 py-3 text-2xs text-dim">{snap?.disclaimer || "Not financial advice."}</p>
+    </>
+  );
+}
+
+function PaperDeskView() {
   const nav = useNavigate();
   const tokens = useOrbitxStore((s) => s.city.districts.tokens || []);
   const orbitx = useOrbitxStore((s) => s.city.districts.orbitx);
@@ -55,7 +263,7 @@ export function AgentsView() {
   }
 
   return (
-    <div className="ox-scroll min-h-0 flex-1 overflow-auto bg-black">
+    <>
       <header className="border-b border-line px-4 py-3">
         <p className="ox-kicker text-accent">Paper desk · mock SOL</p>
         <h2 className="font-display text-lg text-fg">10k mock SOL agent network</h2>
@@ -112,7 +320,7 @@ export function AgentsView() {
         Mock fills never broadcast. Ids: {agents.map((a) => a.id).join(" · ") || "—"} · last mint{" "}
         {formatAddress(agents[0]?.live?.mint || "")}.
       </p>
-    </div>
+    </>
   );
 }
 

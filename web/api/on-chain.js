@@ -31,6 +31,7 @@ import {
 } from "../shared/orbitx-kol-directory.js";
 import { DEX_HUBS, epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
 import { simulatePaperDesk, PAPER_AGENTS, PAPER_STAKE_SOL } from "../shared/orbitx-paper-desk.js";
+import { snapshotLiveDesk } from "./orbitx/live-agent-engine.js";
 
 export const config = { maxDuration: 60 };
 
@@ -1138,6 +1139,14 @@ async function handleAgents(req, res, sb) {
   return json(res, 200, { ok: true, ...desk });
 }
 
+async function handleLiveDesk(req, res) {
+  const snap = await snapshotLiveDesk().catch((e) => ({
+    ok: false,
+    error: e instanceof Error ? e.message : "live_desk_failed",
+  }));
+  return json(res, snap.ok === false ? 503 : 200, snap);
+}
+
 async function handleEvents(req, res, sb) {
   const limit = Math.min(Number(req.query?.limit) || 50, 200);
   const cursor = String(req.query?.cursor || "").trim();
@@ -1450,6 +1459,7 @@ export default async function handler(req, res) {
     if (head === "search") return await handleSearch(req, res, sb);
     if (head === "kols") return await handleKols(req, res, sb);
     if (head === "agents" || head === "paper") return await handleAgents(req, res, sb);
+    if (head === "live-desk") return await handleLiveDesk(req, res);
     if (head === "districts") return await handleDistricts(req, res, sb);
     if (head === "trending") return await handleTrending(req, res, sb);
     if (head === "flows" && a) return await handleFlows(req, res, sb, a);

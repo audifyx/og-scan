@@ -391,6 +391,9 @@
     "api/on-chain.js": {
       "maxDuration": 60
     },
+    "api/live-agents.js": {
+      "maxDuration": 60
+    },
     "api/mcp-life-tick.js": {
       "maxDuration": 90
     },
@@ -431,6 +434,10 @@
     {
       "path": "/api/mcp-life-tick",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/live-agents?path=tick",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

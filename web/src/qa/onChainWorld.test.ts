@@ -22,7 +22,7 @@ describe("OrbitX /on-chain world", () => {
     expect(vercel).toContain('"/api/on-chain?path=ingest&force=1"');
     expect(vercel).toContain('"api/on-chain.js"');
     const api = readFileSync(resolve(WEB, "api/on-chain.js"), "utf8");
-      for (const path of ["live", "events", "wallet", "token", "transaction", "block", "orbitx", "search", "flows", "ingest", "status", "kols", "agents", "districts", "trending"]) {
+      for (const path of ["live", "events", "wallet", "token", "transaction", "block", "orbitx", "search", "flows", "ingest", "status", "kols", "agents", "live-desk", "districts", "trending"]) {
       expect(api).toContain(path);
     }
     expect(api).toContain("activeOrbitxKols");
@@ -31,6 +31,7 @@ describe("OrbitX /on-chain world", () => {
     expect(api).toContain("handleTransaction");
     expect(api).toContain("handleTrending");
     expect(api).toContain("handleAgents");
+    expect(api).toContain("handleLiveDesk");
     expect(api).toContain("simulatePaperDesk");
     expect(api).toContain("decorateKols");
     expect(api).toContain("ox_paper_fills");
@@ -183,6 +184,8 @@ describe("OrbitX /on-chain world", () => {
     expect(dash).toContain("AgentsView");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("10k mock SOL");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("Currently buying");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("Live SOL");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("LIVE_WALLET_PUBKEY");
     expect(readFileSync(resolve(WEB, "src/components/theme/PlatformDock.tsx"), "utf8")).not.toContain('"/on-chain"');
     expect(readFileSync(resolve(WEB, "src/components/theme/platform-shell.css"), "utf8")).toContain("z-index: 9999");
   });
@@ -486,6 +489,27 @@ describe("OrbitX /on-chain world", () => {
     expect(sql).toContain("ox_paper_agents");
     expect(sql).toContain("ox_paper_fills");
     expect(sql).toContain("ox_chain_kol_state");
+    expect(sql).toContain("enable row level security");
+  });
+
+  it("runs a real-SOL live desk with $2 clips and full take-profit", async () => {
+    const { LIVE_TRADE_USD, LIVE_AGENTS, LIVE_WALLET_PUBKEY, decideLiveExit, sizeLiveBuy, screenLiveCandidate } = await import("../../shared/orbitx-live-desk.js");
+    expect(LIVE_TRADE_USD).toBe(2);
+    expect(LIVE_AGENTS).toHaveLength(3);
+    expect(LIVE_WALLET_PUBKEY).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
+    expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.3 }, 1.3).action).toBe("take_profit");
+    expect(sizeLiveBuy({ solBalance: 0.05, solUsd: 150, openCount: 0 }).usd).toBe(2);
+    expect(screenLiveCandidate({ mint: "x", liquidity_usd: 10 }, { canSell: false }).ok).toBe(false);
+    const vercel = readFileSync(resolve(WEB, "vercel.json"), "utf8");
+    expect(vercel).toContain("/api/live-agents?path=tick");
+    expect(vercel).not.toMatch(/LIVE_AGENT_WALLET_SECRET.{0,20}[1-9A-HJ-NP-Za-km-z]{80,}/);
+    const engine = readFileSync(resolve(WEB, "api/orbitx/live-agent-engine.js"), "utf8");
+    expect(engine).toContain("LIVE_AGENT_WALLET_SECRET");
+    expect(engine).not.toContain("secretBase58");
+    const sql = readFileSync(resolve(REPO, "supabase/migrations/20260907043000_ox_live_agent_desk.sql"), "utf8");
+    expect(sql).toContain("ox_live_desk");
+    expect(sql).toContain("ox_live_positions");
+    expect(sql).toContain("ox_live_fills");
     expect(sql).toContain("enable row level security");
   });
 });
