@@ -207,7 +207,7 @@ const SLASH_ALIAS = {
 };
 
 function slashFor(tool) {
-  return SLASH_ALIAS[tool] || toolToSlashCommand(tool, "agent") || String(tool || "").replace(/^orbitx_/, "");
+  return toolToSlashCommand(tool, "agent") || String(tool || "").replace(/^orbitx_/, "");
 }
 
 function chainLabel(chain) {
@@ -350,28 +350,20 @@ function inlineKeyboard(rows) {
 export function deskKeyboard() {
   return inlineKeyboard([
     [
-      { text: "🚀 Coins", callback_data: "ox:coins" },
-      { text: "📈 Charts", callback_data: "ox:charts" },
+      { text: "🚀 /get_token", callback_data: "ox:coins" },
+      { text: "📈 /dex_chart", callback_data: "ox:charts" },
     ],
     [
-      { text: "🛡️ Scan", callback_data: "ox:scan" },
-      { text: "📡 Pulse", callback_data: "ox:scanners" },
+      { text: "🛡️ /full_report", callback_data: "ox:scan" },
+      { text: "📡 /screen_tokens", callback_data: "ox:scanners" },
     ],
     [
-      { text: "🎬 Grok", callback_data: "ox:media" },
-      { text: "🛍️ Shop", callback_data: "ox:shop" },
+      { text: "🎬 /generate_image", callback_data: "ox:media" },
+      { text: "👛 /get_wallet", callback_data: "ox:wallet" },
     ],
     [
-      { text: "⚡ Trade", callback_data: "ox:trade" },
-      { text: "👛 Wallet", callback_data: "ox:wallet" },
-    ],
-    [
-      { text: "🧪 Launch", callback_data: "ox:launch" },
-      { text: "✦ FAQ", callback_data: "ox:ai" },
-    ],
-    [
+      { text: "✦ /cmds", callback_data: "ox:desk" },
       { text: "🔗 Links", callback_data: "ox:links" },
-      { text: "🩺 Health", callback_data: "ox:system" },
     ],
   ]);
 }
@@ -407,13 +399,15 @@ export function formatTelegramStartGate({
   if (open) {
     const until = formatOpenUntilLabel();
     const text = [
-      "Welcome to the <b>OrbitX MCP bot</b> on Telegram.",
+      "Welcome to <b>OrbitX MCP</b> on Telegram.",
       "",
-      `MCP is <b>free for everyone until ${tgEsc(until)}</b> during testing and development.`,
-      "Every live MCP tool is on this bot — /cmds for the catalog, /call name to run any of them.",
+      `MCP is <b>free for everyone until ${tgEsc(until)}</b> during testing.`,
+      "Every <b>public</b> MCP tool is a slash command — names match the catalog.",
+      "/get_token · /full_report · /dex_chart · /xray · /crypto_scan · /cmds",
+      "/call name args runs any live tool. Auth-link tools are not on this bot.",
       "",
-      "Groups: drop a CA or /token /chart /scan.",
-      "DMs: <code>/login</code> links YOUR wallet so /trade /shop /tweet work, and so Claude/Cursor/Grok MCP results push here.",
+      "Groups: drop a CA or paste a GMGN / Dexscreener URL.",
+      "DMs: <code>/login</code> links YOUR wallet so /trade works, and Claude/Cursor/Grok MCP results push here.",
       linked ? "" : "Trades need <code>/login</code> first so the tx is YOUR wallet.",
       accessLine,
       "",
@@ -788,7 +782,7 @@ function formatTokenList(raw, title = "Pulse") {
     return `${i + 1}. <b>$${tgEsc(sym)}</b>  ${tgEsc(fmtUsd(price))}  ${tgEsc(fmtPct(ch))}  MC ${tgEsc(fmtUsd(mc))}`;
   });
   return {
-    text: [`📡 <b>${tgEsc(title)}</b> · ${items.length} tokens`, "", ...rows, "", "Tap a CA with /token for the full intel card."].join("\n"),
+    text: [`📡 <b>${tgEsc(title)}</b> · ${items.length} tokens`, "", ...rows, "", "Tap a CA with /get_token for the full intel card."].join("\n"),
     reply_markup: inlineKeyboard([
       [
         { text: "🚀 Coins", callback_data: "ox:coins" },
@@ -1231,8 +1225,9 @@ const FAMILY_MENUS = {
     menuCard("coins", [
       "Drop a mint in chat — or run these:",
       "",
-      "<b>/token</b> <code>CA</code> — flagship intel card",
-      "<b>/scan</b> <code>CA</code> — safety + forensics overlay",
+      "<b>/get_token</b> <code>CA</code> — flagship intel card (alias /token)",
+      "<b>/full_report</b> <code>CA</code> — max-depth dossier",
+      "<b>/crypto_scan</b> <code>CA</code> — safety + forensics (alias /scan)",
       "<b>/xray</b> <code>CA</code> — bundles, snipers, concentration",
       "<b>/research</b> <code>CA</code> — utility brief, no hopium",
       "<b>/search</b> <code>ticker</code> — find the mint first",
@@ -1241,32 +1236,30 @@ const FAMILY_MENUS = {
     ]),
   charts: () =>
     menuCard("charts", [
-      "<b>/chart</b> <code>CA</code> — DexScreener live + OrbitX DEX",
-      "/call chart_1h_solana mint=CA — OHLCV candles",
+      "<b>/dex_chart</b> <code>CA</code> — DexScreener live + OrbitX DEX (alias /chart)",
+      "/get_chart mint=CA — OHLCV candles",
       "",
       "Quick links land under every coin card: Dex · Jupiter · Birdeye · Solscan.",
     ]),
   scanners: () =>
     menuCard("scanners", [
-      "<b>/screen</b> — trending Solana",
-      "/call screen_new_pairs_1h_solana",
-      "/call pulse_organic_solana",
+      "<b>/screen_tokens</b> — trending Solana (alias /screen)",
       "/search BONK",
       "",
-      "Each row is a teaser. /token CA for the full card.",
+      "Each row is a teaser. /get_token CA for the full card.",
     ]),
   scan: () =>
     menuCard("scan", [
-      "<b>/scan</b> <code>CA</code> — branded safety card",
-      "<b>/xray</b> · <b>/research</b> · /call get_forensics mint=CA",
+      "<b>/full_report</b> <code>CA</code> — dossier",
+      "<b>/crypto_scan</b> · <b>/xray</b> · /get_forensics · /get_safety",
       "",
       "Mint/freeze, top holders, organic, LP lock, dev % — omitted if unknown. Never faked.",
     ]),
   wallet: () =>
     menuCard("wallet", [
-      "<b>/wallet</b> <code>address</code>",
-      "Linked DMs: /wallet with no args uses YOUR wallet.",
-      "/call get_swaps · /call get_balance",
+      "<b>/get_wallet</b> <code>address</code> (alias /wallet)",
+      "Linked DMs: /get_wallet with no args uses YOUR wallet.",
+      "/get_swaps · /get_balance",
     ]),
   trade: () =>
     menuCard("trade", [
@@ -1291,9 +1284,9 @@ const FAMILY_MENUS = {
     ]),
   media: () =>
     menuCard("media", [
-      "<b>/img</b> neon saturn city",
-      "<b>/vid</b> orbitx trailer",
-      "<b>/check</b> — countdown until Grok lands (a few minutes)",
+      "<b>/generate_image</b> neon saturn city  (alias /img)",
+      "<b>/generate_video</b> orbitx trailer  (alias /vid)",
+      "<b>/media_status</b> — poll Grok (alias /check)",
       "",
       "Keep /check. Don’t assume OrbitX is down while it cooks.",
     ]),
@@ -1388,25 +1381,24 @@ export function formatToolMenu(toolOrCmd) {
 export function formatHelpDesk(isPrivate = false, linked = false) {
   const gate = isPrivate
     ? linked
-      ? "Account linked. /trade /buy /orbitx /shop /launch are live in this DM. /reset starts you as a fresh user."
-      : "/login binds THIS Telegram to YOUR wallet. /reset logs out and wipes access so you can start over."
-    : "Groups stay public. Drop a CA or $ORBITX here. /trade /buy /tweet only in DM after /login.";
+      ? "Account linked. Typed /trade /buy still work in this DM. Slash menu is public MCP only."
+      : "/login binds THIS Telegram to YOUR wallet. Public MCP cmds work without it."
+    : "Groups stay public. Drop a CA. Slash cmds match MCP tool names. /trade only in DM after /login.";
   const text = [
-    "🚀 <b>OrbitX Desk</b> · @theorbitxmcpbot",
-    "Premium intel · live charts · Grok · shop burns · Jupiter trades",
+    "🚀 <b>OrbitX MCP</b> · @theorbitxmcpbot",
+    "Slash commands = live MCP tools. No auth-link tools on this bot.",
     "",
-    "<b>💰 Coins</b> — drop a CA or /token mint",
-    "<b>📈 Charts</b> — /chart CA",
-    "<b>🛡️ Scan</b> — /scan · /xray · /research",
-    "<b>📡 Pulse</b> — /screen · /search",
-    "<b>🎬 Grok</b> — /img · /vid · /check",
-    "<b>🛍️ Shop</b> — /shop hour · /shop day · /shop week · /shop month",
-    "<b>✦ Ask</b> — /faq · /ask · just type",
+    "<b>/get_token</b> CA — intel card  ·  alias /token",
+    "<b>/full_report</b> CA — max-depth dossier  ·  /xray /crypto_scan",
+    "<b>/dex_chart</b> CA — DexScreener  ·  alias /chart",
+    "<b>/screen_tokens</b> · /search ticker · /get_wallet",
+    "<b>/generate_image</b> · /generate_video · /media_status",
+    "<b>/faq</b> · /links · /check · aliases /img /vid /token still work",
+    "<b>/call</b> name args — any MCP tool  ·  /cmds catalog",
     "",
     tgEsc(gate),
     "",
     `GC ${href(ORBITX_GC, "t.me/orbitxwrld")} · ${href(ORBITX_HOST, "orbitx.world")}`,
-    "/cmds for the full live catalog · tap a button below",
   ].join("\n");
   return { text, reply_markup: deskKeyboard() };
 }
@@ -1609,7 +1601,7 @@ export function formatOrbitXTelegramResult(result, tool) {
     };
   }
   return {
-    text: `${(FAMILY_META[family] || FAMILY_META.system).emoji} Got a result. Try /token mint, /chart ca, /cmds, or /links.`,
+    text: `${(FAMILY_META[family] || FAMILY_META.system).emoji} Got a result. Try /get_token mint, /dex_chart ca, /cmds, or /links.`,
     reply_markup: deskKeyboard(),
   };
 }

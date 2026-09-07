@@ -96,6 +96,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(isPrivilegedTelegramTool("x_post")).toBe(true);
     expect(isPrivilegedTelegramTool("orbitx_auth_link")).toBe(true);
     expect(isPublicTelegramTool("orbitx_auth_link")).toBe(false);
+    expect(isPrivilegedTelegramTool("orbitx_x_connect")).toBe(true);
+    expect(isPublicTelegramTool("orbitx_x_connect")).toBe(false);
+    expect(isPublicTelegramTool("orbitx_x_post")).toBe(false);
   });
 
   it("maps slash commands and infers public media / CA messages", () => {
@@ -143,6 +146,23 @@ describe("official OrbitX Telegram bot", () => {
     expect(resolveOfficialCommand("xray").tool).toBe("orbitx_xray");
     expect(resolveOfficialCommand("report").tool).toBe("orbitx_full_report");
     expect(resolveOfficialCommand("full").tool).toBe("orbitx_full_report");
+    expect(resolveOfficialCommand("get_token").tool).toBe("orbitx_get_token");
+    expect(resolveOfficialCommand("full_report").tool).toBe("orbitx_full_report");
+    expect(resolveOfficialCommand("dex_chart").tool).toBe("orbitx_dex_chart");
+    expect(resolveOfficialCommand("crypto_scan").tool).toBe("orbitx_crypto_scan");
+    expect(resolveOfficialCommand("generate_image").tool).toBe("orbitx_generate_image");
+    expect(argsFromCommand("get_token", "/get_token 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9").mint).toBe(
+      "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    );
+    expect(argsFromCommand("full_report", "/full_report 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")).toMatchObject({
+      mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      depth: "standard",
+      includeWallets: false,
+    });
+    expect(argsFromCommand("generate_image", "/generate_image neon saturn")).toMatchObject({ prompt: "neon saturn" });
+    expect(argsFromCommand("get_wallet", "/get_wallet So11111111111111111111111111111111111111112").address).toBe(
+      "So11111111111111111111111111111111111111112",
+    );
     const ansem = "9cRCn9rGT8V2imeM2Baks13yhMEais3ruM3rPvTGpump";
     expect(isTokenProjectQuestion(`can you tell me about ${ansem}`)).toBe(true);
     expect(inferPublicTool(`can you tell me about ${ansem}`)?.tool).toBe("orbitx_full_report");
@@ -229,11 +249,17 @@ describe("official OrbitX Telegram bot", () => {
         { name: "orbitx_get_token", description: "Token intel" },
         { name: "orbitx_telegram_status", description: "Telegram link" },
         { name: "orbitx_buy", description: "Buy" },
+        { name: "orbitx_auth_link", description: "Auth link" },
+        { name: "orbitx_auth_status", description: "Auth status" },
       ],
     });
-    expect(cmds.some((c) => c.command === "token" || c.command === "get_token")).toBe(true);
+    expect(cmds.map((c) => c.command).slice(0, 4)).toEqual(["start", "help", "cmds", "call"]);
+    expect(cmds.some((c) => c.command === "get_token")).toBe(true);
     expect(cmds.some((c) => c.command === "telegram_status" || c.command === "status")).toBe(true);
-    expect(cmds.length).toBeGreaterThan(20);
+    expect(cmds.some((c) => c.command === "buy")).toBe(false);
+    expect(cmds.some((c) => c.command === "auth_link")).toBe(false);
+    expect(cmds.some((c) => c.command === "auth_status")).toBe(false);
+    expect(cmds.length).toBeGreaterThan(4);
     expect(cmds.length).toBeLessThanOrEqual(100);
     const openGate = { accessActive: true, unlocked: false, openTesting: true };
     expect(dmAllowsCommand(openGate, "token", "/token")).toBe(true);
@@ -242,6 +268,26 @@ describe("official OrbitX Telegram bot", () => {
     expect(dmAllowsCommand({ accessActive: false, unlocked: false }, "token", "/token")).toBe(false);
     expect(isPublicTelegramTool("orbitx_telegram_status")).toBe(true);
     expect(isAgentTelegramToolAllowed("orbitx_telegram_send")).toBe(true);
+  });
+
+  it("fills Telegram's 100 slash slots from public MCP tools with matching names", async () => {
+    const { listAllOrbitXTools } = await import("../../api/orbitx-hub.js");
+    const cmds = buildOfficialTelegramCommands({ tools: listAllOrbitXTools() });
+    const names = cmds.map((c) => c.command);
+    expect(cmds.length).toBe(100);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names.slice(0, 4)).toEqual(["start", "help", "cmds", "call"]);
+    expect(names).toContain("get_token");
+    expect(names).toContain("full_report");
+    expect(names).toContain("dex_chart");
+    expect(names.indexOf("get_token")).toBeLessThan(12);
+    expect(names.indexOf("full_report")).toBeLessThan(12);
+    expect(names).not.toContain("buy");
+    expect(names).not.toContain("auth_link");
+    expect(names).not.toContain("auth_status");
+    expect(names).not.toContain("x_connect");
+    expect(names).not.toContain("x_post");
+    expect(isAgentTelegramToolAllowed("orbitx_auth_link")).toBe(false);
   });
 
   it("handles public group triggers, forum threads, and anonymous admins", () => {
@@ -878,6 +924,11 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("OFFICIAL_ORBITX_TELEGRAM_SYSTEM");
     expect(api).toContain("wait: false");
     expect(api).toContain("async function ensureWebhook");
+    expect(api).toContain("setMyName");
+    expect(api).toContain("listAllOrbitXTools");
+    expect(api).toContain("brand/orbitx-telegram-bot.png");
+    expect(api).toContain("icon-512x512.png");
+    expect(api).toContain('sendPhoto');
     expect(api).toContain("buildBrandedScan");
     expect(api).toContain("fetchTelegramTokenSnapshot");
     expect(api).toContain("alreadyHandledUpdate");

@@ -7,7 +7,7 @@
 import { isMcpOpenTesting, formatOpenUntilLabel } from "./mcp-open-window.js";
 import { isHoldGatedTool } from "./token-hold.js";
 import { isAllowedGatedDmCommand } from "./telegram-bot-access.js";
-import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
+import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand, buildPublicMcpTelegramCommands, isTelegramAuthMcpTool, isAgentTelegramToolAllowed } from "./telegram-mcp-allowlist.js";
 import { applyTelegramAlias, hasExplicitTradeAmount, parseTradeIntent } from "./telegram-trade-intent.js";
 import { ORBITX_MINT } from "./telegram-token-snapshot.js";
 import {
@@ -37,11 +37,11 @@ import {
 } from "./telegram-tool-cards.js";
 
 export const OFFICIAL_BOT_USERNAME = "theorbitxmcpbot";
-export const OFFICIAL_BOT_NAME = "OrbitX";
+export const OFFICIAL_BOT_NAME = "OrbitX MCP";
 export const OFFICIAL_BOT_SHORT =
-  "Official OrbitX MCP bot — every live tool, charts, scans, Grok, and (in DMs after /login) trade.";
+  "Official OrbitX MCP — every public tool as a slash command. Drop a CA. /cmds · /call name.";
 export const OFFICIAL_BOT_ABOUT =
-  "OrbitX's official Telegram bot. MCP is free for everyone during testing through 7 Nov 2026. Groups: drop a CA or /token /chart /scan. DMs: /login to trade and to receive MCP results from Claude/Cursor/Grok. /cmds lists the live catalog. /reset starts you as a fresh user.";
+  "OrbitX MCP on Telegram. Public intel is free during testing through 7 Nov 2026. Slash commands match MCP tool names (/get_token, /full_report, /dex_chart, /xray). Groups: drop a CA. /cmds lists the live catalog. /call name runs any tool. DMs: /login to trade and to receive Claude/Cursor/Grok MCP results. Auth-link tools are not on this bot.";
 
 const GROUP_ANON = "groupanonymousbot";
 
@@ -146,7 +146,7 @@ export function formatOrbitXHomeWelcomeHtml() {
   return [
     "🚀 <b>OrbitX community desk is live</b>",
     `Official group: ${ORBITX_GC}`,
-    "Drop a CA or /token /chart /scan — public intel stays on in this chat.",
+    "Drop a CA or /get_token /full_report /dex_chart — slash names match MCP. Public intel stays on in this chat.",
     "Trades / shop / tweet stay in a DM with @theorbitxmcpbot after /login.",
   ].join("\n");
 }
@@ -193,13 +193,13 @@ export function formatGroupWelcomeHtml(chat, opts = {}) {
     return [
       "🚀 <b>OrbitX is in this group</b>",
       `MCP is free for everyone until <b>${formatOpenUntilLabel()}</b> during testing.`,
-      "Drop a CA or /token /chart /scan. Trade / tweet stay in a DM after /login.",
+      "Drop a CA or /get_token /full_report /dex_chart. Slash names match MCP. Trade stays in a DM after /login.",
     ].join("\n");
   }
   return [
     "🚀 <b>OrbitX is in this group</b>",
     "This bot is locked. Each person DMs @theorbitxmcpbot, types the access code they received from us, then <code>/login</code>.",
-    "After that, drop a CA or /token /chart /scan here.",
+    "After that, drop a CA or /get_token /full_report /dex_chart here.",
   ].join("\n");
 }
 
@@ -224,6 +224,7 @@ export function isPrivilegedTelegramTool(name) {
   if (n.startsWith("orbitx_mcp_access_")) return true;
   if (isHoldGatedTool(n)) return true;
   if (n.startsWith("x_") && !["x_menu", "x_help", "x_tools_help"].includes(n)) return true;
+  if (n.startsWith("orbitx_x_") && !["orbitx_x_menu", "orbitx_x_help", "orbitx_x_tools_help"].includes(n)) return true;
   return WRITE_PREFIXES.some((re) => re.test(n));
 }
 
@@ -310,18 +311,31 @@ const PRIORITY_TOOL = {
   img: "orbitx_generate_image",
   vid: "orbitx_generate_video",
   media: "orbitx_media_status",
+  generate_image: "orbitx_generate_image",
+  generate_video: "orbitx_generate_video",
+  media_status: "orbitx_media_status",
+  grok_image: "orbitx_grok_image",
+  grok_video: "orbitx_grok_video",
   token: "orbitx_get_token",
+  get_token: "orbitx_get_token",
   chart: "orbitx_dex_chart",
+  dex_chart: "orbitx_dex_chart",
+  get_chart: "orbitx_get_chart",
   scan: "orbitx_crypto_scan",
+  crypto_scan: "orbitx_crypto_scan",
   xray: "orbitx_xray",
   report: "orbitx_full_report",
   full: "orbitx_full_report",
   dossier: "orbitx_full_report",
+  full_report: "orbitx_full_report",
   research: "orbitx_research",
   search: "orbitx_search",
   screen: "orbitx_screen_tokens",
+  screen_tokens: "orbitx_screen_tokens",
   wallet: "orbitx_get_wallet",
+  get_wallet: "orbitx_get_wallet",
   health: "orbitx_health",
+  fetch: "fetch",
   call: null,
   buy: "orbitx_prepare_buy",
   trade: "orbitx_prepare_buy",
@@ -357,7 +371,31 @@ export function resolveOfficialCommand(cmd) {
 
 export const DEFAULT_TELEGRAM_BUY_SOL = 0.05;
 export const DEFAULT_TELEGRAM_SELL_AMOUNT = "100%";
-const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "report", "full", "dossier", "buy", "sell", "trade", "swap"];
+const MINT_COMMANDS = [
+  "token",
+  "chart",
+  "xray",
+  "research",
+  "scan",
+  "report",
+  "full",
+  "dossier",
+  "get_token",
+  "full_report",
+  "crypto_scan",
+  "dex_chart",
+  "get_chart",
+  "get_forensics",
+  "get_safety",
+  "get_ath",
+  "get_metadata",
+  "report_url",
+  "open_dex",
+  "buy",
+  "sell",
+  "trade",
+  "swap",
+];
 const BUY_COMMANDS = ["buy", "trade", "swap"];
 const BUY_TOOLS = new Set([
   "orbitx_prepare_buy",
@@ -386,12 +424,27 @@ export function applyDefaultBuyAmount(tool, args) {
 export function argsFromCommand(command, text) {
   const rest = String(text || "").replace(/^\S+\s*/, "").trim();
   const args = rest ? parseCallArgs(rest) : {};
-  if ((command === "img" || command === "vid" || command === "tweet" || command === "post" || command === "ask") && rest) {
+  if (
+    (
+      command === "img" ||
+      command === "vid" ||
+      command === "generate_image" ||
+      command === "generate_video" ||
+      command === "grok_image" ||
+      command === "grok_video" ||
+      command === "tweet" ||
+      command === "post" ||
+      command === "ask"
+    ) &&
+    rest
+  ) {
     if (!args.prompt) args.prompt = rest;
     if (!args.text && (command === "tweet" || command === "post")) args.text = rest;
     if (!args.q && command === "ask") args.q = rest;
   }
-  if (command === "media" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
+  if ((command === "media" || command === "media_status") && rest && !args.taskId) {
+    args.taskId = rest.split(/\s+/)[0];
+  }
   if (command === "check" && rest && !args.taskId) args.taskId = rest.split(/\s+/)[0];
   if (
     (MINT_COMMANDS.includes(command) || command === "orbitx") &&
@@ -425,7 +478,7 @@ export function argsFromCommand(command, text) {
     args.q = rest;
     args.query = rest;
   }
-  if (command === "wallet" && rest && !args.address) {
+  if ((command === "wallet" || command === "get_wallet") && rest && !args.address) {
     args.address = rest.split(/\s+/)[0];
     args.publicKey = args.address;
   }
@@ -436,8 +489,8 @@ export function argsFromCommand(command, text) {
     args.ca = token;
   }
   if (command === "faq" && rest && !args.q) args.q = rest;
-  if (command === "screen" && !args.chain) args.chain = "solana";
-  if (["report", "full", "dossier"].includes(command)) {
+  if ((command === "screen" || command === "screen_tokens") && !args.chain) args.chain = "solana";
+  if (["report", "full", "dossier", "full_report"].includes(command)) {
     if (!args.depth) args.depth = "standard";
     if (args.includeWallets == null) args.includeWallets = false;
   }
@@ -673,28 +726,18 @@ export function cmdsPage(tools, opts = {}) {
   return cmdsPageImpl(tools, { ...opts, isPrivileged: isPrivilegedTelegramTool });
 }
 
-/** Fill Telegram's 100 slash-command slots from the live MCP catalog. */
+/** Fill Telegram's 100 slash-command slots from the live public MCP catalog. */
 export function buildOfficialTelegramCommands({ kind = "private", tools = [] } = {}) {
-  const base = kind === "private" ? PRIVATE_COMMANDS : GROUP_COMMANDS;
-  const out = [];
-  const seen = new Set();
-  for (const c of base) {
-    if (!c?.command || seen.has(c.command)) continue;
-    seen.add(c.command);
-    out.push({ command: c.command, description: String(c.description || "").slice(0, 256) });
-  }
-  for (const t of tools) {
-    if (out.length >= 100) break;
-    const name = typeof t === "string" ? t : t?.name;
-    if (!name) continue;
-    if (kind !== "private" && isPrivilegedTelegramTool(name)) continue;
-    const cmd = toolToSlashCommand(name, "agent");
-    if (!cmd || seen.has(cmd)) continue;
-    seen.add(cmd);
-    const desc = typeof t === "string" ? `MCP ${name}` : t.description || `MCP ${name}`;
-    out.push({ command: cmd, description: String(desc).slice(0, 256) });
-  }
-  return out.slice(0, 100);
+  void kind;
+  return buildPublicMcpTelegramCommands(tools, {
+    limit: 100,
+    allow: (name) => {
+      if (isTelegramAuthMcpTool(name)) return false;
+      if (!isAgentTelegramToolAllowed(name)) return false;
+      if (!isPublicTelegramTool(name)) return false;
+      return true;
+    },
+  });
 }
 
 /** Public intel in DMs during the free window (or after a code) without /login. */
