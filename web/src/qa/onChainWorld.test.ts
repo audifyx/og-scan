@@ -539,6 +539,8 @@ describe("OrbitX /on-chain world", () => {
     expect(city).toContain("River");
     expect(city).toContain("Snow");
     expect(city).toContain("Birds");
+    expect(city).toContain("absolute inset-0");
+    expect(ui).toContain("relative min-h-0 flex-1 overflow-hidden");
     const feedUi = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/LiveAgentFeed.tsx"), "utf8");
     expect(feedUi).toContain("solscan");
     expect(feedUi).toContain("What the desk is doing");

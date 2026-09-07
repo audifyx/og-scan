@@ -50,8 +50,10 @@ export function LiveAgentCity({ snap: snapProp }: { snap?: LiveDeskPayload | nul
   if (!webgl) return <CityFallback world={world} />;
 
   return (
-    <div className="relative min-h-0 flex-1 bg-black">
+    <div className="absolute inset-0 h-full min-h-0 w-full overflow-hidden bg-black">
       <Canvas
+        className="absolute inset-0 h-full w-full"
+        style={{ width: "100%", height: "100%", display: "block" }}
         shadows
         camera={{ position: [38, 24, 46], fov: 40, near: 0.1, far: 420 }}
         dpr={[1, 1.5]}
@@ -740,7 +742,7 @@ function Hud({ world, climate }: { world: WorldSnap; climate: Climate }) {
 
 function CityFallback({ world }: { world: WorldSnap }) {
   return (
-    <div className="ox-scroll min-h-0 flex-1 overflow-auto bg-black p-4">
+    <div className="ox-scroll absolute inset-0 h-full overflow-auto bg-black p-4">
       <p className="ox-kicker text-accent">Live city · map</p>
       <h2 className="font-display text-lg text-fg">Growing street grid</h2>
       <p className="mt-1 text-2xs text-dim">

@@ -19,8 +19,8 @@ import { LiveAgentCity } from "./LiveAgentCity";
 export function AgentsView() {
   const [desk, setDesk] = useState<"paper" | "live">("live");
   return (
-    <div className="ox-scroll min-h-0 flex-1 overflow-auto bg-black">
-      <div className="flex gap-1 border-b border-line px-4 py-2">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-black">
+      <div className="flex shrink-0 gap-1 border-b border-line px-4 py-2">
         <button
           type="button"
           className={`rounded-full px-3 py-1 text-2xs font-semibold uppercase tracking-wide ${desk === "live" ? "bg-fg text-bg" : "text-dim hover:text-fg"}`}
@@ -36,7 +36,9 @@ export function AgentsView() {
           Paper 10k
         </button>
       </div>
-      {desk === "live" ? <LiveDeskView /> : <PaperDeskView />}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {desk === "live" ? <LiveDeskView /> : <PaperDeskView />}
+      </div>
     </div>
   );
 }
@@ -155,26 +157,27 @@ function LiveDeskView() {
 
   if (pane === "feed") {
     return (
-      <>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {paneTabs}
         <LiveAgentFeed snap={snap} now={now} />
-      </>
+      </div>
     );
   }
   if (pane === "city") {
     return (
-      <>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {paneTabs}
-        <div className="min-h-[70vh] flex-1">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           <LiveAgentCity snap={snap} />
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {paneTabs}
+      <div className="ox-scroll min-h-0 flex-1 overflow-auto">
       <header className="border-b border-line px-4 py-3">
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
@@ -381,7 +384,8 @@ function LiveDeskView() {
         </ol>
       ) : null}
       <p className="px-4 py-3 text-2xs text-dim">{snap?.disclaimer || "Not financial advice."}</p>
-    </>
+      </div>
+    </div>
   );
 }
 
@@ -434,7 +438,7 @@ function PaperDeskView() {
   }
 
   return (
-    <>
+    <div className="ox-scroll min-h-0 flex-1 overflow-auto">
       <header className="border-b border-line px-4 py-3">
         <p className="ox-kicker text-accent">Paper desk · mock SOL</p>
         <h2 className="font-display text-lg text-fg">10k mock SOL agent network</h2>
@@ -491,7 +495,7 @@ function PaperDeskView() {
         Mock fills never broadcast. Ids: {agents.map((a) => a.id).join(" · ") || "—"} · last mint{" "}
         {formatAddress(agents[0]?.live?.mint || "")}.
       </p>
-    </>
+    </div>
   );
 }
 

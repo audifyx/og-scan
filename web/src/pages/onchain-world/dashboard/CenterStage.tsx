@@ -104,7 +104,7 @@ export function CenterStage() {
       {view === "agents" ? <AgentsView /> : null}
       {view === "feed" ? <LiveAgentFeed /> : null}
       {view === "city" ? (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           <LiveAgentCity />
         </div>
       ) : null}
