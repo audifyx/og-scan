@@ -416,4 +416,47 @@ describe("live agent engine tick", () => {
     expect(sellFill.pnl_usd).toBeGreaterThan(0);
     expect(sell.usd_balance).toBeGreaterThan(9_800);
   });
+
+  it("paper desk apes the ranked coin even when the live screen would skip it, once per 5 minutes", async () => {
+    const sb = memSb();
+    sb._tables.ox_live_desk[0] = { id: "main", armed: false, paused: false, paper: true, paper_start_usd: 10_000 };
+    const topped = {
+      mint: "ToppedMint11111111111111111111111111111111",
+      symbol: "TOPPED",
+      change_1h: 240,
+      change_5m: 30,
+      change_24h: 900,
+      volume_24h: 20_000,
+      liquidity_usd: 3_000,
+      market_cap: 90_000,
+      pair_age_min: 4,
+      price_usd: 0.001,
+      buys_1h: 3,
+    };
+    const first = await tickLiveDesk({ sb, sol_usd: 100, tape: async () => [topped], safety: async () => ({ canBuy: false, canSell: false }), mark: async () => 0.001 });
+    expect(first.actions.some((a) => a.type === "buy" && a.symbol === "TOPPED")).toBe(true);
+    expect(sb._tables.ox_live_events.some((e) => e.kind === "skip")).toBe(false);
+
+    sb._tables.ox_live_desk[0].last_tick_at = new Date(Date.now() - 60_000).toISOString();
+    const second = {
+      ...topped,
+      mint: "SecondMint11111111111111111111111111111111",
+      symbol: "SECOND",
+    };
+    const cooled = await tickLiveDesk({ sb, sol_usd: 100, tape: async () => [second], safety: async () => ({}), mark: async () => 0.001 });
+    expect(cooled.skipped).toBe("paper_cooldown");
+    expect(cooled.actions.some((a) => a.type === "buy")).toBe(false);
+
+    for (const f of sb._tables.ox_live_fills) f.created_at = new Date(Date.now() - 6 * 60_000).toISOString();
+    sb._tables.ox_live_desk[0].last_tick_at = new Date(Date.now() - 60_000).toISOString();
+    const third = await tickLiveDesk({ sb, sol_usd: 100, tape: async () => [second], safety: async () => ({}), mark: async () => 0.001 });
+    expect(third.actions.some((a) => a.type === "buy" && a.symbol === "SECOND")).toBe(true);
+    expect(sb._tables.ox_live_positions.filter((p) => p.status === "open").length).toBe(2);
+
+    const jup = { ...topped, mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", market_cap: 2_000_000_000, liquidity_usd: 50_000_000, volume_24h: 90_000_000 };
+    for (const f of sb._tables.ox_live_fills) f.created_at = new Date(Date.now() - 6 * 60_000).toISOString();
+    sb._tables.ox_live_desk[0].last_tick_at = new Date(Date.now() - 60_000).toISOString();
+    const major = await tickLiveDesk({ sb, sol_usd: 100, tape: async () => [jup], safety: async () => ({}), mark: async () => 0.001 });
+    expect(major.actions.some((a) => a.type === "buy")).toBe(false);
+  });
 });

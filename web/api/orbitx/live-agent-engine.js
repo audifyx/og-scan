@@ -98,6 +98,16 @@ const PAPER_CTX = { paper: false };
 export const PAPER_START_USD_DEFAULT = 10_000;
 export const PAPER_CLIP_PCT = 0.02;
 export const PAPER_SIGNATURE = "paper";
+export const PAPER_MAX_OPEN = 6;
+export const PAPER_APE_EVERY_MS = 5 * 60_000;
+const PAPER_HARD_SKIP = /bad mint|sol mint|stable \/ skip|mcap too large/;
+/** Paper desk apes: only hard filters (bad mint, SOL/stables, majors, too-large MC, no price). */
+export function paperApeOk(coin, screenFn = screenLiveCandidate) {
+  if (!(num(coin?.price_usd) > 0)) return false;
+  if (liveIsMajor(coin)) return false;
+  const cheap = screenFn(coin, { canBuy: true, canSell: true });
+  return !(cheap.reasons || []).some((r) => PAPER_HARD_SKIP.test(String(r)));
+}
 function paperCashUsd(fills, startUsd) {
   let cash = num(startUsd);
   for (const f of fills || []) {
@@ -721,7 +731,7 @@ export async function snapshotLiveDesk(opts = {}) {
 
 async function recordFill(sb, row) {
   if (!sb) return;
-  await sb.from("ox_live_fills").insert({ paper: PAPER_CTX.paper, ...row });
+  await sb.from("ox_live_fills").insert({ paper: PAPER_CTX.paper, created_at: new Date().toISOString(), ...row });
 }
 
 async function closePosition(sb, id, patch) {
@@ -1073,7 +1083,17 @@ export async function tickLiveDesk(opts = {}) {
     : open.filter(
         (p) => !actions.some((a) => a.type === "sell" && a.mint === p.mint && a.reason !== "scale_out"),
       );
-  if (stillOpen.length >= LIVE_MAX_OPEN) {
+  const maxOpen = paper ? PAPER_MAX_OPEN : LIVE_MAX_OPEN;
+  if (paper) {
+    const lastBuy = (fillsNow || []).find((f) => String(f.side) === "buy");
+    const sinceBuy = lastBuy?.created_at ? Date.now() - Date.parse(lastBuy.created_at) : Infinity;
+    if (sinceBuy < PAPER_APE_EVERY_MS) {
+      await upsertDesk(sb, { wallet_pubkey: owner, last_tick_at: new Date().toISOString(), last_agent_id: agent.id, last_error: null }).catch(() => {});
+      const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
+      return { ...snap, skipped: "paper_cooldown", next_ape_in_ms: PAPER_APE_EVERY_MS - sinceBuy, actions, dry, paper };
+    }
+  }
+  if (stillOpen.length >= maxOpen) {
     await recordEvent(sb, { kind: "tick", reason: "max_open", meta: { open: stillOpen.length } });
     await upsertDesk(sb, {
       wallet_pubkey: owner,
@@ -1106,7 +1126,11 @@ export async function tickLiveDesk(opts = {}) {
   }
   const cheapPass = [];
   let firstReject = null;
-  for (const coin of pool.slice(0, 40)) {
+  if (paper) {
+    chosen = pool.find((c) => !stillOpen.some((p) => p.mint === c.mint) && paperApeOk(c)) || null;
+    if (chosen) safety = { canBuy: true, canSell: true, paper: true };
+  }
+  for (const coin of paper ? [] : pool.slice(0, 40)) {
     if (stillOpen.some((p) => p.mint === coin.mint)) continue;
     const cheap = screenLiveCandidate(coin, { canBuy: true, canSell: true });
     if (cheap.ok) {
@@ -1119,7 +1143,7 @@ export async function tickLiveDesk(opts = {}) {
       firstReject = { coin, reasons: cheap.reasons, headline };
     }
   }
-  if (firstReject && !cheapPass.length) await noteSkip(firstReject.coin, firstReject.reasons);
+  if (firstReject && !cheapPass.length && !paper) await noteSkip(firstReject.coin, firstReject.reasons);
   for (const coin of cheapPass) {
     if (Date.now() > deadline) break;
     if (probes >= LIVE_MAX_PROBES) break;
@@ -1161,7 +1185,7 @@ export async function tickLiveDesk(opts = {}) {
   const sized = sizeLiveBuy({
     solBalance: bal,
     solUsd,
-    openCount: stillOpen.length,
+    openCount: paper ? 0 : stillOpen.length,
     tradeUsd: paper ? Math.max(LIVE_TRADE_USD, num(snap0.paper_start_usd, PAPER_START_USD_DEFAULT) * PAPER_CLIP_PCT) : huntClipUsd(chosen),
   });
   if (!sized.ok) {
