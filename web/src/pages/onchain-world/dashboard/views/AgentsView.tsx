@@ -12,7 +12,7 @@ import {
 import { formatAddress, formatPct, formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { simulatePaperDesk } from "../../../../../shared/orbitx-paper-desk.js";
-import { LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
+import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
 
 export function AgentsView() {
   const [desk, setDesk] = useState<"paper" | "live">("live");
@@ -67,7 +67,7 @@ function LiveDeskView() {
   const wallet = snap?.wallet || LIVE_WALLET_PUBKEY;
   const open = snap?.open || [];
   const fills = snap?.fills || [];
-  const agents = snap?.agents?.length ? snap.agents : [];
+  const agents = snap?.agents?.length ? snap.agents : LIVE_AGENTS;
 
   function openMint(mint?: string | null) {
     if (!mint) return;
@@ -169,29 +169,27 @@ function LiveDeskView() {
       )}
 
       <ul className="divide-y divide-line">
-        {(agents.length ? agents : [{ id: "neon-live", name: "NEON LIVE", style: "momentum", tpPct: 0.12, color: "#34d399", blurb: "…" }]).map(
-          (a, i) => (
-            <li key={a.id} className="px-4 py-3">
-              <div className="flex items-start gap-3">
-                <span
-                  className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full"
-                  style={{ background: `${a.color}22`, color: a.color }}
-                >
-                  <Bot className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-display text-sm text-fg">
-                    <span className="mr-2 text-2xs text-dim">#{i + 1}</span>
-                    {a.name}
-                  </h3>
-                  <p className="text-2xs text-dim">
-                    {a.blurb} · TP +{Math.round((a.tpPct || 0.1) * 100)}% full sell · $2 clips
-                  </p>
-                </div>
+        {agents.map((a, i) => (
+          <li key={a.id} className="px-4 py-3">
+            <div className="flex items-start gap-3">
+              <span
+                className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full"
+                style={{ background: `${a.color}22`, color: a.color }}
+              >
+                <Bot className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-display text-sm text-fg">
+                  <span className="mr-2 text-2xs text-dim">#{i + 1}</span>
+                  {a.name}
+                </h3>
+                <p className="text-2xs text-dim">
+                  {a.blurb} · TP +{Math.round((a.tpPct || 0.1) * 100)}% full sell · $2 clips
+                </p>
               </div>
-            </li>
-          ),
-        )}
+            </div>
+          </li>
+        ))}
       </ul>
 
       {fills.length ? (

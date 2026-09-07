@@ -185,6 +185,7 @@ describe("OrbitX /on-chain world", () => {
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("10k mock SOL");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("Currently buying");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("Live SOL");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("LIVE_AGENTS");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("LIVE_WALLET_PUBKEY");
     expect(readFileSync(resolve(WEB, "src/components/theme/PlatformDock.tsx"), "utf8")).not.toContain('"/on-chain"');
     expect(readFileSync(resolve(WEB, "src/components/theme/platform-shell.css"), "utf8")).toContain("z-index: 9999");
