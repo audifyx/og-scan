@@ -11,6 +11,7 @@ import {
   screenLiveCandidate,
   sizeLiveBuy,
   summarizeLiveLedger,
+  mergeLiveFeed,
   writeLiveThesis,
 } from "./orbitx-live-desk.js";
 
@@ -101,5 +102,16 @@ describe("live agent desk rules", () => {
     const raid = ledger.books.find((a) => a.id === "raid-live");
     expect(raid.losses).toBe(1);
     expect(raid.currently_hold).toBe("cash");
+  });
+
+  it("merges fills, skip events, and on-chain swaps into one tape", () => {
+    const tape = mergeLiveFeed({
+      fills: [{ id: "f1", side: "buy", symbol: "ORBITX", usd_amount: 1.5, thesis: "buy thesis", created_at: "2026-09-07T06:00:00Z", signature: "sig-buy" }],
+      events: [{ id: "e1", kind: "skip", symbol: "RUG", reason: "cannot sell", created_at: "2026-09-07T06:01:00Z" }],
+      chain: [{ signature: "sig-buy", blockTime: Date.parse("2026-09-07T06:00:02Z") / 1000 }],
+    });
+    expect(tape[0].kind).toBe("skip");
+    expect(tape.some((r) => r.kind === "buy" && r.thesis === "buy thesis")).toBe(true);
+    expect(tape.some((r) => r.kind === "swap" && r.signature === "sig-buy")).toBe(true);
   });
 });

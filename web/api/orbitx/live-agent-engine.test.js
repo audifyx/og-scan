@@ -7,6 +7,7 @@ function memSb() {
     ox_live_desk: [{ id: "main", armed: true, paused: false, last_agent_id: null }],
     ox_live_positions: [],
     ox_live_fills: [],
+    ox_live_events: [],
   };
   const api = (name) => ({
     select() {
@@ -110,6 +111,7 @@ describe("live agent engine tick", () => {
       swap: async () => ({ ok: true, signature: "sig-buy", outAmount: "1000" }),
     });
     expect(buy.actions.some((a) => a.type === "buy" && a.usd === 1.5)).toBe(true);
+    expect(sb._tables.ox_live_events.some((e) => e.kind === "buy")).toBe(true);
     expect(buy.actions[0].thesis).toMatch(/sell 100%/);
     expect(LIVE_AGENTS.map((a) => a.id)).toContain(buy.actions[0].agent_id);
 

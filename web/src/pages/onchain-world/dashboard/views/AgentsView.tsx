@@ -46,6 +46,8 @@ function LiveDeskView() {
   const setView = useOrbitxStore((s) => s.setActiveView);
   const [snap, setSnap] = useState<LiveDeskPayload | null>(null);
   const [copied, setCopied] = useState(false);
+  const [tapeFilter, setTapeFilter] = useState<"all" | "buy" | "sell" | "skip" | "swap">("all");
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let alive = true;
@@ -57,10 +59,12 @@ function LiveDeskView() {
         .catch(() => undefined);
     };
     pull();
-    const id = window.setInterval(pull, 20_000);
+    const id = window.setInterval(pull, 4_000);
+    const clock = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => {
       alive = false;
       window.clearInterval(id);
+      window.clearInterval(clock);
     };
   }, []);
 
@@ -76,6 +80,22 @@ function LiveDeskView() {
   const wins = ledger?.wins ?? 0;
   const losses = ledger?.losses ?? 0;
   const holding = ledger?.holding || open[0] || null;
+  const feed = (snap?.feed || []).length ? snap.feed : [];
+  const tickAgo = snap?.last_tick_at ? Math.max(0, now - Date.parse(snap.last_tick_at)) : null;
+  const tickLabel =
+    tickAgo == null
+      ? "no tick yet"
+      : tickAgo < 60_000
+        ? `${Math.floor(tickAgo / 1000)}s ago`
+        : `${Math.floor(tickAgo / 60_000)}m ${Math.floor((tickAgo % 60_000) / 1000)}s ago`;
+  const visibleFeed = feed.filter((row) => {
+    if (tapeFilter === "all") return true;
+    if (tapeFilter === "buy") return row.kind === "buy";
+    if (tapeFilter === "sell") return row.kind === "sell";
+    if (tapeFilter === "skip") return row.kind === "skip" || row.kind === "tick";
+    if (tapeFilter === "swap") return row.kind === "swap" || row.source === "chain";
+    return true;
+  });
 
   function openMint(mint?: string | null) {
     if (!mint) return;
@@ -102,7 +122,7 @@ function LiveDeskView() {
       : snap.paused
         ? "Paused"
         : snap.armed
-          ? `Live — scanning for $${clip.toFixed(2)} entries · max 1 open`
+          ? `LIVE · $${clip.toFixed(2)} clips · max 1 open · last tick ${tickLabel}`
           : "Funded wallet waiting to arm";
 
   function money(n: number | null | undefined, sign = false) {
@@ -174,10 +194,76 @@ function LiveDeskView() {
         </div>
       ) : (
         <p className="border-b border-line px-4 py-3 text-2xs text-dim">
-          No open live book. Next tick buys one ${clip.toFixed(2)} clip if the wallet is armed and Jupiter can sell the
-          name. Ticks run every 5 minutes.
+          No open live book. Next armed tick buys one ${clip.toFixed(2)} clip if Jupiter can sell. Ticks run every 2
+          minutes.
         </p>
       )}
+
+      <section className="border-b border-line px-4 py-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="ox-kicker text-accent">Live tape · thesis · buys · sells · swaps</p>
+          <p className="text-[10px] uppercase tracking-wide text-dim">
+            poll 4s · last tick {tickLabel} · {feed.length} rows
+          </p>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(["all", "buy", "sell", "skip", "swap"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                tapeFilter === key ? "bg-fg text-bg" : "text-dim hover:text-fg"
+              }`}
+              onClick={() => setTapeFilter(key)}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+        {visibleFeed.length ? (
+          <ol className="mt-2 max-h-72 space-y-1 overflow-auto">
+            {visibleFeed.slice(0, 40).map((row) => (
+              <li key={row.id} className="rounded-sm border border-line/80 bg-bg-sunken px-2 py-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <button
+                    type="button"
+                    className="min-w-0 truncate text-left text-2xs text-fg hover:text-accent"
+                    onClick={() => openMint(row.mint)}
+                  >
+                    <span className="text-dim">
+                      {row.at ? new Date(row.at).toISOString().slice(11, 19) : "--:--:--"} UTC
+                    </span>
+                    {" · "}
+                    {(row.kind || "").toUpperCase()}
+                    {row.symbol ? ` · $${row.symbol}` : ""}
+                    {row.agent_id ? ` · ${row.agent_id}` : ""}
+                    {row.usd != null ? ` · ${money(row.usd)}` : ""}
+                    {row.pnl_usd != null ? ` · ${money(row.pnl_usd, true)}` : ""}
+                  </button>
+                  {row.signature ? (
+                    <a
+                      className="shrink-0 text-[10px] text-dim hover:text-fg"
+                      href={`https://solscan.io/tx/${row.signature}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      tx
+                    </a>
+                  ) : null}
+                </div>
+                {row.thesis ? <p className="mt-1 text-2xs leading-relaxed text-muted">{row.thesis}</p> : null}
+                {row.reason && row.reason !== row.kind ? (
+                  <p className="mt-0.5 text-[10px] uppercase tracking-wide text-dim">{row.reason}</p>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-2 text-2xs text-dim">
+            Tape is empty until the next armed tick. Buys, sells, skip reasons, theses, and on-chain swaps land here.
+          </p>
+        )}
+      </section>
 
       <ul className="divide-y divide-line">
         {agents.map((a, i) => (

@@ -467,6 +467,38 @@ export type LiveDeskPayload = {
     open?: LiveDeskPayload["open"] extends (infer T)[] | undefined ? T | null : null;
     last?: unknown;
   }>;
+  events?: Array<{
+    id?: string;
+    created_at?: string;
+    kind?: string;
+    agent_id?: string;
+    mint?: string;
+    symbol?: string;
+    thesis?: string;
+    reason?: string;
+    signature?: string;
+  }>;
+  chain?: Array<{
+    signature?: string;
+    slot?: number;
+    err?: unknown;
+    blockTime?: number | null;
+    url?: string;
+  }>;
+  feed?: Array<{
+    id: string;
+    at?: string | null;
+    kind?: string;
+    agent_id?: string | null;
+    mint?: string | null;
+    symbol?: string | null;
+    usd?: number | null;
+    pnl_usd?: number | null;
+    thesis?: string | null;
+    reason?: string | null;
+    signature?: string | null;
+    source?: string;
+  }>;
   error?: string;
 };
 

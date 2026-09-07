@@ -292,7 +292,72 @@ export function emptyLiveDesk(extra = {}) {
     last_tick_at: extra.last_tick_at || null,
     last_error: extra.last_error || null,
     skipped: extra.skipped || null,
+    events: extra.events || [],
+    chain: extra.chain || [],
+    feed: extra.feed || [],
     worldUrl: "https://www.orbitx.world/on-chain",
     fundUrl: `https://solscan.io/account/${extra.wallet || LIVE_WALLET_PUBKEY}`,
   };
+}
+
+export function mergeLiveFeed({ fills = [], events = [], chain = [] } = {}) {
+  const rows = [];
+  for (const f of fills) {
+    const side = String(f.side || "buy");
+    rows.push({
+      id: f.id || `fill-${f.signature || f.created_at}`,
+      at: f.created_at,
+      kind: side === "sell" ? "sell" : "buy",
+      agent_id: f.agent_id || null,
+      mint: f.mint || null,
+      symbol: f.symbol || null,
+      usd: f.usd_amount != null ? num(f.usd_amount) : null,
+      pnl_usd: f.pnl_usd != null ? num(f.pnl_usd) : null,
+      thesis: f.thesis || null,
+      reason: f.reason || side,
+      signature: f.signature || null,
+      source: "fill",
+    });
+  }
+  for (const e of events) {
+    rows.push({
+      id: e.id || `evt-${e.created_at}-${e.kind}`,
+      at: e.created_at || e.at,
+      kind: e.kind || "tick",
+      agent_id: e.agent_id || null,
+      mint: e.mint || null,
+      symbol: e.symbol || null,
+      usd: e.usd_amount != null ? num(e.usd_amount) : e.usd != null ? num(e.usd) : null,
+      pnl_usd: e.pnl_usd != null ? num(e.pnl_usd) : null,
+      thesis: e.thesis || null,
+      reason: e.reason || null,
+      signature: e.signature || null,
+      source: "desk",
+    });
+  }
+  for (const c of chain) {
+    rows.push({
+      id: c.signature || `chain-${c.slot}`,
+      at: c.blockTime ? new Date(num(c.blockTime) * 1000).toISOString() : c.at || null,
+      kind: c.err ? "fail" : "swap",
+      agent_id: null,
+      mint: null,
+      symbol: null,
+      usd: null,
+      pnl_usd: null,
+      thesis: null,
+      reason: c.err ? "tx_err" : "on-chain swap",
+      signature: c.signature || null,
+      source: "chain",
+    });
+  }
+  const seen = new Set();
+  const out = [];
+  for (const row of rows.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0))) {
+    const key = `${row.source}:${row.kind}:${row.signature || row.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out.slice(0, 80);
 }

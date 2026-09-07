@@ -19,6 +19,7 @@ import {
   screenLiveCandidate,
   sizeLiveBuy,
   summarizeLiveLedger,
+  mergeLiveFeed,
   writeLiveThesis,
 } from "../../shared/orbitx-live-desk.js";
 
@@ -393,6 +394,50 @@ async function loadFills(sb, limit = 200) {
   return data || [];
 }
 
+async function loadEvents(sb, limit = 80) {
+  if (!sb) return [];
+  const { data } = await sb.from("ox_live_events").select("*").order("created_at", { ascending: false }).limit(limit);
+  return data || [];
+}
+
+async function recordEvent(sb, row) {
+  if (!sb) return;
+  try {
+    await sb.from("ox_live_events").insert({
+      kind: row.kind,
+      agent_id: row.agent_id || null,
+      mint: row.mint || null,
+      symbol: row.symbol || null,
+      side: row.side || null,
+      usd_amount: row.usd_amount ?? row.usd ?? null,
+      sol_amount: row.sol_amount ?? row.sol ?? null,
+      pnl_usd: row.pnl_usd ?? null,
+      thesis: row.thesis || null,
+      reason: row.reason || null,
+      signature: row.signature || null,
+      meta: row.meta || null,
+    });
+  } catch {
+    /* tape is best-effort */
+  }
+}
+
+async function recentWalletSigs(pubkey) {
+  if (!pubkey) return [];
+  try {
+    const rows = await rpc("getSignaturesForAddress", [pubkey, { limit: 20 }]);
+    return (rows || []).map((s) => ({
+      signature: s.signature,
+      slot: s.slot,
+      err: s.err || null,
+      blockTime: s.blockTime || null,
+      url: `https://solscan.io/tx/${s.signature}`,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function publicPosition(p, markUsd = null) {
   const entry = num(p.entry_price_usd);
   const mark = markUsd != null ? num(markUsd) : null;
@@ -447,6 +492,8 @@ export async function snapshotLiveDesk(opts = {}) {
   }
   const openRows = await loadOpen(sb).catch(() => []);
   const fills = await loadFills(sb).catch(() => []);
+  const events = await loadEvents(sb).catch(() => []);
+  const chain = opts.chain || (!opts.skipChain ? await recentWalletSigs(wallet).catch(() => []) : []);
   const open = [];
   for (const p of openRows) {
     let mark = null;
@@ -502,6 +549,21 @@ export async function snapshotLiveDesk(opts = {}) {
     equityUsd,
     realizedPnlUsd: realized,
   });
+  const publicEvents = events.map((e) => ({
+    id: e.id,
+    created_at: e.created_at,
+    kind: e.kind,
+    agent_id: e.agent_id,
+    mint: e.mint,
+    symbol: e.symbol,
+    usd_amount: e.usd_amount != null ? num(e.usd_amount) : null,
+    sol_amount: e.sol_amount != null ? num(e.sol_amount) : null,
+    pnl_usd: e.pnl_usd != null ? num(e.pnl_usd) : null,
+    thesis: e.thesis,
+    reason: e.reason,
+    signature: e.signature,
+  }));
+  const feed = mergeLiveFeed({ fills: publicFills, events: publicEvents, chain });
   return emptyLiveDesk({
     wallet,
     enabled,
@@ -518,6 +580,9 @@ export async function snapshotLiveDesk(opts = {}) {
     ledger,
     open,
     fills: publicFills,
+    events: publicEvents,
+    chain,
+    feed,
     agents: ledger.books,
     last_tick_at: row.last_tick_at || null,
     last_error: row.last_error || null,
@@ -569,19 +634,23 @@ export async function tickLiveDesk(opts = {}) {
   });
 
   if (!enabled) {
+    await recordEvent(sb, { kind: "tick", reason: "not_enabled" });
     return { ...snap0, skipped: "not_enabled", disclaimer: LIVE_DISCLAIMER, actions };
   }
   const row = await loadDeskRow(sb).catch(() => ({ armed: false, paused: false }));
   const armed = Boolean(row.armed) || liveDeskArmedEnv() || opts.force === true;
   if (row.paused && !opts.force) {
+    await recordEvent(sb, { kind: "tick", reason: "paused" });
     return { ...snap0, skipped: "paused", armed, actions };
   }
   if (!armed) {
+    await recordEvent(sb, { kind: "tick", reason: "not_armed" });
     return { ...snap0, skipped: "not_armed", armed: false, actions };
   }
   let keypair = opts.keypair || null;
   if (!keypair) {
     if (!secret) {
+      await recordEvent(sb, { kind: "tick", reason: "missing_wallet_secret" });
       return { ...snap0, skipped: "missing_wallet_secret", actions };
     }
     try {
@@ -644,6 +713,19 @@ export async function tickLiveDesk(opts = {}) {
       reason: decision.action,
     }).catch(() => {});
     await closePosition(sb, pos.id, { exit_signature: sent.signature, exit_reason: decision.action, pnl_usd: pnlUsd }).catch(() => {});
+    await recordEvent(sb, {
+      kind: "sell",
+      side: "sell",
+      agent_id: pos.agent_id,
+      mint: pos.mint,
+      symbol: pos.symbol,
+      usd_amount: usdOut,
+      sol_amount: solOut,
+      pnl_usd: pnlUsd,
+      thesis: pos.thesis,
+      reason: decision.action,
+      signature: sent.signature,
+    });
     actions.push({
       type: "sell",
       agent_id: pos.agent_id,
@@ -660,6 +742,7 @@ export async function tickLiveDesk(opts = {}) {
   const stillOpen = openAfter.length ? openAfter : open.filter((p) => !actions.some((a) => a.type === "sell" && a.mint === p.mint));
   const sized = sizeLiveBuy({ solBalance: bal, solUsd, openCount: stillOpen.length });
   if (!sized.ok) {
+    await recordEvent(sb, { kind: "tick", reason: sized.skip, meta: { open: stillOpen.length } });
     await upsertDesk(sb, {
       wallet_pubkey: owner,
       last_tick_at: new Date().toISOString(),
@@ -689,12 +772,25 @@ export async function tickLiveDesk(opts = {}) {
     safety = await safetyFn(coin.mint);
     if (pump && pump.complete === false && !safety.canSell) safety = { ...safety, bondingOnly: true };
     const screen = screenLiveCandidate(coin, safety);
-    if (!screen.ok) continue;
+    if (!screen.ok) {
+      if (!actions.some((a) => a.type === "screen")) {
+        actions.push({ type: "screen", mint: coin.mint, symbol: coin.symbol, reason: screen.reasons[0] });
+        await recordEvent(sb, {
+          kind: "skip",
+          agent_id: agent.id,
+          mint: coin.mint,
+          symbol: coin.symbol,
+          reason: screen.reasons.join("; "),
+        });
+      }
+      continue;
+    }
     chosen = coin;
     break;
   }
 
   if (!chosen) {
+    await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "no_clean_coin" });
     await upsertDesk(sb, { wallet_pubkey: owner, last_tick_at: new Date().toISOString(), last_agent_id: agent.id, last_error: null }).catch(() => {});
     const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
     return { ...snap, skipped: "no_clean_coin", actions, dry };
@@ -747,6 +843,18 @@ export async function tickLiveDesk(opts = {}) {
     thesis,
     reason: "buy",
   }).catch(() => {});
+  await recordEvent(sb, {
+    kind: "buy",
+    side: "buy",
+    agent_id: agent.id,
+    mint: chosen.mint,
+    symbol: chosen.symbol,
+    usd_amount: sized.usd,
+    sol_amount: sized.sol,
+    thesis,
+    reason: "buy",
+    signature: sent.signature,
+  });
   await upsertDesk(sb, {
     wallet_pubkey: owner,
     last_tick_at: new Date().toISOString(),
