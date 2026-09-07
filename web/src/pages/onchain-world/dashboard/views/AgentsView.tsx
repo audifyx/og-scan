@@ -184,8 +184,9 @@ function LiveDeskView() {
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
           Three agents share one Solana wallet and rotate every tick — NEON, WARDEN, then RAID. Each fill is $
-          {clip.toFixed(2)}. Max one open position. They research every 5 minutes, wait for dips on low-cap books with
-          real social tape, skip tops and dumpers, and never buy what Jupiter cannot sell. Take profit around +$0.30
+          {clip.toFixed(2)}. Max one open position. They research every 5 minutes for early low-cap runners
+          (CatGPT/Nasduck-shaped before they go vertical), buy the dip, skip dumps and tops, and never buy what Jupiter
+          cannot sell. First take: sell 41% into strength, keep 59% for a short hold, then flatten the rest around +$0.30
           (or +$1 if it rips). Not financial advice — this bank can go to zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">

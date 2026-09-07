@@ -499,7 +499,8 @@ describe("OrbitX /on-chain world", () => {
     expect(LIVE_MAX_OPEN).toBe(1);
     expect(LIVE_AGENTS).toHaveLength(3);
     expect(LIVE_WALLET_PUBKEY).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
-    expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.3 }, 1.3).action).toBe("take_profit");
+    expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.3, usd_in: 1.5 }, 1.3).action).toBe("scale_out");
+    expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.3, usd_in: 0.885 }, 1.3, Date.now(), { scaled: true, scaledAt: new Date(Date.now() - 9 * 60_000).toISOString() }).action).toBe("take_profit");
     expect(sizeLiveBuy({ solBalance: 0.05, solUsd: 150, openCount: 0 }).usd).toBe(1.5);
     expect(sizeLiveBuy({ solBalance: 1, solUsd: 150, openCount: 1 }).skip).toBe("max_open");
     expect(screenLiveCandidate({ mint: "x", liquidity_usd: 10 }, { canSell: false }).ok).toBe(false);
@@ -528,7 +529,8 @@ describe("OrbitX /on-chain world", () => {
     expect(ui).toContain("low-cap");
     expect(ui).toContain("$0.30");
     expect(ui).toContain("every 5");
-    expect(ui).toContain("skip tops");
+    expect(ui).toContain("skip dumps");
+    expect(ui).toContain("keep 59%");
     expect(ui).toContain("NEON, WARDEN, then RAID");
     expect(vercel).toContain("/api/live-agents?path=tick");
     expect(ui).toContain("LiveAgentFeed");

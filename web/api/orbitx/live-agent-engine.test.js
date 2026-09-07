@@ -81,7 +81,7 @@ function memSb() {
 }
 
 describe("live agent engine tick", () => {
-  it("buys $1.50 of a sellable coin then fully exits at take-profit", async () => {
+  it("buys $1.50 of a sellable coin then scales 41% and flattens the 59%", async () => {
     const prev = process.env.LIVE_AGENT_ENABLED;
     process.env.LIVE_AGENT_ENABLED = "1";
     const sb = memSb();
@@ -90,12 +90,15 @@ describe("live agent engine tick", () => {
       symbol: "ORBITX",
       name: "OrbitX",
       change_1h: 8,
+      change_5m: -2.1,
       change_24h: 14,
-      volume_24h: 900_000,
-      liquidity_usd: 2_000_000,
-      market_cap: 8_000_000,
-      pair_age_min: 400,
+      volume_24h: 220_000,
+      liquidity_usd: 80_000,
+      market_cap: 420_000,
+      pair_age_min: 180,
       price_usd: 1,
+      twitter: "https://x.com/orbitx",
+      buys_1h: 80,
     };
     const buy = await tickLiveDesk({
       sb,
@@ -115,18 +118,22 @@ describe("live agent engine tick", () => {
     expect(buy.actions[0].thesis).toMatch(/\$0\.30/);
     expect(LIVE_AGENTS.map((a) => a.id)).toContain(buy.actions[0].agent_id);
 
-    sb._tables.ox_live_positions.push({
-      id: "pos-1",
-      agent_id: "neon-live",
-      mint: coin.mint,
-      symbol: "ORBITX",
-      usd_in: 1.5,
-      sol_in: 1.5 / 150,
-      entry_price_usd: 1,
-      tp_pct: 0.12,
-      status: "open",
-      thesis: "test",
-    });
+    sb._tables.ox_live_positions = [
+      {
+        id: "pos-1",
+        agent_id: "neon-live",
+        mint: coin.mint,
+        symbol: "ORBITX",
+        usd_in: 1.5,
+        sol_in: 1.5 / 150,
+        entry_price_usd: 1,
+        tp_pct: 0.2,
+        status: "open",
+        thesis: "test",
+        tokens_raw: "1000",
+        opened_at: "2026-09-07T12:00:00Z",
+      },
+    ];
     const sell = await tickLiveDesk({
       sb,
       force: true,
@@ -137,10 +144,28 @@ describe("live agent engine tick", () => {
       owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
       tape: async () => [coin],
       safety: async () => ({ canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 }),
-      mark: async () => 1.12,
+      mark: async () => 1.2,
       swap: async () => ({ ok: true, signature: "sig-sell", outAmount: "15000000" }),
     });
-    expect(sell.actions.some((a) => a.type === "sell" && a.reason === "take_profit")).toBe(true);
+    expect(sell.actions.some((a) => a.type === "sell" && a.reason === "scale_out" && a.keep_pct === 0.59)).toBe(true);
+    expect(sb._tables.ox_live_positions.some((p) => p.id === "pos-1" && p.status !== "closed")).toBe(true);
+
+    const scaleFill = sb._tables.ox_live_fills.find((f) => f.reason === "scale_out");
+    if (scaleFill) scaleFill.created_at = new Date(Date.now() - 9 * 60_000).toISOString();
+    const flat = await tickLiveDesk({
+      sb,
+      force: true,
+      dryRun: true,
+      sol_usd: 150,
+      solBalance: 0.03,
+      keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
+      owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
+      tape: async () => [coin],
+      safety: async () => ({ canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 }),
+      mark: async () => 1.2,
+      swap: async () => ({ ok: true, signature: "sig-flat", outAmount: "8000000" }),
+    });
+    expect(flat.actions.some((a) => a.type === "sell" && a.reason === "take_profit")).toBe(true);
 
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;

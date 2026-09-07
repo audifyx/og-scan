@@ -22,11 +22,12 @@ const GOOD = {
   mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
   symbol: "ORBITX",
   change_1h: 6,
+  change_5m: -2,
   change_24h: 12,
   volume_24h: 900_000,
-  liquidity_usd: 2_000_000,
-  market_cap: 8_000_000,
-  pair_age_min: 240,
+  liquidity_usd: 90_000,
+  market_cap: 420_000,
+  pair_age_min: 180,
 };
 
 const SAFETY = { canBuy: true, canSell: true, roundTripLossPct: 4.2, buyImpactPct: 0.8 };
@@ -51,9 +52,10 @@ describe("live agent desk rules", () => {
     expect(screenLiveCandidate(GOOD, { ...SAFETY, bondingOnly: true }).ok).toBe(false);
   });
 
-  it("sells 100% at a $0.30 scalp, a $1 rip, or a time stop", () => {
+  it("scales 41% at +$0.30, flattens the 59% remainder after a short hold, and cuts dumps", () => {
     const thirty = decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 1.2);
-    expect(thirty.action).toBe("take_profit");
+    expect(thirty.action).toBe("scale_out");
+    expect(thirty.keepPct).toBe(0.59);
     const dollar = decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 1.7);
     expect(dollar.action).toBe("take_profit");
     expect(decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 1.05).action).toBe("hold");
@@ -64,7 +66,14 @@ describe("live agent desk rules", () => {
       1.06,
       now,
     );
-    expect(scrape.action).toBe("take_profit");
+    expect(scrape.action).toBe("scale_out");
+    const rest = decideLiveExit(
+      { entry_price_usd: 1, usd_in: 0.885, tp_pct: 0.2, opened_at: "2026-09-07T12:09:00Z" },
+      1.06,
+      now,
+      { scaled: true, scaledAt: "2026-09-07T12:13:00Z" },
+    );
+    expect(rest.action).toBe("take_profit");
     const rotate = decideLiveExit(
       { entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2, opened_at: "2026-09-07T11:55:00Z" },
       1.01,
@@ -139,10 +148,11 @@ describe("live agent desk rules", () => {
     expect(screenLiveCandidate(boosted, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(room, SAFETY).ok).toBe(true);
     expect(screenLiveCandidate({ ...GOOD, change_1h: 80 }, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate({ ...GOOD, change_24h: 938 }, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(mouse, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(mouse, SAFETY).reasons.some((r) => /dumping|topped|already pumped|liq/.test(r))).toBe(true);
     expect(screenLiveCandidate({ ...GOOD, change_5m: -12, change_1h: 9 }, SAFETY).ok).toBe(false);
-    expect(screenLiveCandidate({ ...GOOD, change_1h: 0.4, volume_1h: 200, txns_1h: 4, buys_1h: 2 }, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate({ ...GOOD, change_1h: 0.4, change_5m: 0.2, volume_1h: 200, volume_24h: 1_000, txns_1h: 4, buys_1h: 2 }, SAFETY).ok).toBe(false);
     expect(liveIsMajor({ mint: GOOD.mint, symbol: "PUMP", market_cap: 2_000_000, liquidity_usd: 1_500_000, volume_24h: 800_000 })).toBe(false);
     const ranked = rankForLiveStyle("momentum", [
       { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", symbol: "HOT", change_1h: 18, change_5m: -2, twitter: "https://x.com/hot" },

@@ -3,7 +3,7 @@
  * Deposit address is public. The signing secret lives only in
  * LIVE_AGENT_WALLET_SECRET on Vercel. Never commit a key.
  *
- * Not financial advice. Caps: $1.50 per buy, 1 open book, full take-profit.
+ * Not financial advice. Caps: $1.50 per buy, 1 open book, scale 41% / keep 59%, then flatten.
  */
 import { layoutLiveCity } from "./orbitx-live-city.js";
 export const LIVE_WALLET_PUBKEY = "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj";
@@ -17,21 +17,26 @@ export const LIVE_SCRAPE_USD = 0.08;
 export const LIVE_SCALP_MS = 12 * 60_000;
 export const LIVE_MAX_HOLD_MS = 22 * 60_000;
 export const LIVE_TICK_MINUTES = 5;
-export const LIVE_MIN_LIQ_USD = 40_000;
-export const LIVE_MIN_VOL_USD = 40_000;
-export const LIVE_MIN_MCAP_USD = 80_000;
-export const LIVE_MAX_MCAP_USD = 18_000_000;
+export const LIVE_MIN_LIQ_USD = 22_000;
+export const LIVE_MIN_VOL_USD = 25_000;
+export const LIVE_MIN_MCAP_USD = 30_000;
+export const LIVE_MAX_MCAP_USD = 4_000_000;
+export const LIVE_EARLY_MAX_MCAP_USD = 2_500_000;
+export const LIVE_EARLY_MAX_AGE_MIN = 18 * 60;
 export const LIVE_MAJOR_MCAP_USD = 80_000_000;
 export const LIVE_MAJOR_LIQ_USD = 250_000;
 export const LIVE_MAX_ROUND_TRIP_PCT = 8;
 export const LIVE_MAX_BUY_IMPACT_PCT = 3.5;
-export const LIVE_MIN_AGE_MIN = 45;
-export const LIVE_MAX_1H_PUMP_PCT = 42;
-export const LIVE_MAX_24H_PUMP_PCT = 120;
+export const LIVE_MIN_AGE_MIN = 18;
+export const LIVE_MAX_1H_PUMP_PCT = 38;
+export const LIVE_MAX_24H_PUMP_PCT = 140;
 export const LIVE_MAX_5M_DUMP_PCT = -6;
 export const LIVE_MAX_15M_DUMP_PCT = -10;
 export const LIVE_MIN_MOVE_1H_PCT = 3;
 export const LIVE_MIN_TXNS_1H = 30;
+export const LIVE_SCALE_KEEP_PCT = 0.59;
+export const LIVE_SCALE_SELL_PCT = 0.41;
+export const LIVE_RUNNER_HOLD_MS = 8 * 60_000;
 export const LIVE_MAX_PROBES = 5;
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 /** Liquid majors the desk is allowed to buy — high MC is a feature, not a skip. */
@@ -92,7 +97,7 @@ export const LIVE_AGENTS = [
     style: "momentum",
     tpPct: 0.2,
     color: "#34d399",
-    blurb: "Buys low-cap continuation only after a dip — never a vertical top. Jupiter must sell. Takes about +$0.30.",
+    blurb: "Finds early low-cap runners, buys the dip, sells 41% into strength, keeps 59% on a short leash.",
   },
   {
     id: "warden-live",
@@ -100,7 +105,7 @@ export const LIVE_AGENTS = [
     style: "mean_reversion",
     tpPct: 0.18,
     color: "#fb7185",
-    blurb: "Waits for pullbacks on real books. Skips dumps, tops, and unsellable tape. Takes about +$0.30.",
+    blurb: "Buys pullbacks on young books. Skips dumps and already-ran tops. Scales 41/59 then flattens.",
   },
   {
     id: "raid-live",
@@ -108,12 +113,12 @@ export const LIVE_AGENTS = [
     style: "fresh",
     tpPct: 0.22,
     color: "#fbbf24",
-    blurb: "Young listed coins with depth and a sell route — after they dip, not while they're dumping.",
+    blurb: "Catches just-listed graduates early — after a dip, not a 1000% day. Scale out, then take the clip.",
   },
 ];
 
 export const LIVE_DISCLAIMER =
-  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. NEON, WARDEN, and RAID rotate. They wait for dips on low-cap books with real tape, skip tops and dumpers, and never buy what Jupiter cannot sell. Take profit around +$0.30 (or +$1 if it rips). You can lose the whole bank.";
+  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. NEON, WARDEN, and RAID rotate. They hunt early low-cap runners (CatGPT/Nasduck-shaped before they go vertical), buy dips, skip dumps and tops, and never buy what Jupiter cannot sell. First take: sell 41% into strength, keep 59% for a short hold, then flatten the rest. You can lose the whole bank.";
 
 export function liveAgentById(id) {
   const needle = String(id || "").trim().toLowerCase();
@@ -207,6 +212,18 @@ export function isHealthyDip(coin = {}) {
 
 export function isLiveMover(coin = {}) {
   return isHealthyDip(coin);
+}
+
+export function isEarlyRunner(coin = {}) {
+  if (isDumping(coin) || looksTopped(coin) || looksDead(coin)) return false;
+  const age = coin.pair_age_min == null ? null : num(coin.pair_age_min);
+  const mcap = num(coin.market_cap ?? coin.marketCap);
+  const liq = num(coin.liquidity_usd ?? coin.liquidity);
+  if (age != null && (age < LIVE_MIN_AGE_MIN || age > LIVE_EARLY_MAX_AGE_MIN)) return false;
+  if (mcap > 0 && (mcap < LIVE_MIN_MCAP_USD || mcap > LIVE_EARLY_MAX_MCAP_USD)) return false;
+  if (liq < LIVE_MIN_LIQ_USD) return false;
+  if (num(coin.change_24h) >= LIVE_MAX_24H_PUMP_PCT) return false;
+  return hasCommunity(coin) || hasOrganicFlow(coin);
 }
 
 export function solForTradeUsd(usd, solUsd) {
@@ -305,6 +322,7 @@ export function scoreLiveCandidate(coin = {}, safety = {}) {
   if (safety.canSell) s += 20;
   if (safety.roundTripLossPct != null && num(safety.roundTripLossPct) < 6) s += 8;
   if (isHealthyDip(coin)) s += 18;
+  if (isEarlyRunner(coin)) s += 16;
   if (ch1 >= LIVE_MIN_MOVE_1H_PCT && ch1 <= 22) s += 8;
   if (m5 != null && m5 <= 1 && m5 > LIVE_MAX_5M_DUMP_PCT && ch1 >= 6) s += 10;
   if (ch24 <= -40) s -= 12;
@@ -312,7 +330,7 @@ export function scoreLiveCandidate(coin = {}, safety = {}) {
   if (looksTopped(coin)) s -= 24;
   if (looksDead(coin)) s -= 16;
   if (ch1 >= 36) s -= 14;
-  if (mcap >= 120_000 && mcap <= 8_000_000) s += 10;
+  if (mcap >= 40_000 && mcap <= LIVE_EARLY_MAX_MCAP_USD) s += 10;
   if (mcap > LIVE_MAX_MCAP_USD) s -= 20;
   if (hasCommunity(coin)) s += 12;
   if (coin.boosted && !hasCommunity(coin)) s -= 22;
@@ -342,6 +360,7 @@ export function liftLiveMajors(ranked) {
 
 export function liftLiveScalps(ranked) {
   const list = ranked || [];
+  const early = [];
   const dips = [];
   const community = [];
   const rest = [];
@@ -354,12 +373,15 @@ export function liftLiveScalps(ranked) {
       rest.push(c);
       continue;
     }
-    if (isHealthyDip(c)) dips.push(c);
+    if (isEarlyRunner(c) && isHealthyDip(c)) early.push(c);
+    else if (isHealthyDip(c)) dips.push(c);
     else if (hasCommunity(c) && !c.boosted) community.push(c);
     else rest.push(c);
   }
-  dips.sort((a, b) => scoreLiveCandidate(b, { canBuy: true, canSell: true }) - scoreLiveCandidate(a, { canBuy: true, canSell: true }));
-  return dips.concat(community).concat(rest);
+  const byScore = (a, b) => scoreLiveCandidate(b, { canBuy: true, canSell: true }) - scoreLiveCandidate(a, { canBuy: true, canSell: true });
+  early.sort(byScore);
+  dips.sort(byScore);
+  return early.concat(dips).concat(community).concat(rest);
 }
 
 export function pickLiveToken(agent, ranked) {
@@ -389,7 +411,7 @@ export function pickLiveToken(agent, ranked) {
   return safe[0] || null;
 }
 
-export function decideLiveExit(position = {}, markUsd, now = Date.now()) {
+export function decideLiveExit(position = {}, markUsd, now = Date.now(), opts = {}) {
   const entry = num(position.entry_price_usd);
   const mark = num(markUsd);
   const tp = num(position.tp_pct, 0.2);
@@ -399,20 +421,50 @@ export function decideLiveExit(position = {}, markUsd, now = Date.now()) {
   const pnlUsd = Math.round(usdIn * pnlPct * 100) / 100;
   const opened = Date.parse(position.opened_at || position.created_at || "") || 0;
   const heldMs = opened > 0 ? Math.max(0, now - opened) : 0;
+  const scaled = opts.scaled === true || Boolean(position.scaled_at);
+  const scaledAt = Date.parse(opts.scaledAt || position.scaled_at || "") || 0;
+  const sinceScale = scaledAt > 0 ? Math.max(0, now - scaledAt) : heldMs;
+
+  if (pnlPct <= LIVE_STOP_PCT) {
+    return { action: "stop", pnlPct, pnlUsd, reason: `${(pnlPct * 100).toFixed(1)}% — cut it, could be a rug/dump` };
+  }
   if (pnlUsd >= LIVE_TP_MAX_USD) {
-    return { action: "take_profit", pnlPct, pnlUsd, reason: `+${pnlUsd.toFixed(2)} hit $1 cap — sell 100%, don't hunt 100x` };
+    return { action: "take_profit", pnlPct, pnlUsd, reason: `+${pnlUsd.toFixed(2)} hit $1 cap — sell the rest of the clip` };
+  }
+  if (scaled) {
+    if (sinceScale >= LIVE_RUNNER_HOLD_MS) {
+      return { action: "take_profit", pnlPct, pnlUsd, reason: `held the 59% remainder ${Math.round(sinceScale / 60000)}m — flatten the clip` };
+    }
+    if (pnlUsd >= LIVE_TP_USD) {
+      return { action: "take_profit", pnlPct, pnlUsd, reason: `remainder popped +${pnlUsd.toFixed(2)} — sell the rest` };
+    }
+    if (heldMs >= LIVE_MAX_HOLD_MS) {
+      return { action: "time_stop", pnlPct, pnlUsd, reason: `held ${Math.round(heldMs / 60000)}m — flatten remainder` };
+    }
+    return { action: "hold", pnlPct, pnlUsd, reason: "hold_remainder" };
   }
   if (pnlUsd >= LIVE_TP_USD || pnlPct >= tp) {
-    return { action: "take_profit", pnlPct, pnlUsd, reason: `+${pnlUsd.toFixed(2)} scalp — sell 100%` };
+    return {
+      action: "scale_out",
+      pnlPct,
+      pnlUsd,
+      sellPct: LIVE_SCALE_SELL_PCT,
+      keepPct: LIVE_SCALE_KEEP_PCT,
+      reason: `+${pnlUsd.toFixed(2)} — sell ${(LIVE_SCALE_SELL_PCT * 100).toFixed(0)}%, keep ${(LIVE_SCALE_KEEP_PCT * 100).toFixed(0)}% for a short hold`,
+    };
   }
   if (heldMs >= LIVE_SCALP_MS && pnlUsd >= LIVE_SCRAPE_USD) {
-    return { action: "take_profit", pnlPct, pnlUsd, reason: `held ${Math.round(heldMs / 60000)}m, booked +${pnlUsd.toFixed(2)} — get out` };
+    return {
+      action: "scale_out",
+      pnlPct,
+      pnlUsd,
+      sellPct: LIVE_SCALE_SELL_PCT,
+      keepPct: LIVE_SCALE_KEEP_PCT,
+      reason: `held ${Math.round(heldMs / 60000)}m, booked +${pnlUsd.toFixed(2)} — scale 41%, keep 59%`,
+    };
   }
   if (heldMs >= LIVE_MAX_HOLD_MS) {
     return { action: "time_stop", pnlPct, pnlUsd, reason: `held ${Math.round(heldMs / 60000)}m — rotate, don't baghold` };
-  }
-  if (pnlPct <= LIVE_STOP_PCT) {
-    return { action: "stop", pnlPct, pnlUsd, reason: `${(pnlPct * 100).toFixed(1)}% — cut it, could be a rug/dump` };
   }
   return { action: "hold", pnlPct, pnlUsd, reason: "hold" };
 }
@@ -534,8 +586,8 @@ export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
     why = `Young listed pair, depth is real, and it dipped instead of ripping vertical. In after the pullback.`;
   } else {
     why = ch1
-      ? `${t} still has follow-through (${ch1}) but I'm in on the dip, not the top.`
-      : `I'm clipping ${t} on a pullback because the book looks real and Jupiter will sell it.`;
+      ? `${t} looks like an early runner (${ch1}) and I'm in on the dip, not the high. I'll sell 41% into strength and keep 59% on a short leash.`
+      : `I'm clipping ${t} early on a pullback. Sell 41% at +$0.30, keep 59% briefly, then flatten.`;
   }
   const social = hasCommunity(coin) ? " Community's actually posting, not just a paid boost." : "";
   const pump = coin.pump_complete === false ? " Still on the launch tape, but Jupiter will sell it." : "";
@@ -578,7 +630,10 @@ export function humanLivePost(row = {}, ctx = {}) {
   const kind = String(row.kind || row.reason || "").toLowerCase();
   if (kind === "buy") {
     if (row.thesis && /just put/.test(row.thesis)) return row.thesis;
-    return `${who} just put ${usd || `$${LIVE_TRADE_USD.toFixed(2)}`} into ${t || "a live book"}. I'll sell the whole clip around $${LIVE_TP_USD.toFixed(2)}.`;
+    return `${who} just put ${usd || `$${LIVE_TRADE_USD.toFixed(2)}`} into ${t || "a live book"}. I'll sell 41% around $${LIVE_TP_USD.toFixed(2)} and keep 59% for a short hold.`;
+  }
+  if (kind === "scale_out" || kind.includes("scale")) {
+    return `${who} sold 41% of ${t || "the bag"} into strength. Keeping 59% in for a short hold, then the rest of the clip.`;
   }
   if (kind === "sell" || kind === "take_profit") {
     const won = num(row.pnl_usd) > 0;

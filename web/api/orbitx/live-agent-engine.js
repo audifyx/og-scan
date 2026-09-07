@@ -23,6 +23,8 @@ import {
   writeLiveThesis,
   liveIsMajor,
   LIVE_MAX_PROBES,
+  LIVE_SCALE_KEEP_PCT,
+  LIVE_SCALE_SELL_PCT,
 } from "../../shared/orbitx-live-desk.js";
 
 const JUP = "https://lite-api.jup.ag";
@@ -282,7 +284,7 @@ export async function loadLiveTape() {
     ).then((windows) => windows.flat()),
     (async () => {
       try {
-        const r = await fetch(`${PUMP}?limit=24&offset=0&sort=last_trade_timestamp&order=DESC&includeNsfw=false`, {
+        const r = await fetch(`${PUMP}?limit=40&offset=0&sort=last_trade_timestamp&order=DESC&includeNsfw=false`, {
           headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
           signal: AbortSignal.timeout(8000),
         });
@@ -769,19 +771,29 @@ export async function tickLiveDesk(opts = {}) {
   const tapeFn = opts.tape || loadLiveTape;
   const markFn = opts.mark || markPriceUsd;
   const open = await loadOpen(sb).catch(() => []);
+  const fillsNow = await loadFills(sb).catch(() => []);
 
   for (const pos of open) {
     const mark = await markFn(pos.mint).catch(() => 0);
-    const decision = decideLiveExit(pos, mark);
+    const scaleFill = (fillsNow || []).find(
+      (f) => f.mint === pos.mint && String(f.side) === "sell" && String(f.reason || "").includes("scale_out"),
+    );
+    const decision = decideLiveExit(pos, mark, Date.now(), {
+      scaled: Boolean(scaleFill),
+      scaledAt: scaleFill?.created_at,
+    });
     if (decision.action === "hold") continue;
-    const raw = dry ? 1n : await tokenRawBalance(owner, pos.mint).catch(() => 0n);
+    const raw = dry ? 1_000n : await tokenRawBalance(owner, pos.mint).catch(() => 0n);
     if (raw <= 0n && !dry) {
       actions.push({ type: "skip_exit", mint: pos.mint, reason: "no_tokens" });
       continue;
     }
+    const sellFrac = decision.action === "scale_out" ? LIVE_SCALE_SELL_PCT : 1;
+    const sellRaw = (raw * BigInt(Math.round(sellFrac * 1000))) / 1000n;
+    if (sellRaw <= 0n) continue;
     const sellQ = dry
-      ? { outAmount: "1" }
-      : await quoteSwap(pos.mint, SOL_MINT, raw.toString(), 300);
+      ? { outAmount: String(sellRaw) }
+      : await quoteSwap(pos.mint, SOL_MINT, sellRaw.toString(), 300);
     if (!sellQ) {
       actions.push({ type: "skip_exit", mint: pos.mint, reason: "no_sell_route" });
       continue;
@@ -797,7 +809,8 @@ export async function tickLiveDesk(opts = {}) {
     }
     const solOut = num(sellQ.outAmount) / 1e9;
     const usdOut = solOut * solUsd;
-    const pnlUsd = usdOut - num(pos.usd_in);
+    const soldUsdIn = num(pos.usd_in) * sellFrac;
+    const pnlUsd = usdOut - soldUsdIn;
     const pnlPct = decision.pnlPct * 100;
     await recordFill(sb, {
       agent_id: pos.agent_id,
@@ -812,9 +825,22 @@ export async function tickLiveDesk(opts = {}) {
       thesis: pos.thesis,
       reason: decision.action,
     }).catch(() => {});
-    await closePosition(sb, pos.id, { exit_signature: sent.signature, exit_reason: decision.action, pnl_usd: pnlUsd }).catch(() => {});
+    if (decision.action === "scale_out") {
+      const keepRaw = raw - sellRaw;
+      await sb
+        .from("ox_live_positions")
+        .update({
+          tokens_raw: keepRaw.toString(),
+          usd_in: num(pos.usd_in) * LIVE_SCALE_KEEP_PCT,
+          sol_in: num(pos.sol_in) * LIVE_SCALE_KEEP_PCT,
+        })
+        .eq("id", pos.id)
+        .catch(() => {});
+    } else {
+      await closePosition(sb, pos.id, { exit_signature: sent.signature, exit_reason: decision.action, pnl_usd: pnlUsd }).catch(() => {});
+    }
     await recordEvent(sb, {
-      kind: "sell",
+      kind: decision.action === "scale_out" ? "scale_out" : "sell",
       side: "sell",
       agent_id: pos.agent_id,
       mint: pos.mint,
@@ -833,13 +859,18 @@ export async function tickLiveDesk(opts = {}) {
       symbol: pos.symbol,
       reason: decision.action,
       pnl_pct: pnlPct,
+      keep_pct: decision.action === "scale_out" ? LIVE_SCALE_KEEP_PCT : 0,
       signature: sent.signature,
       dry,
     });
   }
 
   const openAfter = (await loadOpen(sb).catch(() => [])).filter((p) => p.status !== "closed");
-  const stillOpen = openAfter.length ? openAfter : open.filter((p) => !actions.some((a) => a.type === "sell" && a.mint === p.mint));
+  const stillOpen = openAfter.length
+    ? openAfter
+    : open.filter(
+        (p) => !actions.some((a) => a.type === "sell" && a.mint === p.mint && a.reason !== "scale_out"),
+      );
   const sized = sizeLiveBuy({ solBalance: bal, solUsd, openCount: stillOpen.length });
   if (!sized.ok) {
     await recordEvent(sb, { kind: "tick", reason: sized.skip, meta: { open: stillOpen.length } });
