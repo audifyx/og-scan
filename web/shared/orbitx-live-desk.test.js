@@ -51,13 +51,26 @@ describe("live agent desk rules", () => {
     expect(screenLiveCandidate(GOOD, { ...SAFETY, bondingOnly: true }).ok).toBe(false);
   });
 
-  it("sells 100% at +10% and +30% take-profit", () => {
-    const ten = decideLiveExit({ entry_price_usd: 1, tp_pct: 0.1 }, 1.1);
-    expect(ten.action).toBe("take_profit");
-    const thirty = decideLiveExit({ entry_price_usd: 1, tp_pct: 0.3 }, 1.3);
+  it("sells 100% at a $0.30 scalp, a $1 rip, or a time stop", () => {
+    const thirty = decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 1.2);
     expect(thirty.action).toBe("take_profit");
-    expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.12 }, 1.05).action).toBe("hold");
-    expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.1 }, 0.79).action).toBe("stop");
+    const dollar = decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 1.7);
+    expect(dollar.action).toBe("take_profit");
+    expect(decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 1.05).action).toBe("hold");
+    expect(decideLiveExit({ entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2 }, 0.84).action).toBe("stop");
+    const now = Date.parse("2026-09-07T12:22:00Z");
+    const scrape = decideLiveExit(
+      { entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2, opened_at: "2026-09-07T12:09:00Z" },
+      1.06,
+      now,
+    );
+    expect(scrape.action).toBe("take_profit");
+    const rotate = decideLiveExit(
+      { entry_price_usd: 1, usd_in: 1.5, tp_pct: 0.2, opened_at: "2026-09-07T11:55:00Z" },
+      1.01,
+      now,
+    );
+    expect(rotate.action).toBe("time_stop");
   });
 
   it("writes a thesis and rotates three live books", () => {
@@ -66,7 +79,7 @@ describe("live agent desk rules", () => {
     const thesis = writeLiveThesis(LIVE_AGENTS[0], GOOD, SAFETY, { usd: 1.5 });
     expect(thesis).toMatch(/NEON/);
     expect(thesis).toMatch(/\$1\.50/);
-    expect(thesis).toMatch(/whole clip/);
+    expect(thesis).toMatch(/\$0\.30/);
     expect(nextLiveAgent("neon-live").id).toBe("warden-live");
     const ranked = rankForLiveStyle("momentum", [GOOD, { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", change_1h: 18, symbol: "HOT" }]);
     expect(pickLiveToken(LIVE_AGENTS[0], ranked).symbol).toBe("HOT");
@@ -75,7 +88,7 @@ describe("live agent desk rules", () => {
     expect(emptyLiveDesk().max_open).toBe(1);
   });
 
-  it("allows liquid high-MC majors like JUP and USELESS instead of skipping them", () => {
+  it("skips high-MC majors and boosted-only names, prefers low-cap community tape", () => {
     const jup = {
       mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
       symbol: "JUP",
@@ -86,37 +99,37 @@ describe("live agent desk rules", () => {
       market_cap: 1_200_000_000,
       pair_age_min: 525_600,
     };
-    const useless = {
-      mint: "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-      symbol: "USELESS",
-      change_1h: 9,
-      change_24h: 18,
-      volume_24h: 8_000_000,
-      liquidity_usd: 4_000_000,
-      market_cap: 220_000_000,
-      pair_age_min: 40_000,
+    const boosted = {
+      ...GOOD,
+      mint: "Boost11111111111111111111111111111111111111",
+      symbol: "BOOST",
+      boosted: true,
+      volume_24h: 90_000,
+      twitter: null,
+      socials: [],
     };
-    const jupScreen = screenLiveCandidate(jup, SAFETY);
-    const uselessScreen = screenLiveCandidate(useless, SAFETY);
-    expect(jupScreen.ok).toBe(true);
-    expect(jupScreen.major).toBe(true);
-    expect(uselessScreen.ok).toBe(true);
-    expect(uselessScreen.major).toBe(true);
-    expect(screenLiveCandidate(jup, { ...SAFETY, canSell: false }).ok).toBe(false);
-    expect(screenLiveCandidate({ ...jup, symbol: "USDC", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }, SAFETY).ok).toBe(false);
-    expect(
-      screenLiveCandidate(
-        { ...GOOD, symbol: "MEGA", market_cap: 60_000_000_000, liquidity_usd: 80_000, volume_24h: 50_000 },
-        SAFETY,
-      ).ok,
-    ).toBe(false);
+    const room = {
+      ...GOOD,
+      mint: "Comm111111111111111111111111111111111111111",
+      symbol: "ROOM",
+      market_cap: 2_400_000,
+      change_1h: 11,
+      twitter: "https://x.com/room",
+      buys_1h: 90,
+    };
+    expect(screenLiveCandidate(jup, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate(jup, SAFETY).reasons.some((r) => /mcap too large/.test(r))).toBe(true);
+    expect(screenLiveCandidate(boosted, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate(room, SAFETY).ok).toBe(true);
+    expect(screenLiveCandidate({ ...GOOD, change_1h: 80 }, SAFETY).ok).toBe(false);
     expect(liveIsMajor({ mint: GOOD.mint, symbol: "PUMP", market_cap: 2_000_000, liquidity_usd: 1_500_000, volume_24h: 800_000 })).toBe(false);
     const ranked = rankForLiveStyle("momentum", [
-      { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", symbol: "HOT", change_1h: 40 },
+      { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", symbol: "HOT", change_1h: 18, twitter: "https://x.com/hot" },
       jup,
     ]);
-    expect(ranked[0].symbol).toBe("JUP");
-    expect(writeLiveThesis(LIVE_AGENTS[0], jup, SAFETY, { usd: 1.5 })).toMatch(/liquid major/);
+    expect(ranked[0].symbol).toBe("HOT");
+    expect(writeLiveThesis(LIVE_AGENTS[0], room, SAFETY, { usd: 1.5 })).toMatch(/\$0\.30/);
+    expect(writeLiveThesis(LIVE_AGENTS[0], room, SAFETY, { usd: 1.5 })).toMatch(/Community/);
   });
 
   it("rolls started vs now, wins, losses, and current hold per book", () => {

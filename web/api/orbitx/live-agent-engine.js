@@ -21,7 +21,6 @@ import {
   summarizeLiveLedger,
   mergeLiveFeed,
   writeLiveThesis,
-  LIVE_ALLOW_MINTS,
 } from "../../shared/orbitx-live-desk.js";
 
 const JUP = "https://lite-api.jup.ag";
@@ -170,18 +169,32 @@ function fromDexPair(p) {
   if (!mint) return null;
   const created = num(p?.pairCreatedAt);
   const ageMin = created > 0 ? (Date.now() - created) / 60_000 : null;
+  const socials = Array.isArray(p?.info?.socials) ? p.info.socials : [];
+  const websites = Array.isArray(p?.info?.websites) ? p.info.websites : [];
+  const twitter = socials.find((s) => String(s.type || "").toLowerCase() === "twitter")?.url || null;
+  const telegram = socials.find((s) => String(s.type || "").toLowerCase() === "telegram")?.url || null;
+  const website = websites[0]?.url || websites[0] || null;
+  const h1 = p?.txns?.h1 || {};
   return {
     mint,
     symbol: String(base.symbol || mint.slice(0, 4)).toUpperCase(),
     name: base.name || base.symbol || mint.slice(0, 6),
     image: p?.info?.imageUrl || null,
     price_usd: num(p?.priceUsd),
+    change_5m: num(p?.priceChange?.m5),
     change_1h: num(p?.priceChange?.h1),
     change_24h: num(p?.priceChange?.h24),
+    volume_1h: num(p?.volume?.h1),
     volume_24h: num(p?.volume?.h24),
     liquidity_usd: num(p?.liquidity?.usd),
     market_cap: num(p?.marketCap || p?.fdv),
     pair_age_min: ageMin,
+    buys_1h: num(h1.buys),
+    txns_1h: num(h1.buys) + num(h1.sells),
+    twitter,
+    telegram,
+    website,
+    socials,
     dex: p?.dexId || null,
     url: p?.url || `https://dexscreener.com/solana/${mint}`,
   };
@@ -225,17 +238,38 @@ async function hydrateDex(mints) {
   return out;
 }
 
+async function loadBoostedMints() {
+  const set = new Set();
+  for (const path of ["token-boosts/top/v1", "token-boosts/latest/v1"]) {
+    try {
+      const r = await fetch(`https://api.dexscreener.com/${path}`, { signal: AbortSignal.timeout(7000) });
+      const j = await r.json();
+      const rows = Array.isArray(j) ? j : [];
+      for (const row of rows) {
+        const mint = row?.tokenAddress || row?.address;
+        const chain = String(row?.chainId || "").toLowerCase();
+        if (mint && (!chain || chain === "solana")) set.add(mint);
+      }
+    } catch {
+      /* boosts optional */
+    }
+  }
+  return set;
+}
+
 export async function loadLiveTape() {
   const coins = [];
-  try {
-    const j = await jget("/tokens/v2/toptraded/24h?limit=30");
-    const rows = Array.isArray(j) ? j : j?.tokens || [];
-    for (const row of rows) {
-      const mapped = fromJupToken(row);
-      if (mapped) coins.push(mapped);
+  for (const path of ["/tokens/v2/toptraded/1h?limit=30", "/tokens/v2/toptraded/24h?limit=24"]) {
+    try {
+      const j = await jget(path);
+      const rows = Array.isArray(j) ? j : j?.tokens || [];
+      for (const row of rows) {
+        const mapped = fromJupToken(row);
+        if (mapped) coins.push(mapped);
+      }
+    } catch {
+      /* ignore missing window */
     }
-  } catch {
-    /* ignore */
   }
   try {
     const r = await fetch(`${PUMP}?limit=24&offset=0&sort=last_trade_timestamp&order=DESC&includeNsfw=false`, {
@@ -267,28 +301,38 @@ export async function loadLiveTape() {
   } catch {
     /* pump optional */
   }
-  const extra = await hydrateDex([...new Set([...LIVE_ALLOW_MINTS, ...coins.map((c) => c.mint)])].slice(0, 30));
+  const boosted = await loadBoostedMints();
+  const extra = await hydrateDex([...new Set(coins.map((c) => c.mint))].slice(0, 30));
   coins.push(...extra);
   const byMint = new Map();
   for (const c of coins) {
     const prev = byMint.get(c.mint);
-    if (!prev) {
-      byMint.set(c.mint, c);
-      continue;
-    }
-    byMint.set(c.mint, {
-      ...prev,
-      ...c,
-      liquidity_usd: Math.max(num(prev.liquidity_usd), num(c.liquidity_usd)),
-      volume_24h: Math.max(num(prev.volume_24h), num(c.volume_24h)),
-      market_cap: num(c.market_cap) || num(prev.market_cap),
-      change_1h: c.change_1h ?? prev.change_1h,
-      change_24h: c.change_24h ?? prev.change_24h,
-      pair_age_min: c.pair_age_min ?? prev.pair_age_min,
-      pump_complete: c.pump_complete ?? prev.pump_complete,
-    });
+    const row = prev
+      ? {
+          ...prev,
+          ...c,
+          liquidity_usd: Math.max(num(prev.liquidity_usd), num(c.liquidity_usd)),
+          volume_24h: Math.max(num(prev.volume_24h), num(c.volume_24h)),
+          volume_1h: Math.max(num(prev.volume_1h), num(c.volume_1h)),
+          buys_1h: Math.max(num(prev.buys_1h), num(c.buys_1h)),
+          txns_1h: Math.max(num(prev.txns_1h), num(c.txns_1h)),
+          market_cap: num(c.market_cap) || num(prev.market_cap),
+          change_1h: c.change_1h ?? prev.change_1h,
+          change_24h: c.change_24h ?? prev.change_24h,
+          pair_age_min: c.pair_age_min ?? prev.pair_age_min,
+          pump_complete: c.pump_complete ?? prev.pump_complete,
+          twitter: c.twitter || prev.twitter,
+          telegram: c.telegram || prev.telegram,
+          website: c.website || prev.website,
+          socials: c.socials?.length ? c.socials : prev.socials,
+        }
+      : c;
+    row.boosted = Boolean(row.boosted || prev?.boosted || boosted.has(c.mint));
+    byMint.set(c.mint, row);
   }
-  return [...byMint.values()].sort((a, b) => num(b.volume_24h) - num(a.volume_24h)).slice(0, 40);
+  return [...byMint.values()]
+    .sort((a, b) => num(b.volume_1h) - num(a.volume_1h) || num(b.volume_24h) - num(a.volume_24h))
+    .slice(0, 48);
 }
 
 async function pumpMeta(mint) {

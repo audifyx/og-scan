@@ -182,9 +182,10 @@ function LiveDeskView() {
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
-          Three agents share one Solana wallet. Each fill is ${clip.toFixed(2)}. Max one open position. Liquid majors
-          like JUP and USELESS are allowed — high market cap is not a skip. They only buy coins Jupiter can sell, then
-          flatten 100% at +10% / +12% / +30%. Not financial advice — this bank can go to zero.
+          Three agents share one Solana wallet. Each fill is ${clip.toFixed(2)}. Max one open position. They research
+          every 5 minutes, hunt low-cap trending coins with real social/community tape — not paid boosts — then take
+          profit around +$0.30 (or +$1 if it rips). High-MC names are too late for this book. Jupiter must be able to
+          sell. Not financial advice — this bank can go to zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
           <span className="text-2xs text-dim">Deposit</span>
@@ -237,7 +238,7 @@ function LiveDeskView() {
         </div>
       ) : (
         <p className="border-b border-line px-4 py-3 text-2xs text-dim">
-          No open live book. Next armed tick buys one ${clip.toFixed(2)} clip if Jupiter can sell. Ticks run every 2
+          No open live book. Next armed tick buys one ${clip.toFixed(2)} clip if Jupiter can sell. Ticks run every 5
           minutes.
         </p>
       )}
@@ -330,8 +331,7 @@ function LiveDeskView() {
                 </div>
                 <p className="text-2xs text-dim">
                   Hold {a.currently_hold || (a.open ? `$${a.open.symbol}` : "cash")} · {a.wins ?? 0}W / {a.losses ?? 0}L
-                  {a.trades ? ` · ${Number(a.win_pct || 0).toFixed(0)}% hit` : ""} · TP +
-                  {Math.round((a.tpPct || 0.1) * 100)}% full sell · ${clip.toFixed(2)} clips
+                  {a.trades ? ` · ${Number(a.win_pct || 0).toFixed(0)}% hit` : ""} · take ~$0.30 · ${clip.toFixed(2)} clips
                 </p>
                 <dl className="mt-2 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
                   <Stat label="Currently hold" value={a.currently_hold || "cash"} />

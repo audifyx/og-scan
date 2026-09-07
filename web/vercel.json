@@ -437,7 +437,7 @@
     },
     {
       "path": "/api/live-agents?path=tick",
-      "schedule": "*/2 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

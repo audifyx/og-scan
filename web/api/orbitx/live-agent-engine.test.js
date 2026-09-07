@@ -112,7 +112,7 @@ describe("live agent engine tick", () => {
     });
     expect(buy.actions.some((a) => a.type === "buy" && a.usd === 1.5)).toBe(true);
     expect(sb._tables.ox_live_events.some((e) => e.kind === "buy")).toBe(true);
-    expect(buy.actions[0].thesis).toMatch(/whole clip/);
+    expect(buy.actions[0].thesis).toMatch(/\$0\.30/);
     expect(LIVE_AGENTS.map((a) => a.id)).toContain(buy.actions[0].agent_id);
 
     sb._tables.ox_live_positions.push({
@@ -146,7 +146,7 @@ describe("live agent engine tick", () => {
     else process.env.LIVE_AGENT_ENABLED = prev;
   });
 
-  it("buys a high-MC major like JUP instead of skipping mcap too large", async () => {
+  it("skips a high-MC major like JUP and buys a low-cap with community tape", async () => {
     const prev = process.env.LIVE_AGENT_ENABLED;
     process.env.LIVE_AGENT_ENABLED = "1";
     const sb = memSb();
@@ -162,7 +162,7 @@ describe("live agent engine tick", () => {
       pair_age_min: 525_600,
       price_usd: 0.4,
     };
-    const buy = await tickLiveDesk({
+    const skip = await tickLiveDesk({
       sb,
       force: true,
       dryRun: true,
@@ -175,8 +175,39 @@ describe("live agent engine tick", () => {
       mark: async () => 0.4,
       swap: async () => ({ ok: true, signature: "sig-jup", outAmount: "1000" }),
     });
-    expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "JUP" && a.usd === 1.5)).toBe(true);
-    expect(buy.actions[0].thesis).toMatch(/liquid major/);
+    expect(skip.actions.some((a) => a.type === "buy")).toBe(false);
+    expect(skip.skipped).toBe("no_clean_coin");
+
+    sb._tables.ox_live_events = [];
+    const room = {
+      mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+      symbol: "ROOM",
+      name: "Room",
+      change_1h: 9,
+      change_24h: 14,
+      volume_24h: 220_000,
+      liquidity_usd: 180_000,
+      market_cap: 2_100_000,
+      pair_age_min: 180,
+      price_usd: 0.02,
+      twitter: "https://x.com/room",
+      buys_1h: 120,
+    };
+    const buy = await tickLiveDesk({
+      sb,
+      force: true,
+      dryRun: true,
+      sol_usd: 150,
+      solBalance: 0.05,
+      keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
+      owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
+      tape: async () => [jup, room],
+      safety: async () => ({ canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 }),
+      mark: async () => 0.02,
+      swap: async () => ({ ok: true, signature: "sig-room", outAmount: "1000" }),
+    });
+    expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "ROOM" && a.usd === 1.5)).toBe(true);
+    expect(buy.actions[0].thesis).toMatch(/\$0\.30/);
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
   });

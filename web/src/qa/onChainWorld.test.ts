@@ -524,8 +524,10 @@ describe("OrbitX /on-chain world", () => {
     expect(ui).toContain("one book at a time");
     expect(ui).toContain("Live tape");
     expect(ui).toContain("thesis");
-    expect(ui).toContain("JUP");
-    expect(ui).toContain("USELESS");
+    expect(ui).toContain("low-cap");
+    expect(ui).toContain("$0.30");
+    expect(ui).toContain("every 5");
+    expect(vercel).toContain("/api/live-agents?path=tick");
     expect(ui).toContain("LiveAgentFeed");
     expect(ui).toContain("LiveAgentCity");
     const city = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/LiveAgentCity.tsx"), "utf8");
@@ -549,6 +551,6 @@ describe("OrbitX /on-chain world", () => {
     expect(stage).toContain('id: "city"');
     const eventsSql = readFileSync(resolve(REPO, "supabase/migrations/20260907073000_ox_live_events.sql"), "utf8");
     expect(eventsSql).toContain("ox_live_events");
-    expect(vercel).toContain("*/2 * * * *");
+    expect(vercel).toContain("*/5 * * * *");
   });
 });
