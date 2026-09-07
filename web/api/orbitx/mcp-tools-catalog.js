@@ -1,7 +1,10 @@
 /**
- * Generated OrbitX MCP tool catalog — expands factories to 2500+ live tools.
+ * Generated OrbitX MCP tool catalog — expands factories to 2500+ live tools
+ * plus 140 named orbitx_skill_* intents from mcp-custom-skills.js.
  * Each tool maps to a real OG DEX / OrbitX endpoint or Phantom openUrl/signUrl.
  */
+
+import { registerCustomSkills, dispatchCustomSkill, customSkillStats } from "./mcp-custom-skills.js";
 
 /** Primary chains used by OG DEX screener / token APIs */
 const CHAINS = [
@@ -462,6 +465,9 @@ export function buildGeneratedTools() {
     );
   }
 
+  // 13) 140 named intent skills (market / trade / data / PDF / create / idea / NFT / launch / desk)
+  registerCustomSkills(push, tool);
+
   return out;
 }
 
@@ -469,6 +475,9 @@ export function buildGeneratedTools() {
  * Dispatch a generated tool. Returns result or null if not generated.
  */
 export async function dispatchGenerated(name, args, ctx) {
+  const custom = await dispatchCustomSkill(name, args, ctx);
+  if (custom != null) return custom;
+
   const meta = GEN_META.get(name);
   if (!meta) return null;
 
@@ -568,8 +577,12 @@ export async function dispatchGenerated(name, args, ctx) {
       if (!pk) throw new Error("publicKey required");
       if (!mint) throw new Error("mint required");
       const action = meta.action === "sell" ? "sell" : "buy";
-      const amount = action === "buy" ? Number(args.amountSol) : args.amount;
+      let amount = action === "buy" ? Number(args.amountSol) : args.amount;
+      if (meta.fullSell && (amount == null || amount === "")) amount = "100%";
       if (amount == null || amount === "") throw new Error(action === "buy" ? "amountSol required" : "amount required");
+      const slipArg = Number(args.slippage);
+      const slippage =
+        Number.isFinite(slipArg) && slipArg > 0 ? slipArg : Number(meta.slippage) || 10;
       // Validate route exists
       const body = {
         publicKey: pk,
@@ -577,7 +590,7 @@ export async function dispatchGenerated(name, args, ctx) {
         mint,
         amount,
         denominatedInSol: action === "buy",
-        slippage: Number(args.slippage) || 10,
+        slippage,
         pool: meta.pool || "auto",
         platformFee: true,
       };
@@ -595,12 +608,16 @@ export async function dispatchGenerated(name, args, ctx) {
         mint,
         amount: String(amount),
         publicKey: pk,
-        slippage: String(Number(args.slippage) || 10),
+        slippage: String(slippage),
         pool: String(meta.pool || "auto"),
       });
       const autoQs = new URLSearchParams(signQs);
       autoQs.set("auto", "1");
-      const auto = args.autoConfirm === true || args.auto === true || args.confirmMode === "auto";
+      const auto =
+        args.autoConfirm === true ||
+        args.auto === true ||
+        args.confirmMode === "auto" ||
+        meta.preferAuto === true;
       const signUrl = `${base}/agent/sign?${signQs.toString()}`;
       const autoSignUrl = `${base}/agent/sign?${autoQs.toString()}`;
       return {
@@ -650,5 +667,6 @@ export function generatedStats() {
     chains: CHAINS_EXT.length,
     screenerTypes: SCREENER_TYPES.length,
     intervals: INTERVALS.length,
+    customSkills: customSkillStats(),
   };
 }

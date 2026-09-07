@@ -99,6 +99,7 @@ const DIRECT_TOOL_NAMES = new Set([
   "orbitx_report_url",
   "orbitx_open_dex",
   "orbitx_tools_help",
+  "orbitx_skill_menu",
 ]);
 const BLOCKED_EMBEDDED_TOOLS = new Set([
   // The first-party app already has an authoritative Supabase/SIWS session.
@@ -110,10 +111,12 @@ const BLOCKED_EMBEDDED_TOOLS = new Set([
 const SYSTEM_PROMPT = `You are OrbitX AI, the first-party crypto copilot inside OrbitX.
 
 You have live OrbitX MCP tools for token research, wallets, charts, trading handoffs,
-launches, NFTs, social, generated media, and platform data. Use tools whenever live
-data is useful. For a contract address plus "chart", call orbitx_dex_chart immediately.
+launches, NFTs, social, generated media, and platform data, plus 140 named skills
+(orbitx_skill_mkt_* / td_* / data_* / pdf_* / create_* / idea_* / nft_* / ln_* / desk_*).
+Call orbitx_skill_menu to list them. Use tools whenever live data is useful. For a
+contract address plus "chart", call orbitx_dex_chart immediately.
 Use orbitx_tools_help or orbitx_command when the user asks for a capability that is
-not in the direct tool list.
+not in the direct tool list. Never invent prices — ground idea/PDF answers in tool results.
 
 Safety:
 - Never ask for a seed phrase or private key.
@@ -528,7 +531,7 @@ function directTools() {
     function: {
       name: "orbitx_command",
       description:
-        "Call any live OrbitX MCP tool by exact name. Use orbitx_tools_help first when unsure. Write, launch, trade, social, and NFT mutation tools return a confirmation card before execution.",
+        "Call any live OrbitX MCP tool by exact name. Use orbitx_skill_menu for the 140 named skills, or orbitx_tools_help when unsure. Write, launch, trade, social, and NFT mutation tools return a confirmation card before execution.",
       parameters: {
         type: "object",
         properties: {
