@@ -10,7 +10,7 @@ export const LIVE_WALLET_PUBKEY = "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj"
 export const LIVE_TRADE_USD = 1.5;
 export const LIVE_FEE_RESERVE_SOL = 0.004;
 export const LIVE_MAX_OPEN = 1;
-export const LIVE_STOP_PCT = -0.15;
+export const LIVE_STOP_PCT = -0.12;
 export const LIVE_TP_USD = 0.3;
 export const LIVE_TP_MAX_USD = 1;
 export const LIVE_SCRAPE_USD = 0.08;
@@ -18,17 +18,20 @@ export const LIVE_SCALP_MS = 12 * 60_000;
 export const LIVE_MAX_HOLD_MS = 22 * 60_000;
 export const LIVE_TICK_MINUTES = 5;
 export const LIVE_MIN_LIQ_USD = 40_000;
-export const LIVE_MIN_VOL_USD = 60_000;
-export const LIVE_MIN_MCAP_USD = 150_000;
+export const LIVE_MIN_VOL_USD = 40_000;
+export const LIVE_MIN_MCAP_USD = 80_000;
 export const LIVE_MAX_MCAP_USD = 18_000_000;
 export const LIVE_MAJOR_MCAP_USD = 80_000_000;
 export const LIVE_MAJOR_LIQ_USD = 250_000;
-export const LIVE_MAX_ROUND_TRIP_PCT = 10;
+export const LIVE_MAX_ROUND_TRIP_PCT = 8;
 export const LIVE_MAX_BUY_IMPACT_PCT = 3.5;
-export const LIVE_MIN_AGE_MIN = 60;
-export const LIVE_MAX_1H_PUMP_PCT = 55;
-export const LIVE_MAX_24H_PUMP_PCT = 180;
-export const LIVE_MIN_TXNS_1H = 40;
+export const LIVE_MIN_AGE_MIN = 45;
+export const LIVE_MAX_1H_PUMP_PCT = 42;
+export const LIVE_MAX_24H_PUMP_PCT = 120;
+export const LIVE_MAX_5M_DUMP_PCT = -6;
+export const LIVE_MAX_15M_DUMP_PCT = -10;
+export const LIVE_MIN_MOVE_1H_PCT = 3;
+export const LIVE_MIN_TXNS_1H = 30;
 export const LIVE_MAX_PROBES = 5;
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 /** Liquid majors the desk is allowed to buy — high MC is a feature, not a skip. */
@@ -89,7 +92,7 @@ export const LIVE_AGENTS = [
     style: "momentum",
     tpPct: 0.2,
     color: "#34d399",
-    blurb: "Scalps 1h continuation on low-cap books with real social tape. Sells the whole clip around +$0.30.",
+    blurb: "Buys low-cap continuation only after a dip — never a vertical top. Jupiter must sell. Takes about +$0.30.",
   },
   {
     id: "warden-live",
@@ -97,7 +100,7 @@ export const LIVE_AGENTS = [
     style: "mean_reversion",
     tpPct: 0.18,
     color: "#fb7185",
-    blurb: "Fades stretched low-caps that still have community flow. Takes about +$0.30 and walks — no 100x bags.",
+    blurb: "Waits for pullbacks on real books. Skips dumps, tops, and unsellable tape. Takes about +$0.30.",
   },
   {
     id: "raid-live",
@@ -105,12 +108,12 @@ export const LIVE_AGENTS = [
     style: "fresh",
     tpPct: 0.22,
     color: "#fbbf24",
-    blurb: "Catches younger listed pumps with Dex socials, then gets out. Stacks cents, not lottery tickets.",
+    blurb: "Young listed coins with depth and a sell route — after they dip, not while they're dumping.",
   },
 ];
 
 export const LIVE_DISCLAIMER =
-  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. They hunt low-cap trending coins with real social/community tape — not paid boosts — and take profit around +$0.30 (or +$1 if it rips). Skip anything Jupiter cannot sell. You can lose the whole bank.";
+  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. NEON, WARDEN, and RAID rotate. They wait for dips on low-cap books with real tape, skip tops and dumpers, and never buy what Jupiter cannot sell. Take profit around +$0.30 (or +$1 if it rips). You can lose the whole bank.";
 
 export function liveAgentById(id) {
   const needle = String(id || "").trim().toLowerCase();
@@ -121,6 +124,18 @@ export function nextLiveAgent(lastId) {
   if (!LIVE_AGENTS.length) return null;
   const i = LIVE_AGENTS.findIndex((a) => a.id === lastId);
   return LIVE_AGENTS[(i + 1) % LIVE_AGENTS.length];
+}
+
+export function liveAgentOrder(lastId) {
+  const start = nextLiveAgent(lastId);
+  if (!start) return [];
+  const out = [start];
+  let cur = start;
+  for (let i = 1; i < LIVE_AGENTS.length; i += 1) {
+    cur = nextLiveAgent(cur.id);
+    if (cur) out.push(cur);
+  }
+  return out;
 }
 
 function num(v, fallback = 0) {
@@ -144,10 +159,54 @@ export function hasCommunity(coin = {}) {
 export function hasOrganicFlow(coin = {}) {
   return (
     num(coin.buys_1h) >= LIVE_MIN_TXNS_1H ||
-    num(coin.txns_1h) >= 70 ||
-    num(coin.volume_1h) >= 20_000 ||
+    num(coin.txns_1h) >= 55 ||
+    num(coin.volume_1h) >= 15_000 ||
     num(coin.volume_24h) >= LIVE_MIN_VOL_USD
   );
+}
+
+export function isDumping(coin = {}) {
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? null : num(coin.change_5m);
+  const m15 = coin.change_15m == null || coin.change_15m === "" ? null : num(coin.change_15m);
+  const h1 = num(coin.change_1h);
+  if (m5 != null && m5 <= LIVE_MAX_5M_DUMP_PCT) return true;
+  if (m15 != null && m15 <= LIVE_MAX_15M_DUMP_PCT) return true;
+  if (h1 <= -15 && (m5 == null || m5 <= 0)) return true;
+  return false;
+}
+
+export function looksTopped(coin = {}) {
+  const h1 = num(coin.change_1h);
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? null : num(coin.change_5m);
+  const m15 = coin.change_15m == null || coin.change_15m === "" ? null : num(coin.change_15m);
+  if (h1 >= LIVE_MAX_1H_PUMP_PCT) return true;
+  if (num(coin.change_24h) >= LIVE_MAX_24H_PUMP_PCT) return true;
+  if (h1 >= 28 && m5 != null && m5 <= -4) return true;
+  if (h1 >= 22 && m15 != null && m15 <= -8) return true;
+  if (h1 >= 25 && m5 == null) return true;
+  const buys = num(coin.buys_1h);
+  const sells = num(coin.sells_1h);
+  if (sells > 0 && buys > 0 && sells > buys * 1.35 && (m5 == null || m5 <= 0)) return true;
+  return false;
+}
+
+export function looksDead(coin = {}) {
+  const h1 = Math.abs(num(coin.change_1h));
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? 0 : Math.abs(num(coin.change_5m));
+  return h1 < LIVE_MIN_MOVE_1H_PCT && m5 < 1.5 && num(coin.volume_1h) < 12_000 && num(coin.txns_1h) < 40;
+}
+
+export function isHealthyDip(coin = {}) {
+  if (isDumping(coin) || looksTopped(coin) || looksDead(coin)) return false;
+  const h1 = num(coin.change_1h);
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? null : num(coin.change_5m);
+  if (h1 < LIVE_MIN_MOVE_1H_PCT || h1 >= LIVE_MAX_1H_PUMP_PCT) return false;
+  if (m5 == null) return h1 >= LIVE_MIN_MOVE_1H_PCT && h1 <= 22;
+  return m5 <= 2 && m5 > LIVE_MAX_5M_DUMP_PCT;
+}
+
+export function isLiveMover(coin = {}) {
+  return isHealthyDip(coin);
 }
 
 export function solForTradeUsd(usd, solUsd) {
@@ -200,6 +259,9 @@ export function screenLiveCandidate(coin = {}, safety = {}) {
   if (mcap > 0 && mcap < LIVE_MIN_MCAP_USD) reasons.push("mcap too small");
   if (mcap > LIVE_MAX_MCAP_USD) reasons.push("mcap too large");
   if (ageMin != null && ageMin < LIVE_MIN_AGE_MIN) reasons.push(`pair only ${Math.round(ageMin)}m old`);
+  if (isDumping(coin)) reasons.push("dumping — skip");
+  if (looksTopped(coin)) reasons.push("topped — don't chase");
+  if (looksDead(coin)) reasons.push("no follow-through — wait");
   if (num(coin.change_1h) >= LIVE_MAX_1H_PUMP_PCT) reasons.push("already pumped");
   if (num(coin.change_24h) >= LIVE_MAX_24H_PUMP_PCT) reasons.push("already ran");
   if (coin.boosted && !hasCommunity(coin)) reasons.push("boosted, no community");
@@ -233,6 +295,7 @@ export function scoreLiveCandidate(coin = {}, safety = {}) {
   const vol = num(coin.volume_24h);
   const ch1 = num(coin.change_1h);
   const ch24 = num(coin.change_24h);
+  const m5 = coin.change_5m == null || coin.change_5m === "" ? null : num(coin.change_5m);
   const mcap = num(coin.market_cap ?? coin.marketCap);
   if (liq >= 80_000) s += 10;
   if (liq >= 250_000) s += 6;
@@ -241,11 +304,15 @@ export function scoreLiveCandidate(coin = {}, safety = {}) {
   if (num(coin.buys_1h) >= LIVE_MIN_TXNS_1H) s += 8;
   if (safety.canSell) s += 20;
   if (safety.roundTripLossPct != null && num(safety.roundTripLossPct) < 6) s += 8;
-  if (ch1 >= 3 && ch1 <= 28) s += 12;
-  if (ch1 >= 4 && ch1 <= 18) s += 4;
+  if (isHealthyDip(coin)) s += 18;
+  if (ch1 >= LIVE_MIN_MOVE_1H_PCT && ch1 <= 22) s += 8;
+  if (m5 != null && m5 <= 1 && m5 > LIVE_MAX_5M_DUMP_PCT && ch1 >= 6) s += 10;
   if (ch24 <= -40) s -= 12;
-  if (ch1 >= 45) s -= 12;
-  if (mcap >= 200_000 && mcap <= 8_000_000) s += 10;
+  if (isDumping(coin)) s -= 30;
+  if (looksTopped(coin)) s -= 24;
+  if (looksDead(coin)) s -= 16;
+  if (ch1 >= 36) s -= 14;
+  if (mcap >= 120_000 && mcap <= 8_000_000) s += 10;
   if (mcap > LIVE_MAX_MCAP_USD) s -= 20;
   if (hasCommunity(coin)) s += 12;
   if (coin.boosted && !hasCommunity(coin)) s -= 22;
@@ -275,6 +342,7 @@ export function liftLiveMajors(ranked) {
 
 export function liftLiveScalps(ranked) {
   const list = ranked || [];
+  const dips = [];
   const community = [];
   const rest = [];
   for (const c of list) {
@@ -282,30 +350,43 @@ export function liftLiveScalps(ranked) {
       rest.push(c);
       continue;
     }
-    if (hasCommunity(c) && !c.boosted) community.push(c);
+    if (isDumping(c) || looksTopped(c) || looksDead(c)) {
+      rest.push(c);
+      continue;
+    }
+    if (isHealthyDip(c)) dips.push(c);
+    else if (hasCommunity(c) && !c.boosted) community.push(c);
     else rest.push(c);
   }
-  return community.concat(rest);
+  dips.sort((a, b) => scoreLiveCandidate(b, { canBuy: true, canSell: true }) - scoreLiveCandidate(a, { canBuy: true, canSell: true }));
+  return dips.concat(community).concat(rest);
 }
 
 export function pickLiveToken(agent, ranked) {
   const list = ranked || [];
   if (!list.length) return null;
+  const safe = list.filter((t) => !isDumping(t) && !looksTopped(t) && !looksDead(t));
   if (agent?.style === "momentum") {
-    return list.find((t) => num(t.change_1h) >= 3 && num(t.change_1h) < LIVE_MAX_1H_PUMP_PCT) || list[0];
+    return safe.find((t) => isHealthyDip(t) || (num(t.change_1h) >= LIVE_MIN_MOVE_1H_PCT && num(t.change_1h) < 28)) || null;
   }
   if (agent?.style === "mean_reversion") {
-    return list.find((t) => num(t.change_24h) <= -8 && num(t.change_24h) >= -40) || list[0];
+    return (
+      safe.find((t) => num(t.change_24h) <= -4 && num(t.change_24h) >= -35 && !isDumping(t)) ||
+      safe.find((t) => isHealthyDip(t)) ||
+      null
+    );
   }
   if (agent?.style === "fresh") {
     return (
-      list.find((t) => {
+      safe.find((t) => {
         const age = num(t.pair_age_min, 999);
-        return age >= LIVE_MIN_AGE_MIN && age <= 12 * 60;
-      }) || list[0]
+        return age >= LIVE_MIN_AGE_MIN && age <= 12 * 60 && isHealthyDip(t);
+      }) ||
+      safe.find((t) => isHealthyDip(t)) ||
+      null
     );
   }
-  return list[0];
+  return safe[0] || null;
 }
 
 export function decideLiveExit(position = {}, markUsd, now = Date.now()) {
@@ -328,10 +409,10 @@ export function decideLiveExit(position = {}, markUsd, now = Date.now()) {
     return { action: "take_profit", pnlPct, pnlUsd, reason: `held ${Math.round(heldMs / 60000)}m, booked +${pnlUsd.toFixed(2)} — get out` };
   }
   if (heldMs >= LIVE_MAX_HOLD_MS) {
-    return { action: "time_stop", pnlPct, pnlUsd, reason: `held ${Math.round(heldMs / 60000)}m — rotate, don't marry it` };
+    return { action: "time_stop", pnlPct, pnlUsd, reason: `held ${Math.round(heldMs / 60000)}m — rotate, don't baghold` };
   }
   if (pnlPct <= LIVE_STOP_PCT) {
-    return { action: "stop", pnlPct, pnlUsd, reason: `${(pnlPct * 100).toFixed(1)}% hit ${LIVE_STOP_PCT * 100}% stop — sell 100%` };
+    return { action: "stop", pnlPct, pnlUsd, reason: `${(pnlPct * 100).toFixed(1)}% — cut it, could be a rug/dump` };
   }
   return { action: "hold", pnlPct, pnlUsd, reason: "hold" };
 }
@@ -447,14 +528,14 @@ export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
   let why;
   if (agent?.style === "mean_reversion") {
     why = ch24
-      ? `${t} looks stretched after ${ch24}. I'm fading a low-cap with real flow and taking a small win.`
-      : `${t} looks stretched. Tight take, no hero trade.`;
+      ? `${t} pulled back after ${ch24}. I'm buying the dip on a real book, not the dump.`
+      : `${t} pulled back. Tight take, no hero trade.`;
   } else if (agent?.style === "fresh") {
-    why = `Young listed pair, community still posting, depth is real. Catch the pump, then leave.`;
+    why = `Young listed pair, depth is real, and it dipped instead of ripping vertical. In after the pullback.`;
   } else {
     why = ch1
-      ? `${t} is still pushing (${ch1}) and the room looks real. In and out — stack cents.`
-      : `I'm clipping ${t} because the book looks real, socials are live, and I can sell.`;
+      ? `${t} still has follow-through (${ch1}) but I'm in on the dip, not the top.`
+      : `I'm clipping ${t} on a pullback because the book looks real and Jupiter will sell it.`;
   }
   const social = hasCommunity(coin) ? " Community's actually posting, not just a paid boost." : "";
   const pump = coin.pump_complete === false ? " Still on the launch tape, but Jupiter will sell it." : "";
@@ -464,9 +545,12 @@ export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
 export function humanSkipReason(reason) {
   const r = String(reason || "").toLowerCase();
   if (r.includes("cannot sell") || r.includes("honeypot")) return "Jupiter wouldn't give a sell route, so it stays on the sidelines.";
+  if (r.includes("dumping")) return "It's dumping. We don't catch falling knives.";
+  if (r.includes("topped") || r.includes("don't chase")) return "Looks topped. Waiting for a dip, not the high.";
+  if (r.includes("no follow-through")) return "No follow-through. Staying in cash until it actually looks like it will move.";
   if (r.includes("mcap too large")) return "Cap's already huge. We're hunting low-cap tapes we can actually scalp.";
   if (r.includes("mcap too small")) return "Too small. Not worth the heat.";
-  if (r.includes("already pumped") || r.includes("already ran")) return "That move already happened. We don't chase the top.";
+  if (r.includes("already pumped") || r.includes("already ran")) return "That's a top, not an entry. We wait for a dip.";
   if (r.includes("boosted")) return "That's paid heat, not a real room. Passing.";
   if (r.includes("no social")) return "No community tape. We don't ape boosted ghosts.";
   if (r.includes("thin") || r.includes("liq $")) return "The pool's too thin even for a $1.50 clip.";
@@ -479,6 +563,8 @@ export function humanSkipReason(reason) {
   if (r.includes("stable")) return "That's a stable. We don't clip those.";
   if (r.includes("no_clean")) return "Looked at the tape and stayed in cash.";
   if (r.includes("no_buy_quote")) return "Couldn't get a buy quote. Left it.";
+  if (r.includes("rpc_balance") || r.includes("rpc")) return "RPC went dark mid-tick. I'll retry next pass.";
+  if (r === "scan" || r.includes("scan")) return "Scanning the 5-minute tape.";
   if (reason) return `Passed — ${String(reason).replace(/_/g, " ")}.`;
   return "Didn't like the book.";
 }
@@ -516,6 +602,8 @@ export function humanLivePost(row = {}, ctx = {}) {
     return `A swap failed on-chain${t ? ` for ${t}` : ""}. Check the Solscan tx if you want the raw error.`;
   }
   if (kind === "tick") {
+    const why = String(row.reason || "").toLowerCase();
+    if (why === "scan") return `${who} is scanning the 5-minute tape.`;
     return `${who} looked at the tape and stayed in cash. ${humanSkipReason(row.reason)}`;
   }
   if (row.thesis) return row.thesis;
@@ -578,7 +666,8 @@ export function emptyLiveDesk(extra = {}) {
     open: extra.open || [],
     fills: extra.fills || [],
     agents: extra.agents || LIVE_AGENTS.map((a) => ({ ...a, open: null, last: null, wins: 0, losses: 0 })),
-    last_tick_at: extra.last_tick_at || null,
+    last_tick_at: extra.last_tick_at || extra.last_activity_at || null,
+    last_activity_at: extra.last_activity_at || extra.last_tick_at || null,
     last_error: extra.last_error || null,
     skipped: extra.skipped || null,
     events: extra.events || [],

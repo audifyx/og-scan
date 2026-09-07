@@ -86,7 +86,8 @@ function LiveDeskView() {
   const losses = ledger?.losses ?? 0;
   const holding = ledger?.holding || open[0] || null;
   const feed = (snap?.feed || []).length ? snap.feed : [];
-  const tickAgo = snap?.last_tick_at ? Math.max(0, now - Date.parse(snap.last_tick_at)) : null;
+  const lastTickAt = snap?.last_tick_at || snap?.last_activity_at || feed[0]?.at || feed[0]?.created_at || null;
+  const tickAgo = lastTickAt ? Math.max(0, now - Date.parse(lastTickAt)) : null;
   const tickLabel =
     tickAgo == null
       ? "no tick yet"
@@ -182,10 +183,10 @@ function LiveDeskView() {
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
-          Three agents share one Solana wallet. Each fill is ${clip.toFixed(2)}. Max one open position. They research
-          every 5 minutes, hunt low-cap trending coins with real social/community tape — not paid boosts — then take
-          profit around +$0.30 (or +$1 if it rips). High-MC names are too late for this book. Jupiter must be able to
-          sell. Not financial advice — this bank can go to zero.
+          Three agents share one Solana wallet and rotate every tick — NEON, WARDEN, then RAID. Each fill is $
+          {clip.toFixed(2)}. Max one open position. They research every 5 minutes, wait for dips on low-cap books with
+          real social tape, skip tops and dumpers, and never buy what Jupiter cannot sell. Take profit around +$0.30
+          (or +$1 if it rips). Not financial advice — this bank can go to zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
           <span className="text-2xs text-dim">Deposit</span>

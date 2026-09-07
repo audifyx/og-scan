@@ -179,11 +179,13 @@ describe("live agent engine tick", () => {
     expect(skip.skipped).toBe("no_clean_coin");
 
     sb._tables.ox_live_events = [];
+    sb._tables.ox_live_desk[0].last_agent_id = null;
     const room = {
       mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
       symbol: "ROOM",
       name: "Room",
       change_1h: 9,
+      change_5m: -2.2,
       change_24h: 14,
       volume_24h: 220_000,
       liquidity_usd: 180_000,
@@ -213,7 +215,49 @@ describe("live agent engine tick", () => {
     expect(probes).toBe(1);
     expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "ROOM" && a.usd === 1.5)).toBe(true);
     expect(buy.last_tick_at).toBeTruthy();
+    expect(sb._tables.ox_live_desk[0].last_agent_id).toBe("neon-live");
+    expect(sb._tables.ox_live_events.some((e) => e.kind === "tick" && e.reason === "scan")).toBe(true);
     expect(buy.actions[0].thesis).toMatch(/\$0\.30/);
+
+    sb._tables.ox_live_positions = [];
+    sb._tables.ox_live_events = [];
+    const mouse = {
+      mint: "Aw6fiDPWLUnjSsJQtsyEMSaoPaKAUUrStAsYPiPwpump",
+      symbol: "ANONYMOUSE",
+      change_5m: -8.69,
+      change_15m: -7.69,
+      change_1h: 122,
+      change_24h: 101,
+      volume_24h: 364_000,
+      liquidity_usd: 24_451,
+      market_cap: 85_440,
+      pair_age_min: 70,
+      price_usd: 0.00008,
+      twitter: "https://x.com/OxFlipped",
+      buys_1h: 200,
+      sells_1h: 260,
+    };
+    let mouseProbes = 0;
+    const skipDump = await tickLiveDesk({
+      sb,
+      force: true,
+      dryRun: true,
+      sol_usd: 150,
+      solBalance: 0.05,
+      keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
+      owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
+      tape: async () => [mouse],
+      safety: async () => {
+        mouseProbes += 1;
+        return { canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 };
+      },
+      mark: async () => 0.00008,
+      swap: async () => ({ ok: true, signature: "sig-mouse", outAmount: "1000" }),
+    });
+    expect(mouseProbes).toBe(0);
+    expect(skipDump.actions.some((a) => a.type === "buy")).toBe(false);
+    expect(skipDump.skipped).toBe("no_clean_coin");
+    expect(sb._tables.ox_live_desk[0].last_agent_id).toBe("warden-live");
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
   });

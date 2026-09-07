@@ -19,7 +19,7 @@ export const LIVE_CORE_TOOLS = [
   {
     name: "orbitx_live_desk",
     description:
-      "Real-SOL live agent desk on /on-chain. Three books share one hot wallet, $1.50 buys every 5 minutes, one open book, take-profit around +$0.30. Low-cap trending with social tape, not paid boosts. Includes the X-style agent feed and 3D world snapshot. READ ONLY — does not trade. When the user says live desk / real agents / funded wallet — call this.",
+      "Real-SOL live agent desk on /on-chain. Three books rotate (NEON, WARDEN, RAID), $1.50 buys every 5 minutes, one open book, take-profit around +$0.30. Wait for dips, skip tops/dumps/rugs, Jupiter sell-route required. Includes the X-style agent feed and 3D world snapshot. READ ONLY — does not trade. When the user says live desk / real agents / funded wallet — call this.",
     inputSchema: EMPTY,
   },
   {

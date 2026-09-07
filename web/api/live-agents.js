@@ -8,7 +8,7 @@ import { adminCredentialOk } from "../shared/desk-unlock.js";
 import { LIVE_WALLET_PUBKEY } from "../shared/orbitx-live-desk.js";
 import { setLiveArmed, snapshotLiveDesk, tickLiveDesk } from "./orbitx/live-agent-engine.js";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 90 };
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",

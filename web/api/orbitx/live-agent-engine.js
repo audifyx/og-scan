@@ -21,6 +21,7 @@ import {
   summarizeLiveLedger,
   mergeLiveFeed,
   writeLiveThesis,
+  liveIsMajor,
   LIVE_MAX_PROBES,
 } from "../../shared/orbitx-live-desk.js";
 
@@ -182,15 +183,17 @@ function fromDexPair(p) {
     name: base.name || base.symbol || mint.slice(0, 6),
     image: p?.info?.imageUrl || null,
     price_usd: num(p?.priceUsd),
-    change_5m: num(p?.priceChange?.m5),
-    change_1h: num(p?.priceChange?.h1),
-    change_24h: num(p?.priceChange?.h24),
+    change_5m: p?.priceChange?.m5 == null ? null : num(p.priceChange.m5),
+    change_15m: p?.priceChange?.m15 == null ? null : num(p.priceChange.m15),
+    change_1h: p?.priceChange?.h1 == null ? null : num(p.priceChange.h1),
+    change_24h: p?.priceChange?.h24 == null ? null : num(p.priceChange.h24),
     volume_1h: num(p?.volume?.h1),
     volume_24h: num(p?.volume?.h24),
     liquidity_usd: num(p?.liquidity?.usd),
     market_cap: num(p?.marketCap || p?.fdv),
     pair_age_min: ageMin,
     buys_1h: num(h1.buys),
+    sells_1h: num(h1.sells),
     txns_1h: num(h1.buys) + num(h1.sells),
     twitter,
     telegram,
@@ -210,6 +213,8 @@ function fromJupToken(row) {
     name: row.name || row.symbol || mint.slice(0, 6),
     image: row.icon || row.logoURI || null,
     price_usd: num(row.usdPrice ?? row.price),
+    change_5m: row.stats5m?.priceChange ?? row.priceChange5m ?? null,
+    change_15m: row.stats15m?.priceChange ?? row.priceChange15m ?? null,
     change_1h: num(row.stats1h?.priceChange ?? row.priceChange1h),
     change_24h: num(row.stats24h?.priceChange ?? row.priceChange24h),
     volume_24h: num(row.stats24h?.buyVolume ?? row.volume24h ?? row.v24hUSD),
@@ -241,18 +246,22 @@ async function hydrateDex(mints) {
 
 async function loadBoostedMints() {
   const set = new Set();
-  for (const path of ["token-boosts/top/v1", "token-boosts/latest/v1"]) {
-    try {
-      const r = await fetch(`https://api.dexscreener.com/${path}`, { signal: AbortSignal.timeout(7000) });
-      const j = await r.json();
-      const rows = Array.isArray(j) ? j : [];
-      for (const row of rows) {
-        const mint = row?.tokenAddress || row?.address;
-        const chain = String(row?.chainId || "").toLowerCase();
-        if (mint && (!chain || chain === "solana")) set.add(mint);
+  const pages = await Promise.all(
+    ["token-boosts/top/v1", "token-boosts/latest/v1"].map(async (path) => {
+      try {
+        const r = await fetch(`https://api.dexscreener.com/${path}`, { signal: AbortSignal.timeout(7000) });
+        const j = await r.json();
+        return Array.isArray(j) ? j : [];
+      } catch {
+        return [];
       }
-    } catch {
-      /* boosts optional */
+    }),
+  );
+  for (const rows of pages) {
+    for (const row of rows) {
+      const mint = row?.tokenAddress || row?.address;
+      const chain = String(row?.chainId || "").toLowerCase();
+      if (mint && (!chain || chain === "solana")) set.add(mint);
     }
   }
   return set;
@@ -260,49 +269,55 @@ async function loadBoostedMints() {
 
 export async function loadLiveTape() {
   const coins = [];
-  for (const path of ["/tokens/v2/toptraded/1h?limit=30", "/tokens/v2/toptraded/24h?limit=24"]) {
-    try {
-      const j = await jget(path);
-      const rows = Array.isArray(j) ? j : j?.tokens || [];
-      for (const row of rows) {
-        const mapped = fromJupToken(row);
-        if (mapped) coins.push(mapped);
+  const [jupRows, pumpList, boosted] = await Promise.all([
+    Promise.all(
+      ["/tokens/v2/toptraded/1h?limit=30", "/tokens/v2/toptraded/24h?limit=24"].map(async (path) => {
+        try {
+          const j = await jget(path, 8000);
+          return Array.isArray(j) ? j : j?.tokens || [];
+        } catch {
+          return [];
+        }
+      }),
+    ).then((windows) => windows.flat()),
+    (async () => {
+      try {
+        const r = await fetch(`${PUMP}?limit=24&offset=0&sort=last_trade_timestamp&order=DESC&includeNsfw=false`, {
+          headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
+          signal: AbortSignal.timeout(8000),
+        });
+        const j = await r.json();
+        return Array.isArray(j) ? j : j?.coins || [];
+      } catch {
+        return [];
       }
-    } catch {
-      /* ignore missing window */
-    }
+    })(),
+    loadBoostedMints(),
+  ]);
+  for (const row of jupRows) {
+    const mapped = fromJupToken(row);
+    if (mapped) coins.push(mapped);
   }
-  try {
-    const r = await fetch(`${PUMP}?limit=24&offset=0&sort=last_trade_timestamp&order=DESC&includeNsfw=false`, {
-      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(8000),
+  for (const c of pumpList) {
+    const mint = c?.mint;
+    if (!mint) continue;
+    coins.push({
+      mint,
+      symbol: String(c.symbol || mint.slice(0, 4)).toUpperCase(),
+      name: c.name || c.symbol || mint.slice(0, 6),
+      image: c.image_uri || null,
+      price_usd: num(c.usd_market_cap) && num(c.total_supply) ? num(c.usd_market_cap) / Math.max(1, num(c.total_supply)) : 0,
+      change_1h: null,
+      change_24h: null,
+      volume_24h: num(c.volume_24h ?? c.virtual_sol_reserves) * 150,
+      liquidity_usd: num(c.virtual_sol_reserves) * 2 * 150,
+      market_cap: num(c.usd_market_cap),
+      pair_age_min: c.created_timestamp ? (Date.now() - num(c.created_timestamp)) / 60_000 : null,
+      pump_complete: Boolean(c.complete),
+      dex: "pump.fun",
+      url: `https://pump.fun/${mint}`,
     });
-    const j = await r.json();
-    const list = Array.isArray(j) ? j : j?.coins || [];
-    for (const c of list) {
-      const mint = c?.mint;
-      if (!mint) continue;
-      coins.push({
-        mint,
-        symbol: String(c.symbol || mint.slice(0, 4)).toUpperCase(),
-        name: c.name || c.symbol || mint.slice(0, 6),
-        image: c.image_uri || null,
-        price_usd: num(c.usd_market_cap) && num(c.total_supply) ? num(c.usd_market_cap) / Math.max(1, num(c.total_supply)) : 0,
-        change_1h: null,
-        change_24h: null,
-        volume_24h: num(c.volume_24h ?? c.virtual_sol_reserves) * 150,
-        liquidity_usd: num(c.virtual_sol_reserves) * 2 * 150,
-        market_cap: num(c.usd_market_cap),
-        pair_age_min: c.created_timestamp ? (Date.now() - num(c.created_timestamp)) / 60_000 : null,
-        pump_complete: Boolean(c.complete),
-        dex: "pump.fun",
-        url: `https://pump.fun/${mint}`,
-      });
-    }
-  } catch {
-    /* pump optional */
   }
-  const boosted = await loadBoostedMints();
   const extra = await hydrateDex([...new Set(coins.map((c) => c.mint))].slice(0, 30));
   coins.push(...extra);
   const byMint = new Map();
@@ -316,8 +331,11 @@ export async function loadLiveTape() {
           volume_24h: Math.max(num(prev.volume_24h), num(c.volume_24h)),
           volume_1h: Math.max(num(prev.volume_1h), num(c.volume_1h)),
           buys_1h: Math.max(num(prev.buys_1h), num(c.buys_1h)),
+          sells_1h: Math.max(num(prev.sells_1h), num(c.sells_1h)),
           txns_1h: Math.max(num(prev.txns_1h), num(c.txns_1h)),
           market_cap: num(c.market_cap) || num(prev.market_cap),
+          change_5m: c.change_5m ?? prev.change_5m,
+          change_15m: c.change_15m ?? prev.change_15m,
           change_1h: c.change_1h ?? prev.change_1h,
           change_24h: c.change_24h ?? prev.change_24h,
           pair_age_min: c.pair_age_min ?? prev.pair_age_min,
@@ -421,11 +439,12 @@ async function loadDeskRow(sb) {
 }
 
 async function upsertDesk(sb, patch) {
-  if (!sb) return;
-  await sb.from("ox_live_desk").upsert(
+  if (!sb) return { error: null };
+  const { error } = await sb.from("ox_live_desk").upsert(
     { id: "main", updated_at: new Date().toISOString(), ...patch },
     { onConflict: "id" },
   );
+  return { error: error || null };
 }
 
 async function loadOpen(sb) {
@@ -610,6 +629,8 @@ export async function snapshotLiveDesk(opts = {}) {
     signature: e.signature,
   }));
   const feed = mergeLiveFeed({ fills: publicFills, events: publicEvents, chain, wallet });
+  const lastActivity =
+    row.last_tick_at || feed[0]?.at || feed[0]?.created_at || publicEvents[0]?.created_at || null;
   return emptyLiveDesk({
     wallet,
     enabled,
@@ -630,7 +651,8 @@ export async function snapshotLiveDesk(opts = {}) {
     chain,
     feed,
     agents: ledger.books,
-    last_tick_at: row.last_tick_at || null,
+    last_tick_at: row.last_tick_at || lastActivity || null,
+    last_activity_at: lastActivity,
     last_error: row.last_error || null,
   });
 }
@@ -672,6 +694,7 @@ export async function tickLiveDesk(opts = {}) {
   const enabled = liveDeskEnabled();
   const secret = liveWalletSecret();
   const actions = [];
+  const deadline = Date.now() + 50_000;
   const snap0 = await snapshotLiveDesk({
     sb,
     sol_usd: opts.sol_usd,
@@ -707,19 +730,45 @@ export async function tickLiveDesk(opts = {}) {
     }
   }
   const owner = keypair.publicKey?.toBase58?.() || opts.owner || LIVE_WALLET_PUBKEY;
-  const solUsd = opts.sol_usd || snap0.sol_usd || (await solPriceUsd());
-  const bal = opts.solBalance != null ? num(opts.solBalance) : await solBalance(owner);
-  const open = await loadOpen(sb).catch(() => []);
+  const agent = nextLiveAgent(row.last_agent_id);
+  const beatAt = new Date().toISOString();
   await upsertDesk(sb, {
     wallet_pubkey: owner,
-    last_tick_at: new Date().toISOString(),
+    last_tick_at: beatAt,
+    last_agent_id: agent.id,
     last_error: null,
   }).catch(() => {});
+  await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "scan" });
+
+  let solUsd = opts.sol_usd || snap0.sol_usd || 0;
+  if (!(solUsd > 0)) {
+    try {
+      solUsd = await solPriceUsd();
+    } catch {
+      solUsd = 0;
+    }
+  }
+  let bal = opts.solBalance != null ? num(opts.solBalance) : null;
+  if (bal == null) {
+    try {
+      bal = await solBalance(owner);
+    } catch (e) {
+      await upsertDesk(sb, {
+        last_error: "rpc_balance",
+        last_tick_at: new Date().toISOString(),
+        last_agent_id: agent.id,
+      }).catch(() => {});
+      await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "rpc_balance" });
+      const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, skipChain: true });
+      return { ...snap, skipped: "rpc_balance", last_error: String(e?.message || e), actions, dry };
+    }
+  }
 
   const swapFn = opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
   const safetyFn = opts.safety || ((mint) => probeSellability(mint));
   const tapeFn = opts.tape || loadLiveTape;
   const markFn = opts.mark || markPriceUsd;
+  const open = await loadOpen(sb).catch(() => []);
 
   for (const pos of open) {
     const mark = await markFn(pos.mint).catch(() => 0);
@@ -797,13 +846,13 @@ export async function tickLiveDesk(opts = {}) {
     await upsertDesk(sb, {
       wallet_pubkey: owner,
       last_tick_at: new Date().toISOString(),
+      last_agent_id: agent.id,
       last_error: null,
     }).catch(() => {});
     const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
     return { ...snap, skipped: sized.skip, actions, dry };
   }
 
-  const agent = nextLiveAgent(row.last_agent_id);
   const tape = await tapeFn();
   const ranked = rankForLiveStyle(agent.style, tape);
   let chosen = null;
@@ -821,13 +870,24 @@ export async function tickLiveDesk(opts = {}) {
       reason,
     });
   }
+  const cheapPass = [];
+  let firstReject = null;
   for (const coin of ranked.slice(0, 40)) {
     if (stillOpen.some((p) => p.mint === coin.mint)) continue;
     const cheap = screenLiveCandidate(coin, { canBuy: true, canSell: true });
-    if (!cheap.ok) {
-      await noteSkip(coin, cheap.reasons);
+    if (cheap.ok) {
+      cheapPass.push(coin);
       continue;
     }
+    const why = (cheap.reasons || []).join("; ");
+    const headline = !liveIsMajor(coin) && !why.includes("mcap too large");
+    if (!firstReject || (headline && !firstReject.headline)) {
+      firstReject = { coin, reasons: cheap.reasons, headline };
+    }
+  }
+  if (firstReject && !cheapPass.length) await noteSkip(firstReject.coin, firstReject.reasons);
+  for (const coin of cheapPass) {
+    if (Date.now() > deadline) break;
     if (probes >= LIVE_MAX_PROBES) break;
     probes += 1;
     let pump = null;

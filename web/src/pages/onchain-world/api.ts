@@ -403,6 +403,7 @@ export type LiveDeskPayload = {
   starting_usd?: number | null;
   starting_sol?: number | null;
   last_tick_at?: string | null;
+  last_activity_at?: string | null;
   last_error?: string | null;
   fundUrl?: string;
   worldUrl?: string;

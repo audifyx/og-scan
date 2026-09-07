@@ -81,7 +81,7 @@ describe("live agent desk rules", () => {
     expect(thesis).toMatch(/\$1\.50/);
     expect(thesis).toMatch(/\$0\.30/);
     expect(nextLiveAgent("neon-live").id).toBe("warden-live");
-    const ranked = rankForLiveStyle("momentum", [GOOD, { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", change_1h: 18, symbol: "HOT" }]);
+    const ranked = rankForLiveStyle("momentum", [GOOD, { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", change_1h: 18, change_5m: -2, symbol: "HOT" }]);
     expect(pickLiveToken(LIVE_AGENTS[0], ranked).symbol).toBe("HOT");
     expect(emptyLiveDesk().disclaimer).toMatch(/Not financial advice/);
     expect(emptyLiveDesk().trade_usd).toBe(1.5);
@@ -114,17 +114,38 @@ describe("live agent desk rules", () => {
       symbol: "ROOM",
       market_cap: 2_400_000,
       change_1h: 11,
+      change_5m: -2.4,
       twitter: "https://x.com/room",
       buys_1h: 90,
+    };
+    const mouse = {
+      mint: "Aw6fiDPWLUnjSsJQtsyEMSaoPaKAUUrStAsYPiPwpump",
+      symbol: "ANONYMOUSE",
+      change_5m: -8.69,
+      change_15m: -7.69,
+      change_1h: 122,
+      change_24h: 101,
+      volume_24h: 364_000,
+      volume_1h: 274_000,
+      liquidity_usd: 24_451,
+      market_cap: 85_440,
+      pair_age_min: 70,
+      twitter: "https://x.com/OxFlipped/status/2096883786357027073",
+      buys_1h: 200,
+      sells_1h: 260,
     };
     expect(screenLiveCandidate(jup, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(jup, SAFETY).reasons.some((r) => /mcap too large/.test(r))).toBe(true);
     expect(screenLiveCandidate(boosted, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(room, SAFETY).ok).toBe(true);
     expect(screenLiveCandidate({ ...GOOD, change_1h: 80 }, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate(mouse, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate(mouse, SAFETY).reasons.some((r) => /dumping|topped|already pumped|liq/.test(r))).toBe(true);
+    expect(screenLiveCandidate({ ...GOOD, change_5m: -12, change_1h: 9 }, SAFETY).ok).toBe(false);
+    expect(screenLiveCandidate({ ...GOOD, change_1h: 0.4, volume_1h: 200, txns_1h: 4, buys_1h: 2 }, SAFETY).ok).toBe(false);
     expect(liveIsMajor({ mint: GOOD.mint, symbol: "PUMP", market_cap: 2_000_000, liquidity_usd: 1_500_000, volume_24h: 800_000 })).toBe(false);
     const ranked = rankForLiveStyle("momentum", [
-      { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", symbol: "HOT", change_1h: 18, twitter: "https://x.com/hot" },
+      { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", symbol: "HOT", change_1h: 18, change_5m: -2, twitter: "https://x.com/hot" },
       jup,
     ]);
     expect(ranked[0].symbol).toBe("HOT");

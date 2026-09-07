@@ -528,6 +528,8 @@ describe("OrbitX /on-chain world", () => {
     expect(ui).toContain("low-cap");
     expect(ui).toContain("$0.30");
     expect(ui).toContain("every 5");
+    expect(ui).toContain("skip tops");
+    expect(ui).toContain("NEON, WARDEN, then RAID");
     expect(vercel).toContain("/api/live-agents?path=tick");
     expect(ui).toContain("LiveAgentFeed");
     expect(ui).toContain("LiveAgentCity");
