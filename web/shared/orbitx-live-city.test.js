@@ -24,6 +24,12 @@ describe("live agent city layout", () => {
     expect(grown.generation).toBeGreaterThan(empty.generation);
     expect(grown.buildings.some((b) => b.symbol === "JUP" && b.height > 4)).toBe(true);
     expect(grown.trees.length).toBeGreaterThan(0);
+    expect(empty.water.some((w) => w.kind === "river")).toBe(true);
+    expect(empty.hills.length).toBeGreaterThan(8);
+    expect(empty.props.some((p) => p.kind === "fountain")).toBe(true);
+    expect(grown.characters.every((c) => Array.isArray(c.path) && c.path.length > 0)).toBe(true);
+    expect(grown.age_days).toBeGreaterThanOrEqual(1);
     expect(liveCityClimate(Date.parse("2026-09-07T02:00:00Z")).phase).toBe("night");
+    expect(liveCityClimate(Date.parse("2026-09-07T12:00:00Z")).weather).toMatch(/clear|rain|fog|storm|snow/);
   });
 });

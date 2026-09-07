@@ -165,7 +165,7 @@ function LiveDeskView() {
     return (
       <>
         {paneTabs}
-        <div className="min-h-[28rem] flex-1">
+        <div className="min-h-[70vh] flex-1">
           <LiveAgentCity snap={snap} />
         </div>
       </>

@@ -103,7 +103,11 @@ export function CenterStage() {
       {view === "block" ? <BlockView /> : null}
       {view === "agents" ? <AgentsView /> : null}
       {view === "feed" ? <LiveAgentFeed /> : null}
-      {view === "city" ? <LiveAgentCity /> : null}
+      {view === "city" ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <LiveAgentCity />
+        </div>
+      ) : null}
     </section>
   );
 }

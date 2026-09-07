@@ -186,6 +186,7 @@ describe("live agent desk rules", () => {
     expect(world.trees.length).toBeGreaterThan(3);
     expect(world.generation).toBeGreaterThanOrEqual(1);
     expect(world.buildings.length).toBeGreaterThan(8);
+    expect(world.water?.length || world.hills?.length).toBeGreaterThan(0);
     const grown = buildLiveWorld({
       fills: [
         { side: "buy", mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", usd_amount: 1.5, agent_id: "neon-live" },
