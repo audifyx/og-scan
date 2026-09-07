@@ -433,27 +433,29 @@ function LiveDeskView() {
                 </dl>
                 <p className="mt-2 text-2xs text-dim">{a.blurb}</p>
                 {a.open ? (
-                  <button
-                    type="button"
-                    className="mt-2 w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
-                    onClick={() => openMint(a.open?.mint)}
-                  >
-                    <p className="ox-kicker text-accent">Open book</p>
-                    <p className="mt-0.5 text-xs text-fg">
-                      ${a.open.symbol} · {money(a.open.usd_in)}
-                      {a.open.pnl_pct != null ? ` · ${a.open.pnl_pct >= 0 ? "+" : ""}${a.open.pnl_pct.toFixed(1)}%` : ""}
-                    </p>
-                    <p className="mt-1 text-2xs leading-relaxed text-muted">{a.open.thesis}</p>
-                  </button>
-                  {a.open.mint ? (
-                    <CopyMintButton
-                      mint={a.open.mint}
-                      label="copy CA"
-                      copiedLabel="copied"
-                      className="mt-1 rounded-full border-line px-2 py-0.5 text-[10px] text-dim hover:border-fg hover:text-fg"
-                      iconClassName="h-3 w-3"
-                    />
-                  ) : null}
+                  <>
+                    <button
+                      type="button"
+                      className="mt-2 w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
+                      onClick={() => openMint(a.open?.mint)}
+                    >
+                      <p className="ox-kicker text-accent">Open book</p>
+                      <p className="mt-0.5 text-xs text-fg">
+                        ${a.open.symbol} · {money(a.open.usd_in)}
+                        {a.open.pnl_pct != null ? ` · ${a.open.pnl_pct >= 0 ? "+" : ""}${a.open.pnl_pct.toFixed(1)}%` : ""}
+                      </p>
+                      <p className="mt-1 text-2xs leading-relaxed text-muted">{a.open.thesis}</p>
+                    </button>
+                    {a.open.mint ? (
+                      <CopyMintButton
+                        mint={a.open.mint}
+                        label="copy CA"
+                        copiedLabel="copied"
+                        className="mt-1 rounded-full border-line px-2 py-0.5 text-[10px] text-dim hover:border-fg hover:text-fg"
+                        iconClassName="h-3 w-3"
+                      />
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             </div>
