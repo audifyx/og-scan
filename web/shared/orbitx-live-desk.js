@@ -3,12 +3,12 @@
  * Deposit address is public. The signing secret lives only in
  * LIVE_AGENT_WALLET_SECRET on Vercel. Never commit a key.
  *
- * Not financial advice. Caps: $2 per buy, 2 open books, full take-profit.
+ * Not financial advice. Caps: $1.50 per buy, 1 open book, full take-profit.
  */
 export const LIVE_WALLET_PUBKEY = "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj";
-export const LIVE_TRADE_USD = 2;
+export const LIVE_TRADE_USD = 1.5;
 export const LIVE_FEE_RESERVE_SOL = 0.004;
-export const LIVE_MAX_OPEN = 2;
+export const LIVE_MAX_OPEN = 1;
 export const LIVE_STOP_PCT = -0.2;
 export const LIVE_MIN_LIQ_USD = 25_000;
 export const LIVE_MIN_VOL_USD = 40_000;
@@ -47,7 +47,7 @@ export const LIVE_AGENTS = [
 ];
 
 export const LIVE_DISCLAIMER =
-  "Not financial advice. These books spend real SOL from a hot wallet. Max $2 per buy, full take-profit at 10–30%, skip anything that cannot sell. You can lose the whole bank.";
+  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book at a time, full take-profit at 10–30%, skip anything that cannot sell. You can lose the whole bank.";
 
 export function liveAgentById(id) {
   const needle = String(id || "").trim().toLowerCase();
@@ -173,6 +173,78 @@ export function decideLiveExit(position = {}, markUsd) {
   return { action: "hold", pnlPct, reason: "hold" };
 }
 
+export function summarizeLiveLedger({
+  fills = [],
+  open = [],
+  agents = LIVE_AGENTS,
+  startingUsd = null,
+  startingSol = null,
+  solBalance = null,
+  usdBalance = null,
+  equityUsd = null,
+  realizedPnlUsd = 0,
+} = {}) {
+  const sells = fills.filter((f) => String(f.side || "") === "sell");
+  const buys = fills.filter((f) => String(f.side || "") === "buy");
+  const winRows = sells.filter((f) => num(f.pnl_usd) > 0);
+  const lossRows = sells.filter((f) => num(f.pnl_usd) <= 0);
+  const realized = sells.reduce((s, f) => s + num(f.pnl_usd), 0) || num(realizedPnlUsd);
+  const holding = open[0] || null;
+  const unrealized = open.reduce((s, p) => {
+    if (p.pnl_pct == null) return s;
+    return s + (num(p.usd_in) * num(p.pnl_pct)) / 100;
+  }, 0);
+  const startUsd = startingUsd != null ? num(startingUsd) : null;
+  const nowUsd = equityUsd != null ? num(equityUsd) : usdBalance != null ? num(usdBalance) + unrealized : null;
+  const madeUsd = startUsd != null && nowUsd != null ? nowUsd - startUsd : realized + unrealized;
+  const books = (agents || LIVE_AGENTS).map((a) => {
+    const mine = fills.filter((f) => f.agent_id === a.id);
+    const mySells = mine.filter((f) => String(f.side || "") === "sell");
+    const wins = mySells.filter((f) => num(f.pnl_usd) > 0).length;
+    const losses = mySells.filter((f) => num(f.pnl_usd) <= 0).length;
+    const hold = open.find((p) => p.agent_id === a.id) || null;
+    const realizedA = mySells.reduce((s, f) => s + num(f.pnl_usd), 0);
+    const unrealizedA = hold?.pnl_pct != null ? (num(hold.usd_in) * num(hold.pnl_pct)) / 100 : 0;
+    const deployed = mine.filter((f) => String(f.side || "") === "buy").reduce((s, f) => s + num(f.usd_amount ?? f.usd_in), 0);
+    return {
+      ...a,
+      open: hold,
+      holding: hold,
+      currently_hold: hold ? `$${String(hold.symbol || "").replace(/^\$/, "")}` : "cash",
+      wins,
+      losses,
+      trades: mySells.length,
+      win_pct: mySells.length ? (wins / mySells.length) * 100 : 0,
+      realized_pnl_usd: realizedA,
+      unrealized_pnl_usd: unrealizedA,
+      made_usd: realizedA + unrealizedA,
+      deployed_usd: deployed,
+      buys: mine.filter((f) => String(f.side || "") === "buy").length,
+      last: mine[0] || null,
+    };
+  });
+  return {
+    started_usd: startUsd,
+    started_sol: startingSol != null ? num(startingSol) : null,
+    currently_usd: nowUsd,
+    currently_sol: solBalance != null ? num(solBalance) : null,
+    cash_usd: usdBalance != null ? num(usdBalance) : null,
+    made_usd: madeUsd,
+    made_pct: startUsd > 0 && madeUsd != null ? (madeUsd / startUsd) * 100 : null,
+    wins: winRows.length,
+    losses: lossRows.length,
+    trades: sells.length,
+    buys: buys.length,
+    win_pct: sells.length ? (winRows.length / sells.length) * 100 : 0,
+    realized_pnl_usd: realized,
+    unrealized_pnl_usd: unrealized,
+    holding,
+    trade_usd: LIVE_TRADE_USD,
+    max_open: LIVE_MAX_OPEN,
+    books,
+  };
+}
+
 export function writeLiveThesis(agent, coin = {}, safety = {}, size = {}) {
   const t = String(coin.symbol || "TOKEN").replace(/^\$/, "").toUpperCase();
   const ch1 = coin.change_1h != null ? `${num(coin.change_1h) >= 0 ? "+" : ""}${num(coin.change_1h).toFixed(1)}% 1h` : "no 1h";
@@ -211,9 +283,12 @@ export function emptyLiveDesk(extra = {}) {
     usd_balance: extra.usd_balance ?? null,
     equity_usd: extra.equity_usd ?? null,
     realized_pnl_usd: extra.realized_pnl_usd ?? 0,
+    starting_usd: extra.starting_usd ?? null,
+    starting_sol: extra.starting_sol ?? null,
+    ledger: extra.ledger || null,
     open: extra.open || [],
     fills: extra.fills || [],
-    agents: extra.agents || LIVE_AGENTS.map((a) => ({ ...a, open: null, last: null })),
+    agents: extra.agents || LIVE_AGENTS.map((a) => ({ ...a, open: null, last: null, wins: 0, losses: 0 })),
     last_tick_at: extra.last_tick_at || null,
     last_error: extra.last_error || null,
     skipped: extra.skipped || null,

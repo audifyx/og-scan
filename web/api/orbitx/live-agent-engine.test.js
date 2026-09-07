@@ -80,7 +80,7 @@ function memSb() {
 }
 
 describe("live agent engine tick", () => {
-  it("buys $2 of a sellable coin then fully exits at take-profit", async () => {
+  it("buys $1.50 of a sellable coin then fully exits at take-profit", async () => {
     const prev = process.env.LIVE_AGENT_ENABLED;
     process.env.LIVE_AGENT_ENABLED = "1";
     const sb = memSb();
@@ -109,7 +109,7 @@ describe("live agent engine tick", () => {
       mark: async () => 1,
       swap: async () => ({ ok: true, signature: "sig-buy", outAmount: "1000" }),
     });
-    expect(buy.actions.some((a) => a.type === "buy" && a.usd === 2)).toBe(true);
+    expect(buy.actions.some((a) => a.type === "buy" && a.usd === 1.5)).toBe(true);
     expect(buy.actions[0].thesis).toMatch(/sell 100%/);
     expect(LIVE_AGENTS.map((a) => a.id)).toContain(buy.actions[0].agent_id);
 
@@ -118,8 +118,8 @@ describe("live agent engine tick", () => {
       agent_id: "neon-live",
       mint: coin.mint,
       symbol: "ORBITX",
-      usd_in: 2,
-      sol_in: 2 / 150,
+      usd_in: 1.5,
+      sol_in: 1.5 / 150,
       entry_price_usd: 1,
       tp_pct: 0.12,
       status: "open",

@@ -493,24 +493,34 @@ describe("OrbitX /on-chain world", () => {
     expect(sql).toContain("enable row level security");
   });
 
-  it("runs a real-SOL live desk with $2 clips and full take-profit", async () => {
-    const { LIVE_TRADE_USD, LIVE_AGENTS, LIVE_WALLET_PUBKEY, decideLiveExit, sizeLiveBuy, screenLiveCandidate } = await import("../../shared/orbitx-live-desk.js");
-    expect(LIVE_TRADE_USD).toBe(2);
+  it("runs a real-SOL live desk with $1.50 clips, one open book, and full take-profit", async () => {
+    const { LIVE_TRADE_USD, LIVE_MAX_OPEN, LIVE_AGENTS, LIVE_WALLET_PUBKEY, decideLiveExit, sizeLiveBuy, screenLiveCandidate, summarizeLiveLedger } = await import("../../shared/orbitx-live-desk.js");
+    expect(LIVE_TRADE_USD).toBe(1.5);
+    expect(LIVE_MAX_OPEN).toBe(1);
     expect(LIVE_AGENTS).toHaveLength(3);
     expect(LIVE_WALLET_PUBKEY).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
     expect(decideLiveExit({ entry_price_usd: 1, tp_pct: 0.3 }, 1.3).action).toBe("take_profit");
-    expect(sizeLiveBuy({ solBalance: 0.05, solUsd: 150, openCount: 0 }).usd).toBe(2);
+    expect(sizeLiveBuy({ solBalance: 0.05, solUsd: 150, openCount: 0 }).usd).toBe(1.5);
+    expect(sizeLiveBuy({ solBalance: 1, solUsd: 150, openCount: 1 }).skip).toBe("max_open");
     expect(screenLiveCandidate({ mint: "x", liquidity_usd: 10 }, { canSell: false }).ok).toBe(false);
+    expect(summarizeLiveLedger({ startingUsd: 4, equityUsd: 4.2 }).made_usd).toBeCloseTo(0.2, 6);
     const vercel = readFileSync(resolve(WEB, "vercel.json"), "utf8");
     expect(vercel).toContain("/api/live-agents?path=tick");
     expect(vercel).not.toMatch(/LIVE_AGENT_WALLET_SECRET.{0,20}[1-9A-HJ-NP-Za-km-z]{80,}/);
     const engine = readFileSync(resolve(WEB, "api/orbitx/live-agent-engine.js"), "utf8");
     expect(engine).toContain("LIVE_AGENT_WALLET_SECRET");
+    expect(engine).toContain("summarizeLiveLedger");
     expect(engine).not.toContain("secretBase58");
     const sql = readFileSync(resolve(REPO, "supabase/migrations/20260907043000_ox_live_agent_desk.sql"), "utf8");
     expect(sql).toContain("ox_live_desk");
     expect(sql).toContain("ox_live_positions");
     expect(sql).toContain("ox_live_fills");
     expect(sql).toContain("enable row level security");
+    const startSql = readFileSync(resolve(REPO, "supabase/migrations/20260907070000_ox_live_desk_starting_bank.sql"), "utf8");
+    expect(startSql).toContain("starting_usd");
+    const ui = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8");
+    expect(ui).toContain("Currently hold");
+    expect(ui).toContain("Wins / losses");
+    expect(ui).toContain("one book at a time");
   });
 });

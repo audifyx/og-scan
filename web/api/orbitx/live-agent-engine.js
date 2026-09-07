@@ -18,6 +18,7 @@ import {
   rankForLiveStyle,
   screenLiveCandidate,
   sizeLiveBuy,
+  summarizeLiveLedger,
   writeLiveThesis,
 } from "../../shared/orbitx-live-desk.js";
 
@@ -386,7 +387,7 @@ async function loadOpen(sb) {
   return data || [];
 }
 
-async function loadFills(sb, limit = 24) {
+async function loadFills(sb, limit = 200) {
   if (!sb) return [];
   const { data } = await sb.from("ox_live_fills").select("*").order("created_at", { ascending: false }).limit(limit);
   return data || [];
@@ -462,11 +463,45 @@ export async function snapshotLiveDesk(opts = {}) {
     if (p.pnl_pct == null) return s;
     return s + (num(p.usd_in) * p.pnl_pct) / 100;
   }, 0);
-  const agents = LIVE_AGENTS.map((a) => ({
-    ...a,
-    open: open.find((p) => p.agent_id === a.id) || null,
-    last: fills.find((f) => f.agent_id === a.id) || null,
+  const equityUsd = usdBal != null ? usdBal + open.reduce((s, p) => s + num(p.usd_in), 0) + unrealized : null;
+  let startingSol = row.starting_sol != null ? num(row.starting_sol) : null;
+  let startingUsd = row.starting_usd != null ? num(row.starting_usd) : null;
+  if (sb && solBal != null && solBal > 0.001 && (startingSol == null || startingSol <= 0)) {
+    startingSol = solBal;
+    startingUsd = solUsd ? solBal * solUsd : null;
+    await upsertDesk(sb, {
+      wallet_pubkey: wallet,
+      starting_sol: startingSol,
+      starting_usd: startingUsd,
+      starting_captured_at: new Date().toISOString(),
+    }).catch(() => {});
+  }
+  const publicFills = fills.map((f) => ({
+    id: f.id,
+    agent_id: f.agent_id,
+    mint: f.mint,
+    symbol: f.symbol,
+    side: f.side,
+    sol_amount: num(f.sol_amount),
+    usd_amount: num(f.usd_amount),
+    pnl_usd: num(f.pnl_usd),
+    pnl_pct: f.pnl_pct != null ? num(f.pnl_pct) : null,
+    signature: f.signature,
+    thesis: f.thesis,
+    reason: f.reason,
+    created_at: f.created_at,
   }));
+  const ledger = summarizeLiveLedger({
+    fills: publicFills,
+    open,
+    agents: LIVE_AGENTS,
+    startingUsd,
+    startingSol,
+    solBalance: solBal,
+    usdBalance: usdBal,
+    equityUsd,
+    realizedPnlUsd: realized,
+  });
   return emptyLiveDesk({
     wallet,
     enabled,
@@ -476,25 +511,14 @@ export async function snapshotLiveDesk(opts = {}) {
     sol_usd: solUsd,
     sol_balance: solBal,
     usd_balance: usdBal,
-    equity_usd: usdBal != null ? usdBal + open.reduce((s, p) => s + num(p.usd_in), 0) + unrealized : null,
+    equity_usd: equityUsd,
     realized_pnl_usd: realized,
+    starting_usd: startingUsd,
+    starting_sol: startingSol,
+    ledger,
     open,
-    fills: fills.map((f) => ({
-      id: f.id,
-      agent_id: f.agent_id,
-      mint: f.mint,
-      symbol: f.symbol,
-      side: f.side,
-      sol_amount: num(f.sol_amount),
-      usd_amount: num(f.usd_amount),
-      pnl_usd: num(f.pnl_usd),
-      pnl_pct: f.pnl_pct != null ? num(f.pnl_pct) : null,
-      signature: f.signature,
-      thesis: f.thesis,
-      reason: f.reason,
-      created_at: f.created_at,
-    })),
-    agents,
+    fills: publicFills,
+    agents: ledger.books,
     last_tick_at: row.last_tick_at || null,
     last_error: row.last_error || null,
   });

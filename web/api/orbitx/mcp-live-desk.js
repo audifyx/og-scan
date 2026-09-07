@@ -13,13 +13,13 @@ export const LIVE_CORE_TOOLS = [
   {
     name: "orbitx_live_desk",
     description:
-      "Real-SOL live agent desk on /on-chain. Three books share one hot wallet, $2 buys, full take-profit at 10–30%. READ ONLY — does not trade. When the user says live desk / real agents / funded wallet — call this.",
+      "Real-SOL live agent desk on /on-chain. Three books share one hot wallet, $1.50 buys, one open book, full take-profit at 10–30%. READ ONLY — does not trade. When the user says live desk / real agents / funded wallet — call this.",
     inputSchema: EMPTY,
   },
   {
     name: "orbitx_live_positions",
     description:
-      "Open real-SOL live-agent positions: mint, $2 size, mark, P&L %, thesis, take-profit target. Read only.",
+      "Open real-SOL live-agent positions: mint, $1.50 size, max 1 open, mark, P&L %, thesis, take-profit target. Read only.",
     inputSchema: EMPTY,
   },
   {
@@ -44,7 +44,7 @@ export function isLiveTool(name) {
 export function resolveLiveNaturalTool(rawName, args = {}) {
   const raw = String(rawName || "").trim();
   if (!raw) return null;
-  if (/live desk|live agent|real sol agent|funded wallet|\$2 trade/i.test(raw)) {
+  if (/live desk|live agent|real sol agent|funded wallet|\$1\.50 trade|\$2 trade/i.test(raw)) {
     if (/position|open book/i.test(raw)) return { name: "orbitx_live_positions", args };
     const who = raw.match(/\b(neon[-\s]?live|warden[-\s]?live|raid[-\s]?live)\b/i);
     if (who) return { name: "orbitx_live_agent", args: { ...args, name: args.name || who[1] } };

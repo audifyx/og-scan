@@ -68,6 +68,14 @@ function LiveDeskView() {
   const open = snap?.open || [];
   const fills = snap?.fills || [];
   const agents = snap?.agents?.length ? snap.agents : LIVE_AGENTS;
+  const ledger = snap?.ledger;
+  const clip = snap?.trade_usd ?? 1.5;
+  const startedUsd = ledger?.started_usd ?? snap?.starting_usd;
+  const nowUsd = ledger?.currently_usd ?? snap?.equity_usd ?? snap?.usd_balance;
+  const madeUsd = ledger?.made_usd;
+  const wins = ledger?.wins ?? 0;
+  const losses = ledger?.losses ?? 0;
+  const holding = ledger?.holding || open[0] || null;
 
   function openMint(mint?: string | null) {
     if (!mint) return;
@@ -88,23 +96,32 @@ function LiveDeskView() {
   }
 
   const status = !snap?.configured
-    ? "Wallet secret not on the server yet"
+    ? "Wallet secret not on the server yet — set LIVE_AGENT_WALLET_SECRET on Vercel to start fills"
     : !snap.enabled
-      ? "Armed only after LIVE_AGENT_ENABLED=1"
+      ? "Waiting on LIVE_AGENT_ENABLED=1"
       : snap.paused
         ? "Paused"
         : snap.armed
-          ? "Live — scanning for $2 entries"
+          ? `Live — scanning for $${clip.toFixed(2)} entries · max 1 open`
           : "Funded wallet waiting to arm";
+
+  function money(n: number | null | undefined, sign = false) {
+    if (n == null || Number.isNaN(Number(n))) return "—";
+    const v = Number(n);
+    const body = formatUsd(Math.abs(v));
+    if (!sign) return v < 0 ? `-${body}` : body;
+    return `${v >= 0 ? "+" : "-"}${body}`;
+  }
 
   return (
     <>
       <header className="border-b border-line px-4 py-3">
         <p className="ox-kicker text-accent">Live desk · real SOL</p>
-        <h2 className="font-display text-lg text-fg">$2 agent books on a shared hot wallet</h2>
+        <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
-          Three agents share one Solana wallet. Each fill is about $2. They only buy coins Jupiter can sell,
-          then flatten 100% at +10% / +12% / +30%. Not financial advice — this bank can go to zero.
+          Three agents share one Solana wallet. Each fill is ${clip.toFixed(2)}. Max one open position. They only buy
+          coins Jupiter can sell, then flatten 100% at +10% / +12% / +30%. Not financial advice — this bank can go to
+          zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
           <span className="text-2xs text-dim">Deposit</span>
@@ -123,48 +140,42 @@ function LiveDeskView() {
           </a>
         </div>
         <p className="mt-2 text-2xs text-accent">{status}</p>
-        <dl className="mt-3 grid grid-cols-2 gap-px bg-line sm:grid-cols-5">
-          <Stat label="SOL" value={snap?.sol_balance != null ? snap.sol_balance.toFixed(4) : "—"} />
-          <Stat label="USD" value={snap?.usd_balance != null ? formatUsd(snap.usd_balance) : "—"} />
-          <Stat label="Open" value={String(open.length)} />
+        <dl className="mt-3 grid grid-cols-2 gap-px bg-line sm:grid-cols-4 lg:grid-cols-8">
+          <Stat label="Started" value={money(startedUsd)} />
+          <Stat label="Now" value={money(nowUsd)} />
           <Stat
-            label="Realized"
-            value={
-              snap?.realized_pnl_usd != null
-                ? `${snap.realized_pnl_usd >= 0 ? "+" : ""}${formatUsd(snap.realized_pnl_usd)}`
-                : "—"
-            }
+            label="Made"
+            value={madeUsd != null ? money(madeUsd, true) : "—"}
+            tone={madeUsd == null ? undefined : madeUsd >= 0 ? "up" : "down"}
           />
-          <Stat label="Size" value="$2" />
+          <Stat label="Wins / losses" value={`${wins}W / ${losses}L`} />
+          <Stat label="SOL cash" value={snap?.sol_balance != null ? snap.sol_balance.toFixed(4) : "—"} />
+          <Stat label="Holding" value={holding ? `$${holding.symbol}` : "cash"} />
+          <Stat label="Open" value={`${open.length}/${snap?.max_open ?? 1}`} />
+          <Stat label="Clip" value={`$${clip.toFixed(2)}`} />
         </dl>
       </header>
 
-      {open.length ? (
+      {holding ? (
         <div className="border-b border-line px-4 py-2">
-          <p className="ox-kicker mb-1.5">Open books</p>
-          <ul className="space-y-2">
-            {open.map((p) => (
-              <li key={p.id || p.mint}>
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
-                  onClick={() => openMint(p.mint)}
-                >
-                  <p className="text-xs text-fg">
-                    ${p.symbol} · {p.agent_name || p.agent_id} · ${Number(p.usd_in || 0).toFixed(2)}
-                    {p.pnl_pct != null ? ` · ${p.pnl_pct >= 0 ? "+" : ""}${p.pnl_pct.toFixed(1)}%` : ""}
-                    {p.tp_pct != null ? ` · TP +${Number(p.tp_pct).toFixed(0)}%` : ""}
-                  </p>
-                  <p className="mt-1 text-2xs leading-relaxed text-muted">{p.thesis}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <p className="ox-kicker mb-1.5">Currently holding</p>
+          <button
+            type="button"
+            className="w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
+            onClick={() => openMint(holding.mint)}
+          >
+            <p className="text-xs text-fg">
+              ${holding.symbol} · {holding.agent_name || holding.agent_id} · in {money(holding.usd_in)}
+              {holding.pnl_pct != null ? ` · ${holding.pnl_pct >= 0 ? "+" : ""}${holding.pnl_pct.toFixed(1)}%` : ""}
+              {holding.tp_pct != null ? ` · TP +${Number(holding.tp_pct).toFixed(0)}%` : ""}
+            </p>
+            <p className="mt-1 text-2xs leading-relaxed text-muted">{holding.thesis}</p>
+          </button>
         </div>
       ) : (
         <p className="border-b border-line px-4 py-3 text-2xs text-dim">
-          No open live book. Send ~$7 of SOL to the deposit address, set LIVE_AGENT_WALLET_SECRET and
-          LIVE_AGENT_ENABLED=1 on Vercel, then arm. Ticks run every 5 minutes.
+          No open live book. Next tick buys one ${clip.toFixed(2)} clip if the wallet is armed and Jupiter can sell the
+          name. Ticks run every 5 minutes.
         </p>
       )}
 
@@ -179,13 +190,49 @@ function LiveDeskView() {
                 <Bot className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <h3 className="font-display text-sm text-fg">
-                  <span className="mr-2 text-2xs text-dim">#{i + 1}</span>
-                  {a.name}
-                </h3>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="font-display text-sm text-fg">
+                    <span className="mr-2 text-2xs text-dim">#{i + 1}</span>
+                    {a.name}
+                  </h3>
+                  <p className={`ox-stat text-xs ${(a.made_usd || 0) >= 0 ? "text-live" : "text-muted"}`}>
+                    {money(a.made_usd, true)} made
+                  </p>
+                </div>
                 <p className="text-2xs text-dim">
-                  {a.blurb} · TP +{Math.round((a.tpPct || 0.1) * 100)}% full sell · $2 clips
+                  Hold {a.currently_hold || (a.open ? `$${a.open.symbol}` : "cash")} · {a.wins ?? 0}W / {a.losses ?? 0}L
+                  {a.trades ? ` · ${Number(a.win_pct || 0).toFixed(0)}% hit` : ""} · TP +
+                  {Math.round((a.tpPct || 0.1) * 100)}% full sell · ${clip.toFixed(2)} clips
                 </p>
+                <dl className="mt-2 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
+                  <Stat label="Currently hold" value={a.currently_hold || "cash"} />
+                  <Stat
+                    label="Unrealized"
+                    value={a.unrealized_pnl_usd != null ? money(a.unrealized_pnl_usd, true) : "—"}
+                    tone={(a.unrealized_pnl_usd || 0) >= 0 ? "up" : "down"}
+                  />
+                  <Stat
+                    label="Realized"
+                    value={a.realized_pnl_usd != null ? money(a.realized_pnl_usd, true) : "—"}
+                    tone={(a.realized_pnl_usd || 0) >= 0 ? "up" : "down"}
+                  />
+                  <Stat label="Deployed" value={money(a.deployed_usd)} />
+                </dl>
+                <p className="mt-2 text-2xs text-dim">{a.blurb}</p>
+                {a.open ? (
+                  <button
+                    type="button"
+                    className="mt-2 w-full rounded-md border border-line bg-bg-sunken px-3 py-2 text-left hover:bg-bg-hover"
+                    onClick={() => openMint(a.open?.mint)}
+                  >
+                    <p className="ox-kicker text-accent">Open book</p>
+                    <p className="mt-0.5 text-xs text-fg">
+                      ${a.open.symbol} · {money(a.open.usd_in)}
+                      {a.open.pnl_pct != null ? ` · ${a.open.pnl_pct >= 0 ? "+" : ""}${a.open.pnl_pct.toFixed(1)}%` : ""}
+                    </p>
+                    <p className="mt-1 text-2xs leading-relaxed text-muted">{a.open.thesis}</p>
+                  </button>
+                ) : null}
               </div>
             </div>
           </li>
@@ -433,11 +480,17 @@ function Spark({ fills, up }: { fills: PaperFill[]; up: boolean }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
   return (
     <div className="bg-bg-panel px-3 py-2">
       <dt className="ox-kicker">{label}</dt>
-      <dd className="ox-stat mt-0.5 text-xs text-fg">{value}</dd>
+      <dd
+        className={`ox-stat mt-0.5 text-xs ${
+          tone === "up" ? "text-live" : tone === "down" ? "text-muted" : "text-fg"
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

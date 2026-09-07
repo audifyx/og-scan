@@ -10,6 +10,7 @@ import {
   rankForLiveStyle,
   screenLiveCandidate,
   sizeLiveBuy,
+  summarizeLiveLedger,
   writeLiveThesis,
 } from "./orbitx-live-desk.js";
 
@@ -27,13 +28,14 @@ const GOOD = {
 const SAFETY = { canBuy: true, canSell: true, roundTripLossPct: 4.2, buyImpactPct: 0.8 };
 
 describe("live agent desk rules", () => {
-  it("caps a buy at $2 and keeps a fee reserve", () => {
+  it("caps a buy at $1.50, one open book, and keeps a fee reserve", () => {
     const sized = sizeLiveBuy({ solBalance: 0.05, solUsd: 150, openCount: 0 });
     expect(sized.ok).toBe(true);
     expect(sized.usd).toBe(LIVE_TRADE_USD);
-    expect(sized.sol).toBeCloseTo(2 / 150, 6);
+    expect(LIVE_TRADE_USD).toBe(1.5);
+    expect(sized.sol).toBeCloseTo(1.5 / 150, 6);
     expect(sizeLiveBuy({ solBalance: 0.01, solUsd: 150, openCount: 0 }).ok).toBe(false);
-    expect(sizeLiveBuy({ solBalance: 1, solUsd: 150, openCount: 2 }).skip).toBe("max_open");
+    expect(sizeLiveBuy({ solBalance: 1, solUsd: 150, openCount: 1 }).skip).toBe("max_open");
   });
 
   it("rejects rugs / unsellable / mint-authority coins", () => {
@@ -57,13 +59,47 @@ describe("live agent desk rules", () => {
   it("writes a thesis and rotates three live books", () => {
     expect(LIVE_AGENTS).toHaveLength(3);
     expect(LIVE_WALLET_PUBKEY).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
-    const thesis = writeLiveThesis(LIVE_AGENTS[0], GOOD, SAFETY, { usd: 2 });
+    const thesis = writeLiveThesis(LIVE_AGENTS[0], GOOD, SAFETY, { usd: 1.5 });
     expect(thesis).toMatch(/NEON LIVE/);
-    expect(thesis).toMatch(/\$2\.00/);
+    expect(thesis).toMatch(/\$1\.50/);
     expect(thesis).toMatch(/sell 100%/);
     expect(nextLiveAgent("neon-live").id).toBe("warden-live");
     const ranked = rankForLiveStyle("momentum", [GOOD, { ...GOOD, mint: "Aaa1111111111111111111111111111111111111111", change_1h: 18, symbol: "HOT" }]);
     expect(pickLiveToken(LIVE_AGENTS[0], ranked).symbol).toBe("HOT");
     expect(emptyLiveDesk().disclaimer).toMatch(/Not financial advice/);
+    expect(emptyLiveDesk().trade_usd).toBe(1.5);
+    expect(emptyLiveDesk().max_open).toBe(1);
+  });
+
+  it("rolls started vs now, wins, losses, and current hold per book", () => {
+    const ledger = summarizeLiveLedger({
+      startingUsd: 4,
+      startingSol: 0.027,
+      solBalance: 0.017,
+      usdBalance: 2.55,
+      equityUsd: 4.2,
+      realizedPnlUsd: 0.12,
+      open: [{ agent_id: "neon-live", symbol: "ORBITX", usd_in: 1.5, pnl_pct: 10 }],
+      fills: [
+        { agent_id: "neon-live", side: "buy", usd_amount: 1.5 },
+        { agent_id: "warden-live", side: "sell", pnl_usd: 0.18 },
+        { agent_id: "raid-live", side: "sell", pnl_usd: -0.06 },
+      ],
+    });
+    expect(ledger.started_usd).toBe(4);
+    expect(ledger.currently_usd).toBe(4.2);
+    expect(ledger.made_usd).toBeCloseTo(0.2, 6);
+    expect(ledger.wins).toBe(1);
+    expect(ledger.losses).toBe(1);
+    expect(ledger.holding.symbol).toBe("ORBITX");
+    const neon = ledger.books.find((a) => a.id === "neon-live");
+    expect(neon.currently_hold).toBe("$ORBITX");
+    expect(neon.unrealized_pnl_usd).toBeCloseTo(0.15, 6);
+    const warden = ledger.books.find((a) => a.id === "warden-live");
+    expect(warden.wins).toBe(1);
+    expect(warden.made_usd).toBeCloseTo(0.18, 6);
+    const raid = ledger.books.find((a) => a.id === "raid-live");
+    expect(raid.losses).toBe(1);
+    expect(raid.currently_hold).toBe("cash");
   });
 });

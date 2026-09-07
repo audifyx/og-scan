@@ -400,10 +400,25 @@ export type LiveDeskPayload = {
   usd_balance?: number | null;
   equity_usd?: number | null;
   realized_pnl_usd?: number | null;
+  starting_usd?: number | null;
+  starting_sol?: number | null;
   last_tick_at?: string | null;
   last_error?: string | null;
   fundUrl?: string;
   worldUrl?: string;
+  ledger?: {
+    started_usd?: number | null;
+    started_sol?: number | null;
+    currently_usd?: number | null;
+    currently_sol?: number | null;
+    made_usd?: number | null;
+    made_pct?: number | null;
+    wins?: number;
+    losses?: number;
+    trades?: number;
+    win_pct?: number;
+    holding?: LiveDeskPayload["open"] extends (infer T)[] | undefined ? T | null : null;
+  };
   open?: Array<{
     id?: string;
     agent_id?: string;
@@ -440,6 +455,15 @@ export type LiveDeskPayload = {
     tpPct: number;
     color: string;
     blurb?: string;
+    currently_hold?: string;
+    wins?: number;
+    losses?: number;
+    trades?: number;
+    win_pct?: number;
+    realized_pnl_usd?: number;
+    unrealized_pnl_usd?: number;
+    made_usd?: number;
+    deployed_usd?: number;
     open?: LiveDeskPayload["open"] extends (infer T)[] | undefined ? T | null : null;
     last?: unknown;
   }>;
