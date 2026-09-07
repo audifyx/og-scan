@@ -15,6 +15,7 @@ import {
   saveCallsSettings,
   snapshotCallsDesk,
   tickCallsDesk,
+  applyCallsSql,
 } from "./orbitx/calls-engine.js";
 
 export const config = { maxDuration: 90 };
@@ -122,6 +123,11 @@ export default async function handler(req, res) {
         },
       });
       return json(res, out.ok ? 200 : 400, out);
+    }
+    if (action === "apply_schema") {
+      const out = await applyCallsSql();
+      const snap = await snapshotCallsDesk();
+      return json(res, 200, { ...snap, applied: out });
     }
     if (action === "tick") {
       const out = await tickCallsDesk({ force: true });

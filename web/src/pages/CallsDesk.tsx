@@ -3,6 +3,7 @@ import {
   Bell,
   Bot,
   Crosshair,
+  Database,
   Link2,
   Loader2,
   Radio,
@@ -68,6 +69,8 @@ type DeskSnap = {
   error?: string;
   skipped?: string | null;
   disclaimer?: string;
+  store?: string;
+  applied?: { ok?: boolean; error?: string; via?: string };
   stats?: {
     calls?: number;
     open?: number;
@@ -186,6 +189,21 @@ export default function CallsDesk() {
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-og-lime">
               {statusTone}
             </span>
+            {snap?.store === "kv" ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-og-gold/30 bg-og-gold/10 px-3 py-2 text-xs font-bold text-og-gold hover:border-og-gold/60"
+                onClick={() => void run("sql", async () => {
+                  const out = await callsApi("POST", { action: "apply_schema" });
+                  setNote(out.applied?.ok ? "Postgres tables ready" : "Still on storage fallback — desk works either way");
+                  return out;
+                })}
+                disabled={Boolean(busy)}
+              >
+                {busy === "sql" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
+                Apply SQL
+              </button>
+            ) : null}
             <button
               type="button"
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold hover:border-og-lime/40"
@@ -203,7 +221,7 @@ export default function CallsDesk() {
             {error === "admin_required"
               ? "Unlock the owner desk first, then open /calls."
               : error === "apply_ox_calls_desk_migration"
-                ? "Apply supabase/migrations/20260907180000_ox_calls_desk.sql in the SQL editor, then reload."
+                ? "Click Apply SQL, or paste supabase/migrations/20260907180000_ox_calls_desk.sql in the Supabase SQL editor."
                 : error}
           </p>
         ) : null}

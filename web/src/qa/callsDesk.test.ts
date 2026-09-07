@@ -23,6 +23,12 @@ describe("admin /calls desk", () => {
     const page = readFileSync(resolve(root, "src/pages/CallsDesk.tsx"), "utf8");
     expect(page).toContain("BotFather token");
     expect(page).toContain("Arm 5-minute agent alerts");
+    expect(page).toContain("apply_schema");
     expect(page).not.toContain("bot_token:");
+    const api = readFileSync(resolve(root, "api/orbitx-calls.js"), "utf8");
+    expect(api).toContain("apply_schema");
+    const schema = readFileSync(resolve(root, "api/orbitx/calls-schema.js"), "utf8");
+    expect(schema).toContain("ox_calls_desk");
+    expect(schema).toContain("ox_calls_ledger");
   });
 });

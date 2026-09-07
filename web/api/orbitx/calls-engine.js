@@ -27,9 +27,14 @@ import {
   writeCallThesis,
 } from "../../shared/orbitx-calls-desk.js";
 import { loadLiveTape } from "./live-agent-engine.js";
+import { CALLS_DDL, CALLS_PROJECT_REF } from "./calls-schema.js";
 
 const DEX = "https://api.dexscreener.com/latest/dex";
 const TG = "https://api.telegram.org";
+const KV_BUCKET = "ogdex-kv";
+const KV_PATH = "ox-calls/state.json";
+let _storeMode = null;
+let _applyTried = false;
 
 function trim(v) {
   return String(v || "").trim();
@@ -65,49 +70,237 @@ async function tg(token, method, body) {
   return r.json().catch(() => ({ ok: false }));
 }
 
-async function loadDesk(sb) {
+function tableMissing(error) {
+  const m = `${error?.code || ""} ${error?.message || ""}`;
+  return error?.code === "42P01" || /does not exist|schema cache|Could not find the table/i.test(m);
+}
+
+function envUrl(env = process.env) {
+  return trim(env.SUPABASE_URL || env.VITE_SUPABASE_URL);
+}
+
+function envSrk(env = process.env) {
+  return trim(env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function kvGetState(env = process.env) {
+  const url = envUrl(env);
+  const key = envSrk(env);
+  if (!url || !key) return { desk: { id: "main" }, chats: [], ledger: [] };
+  const r = await fetch(`${url}/storage/v1/object/${KV_BUCKET}/${KV_PATH}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!r.ok) return { desk: { id: "main" }, chats: [], ledger: [] };
+  const j = await r.json().catch(() => null);
+  if (!j || typeof j !== "object") return { desk: { id: "main" }, chats: [], ledger: [] };
+  return {
+    desk: j.desk && typeof j.desk === "object" ? j.desk : { id: "main" },
+    chats: Array.isArray(j.chats) ? j.chats : [],
+    ledger: Array.isArray(j.ledger) ? j.ledger : [],
+  };
+}
+
+async function kvPutState(state, env = process.env) {
+  const url = envUrl(env);
+  const key = envSrk(env);
+  if (!url || !key) throw new Error("supabase_unconfigured");
+  await fetch(`${url}/storage/v1/bucket`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ id: KV_BUCKET, name: KV_BUCKET, public: false }),
+  }).catch(() => {});
+  const r = await fetch(`${url}/storage/v1/object/${KV_BUCKET}/${KV_PATH}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "x-upsert": "true",
+    },
+    body: JSON.stringify(state),
+  });
+  if (!r.ok) throw new Error(`kv_put ${r.status}`);
+}
+
+async function storeMode(sb) {
+  if (sb?._tables) return "sql";
+  if (_storeMode) return _storeMode;
+  const { error } = await sb.from("ox_calls_desk").select("id").eq("id", "main").maybeSingle();
+  _storeMode = error && tableMissing(error) ? "kv" : "sql";
+  return _storeMode;
+}
+
+async function applyViaExecSql(env) {
+  const url = envUrl(env);
+  const key = envSrk(env);
+  if (!url || !key) return null;
+  const r = await fetch(`${url}/rest/v1/rpc/exec_sql`, {
+    method: "POST",
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ sql_text: CALLS_DDL }),
+  });
+  if (!r.ok) return { ok: false, status: r.status, error: (await r.text()).slice(0, 240), via: "exec_sql" };
+  return { ok: true, via: "exec_sql" };
+}
+
+async function applyViaManagementApi(env) {
+  const token = trim(env.SUPABASE_ACCESS_TOKEN);
+  const ref = trim(env.SUPABASE_PROJECT_REF || CALLS_PROJECT_REF);
+  if (!token) return { ok: false, error: "no_access_token", via: "kv_fallback" };
+  const r = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ query: CALLS_DDL }),
+  });
+  const txt = await r.text();
+  if (!r.ok) return { ok: false, error: txt.slice(0, 400), via: "management_api", status: r.status };
+  return { ok: true, via: "management_api" };
+}
+
+export async function applyCallsSql(env = process.env) {
+  const rpc = await applyViaExecSql(env);
+  if (rpc?.ok) {
+    _storeMode = "sql";
+    return rpc;
+  }
+  const mgmt = await applyViaManagementApi(env);
+  if (mgmt.ok) {
+    _storeMode = "sql";
+    return mgmt;
+  }
+  return {
+    ok: false,
+    error: mgmt.error || rpc?.error || "apply_failed",
+    via: "kv_fallback",
+    tried: [rpc?.via, mgmt.via].filter(Boolean),
+  };
+}
+
+async function loadDesk(sb, env = process.env) {
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    return st.desk || { id: "main" };
+  }
   const { data, error } = await sb.from("ox_calls_desk").select("*").eq("id", "main").maybeSingle();
-  if (error && /does not exist|schema cache/i.test(error.message || "")) {
-    const err = new Error("apply_ox_calls_desk_migration");
-    err.code = "42P01";
-    throw err;
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return loadDesk(sb, env);
   }
   if (error) throw new Error(error.message);
   return data || { id: "main" };
 }
 
-async function upsertDesk(sb, patch) {
-  const cur = await loadDesk(sb).catch(() => ({ id: "main" }));
+async function upsertDesk(sb, patch, env = process.env) {
+  const cur = await loadDesk(sb, env).catch(() => ({ id: "main" }));
   const row = { ...cur, id: "main", ...patch, updated_at: new Date().toISOString() };
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    st.desk = row;
+    await kvPutState(st, env);
+    return row;
+  }
   const { error } = await sb.from("ox_calls_desk").upsert(row, { onConflict: "id" });
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return upsertDesk(sb, patch, env);
+  }
   if (error) throw new Error(error.message);
   return row;
 }
 
-async function loadChats(sb) {
-  const { data } = await sb.from("ox_calls_chats").select("*").order("last_seen_at", { ascending: false });
+async function loadChats(sb, env = process.env) {
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    return [...(st.chats || [])].sort((a, b) => String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || "")));
+  }
+  const { data, error } = await sb.from("ox_calls_chats").select("*").order("last_seen_at", { ascending: false });
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return loadChats(sb, env);
+  }
   return data || [];
 }
 
-async function loadCalls(sb, limit = 80) {
-  const { data } = await sb.from("ox_calls_ledger").select("*").order("called_at", { ascending: false }).limit(limit);
+async function loadCalls(sb, limit = 80, env = process.env) {
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    return (st.ledger || []).slice(0, limit);
+  }
+  const { data, error } = await sb.from("ox_calls_ledger").select("*").order("called_at", { ascending: false }).limit(limit);
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return loadCalls(sb, limit, env);
+  }
   return data || [];
 }
 
-async function upsertChat(sb, row) {
-  const { error } = await sb.from("ox_calls_chats").upsert(
-    { ...row, last_seen_at: new Date().toISOString() },
-    { onConflict: "chat_id" },
-  );
+async function upsertChat(sb, row, env = process.env) {
+  const next = { ...row, last_seen_at: new Date().toISOString() };
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    const i = st.chats.findIndex((c) => String(c.chat_id) === String(next.chat_id));
+    if (i >= 0) st.chats[i] = { ...st.chats[i], ...next };
+    else st.chats.push(next);
+    await kvPutState(st, env);
+    return;
+  }
+  const { error } = await sb.from("ox_calls_chats").upsert(next, { onConflict: "chat_id" });
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return upsertChat(sb, row, env);
+  }
   if (error) throw new Error(error.message);
 }
 
-export async function snapshotCallsDesk({ sb: sbIn } = {}) {
-  const sb = sbIn || adminSb();
+async function insertCall(sb, row, env = process.env) {
+  const rec = { id: row.id || crypto.randomUUID(), ...row };
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    st.ledger = [rec, ...(st.ledger || [])].slice(0, 400);
+    await kvPutState(st, env);
+    return rec;
+  }
+  const { data, error } = await sb.from("ox_calls_ledger").insert(row).select("*").single();
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return insertCall(sb, row, env);
+  }
+  if (error) throw new Error(error.message);
+  return data || rec;
+}
+
+async function updateCall(sb, id, patch, env = process.env) {
+  if ((await storeMode(sb)) === "kv") {
+    const st = await kvGetState(env);
+    const rec = st.ledger.find((c) => c.id === id);
+    if (rec) Object.assign(rec, patch);
+    await kvPutState(st, env);
+    return;
+  }
+  const { error } = await sb.from("ox_calls_ledger").update(patch).eq("id", id);
+  if (error && tableMissing(error)) {
+    _storeMode = "kv";
+    return updateCall(sb, id, patch, env);
+  }
+  if (error) throw new Error(error.message);
+}
+
+export async function snapshotCallsDesk({ sb: sbIn, env = process.env } = {}) {
+  const sb = sbIn || adminSb(env);
   if (!sb) return { ...emptyCallsDesk(), error: "supabase_unconfigured" };
   try {
-    const [desk, chats, calls] = await Promise.all([loadDesk(sb), loadChats(sb), loadCalls(sb)]);
-    return publicDesk(desk, chats, calls);
+    if (!sb._tables && !_applyTried) {
+      _applyTried = true;
+      await applyCallsSql(env).catch(() => ({ ok: false }));
+    }
+    const [desk, chats, calls] = await Promise.all([loadDesk(sb, env), loadChats(sb, env), loadCalls(sb, 80, env)]);
+    const snap = publicDesk(desk, chats, calls);
+    snap.store = (await storeMode(sb)) === "kv" ? "kv" : "sql";
+    return snap;
   } catch (e) {
     return { ...emptyCallsDesk(), error: e.message || String(e) };
   }
@@ -278,25 +471,20 @@ async function refreshMarks(sb, desk, calls, { post = false, send } = {}) {
     const mark = marks.get(call.mint);
     if (!mark || !(mark.market_cap > 0)) continue;
     const next = applyMark(call, mark, Date.now());
-    const { error } = await sb
-      .from("ox_calls_ledger")
-      .update({
-        mc_now: next.mc_now,
-        mc_ath: next.mc_ath,
-        mc_atl: next.mc_atl,
-        price_now: next.price_now,
-        ath_at: next.ath_at,
-        atl_at: next.atl_at,
-        multiple_now: next.multiple_now,
-        multiple_ath: next.multiple_ath,
-        status: next.status,
-        resolved_at: next.resolved_at || call.resolved_at,
-      })
-      .eq("id", call.id);
-    if (!error) {
-      updated += 1;
-      Object.assign(call, next);
-    }
+    await updateCall(sb, call.id, {
+      mc_now: next.mc_now,
+      mc_ath: next.mc_ath,
+      mc_atl: next.mc_atl,
+      price_now: next.price_now,
+      ath_at: next.ath_at,
+      atl_at: next.atl_at,
+      multiple_now: next.multiple_now,
+      multiple_ath: next.multiple_ath,
+      status: next.status,
+      resolved_at: next.resolved_at || call.resolved_at,
+    });
+    updated += 1;
+    Object.assign(call, next);
     const flipped = call.status !== next.status && (next.status === "won" || next.status === "lost");
     const doubled = num(next.multiple_now) >= 2 && num(call.multiple_now) < 2;
     if (post && desk.bot_token && (flipped || doubled) && desk.channel_id) {
@@ -413,7 +601,7 @@ export async function tickCallsDesk(opts = {}) {
       }
     }
     row.telegram_posts = posts;
-    const { data: inserted } = await sb.from("ox_calls_ledger").insert(row).select("*").single();
+    const inserted = await insertCall(sb, row);
     actions.push({ type: "call", mint: coin.mint, symbol: coin.symbol, agent_id: agent?.id, posts: posts.length, id: inserted?.id });
   }
 
