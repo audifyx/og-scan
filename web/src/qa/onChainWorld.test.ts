@@ -22,7 +22,7 @@ describe("OrbitX /on-chain world", () => {
     expect(vercel).toContain('"/api/on-chain?path=ingest&force=1"');
     expect(vercel).toContain('"api/on-chain.js"');
     const api = readFileSync(resolve(WEB, "api/on-chain.js"), "utf8");
-      for (const path of ["live", "events", "wallet", "token", "transaction", "block", "orbitx", "search", "flows", "ingest", "status", "kols", "districts", "trending"]) {
+      for (const path of ["live", "events", "wallet", "token", "transaction", "block", "orbitx", "search", "flows", "ingest", "status", "kols", "agents", "districts", "trending"]) {
       expect(api).toContain(path);
     }
     expect(api).toContain("activeOrbitxKols");
@@ -30,6 +30,11 @@ describe("OrbitX /on-chain world", () => {
     expect(api).toContain("handleBlock");
     expect(api).toContain("handleTransaction");
     expect(api).toContain("handleTrending");
+    expect(api).toContain("handleAgents");
+    expect(api).toContain("simulatePaperDesk");
+    expect(api).toContain("decorateKols");
+    expect(api).toContain("ox_paper_fills");
+    expect(api).toContain("ox_chain_kol_state");
     expect(api).toContain("banner");
     expect(api).toContain("handleMedia");
     expect(api).toContain("rpcFallback: true");
@@ -99,10 +104,12 @@ describe("OrbitX /on-chain world", () => {
     const nav = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/MobileNav.tsx"), "utf8");
     expect(nav).toContain("World");
     expect(nav).toContain("Feed");
+    expect(nav).toContain("Agents");
     expect(nav).toContain("Events");
     expect(nav).toContain("Tx");
     expect(nav).toContain("Wallet");
     expect(nav).toContain("lg:hidden");
+    expect(nav).toContain("rounded-full");
     const wallet = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/WalletPanel.tsx"), "utf8");
     expect(wallet).toContain("KOL directory");
     expect(wallet).toContain("TRACKED");
@@ -171,6 +178,13 @@ describe("OrbitX /on-chain world", () => {
     expect(top).toContain('label="Buys"');
     expect(top).toContain('label="Swaps"');
     expect(top).not.toContain("OrbitX Buys");
+    expect(top).toContain('to="/app"');
+    expect(top).toContain("OrbitX home");
+    expect(dash).toContain("AgentsView");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("10k mock SOL");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("Currently buying");
+    expect(readFileSync(resolve(WEB, "src/components/theme/PlatformDock.tsx"), "utf8")).not.toContain('"/on-chain"');
+    expect(readFileSync(resolve(WEB, "src/components/theme/platform-shell.css"), "utf8")).toContain("z-index: 200");
   });
 
   it("renders a 3D galaxy of token nodes, official KOLs, holders, and swaps", () => {
@@ -231,6 +245,12 @@ describe("OrbitX /on-chain world", () => {
     expect(planet).toContain("/api/on-chain/media");
     expect(planet).toContain("CanvasTexture");
     expect(readFileSync(resolve(REPO, "supabase/migrations/20260826061200_ox_chain_tokens_banner.sql"), "utf8")).toContain("banner");
+    expect(canvas).toContain('saturation={0.18}');
+    expect(canvas).toContain("#e9d5ff");
+    expect(canvas).toContain("#34d399");
+    expect(planet).toContain("hi512");
+    expect(planet).not.toContain("bw512");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/universeLayout.ts"), "utf8")).toContain("#fbbf24");
   });
 
   it("stores a rebuildable chain cache instead of replacing ox_onchain_events", () => {
@@ -414,5 +434,57 @@ describe("OrbitX /on-chain world", () => {
     expect(exploreTargetsForQuery("441800000")[0]).toMatchObject({ view: "block", path: "/on-chain/block/441800000" });
     expect(exploreTargetsForQuery(wallet).map((t) => t.view)).toEqual(["world", "wallets"]);
     expect(exploreTargetsForQuery("$orbitx")).toEqual([]);
+  });
+
+  it("runs a 10k mock-SOL paper desk off live coin tape", async () => {
+    const { simulatePaperDesk, PAPER_STAKE_SOL, PAPER_AGENTS } = await import("../../shared/orbitx-paper-desk.js");
+    expect(PAPER_STAKE_SOL).toBe(10_000);
+    expect(PAPER_AGENTS).toHaveLength(10);
+    const desk = simulatePaperDesk(
+      [
+        {
+          mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+          symbol: "ORBITX",
+          name: "OrbitX",
+          change_1h: 4.2,
+          change_24h: 12.5,
+          volume_24h: 900_000,
+          liquidity_usd: 2_000_000,
+          market_cap: 8_000_000,
+        },
+        {
+          mint: "Aaa1111111111111111111111111111111111111111",
+          symbol: "HOT",
+          name: "Hot",
+          change_1h: 18,
+          change_24h: 40,
+          volume_24h: 4_000_000,
+          liquidity_usd: 3_000_000,
+          market_cap: 60_000_000,
+        },
+        {
+          mint: "Bbb1111111111111111111111111111111111111111",
+          symbol: "DIP",
+          name: "Dip",
+          change_1h: -12,
+          change_24h: -22,
+          volume_24h: 250_000,
+          liquidity_usd: 400_000,
+          market_cap: 80_000,
+        },
+      ],
+      { now: Date.parse("2026-09-07T12:00:00.000Z"), kols: [{ last_mint: "Aaa1111111111111111111111111111111111111111" }] },
+    );
+    expect(desk.agents).toHaveLength(10);
+    expect(desk.agents.every((a) => a.stake_sol === 10_000)).toBe(true);
+    expect(desk.agents.every((a) => a.live?.thesis.includes("mock SOL"))).toBe(true);
+    expect(desk.agents.every((a) => a.live?.mint)).toBe(true);
+    expect(desk.desk_equity_sol).toBeGreaterThan(50_000);
+    expect(desk.hours).toBe(24);
+    const sql = readFileSync(resolve(REPO, "supabase/migrations/20260907010000_ox_paper_desk_kol_state.sql"), "utf8");
+    expect(sql).toContain("ox_paper_agents");
+    expect(sql).toContain("ox_paper_fills");
+    expect(sql).toContain("ox_chain_kol_state");
+    expect(sql).toContain("enable row level security");
   });
 });

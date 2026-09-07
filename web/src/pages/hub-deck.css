@@ -638,14 +638,16 @@ button.ox-tel {
   left: 50%;
   bottom: calc(10px + var(--deck-safe-b));
   transform: translateX(-50%);
-  z-index: 4;
+  z-index: 40;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 2px;
+  width: min(calc(100% - 20px), 460px);
   padding: 6px 8px;
-  border-radius: 28px;
+  border-radius: 999px;
   border: 1px solid var(--deck-line);
-  background: rgba(5, 8, 14, 0.62);
+  background: rgba(5, 8, 14, 0.78);
   backdrop-filter: blur(24px) saturate(170%);
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.4);
 }

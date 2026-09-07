@@ -216,7 +216,7 @@ export function MapView() {
           const mapped = projectToMap([Math.cos(a) * 16, 0, Math.sin(a) * 16], bounds);
           return (
             <g key={hub.id}>
-              <circle cx={mapped.x} cy={mapped.y} r="1.8" fill="#050505" stroke="#d4d4d4" strokeWidth="0.24" />
+              <circle cx={mapped.x} cy={mapped.y} r="1.8" fill="#0b0e16" stroke="#c4b5fd" strokeWidth="0.24" />
               <text x={mapped.x} y={mapped.y + 3.2} textAnchor="middle" fill="#e5e5e5" fontSize="1.9" fontFamily="Oxanium, sans-serif">
                 {hub.label.replace(" DEX", "")}
               </text>
@@ -224,7 +224,7 @@ export function MapView() {
           );
         })}
         {sparks.map((s) => (
-          <circle key={s.id} cx={s.x} cy={s.y} r="0.38" fill={s.buy ? "#f5f5f5" : "#737373"} opacity="0.88" />
+          <circle key={s.id} cx={s.x} cy={s.y} r="0.38" fill={s.buy ? "#34d399" : "#fb7185"} opacity="0.88" />
         ))}
         {planets.map((p) => (
           <g
@@ -239,7 +239,7 @@ export function MapView() {
               cy={p.y}
               r={p.r}
               fill="#0a0a0a"
-              stroke={selected === p.mint || hover === p.mint ? "#ffffff" : CLUSTER_META[p.cluster]?.color || "#a3a3a3"}
+              stroke={selected === p.mint || hover === p.mint ? "#f5d0fe" : CLUSTER_META[p.cluster]?.color || "#a78bfa"}
               strokeWidth={selected === p.mint ? 0.38 : hover === p.mint ? 0.28 : 0.16}
             />
             {p.image ? (
@@ -251,7 +251,6 @@ export function MapView() {
                 height={p.r * 1.64}
                 clipPath={`url(#map-clip-${p.mint})`}
                 preserveAspectRatio="xMidYMid slice"
-                style={{ filter: "grayscale(1) contrast(1.12)" }}
               />
             ) : null}
             {zoom >= 1.7 || hover === p.mint || selected === p.mint ? (
@@ -269,8 +268,8 @@ export function MapView() {
           </g>
         ))}
         <g className="cursor-pointer" onPointerUp={() => open(orbitx?.mint || ORBITX_MINT)}>
-          <circle cx={ox.x} cy={ox.y} r="3.6" fill="#111111" stroke="#ffffff" strokeWidth="0.4" />
-          <text x={ox.x} y={ox.y + 0.55} textAnchor="middle" fill="#f5f5f5" fontSize="2.1" fontFamily="Oxanium, sans-serif">
+          <circle cx={ox.x} cy={ox.y} r="3.6" fill="#8b5cf6" stroke="#c4b5fd" strokeWidth="0.4" />
+          <text x={ox.x} y={ox.y + 0.55} textAnchor="middle" fill="#f5d0fe" fontSize="2.1" fontFamily="Oxanium, sans-serif">
             OX
           </text>
           <text x={ox.x} y={ox.y + 5.6} textAnchor="middle" fill="#e5e5e5" fontSize="2.3" fontFamily="Oxanium, sans-serif">
@@ -297,7 +296,7 @@ export function MapView() {
                 nav(`/on-chain/wallet/${k.address}`);
               }}
             >
-              <circle cx={cx} cy={cy} r="0.9" fill="#e5e5e5" opacity="0.95" />
+              <circle cx={cx} cy={cy} r="0.9" fill="#34d399" opacity="0.95" />
               <text x={cx} y={cy + 2.1} textAnchor="middle" fill="#a3a3a3" fontSize="1.4" fontFamily="Oxanium, sans-serif">
                 {k.name.slice(0, 10)}
               </text>

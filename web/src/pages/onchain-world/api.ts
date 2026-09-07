@@ -337,6 +337,55 @@ export function fetchBlock(slot: string | number) {
   return getJson<BlockPayload>(`block/${encodeURIComponent(String(slot))}`);
 }
 
+export type PaperFill = {
+  hour: number;
+  at: string;
+  mint: string;
+  symbol: string;
+  name?: string;
+  image?: string | null;
+  side: string;
+  sol: number;
+  pnl_sol: number;
+  move_pct: number;
+  thesis: string;
+  current?: boolean;
+  change_1h?: number | null;
+  volume_24h?: number | null;
+};
+
+export type PaperAgent = {
+  id: string;
+  name: string;
+  style: string;
+  color: string;
+  blurb?: string;
+  equity_sol: number;
+  pnl_sol: number;
+  pnl_pct: number;
+  wins: number;
+  losses: number;
+  win_pct: number;
+  live?: PaperFill | null;
+  fills?: PaperFill[];
+};
+
+export type PaperDeskPayload = {
+  ok?: boolean;
+  mock?: boolean;
+  stake_sol?: number;
+  desk_equity_sol?: number;
+  desk_pnl_sol?: number;
+  agent_count?: number;
+  next_hour_at?: string;
+  agents?: PaperAgent[];
+  error?: string;
+};
+
+export function fetchAgents() {
+  return getJson<PaperDeskPayload>("agents");
+}
+
 export function fetchOrbitx() {
   return getJson<OrbitxPayload>("orbitx");
 }

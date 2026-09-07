@@ -6,6 +6,7 @@ import { MapView } from "@/pages/onchain-world/dashboard/views/MapView";
 import { OrbitxTokenView } from "@/pages/onchain-world/dashboard/views/OrbitxTokenView";
 import { TerminalView } from "@/pages/onchain-world/dashboard/views/TerminalView";
 import { TxView } from "@/pages/onchain-world/dashboard/views/TxView";
+import { AgentsView } from "@/pages/onchain-world/dashboard/views/AgentsView";
 import { WalletsView } from "@/pages/onchain-world/dashboard/views/WalletsView";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
@@ -22,6 +23,7 @@ const VIEWS: { id: CenterView; label: string }[] = [
   { id: "analytics", label: "Analytics" },
   { id: "tx", label: "Tx" },
   { id: "block", label: "Block" },
+  { id: "agents", label: "Agents" },
 ];
 
 export function CenterStage() {
@@ -41,9 +43,9 @@ export function CenterStage() {
               type="button"
               onClick={() => setView(item.id)}
               className={cn(
-                "rounded-sm px-2.5 py-1.5 text-xs font-semibold tracking-wide uppercase transition-[background-color,color] duration-150",
+                "rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide uppercase transition-[background-color,color] duration-150",
                 view === item.id
-                  ? "bg-accent-2/25 text-accent"
+                  ? "bg-fg text-bg"
                   : "text-dim hover:bg-bg-hover hover:text-fg",
               )}
             >
@@ -95,6 +97,7 @@ export function CenterStage() {
       {view === "analytics" ? <AnalyticsView /> : null}
       {view === "tx" ? <TxView /> : null}
       {view === "block" ? <BlockView /> : null}
+      {view === "agents" ? <AgentsView /> : null}
     </section>
   );
 }

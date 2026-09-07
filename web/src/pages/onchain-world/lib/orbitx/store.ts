@@ -60,8 +60,8 @@ type OrbitxState = {
   setCamera: (camera: CameraState) => void;
   resetCamera: () => void;
 
-  mobilePanel: "world" | "feed" | "events" | "tx" | "wallet";
-  setMobilePanel: (panel: "world" | "feed" | "events" | "tx" | "wallet") => void;
+  mobilePanel: "world" | "feed" | "events" | "tx" | "wallet" | "agents";
+  setMobilePanel: (panel: "world" | "feed" | "events" | "tx" | "wallet" | "agents") => void;
 
   selectedToken: string | null;
   selectToken: (mint: string | null) => void;

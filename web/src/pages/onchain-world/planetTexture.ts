@@ -57,7 +57,7 @@ function finishCanvas(canvas: HTMLCanvasElement): CanvasTexture {
 }
 
 export function makeFallbackPlanetTexture(tint: string, ticker: string, seed = "x"): CanvasTexture {
-  const key = `${tint}|${ticker}|${seed}|bw512`;
+  const key = `${tint}|${ticker}|${seed}|hi512`;
   const hit = fallbackCache.get(key);
   if (hit) return hit;
   const size = 512;
@@ -69,8 +69,8 @@ export function makeFallbackPlanetTexture(tint: string, ticker: string, seed = "
   const hue = hashHue(seed + tint);
   const light = 18 + (hue % 22);
   const g = ctx.createRadialGradient(size * 0.32, size * 0.28, 12, size * 0.5, size * 0.5, size * 0.74);
-  g.addColorStop(0, `hsl(0 0% ${Math.min(72, light + 38)}%)`);
-  g.addColorStop(0.42, `hsl(0 0% ${light + 8}%)`);
+  g.addColorStop(0, `hsl(${hue} 62% ${Math.min(72, light + 38)}%)`);
+  g.addColorStop(0.42, `hsl(${hue} 48% ${light + 8}%)`);
   g.addColorStop(1, "#050505");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
@@ -80,7 +80,7 @@ export function makeFallbackPlanetTexture(tint: string, ticker: string, seed = "
     const y = ((hashHue(`${seed}*${i}`) * 13) % size);
     const r = 14 + (i % 11) * 8;
     const blob = ctx.createRadialGradient(x, y, 1, x, y, r);
-    blob.addColorStop(0, `hsla(0 0% ${30 + (i % 40)}% / 0.42)`);
+    blob.addColorStop(0, `hsla(${(hue + i * 7) % 360} 50% ${30 + (i % 40)}% / 0.42)`);
     blob.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = blob;
     ctx.beginPath();
@@ -116,11 +116,6 @@ function paintCoinPlanet(img: HTMLImageElement, tint: string, size: number): Can
   ctx.fillStyle = "#050505";
   ctx.fillRect(0, 0, size, size);
   ctx.drawImage(img, 0, 0, size, size);
-  ctx.save();
-  ctx.globalCompositeOperation = "saturation";
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, size, size);
-  ctx.restore();
 
   const shade = ctx.createLinearGradient(0, 0, size, size);
   shade.addColorStop(0, "rgba(255,255,255,0.16)");

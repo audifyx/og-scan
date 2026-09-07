@@ -31,11 +31,11 @@
 }
 
 .ox-deck--ios .ox-deck__rail {
-  width: min(calc(100% - 20px), 430px);
-  padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
-  border-radius: 22px;
-  background: rgba(22, 22, 24, 0.72);
-  border-color: rgba(255, 255, 255, 0.1);
+  width: min(calc(100% - 16px), 460px);
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(22, 22, 24, 0.82);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .ox-deck--ios .ox-railbtn {
@@ -631,6 +631,7 @@ a.ios-cell {
 .ox-deck--ios .ox-deck__rail {
   width: min(calc(100% - 16px), 460px);
   padding: 5px 8px;
+  border-radius: 999px;
 }
 
 .ox-deck--ios .ox-homebtn {

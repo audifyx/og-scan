@@ -142,7 +142,8 @@ export type CenterView =
   | "wallets"
   | "analytics"
   | "tx"
-  | "block";
+  | "block"
+  | "agents";
 
 export type BottomTab =
   | "recent"

@@ -51,7 +51,6 @@ const HIDE_ON_PREFIX = [
   "/supercomputer/link-auth",
   "/supercomputer/x-link-auth",
   "/supercomputer/x-mcp-auth",
-  "/on-chain",
   "/education",
   "/orbitxagents",
   "/Orbitxagents",

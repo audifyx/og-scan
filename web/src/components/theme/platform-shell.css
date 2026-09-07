@@ -159,7 +159,7 @@
 /* Draggable OrbitX apps FAB (replaces bottom platform dock) */
 .ox-platform-fab {
   position: fixed;
-  z-index: 70;
+  z-index: 200;
   width: 52px;
   height: 52px;
   touch-action: none;

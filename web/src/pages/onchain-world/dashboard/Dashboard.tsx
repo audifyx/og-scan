@@ -8,6 +8,7 @@ import { TokenPanel } from "@/pages/onchain-world/dashboard/TokenPanel";
 import { TopBar } from "@/pages/onchain-world/dashboard/TopBar";
 import { TrendingFeed } from "@/pages/onchain-world/dashboard/TrendingFeed";
 import { WalletPanel } from "@/pages/onchain-world/dashboard/WalletPanel";
+import { AgentsView } from "@/pages/onchain-world/dashboard/views/AgentsView";
 import { TooltipProvider } from "@/pages/onchain-world/dashboard/ui/tooltip";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import "../ox-dash.css";
@@ -70,6 +71,11 @@ export function Dashboard() {
           {page === "wallet" ? (
             <section aria-label="Wallet" className="flex h-full min-h-0 flex-col">
               {depth}
+            </section>
+          ) : null}
+          {page === "agents" ? (
+            <section aria-label="Agents" className="flex h-full min-h-0 flex-col">
+              <AgentsView />
             </section>
           ) : null}
         </div>

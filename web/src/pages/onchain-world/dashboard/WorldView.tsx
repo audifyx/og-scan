@@ -86,7 +86,7 @@ export function WorldView() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-black">
+      <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-[#02010a]">
         {showGl ? (
           <WorldCanvas
             events={events}

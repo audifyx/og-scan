@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { MoreVertical, Search, Volume2, VolumeX } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Home, LayoutGrid, MoreVertical, Search, Volume2, VolumeX } from "lucide-react";
 import { OrbitxMark } from "@/pages/onchain-world/dashboard/OrbitxMark";
 import { Badge } from "@/pages/onchain-world/dashboard/ui/badge";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
@@ -175,6 +175,20 @@ export function TopBar() {
     <header className="flex shrink-0 flex-col border-b border-line bg-bg-raised">
       <div className="flex h-12 items-center gap-3 px-3">
         <div className="flex shrink-0 items-center gap-2.5">
+          <Link
+            to="/app"
+            className="flex size-8 items-center justify-center rounded-full border border-line bg-white/10 hover:bg-white/20"
+            aria-label="OrbitX home"
+          >
+            <Home className="size-4" />
+          </Link>
+          <Link
+            to="/app"
+            className="hidden items-center gap-1 rounded-full border border-line bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-fg hover:bg-white/20 sm:flex"
+          >
+            <LayoutGrid className="size-3.5" />
+            Apps
+          </Link>
           <span className="flex size-8 items-center justify-center rounded-md bg-white/10 shadow-[0_0_18px_rgb(255_255_255_/_0.18)]">
             <OrbitxMark className="size-5" />
           </span>
@@ -244,7 +258,7 @@ export function TopBar() {
                     onClick={() => go(`/on-chain/token/${t.mint}`, "world", { mint: t.mint })}
                   >
                     {t.image ? (
-                      <img src={t.image} alt="" className="size-6 rounded-full object-cover grayscale" />
+                      <img src={t.image} alt="" className="size-6 rounded-full object-cover" />
                     ) : (
                       <span className="size-6 rounded-full bg-bg-hover" />
                     )}
@@ -268,7 +282,7 @@ export function TopBar() {
                     onClick={() => go(`/on-chain/token/${t.mint}`, "world", { mint: t.mint })}
                   >
                     {t.image ? (
-                      <img src={t.image} alt="" className="size-6 rounded-full object-cover grayscale" />
+                      <img src={t.image} alt="" className="size-6 rounded-full object-cover" />
                     ) : (
                       <span className="size-6 rounded-full bg-bg-hover" />
                     )}

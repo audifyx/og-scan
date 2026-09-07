@@ -30,6 +30,7 @@ import {
   trackedRowsFromDirectory,
 } from "../shared/orbitx-kol-directory.js";
 import { DEX_HUBS, epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
+import { simulatePaperDesk, PAPER_AGENTS, PAPER_STAKE_SOL } from "../shared/orbitx-paper-desk.js";
 
 export const config = { maxDuration: 60 };
 
@@ -360,6 +361,70 @@ async function searchDex(symbol) {
   } catch {
     return [];
   }
+}
+
+function lastTokenLabel(last) {
+  if (!last) return null;
+  return tokenDisplayName({ name: last.token_name, symbol: last.token_symbol, mint: last.token_ca })
+    || tokenTicker({ symbol: last.token_symbol, mint: last.token_ca })
+    || null;
+}
+
+function decorateKols(events, extras = {}) {
+  const tracked = extras.tracked || {};
+  const cacheBy = Object.fromEntries((extras.cached || []).map((r) => [r.address, r]));
+  const latestByWallet = {};
+  for (const e of events || []) {
+    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
+      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
+    }
+  }
+  return allOrbitxKols().map((k) => {
+    const last = latestByWallet[k.address];
+    const cache = cacheBy[k.address] || {};
+    const liveHits = (events || []).filter((e) =>
+      e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address
+    ).length;
+    return {
+      ...k,
+      label_kind: "KOL",
+      tracked: Boolean(tracked[k.address]),
+      hits: liveHits || cache.hits || 0,
+      last_type: last?.event_type || cache.last_type || null,
+      last_token: lastTokenLabel(last) || cache.last_token || null,
+      last_mint: last?.token_ca || cache.last_mint || null,
+      last_usd: last?.usd_value ?? cache.last_usd ?? null,
+      last_at: last?.block_time || cache.last_at || null,
+    };
+  });
+}
+
+async function loadKolCache(sb) {
+  if (!sb) return [];
+  const { data, error } = await sb.from("ox_chain_kol_state").select("*").limit(200);
+  if (error) return [];
+  return data || [];
+}
+
+async function persistKolState(sb, kols) {
+  if (!sb || !kols?.length) return;
+  const { error } = await sb.from("ox_chain_kol_state").upsert(
+    kols.map((k) => ({
+      address: k.address,
+      name: k.name,
+      twitter: k.twitter,
+      status: k.status,
+      hits: k.hits,
+      last_type: k.last_type,
+      last_token: k.last_token,
+      last_mint: k.last_mint,
+      last_usd: k.last_usd,
+      last_at: k.last_at,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "address" },
+  );
+  if (error) return;
 }
 
 async function seedAssignedKols(sb) {
@@ -937,29 +1002,9 @@ async function handleLive(req, res, sb) {
       wallet_twitter: kol?.twitter || null,
     });
   });
-  const latestByWallet = {};
-  for (const e of labeled) {
-    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
-      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
-    }
-  }
-  const kols = allOrbitxKols().map((k) => {
-    const last = latestByWallet[k.address];
-    const hits = labeled.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
-    return {
-      address: k.address,
-      name: k.name,
-      twitter: k.twitter,
-      status: k.status,
-      hits,
-      last_type: last?.event_type || null,
-      last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
-        || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
-      last_mint: last?.token_ca || null,
-      last_usd: last?.usd_value ?? null,
-      last_at: last?.block_time || null,
-    };
-  });
+  const cachedKols = await loadKolCache(sb);
+  const kols = decorateKols(labeled, { tracked, cached: cachedKols });
+  try { await persistKolState(sb, kols); } catch { /* cache table may not be applied yet */ }
   const { data: flows } = await sb.from("ox_chain_flows").select("*").order("last_seen", { ascending: false }).limit(40);
   const extraMints = labeled.map((e) => e.token_ca).filter(Boolean);
   const districts = await peekOrReadDistricts(extraMints, sb);
@@ -1016,6 +1061,9 @@ async function handleTrending(req, res, sb) {
 
 async function handleKols(req, res, sb) {
   await seedAssignedKols(sb);
+  try {
+    await ingestAddresses(sb, kolWatchBatch(8), { limit: 24, rpcFallback: true });
+  } catch { /* serve directory even if ingest is quiet */ }
   const tracked = await loadTracked(sb);
   const addresses = allOrbitxKols().map((k) => k.address);
   let events = [];
@@ -1033,33 +1081,61 @@ async function handleKols(req, res, sb) {
       .limit(400);
     events = data || [];
   }
-  const latestByWallet = {};
-  for (const e of events) {
-    for (const addr of [e.wallet, e.source_wallet, e.destination_wallet]) {
-      if (addr && !latestByWallet[addr]) latestByWallet[addr] = e;
-    }
-  }
+  const cachedKols = await loadKolCache(sb);
+  const kols = decorateKols(events, { tracked, cached: cachedKols });
+  try { await persistKolState(sb, kols); } catch { /* table may not be applied yet */ }
   return json(res, 200, {
     ok: true,
-    count: allOrbitxKols().length,
-    kols: allOrbitxKols().map((k) => {
-      const last = latestByWallet[k.address];
-      const hits = events.filter((e) => e.wallet === k.address || e.source_wallet === k.address || e.destination_wallet === k.address).length;
-      return {
-        ...k,
-        label_kind: "KOL",
-        tracked: Boolean(tracked[k.address]),
-        hits,
-        last_type: last?.event_type || null,
-        last_token: tokenDisplayName({ name: last?.token_name, symbol: last?.token_symbol, mint: last?.token_ca })
-          || tokenTicker({ symbol: last?.token_symbol, mint: last?.token_ca }),
-        last_mint: last?.token_ca || null,
-        last_usd: last?.usd_value ?? null,
-        last_at: last?.block_time || null,
-      };
-    }),
+    count: kols.length,
+    kols,
     events: events.map(publicEvent),
   });
+}
+
+async function persistPaperDesk(sb, desk) {
+  if (!sb || !desk?.agents?.length) return;
+  await sb.from("ox_paper_agents").upsert(
+    PAPER_AGENTS.map((a) => ({
+      id: a.id,
+      name: a.name,
+      style: a.style,
+      color: a.color,
+      sol_start: PAPER_STAKE_SOL,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "id" },
+  );
+  const rows = desk.agents.flatMap((a) =>
+    (a.fills || [])
+      .filter((f) => f.current)
+      .map((f) => ({
+        agent_id: a.id,
+        hour_bucket: f.hour,
+        mint: f.mint,
+        symbol: f.symbol,
+        side: f.side,
+        sol_amount: f.sol,
+        pnl_sol: f.pnl_sol,
+        move_pct: f.move_pct,
+        thesis: f.thesis,
+      })),
+  );
+  if (rows.length) {
+    await sb.from("ox_paper_fills").upsert(rows, { onConflict: "agent_id,hour_bucket" });
+  }
+}
+
+async function handleAgents(req, res, sb) {
+  const districts = await peekOrReadDistricts([], sb).catch(() => null);
+  const tokens = [districts?.orbitx, ...(districts?.tokens || [])].filter((t) => t?.mint);
+  const cachedKols = await loadKolCache(sb);
+  const desk = simulatePaperDesk(tokens, {
+    kols: cachedKols.concat(allOrbitxKols()),
+  });
+  try {
+    await persistPaperDesk(sb, desk);
+  } catch { /* read-only / missing table still serves the live book */ }
+  return json(res, 200, { ok: true, ...desk });
 }
 
 async function handleEvents(req, res, sb) {
@@ -1373,6 +1449,7 @@ export default async function handler(req, res) {
     if (head === "orbitx" && a === "buyers") return await handleOrbitx(req, res, sb, "buyers");
     if (head === "search") return await handleSearch(req, res, sb);
     if (head === "kols") return await handleKols(req, res, sb);
+    if (head === "agents" || head === "paper") return await handleAgents(req, res, sb);
     if (head === "districts") return await handleDistricts(req, res, sb);
     if (head === "trending") return await handleTrending(req, res, sb);
     if (head === "flows" && a) return await handleFlows(req, res, sb, a);

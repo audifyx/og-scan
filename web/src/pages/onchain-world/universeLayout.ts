@@ -85,16 +85,16 @@ function meta(
 }
 
 export const CLUSTER_META: Record<ClusterId, RingMeta> = {
-  orbitx: { label: "ORBITX CORE", orbit: 0, tilt: 0, phase: 0, band: 6, color: "#f5f5f5", center: [0, 0, 0], spread: 14 },
-  majors: meta("MAJORS", 54, 0.10, 0.0, 3.6, "#e7e7e7"),
-  established: meta("ESTABLISHED", 82, -0.16, 0.9, 4.2, "#c8c8c8"),
-  trending: meta("TRENDING", 112, 0.22, 1.9, 4.8, "#a3a3a3"),
-  fresh: meta("NEW PAIRS", 144, -0.12, 2.8, 5.2, "#737373"),
-  outer: meta("LONG TAIL", 180, 0.18, 3.9, 6.0, "#525252"),
+  orbitx: { label: "ORBITX CORE", orbit: 0, tilt: 0, phase: 0, band: 6, color: "#e9d5ff", center: [0, 0, 0], spread: 14 },
+  majors: meta("MAJORS", 54, 0.10, 0.0, 3.6, "#fbbf24"),
+  established: meta("ESTABLISHED", 82, -0.16, 0.9, 4.2, "#67e8f9"),
+  trending: meta("TRENDING", 112, 0.22, 1.9, 4.8, "#34d399"),
+  fresh: meta("NEW PAIRS", 144, -0.12, 2.8, 5.2, "#a78bfa"),
+  outer: meta("LONG TAIL", 180, 0.18, 3.9, 6.0, "#64748b"),
 };
 
 /** The KOL ring is wallets, not tokens, so WorldCanvas places it itself. */
-export const KOL_RING = { orbit: 30, tilt: -0.20, phase: 0.5, color: "#d4d4d4", label: "KOL ORBIT" };
+export const KOL_RING = { orbit: 30, tilt: -0.20, phase: 0.5, color: "#e879f9", label: "KOL ORBIT" };
 
 export function kolRingPos(index: number, count: number): [number, number, number] {
   const theta = KOL_RING.phase + (index / Math.max(count, 1)) * Math.PI * 2;
