@@ -8,6 +8,7 @@ import {
   mcMultiple,
   parseChannelRef,
   pickCallCandidates,
+  publicAgentCallsBoard,
   publicWebhookUrl,
   resolveCallStatus,
   stillCooling,
@@ -137,5 +138,39 @@ describe("calls desk math", () => {
     });
     expect(added.chat_id).toBe("-1002");
     expect(added.chat_type).toBe("supergroup");
+  });
+
+  it("public agentcalls board is tape-only and never includes bot keys", () => {
+    const board = publicAgentCallsBoard(
+      {
+        ok: true,
+        wallet: { pubkey: "W", sol: 1, usd: 2 },
+        holding: { mint: "Mint111111111111111111111111111111111111111", symbol: "FOO", usd: 3 },
+        hunt: { symbol: "BAR" },
+        feed: [{ id: "f1", kind: "buy", text: "NEON bought" }],
+        fills: [{ id: "t1", side: "buy" }],
+        open: [],
+        ledger: { started_at: "2026-01-01T00:00:00.000Z", now_at: "2026-01-01T01:00:00.000Z", trades: 1, wins: 1, losses: 0, pnl_sol: 0.1 },
+      },
+      {
+        ok: true,
+        bot_token: "123:SECRET",
+        token_masked: "123:****",
+        webhook_secret: "whsec",
+        armed: true,
+        hunt_ca: "Mint111",
+        chats: [{ chat_id: "-1001", title: "secret group" }],
+        calls: [{ id: "c1", mint: "Mint111", symbol: "FOO", telegram_posts: [{ chat_id: "-1001" }] }],
+        stats: { calls: 1, last_scan_at: "now", best: { mint: "Mint111", symbol: "FOO", telegram_posts: [{ chat_id: "-1001" }] } },
+      },
+    );
+    expect(board.ok).toBe(true);
+    expect(board.wallet).toBe("W");
+    expect(board.feed).toHaveLength(1);
+    expect(board.calls[0].symbol).toBe("FOO");
+    expect(board.calls[0].telegram_posts).toBeUndefined();
+    expect(board.stats.best?.mint).toBe("Mint111");
+    expect(board.stats.best?.telegram_posts).toBeUndefined();
+    expect(JSON.stringify(board)).not.toMatch(/SECRET|whsec|token_masked|bot_token|-1001/);
   });
 });

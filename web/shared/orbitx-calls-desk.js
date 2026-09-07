@@ -409,4 +409,157 @@ export function emptyCallsDesk() {
   return publicDesk({}, [], []);
 }
 
+function deskWallet(live = {}) {
+  if (typeof live.wallet === "string" && live.wallet) return live.wallet;
+  if (live.wallet && typeof live.wallet === "object" && typeof live.wallet.pubkey === "string") return live.wallet.pubkey;
+  return null;
+}
+
+function publicCallStats(calls, incoming) {
+  const base = summarizeCalls(calls);
+  const src = incoming && typeof incoming === "object" ? incoming : {};
+  const bestSrc = src.best || base.best;
+  return {
+    calls: num(src.calls, base.calls),
+    open: num(src.open, base.open),
+    won: num(src.won, base.won),
+    lost: num(src.lost, base.lost),
+    win_rate: src.win_rate != null ? src.win_rate : base.win_rate,
+    avg_multiple_now: src.avg_multiple_now ?? base.avg_multiple_now,
+    avg_multiple_ath: src.avg_multiple_ath ?? base.avg_multiple_ath,
+    pnl_now: src.pnl_now ?? base.pnl_now,
+    pnl_ath: src.pnl_ath ?? base.pnl_ath,
+    best: bestSrc
+      ? {
+          mint: bestSrc.mint || null,
+          symbol: bestSrc.symbol || null,
+          multiple_ath: bestSrc.multiple_ath != null ? num(bestSrc.multiple_ath) : null,
+          status: bestSrc.status || null,
+        }
+      : null,
+  };
+}
+
+export function publicAgentCallsBoard(live = {}, callDesk = {}) {
+  const wallet = deskWallet(live);
+  const calls = (callDesk.calls || []).map((c) => {
+    const row = publicCall(c);
+    return {
+      id: row.id,
+      mint: row.mint,
+      symbol: row.symbol,
+      name: row.name,
+      url: row.url,
+      agent_id: row.agent_id,
+      agent_name: row.agent_name,
+      thesis: row.thesis,
+      mc_at_call: row.mc_at_call,
+      mc_ath: row.mc_ath,
+      mc_atl: row.mc_atl,
+      mc_now: row.mc_now,
+      multiple_now: row.multiple_now,
+      multiple_ath: row.multiple_ath,
+      status: row.status,
+      called_at: row.called_at,
+    };
+  });
+  const open = (live.open || []).map((p) => ({
+    mint: p.mint,
+    symbol: p.symbol,
+    agent_id: p.agent_id,
+    agent_name: p.agent_name,
+    usd_in: p.usd_in,
+    pnl_pct: p.pnl_pct,
+    thesis: p.thesis,
+    tp_pct: p.tp_pct,
+  }));
+  const fills = (live.fills || []).slice(0, 50).map((f) => ({
+    id: f.id,
+    created_at: f.created_at,
+    agent_id: f.agent_id,
+    mint: f.mint,
+    symbol: f.symbol,
+    side: f.side,
+    usd_amount: f.usd_amount,
+    pnl_usd: f.pnl_usd,
+    pnl_pct: f.pnl_pct,
+    signature: f.signature,
+    thesis: f.thesis,
+    reason: f.reason,
+  }));
+  const feed = (live.feed || []).slice(0, 80).map((row) => ({
+    id: row.id,
+    at: row.at,
+    kind: row.kind,
+    agent_id: row.agent_id,
+    agent_name: row.agent_name,
+    agent_handle: row.agent_handle,
+    agent_color: row.agent_color,
+    mint: row.mint,
+    symbol: row.symbol,
+    usd: row.usd,
+    pnl_usd: row.pnl_usd,
+    text: row.text,
+    thesis: row.thesis,
+    reason: row.reason,
+    signature: row.signature,
+    solscan_tx: row.solscan_tx,
+    solscan_token: row.solscan_token,
+    solscan_account: row.solscan_account,
+  }));
+  const ledger = live.ledger
+    ? {
+        started_usd: live.ledger.started_usd,
+        currently_usd: live.ledger.currently_usd,
+        made_usd: live.ledger.made_usd,
+        wins: live.ledger.wins,
+        losses: live.ledger.losses,
+        holding: live.ledger.holding || null,
+      }
+    : null;
+  const hunt = (Array.isArray(live.hunt) ? live.hunt : []).map((h) => ({
+    mint: h.mint,
+    symbol: h.symbol,
+    clipUsd: h.clipUsd,
+    scaleMcap: h.scaleMcap,
+    flattenMcap: h.flattenMcap,
+  }));
+  const agents = (live.agents || LIVE_AGENTS).map((a) => ({
+    id: a.id,
+    name: a.name,
+    handle: a.handle,
+    color: a.color,
+    wins: a.wins ?? 0,
+    losses: a.losses ?? 0,
+    currently_hold: a.currently_hold || (a.open?.symbol ? `$${String(a.open.symbol).replace(/^\$/, "")}` : "cash"),
+    made_usd: a.made_usd ?? null,
+  }));
+  return {
+    ok: true,
+    public: true,
+    disclaimer:
+      live.disclaimer ||
+      "Not financial advice. Public tape from the OrbitX live desk — trades, skips, and calls.",
+    wallet,
+    fundUrl: live.fundUrl || (wallet ? `https://solscan.io/account/${wallet}` : null),
+    worldUrl: live.worldUrl || "https://www.orbitx.world/on-chain",
+    last_tick_at: live.last_tick_at || callDesk.last_tick_at || null,
+    last_activity_at: live.last_activity_at || null,
+    live: Boolean(live.armed && live.enabled && !live.paused),
+    trade_usd: live.trade_usd ?? null,
+    max_open: live.max_open ?? 1,
+    sol_balance: live.sol_balance ?? null,
+    usd_balance: live.usd_balance ?? null,
+    equity_usd: live.equity_usd ?? null,
+    ledger,
+    open,
+    fills,
+    feed,
+    agents,
+    hunt,
+    calls,
+    stats: publicCallStats(calls, callDesk.stats),
+  };
+}
+
 export { LIVE_AGENTS };

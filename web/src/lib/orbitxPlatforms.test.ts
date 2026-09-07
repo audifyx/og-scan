@@ -13,7 +13,7 @@ import {
   visiblePlatformSections,
 } from "./orbitxPlatforms";
 
-const REQUIRED = ["shop", "city", "agents", "os", "play", "intel", "onchain", "predict", "supercomputer", "dex", "telegram", "trade", "support", "education"];
+const REQUIRED = ["shop", "city", "agents", "os", "play", "intel", "onchain", "agentcalls", "predict", "supercomputer", "dex", "telegram", "trade", "support", "education"];
 const OWNER_ONLY = ["terminal", "scanner", "vamp", "koltracker", "pnltracker", "hq", "gaming"];
 
 describe("OrbitX platform catalog", () => {
@@ -33,6 +33,8 @@ describe("OrbitX platform catalog", () => {
     expect(PLATFORM_APPS.find((a) => a.key === "telegram")?.href).toBe("/telegram");
     expect(PLATFORM_APPS.find((a) => a.key === "support")?.href).toBe("/support");
     expect(PLATFORM_APPS.find((a) => a.key === "onchain")?.href).toBe("/on-chain");
+    expect(PLATFORM_APPS.find((a) => a.key === "agentcalls")?.href).toBe("/agentcalls");
+    expect(PLATFORM_APPS.find((a) => a.key === "agentcalls")?.visibility).not.toBe("admin");
     expect(PLATFORM_APPS.find((a) => a.key === "education")?.href).toBe("/education");
   });
 
@@ -74,5 +76,8 @@ describe("OrbitX platform catalog", () => {
     expect(matchPlatformPath("/hq", "/hq/feed")).toBe(true);
     expect(matchPlatformPath("/Orbitxcity", "/orbitxcity")).toBe(true);
     expect(matchPlatformPath("/shop", "/agent")).toBe(false);
+    expect(matchPlatformPath("/agentcalls", "/agentcalls")).toBe(true);
+    expect(matchPlatformPath("/agentcalls", "/agent-calls")).toBe(true);
+    expect(matchPlatformPath("/agentcalls", "/calls")).toBe(false);
   });
 });

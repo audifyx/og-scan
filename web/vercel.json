@@ -179,6 +179,18 @@
       "destination": "https://orbitx-prediction.fun/:path*"
     },
     {
+      "source": "/agentcalls",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/agentcalls/(.*)",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/agent-calls",
+      "destination": "/app.html"
+    },
+    {
       "source": "/education",
       "destination": "/app.html"
     },
@@ -396,6 +408,9 @@
     },
     "api/orbitx-calls.js": {
       "maxDuration": 90
+    },
+    "api/agent-calls.js": {
+      "maxDuration": 30
     },
     "api/mcp-life-tick.js": {
       "maxDuration": 90

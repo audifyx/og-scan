@@ -305,16 +305,20 @@ async function ensureCallsWebhook(desk, env = process.env) {
   }).catch(() => {});
 }
 
-export async function snapshotCallsDesk({ sb: sbIn, env = process.env } = {}) {
+export async function snapshotCallsDesk({ sb: sbIn, env = process.env, readonly = false } = {}) {
   const sb = sbIn || adminSb(env);
   if (!sb) return { ...emptyCallsDesk(), error: "supabase_unconfigured" };
   try {
-    if (!sb._tables && !_applyTried) {
+    if (!readonly && !sb._tables && !_applyTried) {
       _applyTried = true;
       await applyCallsSql(env).catch(() => ({ ok: false }));
     }
-    const [desk, chats, calls] = await Promise.all([loadDesk(sb, env), loadChats(sb, env), loadCalls(sb, 80, env)]);
-    if (!sb._tables && !_webhookTried && desk.bot_token) {
+    const [desk, chats, calls] = await Promise.all([
+      loadDesk(sb, env),
+      readonly ? Promise.resolve([]) : loadChats(sb, env),
+      loadCalls(sb, 80, env),
+    ]);
+    if (!readonly && !sb._tables && !_webhookTried && desk.bot_token) {
       _webhookTried = true;
       await ensureCallsWebhook(desk, env);
     }

@@ -25,6 +25,9 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('import OnChainProofPage from "./pages/OnChainProofPage"');
     expect(app).toContain('path="/calls"');
     expect(app).toContain('import CallsDesk from "./pages/CallsDesk"');
+    expect(app).toContain('path="/agentcalls"');
+    expect(app).toContain('import AgentCalls from "./pages/AgentCalls"');
+    expect(app).not.toContain('<Route path="/agentcalls" element={<AdminRoute>');
     expect(app).toContain('path="/on-chain"');
     expect(app).toContain('path="/world"');
     expect(app).toContain('import OnChainWorld from "./pages/OnChainWorld"');
@@ -57,6 +60,7 @@ describe("OrbitX route manifest", () => {
     const vercel = readFileSync(resolve(__dirname, "../../vercel.json"), "utf8");
     expect(vercel).toContain('"/education"');
     expect(vercel).toContain('"/education/(.*)"');
+    expect(vercel).toContain('"/agentcalls"');
     expect(vercel).toContain('"/orbitxagents"');
     expect(vercel).toContain('"/orbitxagents/(.*)"');
     expect(vercel).toContain('"/app.html"');

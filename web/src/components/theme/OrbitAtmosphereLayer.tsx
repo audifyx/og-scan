@@ -21,6 +21,8 @@ const EXCLUDE_PREFIXES = [
   "/app",
   "/hub",
   "/on-chain",
+  "/agentcalls",
+  "/agent-calls",
   "/education",
 ];
 

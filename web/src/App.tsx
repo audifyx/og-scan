@@ -155,6 +155,7 @@ import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import EnhancedAdvancedIntelligence from "./pages/EnhancedAdvancedIntelligence";
 import IntelligenceAdmin from "./pages/IntelligenceAdmin";
 import CallsDesk from "./pages/CallsDesk";
+import AgentCalls from "./pages/AgentCalls";
 import AlertSettings from "./pages/AlertSettings";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
@@ -591,6 +592,8 @@ const App = () => (
             {/* ── Owner desk (obscure path; not linked in product chrome) ── */}
             <Route path="/ox-desk-m4k9q" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="/calls" element={<AdminRoute><CallsDesk /></AdminRoute>} />
+            <Route path="/agentcalls" element={<AgentCalls />} />
+            <Route path="/agent-calls" element={<Navigate to="/agentcalls" replace />} />
             {/* Legacy /admin must NOT redirect to the desk */}
             <Route path="/admin" element={<NotFound />} />
             <Route path="/art" element={<OwnerPreviewRoute><ProtectedRoute><Suspense fallback={null}><ArtFeedPage /></Suspense></ProtectedRoute></OwnerPreviewRoute>} />

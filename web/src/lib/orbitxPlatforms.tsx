@@ -211,6 +211,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "vamp", name: "Anti-Vamp", caption: "Originality checks", href: "/vamp", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #67E8F9 48%, #0891B2 100%)", glyph: PlatformGlyph.vamp, menu: false, visibility: "admin" },
   { key: "intel", name: "Intel", caption: "Crypto intelligence", href: "/intel", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #0EA5E9 50%, #0369A1 100%)", glyph: PlatformGlyph.intel },
   { key: "onchain", name: "On-Chain", caption: "Living chain world", href: "/on-chain", tone: "#67E8F9", iconBg: "linear-gradient(145deg, #A5F3FC 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.onchain, dock: true },
+  { key: "agentcalls", name: "Agent Calls", caption: "Public live tape", href: "/agentcalls", tone: "#E5E5E5", iconBg: "linear-gradient(145deg, #A3A3A3 0%, #525252 50%, #0A0A0A 100%)", glyph: PlatformGlyph.terminal },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(145deg, #86EFAC 0%, #22C55E 48%, #065F46 100%)", glyph: PlatformGlyph.kol, menu: false, visibility: "admin" },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(145deg, #FDBA74 0%, #F97316 48%, #B45309 100%)", glyph: PlatformGlyph.pnl, menu: false, visibility: "admin" },
   { key: "ai", name: "OrbitX AI", caption: "Chat · create · transact", href: "/ai", tone: "#38BDF8", iconBg: "linear-gradient(145deg, #7DD3FC 0%, #38BDF8 48%, #0284C7 100%)", glyph: PlatformGlyph.ai },
@@ -238,7 +239,7 @@ export type PlatformSection = { id: string; title: string; subtitle: string; key
 export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "world", title: "World", subtitle: "City, agents, OS, play, and education", keys: ["city", "agents", "os", "play", "gaming", "education"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, terminal, scanner, launch", keys: ["dex", "trade", "terminal", "scanner", "launchpad", "vamp"] },
-  { id: "intel", title: "Intelligence", subtitle: "Intel desk, chain world, wallets, AI", keys: ["intel", "onchain", "koltracker", "pnltracker", "ai"] },
+  { id: "intel", title: "Intelligence", subtitle: "Intel desk, chain world, wallets, AI", keys: ["intel", "onchain", "agentcalls", "koltracker", "pnltracker", "ai"] },
   { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "telegram", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "Markets, NFTs, tasks", keys: ["predict", "nft", "bagwork"] },
@@ -296,6 +297,9 @@ export function matchPlatformPath(href: string, pathname: string): boolean {
       pathname === "/world" ||
       pathname.startsWith("/world/")
     );
+  }
+  if (href === "/agentcalls") {
+    return pathname === "/agentcalls" || pathname === "/agent-calls" || pathname.startsWith("/agentcalls/");
   }
   if (href === "/ai") return pathname.toLowerCase() === "/ai";
   if (href === "/telegram") return pathname.toLowerCase() === "/telegram";
