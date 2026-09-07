@@ -50,6 +50,7 @@ import {
   usdToSol,
 } from "./orbitx/buy-orbitx.js";
 import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias, parseTradeIntent } from "./orbitx/telegram-trade-intent.js";
+import { PUBLIC_MCP_PRIORITY_TOOLS } from "./orbitx/telegram-mcp-allowlist.js";
 import {
   classifyOrbitXAuthPaste,
   TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
@@ -178,23 +179,77 @@ function withAuthCodeSchema(schema, toolName) {
   return { ...base, type: "object", properties: props };
 }
 
+/** Claude / ChatGPT choke on 1000+ tools — and ChatGPT hard-fails above 128. */
+export const MCP_TOOLS_LIST_PAGE = 80;
+
+/** Auth + intel first so connectors actually see live public tools. */
+const MCP_TOOLS_LIST_PRIORITY = [
+  "search",
+  "fetch",
+  "orbitx_menu",
+  "orbitx_auth_link",
+  "orbitx_auth_status",
+  "orbitx_whoami",
+  ...PUBLIC_MCP_PRIORITY_TOOLS.filter(
+    (n) => !["search", "fetch", "orbitx_menu"].includes(n),
+  ),
+];
+
+export function orderedCoreTools() {
+  const byName = new Map(CORE_TOOLS.map((t) => [t.name, t]));
+  const out = [];
+  const seen = new Set();
+  for (const name of MCP_TOOLS_LIST_PRIORITY) {
+    const t = byName.get(name);
+    if (!t || seen.has(name)) continue;
+    seen.add(name);
+    out.push(t);
+  }
+  for (const t of CORE_TOOLS) {
+    if (seen.has(t.name)) continue;
+    seen.add(t.name);
+    out.push(t);
+  }
+  return out;
+}
+
+function mapListedTool(t) {
+  return {
+    name: t.name,
+    description: t.description,
+    inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+  };
+}
+
 /** Claude / ChatGPT choke on 1000+ tools — expose CORE live tools only in tools/list. */
-function listLiveTools(cursor) {
-  const PAGE = 80;
+export function listLiveTools(cursor) {
+  const PAGE = MCP_TOOLS_LIST_PAGE;
+  const ordered = orderedCoreTools();
   if (!cursor || cursor === "core" || cursor === "0") {
-    const tools = CORE_TOOLS.map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-    }));
+    const slice = ordered.slice(0, PAGE);
     return {
-      tools,
-      // Hint there are more via tools_help — do not dump 1000 schemas (breaks connectors).
+      tools: slice.map(mapListedTool),
+      nextCursor: ordered.length > PAGE ? `core:${PAGE}` : _generated.length ? "gen:0" : undefined,
       _meta: {
         totalAvailable: TOOLS.length,
         liveCore: CORE_TOOLS.length,
         note: "Live callable tools listed. Call orbitx_tools_help for the full catalog; generated shortcuts still work if you know the name.",
       },
+    };
+  }
+  const corePage = String(cursor).match(/^core:(\d+)$/);
+  if (corePage) {
+    const offset = Number(corePage[1]) || 0;
+    const slice = ordered.slice(offset, offset + PAGE);
+    const nextOff = offset + PAGE;
+    let next;
+    if (nextOff < ordered.length) next = `core:${nextOff}`;
+    else if (_generated.length) next = "gen:0";
+    else if (_cook.length) next = "cook:0";
+    else if (_life.length) next = "life:0";
+    return {
+      tools: slice.map(mapListedTool),
+      nextCursor: next,
     };
   }
   // Optional paginated generated tools: cursor = "gen:0", "gen:80", …
@@ -241,11 +296,8 @@ function listLiveTools(cursor) {
     };
   }
   return {
-    tools: CORE_TOOLS.map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-    })),
+    tools: ordered.slice(0, PAGE).map(mapListedTool),
+    nextCursor: ordered.length > PAGE ? `core:${PAGE}` : undefined,
   };
 }
 
@@ -5566,10 +5618,10 @@ async function handleMcp(req, res, parts) {
         scope: "orbitx",
         token_endpoint_auth_method: "none",
       },
-      tools: CORE_TOOLS.map((t) => ({ name: t.name, description: t.description })),
+      tools: orderedCoreTools().map((t) => ({ name: t.name, description: t.description })),
       toolsTotal: TOOLS.length,
       toolsLive: CORE_TOOLS.length,
-      note: "tools/list returns live CORE tools only — full catalog via orbitx_tools_help",
+      note: "tools/list first page is intel + auth (≤80). ChatGPT fails above 128 tools. Full catalog via orbitx_tools_help.",
     });
   }
 
@@ -5588,9 +5640,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.13.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.14.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. LIVE INTEL (call these): orbitx_full_report for tell-me-about a CA / GMGN / Dexscreener URL; orbitx_get_token; orbitx_dex_chart; orbitx_crypto_scan; orbitx_xray; orbitx_screen_tokens. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5662,6 +5714,16 @@ async function handleMcp(req, res, parts) {
         "orbitx_tools_help",
         "orbitx_search",
         "orbitx_whoami",
+        "orbitx_get_token",
+        "orbitx_full_report",
+        "orbitx_crypto_scan",
+        "orbitx_xray",
+        "orbitx_research",
+        "orbitx_screen_tokens",
+        "orbitx_get_forensics",
+        "orbitx_get_safety",
+        "orbitx_get_ath",
+        "orbitx_get_metadata",
         "orbitx_dex_chart",
         "orbitx_get_chart",
         "orbitx_trade_quote",
