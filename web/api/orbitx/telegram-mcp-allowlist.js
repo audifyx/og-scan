@@ -97,6 +97,7 @@ export const AGENT_PRIORITY_CMDS = [
   { command: "screen", description: "Screen trending tokens", tool: "orbitx_screen_tokens" },
   { command: "chart", description: "Dex chart for a CA", tool: "orbitx_dex_chart" },
   { command: "xray", description: "Token X-ray", tool: "orbitx_xray" },
+  { command: "report", description: "Full intel dossier", tool: "orbitx_full_report" },
   { command: "research", description: "Deep research", tool: "orbitx_research" },
   { command: "wallet", description: "Wallet snapshot", tool: "orbitx_get_wallet" },
   { command: "help_mcp", description: "MCP tools help", tool: "orbitx_tools_help" },

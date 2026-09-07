@@ -6,7 +6,29 @@ import { hasMarketSnapshot, hasTokenIdentity, hydrateKnownMint } from "./telegra
 export const CA_RE = /(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/;
 
 export function extractMint(text) {
-  const m = String(text || "").match(CA_RE);
+  const s = String(text || "");
+  const url = s.match(/https?:\/\/[^\s<>"']+/i) || s.match(/\b(?:www\.)?(?:gmgn\.ai|dexscreener\.com|pump\.fun|solscan\.io|birdeye\.so)\/[^\s<>"']+/i);
+  if (url) {
+    try {
+      const href = url[0].startsWith("http") ? url[0] : `https://${url[0]}`;
+      const u = new URL(href);
+      const parts = decodeURIComponent(u.pathname || "")
+        .split("/")
+        .filter(Boolean);
+      for (const p of [...parts].reverse()) {
+        const token = p.split("?")[0];
+        const prefixed = token.match(/^([A-Za-z0-9]{2,16})_([1-9A-HJ-NP-Za-km-z]{32,44})$/);
+        if (prefixed) return prefixed[2];
+        if (/^0x[a-fA-F0-9]{40}$/.test(token)) return token;
+        if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(token)) return token;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  const prefixed = s.match(/\b([A-Za-z0-9]{2,16})_([1-9A-HJ-NP-Za-km-z]{32,44})\b/);
+  if (prefixed) return prefixed[2];
+  const m = s.match(CA_RE);
   return m ? m[1] : "";
 }
 

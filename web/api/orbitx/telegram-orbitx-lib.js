@@ -252,6 +252,7 @@ export const GROUP_COMMANDS = [
   { command: "chart", description: "Live DexScreener + OrbitX DEX" },
   { command: "scan", description: "Safety + forensics overlay" },
   { command: "xray", description: "Bundles, whales, mint/freeze" },
+  { command: "report", description: "Full intel dossier for a CA" },
   { command: "research", description: "Utility brief — no hopium" },
   { command: "search", description: "Find a token by ticker / CA" },
   { command: "screen", description: "Trending Solana pulse" },
@@ -313,6 +314,9 @@ const PRIORITY_TOOL = {
   chart: "orbitx_dex_chart",
   scan: "orbitx_crypto_scan",
   xray: "orbitx_xray",
+  report: "orbitx_full_report",
+  full: "orbitx_full_report",
+  dossier: "orbitx_full_report",
   research: "orbitx_research",
   search: "orbitx_search",
   screen: "orbitx_screen_tokens",
@@ -353,7 +357,7 @@ export function resolveOfficialCommand(cmd) {
 
 export const DEFAULT_TELEGRAM_BUY_SOL = 0.05;
 export const DEFAULT_TELEGRAM_SELL_AMOUNT = "100%";
-const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "buy", "sell", "trade", "swap"];
+const MINT_COMMANDS = ["token", "chart", "xray", "research", "scan", "report", "full", "dossier", "buy", "sell", "trade", "swap"];
 const BUY_COMMANDS = ["buy", "trade", "swap"];
 const BUY_TOOLS = new Set([
   "orbitx_prepare_buy",
@@ -433,6 +437,10 @@ export function argsFromCommand(command, text) {
   }
   if (command === "faq" && rest && !args.q) args.q = rest;
   if (command === "screen" && !args.chain) args.chain = "solana";
+  if (["report", "full", "dossier"].includes(command)) {
+    if (!args.depth) args.depth = "standard";
+    if (args.includeWallets == null) args.includeWallets = false;
+  }
   return args;
 }
 
@@ -452,7 +460,7 @@ export function extractMint(text) {
 }
 
 const PROJECT_QUESTION_RE =
-  /\b(tell me about|tell me|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape|snipe|sell|dump)|is (?:it|this) legit|is (?:it|this) a (?:good|bad) (?:buy|sell)|(?:good|bad) buy|worth (?:buying|aping|selling)|would you (?:buy|ape|sell)|time to sell)\b/i;
+  /\b(tell me about|tell me|full report|intel report|dossier|what(?:'s| is) (?:this|it|the )?(?:project|token|coin)?|who (?:is|made|created|launched)|why (?:is )?(?:it|this )?(?:trending|pumping|running|moving)|research|explain|narrative|story behind|what does (?:it|this) do|should i (?:buy|ape|snipe|sell|dump)|is (?:it|this) legit|is (?:it|this) a (?:good|bad) (?:buy|sell)|(?:good|bad) buy|worth (?:buying|aping|selling)|would you (?:buy|ape|sell)|time to sell)\b/i;
 
 /** Natural-language project ask (not /token). Needs a mint in the same message. */
 export function isTokenProjectQuestion(text) {
@@ -553,8 +561,23 @@ export function inferPublicTool(text) {
   }
 
   const mintForBrief = extractMint(t);
-  if (mintForBrief && isTokenProjectQuestion(t) && !hasExplicitTradeAmount(t)) {
-    return { meta: "brief", args: { mint: mintForBrief } };
+  const wantsFull =
+    mintForBrief &&
+    !hasExplicitTradeAmount(t) &&
+    (/\b(full report|intel report|dossier|xray)\b/i.test(t) ||
+      /gmgn\.ai|dexscreener\.com|pump\.fun\/|solscan\.io\/token/i.test(t) ||
+      isTokenProjectQuestion(t));
+  if (wantsFull) {
+    return {
+      tool: "orbitx_full_report",
+      args: {
+        mint: mintForBrief,
+        depth: /\bquick\b/i.test(t) ? "quick" : /\bmax\b/i.test(t) ? "max" : "standard",
+        format: /\bpdf\b/i.test(t) ? "markdown" : "json",
+        includeSocial: !/\bquick\b/i.test(t),
+        includeWallets: /\b(max|wallets|holders|exit desk)\b/i.test(t),
+      },
+    };
   }
 
   const trade = parseTradeIntent(t);
@@ -571,7 +594,9 @@ export function inferPublicTool(text) {
   if (chart) return { tool: "orbitx_dex_chart", args: { ca: chart[1], mint: chart[1] } };
 
   const mint = extractMint(t);
-  if (mint && isTokenProjectQuestion(t)) return { meta: "brief", args: { mint } };
+  if (mint && isTokenProjectQuestion(t)) {
+    return { tool: "orbitx_full_report", args: { mint, depth: "standard", includeWallets: false } };
+  }
   if (mint) return { tool: "orbitx_get_token", args: { mint } };
   if (/^\$orbitx\b/i.test(t) || /^orbitx$/i.test(t)) {
     return { tool: "orbitx_get_token", args: { mint: ORBITX_MINT } };

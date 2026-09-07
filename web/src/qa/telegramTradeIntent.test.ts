@@ -81,10 +81,10 @@ describe("official Telegram trade wiring", () => {
 
     const research = `Hey tell me about this is it a good buy?\n${ORBITX}`;
     expect(parseTradeIntent(research)).toBeNull();
-    expect(inferPublicTool(research)?.meta).toBe("brief");
-    expect(inferPublicTool(research)?.tool).toBeUndefined();
+    expect(inferPublicTool(research)?.tool).toBe("orbitx_full_report");
+    expect(inferPublicTool(research)?.args).toMatchObject({ mint: ORBITX });
     expect(parseTradeIntent(`is it a good buy ${ORBITX}`)).toBeNull();
-    expect(inferPublicTool(`should I ape ${ORBITX}`)?.meta).toBe("brief");
+    expect(inferPublicTool(`should I ape ${ORBITX}`)?.tool).toBe("orbitx_full_report");
     expect(parseTradeIntent(`buy ${ORBITX} 0.05 sol`)?.tool).toBe("orbitx_buy_orbitx");
     expect(inferPublicTool(`buy ${ORBITX} 0.05 sol`)?.tool).toBe("orbitx_buy_orbitx");
     expect(inferPublicTool(ORBITX)?.tool).toBe("orbitx_get_token");
@@ -97,7 +97,7 @@ describe("official Telegram trade wiring", () => {
     expect(parseTradeIntent(`dump half ${ORBITX}`)?.args.amount).toBe("50%");
     expect(parseTradeIntent(`sell all $ORBITX`)?.args).toMatchObject({ mint: ORBITX, amount: "100%" });
     expect(parseTradeIntent(`should I sell ${ORBITX}`)).toBeNull();
-    expect(inferPublicTool(`should I sell ${ORBITX}`)?.meta).toBe("brief");
+    expect(inferPublicTool(`should I sell ${ORBITX}`)?.tool).toBe("orbitx_full_report");
   });
 
   it("exposes a 2500+ live OrbitX tool catalog", () => {
@@ -107,6 +107,7 @@ describe("official Telegram trade wiring", () => {
     expect(tools.some((t) => t.name === "orbitx_execute_launch")).toBe(true);
     expect(tools.some((t) => t.name === "orbitx_mint_nft")).toBe(true);
     expect(tools.some((t) => t.name === "orbitx_shop")).toBe(true);
+    expect(tools.some((t) => t.name === "orbitx_full_report")).toBe(true);
     expect(tools.some((t) => t.name === "orbitx_buy_orbitx")).toBe(true);
   });
 });

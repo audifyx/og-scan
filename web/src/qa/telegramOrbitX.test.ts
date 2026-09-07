@@ -140,19 +140,23 @@ describe("official OrbitX Telegram bot", () => {
     expect(inferPublicTool("13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool("$ORBITX")?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool("$ORBITX")?.args).toMatchObject({ mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9" });
+    expect(resolveOfficialCommand("xray").tool).toBe("orbitx_xray");
+    expect(resolveOfficialCommand("report").tool).toBe("orbitx_full_report");
+    expect(resolveOfficialCommand("full").tool).toBe("orbitx_full_report");
     const ansem = "9cRCn9rGT8V2imeM2Baks13yhMEais3ruM3rPvTGpump";
     expect(isTokenProjectQuestion(`can you tell me about ${ansem}`)).toBe(true);
-    expect(inferPublicTool(`can you tell me about ${ansem}`)?.meta).toBe("brief");
+    expect(inferPublicTool(`can you tell me about ${ansem}`)?.tool).toBe("orbitx_full_report");
     expect(inferPublicTool(`can you tell me about ${ansem}`)?.args).toMatchObject({ mint: ansem });
-    expect(inferPublicTool(`what is this project ${ansem}`)?.meta).toBe("brief");
+    expect(inferPublicTool(`what is this project ${ansem}`)?.tool).toBe("orbitx_full_report");
     const goodBuy = `Hey tell me about this is it a good buy?\n13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9`;
     expect(isTokenProjectQuestion(goodBuy)).toBe(true);
-    expect(inferPublicTool(goodBuy)?.meta).toBe("brief");
-    expect(inferPublicTool(goodBuy)?.tool).toBeUndefined();
+    expect(inferPublicTool(goodBuy)?.tool).toBe("orbitx_full_report");
     expect(inferPublicTool(goodBuy)?.args).toMatchObject({
       mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
     });
-    expect(inferPublicTool(`is it a good buy ${ansem}`)?.meta).toBe("brief");
+    expect(inferPublicTool(`is it a good buy ${ansem}`)?.tool).toBe("orbitx_full_report");
+    expect(inferPublicTool(`xray ${ansem}`)?.tool).toBe("orbitx_full_report");
+    expect(inferPublicTool(`full report ${ansem}`)?.tool).toBe("orbitx_full_report");
     expect(inferPublicTool(ansem)?.tool).toBe("orbitx_get_token");
     expect(inferPublicTool(`/token ${ansem}`)).toBeNull();
     const facts = compactTokenBriefFacts({
@@ -170,6 +174,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(formatTokenProjectBriefHtml({ mint: ansem, name: "The Black Bull", symbol: "ANSEM", summary: "A meme." })).toContain("Project brief");
     expect(formatTokenProjectBriefHtml({ mint: ansem, name: "The Black Bull", symbol: "ANSEM", summary: "A meme." })).toContain("/token for the market card");
     expect(extractMint("scan this 13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9 please")).toBe(
+      "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    );
+    expect(extractMint("https://gmgn.ai/sol/token/M5SopoUM_13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9")).toBe(
       "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
     );
     expect(isTelegramAdminWallet("jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb")).toBe(true);

@@ -1622,6 +1622,11 @@ const TOOL_ALIASES = {
   live_world: "orbitx_live_world",
   live_city: "orbitx_live_world",
   agent_city_live: "orbitx_live_world",
+  full_report: "orbitx_full_report",
+  orbitx_intel_report: "orbitx_full_report",
+  intel_report: "orbitx_full_report",
+  dossier: "orbitx_full_report",
+  fullreport: "orbitx_full_report",
   any_group_chats: "orbitx_gc_list",
   group_chats: "orbitx_gc_list",
   hey_any_group_chats: "orbitx_gc_list",
@@ -2240,6 +2245,26 @@ const CORE_TOOLS = [
     name: "orbitx_crypto_scan",
     description: "One-shot aggregator: safety + forensics + token payload for a mint.",
     inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
+  },
+  {
+    name: "orbitx_full_report",
+    description:
+      "Max-depth token dossier: market, ATH/ATL, safety, xray bundles/snipers/insiders, metadata, pairs, socials, dev history, top holders, classified wallet PnL. Use for tell me about <CA>, full report, xray, or a GMGN/Dexscreener/Pump/Solscan URL. Never invent numbers. Never say 0% bundled unless traced=true and pct is 0. Pass authCode when the session has one.",
+    inputSchema: {
+      type: "object",
+      required: ["mint"],
+      properties: {
+        mint: { type: "string", description: "Mint, ticker, or GMGN/Dex/Pump/Solscan URL" },
+        chain: { type: "string", default: "solana" },
+        depth: { type: "string", enum: ["quick", "standard", "max"], default: "max" },
+        includeSocial: { type: "boolean", default: true },
+        includeWallets: { type: "boolean", default: true },
+        walletLimit: { type: "integer", default: 15 },
+        format: { type: "string", enum: ["json", "markdown", "pdf"], default: "json" },
+        authCode: { type: "string" },
+        pdf: { type: "boolean" },
+      },
+    },
   },
   {
     name: "orbitx_get_ath",
@@ -3582,6 +3607,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     if (caMatch && /chart|dex|embed|graph|candle|dexscreener|price/i.test(q)) {
       return callTool("orbitx_dex_chart", { ca: caMatch[1] }, auth, base, req);
     }
+    if (caMatch && /full report|dossier|intel report|xray|tell me about|pdf/i.test(q)) {
+      return callTool(
+        "orbitx_full_report",
+        { mint: caMatch[1], authCode: args.authCode || auth?.authCode, format: /pdf/i.test(q) ? "pdf" : "json" },
+        auth,
+        base,
+        req,
+      );
+    }
     const docs = [
       {
         id: "tool:orbitx_dex_chart",
@@ -3618,6 +3652,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         title: "orbitx_get_token",
         url: "https://www.orbitx.world/agent",
         text: "Full token intel for a mint.",
+      },
+      {
+        id: "tool:orbitx_full_report",
+        title: "orbitx_full_report",
+        url: "https://www.orbitx.world/agent",
+        text: "Max-depth token dossier. tell me about <CA>, full report, xray, GMGN/Dex/Pump/Solscan URL.",
       },
       {
         id: "tool:orbitx_paper_desk",
@@ -3688,6 +3728,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     if (id.startsWith("chart:")) {
       return callTool("orbitx_dex_chart", { ca: id.slice("chart:".length) }, auth, base, req);
+    }
+    if (id.startsWith("report:")) {
+      return callTool("orbitx_full_report", { mint: id.slice("report:".length) }, auth, base, req);
     }
     if (/^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(id)) {
       return callTool("orbitx_get_token", { mint: id }, auth, base, req);
@@ -3840,6 +3883,15 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     };
   }
 
+  if (name === "orbitx_full_report") {
+    const { runFullReport } = await import("./orbitx/full-report.js");
+    return runFullReport({
+      ...args,
+      mint: args.mint || args.ca || args.q || args.query,
+      authCode: args.authCode || auth?.authCode,
+    });
+  }
+
   const get = {
     orbitx_search: () => `${base}/api/ogdex/search?q=${encodeURIComponent(String(args.q || ""))}`,
     orbitx_get_token: () =>
@@ -3947,7 +3999,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "orbitx_life_report",
         "life:0 paginated catalog (300 cmds)",
       ],
-      intel: ["orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
+      intel: ["orbitx_full_report", "orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       paperDesk: ["orbitx_paper_desk", "orbitx_paper_agent", "orbitx_paper_buying"],
       liveDesk: ["orbitx_live_desk", "orbitx_live_positions", "orbitx_live_agent", "orbitx_live_feed", "orbitx_live_world"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),

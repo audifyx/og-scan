@@ -33,7 +33,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     "║    orbitx_whoami        · session identity       ║",
     "╠══════════════════════════════════════════════════╣",
     "║  INTEL                                               ║",
-    "║    orbitx_search · orbitx_get_token · screen     ║",
+    "║    orbitx_full_report · get_token · screen        ║",
     "║    forensics · safety · crypto_scan · xray       ║",
     "║    orbitx_dex_chart · chart · ath · research     ║",
     "╠══════════════════════════════════════════════════╣",

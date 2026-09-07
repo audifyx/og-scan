@@ -41,6 +41,7 @@ const TOKEN_2022_PROG = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 export const TOKEN_INTEL_TOOLS = new Set([
   "orbitx_get_token",
   "orbitx_crypto_scan",
+  "orbitx_full_report",
   "orbitx_xray",
   "orbitx_research",
   "orbitx_get_forensics",
@@ -125,6 +126,7 @@ const FAMILY_META = {
 const CORE_BLURBS = {
   orbitx_get_token: "Premium intel card — price, MC, audit, links",
   orbitx_crypto_scan: "Safety + forensics branded scan",
+  orbitx_full_report: "Max-depth dossier — market, xray, holders, exit desk",
   orbitx_xray: "Bundles, snipers, concentration, verdict",
   orbitx_research: "Deep brief — utility if it exists, no hopium",
   orbitx_get_forensics: "Dev wallet, DEX paid, first buyer",
@@ -182,6 +184,7 @@ const SLASH_ALIAS = {
   orbitx_get_token: "token",
   orbitx_dex_chart: "chart",
   orbitx_crypto_scan: "scan",
+  orbitx_full_report: "report",
   orbitx_xray: "xray",
   orbitx_research: "research",
   orbitx_search: "search",
@@ -314,7 +317,7 @@ export function missingToolInput(tool, args = {}) {
   const prompt = String(args.prompt || args.text || "").trim();
   const q = String(args.q || args.query || "").trim();
   const address = String(args.address || args.publicKey || args.wallet || "").trim();
-  if (TOKEN_INTEL_TOOLS.has(n) || /^orbitx_(get_token|xray|research|crypto_scan)/.test(n) || /_(xray|research|forensics|safety|ath|metadata)_/.test(n)) {
+  if (TOKEN_INTEL_TOOLS.has(n) || /^orbitx_(get_token|xray|research|crypto_scan|full_report)/.test(n) || /_(xray|research|forensics|safety|ath|metadata)_/.test(n)) {
     if (!mint) return "mint";
   }
   if (n === "orbitx_dex_chart" || n === "orbitx_get_chart" || n.startsWith("orbitx_chart_")) {
@@ -1502,6 +1505,15 @@ function asText(card) {
 export function formatOrbitXTelegramResult(result, tool) {
   if (result == null) return "(empty)";
   const data = unwrapToolPayload(result);
+  if (data && typeof data === "object" && (data.cover?.verdict || tool === "orbitx_full_report") && (data.markdown || data.telegramHtml || data.cover)) {
+    const html = data.telegramHtml || null;
+    if (html) {
+      return {
+        text: String(html).slice(0, 3500),
+        reply_markup: tokenCardKeyboard(String(data.cover?.ca || data.cover?.mint || data.mint || "")),
+      };
+    }
+  }
   const family = classifyTool(tool);
   if (typeof data === "string") {
     const maybe = unwrapToolPayload(data);
