@@ -184,7 +184,7 @@ describe("OrbitX /on-chain world", () => {
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("10k mock SOL");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/AgentsView.tsx"), "utf8")).toContain("Currently buying");
     expect(readFileSync(resolve(WEB, "src/components/theme/PlatformDock.tsx"), "utf8")).not.toContain('"/on-chain"');
-    expect(readFileSync(resolve(WEB, "src/components/theme/platform-shell.css"), "utf8")).toContain("z-index: 200");
+    expect(readFileSync(resolve(WEB, "src/components/theme/platform-shell.css"), "utf8")).toContain("z-index: 9999");
   });
 
   it("renders a 3D galaxy of token nodes, official KOLs, holders, and swaps", () => {
@@ -480,6 +480,7 @@ describe("OrbitX /on-chain world", () => {
     expect(desk.agents.every((a) => a.live?.thesis.includes("mock SOL"))).toBe(true);
     expect(desk.agents.every((a) => a.live?.mint)).toBe(true);
     expect(desk.desk_equity_sol).toBeGreaterThan(50_000);
+    expect(desk.agents.every((a) => a.pnl_pct > -80 && a.pnl_pct < 120)).toBe(true);
     expect(desk.hours).toBe(24);
     const sql = readFileSync(resolve(REPO, "supabase/migrations/20260907010000_ox_paper_desk_kol_state.sql"), "utf8");
     expect(sql).toContain("ox_paper_agents");

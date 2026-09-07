@@ -86,11 +86,9 @@ function hourMove(token, hour, nowHour) {
   const ch1 = (Number(token.change_1h) || 0) / 100;
   const ch24 = (Number(token.change_24h) || 0) / 100;
   const age = Math.max(0, nowHour - hour);
-  if (age === 0) return ch1;
-  const rest = (1 + ch24) / Math.max(1 + ch1, 0.05) - 1;
-  const per = rest / 23;
   const wobble = ((hash32(`${token.mint}:${hour}`) % 1000) / 1000 - 0.5) * 0.018;
-  return per + wobble;
+  const raw = age === 0 ? ch1 : ch24 / 24;
+  return Math.max(-0.18, Math.min(0.18, raw + wobble));
 }
 
 function thesis(agent, token, sol, hourMovePct) {
