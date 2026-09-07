@@ -208,6 +208,7 @@ export async function scanRunningMemes({ sources = [], knowledge = [] } = {}) {
   return {
     scanned: scored.length,
     picks,
+    tape: scored.slice(0, 48),
     sourcesUsed: [
       wantX ? "x-heat (DexScreener boosts)" : null,
       "GeckoTerminal trending",

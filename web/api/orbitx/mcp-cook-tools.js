@@ -7,6 +7,7 @@ import { dispatchVoiceTool } from "./mcp-voice.js";
 import { dispatchGroupChatTool } from "./mcp-group-chat.js";
 import { dispatchLifeTool } from "./mcp-life-agents.js";
 import { dispatchLifeCmd } from "./mcp-life-cmds.js";
+import { dispatchPaperTool } from "./mcp-paper-desk.js";
 
 async function xDispatch(name, args, ctx) {
   const { dispatchXTool } = await import("./mcp-x-bridge.js");
@@ -282,6 +283,8 @@ const INTEL_PATH = {
 };
 
 export async function dispatchCookTool(name, args, ctx) {
+  const paper = await dispatchPaperTool(name, args, ctx);
+  if (paper) return paper;
   const life = await dispatchLifeTool(name, args, ctx);
   if (life) return life;
   const lifeCmd = await dispatchLifeCmd(name, args, ctx);

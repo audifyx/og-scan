@@ -57,6 +57,12 @@ import {
 import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
 import { buildCookTools, dispatchCookTool, cookStats } from "./orbitx/mcp-cook-tools.js";
 import {
+  PAPER_CORE_TOOLS,
+  dispatchPaperTool,
+  isPaperTool,
+  resolvePaperNaturalTool,
+} from "./orbitx/mcp-paper-desk.js";
+import {
   maybeRelayGroupChat,
   resolveGcNaturalTool,
 } from "./orbitx/mcp-group-chat.js";
@@ -1592,6 +1598,13 @@ const TOOL_ALIASES = {
   agent_account: "orbitx_life_account",
   post_as_agent: "orbitx_life_post",
   follow_agent: "orbitx_life_follow",
+  paper_desk: "orbitx_paper_desk",
+  paper_agents: "orbitx_paper_desk",
+  mock_sol: "orbitx_paper_desk",
+  mock_sol_agents: "orbitx_paper_desk",
+  orbitx_paper: "orbitx_paper_desk",
+  currently_buying: "orbitx_paper_buying",
+  paper_buying: "orbitx_paper_buying",
   any_group_chats: "orbitx_gc_list",
   group_chats: "orbitx_gc_list",
   hey_any_group_chats: "orbitx_gc_list",
@@ -3418,6 +3431,7 @@ const CORE_TOOLS = [
       "Catalog of MCP tools by category + total count (2500+ generated + 200 cook + 300 life cmds). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
+  ...PAPER_CORE_TOOLS,
 ];
 
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
@@ -3560,6 +3574,18 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         url: "https://www.orbitx.world/agent",
         text: "Full token intel for a mint.",
       },
+      {
+        id: "tool:orbitx_paper_desk",
+        title: "orbitx_paper_desk",
+        url: "https://www.orbitx.world/on-chain",
+        text: "10k mock-SOL paper agents trading real coin tape. Virtual SOL only.",
+      },
+      {
+        id: "paper",
+        title: "Paper desk",
+        url: "https://www.orbitx.world/on-chain",
+        text: "Ten agents, 10,000 mock SOL each. Call orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent.",
+      },
     ];
     const results = docs.filter(
       (d) => d.id.includes(q) || d.title.toLowerCase().includes(q) || d.text.toLowerCase().includes(q),
@@ -3580,6 +3606,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         text:
           "If the user pasted an authCode from the OrbitX dashboard: call orbitx_auth_status with it, then pass authCode on tools. Otherwise call orbitx_auth_link → send url → user authorizes → orbitx_auth_status.",
       };
+    }
+    if (id === "paper" || id === "paper-desk" || id === "paper_desk") {
+      return callTool("orbitx_paper_desk", args, auth, base, req);
     }
     if (id.startsWith("tool:")) {
       const toolName = id.slice(5);
@@ -3602,6 +3631,10 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
 
   if (name === "orbitx_dex_chart" || name === "orbitx_chart_embed" || name === "orbitx_embed_chart") {
     return buildDexChartEmbed(args);
+  }
+
+  if (isPaperTool(name)) {
+    return dispatchPaperTool(name, args, { base, fetchJson, sb, wallet, auth });
   }
 
   const generated = await dispatchGenerated(name, args, {
@@ -3844,6 +3877,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         "life:0 paginated catalog (300 cmds)",
       ],
       intel: ["orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
+      paperDesk: ["orbitx_paper_desk", "orbitx_paper_agent", "orbitx_paper_buying"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
       note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (Grok Imagine / KIE_API_KEY only). Tx tools return signUrl/openUrl.",
       mcpUrl: "https://www.orbitx.world/api/mcp",
@@ -5398,9 +5432,9 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.11.0" },
+            serverInfo: { name: "OrbitX Agent MCP", version: "1.12.0" },
             instructions:
-              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
+              "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. Watch at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
           },
         },
         200,
@@ -5438,6 +5472,11 @@ async function handleMcp(req, res, parts) {
       if (lifeNat) {
         name = lifeNat.name;
         Object.assign(args, lifeNat.args);
+      }
+      const paperNat = resolvePaperNaturalTool(rawName, args);
+      if (paperNat) {
+        name = paperNat.name;
+        Object.assign(args, paperNat.args);
       }
       if (rawName === "orbitx_sell_pump" && !args.pool) args.pool = "pump";
       if (rawName === "orbitx_buy_auto" && !args.pool) args.pool = "auto";
@@ -5493,6 +5532,9 @@ async function handleMcp(req, res, parts) {
         "orbitx_life_diary",
         "orbitx_life_run",
         "orbitx_life_pause",
+        "orbitx_paper_desk",
+        "orbitx_paper_agent",
+        "orbitx_paper_buying",
       ]);
       if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
         const link = {
