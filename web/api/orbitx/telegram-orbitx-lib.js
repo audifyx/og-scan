@@ -203,6 +203,9 @@ const WRITE_PREFIXES = [
   /^orbitx_social_(post|join|create|leave)/,
   /^orbitx_nft_(prepare_buy|submit_buy|like|comment|follow|register|make_offer|cancel_offer|list_for_sale|cancel_listing|create_auction|place_bid|favorite)/,
   /^orbitx_(create_token|execute_launch|prepare_launch|launch_|vanity_mint|mint_nft|submit_listing|request_boost|burn|claim_fees|rent_refund)/,
+  /^orbitx_skill_td_(quote_|buy_|sell_|snipe|ape|route_|slippage_|claim_|burn_|size_from_usd)/,
+  /^orbitx_skill_create_(pump|custom)$/,
+  /^orbitx_skill_(ln_claim_fees|nft_(mint|list_sale|offer|bid))$/,
 ];
 
 export function isPrivilegedTelegramTool(name) {

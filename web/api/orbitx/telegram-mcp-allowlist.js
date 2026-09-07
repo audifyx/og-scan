@@ -62,6 +62,11 @@ export function isAgentTelegramToolAllowed(name) {
   if (/^orbitx_(buy|sell|prepare_buy|prepare_sell|confirm_buy|credits_buy|credits_confirm)/.test(n)) {
     return false;
   }
+  if (/^orbitx_skill_td_(quote_|buy_|sell_|snipe|ape|route_|slippage_|claim_|burn_|size_from_usd)/.test(n)) {
+    return false;
+  }
+  if (/^orbitx_skill_create_(pump|custom)$/.test(n)) return false;
+  if (/^orbitx_skill_(ln_claim_fees|nft_(mint|list_sale|offer|bid))$/.test(n)) return false;
   return true;
 }
 

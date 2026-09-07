@@ -298,5 +298,10 @@ export function isHoldGatedTool(name) {
   if (HOLD_GATED_TOOLS.has(name)) return true;
   if (/^orbitx_(buy|sell)_/.test(name)) return true;
   if (/^orbitx_create_token_/.test(name)) return true;
+  if (/^orbitx_skill_td_(quote_|buy_|sell_|snipe|ape|route_|slippage_|claim_|burn_|size_from_usd)/.test(name)) {
+    return true;
+  }
+  if (/^orbitx_skill_create_(pump|custom)$/.test(name)) return true;
+  if (/^orbitx_skill_(ln_claim_fees|nft_(mint|list_sale|offer|bid))$/.test(name)) return true;
   return false;
 }

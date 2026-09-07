@@ -15,6 +15,11 @@ import {
   generatedStats,
 } from "./orbitx/mcp-tools-catalog.js";
 import {
+  CUSTOM_SKILL_COUNT,
+  customSkillStats,
+  listCustomSkillCategories,
+} from "./orbitx/mcp-custom-skills.js";
+import {
   holdBlockedPayload,
   isHoldGatedTool,
   isTokenGateExemptAny,
@@ -1615,6 +1620,9 @@ const TOOL_ALIASES = {
   live_agents: "orbitx_live_desk",
   real_sol_agents: "orbitx_live_desk",
   live_positions: "orbitx_live_positions",
+  skills: "orbitx_skill_menu",
+  skill_menu: "orbitx_skill_menu",
+  custom_skills: "orbitx_skill_menu",
   any_group_chats: "orbitx_gc_list",
   group_chats: "orbitx_gc_list",
   hey_any_group_chats: "orbitx_gc_list",
@@ -3436,9 +3444,15 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_skill_menu",
+    description:
+      "List the 140 named OrbitX skills (market, trading, data, PDF, create, idea, NFT, launch, desk). Call when the user asks for skills or which skill to use.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
     name: "orbitx_tools_help",
     description:
-      "Catalog of MCP tools by category + total count (2500+ generated + 200 cook + 300 life cmds). Call when unsure which tool to use.",
+      "Catalog of MCP tools by category + total count (2500+ generated + 140 named skills + 200 cook + 300 life cmds). Call when unsure which tool to use.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   ...PAPER_CORE_TOOLS,
@@ -3527,6 +3541,27 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
   if (name === "orbitx_menu") {
     return agentMenuPayload({ authCode: args.authCode || auth?.authCode || null });
   }
+  if (name === "orbitx_skill_menu") {
+    const categories = listCustomSkillCategories();
+    return {
+      ok: true,
+      count: CUSTOM_SKILL_COUNT,
+      categories: customSkillStats().categories,
+      skills: categories,
+      examples: {
+        market: "orbitx_skill_mkt_trending",
+        trade: "orbitx_skill_td_quote_buy",
+        data: "orbitx_skill_data_token",
+        pdf: "orbitx_skill_pdf_pack",
+        create: "orbitx_skill_create_pump",
+        idea: "orbitx_skill_idea_thesis",
+        nft: "orbitx_skill_nft_items",
+        launch: "orbitx_skill_ln_pump_desk",
+        desk: "orbitx_skill_desk_intel",
+      },
+      note: "Call any orbitx_skill_* name. Trade / create / claim / burn require a linked wallet. Trades return signUrl — Phantom signs. Never invent prices.",
+    };
+  }
   if (name === "orbitx_auth_link") {
     return createAgentLinkAuthSession(req);
   }
@@ -3541,6 +3576,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     const q = String(args.query || "").trim().toLowerCase();
     if (!q || q === "/" || q === "menu" || q === "help" || q === "commands") {
       return callTool("orbitx_menu", { authCode: args.authCode || auth?.authCode }, auth, base, req);
+    }
+    if (q === "skills" || q === "skill" || q === "custom skills" || q === "skill menu") {
+      return callTool("orbitx_skill_menu", args, auth, base, req);
     }
     const caMatch = String(args.query || "").match(
       /(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/,
@@ -3560,6 +3598,12 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         title: "OrbitX command menu",
         url: "https://www.orbitx.world/agent",
         text: "Branded OrbitX banner + capability menu. Call orbitx_menu or fetch id menu.",
+      },
+      {
+        id: "skills",
+        title: "OrbitX named skills (140)",
+        url: "https://www.orbitx.world/agent",
+        text: "140 intent skills: market, trading, data, PDF, create, idea, NFT, launch, desk. Call orbitx_skill_menu.",
       },
       {
         id: "help",
@@ -3635,6 +3679,9 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
     }
     if (id === "live" || id === "live-desk" || id === "live_desk") {
       return callTool("orbitx_live_desk", args, auth, base, req);
+    }
+    if (id === "skills" || id === "skill" || id === "skill-menu" || id === "skill_menu") {
+      return callTool("orbitx_skill_menu", args, auth, base, req);
     }
     if (id.startsWith("tool:")) {
       const toolName = id.slice(5);
@@ -3864,6 +3911,8 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       lifeCmds: _life.length,
       lifeCmdStats: lifeCmdStats(),
       generatedStats: generatedStats(),
+      customSkills: customSkillStats(),
+      skillMenu: "orbitx_skill_menu",
       categoryCounts: byPrefix,
       create: [
         "orbitx_execute_launch",
@@ -3909,6 +3958,21 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       intel: ["orbitx_search", "orbitx_dex_chart", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       paperDesk: ["orbitx_paper_desk", "orbitx_paper_agent", "orbitx_paper_buying"],
       liveDesk: ["orbitx_live_desk", "orbitx_live_positions", "orbitx_live_agent"],
+      skills: [
+        "orbitx_skill_menu",
+        "orbitx_skill_mkt_trending",
+        "orbitx_skill_td_quote_buy",
+        "orbitx_skill_td_sell_all",
+        "orbitx_skill_td_claim_fees",
+        "orbitx_skill_td_claim_rent",
+        "orbitx_skill_data_token",
+        "orbitx_skill_pdf_pack",
+        "orbitx_skill_create_pump",
+        "orbitx_skill_idea_thesis",
+        "orbitx_skill_nft_items",
+        "orbitx_skill_ln_pump_desk",
+        "orbitx_skill_desk_intel",
+      ],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
       note: "Live tools/list is CORE only (Claude-safe). Full catalog via this help. Launch: orbitx_execute_launch. Image: orbitx_generate_image (Grok Imagine / KIE_API_KEY only). Tx tools return signUrl/openUrl.",
       mcpUrl: "https://www.orbitx.world/api/mcp",
@@ -5535,6 +5599,7 @@ async function handleMcp(req, res, parts) {
         "orbitx_auth_link",
         "orbitx_auth_status",
         "orbitx_tools_help",
+        "orbitx_skill_menu",
         "orbitx_search",
         "orbitx_whoami",
         "orbitx_dex_chart",
