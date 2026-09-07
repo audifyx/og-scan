@@ -3,6 +3,7 @@
  * Token intel follows the OrbitX Token Intel Bot card spec (HTML for Telegram).
  */
 import { toolToSlashCommand, formatMcpResultForTelegram } from "./telegram-mcp-allowlist.js";
+import { formatOpenUntilLabel, isMcpOpenTesting } from "./mcp-open-window.js";
 import {
   asTokenRecord,
   extractMint,
@@ -153,6 +154,9 @@ const CORE_BLURBS = {
   orbitx_credits_balance: "Credits remaining",
   orbitx_mcp_access_buy: "Burn $ORBITX for MCP days",
   orbitx_mcp_access_status: "MCP seat expiry",
+  orbitx_telegram_status: "Linked Telegram DM",
+  orbitx_telegram_send: "Push a note to Telegram",
+  orbitx_telegram_cmds: "Live MCP catalog on Telegram",
   orbitx_generate_image: "Grok Imagine still",
   orbitx_generate_video: "Grok Imagine clip",
   orbitx_media_status: "Poll an image/video job",
@@ -389,10 +393,33 @@ export function startGateKeyboard({ unlocked = false } = {}) {
   return inlineKeyboard(rows);
 }
 
-export function formatTelegramStartGate({ remainingLabel = "", linked = false, unlocked = false } = {}) {
-  const accessLine = remainingLabel
-    ? `Access: <b>${tgEsc(remainingLabel)}</b>`
-    : "";
+export function formatTelegramStartGate({
+  remainingLabel = "",
+  linked = false,
+  unlocked = false,
+  openTesting = undefined,
+} = {}) {
+  const open = openTesting === undefined ? isMcpOpenTesting() : Boolean(openTesting);
+  const accessLine = remainingLabel ? `Access: <b>${tgEsc(remainingLabel)}</b>` : "";
+  if (open) {
+    const until = formatOpenUntilLabel();
+    const text = [
+      "Welcome to the <b>OrbitX MCP bot</b> on Telegram.",
+      "",
+      `MCP is <b>free for everyone until ${tgEsc(until)}</b> during testing and development.`,
+      "Every live MCP tool is on this bot — /cmds for the catalog, /call name to run any of them.",
+      "",
+      "Groups: drop a CA or /token /chart /scan.",
+      "DMs: <code>/login</code> links YOUR wallet so /trade /shop /tweet work, and so Claude/Cursor/Grok MCP results push here.",
+      linked ? "" : "Trades need <code>/login</code> first so the tx is YOUR wallet.",
+      accessLine,
+      "",
+      `${href(ORBITX_GC, "Community GC")} · ${href(ORBITX_HOST, "orbitx.world")}`,
+    ]
+      .filter((line, i, arr) => line !== "" || arr[i - 1] !== "")
+      .join("\n");
+    return { text, reply_markup: startGateKeyboard({ unlocked: unlocked || linked }) };
+  }
   const text = [
     "Welcome to the <b>OrbitX MCP bot</b> on Telegram.",
     "",

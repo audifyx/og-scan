@@ -33,6 +33,7 @@ import {
   prepareAccessBurn,
   prepareAccessMcpPurchase,
 } from "./orbitx/mcp-burn-access.js";
+import { decorateAccessStatus } from "./orbitx/mcp-open-window.js";
 import {
   agentMenuPayload,
   buildAgentAuthPasteMessages,
@@ -599,7 +600,7 @@ async function handleAgent(req, res, parts) {
     );
     if (!authUser?.id && !walletPk) return json(res, { error: "unauthorized" }, 401);
     try {
-      return json(res, await getAccessStatus(sb, authUser?.id, { wallets: [walletPk] }));
+      return json(res, decorateAccessStatus(await getAccessStatus(sb, authUser?.id, { wallets: [walletPk] })));
     } catch (e) {
       return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
     }
@@ -1545,6 +1546,7 @@ const SESSION_TOOLS = new Set([
   "orbitx_vc_start",
   "orbitx_vc_end",
   "orbitx_gc_start",
+  "orbitx_telegram_send",
 ]);
 
 async function getProfileForUser(userId) {
@@ -1676,6 +1678,11 @@ const TOOL_ALIASES = {
   mcp_access: "orbitx_mcp_access_status",
   mcp_access_buy: "orbitx_mcp_access_buy",
   "confirm access": "orbitx_mcp_access_confirm",
+  telegram: "orbitx_telegram_status",
+  "telegram status": "orbitx_telegram_status",
+  "telegram send": "orbitx_telegram_send",
+  "telegram cmds": "orbitx_telegram_cmds",
+  "telegram bot": "orbitx_telegram_status",
   orbitx_launch_token: "orbitx_execute_launch",
   orbitx_create_community: "orbitx_social_create_community",
   orbitx_post_community: "orbitx_social_post",
@@ -2743,6 +2750,28 @@ const CORE_TOOLS = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: "orbitx_telegram_status",
+    description:
+      "Show whether this OrbitX account is linked to @theorbitxmcpbot. Linked DMs receive a copy of MCP tool results (Claude/Cursor/Grok).",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "orbitx_telegram_send",
+    description:
+      "Push a message to the linked @theorbitxmcpbot DM. Link first at https://www.orbitx.world/telegram after /login.",
+    inputSchema: {
+      type: "object",
+      properties: { text: { type: "string", description: "Message to send to Telegram" } },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "orbitx_telegram_cmds",
+    description: "List the live OrbitX MCP tool catalog as Telegram /cmds — every tool the bot can run.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "orbitx_buy_orbitx",
@@ -3886,6 +3915,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
       ],
       credits: ["orbitx_credits_buy", "orbitx_credits_confirm", "orbitx_credits_balance", "orbitx_credits_usage"],
       mcpAccess: ["orbitx_mcp_access_status", "orbitx_mcp_access_buy", "orbitx_mcp_access_confirm"],
+      telegram: ["orbitx_telegram_status", "orbitx_telegram_send", "orbitx_telegram_cmds"],
       trade: ["orbitx_buy_orbitx", "orbitx_confirm_buy", "orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
       media: [
@@ -4161,11 +4191,16 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
 
   if (name === "orbitx_mcp_access_status") {
     try {
-      return await getAccessStatus(sb, auth?.userId, {
+      const status = await getAccessStatus(sb, auth?.userId, {
         wallets: [wallet, args.publicKey, args.wallet, auth?.walletAddress],
       });
+      return decorateAccessStatus(status);
     } catch (e) {
-      return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
+      return decorateAccessStatus({
+        ok: false,
+        error: "access_failed",
+        message: e?.message || "access unavailable",
+      });
     }
   }
 
@@ -4203,6 +4238,33 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
         message: e?.message || "Could not grant access — apply mcp_burn_access migration",
       };
     }
+  }
+
+  if (name === "orbitx_telegram_status") {
+    const { telegramStatusForUser } = await import("./orbitx/mcp-telegram-push.js");
+    return telegramStatusForUser(auth?.userId);
+  }
+  if (name === "orbitx_telegram_send") {
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "session_required",
+        message: "Authenticate MCP, then link Telegram at https://www.orbitx.world/telegram",
+      };
+    }
+    const { telegramSendForUser } = await import("./orbitx/mcp-telegram-push.js");
+    return telegramSendForUser(auth.userId, args.text || args.message || args.prompt);
+  }
+  if (name === "orbitx_telegram_cmds") {
+    const tools = listAllOrbitXTools().map((t) => ({ name: t.name, description: t.description }));
+    return {
+      ok: true,
+      bot: "theorbitxmcpbot",
+      botUrl: "https://t.me/theorbitxmcpbot",
+      count: tools.length,
+      tools,
+      message: `Official bot @theorbitxmcpbot runs all ${tools.length} live MCP tools. /call name args or /cmds in Telegram.`,
+    };
   }
 
   if (name === "orbitx_credits_usage") {
@@ -5714,6 +5776,12 @@ async function handleMcp(req, res, parts) {
           base,
           req,
         );
+        scheduleMcpTelegramPush({
+          userId: auth?.userId,
+          tool: name,
+          result,
+          source: auth?.source || "mcp",
+        });
         const wrapped = wrapMcpToolContent(result);
         return json(res, {
           jsonrpc: "2.0",
@@ -5835,6 +5903,13 @@ export function listAllOrbitXTools() {
   }));
 }
 
+function scheduleMcpTelegramPush({ userId, tool, result, source, skip } = {}) {
+  if (skip || !userId) return;
+  void import("./orbitx/mcp-telegram-push.js")
+    .then((mod) => mod.pushMcpResultToTelegram({ userId, tool, result, source }))
+    .catch(() => {});
+}
+
 /**
  * Public Telegram / web runner — no OrbitX login required.
  * Used for group chats and unauthenticated /telegram browse of read tools.
@@ -5876,6 +5951,7 @@ export async function runEmbeddedAgentTool({
   toolName,
   args = {},
   req = null,
+  skipTelegramPush = false,
 }) {
   const uid = String(userId || "").trim();
   if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
@@ -5921,7 +5997,16 @@ export async function runEmbeddedAgentTool({
     }
   }
 
-  return callTool(name, args || {}, auth, base, req);
+  const embeddedResult = await callTool(name, args || {}, auth, base, req);
+  if (!skipTelegramPush) {
+    scheduleMcpTelegramPush({
+      userId: uid,
+      tool: name,
+      result: embeddedResult,
+      source: auth.source || "orbitx_ai",
+    });
+  }
+  return embeddedResult;
 }
 
 /**

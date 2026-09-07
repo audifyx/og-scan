@@ -179,7 +179,7 @@ describe("evaluateMcpAccess middleware", () => {
     expect(access.burn.active).toBe(true);
   });
 
-  it("blocks expired burn access when the hold is also missing", async () => {
+  it("blocks expired burn access when the hold is also missing (after the free window)", async () => {
     const access = await evaluateMcpAccess({
       sb: async () => [
         {
@@ -191,7 +191,7 @@ describe("evaluateMcpAccess middleware", () => {
       ],
       userId: "user-1",
       hold: { exempt: false, meetsRequirement: false },
-      now,
+      now: Date.parse("2026-12-01T12:00:00.000Z"),
     });
     expect(access.allowed).toBe(false);
     expect(access.burn.expired).toBe(true);
@@ -239,6 +239,18 @@ describe("evaluateMcpAccess middleware", () => {
     });
     expect(access.allowed).toBe(true);
     expect(access.source).toBe("hold");
+  });
+
+  it("allows everyone during the public testing window without a hold or burn", async () => {
+    const access = await evaluateMcpAccess({
+      sb: async () => [],
+      userId: "user-open",
+      hold: { exempt: false, meetsRequirement: false },
+      now: Date.parse("2026-09-07T12:00:00.000Z"),
+    });
+    expect(access.allowed).toBe(true);
+    expect(access.source).toBe("open_testing");
+    expect(access.openUntil).toBe("2026-11-07T00:00:00.000Z");
   });
 });
 

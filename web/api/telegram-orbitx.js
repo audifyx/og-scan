@@ -11,12 +11,10 @@ export const config = { maxDuration: 120 };
 
 import { randomUUID } from "crypto";
 import {
-  GROUP_COMMANDS,
   OFFICIAL_BOT_ABOUT,
   OFFICIAL_BOT_NAME,
   OFFICIAL_BOT_SHORT,
   OFFICIAL_BOT_USERNAME,
-  PRIVATE_COMMANDS,
   argsFromCommand,
   applyDefaultBuyAmount,
   deskKeyboard,
@@ -58,11 +56,12 @@ import {
   telegramMessageParts,
   TOKEN_INTEL_TOOLS,
   tokenCardKeyboard,
+  buildOfficialTelegramCommands,
+  dmAllowsCommand,
 } from "./orbitx/telegram-orbitx-lib.js";
 import {
   accessStatusFromRow,
   grantMcpBetaAccessBadge,
-  isAllowedGatedDmCommand,
   isOrbitXBetaCode,
   loadTelegramBotAccess,
   looksLikeEarlyAccessCode,
@@ -359,6 +358,7 @@ async function runTool({ tool, args, req, link, allowPrivileged }) {
       toolName: name,
       args: cleanArgs,
       req,
+      skipTelegramPush: true,
     });
   }
   return hub.runPublicOrbitXTool({ toolName: name, args: cleanArgs, req });
@@ -575,6 +575,7 @@ async function handleStartDm(chatId, from, link, extra, req) {
       remainingLabel: gate.accessActive ? gate.remainingLabel : "",
       linked: Boolean(link),
       unlocked: gate.unlocked,
+      openTesting: gate.openTesting,
     }),
     extra,
   );
@@ -1392,7 +1393,7 @@ async function handleTelegramUpdate(update, req) {
 
   if (isGroup) {
     if (!isPublicGroupTrigger(text, msg) && bare !== "start" && bare !== "help") return;
-  } else if (!gate.unlocked && !isAllowedGatedDmCommand(bare, text)) {
+  } else if (!dmAllowsCommand(gate, bare, text)) {
     awaitingCode.set(String(from.id), Date.now());
     await handleStartDm(chatId, from, link, replyExtra, req);
     return;
@@ -1755,15 +1756,24 @@ async function configureBot(req) {
   const name = await tg("setMyName", { name: OFFICIAL_BOT_NAME });
   const short = await tg("setMyShortDescription", { short_description: OFFICIAL_BOT_SHORT.slice(0, 120) });
   const about = await tg("setMyDescription", { description: OFFICIAL_BOT_ABOUT.slice(0, 512) });
+  let liveTools = [];
+  try {
+    const hub = await import("./orbitx-hub.js");
+    liveTools = hub.listAllOrbitXTools();
+  } catch {
+    liveTools = [];
+  }
   const groupCmds = await tg("setMyCommands", {
-    commands: GROUP_COMMANDS.slice(0, 100),
+    commands: buildOfficialTelegramCommands({ kind: "group", tools: liveTools }).slice(0, 100),
     scope: { type: "all_group_chats" },
   });
   const privateCmds = await tg("setMyCommands", {
-    commands: PRIVATE_COMMANDS.slice(0, 100),
+    commands: buildOfficialTelegramCommands({ kind: "private", tools: liveTools }).slice(0, 100),
     scope: { type: "all_private_chats" },
   });
-  const defaultCmds = await tg("setMyCommands", { commands: GROUP_COMMANDS.slice(0, 100) });
+  const defaultCmds = await tg("setMyCommands", {
+    commands: buildOfficialTelegramCommands({ kind: "group", tools: liveTools }).slice(0, 100),
+  });
   const webhook = await tg("setWebhook", {
     url: webhookUrl,
     secret_token: WEBHOOK_SECRET || undefined,
@@ -1895,7 +1905,7 @@ async function handleWeb(req, res, body) {
       await tg("sendMessage", {
         chat_id: telegramUserId,
         text: accessOn
-          ? "OrbitX linked. Beta Access is on your MCP profile. This DM is live for YOUR wallet — /buy /trade /shop /launch."
+          ? "OrbitX linked. MCP is live in this DM — /cmds for the catalog, /buy /trade /shop /launch for YOUR wallet. Claude/Cursor/Grok tool results also push here."
           : "OrbitX linked. Type the access code you received from us to unlock the bot, or burn $ORBITX on /start. /reset starts over.",
         parse_mode: "HTML",
       });

@@ -176,13 +176,13 @@ describe("redeemEarlyAccessCode", () => {
 });
 
 describe("DM unlock gate", () => {
-  it("stays locked until code and linked wallet", () => {
-    const now = Date.parse("2026-08-20T12:00:00.000Z");
+  it("stays locked until code and linked wallet after the free window", () => {
+    const now = Date.parse("2026-12-01T12:00:00.000Z");
     const none = telegramDmUnlockState(null, null, now);
     expect(none.unlocked).toBe(false);
     expect(none.needsCode).toBe(true);
     const coded = telegramDmUnlockState(
-      { expires_at: "2026-08-21T12:00:00.000Z", package_id: "lifetime" },
+      { expires_at: "2026-12-02T12:00:00.000Z", package_id: "lifetime" },
       null,
       now,
     );
@@ -190,10 +190,22 @@ describe("DM unlock gate", () => {
     expect(coded.needsLogin).toBe(true);
     expect(coded.unlocked).toBe(false);
     const ready = telegramDmUnlockState(
-      { expires_at: "2026-08-21T12:00:00.000Z", package_id: "lifetime" },
+      { expires_at: "2026-12-02T12:00:00.000Z", package_id: "lifetime" },
       { user_id: "u1" },
       now,
     );
+    expect(ready.unlocked).toBe(true);
+  });
+
+  it("treats the public testing window as access without a code", () => {
+    const now = Date.parse("2026-09-07T12:00:00.000Z");
+    const none = telegramDmUnlockState(null, null, now);
+    expect(none.accessActive).toBe(true);
+    expect(none.needsCode).toBe(false);
+    expect(none.needsLogin).toBe(true);
+    expect(none.unlocked).toBe(false);
+    expect(none.openTesting).toBe(true);
+    const ready = telegramDmUnlockState(null, { user_id: "u1" }, now);
     expect(ready.unlocked).toBe(true);
   });
 

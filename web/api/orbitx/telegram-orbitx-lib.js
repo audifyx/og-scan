@@ -4,7 +4,9 @@
  * Groups: public / unauthenticated intel + Grok media.
  * Private DMs: link an OrbitX account, then trade / X / social / NFT writes.
  */
+import { isMcpOpenTesting, formatOpenUntilLabel } from "./mcp-open-window.js";
 import { isHoldGatedTool } from "./token-hold.js";
+import { isAllowedGatedDmCommand } from "./telegram-bot-access.js";
 import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
 import { applyTelegramAlias, hasExplicitTradeAmount, parseTradeIntent } from "./telegram-trade-intent.js";
 import { ORBITX_MINT } from "./telegram-token-snapshot.js";
@@ -37,9 +39,9 @@ import {
 export const OFFICIAL_BOT_USERNAME = "theorbitxmcpbot";
 export const OFFICIAL_BOT_NAME = "OrbitX";
 export const OFFICIAL_BOT_SHORT =
-  "Official OrbitX bot — charts, scans, Grok image/video, and (in DMs) trade, X, and your account.";
+  "Official OrbitX MCP bot — every live tool, charts, scans, Grok, and (in DMs after /login) trade.";
 export const OFFICIAL_BOT_ABOUT =
-  "OrbitX's official Telegram bot. Locked until you DM it, type the access code you received from us, then /login. After that: token intel, Dex charts, Grok, and (in DMs) trade. /reset starts you as a fresh user. Not an MCP connector — tools run natively on OrbitX.";
+  "OrbitX's official Telegram bot. MCP is free for everyone during testing through 7 Nov 2026. Groups: drop a CA or /token /chart /scan. DMs: /login to trade and to receive MCP results from Claude/Cursor/Grok. /cmds lists the live catalog. /reset starts you as a fresh user.";
 
 const GROUP_ANON = "groupanonymousbot";
 
@@ -184,8 +186,16 @@ export function telegramChatExtras(msg) {
   return { isGroup, isHome, extra };
 }
 
-export function formatGroupWelcomeHtml(chat) {
+export function formatGroupWelcomeHtml(chat, opts = {}) {
   if (isOrbitXCommunityChat(chat)) return formatOrbitXHomeWelcomeHtml();
+  const open = opts.openTesting === undefined ? isMcpOpenTesting() : Boolean(opts.openTesting);
+  if (open) {
+    return [
+      "🚀 <b>OrbitX is in this group</b>",
+      `MCP is free for everyone until <b>${formatOpenUntilLabel()}</b> during testing.`,
+      "Drop a CA or /token /chart /scan. Trade / tweet stay in a DM after /login.",
+    ].join("\n");
+  }
   return [
     "🚀 <b>OrbitX is in this group</b>",
     "This bot is locked. Each person DMs @theorbitxmcpbot, types the access code they received from us, then <code>/login</code>.",
@@ -636,6 +646,42 @@ export function formatOrbitXTelegramResult(result, tool) {
 
 export function cmdsPage(tools, opts = {}) {
   return cmdsPageImpl(tools, { ...opts, isPrivileged: isPrivilegedTelegramTool });
+}
+
+/** Fill Telegram's 100 slash-command slots from the live MCP catalog. */
+export function buildOfficialTelegramCommands({ kind = "private", tools = [] } = {}) {
+  const base = kind === "private" ? PRIVATE_COMMANDS : GROUP_COMMANDS;
+  const out = [];
+  const seen = new Set();
+  for (const c of base) {
+    if (!c?.command || seen.has(c.command)) continue;
+    seen.add(c.command);
+    out.push({ command: c.command, description: String(c.description || "").slice(0, 256) });
+  }
+  for (const t of tools) {
+    if (out.length >= 100) break;
+    const name = typeof t === "string" ? t : t?.name;
+    if (!name) continue;
+    if (kind !== "private" && isPrivilegedTelegramTool(name)) continue;
+    const cmd = toolToSlashCommand(name, "agent");
+    if (!cmd || seen.has(cmd)) continue;
+    seen.add(cmd);
+    const desc = typeof t === "string" ? `MCP ${name}` : t.description || `MCP ${name}`;
+    out.push({ command: cmd, description: String(desc).slice(0, 256) });
+  }
+  return out.slice(0, 100);
+}
+
+/** Public intel in DMs during the free window (or after a code) without /login. */
+export function dmAllowsCommand(gate, bare, text = "") {
+  if (isAllowedGatedDmCommand(bare, text)) return true;
+  if (gate?.unlocked) return true;
+  if (!gate?.accessActive) return false;
+  const resolved = resolveOfficialCommand(bare);
+  if (resolved.kind === "meta") return true;
+  if (!resolved.tool) return true;
+  if (isPrivilegedTelegramTool(resolved.tool)) return false;
+  return isPublicTelegramTool(resolved.tool);
 }
 
 export function collectMediaUrls(result) {

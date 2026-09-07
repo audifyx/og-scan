@@ -23,6 +23,7 @@ import {
 } from "./orbitx-hub.js";
 import { verifyTokenHold } from "./orbitx/token-hold.js";
 import { statusFromRow } from "./orbitx/mcp-burn-access.js";
+import { decorateAccessStatus, isMcpOpenTesting } from "./orbitx/mcp-open-window.js";
 import {
   DEFAULT_NIM_MODEL,
   NIM_MODELS,
@@ -430,15 +431,26 @@ async function authenticatedContext(req) {
     /* table may not exist until migration is applied */
   }
 
+  const open = isMcpOpenTesting();
+  const mcpAccess = decorateAccessStatus(burn);
+
   return {
     userId: id,
     email,
     walletAddress,
     gate: {
       ...gate,
-      hasAccess: Boolean(gate.meetsRequirement || gate.exempt || burn.active),
-      mcpAccess: burn,
-      accessSource: gate.exempt ? "exempt" : burn.active ? "burn" : gate.meetsRequirement ? "hold" : null,
+      hasAccess: Boolean(gate.meetsRequirement || gate.exempt || burn.active || open),
+      mcpAccess,
+      accessSource: gate.exempt
+        ? "exempt"
+        : burn.active
+          ? "burn"
+          : gate.meetsRequirement
+            ? "hold"
+            : open
+              ? "open_testing"
+              : null,
     },
     db,
   };

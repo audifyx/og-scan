@@ -8,6 +8,7 @@ import {
   remainingMs,
   resolvePackage,
 } from "./mcp-burn-access.js";
+import { isMcpOpenTesting, mcpOpenWindow } from "./mcp-open-window.js";
 
 /** Secret supporter code. Never print this (or the spaced display form) in Telegram copy. */
 export const ORBITX_BETA_CODE = "ORBITXBETA";
@@ -311,14 +312,21 @@ export async function resetTelegramBotSession(sb, telegramUserId) {
 export function telegramDmUnlockState(accessRow, link, now = Date.now()) {
   const access = accessStatusFromRow(accessRow, now);
   const linked = Boolean(link?.user_id);
+  const open = isMcpOpenTesting(now);
+  const accessActive = Boolean(access.active || open);
   return {
-    accessActive: access.active,
+    accessActive,
     linked,
-    unlocked: Boolean(access.active && linked),
-    remainingLabel: access.remainingLabel,
-    needsCode: !access.active,
-    needsLogin: Boolean(access.active && !linked),
-    packageId: access.packageId || null,
+    unlocked: Boolean(accessActive && linked),
+    remainingLabel: access.active
+      ? access.remainingLabel
+      : open
+        ? mcpOpenWindow(now).remainingLabel
+        : access.remainingLabel,
+    needsCode: !accessActive,
+    needsLogin: Boolean(accessActive && !linked),
+    packageId: access.packageId || (open ? "open_testing" : null),
+    openTesting: open,
   };
 }
 

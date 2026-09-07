@@ -29,11 +29,13 @@ export function McpShop({
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">{both ? "OrbitX Shop" : "Shop"}</h1>
         <p className="ox-agent__lead">
-          Buy timed OrbitX MCP access by burning $ORBITX, or top up credits with SOL. One grant unlocks
-          every connected channel. Credits are shared across the entire control plane.
+          MCP is free for everyone until 7 Nov 2026 during testing and development. Burns still
+          extend seats after that date. Credits stay optional for media/X runs. One grant unlocks
+          every connected channel, including @theorbitxmcpbot.
         </p>
         {both && (
           <div className="ox-agent__steps">
+            <span className="ox-agent__chip is-ok">Free until 7 Nov 2026</span>
             <span className="ox-agent__chip is-ok">All-channel shared access</span>
             <span className="ox-agent__chip">One checkout surface</span>
           </div>

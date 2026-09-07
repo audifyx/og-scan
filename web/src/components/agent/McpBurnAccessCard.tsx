@@ -143,15 +143,18 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
 
   const remaining = status?.active
     ? liveRemaining(status.expiresAt, now)
-    : status?.expired
-      ? "Expired"
-      : "No timed access";
+    : status?.openTesting
+      ? status.remainingLabel || "Free during testing"
+      : status?.expired
+        ? "Expired"
+        : "No timed access";
+  const unlocked = Boolean(status?.active || status?.openTesting || status?.allowed);
 
   return (
     <section className="ox-agent__panel">
       <div className="ox-agent__panel-h">
         <h2 className="ox-agent__panel-title">Burn $ORBITX for MCP access</h2>
-        <span className="ox-agent__panel-hint">{status?.active ? remaining : "timed unlock"}</span>
+        <span className="ox-agent__panel-hint">{unlocked ? remaining : "timed unlock"}</span>
       </div>
       <div className="ox-agent__panel-b">
         <div className={`ox-agent__access-status${status?.active ? " is-ok" : status?.expired ? " is-expired" : ""}`}>
@@ -169,19 +172,16 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
               </p>
             )}
           </div>
-          <span className={`ox-agent__chip${status?.active ? " is-ok" : ""}`}>
-            {status?.active ? "Active" : status?.expired ? "Expired" : "Locked"}
+          <span className={`ox-agent__chip${unlocked ? " is-ok" : ""}`}>
+            {status?.active ? "Active" : status?.openTesting ? "Free testing" : status?.expired ? "Expired" : "Locked"}
           </span>
         </div>
 
         {!compact && (
           <p className="ox-agent__note">
-            Burn the exact package amount. Tokens are destroyed on-chain. Access expires automatically
-            when the clock runs out. From Claude/Grok call{" "}
-            <code>orbitx_mcp_access_buy</code> or <code>x_mcp_access_buy</code> (or{" "}
-            <code>x_buy what=access</code>), then <code>orbitx_mcp_access_confirm</code> /{" "}
-            <code>x_mcp_access_confirm</code>. Status: <code>orbitx_mcp_access_status</code> /{" "}
-            <code>x_mcp_access_status</code>.
+            MCP is free for everyone until 7 Nov 2026 during testing. Burns still extend seats after
+            that date. From Claude/Grok call <code>orbitx_mcp_access_status</code>. Linked Telegram
+            (@theorbitxmcpbot) receives MCP tool results — <code>orbitx_telegram_status</code>.
           </p>
         )}
 

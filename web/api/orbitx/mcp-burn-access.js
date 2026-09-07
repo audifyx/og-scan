@@ -5,6 +5,8 @@
  * Do NOT top-level import @solana/web3.js — same cold-start rule as x-credits / mcp-ops.
  */
 
+import { isMcpOpenTesting, mcpOpenWindow } from "./mcp-open-window.js";
+
 export const ORBITX_BURN_MINT =
   process.env.AGENT_GATE_MINT || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
@@ -349,7 +351,8 @@ export async function hasValidAccess(sb, userId, { now = Date.now() } = {}) {
 }
 
 /**
- * Combined MCP gate: exempt OR unexpired burn access OR $ORBITX hold.
+ * Combined MCP gate: exempt OR unexpired burn access OR $ORBITX hold
+ * OR the public testing window (free for everyone until MCP_OPEN_UNTIL).
  */
 export async function evaluateMcpAccess({
   sb,
@@ -367,6 +370,17 @@ export async function evaluateMcpAccess({
   }
   if (hold?.meetsRequirement) {
     return { allowed: true, source: "hold", hold, burn };
+  }
+  if (isMcpOpenTesting(now)) {
+    const open = mcpOpenWindow(now);
+    return {
+      allowed: true,
+      source: "open_testing",
+      hold,
+      burn,
+      openTesting: true,
+      openUntil: open.until,
+    };
   }
   return {
     allowed: false,

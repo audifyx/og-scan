@@ -53,6 +53,7 @@ import {
   prepareAccessBurn,
   prepareAccessMcpPurchase,
 } from "./orbitx/mcp-burn-access.js";
+import { decorateAccessStatus } from "./orbitx/mcp-open-window.js";
 import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
@@ -2377,11 +2378,17 @@ async function callTool(rawName, args, auth, req = null) {
 
   if (name === "x_mcp_access_status") {
     try {
-      return await getAccessStatus(sb, auth?.userId, {
-        wallets: [a.publicKey, a.wallet, auth?.walletAddress],
-      });
+      return decorateAccessStatus(
+        await getAccessStatus(sb, auth?.userId, {
+          wallets: [a.publicKey, a.wallet, auth?.walletAddress],
+        }),
+      );
     } catch (e) {
-      return { ok: false, error: "access_failed", message: e?.message || "access unavailable" };
+      return decorateAccessStatus({
+        ok: false,
+        error: "access_failed",
+        message: e?.message || "access unavailable",
+      });
     }
   }
 
@@ -3603,7 +3610,7 @@ async function handleAgent(req, res, parts) {
     ).trim();
     if (!user?.id && !walletPk) return json(res, { error: "unauthorized" }, 401);
     try {
-      return json(res, await getAccessStatus(sb, user?.id, { wallets: [walletPk] }));
+      return json(res, decorateAccessStatus(await getAccessStatus(sb, user?.id, { wallets: [walletPk] })));
     } catch (e) {
       return json(res, { error: e?.message || "mcp_access_failed", packages: listPackages() }, 500);
     }
@@ -4508,6 +4515,18 @@ async function handleMcp(req, res, parts) {
             ? { ...args, ...(authCode ? { authCode } : {}) }
             : args;
         const result = await callTool(name, toolArgs, auth || { userId: null, authCode }, req);
+        if (auth?.userId) {
+          void import("./orbitx/mcp-telegram-push.js")
+            .then((mod) =>
+              mod.pushMcpResultToTelegram({
+                userId: auth.userId,
+                tool: name,
+                result,
+                source: auth.source || "x_mcp",
+              }),
+            )
+            .catch(() => {});
+        }
         const wrapped = wrapMcpToolContent(result);
         const outSession = result?.mcpSessionId || inboundSession || undefined;
         return json(

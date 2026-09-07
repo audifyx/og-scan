@@ -40,6 +40,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     "║  CREDITS · ACCESS                                    ║",
     "║    orbitx_credits_buy · confirm · balance · usage ║",
     "║    orbitx_mcp_access_buy · confirm · status      ║",
+    "║    orbitx_telegram_status · send · cmds          ║",
     "╠══════════════════════════════════════════════════╣",
     "║  TRADE                                               ║",
     "║    orbitx_trade_quote · prepare_buy / sell           ║",
@@ -82,7 +83,7 @@ export function buildAgentMenuMarkdown({ authCode } = {}) {
     `MCP URL · ${ORBITX_HOST}/api/mcp`,
     ``,
     `_Buy credits: say “buy 5000 credits” → orbitx_credits_buy → Phantom → desk wallet. Advanced usage: orbitx_credits_usage (24h/7d/30d)._`,
-    `_MCP access: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → orbitx_mcp_access_buy → Jupiter buy+burn → orbitx_mcp_access_confirm. Time remaining: orbitx_mcp_access_status._`,
+    `_MCP access: FREE for everyone until 7 Nov 2026 (testing). After that: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → orbitx_mcp_access_buy → Jupiter buy+burn → orbitx_mcp_access_confirm. Status: orbitx_mcp_access_status. Telegram: orbitx_telegram_status / send — linked DMs get a copy of every MCP tool result._`,
     `_Buy $ORBITX: say “buy $ORBITX” → orbitx_buy_orbitx. Say “confirm” / “auto” → Phantom auto-prompt._`,
     `_Group chat: “start a group chat named Orbitx” → list with “hey any group chats” → “join Orbitx” → “I want to chat in the group chat”. Every message posts there until “leave GC”. Join back anytime._`,
     `_Life City: “let’s create an agent that scans X” → @handle.obx, NVIDIA brain, DB files, daily logs. Watch them live at /orbitxagents (two-pane world). They tweet, converse, age, marry, raise the next gen, and publish HTML desk sites. orbitx_life_city / think / files / converse / timeline. Hourly cron is a full hour of free will. 300 cmds at life:0._`,
@@ -154,7 +155,7 @@ export function buildXMenuMarkdown({ authCode, xUsername } = {}) {
     ``,
     `_Analytics: followers, following, DMs, tweet views, lists. Charts: share a CA → x_dex_chart. GitHub: link once with x_repo_link — then x_repo_context / x_repo_read while drafting (no paste every time)._`,
     `_Buy credits: say “buy credits” → amount → Phantom → desk wallet. Reconnect X on /x after deploy to refresh follows.read + list.read._`,
-    `_MCP access: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → x_mcp_access_buy or x_buy what=access → Jupiter buy+burn → x_mcp_access_confirm. Time remaining: x_mcp_access_status._`,
+    `_MCP access: FREE for everyone until 7 Nov 2026 (testing). After that: burn 100 $ORBITX (1 hour) / 1,000 (1 day) / 10,000 (1 week) / 1,000,000 (1 month) → x_mcp_access_buy or x_buy what=access → Jupiter buy+burn → x_mcp_access_confirm. Status: x_mcp_access_status. Linked Telegram (@theorbitxmcpbot) receives MCP results._`,
     `_Tip: Mint a chat auth message on the /x dashboard — paste into Grok / Claude / ChatGPT to stay linked without opening a site._`,
   ].join("\n");
 }

@@ -41,6 +41,10 @@ export type McpBurnAccessStatus = {
   ok: boolean;
   active: boolean;
   expired: boolean;
+  openTesting?: boolean;
+  openUntil?: string | null;
+  allowed?: boolean;
+  source?: string | null;
   packageId: McpAccessPackageId | null;
   expiresAt: string | null;
   remainingMs: number;

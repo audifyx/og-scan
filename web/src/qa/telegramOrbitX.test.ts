@@ -40,6 +40,8 @@ import {
   selectOrbitXFaqChunks,
   shouldSkipTelegramSender,
   telegramChatExtras,
+  dmAllowsCommand,
+  buildOfficialTelegramCommands,
 } from "../../api/orbitx/telegram-orbitx-lib.js";
 import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
 import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
@@ -175,7 +177,7 @@ describe("official OrbitX Telegram bot", () => {
   });
 
   it("starts locked, never prints the access code, and offers /reset plus timed burns", () => {
-    const card = formatTelegramStartGate({ remainingLabel: "", linked: false });
+    const card = formatTelegramStartGate({ remainingLabel: "", linked: false, openTesting: false });
     expect(card.text.startsWith("Welcome to the <b>OrbitX MCP bot</b> on Telegram.")).toBe(true);
     expect(card.text).not.toContain("ORBITX BETA");
     expect(card.text).not.toContain("ORBITXBETA");
@@ -199,12 +201,40 @@ describe("official OrbitX Telegram bot", () => {
     expect(buttons).toContain("ox:gate:hour");
     expect(buttons).toContain("ox:gate:month");
     expect(buttons).not.toContain("ox:desk");
-    const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true, unlocked: true });
+    const linked = formatTelegramStartGate({ remainingLabel: "lifetime", linked: true, unlocked: true, openTesting: false });
     expect(linked.text).toContain("lifetime");
     expect(linked.text).not.toContain("Burns need");
     expect(JSON.stringify(linked.reply_markup)).toContain("ox:desk");
     expect(inferPublicTool("shop hour")?.args).toMatchObject({ package: "hour" });
     expect(inferPublicTool("shop month")?.args).toMatchObject({ package: "month" });
+  });
+
+  it("opens MCP for everyone during the testing window and wires the live catalog onto Telegram", () => {
+    const open = formatTelegramStartGate({ remainingLabel: "Free until 7 Nov 2026", linked: false, openTesting: true });
+    expect(open.text).toContain("free for everyone");
+    expect(open.text).toContain("/cmds");
+    expect(open.text).toContain("/login");
+    expect(open.text).not.toContain("This bot is locked");
+    expect(formatGroupWelcomeHtml(undefined, { openTesting: true })).toContain("free for everyone");
+    const cmds = buildOfficialTelegramCommands({
+      kind: "private",
+      tools: [
+        { name: "orbitx_get_token", description: "Token intel" },
+        { name: "orbitx_telegram_status", description: "Telegram link" },
+        { name: "orbitx_buy", description: "Buy" },
+      ],
+    });
+    expect(cmds.some((c) => c.command === "token" || c.command === "get_token")).toBe(true);
+    expect(cmds.some((c) => c.command === "telegram_status" || c.command === "status")).toBe(true);
+    expect(cmds.length).toBeGreaterThan(20);
+    expect(cmds.length).toBeLessThanOrEqual(100);
+    const openGate = { accessActive: true, unlocked: false, openTesting: true };
+    expect(dmAllowsCommand(openGate, "token", "/token")).toBe(true);
+    expect(dmAllowsCommand(openGate, "chart", "/chart")).toBe(true);
+    expect(dmAllowsCommand(openGate, "buy", "/buy CA")).toBe(false);
+    expect(dmAllowsCommand({ accessActive: false, unlocked: false }, "token", "/token")).toBe(false);
+    expect(isPublicTelegramTool("orbitx_telegram_status")).toBe(true);
+    expect(isAgentTelegramToolAllowed("orbitx_telegram_send")).toBe(true);
   });
 
   it("handles public group triggers, forum threads, and anonymous admins", () => {
@@ -236,10 +266,10 @@ describe("official OrbitX Telegram bot", () => {
     expect(extras.extra.reply_to_message_id).toBe(88);
     expect(extras.extra.allow_sending_without_reply).toBe(true);
     expect(extras.extra.message_thread_id).toBe(12);
-    expect(formatGroupWelcomeHtml()).toContain("OrbitX is in this group");
-    expect(formatGroupWelcomeHtml()).toContain("locked");
-    expect(formatGroupWelcomeHtml()).not.toContain("ORBITX BETA");
-    expect(formatGroupWelcomeHtml()).toContain("access code they received from us");
+    expect(formatGroupWelcomeHtml(undefined, { openTesting: false })).toContain("OrbitX is in this group");
+    expect(formatGroupWelcomeHtml(undefined, { openTesting: false })).toContain("locked");
+    expect(formatGroupWelcomeHtml(undefined, { openTesting: false })).not.toContain("ORBITX BETA");
+    expect(formatGroupWelcomeHtml(undefined, { openTesting: false })).toContain("access code they received from us");
     expect(formatOrbitXHomeWelcomeHtml()).toContain("t.me/orbitxwrld");
     expect(formatOrbitXHomeWelcomeHtml()).toContain("community desk is live");
     expect(formatOrbitXHomeWelcomeHtml()).not.toContain("locked");
@@ -824,7 +854,9 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("if (secret !== strictSecret)");
     expect(api).toContain("allowPrivileged: !isGroup && Boolean(link)");
     expect(api).toContain("telegramDmUnlockState");
-    expect(api).toContain("isAllowedGatedDmCommand");
+    expect(api).toContain("dmAllowsCommand");
+    expect(api).toContain("skipTelegramPush");
+    expect(api).toContain("buildOfficialTelegramCommands");
     expect(api).toContain("rejectLockedSender");
     expect(api).toContain("senderGate");
     expect(api).toContain("formatOrbitXTelegramResult");
