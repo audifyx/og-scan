@@ -29,6 +29,7 @@ export const LIVE_MIN_AGE_MIN = 60;
 export const LIVE_MAX_1H_PUMP_PCT = 55;
 export const LIVE_MAX_24H_PUMP_PCT = 180;
 export const LIVE_MIN_TXNS_1H = 40;
+export const LIVE_MAX_PROBES = 5;
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 /** Liquid majors the desk is allowed to buy — high MC is a feature, not a skip. */
 export const LIVE_ALLOW_SYMBOLS = new Set([

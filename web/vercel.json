@@ -392,7 +392,7 @@
       "maxDuration": 60
     },
     "api/live-agents.js": {
-      "maxDuration": 60
+      "maxDuration": 90
     },
     "api/mcp-life-tick.js": {
       "maxDuration": 90

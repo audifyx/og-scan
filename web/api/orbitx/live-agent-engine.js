@@ -21,6 +21,7 @@ import {
   summarizeLiveLedger,
   mergeLiveFeed,
   writeLiveThesis,
+  LIVE_MAX_PROBES,
 } from "../../shared/orbitx-live-desk.js";
 
 const JUP = "https://lite-api.jup.ag";
@@ -675,7 +676,7 @@ export async function tickLiveDesk(opts = {}) {
     sb,
     sol_usd: opts.sol_usd,
     sol_balance: opts.solBalance,
-    skipChain: Boolean(opts.skipChain || opts.dryRun || opts.keypair),
+    skipChain: true,
   });
 
   if (!enabled) {
@@ -709,6 +710,11 @@ export async function tickLiveDesk(opts = {}) {
   const solUsd = opts.sol_usd || snap0.sol_usd || (await solPriceUsd());
   const bal = opts.solBalance != null ? num(opts.solBalance) : await solBalance(owner);
   const open = await loadOpen(sb).catch(() => []);
+  await upsertDesk(sb, {
+    wallet_pubkey: owner,
+    last_tick_at: new Date().toISOString(),
+    last_error: null,
+  }).catch(() => {});
 
   const swapFn = opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
   const safetyFn = opts.safety || ((mint) => probeSellability(mint));
@@ -802,8 +808,28 @@ export async function tickLiveDesk(opts = {}) {
   const ranked = rankForLiveStyle(agent.style, tape);
   let chosen = null;
   let safety = null;
-  for (const coin of ranked.slice(0, 24)) {
+  let probes = 0;
+  async function noteSkip(coin, reasons) {
+    if (actions.some((a) => a.type === "screen")) return;
+    const reason = (reasons || []).filter(Boolean).join("; ") || "skip";
+    actions.push({ type: "screen", mint: coin.mint, symbol: coin.symbol, reason: reasons?.[0] || "skip" });
+    await recordEvent(sb, {
+      kind: "skip",
+      agent_id: agent.id,
+      mint: coin.mint,
+      symbol: coin.symbol,
+      reason,
+    });
+  }
+  for (const coin of ranked.slice(0, 40)) {
     if (stillOpen.some((p) => p.mint === coin.mint)) continue;
+    const cheap = screenLiveCandidate(coin, { canBuy: true, canSell: true });
+    if (!cheap.ok) {
+      await noteSkip(coin, cheap.reasons);
+      continue;
+    }
+    if (probes >= LIVE_MAX_PROBES) break;
+    probes += 1;
     let pump = null;
     if (!dry && !opts.tape) {
       pump = await pumpMeta(coin.mint).catch(() => null);
@@ -818,16 +844,7 @@ export async function tickLiveDesk(opts = {}) {
     if (pump && pump.complete === false && !safety.canSell) safety = { ...safety, bondingOnly: true };
     const screen = screenLiveCandidate(coin, safety);
     if (!screen.ok) {
-      if (!actions.some((a) => a.type === "screen")) {
-        actions.push({ type: "screen", mint: coin.mint, symbol: coin.symbol, reason: screen.reasons[0] });
-        await recordEvent(sb, {
-          kind: "skip",
-          agent_id: agent.id,
-          mint: coin.mint,
-          symbol: coin.symbol,
-          reason: screen.reasons.join("; "),
-        });
-      }
+      await noteSkip(coin, screen.reasons);
       continue;
     }
     chosen = coin;
@@ -846,7 +863,9 @@ export async function tickLiveDesk(opts = {}) {
     ? { outAmount: "1", inAmount: String(sized.lamports) }
     : await quoteSwap(SOL_MINT, chosen.mint, sized.lamports, 150);
   if (!buyQ) {
-    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: dry });
+    await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "no_buy_quote", mint: chosen.mint, symbol: chosen.symbol });
+    await upsertDesk(sb, { wallet_pubkey: owner, last_tick_at: new Date().toISOString(), last_agent_id: agent.id, last_error: null }).catch(() => {});
+    const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
     return { ...snap, skipped: "no_buy_quote", actions, dry };
   }
   let sent = { ok: true, signature: "dry-run", via: "dry", outAmount: buyQ.outAmount };

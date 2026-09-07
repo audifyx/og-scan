@@ -510,6 +510,7 @@ describe("OrbitX /on-chain world", () => {
     const engine = readFileSync(resolve(WEB, "api/orbitx/live-agent-engine.js"), "utf8");
     expect(engine).toContain("LIVE_AGENT_WALLET_SECRET");
     expect(engine).toContain("summarizeLiveLedger");
+    expect(engine).toContain("LIVE_MAX_PROBES");
     expect(engine).not.toContain("secretBase58");
     const sql = readFileSync(resolve(REPO, "supabase/migrations/20260907043000_ox_live_agent_desk.sql"), "utf8");
     expect(sql).toContain("ox_live_desk");

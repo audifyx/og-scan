@@ -193,6 +193,7 @@ describe("live agent engine tick", () => {
       twitter: "https://x.com/room",
       buys_1h: 120,
     };
+    let probes = 0;
     const buy = await tickLiveDesk({
       sb,
       force: true,
@@ -202,11 +203,16 @@ describe("live agent engine tick", () => {
       keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
       owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
       tape: async () => [jup, room],
-      safety: async () => ({ canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 }),
+      safety: async () => {
+        probes += 1;
+        return { canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 };
+      },
       mark: async () => 0.02,
       swap: async () => ({ ok: true, signature: "sig-room", outAmount: "1000" }),
     });
+    expect(probes).toBe(1);
     expect(buy.actions.some((a) => a.type === "buy" && a.symbol === "ROOM" && a.usd === 1.5)).toBe(true);
+    expect(buy.last_tick_at).toBeTruthy();
     expect(buy.actions[0].thesis).toMatch(/\$0\.30/);
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
