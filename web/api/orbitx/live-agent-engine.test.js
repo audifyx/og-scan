@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIVE_AGENTS } from "../../shared/orbitx-live-desk.js";
+import { LIVE_AGENTS, setRuntimeHunts } from "../../shared/orbitx-live-desk.js";
 import { tickLiveDesk } from "./live-agent-engine.js";
 
 function memSb() {
@@ -262,6 +262,9 @@ describe("live agent engine tick", () => {
       buys_1h: 200,
       sells_1h: 260,
     };
+    sb._tables.ox_live_desk[0].note = JSON.stringify({
+      hunts: [{ mint: mouse.mint, symbol: "ANONYMOUSE", clipUsd: 1, scaleMcap: 300_000, flattenMcap: 600_000 }],
+    });
     let mouseProbes = 0;
     const skipDump = await tickLiveDesk({
       sb,
@@ -283,6 +286,70 @@ describe("live agent engine tick", () => {
     expect(skipDump.actions.some((a) => a.type === "buy")).toBe(false);
     expect(skipDump.skipped).toBe("no_clean_coin");
     expect(sb._tables.ox_live_desk[0].last_agent_id).toBe("warden-live");
+
+    sb._tables.ox_live_positions = [];
+    sb._tables.ox_live_events = [];
+    const digesting = {
+      ...mouse,
+      change_5m: 1.2,
+      change_15m: -1.4,
+      change_1h: -6.8,
+      change_24h: 80,
+      buys_1h: 210,
+      sells_1h: 150,
+    };
+    let waitProbes = 0;
+    const wait = await tickLiveDesk({
+      sb,
+      force: true,
+      dryRun: true,
+      sol_usd: 150,
+      solBalance: 0.05,
+      keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
+      owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
+      tape: async () => [digesting, room],
+      safety: async () => {
+        waitProbes += 1;
+        return { canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 };
+      },
+      mark: async () => 0.00008,
+      swap: async () => ({ ok: true, signature: "sig-wait", outAmount: "1000" }),
+    });
+    expect(waitProbes).toBe(1);
+    expect(wait.actions.some((a) => a.type === "buy" && a.symbol === "ANONYMOUSE" && a.usd === 1)).toBe(true);
+    expect(wait.actions.some((a) => a.type === "buy" && a.symbol === "ROOM")).toBe(false);
+
+    sb._tables.ox_live_positions = [];
+    sb._tables.ox_live_events = [];
+    const running = {
+      ...digesting,
+      change_5m: 5.4,
+      change_15m: 3.2,
+      change_1h: 8.6,
+      change_24h: 38,
+      buys_1h: 260,
+      sells_1h: 170,
+    };
+    let runProbes = 0;
+    const ape = await tickLiveDesk({
+      sb,
+      force: true,
+      dryRun: true,
+      sol_usd: 150,
+      solBalance: 0.05,
+      keypair: { publicKey: { toBase58: () => "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj" } },
+      owner: "BhdxqXy1C1PMaLBGUABdncqjR68PqB19xPJYcpGcWPJj",
+      tape: async () => [running, room],
+      safety: async () => {
+        runProbes += 1;
+        return { canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 };
+      },
+      mark: async () => 0.00009,
+      swap: async () => ({ ok: true, signature: "sig-run", outAmount: "1000" }),
+    });
+    expect(runProbes).toBe(1);
+    expect(ape.actions.some((a) => a.type === "buy" && a.symbol === "ANONYMOUSE" && a.usd === 1)).toBe(true);
+    expect(ape.actions.some((a) => a.type === "buy" && a.symbol === "ROOM")).toBe(false);
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
   });

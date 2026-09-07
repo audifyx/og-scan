@@ -7,6 +7,8 @@ import { Color, DoubleSide, Object3D } from "three";
 import type { LiveDeskPayload } from "@/pages/onchain-world/api";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY, buildLiveWorld } from "../../../../../shared/orbitx-live-desk.js";
 import { liveCityClimate } from "../../../../../shared/orbitx-live-city.js";
+import { HuntWatchBar } from "./HuntWatchBar";
+import { CopyMintButton } from "@/components/CopyMintButton";
 import { useLiveDesk } from "../useLiveDesk";
 
 type WorldSnap = NonNullable<LiveDeskPayload["world"]>;
@@ -95,7 +97,7 @@ export function LiveAgentCity({ snap: snapProp }: { snap?: LiveDeskPayload | nul
         </FxCatch>
         <OrbitControls enableDamping dampingFactor={0.08} minDistance={12} maxDistance={120} maxPolarAngle={Math.PI / 2.05} target={[0, 4, 0]} />
       </Canvas>
-      <Hud world={world} climate={climate} />
+      <Hud world={world} climate={climate} hunts={snap?.hunt} />
     </div>
   );
 }
@@ -708,7 +710,7 @@ function Snow() {
   );
 }
 
-function Hud({ world, climate }: { world: WorldSnap; climate: Climate }) {
+function Hud({ world, climate, hunts }: { world: WorldSnap; climate: Climate; hunts?: LiveDeskPayload["hunt"] }) {
   return (
     <>
       <div className="pointer-events-none absolute inset-x-0 top-0 p-3">
@@ -721,6 +723,11 @@ function Hud({ world, climate }: { world: WorldSnap; climate: Climate }) {
           {climate.storm ? " · storm" : ""} · day {world.age_days ?? 1} · gen {world.generation ?? 1} ·{" "}
           {world.buildings?.length || 0} buildings · {world.built ?? 0} coin towers
         </p>
+      </div>
+      <div className="pointer-events-auto absolute inset-x-0 top-16 px-3">
+        <div className="rounded-md border border-line bg-black/75 backdrop-blur-md">
+          <HuntWatchBar hunts={hunts} />
+        </div>
       </div>
       <aside className="absolute bottom-3 left-3 right-3 max-h-40 overflow-auto rounded-md border border-line bg-black/75 p-2 backdrop-blur-md sm:right-auto sm:w-96">
         <p className="ox-kicker mb-1">On the floor</p>
@@ -754,6 +761,7 @@ function CityFallback({ world }: { world: WorldSnap }) {
           <li key={b.id} className="rounded-md border border-line bg-bg-sunken p-3">
             <p className="text-xs text-fg">{b.label || (b.symbol ? `$${b.symbol}` : b.id)}</p>
             <p className="mt-1 text-2xs text-dim">{b.meta || b.kind}</p>
+            {b.mint ? <CopyMintButton mint={b.mint} label="CA" copiedLabel="copied" className="mt-2 rounded-full border-line px-2 py-0.5 text-[10px] text-dim" iconClassName="h-3 w-3" /> : null}
           </li>
         ))}
       </ul>

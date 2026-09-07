@@ -4,6 +4,8 @@ import type { LiveDeskPayload } from "@/pages/onchain-world/api";
 import { formatUsd } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
+import { CopyMintButton } from "@/components/CopyMintButton";
+import { HuntWatchBar, CA_BTN } from "./HuntWatchBar";
 import { useLiveDesk } from "../useLiveDesk";
 
 type FeedRow = NonNullable<LiveDeskPayload["feed"]>[number];
@@ -25,6 +27,8 @@ function timeAgo(at: string | null | undefined, now: number) {
   if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h`;
   return new Date(at).toISOString().slice(5, 16);
 }
+
+export { HuntWatchBar } from "./HuntWatchBar";
 
 export function LiveAgentFeed({ snap: snapProp, now: nowProp }: { snap?: LiveDeskPayload | null; now?: number } = {}) {
   const hooked = useLiveDesk();
@@ -55,9 +59,10 @@ export function LiveAgentFeed({ snap: snapProp, now: nowProp }: { snap?: LiveDes
         <h2 className="font-display text-lg text-fg">What the desk is doing</h2>
         <p className="mt-1 text-2xs text-muted">
           Neon, Warden, and Raid post every clip, every skip, every exit — in plain language, with Solscan proof.
-          {made ? ` Desk is ${made} vs start.` : ""} Not financial advice.
+          {made ? ` Desk is ${made} vs start.` : ""} Watched names get a copy-CA button. Not financial advice.
         </p>
       </header>
+      <HuntWatchBar hunts={snap?.hunt} />
       {feed.length ? (
         <ol>
           {feed.map((row) => (
@@ -126,9 +131,12 @@ function FeedPost({
               </a>
             ) : null}
             {row.mint ? (
-              <a className="inline-flex items-center gap-1 text-dim hover:text-fg" href={row.solscan_token || `https://solscan.io/token/${row.mint}`} target="_blank" rel="noreferrer">
-                token
-              </a>
+              <>
+                <CopyMintButton mint={row.mint} label="CA" copiedLabel="copied" className={CA_BTN} iconClassName="h-3 w-3" />
+                <a className="inline-flex items-center gap-1 text-dim hover:text-fg" href={row.solscan_token || `https://solscan.io/token/${row.mint}`} target="_blank" rel="noreferrer">
+                  token
+                </a>
+              </>
             ) : null}
             <a className="inline-flex items-center gap-1 text-dim hover:text-fg" href={row.solscan_account || `https://solscan.io/account/${wallet}`} target="_blank" rel="noreferrer">
               wallet

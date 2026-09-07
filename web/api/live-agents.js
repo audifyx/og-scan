@@ -6,7 +6,7 @@
  */
 import { adminCredentialOk } from "../shared/desk-unlock.js";
 import { LIVE_WALLET_PUBKEY } from "../shared/orbitx-live-desk.js";
-import { setLiveArmed, snapshotLiveDesk, tickLiveDesk } from "./orbitx/live-agent-engine.js";
+import { setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/live-agent-engine.js";
 
 export const config = { maxDuration: 90 };
 
@@ -87,6 +87,20 @@ export default async function handler(req, res) {
     if (action === "pause" || action === "disarm") {
       const snap = await setLiveArmed({ armed: action !== "pause" ? false : undefined, paused: action === "pause" });
       return json(res, 200, { ok: true, ...snap });
+    }
+    if (action === "hunt" || action === "ape") {
+      const out = await setLiveHunt(
+        {
+          mint: body.mint || body.ca,
+          symbol: body.symbol,
+          clipUsd: body.clipUsd ?? body.usd ?? 1,
+          scaleMcap: body.scaleMcap ?? body.scale_mcap ?? 300_000,
+          flattenMcap: body.flattenMcap ?? body.flatten_mcap ?? 600_000,
+        },
+        { tick: body.tick !== false, dryRun: body.dryRun === true },
+      );
+      const status = out.ok === false ? 400 : 200;
+      return json(res, status, out);
     }
     const out = await tickLiveDesk({ force: true, dryRun: body.dryRun === true });
     return json(res, 200, { ok: true, ...out });

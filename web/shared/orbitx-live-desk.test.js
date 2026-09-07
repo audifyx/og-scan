@@ -8,6 +8,14 @@ import {
   nextLiveAgent,
   pickLiveToken,
   rankForLiveStyle,
+  isEarlyRunner,
+  isAccumulating,
+  isConfirmedRun,
+  liveHunt,
+  huntClipUsd,
+  LIVE_HUNT_USD,
+  setRuntimeHunts,
+  parseHuntSource,
   screenLiveCandidate,
   sizeLiveBuy,
   summarizeLiveLedger,
@@ -127,6 +135,15 @@ describe("live agent desk rules", () => {
       twitter: "https://x.com/room",
       buys_1h: 90,
     };
+    setRuntimeHunts([
+      {
+        mint: "Aw6fiDPWLUnjSsJQtsyEMSaoPaKAUUrStAsYPiPwpump",
+        symbol: "ANONYMOUSE",
+        clipUsd: 1,
+        scaleMcap: 300_000,
+        flattenMcap: 600_000,
+      },
+    ]);
     const mouse = {
       mint: "Aw6fiDPWLUnjSsJQtsyEMSaoPaKAUUrStAsYPiPwpump",
       symbol: "ANONYMOUSE",
@@ -151,6 +168,47 @@ describe("live agent desk rules", () => {
     expect(screenLiveCandidate({ ...GOOD, change_24h: 938 }, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(mouse, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate(mouse, SAFETY).reasons.some((r) => /dumping|topped|already pumped|liq/.test(r))).toBe(true);
+    const digesting = {
+      ...mouse,
+      change_5m: 1.4,
+      change_15m: -1.2,
+      change_1h: -6.5,
+      change_24h: 88,
+      buys_1h: 220,
+      sells_1h: 160,
+    };
+    expect(isAccumulating(digesting)).toBe(true);
+    expect(isConfirmedRun(digesting)).toBe(false);
+    expect(screenLiveCandidate(digesting, SAFETY).ok).toBe(true);
+    const bounce = { ...digesting, change_5m: 4.3, change_1h: -8.2 };
+    expect(isConfirmedRun(bounce)).toBe(false);
+    expect(screenLiveCandidate(bounce, SAFETY).ok).toBe(true);
+    const running = {
+      ...digesting,
+      change_5m: 5.2,
+      change_15m: 3.1,
+      change_1h: 9.4,
+      change_24h: 42,
+      buys_1h: 280,
+      sells_1h: 190,
+    };
+    expect(isConfirmedRun(running)).toBe(true);
+    expect(screenLiveCandidate(running, SAFETY).ok).toBe(true);
+    expect(liveHunt(running).symbol).toBe("ANONYMOUSE");
+    expect(huntClipUsd(running)).toBe(LIVE_HUNT_USD);
+    expect(LIVE_HUNT_USD).toBe(1);
+    expect(sizeLiveBuy({ solBalance: 0.05, solUsd: 150, openCount: 0, tradeUsd: LIVE_HUNT_USD }).usd).toBe(1);
+    expect(writeLiveThesis(LIVE_AGENTS[0], running, SAFETY, { usd: 1 })).toMatch(/\$1\.00/);
+    expect(writeLiveThesis(LIVE_AGENTS[0], running, SAFETY, { usd: 1 })).toMatch(/300k/);
+    expect(writeLiveThesis(LIVE_AGENTS[0], running, SAFETY, { usd: 1 })).toMatch(/600k/);
+    const pos = { mint: running.mint, entry_price_usd: 1, usd_in: 1, tp_pct: 0.2 };
+    expect(decideLiveExit(pos, 1.05, Date.now(), { marketCap: 85_000 }).reason).toMatch(/300k/);
+    expect(decideLiveExit(pos, 3.5, Date.now(), { marketCap: 300_000 }).action).toBe("scale_out");
+    expect(decideLiveExit(pos, 7, Date.now(), { marketCap: 600_000 }).action).toBe("take_profit");
+    expect(decideLiveExit(pos, 3.5, Date.now(), { marketCap: 300_000, scaled: true }).reason).toMatch(/600k/);
+    const rankedHunt = rankForLiveStyle("momentum", [room, digesting]);
+    expect(rankedHunt[0].symbol).toBe("ANONYMOUSE");
+    expect(parseHuntSource({ mint: mouse.mint, clipUsd: 1 })[0].mint).toBe(mouse.mint);
     expect(screenLiveCandidate({ ...GOOD, change_5m: -12, change_1h: 9 }, SAFETY).ok).toBe(false);
     expect(screenLiveCandidate({ ...GOOD, change_1h: 0.4, change_5m: 0.2, volume_1h: 200, volume_24h: 1_000, txns_1h: 4, buys_1h: 2 }, SAFETY).ok).toBe(false);
     expect(liveIsMajor({ mint: GOOD.mint, symbol: "PUMP", market_cap: 2_000_000, liquidity_usd: 1_500_000, volume_24h: 800_000 })).toBe(false);
