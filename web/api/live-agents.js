@@ -7,6 +7,7 @@
 import { adminCredentialOk } from "../shared/desk-unlock.js";
 import { LIVE_WALLET_PUBKEY } from "../shared/orbitx-live-desk.js";
 import { setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/live-agent-engine.js";
+import { pushLiveDeskToTelegram } from "./orbitx/calls-engine.js";
 
 export const config = { maxDuration: 90 };
 
@@ -51,6 +52,15 @@ function cronAuthorized(req) {
   return String(req.headers?.authorization || "") === `Bearer ${secret}`;
 }
 
+async function withTelegram(out) {
+  try {
+    const telegram = await pushLiveDeskToTelegram({ live: out, ensureArmed: true });
+    return { ...out, telegram };
+  } catch (e) {
+    return { ...out, telegram: { ok: false, error: e.message || String(e) } };
+  }
+}
+
 function adminFrom(req) {
   const body = bodyOf(req);
   const h = String(req.headers?.authorization || "").replace(/^Bearer\s+/i, "");
@@ -70,7 +80,7 @@ export default async function handler(req, res) {
         return json(res, 401, { ok: false, error: "cron_or_admin_required" });
       }
       const out = await tickLiveDesk({ force: adminFrom(req) });
-      return json(res, 200, { ok: true, ...out, wallet: out.wallet || LIVE_WALLET_PUBKEY });
+      return json(res, 200, { ok: true, ...await withTelegram(out), wallet: out.wallet || LIVE_WALLET_PUBKEY });
     }
     if (req.method === "GET") {
       const snap = await snapshotLiveDesk();
@@ -100,10 +110,10 @@ export default async function handler(req, res) {
         { tick: body.tick !== false, dryRun: body.dryRun === true },
       );
       const status = out.ok === false ? 400 : 200;
-      return json(res, status, out);
+      return json(res, status, out.ok === false ? out : await withTelegram(out));
     }
     const out = await tickLiveDesk({ force: true, dryRun: body.dryRun === true });
-    return json(res, 200, { ok: true, ...out });
+    return json(res, 200, { ok: true, ...await withTelegram(out) });
   } catch (e) {
     return json(res, 500, { ok: false, error: e instanceof Error ? e.message : "live_desk_failed" });
   }

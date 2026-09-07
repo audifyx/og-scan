@@ -166,7 +166,7 @@ export default function CallsDesk() {
   const chats = (snap?.chats || []).filter((c) => c.status !== "left" && c.status !== "kicked");
 
   const statusTone = useMemo(() => {
-    if (snap?.armed && snap?.connected) return "Live every 5 min";
+    if (snap?.armed && snap?.connected) return "Mirroring /on-chain live ticks";
     if (snap?.connected) return "Bot connected · alerts paused";
     return "Connect a bot to start";
   }, [snap?.armed, snap?.connected]);
@@ -181,8 +181,8 @@ export default function CallsDesk() {
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40">Owner · /calls</p>
             <h1 className="mt-1 font-display text-3xl font-black tracking-tight">Calls desk</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/55">
-              Connect your BotFather token here — not Vercel. NEON, WARDEN, and RAID scan the same /on-chain tape every 5
-              minutes and push full-tape alerts. No commands. Channel + groups only.
+              Same tape as /on-chain. Connect a BotFather token, add the bot to your group or channel, and NEON / WARDEN /
+              RAID posts every live tick — buys, skips, sells — in the same words as the dashboard. No commands.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -211,7 +211,7 @@ export default function CallsDesk() {
               disabled={Boolean(busy)}
             >
               {busy === "scan" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Scan now
+              Push live tape
             </button>
           </div>
         </header>
@@ -246,7 +246,7 @@ export default function CallsDesk() {
                   Connected <span className="text-white">@{snap.bot_username}</span>
                   {snap.token_masked ? <span className="ml-2 font-mono text-[10px] text-white/35">{snap.token_masked}</span> : null}
                 </p>
-                <p className="text-2xs text-white/40">Webhook is alert-only. Commands are ignored. Add the bot to groups/channel as admin so it can post.</p>
+                <p className="text-2xs text-white/40">Add the bot to a group or channel (admin for channels). The next /on-chain tick posts here. Commands are ignored.</p>
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70 hover:text-white"
@@ -291,7 +291,7 @@ export default function CallsDesk() {
               <Link2 className="h-4 w-4 text-og-cyan" />
               <h2 className="font-display text-lg">Calls community</h2>
             </div>
-            <p className="text-2xs text-white/40">Link the channel. Every call posts there. Optionally also every group the bot is in.</p>
+            <p className="text-2xs text-white/40">Optional. If you skip this, adding the bot to a group is enough — we post there automatically.</p>
             <form
               className="flex flex-wrap gap-2"
               onSubmit={(e) => {
@@ -338,7 +338,7 @@ export default function CallsDesk() {
                 onChange={(e) => void run("arm", () => callsApi("POST", { action: "settings", armed: e.target.checked }))}
               />
               <Radio className="h-3.5 w-3.5 text-og-lime" />
-              Arm 5-minute agent alerts
+              Mirror /on-chain live desk
             </label>
             <p className="text-[10px] uppercase tracking-wide text-white/35">
               Last tick {ago(snap?.last_tick_at)} · agent {snap?.last_agent_id || "—"}

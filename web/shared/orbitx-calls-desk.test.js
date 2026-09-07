@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   applyMark,
+  chatFromTelegramUpdate,
   formatCallTelegram,
+  formatLiveFeedTelegram,
   maskBotToken,
   mcMultiple,
   parseChannelRef,
@@ -10,6 +12,7 @@ import {
   resolveCallStatus,
   stillCooling,
   summarizeCalls,
+  unpublishedLiveFeed,
   writeCallThesis,
 } from "./orbitx-calls-desk.js";
 
@@ -104,5 +107,35 @@ describe("calls desk math", () => {
     });
     expect(picked.every((p) => p.screen.ok)).toBe(true);
     expect(picked[0].coin.mint).toBe(coin.mint);
+  });
+
+  it("formats the same /on-chain live feed for Telegram", () => {
+    const tg = formatLiveFeedTelegram({
+      kind: "buy",
+      agent_id: "neon-live",
+      symbol: "MOUSE",
+      mint: coin.mint,
+      usd: 1.5,
+      thesis: "NEON just put $1.50 into $MOUSE.",
+      at: new Date().toISOString(),
+    });
+    expect(tg).toContain("NEON");
+    expect(tg).toContain("BUY");
+    expect(tg).toContain(coin.mint);
+    expect(tg).toContain("/on-chain");
+    const older = unpublishedLiveFeed(
+      [
+        { id: "a", at: "2026-09-07T16:00:00.000Z", kind: "skip" },
+        { id: "b", at: "2026-09-07T16:05:00.000Z", kind: "buy" },
+      ],
+      "2026-09-07T16:01:00.000Z",
+      8,
+    );
+    expect(older.map((r) => r.id)).toEqual(["b"]);
+    const added = chatFromTelegramUpdate({
+      message: { chat: { id: -1002, title: "Calls", type: "supergroup" }, text: "hi" },
+    });
+    expect(added.chat_id).toBe("-1002");
+    expect(added.chat_type).toBe("supergroup");
   });
 });

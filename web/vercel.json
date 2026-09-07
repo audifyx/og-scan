@@ -444,7 +444,7 @@
     },
     {
       "path": "/api/orbitx-calls?path=tick",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }

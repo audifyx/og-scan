@@ -2,7 +2,7 @@
  * OrbitX Calls desk — alert-only Telegram calls from the /on-chain agents.
  * No commands. Paper track-record from MC at call vs ATH / ATL / now.
  */
-import { LIVE_AGENTS, liveAgentVoice, nextLiveAgent, screenLiveCandidate } from "./orbitx-live-desk.js";
+import { LIVE_AGENTS, enrichLiveFeedRow, liveAgentVoice, nextLiveAgent, screenLiveCandidate } from "./orbitx-live-desk.js";
 
 export const CALLS_WIN_MULTIPLE = 1.5;
 export const CALLS_LOSE_MULTIPLE = 0.7;
@@ -226,8 +226,82 @@ export function formatCallTelegram(call = {}) {
   if (call.url) lines.push(`<a href="${escapeAttr(call.url)}">Dex</a>`);
   lines.push(`<a href="https://www.orbitx.world/on-chain/token/${escapeAttr(call.mint || "")}">OrbitX tape</a>`);
   lines.push("");
-  lines.push("<i>Not financial advice. Alert only — no commands. Agents scan every 5 minutes.</i>");
+  lines.push("<i>Not financial advice. Alert only — same live desk as /on-chain.</i>");
   return lines.join("\n");
+}
+
+export function unpublishedLiveFeed(feed = [], sinceAt, limit = 8) {
+  const rows = Array.isArray(feed) ? feed : [];
+  const cap = Math.max(1, Math.min(12, num(limit, 8)));
+  const since = Date.parse(sinceAt || 0);
+  const hasSince = Number.isFinite(since) && since > 0;
+  const fresh = hasSince
+    ? rows.filter((row) => {
+        const at = Date.parse(row?.at || row?.created_at || 0);
+        return Number.isFinite(at) && at > since;
+      })
+    : rows.slice(0, Math.min(3, cap));
+  return [...fresh]
+    .sort((a, b) => Date.parse(a?.at || a?.created_at || 0) - Date.parse(b?.at || b?.created_at || 0))
+    .slice(-cap);
+}
+
+export function formatLiveFeedTelegram(row = {}, ctx = {}) {
+  const live = enrichLiveFeedRow(row, ctx);
+  const kind = String(live.kind || "tick").toUpperCase();
+  const who = live.agent_name || live.agent_handle || "OrbitX";
+  const t = live.symbol ? `$${String(live.symbol).replace(/^\$/, "").toUpperCase()}` : "";
+  const lines = [
+    `<b>${escapeHtml(who.replace(/\s+LIVE$/i, ""))} · ${escapeHtml(kind)}</b>`,
+    escapeHtml(live.text || "On the desk."),
+  ];
+  if (t) lines.push(`<b>${escapeHtml(t)}</b>`);
+  if (live.mint) lines.push(`CA: <code>${escapeHtml(live.mint)}</code>`);
+  const links = [];
+  if (live.mint) links.push(`<a href="https://www.orbitx.world/on-chain/token/${escapeAttr(live.mint)}">OrbitX tape</a>`);
+  else links.push(`<a href="https://www.orbitx.world/on-chain">OrbitX /on-chain</a>`);
+  if (live.solscan_tx) links.push(`<a href="${escapeAttr(live.solscan_tx)}">Solscan tx</a>`);
+  if (live.solscan_token) links.push(`<a href="${escapeAttr(live.solscan_token)}">token</a>`);
+  lines.push(links.join(" · "));
+  lines.push("<i>Same live desk as /on-chain. Alert only — no commands.</i>");
+  return lines.join("\n");
+}
+
+export function formatDeskLinkedTelegram() {
+  return [
+    "<b>OrbitX live desk linked</b>",
+    "This chat now gets the same NEON / WARDEN / RAID tape as <a href=\"https://www.orbitx.world/on-chain\">/on-chain</a>.",
+    "<i>Alert only — no commands.</i>",
+  ].join("\n");
+}
+
+export function chatFromTelegramUpdate(upd = {}) {
+  const node = upd.my_chat_member || upd.chat_member;
+  if (node?.chat) {
+    const status = String(node.new_chat_member?.status || "member");
+    const left = status === "left" || status === "kicked";
+    return {
+      chat_id: String(node.chat.id),
+      title: node.chat.title || node.chat.username || String(node.chat.id),
+      username: node.chat.username || null,
+      chat_type: node.chat.type || null,
+      status: left ? status : "member",
+      is_channel_target: node.chat.type === "channel",
+    };
+  }
+  const msg = upd.message || upd.edited_message || upd.channel_post || upd.edited_channel_post;
+  if (!msg?.chat) return null;
+  const c = msg.chat;
+  const title =
+    c.title || c.username || [c.first_name, c.last_name].filter(Boolean).join(" ").trim() || String(c.id);
+  return {
+    chat_id: String(c.id),
+    title,
+    username: c.username || null,
+    chat_type: c.type || null,
+    status: "member",
+    is_channel_target: c.type === "channel",
+  };
 }
 
 export function formatMarkUpdate(call = {}) {

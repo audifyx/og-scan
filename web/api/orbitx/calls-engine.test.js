@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tickCallsDesk } from "./calls-engine.js";
+import { ingestCallsHook, pushLiveDeskToTelegram, tickCallsDesk } from "./calls-engine.js";
 
 function memSb() {
   const tables = {
@@ -132,5 +132,56 @@ describe("calls engine tick", () => {
     });
     expect(out.skipped).toBe("not_armed");
     expect(sent.filter((s) => s.method === "sendMessage" && /WHY THIS CALL/.test(s.body?.text || ""))).toHaveLength(0);
+  });
+
+  it("mirrors /on-chain live feed rows to the group the bot is in", async () => {
+    const sb = memSb();
+    const sent = [];
+    const at = new Date().toISOString();
+    const out = await pushLiveDeskToTelegram({
+      sb,
+      live: {
+        wallet: "Desk111",
+        feed: [
+          {
+            id: "evt-1",
+            at,
+            kind: "buy",
+            agent_id: "neon-live",
+            symbol: "MOUSE",
+            mint: clean.mint,
+            text: "NEON just put $1.50 into $MOUSE.",
+            usd: 1.5,
+          },
+        ],
+      },
+      send: async (_token, method, body) => {
+        sent.push({ method, body });
+        return { ok: true, result: { message_id: 11 } };
+      },
+    });
+    expect(out.posted).toBe(1);
+    expect(sent[0].body.chat_id).toBe("-1001");
+    expect(String(sent[0].body.text)).toContain("MOUSE");
+    expect(String(sent[0].body.text)).toContain("/on-chain");
+  });
+
+  it("registers a group from a Telegram message and sends the linked notice", async () => {
+    const sb = memSb();
+    sb._tables.ox_calls_chats = [];
+    const sent = [];
+    const out = await ingestCallsHook({
+      sb,
+      live: { feed: [] },
+      body: { message: { chat: { id: -2002, title: "OrbitX group", type: "supergroup" }, text: "hello" } },
+      send: async (_t, method, body) => {
+        sent.push({ method, body });
+        return { ok: true, result: { message_id: 1 } };
+      },
+    });
+    expect(out.chat_id).toBe("-2002");
+    expect(sb._tables.ox_calls_chats[0].chat_id).toBe("-2002");
+    expect(sb._tables.ox_calls_desk[0].armed).toBe(true);
+    expect(sent.some((s) => String(s.body.text).includes("live desk linked"))).toBe(true);
   });
 });
