@@ -23,6 +23,8 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain('import TelegramOrbitX from "./pages/TelegramOrbitX"');
     expect(app).toContain('path="/onchain"');
     expect(app).toContain('import OnChainProofPage from "./pages/OnChainProofPage"');
+    expect(app).toContain('path="/calls"');
+    expect(app).toContain('import CallsDesk from "./pages/CallsDesk"');
     expect(app).toContain('path="/on-chain"');
     expect(app).toContain('path="/world"');
     expect(app).toContain('import OnChainWorld from "./pages/OnChainWorld"');

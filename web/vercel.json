@@ -394,6 +394,9 @@
     "api/live-agents.js": {
       "maxDuration": 90
     },
+    "api/orbitx-calls.js": {
+      "maxDuration": 90
+    },
     "api/mcp-life-tick.js": {
       "maxDuration": 90
     },
@@ -438,6 +441,10 @@
     {
       "path": "/api/live-agents?path=tick",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/orbitx-calls?path=tick",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

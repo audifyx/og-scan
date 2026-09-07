@@ -17,6 +17,7 @@ import {
   Sparkles,
   Twitter,
   Crosshair,
+  Megaphone,
   Palette,
 } from "lucide-react";
 import { OWNER_DESK_HREF, OWNER_DESK_PATH } from "@/lib/ownerDesk";
@@ -116,6 +117,19 @@ export const ADMIN_APPS: AdminAppDef[] = [
     tone: "#34D399",
     iconBg: "linear-gradient(135deg, #34D399, #047857)",
     emoji: "🎯",
+  },
+  {
+    key: "calls-desk",
+    to: "/calls",
+    label: "Calls desk",
+    caption: "TG alerts",
+    eyebrow: "/calls",
+    description: "Connect a BotFather token, link the calls channel, and let NEON/WARDEN/RAID post 5-minute tape alerts. No commands.",
+    group: "desks",
+    icon: Megaphone,
+    tone: "#34D399",
+    iconBg: "linear-gradient(135deg, #34D399, #0F766E)",
+    emoji: "📣",
   },
   {
     key: "dex-desk",
