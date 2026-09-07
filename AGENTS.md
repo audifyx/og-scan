@@ -23,6 +23,13 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
 
+## Owner speed rules (non-negotiable)
+
+- Ship in under 5 minutes. No long investigation, no overthinking, no extra cleanup. Smallest working fix, then push.
+- Push working code straight to **`main`** (production). Never leave work on a preview/PR-only branch waiting for a manual deploy.
+- Handle everything end to end yourself: code, SQL migrations (`supabase/migrations`), env notes, tests. Do not hand back partial work.
+- Run only the tests that touch the change, in parallel with other steps. Do not run the full suite unless asked.
+
 ## Cursor Cloud specific instructions
 
 - Production Vercel project is **`rork-og-meme-coin-tracker`**. Set `ADMIN_AUTH` and every other server secret there (Production + Preview). Do **not** target the leftover `og-scan` Vercel project — `web/vercel.json` `ignoreCommand` skips those builds.
