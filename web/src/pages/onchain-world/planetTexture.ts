@@ -51,35 +51,36 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 function finishCanvas(canvas: HTMLCanvasElement): CanvasTexture {
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   tex.needsUpdate = true;
   return tex;
 }
 
 export function makeFallbackPlanetTexture(tint: string, ticker: string, seed = "x"): CanvasTexture {
-  const key = `${tint}|${ticker}|${seed}`;
+  const key = `${tint}|${ticker}|${seed}|bw512`;
   const hit = fallbackCache.get(key);
   if (hit) return hit;
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (!ctx) return finishCanvas(canvas);
 
   const hue = hashHue(seed + tint);
-  const g = ctx.createRadialGradient(size * 0.34, size * 0.3, 8, size * 0.5, size * 0.5, size * 0.72);
-  g.addColorStop(0, tint);
-  g.addColorStop(0.45, `hsl(${hue} 42% 18%)`);
-  g.addColorStop(1, "#05030c");
+  const light = 18 + (hue % 22);
+  const g = ctx.createRadialGradient(size * 0.32, size * 0.28, 12, size * 0.5, size * 0.5, size * 0.74);
+  g.addColorStop(0, `hsl(0 0% ${Math.min(72, light + 38)}%)`);
+  g.addColorStop(0.42, `hsl(0 0% ${light + 8}%)`);
+  g.addColorStop(1, "#050505");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
 
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 48; i++) {
     const x = ((hashHue(`${seed}:${i}`) * 17) % size);
     const y = ((hashHue(`${seed}*${i}`) * 13) % size);
-    const r = 10 + (i % 9) * 6;
+    const r = 14 + (i % 11) * 8;
     const blob = ctx.createRadialGradient(x, y, 1, x, y, r);
-    blob.addColorStop(0, `hsla(${(hue + i * 9) % 360} 50% 48% / 0.38)`);
+    blob.addColorStop(0, `hsla(0 0% ${30 + (i % 40)}% / 0.42)`);
     blob.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = blob;
     ctx.beginPath();
@@ -88,15 +89,19 @@ export function makeFallbackPlanetTexture(tint: string, ticker: string, seed = "
   }
 
   const poles = ctx.createLinearGradient(0, 0, 0, size);
-  poles.addColorStop(0, "rgba(8,6,18,0.72)");
-  poles.addColorStop(0.16, "rgba(8,6,18,0)");
-  poles.addColorStop(0.84, "rgba(8,6,18,0)");
-  poles.addColorStop(1, "rgba(8,6,18,0.72)");
+  poles.addColorStop(0, "rgba(0,0,0,0.72)");
+  poles.addColorStop(0.16, "rgba(0,0,0,0)");
+  poles.addColorStop(0.84, "rgba(0,0,0,0)");
+  poles.addColorStop(1, "rgba(0,0,0,0.78)");
   ctx.fillStyle = poles;
   ctx.fillRect(0, 0, size, size);
 
-  // Deliberately no ticker text baked into the sphere. An unlabelled world
-  // reads as a planet; the name is drawn as a floating label by WorldCanvas.
+  const spec = ctx.createRadialGradient(size * 0.34, size * 0.3, 4, size * 0.34, size * 0.3, size * 0.38);
+  spec.addColorStop(0, "rgba(255,255,255,0.22)");
+  spec.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = spec;
+  ctx.fillRect(0, 0, size, size);
+
   const tex = finishCanvas(canvas);
   fallbackCache.set(key, tex);
   return tex;
@@ -108,28 +113,33 @@ function paintCoinPlanet(img: HTMLImageElement, tint: string, size: number): Can
   const ctx = canvas.getContext("2d");
   if (!ctx) return finishCanvas(canvas);
 
-  ctx.fillStyle = "#07040f";
+  ctx.fillStyle = "#050505";
   ctx.fillRect(0, 0, size, size);
   ctx.drawImage(img, 0, 0, size, size);
+  ctx.save();
+  ctx.globalCompositeOperation = "saturation";
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, size, size);
+  ctx.restore();
 
   const shade = ctx.createLinearGradient(0, 0, size, size);
-  shade.addColorStop(0, "rgba(255,255,255,0.08)");
+  shade.addColorStop(0, "rgba(255,255,255,0.16)");
   shade.addColorStop(0.45, "rgba(0,0,0,0)");
-  shade.addColorStop(1, "rgba(0,0,0,0.28)");
+  shade.addColorStop(1, "rgba(0,0,0,0.42)");
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, size, size);
 
   const poles = ctx.createLinearGradient(0, 0, 0, size);
-  poles.addColorStop(0, "rgba(5,3,12,0.55)");
-  poles.addColorStop(0.14, "rgba(5,3,12,0)");
-  poles.addColorStop(0.86, "rgba(5,3,12,0)");
-  poles.addColorStop(1, "rgba(5,3,12,0.62)");
+  poles.addColorStop(0, "rgba(0,0,0,0.58)");
+  poles.addColorStop(0.14, "rgba(0,0,0,0)");
+  poles.addColorStop(0.86, "rgba(0,0,0,0)");
+  poles.addColorStop(1, "rgba(0,0,0,0.66)");
   ctx.fillStyle = poles;
   ctx.fillRect(0, 0, size, size);
 
-  ctx.strokeStyle = tint;
-  ctx.globalAlpha = 0.18;
-  ctx.lineWidth = 8;
+  ctx.strokeStyle = "#f5f5f5";
+  ctx.globalAlpha = 0.14;
+  ctx.lineWidth = 10;
   ctx.beginPath();
   ctx.ellipse(size / 2, size / 2, size * 0.46, size * 0.14, -0.4, 0, Math.PI * 2);
   ctx.stroke();
@@ -208,7 +218,7 @@ export function usePlanetTexture(
     setTex(fallback);
     if (!url) return undefined;
     let cancelled = false;
-    void requestPlanetTexture(url, hi ? 512 : 256, tint, ticker, priority).then((loaded) => {
+    void requestPlanetTexture(url, hi ? 768 : 512, tint, ticker, priority).then((loaded) => {
       if (!cancelled && loaded) setTex(loaded);
     });
     return () => {

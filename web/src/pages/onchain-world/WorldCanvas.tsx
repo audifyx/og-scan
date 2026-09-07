@@ -104,7 +104,7 @@ function walletPos(address: string, kolIndex: number, kolCount: number, isKol: b
   // never sit on top of a planet.
   const h = hash(address);
   const a = (h % 3600) * (Math.PI / 1800);
-  const r = 168 + (h % 40) / 2;
+  const r = 210 + (h % 40) / 2;
   return [Math.cos(a) * r, ((h % 21) - 10) * 0.9, Math.sin(a) * r];
 }
 
@@ -117,23 +117,22 @@ function holderPos(mint: string, index: number, around: [number, number, number]
 
 function eventColor(type: string): string {
   const t = String(type || "").toUpperCase();
-  if (t.includes("LAUNCH")) return "#a3e635";
-  if (t.includes("LIQUIDITY")) return "#2dd4bf";
-  if (t.includes("BURN")) return "#f59e0b";
-  if (t.includes("BUY")) return "#34d399";
-  if (t.includes("SELL")) return "#fb7185";
-  if (t.includes("SWAP")) return "#22d3ee";
-  if (t.includes("TRANSFER") || t.includes("SOL")) return "#38bdf8";
-  if (t.includes("ORBITX")) return "#c084fc";
-  return "#67e8f9";
+  if (t.includes("LAUNCH")) return "#f5f5f5";
+  if (t.includes("LIQUIDITY")) return "#d4d4d4";
+  if (t.includes("BURN")) return "#a3a3a3";
+  if (t.includes("BUY")) return "#ffffff";
+  if (t.includes("SELL")) return "#737373";
+  if (t.includes("SWAP")) return "#e5e5e5";
+  if (t.includes("TRANSFER") || t.includes("SOL")) return "#c8c8c8";
+  if (t.includes("ORBITX")) return "#fafafa";
+  return "#d4d4d4";
 }
 
 function nodeColor(mint: string, volume: number): string {
-  if (isOrbitxMint(mint)) return "#e9d5ff";
-  const h = hash(mint);
-  if (volume >= 1_000_000) return h % 2 ? "#67e8f9" : "#c4b5fd";
-  if (volume >= 100_000) return h % 2 ? "#38bdf8" : "#a78bfa";
-  return h % 3 === 0 ? "#818cf8" : h % 3 === 1 ? "#22d3ee" : "#c084fc";
+  if (isOrbitxMint(mint)) return "#f5f5f5";
+  if (volume >= 1_000_000) return "#e7e7e7";
+  if (volume >= 100_000) return "#c4c4c4";
+  return "#8a8a8a";
 }
 
 function Glow({ enabled }: { enabled: boolean }) {
@@ -204,14 +203,14 @@ function DustField() {
   });
   return (
     <points ref={points} geometry={buffer}>
-      <pointsMaterial color="#c4b5fd" size={0.032} sizeAttenuation transparent opacity={0.42} depthWrite={false} />
+      <pointsMaterial color="#c4c4c4" size={0.032} sizeAttenuation transparent opacity={0.42} depthWrite={false} />
     </points>
   );
 }
 
 function StarGrid({ on }: { on: boolean }) {
   const helper = useMemo(() => {
-    const g = new PolarGridHelper(180, 16, 8, 64, "#1e1b4b", "#312e81");
+    const g = new PolarGridHelper(180, 16, 8, 64, "#1a1a1a", "#2e2e2e");
     g.position.y = -3.2;
     return g;
   }, []);
@@ -256,23 +255,23 @@ function OrbitXCore({
           map={map}
           roughness={0.48}
           metalness={0.12}
-          emissive="#6d28d9"
-          emissiveIntensity={0.22}
+          emissive="#ffffff"
+          emissiveIntensity={0.16}
           emissiveMap={map}
         />
       </mesh>
       <mesh scale={1.08}>
         <sphereGeometry args={[1.22, lite ? 16 : 40, lite ? 16 : 40]} />
-        <meshBasicMaterial color="#c084fc" transparent opacity={0.16} side={BackSide} blending={AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color="#f5f5f5" transparent opacity={0.12} side={BackSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh ref={glow}>
         <sphereGeometry args={[1.62, 32, 32]} />
-        <meshBasicMaterial color="#a78bfa" transparent opacity={0.1} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.08} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
-      {lite ? null : <Sparkles count={64} scale={[3.6, 3.6, 3.6]} size={3.2} color="#e9d5ff" />}
-      <pointLight position={[0, 0.4, 0]} intensity={pulsing ? 42 : 28} distance={30} color="#c084fc" />
+      {lite ? null : <Sparkles count={64} scale={[3.6, 3.6, 3.6]} size={3.2} color="#f5f5f5" />}
+      <pointLight position={[0, 0.4, 0]} intensity={pulsing ? 28 : 16} distance={30} color="#ffffff" />
       {showLabel ? (
-        <Text position={[0, 2.28, 0]} fontSize={0.36} color="#f5d0fe" anchorX="center" outlineWidth={0.025} outlineColor="#12081c">
+        <Text position={[0, 2.28, 0]} fontSize={0.36} color="#f5f5f5" anchorX="center" outlineWidth={0.025} outlineColor="#050505">
           {cap ? `OrbitX  ${cap}` : "OrbitX"}
         </Text>
       ) : null}
@@ -311,13 +310,13 @@ function TokenStar({
   const name = tokenLabel(district);
   const ticker = tokenTicker(district);
   const hi = selected || lod === "inspect" || lod === "local";
-  const wantImage = Boolean(district.image) && (selected || (!lite && (hi || node.rank === "planet")));
+  const wantImage = Boolean(district.image) && (selected || !lite);
   const map = usePlanetTexture(
     wantImage ? district.image : null,
     color,
     ticker || name.slice(0, 4),
     district.mint,
-    selected,
+    selected || node.rank === "planet",
     selected ? 9 : labeled ? 6 : node.rank === "planet" ? 5 : 3,
   );
   const sub = district.volume_24h != null ? `${fmtNum(district.volume_24h)} VOL` : district.market_cap != null ? fmtUsd(district.market_cap) : "";
@@ -325,7 +324,7 @@ function TokenStar({
     if (paused || !spin || !body.current) return;
     body.current.rotation.y += dt * (selected ? 0.22 : 0.09 + (hash(district.mint) % 8) / 120);
   });
-  const segs = hi ? (selected ? 48 : 28) : 12;
+  const segs = hi ? (selected ? 64 : 40) : 24;
   return (
     <group position={pos} onClick={(e) => { e.stopPropagation(); onPick(); }}>
       <mesh ref={body} scale={r}>
@@ -362,12 +361,12 @@ function TokenStar({
         </mesh>
       ) : null}
       {labeled ? (
-        <Text position={[0, r + 0.46, 0]} fontSize={selected ? 0.22 : 0.16} color="#eef2ff" anchorX="center" outlineWidth={0.014} outlineColor="#05030c">
+        <Text position={[0, r + 0.46, 0]} fontSize={selected ? 0.22 : 0.16} color="#f5f5f5" anchorX="center" outlineWidth={0.014} outlineColor="#000000">
           {name}
         </Text>
       ) : null}
       {selected && ticker ? (
-        <Text position={[0, r + 0.78, 0]} fontSize={0.14} color="#a5b4fc" anchorX="center" outlineWidth={0.01} outlineColor="#05030c">
+        <Text position={[0, r + 0.78, 0]} fontSize={0.14} color="#a3a3a3" anchorX="center" outlineWidth={0.01} outlineColor="#000000">
           {`$${ticker}${sub ? ` · ${sub}` : ""}`}
         </Text>
       ) : null}
@@ -400,7 +399,7 @@ function Agent({
     ref.current.position.y = pos[1] + Math.sin(clock.elapsedTime * 2.1 + pos[0]) * 0.08;
     ref.current.rotation.y += 0.014;
   });
-  const color = followed ? "#f0abfc" : kol ? "#e879f9" : whale ? "#fbbf24" : "#38bdf8";
+  const color = followed ? "#ffffff" : kol ? "#e5e5e5" : whale ? "#d4d4d4" : "#a3a3a3";
   const s = whale ? 0.22 : kol ? 0.16 : 0.09;
   return (
     <group position={[pos[0], 0, pos[2]]} onClick={(e) => { e.stopPropagation(); onPick(); }}>
@@ -409,7 +408,7 @@ function Agent({
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={followed ? 1.5 : 1} metalness={0.25} roughness={0.18} />
       </mesh>
       {(kol || followed) && (
-        <Text position={[0, pos[1] + 0.42, 0]} fontSize={0.16} color={color} anchorX="center" outlineWidth={0.012} outlineColor="#05030c">
+        <Text position={[0, pos[1] + 0.42, 0]} fontSize={0.16} color={color} anchorX="center" outlineWidth={0.012} outlineColor="#000000">
           {label}
         </Text>
       )}
@@ -550,7 +549,7 @@ function CameraRig({
       camera.position.add(vel.current);
     }
     if (flyingTo.current) {
-      camera.position.lerp(flyingTo.current, 0.09);
+      camera.position.lerp(flyingTo.current, 0.065);
       if (camera.position.distanceTo(flyingTo.current) < 0.55) {
         flyingTo.current = null;
         onConsumed?.();
@@ -580,10 +579,10 @@ function OrbitRing({ id, count, visible }: { id: ClusterId; count: number; visib
         />
       </mesh>
       <group position={[label[0], label[1] + meta.band * 1.5, label[2]]}>
-        <Text fontSize={2.1} color={meta.color} anchorX="center" outlineWidth={0.05} outlineColor="#05030c">
+        <Text fontSize={2.1} color={meta.color} anchorX="center" outlineWidth={0.05} outlineColor="#000000">
           {meta.label}
         </Text>
-        <Text position={[0, -2.0, 0]} fontSize={1.0} color="#cbd5e1" anchorX="center" outlineWidth={0.03} outlineColor="#05030c">
+        <Text position={[0, -2.0, 0]} fontSize={1.0} color="#a3a3a3" anchorX="center" outlineWidth={0.03} outlineColor="#000000">
           {`${count} worlds`}
         </Text>
       </group>
@@ -608,10 +607,10 @@ function KolOrbitRing({ count, visible }: { count: number; visible: boolean }) {
         />
       </mesh>
       <group position={[label[0], label[1] + 3.4, label[2]]}>
-        <Text fontSize={1.5} color={KOL_RING.color} anchorX="center" outlineWidth={0.04} outlineColor="#05030c">
+        <Text fontSize={1.5} color={KOL_RING.color} anchorX="center" outlineWidth={0.04} outlineColor="#000000">
           {KOL_RING.label}
         </Text>
-        <Text position={[0, -1.5, 0]} fontSize={0.8} color="#cbd5e1" anchorX="center" outlineWidth={0.025} outlineColor="#05030c">
+        <Text position={[0, -1.5, 0]} fontSize={0.8} color="#a3a3a3" anchorX="center" outlineWidth={0.025} outlineColor="#000000">
           {`${count} tracked`}
         </Text>
       </group>
@@ -754,14 +753,14 @@ function Scene({
 
   return (
     <>
-      <color attach="background" args={["#02010a"]} />
-      <fog attach="fog" args={lite ? ["#070314", 36, 170] : ["#070314", 48, 260]} />
-      <ambientLight intensity={0.22} color="#9bb6ff" />
-      <directionalLight position={[40, 48, 22]} intensity={1.55} color="#fff4e0" />
-      <directionalLight position={[-28, 12, -24]} intensity={0.28} color="#67e8f9" />
-      <pointLight position={[0, 2, 0]} intensity={22} distance={36} color="#c084fc" />
-      <pointLight position={[40, -8, 24]} intensity={10} distance={54} color="#22d3ee" />
-      <Stars radius={lite ? 220 : 380} depth={80} count={lite ? 2200 : lod === "galaxy" ? 14000 : 9000} factor={lite ? 2.6 : 3.4} saturation={0.18} fade speed={0} />
+      <color attach="background" args={["#000000"]} />
+      <fog attach="fog" args={lite ? ["#050505", 40, 190] : ["#050505", 56, 300]} />
+      <ambientLight intensity={0.32} color="#f0f0f0" />
+      <directionalLight position={[40, 48, 22]} intensity={1.7} color="#ffffff" />
+      <directionalLight position={[-28, 12, -24]} intensity={0.22} color="#a3a3a3" />
+      <pointLight position={[0, 2, 0]} intensity={14} distance={40} color="#ffffff" />
+      <pointLight position={[40, -8, 24]} intensity={6} distance={54} color="#d4d4d4" />
+      <Stars radius={lite ? 220 : 380} depth={80} count={lite ? 2200 : lod === "galaxy" ? 14000 : 9000} factor={lite ? 2.6 : 3.4} saturation={0} fade speed={0} />
       <NebulaField />
       <DustField />
       <StarGrid on={viewOptions.grid} />
@@ -782,7 +781,7 @@ function Scene({
       {(districts?.hubs?.length ? districts.hubs : DEX_HUBS).map((hub, i) => {
         const a = (i / 3) * Math.PI * 2;
         const pos: [number, number, number] = [Math.cos(a) * 16, 1.8, Math.sin(a) * 16];
-        const color = hub.id === "jupiter" ? "#22d3ee" : hub.id === "raydium" ? "#a78bfa" : "#fb923c";
+        const color = "#d4d4d4";
         return (
           <group key={hub.id} position={pos} onClick={(e) => { e.stopPropagation(); onPick({ kind: "hub", id: hub.id }); }}>
             <mesh>
@@ -790,7 +789,7 @@ function Scene({
               <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.1} />
             </mesh>
             {viewOptions.labels ? (
-              <Text position={[0, 1.05, 0]} fontSize={0.24} color={color} anchorX="center" outlineWidth={0.012} outlineColor="#05030c">
+              <Text position={[0, 1.05, 0]} fontSize={0.24} color={color} anchorX="center" outlineWidth={0.012} outlineColor="#000000">
                 {hub.label}
               </Text>
             ) : null}
@@ -898,12 +897,13 @@ function Scene({
         ref={controls}
         enablePan
         enableZoom
-        enableDamping={false}
-        zoomSpeed={1.35}
-        panSpeed={1.15}
-        rotateSpeed={0.72}
+        enableDamping
+        dampingFactor={0.078}
+        zoomSpeed={0.95}
+        panSpeed={0.72}
+        rotateSpeed={0.48}
         enableRotate={!stickBusy}
-        maxDistance={280}
+        maxDistance={360}
         minDistance={1.6}
         autoRotate={false}
         screenSpacePanning

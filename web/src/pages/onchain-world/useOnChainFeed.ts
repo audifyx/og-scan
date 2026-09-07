@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { allOrbitxKols } from "../../../shared/orbitx-kol-directory.js";
 import { loadCityDistricts } from "../../../shared/orbitx-chain-districts.js";
 import type { KolCard, WalletPayload } from "./api";
-import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchStatus, fetchToken, fetchTrending, fetchTx, fetchWallet } from "./api";
+import { fetchDistricts, fetchEvents, fetchKols, fetchLive, fetchOrbitx, fetchStatus, fetchToken, fetchTrending, fetchWallet } from "./api";
 import { liveToSnapshot, mergeChainEvents, toWalletSnapshot } from "./lib/mapLive";
 import { tallyActivity } from "./activityStats";
 import { ORBITX_MINT } from "../../../shared/orbitx-chain-intel.js";
@@ -108,6 +108,7 @@ export function useOnChainFeed() {
   const selectToken = useOrbitxStore((s) => s.selectToken);
   const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
   const setTokenDetail = useOrbitxStore((s) => s.setTokenDetail);
+  const setActiveView = useOrbitxStore((s) => s.setActiveView);
   const selectedToken = useOrbitxStore((s) => s.selectedToken);
   const liveInflight = useRef(false);
   const catalogInflight = useRef(false);
@@ -311,12 +312,17 @@ export function useOnChainFeed() {
 
   useEffect(() => {
     if (params.signature) {
-      void fetchTx(params.signature).catch(() => undefined);
+      setActiveView("tx");
+      return;
+    }
+    if (params.slot) {
+      setActiveView("block");
       return;
     }
     if (params.address && location.pathname.includes("/wallet/")) {
       trackWallet(params.address);
       setCamCommand({ kind: "wallet", address: params.address });
+      setActiveView("wallets");
       return;
     }
     if (params.address && location.pathname.includes("/token/")) {
@@ -328,7 +334,7 @@ export function useOnChainFeed() {
         })
         .catch(() => undefined);
     }
-  }, [params.address, params.signature, trackWallet, selectToken, setCamCommand, setTokenDetail]);
+  }, [params.address, params.signature, params.slot, trackWallet, selectToken, setCamCommand, setTokenDetail, setActiveView]);
 
   useEffect(() => {
     if (!selectedToken) return;

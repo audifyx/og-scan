@@ -86,7 +86,7 @@ export function WorldView() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-[#02010a]">
+      <div className="relative h-full min-h-0 flex-1 overflow-hidden bg-black">
         {showGl ? (
           <WorldCanvas
             events={events}
@@ -210,6 +210,7 @@ function InspectHud({
   onFocusToken: (mint: string) => void;
   onTrackWallet: (address: string) => void;
 }) {
+  const nav = useNavigate();
   const from = event.source_wallet || event.wallet;
   const to = event.destination_wallet || event.counterparty;
   const amount =
@@ -255,14 +256,16 @@ function InspectHud({
           </Button>
         ) : null}
         {event.signature ? (
-          <a
-            href={`https://solscan.io/tx/${event.signature}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-6 items-center rounded-sm px-1.5 text-2xs text-cyan hover:text-fg"
+          <Button
+            size="xs"
+            variant="subtle"
+            onClick={() => {
+              useOrbitxStore.getState().setActiveView("tx");
+              nav(`/on-chain/tx/${event.signature}`);
+            }}
           >
-            Solscan
-          </a>
+            Open tx
+          </Button>
         ) : null}
       </div>
     </aside>

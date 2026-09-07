@@ -84,6 +84,7 @@ export function toLiveEvent(ev: ChainEvent): LiveEvent {
     usd: ev.usd_value ?? null,
     detail: ev.description || ev.wallet_label || ev.wallet || ev.source_wallet || undefined,
     wallet: ev.wallet || ev.source_wallet || undefined,
+    signature: ev.signature || undefined,
     ts: ev.block_time ? Date.parse(ev.block_time) || Date.now() : Date.now(),
   };
 }

@@ -1,43 +1,43 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Oxanium:wght@500;600;700&display=swap");
 
 .ox-dash {
-  --color-bg: #07080e;
-  --color-bg-raised: #0b0e16;
-  --color-bg-panel: #0c1018;
-  --color-bg-hover: #141825;
-  --color-bg-sunken: #080a10;
-  --color-fg: #e8eaf2;
-  --color-muted: #8b90a5;
-  --color-dim: #5c6178;
-  --color-faint: #3a3e52;
-  --color-line: rgb(139 92 246 / 0.2);
-  --color-line-strong: rgb(139 92 246 / 0.42);
-  --color-accent: #c4b5fd;
-  --color-accent-2: #8b5cf6;
-  --color-live: #34d399;
-  --color-cyan: #22d3ee;
-  --color-buy: #34d399;
-  --color-sell: #e879f9;
-  --color-burn: #fb923c;
-  --color-transfer: #38bdf8;
-  --color-whale: #c084fc;
-  --color-launch: #2dd4bf;
-  --color-warn: #fbbf24;
-  --color-danger: #f87171;
-  --color-slice-buy: #7c5cfc;
-  --color-slice-transfer: #3b82f6;
-  --color-slice-sell: #f59e0b;
-  --color-slice-orbitx: #a3e635;
-  --color-slice-burn: #14b8a6;
-  --color-slice-other: #475569;
-  --muted: 228 12% 60%;
-  --muted-foreground: 228 12% 60%;
-  --accent: 258 91% 76%;
+  --color-bg: #000000;
+  --color-bg-raised: #070707;
+  --color-bg-panel: #0a0a0a;
+  --color-bg-hover: #141414;
+  --color-bg-sunken: #050505;
+  --color-fg: #f5f5f5;
+  --color-muted: #a3a3a3;
+  --color-dim: #737373;
+  --color-faint: #3f3f3f;
+  --color-line: rgb(255 255 255 / 0.12);
+  --color-line-strong: rgb(255 255 255 / 0.28);
+  --color-accent: #f5f5f5;
+  --color-accent-2: #d4d4d4;
+  --color-live: #ffffff;
+  --color-cyan: #e5e5e5;
+  --color-buy: #f5f5f5;
+  --color-sell: #737373;
+  --color-burn: #a3a3a3;
+  --color-transfer: #c8c8c8;
+  --color-whale: #e5e5e5;
+  --color-launch: #d4d4d4;
+  --color-warn: #d4d4d4;
+  --color-danger: #a3a3a3;
+  --color-slice-buy: #f5f5f5;
+  --color-slice-transfer: #c8c8c8;
+  --color-slice-sell: #737373;
+  --color-slice-orbitx: #ffffff;
+  --color-slice-burn: #a3a3a3;
+  --color-slice-other: #3f3f3f;
+  --muted: 0 0% 64%;
+  --muted-foreground: 0 0% 64%;
+  --accent: 0 0% 96%;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Oxanium", "IBM Plex Sans", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --text-2xs: 0.625rem;
-  --shadow-panel: 0 0 0 1px rgb(139 92 246 / 0.16), 0 18px 40px rgb(0 0 0 / 0.45);
+  --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.1), 0 18px 40px rgb(0 0 0 / 0.65);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   font-family: var(--font-sans);
   background: var(--color-bg);
@@ -88,7 +88,7 @@
 
 .ox-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgb(139 92 246 / 0.35) transparent;
+  scrollbar-color: rgb(255 255 255 / 0.28) transparent;
 }
 
 .ox-scroll::-webkit-scrollbar {
@@ -97,7 +97,7 @@
 }
 
 .ox-scroll::-webkit-scrollbar-thumb {
-  background: rgb(139 92 246 / 0.35);
+  background: rgb(255 255 255 / 0.28);
   border-radius: 99px;
 }
 

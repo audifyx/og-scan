@@ -11,29 +11,43 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/pages/onchain-world/dashboard/ui/dropdown-menu";
+import { fetchSearch } from "@/pages/onchain-world/api";
 import { APP_NAME } from "@/pages/onchain-world/lib/orbitx/constants";
-import { formatAge, formatInt, formatUsd, utcClock } from "@/pages/onchain-world/lib/orbitx/format";
+import { exploreTargetsForQuery } from "@/pages/onchain-world/lib/orbitx/explore";
+import { formatAge, formatInt, utcClock } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
+import type { CenterView } from "@/pages/onchain-world/lib/orbitx/types";
 import { matchTokenQuery, tokenLabel, tokenTicker } from "../../../../shared/orbitx-chain-districts.js";
+import { detectQueryKind } from "../../../../shared/orbitx-chain-intel.js";
 
 function Stat({
   label,
   value,
   delta,
+  onClick,
 }: {
   label: string;
   value: string;
   delta?: string | null;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 px-3 py-1.5">
+  const inner = (
+    <>
       <span className="ox-kicker">{label}</span>
       <div className="flex items-baseline gap-1.5">
         <span className="ox-stat text-sm font-medium text-fg">{value}</span>
         {delta ? <span className="ox-stat text-2xs text-live">{delta}</span> : null}
       </div>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="flex min-w-0 flex-col gap-0.5 px-3 py-1.5 text-left hover:bg-bg-hover">
+        {inner}
+      </button>
+    );
+  }
+  return <div className="flex min-w-0 flex-col gap-0.5 px-3 py-1.5">{inner}</div>;
 }
 
 export function TopBar() {
@@ -49,8 +63,11 @@ export function TopBar() {
   const orbitx = useOrbitxStore((s) => s.city.districts.orbitx);
   const selectToken = useOrbitxStore((s) => s.selectToken);
   const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
+  const trackWallet = useOrbitxStore((s) => s.trackWallet);
+  const setView = useOrbitxStore((s) => s.setActiveView);
   const [now, setNow] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [remote, setRemote] = useState<Array<{ mint: string; name: string; ticker: string; image: string | null }>>([]);
 
   const hits = useMemo(() => {
     const catalog = [orbitx, ...tokens].filter(Boolean);
@@ -58,12 +75,68 @@ export function TopBar() {
     return catalog.filter((t) => t && matchTokenQuery(t, query)).slice(0, 8);
   }, [orbitx, tokens, query]);
 
+  const targets = useMemo(() => exploreTargetsForQuery(query), [query]);
+
   useEffect(() => {
     const tick = () => setNow(utcClock(new Date()));
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    const kind = detectQueryKind(q);
+    if (!q || kind.kind === "signature" || kind.kind === "slot") {
+      setRemote([]);
+      return;
+    }
+    const id = window.setTimeout(() => {
+      void fetchSearch(q)
+        .then((res) => {
+          const pairs = (res.pairs || [])
+            .concat((res.tokens || []).map((t) => ({ mint: t.mint, symbol: t.symbol, name: t.name, image: t.image })))
+            .filter((p) => p.mint)
+            .slice(0, 6)
+            .map((p) => ({
+              mint: String(p.mint),
+              name: p.name || p.symbol || String(p.mint),
+              ticker: p.symbol || "",
+              image: p.image || null,
+            }));
+          setRemote(pairs);
+        })
+        .catch(() => setRemote([]));
+    }, 280);
+    return () => window.clearTimeout(id);
+  }, [query]);
+
+  function go(path: string, view: CenterView, extra?: { mint?: string; wallet?: string }) {
+    if (extra?.mint) {
+      selectToken(extra.mint);
+      setCamCommand({ kind: "token", mint: extra.mint });
+    }
+    if (extra?.wallet) {
+      trackWallet(extra.wallet);
+      setCamCommand({ kind: "wallet", address: extra.wallet });
+    }
+    setView(view);
+    nav(path);
+    setOpen(false);
+  }
+
+  function submit() {
+    const q = query.trim();
+    if (!q) return;
+    if (targets[0]) {
+      go(targets[0].path, targets[0].view);
+      return;
+    }
+    const first = hits[0] || (remote[0] ? { mint: remote[0].mint } : null);
+    if (first?.mint) {
+      go(`/on-chain/token/${first.mint}`, "world", { mint: first.mint });
+    }
+  }
 
   const live = Boolean(network.live);
   const liveLabel = network.liveLabel || (live ? "LIVE" : "IDLE");
@@ -74,6 +147,14 @@ export function TopBar() {
         label="Block"
         value={formatInt(ticker.block)}
         delta={ticker.blockAgeSec != null ? `+${formatAge(ticker.blockAgeSec)}` : null}
+        onClick={
+          ticker.block != null
+            ? () => {
+                setView("block");
+                nav(`/on-chain/block/${ticker.block}`);
+              }
+            : undefined
+        }
       />
       <Stat label="Tx / Min" value={formatInt(ticker.txPerMin)} />
       <Stat label="Events / sec" value={ticker.eventsPerSec == null ? "—" : String(ticker.eventsPerSec)} />
@@ -88,11 +169,13 @@ export function TopBar() {
     </div>
   );
 
+  const showMenu = open && (targets.length > 0 || hits.length > 0 || remote.length > 0);
+
   return (
     <header className="flex shrink-0 flex-col border-b border-line bg-bg-raised">
       <div className="flex h-12 items-center gap-3 px-3">
         <div className="flex shrink-0 items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-md bg-accent-2/20 shadow-[0_0_18px_rgb(139_92_246_/_0.35)]">
+          <span className="flex size-8 items-center justify-center rounded-md bg-white/10 shadow-[0_0_18px_rgb(255_255_255_/_0.18)]">
             <OrbitxMark className="size-5" />
           </span>
           <div className="flex items-center gap-2">
@@ -124,12 +207,33 @@ export function TopBar() {
               }}
               onFocus={() => setOpen(true)}
               onBlur={() => window.setTimeout(() => setOpen(false), 180)}
-              placeholder="Search 250 trending"
-              className="h-8 w-44 bg-transparent text-xs text-fg outline-none placeholder:text-dim lg:w-56"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Search tx, wallet, token, block"
+              className="h-8 w-52 bg-transparent text-xs text-fg outline-none placeholder:text-dim lg:w-64"
             />
           </label>
-          {open && hits.length > 0 ? (
-            <div className="absolute right-0 top-11 z-20 w-72 overflow-hidden rounded-md border border-line bg-bg-panel shadow-[0_18px_40px_rgb(0_0_0_/_0.5)]">
+          {showMenu ? (
+            <div className="absolute right-0 top-11 z-20 w-80 overflow-hidden rounded-md border border-line bg-bg-panel shadow-[0_18px_40px_rgb(0_0_0_/_0.5)]">
+              {targets.map((t) => (
+                <button
+                  key={t.path + t.label}
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-hover"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => go(t.path, t.view)}
+                >
+                  <span className="size-6 rounded-full border border-line" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-fg">{t.label}</span>
+                    <span className="block truncate text-2xs text-dim">{t.path}</span>
+                  </span>
+                </button>
+              ))}
               {hits.map((t) =>
                 t ? (
                   <button
@@ -137,34 +241,50 @@ export function TopBar() {
                     type="button"
                     className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-hover"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      selectToken(t.mint);
-                      setCamCommand({ kind: "token", mint: t.mint });
-                      nav(`/on-chain/token/${t.mint}`);
-                      setOpen(false);
-                    }}
+                    onClick={() => go(`/on-chain/token/${t.mint}`, "world", { mint: t.mint })}
                   >
                     {t.image ? (
-                      <img src={t.image} alt="" className="size-6 rounded-full object-cover" />
+                      <img src={t.image} alt="" className="size-6 rounded-full object-cover grayscale" />
                     ) : (
                       <span className="size-6 rounded-full bg-bg-hover" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs text-fg">{tokenLabel(t)}</span>
                       <span className="block truncate text-2xs text-dim">
-                        {tokenTicker(t) ? `$${tokenTicker(t)}` : "Solana"}
+                        {tokenTicker(t) ? `$${tokenTicker(t)}` : "Solana token"}
                       </span>
                     </span>
                   </button>
                 ) : null,
               )}
+              {remote
+                .filter((r) => !hits.some((h) => h?.mint === r.mint))
+                .map((t) => (
+                  <button
+                    key={`r-${t.mint}`}
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-hover"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => go(`/on-chain/token/${t.mint}`, "world", { mint: t.mint })}
+                  >
+                    {t.image ? (
+                      <img src={t.image} alt="" className="size-6 rounded-full object-cover grayscale" />
+                    ) : (
+                      <span className="size-6 rounded-full bg-bg-hover" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs text-fg">{t.name}</span>
+                      <span className="block truncate text-2xs text-dim">{t.ticker ? `$${t.ticker}` : "Search hit"}</span>
+                    </span>
+                  </button>
+                ))}
             </div>
           ) : null}
           <span className="ox-stat hidden min-w-28 text-right text-xs text-muted lg:inline">
             {now ?? "—"}
           </span>
-          <span className="hidden items-center gap-1.5 rounded-sm border border-line px-2 py-1 text-2xs font-semibold tracking-wider text-cyan sm:inline-flex">
-            <span className="size-1.5 rounded-full bg-cyan" />
+          <span className="hidden items-center gap-1.5 rounded-sm border border-line px-2 py-1 text-2xs font-semibold tracking-wider text-fg sm:inline-flex">
+            <span className="size-1.5 rounded-full bg-fg" />
             SOLANA
           </span>
           <Button

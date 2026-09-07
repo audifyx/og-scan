@@ -1,5 +1,7 @@
 import { Copy, Crosshair, ExternalLink, Radio } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { EmptyState } from "@/pages/onchain-world/dashboard/EmptyState";
+import { HolderBubbles } from "@/pages/onchain-world/dashboard/HolderBubbles";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { clock } from "@/pages/onchain-world/format";
 import { buySellRatio, kolEventsFor, recentLargeEvents, tokenActivity, windowedTokenActivity } from "@/pages/onchain-world/activityStats";
@@ -11,6 +13,7 @@ import { tokenLabel, tokenTicker } from "../../../../shared/orbitx-chain-distric
 import { isOrbitxMint } from "../../../../shared/orbitx-chain-intel.js";
 
 export function TokenPanel() {
+  const nav = useNavigate();
   const selected = useOrbitxStore((s) => s.selectedToken);
   const detail = useOrbitxStore((s) => s.tokenDetail);
   const districts = useOrbitxStore((s) => s.city.districts);
@@ -62,7 +65,7 @@ export function TokenPanel() {
         {token.banner ? (
           <img src={token.banner} alt="" className="h-20 w-full object-cover" />
         ) : (
-          <div className="h-12 bg-gradient-to-r from-accent-2/30 to-cyan/10" />
+          <div className="h-12 bg-gradient-to-r from-white/15 to-white/5" />
         )}
         <div className="flex items-center gap-2.5 px-3 py-2.5">
           {token.image ? (
@@ -153,6 +156,8 @@ export function TokenPanel() {
           </a>
         </div>
 
+        {buyers.length > 0 ? <HolderBubbles buyers={detail?.buyers || buyers} /> : null}
+
         {buyers.length > 0 ? (
           <section className="border-b border-line px-3 py-2.5">
             <h3 className="ox-kicker mb-2 text-fg">Observed wallets</h3>
@@ -219,12 +224,23 @@ export function TokenPanel() {
             <ul className="space-y-2">
               {related.map((e) => (
                 <li key={e.event_id} className="text-2xs">
-                  <p className="text-fg">{e.event_type.replace(/_/g, " ")}</p>
-                  <p className="text-dim">
-                    {e.wallet_label || formatAddress(e.wallet)}
-                    {e.amount != null ? ` · ${e.amount}` : e.sol_amount != null ? ` · ${e.sol_amount} SOL` : ""}
-                    {` · ${clock(e.block_time)}`}
-                  </p>
+                  <button
+                    type="button"
+                    className="w-full text-left hover:text-fg"
+                    onClick={() => {
+                      if (e.signature) {
+                        setView("tx");
+                        nav(`/on-chain/tx/${e.signature}`);
+                      }
+                    }}
+                  >
+                    <p className="text-fg">{e.event_type.replace(/_/g, " ")}</p>
+                    <p className="text-dim">
+                      {e.wallet_label || formatAddress(e.wallet)}
+                      {e.amount != null ? ` · ${e.amount}` : e.sol_amount != null ? ` · ${e.sol_amount} SOL` : ""}
+                      {` · ${clock(e.block_time)}`}
+                    </p>
+                  </button>
                 </li>
               ))}
             </ul>

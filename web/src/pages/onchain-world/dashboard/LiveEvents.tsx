@@ -1,4 +1,5 @@
 import { Filter, Radio } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { EventKindGlyph } from "@/pages/onchain-world/dashboard/EventKindGlyph";
 import { EmptyState } from "@/pages/onchain-world/dashboard/EmptyState";
 import { Badge } from "@/pages/onchain-world/dashboard/ui/badge";
@@ -99,10 +100,12 @@ export function LiveEvents() {
 }
 
 function EventRow({ event }: { event: LiveEvent }) {
+  const nav = useNavigate();
   const meta = EVENT_META[event.kind];
   const trackWallet = useOrbitxStore((s) => s.trackWallet);
   const setFollowId = useOrbitxStore((s) => s.setFollowId);
   const setCamCommand = useOrbitxStore((s) => s.setCamCommand);
+  const setView = useOrbitxStore((s) => s.setActiveView);
   return (
     <li>
       <button
@@ -110,6 +113,11 @@ function EventRow({ event }: { event: LiveEvent }) {
         className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-bg-hover"
         onClick={() => {
           setFollowId(event.id);
+          if (event.signature) {
+            setView("tx");
+            nav(`/on-chain/tx/${event.signature}`);
+            return;
+          }
           if (event.wallet) {
             trackWallet(event.wallet);
             setCamCommand({ kind: "wallet", address: event.wallet });

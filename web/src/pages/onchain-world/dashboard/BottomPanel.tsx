@@ -1,4 +1,5 @@
 import { Activity, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -33,6 +34,7 @@ const KIND_MATCH: Record<BottomTab, EventKind[] | null> = {
 };
 
 export function BottomPanel() {
+  const nav = useNavigate();
   const tab = useOrbitxStore((s) => s.bottomTab);
   const setTab = useOrbitxStore((s) => s.setBottomTab);
   const snapRows = useOrbitxStore((s) => s.snapshot.transactions);
@@ -114,6 +116,10 @@ export function BottomPanel() {
                     key={row.id}
                     className="cursor-pointer border-b border-line/70 hover:bg-bg-hover"
                     onClick={() => {
+                      if (row.signature) {
+                        useOrbitxStore.getState().setActiveView("tx");
+                        nav(`/on-chain/tx/${row.signature}`);
+                      }
                       if (row.wallet) {
                         useOrbitxStore.getState().trackWallet(row.wallet);
                         useOrbitxStore.getState().setFollowId(row.id);

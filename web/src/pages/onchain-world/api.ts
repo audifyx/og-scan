@@ -272,10 +272,6 @@ export function fetchLive(filters: FilterState): Promise<LivePayload> {
   return getJson<LivePayload>(`live${q ? `?${q}` : ""}`);
 }
 
-export function fetchSearch(q: string) {
-  return getJson<Record<string, unknown>>(`search?q=${encodeURIComponent(q)}`);
-}
-
 export function fetchWallet(address: string) {
   return getJson<WalletPayload>(`wallet/${encodeURIComponent(address)}`);
 }
@@ -284,8 +280,61 @@ export function fetchToken(mint: string) {
   return getJson<TokenPayload>(`token/${encodeURIComponent(mint)}`);
 }
 
+export type TxPayload = {
+  ok: boolean;
+  signature: string;
+  slot?: number | null;
+  block_time?: string | null;
+  status?: string;
+  fee?: number | null;
+  events?: ChainEvent[];
+  raw?: unknown;
+  parsed?: unknown;
+  error?: string;
+};
+
+export type BlockPayload = {
+  ok: boolean;
+  slot: number;
+  block_time?: string | null;
+  signatures?: string[];
+  transaction_count?: number | null;
+  error?: string;
+};
+
+export type SearchPayload = {
+  ok: boolean;
+  kind?: string;
+  query?: string;
+  mint?: string;
+  address?: string;
+  signature?: string;
+  slot?: number | null;
+  token?: TokenDistrict;
+  tokens?: TokenDistrict[];
+  pairs?: Array<{
+    mint?: string;
+    symbol?: string | null;
+    name?: string | null;
+    image?: string | null;
+    price_usd?: number | null;
+    market_cap?: number | null;
+    volume_24h?: number | null;
+    dex?: string | null;
+  }>;
+  error?: string;
+};
+
+export function fetchSearch(q: string) {
+  return getJson<SearchPayload>(`search?q=${encodeURIComponent(q)}`);
+}
+
 export function fetchTx(signature: string) {
-  return getJson<Record<string, unknown>>(`transaction/${encodeURIComponent(signature)}`);
+  return getJson<TxPayload>(`transaction/${encodeURIComponent(signature)}`);
+}
+
+export function fetchBlock(slot: string | number) {
+  return getJson<BlockPayload>(`block/${encodeURIComponent(String(slot))}`);
 }
 
 export function fetchOrbitx() {

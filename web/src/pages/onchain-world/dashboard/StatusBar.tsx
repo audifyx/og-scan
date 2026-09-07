@@ -1,11 +1,14 @@
 import { Activity, Radio, Unplug, Wifi } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { APP_NAME, APP_VERSION } from "@/pages/onchain-world/lib/orbitx/constants";
 import { blank, formatAge, formatInt } from "@/pages/onchain-world/lib/orbitx/format";
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { cn } from "@/lib/utils";
 
 export function StatusBar() {
+  const nav = useNavigate();
   const network = useOrbitxStore((s) => s.snapshot.network);
+  const setView = useOrbitxStore((s) => s.setActiveView);
   const rpcTone =
     network.rpc === "healthy" ? "text-live" : network.rpc === "idle" ? "text-warn" : "text-danger";
   const wsOn = network.ws === "connected";
@@ -23,10 +26,18 @@ export function StatusBar() {
         RPC {network.rpc === "healthy" ? "live" : network.rpc}
       </span>
       <span className="hidden h-3 w-px bg-line md:block" />
-      <span className="hidden text-muted md:inline">
+      <button
+        type="button"
+        className="hidden text-muted md:inline"
+        onClick={() => {
+          if (network.lastIndexedBlock == null) return;
+          setView("block");
+          nav(`/on-chain/block/${network.lastIndexedBlock}`);
+        }}
+      >
         Last indexed block{" "}
         <span className="ox-stat text-fg">{formatInt(network.lastIndexedBlock)}</span>
-      </span>
+      </button>
       <span className="hidden text-muted lg:inline">
         Indexing delay{" "}
         <span className="ox-stat text-fg">

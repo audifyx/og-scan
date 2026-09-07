@@ -85,16 +85,16 @@ function meta(
 }
 
 export const CLUSTER_META: Record<ClusterId, RingMeta> = {
-  orbitx: { label: "ORBITX CORE", orbit: 0, tilt: 0, phase: 0, band: 6, color: "#e9d5ff", center: [0, 0, 0], spread: 14 },
-  majors: meta("MAJORS", 46, 0.10, 0.0, 4.2, "#fbbf24"),
-  established: meta("ESTABLISHED", 68, -0.16, 0.9, 5.0, "#67e8f9"),
-  trending: meta("TRENDING", 92, 0.22, 1.9, 5.8, "#34d399"),
-  fresh: meta("NEW PAIRS", 116, -0.12, 2.8, 6.4, "#a78bfa"),
-  outer: meta("LONG TAIL", 142, 0.18, 3.9, 7.6, "#64748b"),
+  orbitx: { label: "ORBITX CORE", orbit: 0, tilt: 0, phase: 0, band: 6, color: "#f5f5f5", center: [0, 0, 0], spread: 14 },
+  majors: meta("MAJORS", 54, 0.10, 0.0, 3.6, "#e7e7e7"),
+  established: meta("ESTABLISHED", 82, -0.16, 0.9, 4.2, "#c8c8c8"),
+  trending: meta("TRENDING", 112, 0.22, 1.9, 4.8, "#a3a3a3"),
+  fresh: meta("NEW PAIRS", 144, -0.12, 2.8, 5.2, "#737373"),
+  outer: meta("LONG TAIL", 180, 0.18, 3.9, 6.0, "#525252"),
 };
 
 /** The KOL ring is wallets, not tokens, so WorldCanvas places it itself. */
-export const KOL_RING = { orbit: 28, tilt: -0.20, phase: 0.5, color: "#e879f9", label: "KOL ORBIT" };
+export const KOL_RING = { orbit: 30, tilt: -0.20, phase: 0.5, color: "#d4d4d4", label: "KOL ORBIT" };
 
 export function kolRingPos(index: number, count: number): [number, number, number] {
   const theta = KOL_RING.phase + (index / Math.max(count, 1)) * Math.PI * 2;
@@ -217,8 +217,84 @@ export function layoutUniverse(tokens: TokenDistrict[]): Map<string, UniverseNod
         theta,
       });
     });
+    separateRing(
+      [...nodes.values()].filter((n) => n.cluster === cluster),
+      ring,
+    );
   }
   return nodes;
+}
+
+/** Push neighbors apart on a ring so planets do not sit inside each other. */
+export function separateRing(nodes: UniverseNode[], ring: RingMeta, gap = 1.05): void {
+  if (nodes.length < 2) return;
+  for (let pass = 0; pass < 16; pass++) {
+    nodes.sort((a, b) => a.theta - b.theta);
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      const b = nodes[(i + 1) % nodes.length];
+      const dx = a.pos[0] - b.pos[0];
+      const dy = a.pos[1] - b.pos[1];
+      const dz = a.pos[2] - b.pos[2];
+      const dist = Math.hypot(dx, dy, dz);
+      const need = a.radius + b.radius + gap;
+      if (dist >= need || dist < 1e-6) continue;
+      const push = (need - dist) / Math.max(ring.orbit, 10);
+      a.theta -= push * 0.55;
+      b.theta += push * 0.55;
+      const oa = Math.hypot(a.pos[0], a.pos[2]) || ring.orbit;
+      const ob = Math.hypot(b.pos[0], b.pos[2]) || ring.orbit;
+      const pa = ringPoint(oa, ring.tilt, a.theta);
+      const pb = ringPoint(ob, ring.tilt, b.theta);
+      a.pos = [pa[0], a.pos[1], pa[2]];
+      b.pos = [pb[0], b.pos[1], pb[2]];
+    }
+  }
+}
+
+/** Radius for a 2D volume bubble. Log scale so whales read large without swallowing the map. */
+export function volumeBubbleRadius(volume: number, planet = 1, max = 4.4): number {
+  const v = Math.log10(Math.max(volume, 12));
+  return Math.min(max, 0.72 + v * 0.38 + planet * 0.28);
+}
+
+/** 2D bubble-map packing so volume circles do not cover their neighbors. */
+export function packBubbles<T extends { x: number; y: number; r: number }>(
+  items: T[],
+  gap = 0.32,
+  passes = 20,
+  box?: { min: number; max: number },
+): T[] {
+  const out = items.map((p) => ({ ...p }));
+  const clamp = (v: number) => (box ? Math.min(box.max, Math.max(box.min, v)) : v);
+  for (let pass = 0; pass < passes; pass++) {
+    for (let i = 0; i < out.length; i++) {
+      for (let j = i + 1; j < out.length; j++) {
+        const a = out[i];
+        const b = out[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        let dist = Math.hypot(dx, dy);
+        const need = a.r + b.r + gap;
+        if (dist >= need) continue;
+        if (dist < 1e-6) dist = 1e-6;
+        const push = (need - dist) / 2;
+        const ux = dx / dist;
+        const uy = dy / dist;
+        a.x += ux * push;
+        a.y += uy * push;
+        b.x -= ux * push;
+        b.y -= uy * push;
+      }
+    }
+    if (box) {
+      for (const a of out) {
+        a.x = clamp(a.x);
+        a.y = clamp(a.y);
+      }
+    }
+  }
+  return out;
 }
 
 /** Hash-stable fallback used when the district catalog has not loaded yet. */

@@ -1,25 +1,25 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
 
 .oxw {
-  --bg: #05030c;
-  --panel: rgba(8, 6, 18, 0.78);
-  --panel-2: rgba(12, 8, 24, 0.92);
-  --line: rgba(196, 181, 253, 0.16);
-  --text: #eef2ff;
-  --muted: #8b8aa8;
-  --ox: #c084fc;
-  --cyan: #22d3ee;
-  --green: #34d399;
-  --red: #fb7185;
-  --amber: #f59e0b;
-  --kol: #e879f9;
+  --bg: #000000;
+  --panel: rgba(10, 10, 10, 0.78);
+  --panel-2: rgba(12, 12, 12, 0.92);
+  --line: rgba(255, 255, 255, 0.12);
+  --text: #f5f5f5;
+  --muted: #a3a3a3;
+  --ox: #ffffff;
+  --cyan: #e5e5e5;
+  --green: #f5f5f5;
+  --red: #737373;
+  --amber: #d4d4d4;
+  --kol: #e5e5e5;
   --font: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
   --display: "Syne", "IBM Plex Sans", sans-serif;
   position: relative;
   height: 100vh;
   color: var(--text);
-  background: #05030c;
+  background: #000000;
   font-family: var(--font);
   overflow: hidden;
   display: grid;

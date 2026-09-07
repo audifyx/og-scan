@@ -27,6 +27,7 @@ export type LiveEvent = {
   usd?: number | null;
   detail?: string;
   wallet?: string;
+  signature?: string;
   ts: number;
 };
 
@@ -139,7 +140,9 @@ export type CenterView =
   | "map"
   | "orbitx"
   | "wallets"
-  | "analytics";
+  | "analytics"
+  | "tx"
+  | "block";
 
 export type BottomTab =
   | "recent"

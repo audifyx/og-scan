@@ -37,7 +37,7 @@ export function TerminalView() {
   }, [raw, ox, snap, q, kind]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#05030c]">
+    <div className="flex min-h-0 flex-1 flex-col bg-black">
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-1.5 font-mono text-2xs text-dim">
         <span>orbitx@mainnet — {lines.length} decoded rows</span>
         <input

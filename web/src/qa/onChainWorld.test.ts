@@ -22,11 +22,13 @@ describe("OrbitX /on-chain world", () => {
     expect(vercel).toContain('"/api/on-chain?path=ingest&force=1"');
     expect(vercel).toContain('"api/on-chain.js"');
     const api = readFileSync(resolve(WEB, "api/on-chain.js"), "utf8");
-    for (const path of ["live", "events", "wallet", "token", "transaction", "orbitx", "search", "flows", "ingest", "status", "kols", "districts", "trending"]) {
+      for (const path of ["live", "events", "wallet", "token", "transaction", "block", "orbitx", "search", "flows", "ingest", "status", "kols", "districts", "trending"]) {
       expect(api).toContain(path);
     }
     expect(api).toContain("activeOrbitxKols");
     expect(api).toContain("assigned_kols");
+    expect(api).toContain("handleBlock");
+    expect(api).toContain("handleTransaction");
     expect(api).toContain("handleTrending");
     expect(api).toContain("banner");
     expect(api).toContain("handleMedia");
@@ -92,6 +94,7 @@ describe("OrbitX /on-chain world", () => {
     expect(tokenPanel).toContain("tokenActivity");
     expect(tokenPanel).toContain("KOL interactions");
     expect(tokenPanel).toContain("24h buys");
+    expect(tokenPanel).toContain("HolderBubbles");
     expect(tokenPanel).not.toMatch(/\?\?[^;\n]*\|\|/);
     const nav = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/MobileNav.tsx"), "utf8");
     expect(nav).toContain("World");
@@ -121,6 +124,15 @@ describe("OrbitX /on-chain world", () => {
     expect(map).not.toContain("pos[0] * 0.26");
     expect(map).toContain("city.kols");
     expect(map).toContain("slice(0, 250)");
+    expect(map).toContain("packBubbles");
+    expect(map).toContain("volumeBubbleRadius");
+    expect(map).toContain("BUBBLE MAP");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/TxView.tsx"), "utf8")).toContain("Transaction explorer");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/BlockView.tsx"), "utf8")).toContain("Block explorer");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/CenterStage.tsx"), "utf8")).toContain("TxView");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/api.ts"), "utf8")).toContain("fetchBlock");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/universeLayout.ts"), "utf8")).toContain("separateRing");
+    expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/HolderBubbles.tsx"), "utf8")).toContain("Holder bubble map");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/views/TerminalView.tsx"), "utf8")).toContain("decoded rows");
     expect(readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/BottomPanel.tsx"), "utf8")).toContain("isOrbitxChainEvent");
     expect(readFileSync(resolve(WEB, "src/components/theme/OrbitAtmosphereLayer.tsx"), "utf8")).toContain('"/on-chain"');
@@ -148,8 +160,12 @@ describe("OrbitX /on-chain world", () => {
     expect(hook).toContain("tokenCatalogSize");
     expect(hook).toContain("loadCatalog");
     expect(hook).toContain("keepTicker");
+    expect(hook).toContain("params.slot");
+    expect(hook).toContain("setActiveView");
     const top = readFileSync(resolve(WEB, "src/pages/onchain-world/dashboard/TopBar.tsx"), "utf8");
-    expect(top).toContain("Search 250 trending");
+    expect(top).toContain("Search tx, wallet, token, block");
+    expect(top).toContain("detectQueryKind");
+    expect(top).toContain("exploreTargetsForQuery");
     expect(top).toContain('label="OX 24h Buys"');
     expect(top).toContain('label="OX 24h Sells"');
     expect(top).toContain('label="Buys"');
@@ -174,7 +190,8 @@ describe("OrbitX /on-chain world", () => {
     expect(canvas).toContain("export { galaxyPos }");
     expect(canvas).toContain("layoutUniverse");
     expect(canvas).toContain("CLUSTER_META");
-    expect(canvas).toContain("autoRotate={false}");
+    expect(canvas).toContain("enableDamping");
+    expect(canvas).toContain("dampingFactor");
     expect(canvas).toContain("speed={0}");
     expect(canvas).toContain("detectLiteGpu");
     expect(canvas).toContain("absolute inset-0");
@@ -326,7 +343,7 @@ describe("OrbitX /on-chain world", () => {
   });
 
   it("fits cluster positions onto the 0-100 map and never wipes a loaded catalog", async () => {
-    const { layoutUniverse, layoutBounds, projectToMap, CLUSTER_META } = await import("../pages/onchain-world/universeLayout");
+    const { layoutUniverse, layoutBounds, projectToMap, CLUSTER_META, packBubbles, volumeBubbleRadius } = await import("../pages/onchain-world/universeLayout");
     const { mergeDistricts, tokenCatalogSize, keepTicker } = await import("../pages/onchain-world/mergeDistricts");
     const tokens = [
       { mint: "Aaa1111111111111111111111111111111111111111", market_cap: 80_000_000, volume_24h: 1_000_000 },
@@ -339,6 +356,13 @@ describe("OrbitX /on-chain world", () => {
     expect(mapped.every((p) => p.x >= 6 && p.x <= 94 && p.y >= 6 && p.y <= 94)).toBe(true);
     const dawgs = projectToMap(CLUSTER_META.majors.center, bounds);
     expect(dawgs.x).toBeGreaterThan(50);
+    const packed = packBubbles([
+      { id: "a", x: 50, y: 50, r: 4 },
+      { id: "b", x: 50.2, y: 50.1, r: 4 },
+    ], 0.4, 24);
+    const dist = Math.hypot(packed[0].x - packed[1].x, packed[0].y - packed[1].y);
+    expect(dist).toBeGreaterThanOrEqual(packed[0].r + packed[1].r + 0.35);
+    expect(volumeBubbleRadius(1_000_000)).toBeGreaterThan(volumeBubbleRadius(1_000));
     const kept = mergeDistricts(
       { orbitx: { mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", buys_24h: 44, sells_24h: 44 }, tokens: [] },
       { tokens: tokens as never },
@@ -380,5 +404,15 @@ describe("OrbitX /on-chain world", () => {
     expect(kept.orbitxBuys24h).toBe(39);
     expect(kept.block).toBe(441800000);
     expect(kept.sells).toBe(39);
+  });
+
+  it("routes explorer search into tx, block, token, and account desks", async () => {
+    const { exploreTargetsForQuery } = await import("../pages/onchain-world/lib/orbitx/explore");
+    const sig = "5".repeat(88);
+    const wallet = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
+    expect(exploreTargetsForQuery(sig)[0]).toMatchObject({ view: "tx", path: `/on-chain/tx/${sig}` });
+    expect(exploreTargetsForQuery("441800000")[0]).toMatchObject({ view: "block", path: "/on-chain/block/441800000" });
+    expect(exploreTargetsForQuery(wallet).map((t) => t.view)).toEqual(["world", "wallets"]);
+    expect(exploreTargetsForQuery("$orbitx")).toEqual([]);
   });
 });

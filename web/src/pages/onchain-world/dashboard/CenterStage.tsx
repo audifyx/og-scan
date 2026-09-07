@@ -1,9 +1,11 @@
 import { Maximize2, Settings2 } from "lucide-react";
 import { WorldView } from "@/pages/onchain-world/dashboard/WorldView";
 import { AnalyticsView } from "@/pages/onchain-world/dashboard/views/AnalyticsView";
+import { BlockView } from "@/pages/onchain-world/dashboard/views/BlockView";
 import { MapView } from "@/pages/onchain-world/dashboard/views/MapView";
 import { OrbitxTokenView } from "@/pages/onchain-world/dashboard/views/OrbitxTokenView";
 import { TerminalView } from "@/pages/onchain-world/dashboard/views/TerminalView";
+import { TxView } from "@/pages/onchain-world/dashboard/views/TxView";
 import { WalletsView } from "@/pages/onchain-world/dashboard/views/WalletsView";
 import { Button } from "@/pages/onchain-world/dashboard/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/pages/onchain-world/dashboard/ui/popover";
@@ -18,6 +20,8 @@ const VIEWS: { id: CenterView; label: string }[] = [
   { id: "orbitx", label: "OrbitX" },
   { id: "wallets", label: "Wallets" },
   { id: "analytics", label: "Analytics" },
+  { id: "tx", label: "Tx" },
+  { id: "block", label: "Block" },
 ];
 
 export function CenterStage() {
@@ -89,6 +93,8 @@ export function CenterStage() {
       {view === "orbitx" ? <OrbitxTokenView /> : null}
       {view === "wallets" ? <WalletsView /> : null}
       {view === "analytics" ? <AnalyticsView /> : null}
+      {view === "tx" ? <TxView /> : null}
+      {view === "block" ? <BlockView /> : null}
     </section>
   );
 }
