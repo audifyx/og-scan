@@ -76,7 +76,7 @@ export function BlockView() {
       </header>
 
       <dl className="grid grid-cols-2 gap-px border-b border-line bg-line sm:grid-cols-3">
-        <Stat label="Slot" value={formatInt(data?.slot ?? Number(slot) || null)} />
+        <Stat label="Slot" value={formatInt(data?.slot ?? (Number(slot) || null))} />
         <Stat label="Time" value={clock(data?.block_time)} />
         <Stat label="Transactions" value={formatInt(data?.transaction_count ?? sigs.length ?? null)} />
       </dl>
