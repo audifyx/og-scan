@@ -17,7 +17,7 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { HELIUS_RPC } from "@/lib/og";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import {
   connectInjectWallet,
   hubWalletFromName,
@@ -95,7 +95,7 @@ function displayName(name: InjectWallet): HubWalletName {
 }
 
 export function OrbitxWalletHub({ children }: { children: ReactNode }) {
-  const connection = useMemo(() => new Connection(HELIUS_RPC, "confirmed"), []);
+  const connection = useMemo(() => new Connection(browserWalletRpcUrl(), "confirmed"), []);
   const [selected, setSelected] = useState<InjectWallet>("phantom");
   const [session, setSession] = useState<InjectWalletSession | null>(null);
   const [connecting, setConnecting] = useState(false);

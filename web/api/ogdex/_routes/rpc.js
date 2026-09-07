@@ -1,4 +1,5 @@
 import { send, callFn, readBody } from "../_lib.js";
+import { isRpcQuotaError, PUBLIC_SOLANA_RPC } from "../../../shared/pump-claim.js";
 
 /** Allowlisted Solana RPC methods — blocks expensive/unbounded proxy abuse. */
 const ALLOWED = new Set([
@@ -8,6 +9,7 @@ const ALLOWED = new Set([
   "getBlockTime",
   "getFeeForMessage",
   "getLatestBlockhash",
+  "getMinimumBalanceForRentExemption",
   "getMultipleAccounts",
   "getProgramAccounts",
   "getRecentPrioritizationFees",
@@ -27,7 +29,34 @@ const ALLOWED = new Set([
  * POST /api/ogdex/rpc — Solana JSON-RPC proxy.
  * Forwards to OG Scan's Helius-backed Supabase rpc-proxy so the browser never
  * sees an API key. Method allowlist + batch size cap reduce cost abuse.
+ * When Helius returns 429 "max usage reached", retry public mainnet so
+ * launchpad claim / sendTransaction keep working.
  */
+async function publicJsonRpc(b) {
+  const r = await fetch(PUBLIC_SOLANA_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: b.id ?? 1,
+      method: b.method,
+      params: b.params || [],
+    }),
+    signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(12_000)
+      : undefined,
+  });
+  return r.json();
+}
+
+function proxyNeedsPublicFallback(r) {
+  if (!r) return true;
+  if (isRpcQuotaError(r)) return true;
+  if (r.data && isRpcQuotaError(r.data)) return true;
+  if (r.error && isRpcQuotaError(r.error)) return true;
+  return false;
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.statusCode = 200;
@@ -47,9 +76,25 @@ export default async function handler(req, res) {
       const r = await callFn("rpc-proxy", {
         method: b.method, params: b.params || [], id: b.id ?? 1, provider: "helius",
       });
-      if (r && r.success && r.data) return r.data;
-      return { jsonrpc: "2.0", id: b.id ?? 1, error: { code: -32603, message: r?.error || "rpc proxy error" } };
+      const data = r && r.success ? r.data : null;
+      if (data && !(data.error && isRpcQuotaError(data.error))) return data;
+      if (proxyNeedsPublicFallback(r) || (data && data.error && isRpcQuotaError(data.error))) {
+        try {
+          return await publicJsonRpc(b);
+        } catch {
+          /* fall through to proxy error */
+        }
+      }
+      if (data) return data;
+      return { jsonrpc: "2.0", id: b.id ?? 1, error: { code: -32603, message: r?.error || r?.raw || "rpc proxy error" } };
     } catch (e) {
+      if (isRpcQuotaError(e)) {
+        try {
+          return await publicJsonRpc(b);
+        } catch {
+          /* keep original */
+        }
+      }
       return { jsonrpc: "2.0", id: b?.id ?? 1, error: { code: -32603, message: String(e?.message || e) } };
     }
   };

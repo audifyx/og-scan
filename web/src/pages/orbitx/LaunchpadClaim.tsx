@@ -13,6 +13,7 @@ import {
   getPumpClaimableSol,
   getCustomClaimable, buildCustomClaimTransactions, type CustomClaimable,
   buildPumpClaimWithSkim, buildPumpBuyTransaction, buildCustomSwapToSolWithSkim,
+  isRpcQuotaError,
 } from "@/lib/orbitx/claim";
 import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
@@ -57,6 +58,9 @@ export default function LaunchpadClaim() {
     } catch (e) {
       console.error("[claim] pump balance", e);
       setPumpSol(null);
+      if (isRpcQuotaError(e)) {
+        toast.error("RPC quota hit — retrying public Solana. Tap refresh if the balance stays blank.");
+      }
     } finally {
       setPumpLoading(false);
     }
@@ -122,6 +126,7 @@ export default function LaunchpadClaim() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("User rejected")) toast.error("Transaction cancelled");
+      else if (isRpcQuotaError(msg)) toast.error("RPC quota hit. Rebuilt the claim locally — tap Claim again.");
       else toast.error(msg || "Claim failed");
     } finally {
       setPumpClaiming(false);

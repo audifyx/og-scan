@@ -4,10 +4,11 @@
  * PUMP LANE — the exact system pump.fun itself uses:
  *   Creator fees accrue in the Pump program's creator-vault PDA
  *   (seeds ["creator-vault", creator]). Claiming runs the Pump program's
- *   `collectCreatorFee` instruction, built by PumpPortal /api/trade-local
- *   (action "collectCreatorFee") and SIGNED BY THE SAME WALLET THAT CREATED
+ *   `collectCreatorFee` instruction, SIGNED BY THE SAME WALLET THAT CREATED
  *   the coins. One claim collects fees across ALL of the wallet's pump coins
  *   (bonding curve + graduated PumpSwap pools).
+ *   PumpPortal /api/trade-local is tried first; on 429 "max usage reached"
+ *   (Helius quota) we build the instruction locally and use public Solana RPC.
  *
  * CUSTOM LANE — same economics, enforced by the Token-2022 transfer-fee
  *   extension: 0.45% of every buy/sell is withheld on-chain. Only the
@@ -16,9 +17,18 @@
  *   skims 1.3% to the admin wallet and the creator keeps 98.7%.
  */
 import {
-  Connection, PublicKey, Transaction, VersionedTransaction, LAMPORTS_PER_SOL, ComputeBudgetProgram,
+  Connection, PublicKey, Transaction, TransactionInstruction, VersionedTransaction, LAMPORTS_PER_SOL, ComputeBudgetProgram,
   TransactionMessage, SystemProgram, type AddressLookupTableAccount,
 } from "@solana/web3.js";
+import {
+  COLLECT_CREATOR_FEE_DISCRIMINATOR,
+  PUBLIC_SOLANA_RPC,
+  PUMP_CREATOR_VAULT_SEED,
+  PUMP_EVENT_AUTHORITY_SEED,
+  PUMP_PROGRAM_ID as PUMP_PROGRAM_ID_STR,
+  SYSTEM_ACCOUNT_RENT_LAMPORTS,
+  isRpcQuotaError,
+} from "../../../shared/pump-claim.js";
 import { buildJupiterSwapTransaction, SOL_MINT } from "./rescue";
 import { computeSkim, routedFeeDestination, DEFAULT_FEE_ROUTING, type FeeRoutingConfig } from "./feeRouting";
 import {
@@ -29,31 +39,80 @@ import {
 
 /* ─────────────────────────── Pump lane ─────────────────────────── */
 
-export const PUMP_PROGRAM_ID = new PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
+export const PUMP_PROGRAM_ID = new PublicKey(PUMP_PROGRAM_ID_STR);
+export { isRpcQuotaError, SYSTEM_ACCOUNT_RENT_LAMPORTS };
 
 /** Pump program creator-vault PDA — where pump.fun accrues this wallet's creator fees. */
 export function pumpCreatorVaultPda(creator: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("creator-vault"), creator.toBuffer()],
+    [new TextEncoder().encode(PUMP_CREATOR_VAULT_SEED), creator.toBytes()],
     PUMP_PROGRAM_ID,
   )[0];
+}
+
+export function pumpEventAuthorityPda(): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode(PUMP_EVENT_AUTHORITY_SEED)],
+    PUMP_PROGRAM_ID,
+  )[0];
+}
+
+/** Official Pump `collect_creator_fee` — no PumpPortal / Helius required. */
+export function buildCollectCreatorFeeInstruction(creator: PublicKey): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PUMP_PROGRAM_ID,
+    keys: [
+      { pubkey: creator, isSigner: true, isWritable: true },
+      { pubkey: pumpCreatorVaultPda(creator), isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: pumpEventAuthorityPda(), isSigner: false, isWritable: false },
+      { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Uint8Array.from(COLLECT_CREATOR_FEE_DISCRIMINATOR),
+  });
+}
+
+function publicRpcConnection(): Connection {
+  return new Connection(PUBLIC_SOLANA_RPC, "confirmed");
+}
+
+async function withRpcFallback<T>(preferred: Connection | undefined, fn: (conn: Connection) => Promise<T>): Promise<T> {
+  const tried = new Set<string>();
+  const candidates: Connection[] = [];
+  if (preferred) candidates.push(preferred);
+  candidates.push(publicRpcConnection());
+  let lastErr: unknown;
+  for (const conn of candidates) {
+    const key = conn.rpcEndpoint;
+    if (tried.has(key)) continue;
+    tried.add(key);
+    try {
+      return await fn(conn);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr || "Solana RPC failed"));
+}
+
+async function vaultClaimableSol(connection: Connection, vault: PublicKey): Promise<number> {
+  const bal = await connection.getBalance(vault);
+  let rentFloor = SYSTEM_ACCOUNT_RENT_LAMPORTS;
+  try {
+    rentFloor = await connection.getMinimumBalanceForRentExemption(0);
+  } catch {
+    /* ogdex rpc may not allow this method; 890880 is the 0-byte system rent */
+  }
+  return Math.max(0, bal - rentFloor) / LAMPORTS_PER_SOL;
 }
 
 /** Claimable pump.fun creator fees (SOL) sitting in the wallet's creator vault. */
 export async function getPumpClaimableSol(connection: Connection, creator: PublicKey): Promise<number> {
   const vault = pumpCreatorVaultPda(creator);
-  const [bal, rentFloor] = await Promise.all([
-    connection.getBalance(vault),
-    connection.getMinimumBalanceForRentExemption(0),
-  ]);
-  return Math.max(0, bal - rentFloor) / LAMPORTS_PER_SOL;
+  return withRpcFallback(connection, (conn) => vaultClaimableSol(conn, vault));
 }
 
-/**
- * Build the pump.fun claim transaction via PumpPortal (action "collectCreatorFee").
- * Must be signed by the creator wallet. Claims across all the wallet's pump coins.
- */
-export async function buildPumpClaimTransaction(creator: PublicKey): Promise<VersionedTransaction> {
+async function buildPumpClaimViaPumpPortal(creator: PublicKey): Promise<VersionedTransaction> {
   const res = await fetch("https://pumpportal.fun/api/trade-local", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -62,6 +121,9 @@ export async function buildPumpClaimTransaction(creator: PublicKey): Promise<Ver
       action: "collectCreatorFee",
       priorityFee: 0.000001,
     }),
+    signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(8000)
+      : undefined,
   });
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
@@ -69,6 +131,40 @@ export async function buildPumpClaimTransaction(creator: PublicKey): Promise<Ver
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
   return VersionedTransaction.deserialize(bytes);
+}
+
+/** Local collectCreatorFee + compute budget. Used when PumpPortal/Helius quota is exhausted. */
+export async function buildLocalPumpClaimTransaction(
+  creator: PublicKey,
+  connection?: Connection,
+): Promise<VersionedTransaction> {
+  const { blockhash } = await withRpcFallback(connection, (conn) => conn.getLatestBlockhash("confirmed"));
+  const message = new TransactionMessage({
+    payerKey: creator,
+    recentBlockhash: blockhash,
+    instructions: [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
+      buildCollectCreatorFeeInstruction(creator),
+    ],
+  }).compileToV0Message();
+  return new VersionedTransaction(message);
+}
+
+/**
+ * Build the pump.fun claim transaction. Tries PumpPortal first; on 429
+ * "max usage reached" (or any PumpPortal failure) builds collectCreatorFee locally.
+ */
+export async function buildPumpClaimTransaction(
+  creator: PublicKey,
+  connection?: Connection,
+): Promise<VersionedTransaction> {
+  try {
+    return await buildPumpClaimViaPumpPortal(creator);
+  } catch (e) {
+    console.warn("[claim] PumpPortal unavailable, building collectCreatorFee locally", e);
+    return buildLocalPumpClaimTransaction(creator, connection);
+  }
 }
 
 /* ─────────────────────────── Custom lane ─────────────────────────── */
@@ -199,7 +295,7 @@ export async function appendSolTransferToVersionedTx(
   const lookups = vtx.message.addressTableLookups ?? [];
   const alts: AddressLookupTableAccount[] = [];
   for (const l of lookups) {
-    const res = await connection.getAddressLookupTable(l.accountKey);
+    const res = await withRpcFallback(connection, (conn) => conn.getAddressLookupTable(l.accountKey));
     if (res.value) alts.push(res.value);
   }
   const msg = TransactionMessage.decompile(vtx.message, { addressLookupTableAccounts: alts });
@@ -234,7 +330,7 @@ export async function buildPumpClaimWithSkim(
   const grossLamports = Math.floor(grossSol * LAMPORTS_PER_SOL);
   const { skimRaw, netRaw } = computeSkim(BigInt(grossLamports), cfg);
   const skimLamports = Number(skimRaw);
-  let tx = await buildPumpClaimTransaction(creator);
+  let tx = await buildPumpClaimTransaction(creator, connection);
   if (skimLamports > 0) {
     tx = await appendSolTransferToVersionedTx(connection, tx, creator, routedFeeDestination(cfg.wallet), skimLamports);
   }
