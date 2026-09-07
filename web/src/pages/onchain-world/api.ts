@@ -386,6 +386,9 @@ export type LiveDeskPayload = {
   ok?: boolean;
   live?: boolean;
   mock?: boolean;
+  paper?: boolean;
+  mode?: "paper" | "live" | string;
+  paper_start_usd?: number | null;
   disclaimer?: string;
   wallet?: string;
   enabled?: boolean;

@@ -825,7 +825,7 @@ export function enrichLiveFeedRow(row = {}, ctx = {}) {
     solscan_tx: row.signature ? `https://solscan.io/tx/${row.signature}` : null,
     solscan_token: row.mint ? `https://solscan.io/token/${row.mint}` : null,
     solscan_account: `https://solscan.io/account/${wallet}`,
-    worldUrl: "https://www.orbitx.world/on-chain",
+    worldUrl: "https://www.orbitx.world/orbitxagents",
   };
 }
 
@@ -844,9 +844,12 @@ export function buildLiveWorld(opts = {}) {
 export function emptyLiveDesk(extra = {}) {
   return {
     ok: true,
-    live: true,
-    mock: false,
-    disclaimer: LIVE_DISCLAIMER,
+    live: !extra.paper,
+    mock: Boolean(extra.paper),
+    paper: Boolean(extra.paper),
+    mode: extra.mode || (extra.paper ? "paper" : "live"),
+    paper_start_usd: extra.paper_start_usd ?? null,
+    disclaimer: extra.paper ? "Paper desk: mock bank, real tokens, real prices. No real SOL moves." : LIVE_DISCLAIMER,
     wallet: extra.wallet || LIVE_WALLET_PUBKEY,
     enabled: Boolean(extra.enabled),
     armed: Boolean(extra.armed),
@@ -884,7 +887,7 @@ export function emptyLiveDesk(extra = {}) {
         fills: extra.fills,
         ledger: extra.ledger,
       }),
-    worldUrl: "https://www.orbitx.world/on-chain",
+    worldUrl: "https://www.orbitx.world/orbitxagents",
     fundUrl: `https://solscan.io/account/${extra.wallet || LIVE_WALLET_PUBKEY}`,
   };
 }

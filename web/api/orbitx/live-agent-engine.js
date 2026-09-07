@@ -93,6 +93,21 @@ function adminSb() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+/** Paper mode: same agents, same scans, same real prices — simulated fills, mock bank. */
+const PAPER_CTX = { paper: false };
+export const PAPER_START_USD_DEFAULT = 10_000;
+export const PAPER_CLIP_PCT = 0.02;
+export const PAPER_SIGNATURE = "paper";
+function paperCashUsd(fills, startUsd) {
+  let cash = num(startUsd);
+  for (const f of fills || []) {
+    const usd = num(f.usd_amount);
+    if (String(f.side) === "buy") cash -= usd;
+    else if (String(f.side) === "sell") cash += usd;
+  }
+  return cash;
+}
+
 function rpcUrl() {
   return (
     process.env.SOLANA_RPC_URL ||
@@ -484,19 +499,19 @@ async function upsertDesk(sb, patch) {
 
 async function loadOpen(sb) {
   if (!sb) return [];
-  const { data } = await sb.from("ox_live_positions").select("*").eq("status", "open").order("opened_at", { ascending: true });
+  const { data } = await sb.from("ox_live_positions").select("*").eq("status", "open").eq("paper", PAPER_CTX.paper).order("opened_at", { ascending: true });
   return data || [];
 }
 
 async function loadFills(sb, limit = 200) {
   if (!sb) return [];
-  const { data } = await sb.from("ox_live_fills").select("*").order("created_at", { ascending: false }).limit(limit);
+  const { data } = await sb.from("ox_live_fills").select("*").eq("paper", PAPER_CTX.paper).order("created_at", { ascending: false }).limit(limit);
   return data || [];
 }
 
 async function loadEvents(sb, limit = 80) {
   if (!sb) return [];
-  const { data } = await sb.from("ox_live_events").select("*").order("created_at", { ascending: false }).limit(limit);
+  const { data } = await sb.from("ox_live_events").select("*").eq("paper", PAPER_CTX.paper).order("created_at", { ascending: false }).limit(limit);
   return data || [];
 }
 
@@ -504,6 +519,7 @@ async function recordEvent(sb, row) {
   if (!sb) return;
   try {
     await sb.from("ox_live_events").insert({
+      paper: PAPER_CTX.paper,
       kind: row.kind,
       agent_id: row.agent_id || null,
       mint: row.mint || null,
@@ -576,45 +592,49 @@ export async function snapshotLiveDesk(opts = {}) {
   }
   const row = await loadDeskRow(sb).catch(() => ({ armed: false, paused: false }));
   parseHuntSource(process.env.LIVE_HUNT_JSON || process.env.LIVE_HUNT, row.note);
-  const armed = Boolean(row.armed) || liveDeskArmedEnv();
-  const enabled = liveDeskEnabled();
+  const paper = Boolean(row.paper);
+  PAPER_CTX.paper = paper;
+  const paperStartUsd = paper ? num(row.paper_start_usd, PAPER_START_USD_DEFAULT) || PAPER_START_USD_DEFAULT : null;
+  const armed = paper ? true : Boolean(row.armed) || liveDeskArmedEnv();
+  const enabled = paper ? true : liveDeskEnabled();
   let solBal = null;
   let solUsd = opts.sol_usd ?? null;
   try {
-    if (solUsd == null && !opts.skipChain) solUsd = await solPriceUsd();
+    if (solUsd == null && (!opts.skipChain || paper)) solUsd = await raceMs(solPriceUsd(), 5_000, null);
   } catch {
     solUsd = null;
-  }
-  try {
-    if (opts.sol_balance != null) solBal = num(opts.sol_balance);
-    else if (!opts.skipChain) solBal = await solBalance(wallet);
-  } catch {
-    solBal = null;
   }
   const openRows = await loadOpen(sb).catch(() => []);
   const fills = await loadFills(sb).catch(() => []);
   const events = await loadEvents(sb).catch(() => []);
-  const chain = opts.chain || (!opts.skipChain ? await recentWalletSigs(wallet).catch(() => []) : []);
+  try {
+    if (paper) solBal = solUsd ? paperCashUsd(fills, paperStartUsd) / solUsd : null;
+    else if (opts.sol_balance != null) solBal = num(opts.sol_balance);
+    else if (!opts.skipChain) solBal = await solBalance(wallet);
+  } catch {
+    solBal = null;
+  }
+  const chain = opts.chain || (!opts.skipChain && !paper ? await recentWalletSigs(wallet).catch(() => []) : []);
   const open = [];
   for (const p of openRows) {
     let mark = null;
     try {
-      if (!opts.skipChain) mark = await markPriceUsd(p.mint);
+      if (!opts.skipChain || paper) mark = await raceMs(markPriceUsd(p.mint), 4_000, null);
     } catch {
       mark = null;
     }
     open.push(publicPosition(p, mark || null));
   }
   const realized = fills.filter((f) => f.side === "sell").reduce((s, f) => s + num(f.pnl_usd), 0);
-  const usdBal = solBal != null && solUsd ? solBal * solUsd : null;
+  const usdBal = paper ? paperCashUsd(fills, paperStartUsd) : solBal != null && solUsd ? solBal * solUsd : null;
   const unrealized = open.reduce((s, p) => {
     if (p.pnl_pct == null) return s;
     return s + (num(p.usd_in) * p.pnl_pct) / 100;
   }, 0);
   const equityUsd = usdBal != null ? usdBal + open.reduce((s, p) => s + num(p.usd_in), 0) + unrealized : null;
-  let startingSol = row.starting_sol != null ? num(row.starting_sol) : null;
-  let startingUsd = row.starting_usd != null ? num(row.starting_usd) : null;
-  if (sb && solBal != null && solBal > 0.001 && (startingSol == null || startingSol <= 0)) {
+  let startingSol = paper ? (solUsd ? paperStartUsd / solUsd : null) : row.starting_sol != null ? num(row.starting_sol) : null;
+  let startingUsd = paper ? paperStartUsd : row.starting_usd != null ? num(row.starting_usd) : null;
+  if (!paper && sb && solBal != null && solBal > 0.001 && (startingSol == null || startingSol <= 0)) {
     startingSol = solBal;
     startingUsd = solUsd ? solBal * solUsd : null;
     await upsertDesk(sb, {
@@ -673,6 +693,9 @@ export async function snapshotLiveDesk(opts = {}) {
     wallet,
     enabled,
     armed,
+    paper,
+    mode: paper ? "paper" : "live",
+    paper_start_usd: paperStartUsd,
     paused: Boolean(row.paused),
     configured: Boolean(secret),
     sol_usd: solUsd,
@@ -698,7 +721,7 @@ export async function snapshotLiveDesk(opts = {}) {
 
 async function recordFill(sb, row) {
   if (!sb) return;
-  await sb.from("ox_live_fills").insert(row);
+  await sb.from("ox_live_fills").insert({ paper: PAPER_CTX.paper, ...row });
 }
 
 async function closePosition(sb, id, patch) {
@@ -708,7 +731,7 @@ async function closePosition(sb, id, patch) {
 
 async function openPosition(sb, row) {
   if (!sb) return null;
-  const { data } = await sb.from("ox_live_positions").insert({ ...row, status: "open" }).select("*").single();
+  const { data } = await sb.from("ox_live_positions").insert({ paper: PAPER_CTX.paper, ...row, status: "open" }).select("*").single();
   return data;
 }
 
@@ -739,6 +762,8 @@ async function tokenRawBalance(owner, mint, usePublic = false) {
  */
 export async function runTakeProfitOrders(opts = {}) {
   const sb = opts.sb === undefined ? adminSb() : opts.sb;
+  const deskRow = sb ? await loadDeskRow(sb).catch(() => ({})) : {};
+  if (deskRow?.paper && !opts.force) return { skipped: "paper_mode" };
   const out = { checked: 0, filled: [], failed: [], skipped: [] };
   if (!sb) return { ...out, skipped: ["no_db"] };
   const { data: orders } = await sb
@@ -755,7 +780,9 @@ export async function runTakeProfitOrders(opts = {}) {
     keypair = await loadKeypair(secret);
   }
   const owner = keypair.publicKey?.toBase58?.() || LIVE_WALLET_PUBKEY;
-  const swapFn = opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
+  const swapFn = paper
+    ? async ({ quote }) => ({ ok: true, signature: PAPER_SIGNATURE, via: "paper", outAmount: quote?.outAmount })
+    : opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
   const markFn = opts.mark || markPriceUsd;
   const solUsd = num(opts.sol_usd) || (await raceMs(solPriceUsd(), 5_000, 0));
   const now = new Date().toISOString();
@@ -864,13 +891,15 @@ export async function tickLiveDesk(opts = {}) {
     skipChain: true,
   });
 
-  if (!enabled) {
+  const row = await loadDeskRow(sb).catch(() => ({ armed: false, paused: false }));
+  const paper = Boolean(row.paper);
+  PAPER_CTX.paper = paper;
+  if (!enabled && !paper) {
     await recordEvent(sb, { kind: "tick", reason: "not_enabled" });
     return { ...snap0, skipped: "not_enabled", disclaimer: LIVE_DISCLAIMER, actions };
   }
-  const row = await loadDeskRow(sb).catch(() => ({ armed: false, paused: false }));
   parseHuntSource(process.env.LIVE_HUNT_JSON || process.env.LIVE_HUNT, row.note);
-  const armed = Boolean(row.armed) || liveDeskArmedEnv() || opts.force === true;
+  const armed = paper || Boolean(row.armed) || liveDeskArmedEnv() || opts.force === true;
   if (row.paused && !opts.force) {
     await recordEvent(sb, { kind: "tick", reason: "paused" });
     return { ...snap0, skipped: "paused", armed, actions };
@@ -886,7 +915,7 @@ export async function tickLiveDesk(opts = {}) {
     }
   }
   let keypair = opts.keypair || null;
-  if (!keypair) {
+  if (!keypair && !paper) {
     if (!secret) {
       await recordEvent(sb, { kind: "tick", reason: "missing_wallet_secret" });
       return { ...snap0, skipped: "missing_wallet_secret", actions };
@@ -898,7 +927,7 @@ export async function tickLiveDesk(opts = {}) {
       return { ...snap0, skipped: "bad_wallet_secret", last_error: String(e?.message || e), actions };
     }
   }
-  const owner = keypair.publicKey?.toBase58?.() || opts.owner || LIVE_WALLET_PUBKEY;
+  const owner = keypair?.publicKey?.toBase58?.() || opts.owner || LIVE_WALLET_PUBKEY;
   const agent = nextLiveAgent(row.last_agent_id);
   const beatAt = new Date().toISOString();
   await upsertDesk(sb, {
@@ -910,7 +939,8 @@ export async function tickLiveDesk(opts = {}) {
 
   try {
   let solUsd = num(opts.sol_usd || snap0.sol_usd);
-  let bal = opts.solBalance != null ? num(opts.solBalance) : null;
+  let bal = paper ? num(snap0.sol_balance) : opts.solBalance != null ? num(opts.solBalance) : null;
+  if (paper && !(bal > 0) && snap0.sol_usd > 0) bal = num(snap0.usd_balance) / num(snap0.sol_usd);
   const [priceGot, balGot] = await Promise.all([
     solUsd > 0 ? Promise.resolve(solUsd) : raceMs(solPriceUsd(), 5_000, 0),
     bal != null ? Promise.resolve(bal) : raceMs(solBalance(owner).catch(() => 0), 8_000, 0),
@@ -924,7 +954,9 @@ export async function tickLiveDesk(opts = {}) {
     return { ...snap, skipped: "no_sol_price", actions, dry };
   }
 
-  const swapFn = opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
+  const swapFn = paper
+    ? async ({ quote }) => ({ ok: true, signature: PAPER_SIGNATURE, via: "paper", outAmount: quote?.outAmount })
+    : opts.swap || (async ({ quote }) => buildAndSignSwap({ quote, owner, keypair }));
   const safetyFn = opts.safety || ((mint) => probeSellability(mint));
   const tapeFn = opts.tape || loadLiveTape;
   const markFn = opts.mark || markPriceUsd;
@@ -943,7 +975,11 @@ export async function tickLiveDesk(opts = {}) {
       marketCap: marked.mcap,
     });
     if (decision.action === "hold") continue;
-    const raw = dry ? 1_000n : await tokenRawBalance(owner, pos.mint).catch(() => 0n);
+    let raw = dry ? 1_000n : paper ? 0n : await tokenRawBalance(owner, pos.mint).catch(() => 0n);
+    if (paper) {
+      try { raw = BigInt(String(pos.tokens_raw || "0").replace(/\D/g, "") || "0"); } catch { raw = 0n; }
+      if (raw <= 0n) raw = 1_000_000n;
+    }
     if (raw <= 0n && !dry) {
       actions.push({ type: "skip_exit", mint: pos.mint, reason: "no_tokens" });
       continue;
@@ -951,9 +987,15 @@ export async function tickLiveDesk(opts = {}) {
     const sellFrac = decision.action === "scale_out" ? LIVE_SCALE_SELL_PCT : 1;
     const sellRaw = (raw * BigInt(Math.round(sellFrac * 1000))) / 1000n;
     if (sellRaw <= 0n) continue;
+    const paperSellQ = () => ({
+      outAmount: String(Math.max(0, Math.round(((num(pos.usd_in) * sellFrac * (1 + num(decision.pnlPct))) / solUsd) * 1e9))),
+      paper: true,
+    });
     const sellQ = dry
       ? { outAmount: String(sellRaw) }
-      : await quoteSwap(pos.mint, SOL_MINT, sellRaw.toString(), 300);
+      : paper
+        ? (await raceMs(quoteSwap(pos.mint, SOL_MINT, sellRaw.toString(), 300).catch(() => null), 6_000, null)) || paperSellQ()
+        : await quoteSwap(pos.mint, SOL_MINT, sellRaw.toString(), 300);
     if (!sellQ) {
       actions.push({ type: "skip_exit", mint: pos.mint, reason: "no_sell_route" });
       continue;
@@ -961,7 +1003,7 @@ export async function tickLiveDesk(opts = {}) {
     let sent = { ok: true, signature: "dry-run", via: "dry", outAmount: sellQ.outAmount };
     if (!dry) {
       sent = await swapFn({ quote: sellQ, action: "sell", mint: pos.mint });
-      if (sent.ok && sent.signature) await confirmSig(sent.signature).catch(() => ({ ok: true }));
+      if (sent.ok && sent.signature && !paper) await confirmSig(sent.signature).catch(() => ({ ok: true }));
     }
     if (!sent.ok) {
       actions.push({ type: "sell_failed", mint: pos.mint, error: sent.error });
@@ -1120,7 +1162,7 @@ export async function tickLiveDesk(opts = {}) {
     solBalance: bal,
     solUsd,
     openCount: stillOpen.length,
-    tradeUsd: huntClipUsd(chosen),
+    tradeUsd: paper ? Math.max(LIVE_TRADE_USD, num(snap0.paper_start_usd, PAPER_START_USD_DEFAULT) * PAPER_CLIP_PCT) : huntClipUsd(chosen),
   });
   if (!sized.ok) {
     await recordEvent(sb, { kind: "skip", agent_id: agent.id, mint: chosen.mint, symbol: chosen.symbol, reason: sized.skip });
@@ -1135,9 +1177,16 @@ export async function tickLiveDesk(opts = {}) {
   }
 
   const thesis = writeLiveThesis(agent, chosen, safety, { usd: sized.usd, sol: sized.sol });
+  const paperBuyQ = () => ({
+    outAmount: String(Math.max(1, Math.round((sized.usd / Math.max(num(chosen.price_usd), 1e-12)) * 1e6))),
+    inAmount: String(sized.lamports),
+    paper: true,
+  });
   const buyQ = dry
     ? { outAmount: "1", inAmount: String(sized.lamports) }
-    : await quoteSwap(SOL_MINT, chosen.mint, sized.lamports, 150);
+    : paper
+      ? (await raceMs(quoteSwap(SOL_MINT, chosen.mint, sized.lamports, 150).catch(() => null), 6_000, null)) || paperBuyQ()
+      : await quoteSwap(SOL_MINT, chosen.mint, sized.lamports, 150);
   if (!buyQ) {
     await recordEvent(sb, { kind: "tick", agent_id: agent.id, reason: "no_buy_quote", mint: chosen.mint, symbol: chosen.symbol });
     await upsertDesk(sb, { wallet_pubkey: owner, last_tick_at: new Date().toISOString(), last_agent_id: agent.id, last_error: null }).catch(() => {});
@@ -1147,7 +1196,7 @@ export async function tickLiveDesk(opts = {}) {
   let sent = { ok: true, signature: "dry-run", via: "dry", outAmount: buyQ.outAmount };
   if (!dry) {
     sent = await swapFn({ quote: buyQ, action: "buy", mint: chosen.mint });
-    if (sent.ok && sent.signature) await confirmSig(sent.signature).catch(() => ({ ok: true }));
+    if (sent.ok && sent.signature && !paper) await confirmSig(sent.signature).catch(() => ({ ok: true }));
   }
   if (!sent.ok) {
     await upsertDesk(sb, { last_error: sent.error || "buy_failed", last_tick_at: new Date().toISOString() }).catch(() => {});
@@ -1216,7 +1265,7 @@ export async function tickLiveDesk(opts = {}) {
   });
 
   const snap = await snapshotLiveDesk({ sb, sol_usd: solUsd, sol_balance: bal, skipChain: true });
-  return { ...snap, actions, dry, skipped: null, trade_usd: LIVE_TRADE_USD };
+  return { ...snap, actions, dry, paper, skipped: null, trade_usd: paper ? sized.usd : LIVE_TRADE_USD };
   } catch (e) {
     await recordEvent(sb, {
       kind: "skip",

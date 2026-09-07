@@ -17,9 +17,10 @@ import { dexPairsForMints, fmtUsd, shortAddr } from "@/lib/og";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../shared/orbitx-live-desk.js";
 import "./orbitx-agents-hub.css";
 
-type Tab = "feed" | "calls" | "agents" | "ledger" | "chain" | "city";
+type Tab = "feed" | "desk" | "calls" | "agents" | "ledger" | "chain" | "city";
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "feed", label: "Feed", icon: <Radio className="h-3.5 w-3.5" /> },
+  { id: "desk", label: "Paper Desk", icon: <Wallet className="h-3.5 w-3.5" /> },
   { id: "calls", label: "Top Calls", icon: <Megaphone className="h-3.5 w-3.5" /> },
   { id: "agents", label: "Agents", icon: <Bot className="h-3.5 w-3.5" /> },
   { id: "ledger", label: "Ledger", icon: <Activity className="h-3.5 w-3.5" /> },
@@ -44,6 +45,7 @@ function ago(iso?: string | null, now = Date.now()) {
   return `${Math.floor(s / 86400)}d`;
 }
 const pnlCls = (v?: number | null) => (v == null ? "" : v >= 0 ? "oxh-up" : "oxh-down");
+const isRealSig = (s?: string | null) => Boolean(s && s !== "paper" && s !== "dry-run" && s.length > 40);
 const solscanTx = (s?: string | null) => (s ? `https://solscan.io/tx/${s}` : "#");
 const solscanAcct = (a: string) => `https://solscan.io/account/${a}`;
 
@@ -95,6 +97,16 @@ export default function OrbitxAgentsHub() {
   const madeUsd = ledger?.made_usd ?? desk?.realized_pnl_usd ?? 0;
   const equity = ledger?.currently_usd ?? desk?.equity_usd ?? 0;
   const started = ledger?.started_usd ?? desk?.starting_usd ?? 0;
+  const paper = Boolean(desk?.paper);
+  const cash = desk?.usd_balance ?? 0;
+  const curve = useMemo(() => {
+    const sells = [...fills].filter((f) => f.side === "sell").reverse();
+    let acc = started;
+    const pts = [{ t: 0, v: started }];
+    sells.forEach((f, i) => { acc += f.pnl_usd ?? 0; pts.push({ t: i + 1, v: acc }); });
+    if (pts.length === 1) pts.push({ t: 1, v: equity || started });
+    return pts;
+  }, [fills, started, equity]);
   const agentColor = (id?: string | null) => agents.find((a) => a.id === id)?.color || "#9945FF";
   const agentName = (id?: string | null) => agents.find((a) => a.id === id)?.name || id || "DESK";
 
@@ -136,16 +148,17 @@ export default function OrbitxAgentsHub() {
         <div className="oxh-brand">
           <span className="oxh-orb" />
           <div>
-            <div className="oxh-kicker">OrbitX Agents · live desk · real SOL</div>
-            <h1>Agents</h1>
+            <div className="oxh-kicker">{paper ? "OrbitX Agents · paper desk · mock bank · real tokens" : "OrbitX Agents · live desk · real SOL"}</div>
+            <h1>Agents {paper && <span className="oxh-badge">PAPER</span>}</h1>
           </div>
         </div>
         <div className="oxh-stats">
-          <Stat label="Equity" value={fmtUsd(equity)} sub={started ? `from ${fmtUsd(started)}` : ""} />
+          <Stat label={paper ? "Paper equity" : "Equity"} value={fmtUsd(equity)} sub={started ? `from ${fmtUsd(started)}` : ""} />
+          <Stat label="Cash" value={fmtUsd(cash)} sub={paper ? "mock" : "SOL"} />
           <Stat label="Realized PnL" value={`${madeUsd >= 0 ? "+" : ""}${fmtUsd(madeUsd)}`} cls={pnlCls(madeUsd)} />
           <Stat label="Record" value={`${wins}W · ${losses}L`} sub={`${winPct}% win`} />
           <Stat label="Open" value={String(open.length)} sub={open[0]?.symbol ? `holding ${open[0].symbol}` : "flat"} />
-          <Stat label="Last tick" value={ago(desk?.last_tick_at || desk?.last_activity_at, now) || "—"} sub={desk?.armed ? "armed" : desk?.paused ? "paused" : "idle"} />
+          <Stat label="Last tick" value={ago(desk?.last_tick_at || desk?.last_activity_at, now) || "—"} sub={paper ? "real trading paused" : desk?.armed ? "armed" : desk?.paused ? "paused" : "idle"} />
         </div>
         <button type="button" className="oxh-wallet" onClick={copyWallet} title="Copy desk wallet">
           <Wallet className="h-3.5 w-3.5" /> {shortAddr(wallet, 5)} <Copy className="h-3 w-3" /> {copied && <em>copied</em>}
@@ -220,6 +233,54 @@ export default function OrbitxAgentsHub() {
             </>
           )}
 
+          {tab === "desk" && (
+            <div className="oxh-desk">
+              <div className="oxh-desk-bank">
+                <div>
+                  <small>{paper ? "Paper bank" : "Bank"}</small>
+                  <b className="oxh-mono">{fmtUsd(equity)}</b>
+                  <em className={pnlCls(equity - started)}>{equity - started >= 0 ? "+" : ""}{fmtUsd(equity - started)} · {started ? `${(((equity - started) / started) * 100).toFixed(2)}%` : "0%"} since start</em>
+                </div>
+                <div className="oxh-desk-cells">
+                  <span><small>Start</small><b className="oxh-mono">{fmtUsd(started)}</b></span>
+                  <span><small>Cash</small><b className="oxh-mono">{fmtUsd(cash)}</b></span>
+                  <span><small>In positions</small><b className="oxh-mono">{fmtUsd(open.reduce((s, o) => s + (o.usd_in ?? 0), 0))}</b></span>
+                  <span><small>Realized</small><b className={`oxh-mono ${pnlCls(madeUsd)}`}>{madeUsd >= 0 ? "+" : ""}{fmtUsd(madeUsd)}</b></span>
+                  <span><small>Clip</small><b className="oxh-mono">{fmtUsd(desk?.trade_usd ?? 0)}</b></span>
+                  <span><small>Max open</small><b className="oxh-mono">{desk?.max_open ?? 1}</b></span>
+                  <span><small>Record</small><b className="oxh-mono">{wins}W {losses}L</b></span>
+                  <span><small>SOL</small><b className="oxh-mono">{desk?.sol_usd ? fmtUsd(desk.sol_usd) : "—"}</b></span>
+                </div>
+              </div>
+              <Sparkline pts={curve} />
+              <p className="oxh-muted">{desk?.disclaimer}</p>
+              {open.length > 0 && (
+                <div className="oxh-grid oxh-grid-tight">
+                  {open.map((o, i) => (
+                    <article key={o.id || i} className="oxh-agent">
+                      <header>
+                        <span className="oxh-avatar" style={{ background: agentColor(o.agent_id) }}>{agentName(o.agent_id).slice(0, 1)}</span>
+                        <div><b>{o.symbol || shortAddr(o.mint)}</b><small>{agentName(o.agent_id)} · in {fmtUsd(o.usd_in ?? 0)} · entry {o.entry_price_usd ? fmtUsd(o.entry_price_usd) : "—"}</small></div>
+                        <b className={`oxh-mono ${pnlCls(o.pnl_pct)}`}>{o.pnl_pct != null ? `${o.pnl_pct >= 0 ? "+" : ""}${o.pnl_pct.toFixed(1)}%` : "…"}</b>
+                      </header>
+                      <p>{o.thesis}</p>
+                      <div className="oxh-post-meta">
+                        <Link to={`/ORBITX_DEX/token/${o.mint}`} className="oxh-chip">chart</Link>
+                        <a className="oxh-chip" href={`https://solscan.io/token/${o.mint}`} target="_blank" rel="noreferrer">solscan <ExternalLink className="h-3 w-3" /></a>
+                        <span className="oxh-chip oxh-mono">TP {Math.round((o.tp_pct ?? 0) * 100)}%</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+              {!open.length && <p className="oxh-muted oxh-pad">Flat. Agents scan the live tape every minute and enter when a coin clears the screen.</p>}
+              <h3 className="oxh-h3">Recent fills</h3>
+              <ul className="oxh-feed">
+                {posts.filter((p) => p.source === "desk" && (p.kind === "buy" || p.kind === "sell" || p.kind === "scale_out")).slice(0, 30).map((p) => <PostCard key={p.id} p={p} now={now} />)}
+              </ul>
+            </div>
+          )}
+
           {tab === "calls" && (
             <div className="oxh-table-wrap">
               <table className="oxh-table">
@@ -278,7 +339,7 @@ export default function OrbitxAgentsHub() {
                           <span>{f.side} {f.symbol}</span>
                           <span className="oxh-mono">{fmtUsd(f.usd_amount ?? 0)}</span>
                           {f.pnl_usd != null && f.side === "sell" && <span className={`oxh-mono ${pnlCls(f.pnl_usd)}`}>{f.pnl_usd >= 0 ? "+" : ""}{fmtUsd(f.pnl_usd)}</span>}
-                          {f.signature && <a href={solscanTx(f.signature)} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" /></a>}
+                          {isRealSig(f.signature) && <a href={solscanTx(f.signature)} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3" /></a>}
                         </li>
                       ))}
                       {!recent.length && <li className="oxh-muted">No fills yet</li>}
@@ -321,7 +382,7 @@ export default function OrbitxAgentsHub() {
                   </table>
                 </>
               )}
-              <h3 className="oxh-h3">Fills · real transactions</h3>
+              <h3 className="oxh-h3">{paper ? "Fills · paper desk (real prices)" : "Fills · real transactions"}</h3>
               <table className="oxh-table">
                 <thead><tr><th>Time</th><th>Agent</th><th>Side</th><th>Token</th><th>USD</th><th>PnL</th><th>Reason</th><th>Tx</th></tr></thead>
                 <tbody>
@@ -334,7 +395,7 @@ export default function OrbitxAgentsHub() {
                       <td className="oxh-mono">{fmtUsd(f.usd_amount ?? 0)}</td>
                       <td className={`oxh-mono ${pnlCls(f.pnl_usd)}`}>{f.side === "sell" && f.pnl_usd != null ? `${f.pnl_usd >= 0 ? "+" : ""}${fmtUsd(f.pnl_usd)}${f.pnl_pct != null ? ` (${f.pnl_pct.toFixed(0)}%)` : ""}` : "—"}</td>
                       <td className="oxh-thesis">{f.reason || f.thesis}</td>
-                      <td>{f.signature ? <a href={solscanTx(f.signature)} target="_blank" rel="noreferrer" className="oxh-mono">{f.signature.slice(0, 6)}… <ExternalLink className="h-3 w-3" /></a> : "—"}</td>
+                      <td>{isRealSig(f.signature) ? <a href={solscanTx(f.signature)} target="_blank" rel="noreferrer" className="oxh-mono">{f.signature!.slice(0, 6)}… <ExternalLink className="h-3 w-3" /></a> : <span className="oxh-tag oxh-tag-dim">{f.signature === "paper" ? "PAPER" : "—"}</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -386,6 +447,24 @@ export default function OrbitxAgentsHub() {
   );
 }
 
+function Sparkline({ pts }: { pts: { t: number; v: number }[] }) {
+  const w = 800, h = 140, pad = 6;
+  const vs = pts.map((p) => p.v);
+  const min = Math.min(...vs), max = Math.max(...vs);
+  const span = max - min || 1;
+  const x = (i: number) => pad + (i / Math.max(1, pts.length - 1)) * (w - pad * 2);
+  const y = (v: number) => h - pad - ((v - min) / span) * (h - pad * 2);
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const up = vs[vs.length - 1] >= vs[0];
+  return (
+    <svg className="oxh-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="equity curve">
+      <defs><linearGradient id="oxh-sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#fff" stopOpacity=".25" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></linearGradient></defs>
+      <path d={`${d} L${x(pts.length - 1).toFixed(1)},${h} L${x(0)},${h} Z`} fill="url(#oxh-sg)" />
+      <path d={d} fill="none" stroke={up ? "#fff" : "#888"} strokeWidth="2" strokeDasharray={up ? undefined : "4 3"} />
+    </svg>
+  );
+}
+
 function Stat({ label, value, sub, cls }: { label: string; value: string; sub?: string; cls?: string }) {
   return (
     <div className="oxh-stat">
@@ -413,7 +492,8 @@ function PostCard({ p, now }: { p: UnifiedPost; now: number }) {
             {p.mint ? <Link to={`/ORBITX_DEX/token/${p.mint}`} className="oxh-chip">${p.symbol || shortAddr(p.mint)}</Link> : p.symbol ? <span className="oxh-chip">${p.symbol}</span> : null}
             {p.usd != null && p.usd > 0 && <span className="oxh-chip oxh-mono">{fmtUsd(p.usd)}{p.source === "call" ? " MC" : ""}</span>}
             {p.pnl != null && <span className={`oxh-chip oxh-mono ${pnlCls(p.pnl)}`}>{p.pnl >= 0 ? "+" : ""}{fmtUsd(p.pnl)}</span>}
-            {p.sig && <a className="oxh-chip" href={solscanTx(p.sig)} target="_blank" rel="noreferrer">tx <ExternalLink className="h-3 w-3" /></a>}
+            {isRealSig(p.sig) && <a className="oxh-chip" href={solscanTx(p.sig!)} target="_blank" rel="noreferrer">tx <ExternalLink className="h-3 w-3" /></a>}
+            {p.sig === "paper" && <span className="oxh-chip">paper fill</span>}
           </div>
         )}
       </div>

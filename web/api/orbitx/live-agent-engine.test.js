@@ -20,19 +20,24 @@ function memSb() {
               },
             };
           }
-          const rows = tables[name].filter((r) => r[col] === val);
-          return {
+          const match = (r) => (col === "paper" ? Boolean(r.paper) === Boolean(val) : r[col] === val);
+          const rows = tables[name].filter(match);
+          const chain = (subset) => ({
+            eq(c2, v2) {
+              return chain(subset.filter((r) => (c2 === "paper" ? Boolean(r.paper) === Boolean(v2) : r[c2] === v2)));
+            },
             order() {
               return {
                 async then(resolve) {
-                  return resolve({ data: rows, error: null });
+                  return resolve({ data: subset, error: null });
                 },
                 limit() {
-                  return Promise.resolve({ data: rows, error: null });
+                  return Promise.resolve({ data: subset, error: null });
                 },
               };
             },
-          };
+          });
+          return chain(rows);
         },
         order() {
           return {
@@ -352,5 +357,63 @@ describe("live agent engine tick", () => {
     expect(ape.actions.some((a) => a.type === "buy" && a.symbol === "ROOM")).toBe(false);
     if (prev === undefined) delete process.env.LIVE_AGENT_ENABLED;
     else process.env.LIVE_AGENT_ENABLED = prev;
+  });
+
+  it("paper mode: mock $10k bank, real coin, simulated fill, no wallet/arm needed, then a paper win", async () => {
+    const sb = memSb();
+    sb._tables.ox_live_desk[0] = { id: "main", armed: false, paused: false, paper: true, paper_start_usd: 10_000 };
+    const coin = {
+      mint: "PaperMint111111111111111111111111111111111",
+      symbol: "PAPER",
+      name: "Paper",
+      change_1h: 8,
+      change_5m: -2.1,
+      change_24h: 14,
+      volume_24h: 220_000,
+      liquidity_usd: 80_000,
+      market_cap: 420_000,
+      pair_age_min: 180,
+      price_usd: 0.5,
+      twitter: "https://x.com/orbitx",
+      buys_1h: 80,
+    };
+    let swaps = 0;
+    const buy = await tickLiveDesk({
+      sb,
+      sol_usd: 100,
+      tape: async () => [coin],
+      safety: async () => ({ canBuy: true, canSell: true, roundTripLossPct: 3, buyImpactPct: 0.4 }),
+      mark: async () => 0.5,
+      swap: async () => { swaps += 1; return { ok: true, signature: "real", outAmount: "1" }; },
+    });
+    expect(buy.paper).toBe(true);
+    expect(swaps).toBe(0);
+    const b = buy.actions.find((a) => a.type === "buy");
+    expect(b).toBeTruthy();
+    expect(b.usd).toBe(200);
+    expect(b.signature).toBe("paper");
+    expect(sb._tables.ox_live_fills.every((f) => f.paper === true)).toBe(true);
+    expect(sb._tables.ox_live_positions[0].paper).toBe(true);
+    expect(buy.usd_balance).toBeCloseTo(9_800, 0);
+    expect(buy.starting_usd).toBe(10_000);
+
+    const pos = sb._tables.ox_live_positions[0];
+    pos.opened_at = new Date(Date.now() - 60 * 60_000).toISOString();
+    sb._tables.ox_live_desk[0].last_tick_at = new Date(Date.now() - 120_000).toISOString();
+    const sell = await tickLiveDesk({
+      sb,
+      sol_usd: 100,
+      tape: async () => [],
+      safety: async () => ({ canBuy: true, canSell: true }),
+      mark: async () => 0.5 * 3,
+      swap: async () => { swaps += 1; return { ok: true }; },
+    });
+    expect(swaps).toBe(0);
+    const s = sell.actions.find((a) => a.type === "sell");
+    expect(s).toBeTruthy();
+    expect(s.signature).toBe("paper");
+    const sellFill = sb._tables.ox_live_fills.find((f) => f.side === "sell");
+    expect(sellFill.pnl_usd).toBeGreaterThan(0);
+    expect(sell.usd_balance).toBeGreaterThan(9_800);
   });
 });
