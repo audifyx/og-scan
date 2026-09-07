@@ -166,6 +166,50 @@ describe("calls engine tick", () => {
     expect(String(sent[0].body.text)).toContain("/on-chain");
   });
 
+  it("does not telegram skip ticks and caps bursts to 1 per 2 minutes", async () => {
+    const sb = memSb();
+    const sent = [];
+    const send = async (_token, method, body) => {
+      sent.push({ method, body });
+      return { ok: true, result: { message_id: sent.length } };
+    };
+    const t0 = Date.parse("2026-09-07T18:00:00.000Z");
+    const skipOut = await pushLiveDeskToTelegram({
+      sb,
+      now: t0,
+      send,
+      live: {
+        feed: [
+          { id: "s1", at: new Date(t0).toISOString(), kind: "skip", text: "passed" },
+          { id: "s2", at: new Date(t0 + 1000).toISOString(), kind: "tick", text: "scan" },
+        ],
+      },
+    });
+    expect(skipOut.posted).toBe(0);
+    expect(sent).toHaveLength(0);
+    const buy1 = await pushLiveDeskToTelegram({
+      sb,
+      now: t0 + 2000,
+      send,
+      live: {
+        feed: [{ id: "b1", at: new Date(t0 + 2000).toISOString(), kind: "buy", symbol: "ONE", mint: clean.mint, text: "bought one" }],
+      },
+    });
+    expect(buy1.posted).toBe(1);
+    const buy2 = await pushLiveDeskToTelegram({
+      sb,
+      now: t0 + 60_000,
+      send,
+      live: {
+        feed: [{ id: "b2", at: new Date(t0 + 60_000).toISOString(), kind: "buy", symbol: "TWO", mint: "Mint222222222222222222222222222222222222222", text: "bought two" }],
+      },
+    });
+    expect(buy2.posted).toBe(0);
+    expect(buy2.skipped).toBe("min_gap");
+    expect(sent.filter((s) => String(s.body?.text || "").includes("ONE"))).toHaveLength(1);
+    expect(sent.filter((s) => String(s.body?.text || "").includes("TWO"))).toHaveLength(0);
+  });
+
   it("registers a group from a Telegram message and sends the linked notice", async () => {
     const sb = memSb();
     sb._tables.ox_calls_chats = [];

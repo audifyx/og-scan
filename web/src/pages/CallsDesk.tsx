@@ -60,6 +60,8 @@ type DeskSnap = {
   broadcast_groups?: boolean;
   armed?: boolean;
   last_tick_at?: string | null;
+  last_posted_at?: string | null;
+  pace?: { min_gap_sec?: number; window_min?: number; max_per_window?: number; posted_in_window?: number };
   last_agent_id?: string | null;
   last_error?: string | null;
   groups?: number;
@@ -182,7 +184,7 @@ export default function CallsDesk() {
             <h1 className="mt-1 font-display text-3xl font-black tracking-tight">Calls desk</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/55">
               Same tape as /on-chain. Connect a BotFather token, add the bot to your group or channel, and NEON / WARDEN /
-              RAID posts every live tick — buys, skips, sells — in the same words as the dashboard. No commands.
+              RAID post buys and sells — not every skip tick. Hard cap: 1 call per 2 minutes, 5 per 25 minutes. No commands.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -342,6 +344,7 @@ export default function CallsDesk() {
             </label>
             <p className="text-[10px] uppercase tracking-wide text-white/35">
               Last tick {ago(snap?.last_tick_at)} · agent {snap?.last_agent_id || "—"}
+              {snap?.pace ? ` · ${snap.pace.posted_in_window || 0}/${snap.pace.max_per_window} in ${snap.pace.window_min}m · 1 / ${Math.round((snap.pace.min_gap_sec || 120) / 60)}m` : ""}
               {snap?.last_error ? ` · ${snap.last_error}` : ""}
             </p>
           </div>

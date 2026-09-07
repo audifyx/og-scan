@@ -25,6 +25,8 @@ describe("admin /calls desk", () => {
     const page = readFileSync(resolve(root, "src/pages/CallsDesk.tsx"), "utf8");
     expect(page).toContain("BotFather token");
     expect(page).toContain("Mirror /on-chain live desk");
+    expect(page).toContain("1 call per 2 minutes");
+    expect(page).toContain("5 per 25 minutes");
     expect(page).toContain("apply_schema");
     expect(page).not.toContain("bot_token:");
     const api = readFileSync(resolve(root, "api/orbitx-calls.js"), "utf8");

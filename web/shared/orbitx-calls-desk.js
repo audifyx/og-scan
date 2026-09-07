@@ -7,8 +7,12 @@ import { LIVE_AGENTS, enrichLiveFeedRow, liveAgentVoice, nextLiveAgent, screenLi
 export const CALLS_WIN_MULTIPLE = 1.5;
 export const CALLS_LOSE_MULTIPLE = 0.7;
 export const CALLS_LOSE_AFTER_MS = 24 * 60 * 60 * 1000;
-export const CALLS_MAX_PER_TICK = 2;
+export const CALLS_MAX_PER_TICK = 1;
 export const CALLS_COOLDOWN_HOURS = 12;
+/** Telegram: at most one call every 2 minutes, 5 calls in any 25-minute window. */
+export const CALLS_MIN_GAP_MS = 2 * 60 * 1000;
+export const CALLS_WINDOW_MS = 25 * 60 * 1000;
+export const CALLS_MAX_PER_WINDOW = 5;
 
 function num(v, fallback = 0) {
   const n = Number(v);
@@ -121,7 +125,7 @@ export function stillCooling(existing = [], mint, now = Date.now(), hours = CALL
 }
 
 export function pickCallCandidates(tape = [], agent, existing = [], opts = {}) {
-  const max = Math.max(1, Math.min(5, num(opts.max_calls_per_tick, CALLS_MAX_PER_TICK)));
+  const max = Math.max(1, Math.min(1, num(opts.max_calls_per_tick, CALLS_MAX_PER_TICK)));
   const hours = num(opts.cooldown_hours, CALLS_COOLDOWN_HOURS);
   const now = opts.now || Date.now();
   const out = [];
@@ -246,6 +250,75 @@ export function unpublishedLiveFeed(feed = [], sinceAt, limit = 8) {
     .slice(-cap);
 }
 
+export function isTelegramCallKind(kind) {
+  return /^(buy|sell)$/i.test(String(kind || ""));
+}
+
+export function parsePostAts(raw) {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((v) => (typeof v === "string" ? v : v ? new Date(v).toISOString() : ""))
+      .filter((v) => Number.isFinite(Date.parse(v)));
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      return parsePostAts(JSON.parse(raw));
+    } catch {
+      return Number.isFinite(Date.parse(raw)) ? [raw] : [];
+    }
+  }
+  return [];
+}
+
+export function prunePostAts(ats, now = Date.now(), windowMs = CALLS_WINDOW_MS) {
+  const cut = now - windowMs;
+  return parsePostAts(ats).filter((t) => Date.parse(t) > cut);
+}
+
+export function telegramCallGate(ats, now = Date.now(), opts = {}) {
+  const gap = opts.minGapMs ?? CALLS_MIN_GAP_MS;
+  const windowMs = opts.windowMs ?? CALLS_WINDOW_MS;
+  const max = opts.maxPerWindow ?? CALLS_MAX_PER_WINDOW;
+  const recent = prunePostAts(ats, now, windowMs);
+  const last = recent.length ? Math.max(...recent.map((t) => Date.parse(t))) : 0;
+  if (last && now - last < gap) {
+    return { ok: false, reason: "min_gap", wait_ms: gap - (now - last), recent };
+  }
+  if (recent.length >= max) {
+    const oldest = Math.min(...recent.map((t) => Date.parse(t)));
+    return { ok: false, reason: "window_cap", wait_ms: Math.max(0, windowMs - (now - oldest)), recent };
+  }
+  return { ok: true, reason: null, wait_ms: 0, recent };
+}
+
+export function claimTelegramCall(ats, now = Date.now(), opts = {}) {
+  const gate = telegramCallGate(ats, now, opts);
+  if (!gate.ok) return gate;
+  const iso = new Date(now).toISOString();
+  return { ok: true, reason: null, wait_ms: 0, recent: [...gate.recent, iso] };
+}
+
+/** Next buy/sell to post. Noise (skip/tick) can be acked without sending. */
+export function nextTelegramCall(feed, sinceAt) {
+  const fresh = unpublishedLiveFeed(feed, sinceAt, 12);
+  const noise = [];
+  for (const row of fresh) {
+    if (isTelegramCallKind(row.kind)) {
+      return {
+        call: row,
+        ackThrough: noise.length ? noise[noise.length - 1] : null,
+        fresh,
+      };
+    }
+    noise.push(row);
+  }
+  return {
+    call: null,
+    ackThrough: noise.length ? noise[noise.length - 1] : null,
+    fresh,
+  };
+}
+
 export function formatLiveFeedTelegram(row = {}, ctx = {}) {
   const live = enrichLiveFeedRow(row, ctx);
   const kind = String(live.kind || "tick").toUpperCase();
@@ -353,6 +426,12 @@ export function publicDesk(row = {}, chats = [], calls = []) {
     last_agent_id: row.last_agent_id || null,
     last_error: row.last_error || null,
     last_posted_at: row.last_posted_at || null,
+    pace: {
+      min_gap_sec: CALLS_MIN_GAP_MS / 1000,
+      window_min: CALLS_WINDOW_MS / 60000,
+      max_per_window: CALLS_MAX_PER_WINDOW,
+      posted_in_window: prunePostAts(row.post_ats).length,
+    },
     agents: LIVE_AGENTS,
     groups: groupCount,
     channels: channels.length,

@@ -15,6 +15,9 @@ import {
   summarizeCalls,
   unpublishedLiveFeed,
   writeCallThesis,
+  claimTelegramCall,
+  nextTelegramCall,
+  telegramCallGate,
 } from "./orbitx-calls-desk.js";
 
 const coin = {
@@ -138,6 +141,38 @@ describe("calls desk math", () => {
     });
     expect(added.chat_id).toBe("-1002");
     expect(added.chat_type).toBe("supergroup");
+  });
+
+  it("rate-limits telegram calls to 1 per 2 min and 5 per 25 min", () => {
+    const t0 = Date.parse("2026-09-07T17:00:00.000Z");
+    const first = claimTelegramCall([], t0);
+    expect(first.ok).toBe(true);
+    const tooSoon = telegramCallGate(first.recent, t0 + 60_000);
+    expect(tooSoon.ok).toBe(false);
+    expect(tooSoon.reason).toBe("min_gap");
+    const afterGap = claimTelegramCall(first.recent, t0 + 120_000);
+    expect(afterGap.ok).toBe(true);
+    let ats = [];
+    for (let i = 0; i < 5; i += 1) {
+      const slot = claimTelegramCall(ats, t0 + i * 120_000);
+      expect(slot.ok).toBe(true);
+      ats = slot.recent;
+    }
+    const sixth = telegramCallGate(ats, t0 + 5 * 120_000);
+    expect(sixth.ok).toBe(false);
+    expect(sixth.reason).toBe("window_cap");
+    const afterWindow = telegramCallGate(ats, t0 + 25 * 60_000 + 1);
+    expect(afterWindow.ok).toBe(true);
+    const pick = nextTelegramCall(
+      [
+        { id: "s", at: "2026-09-07T17:01:00.000Z", kind: "skip" },
+        { id: "t", at: "2026-09-07T17:02:00.000Z", kind: "tick" },
+        { id: "b", at: "2026-09-07T17:03:00.000Z", kind: "buy" },
+      ],
+      "2026-09-07T17:00:00.000Z",
+    );
+    expect(pick.call.id).toBe("b");
+    expect(pick.ackThrough.id).toBe("t");
   });
 
   it("public agentcalls board is tape-only and never includes bot keys", () => {

@@ -12,9 +12,9 @@ import {
   applyMark,
   buildCallAnalysis,
   CALLS_COOLDOWN_HOURS,
-  CALLS_MAX_PER_TICK,
   CALLS_WIN_MULTIPLE,
   chatFromTelegramUpdate,
+  claimTelegramCall,
   emptyCallsDesk,
   formatCallTelegram,
   formatDeskLinkedTelegram,
@@ -22,11 +22,11 @@ import {
   formatMarkUpdate,
   maskBotToken,
   nextCallsAgent,
+  nextTelegramCall,
   parseChannelRef,
   pickCallCandidates,
   publicDesk,
   publicWebhookUrl,
-  unpublishedLiveFeed,
   stillCooling,
   writeCallThesis,
 } from "../../shared/orbitx-calls-desk.js";
@@ -187,17 +187,31 @@ export async function applyCallsSql(env = process.env) {
 }
 
 async function loadDesk(sb, env = process.env) {
+  let desk;
   if ((await storeMode(sb)) === "kv") {
     const st = await kvGetState(env);
-    return st.desk || { id: "main" };
+    desk = st.desk || { id: "main" };
+  } else {
+    const { data, error } = await sb.from("ox_calls_desk").select("*").eq("id", "main").maybeSingle();
+    if (error && tableMissing(error)) {
+      _storeMode = "kv";
+      return loadDesk(sb, env);
+    }
+    if (error) throw new Error(error.message);
+    desk = data || { id: "main" };
+    if (!Array.isArray(desk.post_ats)) {
+      const st = await kvGetState(env).catch(() => null);
+      if (Array.isArray(st?.desk?.post_ats)) desk.post_ats = st.desk.post_ats;
+    }
   }
-  const { data, error } = await sb.from("ox_calls_desk").select("*").eq("id", "main").maybeSingle();
-  if (error && tableMissing(error)) {
-    _storeMode = "kv";
-    return loadDesk(sb, env);
-  }
-  if (error) throw new Error(error.message);
-  return data || { id: "main" };
+  return desk;
+}
+
+async function persistPace(row, env = process.env) {
+  if (!row || !Array.isArray(row.post_ats)) return;
+  const st = await kvGetState(env).catch(() => ({ desk: { id: "main" }, chats: [], ledger: [] }));
+  st.desk = { ...(st.desk || { id: "main" }), post_ats: row.post_ats, last_posted_at: row.last_posted_at || st.desk?.last_posted_at || null };
+  await kvPutState(st, env).catch(() => {});
 }
 
 async function upsertDesk(sb, patch, env = process.env) {
@@ -209,12 +223,19 @@ async function upsertDesk(sb, patch, env = process.env) {
     await kvPutState(st, env);
     return row;
   }
-  const { error } = await sb.from("ox_calls_desk").upsert(row, { onConflict: "id" });
+  let { error } = await sb.from("ox_calls_desk").upsert(row, { onConflict: "id" });
   if (error && tableMissing(error)) {
     _storeMode = "kv";
     return upsertDesk(sb, patch, env);
   }
+  if (error && /post_ats|schema cache|column/i.test(`${error.code || ""} ${error.message || ""}`)) {
+    const { post_ats: _drop, ...rest } = row;
+    const retry = await sb.from("ox_calls_desk").upsert(rest, { onConflict: "id" });
+    error = retry.error;
+    await kvPutState({ ...(await kvGetState(env)), desk: row }, env).catch(() => {});
+  }
   if (error) throw new Error(error.message);
+  await persistPace(row, env);
   return row;
 }
 
@@ -427,7 +448,7 @@ export async function saveCallsSettings({ patch = {}, sb: sbIn } = {}) {
   const next = {};
   if (patch.armed != null) next.armed = Boolean(patch.armed);
   if (patch.broadcast_groups != null) next.broadcast_groups = Boolean(patch.broadcast_groups);
-  if (patch.max_calls_per_tick != null) next.max_calls_per_tick = Math.max(1, Math.min(5, num(patch.max_calls_per_tick, 2)));
+  if (patch.max_calls_per_tick != null) next.max_calls_per_tick = 1;
   if (patch.cooldown_hours != null) next.cooldown_hours = Math.max(1, Math.min(72, num(patch.cooldown_hours, 12)));
   if (patch.win_multiple != null) next.win_multiple = Math.max(1.1, Math.min(5, num(patch.win_multiple, 1.5)));
   await upsertDesk(sb, next);
@@ -522,12 +543,17 @@ async function refreshMarks(sb, desk, calls, { post = false, send } = {}) {
     const flipped = call.status !== next.status && (next.status === "won" || next.status === "lost");
     const doubled = num(next.multiple_now) >= 2 && num(call.multiple_now) < 2;
     if (post && desk.bot_token && (flipped || doubled) && desk.channel_id) {
-      await sendFn(desk.bot_token, "sendMessage", {
-        chat_id: desk.channel_id,
-        text: formatMarkUpdate(next),
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }).catch(() => {});
+      const slot = claimTelegramCall(desk.post_ats, Date.now());
+      if (slot.ok) {
+        desk.post_ats = slot.recent;
+        await sendFn(desk.bot_token, "sendMessage", {
+          chat_id: desk.channel_id,
+          text: formatMarkUpdate(next),
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        }).catch(() => {});
+        await upsertDesk(sb, { post_ats: slot.recent }).catch(() => {});
+      }
     }
   }
   return updated;
@@ -558,6 +584,7 @@ async function postHtml(send, token, chatId, text) {
 export async function pushLiveDeskToTelegram(opts = {}) {
   const sb = opts.sb || adminSb();
   const send = opts.send || ((token, method, body) => tg(token, method, body));
+  const now = opts.now || Date.now();
   if (!sb) return { ok: false, error: "supabase_unconfigured" };
   const desk = await loadDesk(sb);
   if (!desk.bot_token) return { ok: false, skipped: "connect_bot_first" };
@@ -580,52 +607,67 @@ export async function pushLiveDeskToTelegram(opts = {}) {
     opts.live !== undefined
       ? opts.live
       : await snapshotLiveDesk({ skipChain: true }).catch(() => ({ feed: [] }));
-  const catchUp = opts.catchUp != null ? num(opts.catchUp, 3) : desk.last_posted_at ? 8 : 3;
-  const rows = unpublishedLiveFeed(live?.feed || [], desk.last_posted_at, catchUp);
-  const actions = [];
-  let lastAt = desk.last_posted_at;
-  for (const row of rows) {
-    const text = formatLiveFeedTelegram(row, { wallet: live?.wallet });
-    const posts = [];
-    if (!opts.dryRun) {
-      for (const chatId of targets) {
-        const sent = await postHtml(send, desk.bot_token, chatId, text);
-        if (sent?.ok) posts.push({ chat_id: String(chatId), message_id: sent.result?.message_id });
-      }
+  const pick = nextTelegramCall(live?.feed || [], desk.last_posted_at);
+  const ackAt = pick.ackThrough?.at || pick.ackThrough?.created_at || desk.last_posted_at;
+  if (!pick.call) {
+    await upsertDesk(sb, {
+      last_tick_at: new Date(now).toISOString(),
+      last_error: targets.length ? null : "add_bot_to_a_group_or_channel",
+      last_posted_at: ackAt || desk.last_posted_at,
+      last_agent_id: live?.feed?.[0]?.agent_id || desk.last_agent_id,
+    });
+    return { ok: true, posted: 0, targets: targets.length, actions: [], skipped: "live_feed_quiet" };
+  }
+  const slot = claimTelegramCall(desk.post_ats, now);
+  if (!slot.ok) {
+    await upsertDesk(sb, {
+      last_tick_at: new Date(now).toISOString(),
+      last_posted_at: ackAt || desk.last_posted_at,
+      last_error: null,
+    });
+    return { ok: true, posted: 0, targets: targets.length, actions: [], skipped: slot.reason, wait_ms: slot.wait_ms };
+  }
+  const row = pick.call;
+  const text = formatLiveFeedTelegram(row, { wallet: live?.wallet });
+  const posts = [];
+  if (!opts.dryRun) {
+    for (const chatId of targets) {
+      const sent = await postHtml(send, desk.bot_token, chatId, text);
+      if (sent?.ok) posts.push({ chat_id: String(chatId), message_id: sent.result?.message_id });
     }
-    actions.push({ type: "feed", kind: row.kind, mint: row.mint, symbol: row.symbol, posts: posts.length, id: row.id });
-    const at = row.at || row.created_at;
-    if (at && (!lastAt || Date.parse(at) >= Date.parse(lastAt))) lastAt = at;
-    if (row.kind === "buy" && row.mint) {
-      const calls = await loadCalls(sb, 40);
-      if (!stillCooling(calls, row.mint)) {
-        await insertCall(sb, {
-          mint: row.mint,
-          symbol: row.symbol,
-          name: row.symbol,
-          url: row.mint ? `https://www.orbitx.world/on-chain/token/${row.mint}` : null,
-          agent_id: row.agent_id,
-          agent_name: row.agent_name,
-          thesis: row.text || row.thesis,
-          analysis: { source: "on-chain-live", kind: row.kind, signature: row.signature },
-          mc_at_call: null,
-          mc_ath: null,
-          mc_atl: null,
-          mc_now: null,
-          status: "open",
-          called_at: at || new Date().toISOString(),
-          telegram_posts: posts,
-        }).catch(() => {});
-      }
+  }
+  const actions = [{ type: "feed", kind: row.kind, mint: row.mint, symbol: row.symbol, posts: posts.length, id: row.id }];
+  const at = row.at || row.created_at;
+  if (row.kind === "buy" && row.mint) {
+    const calls = await loadCalls(sb, 40);
+    if (!stillCooling(calls, row.mint)) {
+      await insertCall(sb, {
+        mint: row.mint,
+        symbol: row.symbol,
+        name: row.symbol,
+        url: row.mint ? `https://www.orbitx.world/on-chain/token/${row.mint}` : null,
+        agent_id: row.agent_id,
+        agent_name: row.agent_name,
+        thesis: row.text || row.thesis,
+        analysis: { source: "on-chain-live", kind: row.kind, signature: row.signature },
+        mc_at_call: null,
+        mc_ath: null,
+        mc_atl: null,
+        mc_now: null,
+        status: "open",
+        called_at: at || new Date(now).toISOString(),
+        telegram_posts: posts,
+      }).catch(() => {});
     }
   }
   await upsertDesk(sb, {
-    last_tick_at: new Date().toISOString(),
-    last_error: actions.length || targets.length ? null : "add_bot_to_a_group_or_channel",
-    last_posted_at: lastAt || desk.last_posted_at,
-    last_agent_id: live?.feed?.[0]?.agent_id || desk.last_agent_id,
+    last_tick_at: new Date(now).toISOString(),
+    last_error: null,
+    last_posted_at: at || desk.last_posted_at,
+    last_agent_id: row.agent_id || desk.last_agent_id,
+    post_ats: slot.recent,
   });
-  return { ok: true, posted: actions.length, targets: targets.length, actions, skipped: actions.length ? null : "live_feed_quiet" };
+  return { ok: true, posted: 1, targets: targets.length, actions, skipped: null };
 }
 
 export async function tickCallsDesk(opts = {}) {
@@ -646,6 +688,7 @@ export async function tickCallsDesk(opts = {}) {
     await upsertDesk(sb, { last_error: e.message || String(e), last_tick_at: new Date().toISOString() }).catch(() => {});
   }
 
+  const now = opts.now || Date.now();
   const live =
     opts.live !== undefined
       ? opts.live
@@ -656,65 +699,72 @@ export async function tickCallsDesk(opts = {}) {
     live,
     force: opts.force,
     dryRun: opts.dryRun,
+    now,
   });
   const actions = [...(pushed.actions || [])];
 
   if (typeof opts.tape === "function" && desk.bot_token && (desk.armed !== false || opts.force)) {
-    const agent = nextCallsAgent(desk.last_agent_id);
-    const chats = await loadChats(sb);
-    const tape = await Promise.resolve().then(() => opts.tape()).catch(() => []);
-    const ranked = rankForLiveStyle(agent?.style || "momentum", tape || []);
-    const picks = pickCallCandidates(ranked, agent, calls, {
-      max_calls_per_tick: desk.max_calls_per_tick || CALLS_MAX_PER_TICK,
-      cooldown_hours: desk.cooldown_hours || CALLS_COOLDOWN_HOURS,
-    });
-    const targets = deliveryTargets(desk, chats);
-    for (const pick of picks) {
-      const { coin, screen } = pick;
-      const thesis = writeCallThesis(agent, coin, screen);
-      const analysis = buildCallAnalysis(coin, screen, agent);
-      const row = {
-        mint: coin.mint,
-        symbol: coin.symbol,
-        name: coin.name || coin.symbol,
-        url: coin.url || `https://dexscreener.com/solana/${coin.mint}`,
-        agent_id: agent?.id,
-        agent_name: agent?.name,
-        thesis,
-        analysis,
-        mc_at_call: num(coin.market_cap),
-        liq_at_call: num(coin.liquidity_usd),
-        vol_24h_at_call: num(coin.volume_24h),
-        vol_1h_at_call: num(coin.volume_1h),
-        price_at_call: num(coin.price_usd),
-        mc_ath: num(coin.market_cap),
-        mc_atl: num(coin.market_cap),
-        mc_now: num(coin.market_cap),
-        price_now: num(coin.price_usd),
-        ath_at: new Date().toISOString(),
-        atl_at: new Date().toISOString(),
-        multiple_now: 1,
-        multiple_ath: 1,
-        status: "open",
-        called_at: new Date().toISOString(),
-        telegram_posts: [],
-      };
-      const text = formatCallTelegram(row);
-      const posts = [];
-      if (!opts.dryRun) {
-        for (const chatId of targets) {
-          const sent = await send(desk.bot_token, "sendMessage", {
-            chat_id: chatId,
-            text,
-            parse_mode: "HTML",
-            disable_web_page_preview: false,
-          }).catch(() => ({ ok: false }));
-          if (sent?.ok) posts.push({ chat_id: String(chatId), message_id: sent.result?.message_id });
+    const after = await loadDesk(sb);
+    const slot = claimTelegramCall(after.post_ats, now);
+    if (slot.ok) {
+      const agent = nextCallsAgent(after.last_agent_id);
+      const chats = await loadChats(sb);
+      const tape = await Promise.resolve().then(() => opts.tape()).catch(() => []);
+      const ranked = rankForLiveStyle(agent?.style || "momentum", tape || []);
+      const picks = pickCallCandidates(ranked, agent, calls, {
+        max_calls_per_tick: 1,
+        cooldown_hours: after.cooldown_hours || CALLS_COOLDOWN_HOURS,
+      });
+      const targets = deliveryTargets(after, chats);
+      const pick = picks[0];
+      if (pick) {
+        const { coin, screen } = pick;
+        const thesis = writeCallThesis(agent, coin, screen);
+        const analysis = buildCallAnalysis(coin, screen, agent);
+        const row = {
+          mint: coin.mint,
+          symbol: coin.symbol,
+          name: coin.name || coin.symbol,
+          url: coin.url || `https://dexscreener.com/solana/${coin.mint}`,
+          agent_id: agent?.id,
+          agent_name: agent?.name,
+          thesis,
+          analysis,
+          mc_at_call: num(coin.market_cap),
+          liq_at_call: num(coin.liquidity_usd),
+          vol_24h_at_call: num(coin.volume_24h),
+          vol_1h_at_call: num(coin.volume_1h),
+          price_at_call: num(coin.price_usd),
+          mc_ath: num(coin.market_cap),
+          mc_atl: num(coin.market_cap),
+          mc_now: num(coin.market_cap),
+          price_now: num(coin.price_usd),
+          ath_at: new Date().toISOString(),
+          atl_at: new Date().toISOString(),
+          multiple_now: 1,
+          multiple_ath: 1,
+          status: "open",
+          called_at: new Date().toISOString(),
+          telegram_posts: [],
+        };
+        const text = formatCallTelegram(row);
+        const posts = [];
+        if (!opts.dryRun) {
+          for (const chatId of targets) {
+            const sent = await send(after.bot_token, "sendMessage", {
+              chat_id: chatId,
+              text,
+              parse_mode: "HTML",
+              disable_web_page_preview: false,
+            }).catch(() => ({ ok: false }));
+            if (sent?.ok) posts.push({ chat_id: String(chatId), message_id: sent.result?.message_id });
+          }
         }
+        row.telegram_posts = posts;
+        const inserted = await insertCall(sb, row);
+        await upsertDesk(sb, { post_ats: slot.recent, last_agent_id: agent?.id });
+        actions.push({ type: "call", mint: coin.mint, symbol: coin.symbol, agent_id: agent?.id, posts: posts.length, id: inserted?.id });
       }
-      row.telegram_posts = posts;
-      const inserted = await insertCall(sb, row);
-      actions.push({ type: "call", mint: coin.mint, symbol: coin.symbol, agent_id: agent?.id, posts: posts.length, id: inserted?.id });
     }
   }
 
@@ -725,7 +775,7 @@ export async function tickCallsDesk(opts = {}) {
     skipped: pushed.skipped || (actions.length ? null : "live_feed_quiet"),
     marked,
     actions,
-    posted: pushed.posted || 0,
+    posted: actions.filter((a) => a.type === "feed" || a.type === "call").length,
     targets: pushed.targets || 0,
     agent: live?.feed?.[0]?.agent_id || desk.last_agent_id,
     win_multiple: num(desk.win_multiple, CALLS_WIN_MULTIPLE),

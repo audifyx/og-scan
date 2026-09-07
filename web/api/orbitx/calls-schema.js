@@ -21,9 +21,11 @@ create table if not exists public.ox_calls_desk (
   last_agent_id text,
   last_error text,
   last_posted_at timestamptz,
+  post_ats jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.ox_calls_desk add column if not exists post_ats jsonb not null default '[]'::jsonb;
 insert into public.ox_calls_desk (id) values ('main') on conflict (id) do nothing;
 create table if not exists public.ox_calls_chats (
   chat_id text primary key,
