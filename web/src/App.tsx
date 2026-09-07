@@ -209,6 +209,7 @@ import { SecurityTracker } from "./components/SecurityTracker";
 const McpVoiceRoom = lazyWithRetry(() => import("./pages/McpVoiceRoom"));
 const McpGroupChat = lazyWithRetry(() => import("./pages/McpGroupChat"));
 const OrbitxAgentsWorld = lazyWithRetry(() => import("./pages/OrbitxAgentsWorld"));
+const OrbitxAgentsHub = lazyWithRetry(() => import("./pages/OrbitxAgentsHub"));
 const Calls = lazyWithRetry(() => import("./pages/Calls"));
 
 const DirectMessagesPage = () => (
@@ -357,7 +358,9 @@ const App = () => (
 
             {/* ── Public agent world (must beat /:toolSlug owner-404) ── */}
             <Route path="/calls" element={<Suspense fallback={<RouteFallback label="OrbitX Calls" />}><Calls /></Suspense>} />
-            <Route path="/orbitxagents" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
+            <Route path="/orbitxagents" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsHub /></Suspense>} />
+            <Route path="/orbitxagents/os" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
+            <Route path="/orbitxagents/os/:slug" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
             <Route path="/orbitxagents/:slug" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
             <Route path="/Orbitxagents" element={<Navigate to="/orbitxagents" replace />} />
             <Route path="/Orbitxagents/:slug" element={<OrbitxAgentsSlugRedirect />} />
@@ -696,7 +699,8 @@ const App = () => (
             <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
             <Route path="/world" element={<Navigate to="/on-chain" replace />} />
-            <Route path="/on-chain" element={<OnChainWorld />} />
+            <Route path="/on-chain" element={<Navigate to="/orbitxagents?tab=chain" replace />} />
+            <Route path="/on-chain/world" element={<OnChainWorld />} />
             <Route path="/on-chain/wallet/:address" element={<OnChainWorld />} />
             <Route path="/on-chain/token/:address" element={<OnChainWorld />} />
             <Route path="/on-chain/tx/:signature" element={<OnChainWorld />} />
