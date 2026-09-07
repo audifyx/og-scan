@@ -7,7 +7,7 @@ import { Color, DoubleSide, Object3D } from "three";
 import type { LiveDeskPayload } from "@/pages/onchain-world/api";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY, buildLiveWorld } from "../../../../../shared/orbitx-live-desk.js";
 import { liveCityClimate } from "../../../../../shared/orbitx-live-city.js";
-import { HuntWatchBar } from "./LiveAgentFeed";
+import { HuntWatchBar } from "./HuntWatchBar";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import { useLiveDesk } from "../useLiveDesk";
 

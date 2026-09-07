@@ -13,9 +13,11 @@ import { formatAddress, formatPct, formatUsd } from "@/pages/onchain-world/lib/o
 import { useOrbitxStore } from "@/pages/onchain-world/lib/orbitx/store";
 import { simulatePaperDesk } from "../../../../../shared/orbitx-paper-desk.js";
 import { LIVE_AGENTS, LIVE_WALLET_PUBKEY } from "../../../../../shared/orbitx-live-desk.js";
-import { LiveAgentFeed, HuntWatchBar } from "./LiveAgentFeed";
+import { LiveAgentFeed } from "./LiveAgentFeed";
 import { LiveAgentCity } from "./LiveAgentCity";
+import { HuntWatchBar } from "./HuntWatchBar";
 import { CopyMintButton } from "@/components/CopyMintButton";
+import { readDeskSessionToken, hasDeskSession } from "../../../../../shared/desk-unlock-client.js";
 
 export function AgentsView() {
   const [desk, setDesk] = useState<"paper" | "live">("live");
@@ -54,6 +56,9 @@ function LiveDeskView() {
   const [tapeFilter, setTapeFilter] = useState<"all" | "buy" | "sell" | "skip" | "swap">("all");
   const [now, setNow] = useState(() => Date.now());
   const [pane, setPane] = useState<"desk" | "feed" | "city">("feed");
+  const [huntCa, setHuntCa] = useState("");
+  const [huntBusy, setHuntBusy] = useState(false);
+  const [huntMsg, setHuntMsg] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -122,6 +127,37 @@ function LiveDeskView() {
     }
   }
 
+  async function fireHunt() {
+    const mint = huntCa.trim();
+    if (!mint) return;
+    const admin = readDeskSessionToken();
+    if (!hasDeskSession() || !admin) {
+      setHuntMsg("Unlock the owner desk first, then paste a CA — no git push.");
+      return;
+    }
+    setHuntBusy(true);
+    setHuntMsg("Ticking…");
+    try {
+      const res = await fetch("/api/live-agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin}` },
+        body: JSON.stringify({ action: "hunt", mint, clipUsd: 1, scaleMcap: 300_000, flattenMcap: 600_000, tick: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.ok === false) {
+        setHuntMsg(String(json.error || "hunt failed"));
+        return;
+      }
+      if (json) setSnap(json);
+      const buy = (json.actions || []).find((a: { type?: string }) => a.type === "buy");
+      setHuntMsg(buy ? `bought ${buy.symbol || mint}` : json.skipped ? `tick ${json.skipped}` : "hunt armed — next minute tick");
+    } catch {
+      setHuntMsg("hunt request failed");
+    } finally {
+      setHuntBusy(false);
+    }
+  }
+
   const status = !snap?.configured
     ? "Wallet secret not on the server yet — set LIVE_AGENT_WALLET_SECRET on Vercel to start fills"
     : !snap.enabled
@@ -185,8 +221,8 @@ function LiveDeskView() {
         <h2 className="font-display text-lg text-fg">${clip.toFixed(2)} clips · one book at a time</h2>
         <p className="mt-1 max-w-3xl text-2xs text-muted">
           Three agents share one Solana wallet and rotate every tick — NEON, WARDEN, then RAID. They hunt low-cap
-          tape every 5 minutes. Default fills are ${clip.toFixed(2)}; $ANONYMOUSE is a $1 hunt: buy it, sell 41% at $300k
-          MC (keep 59%), flatten at $600k. skip dumps and rugs. First take on other books is around $0.30. Not financial
+          tape every 1 minute. Paste a CA to hunt without a deploy: $1 clip, sell 41% at $300k MC (keep 59%), flatten at
+          $600k. skip dumps and rugs. First take on other books is around $0.30. Not financial
           advice — this bank can go to zero.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2">
@@ -207,6 +243,31 @@ function LiveDeskView() {
         </div>
         <p className="mt-2 text-2xs text-accent">{status}</p>
         <HuntWatchBar hunts={snap?.hunt} />
+        <form
+          className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-bg-sunken px-3 py-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void fireHunt();
+          }}
+        >
+          <span className="ox-kicker text-accent">Ape CA</span>
+          <input
+            value={huntCa}
+            onChange={(e) => setHuntCa(e.target.value)}
+            placeholder="paste mint — ticks now, no deploy"
+            className="min-w-[12rem] flex-1 bg-transparent font-mono text-2xs text-fg outline-none placeholder:text-faint"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            disabled={huntBusy || !huntCa.trim()}
+            className="rounded-full bg-fg px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-bg disabled:opacity-40"
+          >
+            {huntBusy ? "…" : "buy $1"}
+          </button>
+          {huntMsg ? <span className="text-[10px] text-dim">{huntMsg}</span> : null}
+        </form>
         <dl className="mt-3 grid grid-cols-2 gap-px bg-line sm:grid-cols-4 lg:grid-cols-8">
           <Stat label="Started" value={money(startedUsd)} />
           <Stat label="Now" value={money(nowUsd)} />
@@ -252,8 +313,8 @@ function LiveDeskView() {
         </div>
       ) : (
         <p className="border-b border-line px-4 py-3 text-2xs text-dim">
-          No open live book. Next armed tick buys one ${clip.toFixed(2)} clip if Jupiter can sell. Ticks run every 5
-          minutes.
+          No open live book. Next armed tick buys one ${clip.toFixed(2)} clip if Jupiter can sell. Ticks run every 1
+          minute.
         </p>
       )}
 

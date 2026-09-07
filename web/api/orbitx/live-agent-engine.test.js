@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIVE_AGENTS } from "../../shared/orbitx-live-desk.js";
+import { LIVE_AGENTS, setRuntimeHunts } from "../../shared/orbitx-live-desk.js";
 import { tickLiveDesk } from "./live-agent-engine.js";
 
 function memSb() {
@@ -262,6 +262,9 @@ describe("live agent engine tick", () => {
       buys_1h: 200,
       sells_1h: 260,
     };
+    sb._tables.ox_live_desk[0].note = JSON.stringify({
+      hunts: [{ mint: mouse.mint, symbol: "ANONYMOUSE", clipUsd: 1, scaleMcap: 300_000, flattenMcap: 600_000 }],
+    });
     let mouseProbes = 0;
     const skipDump = await tickLiveDesk({
       sb,

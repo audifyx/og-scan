@@ -18,6 +18,8 @@ import {
   liveHunt,
   liveHuntList,
   liveHuntMints,
+  normalizeHunt,
+  parseHuntSource,
   nextLiveAgent,
   pickLiveToken,
   rankForLiveStyle,
@@ -573,6 +575,7 @@ export async function snapshotLiveDesk(opts = {}) {
     /* keep deposit address */
   }
   const row = await loadDeskRow(sb).catch(() => ({ armed: false, paused: false }));
+  parseHuntSource(process.env.LIVE_HUNT_JSON || process.env.LIVE_HUNT, row.note);
   const armed = Boolean(row.armed) || liveDeskArmedEnv();
   const enabled = liveDeskEnabled();
   let solBal = null;
@@ -743,6 +746,7 @@ export async function tickLiveDesk(opts = {}) {
     return { ...snap0, skipped: "not_enabled", disclaimer: LIVE_DISCLAIMER, actions };
   }
   const row = await loadDeskRow(sb).catch(() => ({ armed: false, paused: false }));
+  parseHuntSource(process.env.LIVE_HUNT_JSON || process.env.LIVE_HUNT, row.note);
   const armed = Boolean(row.armed) || liveDeskArmedEnv() || opts.force === true;
   if (row.paused && !opts.force) {
     await recordEvent(sb, { kind: "tick", reason: "paused" });
@@ -751,6 +755,12 @@ export async function tickLiveDesk(opts = {}) {
   if (!armed) {
     await recordEvent(sb, { kind: "tick", reason: "not_armed" });
     return { ...snap0, skipped: "not_armed", armed: false, actions };
+  }
+  if (!opts.force && row.last_tick_at) {
+    const ago = Date.now() - Date.parse(row.last_tick_at);
+    if (Number.isFinite(ago) && ago >= 0 && ago < 12_000) {
+      return { ...snap0, skipped: "tick_busy", armed, actions };
+    }
   }
   let keypair = opts.keypair || null;
   if (!keypair) {
@@ -1109,4 +1119,21 @@ export async function setLiveArmed({ armed, paused, sb } = {}) {
     wallet_pubkey: LIVE_WALLET_PUBKEY,
   });
   return snapshotLiveDesk({ sb: client });
+}
+
+export async function setLiveHunt(raw, opts = {}) {
+  const client = opts.sb === undefined ? adminSb() : opts.sb;
+  const hunt = normalizeHunt(raw);
+  if (!hunt) return { ok: false, error: "bad_mint" };
+  const hunts = parseHuntSource({ hunts: [hunt] });
+  await upsertDesk(client, {
+    note: JSON.stringify({ hunts }),
+    wallet_pubkey: LIVE_WALLET_PUBKEY,
+  });
+  if (opts.tick === false) {
+    const snap = await snapshotLiveDesk({ sb: client, skipChain: true });
+    return { ok: true, hunt, ...snap };
+  }
+  const out = await tickLiveDesk({ sb: client, force: true, dryRun: opts.dryRun === true });
+  return { ok: true, hunt, ...out };
 }

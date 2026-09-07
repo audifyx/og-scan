@@ -17,7 +17,7 @@ export const LIVE_TP_MAX_USD = 1;
 export const LIVE_SCRAPE_USD = 0.08;
 export const LIVE_SCALP_MS = 12 * 60_000;
 export const LIVE_MAX_HOLD_MS = 22 * 60_000;
-export const LIVE_TICK_MINUTES = 5;
+export const LIVE_TICK_MINUTES = 1;
 export const LIVE_MIN_LIQ_USD = 22_000;
 export const LIVE_MIN_VOL_USD = 25_000;
 export const LIVE_MIN_MCAP_USD = 30_000;
@@ -84,17 +84,9 @@ export const LIVE_ALLOW_MINTS = new Set([
   "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN", // TRUMP
   "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv", // PENGU
 ]);
-/** Names we buy on purpose. $1 clip. Scale 41% at 300k MC, flatten at 600k. */
-export const LIVE_HUNT = [
-  {
-    mint: "Aw6fiDPWLUnjSsJQtsyEMSaoPaKAUUrStAsYPiPwpump",
-    symbol: "ANONYMOUSE",
-    clipUsd: LIVE_HUNT_USD,
-    scaleMcap: 300_000,
-    flattenMcap: 600_000,
-  },
-];
-export const LIVE_HUNT_MINTS = new Map(LIVE_HUNT.map((h) => [h.mint, h]));
+/** Runtime hunt list. Empty by default — set via desk note, LIVE_HUNT_JSON env, or POST /api/live-agents action=hunt. No git push to ape a CA. */
+export const LIVE_HUNT = [];
+let activeHunts = [];
 export const LIVE_SKIP_SYMBOLS = new Set(["USDC", "USDT", "USD1", "PYUSD", "USDS", "DAI", "FDUSD", "USDH", "CASH", "USDG", "EURC"]);
 export const LIVE_SKIP_MINTS = new Set([
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
@@ -130,19 +122,70 @@ export const LIVE_AGENTS = [
 ];
 
 export const LIVE_DISCLAIMER =
-  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 5 minutes. NEON, WARDEN, and RAID rotate. They hunt early low-cap runners, buy dips, skip dumps and tops, and never buy what Jupiter cannot sell. $ANONYMOUSE is a $1 clip: sell 41% at $300k MC, flatten the rest at $600k MC. You can lose the whole bank.";
+  "Not financial advice. These books spend real SOL from a hot wallet. Max $1.50 per buy, one open book, research every 1 minute. NEON, WARDEN, and RAID rotate. They hunt early low-cap runners, buy dips, skip dumps and tops, and never buy what Jupiter cannot sell. Paste a CA to hunt without a deploy: $1 clip, sell 41% at $300k MC, flatten at $600k. You can lose the whole bank.";
+
+export function normalizeHunt(h = {}) {
+  const mint = String(h.mint || h.ca || "").trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint) || mint === SOL_MINT) return null;
+  const clip = Number(h.clipUsd ?? h.usd ?? LIVE_HUNT_USD);
+  const scale = Number(h.scaleMcap ?? h.scale_mcap ?? 300_000);
+  const flat = Number(h.flattenMcap ?? h.flatten_mcap ?? 600_000);
+  return {
+    mint,
+    symbol: String(h.symbol || "").replace(/^\$/, "").toUpperCase() || mint.slice(0, 6),
+    clipUsd: Number.isFinite(clip) && clip > 0 ? clip : LIVE_HUNT_USD,
+    scaleMcap: Number.isFinite(scale) && scale > 0 ? scale : 300_000,
+    flattenMcap: Number.isFinite(flat) && flat > 0 ? flat : 600_000,
+  };
+}
+
+export function setRuntimeHunts(list) {
+  activeHunts = (Array.isArray(list) ? list : []).map(normalizeHunt).filter(Boolean);
+  return liveHuntList();
+}
+
+export function parseHuntSource(...sources) {
+  const out = [];
+  for (const src of sources) {
+    if (!src) continue;
+    if (Array.isArray(src)) {
+      out.push(...src);
+      continue;
+    }
+    if (typeof src === "object") {
+      if (Array.isArray(src.hunts)) out.push(...src.hunts);
+      else if (src.mint || src.ca) out.push(src);
+      continue;
+    }
+    const s = String(src).trim();
+    if (!s) continue;
+    if (s.startsWith("{") || s.startsWith("[")) {
+      try {
+        const j = JSON.parse(s);
+        if (Array.isArray(j)) out.push(...j);
+        else if (Array.isArray(j?.hunts)) out.push(...j.hunts);
+        else if (j?.mint || j?.ca) out.push(j);
+      } catch {
+        /* ignore */
+      }
+      continue;
+    }
+    if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)) out.push({ mint: s });
+  }
+  return setRuntimeHunts(out);
+}
 
 export function liveHunt(coinOrMint = {}) {
   const mint = typeof coinOrMint === "string" ? coinOrMint : String(coinOrMint?.mint || "");
-  return LIVE_HUNT_MINTS.get(mint) || null;
+  return activeHunts.find((h) => h.mint === mint) || null;
 }
 
 export function liveHuntList() {
-  return LIVE_HUNT.map((h) => ({ ...h }));
+  return activeHunts.map((h) => ({ ...h }));
 }
 
 export function liveHuntMints() {
-  return LIVE_HUNT.map((h) => h.mint);
+  return activeHunts.map((h) => h.mint);
 }
 
 export function huntClipUsd(coin = {}) {
