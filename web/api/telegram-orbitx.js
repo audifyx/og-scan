@@ -569,6 +569,14 @@ async function handleStartDm(chatId, from, link, extra, req) {
     return;
   }
   if (gate.needsCode) awaitingCode.set(String(from?.id || ""), Date.now());
+  const photoUrl = `${officialOrigin()}/brand/orbitx-telegram-bot.png`;
+  await tg("sendPhoto", {
+    chat_id: chatId,
+    photo: photoUrl,
+    caption: `<b>${OFFICIAL_BOT_NAME}</b>\n${OFFICIAL_BOT_SHORT}`,
+    parse_mode: "HTML",
+    ...extra,
+  });
   await sendCard(
     chatId,
     formatTelegramStartGate({
@@ -1407,8 +1415,8 @@ async function handleTelegramUpdate(update, req) {
       await sendLong(
         chatId,
         isHome
-          ? "OrbitX desk is live in t.me/orbitxwrld. Drop a CA or /token /chart /scan. Trade is a DM after /login."
-          : "You're in. Drop a CA or /token /chart /scan.",
+          ? "OrbitX MCP is live in t.me/orbitxwrld. Drop a CA or /get_token /full_report /dex_chart. Trade is a DM after /login."
+          : "You're in. Drop a CA or /get_token /full_report /dex_chart.",
         { parse_mode: "HTML", ...replyExtra },
       );
       return;
@@ -1419,7 +1427,7 @@ async function handleTelegramUpdate(update, req) {
 
   if (bare === "help") {
     if (isGroup) {
-      await sendLong(chatId, "Drop a CA or /token /chart /scan. Trade is in a DM after /login.", replyExtra);
+      await sendLong(chatId, "Drop a CA or /get_token /full_report /dex_chart. Trade is in a DM after /login.", replyExtra);
       return;
     }
     await sendCard(chatId, helpText(true, Boolean(link)), replyExtra);
@@ -1763,17 +1771,17 @@ async function configureBot(req) {
   } catch {
     liveTools = [];
   }
+  const commands = buildOfficialTelegramCommands({ tools: liveTools }).slice(0, 100);
   const groupCmds = await tg("setMyCommands", {
-    commands: buildOfficialTelegramCommands({ kind: "group", tools: liveTools }).slice(0, 100),
+    commands,
     scope: { type: "all_group_chats" },
   });
   const privateCmds = await tg("setMyCommands", {
-    commands: buildOfficialTelegramCommands({ kind: "private", tools: liveTools }).slice(0, 100),
+    commands,
     scope: { type: "all_private_chats" },
   });
-  const defaultCmds = await tg("setMyCommands", {
-    commands: buildOfficialTelegramCommands({ kind: "group", tools: liveTools }).slice(0, 100),
-  });
+  const defaultCmds = await tg("setMyCommands", { commands });
+  await tg("setChatMenuButton", { menu_button: { type: "commands" } }).catch(() => null);
   const webhook = await tg("setWebhook", {
     url: webhookUrl,
     secret_token: WEBHOOK_SECRET || undefined,
@@ -1790,6 +1798,7 @@ async function configureBot(req) {
     short,
     about,
     photo,
+    commandCount: commands.length,
     homeChat: homeChat
       ? { id: homeChat.id, username: homeChat.username || ORBITX_GC_USERNAME, title: homeChat.title || null, type: homeChat.type || null }
       : { username: ORBITX_GC_USERNAME, error: "bot_not_in_orbitxwrld_yet" },
@@ -1802,18 +1811,36 @@ async function configureBot(req) {
 }
 
 async function setBotPhoto(base) {
-  try {
-    const url = `${base}/brand/orbitx-telegram-bot.png`;
-    const img = await fetch(url);
-    if (!img.ok) return { ok: false, skipped: true, status: img.status };
-    const buf = Buffer.from(await img.arrayBuffer());
-    const form = new FormData();
-    form.append("photo", JSON.stringify({ type: "static", photo: "attach://pic" }));
-    form.append("pic", new Blob([buf], { type: "image/png" }), "orbitx-telegram-bot.png");
-    return tg("setMyProfilePhoto", null, { form });
-  } catch (error) {
-    return { ok: false, error: error?.message || "photo_failed" };
+  const origin = String(base || "").replace(/\/+$/, "");
+  const candidates = [
+    `${origin}/brand/orbitx-telegram-bot.png`,
+    `${origin}/icon-512x512.png`,
+    `${origin}/orbitx-globe.png`,
+    `${origin}/orbitx-banner.jpg`,
+  ];
+  let last = { ok: false, skipped: true };
+  for (const url of candidates) {
+    try {
+      const img = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+      if (!img.ok) {
+        last = { ok: false, skipped: true, status: img.status, used: url };
+        continue;
+      }
+      const buf = Buffer.from(await img.arrayBuffer());
+      if (buf.length < 800) continue;
+      const mime = url.endsWith(".jpg") || url.endsWith(".jpeg") ? "image/jpeg" : "image/png";
+      const filename = mime.includes("jpeg") ? "orbitx.jpg" : "orbitx.png";
+      const form = new FormData();
+      form.append("photo", JSON.stringify({ type: "static", photo: "attach://pic" }));
+      form.append("pic", new Blob([buf], { type: mime }), filename);
+      const result = await tg("setMyProfilePhoto", null, { form });
+      last = { ...result, used: url };
+      if (result?.ok) return last;
+    } catch (error) {
+      last = { ok: false, error: error?.message || "photo_failed", used: url };
+    }
   }
+  return last;
 }
 
 let lastWebhookEnsure = 0;
@@ -1826,9 +1853,6 @@ async function ensureWebhook(req) {
     return { ok: true, cached: true, url: want };
   }
   lastWebhookEnsure = Date.now();
-  const info = await tg("getWebhookInfo", {});
-  const current = String(info?.result?.url || "");
-  if (current === want) return { ok: true, already: true, url: want };
   return configureBot(req);
 }
 

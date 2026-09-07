@@ -139,16 +139,17 @@ function safeBot(b) {
 }
 
 const MCP_AGENT_MENU = [
-  { command: "mcp", description: "OrbitX MCP menu" },
-  { command: "cmds", description: "List MCP commands" },
-  { command: "img", description: "Generate image (Grok Imagine)" },
-  { command: "vid", description: "Generate video (Grok Imagine)" },
-  { command: "media", description: "Poll image/video task" },
+  { command: "start", description: "OrbitX MCP desk" },
+  { command: "help", description: "Public MCP command menu" },
+  { command: "cmds", description: "Live MCP catalog — slash names match tools" },
+  { command: "call", description: "Call any MCP tool: /call name args" },
+  { command: "get_token", description: "Token intel by mint" },
+  { command: "full_report", description: "Full intel dossier" },
+  { command: "dex_chart", description: "Dex chart for a CA" },
+  { command: "generate_image", description: "Generate image (Grok Imagine)" },
+  { command: "generate_video", description: "Generate video (Grok Imagine)" },
+  { command: "media_status", description: "Poll image/video task" },
   { command: "search", description: "Search tokens / MCP" },
-  { command: "token", description: "Token intel by mint" },
-  { command: "chart", description: "Dex chart for a CA" },
-  { command: "call", description: "Call MCP tool: /call name args" },
-  { command: "help_mcp", description: "MCP tools help" },
 ];
 
 const MCP_X_MENU = [
@@ -173,6 +174,22 @@ async function setTelegramWebhook(botToken, url, secret) {
     }),
   });
   return r.json().catch(() => ({}));
+}
+
+async function publicMcpCommands(kind) {
+  try {
+    const hub = await import("./orbitx-hub.js");
+    if (kind === "x") {
+      return buildMcpTelegramCommands("x", [...X_TELEGRAM_ALLOW], 40);
+    }
+    return buildMcpTelegramCommands(
+      "agent",
+      hub.listAllOrbitXTools().map((t) => t.name),
+      100,
+    );
+  } catch {
+    return kind === "x" ? MCP_X_MENU : MCP_AGENT_MENU;
+  }
 }
 
 async function setTelegramCommands(botToken, commands) {
@@ -305,7 +322,7 @@ async function handleDashboard(req, res, body) {
       return send(res, { error: "webhook_failed", detail: wh?.description || "Telegram setWebhook failed" }, 400);
     }
 
-    const mcpCmds = kind === "x" ? MCP_X_MENU : MCP_AGENT_MENU;
+    const mcpCmds = kind === "x" ? await publicMcpCommands("x") : await publicMcpCommands("agent");
     await setTelegramCommands(botToken, [
       ...mcpCmds,
       { command: "chat", description: "Chat with OrbitX AI" },
@@ -365,7 +382,11 @@ async function handleDashboard(req, res, body) {
       );
     }
 
-    const mcpCmds = agentOn ? MCP_AGENT_MENU : xOn ? MCP_X_MENU : [];
+    const mcpCmds = agentOn
+      ? await publicMcpCommands("agent")
+      : xOn
+        ? await publicMcpCommands("x")
+        : [];
     const baseCmds = [
       { command: "scan", description: "Full token risk report" },
       { command: "chat", description: "Chat with the AI analyst" },
@@ -477,7 +498,7 @@ export default async function handler(req, res) {
         kind: "agent",
         auth: "dashboard",
         tools,
-        commands: buildMcpTelegramCommands("agent", tools.map((t) => t.name), 70),
+        commands: buildMcpTelegramCommands("agent", tools.map((t) => t.name), 100),
         priority: AGENT_PRIORITY_CMDS,
       });
     }

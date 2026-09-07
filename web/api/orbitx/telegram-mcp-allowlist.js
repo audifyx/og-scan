@@ -72,6 +72,24 @@ export function isXTelegramToolAllowed(name) {
   return X_TELEGRAM_ALLOW.has(n);
 }
 
+export const TELEGRAM_CMD_LIMIT = 100;
+
+/** Meta cmds that are not MCP tools — always occupy the first slash slots. */
+export const TELEGRAM_META_CMDS = [
+  { command: "start", description: "OrbitX MCP desk" },
+  { command: "help", description: "Public MCP command menu" },
+  { command: "cmds", description: "Live MCP catalog — slash names match tools" },
+  { command: "call", description: "Call any MCP tool: /call name args" },
+];
+
+export function isTelegramAuthMcpTool(name) {
+  const n = String(name || "").trim();
+  if (!n) return true;
+  if (AGENT_AUTH_DENY.has(n) || X_AUTH_DENY.has(n)) return true;
+  if (n.startsWith("orbitx_auth_") || n.startsWith("x_auth_")) return true;
+  return false;
+}
+
 /** Map MCP tool → Telegram slash command (≤32 chars, [a-z0-9_]). */
 export function toolToSlashCommand(toolName, kind = "agent") {
   let n = String(toolName || "").trim().toLowerCase();
@@ -97,6 +115,7 @@ export const AGENT_PRIORITY_CMDS = [
   { command: "screen", description: "Screen trending tokens", tool: "orbitx_screen_tokens" },
   { command: "chart", description: "Dex chart for a CA", tool: "orbitx_dex_chart" },
   { command: "xray", description: "Token X-ray", tool: "orbitx_xray" },
+  { command: "report", description: "Full intel dossier", tool: "orbitx_full_report" },
   { command: "research", description: "Deep research", tool: "orbitx_research" },
   { command: "wallet", description: "Wallet snapshot", tool: "orbitx_get_wallet" },
   { command: "help_mcp", description: "MCP tools help", tool: "orbitx_tools_help" },
@@ -113,32 +132,133 @@ export const X_PRIORITY_CMDS = [
   { command: "call", description: "Call media tool: /call name args", tool: null },
 ];
 
-/** Build Telegram setMyCommands entries for MCP (≤ limit, after base cmds). */
-export function buildMcpTelegramCommands(kind, toolNames = [], limit = 60) {
-  const priority = kind === "x" ? X_PRIORITY_CMDS : AGENT_PRIORITY_CMDS;
+export function mcpToolSlashCommand(name, kind = "agent") {
+  const n = String(name || "").trim();
+  if (n === "search" || n === "fetch") return n;
+  return toolToSlashCommand(n, kind);
+}
+
+/**
+ * Public intel / media tools pin to the front of Telegram's 100-command cap
+ * so CORE life/gc/vc helpers cannot push /get_token off the slash menu.
+ */
+export const PUBLIC_MCP_PRIORITY_TOOLS = [
+  "search",
+  "fetch",
+  "orbitx_menu",
+  "orbitx_get_token",
+  "orbitx_full_report",
+  "orbitx_dex_chart",
+  "orbitx_crypto_scan",
+  "orbitx_xray",
+  "orbitx_research",
+  "orbitx_screen_tokens",
+  "orbitx_search",
+  "orbitx_get_chart",
+  "orbitx_get_forensics",
+  "orbitx_get_safety",
+  "orbitx_get_ath",
+  "orbitx_get_metadata",
+  "orbitx_get_wallet",
+  "orbitx_get_swaps",
+  "orbitx_get_balance",
+  "orbitx_generate_image",
+  "orbitx_generate_video",
+  "orbitx_media_status",
+  "orbitx_grok_image",
+  "orbitx_grok_video",
+  "orbitx_health",
+  "orbitx_tools_help",
+  "orbitx_telegram_status",
+  "orbitx_telegram_cmds",
+  "orbitx_shop",
+  "orbitx_leaderboard",
+  "orbitx_platform_stats",
+  "orbitx_paper_desk",
+  "orbitx_live_desk",
+  "orbitx_live_feed",
+  "orbitx_live_world",
+  "orbitx_live_agent",
+  "orbitx_live_positions",
+];
+
+/**
+ * Fill Telegram's 100 slash slots with public MCP tools.
+ * Command names match the MCP tool (orbitx_get_token → /get_token).
+ * Auth tools are never included.
+ */
+export function buildPublicMcpTelegramCommands(tools = [], {
+  limit = TELEGRAM_CMD_LIMIT,
+  kind = "agent",
+  allow,
+} = {}) {
+  const ok =
+    allow ||
+    ((name) =>
+      kind === "x"
+        ? isXTelegramToolAllowed(name)
+        : isAgentTelegramToolAllowed(name) && !isTelegramAuthMcpTool(name));
   const out = [];
   const seen = new Set();
-  for (const p of priority) {
-    if (seen.has(p.command)) continue;
-    seen.add(p.command);
-    out.push({ command: p.command, description: p.description.slice(0, 256) });
+  const byName = new Map();
+  for (const t of tools) {
+    const name = typeof t === "string" ? t : t?.name;
+    if (name && !byName.has(name)) byName.set(name, t);
   }
-  for (const name of toolNames) {
-    if (out.length >= limit) break;
-    const allowed =
-      kind === "x" ? isXTelegramToolAllowed(name) : isAgentTelegramToolAllowed(name);
-    if (!allowed) continue;
-    const cmd = toolToSlashCommand(name, kind === "x" && name.startsWith("x_") ? "x" : "agent");
-    if (!cmd || seen.has(cmd)) continue;
-    // Skip if collides with priority aliases that map differently
-    if (priority.some((p) => p.command === cmd && p.tool && p.tool !== name)) continue;
+  const add = (t) => {
+    if (out.length >= limit) return;
+    const name = typeof t === "string" ? t : t?.name;
+    if (!name || !ok(name)) return;
+    const cmdKind = kind === "x" && String(name).startsWith("x_") ? "x" : "agent";
+    const cmd = mcpToolSlashCommand(name, cmdKind);
+    if (!cmd || seen.has(cmd)) return;
     seen.add(cmd);
-    out.push({
-      command: cmd,
-      description: `MCP ${name}`.slice(0, 256),
-    });
+    const desc = typeof t === "string" ? `MCP ${name}` : String(t.description || `MCP ${name}`);
+    out.push({ command: cmd, description: desc.slice(0, 256) });
+  };
+  for (const c of TELEGRAM_META_CMDS) {
+    if (out.length >= limit) break;
+    if (seen.has(c.command)) continue;
+    seen.add(c.command);
+    out.push({ command: c.command, description: String(c.description).slice(0, 256) });
   }
-  return out;
+  if (kind !== "x") {
+    for (const name of PUBLIC_MCP_PRIORITY_TOOLS) {
+      if (out.length >= limit) break;
+      if (byName.has(name)) add(byName.get(name));
+    }
+  }
+  for (const t of tools) add(t);
+  return out.slice(0, limit);
+}
+
+/** Build Telegram setMyCommands entries for MCP (≤ limit, after meta cmds). */
+export function buildMcpTelegramCommands(kind, toolNames = [], limit = TELEGRAM_CMD_LIMIT) {
+  if (kind === "x") {
+    const priority = X_PRIORITY_CMDS;
+    const out = [];
+    const seen = new Set();
+    for (const p of priority) {
+      if (seen.has(p.command)) continue;
+      seen.add(p.command);
+      out.push({ command: p.command, description: p.description.slice(0, 256) });
+    }
+    for (const name of toolNames) {
+      if (out.length >= limit) break;
+      if (!isXTelegramToolAllowed(name) || isTelegramAuthMcpTool(name)) continue;
+      const cmd = mcpToolSlashCommand(name, name.startsWith("x_") ? "x" : "agent");
+      if (!cmd || seen.has(cmd)) continue;
+      if (priority.some((p) => p.command === cmd && p.tool && p.tool !== name)) continue;
+      seen.add(cmd);
+      out.push({ command: cmd, description: `MCP ${name}`.slice(0, 256) });
+    }
+    return out;
+  }
+  return buildPublicMcpTelegramCommands(toolNames, {
+    limit,
+    kind: "agent",
+    allow: (name) => isAgentTelegramToolAllowed(name) && !isTelegramAuthMcpTool(name),
+  });
 }
 
 export function resolveSlashToTool(cmd, kind = "agent") {

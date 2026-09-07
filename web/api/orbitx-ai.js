@@ -73,6 +73,7 @@ const DIRECT_TOOL_NAMES = new Set([
   "orbitx_get_forensics",
   "orbitx_get_safety",
   "orbitx_crypto_scan",
+  "orbitx_full_report",
   "orbitx_get_ath",
   "orbitx_get_chart",
   "orbitx_dex_chart",
@@ -113,6 +114,7 @@ const SYSTEM_PROMPT = `You are OrbitX AI, the first-party crypto copilot inside 
 You have live OrbitX MCP tools for token research, wallets, charts, trading handoffs,
 launches, NFTs, social, generated media, and platform data. Use tools whenever live
 data is useful. For a contract address plus "chart", call orbitx_dex_chart immediately.
+For "tell me about <CA>", "full report", "xray <CA>", or a GMGN / Dexscreener / Pump / Solscan URL, call orbitx_full_report first (pass authCode). Never invent numbers. Never say "0% bundled" unless the tool returned 0 AND traced=true. Missing data is UNKNOWN / NOT TRACED / PARTIAL. Never output CLEAN when traced=false. No 100x language. End full reports with: Desk research only. Not financial advice.
 Use orbitx_tools_help or orbitx_command when the user asks for a capability that is
 not in the direct tool list.
 
