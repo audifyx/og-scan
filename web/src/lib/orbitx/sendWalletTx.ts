@@ -21,6 +21,7 @@ import {
   toVersionedTransaction,
 } from "@/lib/wallets/jupiterWalletAdapter";
 import { normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
+import { confirmSignatureWithFallback, sendRawWithFallback } from "@/lib/solanaRpc";
 
 export type WalletSendCaps = {
   sendTransaction?: (
@@ -122,10 +123,10 @@ export async function sendWithKeypair(
   };
   if (tx instanceof VersionedTransaction) {
     tx.sign([keypair]);
-    return connection.sendRawTransaction(tx.serialize(), opts);
+    return sendRawWithFallback(tx.serialize(), connection, opts);
   }
   tx.partialSign(keypair);
-  return connection.sendRawTransaction(serializeSigned(tx), opts);
+  return sendRawWithFallback(serializeSigned(tx), connection, opts);
 }
 
 /** Sign and broadcast one legacy or versioned transaction. */
@@ -151,7 +152,7 @@ export async function sendWalletTransaction(
   }
   if (wallet.signTransaction) {
     const signed = await wallet.signTransaction(tx);
-    return normalizeTxSignatureBase58(await connection.sendRawTransaction(serializeSigned(signed), opts));
+    return normalizeTxSignatureBase58(await sendRawWithFallback(serializeSigned(signed), connection, opts));
   }
   throw new Error("This wallet can't sign here — connect Phantom, Jupiter, or Solflare in this browser");
 }
@@ -175,24 +176,15 @@ export async function confirmSentTransaction(
   const sig = normalizeTxSignatureBase58(signature);
   const commitment = options?.commitment ?? "confirmed";
   try {
-    if (options?.blockhash && options.lastValidBlockHeight != null) {
-      await connection.confirmTransaction(
-        { signature: sig, blockhash: options.blockhash, lastValidBlockHeight: options.lastValidBlockHeight },
-        commitment,
-      );
-    } else {
-      await connection.confirmTransaction(sig, commitment);
-    }
+    await confirmSignatureWithFallback(sig, connection, {
+      blockhash: options?.blockhash,
+      lastValidBlockHeight: options?.lastValidBlockHeight,
+      commitment,
+    });
     return sig;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (/already been processed|already processed/i.test(msg)) return sig;
-    try {
-      const st = await connection.getSignatureStatus(sig);
-      if (st?.value && !st.value.err) return sig;
-    } catch {
-      /* RPC status is best-effort */
-    }
     if (/base58/i.test(msg)) return sig;
     throw error;
   }

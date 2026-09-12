@@ -8,11 +8,13 @@
  * Load Solana only inside the functions that actually build txs.
  */
 import {
-  COLLECT_CREATOR_FEE_DISCRIMINATOR,
+  COLLECT_CREATOR_FEE_V2_DISCRIMINATOR,
+  CLAIM_RPC_URLS,
   PUBLIC_SOLANA_RPC,
   PUMP_CREATOR_VAULT_SEED,
   PUMP_EVENT_AUTHORITY_SEED,
   PUMP_PROGRAM_ID,
+  WSOL_MINT,
 } from "../../shared/pump-claim.js";
 
 async function loadSolana() {
@@ -30,6 +32,7 @@ function rpcCandidates() {
   };
   add(process.env.SOLANA_RPC_URL);
   add(process.env.VITE_SOLANA_RPC_URL);
+  for (const u of CLAIM_RPC_URLS) add(u);
   add(PUBLIC_SOLANA_RPC);
   add(process.env.HELIUS_RPC_URL);
   return out;
@@ -51,9 +54,11 @@ async function latestBlockhash(Connection) {
   throw last || new Error("No Solana RPC available");
 }
 
-function collectCreatorFeeIx(web3, creatorPk) {
+function collectCreatorFeeV2Ix(web3, spl, creatorPk) {
   const { PublicKey, SystemProgram, TransactionInstruction } = web3;
+  const { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } = spl;
   const programId = new PublicKey(PUMP_PROGRAM_ID);
+  const quoteMint = new PublicKey(WSOL_MINT);
   const seed = (s) => new TextEncoder().encode(s);
   const [vault] = PublicKey.findProgramAddressSync(
     [seed(PUMP_CREATOR_VAULT_SEED), creatorPk.toBytes()],
@@ -63,16 +68,23 @@ function collectCreatorFeeIx(web3, creatorPk) {
     [seed(PUMP_EVENT_AUTHORITY_SEED)],
     programId,
   );
+  const creatorAta = getAssociatedTokenAddressSync(quoteMint, creatorPk, true, TOKEN_PROGRAM_ID);
+  const vaultAta = getAssociatedTokenAddressSync(quoteMint, vault, true, TOKEN_PROGRAM_ID);
   return new TransactionInstruction({
     programId,
     keys: [
-      { pubkey: creatorPk, isSigner: true, isWritable: true },
+      { pubkey: creatorPk, isSigner: false, isWritable: true },
+      { pubkey: creatorAta, isSigner: false, isWritable: true },
       { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: quoteMint, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: eventAuthority, isSigner: false, isWritable: false },
       { pubkey: programId, isSigner: false, isWritable: false },
     ],
-    data: Uint8Array.from(COLLECT_CREATOR_FEE_DISCRIMINATOR),
+    data: Uint8Array.from(COLLECT_CREATOR_FEE_V2_DISCRIMINATOR),
   });
 }
 
@@ -83,53 +95,27 @@ function serializeTx(tx, recentBlockhash, feePayer) {
 }
 
 async function preparePumpClaimLocal(publicKey) {
-  const { web3 } = await loadSolana();
+  const { web3, spl } = await loadSolana();
   const { PublicKey, Transaction, ComputeBudgetProgram } = web3;
   const creator = new PublicKey(publicKey);
   const { blockhash } = await latestBlockhash(web3.Connection);
   const tx = new Transaction();
   tx.add(
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-    collectCreatorFeeIx(web3, creator),
+    collectCreatorFeeV2Ix(web3, spl, creator),
   );
   return {
     ok: true,
-    action: "collectCreatorFee",
+    action: "collectCreatorFeeV2",
     source: "local",
     transaction: serializeTx(tx, blockhash, creator),
-    note: "Unsigned. Sign with the creator wallet to claim pump.fun creator fees from your creator vault.",
+    note: "Unsigned. Sign with the creator wallet (fee payer) to claim pump.fun creator fees from your creator vault via collect_creator_fee_v2.",
   };
 }
 
-/** Pump.fun creator fee claim. PumpPortal first; local collectCreatorFee on 429 quota. */
+/** Pump.fun creator fee claim — local collect_creator_fee_v2 only (PumpPortal Helius quota is dead). */
 export async function preparePumpClaim(publicKey) {
-  try {
-    const r = await fetch("https://pumpportal.fun/api/trade-local", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        publicKey,
-        action: "collectCreatorFee",
-        priorityFee: 0.000001,
-      }),
-      signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
-        ? AbortSignal.timeout(8000)
-        : undefined,
-    });
-    if (r.ok) {
-      const buf = Buffer.from(await r.arrayBuffer());
-      return {
-        ok: true,
-        action: "collectCreatorFee",
-        source: "pumpportal",
-        transaction: buf.toString("base64"),
-        note: "Unsigned. Sign with the creator wallet to claim pump.fun creator fees across all your coins.",
-      };
-    }
-  } catch {
-    /* PumpPortal 429 / timeout / network — build locally */
-  }
   return preparePumpClaimLocal(publicKey);
 }
 

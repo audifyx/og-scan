@@ -13,6 +13,7 @@ import {
   getPumpClaimableSol,
   getCustomClaimable, buildCustomClaimTransactions, type CustomClaimable,
   buildPumpClaimWithSkim, buildPumpBuyTransaction, buildCustomSwapToSolWithSkim,
+  getClaimBlockhash,
   isRpcQuotaError,
 } from "@/lib/orbitx/claim";
 import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT, tradeFeeSharePerDollar } from "@/lib/platformFee";
@@ -65,7 +66,7 @@ export default function LaunchpadClaim() {
       console.error("[claim] pump balance", e);
       setPumpSol(null);
       if (isRpcQuotaError(e)) {
-        toast.error("RPC quota hit — retrying public Solana. Tap refresh if the balance stays blank.");
+        toast.error("RPC quota hit — switched off Helius. Tap refresh if the balance stays blank.");
       }
     } finally {
       setPumpLoading(false);
@@ -132,7 +133,9 @@ export default function LaunchpadClaim() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("User rejected")) toast.error("Transaction cancelled");
-      else if (isRpcQuotaError(msg)) toast.error("RPC quota hit. Rebuilt the claim locally — tap Claim again.");
+      else if (isRpcQuotaError(msg) || /used usage|max usage/i.test(msg)) {
+        toast.error("RPC usage quota hit. Rebuilt on a public Solana RPC — tap Claim again.");
+      }
       else toast.error(msg || "Claim failed");
     } finally {
       setPumpClaiming(false);
@@ -152,7 +155,7 @@ export default function LaunchpadClaim() {
       let lastSig = "";
       for (const tx of txs) {
         tx.feePayer = publicKey;
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+        const { blockhash, lastValidBlockHeight } = await getClaimBlockhash(connection);
         tx.recentBlockhash = blockhash;
         lastSig = await sendTx(connection, tx);
         await confirmSentTransaction(connection, lastSig, { blockhash, lastValidBlockHeight, commitment: "confirmed" });

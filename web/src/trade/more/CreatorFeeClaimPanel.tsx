@@ -11,6 +11,7 @@ import {
   buildCustomClaimTransactions,
   buildPumpClaimWithSkim,
   buildCustomSwapToSolWithSkim,
+  getClaimBlockhash,
   type CustomClaimable,
 } from "@/lib/orbitx/claim";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
@@ -111,7 +112,7 @@ export default function CreatorFeeClaimPanel() {
       let lastSig = "";
       for (const tx of txs) {
         tx.feePayer = publicKey;
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+        const { blockhash, lastValidBlockHeight } = await getClaimBlockhash(connection);
         tx.recentBlockhash = blockhash;
         lastSig = await sendTx(connection, tx);
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
