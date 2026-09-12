@@ -12,6 +12,7 @@ import { TokenCard, TokenFeedRow, GRADUATION_MC_USD } from "./_shared";
 import { useWatchlist } from "./watchlist";
 import { Tape } from "@/components/launchpad/Tape";
 import { CURATED_QUOTES } from "@/lib/launchpad/quotes";
+import { launchStats, useMarketMap, fmtCompactUsd, type MarketRow } from "./lpx";
 
 type BoardCategory = "board" | "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist" | "rewards" | "stocks" | "bagwork";
 type ViewMode = "feed" | "columns";

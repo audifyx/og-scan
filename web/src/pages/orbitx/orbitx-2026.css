@@ -1856,7 +1856,9 @@
   .lp-ios-rail {
     display: flex;
     flex-direction: column;
+    flex: 0 0 220px;
     width: 220px;
+    max-width: 220px;
     flex-shrink: 0;
     padding: max(0.85rem, env(safe-area-inset-top)) 0.75rem 1rem;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -1866,6 +1868,16 @@
     top: 0;
     height: 100dvh;
     overflow: auto;
+  }
+  .lp-ios-rail .ios-shell__rail-link {
+    width: 100%;
+    max-width: 100%;
+  }
+  .lp-ios-rail .ios-shell__rail-link.is-on {
+    background: rgba(232, 197, 71, 0.16);
+    color: #e8c547;
+    border-color: transparent;
+    box-shadow: none;
   }
 
   .lp-ios-desk-tabs {
@@ -1887,6 +1899,7 @@
   --lp-paper: #111318;
   --lp-gold: #E8C547;
 }
+.lp-create { color: #fff; min-height: 70vh; padding-bottom: 2rem; }
 .lp-auth { margin-bottom: 1.25rem; border: 1px solid rgba(232,197,71,.22); background: var(--lp-paper); border-radius: 14px; padding: 1rem; }
 .lp-auth-kicker, .lp-field-label, .lp-preview-kicker {
   font-family: var(--ox-font-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--lp-gold); margin-bottom: .6rem;

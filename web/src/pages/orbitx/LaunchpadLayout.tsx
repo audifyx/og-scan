@@ -33,6 +33,7 @@ import {
 } from "@/components/app-shell/IosAppShell";
 import { AuthSheet } from "@/components/launchpad/AuthSheet";
 import { useLaunchpadIdentity } from "@/hooks/useLaunchpadIdentity";
+import "./orbitx-2026.css";
 
 const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [
   {
