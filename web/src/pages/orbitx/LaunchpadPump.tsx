@@ -44,6 +44,10 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Confetti } from "./lpx";
+import { AuthSheet } from "@/components/launchpad/AuthSheet";
+import { useLaunchpadIdentity } from "@/hooks/useLaunchpadIdentity";
+import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { WalletPickerModal } from "@/components/WalletPickerModal";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
@@ -169,11 +173,32 @@ export default function LaunchpadPump() {
   const [params] = useSearchParams();
   const fromNft = params.get("from") === "nft" || !!peekTokenCreatePrefill();
   const [view, setView] = useState<PageView>(fromNft ? "create" : "gallery");
+  const { identity } = useLaunchpadIdentity();
+  const { pickable, signInWith, busy } = useWalletSignIn();
+  const [picker, setPicker] = useState(false);
 
   return view === "gallery" ? (
     <TokenGallery onCreateClick={() => setView("create")} />
   ) : (
-    <CreateTokenForm onBack={() => setView("gallery")} onSuccess={() => setView("gallery")} />
+    <>
+      <AuthSheet identity={identity} connectingWallet={!!busy} onConnectWallet={() => setPicker(true)} />
+      <CreateTokenForm onBack={() => setView("gallery")} onSuccess={() => setView("gallery")} />
+      <WalletPickerModal
+        open={picker}
+        onClose={() => setPicker(false)}
+        wallets={pickable}
+        onPick={async (name) => {
+          try {
+            await signInWith(name);
+            setPicker(false);
+            toast.success("Wallet proved");
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Sign-in failed");
+          }
+        }}
+        busy={busy}
+      />
+    </>
   );
 }
 

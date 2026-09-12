@@ -143,6 +143,14 @@
       "destination": "/api/orbitx-hub?path=mcp/.well-known/oauth-authorization-server"
     },
     {
+      "source": "/api/v1",
+      "destination": "/api/pad-v1?path="
+    },
+    {
+      "source": "/api/v1/(.*)",
+      "destination": "/api/pad-v1?path=$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
@@ -460,6 +468,10 @@
     {
       "path": "/api/orbitx-calls?path=tick",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/pad-resolve",
+      "schedule": "0 * * * *"
     }
   ]
 }

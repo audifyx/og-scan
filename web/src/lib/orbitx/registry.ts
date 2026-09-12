@@ -29,6 +29,12 @@ export interface OrbitxToken {
   created_at: string;
   is_featured?: boolean;
   is_hidden?: boolean;
+  quote_mint?: string | null;
+  quote_symbol?: string | null;
+  pad_mode?: string | null;
+  holder_rewards?: boolean | null;
+  bagwork?: boolean | null;
+  graduation_dest?: string | null;
 }
 
 export type FeedKind = "new" | "graduated" | "all";
@@ -305,6 +311,8 @@ export interface RegisterTokenInput {
   decimals: number; supply: number; dex?: string | null; lp_pool_address?: string | null;
   lp_signature?: string | null; mint_signature?: string | null; metadata_uri?: string | null;
   logo_url?: string | null; is_vamp?: boolean; fee_route?: FeeRoute; cluster?: string; launch_type?: "custom" | "pump";
+  quote_mint?: string | null; quote_symbol?: string | null; pad_mode?: string | null;
+  holder_rewards?: boolean; bagwork?: boolean; graduation_dest?: string | null;
 }
 
 /**
@@ -317,6 +325,13 @@ export async function registerToken(input: RegisterTokenInput): Promise<OrbitxTo
   if (error) {
     if ((error as { code?: string }).code === "23505") {
       throw new Error("That name, ticker, or contract address is already taken — pick a unique one (anti-vamp).");
+    }
+    const extras = ["quote_mint", "quote_symbol", "pad_mode", "holder_rewards", "bagwork", "graduation_dest"] as const;
+    const stripped = { ...input };
+    for (const k of extras) delete (stripped as Record<string, unknown>)[k];
+    if (JSON.stringify(stripped) !== JSON.stringify(input)) {
+      const retry = await supabase.from("orbitx_tokens").insert(stripped).select("*").single();
+      if (!retry.error) return retry.data as OrbitxToken;
     }
     throw error;
   }

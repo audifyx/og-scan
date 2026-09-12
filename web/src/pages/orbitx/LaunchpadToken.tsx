@@ -9,7 +9,7 @@
 // and correct small-price formatting (no more "$7.75e-6").
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
@@ -22,6 +22,12 @@ import { orbitScore } from "./orbitScore";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 import { toast } from "sonner";
 import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
+import { SweepCreatorFees } from "@/components/launchpad/SweepCreatorFees";
+import { BagworkBoard } from "@/components/launchpad/BagworkBoard";
+import { STOCK_LEGAL } from "@/lib/launchpad/types";
+import { isStockQuote } from "@/lib/launchpad/quotes";
+import { getPadLaunch, getPadMarket, indexExtraPool, listExtraPools } from "@/lib/launchpad/registry";
+import { MarketTicket, ResolverCard } from "@/components/launchpad/MarketTicket";
 import { indexConfirmedTx } from "@/lib/orbitx/onchainAttest";
 import { solscanTxUrl } from "../../../shared/orbitx-onchain.js";
 import {
@@ -386,10 +392,29 @@ function StatBox({ label, value, tone, href, hint }: { label: string; value: Rea
 export default function LaunchpadToken() {
   const { mint } = useParams<{ mint: string }>();
   const [copied, setCopied] = useState(false);
+  const { publicKey } = useWallet();
 
   const { data: t, isLoading: registryLoading } = useQuery({
     queryKey: ["orbitx-token", mint],
     queryFn: () => getToken(mint!),
+    enabled: !!mint,
+  });
+
+  const { data: pad } = useQuery({
+    queryKey: ["pad-launch", mint],
+    queryFn: () => getPadLaunch(mint!),
+    enabled: !!mint,
+  });
+
+  const { data: extraPools = [] } = useQuery({
+    queryKey: ["pad-extra-pools", mint],
+    queryFn: () => listExtraPools(mint!),
+    enabled: !!mint,
+  });
+
+  const { data: padMarket } = useQuery({
+    queryKey: ["pad-market", mint],
+    queryFn: () => getPadMarket(mint!),
     enabled: !!mint,
   });
 
@@ -508,6 +533,13 @@ export default function LaunchpadToken() {
               <span className="rounded-full border border-[rgba(212,175,55,0.35)] bg-[rgba(212,175,55,0.12)] px-2 py-0.5 pf-mono text-xs font-bold text-[#F0C75E]">${ticker}</span>
               {isOfficial && <Pill tone="gold"><BadgeCheck className="h-3 w-3" /> Official OrbitX token</Pill>}
               {t && <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump launch" : "Custom launch"}</Pill>}
+              {(pad?.quote_symbol || t?.quote_symbol) && (
+                <Pill tone="gold">{pad?.quote_symbol || t?.quote_symbol} pair</Pill>
+              )}
+              {(pad?.holder_rewards || t?.holder_rewards) && <Pill tone="cyan">Rewards</Pill>}
+              {(pad?.bagwork || t?.bagwork) && <Pill tone="gold">Bagwork</Pill>}
+              {pad?.launch_style && pad.launch_style !== "curve" && <Pill tone="gold">{pad.launch_style}</Pill>}
+              {(padMarket || pad?.launch_type === "predict") && <Pill tone="cyan">Predict</Pill>}
             </div>
             <div className="ox-tok-price mt-3">{fmtPrice(priceUsd)}</div>
             <div className="ox-tok-chips mt-3">
@@ -577,6 +609,44 @@ export default function LaunchpadToken() {
           <div className="ox-tok-trade ox-tok-panel">
             <BuySellPanel mint={mint!} symbol={ticker ?? "TOKEN"} decimals={decimals} solUsd={solUsdData ?? null} />
           </div>
+          {t?.creator_wallet && (
+            <div className="ox-tok-panel">
+              <SectionLabel>Sweep creator fees</SectionLabel>
+              <SweepCreatorFees
+                creator={t.creator_wallet}
+                graduated={graduated}
+                quoteMint={pad?.quote_mint || t.quote_mint || undefined}
+              />
+            </div>
+          )}
+          {(pad?.bagwork || t?.bagwork) && mint && (
+            <BagworkBoard
+              mint={mint}
+              isAdmin={!!publicKey && t?.creator_wallet === publicKey.toBase58()}
+              wallet={publicKey?.toBase58() ?? null}
+              xHandle={pad?.creator_x}
+            />
+          )}
+          {padMarket && (
+            <>
+              <div className="ox-tok-panel"><MarketTicket market={padMarket} /></div>
+              <div className="ox-tok-panel"><ResolverCard market={padMarket} /></div>
+            </>
+          )}
+          {isStockQuote(pad?.quote_mint || t?.quote_mint || "") && (
+            <div className="ox-tok-panel"><p className="lp-legal">{STOCK_LEGAL}</p></div>
+          )}
+          <div className="ox-tok-panel">
+            <SectionLabel>External pairs</SectionLabel>
+            <p className="mb-2 text-xs">Not the canonical PumpSwap pool. Price can diverge.</p>
+            <ul className="space-y-1 text-xs font-mono">
+              {extraPools.map((p: { id: string; venue: string; quote_mint: string; pool_pubkey: string }) => (
+                <li key={p.id}>{p.venue} · {shortAddr(p.pool_pubkey, 4)}</li>
+              ))}
+              {!extraPools.length && <li className="opacity-70">None indexed yet</li>}
+            </ul>
+            <ExtraPoolForm mint={mint!} />
+          </div>
           <PositionPanel mint={mint!} symbol={ticker ?? "TOKEN"} priceUsd={priceUsd} solUsd={solUsdData ?? null} />
 
           <div className="ox-tok-panel">
@@ -644,5 +714,46 @@ export default function LaunchpadToken() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function ExtraPoolForm({ mint }: { mint: string }) {
+  const { publicKey } = useWallet();
+  const qc = useQueryClient();
+  const [quote, setQuote] = useState("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  const [venue, setVenue] = useState<"raydium_cpmm" | "meteora_dlmm">("raydium_cpmm");
+  const [pool, setPool] = useState("");
+  return (
+    <form
+      className="mt-3 space-y-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        try {
+          await indexExtraPool({
+            base_mint: mint,
+            quote_mint: quote,
+            venue,
+            pool_pubkey: pool.trim(),
+            created_by: publicKey?.toBase58(),
+          });
+          setPool("");
+          toast.success("External pair indexed");
+          void qc.invalidateQueries({ queryKey: ["pad-extra-pools", mint] });
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Could not index pool");
+        }
+      }}
+    >
+      <input className="lp-input" placeholder="Pool pubkey" value={pool} onChange={(e) => setPool(e.target.value)} required />
+      <select className="lp-input" value={venue} onChange={(e) => setVenue(e.target.value as "raydium_cpmm" | "meteora_dlmm")}>
+        <option value="raydium_cpmm">Raydium CPMM</option>
+        <option value="meteora_dlmm">Meteora DLMM</option>
+      </select>
+      <select className="lp-input" value={quote} onChange={(e) => setQuote(e.target.value)}>
+        <option value="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">USDC</option>
+        <option value="Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh">NVDAX</option>
+      </select>
+      <button type="submit" className="lp-auth-btn" disabled={!pool.trim()}>Index extra pair</button>
+    </form>
   );
 }

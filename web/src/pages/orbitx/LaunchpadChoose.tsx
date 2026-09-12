@@ -23,10 +23,13 @@ export default function LaunchpadChoose() {
       <TabHero
         icon={Rocket}
         accent="gold"
-        eyebrow="Create · Solana mainnet"
-        title="Choose your launch lane"
-        subtitle="Pump bonding curve or full-control custom mint — same fees, obx vanity CA, anti-vamp on both."
+        eyebrow="Other lanes"
+        title="Custom / API / curve"
+        subtitle="The main create router is one form — modes + quote. These lanes stay for custom SPL, multi-chain API, and EVM curve."
       />
+      <p className="mb-6 text-center font-mono text-[11px] uppercase tracking-widest">
+        <Link to="/orbitxlaunch/create" className="text-[#E8C547]">← Back to launch router</Link>
+      </p>
 
       <div className="ox-panel ox-panel--gold pf-card mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-3 font-mono text-[10px] uppercase tracking-widest">
         <span className="font-bold text-[#F0C75E]">Identical fees · both lanes</span>
