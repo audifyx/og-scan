@@ -4,7 +4,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   Coins, Wallet, Loader2, RefreshCw, CheckCircle2, AlertTriangle, Rocket, HandCoins,
 } from "lucide-react";
@@ -22,10 +22,13 @@ import { confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
 import { IndexOnChainTx, SolscanLink } from "@/components/onchain";
+import { SweepCreatorFees } from "@/components/launchpad/SweepCreatorFees";
+import { listRewardsBalances, listRewardsPools } from "@/lib/launchpad/registry";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 export default function LaunchpadClaim() {
+  const { mint: focusMint } = useParams<{ mint?: string }>();
   const { connection } = useConnection();
   const {
     publicKey,
@@ -360,7 +363,70 @@ export default function LaunchpadClaim() {
               </div>
             )}
           </div>
+
+          <HolderRewardsPanel owner={publicKey?.toBase58() ?? null} focusMint={focusMint} />
+
+          <div className="ox-claim-card">
+            <div className="mb-3 flex items-center gap-2">
+              <HandCoins className="h-4 w-4 text-[#E8C547]" />
+              <span className="font-display text-sm font-bold uppercase tracking-wider text-white">Sweep creator vaults</span>
+            </div>
+            <p className="mb-4 text-xs">Anyone can pay gas. Fees still land in the registered creator wallet — keep dead-dev coins alive.</p>
+            {pumpTokens.map((t) => (
+              <div key={t.mint_address} className="mb-3">
+                <div className="mb-1 text-xs font-bold">${t.ticker}</div>
+                <SweepCreatorFees creator={t.creator_wallet} quoteMint={t.quote_mint || undefined} />
+              </div>
+            ))}
+            {pumpTokens.length === 0 && <p className="text-xs opacity-70">No pump launches from this wallet to sweep.</p>}
+          </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function HolderRewardsPanel({ owner, focusMint }: { owner: string | null; focusMint?: string }) {
+  const [history, setHistory] = useState<Array<{ sig: string; amount: number; mint: string; quote_mint: string; claimed_at: string }>>([]);
+  const [pools, setPools] = useState<Array<{ mint: string; quote_mint: string; accrued_quote: number; mode: string }>>([]);
+  useEffect(() => {
+    void listRewardsPools().then((rows) => setPools(rows as typeof pools));
+    if (owner) void listRewardsBalances(owner).then((rows) => setHistory(rows as typeof history));
+  }, [owner]);
+  const shown = focusMint ? pools.filter((p) => p.mint === focusMint) : pools;
+  return (
+    <div className="ox-claim-card">
+      <div className="mb-3 flex items-center gap-2">
+        <Coins className="h-4 w-4 text-[#E8C547]" />
+        <span className="font-display text-sm font-bold uppercase tracking-wider text-white">Holder rewards</span>
+      </div>
+      <p className="mb-4 text-xs">Accrue in the vault. Claim pays quote tokens to this wallet. Empty until a rewards coin is traded.</p>
+      {shown.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm">No rewards yet. Trade a rewards coin or hold one.</div>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {shown.map((p) => (
+            <li key={p.mint} className="flex items-center justify-between">
+              <Link to={`/orbitxlaunch/token/${p.mint}`} className="font-mono">{short(p.mint)}</Link>
+              <span>{p.accrued_quote} · {p.mode}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {history.length > 0 && (
+        <table className="mt-4 w-full text-left text-xs font-mono">
+          <thead><tr><th>Sig</th><th>Amount</th><th>Quote</th><th>When</th></tr></thead>
+          <tbody>
+            {history.map((h) => (
+              <tr key={h.sig}>
+                <td><SolscanLink signature={h.sig}>{short(h.sig)}</SolscanLink></td>
+                <td>{h.amount}</td>
+                <td>{short(h.quote_mint)}</td>
+                <td>{h.claimed_at}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

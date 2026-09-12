@@ -124,10 +124,19 @@ async function handleIpfs(body: any, res: VercelResponse) {
 /* ─── Step 2: Create token transaction ────────────────────────────── */
 
 async function handleCreate(body: any, res: VercelResponse) {
-  const { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, slippage } = body;
+  const { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, slippage, quoteMint, holderReward } = body;
 
   if (!publicKey || !metadataUri || !name || !symbol || !mintPublicKey) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const SOL = "So11111111111111111111111111111111111111112";
+  if (quoteMint && quoteMint !== SOL) {
+    return res.status(400).json({
+      error: "Non-SOL quoteMint requires live QuoteControl create_v2. Launch on SOL or wait for the allowlist.",
+      quoteMint,
+      holderReward: !!holderReward,
+    });
   }
 
   const payload: Record<string, any> = {

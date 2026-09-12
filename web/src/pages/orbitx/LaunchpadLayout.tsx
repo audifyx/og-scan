@@ -31,7 +31,8 @@ import {
   IosRailLink,
   type IosTabItem,
 } from "@/components/app-shell/IosAppShell";
-import "./orbitx-2026.css";
+import { AuthSheet } from "@/components/launchpad/AuthSheet";
+import { useLaunchpadIdentity } from "@/hooks/useLaunchpadIdentity";
 
 const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [
   {
@@ -86,10 +87,12 @@ const ROOT_PATHS = new Set([
   "/orbitxlaunch/create",
   "/orbitxlaunch/create/custom",
   "/orbitxlaunch/create/pump",
+  "/orbitxlaunch/create/lanes",
   "/orbitxlaunch/create/api",
   "/orbitxlaunch/create/curve",
   "/orbitxlaunch/create/nft",
   "/orbitxlaunch/claim",
+  "/orbitxlaunch/connect-wallet",
   "/orbitxlaunch/rescue",
   "/orbitxlaunch/portfolio",
   "/orbitxlaunch/profile",
@@ -100,10 +103,13 @@ const ROOT_PATHS = new Set([
 function titleFor(pathname: string): string {
   if (pathname.startsWith("/orbitxlaunch/create/pump")) return "Pump launch";
   if (pathname.startsWith("/orbitxlaunch/create/custom")) return "Custom launch";
+  if (pathname.startsWith("/orbitxlaunch/create/lanes")) return "Other lanes";
   if (pathname.startsWith("/orbitxlaunch/create/api")) return "API launch";
   if (pathname.startsWith("/orbitxlaunch/create/curve")) return "Curve launch";
   if (pathname.startsWith("/orbitxlaunch/create/nft")) return "NFT launch";
-  if (pathname === "/orbitxlaunch/create" || pathname === "/orbitxlaunch/create/") return "Create";
+  if (pathname === "/orbitxlaunch/create" || pathname === "/orbitxlaunch/create/") return "Launch";
+  if (pathname.startsWith("/orbitxlaunch/connect-wallet")) return "Prove wallet";
+  if (pathname.startsWith("/orbitxlaunch/claim")) return "Claim";
   const flat = TAB_GROUPS.flatMap((g) => g.tabs);
   const hit = flat.find((t) =>
     t.end ? pathname === t.to || pathname === `${t.to}/` : pathname === t.to || pathname.startsWith(`${t.to}/`),
@@ -118,8 +124,10 @@ function WalletConsole() {
   const { connection } = useConnection();
   const { publicKey, connected, disconnect } = useWallet();
   const { user } = useAuth();
+  const { identity } = useLaunchpadIdentity();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [picker, setPicker] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
   const addr = publicKey?.toBase58();
 
   const { data: sol } = useQuery({
@@ -143,25 +151,45 @@ function WalletConsole() {
   if (!connected || !addr) {
     return (
       <>
+        <button type="button" onClick={() => setAuthOpen(true)} className="ox-ghost-btn hidden sm:inline-flex">
+          {identity.x_user_id ? `@${identity.x_handle || "x"}` : "X + wallet"}
+        </button>
         <button type="button" onClick={() => setPicker(true)} className="ox-wallet-btn">
           <Wallet className="h-4 w-4" /> {user ? "Connect" : "Sign in"}
         </button>
         <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
+        {authOpen && (
+          <div className="lp-auth-pop">
+            <AuthSheet identity={identity} connectingWallet={!!busy} onConnectWallet={() => { setAuthOpen(false); setPicker(true); }} compact />
+            <button type="button" className="lp-auth-copy" onClick={() => setAuthOpen(false)}>Close</button>
+          </div>
+        )}
       </>
     );
   }
   return (
-    <div className="ox-wallet-chip">
-      <span className="ox-wallet-dot" />
-      <div className="leading-none">
-        <div className="pf-mono text-[11px] font-bold text-white">{shortAddr(addr)}</div>
-        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-white">
-          {sol != null ? `${sol.toFixed(3)} SOL` : "linked"}
-        </div>
-      </div>
-      <button type="button" onClick={() => disconnect().catch(() => undefined)} className="ox-wallet-exit">
-        Exit
+    <div className="flex items-center gap-1.5">
+      <button type="button" onClick={() => setAuthOpen(true)} className="ox-ghost-btn hidden sm:inline-flex">
+        {identity.x_user_id ? `@${identity.x_handle || "x"}` : "Link X"}
       </button>
+      <div className="ox-wallet-chip">
+        <span className="ox-wallet-dot" />
+        <div className="leading-none">
+          <div className="pf-mono text-[11px] font-bold text-white">{shortAddr(addr)}</div>
+          <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-white">
+            {sol != null ? `${sol.toFixed(3)} SOL` : "linked"}
+          </div>
+        </div>
+        <button type="button" onClick={() => disconnect().catch(() => undefined)} className="ox-wallet-exit">
+          Exit
+        </button>
+      </div>
+      {authOpen && (
+        <div className="lp-auth-pop">
+          <AuthSheet identity={identity} connectingWallet={!!busy} onConnectWallet={() => setAuthOpen(false)} compact />
+          <button type="button" className="lp-auth-copy" onClick={() => setAuthOpen(false)}>Close</button>
+        </div>
+      )}
     </div>
   );
 }

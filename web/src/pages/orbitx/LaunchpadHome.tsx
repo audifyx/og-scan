@@ -4,15 +4,16 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Rocket, Zap, Flame, Loader2, TrendingUp, Droplets, Sparkles,
-  Search, ShieldCheck, Eye, Activity, Gem, Star, Plus, LayoutGrid, List,
+  Search, ShieldCheck, Eye, Activity, Gem, Star, Plus, LayoutGrid, List, HandCoins, Briefcase,
 } from "lucide-react";
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
 import { TokenCard, TokenFeedRow, GRADUATION_MC_USD } from "./_shared";
 import { useWatchlist } from "./watchlist";
-import { launchStats, useMarketMap, fmtCompactUsd, type MarketRow } from "./lpx";
+import { Tape } from "@/components/launchpad/Tape";
+import { CURATED_QUOTES } from "@/lib/launchpad/quotes";
 
-type BoardCategory = "board" | "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist";
+type BoardCategory = "board" | "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist" | "rewards" | "stocks" | "bagwork";
 type ViewMode = "feed" | "columns";
 
 function isGraduated(t: OrbitxToken, markets?: Record<string, MarketRow> | null) {
@@ -69,6 +70,9 @@ const CATEGORIES = [
   { id: "gainers" as const, label: "Gainers", icon: TrendingUp },
   { id: "gems" as const, label: "Gems", icon: Gem },
   { id: "graduated" as const, label: "Graduated", icon: Droplets },
+  { id: "rewards" as const, label: "Rewards", icon: HandCoins },
+  { id: "stocks" as const, label: "Stocks", icon: TrendingUp },
+  { id: "bagwork" as const, label: "Bagwork", icon: Briefcase },
   { id: "watchlist" as const, label: "Watchlist", icon: Star },
 ];
 
@@ -77,6 +81,7 @@ export default function LaunchpadHome() {
   const [category, setCategory] = useState<BoardCategory>("board");
   const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [hideVamps, setHideVamps] = useState(false);
+  const [quoteFilter, setQuoteFilter] = useState<string>("all");
   const { list: watchIds } = useWatchlist();
   const watchSet = useMemo(() => new Set(watchIds), [watchIds]);
 
@@ -96,6 +101,9 @@ export default function LaunchpadHome() {
   const base = useMemo(() => {
     let items = Array.isArray(launches) ? launches.filter((t) => !!t) : [];
     if (hideVamps) items = items.filter((t) => !t?.is_vamp);
+    if (quoteFilter !== "all") {
+      items = items.filter((t) => (t.quote_mint || "So11111111111111111111111111111111111111112") === quoteFilter);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter((t) => {
@@ -104,7 +112,7 @@ export default function LaunchpadHome() {
       });
     }
     return items;
-  }, [launches, hideVamps, search]);
+  }, [launches, hideVamps, search, quoteFilter]);
 
   const liveCol = useMemo(() => {
     return [...base]
@@ -173,6 +181,16 @@ export default function LaunchpadHome() {
         })
         .sort((a, b) => (markets?.[b.mint_address]?.vol24 ?? 0) - (markets?.[a.mint_address]?.vol24 ?? 0));
     }
+    if (category === "rewards") {
+      return items.filter((t) => t.holder_rewards || t.pad_mode === "rewards");
+    }
+    if (category === "bagwork") {
+      return items.filter((t) => t.bagwork || t.pad_mode === "bagwork");
+    }
+    if (category === "stocks") {
+      const stock = new Set(CURATED_QUOTES.filter((q) => q.kind === "stock").map((q) => q.mint));
+      return items.filter((t) => t.quote_mint && stock.has(t.quote_mint));
+    }
     return items;
   }, [base, markets, category, watchSet]);
 
@@ -184,6 +202,17 @@ export default function LaunchpadHome() {
 
   return (
     <div className="ox-launchboard space-y-4">
+      <Tape
+        items={(Array.isArray(launches) ? launches : []).slice(0, 24).map((t) => ({
+          mint: t.mint_address,
+          symbol: t.ticker,
+          name: t.name,
+          quote: t.quote_symbol,
+          mode: t.pad_mode,
+          created_at: t.created_at,
+        }))}
+      />
+
       <div className="ox-board-head">
         <div>
           <div className="ox-board-kicker">Live token terminal</div>
@@ -233,6 +262,20 @@ export default function LaunchpadHome() {
           <ShieldCheck className="h-3.5 w-3.5" />
           {hideVamps ? "OG only" : "All coins"}
         </button>
+      </div>
+
+      <div className="lp-quote-chips">
+        <button type="button" className={`lp-qchip ${quoteFilter === "all" ? "lp-qchip--on" : ""}`} onClick={() => setQuoteFilter("all")}>All quotes</button>
+        {CURATED_QUOTES.filter((q) => ["SOL", "USDC", "NVDAX", "TSLAX", "SPYX"].includes(q.symbol)).map((q) => (
+          <button
+            key={q.mint}
+            type="button"
+            className={`lp-qchip ${quoteFilter === q.mint ? "lp-qchip--on" : ""}`}
+            onClick={() => setQuoteFilter(q.mint)}
+          >
+            {q.symbol}
+          </button>
+        ))}
       </div>
 
       <div className="ox-stats-strip">

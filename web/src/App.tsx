@@ -54,6 +54,8 @@ import LaunchpadLayout from "./pages/orbitx/LaunchpadLayout";
 import LaunchpadHome from "./pages/orbitx/LaunchpadHome";
 import LaunchpadCreate from "./pages/orbitx/LaunchpadCreate";
 import LaunchpadChoose from "./pages/orbitx/LaunchpadChoose";
+import LaunchpadRouter from "./pages/orbitx/LaunchpadRouter";
+import LaunchpadConnectWallet from "./pages/orbitx/LaunchpadConnectWallet";
 // Terminal / Trading Platform UI
 import LaunchpadTerminal from "./pages/orbitx/LaunchpadTerminal";
 import TerminalHome from "./pages/orbitx/TerminalHome";
@@ -390,15 +392,18 @@ const App = () => (
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
             <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
               <Route index element={<LaunchpadHome />} />
-              <Route path="create" element={<LaunchpadChoose />} />
+              <Route path="create" element={<LaunchpadRouter />} />
+              <Route path="create/lanes" element={<LaunchpadChoose />} />
               <Route path="create/custom" element={<LaunchpadCreate />} />
               <Route path="create/pump" element={<LaunchpadPump />} />
+              <Route path="connect-wallet" element={<LaunchpadConnectWallet />} />
               <Route path="create/api" element={<LaunchpadApiLaunch />} />
               <Route path="create/curve" element={<LaunchpadCurveEvm />} />
               <Route path="curve/:token" element={<LaunchpadCurveTrade />} />
               <Route path="curves" element={<LaunchpadCurveMarkets />} />
               <Route path="token/:mint" element={<LaunchpadToken />} />
               <Route path="claim" element={<LaunchpadClaim />} />
+              <Route path="claim/:mint" element={<LaunchpadClaim />} />
               <Route path="rescue" element={<LaunchpadRescue />} />
               <Route path="about" element={<LaunchpadAbout />} />
               <Route path="profile" element={<LaunchpadProfile />} />

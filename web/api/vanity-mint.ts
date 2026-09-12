@@ -62,27 +62,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { suffix = "obx", maxIterations = 1000000 } = req.body || {};
-
-    if (typeof suffix !== "string" || suffix.length === 0) {
-      return res.status(400).json({ error: "Invalid suffix parameter" });
+    const body = req.body || {};
+    const prefixStr = typeof body.prefix === "string" ? body.prefix : "";
+    const suffix = typeof body.suffix === "string" ? body.suffix : prefixStr ? "" : "obx";
+    const caseInsensitive = body.caseInsensitive !== false;
+    const maxIterations = body.maxIterations || 1000000;
+    const pattern = `${prefixStr}${suffix}`;
+    if (pattern.replace(/[^1-9A-HJ-NP-Za-km-z]/g, "").length > 5) {
+      return res.status(400).json({ error: "Vanity pattern max 5 characters" });
+    }
+    if (!suffix && !prefixStr) {
+      return res.status(400).json({ error: "Enter a prefix or suffix" });
     }
 
-    console.log(`[v0] Starting vanity mint generation for suffix: ${suffix}`);
+    console.log(`[v0] Starting vanity mint generation prefix=${prefixStr} suffix=${suffix}`);
     const startTime = Date.now();
 
-    const suffixLower = suffix.toLowerCase();
+    const suffixNorm = caseInsensitive ? String(suffix).toLowerCase() : String(suffix);
+    const prefixNorm = caseInsensitive ? prefixStr.toLowerCase() : prefixStr;
     let keypair: EdKeypair | null = null;
     let attempts = 0;
 
-    // Intensive search for vanity address — bounded by both attempt count
-    // and a wall-clock time budget so we never let Vercel's hard timeout
-    // cut us off mid-response.
     for (attempts = 0; attempts < maxIterations; attempts++) {
       const candidate = generateKeypair();
-      const address = bs58.encode(candidate.publicKey).toLowerCase();
+      const address = caseInsensitive ? bs58.encode(candidate.publicKey).toLowerCase() : bs58.encode(candidate.publicKey);
 
-      if (address.endsWith(suffixLower)) {
+      const prefixOk = !prefixNorm || address.startsWith(prefixNorm);
+      const suffixOk = !suffixNorm || address.endsWith(suffixNorm);
+      if (prefixOk && suffixOk) {
         keypair = candidate;
         console.log(
           `[v0] Vanity mint found after ${attempts + 1} attempts, ${Date.now() - startTime}ms: ${bs58.encode(candidate.publicKey)}`
