@@ -1964,4 +1964,13 @@
 .lp-sweep { display: grid; gap: .5rem; }
 .lp-sweep-copy { font-size: 12px; opacity: .85; }
 .lp-bagwork-list { list-style: none; padding: 0; margin: .75rem 0 0; display: grid; gap: .5rem; }
-.lp-bagwork-row { border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: .75rem; }
+.lp-adv { margin: 1rem 0; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: .75rem; }
+.lp-adv > summary { cursor: pointer; list-style: none; }
+.lp-adv-field { display: grid; gap: .25rem; font-size: 12px; margin-top: .6rem; }
+.lp-ticket { display: grid; gap: .5rem; }
+.lp-ticket-q { font-weight: 800; font-size: 14px; }
+.lp-ticket-odds { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.lp-ticket-odds div { border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: .5rem .7rem; }
+.lp-ticket-odds span { display: block; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .65; }
+.lp-ticket-odds strong { font-size: 1.4rem; }
+.lp-params { border: 1px solid rgba(232,197,71,.22); border-radius: 14px; padding: 1rem; background: var(--lp-paper); }

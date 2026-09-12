@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { GraduationDest, LaunchType } from "./types";
+import type { GraduationDest, LaunchStyle, LaunchType, MarketAmm, ResolverKind, RewardsTrack } from "./types";
 
 export type PadLaunchRow = {
   mint: string;
@@ -16,6 +16,10 @@ export type PadLaunchRow = {
   bagwork: boolean;
   created_sig?: string | null;
   created_at?: string;
+  launch_style?: LaunchStyle | null;
+  rewards_track?: RewardsTrack | null;
+  delay_open_unix?: number | null;
+  anti_snipe_blocks?: number | null;
 };
 
 export async function indexPadLaunch(row: PadLaunchRow): Promise<void> {
@@ -128,4 +132,76 @@ export async function linkWalletPubkey(userId: string, wallet: string): Promise<
     .eq("user_id", userId);
   if (error) return { ok: false, conflict: false, message: error.message };
   return { ok: true };
+}
+
+export type PadMarketRow = {
+  mint: string;
+  question: string;
+  deadline_unix: number;
+  resolver: ResolverKind;
+  feed_id?: string | null;
+  threshold?: string | null;
+  amm: MarketAmm | string;
+  quote_mint: string;
+  status: string;
+  yes_pool?: number | null;
+  no_pool?: number | null;
+  outcome?: string | null;
+  evidence_uri?: string | null;
+  resolved_at?: string | null;
+};
+
+export async function indexPadMarket(row: PadMarketRow): Promise<void> {
+  const { error } = await supabase.from("orbitx_pad_markets").upsert(row, { onConflict: "mint" });
+  if (error) console.warn("[launchpad] market index failed", error);
+}
+
+export async function getPadMarket(mint: string): Promise<PadMarketRow | null> {
+  const { data, error } = await supabase.from("orbitx_pad_markets").select("*").eq("mint", mint).maybeSingle();
+  if (error) return null;
+  return (data as PadMarketRow) ?? null;
+}
+
+export async function listPadMarkets(limit = 80): Promise<PadMarketRow[]> {
+  const { data, error } = await supabase
+    .from("orbitx_pad_markets")
+    .select("*")
+    .order("deadline_unix", { ascending: true })
+    .limit(limit);
+  if (error) return [];
+  return (data ?? []) as PadMarketRow[];
+}
+
+export async function listOpenMarketsPastDeadline(nowUnix = Math.floor(Date.now() / 1000)): Promise<PadMarketRow[]> {
+  const { data, error } = await supabase
+    .from("orbitx_pad_markets")
+    .select("*")
+    .in("status", ["open", "halted", "preview"])
+    .lte("deadline_unix", nowUnix)
+    .limit(200);
+  if (error) return [];
+  return (data ?? []) as PadMarketRow[];
+}
+
+export async function writeMarketOutcome(mint: string, outcome: "yes" | "no" | "void", evidenceUri?: string): Promise<void> {
+  const { error } = await supabase.from("orbitx_pad_markets").update({
+    status: outcome === "void" ? "void" : "resolved",
+    outcome,
+    evidence_uri: evidenceUri ?? null,
+    resolved_at: new Date().toISOString(),
+  }).eq("mint", mint);
+  if (error) console.warn("[launchpad] resolve write failed", error);
+}
+
+export async function insertGeoAttest(row: {
+  user_id?: string | null;
+  wallet?: string | null;
+  country: string;
+  attest_version: string;
+}): Promise<void> {
+  const { error } = await supabase.from("orbitx_pad_attests").insert({
+    ...row,
+    attested_at: new Date().toISOString(),
+  });
+  if (error) console.warn("[launchpad] attest index failed", error);
 }

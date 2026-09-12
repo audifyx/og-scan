@@ -1,0 +1,23 @@
+# OrbitX Launchpad
+
+Agent surface for the pad at `/orbitxlaunch`.
+
+- Create router: `/orbitxlaunch/create` — mode × quote × style × rewards × optional Yes/No
+- Claim / sweep: `/orbitxlaunch/claim`
+- Params: `/orbitxlaunch/params`
+- OpenAPI: `/api/v1/openapi`
+- Quotes: `/api/v1/quotes`
+- Dry-run launch: `POST /api/v1/launch` (unsigned; never holds keys)
+- Markets index: `/api/v1/markets`
+
+## Live vs indexed
+
+- SOL Pump create via `/api/pump-create` is live (including `holderReward: true` Track A).
+- Non-SOL quotes, create_v2 QuoteControl, Dutch/batch/IDO venues, Track B epoch vault, and on-chain Yes/No (pm-core) are **indexed + honest 400/501** until those programs are live.
+- Predict markets are geo-gated (off in US until legal review). Self-attest 18+ required.
+- Email/Google stay enabled globally. Only pad create requires X + wallet.
+
+## Safety
+
+Refuse cashback, hidden mint authority, ToCreator LP default, mayhem+stock.
+Vanity grind max 5 chars. Destination of sweep is always the creator, never the payer.

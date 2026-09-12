@@ -10,6 +10,13 @@ import { pumpCreateBody } from "./pump";
 import { COLLECT_CREATOR_FEE_V2_DISCRIMINATOR, buildCollectCreatorFeeV2Instruction, buildSweepInstructions, sweepCopy } from "./sweep";
 import { PublicKey } from "@solana/web3.js";
 import { SOL_MINT } from "./types";
+import { assertCombo } from "./combo";
+import { DEFAULT_PAD_FLAGS } from "./flags";
+import { claimable, boostablePot, clampPredictBoost, lockBoostForDays } from "./rewards";
+import { splitCompleteSet, mergeCompleteSet, impliedProbability, yesNoPinResidual, lintMarketQuestion, redeemWinning } from "./market";
+import { pythThresholdResolve, metricGraduationResolve, freezeDeadlineAfterFirstBet } from "./resolve";
+import { agentSafety, dryRunLaunch, intentFromV2 } from "./agent";
+import { PAD_PARAMS } from "./params";
 
 describe("launchpad identity", () => {
   it("requires both X and wallet to launch", () => {
@@ -148,5 +155,137 @@ describe("pump create + permissionless sweep", () => {
     const sweep = buildSweepInstructions({ creator, graduated: true });
     expect(sweep.length).toBe(3);
     expect(sweepCopy("Cicb…eQDh")).toMatch(/not to you/i);
+  });
+});
+
+describe("v2 combo + flags", () => {
+  it("hides predict when the flag is off", () => {
+    const intent = defaultIntent({
+      type: "predict",
+      name: "Ship",
+      symbol: "SHIP",
+      geoAttest: true,
+      geoCountry: "DE",
+    });
+    const issues = assertCombo(intent, { flags: { ...DEFAULT_PAD_FLAGS, predict_markets: false } });
+    expect(issues.some((i) => /predict disabled/i.test(i.message))).toBe(true);
+  });
+
+  it("blocks US predict until review", () => {
+    const intent = defaultIntent({
+      type: "predict",
+      name: "Ship",
+      symbol: "SHIP",
+      geoAttest: true,
+      geoCountry: "US",
+    });
+    expect(assertCombo(intent).some((i) => /region/i.test(i.message))).toBe(true);
+  });
+
+  it("requires 18+ attest and rejects delay too soon", () => {
+    const now = 1_800_000_000;
+    const intent = defaultIntent({
+      type: "predict",
+      name: "Ship",
+      symbol: "SHIP",
+      geoCountry: "DE",
+      style: "delay",
+      delayOpenUnix: now + 10,
+    });
+    const issues = assertCombo(intent, { nowUnix: now, country: "DE" });
+    expect(issues.some((i) => i.field === "geoAttest")).toBe(true);
+    expect(issues.some((i) => /delay too soon/i.test(i.message))).toBe(true);
+  });
+
+  it("refuses Track B vault until the flag is on", () => {
+    const intent = defaultIntent({
+      name: "Ship",
+      symbol: "SHIP",
+      rewards: { track: "epoch_vault", epochSeconds: 3600 },
+    });
+    expect(assertCombo(intent).some((i) => /vault not live/i.test(i.message))).toBe(true);
+    expect(assertCombo(intent, { flags: { ...DEFAULT_PAD_FLAGS, track_b_vault: true } }).some((i) => i.field === "rewards")).toBe(false);
+  });
+
+  it("applies predict as a mode without dropping SOL create", () => {
+    const p = applyLaunchType(defaultIntent({ name: "Ship", symbol: "SHIP" }), "predict");
+    expect(p.type).toBe("predict");
+    expect(p.market?.question).toMatch(/graduate/i);
+    expect(onChainCreateSupported(p)).toBe(true);
+  });
+});
+
+describe("v2 claimable + YES/NO pin", () => {
+  it("computes pro-rata claim and never overpays", () => {
+    expect(claimable({ ownerBal: 10n, supply: 100n, pot: 1000n, claimed: 0n })).toBe(100n);
+    expect(claimable({ ownerBal: 10n, supply: 100n, pot: 1000n, claimed: 100n })).toBe(0n);
+    expect(claimable({ ownerBal: 1n, supply: 0n, pot: 50n, claimed: 0n })).toBe(0n);
+  });
+
+  it("keeps 20% insurance off the boost pot", () => {
+    expect(boostablePot(1000n)).toBe(800n);
+    expect(clampPredictBoost(2)).toBe(PAD_PARAMS.predictBoostCap);
+    expect(lockBoostForDays(30)).toBe(1.25);
+  });
+
+  it("pins YES+NO and splits/merges a complete set", () => {
+    const set = splitCompleteSet(1_000_000n);
+    expect(set.yes).toBe(1_000_000n);
+    expect(set.no).toBe(1_000_000n);
+    expect(mergeCompleteSet(set.yes, set.no)).toBe(1_000_000n);
+    expect(impliedProbability(75n, 25n)).toBe(0.75);
+    expect(yesNoPinResidual(0.495, 0.495, 100)).toBeLessThan(0.02);
+    expect(redeemWinning(5n, true)).toBe(5n);
+    expect(redeemWinning(5n, false)).toBe(0n);
+  });
+
+  it("lints questions", () => {
+    expect(lintMarketQuestion("")).toMatch(/required/i);
+    expect(lintMarketQuestion("x".repeat(141))).toMatch(/max/i);
+    expect(lintMarketQuestion("Will $SHIP graduate within 48h?")).toBeNull();
+  });
+});
+
+describe("v2 resolve + agent dry-run", () => {
+  it("voids stale Pyth after grace and skips before deadline", () => {
+    const deadline = 1000;
+    expect(pythThresholdResolve({ nowUnix: 900, deadlineUnix: deadline, tick: null, threshold: 1 }).outcome).toBe("skip");
+    expect(pythThresholdResolve({ nowUnix: 1000 + PAD_PARAMS.graceResolveSec + 1, deadlineUnix: deadline, tick: null, threshold: 1 }).outcome).toBe("void");
+    expect(pythThresholdResolve({
+      nowUnix: 1001,
+      deadlineUnix: deadline,
+      tick: { value: 2, conf: 0.01, publishTime: 1000, feedId: "abc" },
+      threshold: 1,
+    }).outcome).toBe("yes");
+  });
+
+  it("resolves graduation metric after grace", () => {
+    expect(metricGraduationResolve({ nowUnix: 50, deadlineUnix: 100, graduatedAtUnix: null }).outcome).toBe("skip");
+    expect(metricGraduationResolve({ nowUnix: 100, deadlineUnix: 100, graduatedAtUnix: 80 }).outcome).toBe("yes");
+    expect(metricGraduationResolve({ nowUnix: 100 + PAD_PARAMS.graceResolveSec + 1, deadlineUnix: 100, graduatedAtUnix: null }).outcome).toBe("no");
+  });
+
+  it("freezes deadline after first bet", () => {
+    expect(freezeDeadlineAfterFirstBet(10, 20, 1n)).toMatch(/deadline/i);
+    expect(freezeDeadlineAfterFirstBet(10, 20, 0n)).toBeNull();
+  });
+
+  it("dry-run refuses cashback and mayhem+stock", () => {
+    const intent = defaultIntent({ name: "Nvidia Cats", symbol: "NVDCAT", quoteSymbol: "NVDAX", mayhem: true });
+    expect(agentSafety(intent, { cashback: true }).some((h) => h.code === "cashback")).toBe(true);
+    expect(agentSafety(intent).some((h) => h.code === "mayhem_stock")).toBe(true);
+    const v2 = intentFromV2({
+      name: "Ship",
+      symbol: "SHIP",
+      uri: "https://example/meta",
+      launchType: "rewards",
+      quoteMint: SOL_MINT,
+      graduationDest: "pumpswap",
+      style: "curve",
+      rewards: { track: "pump_holder" },
+    });
+    const dry = dryRunLaunch(v2);
+    expect(dry.ok).toBe(true);
+    expect(dry.ixs.some((i) => /pump create/i.test(i))).toBe(true);
   });
 });

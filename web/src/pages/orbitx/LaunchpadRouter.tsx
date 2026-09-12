@@ -11,18 +11,22 @@ import { ModeRail } from "@/components/launchpad/ModeRail";
 import { QuotePicker } from "@/components/launchpad/QuotePicker";
 import { VanityGrind } from "@/components/launchpad/VanityGrind";
 import { PreviewCard } from "@/components/launchpad/PreviewCard";
+import { StylePicker } from "@/components/launchpad/StylePicker";
+import { PredictPanel } from "@/components/launchpad/PredictPanel";
+import { RewardsTrack } from "@/components/launchpad/RewardsTrack";
 import { useLaunchpadIdentity } from "@/hooks/useLaunchpadIdentity";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import {
-  CURATED_QUOTES, STOCK_LEGAL, applyLaunchType, defaultIntent, deserializeCreateTx,
-  feeSplitFor, isStockQuote, loadQuotes, mayhemAllowedForQuote, mintKeypairFromSecret,
-  mintUnusedOnChain, needsQuoteHop, onChainCreateSupported, postPumpCreate,
-  quoteByMint, quoteToBuyPreview, validateLaunchIntent, vanityEta, vanityPatternLength,
-  type LaunchIntent, type QuoteAsset,
+  CURATED_QUOTES, STOCK_LEGAL, applyLaunchType, clientPadFlags, countryFromTimezone,
+  defaultIntent, deserializeCreateTx, feeSplitFor, isStockQuote, loadLaunchDraft,
+  loadQuotes, mayhemAllowedForQuote, mintKeypairFromSecret, mintUnusedOnChain,
+  needsQuoteHop, onChainCreateSupported, postPumpCreate, predictBlockedForCountry,
+  quoteByMint, quoteToBuyPreview, saveLaunchDraft, validateLaunchIntent, vanityEta,
+  vanityPatternLength, type LaunchIntent, type QuoteAsset,
 } from "@/lib/launchpad";
 import { grindMint } from "@/lib/launchpad/vanity";
-import { indexPadLaunch } from "@/lib/launchpad/registry";
+import { indexPadLaunch, indexPadMarket } from "@/lib/launchpad/registry";
 import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
 import { ANTI_VAMP_ENFORCEMENT_ENABLED, PLATFORM_WALLET, LAUNCHPAD_FEE_USD } from "@/lib/platformFee";
 import { TabHero } from "@/pages/orbitx/TabHero";
@@ -45,9 +49,15 @@ export default function LaunchpadRouter() {
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [picker, setPicker] = useState(false);
   const [quotes, setQuotes] = useState<QuoteAsset[]>(CURATED_QUOTES);
-  const [intent, setIntent] = useState<LaunchIntent>(() =>
-    defaultIntent({ twitter: identity.x_handle ? `https://x.com/${identity.x_handle}` : "" }),
-  );
+  const flags = useMemo(() => clientPadFlags(), []);
+  const [intent, setIntent] = useState<LaunchIntent>(() => {
+    const draft = typeof window !== "undefined" ? loadLaunchDraft() : null;
+    return defaultIntent({
+      ...draft,
+      twitter: identity.x_handle ? `https://x.com/${identity.x_handle}` : draft?.twitter || "",
+      geoCountry: draft?.geoCountry || countryFromTimezone(),
+    });
+  });
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [grinding, setGrinding] = useState(false);
@@ -70,11 +80,25 @@ export default function LaunchpadRouter() {
     }
   }, [identity.x_handle, intent.twitter]);
 
+  useEffect(() => {
+    saveLaunchDraft(intent);
+  }, [intent]);
+
   const quote = quoteByMint(intent.quoteMint, quotes) || quotes.find((q) => q.mint === intent.quoteMint);
-  const issues = useMemo(() => validateLaunchIntent(intent), [intent]);
+  const issues = useMemo(
+    () => validateLaunchIntent(intent, { flags, country: intent.geoCountry }),
+    [intent, flags],
+  );
   const live = onChainCreateSupported(intent);
   const split = feeSplitFor(intent);
   const stock = quote ? isStockQuote(quote.mint) : false;
+  const hidePredict = !flags.predict_markets || predictBlockedForCountry(intent.geoCountry, flags);
+
+  useEffect(() => {
+    if (hidePredict && intent.type === "predict") {
+      setIntent((p) => applyLaunchType({ ...p, market: undefined }, "normal"));
+    }
+  }, [hidePredict, intent.type]);
 
   useEffect(() => {
     if (!needsQuoteHop(intent.quoteMint) || intent.firstBuySol <= 0) {
@@ -253,7 +277,7 @@ export default function LaunchpadRouter() {
         mintPublicKey: mintKeypair.publicKey.toBase58(),
         devBuySol: intent.firstBuySol || 0,
         quoteMint: intent.quoteMint,
-        holderReward: intent.holderRewards,
+        holderReward: intent.holderRewards || intent.rewards.track === "pump_holder",
       });
       setStatus("Sign in wallet…");
       const tx = deserializeCreateTx(txBase64, mintKeypair);
@@ -285,7 +309,7 @@ export default function LaunchpadRouter() {
           quote_mint: intent.quoteMint,
           quote_symbol: intent.quoteSymbol,
           pad_mode: intent.type,
-          holder_rewards: intent.holderRewards,
+          holder_rewards: intent.holderRewards || intent.rewards.track === "pump_holder",
           bagwork: intent.bagwork,
           graduation_dest: intent.graduationDest,
         });
@@ -304,10 +328,27 @@ export default function LaunchpadRouter() {
         name: intent.name.trim(),
         symbol: intent.symbol.trim().toUpperCase(),
         uri: metadataUri,
-        holder_rewards: intent.holderRewards,
+        holder_rewards: intent.holderRewards || intent.rewards.track === "pump_holder",
         bagwork: intent.bagwork,
         created_sig: sig,
+        launch_style: intent.style,
+        rewards_track: intent.rewards.track,
+        delay_open_unix: intent.delayOpenUnix ?? null,
+        anti_snipe_blocks: intent.antiSnipeBlocks,
       });
+      if (intent.market && intent.type === "predict" && !hidePredict) {
+        await indexPadMarket({
+          mint,
+          question: intent.market.question,
+          deadline_unix: intent.market.deadlineUnix,
+          resolver: intent.market.resolver,
+          feed_id: intent.market.feedId ?? null,
+          threshold: intent.market.threshold ?? null,
+          amm: intent.market.amm,
+          quote_mint: intent.quoteMint,
+          status: "open",
+        });
+      }
       toast.success(`Launched ${intent.symbol}`);
       nav(`/orbitxlaunch/token/${mint}`);
     } catch (e) {
@@ -346,6 +387,7 @@ export default function LaunchpadRouter() {
         <div className="lp-create-col">
           <ModeRail
             value={intent.type}
+            hidePredict={hidePredict}
             onChange={(t) => setIntent((p) => applyLaunchType(p, t))}
           />
           <QuotePicker
@@ -464,14 +506,14 @@ export default function LaunchpadRouter() {
             {hop && <p className="lp-auth-copy">{hop}</p>}
             <p className="lp-auth-copy">{split.label}</p>
             <div className="lp-grad">
-              {(["pumpswap", "raydium", "meteora"] as const).map((d) => (
+              {(["pumpswap", "raydium", "meteora", "none"] as const).map((d) => (
                 <button
                   key={d}
                   type="button"
                   className={`lp-mode ${intent.graduationDest === d ? "lp-mode--on" : ""}`}
                   onClick={() => patch({ graduationDest: d })}
                 >
-                  {d === "pumpswap" ? "PumpSwap" : d === "raydium" ? "Raydium" : "Meteora"}
+                  {d === "pumpswap" ? "PumpSwap" : d === "raydium" ? "Raydium" : d === "meteora" ? "Meteora" : "Forever curve"}
                 </button>
               ))}
             </div>
@@ -487,9 +529,15 @@ export default function LaunchpadRouter() {
             {stock && <p className="lp-legal">{STOCK_LEGAL}</p>}
           </div>
 
+          <StylePicker intent={intent} onChange={patch} />
+          <RewardsTrack intent={intent} flags={flags} onChange={patch} />
+          {(intent.type === "predict" || intent.market) && !hidePredict && (
+            <PredictPanel intent={intent} flags={flags} onChange={patch} />
+          )}
+
           <button type="button" className="lp-launch-btn" disabled={launchDisabled} onClick={() => void launch()}>
             {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-            {launching ? status || "Launching…" : ready ? "Launch" : "X + wallet required"}
+            {launching ? status || "Launching…" : ready ? (intent.market ? "Launch (one or two signatures)" : "Launch") : "X + wallet required"}
           </button>
           {issues.length > 0 && <p className="lp-preview-warn">{issues[0].message}</p>}
 

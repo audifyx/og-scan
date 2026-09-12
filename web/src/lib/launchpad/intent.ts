@@ -1,17 +1,22 @@
 import { LAUNCH_TYPES, type IntentIssue, type LaunchIntent, type LaunchType } from "./types";
 import { CURATED_QUOTES, isNativeSol, isStockQuote, mayhemAllowedForQuote, quoteByMint } from "./quotes";
+import { defaultMarketSpec } from "./market";
+import { PAD_PARAMS } from "./params";
+import { assertCombo } from "./combo";
+import { DEFAULT_PAD_FLAGS, type PadFlags } from "./flags";
 
-const TICKER_RE = /^[A-Za-z0-9]{1,12}$/;
+const TICKER_RE = /^[A-Za-z0-9]{1,10}$/;
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
 
 export function defaultIntent(partial?: Partial<LaunchIntent>): LaunchIntent {
   const type = partial?.type ?? "normal";
+  const ticker = partial?.symbol ?? "";
   return {
     type,
     quoteMint: partial?.quoteMint ?? "So11111111111111111111111111111111111111112",
     quoteSymbol: partial?.quoteSymbol ?? "SOL",
     name: partial?.name ?? "",
-    symbol: partial?.symbol ?? "",
+    symbol: ticker,
     description: partial?.description ?? "",
     twitter: partial?.twitter ?? "",
     telegram: partial?.telegram ?? "",
@@ -26,6 +31,19 @@ export function defaultIntent(partial?: Partial<LaunchIntent>): LaunchIntent {
     mayhem: !!partial?.mayhem,
     firstBuySol: partial?.firstBuySol ?? 0,
     graduationDest: partial?.graduationDest ?? "pumpswap",
+    style: partial?.style ?? "curve",
+    delayOpenUnix: partial?.delayOpenUnix,
+    antiSnipeBlocks: partial?.antiSnipeBlocks ?? 0,
+    perWalletCapSol: partial?.perWalletCapSol ?? 0,
+    rewards: partial?.rewards ?? {
+      track: type === "rewards" || type === "bagwork" ? "pump_holder" : "none",
+      epochSeconds: PAD_PARAMS.epochDefaultSec,
+      lockBoost: false,
+      predictBoost: false,
+    },
+    market: type === "predict" ? (partial?.market ?? defaultMarketSpec(ticker || "TICKER")) : partial?.market,
+    geoAttest: !!partial?.geoAttest,
+    geoCountry: partial?.geoCountry ?? "",
   };
 }
 
@@ -33,9 +51,18 @@ export function applyLaunchType(intent: LaunchIntent, type: LaunchType): LaunchI
   return {
     ...intent,
     type,
-    holderRewards: type === "rewards" || type === "bagwork",
+    holderRewards: type === "rewards" || type === "bagwork" ? true : type === "predict" ? intent.holderRewards : false,
     bagwork: type === "bagwork",
-    mayhem: type === "bagwork" || type === "rewards" ? false : intent.mayhem,
+    mayhem: type === "bagwork" || type === "rewards" || type === "predict" ? false : intent.mayhem,
+    rewards: {
+      ...intent.rewards,
+      track: type === "rewards" || type === "bagwork"
+        ? "pump_holder"
+        : type === "predict"
+          ? intent.rewards.track
+          : "none",
+    },
+    market: type === "predict" ? (intent.market ?? defaultMarketSpec(intent.symbol || "TICKER")) : undefined,
   };
 }
 
@@ -53,16 +80,22 @@ export function vanityEta(chars: number): { label: string; disabled: boolean } {
   return { label: "too long — max 5", disabled: true };
 }
 
-export function validateLaunchIntent(intent: LaunchIntent, opts?: { onChainAllowed?: string[] }): IntentIssue[] {
+export function validateLaunchIntent(
+  intent: LaunchIntent,
+  opts?: { onChainAllowed?: string[]; flags?: PadFlags; nowUnix?: number; country?: string },
+): IntentIssue[] {
   const issues: IntentIssue[] = [];
   if (!LAUNCH_TYPES.includes(intent.type)) {
     issues.push({ field: "type", message: "Unknown launch type" });
   }
-  if (!intent.name.trim() || intent.name.trim().length > 32) {
-    issues.push({ field: "name", message: "Name is required (max 32)" });
+  if (!intent.name.trim() || intent.name.trim().length > PAD_PARAMS.nameMax) {
+    issues.push({ field: "name", message: `Name is required (max ${PAD_PARAMS.nameMax})` });
   }
   if (!TICKER_RE.test(intent.symbol.trim())) {
-    issues.push({ field: "symbol", message: "Ticker must be 1–12 letters or numbers" });
+    issues.push({ field: "symbol", message: `Ticker must be 1–${PAD_PARAMS.tickerMax} letters or numbers` });
+  }
+  if (intent.description.length > PAD_PARAMS.descriptionMax) {
+    issues.push({ field: "description", message: `Description max ${PAD_PARAMS.descriptionMax}` });
   }
   const quote = quoteByMint(intent.quoteMint) || CURATED_QUOTES.find((q) => q.mint === intent.quoteMint);
   if (!intent.quoteMint) {
@@ -100,9 +133,37 @@ export function validateLaunchIntent(intent: LaunchIntent, opts?: { onChainAllow
   if (quote && !quote.allowed && quote.awaitingAllowlist) {
     issues.push({ field: "quoteMint", message: `${quote.symbol} is awaiting QuoteControl allowlist` });
   }
+  issues.push(...assertCombo(intent, {
+    flags: opts?.flags ?? DEFAULT_PAD_FLAGS,
+    nowUnix: opts?.nowUnix,
+    country: opts?.country,
+  }));
   return issues;
 }
 
 export function onChainCreateSupported(intent: LaunchIntent): boolean {
   return isNativeSol(intent.quoteMint);
+}
+
+const DRAFT_KEY = "orbitx-pad-draft-v2";
+
+export function saveLaunchDraft(intent: LaunchIntent): void {
+  try {
+    const { customMintSecret: _s, ...safe } = intent;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(safe));
+  } catch { /* ignore */ }
+}
+
+export function loadLaunchDraft(): Partial<LaunchIntent> | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<LaunchIntent>;
+  } catch {
+    return null;
+  }
+}
+
+export function clearLaunchDraft(): void {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }

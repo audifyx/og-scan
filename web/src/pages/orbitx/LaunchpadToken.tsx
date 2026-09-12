@@ -26,7 +26,8 @@ import { SweepCreatorFees } from "@/components/launchpad/SweepCreatorFees";
 import { BagworkBoard } from "@/components/launchpad/BagworkBoard";
 import { STOCK_LEGAL } from "@/lib/launchpad/types";
 import { isStockQuote } from "@/lib/launchpad/quotes";
-import { getPadLaunch, indexExtraPool, listExtraPools } from "@/lib/launchpad/registry";
+import { getPadLaunch, getPadMarket, indexExtraPool, listExtraPools } from "@/lib/launchpad/registry";
+import { MarketTicket, ResolverCard } from "@/components/launchpad/MarketTicket";
 import { indexConfirmedTx } from "@/lib/orbitx/onchainAttest";
 import { solscanTxUrl } from "../../../shared/orbitx-onchain.js";
 import {
@@ -411,6 +412,12 @@ export default function LaunchpadToken() {
     enabled: !!mint,
   });
 
+  const { data: padMarket } = useQuery({
+    queryKey: ["pad-market", mint],
+    queryFn: () => getPadMarket(mint!),
+    enabled: !!mint,
+  });
+
   const { data: jupTokens, isLoading: jupLoading } = useQuery({
     queryKey: ["orbitx-token-jup", mint],
     queryFn: () => jupGetTokens([mint!]),
@@ -531,6 +538,8 @@ export default function LaunchpadToken() {
               )}
               {(pad?.holder_rewards || t?.holder_rewards) && <Pill tone="cyan">Rewards</Pill>}
               {(pad?.bagwork || t?.bagwork) && <Pill tone="gold">Bagwork</Pill>}
+              {pad?.launch_style && pad.launch_style !== "curve" && <Pill tone="gold">{pad.launch_style}</Pill>}
+              {(padMarket || pad?.launch_type === "predict") && <Pill tone="cyan">Predict</Pill>}
             </div>
             <div className="ox-tok-price mt-3">{fmtPrice(priceUsd)}</div>
             <div className="ox-tok-chips mt-3">
@@ -617,6 +626,12 @@ export default function LaunchpadToken() {
               wallet={publicKey?.toBase58() ?? null}
               xHandle={pad?.creator_x}
             />
+          )}
+          {padMarket && (
+            <>
+              <div className="ox-tok-panel"><MarketTicket market={padMarket} /></div>
+              <div className="ox-tok-panel"><ResolverCard market={padMarket} /></div>
+            </>
           )}
           {isStockQuote(pad?.quote_mint || t?.quote_mint || "") && (
             <div className="ox-tok-panel"><p className="lp-legal">{STOCK_LEGAL}</p></div>

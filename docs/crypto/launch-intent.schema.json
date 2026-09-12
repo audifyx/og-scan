@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LaunchIntentV2",
+  "type": "object",
+  "required": ["name", "symbol", "launchType", "quoteMint", "style", "rewards", "graduationDest"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 10 },
+    "uri": { "type": "string" },
+    "launchType": { "enum": ["normal", "vanity", "custom_ca", "rewards", "bagwork", "predict"] },
+    "quoteMint": { "type": "string" },
+    "vanity": {
+      "type": "object",
+      "properties": {
+        "prefix": { "type": "string" },
+        "suffix": { "type": "string" }
+      }
+    },
+    "firstBuyQuoteAmount": { "type": "string" },
+    "graduationDest": { "enum": ["pumpswap", "raydium", "meteora", "none"] },
+    "style": { "enum": ["curve", "delay", "dutch", "batch", "ido_then_curve"] },
+    "delayOpenUnix": { "type": "integer" },
+    "rewards": {
+      "type": "object",
+      "required": ["track"],
+      "properties": {
+        "track": { "enum": ["pump_holder", "epoch_vault", "none"] },
+        "epochSeconds": { "type": "integer" },
+        "lockBoost": { "type": "boolean" },
+        "predictBoost": { "type": "boolean" }
+      }
+    },
+    "market": {
+      "type": "object",
+      "required": ["question", "deadlineUnix", "resolver", "amm"],
+      "properties": {
+        "question": { "type": "string", "maxLength": 140 },
+        "deadlineUnix": { "type": "integer" },
+        "resolver": { "enum": ["pyth", "switchboard", "metric", "mofn", "optimistic"] },
+        "feedId": { "type": "string" },
+        "threshold": { "type": "string" },
+        "amm": { "enum": ["lmsr", "cp", "parimutuel"] },
+        "seedCollateral": { "type": "string" }
+      }
+    }
+  }
+}

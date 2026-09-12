@@ -119,6 +119,7 @@ import BagworkHome from "./pages/bagwork/BagworkHome";
 import BagworkMyWork from "./pages/bagwork/BagworkMyWork";
 import BagworkAdmin from "./pages/bagwork/BagworkAdmin";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
+import LaunchpadParams from "./pages/orbitx/LaunchpadParams";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
 import LaunchpadApiLaunch from "./pages/orbitx/LaunchpadApiLaunch";
@@ -404,6 +405,7 @@ const App = () => (
               <Route path="token/:mint" element={<LaunchpadToken />} />
               <Route path="claim" element={<LaunchpadClaim />} />
               <Route path="claim/:mint" element={<LaunchpadClaim />} />
+              <Route path="params" element={<LaunchpadParams />} />
               <Route path="rescue" element={<LaunchpadRescue />} />
               <Route path="about" element={<LaunchpadAbout />} />
               <Route path="profile" element={<LaunchpadProfile />} />

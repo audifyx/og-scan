@@ -93,6 +93,7 @@ const ROOT_PATHS = new Set([
   "/orbitxlaunch/create/curve",
   "/orbitxlaunch/create/nft",
   "/orbitxlaunch/claim",
+  "/orbitxlaunch/params",
   "/orbitxlaunch/connect-wallet",
   "/orbitxlaunch/rescue",
   "/orbitxlaunch/portfolio",
@@ -111,6 +112,7 @@ function titleFor(pathname: string): string {
   if (pathname === "/orbitxlaunch/create" || pathname === "/orbitxlaunch/create/") return "Launch";
   if (pathname.startsWith("/orbitxlaunch/connect-wallet")) return "Prove wallet";
   if (pathname.startsWith("/orbitxlaunch/claim")) return "Claim";
+  if (pathname.startsWith("/orbitxlaunch/params")) return "Params";
   const flat = TAB_GROUPS.flatMap((g) => g.tabs);
   const hit = flat.find((t) =>
     t.end ? pathname === t.to || pathname === `${t.to}/` : pathname === t.to || pathname.startsWith(`${t.to}/`),
@@ -311,6 +313,7 @@ function LaunchpadFooter() {
         <FooterCol title="Create & claim" links={[
           ["Create coin", "/orbitxlaunch/create"],
           ["Claim fees", "/orbitxlaunch/claim"],
+          ["Params", "/orbitxlaunch/params"],
           ["Rescue", "/orbitxlaunch/rescue"],
           ["Profile", "/orbitxlaunch/profile"],
         ]} />

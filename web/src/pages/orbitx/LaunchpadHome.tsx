@@ -14,7 +14,7 @@ import { Tape } from "@/components/launchpad/Tape";
 import { CURATED_QUOTES } from "@/lib/launchpad/quotes";
 import { launchStats, useMarketMap, fmtCompactUsd, type MarketRow } from "./lpx";
 
-type BoardCategory = "board" | "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist" | "rewards" | "stocks" | "bagwork";
+type BoardCategory = "board" | "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist" | "rewards" | "stocks" | "bagwork" | "predict";
 type ViewMode = "feed" | "columns";
 
 function isGraduated(t: OrbitxToken, markets?: Record<string, MarketRow> | null) {
@@ -74,6 +74,7 @@ const CATEGORIES = [
   { id: "rewards" as const, label: "Rewards", icon: HandCoins },
   { id: "stocks" as const, label: "Stocks", icon: TrendingUp },
   { id: "bagwork" as const, label: "Bagwork", icon: Briefcase },
+  { id: "predict" as const, label: "Predict", icon: Activity },
   { id: "watchlist" as const, label: "Watchlist", icon: Star },
 ];
 
@@ -191,6 +192,9 @@ export default function LaunchpadHome() {
     if (category === "stocks") {
       const stock = new Set(CURATED_QUOTES.filter((q) => q.kind === "stock").map((q) => q.mint));
       return items.filter((t) => t.quote_mint && stock.has(t.quote_mint));
+    }
+    if (category === "predict") {
+      return items.filter((t) => t.pad_mode === "predict");
     }
     return items;
   }, [base, markets, category, watchSet]);
