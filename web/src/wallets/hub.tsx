@@ -17,7 +17,7 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { browserWalletRpcUrl } from "@/lib/solanaRpc";
+import { browserWalletRpcUrl, sendRawWithFallback } from "@/lib/solanaRpc";
 import {
   connectInjectWallet,
   hubWalletFromName,
@@ -193,7 +193,7 @@ export function OrbitxWalletHub({ children }: { children: ReactNode }) {
     const raw = "version" in signed
       ? (signed as VersionedTransaction).serialize()
       : (signed as Transaction).serialize();
-    return normalizeTxSignatureBase58(await conn.sendRawTransaction(raw, {
+    return normalizeTxSignatureBase58(await sendRawWithFallback(raw, conn, {
       skipPreflight: options?.skipPreflight ?? false,
       maxRetries: options?.maxRetries ?? 3,
     }));

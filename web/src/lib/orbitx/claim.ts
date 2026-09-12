@@ -1,20 +1,15 @@
 /**
  * Orbitx creator-fee claims — both lanes, in-app, non-custodial.
  *
- * PUMP LANE — the exact system pump.fun itself uses:
- *   Creator fees accrue in the Pump program's creator-vault PDA
- *   (seeds ["creator-vault", creator]). Claiming runs the Pump program's
- *   `collectCreatorFee` instruction, SIGNED BY THE SAME WALLET THAT CREATED
- *   the coins. One claim collects fees across ALL of the wallet's pump coins
- *   (bonding curve + graduated PumpSwap pools).
- *   PumpPortal /api/trade-local is tried first; on 429 "max usage reached"
- *   (Helius quota) we build the instruction locally and use public Solana RPC.
+ * PUMP LANE — Pump program creator-vault PDA (seeds ["creator-vault", creator]).
+ *   Primary instruction is permissionless `collect_creator_fee_v2` (creator is
+ *   the destination, not a required ix signer). Anyone may pay gas; SOL still
+ *   lands in the registered creator. Built locally — PumpPortal/Helius
+ *   "max usage reached" / "used usage" is never on the hot path.
+ *   Do not mix collect_* with fee-sharing coins (Pump Fees program owner).
  *
- * CUSTOM LANE — same economics, enforced by the Token-2022 transfer-fee
- *   extension: 0.45% of every buy/sell is withheld on-chain. Only the
- *   creator wallet (withdraw-withheld authority) can claim, by signing
- *   WithdrawWithheldTokensFromAccounts / ...FromMint. At claim time OrbitX
- *   skims 1.3% to the admin wallet and the creator keeps 98.7%.
+ * CUSTOM LANE — Token-2022 transfer-fee extension: 0.45% withheld on-chain.
+ *   Only the creator wallet (withdraw-withheld authority) can claim.
  */
 import {
   Connection, PublicKey, Transaction, TransactionInstruction, VersionedTransaction, LAMPORTS_PER_SOL, ComputeBudgetProgram,
@@ -22,17 +17,21 @@ import {
 } from "@solana/web3.js";
 import {
   COLLECT_CREATOR_FEE_DISCRIMINATOR,
-  PUBLIC_SOLANA_RPC,
+  COLLECT_CREATOR_FEE_V2_DISCRIMINATOR,
+  CLAIM_RPC_URLS,
   PUMP_CREATOR_VAULT_SEED,
   PUMP_EVENT_AUTHORITY_SEED,
+  PUMP_FEES_PROGRAM_ID as PUMP_FEES_PROGRAM_ID_STR,
   PUMP_PROGRAM_ID as PUMP_PROGRAM_ID_STR,
   SYSTEM_ACCOUNT_RENT_LAMPORTS,
   isRpcQuotaError,
+  isRpcUnavailableError,
 } from "../../../shared/pump-claim.js";
 import { buildJupiterSwapTransaction, SOL_MINT } from "./rescue";
 import { computeSkim, routedFeeDestination, DEFAULT_FEE_ROUTING, type FeeRoutingConfig } from "./feeRouting";
 import {
-  TOKEN_2022_PROGRAM_ID, unpackMint, unpackAccount, getTransferFeeConfig, getTransferFeeAmount,
+  TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID,
+  unpackMint, unpackAccount, getTransferFeeConfig, getTransferFeeAmount,
   getAssociatedTokenAddressSync, createAssociatedTokenAccountIdempotentInstruction,
   createWithdrawWithheldTokensFromAccountsInstruction, createWithdrawWithheldTokensFromMintInstruction,
 } from "@solana/spl-token";
@@ -40,7 +39,8 @@ import {
 /* ─────────────────────────── Pump lane ─────────────────────────── */
 
 export const PUMP_PROGRAM_ID = new PublicKey(PUMP_PROGRAM_ID_STR);
-export { isRpcQuotaError, SYSTEM_ACCOUNT_RENT_LAMPORTS };
+export const PUMP_FEES_PROGRAM_ID = new PublicKey(PUMP_FEES_PROGRAM_ID_STR);
+export { isRpcQuotaError, isRpcUnavailableError, SYSTEM_ACCOUNT_RENT_LAMPORTS, CLAIM_RPC_URLS };
 
 /** Pump program creator-vault PDA — where pump.fun accrues this wallet's creator fees. */
 export function pumpCreatorVaultPda(creator: PublicKey): PublicKey {
@@ -57,7 +57,7 @@ export function pumpEventAuthorityPda(): PublicKey {
   )[0];
 }
 
-/** Official Pump `collect_creator_fee` — no PumpPortal / Helius required. */
+/** Legacy `collect_creator_fee` — creator MUST sign. Do not send; v2 replaced it. */
 export function buildCollectCreatorFeeInstruction(creator: PublicKey): TransactionInstruction {
   return new TransactionInstruction({
     programId: PUMP_PROGRAM_ID,
@@ -72,27 +72,68 @@ export function buildCollectCreatorFeeInstruction(creator: PublicKey): Transacti
   });
 }
 
-function publicRpcConnection(): Connection {
-  return new Connection(PUBLIC_SOLANA_RPC, "confirmed");
+/**
+ * Permissionless `collect_creator_fee_v2`. Creator is the destination (writable,
+ * not a required ix signer). For SOL-paired coins the program transfers lamports
+ * from the vault and ignores the token accounts.
+ */
+export function buildCollectCreatorFeeV2Instruction(
+  creator: PublicKey,
+  quoteMint: PublicKey = SOL_MINT,
+  quoteTokenProgram: PublicKey = TOKEN_PROGRAM_ID,
+): TransactionInstruction {
+  const vault = pumpCreatorVaultPda(creator);
+  const creatorAta = getAssociatedTokenAddressSync(quoteMint, creator, true, quoteTokenProgram);
+  const vaultAta = getAssociatedTokenAddressSync(quoteMint, vault, true, quoteTokenProgram);
+  return new TransactionInstruction({
+    programId: PUMP_PROGRAM_ID,
+    keys: [
+      { pubkey: creator, isSigner: false, isWritable: true },
+      { pubkey: creatorAta, isSigner: false, isWritable: true },
+      { pubkey: vault, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: quoteMint, isSigner: false, isWritable: false },
+      { pubkey: quoteTokenProgram, isSigner: false, isWritable: false },
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: pumpEventAuthorityPda(), isSigner: false, isWritable: false },
+      { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Uint8Array.from(COLLECT_CREATOR_FEE_V2_DISCRIMINATOR),
+  });
+}
+
+function claimRpcConnections(preferred?: Connection): Connection[] {
+  const tried = new Set<string>();
+  const out: Connection[] = [];
+  if (preferred) {
+    out.push(preferred);
+    if (preferred.rpcEndpoint) tried.add(preferred.rpcEndpoint);
+  }
+  for (const url of CLAIM_RPC_URLS) {
+    if (tried.has(url)) continue;
+    tried.add(url);
+    out.push(new Connection(url, "confirmed"));
+  }
+  return out;
 }
 
 async function withRpcFallback<T>(preferred: Connection | undefined, fn: (conn: Connection) => Promise<T>): Promise<T> {
-  const tried = new Set<string>();
-  const candidates: Connection[] = [];
-  if (preferred) candidates.push(preferred);
-  candidates.push(publicRpcConnection());
   let lastErr: unknown;
-  for (const conn of candidates) {
-    const key = conn.rpcEndpoint;
-    if (tried.has(key)) continue;
-    tried.add(key);
+  for (const conn of claimRpcConnections(preferred)) {
     try {
       return await fn(conn);
     } catch (e) {
       lastErr = e;
+      if (!isRpcUnavailableError(e)) throw e;
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr || "Solana RPC failed"));
+}
+
+/** Latest blockhash from the first working claim RPC (skips exhausted Helius). */
+export async function getClaimBlockhash(connection?: Connection) {
+  return withRpcFallback(connection, (conn) => conn.getLatestBlockhash("confirmed"));
 }
 
 async function vaultClaimableSol(connection: Connection, vault: PublicKey): Promise<number> {
@@ -112,59 +153,47 @@ export async function getPumpClaimableSol(connection: Connection, creator: Publi
   return withRpcFallback(connection, (conn) => vaultClaimableSol(conn, vault));
 }
 
-async function buildPumpClaimViaPumpPortal(creator: PublicKey): Promise<VersionedTransaction> {
-  const res = await fetch("https://pumpportal.fun/api/trade-local", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      publicKey: creator.toBase58(),
-      action: "collectCreatorFee",
-      priorityFee: 0.000001,
-    }),
-    signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
-      ? AbortSignal.timeout(8000)
-      : undefined,
-  });
-  if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    throw new Error(`PumpPortal claim build failed (${res.status}): ${msg || res.statusText}`);
+async function assertNotSharingConfig(connection: Connection | undefined, creator: PublicKey): Promise<void> {
+  try {
+    const info = await withRpcFallback(connection, (conn) => conn.getAccountInfo(creator, "confirmed"));
+    if (info && info.owner.equals(PUMP_FEES_PROGRAM_ID)) {
+      throw new Error(
+        "This wallet's creator fees were migrated to a sharing config. collect_creator_fee cannot drain them.",
+      );
+    }
+  } catch (e) {
+    if (e instanceof Error && /sharing config/i.test(e.message)) throw e;
   }
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  return VersionedTransaction.deserialize(bytes);
 }
 
-/** Local collectCreatorFee + compute budget. Used when PumpPortal/Helius quota is exhausted. */
+/** Local permissionless collect_creator_fee_v2 + compute budget. No PumpPortal / Helius. */
 export async function buildLocalPumpClaimTransaction(
   creator: PublicKey,
   connection?: Connection,
 ): Promise<VersionedTransaction> {
-  const { blockhash } = await withRpcFallback(connection, (conn) => conn.getLatestBlockhash("confirmed"));
+  await assertNotSharingConfig(connection, creator);
+  const { blockhash } = await getClaimBlockhash(connection);
   const message = new TransactionMessage({
     payerKey: creator,
     recentBlockhash: blockhash,
     instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
-      buildCollectCreatorFeeInstruction(creator),
+      buildCollectCreatorFeeV2Instruction(creator),
     ],
   }).compileToV0Message();
   return new VersionedTransaction(message);
 }
 
 /**
- * Build the pump.fun claim transaction. Tries PumpPortal first; on 429
- * "max usage reached" (or any PumpPortal failure) builds collectCreatorFee locally.
+ * Build the pump.fun claim transaction locally via collect_creator_fee_v2.
+ * PumpPortal is skipped — its Helius backend returns "max usage reached".
  */
 export async function buildPumpClaimTransaction(
   creator: PublicKey,
   connection?: Connection,
 ): Promise<VersionedTransaction> {
-  try {
-    return await buildPumpClaimViaPumpPortal(creator);
-  } catch (e) {
-    console.warn("[claim] PumpPortal unavailable, building collectCreatorFee locally", e);
-    return buildLocalPumpClaimTransaction(creator, connection);
-  }
+  return buildLocalPumpClaimTransaction(creator, connection);
 }
 
 /* ─────────────────────────── Custom lane ─────────────────────────── */
@@ -188,7 +217,7 @@ export interface CustomClaimable {
 /** Scan a custom token's accrued (unclaimed) 0.45% trading fees. */
 export async function getCustomClaimable(connection: Connection, mintAddr: string): Promise<CustomClaimable> {
   const mint = new PublicKey(mintAddr);
-  const mintInfo = await connection.getAccountInfo(mint, "confirmed");
+  const mintInfo = await withRpcFallback(connection, (conn) => conn.getAccountInfo(mint, "confirmed"));
   if (!mintInfo) throw new Error("Mint not found on-chain");
   const parsedMint = unpackMint(mint, mintInfo, TOKEN_2022_PROGRAM_ID);
   const feeCfg = getTransferFeeConfig(parsedMint);
@@ -199,10 +228,10 @@ export async function getCustomClaimable(connection: Connection, mintAddr: strin
   const feeBps = feeCfg.newerTransferFee.transferFeeBasisPoints;
 
   // All token accounts for this mint that carry withheld fees.
-  const accounts = await connection.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
+  const accounts = await withRpcFallback(connection, (conn) => conn.getProgramAccounts(TOKEN_2022_PROGRAM_ID, {
     commitment: "confirmed",
     filters: [{ memcmp: { offset: 0, bytes: mint.toBase58() } }],
-  });
+  }));
   const feeAccounts: PublicKey[] = [];
   let accountsWithheldRaw = BigInt(0);
   for (const { pubkey, account } of accounts) {

@@ -1,5 +1,5 @@
 import { send, callFn, readBody } from "../_lib.js";
-import { isRpcQuotaError, PUBLIC_SOLANA_RPC } from "../../../shared/pump-claim.js";
+import { isRpcQuotaError, isRpcUnavailableError, jsonRpcWithFallback } from "../../../shared/pump-claim.js";
 
 /** Allowlisted Solana RPC methods — blocks expensive/unbounded proxy abuse. */
 const ALLOWED = new Set([
@@ -29,31 +29,15 @@ const ALLOWED = new Set([
  * POST /api/ogdex/rpc — Solana JSON-RPC proxy.
  * Forwards to OG Scan's Helius-backed Supabase rpc-proxy so the browser never
  * sees an API key. Method allowlist + batch size cap reduce cost abuse.
- * When Helius returns 429 "max usage reached", retry public mainnet so
- * launchpad claim / sendTransaction keep working.
+ * When Helius returns 429 "max usage reached" / "used usage", hop to public
+ * RPCs that can still send (PublicNode / Ankr / dRPC) so claim stays live.
  */
-async function publicJsonRpc(b) {
-  const r = await fetch(PUBLIC_SOLANA_RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: b.id ?? 1,
-      method: b.method,
-      params: b.params || [],
-    }),
-    signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
-      ? AbortSignal.timeout(12_000)
-      : undefined,
-  });
-  return r.json();
-}
-
 function proxyNeedsPublicFallback(r) {
   if (!r) return true;
-  if (isRpcQuotaError(r)) return true;
-  if (r.data && isRpcQuotaError(r.data)) return true;
-  if (r.error && isRpcQuotaError(r.error)) return true;
+  if (isRpcUnavailableError(r) || isRpcQuotaError(r)) return true;
+  if (r.data && (isRpcUnavailableError(r.data) || isRpcQuotaError(r.data))) return true;
+  if (r.error && (isRpcUnavailableError(r.error) || isRpcQuotaError(r.error))) return true;
+  if (r.raw && (isRpcUnavailableError(r.raw) || isRpcQuotaError(r.raw))) return true;
   return false;
 }
 
@@ -77,10 +61,10 @@ export default async function handler(req, res) {
         method: b.method, params: b.params || [], id: b.id ?? 1, provider: "helius",
       });
       const data = r && r.success ? r.data : null;
-      if (data && !(data.error && isRpcQuotaError(data.error))) return data;
-      if (proxyNeedsPublicFallback(r) || (data && data.error && isRpcQuotaError(data.error))) {
+      if (data && !(data.error && (isRpcUnavailableError(data.error) || isRpcQuotaError(data.error)))) return data;
+      if (proxyNeedsPublicFallback(r) || (data && data.error && (isRpcUnavailableError(data.error) || isRpcQuotaError(data.error)))) {
         try {
-          return await publicJsonRpc(b);
+          return await jsonRpcWithFallback(b);
         } catch {
           /* fall through to proxy error */
         }
@@ -88,9 +72,9 @@ export default async function handler(req, res) {
       if (data) return data;
       return { jsonrpc: "2.0", id: b.id ?? 1, error: { code: -32603, message: r?.error || r?.raw || "rpc proxy error" } };
     } catch (e) {
-      if (isRpcQuotaError(e)) {
+      if (isRpcUnavailableError(e) || isRpcQuotaError(e)) {
         try {
-          return await publicJsonRpc(b);
+          return await jsonRpcWithFallback(b);
         } catch {
           /* keep original */
         }
