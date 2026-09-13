@@ -190,9 +190,9 @@ og-scan/
 ```bash
 git clone https://github.com/audifyx/og-scan
 cd og-scan/web
-npm install
+pnpm install
 cp ../.env.example .env   # fill in your keys
-npm run dev
+pnpm dev
 ```
 
 ---
