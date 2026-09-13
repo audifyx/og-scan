@@ -5,7 +5,7 @@ import {
   presenceStatus,
   PRESENCE_AWAY_MS,
   PRESENCE_ONLINE_MS,
-} from "../../api/orbitx/owner-command.js";
+} from "../../api/orbitx/_handlers/_owner-command.js";
 
 describe("owner command presence rules", () => {
   it("marks online / away / offline from heartbeat age", () => {

@@ -157,7 +157,7 @@ export async function isNameTaken(name: string): Promise<boolean> {
 
     // 4. Check OG Scanner API
     try {
-      const ogRes = await fetch(`/api/ogdex/_routes/search.js?q=${encodeURIComponent(trimmed)}`);
+      const ogRes = await fetch(`/api/ogdex/_routes/_search.js?q=${encodeURIComponent(trimmed)}`);
       if (ogRes.ok) {
         const ogData = await ogRes.json();
         if (Array.isArray(ogData) && ogData.some((t: any) => t.name?.toLowerCase() === trimmed)) {

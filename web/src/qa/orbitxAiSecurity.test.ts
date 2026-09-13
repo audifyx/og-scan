@@ -11,7 +11,7 @@ describe("OrbitX AI security guards", () => {
   );
 
   it("uses a JavaScript-safe server runtime entry", () => {
-    expect(api).toContain('from "./orbitx/ai-runtime.js"');
+    expect(api).toContain('from "./orbitx/_handlers/ai-runtime.js"');
     expect(api).not.toContain('from "./orbitx/world/_lib"');
   });
 

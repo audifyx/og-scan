@@ -39,12 +39,12 @@ import {
   runCronTick,
   processAutoReplies,
   patchXAgent,
-} from "./orbitx/x-agent-lib.js";
+} from "./orbitx/_handlers/_x-agent-lib.js";
 import {
   buildXAuthPasteMessages,
   wrapMcpToolContent,
   xMenuPayload,
-} from "./orbitx/mcp-brand.js";
+} from "./orbitx/_handlers/_mcp-brand.js";
 import {
   accessBuyPrompt,
   confirmAccessBurn,
@@ -52,22 +52,22 @@ import {
   listPackages,
   prepareAccessBurn,
   prepareAccessMcpPurchase,
-} from "./orbitx/mcp-burn-access.js";
-import { decorateAccessStatus } from "./orbitx/mcp-open-window.js";
+} from "./orbitx/_handlers/_mcp-burn-access.js";
+import { decorateAccessStatus } from "./orbitx/_handlers/_mcp-open-window.js";
 import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
   prepareBuyOrbitx,
   saveTradeIntent,
   loadLatestTradeIntent,
-} from "./orbitx/buy-orbitx.js";
+} from "./orbitx/_handlers/_buy-orbitx.js";
 import {
   buildXGeneratedTools,
   dispatchXGenerated,
   listXGeneratedHelp,
   xGeneratedStats,
-} from "./orbitx/x-mcp-tools-catalog.js";
-import { buildDexChartEmbed } from "./orbitx/dex-chart-embed.js";
+} from "./orbitx/_handlers/_x-mcp-tools-catalog.js";
+import { buildDexChartEmbed } from "./orbitx/_handlers/_dex-chart-embed.js";
 import {
   DEFAULT_GITHUB_REPO,
   loadLinkedRepo,
@@ -80,11 +80,11 @@ import {
   listRepoResources,
   parseRepoResourceUri,
   parseGithubRepo,
-} from "./orbitx/x-github-repo.js";
+} from "./orbitx/_handlers/_x-github-repo.js";
 
 /** Lazy — x-credits must not load at cold start (Solana deps can 500 the whole MCP). */
 async function xCredits() {
-  return import("./orbitx/x-credits.js");
+  return import("./orbitx/_handlers/_x-credits.js");
 }
 
 const CREDITS_PER_SOL = 10_000;
@@ -4516,7 +4516,7 @@ async function handleMcp(req, res, parts) {
             : args;
         const result = await callTool(name, toolArgs, auth || { userId: null, authCode }, req);
         if (auth?.userId) {
-          void import("./orbitx/mcp-telegram-push.js")
+          void import("./orbitx/_handlers/_mcp-telegram-push.js")
             .then((mod) =>
               mod.pushMcpResultToTelegram({
                 userId: auth.userId,

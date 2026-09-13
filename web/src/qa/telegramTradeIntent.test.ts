@@ -4,13 +4,13 @@ import {
   parseSolAmount,
   parseTradeIntent,
   parseUsdAmount,
-} from "../../api/orbitx/telegram-trade-intent.js";
+} from "../../api/orbitx/_handlers/_telegram-trade-intent.js";
 import {
   inferPublicTool,
   isPrivilegedTelegramTool,
   parseCallInvocation,
   resolveOfficialCommand,
-} from "../../api/orbitx/telegram-orbitx-lib.js";
+} from "../../api/orbitx/_handlers/_telegram-orbitx-lib.js";
 import { hasEmbeddedAgentTool, listAllOrbitXTools, resolveOrbitXToolName } from "../../api/orbitx-hub.js";
 
 const ORBITX = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";

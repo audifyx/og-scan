@@ -31,7 +31,7 @@ describe("admin /calls desk", () => {
     expect(page).not.toContain("bot_token:");
     const api = readFileSync(resolve(root, "api/orbitx-calls.js"), "utf8");
     expect(api).toContain("apply_schema");
-    const schema = readFileSync(resolve(root, "api/orbitx/calls-schema.js"), "utf8");
+    const schema = readFileSync(resolve(root, "api/orbitx/_handlers/_calls-schema.js"), "utf8");
     expect(schema).toContain("ox_calls_desk");
     expect(schema).toContain("ox_calls_ledger");
   });

@@ -67,8 +67,36 @@
       "destination": "/api/x-mcp?path=agent"
     },
     {
+      "source": "/api/og-memes",
+      "destination": "/api/web?path=og-memes"
+    },
+    {
+      "source": "/api/admin-tokens",
+      "destination": "/api/web?path=admin-tokens"
+    },
+    {
+      "source": "/api/signup-check",
+      "destination": "/api/web?path=signup-check"
+    },
+    {
+      "source": "/api/bagwork",
+      "destination": "/api/web?path=bagwork"
+    },
+    {
+      "source": "/api/pump-create",
+      "destination": "/api/web?path=pump-create"
+    },
+    {
       "source": "/api/orbitx-world/(.*)",
-      "destination": "/api/orbitx-world?path=$1"
+      "destination": "/api/web?path=orbitx-world/$1"
+    },
+    {
+      "source": "/api/orbitx-world",
+      "destination": "/api/web?path=orbitx-world"
+    },
+    {
+      "source": "/api/kol/(.*)",
+      "destination": "/api/web?path=kol/$1"
     },
     {
       "source": "/api/orbitx-agent/(.*)",
@@ -88,11 +116,27 @@
     },
     {
       "source": "/api/orbitx/anti-vamp-check",
-      "destination": "/api/orbitx-anti-vamp-check"
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/orbitx/delegated-wallet",
-      "destination": "/api/orbitx-delegated-wallet"
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-desk-unlock",
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-calls",
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-tx-report",
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-onchain",
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/orbitx/(.*)",
@@ -104,11 +148,11 @@
     },
     {
       "source": "/api/on-chain/(.*)",
-      "destination": "/api/on-chain?path=$1"
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/on-chain",
-      "destination": "/api/on-chain"
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/ogdex/(.*)",
@@ -379,47 +423,14 @@
     "api/orbitx-hub.js": {
       "maxDuration": 120
     },
-    "api/orbitx-ai.js": {
-      "maxDuration": 120
-    },
     "api/x-mcp.js": {
       "maxDuration": 60
-    },
-    "api/telegram-mcp.js": {
-      "maxDuration": 120
-    },
-    "api/telegram-bot-hook.js": {
-      "maxDuration": 120
-    },
-    "api/telegram-orbitx.js": {
-      "maxDuration": 120
     },
     "api/ogdex.js": {
       "maxDuration": 60
     },
     "api/orbitx-onchain.js": {
       "maxDuration": 60
-    },
-    "api/on-chain.js": {
-      "maxDuration": 60
-    },
-    "api/live-agents.js": {
-      "maxDuration": 90
-    },
-    "api/orbitx-calls.js": {
-      "maxDuration": 90
-    },
-    "api/agent-calls.js": {
-      "maxDuration": 30
-    },
-    "api/mcp-life-tick.js": {
-      "maxDuration": 90
-    },
-    "api/**/*.js": {
-      "maxDuration": 30
-    },
-    "api/kol.ts": {
-      "maxDuration": 30
     },
     "api/auth-login.ts": {
       "maxDuration": 25
