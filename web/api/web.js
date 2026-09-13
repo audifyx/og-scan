@@ -21,10 +21,10 @@ function pausedFeature(req, res) {
 
 const ROUTES = {
   "og-memes": ogMemes,
-  "admin-tokens": adminTokens,
+  "admin-tokens": pausedFeature,
   "signup-check": signupCheck,
-  bagwork,
-  "pump-create": pumpCreate,
+  bagwork: pausedFeature,
+  "pump-create": pausedFeature,
   "orbitx-world": orbitxWorld,
   kol,
   paused: pausedFeature,
