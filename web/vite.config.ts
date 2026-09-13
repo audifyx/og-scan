@@ -52,6 +52,10 @@ export default defineConfig(({ mode }) => {
   const supabaseUrl = env.VITE_SUPABASE_URL || env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
 
   return {
+  define: {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
+    "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.REACT_APP_SUPABASE_ANON_KEY || ""),
+  },
   server: {
     host: "::",
     port: 8080,

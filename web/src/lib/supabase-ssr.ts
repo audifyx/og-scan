@@ -19,7 +19,6 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { CookieAuthStorageAdapter } from "@supabase/ssr";
 
 const env = import.meta.env as Record<string, string | undefined>;
 const SUPABASE_URL = env.VITE_SUPABASE_URL || env.REACT_APP_SUPABASE_URL || "";
@@ -46,11 +45,8 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 export const supabase = createClient(SAFE_URL, SAFE_ANON, {
   auth: {
-    // Use cookie-based storage (httpOnly safe)
-    storage: new CookieAuthStorageAdapter({
-      isServer: false, // browser mode
-    }),
-    storageKey: `sb-${SAFE_URL.split("//")[1]?.split(".")[0]}-auth-token`,
+    storage: localStorage,
+    storageKey: "sol-tools-auth",
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
@@ -106,7 +102,7 @@ export async function signUpWithEmail(
     password,
     options: {
       data: metadata,
-      emailRedirectTo: `${window.location.origin}/verify-email`,
+      emailRedirectTo: `${window.location.origin}/auth/email?mode=update`,
     },
   });
   if (error) throw error;
