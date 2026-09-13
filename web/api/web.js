@@ -19,10 +19,10 @@ function pausedFeature(req, res) {
 }
 
 const ROUTES = {
-  "admin-tokens": pausedFeature,
+  "admin-tokens": adminTokens,
   "signup-check": signupCheck,
-  bagwork: pausedFeature,
-  "pump-create": pausedFeature,
+  bagwork,
+  "pump-create": pumpCreate,
   "orbitx-world": orbitxWorld,
   kol,
   paused: pausedFeature,

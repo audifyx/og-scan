@@ -12,7 +12,7 @@ import {
   isExemptEmailInList,
   isExemptWalletInList,
   walletFromSiwsEmail,
-} from "../../shared/token-gate-exempt.js";
+} from "../../../shared/token-gate-exempt.js";
 
 export const AGENT_HOLD_MINT =
   process.env.AGENT_GATE_MINT || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
