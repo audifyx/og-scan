@@ -432,9 +432,6 @@
     "api/orbitx-onchain.js": {
       "maxDuration": 60
     },
-    "api/**/*.js": {
-      "maxDuration": 30
-    },
     "api/auth-login.ts": {
       "maxDuration": 25
     },
