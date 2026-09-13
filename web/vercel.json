@@ -407,20 +407,8 @@
     "api/orbitx-hub.js": {
       "maxDuration": 120
     },
-    "api/orbitx-ai.js": {
-      "maxDuration": 120
-    },
     "api/x-mcp.js": {
       "maxDuration": 60
-    },
-    "api/telegram-mcp.js": {
-      "maxDuration": 120
-    },
-    "api/telegram-bot-hook.js": {
-      "maxDuration": 120
-    },
-    "api/telegram-orbitx.js": {
-      "maxDuration": 120
     },
     "api/ogdex.js": {
       "maxDuration": 60
@@ -428,25 +416,7 @@
     "api/orbitx-onchain.js": {
       "maxDuration": 60
     },
-    "api/on-chain.js": {
-      "maxDuration": 60
-    },
-    "api/live-agents.js": {
-      "maxDuration": 90
-    },
-    "api/orbitx-calls.js": {
-      "maxDuration": 90
-    },
-    "api/agent-calls.js": {
-      "maxDuration": 30
-    },
-    "api/mcp-life-tick.js": {
-      "maxDuration": 90
-    },
     "api/**/*.js": {
-      "maxDuration": 30
-    },
-    "api/kol.ts": {
       "maxDuration": 30
     },
     "api/auth-login.ts": {
