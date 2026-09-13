@@ -447,19 +447,19 @@
     },
     {
       "path": "/api/on-chain?path=ingest&force=1",
-      "schedule": "* * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/mcp-life-tick",
-      "schedule": "0 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/live-agents?path=tick",
-      "schedule": "* * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/orbitx-calls?path=tick",
-      "schedule": "* * * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }
