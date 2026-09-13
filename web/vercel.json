@@ -67,10 +67,6 @@
       "destination": "/api/x-mcp?path=agent"
     },
     {
-      "source": "/api/og-memes",
-      "destination": "/api/web?path=og-memes"
-    },
-    {
       "source": "/api/admin-tokens",
       "destination": "/api/web?path=admin-tokens"
     },

@@ -1,4 +1,3 @@
-import ogMemes from "./_og-memes.ts";
 import adminTokens from "./_admin-tokens.ts";
 import signupCheck from "./_signup-check.ts";
 import bagwork from "./_bagwork.ts";
@@ -20,7 +19,6 @@ function pausedFeature(req, res) {
 }
 
 const ROUTES = {
-  "og-memes": ogMemes,
   "admin-tokens": pausedFeature,
   "signup-check": signupCheck,
   bagwork: pausedFeature,
