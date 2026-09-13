@@ -2,7 +2,7 @@
  * Natural-language trade / shop / launch intents for the official Telegram bot.
  * Resolves names like "orbitx_trade" to live hub tools. Does not custody keys.
  */
-import { ORBITX_MINT } from "./buy-orbitx.js";
+import { ORBITX_MINT } from "./_buy-orbitx.js";
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 

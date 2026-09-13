@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMcpPushText, shouldPushMcpToTelegram } from "./mcp-telegram-push.js";
+import { formatMcpPushText, shouldPushMcpToTelegram } from "./_mcp-telegram-push.js";
 
 describe("MCP → Telegram push", () => {
   it("skips Telegram-originated and noisy tools", () => {

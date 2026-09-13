@@ -7,8 +7,8 @@ import {
   parseSolanaTxSignature,
   remainingMs,
   resolvePackage,
-} from "./mcp-burn-access.js";
-import { isMcpOpenTesting, mcpOpenWindow } from "./mcp-open-window.js";
+} from "./_mcp-burn-access.js";
+import { isMcpOpenTesting, mcpOpenWindow } from "./_mcp-open-window.js";
 
 /** Secret supporter code. Never print this (or the spaced display form) in Telegram copy. */
 export const ORBITX_BETA_CODE = "ORBITXBETA";

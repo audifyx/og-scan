@@ -1,7 +1,7 @@
 /**
  * Shared Telegram payload helpers — no menus, no hub imports.
  */
-import { hasMarketSnapshot, hasTokenIdentity, hydrateKnownMint } from "./telegram-token-snapshot.js";
+import { hasMarketSnapshot, hasTokenIdentity, hydrateKnownMint } from "./_telegram-token-snapshot.js";
 
 export const CA_RE = /(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})/;
 

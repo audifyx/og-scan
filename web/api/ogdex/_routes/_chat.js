@@ -1,7 +1,7 @@
 import { callFn, send, readBody, INTEL_FN } from "../_lib.js";
-import tokenHandler from "./token.js";
-import forensicsHandler from "./forensics.js";
-import athHandler from "./ath.js";
+import tokenHandler from "./_token.js";
+import forensicsHandler from "./_forensics.js";
+import athHandler from "./_ath.js";
 
 // Capture a route handler's JSON output without an HTTP round-trip.
 function capture(handler, url) {

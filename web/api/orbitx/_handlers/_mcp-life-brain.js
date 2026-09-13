@@ -285,7 +285,7 @@ export async function thinkAsAgent(agent, { userText, context, maxTokens = 280, 
   };
 
   try {
-    const { nvidiaChat } = await import("./x-agent-lib.js");
+    const { nvidiaChat } = await import("./_x-agent-lib.js");
     const nim = await withTimeout(
       nvidiaChat({
         system,

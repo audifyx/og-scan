@@ -5,7 +5,7 @@ import {
   maybeRelayGroupChat,
   resolveGcNaturalTool,
   slugifyGcName,
-} from "./mcp-group-chat.js";
+} from "./_mcp-group-chat.js";
 
 function parsePath(path) {
   const [tablePart, query = ""] = String(path).split("?");

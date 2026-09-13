@@ -6,8 +6,8 @@
  * GET /api/mcp-life?view=file&slug=nova&path=/memory.md
  * GET /api/mcp-life?view=help
  */
-import { getLifeAgent, latestLifeReport, lifeDiary, listLifeAgents } from "./orbitx/_handlers/mcp-life-agents.js";
-import { agentDesk, agentFile, agentSite, worldSnapshot, MCP_HEADLINES } from "./orbitx/_handlers/mcp-life-world.js";
+import { getLifeAgent, latestLifeReport, lifeDiary, listLifeAgents } from "./orbitx/_handlers/_mcp-life-agents.js";
+import { agentDesk, agentFile, agentSite, worldSnapshot, MCP_HEADLINES } from "./orbitx/_handlers/_mcp-life-world.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";

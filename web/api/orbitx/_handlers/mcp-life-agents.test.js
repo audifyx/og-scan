@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildPersona, inferGender, inferRole, inferSources, slugifyLifeName } from "./mcp-life-persona.js";
-import { scoreCoin } from "./mcp-life-scan.js";
-import { dispatchLifeTool, resolveLifeNaturalTool } from "./mcp-life-agents.js";
+import { buildPersona, inferGender, inferRole, inferSources, slugifyLifeName } from "./_mcp-life-persona.js";
+import { scoreCoin } from "./_mcp-life-scan.js";
+import { dispatchLifeTool, resolveLifeNaturalTool } from "./_mcp-life-agents.js";
 
 function parsePath(path) {
   const [table, query = ""] = String(path).split("?");

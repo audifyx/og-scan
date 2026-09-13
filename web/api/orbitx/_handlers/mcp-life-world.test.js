@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAgentWill } from "./mcp-life-city.js";
+import { parseAgentWill } from "./_mcp-life-city.js";
 import {
   cityShift,
   escapeHtml,
@@ -8,7 +8,7 @@ import {
   sanitizeAgentHtml,
   templateAgentSite,
   worldSnapshot,
-} from "./mcp-life-world.js";
+} from "./_mcp-life-world.js";
 
 function mockSb(db) {
   return async (path) => {

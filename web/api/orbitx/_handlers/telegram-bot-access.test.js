@@ -13,7 +13,7 @@ import {
   resolveBurnPackageFromText,
   telegramDmUnlockState,
   resetTelegramBotSession,
-} from "./telegram-bot-access.js";
+} from "./_telegram-bot-access.js";
 
 describe("early access codes", () => {
   it("normalizes and accepts 4–24 alphanumeric codes", () => {

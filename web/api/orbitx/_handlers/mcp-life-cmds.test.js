@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildLifeCmdTools, dispatchLifeCmd, lifeCmdStats, LIFE_CMD_META } from "./mcp-life-cmds.js";
-import { lifeHandleFromSlug } from "./mcp-life-social.js";
+import { buildLifeCmdTools, dispatchLifeCmd, lifeCmdStats, LIFE_CMD_META } from "./_mcp-life-cmds.js";
+import { lifeHandleFromSlug } from "./_mcp-life-social.js";
 
 describe("life cmd catalog", () => {
   it("exposes exactly 300 unique tools with dispatch meta", () => {

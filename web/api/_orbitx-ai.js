@@ -14,16 +14,16 @@ import {
   json,
   memoryRateLimit,
   requireUser,
-} from "./orbitx/_handlers/ai-runtime.js";
+} from "./orbitx/_handlers/_ai-runtime.js";
 import {
   hasEmbeddedAgentTool,
   listEmbeddedAgentTools,
   getEmbeddedTradePreference,
   runEmbeddedAgentTool,
 } from "./orbitx-hub.js";
-import { verifyTokenHold } from "./orbitx/_handlers/token-hold.js";
-import { statusFromRow } from "./orbitx/_handlers/mcp-burn-access.js";
-import { decorateAccessStatus, isMcpOpenTesting } from "./orbitx/_handlers/mcp-open-window.js";
+import { verifyTokenHold } from "./orbitx/_handlers/_token-hold.js";
+import { statusFromRow } from "./orbitx/_handlers/_mcp-burn-access.js";
+import { decorateAccessStatus, isMcpOpenTesting } from "./orbitx/_handlers/_mcp-open-window.js";
 import {
   DEFAULT_NIM_MODEL,
   NIM_MODELS,
@@ -31,7 +31,7 @@ import {
   isNvidiaRateLimit,
   isRetiredNimError,
   resolveNimModel,
-} from "./orbitx/_handlers/x-agent-lib.js";
+} from "./orbitx/_handlers/_x-agent-lib.js";
 
 export const config = { maxDuration: 120 };
 

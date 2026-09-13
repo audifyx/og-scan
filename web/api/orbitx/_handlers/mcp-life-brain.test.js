@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { thinkAsAgent, deskVoice, looksLikePromptEcho, parseHourVoice, spokenLine, stripPromptLeak } from "./mcp-life-brain.js";
+import { thinkAsAgent, deskVoice, looksLikePromptEcho, parseHourVoice, spokenLine, stripPromptLeak } from "./_mcp-life-brain.js";
 
 const jax = { id: "jax", slug: "jax", name: "Jax", role: "X scout", mood: "gleeful", voice: "warm", day_of_life: 1, rank: "rookie" };
 const nova = { id: "nova", slug: "nova", name: "Nova", role: "Whale Watcher", mood: "focused", voice: "stoic", day_of_life: 3 };

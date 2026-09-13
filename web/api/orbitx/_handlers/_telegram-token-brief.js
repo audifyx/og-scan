@@ -65,7 +65,7 @@ function dexLinks(pair) {
 async function redditSearch(query) {
   const q = encodeURIComponent(String(query || "").trim());
   if (!q) return [];
-  const d = await jsonGet(`https://www.reddit.com/search.json?q=${q}&sort=new&limit=12&type=link`, { timeoutMs: 4500 });
+  const d = await jsonGet(`https://www.reddit.com/_search.json?q=${q}&sort=new&limit=12&type=link`, { timeoutMs: 4500 });
   const children = d?.data?.children;
   if (!Array.isArray(children)) return [];
   return children.slice(0, 8).map((c) => ({

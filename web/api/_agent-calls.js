@@ -2,8 +2,8 @@
  * Public agent-calls board.
  * GET /api/agent-calls  — live desk tape + call ledger, no admin, no secrets.
  */
-import { snapshotLiveDesk } from "./orbitx/_handlers/live-agent-engine.js";
-import { snapshotCallsDesk } from "./orbitx/_handlers/calls-engine.js";
+import { snapshotLiveDesk } from "./orbitx/_handlers/_live-agent-engine.js";
+import { snapshotCallsDesk } from "./orbitx/_handlers/_calls-engine.js";
 import { publicAgentCallsBoard } from "../shared/orbitx-calls-desk.js";
 
 export const config = { maxDuration: 30 };

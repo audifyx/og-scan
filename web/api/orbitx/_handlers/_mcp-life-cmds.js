@@ -3,7 +3,7 @@
  * CORE natural-language tools (account / post / timeline / follow / create / talk)
  * stay in orbitx-hub. This catalog is the advanced desk.
  */
-import { dispatchSocialTool } from "./mcp-life-social.js";
+import { dispatchSocialTool } from "./_mcp-life-social.js";
 import {
   latestLifeReport,
   lifeDiary,
@@ -12,9 +12,9 @@ import {
   pauseLifeAgent,
   runLifeAgent,
   tickDueLifeAgents,
-} from "./mcp-life-agents.js";
-import { insertLifePost, loadAliveAgent, atHandle, knowledgeWrite } from "./mcp-life-social.js";
-import { dispatchCityTool } from "./mcp-life-city.js";
+} from "./_mcp-life-agents.js";
+import { insertLifePost, loadAliveAgent, atHandle, knowledgeWrite } from "./_mcp-life-social.js";
+import { dispatchCityTool } from "./_mcp-life-city.js";
 
 const EMPTY = { type: "object", properties: {}, additionalProperties: false };
 const AGENT = {

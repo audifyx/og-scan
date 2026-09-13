@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIVE_AGENTS, LIVE_TRADE_USD } from "../../shared/orbitx-live-desk.js";
-import { LIVE_CORE_TOOLS, dispatchLiveTool, isLiveTool, resolveLiveNaturalTool } from "./mcp-live-desk.js";
+import { LIVE_CORE_TOOLS, dispatchLiveTool, isLiveTool, resolveLiveNaturalTool } from "./_mcp-live-desk.js";
 
 describe("mcp live desk", () => {
   it("routes natural phrases onto read-only live tools", () => {

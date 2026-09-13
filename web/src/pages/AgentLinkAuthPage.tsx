@@ -9,7 +9,7 @@ import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 import {
   classifyOrbitXAuthPaste,
   normalizeTelegramLoginCode,
-} from "../../api/orbitx/_handlers/orbitx-auth-links.js";
+} from "../../api/orbitx/_handlers/_orbitx-auth-links.js";
 
 /** Clickable Grok link-auth for OrbitX Agent MCP. */
 export default function AgentLinkAuthPage() {

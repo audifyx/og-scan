@@ -2,7 +2,7 @@
  * Agent MCP ↔ X (Twitter) using the same profiles.twitter_* tokens as /x and X MCP.
  * Connect via OrbitX X OAuth (Supabase /auth Continue with X, or /x Connect X).
  */
-import { postTweetOAuth2, buildTweetText as libBuildTweetText } from "./x-agent-lib.js";
+import { postTweetOAuth2, buildTweetText as libBuildTweetText } from "./_x-agent-lib.js";
 
 const HOST = "https://www.orbitx.world";
 

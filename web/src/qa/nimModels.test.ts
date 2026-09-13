@@ -12,7 +12,7 @@ import {
   nvidiaChat,
   publicNvidiaMessage,
   resolveNimModel,
-} from "../../api/orbitx/_handlers/x-agent-lib.js";
+} from "../../api/orbitx/_handlers/_x-agent-lib.js";
 
 const RETIRED_8B = "meta/llama-3.1-8b-instruct";
 const EOL_BODY = JSON.stringify({
@@ -143,7 +143,7 @@ describe("NVIDIA NIM catalog after Llama 3.1 8B EOL", () => {
 
 describe("live catalogs must not still select Llama 3.1 8B", () => {
   const roots = [
-    resolve(__dirname, "../../api/orbitx/_handlers/orbitx-telegram-knowledge.js"),
+    resolve(__dirname, "../../api/orbitx/_handlers/_orbitx-telegram-knowledge.js"),
     resolve(__dirname, "../../api/telegram-mcp.js"),
     resolve(__dirname, "../pages/Settings.tsx"),
     resolve(__dirname, "../../../supabase/functions/_shared/models.ts"),

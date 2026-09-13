@@ -76,7 +76,7 @@ async function pumpCoin(mint) {
 async function redditSearch(query) {
   try {
     const q = encodeURIComponent(query);
-    const r = await fetch(`https://www.reddit.com/search.json?q=${q}&sort=new&limit=50&type=link`, {
+    const r = await fetch(`https://www.reddit.com/_search.json?q=${q}&sort=new&limit=50&type=link`, {
       headers: { Accept: "application/json", "User-Agent": "OGScan-Research/1.0" },
     });
     if (!r.ok) return [];

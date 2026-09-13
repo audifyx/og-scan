@@ -7,7 +7,7 @@ const TEXT = `# OrbitX DEX
 > Free public REST API for Solana (and multi-chain) memecoin intelligence: token discovery, full on-chain token intel, dev & early-buyer forensics, snipers/bundlers risk X-ray, holders/whales/KOLs, wallet portfolio + PnL, charts, all-time-high, price alerts, and a per-coin AI you can chat with. No API key required. Be reasonable with volume (per-IP rate limits apply). Most endpoints are JSON and edge-cached.
 
 Base URL: ${BASE}
-OpenAPI 3.1 spec (import this into ChatGPT/Claude Actions, Postman, or any codegen for every endpoint at once): ${BASE}/openapi.json
+OpenAPI 3.1 spec (import this into ChatGPT/Claude Actions, Postman, or any codegen for every endpoint at once): ${BASE}/_openapi.json
 Brand: https://www.orbitx.world  ·  Token page pattern: https://www.orbitx.world/ORBITX_DEX/token/{mint}  ·  Wallet page: https://www.orbitx.world/ORBITX_DEX/wallet/{address}
 
 ## Conventions
@@ -58,7 +58,7 @@ Brand: https://www.orbitx.world  ·  Token page pattern: https://www.orbitx.worl
 ## Notes for agents / MCP
 - Ready-made MCP: GET ${BASE.replace("/api/ogdex","")}/api/mcp or GET ${BASE}/mcp for the tool manifest; POST the same URL with { "tool", "params" } to execute.
 - When the host sets ORBITX_DEX_API_KEYS, POST execute requires Authorization: Bearer <key> or x-ogdex-key. GET manifest stays public.
-- Or import ${BASE}/openapi.json into an OpenAPI→MCP bridge (openapi-mcp, Claude Actions, custom GPTs).
+- Or import ${BASE}/_openapi.json into an OpenAPI→MCP bridge (openapi-mcp, Claude Actions, custom GPTs).
 - Prefer /token for a single coin overview, /xray for risk (+ bubble-map inputs), /forensics for dev origin, /wallet + /swaps for a trader, /screener + /signals for discovery.
 - Endpoints are cached; do not poll faster than a few seconds. Heavy traces (/xray, /forensics) are immutable and cached for ~24h.
 `;

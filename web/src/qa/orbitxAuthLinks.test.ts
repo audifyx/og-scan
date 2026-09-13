@@ -6,7 +6,7 @@ import {
   isTelegramLoginPaste,
   TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
   telegramLoginUrl,
-} from "../../api/orbitx/_handlers/orbitx-auth-links.js";
+} from "../../api/orbitx/_handlers/_orbitx-auth-links.js";
 
 describe("OrbitX auth paste classifier", () => {
   it("reads Telegram /login links that Telegram Desktop or a PC paste might mangle", () => {

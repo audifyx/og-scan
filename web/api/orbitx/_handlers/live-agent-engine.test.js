@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIVE_AGENTS, setRuntimeHunts } from "../../shared/orbitx-live-desk.js";
-import { tickLiveDesk } from "./live-agent-engine.js";
+import { tickLiveDesk } from "./_live-agent-engine.js";
 
 function memSb() {
   const tables = {

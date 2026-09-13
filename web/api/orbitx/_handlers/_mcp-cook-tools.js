@@ -3,15 +3,15 @@
  * CORE natural-language tools live in orbitx-hub; this catalog is callable by name
  * and listed via orbitx_tools_help / tools/list cursor cook:0
  */
-import { dispatchVoiceTool } from "./mcp-voice.js";
-import { dispatchGroupChatTool } from "./mcp-group-chat.js";
-import { dispatchLifeTool } from "./mcp-life-agents.js";
-import { dispatchLifeCmd } from "./mcp-life-cmds.js";
-import { dispatchPaperTool } from "./mcp-paper-desk.js";
-import { dispatchLiveTool } from "./mcp-live-desk.js";
+import { dispatchVoiceTool } from "./_mcp-voice.js";
+import { dispatchGroupChatTool } from "./_mcp-group-chat.js";
+import { dispatchLifeTool } from "./_mcp-life-agents.js";
+import { dispatchLifeCmd } from "./_mcp-life-cmds.js";
+import { dispatchPaperTool } from "./_mcp-paper-desk.js";
+import { dispatchLiveTool } from "./_mcp-live-desk.js";
 
 async function xDispatch(name, args, ctx) {
-  const { dispatchXTool } = await import("./mcp-x-bridge.js");
+  const { dispatchXTool } = await import("./_mcp-x-bridge.js");
   return dispatchXTool(name, args, ctx);
 }
 

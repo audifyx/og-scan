@@ -12,7 +12,7 @@ import {
   telegramOrbitXStatus,
   type TelegramOrbitXStatus,
 } from "@/lib/telegramOrbitX";
-import { extractTelegramLoginCode } from "../../api/orbitx/_handlers/orbitx-auth-links.js";
+import { extractTelegramLoginCode } from "../../api/orbitx/_handlers/_orbitx-auth-links.js";
 import "./telegram-orbitx.css";
 
 type Tab = "link" | "tools";

@@ -3,8 +3,8 @@
  * Files, daily logs, thoughts, talks, factions, family, XP, signals.
  * Hourly tick runs liveCityHour after each scan so agents actually live.
  */
-import { buildPersona } from "./mcp-life-persona.js";
-import { thinkAsAgent, parseHourVoice, deskVoice, hash32, spokenLine } from "./mcp-life-brain.js";
+import { buildPersona } from "./_mcp-life-persona.js";
+import { thinkAsAgent, parseHourVoice, deskVoice, hash32, spokenLine } from "./_mcp-life-brain.js";
 import {
   atHandle,
   displayHandle,
@@ -14,7 +14,7 @@ import {
   lifeFollow,
   lifeLike,
   lifeTimeline,
-} from "./mcp-life-social.js";
+} from "./_mcp-life-social.js";
 
 const RANKS = [
   [0, "rookie"],
@@ -86,7 +86,7 @@ async function maybeTweetToX(sb, agent, text) {
   )[0];
   const acts = Array.isArray(log?.actions) ? log.actions : [];
   if (acts.includes("x_tweet")) return { ok: false, skipped: "already_tweeted_today" };
-  const { xPost } = await import("./mcp-x-bridge.js");
+  const { xPost } = await import("./_mcp-x-bridge.js");
   const handle = atHandle(agent);
   const body = `${handle} ${String(text || "").replace(/\s+/g, " ")}`.slice(0, 270);
   const posted = await xPost(sb, { text: body }, { userId });

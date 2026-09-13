@@ -17,7 +17,7 @@ import {
   resolvePackage,
   statusFromRow,
   verifyOrbitxBurn,
-} from "./mcp-burn-access.js";
+} from "./_mcp-burn-access.js";
 
 describe("MCP burn access packages", () => {
   it("prices hour/day/week/month at 100 / 1,000 / 10,000 / 1,000,000 tokens", () => {

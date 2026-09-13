@@ -18,7 +18,7 @@ import {
   shopMemo,
   usdToShopSol,
 } from "../../src/lib/orbitx/_handlers/desk-shop-catalog.js";
-import { fetchSolUsdPrice } from "./buy-orbitx.js";
+import { fetchSolUsdPrice } from "./_buy-orbitx.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";

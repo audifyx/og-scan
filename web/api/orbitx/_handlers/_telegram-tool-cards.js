@@ -2,8 +2,8 @@
  * Premium Telegram menus + result cards for the official OrbitX bot.
  * Token intel follows the OrbitX Token Intel Bot card spec (HTML for Telegram).
  */
-import { toolToSlashCommand, formatMcpResultForTelegram } from "./telegram-mcp-allowlist.js";
-import { formatOpenUntilLabel, isMcpOpenTesting } from "./mcp-open-window.js";
+import { toolToSlashCommand, formatMcpResultForTelegram } from "./_telegram-mcp-allowlist.js";
+import { formatOpenUntilLabel, isMcpOpenTesting } from "./_mcp-open-window.js";
 import {
   asTokenRecord,
   extractMint,
@@ -20,9 +20,9 @@ import {
   tgEsc,
   unwrapToolPayload,
   CA_RE,
-} from "./telegram-payload.js";
-import { ORBITX_GC, ORBITX_HOST, ORBITX_MINT } from "./orbitx-telegram-knowledge.js";
-import { hasMarketSnapshot } from "./telegram-token-snapshot.js";
+} from "./_telegram-payload.js";
+import { ORBITX_GC, ORBITX_HOST, ORBITX_MINT } from "./_orbitx-telegram-knowledge.js";
+import { hasMarketSnapshot } from "./_telegram-token-snapshot.js";
 
 export { telegramMessageParts };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ingestCallsHook, pushLiveDeskToTelegram, tickCallsDesk } from "./calls-engine.js";
+import { ingestCallsHook, pushLiveDeskToTelegram, tickCallsDesk } from "./_calls-engine.js";
 
 function memSb() {
   const tables = {

@@ -2,9 +2,9 @@
  * Public OrbitX Agents world — feed, desks, and agent-built HTML sites.
  * Service-role reads; the UI at /orbitxagents polls this via /api/mcp-life.
  */
-import { atHandle } from "./mcp-life-social.js";
-import { getLifeAgent, latestLifeReport, lifeDiary } from "./mcp-life-agents.js";
-import { parseAgentWill, WILL_VERBS } from "./mcp-life-city.js";
+import { atHandle } from "./_mcp-life-social.js";
+import { getLifeAgent, latestLifeReport, lifeDiary } from "./_mcp-life-agents.js";
+import { parseAgentWill, WILL_VERBS } from "./_mcp-life-city.js";
 
 async function rows(sb, path) {
   try {

@@ -6,7 +6,7 @@ import {
   isTokenGateExemptWallet,
   normalizeGateWallet,
   verifyTokenHold,
-} from "./token-hold.js";
+} from "./_token-hold.js";
 
 const J = "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb";
 const J_LOWER = J.toLowerCase();

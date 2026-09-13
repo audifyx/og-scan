@@ -6,8 +6,8 @@
  */
 import { adminCredentialOk } from "../shared/desk-unlock.js";
 import { LIVE_WALLET_PUBKEY } from "../shared/orbitx-live-desk.js";
-import { runTakeProfitOrders, setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/_handlers/live-agent-engine.js";
-import { pushLiveDeskToTelegram } from "./orbitx/_handlers/calls-engine.js";
+import { runTakeProfitOrders, setLiveArmed, setLiveHunt, snapshotLiveDesk, tickLiveDesk } from "./orbitx/_handlers/_live-agent-engine.js";
+import { pushLiveDeskToTelegram } from "./orbitx/_handlers/_calls-engine.js";
 
 export const config = { maxDuration: 90 };
 

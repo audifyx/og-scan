@@ -58,7 +58,7 @@ import {
   tokenCardKeyboard,
   buildOfficialTelegramCommands,
   dmAllowsCommand,
-} from "./orbitx/_handlers/telegram-orbitx-lib.js";
+} from "./orbitx/_handlers/_telegram-orbitx-lib.js";
 import {
   accessStatusFromRow,
   grantMcpBetaAccessBadge,
@@ -73,8 +73,8 @@ import {
   telegramDmUnlockState,
   TELEGRAM_CODE_PROMPT_HTML,
   upsertTelegramBotAccess,
-} from "./orbitx/_handlers/telegram-bot-access.js";
-import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/_handlers/mcp-burn-access.js";
+} from "./orbitx/_handlers/_telegram-bot-access.js";
+import { confirmAccessBurn, prepareAccessMcpPurchase } from "./orbitx/_handlers/_mcp-burn-access.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
   formatOrbitXLinksHtml,
@@ -82,11 +82,11 @@ import {
   ORBITX_GC,
   ORBITX_GC_USERNAME,
   ORBITX_MINT,
-} from "./orbitx/_handlers/orbitx-telegram-knowledge.js";
-import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/_handlers/telegram-token-snapshot.js";
-import { fetchTokenProjectResearch } from "./orbitx/_handlers/telegram-token-brief.js";
-import { nvidiaChat, postTweetOAuth2, publicNvidiaMessage, resolveNimModel } from "./orbitx/_handlers/x-agent-lib.js";
-import { memoryRateLimit } from "./orbitx/_handlers/ai-runtime.js";
+} from "./orbitx/_handlers/_orbitx-telegram-knowledge.js";
+import { fetchTelegramTokenSnapshot, hasMarketSnapshot, looksLikeFailedQuoteCard, looksLikeOrbitXCard } from "./orbitx/_handlers/_telegram-token-snapshot.js";
+import { fetchTokenProjectResearch } from "./orbitx/_handlers/_telegram-token-brief.js";
+import { nvidiaChat, postTweetOAuth2, publicNvidiaMessage, resolveNimModel } from "./orbitx/_handlers/_x-agent-lib.js";
+import { memoryRateLimit } from "./orbitx/_handlers/_ai-runtime.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";

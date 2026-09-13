@@ -5,7 +5,7 @@
  * Do NOT top-level import @solana/web3.js — same cold-start rule as x-credits / mcp-ops.
  */
 
-import { isMcpOpenTesting, mcpOpenWindow } from "./mcp-open-window.js";
+import { isMcpOpenTesting, mcpOpenWindow } from "./_mcp-open-window.js";
 
 export const ORBITX_BURN_MINT =
   process.env.AGENT_GATE_MINT || "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -532,7 +532,7 @@ export async function prepareAccessBuyAndBurn({ publicKey, quote }) {
   }
 
   try {
-    const { attachMemoAndBurn } = await import("./desk-shop.js");
+    const { attachMemoAndBurn } = await import("./_desk-shop.js");
     const transaction = await attachMemoAndBurn(swap.swapTransaction, {
       owner: pk,
       mint: ORBITX_BURN_MINT,
@@ -912,7 +912,7 @@ export async function confirmAccessBurn(sb, { userId, signature, packageId, wall
       headers: { Prefer: "return=minimal" },
     });
     try {
-      const { recordVerifiedBurn } = await import("./owner-command.js");
+      const { recordVerifiedBurn } = await import("./_owner-command.js");
       await recordVerifiedBurn(sb, {
         user_id: uid || null,
         wallet_address: burnWallet || null,

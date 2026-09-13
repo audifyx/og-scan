@@ -4,21 +4,21 @@
  * Groups: public / unauthenticated intel + Grok media.
  * Private DMs: link an OrbitX account, then trade / X / social / NFT writes.
  */
-import { isMcpOpenTesting, formatOpenUntilLabel } from "./mcp-open-window.js";
-import { isHoldGatedTool } from "./token-hold.js";
-import { isAllowedGatedDmCommand } from "./telegram-bot-access.js";
-import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./telegram-mcp-allowlist.js";
-import { applyTelegramAlias, hasExplicitTradeAmount, parseTradeIntent } from "./telegram-trade-intent.js";
-import { ORBITX_MINT } from "./telegram-token-snapshot.js";
+import { isMcpOpenTesting, formatOpenUntilLabel } from "./_mcp-open-window.js";
+import { isHoldGatedTool } from "./_token-hold.js";
+import { isAllowedGatedDmCommand } from "./_telegram-bot-access.js";
+import { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand } from "./_telegram-mcp-allowlist.js";
+import { applyTelegramAlias, hasExplicitTradeAmount, parseTradeIntent } from "./_telegram-trade-intent.js";
+import { ORBITX_MINT } from "./_telegram-token-snapshot.js";
 import {
   CA_RE as PAYLOAD_CA_RE,
   extractMint as payloadExtractMint,
   mediaEtaSeconds as payloadMediaEtaSeconds,
   unwrapToolPayload as payloadUnwrap,
   tgEsc,
-} from "./telegram-payload.js";
-import { telegramLoginUrl } from "./orbitx-auth-links.js";
-import { ORBITX_GC, ORBITX_GC_USERNAME, ORBITX_HOST } from "./orbitx-telegram-knowledge.js";
+} from "./_telegram-payload.js";
+import { telegramLoginUrl } from "./_orbitx-auth-links.js";
+import { ORBITX_GC, ORBITX_GC_USERNAME, ORBITX_HOST } from "./_orbitx-telegram-knowledge.js";
 import {
   cmdsPage as cmdsPageImpl,
   deskKeyboard,
@@ -34,7 +34,7 @@ import {
   telegramMessageParts,
   tokenCardKeyboard,
   TOKEN_INTEL_TOOLS as CARD_TOKEN_INTEL_TOOLS,
-} from "./telegram-tool-cards.js";
+} from "./_telegram-tool-cards.js";
 
 export const OFFICIAL_BOT_USERNAME = "theorbitxmcpbot";
 export const OFFICIAL_BOT_NAME = "OrbitX";
@@ -747,7 +747,7 @@ export {
   extractTelegramLoginCode,
   isTelegramLoginPaste,
   telegramLoginUrl,
-} from "./orbitx-auth-links.js";
+} from "./_orbitx-auth-links.js";
 
 export {
   deskKeyboard,
@@ -769,5 +769,5 @@ export {
   ORBITX_FAQ_CORE,
   ORBITX_FAQ_SECTIONS,
   selectOrbitXFaqChunks,
-} from "./orbitx-faq-training.js";
+} from "./_orbitx-faq-training.js";
 export { formatMcpResultForTelegram, parseCallArgs, toolToSlashCommand };

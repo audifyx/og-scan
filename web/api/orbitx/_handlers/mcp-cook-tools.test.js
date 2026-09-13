@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCookTools, cookStats, COOK_META } from "./mcp-cook-tools.js";
+import { buildCookTools, cookStats, COOK_META } from "./_mcp-cook-tools.js";
 
 describe("mcp cook catalog", () => {
   it("exposes exactly 200 unique tools with dispatch meta", () => {

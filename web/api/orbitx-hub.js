@@ -13,7 +13,7 @@ import {
   dispatchGenerated,
   GEN_WALLET_TOOLS,
   generatedStats,
-} from "./orbitx/_handlers/mcp-tools-catalog.js";
+} from "./orbitx/_handlers/_mcp-tools-catalog.js";
 import {
   holdBlockedPayload,
   isHoldGatedTool,
@@ -21,7 +21,7 @@ import {
   isTokenGateExemptWallet,
   normalizeGateWallet,
   verifyTokenHold,
-} from "./orbitx/_handlers/token-hold.js";
+} from "./orbitx/_handlers/_token-hold.js";
 import {
   accessBlockedPayload,
   accessBuyPrompt,
@@ -32,13 +32,13 @@ import {
   listPackages,
   prepareAccessBurn,
   prepareAccessMcpPurchase,
-} from "./orbitx/_handlers/mcp-burn-access.js";
-import { decorateAccessStatus } from "./orbitx/_handlers/mcp-open-window.js";
+} from "./orbitx/_handlers/_mcp-burn-access.js";
+import { decorateAccessStatus } from "./orbitx/_handlers/_mcp-open-window.js";
 import {
   agentMenuPayload,
   buildAgentAuthPasteMessages,
   wrapMcpToolContent,
-} from "./orbitx/_handlers/mcp-brand.js";
+} from "./orbitx/_handlers/_mcp-brand.js";
 import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
@@ -48,44 +48,44 @@ import {
   getChatTradePreference,
   setChatTradePreference,
   usdToSol,
-} from "./orbitx/_handlers/buy-orbitx.js";
-import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias, parseTradeIntent } from "./orbitx/_handlers/telegram-trade-intent.js";
+} from "./orbitx/_handlers/_buy-orbitx.js";
+import { TELEGRAM_TOOL_ALIASES, applyTelegramAlias, parseTradeIntent } from "./orbitx/_handlers/_telegram-trade-intent.js";
 import {
   classifyOrbitXAuthPaste,
   TELEGRAM_LOGIN_NOT_MCP_MESSAGE,
   telegramLoginUrl,
-} from "./orbitx/_handlers/orbitx-auth-links.js";
-import { buildDexChartEmbed } from "./orbitx/_handlers/dex-chart-embed.js";
-import { buildCookTools, dispatchCookTool, cookStats } from "./orbitx/_handlers/mcp-cook-tools.js";
+} from "./orbitx/_handlers/_orbitx-auth-links.js";
+import { buildDexChartEmbed } from "./orbitx/_handlers/_dex-chart-embed.js";
+import { buildCookTools, dispatchCookTool, cookStats } from "./orbitx/_handlers/_mcp-cook-tools.js";
 import {
   PAPER_CORE_TOOLS,
   dispatchPaperTool,
   isPaperTool,
   resolvePaperNaturalTool,
-} from "./orbitx/_handlers/mcp-paper-desk.js";
+} from "./orbitx/_handlers/_mcp-paper-desk.js";
 import {
   LIVE_CORE_TOOLS,
   dispatchLiveTool,
   isLiveTool,
   resolveLiveNaturalTool,
-} from "./orbitx/_handlers/mcp-live-desk.js";
+} from "./orbitx/_handlers/_mcp-live-desk.js";
 import {
   maybeRelayGroupChat,
   resolveGcNaturalTool,
-} from "./orbitx/_handlers/mcp-group-chat.js";
+} from "./orbitx/_handlers/_mcp-group-chat.js";
 import {
   dispatchLifeTool,
   resolveLifeNaturalTool,
-} from "./orbitx/_handlers/mcp-life-agents.js";
-import { buildLifeCmdTools, lifeCmdStats } from "./orbitx/_handlers/mcp-life-cmds.js";
+} from "./orbitx/_handlers/_mcp-life-agents.js";
+import { buildLifeCmdTools, lifeCmdStats } from "./orbitx/_handlers/_mcp-life-cmds.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
-  return import("./orbitx/_handlers/mcp-ops.js");
+  return import("./orbitx/_handlers/_mcp-ops.js");
 }
 
 /** Lazy — credits module (may pull Solana) must not crash MCP cold start. */
 async function xCredits() {
-  return import("./orbitx/_handlers/x-credits.js");
+  return import("./orbitx/_handlers/_x-credits.js");
 }
 
 /** Combined MCP gate: exempt OR unexpired burn access OR $ORBITX hold. */
@@ -111,7 +111,7 @@ async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}
 const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 
 async function grokImagine() {
-  return import("./orbitx/_handlers/grok-imagine.js");
+  return import("./orbitx/_handlers/_grok-imagine.js");
 }
 
 export const config = { maxDuration: 120 };
@@ -3525,7 +3525,7 @@ export function resolveOrbitXToolName(rawName) {
 async function fetchJson(url, init) {
   const href = String(url || "");
   if (/\/api\/ogdex\/trade\/?(?:\?|$)/.test(href) && String(init?.method || "GET").toUpperCase() === "POST") {
-    const { buildUnsignedTrade } = await import("./ogdex/_routes/trade.js");
+    const { buildUnsignedTrade } = await import("./ogdex/_routes/_trade.js");
     const body = typeof init?.body === "string" ? JSON.parse(init.body || "{}") : init?.body || {};
     return buildUnsignedTrade(body);
   }
@@ -4312,7 +4312,7 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
 
   if (name === "orbitx_telegram_status") {
-    const { telegramStatusForUser } = await import("./orbitx/_handlers/mcp-telegram-push.js");
+    const { telegramStatusForUser } = await import("./orbitx/_handlers/_mcp-telegram-push.js");
     return telegramStatusForUser(auth?.userId);
   }
   if (name === "orbitx_telegram_send") {
@@ -4323,7 +4323,7 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
         message: "Authenticate MCP, then link Telegram at https://www.orbitx.world/telegram",
       };
     }
-    const { telegramSendForUser } = await import("./orbitx/_handlers/mcp-telegram-push.js");
+    const { telegramSendForUser } = await import("./orbitx/_handlers/_mcp-telegram-push.js");
     return telegramSendForUser(auth.userId, args.text || args.message || args.prompt);
   }
   if (name === "orbitx_telegram_cmds") {
@@ -4427,7 +4427,7 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     }
     if (pack) {
       try {
-        const { prepareDeskShopBuy } = await import("./orbitx/_handlers/desk-shop.js");
+        const { prepareDeskShopBuy } = await import("./orbitx/_handlers/_desk-shop.js");
         const out = await prepareDeskShopBuy({
           wallet,
           skuId: pack,
@@ -5976,7 +5976,7 @@ export function listAllOrbitXTools() {
 
 function scheduleMcpTelegramPush({ userId, tool, result, source, skip } = {}) {
   if (skip || !userId) return;
-  void import("./orbitx/_handlers/mcp-telegram-push.js")
+  void import("./orbitx/_handlers/_mcp-telegram-push.js")
     .then((mod) => mod.pushMcpResultToTelegram({ userId, tool, result, source }))
     .catch(() => {});
 }
@@ -5992,7 +5992,7 @@ export async function runPublicOrbitXTool({ toolName, args = {}, req = null }) {
   if (!hasEmbeddedAgentTool(name)) {
     throw Object.assign(new Error(`Unknown OrbitX tool: ${rawName}`), { status: 400 });
   }
-  const { isPrivilegedTelegramTool } = await import("./orbitx/_handlers/telegram-orbitx-lib.js");
+  const { isPrivilegedTelegramTool } = await import("./orbitx/_handlers/_telegram-orbitx-lib.js");
   if (isPrivilegedTelegramTool(name) || name === "x_post") {
     throw Object.assign(new Error("login_required"), { status: 401 });
   }
@@ -6130,7 +6130,7 @@ export default async function handler(req, res) {
 
   try {
     if (head === "shop") {
-      const { handleDeskShop } = await import("./orbitx/_handlers/desk-shop.js");
+      const { handleDeskShop } = await import("./orbitx/_handlers/_desk-shop.js");
       return handleDeskShop(req, res, parts, json);
     }
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));

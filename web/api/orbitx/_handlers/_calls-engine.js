@@ -30,8 +30,8 @@ import {
   stillCooling,
   writeCallThesis,
 } from "../../shared/orbitx-calls-desk.js";
-import { snapshotLiveDesk } from "./live-agent-engine.js";
-import { CALLS_DDL, CALLS_PROJECT_REF } from "./calls-schema.js";
+import { snapshotLiveDesk } from "./_live-agent-engine.js";
+import { CALLS_DDL, CALLS_PROJECT_REF } from "./_calls-schema.js";
 
 const DEX = "https://api.dexscreener.com/latest/dex";
 const TG = "https://api.telegram.org";

@@ -15,7 +15,7 @@ import {
   getOwnerUserHub,
   searchOwnerUsers,
   writeOwnerAudit,
-} from "./orbitx/_handlers/owner-command.js";
+} from "./orbitx/_handlers/_owner-command.js";
 
 export const config = { maxDuration: 30 };
 

@@ -5,7 +5,7 @@ import {
   isMcpOpenTesting,
   mcpOpenUntilIso,
   mcpOpenWindow,
-} from "./mcp-open-window.js";
+} from "./_mcp-open-window.js";
 
 describe("MCP open testing window", () => {
   afterEach(() => {

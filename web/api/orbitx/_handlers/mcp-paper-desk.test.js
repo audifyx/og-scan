@@ -6,7 +6,7 @@ import {
   isPaperTool,
   resolvePaperNaturalTool,
   runPaperDesk,
-} from "./mcp-paper-desk.js";
+} from "./_mcp-paper-desk.js";
 
 const TOKENS = [
   {

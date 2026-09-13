@@ -6,7 +6,7 @@ import {
   fetchTelegramTokenSnapshot,
   hasMarketSnapshot,
   jupListFromRaw,
-} from "./telegram-token-snapshot.js";
+} from "./_telegram-token-snapshot.js";
 
 afterEach(() => {
   clearTelegramSnapshotCache();

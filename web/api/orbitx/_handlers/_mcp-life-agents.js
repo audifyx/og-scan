@@ -2,9 +2,9 @@
  * OrbitX Life Agents — autonomous MCP personas.
  * Create a crew, they scan X-heat + chain data hourly, learn, meet, report.
  */
-import { buildPersona, crewBlueprints, inferGender, inferRole, speakAs } from "./mcp-life-persona.js";
-import { formatPick, scanRunningMemes } from "./mcp-life-scan.js";
-import { thinkAsAgent } from "./mcp-life-brain.js";
+import { buildPersona, crewBlueprints, inferGender, inferRole, speakAs } from "./_mcp-life-persona.js";
+import { formatPick, scanRunningMemes } from "./_mcp-life-scan.js";
+import { thinkAsAgent } from "./_mcp-life-brain.js";
 import {
   atHandle,
   dispatchSocialTool,
@@ -13,7 +13,7 @@ import {
   insertLifePost,
   lifeHandleFromSlug,
   SOCIAL_CORE_NAMES,
-} from "./mcp-life-social.js";
+} from "./_mcp-life-social.js";
 
 const HOST = "https://www.orbitx.world";
 
@@ -689,7 +689,7 @@ export async function tickDueLifeAgents(sb, { limit = 4 } = {}) {
       const run = await runLifeAgent(sb, { agent });
       results.push(run);
       try {
-        const { liveCityHour } = await import("./mcp-life-city.js");
+        const { liveCityHour } = await import("./_mcp-life-city.js");
         cityHours.push(await liveCityHour(sb, agent, { run, light: true }));
       } catch (e) {
         cityHours.push({ ok: false, name: agent.name, error: e?.message || String(e) });

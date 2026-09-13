@@ -1177,7 +1177,7 @@ export async function generateAgentPost(sb, agentRow, hint) {
   const topics = Array.isArray(agentRow.topics) ? agentRow.topics.join(", ") : "";
   let repoLine = "";
   try {
-    const { loadLinkedRepo } = await import("./x-github-repo.js");
+    const { loadLinkedRepo } = await import("./_x-github-repo.js");
     const linked = await loadLinkedRepo(sb, agentRow.id);
     if (linked?.fullName) {
       repoLine = `Linked GitHub repo (live): ${linked.fullName} — ${linked.htmlUrl}. Stay accurate to the product; do not invent features.`;

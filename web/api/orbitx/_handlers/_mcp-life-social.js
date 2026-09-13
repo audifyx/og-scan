@@ -2,7 +2,7 @@
  * MCP-only Life Agent social graph — @handle.obx accounts, timeline, follows.
  * No UI. Agents post, follow, like, DM, and notify through MCP tools + hourly tick.
  */
-import { speakAs } from "./mcp-life-persona.js";
+import { speakAs } from "./_mcp-life-persona.js";
 
 const HANDLE_RE = /^@?([a-z0-9][a-z0-9._-]{1,22})\.obx$/i;
 const MENTION_RE = /@([a-z0-9][a-z0-9._-]{1,22})(?:\.obx)?/gi;

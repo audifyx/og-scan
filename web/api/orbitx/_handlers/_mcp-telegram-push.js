@@ -3,8 +3,8 @@
  * (@theorbitxmcpbot) for the linked user. Telegram-originated calls skip
  * this so the bot does not echo itself.
  */
-import { formatMcpResultForTelegram } from "./telegram-mcp-allowlist.js";
-import { isHoldGatedTool } from "./token-hold.js";
+import { formatMcpResultForTelegram } from "./_telegram-mcp-allowlist.js";
+import { isHoldGatedTool } from "./_token-hold.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";

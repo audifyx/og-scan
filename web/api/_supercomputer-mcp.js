@@ -1,7 +1,7 @@
 import hub from "./orbitx-hub.js";
 import xMcp from "./x-mcp.js";
-import { buildGeneratedTools } from "./orbitx/_handlers/mcp-tools-catalog.js";
-import { buildXGeneratedTools } from "./orbitx/_handlers/x-mcp-tools-catalog.js";
+import { buildGeneratedTools } from "./orbitx/_handlers/_mcp-tools-catalog.js";
+import { buildXGeneratedTools } from "./orbitx/_handlers/_x-mcp-tools-catalog.js";
 
 export const config = { maxDuration: 120 };
 

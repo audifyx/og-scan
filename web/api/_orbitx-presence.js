@@ -4,7 +4,7 @@
  * Writes only that user's ox_admin_presence row (service role scoped to JWT uid).
  * PAGE_VIEW events are recorded when `path` changes, not on every beat.
  */
-import { appFromPath, deviceFromUserAgent, recordOwnerEvent, upsertPresence } from "./orbitx/_handlers/owner-command.js";
+import { appFromPath, deviceFromUserAgent, recordOwnerEvent, upsertPresence } from "./orbitx/_handlers/_owner-command.js";
 
 export const config = { maxDuration: 15 };
 

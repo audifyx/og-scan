@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dispatchVoiceTool } from "./mcp-voice.js";
+import { dispatchVoiceTool } from "./_mcp-voice.js";
 
 describe("mcp voice tools", () => {
   it("requires a name to start a VC", async () => {
