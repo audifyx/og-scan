@@ -116,11 +116,27 @@
     },
     {
       "source": "/api/orbitx/anti-vamp-check",
-      "destination": "/api/orbitx-anti-vamp-check"
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/orbitx/delegated-wallet",
-      "destination": "/api/orbitx-delegated-wallet"
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-desk-unlock",
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-calls",
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-tx-report",
+      "destination": "/api/web?path=paused"
+    },
+    {
+      "source": "/api/orbitx-onchain",
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/orbitx/(.*)",
@@ -132,11 +148,11 @@
     },
     {
       "source": "/api/on-chain/(.*)",
-      "destination": "/api/on-chain?path=$1"
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/on-chain",
-      "destination": "/api/on-chain"
+      "destination": "/api/web?path=paused"
     },
     {
       "source": "/api/ogdex/(.*)",

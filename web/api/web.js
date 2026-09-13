@@ -6,6 +6,19 @@ import pumpCreate from "./_pump-create.ts";
 import orbitxWorld from "./_orbitx-world.ts";
 import kol from "./_kol.ts";
 
+function pausedFeature(req, res) {
+  res.statusCode = 503;
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Retry-After", "604800");
+  res.setHeader("Cache-Control", "no-store");
+  return res.end(JSON.stringify({
+    ok: false,
+    status: "paused",
+    error: "Trading and on-chain features are temporarily paused.",
+    message: "Coming back live this week.",
+  }));
+}
+
 const ROUTES = {
   "og-memes": ogMemes,
   "admin-tokens": adminTokens,
@@ -14,6 +27,7 @@ const ROUTES = {
   "pump-create": pumpCreate,
   "orbitx-world": orbitxWorld,
   kol,
+  paused: pausedFeature,
 };
 
 export default async function handler(req, res) {
