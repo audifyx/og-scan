@@ -67,8 +67,36 @@
       "destination": "/api/x-mcp?path=agent"
     },
     {
+      "source": "/api/og-memes",
+      "destination": "/api/web?path=og-memes"
+    },
+    {
+      "source": "/api/admin-tokens",
+      "destination": "/api/web?path=admin-tokens"
+    },
+    {
+      "source": "/api/signup-check",
+      "destination": "/api/web?path=signup-check"
+    },
+    {
+      "source": "/api/bagwork",
+      "destination": "/api/web?path=bagwork"
+    },
+    {
+      "source": "/api/pump-create",
+      "destination": "/api/web?path=pump-create"
+    },
+    {
       "source": "/api/orbitx-world/(.*)",
-      "destination": "/api/orbitx-world?path=$1"
+      "destination": "/api/web?path=orbitx-world/$1"
+    },
+    {
+      "source": "/api/orbitx-world",
+      "destination": "/api/web?path=orbitx-world"
+    },
+    {
+      "source": "/api/kol/(.*)",
+      "destination": "/api/web?path=kol/$1"
     },
     {
       "source": "/api/orbitx-agent/(.*)",
