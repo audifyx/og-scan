@@ -1,6 +1,6 @@
 /**
  * Single source of truth for Agent MCP ORBITX hold exemptions.
- * Imported by server (web/api/orbitx/token-hold.js) and client (agentTokenGate / ownerDesk).
+ * Imported by server (web/api/orbitx/_handlers/token-hold.js) and client (agentTokenGate / ownerDesk).
  *
  * IMPORTANT: Supabase Auth lowercases emails. SIWS sessions store
  * `{pubkey}@wallet.orbitx.app` in lowercase, which mangles base58 casing.

@@ -2,7 +2,7 @@
  * Hourly Life Agent tick — Vercel Cron GET /api/mcp-life-tick
  * Auth: Bearer CRON_SECRET or OXW_WORKER_SECRET when set.
  */
-import { tickDueLifeAgents } from "./orbitx/mcp-life-agents.js";
+import { tickDueLifeAgents } from "./orbitx/_handlers/mcp-life-agents.js";
 
 export const config = { maxDuration: 90 };
 

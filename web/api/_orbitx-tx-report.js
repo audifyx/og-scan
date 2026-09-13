@@ -6,7 +6,7 @@
  * Fee is recomputed server-side: min(1.2% of USD, $10). Client fee fields are ignored.
  */
 import { computePlatformTxFee, PLATFORM_TX_FEE_WALLET } from "../shared/platform-tx-fee.js";
-import { appFromPath, recordOwnerEvent, upsertLedger } from "./orbitx/owner-command.js";
+import { appFromPath, recordOwnerEvent, upsertLedger } from "./orbitx/_handlers/owner-command.js";
 
 export const config = { maxDuration: 30 };
 

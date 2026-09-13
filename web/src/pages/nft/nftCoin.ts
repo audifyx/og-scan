@@ -2,7 +2,7 @@
 //
 // This is the APP + DB layer for a pump.fun-style market attached to an NFT:
 // a bonding curve, per-trade fees split platform/creator, and creator fee
-// accrual that is CLAIMABLE in-app (mirrors lib/orbitx/claim.ts for tokens).
+// accrual that is CLAIMABLE in-app (mirrors lib/orbitx/_handlers/claim.ts for tokens).
 //
 // NOTE: the on-chain bonding-curve program is a separate, security-critical
 // deploy (see docs/NFT_COIN_TRADING.md). Until it ships, these reads return

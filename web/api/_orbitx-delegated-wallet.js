@@ -1,4 +1,4 @@
-import { activeDelegatedWallet, createDelegatedWallet, revokeDelegatedWallet } from "./orbitx/delegated-wallet.js";
+import { activeDelegatedWallet, createDelegatedWallet, revokeDelegatedWallet } from "./orbitx/_handlers/delegated-wallet.js";
 
 async function userFromRequest(req) {
   const auth = req.headers.authorization || ""; const url = process.env.SUPABASE_URL || ""; const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";

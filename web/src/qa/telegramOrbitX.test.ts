@@ -42,10 +42,10 @@ import {
   telegramChatExtras,
   dmAllowsCommand,
   buildOfficialTelegramCommands,
-} from "../../api/orbitx/telegram-orbitx-lib.js";
-import { isAgentTelegramToolAllowed } from "../../api/orbitx/telegram-mcp-allowlist.js";
-import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/orbitx-telegram-knowledge.js";
-import { asTokenRecord } from "../../api/orbitx/telegram-payload.js";
+} from "../../api/orbitx/_handlers/telegram-orbitx-lib.js";
+import { isAgentTelegramToolAllowed } from "../../api/orbitx/_handlers/telegram-mcp-allowlist.js";
+import { formatOrbitXLinksHtml, OFFICIAL_ORBITX_TELEGRAM_SYSTEM } from "../../api/orbitx/_handlers/orbitx-telegram-knowledge.js";
+import { asTokenRecord } from "../../api/orbitx/_handlers/telegram-payload.js";
 import {
   assembleTelegramSnapshot,
   hasMarketSnapshot,
@@ -55,8 +55,8 @@ import {
   mergeTokenSnapshot,
   normalizeDexResponse,
   tokenFromGecko,
-} from "../../api/orbitx/telegram-token-snapshot.js";
-import { phantomBrowseUrl, tokenCardKeyboard } from "../../api/orbitx/telegram-tool-cards.js";
+} from "../../api/orbitx/_handlers/telegram-token-snapshot.js";
+import { phantomBrowseUrl, tokenCardKeyboard } from "../../api/orbitx/_handlers/telegram-tool-cards.js";
 
 const WEB = resolve(__dirname, "../..");
 const REPO = resolve(WEB, "..");
@@ -360,7 +360,7 @@ describe("official OrbitX Telegram bot", () => {
     expect(app).toContain("RedirectPreserveSearch");
     const hub = readFileSync(resolve(WEB, "api/orbitx-hub.js"), "utf8");
     expect(hub).toContain("telegram_login_not_mcp");
-    expect(hub).toContain('from "./orbitx/telegram-trade-intent.js"');
+    expect(hub).toContain('from "./orbitx/_handlers/telegram-trade-intent.js"');
     expect(hub).toContain("TELEGRAM_TOOL_ALIASES");
   });
 
@@ -892,8 +892,8 @@ describe("official OrbitX Telegram bot", () => {
     expect(api).toContain("my_chat_member");
     expect(api).toContain("message_thread_id");
     expect(api).toContain("allow_sending_without_reply");
-    expect(api).toContain('from "./orbitx/x-agent-lib.js"');
-    const snap = readFileSync(resolve(WEB, "api/orbitx/telegram-token-snapshot.js"), "utf8");
+    expect(api).toContain('from "./orbitx/_handlers/x-agent-lib.js"');
+    const snap = readFileSync(resolve(WEB, "api/orbitx/_handlers/telegram-token-snapshot.js"), "utf8");
     expect(snap).toContain("price/v3");
     expect(snap).toContain("token-pairs/v1");
     expect(snap).toContain("fetchQuoteBundle");

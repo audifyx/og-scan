@@ -31,7 +31,7 @@ import {
 } from "../shared/orbitx-kol-directory.js";
 import { DEX_HUBS, epsSeries, eventBreakdown, loadCityDistricts, tokenDisplayName, tokenTicker, looksLikeMint, dexTokenImage, cleanTokenFields, fetchJupiterToken } from "../shared/orbitx-chain-districts.js";
 import { simulatePaperDesk, PAPER_AGENTS, PAPER_STAKE_SOL } from "../shared/orbitx-paper-desk.js";
-import { snapshotLiveDesk } from "./orbitx/live-agent-engine.js";
+import { snapshotLiveDesk } from "./orbitx/_handlers/live-agent-engine.js";
 
 export const config = { maxDuration: 60 };
 

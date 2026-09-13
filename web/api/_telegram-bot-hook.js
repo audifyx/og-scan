@@ -12,13 +12,13 @@ import {
   isXTelegramToolAllowed,
   parseCallArgs,
   resolveSlashToTool,
-} from "./orbitx/telegram-mcp-allowlist.js";
+} from "./orbitx/_handlers/telegram-mcp-allowlist.js";
 import {
   DEFAULT_TELEGRAM_NIM_MODEL,
   ORBITX_TELEGRAM_BLURB,
   ORBITX_TELEGRAM_SYSTEM,
-} from "./orbitx/orbitx-telegram-knowledge.js";
-import { nvidiaChat, resolveNimModel, DEFAULT_NIM_MODEL, publicNvidiaMessage } from "./orbitx/x-agent-lib.js";
+} from "./orbitx/_handlers/orbitx-telegram-knowledge.js";
+import { nvidiaChat, resolveNimModel, DEFAULT_NIM_MODEL, publicNvidiaMessage } from "./orbitx/_handlers/x-agent-lib.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -253,7 +253,7 @@ async function runMcpCall(bot, kind, command, text, req) {
   const cmd = String(command || "").replace(/^\//, "").toLowerCase();
 
   if (cmd === "cmds") {
-    const { X_TELEGRAM_ALLOW, toolToSlashCommand } = await import("./orbitx/telegram-mcp-allowlist.js");
+    const { X_TELEGRAM_ALLOW, toolToSlashCommand } = await import("./orbitx/_handlers/telegram-mcp-allowlist.js");
     const core = typeof hub.listTelegramAgentCoreTools === "function" ? hub.listTelegramAgentCoreTools() : [];
     const inner =
       kind === "x"

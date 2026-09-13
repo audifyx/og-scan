@@ -508,7 +508,7 @@ describe("OrbitX /on-chain world", () => {
     const vercel = readFileSync(resolve(WEB, "vercel.json"), "utf8");
     expect(vercel).toContain("/api/live-agents?path=tick");
     expect(vercel).not.toMatch(/LIVE_AGENT_WALLET_SECRET.{0,20}[1-9A-HJ-NP-Za-km-z]{80,}/);
-    const engine = readFileSync(resolve(WEB, "api/orbitx/live-agent-engine.js"), "utf8");
+    const engine = readFileSync(resolve(WEB, "api/orbitx/_handlers/live-agent-engine.js"), "utf8");
     expect(engine).toContain("LIVE_AGENT_WALLET_SECRET");
     expect(engine).toContain("summarizeLiveLedger");
     expect(engine).toContain("LIVE_MAX_PROBES");

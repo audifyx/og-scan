@@ -1,7 +1,7 @@
 /**
  * Public MCP group-chat list + transcript for /gc/:slug.
  */
-import { getGroupChat, historyGroupChat, listGroupChats } from "./orbitx/mcp-group-chat.js";
+import { getGroupChat, historyGroupChat, listGroupChats } from "./orbitx/_handlers/mcp-group-chat.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";

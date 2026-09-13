@@ -26,9 +26,9 @@ describe("Vercel CJS uuid / rpc-websockets crash", () => {
     const files = [
       "api/orbitx-hub.js",
       "api/x-mcp.js",
-      "api/orbitx/mcp-ops.js",
-      "api/orbitx/mcp-burn-access.js",
-      "api/orbitx/x-credits.js",
+      "api/orbitx/_handlers/mcp-ops.js",
+      "api/orbitx/_handlers/mcp-burn-access.js",
+      "api/orbitx/_handlers/x-credits.js",
     ];
     for (const file of files) {
       expect(read(file), file).not.toMatch(TOP_LEVEL_SOLANA);

@@ -1,7 +1,7 @@
 /**
  * Public LiveKit VC join API for /vc/:slug (no MCP session required).
  */
-import { getVoiceRoom, joinVoiceRoom, listOpenVoiceRooms } from "./orbitx/mcp-voice.js";
+import { getVoiceRoom, joinVoiceRoom, listOpenVoiceRooms } from "./orbitx/_handlers/mcp-voice.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
