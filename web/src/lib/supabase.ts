@@ -3,11 +3,13 @@ import { supabaseAwareFetch } from "@/lib/fetchTimeout";
 
 // Shared Supabase project — syncs data across web + mobile
 // Project: ffjipnkhcebjvttliptb
+const env = import.meta.env as Record<string, string | undefined>;
+
 export const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || "";
+  env.VITE_SUPABASE_URL || env.REACT_APP_SUPABASE_URL || "";
 
 export const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+  env.VITE_SUPABASE_ANON_KEY || env.REACT_APP_SUPABASE_ANON_KEY || "";
 
 // Guard: when env vars are missing (e.g. not set in the deployment), createClient
 // throws "supabaseUrl is required" at import time, which white-screens the ENTIRE
@@ -32,8 +34,7 @@ export const supabase = createClient(
     storage: localStorage,
     storageKey: "sol-tools-auth",
     persistSession: true,
-    // Public GoTrue /token hangs; auto-refresh would abort and SIGN OUT, looping /auth.
-    autoRefreshToken: false,
+    autoRefreshToken: true,
     detectSessionInUrl: true,
   },
   realtime: {

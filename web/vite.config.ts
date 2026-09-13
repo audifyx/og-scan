@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import path from "path";
@@ -47,7 +47,11 @@ function spaAppHtml() {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const supabaseUrl = env.VITE_SUPABASE_URL || env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+
+  return {
   server: {
     host: "::",
     port: 8080,
@@ -57,7 +61,7 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "/ai-fn": {
-        target: process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co",
+        target: supabaseUrl,
         changeOrigin: true,
         rewrite: (p: string) => p.replace(/^\/ai-fn/, "/functions/v1"),
       },
@@ -94,4 +98,5 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-}));
+  };
+});
