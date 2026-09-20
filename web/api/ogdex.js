@@ -370,6 +370,30 @@ async function handleOwnerApi(req, res) {
   }
 }
 
+
+async function handleHunterHttp(req, res) {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+  try {
+    const mod = await import("./orbitx/_handlers/_mcp-hunter-agent.js");
+    const u = new URL(req.url, "http://x");
+    const tick = u.searchParams.get("tick") === "1" || (req.body && (req.body.tick === 1 || req.body.tick === true || req.body.action === "tick"));
+    const out = tick ? await mod.tickHunter({ force: true }) : await mod.snapshotHunter();
+    res.statusCode = 200;
+    return res.end(JSON.stringify({ ok: true, ...out, disclaimer: "Dry $4 ALPHA loop. Live clips need HUNTER_LIVE." }));
+  } catch (e) {
+    res.statusCode = 200;
+    return res.end(JSON.stringify({
+      ok: false,
+      error: String(e && e.message || e),
+      desk: { name: "ALPHA", equityUsd: 4, clipUsd: 1.5, wins: 0, losses: 0, dryRun: true, note: "Hunter module error — still MCP-only dry desk." },
+      feed: [],
+    }));
+  }
+}
+
 export default async function handler(req, res) {
   let seg = "";
   let u;
@@ -389,6 +413,9 @@ export default async function handler(req, res) {
   }
   if (seg === "owner" || seg === "orbitx-owner") {
     return handleOwnerApi(req, res);
+  }
+  if (seg === "hunter" || seg === "hunter-agent") {
+    return handleHunterHttp(req, res);
   }
 
   const route = ROUTES[seg];
