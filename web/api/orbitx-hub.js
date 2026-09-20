@@ -199,6 +199,7 @@ function listLiveTools(cursor) {
       name: t.name,
       description: t.description,
       inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+      annotations: toolAuthMeta(t.name),
     }));
     const next = _generated.length ? "gen:0" : (_cook.length ? "cook:0" : (_life.length ? "life:0" : undefined));
     return {
@@ -262,6 +263,7 @@ function listLiveTools(cursor) {
       name: t.name,
       description: t.description,
       inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+      annotations: toolAuthMeta(t.name),
     })),
   };
 }
@@ -1541,6 +1543,130 @@ const WALLET_TOOLS = new Set([
   "orbitx_nft_place_bid",
   "orbitx_nft_favorite",
 ]);
+
+/** Read/intel tools anyone can call with no login. Writes/trades stay gated. */
+const PUBLIC_TOOL_EXACT = new Set([
+  "search",
+  "fetch",
+  "orbitx_menu",
+  "orbitx_auth_link",
+  "orbitx_auth_status",
+  "orbitx_whoami",
+  "orbitx_tools_help",
+  "orbitx_health",
+  "orbitx_config",
+  "orbitx_search",
+  "orbitx_get_token",
+  "orbitx_screen_tokens",
+  "orbitx_get_forensics",
+  "orbitx_get_safety",
+  "orbitx_crypto_scan",
+  "orbitx_get_ath",
+  "orbitx_get_chart",
+  "orbitx_dex_chart",
+  "orbitx_trade_quote",
+  "orbitx_get_kols",
+  "orbitx_get_traders",
+  "orbitx_get_signals",
+  "orbitx_get_launches",
+  "orbitx_launch_config",
+  "orbitx_launch_check",
+  "orbitx_xray",
+  "orbitx_research",
+  "orbitx_leaderboard",
+  "orbitx_dex_listings",
+  "orbitx_platform_stats",
+  "orbitx_get_metadata",
+  "orbitx_boosts",
+  "orbitx_boost_tiers",
+  "orbitx_report_url",
+  "orbitx_open_dex",
+  "orbitx_open_alerts",
+  "orbitx_nft_collections",
+  "orbitx_nft_items",
+  "orbitx_nft_listings",
+  "orbitx_nft_comments",
+  "orbitx_nft_offers",
+  "orbitx_nft_auctions",
+  "orbitx_nft_recent_sales",
+  "orbitx_nft_sales",
+  "orbitx_social_communities",
+  "orbitx_social_feed",
+  "orbitx_social_members",
+  "orbitx_paper_desk",
+  "orbitx_paper_agent",
+  "orbitx_paper_buying",
+  "orbitx_live_desk",
+  "orbitx_live_positions",
+  "orbitx_live_agent",
+  "orbitx_live_feed",
+  "orbitx_live_world",
+  "orbitx_life_city",
+  "orbitx_life_list",
+  "orbitx_life_account",
+  "orbitx_life_timeline",
+  "orbitx_life_files",
+  "orbitx_x_connect",
+  "orbitx_x_status",
+  "orbitx_vc_list",
+  "orbitx_vc_join",
+  "orbitx_vc_link",
+  "orbitx_gc_list",
+  "orbitx_gc_join",
+  "orbitx_gc_focus",
+  "orbitx_gc_history",
+  "orbitx_gc_read",
+  "orbitx_telegram_status",
+  "orbitx_telegram_cmds",
+  "orbitx_shop",
+  "orbitx_mcp_access_status",
+]);
+
+const PUBLIC_TOOL_PREFIXES = [
+  "orbitx_screen_",
+  "orbitx_pulse_",
+  "orbitx_chart_",
+  "orbitx_search_",
+  "orbitx_token_",
+  "orbitx_safety_",
+  "orbitx_forensics_",
+  "orbitx_ath_",
+  "orbitx_xray_",
+  "orbitx_research_",
+  "orbitx_metadata_",
+  "orbitx_crypto_scan_",
+  "orbitx_get_",
+  "orbitx_launches_",
+  "orbitx_listings_",
+  "orbitx_signals_",
+  "orbitx_traders_",
+  "orbitx_kols_",
+  "orbitx_leaderboard_",
+  "orbitx_nft_items_",
+  "orbitx_nft_collections_",
+  "orbitx_nft_listings_",
+  "orbitx_nft_sales_",
+  "orbitx_nft_auctions_",
+  "orbitx_communities_",
+  "orbitx_open_",
+];
+
+function isPublicMcpTool(name) {
+  const n = String(name || "");
+  if (!n) return false;
+  if (SESSION_TOOLS.has(n) || isHoldGatedTool(n)) return false;
+  if (/^orbitx_(buy|sell|prepare_|execute_|create_token|launch_|burn|claim_|vanity_|social_join|social_post|social_create|social_leave|submit_|request_boost|nft_prepare|nft_submit|nft_like|nft_comment|nft_follow|nft_register|nft_make_|nft_cancel_|nft_list_for|nft_create_auction|nft_place_bid|x_post|x_reply|x_quote|gc_start|gc_send|vc_start|vc_end|telegram_send|generate_|grok_|gen_|media_|credits_|mcp_access_buy|mcp_access_confirm|trade_auto)/.test(n)) {
+    return false;
+  }
+  if (PUBLIC_TOOL_EXACT.has(n)) return true;
+  return PUBLIC_TOOL_PREFIXES.some((p) => n.startsWith(p));
+}
+
+function toolAuthMeta(name) {
+  return isPublicMcpTool(name)
+    ? { auth: "open", readOnlyHint: true, openWorldHint: true }
+    : { auth: "required", destructiveHint: true };
+}
 
 /** Community / listing write tools — need Bearer userId (or publicKey of a wallet linked on /agent). */
 const SESSION_TOOLS = new Set([
@@ -5645,7 +5771,9 @@ async function handleMcp(req, res, parts) {
       tools: CORE_TOOLS.map((t) => ({ name: t.name, description: t.description })),
       toolsTotal: TOOLS.length,
       toolsLive: CORE_TOOLS.length,
-      note: "tools/list page 1 is CORE; follow nextCursor to list all 3000+ live tools",
+      publicTools: TOOLS.filter((x) => isPublicMcpTool(x.name)).length,
+      authRequiredTools: TOOLS.filter((x) => !isPublicMcpTool(x.name)).length,
+      note: "Hundreds of screen/search/intel tools are public (no login). Trade, launch, social writes, and burns need OrbitX auth. tools/list page 1 is CORE; follow nextCursor for the full catalog.",
     });
   }
 
@@ -5730,56 +5858,8 @@ async function handleMcp(req, res, parts) {
       delete args.authCode;
       delete args.orbitxAuthCode;
       const identified = Boolean(auth?.userId);
-      const publicTools = new Set([
-        "search",
-        "fetch",
-        "orbitx_menu",
-        "orbitx_auth_link",
-        "orbitx_auth_status",
-        "orbitx_tools_help",
-        "orbitx_search",
-        "orbitx_whoami",
-        "orbitx_dex_chart",
-        "orbitx_get_chart",
-        "orbitx_trade_quote",
-        "orbitx_x_connect",
-        "orbitx_vc_list",
-        "orbitx_vc_join",
-        "orbitx_vc_link",
-        "orbitx_gc_list",
-        "orbitx_gc_join",
-        "orbitx_gc_focus",
-        "orbitx_gc_send",
-        "orbitx_gc_chat",
-        "orbitx_gc_leave",
-        "orbitx_gc_history",
-        "orbitx_gc_read",
-        "orbitx_life_city",
-        "orbitx_life_think",
-        "orbitx_life_files",
-        "orbitx_life_converse",
-        "orbitx_life_account",
-        "orbitx_life_post",
-        "orbitx_life_timeline",
-        "orbitx_life_follow",
-        "orbitx_life_create",
-        "orbitx_life_list",
-        "orbitx_life_talk",
-        "orbitx_life_report",
-        "orbitx_life_meet",
-        "orbitx_life_diary",
-        "orbitx_life_run",
-        "orbitx_life_pause",
-        "orbitx_paper_desk",
-        "orbitx_paper_agent",
-        "orbitx_paper_buying",
-        "orbitx_live_desk",
-        "orbitx_live_positions",
-        "orbitx_live_agent",
-        "orbitx_live_feed",
-        "orbitx_live_world",
-      ]);
-      if (parsedAuth.kind === "telegram_login" && !identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
+      const publicTool = isPublicMcpTool(name);
+      if (parsedAuth.kind === "telegram_login" && !identified && !publicTool && SESSION_TOOLS.has(name)) {
         const link = {
           ok: false,
           error: "telegram_login_not_mcp",
@@ -5801,7 +5881,7 @@ async function handleMcp(req, res, parts) {
           200,
         );
       }
-      if (!identified && !publicTools.has(name) && SESSION_TOOLS.has(name)) {
+      if (!identified && !publicTool && SESSION_TOOLS.has(name)) {
         const link = authCode
           ? {
               ok: false,
