@@ -224,10 +224,44 @@ async function brainPolish(thesis, token) {
   return thesis;
 }
 
+
+async function fetchWalletState(pubkey) {
+  const pk = trim(pubkey);
+  const out = { pubkey: pk, sol: 0, lamports: 0, usd: 0, rpcOk: false };
+  if (!pk) return out;
+  const key = trim(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "");
+  const rpc = key
+    ? `https://mainnet.helius-rpc.com/?api-key=${key}`
+    : "https://api.mainnet-beta.solana.com";
+  try {
+    const r = await fetch(rpc, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [pk] }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const j = await r.json();
+    const lamports = Number(j?.result?.value || 0);
+    out.lamports = lamports;
+    out.sol = lamports / 1e9;
+    out.rpcOk = true;
+  } catch { /* keep zeros */ }
+  try {
+    const pr = await fetch("https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112", { signal: AbortSignal.timeout(6000) });
+    const pj = await pr.json();
+    const px = Number(pj?.pairs?.[0]?.priceUsd || 0);
+    if (px) out.usd = out.sol * px;
+  } catch { /* ignore */ }
+  return out;
+}
+
 export async function snapshotHunter() {
   const sb = sbClient();
   const desk = await loadDesk(sb);
-  const feed = await loadFeed(sb, 30);
+  const feed = await loadFeed(sb, 80);
+  const chain = await fetchWalletState(desk.wallet);
+  const trades = feed.filter((e) => /buy|sell/i.test(String(e.action || e.kind || "")));
+  const realized = num(desk.realizedPnlUsd);
   return {
     ok: true,
     agent: HUNTER_NAME,
@@ -235,10 +269,22 @@ export async function snapshotHunter() {
     dashboard: HUNTER_DASHBOARD,
     mcpTools: ["orbitx_agent_desk", "orbitx_agent_feed", "orbitx_agent_tick", "orbitx_agent_arm"],
     liveEnabled: liveAllowed(),
-    desk,
+    chain,
+    desk: { ...desk, chainSol: chain.sol, chainUsd: chain.usd },
     feed,
+    trades,
+    stats: {
+      equityUsd: num(desk.equityUsd, 4),
+      chainUsd: chain.usd,
+      chainSol: chain.sol,
+      realizedPnlUsd: realized,
+      wins: num(desk.wins),
+      losses: num(desk.losses),
+      winRate: (num(desk.wins)+num(desk.losses)) ? num(desk.wins) / (num(desk.wins)+num(desk.losses)) : 0,
+      open: desk.open || null,
+    },
     disclaimer:
-      "Dry by default. $4 seed is the experiment size. Live clips need HUNTER_LIVE=1 plus arm. You can lose the whole seed. Not financial advice.",
+      "Isolated ALPHA wallet. $4 seed / $1.50 clip. You can lose the seed. Not financial advice.",
   };
 }
 
