@@ -199,6 +199,7 @@ import AgentCreateTokenPage from "./pages/AgentCreateTokenPage";
 import AgentNftMintPage from "./pages/AgentNftMintPage";
 import OnChainProofPage from "./pages/OnChainProofPage";
 import OnChainWorld from "./pages/OnChainWorld";
+import HunterAgentPage from "./pages/HunterAgentPage";
 import Education from "./pages/Education";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
@@ -358,6 +359,7 @@ const App = () => (
 
             {/* ── Public agent world (must beat /:toolSlug owner-404) ── */}
             <Route path="/calls" element={<Suspense fallback={<RouteFallback label="OrbitX Calls" />}><Calls /></Suspense>} />
+            <Route path="/orbitxagents/hunter" element={<Suspense fallback={<RouteFallback label="Hunter" />}><HunterAgentPage /></Suspense>} />
             <Route path="/orbitxagents" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsHub /></Suspense>} />
             <Route path="/orbitxagents/os" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />
             <Route path="/orbitxagents/os/:slug" element={<Suspense fallback={<RouteFallback label="OrbitX Agents" />}><OrbitxAgentsWorld /></Suspense>} />

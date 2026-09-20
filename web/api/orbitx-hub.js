@@ -54,6 +54,14 @@ import {
   buildAgentAuthPasteMessages,
   wrapMcpToolContent,
 } from "./orbitx/_handlers/_mcp-brand.js";
+
+import {
+  HUNTER_CORE_TOOLS,
+  snapshotHunter,
+  tickHunter,
+  setHunterArmed,
+  setHunterPaused,
+} from "./orbitx/_handlers/_mcp-hunter-agent.js";
 import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
@@ -1901,6 +1909,9 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_why",
+  "orbitx_agent_desk",
+  "orbitx_agent_feed",
+  "orbitx_agent_tick",
     description:
       "Why OrbitX MCP exists. Call when the user asks why use this MCP, why so many tools, which app to use, or how OrbitX is different from a charts-only site.",
     inputSchema: { type: "object", properties: { authCode: { type: "string" } }, additionalProperties: false },
@@ -3627,6 +3638,7 @@ const CORE_TOOLS = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   ...PAPER_CORE_TOOLS,
+  ...HUNTER_CORE_TOOLS,
   ...LIVE_CORE_TOOLS,
 ];
 
@@ -3785,6 +3797,22 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
   if (name === "orbitx_why") {
     return orbitxWhyPayload();
+  }
+  if (name === "orbitx_agent_desk") {
+    return snapshotHunter();
+  }
+  if (name === "orbitx_agent_feed") {
+    const snap = await snapshotHunter();
+    return { ok: true, feed: (snap.feed || []).slice(0, Number(args.limit) || 30), desk: snap.desk };
+  }
+  if (name === "orbitx_agent_tick") {
+    return tickHunter({ force: true });
+  }
+  if (name === "orbitx_agent_arm") {
+    if (args.paused === true) return setHunterPaused(true);
+    if (args.paused === false) return setHunterPaused(false);
+    if (args.armed === false) return setHunterArmed(false);
+    return setHunterArmed(true);
   }
   if (name === "orbitx_auth_link") {
     return createAgentLinkAuthSession(req);

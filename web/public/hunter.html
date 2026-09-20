@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALPHA · OrbitX hunter desk</title>
+  <meta name="description" content="MCP-only hunter agent. Thesis loop, isolated desk, dry until armed." />
+  <style>
+    :root { --bg:#05080c; --ink:#e8fff8; --dim:#7d958e; --line:rgba(111,255,220,.14); --mint:#6fffdc; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; background:#05080c; color:var(--ink); }
+    .w { width:min(920px, calc(100% - 28px)); margin:0 auto; padding:28px 0 60px; }
+    h1 { letter-spacing:-.05em; font-size:42px; }
+    .row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:18px 0; }
+    .card { border:1px solid var(--line); border-radius:16px; padding:14px 16px; background:rgba(8,14,18,.7); }
+    small { color:var(--dim); letter-spacing:.14em; text-transform:uppercase; font-size:10px; }
+    .feed { display:grid; gap:8px; }
+    .item { border:1px solid var(--line); border-radius:12px; padding:12px; font-size:14px; }
+    .buy { color:#34d399; } .skip { color:var(--dim); } .sell { color:#fbbf24; }
+    button { background:var(--mint); color:#04201a; border:0; border-radius:999px; padding:10px 16px; font-weight:700; cursor:pointer; }
+    a { color:var(--mint); }
+    @media(max-width:720px){ .row{grid-template-columns:1fr 1fr;} h1{font-size:32px;} }
+  </style>
+</head>
+<body>
+  <div class="w">
+    <small>OrbitX · MCP-only agent</small>
+    <h1>ALPHA</h1>
+    <p id="note" style="color:var(--dim);margin:8px 0 0">Loading desk…</p>
+    <div class="row" id="stats"></div>
+    <p style="margin:12px 0 20px"><button id="tick">Run loop now</button>
+      <a href="https://www.orbitx.world/api/mcp" style="margin-left:12px">MCP</a>
+    </p>
+    <div class="feed" id="feed"></div>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    async function load() {
+      const r = await fetch("/api/hunter-agent", { cache: "no-store" });
+      const d = await r.json();
+      const desk = d.desk || {};
+      $("note").textContent = desk.note || d.disclaimer || "";
+      $("stats").innerHTML = [
+        ["equity", "$" + (desk.equityUsd ?? 4)],
+        ["clip", "$" + (desk.clipUsd ?? 1.5)],
+        ["wins / losses", (desk.wins||0) + " / " + (desk.losses||0)],
+        ["mode", desk.armed ? (desk.dryRun ? "armed dry" : "LIVE") : "dry"],
+      ].map(([k,v]) => `<div class="card"><small>${k}</small><div style="font-size:22px;margin-top:6px">${v}</div></div>`).join("");
+      const feed = d.feed || [];
+      $("feed").innerHTML = feed.length ? feed.map((t) => {
+        const a = (t.action||"log").toLowerCase();
+        return `<div class="item"><b class="${a}">${(t.symbol||"")} ${a.toUpperCase()}</b> · ${t.sayThis || t.reason || ""}<div style="color:#7d958e;font-size:11px;margin-top:4px">${t.at||""} · ${t.mint||""}</div></div>`;
+      }).join("") : `<div class="item">No theses yet. Hit Run loop now or leave this tab open.</div>`;
+    }
+    $("tick").onclick = async () => {
+      $("tick").disabled = true;
+      await fetch("/api/hunter-agent?tick=1").catch(() => {});
+      $("tick").disabled = false;
+      load();
+    };
+    load();
+    setInterval(async () => {
+      await fetch("/api/hunter-agent?tick=1").catch(() => {});
+      load();
+    }, 180000);
+  </script>
+</body>
+</html>
