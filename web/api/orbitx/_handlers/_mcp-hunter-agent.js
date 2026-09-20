@@ -43,7 +43,8 @@ function emptyDesk() {
     name: HUNTER_NAME,
     home: "mcp",
     dashboard: HUNTER_DASHBOARD,
-    wallet: trim(process.env.HUNTER_WALLET_PUBKEY || process.env.LIVE_WALLET_PUBKEY || ""),
+    wallet: trim(process.env.HUNTER_WALLET_PUBKEY || "EqynMF4Ntjfb5An47qvyYfb2zE897xbNqvPUvpUkECxd"),
+    walletReady: Boolean(trim(process.env.HUNTER_SECRET_KEY)),
     seedUsd: HUNTER_SEED_USD,
     clipUsd: HUNTER_CLIP_USD,
     maxOpen: HUNTER_MAX_OPEN,
@@ -60,7 +61,9 @@ function emptyDesk() {
     lastThesis: null,
     lastTickAt: null,
     lastError: null,
-    note: "Dry loop. Fund the isolated wallet and arm before live clips.",
+    note: trim(process.env.HUNTER_SECRET_KEY)
+      ? "Wallet bound from Vercel env. Loop is dry until HUNTER_LIVE=1 and arm."
+      : "Add HUNTER_SECRET_KEY on Vercel to bind the isolated wallet.",
   };
 }
 
