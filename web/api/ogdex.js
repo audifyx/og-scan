@@ -155,58 +155,61 @@ async function handleOwnerApi(req, res) {
   if (!body || typeof body !== "object") body = {};
   const action = String(body.action || "overview");
 
-  const overview = {
-    generatedAt: new Date().toISOString(),
-    definitions: {
-      online: "heartbeat within 60s",
-      away: "heartbeat 60s–5min",
-      offline: "no heartbeat in 5min",
-      completedTx: "ledger.status=completed AND verified_onchain",
-      burn: "ox_admin_burns.verified_onchain or mcp_burn_ledger row",
-      fee: "min(1.2% of USD notional, $10), backend-enforced",
-    },
-    users: {
-      total: 0, newToday: 0, newYesterday: 0, newWeek: 0, newMonth: 0,
-      onlineNow: 0, awayNow: 0, dau: 0,
-    },
-    activity: {
-      txMonth: 0, txToday: 0, volumeMonthUsd: 0, volumeTodayUsd: 0,
-      launchesMonth: 0, launchesToday: 0, jupiterMonth: 0,
-    },
-    revenue: {
-      feesMonthUsd: 0, feesTodayUsd: 0, feesWeekUsd: 0, feesByApp: {},
-      avgFeeUsd: 0, maxFeeUsd: 0,
-    },
-    burns: { tokensMonth: 0, tokensToday: 0, countMonth: 0, countToday: 0 },
-    apps: {},
-    live: [],
-  };
-
   function send(status, obj) {
     res.statusCode = status;
     return res.end(JSON.stringify(obj));
   }
 
-  try {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-    async function sb(path) {
-      if (!key) return [];
-      const r = await fetch(`${url}/rest/v1/${path}`, {
-        headers: { apikey: key, Authorization: `Bearer ${key}` },
-      });
-      const t = await r.text();
-      if (!r.ok) return [];
-      try { const j = JSON.parse(t); return Array.isArray(j) ? j : []; } catch { return []; }
-    }
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
+  async function sb(path) {
+    if (!key) return [];
+    const r = await fetch(`${url}/rest/v1/${path}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    const t = await r.text();
+    if (!r.ok) return [];
+    try { const j = JSON.parse(t); return Array.isArray(j) ? j : []; } catch { return []; }
+  }
+  async function sbCount(path) {
+    if (!key) return 0;
+    const r = await fetch(`${url}/rest/v1/${path}`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: "count=exact",
+        Range: "0-0",
+      },
+    });
+    const cr = r.headers.get("content-range") || r.headers.get("Content-Range") || "";
+    const m = String(cr).match(/\/(\d+)\s*$/);
+    return m ? Number(m[1]) : 0;
+  }
+
+  const startOfUtcDay = (offset = 0) => {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d.toISOString();
+  };
+  const today = startOfUtcDay(0);
+  const yesterday = startOfUtcDay(-1);
+  const week = new Date(Date.now() - 7 * 86400000).toISOString();
+  const month = new Date(Date.now() - 30 * 86400000).toISOString();
+  const feeOf = (r) => Number(r.fee_usd_actual || r.fee_usd_calc || 0);
+
+  try {
     if (action === "health") {
       return send(200, {
         ok: true,
         action,
         data: {
-          state: "up",
-          checks: [{ name: "owner-api", ok: true, state: "up", ms: 1 }],
+          state: key ? "up" : "degraded",
+          checks: [
+            { name: "owner-api", ok: true, state: "up", ms: 1 },
+            { name: "supabase", ok: Boolean(key), state: key ? "up" : "missing_service_role", ms: 1 },
+          ],
           failedTransactionsToday: 0,
           lastVerifiedBurn: null,
           feeProcessor: "min(tx_usd × 0.012, $10)",
@@ -215,35 +218,155 @@ async function handleOwnerApi(req, res) {
       });
     }
 
-    if (action === "overview" || action === "presence") {
-      const presence = await sb("ox_admin_presence?select=user_id,status,last_heartbeat_at,current_app,username,avatar_url,wallet_address,current_path,device,last_seen_at&limit=2000");
+    if (action === "presence") {
+      const presence = await sb("ox_admin_presence?select=user_id,status,last_heartbeat_at,current_app,username,avatar_url,wallet_address,current_path,device,last_seen_at&order=last_heartbeat_at.desc&limit=2000");
       const now = Date.now();
-      const live = presence.map((p) => {
+      const rows = presence.map((p) => {
         const ts = p.last_heartbeat_at ? new Date(p.last_heartbeat_at).getTime() : 0;
         const age = ts ? now - ts : 1e12;
-        const liveStatus = age <= 60000 ? "online" : age <= 300000 ? "away" : "offline";
-        return { ...p, liveStatus };
+        return { ...p, liveStatus: age <= 60000 ? "online" : age <= 300000 ? "away" : "offline" };
       });
-      overview.users.onlineNow = live.filter((p) => p.liveStatus === "online").length;
-      overview.users.awayNow = live.filter((p) => p.liveStatus === "away").length;
-      overview.live = live.filter((p) => p.liveStatus !== "offline").slice(0, 40);
-      for (const row of overview.live) {
-        const app = row.current_app || "app";
-        overview.apps[app] = overview.apps[app] || { online: 0, away: 0 };
-        if (row.liveStatus === "online") overview.apps[app].online += 1;
-        if (row.liveStatus === "away") overview.apps[app].away += 1;
-      }
-      if (action === "presence") return send(200, { ok: true, action, rows: overview.live });
-      return send(200, { ok: true, action, data: overview });
+      return send(200, { ok: true, action, rows });
     }
 
-    if (["events", "ledger", "jupiter", "burns", "audit", "daily", "search"].includes(action)) {
-      return send(200, { ok: true, action, rows: [], mcp: [], users: [] });
+    if (action === "ledger" || action === "jupiter") {
+      let q = "ox_admin_ledger?select=*&order=created_at.desc&limit=200";
+      if (action === "jupiter") q += "&tx_type=in.(swap,jupiter,buy,sell)";
+      const rows = await sb(q);
+      return send(200, { ok: true, action, rows });
     }
-    if (action === "user") return send(200, { ok: true, action, data: null });
-    return send(200, { ok: true, action, data: overview });
+    if (action === "burns") {
+      const rows = await sb("ox_admin_burns?select=*&order=created_at.desc&limit=200");
+      const mcp = await sb("mcp_burn_ledger?select=id,user_id,wallet_address,tokens_burned,tx_signature,created_at,package_id&order=created_at.desc&limit=200");
+      return send(200, { ok: true, action, rows, mcp });
+    }
+    if (action === "events") {
+      const rows = await sb("ox_admin_events?select=*&order=created_at.desc&limit=200");
+      return send(200, { ok: true, action, rows });
+    }
+    if (action === "audit") {
+      const rows = await sb("ox_admin_audit?select=*&order=created_at.desc&limit=200");
+      return send(200, { ok: true, action, rows });
+    }
+    if (action === "daily") {
+      const rows = await sb("ox_admin_daily?select=*&order=day.desc&limit=90");
+      return send(200, { ok: true, action, rows });
+    }
+    if (action === "search") {
+      const q = String(body.q || body.query || "").trim();
+      const users = q
+        ? await sb(`profiles?or=(username.ilike.*${encodeURIComponent(q)}*,wallet_address.ilike.*${encodeURIComponent(q)}*)&select=user_id,username,wallet_address,created_at&limit=40`)
+        : [];
+      return send(200, { ok: true, action, users, rows: users });
+    }
+    if (action === "user") {
+      const uid = String(body.userId || body.user_id || "").trim();
+      const rows = uid ? await sb(`profiles?user_id=eq.${encodeURIComponent(uid)}&select=*&limit=1`) : [];
+      return send(200, { ok: true, action, data: rows[0] || null });
+    }
+
+    const [
+      total,
+      newToday,
+      newYesterday,
+      newWeek,
+      newMonth,
+      presence,
+      ledger,
+      burns,
+      mcpBurns,
+      tokens,
+      activityToday,
+    ] = await Promise.all([
+      sbCount("profiles?select=user_id"),
+      sbCount(`profiles?select=user_id&created_at=gte.${today}`),
+      sbCount(`profiles?select=user_id&created_at=gte.${yesterday}&created_at=lt.${today}`),
+      sbCount(`profiles?select=user_id&created_at=gte.${week}`),
+      sbCount(`profiles?select=user_id&created_at=gte.${month}`),
+      sb("ox_admin_presence?select=user_id,status,last_heartbeat_at,current_app,username,avatar_url,wallet_address,current_path,device,last_seen_at&limit=5000"),
+      sb(`ox_admin_ledger?select=id,status,value_usd,fee_usd_actual,fee_usd_calc,application,tx_type,verified_onchain,created_at&created_at=gte.${month}&limit=8000`),
+      sb(`ox_admin_burns?select=tokens_burned,verified_onchain,created_at&created_at=gte.${month}&limit=5000`),
+      sb(`mcp_burn_ledger?select=tokens_burned,created_at&created_at=gte.${month}&limit=5000`),
+      sb(`orbitx_tokens?select=id,created_at&created_at=gte.${month}&limit=4000`),
+      sb(`user_activity?select=user_id,created_at&created_at=gte.${today}&limit=8000`),
+    ]);
+
+    const now = Date.now();
+    const live = presence.map((p) => {
+      const ts = p.last_heartbeat_at ? new Date(p.last_heartbeat_at).getTime() : 0;
+      const age = ts ? now - ts : 1e12;
+      return { ...p, liveStatus: age <= 60000 ? "online" : age <= 300000 ? "away" : "offline" };
+    });
+    const completed = ledger.filter((r) => String(r.status) === "completed" && r.verified_onchain);
+    const inRange = (iso, since) => iso && new Date(iso).toISOString() >= since;
+    const sum = (arr, fn) => arr.reduce((a, r) => a + (Number(fn(r)) || 0), 0);
+    const verifiedBurns = [
+      ...burns.filter((b) => b.verified_onchain),
+      ...mcpBurns,
+    ];
+    const apps = {};
+    for (const row of live) {
+      const app = row.current_app || "app";
+      apps[app] = apps[app] || { online: 0, away: 0 };
+      if (row.liveStatus === "online") apps[app].online += 1;
+      if (row.liveStatus === "away") apps[app].away += 1;
+    }
+    const feesByApp = {};
+    for (const row of completed) {
+      const app = row.application || "app";
+      feesByApp[app] = (feesByApp[app] || 0) + feeOf(row);
+    }
+
+    const overview = {
+      generatedAt: new Date().toISOString(),
+      definitions: {
+        online: "heartbeat within 60s",
+        away: "heartbeat 60s–5min",
+        offline: "no heartbeat in 5min",
+        completedTx: "ledger.status=completed AND verified_onchain",
+        burn: "ox_admin_burns.verified_onchain or mcp_burn_ledger row",
+        fee: "min(1.2% of USD notional, $10), backend-enforced",
+      },
+      users: {
+        total,
+        newToday,
+        newYesterday,
+        newWeek,
+        newMonth,
+        onlineNow: live.filter((p) => p.liveStatus === "online").length,
+        awayNow: live.filter((p) => p.liveStatus === "away").length,
+        dau: new Set(activityToday.map((a) => a.user_id).filter(Boolean)).size,
+      },
+      activity: {
+        txMonth: completed.length,
+        txToday: completed.filter((r) => inRange(r.created_at, today)).length,
+        volumeMonthUsd: sum(completed, (r) => r.value_usd),
+        volumeTodayUsd: sum(completed.filter((r) => inRange(r.created_at, today)), (r) => r.value_usd),
+        launchesMonth: tokens.length,
+        launchesToday: tokens.filter((t) => inRange(t.created_at, today)).length,
+        jupiterMonth: completed.filter((r) => /swap|jupiter|buy|sell/i.test(String(r.tx_type || ""))).length,
+      },
+      revenue: {
+        feesMonthUsd: sum(completed, feeOf),
+        feesTodayUsd: sum(completed.filter((r) => inRange(r.created_at, today)), feeOf),
+        feesWeekUsd: sum(completed.filter((r) => inRange(r.created_at, week)), feeOf),
+        feesByApp,
+        avgFeeUsd: completed.length ? sum(completed, feeOf) / completed.length : 0,
+        maxFeeUsd: completed.reduce((m, r) => Math.max(m, feeOf(r)), 0),
+      },
+      burns: {
+        tokensMonth: sum(verifiedBurns, (b) => b.tokens_burned),
+        tokensToday: sum(verifiedBurns.filter((b) => inRange(b.created_at, today)), (b) => b.tokens_burned),
+        countMonth: verifiedBurns.length,
+        countToday: verifiedBurns.filter((b) => inRange(b.created_at, today)).length,
+      },
+      apps,
+      live: live.filter((p) => p.liveStatus !== "offline").slice(0, 40),
+      meta: { supabaseConfigured: Boolean(key) },
+    };
+    return send(200, { ok: true, action: "overview", data: overview });
   } catch (e) {
-    return send(200, { ok: true, action, data: overview, warning: String(e && e.message || e) });
+    return send(500, { ok: false, error: String(e && e.message || e) });
   }
 }
 
