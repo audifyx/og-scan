@@ -120,12 +120,20 @@
     };
     $("reload").onclick = load;
     load();
+    const SESSION_MS = 3 * 60 * 60 * 1000;
+    if (!localStorage.getItem("ox_alpha_until")) {
+      localStorage.setItem("ox_alpha_until", String(Date.now() + SESSION_MS));
+    }
     async function tickLoop() {
+      const until = Number(localStorage.getItem("ox_alpha_until") || 0);
+      if (Date.now() > until) {
+        localStorage.setItem("ox_alpha_until", String(Date.now() + SESSION_MS));
+      }
       try { await fetch(api + "&tick=1", { cache: "no-store" }); } catch {}
       load();
     }
     setInterval(load, 15000);
-    setInterval(tickLoop, 180000);
+    setInterval(tickLoop, 120000);
     tickLoop();
   </script>
 </body>
