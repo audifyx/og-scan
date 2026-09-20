@@ -278,29 +278,29 @@ function ruleThesis(token, desk) {
   const vol = token.volume24h;
   let action = "skip";
   let reason = "no edge";
-  if (liq < 2500) {
+  if (liq < 4000) {
     action = "skip";
     reason = "book too thin";
-  } else if (ch <= -15) {
+  } else if (ch <= -32) {
     action = "skip";
-    reason = "1h dump";
-  } else if (ch >= 90) {
+    reason = "cascade, not a dip";
+  } else if (ch >= 70) {
     action = "skip";
     reason = "already vertical";
-  } else if (vol >= 4000 && liq >= 2500 && ch > -8 && ch < 90) {
+  } else if (vol >= 3000 && liq >= 4000 && ch > -32 && ch < 25) {
     action = desk.open ? "hold" : "buy";
-    reason = "boosted tape with book and flow";
+    reason = ch < 0 ? "dip with book" : "steady tape";
   } else {
     action = "skip";
     reason = "not our setup";
   }
   if (desk.open && desk.open.mint === token.mint) {
-    if (ch <= -12) {
+    if (ch <= -18) {
       action = "sell";
       reason = "open book rolling over";
-    } else if (ch >= 20) {
+    } else if (ch >= 12) {
       action = "sell";
-      reason = "take the clip";
+      reason = "take profit";
     }
   }
   return {
@@ -493,15 +493,18 @@ export async function tickHunter({ force = false } = {}) {
   if (thesis.action === "buy" && !desk.open) {
     if (canLive()) {
       try {
-        const solUsd = Math.max(1, num((await fetchWalletState(desk.wallet)).usd) / Math.max(0.0000001, num((await fetchWalletState(desk.wallet)).sol)));
-        // fallback SOL price ~200 if chain usd missing
         let px = 200;
         try {
           const pr = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + SOL_MINT, { signal: AbortSignal.timeout(6000) });
           const pj = await pr.json();
           px = Number(pj?.pairs?.[0]?.priceUsd) || px;
         } catch {}
-        const lamports = Math.max(50_000_000, Math.floor((HUNTER_CLIP_USD / px) * 1e9));
+        const chain = await fetchWalletState(desk.wallet);
+        const reserve = 8_000_000; // fees + rent
+        const want = Math.floor((HUNTER_CLIP_USD / px) * 1e9);
+        const maxSpend = Math.max(0, Number(chain.lamports || 0) - reserve);
+        const lamports = Math.min(Math.max(want, 8_000_000), maxSpend);
+        if (lamports < 8_000_000) throw new Error("wallet needs more SOL for a clip + fees");
         const live = await liveSwap({ inputMint: SOL_MINT, outputMint: pick.mint, amount: lamports });
         desk.open = {
           mint: pick.mint,
