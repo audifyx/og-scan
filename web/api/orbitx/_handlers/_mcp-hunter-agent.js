@@ -96,7 +96,7 @@ async function sendRaw(b64) {
   const r = await fetch(rpcUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "sendTransaction", params: [b64, { encoding: "base64", skipPreflight: false, maxRetries: 3 }] }),
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "sendTransaction", params: [b64, { encoding: "base64", skipPreflight: true, maxRetries: 3 }] }),
     signal: AbortSignal.timeout(20000),
   });
   const j = await r.json();
@@ -108,7 +108,7 @@ async function liveSwap({ inputMint, outputMint, amount }) {
   const kp = await loadHunterKeypair();
   const owner = kp.publicKey.toBase58();
   const qr = await fetch(
-    `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=150&restrictIntermediateTokens=true`,
+    `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=300&restrictIntermediateTokens=true`,
     { signal: AbortSignal.timeout(12000) },
   );
   const quote = await qr.json();
@@ -500,11 +500,11 @@ export async function tickHunter({ force = false } = {}) {
           px = Number(pj?.pairs?.[0]?.priceUsd) || px;
         } catch {}
         const chain = await fetchWalletState(desk.wallet);
-        const reserve = 8_000_000; // fees + rent
+        const reserve = 25_000_000; // ATA + wrap + priority
         const want = Math.floor((HUNTER_CLIP_USD / px) * 1e9);
         const maxSpend = Math.max(0, Number(chain.lamports || 0) - reserve);
-        const lamports = Math.min(Math.max(want, 8_000_000), maxSpend);
-        if (lamports < 8_000_000) throw new Error("wallet needs more SOL for a clip + fees");
+        const lamports = Math.min(want, maxSpend, 20_000_000);
+        if (lamports < 5_000_000) throw new Error("wallet needs more SOL for a clip + fees");
         const live = await liveSwap({ inputMint: SOL_MINT, outputMint: pick.mint, amount: lamports });
         desk.open = {
           mint: pick.mint,
