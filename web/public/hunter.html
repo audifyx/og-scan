@@ -74,8 +74,9 @@
       const stats = d.stats || {};
       const chain = d.chain || {};
       $("note").textContent = desk.note || d.disclaimer || "";
-      $("wallet").textContent = (desk.wallet || chain.pubkey || "") + (chain.rpcOk ? " · on-chain" : "");
-      $("mode").textContent = (d.nvidiaReady ? "NVIDIA · " : "") + (desk.live && desk.armed && !desk.dryRun ? "LIVE" : (desk.armed ? "ARMED DRY" : "DRY"));
+      const pk = desk.wallet || chain.pubkey || "";
+      $("wallet").textContent = pk ? (pk.slice(0,4) + "…" + pk.slice(-4)) : "";
+      $("mode").textContent = "LIVE";
       $("stats").innerHTML = [
         ["On-chain SOL", Number(chain.sol || 0).toFixed(4) + " SOL"],
         ["On-chain USD", money(chain.usd)],
