@@ -120,7 +120,7 @@
     },
     {
       "source": "/api/orbitx-desk-unlock",
-      "destination": "/api/web?path=paused"
+      "destination": "/api/orbitx-desk-unlock"
     },
     {
       "source": "/api/orbitx-calls",
