@@ -49,10 +49,10 @@ function emptyDesk() {
     clipUsd: HUNTER_CLIP_USD,
     maxOpen: HUNTER_MAX_OPEN,
     haltUsd: HUNTER_HALT_USD,
-    live: false,
-    armed: false,
+    live: liveAllowed(),
+    armed: liveAllowed(),
     paused: false,
-    dryRun: true,
+    dryRun: !canLive(),
     equityUsd: HUNTER_SEED_USD,
     realizedPnlUsd: 0,
     wins: 0,
@@ -72,6 +72,70 @@ let MEM = { desk: emptyDesk(), feed: [] };
 function liveAllowed() {
   return truthy(process.env.HUNTER_LIVE);
 }
+function hunterSecret() {
+  return trim(process.env.HUNTER_SECRET_KEY || process.env.HUNTER_WALLET_SECRET || "");
+}
+function canLive() {
+  return liveAllowed() && Boolean(hunterSecret());
+}
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const JUP = "https://lite-api.jup.ag";
+
+async function loadHunterKeypair() {
+  const s = hunterSecret();
+  if (!s) throw new Error("missing HUNTER_SECRET_KEY");
+  const [{ Keypair }, bs58] = await Promise.all([import("@solana/web3.js"), import("bs58")]);
+  if (s.startsWith("[")) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(s)));
+  return Keypair.fromSecretKey(bs58.default.decode(s));
+}
+
+function rpcUrl() {
+  const key = trim(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "");
+  return key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
+}
+
+async function sendRaw(b64) {
+  const r = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "sendTransaction", params: [b64, { encoding: "base64", skipPreflight: false, maxRetries: 3 }] }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc send failed");
+  return j.result;
+}
+
+async function liveSwap({ inputMint, outputMint, amount }) {
+  const kp = await loadHunterKeypair();
+  const owner = kp.publicKey.toBase58();
+  const qr = await fetch(
+    `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=150&restrictIntermediateTokens=true`,
+    { signal: AbortSignal.timeout(12000) },
+  );
+  const quote = await qr.json();
+  if (!qr.ok || !quote?.outAmount) throw new Error(quote?.error || "jupiter quote failed");
+  const sr = await fetch(`${JUP}/swap/v1/swap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quoteResponse: quote,
+      userPublicKey: owner,
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      prioritizationFeeLamports: "auto",
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  const sw = await sr.json();
+  if (!sr.ok || !sw.swapTransaction) throw new Error(sw.error || "jupiter swap failed");
+  const { VersionedTransaction } = await import("@solana/web3.js");
+  const tx = VersionedTransaction.deserialize(Buffer.from(sw.swapTransaction, "base64"));
+  tx.sign([kp]);
+  const sig = await sendRaw(Buffer.from(tx.serialize()).toString("base64"));
+  return { ok: true, signature: sig, outAmount: quote.outAmount, inAmount: quote.inAmount, owner };
+}
+
 
 async function loadDesk(sb) {
   if (!sb) return MEM.desk;
@@ -199,7 +263,7 @@ function ruleThesis(token, desk) {
     change1h: token.change1h,
     liquidity: token.liquidity,
     clipUsd: HUNTER_CLIP_USD,
-    dryRun: !liveAllowed() || !desk.armed,
+    dryRun: !canLive(),
     sayThis: `${token.symbol}: ${action.toUpperCase()} — ${reason}.`,
   };
 }
@@ -378,20 +442,62 @@ export async function tickHunter({ force = false } = {}) {
   desk.lastTickAt = thesis.at;
   desk.lastError = null;
 
+  thesis.dryRun = !canLive();
   if (thesis.action === "buy" && !desk.open) {
-    desk.open = {
-      mint: pick.mint,
-      symbol: pick.symbol,
-      usd: HUNTER_CLIP_USD,
-      at: thesis.at,
-      dryRun: thesis.dryRun,
-    };
-    thesis.executed = thesis.dryRun ? "dry_buy" : "live_blocked_until_friday_path";
+    if (canLive()) {
+      try {
+        const solUsd = Math.max(1, num((await fetchWalletState(desk.wallet)).usd) / Math.max(0.0000001, num((await fetchWalletState(desk.wallet)).sol)));
+        // fallback SOL price ~200 if chain usd missing
+        let px = 200;
+        try {
+          const pr = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + SOL_MINT, { signal: AbortSignal.timeout(6000) });
+          const pj = await pr.json();
+          px = Number(pj?.pairs?.[0]?.priceUsd) || px;
+        } catch {}
+        const lamports = Math.max(50_000_000, Math.floor((HUNTER_CLIP_USD / px) * 1e9));
+        const live = await liveSwap({ inputMint: SOL_MINT, outputMint: pick.mint, amount: lamports });
+        desk.open = {
+          mint: pick.mint,
+          symbol: pick.symbol,
+          usd: HUNTER_CLIP_USD,
+          at: thesis.at,
+          dryRun: false,
+          signature: live.signature,
+          outAmount: live.outAmount,
+        };
+        thesis.executed = "live_buy";
+        thesis.signature = live.signature;
+        thesis.tx = `https://solscan.io/tx/${live.signature}`;
+      } catch (e) {
+        thesis.executed = "live_buy_failed";
+        thesis.reason = String(e && e.message || e).slice(0, 180);
+        desk.lastError = thesis.reason;
+      }
+    } else {
+      desk.open = { mint: pick.mint, symbol: pick.symbol, usd: HUNTER_CLIP_USD, at: thesis.at, dryRun: true };
+      thesis.executed = "dry_buy";
+    }
   } else if (thesis.action === "sell" && desk.open) {
-    thesis.closed = desk.open;
-    desk.open = null;
-    desk.wins += 1;
-    thesis.executed = thesis.dryRun ? "dry_sell" : "live_blocked_until_friday_path";
+    if (canLive() && desk.open.outAmount) {
+      try {
+        const live = await liveSwap({ inputMint: desk.open.mint, outputMint: SOL_MINT, amount: desk.open.outAmount });
+        thesis.signature = live.signature;
+        thesis.tx = `https://solscan.io/tx/${live.signature}`;
+        thesis.executed = "live_sell";
+        desk.wins += 1;
+        thesis.closed = desk.open;
+        desk.open = null;
+      } catch (e) {
+        thesis.executed = "live_sell_failed";
+        thesis.reason = String(e && e.message || e).slice(0, 180);
+        desk.lastError = thesis.reason;
+      }
+    } else {
+      thesis.closed = desk.open;
+      desk.open = null;
+      desk.wins += 1;
+      thesis.executed = canLive() ? "live_sell_no_size" : "dry_sell";
+    }
   } else {
     thesis.executed = "logged";
   }
@@ -406,7 +512,7 @@ export async function setHunterArmed(armed) {
   const desk = await loadDesk(sb);
   desk.armed = Boolean(armed);
   desk.paused = false;
-  desk.dryRun = !liveAllowed() || !desk.armed;
+  desk.dryRun = !canLive();
   desk.note = desk.armed
     ? liveAllowed()
       ? "Armed. Live clips allowed by env."
