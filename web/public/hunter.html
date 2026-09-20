@@ -40,7 +40,7 @@
       <div>
         <span class="badge" id="mode">…</span>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <button id="tick">Run loop now</button>
+          <button id="tick">Start</button>
           <button class="ghost" id="reload">Refresh</button>
         </div>
       </div>
@@ -107,7 +107,14 @@
     }
     $("tick").onclick = async () => {
       $("tick").disabled = true;
-      await fetch(api + "&tick=1").catch(() => {});
+      $("note").textContent = "Running…";
+      try {
+        const r = await fetch(api + "&tick=1", { cache: "no-store" });
+        const j = await r.json();
+        if (!j.ok) $("note").textContent = j.error || "Tick failed";
+      } catch (e) {
+        $("note").textContent = String(e && e.message || e);
+      }
       $("tick").disabled = false;
       load();
     };
