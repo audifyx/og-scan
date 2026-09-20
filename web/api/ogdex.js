@@ -40,7 +40,7 @@ import platformStats from "./ogdex/_routes/_platform-stats.js";
 import traders from "./ogdex/_routes/_traders.js";
 import waitlist from "./ogdex/_routes/_waitlist.js";
 import mcp from "./ogdex/_routes/_mcp.js";
-import deskUnlock from "./ogdex/_routes/_desk-unlock.js";
+import { createHmac, timingSafeEqual } from "crypto";
 
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
@@ -51,7 +51,6 @@ const ROUTES = {
   traders,
   waitlist,
   mcp,
-  "desk-unlock": deskUnlock,
 };
 
 const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock"]);
@@ -87,6 +86,51 @@ function hasSoftKey(req, u) {
   return !!k && allow.includes(String(k));
 }
 
+
+function deskSecrets() {
+  const out = [];
+  for (const key of ["OXW_WORKER_SECRET", "ADMIN_AUTH", "OWNER_DESK_CODE", "ADMIN_PASS"]) {
+    const s = String(process.env[key] || "").trim();
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+function safeEq(a, b) {
+  const L = Buffer.from(String(a));
+  const R = Buffer.from(String(b));
+  if (L.length !== R.length) return false;
+  return timingSafeEqual(L, R);
+}
+function handleDeskUnlock(req, res) {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
+  const secrets = deskSecrets();
+  if (req.method === "GET") {
+    res.statusCode = 200;
+    return res.end(JSON.stringify({ ok: true, configured: secrets.length > 0 }));
+  }
+  if (req.method !== "POST") { res.statusCode = 405; return res.end(JSON.stringify({ ok: false, error: "method" })); }
+  let body = req.body;
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
+  if (!body || typeof body !== "object") body = {};
+  const code = String(body.code || "").trim();
+  if (!secrets.length) { res.statusCode = 503; return res.end(JSON.stringify({ ok: false, error: "not_configured" })); }
+  if (!code || !secrets.some((s) => safeEq(code, s))) {
+    res.statusCode = 401;
+    return res.end(JSON.stringify({ ok: false, error: "denied" }));
+  }
+  if (String(body.purpose || "desk") === "maintenance") {
+    res.statusCode = 200;
+    return res.end(JSON.stringify({ ok: true, purpose: "maintenance" }));
+  }
+  const exp = Date.now() + 12 * 60 * 60 * 1000;
+  const mac = createHmac("sha256", secrets[0]).update(String(exp)).digest("hex");
+  res.statusCode = 200;
+  return res.end(JSON.stringify({ ok: true, token: `oxdesk1.${exp}.${mac}` }));
+}
+
 export default async function handler(req, res) {
   let seg = "";
   let u;
@@ -100,6 +144,10 @@ export default async function handler(req, res) {
       if (seg === "ogdex" || seg === "api") seg = "";
     }
   } catch { u = new URL("http://x"); }
+
+  if (seg === "desk-unlock" || seg === "orbitx-desk-unlock") {
+    return handleDeskUnlock(req, res);
+  }
 
   const route = ROUTES[seg];
   if (!route) {
