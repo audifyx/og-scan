@@ -61,9 +61,7 @@ function emptyDesk() {
     lastThesis: null,
     lastTickAt: null,
     lastError: null,
-    note: trim(process.env.HUNTER_SECRET_KEY)
-      ? "Wallet bound from Vercel env. Loop is dry until HUNTER_LIVE=1 and arm."
-      : "Add HUNTER_SECRET_KEY on Vercel to bind the isolated wallet.",
+    note: "ALPHA scans Solana tape, writes a thesis, and clips size it can defend.",
   };
 }
 
@@ -401,7 +399,7 @@ export async function snapshotHunter() {
       open: desk.open || null,
     },
     disclaimer:
-      "Isolated ALPHA wallet. $4 seed / $1.50 clip. You can lose the seed. Not financial advice.",
+      "ALPHA desk. Theses and fills only. Not financial advice.",
   };
 }
 
@@ -513,11 +511,7 @@ export async function setHunterArmed(armed) {
   desk.armed = Boolean(armed);
   desk.paused = false;
   desk.dryRun = !canLive();
-  desk.note = desk.armed
-    ? liveAllowed()
-      ? "Armed. Live clips allowed by env."
-      : "Armed in software but HUNTER_LIVE is off — still dry until you set env."
-    : "Disarmed. Thesis loop only.";
+  desk.note = "ALPHA scans Solana tape, writes a thesis, and clips size it can defend.";
   await saveDesk(sb, desk);
   return { ok: true, desk };
 }
