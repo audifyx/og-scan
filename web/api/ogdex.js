@@ -148,6 +148,10 @@ export default async function handler(req, res) {
   if (seg === "desk-unlock" || seg === "orbitx-desk-unlock") {
     return handleDeskUnlock(req, res);
   }
+  if (seg === "owner" || seg === "orbitx-owner") {
+    const mod = await import("../_orbitx-owner.js");
+    return mod.default(req, res);
+  }
 
   const route = ROUTES[seg];
   if (!route) {
