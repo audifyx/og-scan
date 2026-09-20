@@ -259,18 +259,18 @@ function ruleThesis(token, desk) {
   const vol = token.volume24h;
   let action = "skip";
   let reason = "no edge";
-  if (liq < 4000) {
+  if (liq < 2500) {
     action = "skip";
     reason = "book too thin";
-  } else if (ch <= -18) {
+  } else if (ch <= -15) {
     action = "skip";
-    reason = "1h dump — do not catch knives";
-  } else if (ch >= 80 && vol > 20000 && liq > 8000) {
+    reason = "1h dump";
+  } else if (ch >= 90) {
+    action = "skip";
+    reason = "already vertical";
+  } else if (vol >= 4000 && liq >= 2500 && ch > -8 && ch < 90) {
     action = desk.open ? "hold" : "buy";
-    reason = "1h expansion with real volume";
-  } else if (ch >= 12 && vol > 8000 && liq > 6000) {
-    action = desk.open ? "hold" : "watch";
-    reason = "tape is loud but wait for a dip";
+    reason = "boosted tape with book and flow";
   } else {
     action = "skip";
     reason = "not our setup";
