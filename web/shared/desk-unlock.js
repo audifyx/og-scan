@@ -4,7 +4,7 @@
  * OWNER_DESK_CODE / ADMIN_PASS are legacy aliases. Never ship a default PIN.
  * Retired codes are stored as SHA-256 digests only.
  */
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 
 export const DESK_SESSION_PREFIX = "oxdesk1";
 export const DESK_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
