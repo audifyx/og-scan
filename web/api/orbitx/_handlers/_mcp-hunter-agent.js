@@ -139,11 +139,11 @@ async function loadDesk(sb) {
   if (!sb) return MEM.desk;
   const ev = await sb
     .from("ox_live_events")
-    .select("payload,created_at")
+    .select("meta,created_at")
     .eq("kind", "hunter_desk")
     .order("created_at", { ascending: false })
     .limit(1);
-  const saved = ev?.data?.[0]?.payload?.desk;
+  const saved = ev?.data?.[0]?.meta?.desk;
   if (saved && typeof saved === "object") {
     MEM.desk = { ...emptyDesk(), ...saved };
   }
@@ -178,9 +178,11 @@ async function saveDesk(sb, desk) {
   }
   try {
     await sb.from("ox_live_events").insert({
-      paper: false,
       kind: "hunter_desk",
-      payload: { hunter: HUNTER_ID, type: "desk", desk },
+      agent_id: HUNTER_ID,
+      thesis: desk.note || "ALPHA",
+      reason: desk.lastError || null,
+      meta: { hunter: HUNTER_ID, type: "desk", desk },
     });
   } catch { /* events table may reject extra cols */ }
 }
@@ -189,16 +191,26 @@ async function loadFeed(sb, limit = 40) {
   if (!sb) return MEM.feed.slice(0, limit);
   const { data, error } = await sb
     .from("ox_live_events")
-    .select("payload,kind,created_at")
+    .select("kind,agent_id,mint,symbol,side,thesis,reason,signature,meta,created_at")
     .order("created_at", { ascending: false })
     .limit(200);
   if (error || !Array.isArray(data)) return MEM.feed.slice(0, limit);
   const rows = data
-    .map((r) => r.payload || r)
-    .filter((p) => p && (p.hunter === HUNTER_ID || p.type === "desk" || p.kind === "thesis" || p.action));
-  if (rows.length) MEM.feed = rows.filter((p) => p.type !== "desk").slice(0, limit);
-  const lastDesk = data.find((r) => r.kind === "hunter_desk" || r.payload?.type === "desk");
-  if (lastDesk?.payload?.desk) MEM.desk = { ...emptyDesk(), ...lastDesk.payload.desk };
+    .filter((r) => !r.agent_id || r.agent_id === HUNTER_ID || r.meta?.hunter === HUNTER_ID)
+    .map((r) => ({
+      ...(r.meta && typeof r.meta === "object" ? r.meta : {}),
+      kind: r.kind,
+      action: r.side || r.meta?.action,
+      symbol: r.symbol || r.meta?.symbol,
+      mint: r.mint || r.meta?.mint,
+      sayThis: r.thesis || r.meta?.sayThis,
+      reason: r.reason || r.meta?.reason,
+      signature: r.signature || r.meta?.signature,
+      at: r.created_at,
+    }));
+  if (rows.length) MEM.feed = rows.filter((p) => p.kind !== "hunter_desk").slice(0, limit);
+  const lastDesk = data.find((r) => r.kind === "hunter_desk" && r.meta?.desk);
+  if (lastDesk?.meta?.desk) MEM.desk = { ...emptyDesk(), ...lastDesk.meta.desk };
   return MEM.feed.slice(0, limit);
 }
 
@@ -207,9 +219,16 @@ async function pushEvent(sb, payload) {
   MEM.feed = MEM.feed.slice(0, 80);
   if (!sb) return;
   const { error } = await sb.from("ox_live_events").insert({
-    paper: false,
-    kind: payload.kind || "thesis",
-    payload: { hunter: HUNTER_ID, ...payload },
+    kind: payload.kind || payload.action || "thesis",
+    agent_id: HUNTER_ID,
+    mint: payload.mint || null,
+    symbol: payload.symbol || null,
+    side: payload.action || payload.executed || null,
+    usd_amount: payload.usd || payload.clipUsd || null,
+    thesis: payload.sayThis || null,
+    reason: payload.reason || null,
+    signature: payload.signature || null,
+    meta: { hunter: HUNTER_ID, ...payload },
   });
   if (error) payload.persistError = error.message;
 }
@@ -305,7 +324,7 @@ function nvidiaKey() {
   return trim(process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "");
 }
 function nvidiaModel() {
-  return trim(process.env.NVIDIA_MODEL || "meta/llama-3.1-8b-instruct");
+  return trim(process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct");
 }
 
 async function nvidiaThesis(token, thesis) {
@@ -452,7 +471,11 @@ export async function tickHunter({ force = false } = {}) {
     return { ok: false, error: desk.lastError, desk };
   }
 
-  const pick = [...tape].sort((a,b) => num(b.volume24h)-num(a.volume24h))[0] || null;
+  const ranked = [...tape].sort((a,b) => num(b.volume24h)-num(a.volume24h));
+  const pick = ranked.find((tok) => ruleThesis(tok, desk).action === "buy")
+    || ranked.find((tok) => ruleThesis(tok, desk).action !== "skip")
+    || ranked[0]
+    || null;
   if (!pick) {
     desk.lastError = "empty_tape";
     desk.lastTickAt = new Date().toISOString();
