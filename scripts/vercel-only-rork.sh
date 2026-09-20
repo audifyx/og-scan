@@ -8,10 +8,11 @@
 set -euo pipefail
 
 RORK_PROJECT_ID="prj_c5AQF7gDGnrQWmKAznpQPf06GWi2"
+ORBITX_WORLD_PROJECT_ID="prj_zq0S9PT1758Gc2BlSa1R3Uumjao1"
 project_id="${VERCEL_PROJECT_ID:-}"
 haystack="${VERCEL_URL:-} ${VERCEL_BRANCH_URL:-} ${VERCEL_PROJECT_PRODUCTION_URL:-}"
 
-if [[ "$project_id" == "$RORK_PROJECT_ID" ]]; then
+if [[ "$project_id" == "$RORK_PROJECT_ID" || "$project_id" == "$ORBITX_WORLD_PROJECT_ID" ]]; then
   exit 1
 fi
 
