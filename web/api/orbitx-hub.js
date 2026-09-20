@@ -7,6 +7,19 @@
  *   /api/orbitx-mcp/*   → /api/orbitx-hub?path=mcp/*
  *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
+export const MCP_SERVER_VERSION = "1.14.0";
+export const MCP_SERVER_NAME = "OrbitX Agent MCP";
+
+function mcpRuntime() {
+  return {
+    version: MCP_SERVER_VERSION,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_REF || null,
+    env: process.env.VERCEL_ENV || "unknown",
+    region: process.env.VERCEL_REGION || null,
+    now: new Date().toISOString(),
+  };
+}
+
 import { createHash, randomBytes } from "crypto";
 import {
   buildGeneratedTools,
@@ -3180,7 +3193,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_health",
-    description: "OG DEX API health check.",
+    description: "OrbitX MCP + DEX health. Returns live status, tool counts, commit SHA, and whether the Agent MCP line is up. Call this first if tools fail.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -4119,6 +4132,32 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
       ok: true,
       openUrl: `${base}/ORBITX_DEX/alerts`,
       note: "Alerts require wallet signature proof in the DEX UI.",
+    };
+  }
+
+  if (name === "orbitx_health") {
+    let dex = null;
+    try {
+      dex = await fetchJson(`${base}/api/ogdex/health`);
+    } catch (e) {
+      dex = { ok: false, error: e?.message || "dex_health_failed" };
+    }
+    const rt = mcpRuntime();
+    return {
+      ok: true,
+      status: "live",
+      name: MCP_SERVER_NAME,
+      version: rt.version,
+      commit: rt.commit,
+      env: rt.env,
+      region: rt.region,
+      now: rt.now,
+      mcp_url: `${base}/api/mcp`,
+      toolsLive: CORE_TOOLS.length,
+      toolsTotal: TOOLS.length,
+      paper: true,
+      liveDesk: true,
+      dex,
     };
   }
 
@@ -5570,7 +5609,10 @@ async function handleMcp(req, res, parts) {
     }
     return json(res, {
       ok: true,
-      name: "OrbitX Agent MCP",
+      status: "live",
+      name: MCP_SERVER_NAME,
+      version: MCP_SERVER_VERSION,
+      runtime: mcpRuntime(),
       mcp_url: mcpUrl,
       claude_url: mcpUrl,
       aliases: [`${base}/api/orbitx-mcp`],
@@ -5607,7 +5649,7 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "OrbitX Agent MCP", version: "1.13.0" },
+            serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
               "OrbitX Agent MCP. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
           },
