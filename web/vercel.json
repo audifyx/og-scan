@@ -111,14 +111,10 @@
       "destination": "/api/orbitx-hub?path=mcp"
     },
     {
-    {
       "source": "/api/orbitx-desk-unlock",
       "destination": "/api/web?path=orbitx-desk-unlock"
     },
     {
-      "source": "/api/hunter-agent",
-      "destination": "/api/web?path=paused"
-    },
       "source": "/api/orbitx/anti-vamp-check",
       "destination": "/api/web?path=paused"
     },
