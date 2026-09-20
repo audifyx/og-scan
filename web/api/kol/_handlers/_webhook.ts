@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { parseTrade } from "./_transactions";
-import { buildAlertText, sendTelegram } from "./_send-alert";
+import { parseTrade } from "./_transactions.js";
+import { buildAlertText, sendTelegram } from "./_send-alert.js";
 
 // POST /api/kol/webhook — Helius enhanced-transaction webhook receiver.
 // Point your Helius webhook at: https://<domain>/api/kol/webhook
