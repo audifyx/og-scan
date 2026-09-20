@@ -6315,6 +6315,10 @@ export default async function handler(req, res) {
       const { handleDeskShop } = await import("./orbitx/_handlers/_desk-shop.js");
       return handleDeskShop(req, res, parts, json);
     }
+    if (head === "desk-unlock" || head === "orbitx-desk-unlock") {
+      const mod = await import("./_orbitx-desk-unlock.js");
+      return mod.default(req, res);
+    }
     if (head === "agent") return await handleAgent(req, res, parts.slice(1));
     if (head === "mcp") return await handleMcp(req, res, parts.slice(1));
     if (head === "crypto-scan") return await handleCryptoScan(req, res);
