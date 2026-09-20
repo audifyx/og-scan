@@ -15,7 +15,7 @@ import {
   PUMP_EVENT_AUTHORITY_SEED,
   PUMP_PROGRAM_ID,
   WSOL_MINT,
-} from "../../shared/pump-claim.js";
+} from "../../../shared/pump-claim.js";
 
 async function loadSolana() {
   const [web3, spl] = await Promise.all([

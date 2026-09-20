@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PAPER_AGENTS, PAPER_STAKE_SOL } from "../../shared/orbitx-paper-desk.js";
+import { PAPER_AGENTS, PAPER_STAKE_SOL } from "../../../shared/orbitx-paper-desk.js";
 import {
   PAPER_CORE_TOOLS,
   dispatchPaperTool,

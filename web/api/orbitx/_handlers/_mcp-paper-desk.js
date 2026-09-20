@@ -3,7 +3,7 @@
  * 10,000 mock SOL per agent. Tokens / 1h / 24h / volume are real tape.
  * Fills never broadcast.
  */
-import { simulatePaperDesk, PAPER_AGENTS, PAPER_STAKE_SOL } from "../../shared/orbitx-paper-desk.js";
+import { simulatePaperDesk, PAPER_AGENTS, PAPER_STAKE_SOL } from "../../../shared/orbitx-paper-desk.js";
 import { scanRunningMemes } from "./_mcp-life-scan.js";
 
 export const PAPER_WORLD_URL = "https://www.orbitx.world/on-chain";

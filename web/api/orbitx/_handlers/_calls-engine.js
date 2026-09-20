@@ -3,11 +3,11 @@
  * Alert-only. Same NEON / WARDEN / RAID tape as the dashboard.
  */
 import { createClient } from "@supabase/supabase-js";
-import { adminCredentialOk } from "../../shared/desk-unlock.js";
+import { adminCredentialOk } from "../../../shared/desk-unlock.js";
 import {
   LIVE_AGENTS,
   rankForLiveStyle,
-} from "../../shared/orbitx-live-desk.js";
+} from "../../../shared/orbitx-live-desk.js";
 import {
   applyMark,
   buildCallAnalysis,
@@ -29,7 +29,7 @@ import {
   publicWebhookUrl,
   stillCooling,
   writeCallThesis,
-} from "../../shared/orbitx-calls-desk.js";
+} from "../../../shared/orbitx-calls-desk.js";
 import { snapshotLiveDesk } from "./_live-agent-engine.js";
 import { CALLS_DDL, CALLS_PROJECT_REF } from "./_calls-schema.js";
 

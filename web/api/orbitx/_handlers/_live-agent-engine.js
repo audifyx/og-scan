@@ -3,7 +3,7 @@
  * Signing key is LIVE_AGENT_WALLET_SECRET only. Never log it.
  */
 import { createClient } from "@supabase/supabase-js";
-import { adminCredentialOk } from "../../shared/desk-unlock.js";
+import { adminCredentialOk } from "../../../shared/desk-unlock.js";
 import {
   LIVE_AGENTS,
   LIVE_DISCLAIMER,
@@ -32,7 +32,7 @@ import {
   LIVE_MAX_PROBES,
   LIVE_SCALE_KEEP_PCT,
   LIVE_SCALE_SELL_PCT,
-} from "../../shared/orbitx-live-desk.js";
+} from "../../../shared/orbitx-live-desk.js";
 
 const JUP = "https://lite-api.jup.ag";
 const PUMP = "https://frontend-api-v3.pump.fun/coins";

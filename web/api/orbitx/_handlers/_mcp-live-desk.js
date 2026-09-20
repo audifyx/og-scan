@@ -2,7 +2,7 @@
  * Read-only MCP tools for the real-SOL live desk.
  * Never execute a swap from MCP — ticks are cron/admin only.
  */
-import { LIVE_AGENTS, LIVE_TRADE_USD, LIVE_WALLET_PUBKEY, emptyLiveDesk } from "../../shared/orbitx-live-desk.js";
+import { LIVE_AGENTS, LIVE_TRADE_USD, LIVE_WALLET_PUBKEY, emptyLiveDesk } from "../../../shared/orbitx-live-desk.js";
 
 export const LIVE_WORLD_URL = "https://www.orbitx.world/on-chain";
 const EMPTY = { type: "object", properties: {}, additionalProperties: false };
