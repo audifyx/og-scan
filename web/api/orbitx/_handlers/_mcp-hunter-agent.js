@@ -295,12 +295,32 @@ function ruleThesis(token, desk) {
     reason = "not our setup";
   }
   if (desk.open && desk.open.mint === token.mint) {
-    if (ch <= -18) {
+    const entry = num(desk.open.priceUsd);
+    const nowPx = num(token.priceUsd);
+    const dd = entry > 0 && nowPx > 0 ? (nowPx - entry) / entry : ch / 100;
+    if (dd >= 0.12) {
       action = "sell";
-      reason = "open book rolling over";
-    } else if (ch >= 12) {
+      reason = "take profit ~12%+";
+    } else if (dd <= -0.25) {
       action = "sell";
-      reason = "take profit";
+      reason = "hard stop 25%";
+    } else if (dd <= -0.15) {
+      const hit = desk.open.hitSoftStopAt;
+      if (!hit) {
+        desk.open.hitSoftStopAt = new Date().toISOString();
+        action = "hold";
+        reason = "soft stop 15% — wait for bounce";
+      } else if (Date.now() - new Date(hit).getTime() >= 12 * 60 * 1000) {
+        action = "sell";
+        reason = "soft stop waited 12m, still red";
+      } else {
+        action = "hold";
+        reason = "in 15-25% zone, waiting";
+      }
+    } else {
+      action = "hold";
+      reason = "open, no stop";
+      if (desk.open.hitSoftStopAt && dd > -0.10) desk.open.hitSoftStopAt = null;
     }
   }
   return {
@@ -472,10 +492,29 @@ export async function tickHunter({ force = false } = {}) {
   }
 
   const ranked = [...tape].sort((a,b) => num(b.volume24h)-num(a.volume24h));
-  const pick = ranked.find((tok) => ruleThesis(tok, desk).action === "buy")
-    || ranked.find((tok) => ruleThesis(tok, desk).action !== "skip")
-    || ranked[0]
-    || null;
+  let pick = ranked.find((tok) => desk.open && tok.mint === desk.open.mint) || null;
+  if (!pick && desk.open?.mint) {
+    try {
+      const r = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + desk.open.mint, { signal: AbortSignal.timeout(8000) });
+      const j = await r.json();
+      const p = (j.pairs || []).find((x) => String(x.chainId||"").toLowerCase()==="solana") || (j.pairs||[])[0];
+      if (p) pick = {
+        mint: desk.open.mint,
+        symbol: p.baseToken?.symbol || desk.open.symbol,
+        priceUsd: num(p.priceUsd),
+        mcap: num(p.marketCap || p.fdv),
+        volume24h: num(p.volume?.h24),
+        change1h: num(p.priceChange?.h1),
+        liquidity: num(p.liquidity?.usd),
+      };
+    } catch {}
+  }
+  if (!pick) {
+    pick = ranked.find((tok) => ruleThesis(tok, desk).action === "buy")
+      || ranked.find((tok) => ruleThesis(tok, desk).action !== "skip")
+      || ranked[0]
+      || null;
+  }
   if (!pick) {
     desk.lastError = "empty_tape";
     desk.lastTickAt = new Date().toISOString();
@@ -510,10 +549,12 @@ export async function tickHunter({ force = false } = {}) {
           mint: pick.mint,
           symbol: pick.symbol,
           usd: HUNTER_CLIP_USD,
+          priceUsd: pick.priceUsd || 0,
           at: thesis.at,
           dryRun: false,
           signature: live.signature,
           outAmount: live.outAmount,
+          hitSoftStopAt: null,
         };
         thesis.executed = "live_buy";
         thesis.signature = live.signature;
