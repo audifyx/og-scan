@@ -204,7 +204,58 @@ function ruleThesis(token, desk) {
   };
 }
 
+function nvidiaKey() {
+  return trim(process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "");
+}
+function nvidiaModel() {
+  return trim(process.env.NVIDIA_MODEL || "meta/llama-3.1-8b-instruct");
+}
+
+async function nvidiaThesis(token, thesis) {
+  const key = nvidiaKey();
+  if (!key) return null;
+  const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: nvidiaModel(),
+      temperature: 0.3,
+      max_tokens: 120,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are ALPHA, OrbitX MCP hunter. One sentence thesis. Be blunt. Never promise profit. Prefer skip unless liquidity, volume, and 1h change all look tradable for a $1.50 clip.",
+        },
+        {
+          role: "user",
+          content: `${token.symbol} mint ${token.mint} 1h ${token.change1h}% vol ${token.volume24h} liq ${token.liquidity} mcap ${token.mcap}. Rule action ${thesis.action} because ${thesis.reason}. Reply one sentence.`,
+        },
+      ],
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.message || `nvidia ${r.status}`);
+  const line = String(j?.choices?.[0]?.message?.content || "").trim().replace(/\s+/g, " ");
+  return line.slice(0, 280);
+}
+
 async function brainPolish(thesis, token) {
+  try {
+    const line = await nvidiaThesis(token, thesis);
+    if (line) {
+      thesis.sayThis = line;
+      thesis.brain = "nvidia";
+      thesis.model = nvidiaModel();
+      return thesis;
+    }
+  } catch (e) {
+    thesis.brainError = String(e && e.message || e).slice(0, 160);
+  }
   try {
     const { thinkAsAgent } = await import("./_mcp-life-brain.js");
     const out = await thinkAsAgent(
@@ -217,7 +268,7 @@ async function brainPolish(thesis, token) {
     );
     const line = String(out?.text || out?.think || "").trim();
     if (line && line.length < 280) thesis.sayThis = line;
-    thesis.brain = out?.source || null;
+    thesis.brain = out?.source || "fallback";
   } catch {
     thesis.brain = "rules";
   }
@@ -268,6 +319,8 @@ export async function snapshotHunter() {
     home: "mcp",
     dashboard: HUNTER_DASHBOARD,
     mcpTools: ["orbitx_agent_desk", "orbitx_agent_feed", "orbitx_agent_tick", "orbitx_agent_arm"],
+    nvidiaReady: Boolean(nvidiaKey()),
+    nvidiaModel: nvidiaKey() ? nvidiaModel() : null,
     liveEnabled: liveAllowed(),
     chain,
     desk: { ...desk, chainSol: chain.sol, chainUsd: chain.usd },
