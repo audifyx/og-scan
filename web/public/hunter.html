@@ -36,7 +36,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     async function load() {
-      const r = await fetch("/api/hunter-agent", { cache: "no-store" });
+      const r = await fetch("/api/ogdex?path=hunter", { cache: "no-store" });
       const d = await r.json();
       const desk = d.desk || {};
       $("note").textContent = desk.note || d.disclaimer || "";
@@ -54,13 +54,13 @@
     }
     $("tick").onclick = async () => {
       $("tick").disabled = true;
-      await fetch("/api/hunter-agent?tick=1").catch(() => {});
+      await fetch("/api/ogdex?path=hunter&tick=1").catch(() => {});
       $("tick").disabled = false;
       load();
     };
     load();
     setInterval(async () => {
-      await fetch("/api/hunter-agent?tick=1").catch(() => {});
+      await fetch("/api/ogdex?path=hunter&tick=1").catch(() => {});
       load();
     }, 180000);
   </script>
