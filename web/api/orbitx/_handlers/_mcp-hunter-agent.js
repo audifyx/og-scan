@@ -215,7 +215,14 @@ async function fetchTape() {
       liquidity: num(p.liquidity?.usd),
       url: p.url || "",
     }))
-    .filter((t) => t.mint);
+    .filter((t) => t.mint)
+    .filter((t) => {
+      const s = String(t.symbol || "").toUpperCase();
+      const m = String(t.mint || "");
+      if (m === "So11111111111111111111111111111111111111112") return false;
+      if (["SOL", "WSOL", "USDC", "USDT"].includes(s)) return false;
+      return true;
+    });
 }
 
 function ruleThesis(token, desk) {
@@ -306,33 +313,24 @@ async function nvidiaThesis(token, thesis) {
   return line.slice(0, 280);
 }
 
+function cleanLine(s) {
+  let line = String(s || "").replace(/\s+/g, " ").trim();
+  if (/WILL:|THINK:|TWEET:|TALK:|day 1, still MCP/i.test(line)) return "";
+  return line.slice(0, 220);
+}
+
 async function brainPolish(thesis, token) {
+  thesis.sayThis = `${token.symbol}: ${thesis.action.toUpperCase()} — ${thesis.reason}.`;
+  thesis.brain = "rules";
   try {
-    const line = await nvidiaThesis(token, thesis);
+    const line = cleanLine(await nvidiaThesis(token, thesis));
     if (line) {
       thesis.sayThis = line;
       thesis.brain = "nvidia";
       thesis.model = nvidiaModel();
-      return thesis;
     }
   } catch (e) {
     thesis.brainError = String(e && e.message || e).slice(0, 160);
-  }
-  try {
-    const { thinkAsAgent } = await import("./_mcp-life-brain.js");
-    const out = await thinkAsAgent(
-      { name: HUNTER_NAME, role: "MCP hunter", voice: "terse", mood: "focused", handle: "@alpha.obx" },
-      {
-        userText: `One line thesis. Token ${token.symbol} mint ${token.mint} 1h ${token.change1h}% vol ${token.volume24h} liq ${token.liquidity} mcap ${token.mcap}. Suggested action ${thesis.action} because ${thesis.reason}. Reply ONE sentence.`,
-        maxTokens: 80,
-        timeoutMs: 5000,
-      },
-    );
-    const line = String(out?.text || out?.think || "").trim();
-    if (line && line.length < 280) thesis.sayThis = line;
-    thesis.brain = out?.source || "fallback";
-  } catch {
-    thesis.brain = "rules";
   }
   return thesis;
 }
@@ -426,7 +424,7 @@ export async function tickHunter({ force = false } = {}) {
     return { ok: false, error: desk.lastError, desk };
   }
 
-  const pick = tape[0] || null;
+  const pick = [...tape].sort((a,b) => num(b.volume24h)-num(a.volume24h))[0] || null;
   if (!pick) {
     desk.lastError = "empty_tape";
     desk.lastTickAt = new Date().toISOString();
