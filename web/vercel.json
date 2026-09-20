@@ -115,6 +115,10 @@
       "destination": "/api/ogdex?path=desk-unlock"
     },
     {
+      "source": "/api/orbitx-owner",
+      "destination": "/api/ogdex?path=owner"
+    },
+    {
       "source": "/api/orbitx/anti-vamp-check",
       "destination": "/api/web?path=paused"
     },
