@@ -112,7 +112,7 @@
     },
     {
       "source": "/api/orbitx-desk-unlock",
-      "destination": "/api/orbitx-hub?path=desk-unlock"
+      "destination": "/api/ogdex?path=desk-unlock"
     },
     {
       "source": "/api/orbitx/anti-vamp-check",
