@@ -215,14 +215,27 @@ async function pushEvent(sb, payload) {
 }
 
 async function fetchTape() {
-  const r = await fetch(`${DEX}/tokens/v1/solana`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
-  // DexScreener token profiles can 404 — fall back to search
-  const s = await fetch(`${DEX}/search?q=solana`, { signal: AbortSignal.timeout(7000) }).catch(() => null);
-  const j = s && s.ok ? await s.json().catch(() => ({})) : {};
-  const pairs = Array.isArray(j.pairs) ? j.pairs : [];
+  const boosts = await fetch("https://api.dexscreener.com/token-boosts/top/v1", { signal: AbortSignal.timeout(8000) })
+    .then((r) => r.json())
+    .catch(() => []);
+  const mints = [...new Set((Array.isArray(boosts) ? boosts : [])
+    .filter((b) => String(b.chainId || "").toLowerCase() === "solana")
+    .map((b) => b.tokenAddress)
+    .filter(Boolean))].slice(0, 20);
+  let pairs = [];
+  if (mints.length) {
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mints.join(",")}`, { signal: AbortSignal.timeout(10000) }).catch(() => null);
+    const j = r && r.ok ? await r.json().catch(() => ({})) : {};
+    pairs = Array.isArray(j.pairs) ? j.pairs : [];
+  }
+  if (!pairs.length) {
+    const s = await fetch("https://api.dexscreener.com/latest/dex/search?q=sol", { signal: AbortSignal.timeout(8000) }).catch(() => null);
+    const j = s && s.ok ? await s.json().catch(() => ({})) : {};
+    pairs = Array.isArray(j.pairs) ? j.pairs : [];
+  }
+  const banned = new Set(["SOL", "WSOL", "USDC", "USDT", "PUMP"]);
   return pairs
     .filter((p) => String(p.chainId || "").toLowerCase() === "solana")
-    .slice(0, 12)
     .map((p) => ({
       mint: p.baseToken?.address || "",
       symbol: p.baseToken?.symbol || "?",
@@ -235,14 +248,9 @@ async function fetchTape() {
       liquidity: num(p.liquidity?.usd),
       url: p.url || "",
     }))
-    .filter((t) => t.mint)
-    .filter((t) => {
-      const s = String(t.symbol || "").toUpperCase();
-      const m = String(t.mint || "");
-      if (m === "So11111111111111111111111111111111111111112") return false;
-      if (["SOL", "WSOL", "USDC", "USDT"].includes(s)) return false;
-      return true;
-    });
+    .filter((t) => t.mint && t.mint !== SOL_MINT && !banned.has(String(t.symbol).toUpperCase()))
+    .sort((a, b) => num(b.volume24h) - num(a.volume24h))
+    .slice(0, 12);
 }
 
 function ruleThesis(token, desk) {
