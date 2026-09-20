@@ -191,7 +191,7 @@ function withAuthCodeSchema(schema, toolName) {
   return { ...base, type: "object", properties: props };
 }
 
-/** Claude / ChatGPT choke on 1000+ tools — expose CORE live tools only in tools/list. */
+/** Page CORE first, then generated + cook + life via nextCursor until the full catalog is listed. */
 function listLiveTools(cursor) {
   const PAGE = 80;
   if (!cursor || cursor === "core" || cursor === "0") {
@@ -200,13 +200,17 @@ function listLiveTools(cursor) {
       description: t.description,
       inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
     }));
+    const next = _generated.length ? "gen:0" : (_cook.length ? "cook:0" : (_life.length ? "life:0" : undefined));
     return {
       tools,
-      // Hint there are more via tools_help — do not dump 1000 schemas (breaks connectors).
+      nextCursor: next,
       _meta: {
         totalAvailable: TOOLS.length,
         liveCore: CORE_TOOLS.length,
-        note: "Live callable tools listed. Call orbitx_tools_help for the full catalog; generated shortcuts still work if you know the name.",
+        generated: _generated.length,
+        cook: _cook.length,
+        life: _life.length,
+        note: "Page 1 is CORE. Follow nextCursor (gen:0 → cook:0 → life:0) for the full live catalog. Every listed name is dispatchable.",
       },
     };
   }
@@ -5630,7 +5634,7 @@ async function handleMcp(req, res, parts) {
       tools: CORE_TOOLS.map((t) => ({ name: t.name, description: t.description })),
       toolsTotal: TOOLS.length,
       toolsLive: CORE_TOOLS.length,
-      note: "tools/list returns live CORE tools only — full catalog via orbitx_tools_help",
+      note: "tools/list page 1 is CORE; follow nextCursor to list all 3000+ live tools",
     });
   }
 
@@ -5671,6 +5675,7 @@ async function handleMcp(req, res, parts) {
         result: {
           tools: listed.tools,
           ...(listed.nextCursor ? { nextCursor: listed.nextCursor } : {}),
+          ...(listed._meta ? { _meta: listed._meta } : {}),
         },
       });
     }

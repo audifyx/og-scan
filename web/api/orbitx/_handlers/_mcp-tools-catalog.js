@@ -45,6 +45,10 @@ const SCREENER_TYPES = [
   "ath",
   "pumpfun",
   "migrations",
+  "gainers",
+  "losers",
+  "liquidity",
+  "holders",
 ];
 
 const INTERVALS = ["1m", "5m", "15m", "1h", "4h", "6h", "12h", "24h"];
@@ -153,10 +157,10 @@ export function buildGeneratedTools() {
     out.push(t);
   };
 
-  // 1) Screener matrix: type × interval × chain  (14×5×10 = 700)
+  // 1) Screener matrix: type × interval × chain  (24×8×14 ≈ 2688)
   for (const type of SCREENER_TYPES) {
     for (const interval of INTERVALS) {
-      for (const chain of CHAINS) {
+      for (const chain of CHAINS_EXT) {
         const name = `orbitx_screen_${type}_${interval}_${chain}`.replace(/-/g, "_");
         push(
           tool(
