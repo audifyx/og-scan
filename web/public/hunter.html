@@ -85,7 +85,7 @@
         ["Wins", String(stats.wins ?? desk.wins ?? 0)],
         ["Losses", String(stats.losses ?? desk.losses ?? 0)],
         ["Win rate", Math.round((stats.winRate || 0) * 100) + "%"],
-        ["Clip", money(desk.clipUsd ?? 1.5)],
+        ["Clip", money(desk.clipUsd ?? 1)],
       ].map(([k,v],i) => `<div class="card"><small>${k}</small><b class="${k.includes("PnL") ? cls(stats.realizedPnlUsd) : ""}">${v}</b></div>`).join("");
       const open = desk.open;
       $("open").innerHTML = open
