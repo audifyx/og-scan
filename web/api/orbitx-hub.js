@@ -129,8 +129,8 @@ async function grokImagine() {
 
 export const config = { maxDuration: 120 };
 
-const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const FALLBACK_BASE = "https://www.orbitx.world";
 
