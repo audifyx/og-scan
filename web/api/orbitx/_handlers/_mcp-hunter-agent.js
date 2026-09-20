@@ -107,11 +107,12 @@ async function sendRaw(b64) {
 async function liveSwap({ inputMint, outputMint, amount }) {
   const kp = await loadHunterKeypair();
   const owner = kp.publicKey.toBase58();
-  const qr = await fetch(
-    `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=300&restrictIntermediateTokens=true`,
-    { signal: AbortSignal.timeout(12000) },
-  );
-  const quote = await qr.json();
+  const expected = trim(process.env.HUNTER_WALLET_PUBKEY || "EqynMF4Ntjfb5An47qvyYfb2zE897xbNqvPUvpUkECxd");
+  if (owner !== expected) throw new Error("hunter key mismatch " + owner);
+  const amt = String(Math.max(1, Math.floor(Number(amount) || 0)));
+  const quoteUrl = `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amt}&slippageBps=200&restrictIntermediateTokens=true`;
+  const qr = await fetch(quoteUrl, { signal: AbortSignal.timeout(12000) });
+  const quote = await qr.json().catch(() => ({}));
   if (!qr.ok || !quote?.outAmount) throw new Error(quote?.error || "jupiter quote failed");
   const sr = await fetch(`${JUP}/swap/v1/swap`, {
     method: "POST",
@@ -121,224 +122,32 @@ async function liveSwap({ inputMint, outputMint, amount }) {
       userPublicKey: owner,
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
-      prioritizationFeeLamports: "auto",
+      prioritizationFeeLamports: 50000,
     }),
     signal: AbortSignal.timeout(12000),
   });
-  const sw = await sr.json();
+  const sw = await sr.json().catch(() => ({}));
   if (!sr.ok || !sw.swapTransaction) throw new Error(sw.error || "jupiter swap failed");
   const { VersionedTransaction } = await import("@solana/web3.js");
   const tx = VersionedTransaction.deserialize(Buffer.from(sw.swapTransaction, "base64"));
   tx.sign([kp]);
-  const sig = await sendRaw(Buffer.from(tx.serialize()).toString("base64"));
-  return { ok: true, signature: sig, outAmount: quote.outAmount, inAmount: quote.inAmount, owner };
-}
-
-
-async function loadDesk(sb) {
-  if (!sb) return MEM.desk;
-  const ev = await sb
-    .from("ox_live_events")
-    .select("meta,created_at")
-    .eq("kind", "hunter_desk")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const saved = ev?.data?.[0]?.meta?.desk;
-  if (saved && typeof saved === "object") {
-    MEM.desk = { ...emptyDesk(), ...saved };
-  }
-  const { data } = await sb.from("ox_live_desk").select("*").eq("id", "hunter-alpha").maybeSingle();
-  if (data) {
-    MEM.desk.lastTickAt = data.last_tick_at || MEM.desk.lastTickAt;
-    MEM.desk.lastError = data.last_error || MEM.desk.lastError;
-    MEM.desk.armed = data.armed ?? MEM.desk.armed;
-    MEM.desk.paused = data.paused ?? MEM.desk.paused;
-    if (data.wallet_pubkey) MEM.desk.wallet = data.wallet_pubkey;
-  }
-  return MEM.desk;
-}
-
-async function saveDesk(sb, desk) {
-  MEM.desk = desk;
-  if (!sb) return;
-  try {
-    await sb.from("ox_live_desk").upsert({
-      id: "hunter-alpha",
-      armed: Boolean(desk.armed),
-      paused: Boolean(desk.paused),
-      wallet_pubkey: desk.wallet || null,
-      last_tick_at: desk.lastTickAt || new Date().toISOString(),
-      last_error: desk.lastError || null,
-      note: desk.note || "ALPHA",
-      paper: false,
-      updated_at: new Date().toISOString(),
-    });
-  } catch (e) {
-    desk.lastError = desk.lastError || String(e && e.message || e).slice(0, 160);
-  }
-  try {
-    await sb.from("ox_live_events").insert({
-      kind: "hunter_desk",
-      agent_id: HUNTER_ID,
-      thesis: desk.note || "ALPHA",
-      reason: desk.lastError || null,
-      meta: { hunter: HUNTER_ID, type: "desk", desk },
-    });
-  } catch { /* events table may reject extra cols */ }
-}
-
-async function loadFeed(sb, limit = 40) {
-  if (!sb) return MEM.feed.slice(0, limit);
-  const { data, error } = await sb
-    .from("ox_live_events")
-    .select("kind,agent_id,mint,symbol,side,thesis,reason,signature,meta,created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error || !Array.isArray(data)) return MEM.feed.slice(0, limit);
-  const rows = data
-    .filter((r) => !r.agent_id || r.agent_id === HUNTER_ID || r.meta?.hunter === HUNTER_ID)
-    .map((r) => ({
-      ...(r.meta && typeof r.meta === "object" ? r.meta : {}),
-      kind: r.kind,
-      action: r.side || r.meta?.action,
-      symbol: r.symbol || r.meta?.symbol,
-      mint: r.mint || r.meta?.mint,
-      sayThis: r.thesis || r.meta?.sayThis,
-      reason: r.reason || r.meta?.reason,
-      signature: r.signature || r.meta?.signature,
-      at: r.created_at,
-    }));
-  if (rows.length) MEM.feed = rows.filter((p) => p.kind !== "hunter_desk").slice(0, limit);
-  const lastDesk = data.find((r) => r.kind === "hunter_desk" && r.meta?.desk);
-  if (lastDesk?.meta?.desk) MEM.desk = { ...emptyDesk(), ...lastDesk.meta.desk };
-  return MEM.feed.slice(0, limit);
-}
-
-async function pushEvent(sb, payload) {
-  MEM.feed.unshift(payload);
-  MEM.feed = MEM.feed.slice(0, 80);
-  if (!sb) return;
-  const { error } = await sb.from("ox_live_events").insert({
-    kind: payload.kind || payload.action || "thesis",
-    agent_id: HUNTER_ID,
-    mint: payload.mint || null,
-    symbol: payload.symbol || null,
-    side: payload.action || payload.executed || null,
-    usd_amount: payload.usd || payload.clipUsd || null,
-    thesis: payload.sayThis || null,
-    reason: payload.reason || null,
-    signature: payload.signature || null,
-    meta: { hunter: HUNTER_ID, ...payload },
+  const b64 = Buffer.from(tx.serialize()).toString("base64");
+  const r = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "sendTransaction",
+      params: [b64, { encoding: "base64", skipPreflight: true, maxRetries: 4, preflightCommitment: "confirmed" }],
+    }),
+    signal: AbortSignal.timeout(20000),
   });
-  if (error) payload.persistError = error.message;
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc send failed");
+  return { ok: true, signature: j.result, outAmount: quote.outAmount, inAmount: quote.inAmount, owner };
 }
 
-async function fetchTape() {
-  const boosts = await fetch("https://api.dexscreener.com/token-boosts/top/v1", { signal: AbortSignal.timeout(8000) })
-    .then((r) => r.json())
-    .catch(() => []);
-  const mints = [...new Set((Array.isArray(boosts) ? boosts : [])
-    .filter((b) => String(b.chainId || "").toLowerCase() === "solana")
-    .map((b) => b.tokenAddress)
-    .filter(Boolean))].slice(0, 20);
-  let pairs = [];
-  if (mints.length) {
-    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mints.join(",")}`, { signal: AbortSignal.timeout(10000) }).catch(() => null);
-    const j = r && r.ok ? await r.json().catch(() => ({})) : {};
-    pairs = Array.isArray(j.pairs) ? j.pairs : [];
-  }
-  if (!pairs.length) {
-    const s = await fetch("https://api.dexscreener.com/latest/dex/search?q=sol", { signal: AbortSignal.timeout(8000) }).catch(() => null);
-    const j = s && s.ok ? await s.json().catch(() => ({})) : {};
-    pairs = Array.isArray(j.pairs) ? j.pairs : [];
-  }
-  const banned = new Set(["SOL", "WSOL", "USDC", "USDT", "PUMP"]);
-  return pairs
-    .filter((p) => String(p.chainId || "").toLowerCase() === "solana")
-    .map((p) => ({
-      mint: p.baseToken?.address || "",
-      symbol: p.baseToken?.symbol || "?",
-      name: p.baseToken?.name || "",
-      priceUsd: num(p.priceUsd),
-      mcap: num(p.marketCap || p.fdv),
-      volume24h: num(p.volume?.h24),
-      change1h: num(p.priceChange?.h1),
-      change24h: num(p.priceChange?.h24),
-      liquidity: num(p.liquidity?.usd),
-      url: p.url || "",
-    }))
-    .filter((t) => t.mint && t.mint !== SOL_MINT && !banned.has(String(t.symbol).toUpperCase()))
-    .sort((a, b) => num(b.volume24h) - num(a.volume24h))
-    .slice(0, 12);
-}
-
-function ruleThesis(token, desk) {
-  const liq = token.liquidity;
-  const ch = token.change1h;
-  const vol = token.volume24h;
-  let action = "skip";
-  let reason = "no edge";
-  if (liq < 4000) {
-    action = "skip";
-    reason = "book too thin";
-  } else if (ch <= -32) {
-    action = "skip";
-    reason = "cascade, not a dip";
-  } else if (ch >= 70) {
-    action = "skip";
-    reason = "already vertical";
-  } else if (vol >= 3000 && liq >= 4000 && ch > -32 && ch < 25) {
-    action = desk.open ? "hold" : "buy";
-    reason = ch < 0 ? "dip with book" : "steady tape";
-  } else {
-    action = "skip";
-    reason = "not our setup";
-  }
-  if (desk.open && desk.open.mint === token.mint) {
-    const entry = num(desk.open.priceUsd);
-    const nowPx = num(token.priceUsd);
-    const dd = entry > 0 && nowPx > 0 ? (nowPx - entry) / entry : ch / 100;
-    if (dd >= 0.12) {
-      action = "sell";
-      reason = "take profit ~12%+";
-    } else if (dd <= -0.25) {
-      action = "sell";
-      reason = "hard stop 25%";
-    } else if (dd <= -0.15) {
-      const hit = desk.open.hitSoftStopAt;
-      if (!hit) {
-        desk.open.hitSoftStopAt = new Date().toISOString();
-        action = "hold";
-        reason = "soft stop 15% — wait for bounce";
-      } else if (Date.now() - new Date(hit).getTime() >= 12 * 60 * 1000) {
-        action = "sell";
-        reason = "soft stop waited 12m, still red";
-      } else {
-        action = "hold";
-        reason = "in 15-25% zone, waiting";
-      }
-    } else {
-      action = "hold";
-      reason = "open, no stop";
-      if (desk.open.hitSoftStopAt && dd > -0.10) desk.open.hitSoftStopAt = null;
-    }
-  }
-  return {
-    kind: "thesis",
-    at: new Date().toISOString(),
-    action,
-    reason,
-    symbol: token.symbol,
-    mint: token.mint,
-    mcap: token.mcap,
-    volume24h: token.volume24h,
-    change1h: token.change1h,
-    liquidity: token.liquidity,
-    clipUsd: HUNTER_CLIP_USD,
-    dryRun: !canLive(),
-    sayThis: `${token.symbol}: ${action.toUpperCase()} — ${reason}.`,
-  };
-}
 
 function nvidiaKey() {
   return trim(process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "");
@@ -539,8 +348,8 @@ export async function tickHunter({ force = false } = {}) {
           px = Number(pj?.pairs?.[0]?.priceUsd) || px;
         } catch {}
         const chain = await fetchWalletState(desk.wallet);
-        const reserve = 12_000_000; // ~$1.30 fees/rent buffer
-        const want = Math.floor((HUNTER_CLIP_USD / px) * 1e9);
+        const reserve = 15_000_000;
+        const want = 9_000_000; // ~$1 at ~$110 SOL
         const maxSpend = Math.max(0, Number(chain.lamports || 0) - reserve);
         const lamports = Math.min(want, maxSpend);
         if (lamports < 5_000_000) throw new Error("wallet needs more SOL for a clip + fees");
