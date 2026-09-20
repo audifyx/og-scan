@@ -40,6 +40,7 @@ import platformStats from "./ogdex/_routes/_platform-stats.js";
 import traders from "./ogdex/_routes/_traders.js";
 import waitlist from "./ogdex/_routes/_waitlist.js";
 import mcp from "./ogdex/_routes/_mcp.js";
+import deskUnlock from "./ogdex/_routes/_desk-unlock.js";
 
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
@@ -50,9 +51,10 @@ const ROUTES = {
   traders,
   waitlist,
   mcp,
+  "desk-unlock": deskUnlock,
 };
 
-const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt"]);
+const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock"]);
 const LIMITS = { chat: 12, forensics: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
