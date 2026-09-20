@@ -242,6 +242,187 @@ async function fetchWalletState(pubkey) {
   return out;
 }
 
+
+async function loadDesk(sb) {
+  if (!sb) return MEM.desk;
+  const ev = await sb.from("ox_live_events").select("meta,created_at").eq("kind", "hunter_desk").order("created_at", { ascending: false }).limit(1);
+  const saved = ev?.data?.[0]?.meta?.desk;
+  if (saved && typeof saved === "object") MEM.desk = { ...emptyDesk(), ...saved };
+  const { data } = await sb.from("ox_live_desk").select("*").eq("id", "hunter-alpha").maybeSingle();
+  if (data) {
+    MEM.desk.lastTickAt = data.last_tick_at || MEM.desk.lastTickAt;
+    MEM.desk.lastError = data.last_error || MEM.desk.lastError;
+    MEM.desk.armed = data.armed ?? MEM.desk.armed;
+    MEM.desk.paused = data.paused ?? MEM.desk.paused;
+    if (data.wallet_pubkey) MEM.desk.wallet = data.wallet_pubkey;
+  }
+  return MEM.desk;
+}
+
+async function saveDesk(sb, desk) {
+  MEM.desk = desk;
+  if (!sb) return;
+  try {
+    await sb.from("ox_live_desk").upsert({
+      id: "hunter-alpha",
+      armed: Boolean(desk.armed),
+      paused: Boolean(desk.paused),
+      wallet_pubkey: desk.wallet || null,
+      last_tick_at: desk.lastTickAt || new Date().toISOString(),
+      last_error: desk.lastError || null,
+      note: desk.note || "ALPHA",
+      paper: false,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    desk.lastError = desk.lastError || String(e && e.message || e).slice(0, 160);
+  }
+  try {
+    await sb.from("ox_live_events").insert({
+      kind: "hunter_desk",
+      agent_id: HUNTER_ID,
+      thesis: desk.note || "ALPHA",
+      reason: desk.lastError || null,
+      meta: { hunter: HUNTER_ID, type: "desk", desk },
+    });
+  } catch {}
+}
+
+async function loadFeed(sb, limit = 40) {
+  if (!sb) return MEM.feed.slice(0, limit);
+  const { data, error } = await sb.from("ox_live_events").select("kind,agent_id,mint,symbol,side,thesis,reason,signature,meta,created_at").order("created_at", { ascending: false }).limit(200);
+  if (error || !Array.isArray(data)) return MEM.feed.slice(0, limit);
+  const rows = data
+    .filter((r) => !r.agent_id || r.agent_id === HUNTER_ID || r.meta?.hunter === HUNTER_ID)
+    .map((r) => ({
+      ...(r.meta && typeof r.meta === "object" ? r.meta : {}),
+      kind: r.kind,
+      action: r.side || r.meta?.action,
+      symbol: r.symbol || r.meta?.symbol,
+      mint: r.mint || r.meta?.mint,
+      sayThis: r.thesis || r.meta?.sayThis,
+      reason: r.reason || r.meta?.reason,
+      signature: r.signature || r.meta?.signature,
+      at: r.created_at,
+    }));
+  if (rows.length) MEM.feed = rows.filter((p) => p.kind !== "hunter_desk").slice(0, limit);
+  return MEM.feed.slice(0, limit);
+}
+
+async function pushEvent(sb, payload) {
+  MEM.feed.unshift(payload);
+  MEM.feed = MEM.feed.slice(0, 80);
+  if (!sb) return;
+  const { error } = await sb.from("ox_live_events").insert({
+    kind: payload.kind || payload.action || "thesis",
+    agent_id: HUNTER_ID,
+    mint: payload.mint || null,
+    symbol: payload.symbol || null,
+    side: payload.action || payload.executed || null,
+    usd_amount: payload.usd || payload.clipUsd || null,
+    thesis: payload.sayThis || null,
+    reason: payload.reason || null,
+    signature: payload.signature || null,
+    meta: { hunter: HUNTER_ID, ...payload },
+  });
+  if (error) payload.persistError = error.message;
+}
+
+async function fetchWalletState(pubkey) {
+  const pk = trim(pubkey);
+  const out = { pubkey: pk, sol: 0, lamports: 0, usd: 0, rpcOk: false };
+  if (!pk) return out;
+  const key = trim(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "");
+  const rpc = key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
+  try {
+    const r = await fetch(rpc, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [pk] }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const j = await r.json();
+    const lamports = Number(j?.result?.value || 0);
+    out.lamports = lamports;
+    out.sol = lamports / 1e9;
+    out.rpcOk = true;
+  } catch {}
+  try {
+    const pr = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + SOL_MINT, { signal: AbortSignal.timeout(6000) });
+    const pj = await pr.json();
+    const px = Number(pj?.pairs?.[0]?.priceUsd || 0);
+    if (px) out.usd = out.sol * px;
+  } catch {}
+  return out;
+}
+
+async function fetchTape() {
+  const boosts = await fetch("https://api.dexscreener.com/token-boosts/top/v1", { signal: AbortSignal.timeout(8000) }).then((r) => r.json()).catch(() => []);
+  const mints = [...new Set((Array.isArray(boosts) ? boosts : []).filter((b) => String(b.chainId || "").toLowerCase() === "solana").map((b) => b.tokenAddress).filter(Boolean))].slice(0, 20);
+  let pairs = [];
+  if (mints.length) {
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mints.join(",")}`, { signal: AbortSignal.timeout(10000) }).catch(() => null);
+    const j = r && r.ok ? await r.json().catch(() => ({})) : {};
+    pairs = Array.isArray(j.pairs) ? j.pairs : [];
+  }
+  const banned = new Set(["SOL", "WSOL", "USDC", "USDT", "PUMP"]);
+  return pairs
+    .filter((p) => String(p.chainId || "").toLowerCase() === "solana")
+    .map((p) => ({
+      mint: p.baseToken?.address || "",
+      symbol: p.baseToken?.symbol || "?",
+      name: p.baseToken?.name || "",
+      priceUsd: num(p.priceUsd),
+      mcap: num(p.marketCap || p.fdv),
+      volume24h: num(p.volume?.h24),
+      change1h: num(p.priceChange?.h1),
+      change24h: num(p.priceChange?.h24),
+      liquidity: num(p.liquidity?.usd),
+      url: p.url || "",
+    }))
+    .filter((tok) => tok.mint && tok.mint !== SOL_MINT && !banned.has(String(tok.symbol).toUpperCase()))
+    .sort((a, b) => num(b.volume24h) - num(a.volume24h))
+    .slice(0, 12);
+}
+
+function ruleThesis(token, desk) {
+  const liq = token.liquidity;
+  const ch = token.change1h;
+  const vol = token.volume24h;
+  let action = "skip";
+  let reason = "no edge";
+  if (liq < 4000) { action = "skip"; reason = "book too thin"; }
+  else if (ch <= -32) { action = "skip"; reason = "cascade, not a dip"; }
+  else if (ch >= 70) { action = "skip"; reason = "already vertical"; }
+  else if (vol >= 3000 && liq >= 4000 && ch > -32 && ch < 25) {
+    action = desk.open ? "hold" : "buy";
+    reason = ch < 0 ? "dip with book" : "steady tape";
+  } else { action = "skip"; reason = "not our setup"; }
+  if (desk.open && desk.open.mint === token.mint) {
+    const entry = num(desk.open.priceUsd);
+    const nowPx = num(token.priceUsd);
+    const dd = entry > 0 && nowPx > 0 ? (nowPx - entry) / entry : ch / 100;
+    if (dd >= 0.12) { action = "sell"; reason = "take profit ~12%+"; }
+    else if (dd <= -0.25) { action = "sell"; reason = "hard stop 25%"; }
+    else if (dd <= -0.15) {
+      const hit = desk.open.hitSoftStopAt;
+      if (!hit) { desk.open.hitSoftStopAt = new Date().toISOString(); action = "hold"; reason = "soft stop 15% — wait for bounce"; }
+      else if (Date.now() - new Date(hit).getTime() >= 12 * 60 * 1000) { action = "sell"; reason = "soft stop waited 12m, still red"; }
+      else { action = "hold"; reason = "in 15-25% zone, waiting"; }
+    } else {
+      action = "hold"; reason = "open, no stop";
+      if (desk.open.hitSoftStopAt && dd > -0.10) desk.open.hitSoftStopAt = null;
+    }
+  }
+  return {
+    kind: "thesis", at: new Date().toISOString(), action, reason,
+    symbol: token.symbol, mint: token.mint, mcap: token.mcap, volume24h: token.volume24h,
+    change1h: token.change1h, liquidity: token.liquidity, priceUsd: token.priceUsd,
+    clipUsd: HUNTER_CLIP_USD, dryRun: !canLive(),
+    sayThis: `${token.symbol}: ${action.toUpperCase()} — ${reason}.`,
+  };
+}
+
 export async function snapshotHunter() {
   const sb = sbClient();
   const desk = await loadDesk(sb);
