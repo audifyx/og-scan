@@ -1,0 +1,14 @@
+name: ALPHA hunter tick
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tick ALPHA
+        run: |
+          curl -sS -m 25 -o /tmp/alpha.json -w "%{http_code}\n" \
+            "https://www.orbitx.world/api/ogdex?path=hunter&tick=1"
+          head -c 400 /tmp/alpha.json; echo
