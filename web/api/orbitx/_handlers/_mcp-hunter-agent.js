@@ -137,45 +137,68 @@ async function liveSwap({ inputMint, outputMint, amount }) {
 
 async function loadDesk(sb) {
   if (!sb) return MEM.desk;
-  const { data, error } = await sb.from("ox_live_desk").select("*").eq("id", "hunter-alpha").maybeSingle();
-  if (error || !data) return MEM.desk;
-  MEM.desk = {
-    ...emptyDesk(),
-    ...((data.meta && typeof data.meta === "object") ? data.meta : {}),
-    lastTickAt: data.last_tick_at || MEM.desk.lastTickAt,
-    lastError: data.last_error || null,
-    armed: Boolean(data.armed),
-    paused: Boolean(data.paused),
-  };
+  const ev = await sb
+    .from("ox_live_events")
+    .select("payload,created_at")
+    .eq("kind", "hunter_desk")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const saved = ev?.data?.[0]?.payload?.desk;
+  if (saved && typeof saved === "object") {
+    MEM.desk = { ...emptyDesk(), ...saved };
+  }
+  const { data } = await sb.from("ox_live_desk").select("*").eq("id", "hunter-alpha").maybeSingle();
+  if (data) {
+    MEM.desk.lastTickAt = data.last_tick_at || MEM.desk.lastTickAt;
+    MEM.desk.lastError = data.last_error || MEM.desk.lastError;
+    MEM.desk.armed = data.armed ?? MEM.desk.armed;
+    MEM.desk.paused = data.paused ?? MEM.desk.paused;
+    if (data.wallet_pubkey) MEM.desk.wallet = data.wallet_pubkey;
+  }
   return MEM.desk;
 }
 
 async function saveDesk(sb, desk) {
   MEM.desk = desk;
   if (!sb) return;
-  await sb.from("ox_live_desk").upsert({
-    id: "hunter-alpha",
-    armed: desk.armed,
-    paused: desk.paused,
-    last_tick_at: desk.lastTickAt,
-    last_error: desk.lastError,
-    meta: desk,
-  }).catch(() => {});
+  try {
+    await sb.from("ox_live_desk").upsert({
+      id: "hunter-alpha",
+      armed: Boolean(desk.armed),
+      paused: Boolean(desk.paused),
+      wallet_pubkey: desk.wallet || null,
+      last_tick_at: desk.lastTickAt || new Date().toISOString(),
+      last_error: desk.lastError || null,
+      note: desk.note || "ALPHA",
+      paper: false,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    desk.lastError = desk.lastError || String(e && e.message || e).slice(0, 160);
+  }
+  try {
+    await sb.from("ox_live_events").insert({
+      paper: false,
+      kind: "hunter_desk",
+      payload: { hunter: HUNTER_ID, type: "desk", desk },
+    });
+  } catch { /* events table may reject extra cols */ }
 }
 
 async function loadFeed(sb, limit = 40) {
   if (!sb) return MEM.feed.slice(0, limit);
-  const { data } = await sb
+  const { data, error } = await sb
     .from("ox_live_events")
-    .select("*")
-    .eq("paper", true)
-    .contains("payload", { hunter: HUNTER_ID })
+    .select("payload,kind,created_at")
     .order("created_at", { ascending: false })
-    .limit(limit);
-  if (Array.isArray(data) && data.length) {
-    MEM.feed = data.map((r) => r.payload || r);
-    return MEM.feed;
-  }
+    .limit(200);
+  if (error || !Array.isArray(data)) return MEM.feed.slice(0, limit);
+  const rows = data
+    .map((r) => r.payload || r)
+    .filter((p) => p && (p.hunter === HUNTER_ID || p.type === "desk" || p.kind === "thesis" || p.action));
+  if (rows.length) MEM.feed = rows.filter((p) => p.type !== "desk").slice(0, limit);
+  const lastDesk = data.find((r) => r.kind === "hunter_desk" || r.payload?.type === "desk");
+  if (lastDesk?.payload?.desk) MEM.desk = { ...emptyDesk(), ...lastDesk.payload.desk };
   return MEM.feed.slice(0, limit);
 }
 
@@ -183,15 +206,12 @@ async function pushEvent(sb, payload) {
   MEM.feed.unshift(payload);
   MEM.feed = MEM.feed.slice(0, 80);
   if (!sb) return;
-  await sb
-    .from("ox_live_events")
-    .insert({
-      paper: true,
-      created_at: new Date().toISOString(),
-      kind: payload.kind || "thesis",
-      payload: { hunter: HUNTER_ID, ...payload },
-    })
-    .catch(() => {});
+  const { error } = await sb.from("ox_live_events").insert({
+    paper: false,
+    kind: payload.kind || "thesis",
+    payload: { hunter: HUNTER_ID, ...payload },
+  });
+  if (error) payload.persistError = error.message;
 }
 
 async function fetchTape() {
