@@ -115,6 +115,10 @@
       "destination": "/api/ogdex?path=desk-unlock"
     },
     {
+      "source": "/api/hunter-agent",
+      "destination": "/api/ogdex?path=hunter"
+    },
+    {
       "source": "/api/orbitx-owner",
       "destination": "/api/ogdex?path=owner"
     },
