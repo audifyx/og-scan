@@ -7,7 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 export const HUNTER_ID = "alpha";
 export const HUNTER_NAME = "ALPHA";
 export const HUNTER_SEED_USD = 4;
-export const HUNTER_CLIP_USD = 1.5;
+export const HUNTER_CLIP_USD = 1;
 export const HUNTER_MAX_OPEN = 1;
 export const HUNTER_HALT_USD = 2;
 export const HUNTER_DASHBOARD = "https://www.orbitx.world/orbitxagents/hunter";
@@ -539,10 +539,10 @@ export async function tickHunter({ force = false } = {}) {
           px = Number(pj?.pairs?.[0]?.priceUsd) || px;
         } catch {}
         const chain = await fetchWalletState(desk.wallet);
-        const reserve = 25_000_000; // ATA + wrap + priority
+        const reserve = 12_000_000; // ~$1.30 fees/rent buffer
         const want = Math.floor((HUNTER_CLIP_USD / px) * 1e9);
         const maxSpend = Math.max(0, Number(chain.lamports || 0) - reserve);
-        const lamports = Math.min(want, maxSpend, 20_000_000);
+        const lamports = Math.min(want, maxSpend);
         if (lamports < 5_000_000) throw new Error("wallet needs more SOL for a clip + fees");
         const live = await liveSwap({ inputMint: SOL_MINT, outputMint: pick.mint, amount: lamports });
         desk.open = {
