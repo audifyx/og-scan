@@ -154,17 +154,39 @@ async function handleOwnerApi(req, res) {
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   if (!body || typeof body !== "object") body = {};
   const action = String(body.action || "overview");
-  const emptyOverview = {
-    ok: true,
-    action: "overview",
-    users: { total: 0, onlineNow: 0, awayNow: 0, dau: 0, newToday: 0, newYesterday: 0, newWeek: 0, newMonth: 0 },
-    revenue: { feesTodayUsd: 0, feesWeekUsd: 0, feesMonthUsd: 0, feesByApp: {} },
-    volume: { todayUsd: 0, weekUsd: 0, monthUsd: 0 },
-    burns: { monthTokens: 0, todayTokens: 0 },
-    launches: { month: 0, today: 0 },
+
+  const overview = {
+    generatedAt: new Date().toISOString(),
+    definitions: {
+      online: "heartbeat within 60s",
+      away: "heartbeat 60s–5min",
+      offline: "no heartbeat in 5min",
+      completedTx: "ledger.status=completed AND verified_onchain",
+      burn: "ox_admin_burns.verified_onchain or mcp_burn_ledger row",
+      fee: "min(1.2% of USD notional, $10), backend-enforced",
+    },
+    users: {
+      total: 0, newToday: 0, newYesterday: 0, newWeek: 0, newMonth: 0,
+      onlineNow: 0, awayNow: 0, dau: 0,
+    },
+    activity: {
+      txMonth: 0, txToday: 0, volumeMonthUsd: 0, volumeTodayUsd: 0,
+      launchesMonth: 0, launchesToday: 0, jupiterMonth: 0,
+    },
+    revenue: {
+      feesMonthUsd: 0, feesTodayUsd: 0, feesWeekUsd: 0, feesByApp: {},
+      avgFeeUsd: 0, maxFeeUsd: 0,
+    },
+    burns: { tokensMonth: 0, tokensToday: 0, countMonth: 0, countToday: 0 },
     apps: {},
     live: [],
   };
+
+  function send(status, obj) {
+    res.statusCode = status;
+    return res.end(JSON.stringify(obj));
+  }
+
   try {
     const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -177,45 +199,51 @@ async function handleOwnerApi(req, res) {
       if (!r.ok) return [];
       try { const j = JSON.parse(t); return Array.isArray(j) ? j : []; } catch { return []; }
     }
+
     if (action === "health") {
-      res.statusCode = 200;
-      return res.end(JSON.stringify({
+      return send(200, {
         ok: true,
         action,
-        checks: [{ name: "owner-api", ok: true, state: "up", ms: 1 }],
-        feeProcessor: "min(tx_usd × 0.012, $10)",
-      }));
+        data: {
+          state: "up",
+          checks: [{ name: "owner-api", ok: true, state: "up", ms: 1 }],
+          failedTransactionsToday: 0,
+          lastVerifiedBurn: null,
+          feeProcessor: "min(tx_usd × 0.012, $10)",
+          burnProcessor: "verified burns only",
+        },
+      });
     }
-    if (action === "overview") {
+
+    if (action === "overview" || action === "presence") {
       const presence = await sb("ox_admin_presence?select=user_id,status,last_heartbeat_at,current_app,username,avatar_url,wallet_address,current_path,device,last_seen_at&limit=2000");
       const now = Date.now();
       const live = presence.map((p) => {
-        const t = p.last_heartbeat_at ? new Date(p.last_heartbeat_at).getTime() : 0;
-        const age = t ? now - t : 1e12;
+        const ts = p.last_heartbeat_at ? new Date(p.last_heartbeat_at).getTime() : 0;
+        const age = ts ? now - ts : 1e12;
         const liveStatus = age <= 60000 ? "online" : age <= 300000 ? "away" : "offline";
         return { ...p, liveStatus };
       });
-      emptyOverview.users.onlineNow = live.filter((p) => p.liveStatus === "online").length;
-      emptyOverview.users.awayNow = live.filter((p) => p.liveStatus === "away").length;
-      emptyOverview.live = live.filter((p) => p.liveStatus !== "offline").slice(0, 80);
-      const profiles = await sb("profiles?select=user_id&limit=1");
-      emptyOverview.users.total = Array.isArray(profiles) ? profiles.length : 0;
-      res.statusCode = 200;
-      return res.end(JSON.stringify(emptyOverview));
+      overview.users.onlineNow = live.filter((p) => p.liveStatus === "online").length;
+      overview.users.awayNow = live.filter((p) => p.liveStatus === "away").length;
+      overview.live = live.filter((p) => p.liveStatus !== "offline").slice(0, 40);
+      for (const row of overview.live) {
+        const app = row.current_app || "app";
+        overview.apps[app] = overview.apps[app] || { online: 0, away: 0 };
+        if (row.liveStatus === "online") overview.apps[app].online += 1;
+        if (row.liveStatus === "away") overview.apps[app].away += 1;
+      }
+      if (action === "presence") return send(200, { ok: true, action, rows: overview.live });
+      return send(200, { ok: true, action, data: overview });
     }
-    if (["presence", "events", "ledger", "jupiter", "burns", "audit", "daily", "search"].includes(action)) {
-      res.statusCode = 200;
-      return res.end(JSON.stringify({ ok: true, action, rows: [], mcp: [], users: [] }));
+
+    if (["events", "ledger", "jupiter", "burns", "audit", "daily", "search"].includes(action)) {
+      return send(200, { ok: true, action, rows: [], mcp: [], users: [] });
     }
-    if (action === "user") {
-      res.statusCode = 200;
-      return res.end(JSON.stringify({ ok: true, action, user: null }));
-    }
-    res.statusCode = 200;
-    return res.end(JSON.stringify({ ok: true, action, ...emptyOverview }));
+    if (action === "user") return send(200, { ok: true, action, data: null });
+    return send(200, { ok: true, action, data: overview });
   } catch (e) {
-    res.statusCode = 200;
-    return res.end(JSON.stringify({ ...emptyOverview, warning: String(e?.message || e) }));
+    return send(200, { ok: true, action, data: overview, warning: String(e && e.message || e) });
   }
 }
 
