@@ -4,6 +4,7 @@ import bagwork from "./_bagwork.ts";
 import pumpCreate from "./_pump-create.ts";
 import orbitxWorld from "./_orbitx-world.ts";
 import kol from "./_kol.ts";
+import deskUnlock from "./_orbitx-desk-unlock.js";
 
 function pausedFeature(req, res) {
   res.statusCode = 503;
@@ -25,6 +26,7 @@ const ROUTES = {
   "pump-create": pumpCreate,
   "orbitx-world": orbitxWorld,
   kol,
+  "orbitx-desk-unlock": deskUnlock,
   paused: pausedFeature,
 };
 
