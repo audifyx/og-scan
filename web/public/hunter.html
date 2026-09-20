@@ -75,7 +75,7 @@
       const chain = d.chain || {};
       $("note").textContent = desk.note || d.disclaimer || "";
       $("wallet").textContent = (desk.wallet || chain.pubkey || "") + (chain.rpcOk ? " · on-chain" : "");
-      $("mode").textContent = desk.live && desk.armed && !desk.dryRun ? "LIVE" : (desk.armed ? "ARMED DRY" : "DRY");
+      $("mode").textContent = (d.nvidiaReady ? "NVIDIA · " : "") + (desk.live && desk.armed && !desk.dryRun ? "LIVE" : (desk.armed ? "ARMED DRY" : "DRY"));
       $("stats").innerHTML = [
         ["On-chain SOL", Number(chain.sol || 0).toFixed(4) + " SOL"],
         ["On-chain USD", money(chain.usd)],
