@@ -4,7 +4,7 @@
  * confirmMode "auto" adds ?auto=1 so the sign page opens Jupiter immediately.
  * Phantom Connect is never used.
  */
-import { PLATFORM_TX_FEE_BPS } from "../../shared/platform-tx-fee.js";
+import { PLATFORM_TX_FEE_BPS } from "../../../shared/platform-tx-fee.js";
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const ORBITX_SYMBOL = "ORBITX";
