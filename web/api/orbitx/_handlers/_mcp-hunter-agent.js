@@ -3,7 +3,6 @@
  * Live swaps stay OFF until HUNTER_LIVE=1 and the desk is armed.
  */
 import { createClient } from "@supabase/supabase-js";
-import { LIVE_WALLET_PUBKEY } from "../../../shared/orbitx-live-desk.js";
 
 export const HUNTER_ID = "alpha";
 export const HUNTER_NAME = "ALPHA";
@@ -44,7 +43,7 @@ function emptyDesk() {
     name: HUNTER_NAME,
     home: "mcp",
     dashboard: HUNTER_DASHBOARD,
-    wallet: trim(process.env.HUNTER_WALLET_PUBKEY || LIVE_WALLET_PUBKEY || ""),
+    wallet: trim(process.env.HUNTER_WALLET_PUBKEY || process.env.LIVE_WALLET_PUBKEY || ""),
     seedUsd: HUNTER_SEED_USD,
     clipUsd: HUNTER_CLIP_USD,
     maxOpen: HUNTER_MAX_OPEN,
