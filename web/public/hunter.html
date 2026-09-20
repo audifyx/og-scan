@@ -120,7 +120,13 @@
     };
     $("reload").onclick = load;
     load();
-    setInterval(load, 20000);
+    async function tickLoop() {
+      try { await fetch(api + "&tick=1", { cache: "no-store" }); } catch {}
+      load();
+    }
+    setInterval(load, 15000);
+    setInterval(tickLoop, 180000);
+    tickLoop();
   </script>
 </body>
 </html>
