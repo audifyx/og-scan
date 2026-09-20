@@ -55,8 +55,8 @@ export function bearerToken(req) {
 
 export async function supabaseUserFromRequest(req, env = process.env) {
   const token = bearerToken(req);
-  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL || "";
-  const anon = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || "";
+  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL || env.REACT_APP_SUPABASE_URL || "";
+  const anon = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || env.REACT_APP_SUPABASE_ANON_KEY || "";
   if (!token || !url || !anon) return null;
   const r = await fetch(`${url}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${token}`, apikey: anon },
