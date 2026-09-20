@@ -24,9 +24,11 @@ const SUPABASE_URL =
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 function json(res, status, body) {
+  res.statusCode = status;
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "application/json");
-  return res.status(status).json(body);
+  res.end(JSON.stringify(body));
+  return res;
 }
 
 async function sb(path, init = {}) {
@@ -64,7 +66,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-    return res.status(204).end();
+    res.statusCode = 204; return res.end();
   }
   if (req.method !== "POST" && req.method !== "GET") {
     return json(res, 405, { error: "Method not allowed" });
