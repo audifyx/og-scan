@@ -5488,6 +5488,17 @@ async function handleMcp(req, res, parts) {
   }
 
   // Dynamic Client Registration (RFC 7591) — ChatGPT may call this when adding the connector
+  if (route === "oauth/register" && req.method === "GET") {
+    return json(res, {
+      ok: true,
+      registration_endpoint: `${mcpUrl}/oauth/register`,
+      grant_types_supported: ["authorization_code"],
+      response_types_supported: ["code"],
+      token_endpoint_auth_method: "none",
+      note: "POST a RFC 7591 body to register. GET is discovery only.",
+    });
+  }
+
   if (route === "oauth/register" && req.method === "POST") {
     const body = await readBody(req);
     const clientId =
@@ -5510,7 +5521,7 @@ async function handleMcp(req, res, parts) {
     );
   }
 
-  if (route === "oauth/authorize" && req.method === "GET") {
+  if (route === "oauth/authorize" && (req.method === "GET" || req.method === "HEAD")) {
     const u = new URL(req.url || "/", "http://x");
     const params = new URLSearchParams();
     for (const key of [
@@ -5597,7 +5608,7 @@ async function handleMcp(req, res, parts) {
     });
   }
 
-  if ((!route || route === "") && req.method === "GET") {
+  if ((!route || route === "") && (req.method === "GET" || req.method === "HEAD")) {
     const accept = String(header(req, "accept") || "");
     // Streamable HTTP: Claude may open an SSE stream on GET
     if (accept.includes("text/event-stream")) {
@@ -6167,6 +6178,7 @@ export function listTelegramAgentCoreTools() {
 
 export default async function handler(req, res) {
   cors(res);
+  if (req.method === "HEAD") req.method = "GET";
   if (req.method === "OPTIONS") {
     res.statusCode = 204;
     return res.end();

@@ -42,12 +42,14 @@ export default async function handler(req, res) {
   try {
     if (req.method === "OPTIONS") {
       res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,POST,DELETE,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Mcp-Session-Id");
       res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, Mcp-Session-Id");
       res.statusCode = 204;
       return res.end();
     }
+
+    if (req.method === "HEAD") req.method = "GET";
 
     // Legacy OG DEX: POST { tool, params } (no jsonrpc)
     if (req.method === "POST") {
