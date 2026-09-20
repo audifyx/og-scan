@@ -475,10 +475,6 @@
     {
       "path": "/api/orbitx-calls?path=tick",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/ogdex?path=hunter&tick=1",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
