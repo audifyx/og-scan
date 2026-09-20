@@ -1,7 +1,6 @@
 /**
  * Owner desk PIN — server only.
- * Set ADMIN_AUTH on Vercel project rork-og-meme-coin-tracker (Production + Preview).
- * Do not set it on the leftover og-scan Vercel project.
+ * Set ADMIN_AUTH on Vercel, or the alias you actually created: OXW_WORKER_SECRET.
  * OWNER_DESK_CODE / ADMIN_PASS are legacy aliases. Never ship a default PIN.
  * Retired codes are stored as SHA-256 digests only.
  */
@@ -38,7 +37,7 @@ export function isRevokedDeskCode(code) {
 /** Secrets that may unlock the desk. Empty unless Vercel env is set. */
 export function deskUnlockSecrets(env = process.env) {
   const out = [];
-  for (const key of ["ADMIN_AUTH", "OWNER_DESK_CODE", "ADMIN_PASS"]) {
+  for (const key of ["ADMIN_AUTH", "OWNER_DESK_CODE", "ADMIN_PASS", "OXW_WORKER_SECRET"]) {
     const s = trim(env[key]);
     if (!s || isRevokedDeskCode(s)) continue;
     if (!out.includes(s)) out.push(s);
