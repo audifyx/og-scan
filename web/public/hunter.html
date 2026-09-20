@@ -1,68 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ALPHA · OrbitX hunter desk</title>
-  <meta name="description" content="MCP-only hunter agent. Thesis loop, isolated desk, dry until armed." />
+  <title>ALPHA · OrbitX Hunter Desk</title>
   <style>
-    :root { --bg:#05080c; --ink:#e8fff8; --dim:#7d958e; --line:rgba(111,255,220,.14); --mint:#6fffdc; }
-    * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family: ui-sans-serif, system-ui, sans-serif; background:#05080c; color:var(--ink); }
-    .w { width:min(920px, calc(100% - 28px)); margin:0 auto; padding:28px 0 60px; }
-    h1 { letter-spacing:-.05em; font-size:42px; }
-    .row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:18px 0; }
-    .card { border:1px solid var(--line); border-radius:16px; padding:14px 16px; background:rgba(8,14,18,.7); }
-    small { color:var(--dim); letter-spacing:.14em; text-transform:uppercase; font-size:10px; }
-    .feed { display:grid; gap:8px; }
-    .item { border:1px solid var(--line); border-radius:12px; padding:12px; font-size:14px; }
-    .buy { color:#34d399; } .skip { color:var(--dim); } .sell { color:#fbbf24; }
+    :root { --bg:#05070a; --card:#0b1016; --line:#1c2733; --mint:#5eead4; --dim:#7d8b99; --red:#fb7185; --gold:#fbbf24; --txt:#e8eef4; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(1200px 600px at 10% -10%, #0d2a24 0%, var(--bg) 45%); color:var(--txt); font-family:ui-sans-serif,system-ui,Segoe UI,sans-serif; }
+    .w { max-width:1120px; margin:0 auto; padding:28px 18px 80px; }
+    .top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+    small { color:var(--dim); letter-spacing:.16em; text-transform:uppercase; font-size:10px; }
+    h1 { margin:6px 0 0; font-size:42px; letter-spacing:-.04em; }
+    .badge { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:4px 10px; font-size:11px; color:var(--mint); }
+    .row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:22px 0; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; }
+    .card b { display:block; font-size:26px; margin-top:6px; font-variant-numeric:tabular-nums; }
+    .pos { color:var(--mint); } .neg { color:var(--red); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { text-align:left; color:var(--dim); font-size:10px; letter-spacing:.12em; text-transform:uppercase; padding:8px 6px; border-bottom:1px solid var(--line); }
+    td { padding:10px 6px; border-bottom:1px solid #121920; vertical-align:top; }
     button { background:var(--mint); color:#04201a; border:0; border-radius:999px; padding:10px 16px; font-weight:700; cursor:pointer; }
+    button.ghost { background:transparent; color:var(--txt); border:1px solid var(--line); }
     a { color:var(--mint); }
-    @media(max-width:720px){ .row{grid-template-columns:1fr 1fr;} h1{font-size:32px;} }
+    .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; word-break:break-all; }
+    .feed-item { border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:8px; }
+    @media(max-width:800px){ .row{grid-template-columns:1fr 1fr;} h1{font-size:32px;} }
   </style>
 </head>
 <body>
   <div class="w">
-    <small>OrbitX · MCP-only agent</small>
-    <h1>ALPHA</h1>
-    <p id="note" style="color:var(--dim);margin:8px 0 0">Loading desk…</p>
+    <div class="top">
+      <div>
+        <small>OrbitX · MCP hunter · isolated wallet</small>
+        <h1>ALPHA</h1>
+        <p id="note" style="color:var(--dim);margin:8px 0 0"></p>
+        <p class="mono" id="wallet" style="margin:8px 0 0;color:var(--dim)"></p>
+      </div>
+      <div>
+        <span class="badge" id="mode">…</span>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="tick">Run loop now</button>
+          <button class="ghost" id="reload">Refresh</button>
+        </div>
+      </div>
+    </div>
     <div class="row" id="stats"></div>
-    <p style="margin:12px 0 20px"><button id="tick">Run loop now</button>
-      <a href="https://www.orbitx.world/api/mcp" style="margin-left:12px">MCP</a>
-    </p>
-    <div class="feed" id="feed"></div>
+    <div class="card" style="margin-bottom:16px">
+      <small>Open position</small>
+      <div id="open" style="margin-top:8px;color:var(--dim)">None</div>
+    </div>
+    <div class="card" style="margin-bottom:16px;overflow:auto">
+      <small>Trades</small>
+      <table>
+        <thead><tr><th>Time</th><th>Side</th><th>Token</th><th>USD</th><th>Result</th><th>Mint</th></tr></thead>
+        <tbody id="trades"><tr><td colspan="6" style="color:var(--dim)">No fills yet</td></tr></tbody>
+      </table>
+    </div>
+    <div>
+      <small>Thesis tape</small>
+      <div id="feed" style="margin-top:10px"></div>
+    </div>
   </div>
   <script>
     const $ = (id) => document.getElementById(id);
+    const money = (n) => "$" + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const api = "/api/ogdex?path=hunter";
+    function cls(n) { return Number(n) >= 0 ? "pos" : "neg"; }
     async function load() {
-      const r = await fetch("/api/ogdex?path=hunter", { cache: "no-store" });
+      const r = await fetch(api, { cache: "no-store" });
       const d = await r.json();
       const desk = d.desk || {};
+      const stats = d.stats || {};
+      const chain = d.chain || {};
       $("note").textContent = desk.note || d.disclaimer || "";
+      $("wallet").textContent = (desk.wallet || chain.pubkey || "") + (chain.rpcOk ? " · on-chain" : "");
+      $("mode").textContent = desk.live && desk.armed && !desk.dryRun ? "LIVE" : (desk.armed ? "ARMED DRY" : "DRY");
       $("stats").innerHTML = [
-        ["equity", "$" + (desk.equityUsd ?? 4)],
-        ["clip", "$" + (desk.clipUsd ?? 1.5)],
-        ["wins / losses", (desk.wins||0) + " / " + (desk.losses||0)],
-        ["mode", desk.armed ? (desk.dryRun ? "armed dry" : "LIVE") : "dry"],
-      ].map(([k,v]) => `<div class="card"><small>${k}</small><div style="font-size:22px;margin-top:6px">${v}</div></div>`).join("");
+        ["On-chain SOL", Number(chain.sol || 0).toFixed(4) + " SOL"],
+        ["On-chain USD", money(chain.usd)],
+        ["Desk equity", money(stats.equityUsd ?? desk.equityUsd)],
+        ["Realized PnL", money(stats.realizedPnlUsd ?? desk.realizedPnlUsd)],
+        ["Wins", String(stats.wins ?? desk.wins ?? 0)],
+        ["Losses", String(stats.losses ?? desk.losses ?? 0)],
+        ["Win rate", Math.round((stats.winRate || 0) * 100) + "%"],
+        ["Clip", money(desk.clipUsd ?? 1.5)],
+      ].map(([k,v],i) => `<div class="card"><small>${k}</small><b class="${k.includes("PnL") ? cls(stats.realizedPnlUsd) : ""}">${v}</b></div>`).join("");
+      const open = desk.open;
+      $("open").innerHTML = open
+        ? `<b>${open.symbol || "OPEN"}</b> · ${money(open.usd)} · ${open.dryRun ? "dry" : "live"}<div class="mono">${open.mint || ""}</div>`
+        : "No open clip";
+      const trades = d.trades || [];
+      $("trades").innerHTML = trades.length ? trades.map((t) => `<tr>
+        <td>${(t.at || "").replace("T"," ").slice(0,19)}</td>
+        <td class="${String(t.action).toLowerCase()==="buy"?"pos":"neg"}">${(t.action || "").toUpperCase()}</td>
+        <td>${t.symbol || "—"}</td>
+        <td>${money(t.usd || t.clipUsd || 1.5)}</td>
+        <td>${t.executed || t.kind || ""}</td>
+        <td class="mono">${(t.mint || "").slice(0,8)}…</td>
+      </tr>`).join("") : `<tr><td colspan="6" style="color:var(--dim)">No fills yet — run the loop</td></tr>`;
       const feed = d.feed || [];
-      $("feed").innerHTML = feed.length ? feed.map((t) => {
-        const a = (t.action||"log").toLowerCase();
-        return `<div class="item"><b class="${a}">${(t.symbol||"")} ${a.toUpperCase()}</b> · ${t.sayThis || t.reason || ""}<div style="color:#7d958e;font-size:11px;margin-top:4px">${t.at||""} · ${t.mint||""}</div></div>`;
-      }).join("") : `<div class="item">No theses yet. Hit Run loop now or leave this tab open.</div>`;
+      $("feed").innerHTML = feed.length ? feed.map((t) => `<div class="feed-item"><b>${(t.symbol || "ALPHA")} · ${(t.action || t.kind || "log").toUpperCase()}</b>
+        <div style="margin-top:6px">${t.sayThis || t.reason || t.thesis || ""}</div>
+        <div class="mono" style="margin-top:6px;color:var(--dim)">${t.at || ""} · ${t.mint || ""}</div></div>`).join("") : `<div class="feed-item">No theses yet.</div>`;
     }
     $("tick").onclick = async () => {
       $("tick").disabled = true;
-      await fetch("/api/ogdex?path=hunter&tick=1").catch(() => {});
+      await fetch(api + "&tick=1").catch(() => {});
       $("tick").disabled = false;
       load();
     };
+    $("reload").onclick = load;
     load();
-    setInterval(async () => {
-      await fetch("/api/ogdex?path=hunter&tick=1").catch(() => {});
-      load();
-    }, 180000);
+    setInterval(load, 20000);
   </script>
 </body>
 </html>
