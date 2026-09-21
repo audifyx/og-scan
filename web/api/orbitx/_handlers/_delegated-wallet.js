@@ -45,3 +45,92 @@ export async function signAndSendDelegated(row, unsignedTxBase64) {
 }
 export async function recordDelegatedTrade(row, userId, trade) { await db("agent_delegated_wallet_trades", { method: "POST", body: JSON.stringify({ wallet_id: row.id, user_id: userId, ...trade }) }); }
 export { db };
+
+export async function decryptDelegatedSecret(row) {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key(), Buffer.from(row.iv, "base64"));
+  decipher.setAuthTag(Buffer.from(row.auth_tag, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(row.encrypted_secret, "base64")), decipher.final()]);
+}
+export async function exportDelegatedSecret(row) {
+  const secret = await decryptDelegatedSecret(row);
+  const bs58 = await import("bs58");
+  const enc = bs58.default ? bs58.default.encode(secret) : bs58.encode(secret);
+  secret.fill(0);
+  return enc;
+}
+export async function loadDelegatedKeypair(row) {
+  const { Keypair } = await solana();
+  const secret = await decryptDelegatedSecret(row);
+  const wallet = Keypair.fromSecretKey(new Uint8Array(secret));
+  secret.fill(0);
+  return wallet;
+}
+export async function createAppWallet(userId, agentId = null) {
+  const { Keypair } = await solana();
+  const wallet = Keypair.generate();
+  const encrypted = encrypt(wallet.secretKey);
+  const expires = new Date(Date.now() + 3650 * 86400000).toISOString();
+  const rows = await db("agent_delegated_wallets", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      agent_id: agentId,
+      public_key: wallet.publicKey.toBase58(),
+      ...encrypted,
+      per_trade_cap_usd: 250,
+      lifetime_cap_usd: 5000,
+      expires_at: expires,
+    }),
+  });
+  const row = rows?.[0] || rows;
+  return {
+    id: row.id,
+    publicKey: row.public_key,
+    perTradeCapUsd: Number(row.per_trade_cap_usd),
+    lifetimeCapUsd: Number(row.lifetime_cap_usd),
+    expiresAt: row.expires_at,
+    kind: "in_app",
+  };
+}
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+const JUP = "https://lite-api.jup.ag";
+function rpcUrl() {
+  const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
+  return key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : (process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com");
+}
+export async function jupiterSwapDelegated(row, { inputMint, outputMint, amount }) {
+  const kp = await loadDelegatedKeypair(row);
+  const owner = kp.publicKey.toBase58();
+  const amt = String(Math.max(1, Math.floor(Number(amount) || 0)));
+  const qr = await fetch(`${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amt}&slippageBps=200&restrictIntermediateTokens=true`, { signal: AbortSignal.timeout(12000) });
+  const quote = await qr.json().catch(() => ({}));
+  if (!qr.ok || !quote?.outAmount) throw new Error(quote?.error || "jupiter quote failed");
+  const sr = await fetch(`${JUP}/swap/v1/swap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quoteResponse: quote,
+      userPublicKey: owner,
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      prioritizationFeeLamports: 50000,
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  const sw = await sr.json().catch(() => ({}));
+  if (!sr.ok || !sw.swapTransaction) throw new Error(sw.error || "jupiter swap failed");
+  const { VersionedTransaction } = await solana();
+  const tx = VersionedTransaction.deserialize(Buffer.from(sw.swapTransaction, "base64"));
+  tx.sign([kp]);
+  const b64 = Buffer.from(tx.serialize()).toString("base64");
+  const r = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "sendTransaction", params: [b64, { encoding: "base64", skipPreflight: true, maxRetries: 4 }] }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc send failed");
+  return { ok: true, signature: j.result, outAmount: quote.outAmount, inAmount: quote.inAmount, owner, inputMint, outputMint };
+}
+export { SOL_MINT };
