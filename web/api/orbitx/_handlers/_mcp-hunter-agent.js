@@ -328,34 +328,6 @@ async function pushEvent(sb, payload) {
   if (error) payload.persistError = error.message;
 }
 
-async function fetchWalletState(pubkey) {
-  const pk = trim(pubkey);
-  const out = { pubkey: pk, sol: 0, lamports: 0, usd: 0, rpcOk: false };
-  if (!pk) return out;
-  const key = trim(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "");
-  const rpc = key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
-  try {
-    const r = await fetch(rpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [pk] }),
-      signal: AbortSignal.timeout(8000),
-    });
-    const j = await r.json();
-    const lamports = Number(j?.result?.value || 0);
-    out.lamports = lamports;
-    out.sol = lamports / 1e9;
-    out.rpcOk = true;
-  } catch {}
-  try {
-    const pr = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + SOL_MINT, { signal: AbortSignal.timeout(6000) });
-    const pj = await pr.json();
-    const px = Number(pj?.pairs?.[0]?.priceUsd || 0);
-    if (px) out.usd = out.sol * px;
-  } catch {}
-  return out;
-}
-
 async function fetchTape() {
   const boosts = await fetch("https://api.dexscreener.com/token-boosts/top/v1", { signal: AbortSignal.timeout(8000) }).then((r) => r.json()).catch(() => []);
   const mints = [...new Set((Array.isArray(boosts) ? boosts : []).filter((b) => String(b.chainId || "").toLowerCase() === "solana").map((b) => b.tokenAddress).filter(Boolean))].slice(0, 20);
