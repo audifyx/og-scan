@@ -8,6 +8,7 @@ import { isOwnerIdentity } from "@/lib/ownerDesk";
 import { AgentDashboard } from "@/components/agent/agent-dashboard";
 import { McpShop } from "@/components/agent/McpShop";
 import { TradeDesk } from "@/components/agent/TradeDesk";
+import { InAppWalletPanel } from "@/components/agent/InAppWalletPanel";
 import XMcpPage from "@/pages/XMcpPage";
 import {
   IosAppShell,
@@ -19,7 +20,7 @@ import {
 } from "@/components/app-shell/IosAppShell";
 import "./mcp-super-computer.css";
 
-type MainTab = "home" | "setup" | "workspace" | "trade" | "channels" | "shop";
+type MainTab = "home" | "setup" | "workspace" | "trade" | "inapp" | "channels" | "shop";
 type AgentFocus = "setup" | "shop" | "wallet" | "keys" | "connect";
 type XFocus = "home" | "account" | "keys" | "connect";
 type XHomeSub = "post" | "agent" | "queue" | "messages" | "matrix";
@@ -30,6 +31,7 @@ const mainTabs: MainTabItem[] = [
   { id: "home", label: "Overview", short: "Home", icon: <Command size={18} /> },
   { id: "workspace", label: "Agent", short: "Agent", icon: <Bot size={18} /> },
   { id: "trade", label: "Trade", short: "Trade", icon: <Zap size={18} /> },
+  { id: "inapp", label: "In-app wallet", short: "Wallet", icon: <WalletCards size={18} /> },
   { id: "channels", label: "Channels", short: "Channels", icon: <Radio size={18} /> },
   { id: "shop", label: "Access", short: "Access", icon: <Store size={18} /> },
 ];
@@ -186,7 +188,9 @@ export default function McpSuperComputer() {
 
             {tab === "workspace" && <section className="supercomputer-workspace"><SectionHeader eyebrow="MCP WORKSPACE" title="Your AI operating desk." detail="Manage identity, wallet signing, keys, and AI client connections from one place." action={<StatusPill ready={walletReady}>{walletReady ? "Workspace ready" : "Setup needed"}</StatusPill>} /><div className="supercomputer-segmented">{agentTabs.map((item) => <button type="button" key={item.id} className={agentFocus === item.id ? "is-active" : ""} onClick={() => go("workspace", item.id)}>{item.icon}{item.label}</button>)}</div><div className="supercomputer-embedded"><AgentDashboard key={`agent-${agentFocus}`} embedded initialTab={agentFocus} onWorkspaceChange={(next) => go("workspace", next)} /></div></section>}
 
-            {tab === "trade" && <section className="supercomputer-workspace supercomputer-workspace--trade"><SectionHeader eyebrow="TRADE DESK" title="Command the exact trade." detail="Use plain language, include the token contract address, and review the prepared route before signing." action={<StatusPill ready={walletReady}>{walletReady ? "Wallet ready" : "Wallet needed"}</StatusPill>} /><TradeDesk walletAddress={walletAddress} onOpenWallet={() => go("workspace", "wallet")} /></section>}
+                        {tab === "inapp" && <section className="supercomputer-workspace"><SectionHeader eyebrow="IN-APP WALLET" title="Your MCP trading key." detail="Create a wallet OrbitX can sign for you. Export the private key whenever you want. Then tell Grok to buy or sell." /><InAppWalletPanel /></section>}
+
+{tab === "trade" && <section className="supercomputer-workspace supercomputer-workspace--trade"><SectionHeader eyebrow="TRADE DESK" title="Command the exact trade." detail="Use plain language, include the token contract address, and review the prepared route before signing." action={<StatusPill ready={walletReady}>{walletReady ? "Wallet ready" : "Wallet needed"}</StatusPill>} /><TradeDesk walletAddress={walletAddress} onOpenWallet={() => go("workspace", "wallet")} /></section>}
 
             {tab === "channels" && <section className="supercomputer-workspace"><SectionHeader eyebrow="CONNECTED CHANNELS" title="One MCP. Every conversation surface." detail="X and Telegram are channels inside OrbitX now—not separate products." action={<StatusPill ready={xFocus !== "home"}>{xFocus === "home" ? "Choose a channel" : "Channel workspace"}</StatusPill>} /><div className="supercomputer-segmented">{xTabs.map((item) => <button type="button" key={item.id} className={xFocus === item.id ? "is-active" : ""} onClick={() => go("channels", item.id)}>{item.icon}{item.label}</button>)}</div><div className="supercomputer-channel-notice"><div className="supercomputer-channel-notice__icon"><Radio size={18} /></div><div><strong>X is a channel, not another MCP.</strong><p>Publishing, DMs, queues, agent training, X keys, and connector setup all live below in the same Super Computer workspace.</p></div></div><div className="supercomputer-embedded"><XMcpPage key={`x-${xFocus}-${xHomeSub}`} embedded initialTab={xFocus} initialHomeSub={xHomeSub} /></div></section>}
 
