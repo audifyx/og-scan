@@ -63,6 +63,11 @@ import {
   setHunterPaused,
 } from "./orbitx/_handlers/_mcp-hunter-agent.js";
 import {
+  APP_WALLET_CORE_TOOLS,
+  dispatchAppWalletTool,
+  isAppWalletTool,
+} from "./orbitx/_handlers/_mcp-app-wallet.js";
+import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
   prepareBuyOrbitx,
@@ -1909,9 +1914,6 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_why",
-  "orbitx_agent_desk",
-  "orbitx_agent_feed",
-  "orbitx_agent_tick",
     description:
       "Why OrbitX MCP exists. Call when the user asks why use this MCP, why so many tools, which app to use, or how OrbitX is different from a charts-only site.",
     inputSchema: { type: "object", properties: { authCode: { type: "string" } }, additionalProperties: false },
@@ -3640,6 +3642,7 @@ const CORE_TOOLS = [
   ...PAPER_CORE_TOOLS,
   ...HUNTER_CORE_TOOLS,
   ...LIVE_CORE_TOOLS,
+  ...APP_WALLET_CORE_TOOLS,
 ];
 
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));
