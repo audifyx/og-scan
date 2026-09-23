@@ -71,7 +71,7 @@ export default function AgentLinkAuthPage() {
       return;
     }
     if (!user) {
-      setError("Sign in with your Solana wallet first.");
+      setError("Sign in at /auth first.");
       return;
     }
     setSubmitting(true);
@@ -130,21 +130,9 @@ export default function AgentLinkAuthPage() {
             </div>
           ) : !user ? (
             <div className="ox-agent__btn-row">
-              {pickable.slice(0, 4).map((w) => (
-                <button
-                  key={w.name}
-                  type="button"
-                  className="ox-agent__btn ox-agent__btn--primary"
-                  disabled={busy === w.name}
-                  onClick={() =>
-                    signInWith(w.name, { replaceEmailSession: true }).catch((e) =>
-                      setError(e.message),
-                    )
-                  }
-                >
-                  {busy === w.name ? "Connecting…" : `Continue with ${w.name}`}
-                </button>
-              ))}
+              <Link className="ox-agent__btn ox-agent__btn--primary" to={`/auth?next=${encodeURIComponent(`/agent/link-auth?code=${code}`)}`}>
+                Sign in with your OrbitX account
+              </Link>
             </div>
           ) : (
             <div className="ox-agent__btn-row">
