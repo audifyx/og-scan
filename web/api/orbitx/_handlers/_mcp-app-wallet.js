@@ -3,15 +3,13 @@
  * Key is AES-GCM encrypted in agent_delegated_wallets. User can export anytime.
  */
 import {
-  activeDelegatedWallet,
-  createAppWallet,
-  exportDelegatedSecret,
-  enforceDelegatedCaps,
-  jupiterSwapDelegated,
-  recordDelegatedTrade,
-  revokeDelegatedWallet,
+  getUserWallet,
+  createUserWallet,
+  exportUserWalletSecret,
+  revokeUserWallet,
+  signUserSwap,
   SOL_MINT,
-} from "./_delegated-wallet.js";
+} from "./_user-trading-wallet.js";
 
 const DASH = "https://www.orbitx.world/supercomputer?tab=inapp";
 const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -50,13 +48,13 @@ async function solUsd() {
 }
 
 async function walletRow(userId) {
-  return activeDelegatedWallet(userId);
+  return getUserWallet(userId);
 }
 
 async function ensureWallet(userId, agentId) {
   const existing = await walletRow(userId);
   if (existing) return existing;
-  await createAppWallet(userId, agentId || null);
+  await createUserWallet(userId);
   return walletRow(userId);
 }
 
@@ -158,7 +156,7 @@ export async function appWalletExport(auth) {
   if (!gate.userId) return gate;
   const row = await walletRow(gate.userId);
   if (!row) return { ok: false, error: "no_wallet" };
-  const secret = await exportDelegatedSecret(row);
+  const secret = await exportUserWalletSecret(row);
   return {
     ok: true,
     publicKey: row.public_key,
@@ -170,7 +168,7 @@ export async function appWalletExport(auth) {
 export async function appWalletRevoke(auth) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
-  await revokeDelegatedWallet(gate.userId);
+  await revokeUserWallet(gate.userId);
   return { ok: true, revoked: true };
 }
 
@@ -188,7 +186,6 @@ export async function appWalletBuy(auth, args = {}) {
   if (!usd && args.amountSol) usd = Number(args.amountSol) * px;
   if (!usd && args.amountUsdc) usd = Number(args.amountUsdc);
   if (!usd) usd = Number(args.amount) || 1;
-  await enforceDelegatedCaps(row, usd);
   const info = await tokenInfo(mint);
   let inputMint = SOL_MINT;
   let amount = Math.floor((usd / px) * 1e9);
@@ -197,10 +194,7 @@ export async function appWalletBuy(auth, args = {}) {
     amount = Math.floor(usd * 1e6);
   }
   if (amount <= 0) return { ok: false, error: "size" };
-  const live = await jupiterSwapDelegated(row, { inputMint, outputMint: mint, amount });
-  try {
-    await recordDelegatedTrade(row, gate.userId, { side: "buy", mint, amount_usd: usd, signature: live.signature, status: "filled" });
-  } catch {}
+  const live = await signUserSwap(row, { inputMint, outputMint: mint, amount });
   const rec = receipt({ side: "buy", info, usd, signature: live.signature, owner: live.owner, payWith: useUsdc ? "USDC" : "SOL" });
   rec.imageHint = "Call orbitx_generate_image with imagePrompt to show the fill card.";
   return rec;
@@ -223,10 +217,7 @@ export async function appWalletSell(auth, args = {}) {
   }
   if (amt <= 0) return { ok: false, error: "no_balance" };
   const info = await tokenInfo(mint);
-  const live = await jupiterSwapDelegated(row, { inputMint: mint, outputMint: SOL_MINT, amount: amt });
-  try {
-    await recordDelegatedTrade(row, gate.userId, { side: "sell", mint, amount_usd: 0, signature: live.signature, status: "filled" });
-  } catch {}
+  const live = await signUserSwap(row, { inputMint: mint, outputMint: SOL_MINT, amount: amt });
   return receipt({ side: "sell", info, usd: 0, signature: live.signature, owner: live.owner, payWith: "SOL" });
 }
 
