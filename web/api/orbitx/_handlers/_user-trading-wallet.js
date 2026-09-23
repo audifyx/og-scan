@@ -55,9 +55,13 @@ function unpackDeskSecret(plain) {
 }
 
 async function db(path, init = {}) {
-  const base = process.env.SUPABASE_URL || "";
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  if (!base || !secret) throw new Error("Supabase server configuration is missing");
+  const base =
+    process.env.SUPABASE_URL ||
+    process.env.REACT_APP_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    "https://ffjipnkhcebjvttliptb.supabase.co";
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+  if (!secret) throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing on Vercel");
   const response = await fetch(`${base}/rest/v1/${path}`, {
     ...init,
     headers: {
