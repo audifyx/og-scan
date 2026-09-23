@@ -124,12 +124,14 @@ async function handleIpfs(body: any, res: VercelResponse) {
 /* ─── Step 2: Create token transaction ────────────────────────────── */
 
 async function handleCreate(body: any, res: VercelResponse) {
-  const { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, slippage } = body;
+  const { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, devBuyUsdc, slippage, pair, quoteMint } = body;
 
   if (!publicKey || !metadataUri || !name || !symbol || !mintPublicKey) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
+  const useUsdc = String(pair || "").toLowerCase().includes("usdc") || String(quoteMint || "").length > 20;
+  const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const payload: Record<string, any> = {
     publicKey,
     action: "create",
@@ -139,12 +141,13 @@ async function handleCreate(body: any, res: VercelResponse) {
       uri: metadataUri,
     },
     mint: mintPublicKey,
-    denominatedInSol: "true",
-    amount: devBuySol || 0,
+    denominatedInSol: useUsdc ? "false" : "true",
+    amount: useUsdc ? (devBuyUsdc || 0) : (devBuySol || 0),
     slippage: slippage || 10,
     priorityFee: 0.0005,
     pool: "pump",
   };
+  if (useUsdc) payload.quoteMint = quoteMint || USDC;
 
   const ppRes = await fetch("https://pumpportal.fun/api/trade-local", {
     method: "POST",

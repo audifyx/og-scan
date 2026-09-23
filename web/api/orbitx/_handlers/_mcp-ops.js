@@ -94,29 +94,59 @@ function serializeTx(tx, recentBlockhash, feePayer) {
   return Buffer.from(tx.serialize({ requireAllSignatures: false, verifySignatures: false })).toString("base64");
 }
 
-async function preparePumpClaimLocal(publicKey) {
+async function preparePumpClaimLocal(publicKey, quoteMint) {
   const { web3, spl } = await loadSolana();
   const { PublicKey, Transaction, ComputeBudgetProgram } = web3;
   const creator = new PublicKey(publicKey);
   const { blockhash } = await latestBlockhash(web3.Connection);
   const tx = new Transaction();
   tx.add(
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 10_000 }),
     collectCreatorFeeV2Ix(web3, spl, creator),
   );
+  if (quoteMint && String(quoteMint) !== String(WSOL_MINT)) {
+    const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const mint = String(quoteMint).toLowerCase().includes("usdc") ? USDC : String(quoteMint);
+    const { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } = spl;
+    const { SystemProgram, TransactionInstruction } = web3;
+    const programId = new PublicKey(PUMP_PROGRAM_ID);
+    const qMint = new PublicKey(mint);
+    const seed = (s) => new TextEncoder().encode(s);
+    const [vault] = PublicKey.findProgramAddressSync([seed(PUMP_CREATOR_VAULT_SEED), creator.toBytes()], programId);
+    const [eventAuthority] = PublicKey.findProgramAddressSync([seed(PUMP_EVENT_AUTHORITY_SEED)], programId);
+    const creatorAta = getAssociatedTokenAddressSync(qMint, creator, true, TOKEN_PROGRAM_ID);
+    const vaultAta = getAssociatedTokenAddressSync(qMint, vault, true, TOKEN_PROGRAM_ID);
+    tx.add(new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: creator, isSigner: false, isWritable: true },
+        { pubkey: creatorAta, isSigner: false, isWritable: true },
+        { pubkey: vault, isSigner: false, isWritable: true },
+        { pubkey: vaultAta, isSigner: false, isWritable: true },
+        { pubkey: qMint, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: eventAuthority, isSigner: false, isWritable: false },
+        { pubkey: programId, isSigner: false, isWritable: false },
+      ],
+      data: Uint8Array.from(COLLECT_CREATOR_FEE_V2_DISCRIMINATOR),
+    }));
+  }
   return {
     ok: true,
     action: "collectCreatorFeeV2",
     source: "local",
+    quoteMint: quoteMint || WSOL_MINT,
     transaction: serializeTx(tx, blockhash, creator),
     note: "Unsigned. Sign with the creator wallet (fee payer) to claim pump.fun creator fees from your creator vault via collect_creator_fee_v2.",
   };
 }
 
 /** Pump.fun creator fee claim — local collect_creator_fee_v2 only (PumpPortal Helius quota is dead). */
-export async function preparePumpClaim(publicKey) {
-  return preparePumpClaimLocal(publicKey);
+export async function preparePumpClaim(publicKey, quoteMint) {
+  return preparePumpClaimLocal(publicKey, quoteMint);
 }
 
 /** Scan empty ATAs and build close-account txs (rent refund). */

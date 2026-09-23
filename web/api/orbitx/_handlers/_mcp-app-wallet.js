@@ -12,6 +12,7 @@ import {
   getDeskFunds,
   SOL_MINT,
 } from "./_user-trading-wallet.js";
+import { appLaunch, appClaimFees, appBurn, APP_DESK_OPS_TOOLS } from "./_mcp-app-desk-ops.js";
 
 const DASH = "https://www.orbitx.world/supercomputer?tab=inapp";
 const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -308,6 +309,9 @@ export async function dispatchAppWalletTool(name, args, auth) {
   if (name === "orbitx_app_limit") return appWalletLimit(auth, args || {});
   if (name === "orbitx_app_orders") return appWalletOrders(auth);
   if (name === "orbitx_app_limits_tick") return appWalletTickLimits(auth);
+  if (name === "orbitx_app_launch") return appLaunch(auth, args || {});
+  if (name === "orbitx_app_claim" || name === "orbitx_app_claim_fees") return appClaimFees(auth, args || {});
+  if (name === "orbitx_app_burn") return appBurn(auth, args || {});
   return null;
 }
 
@@ -339,4 +343,5 @@ export const APP_WALLET_CORE_TOOLS = [
   },
   { name: "orbitx_app_orders", description: "Open MCP limit orders.", inputSchema: { type: "object", properties: { authCode } } },
   { name: "orbitx_app_limits_tick", description: "Check open limits and fill any that hit. Backend signs.", inputSchema: { type: "object", properties: { authCode } } },
+  ...APP_DESK_OPS_TOOLS,
 ];

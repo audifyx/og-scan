@@ -283,3 +283,40 @@ export async function signUserSwap(row, { inputMint, outputMint, amount }) {
   if (j.error) throw new Error(j.error.message || "rpc send failed");
   return { ok: true, signature: j.result, owner, outAmount: quote.outAmount };
 }
+
+
+export async function loadDeskKeypair(row) {
+  return loadKeypair(row);
+}
+
+export async function signAndSendUserTx(row, txBase64, extraSigners = []) {
+  const { VersionedTransaction, Transaction } = await import("@solana/web3.js");
+  const kp = await loadKeypair(row);
+  const raw = Buffer.from(String(txBase64 || ""), "base64");
+  if (!raw.length) throw new Error("empty transaction");
+  const signers = [kp, ...extraSigners.filter(Boolean)];
+  let serialized;
+  try {
+    const tx = VersionedTransaction.deserialize(raw);
+    tx.sign(signers);
+    serialized = Buffer.from(tx.serialize()).toString("base64");
+  } catch {
+    const tx = Transaction.from(raw);
+    tx.partialSign(...signers);
+    serialized = tx.serialize().toString("base64");
+  }
+  const r = await fetch(rpcUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "sendTransaction",
+      params: [serialized, { encoding: "base64", skipPreflight: true, maxRetries: 4 }],
+    }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc send failed");
+  return { ok: true, signature: j.result, owner: kp.publicKey.toBase58() };
+}
