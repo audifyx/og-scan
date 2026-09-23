@@ -207,10 +207,44 @@ function withAuthCodeSchema(schema, toolName) {
 }
 
 /** Page CORE first, then generated + cook + life via nextCursor until the full catalog is listed. */
+const HIDE_PHANTOM_TOOLS = new Set([
+  "orbitx_execute_launch",
+  "orbitx_prepare_launch",
+  "orbitx_launch_execution",
+  "orbitx_create_token",
+  "orbitx_launch_token",
+  "orbitx_prepare_buy",
+  "orbitx_prepare_sell",
+  "orbitx_claim_fees",
+  "orbitx_burn",
+  "orbitx_buy",
+  "orbitx_sell",
+  "orbitx_buy_auto",
+  "orbitx_sell_pump",
+  "orbitx_nft_prepare_buy",
+  "orbitx_buy_pump",
+  "orbitx_buy_pump_amm",
+  "orbitx_sell_pump_amm",
+  "orbitx_create_token_pump",
+  "orbitx_create_token_custom",
+]);
+
+function isPhantomListedTool(t) {
+  const n = String(t?.name || "");
+  if (n.startsWith("orbitx_app_")) return false;
+  if (HIDE_PHANTOM_TOOLS.has(n)) return true;
+  const d = String(t?.description || "");
+  return /Phantom|signUrl|Jupiter Wallet|connect wallet|openUrl —/i.test(d);
+}
+
+function publicToolList(list) {
+  return (list || []).filter((t) => !isPhantomListedTool(t));
+}
+
 function listLiveTools(cursor) {
   const PAGE = 80;
   if (!cursor || cursor === "core" || cursor === "0") {
-    const tools = CORE_TOOLS.map((t) => ({
+    const tools = publicToolList(CORE_TOOLS).map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
@@ -237,7 +271,7 @@ function listLiveTools(cursor) {
     const slice = _generated.slice(offset, offset + PAGE);
     const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : (_cook.length ? "cook:0" : (_life.length ? "life:0" : undefined));
     return {
-      tools: slice.map((t) => ({
+      tools: publicToolList(slice).map((t) => ({
         name: t.name,
         description: t.description,
         inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
@@ -1758,8 +1792,21 @@ const TOOL_ALIASES = {
   burn_tokens: "orbitx_app_burn",
   burn_token: "orbitx_app_burn",
   orbitx_app_claim_fees: "orbitx_app_claim",
-  orbitx_buy_auto: "orbitx_prepare_buy",
-  orbitx_sell_pump: "orbitx_prepare_sell",
+  orbitx_buy_auto: "orbitx_app_buy",
+  orbitx_sell_pump: "orbitx_app_sell",
+  orbitx_prepare_buy: "orbitx_app_buy",
+  orbitx_prepare_sell: "orbitx_app_sell",
+  orbitx_buy_pump: "orbitx_app_buy",
+  orbitx_buy_pump_amm: "orbitx_app_buy",
+  orbitx_sell_pump_amm: "orbitx_app_sell",
+  orbitx_sell_auto: "orbitx_app_sell",
+  orbitx_sell_bonk: "orbitx_app_sell",
+  orbitx_sell_launchlab: "orbitx_app_sell",
+  orbitx_trade_sell_link: "orbitx_app_sell",
+  orbitx_create_token_pump: "orbitx_app_launch",
+  orbitx_create_token_custom: "orbitx_app_launch",
+  orbitx_launch_token: "orbitx_app_launch",
+  orbitx_adv_launch_pump: "orbitx_app_launch",
   orbitx_quote: "orbitx_trade_quote",
   quote: "orbitx_trade_quote",
   tweet: "orbitx_x_post",
@@ -3811,7 +3858,8 @@ function trackTokenCall(name, args, auth, req, result) {
 }
 
 async function callTool(rawName, args, auth, base = FALLBACK_BASE, req = null) {
-  const name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  let name = resolveOrbitXToolName(rawName) || TOOL_ALIASES[rawName] || rawName;
+  name = TOOL_ALIASES[name] || name;
   const result = await callToolInner(name, args || {}, auth, base, req);
   trackTokenCall(name, args || {}, auth, req, result);
   return result;
