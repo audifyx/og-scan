@@ -13,7 +13,7 @@ async function token() {
 async function api(method: "GET" | "POST", body?: Record<string, unknown>) {
   const t = await token();
   if (!t) throw new Error("Sign in at /auth first");
-  const r = await fetch("/api/orbitx-delegated-wallet", {
+  const r = await fetch("/api/orbitx/desk-wallet", {
     method,
     headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
     body: method === "POST" ? JSON.stringify(body || {}) : undefined,
