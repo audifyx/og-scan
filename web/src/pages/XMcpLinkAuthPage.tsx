@@ -44,7 +44,7 @@ export default function XMcpLinkAuthPage() {
       return;
     }
     if (!user) {
-      setError("Sign in with your Solana wallet first.");
+      setError("Sign in at /auth first. Same OrbitX account.");
       return;
     }
     setSubmitting(true);
