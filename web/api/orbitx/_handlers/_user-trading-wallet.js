@@ -1,34 +1,59 @@
 /**
- * Per-user MCP trading wallet. Not delegated-agent. Not owner/hunter.
- * One generated keypair per user. Encrypted at rest so MCP can sign their txs.
+ * Super Computer desk wallet — same model as orbitxtrade.world:
+ * one generated Solana key per user, sealed at rest, backend signs, user can export.
  */
 import crypto from "node:crypto";
 
-const SOL_MINT = "So11111111111111111111111111111111111111112";
+export const SOL_MINT = "So11111111111111111111111111111111111111112";
 const JUP = "https://lite-api.jup.ag";
 
-function encKey() {
-  const raw = process.env.APP_WALLET_ENC_KEY || process.env.DELEGATED_WALLET_ENC_KEY || "";
-  if (!raw) throw new Error("APP_WALLET_ENC_KEY is not configured");
-  const value = Buffer.from(raw, "base64");
-  if (value.length !== 32) throw new Error("APP_WALLET_ENC_KEY must decode to 32 bytes");
-  return value;
+function kek() {
+  const raw =
+    process.env.EMBEDDED_WALLET_SECRET ||
+    process.env.APP_WALLET_ENC_KEY ||
+    process.env.DELEGATED_WALLET_ENC_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    "";
+  if (!raw) throw new Error("EMBEDDED_WALLET_SECRET is not configured");
+  return crypto.createHash("sha256").update(`orbitx-desk-wallet:${raw}`).digest();
 }
-function encrypt(bytes) {
+
+function sealSecret(plain) {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", encKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(Buffer.from(bytes)), cipher.final()]);
-  return {
-    encrypted_secret: encrypted.toString("base64"),
-    iv: iv.toString("base64"),
-    auth_tag: cipher.getAuthTag().toString("base64"),
-  };
+  const cipher = crypto.createCipheriv("aes-256-gcm", kek(), iv);
+  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString("base64");
 }
-function decrypt(row) {
-  const decipher = crypto.createDecipheriv("aes-256-gcm", encKey(), Buffer.from(row.iv, "base64"));
-  decipher.setAuthTag(Buffer.from(row.auth_tag, "base64"));
-  return Buffer.concat([decipher.update(Buffer.from(row.encrypted_secret, "base64")), decipher.final()]);
+
+function openSecret(blob) {
+  const buf = Buffer.from(blob, "base64");
+  const iv = buf.subarray(0, 12);
+  const tag = buf.subarray(12, 28);
+  const enc = buf.subarray(28);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", kek(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
 }
+
+function packDeskSecret(secret, mnemonic) {
+  if (!mnemonic) return secret;
+  return JSON.stringify({ v: 2, secret, mnemonic });
+}
+
+function unpackDeskSecret(plain) {
+  const trimmed = String(plain || "").trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed.secret === "string") {
+        return { secret: parsed.secret, mnemonic: parsed.mnemonic || null };
+      }
+    } catch {}
+  }
+  return { secret: trimmed, mnemonic: null };
+}
+
 async function db(path, init = {}) {
   const base = process.env.SUPABASE_URL || "";
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -52,44 +77,49 @@ async function db(path, init = {}) {
 
 export async function getUserWallet(userId) {
   const rows = await db(
-    `mcp_user_wallets?user_id=eq.${encodeURIComponent(userId)}&revoked=eq.false&order=created_at.desc&limit=1`,
+    `wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=eq.solana&select=id,user_id,address,ciphertext,created_at&limit=1`,
   ).catch(() => []);
-  return rows?.[0] || null;
+  const row = rows?.[0];
+  if (!row) return null;
+  return { ...row, public_key: row.address };
 }
 
 export async function createUserWallet(userId) {
   const existing = await getUserWallet(userId);
   if (existing) return { id: existing.id, publicKey: existing.public_key, existing: true };
   const { Keypair } = await import("@solana/web3.js");
+  const bs58 = (await import("bs58")).default || (await import("bs58"));
   const wallet = Keypair.generate();
-  const encrypted = encrypt(wallet.secretKey);
-  const rows = await db("mcp_user_wallets", {
+  const address = wallet.publicKey.toBase58();
+  const secret = bs58.encode(wallet.secretKey);
+  const ciphertext = sealSecret(packDeskSecret(secret, null));
+  const rows = await db("wallet_secrets", {
     method: "POST",
-    body: JSON.stringify({
-      user_id: userId,
-      public_key: wallet.publicKey.toBase58(),
-      ...encrypted,
-      revoked: false,
-    }),
+    body: JSON.stringify({ user_id: userId, chain: "solana", address, ciphertext }),
   });
   const row = rows?.[0] || rows;
-  return { id: row.id, publicKey: row.public_key, existing: false };
+  return { id: row.id, publicKey: address, existing: false };
 }
 
 export async function revokeUserWallet(userId) {
-  await db(`mcp_user_wallets?user_id=eq.${encodeURIComponent(userId)}&revoked=eq.false`, {
-    method: "PATCH",
-    body: JSON.stringify({ revoked: true, revoked_at: new Date().toISOString() }),
+  await db(`wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=eq.solana`, {
+    method: "DELETE",
     headers: { Prefer: "return=minimal" },
   });
 }
 
 export async function exportUserWalletSecret(row) {
-  const secret = decrypt(row);
-  const bs58 = await import("bs58");
-  const enc = bs58.default ? bs58.default.encode(secret) : bs58.encode(secret);
-  secret.fill(0);
-  return enc;
+  const packed = openSecret(row.ciphertext);
+  const opened = unpackDeskSecret(packed);
+  return opened.secret;
+}
+
+async function loadKeypair(row) {
+  const { Keypair } = await import("@solana/web3.js");
+  const bs58 = (await import("bs58")).default || (await import("bs58"));
+  const packed = openSecret(row.ciphertext);
+  const opened = unpackDeskSecret(packed);
+  return Keypair.fromSecretKey(bs58.decode(opened.secret));
 }
 
 function rpcUrl() {
@@ -98,10 +128,8 @@ function rpcUrl() {
 }
 
 export async function signUserSwap(row, { inputMint, outputMint, amount }) {
-  const { Keypair, VersionedTransaction } = await import("@solana/web3.js");
-  const secret = decrypt(row);
-  const kp = Keypair.fromSecretKey(new Uint8Array(secret));
-  secret.fill(0);
+  const { VersionedTransaction } = await import("@solana/web3.js");
+  const kp = await loadKeypair(row);
   const owner = kp.publicKey.toBase58();
   const amt = String(Math.max(1, Math.floor(Number(amount) || 0)));
   const qr = await fetch(
@@ -142,5 +170,3 @@ export async function signUserSwap(row, { inputMint, outputMint, amount }) {
   if (j.error) throw new Error(j.error.message || "rpc send failed");
   return { ok: true, signature: j.result, owner, outAmount: quote.outAmount };
 }
-
-export { SOL_MINT };
