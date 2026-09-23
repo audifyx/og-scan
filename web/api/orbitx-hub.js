@@ -1338,7 +1338,13 @@ async function completeAgentLinkAuthSession({ code, userId, walletAddress }) {
   if (row.status === "completed") throw new Error("This link was already used by another account.");
 
   let agent = await ensureAgent(userId);
-  const wallet = normalizeGateWallet(walletAddress || "") || agent.wallet_address || null;
+  let deskPk = "";
+  try {
+    const { getUserWallet } = await import("./orbitx/_handlers/_user-trading-wallet.js");
+    const desk = await getUserWallet(userId);
+    deskPk = desk?.public_key || "";
+  } catch {}
+  const wallet = normalizeGateWallet(deskPk || walletAddress || "") || agent.wallet_address || null;
   if (wallet && wallet !== agent.wallet_address) {
     const updated = await sb(`agents?id=eq.${encodeURIComponent(agent.id)}`, {
       method: "PATCH",
@@ -1725,12 +1731,14 @@ const TOOL_ALIASES = {
   "/": "orbitx_menu",
   menu: "orbitx_menu",
   help: "orbitx_menu",
-  orbitx_buy: "orbitx_prepare_buy",
-  orbitx_trade: "orbitx_prepare_buy",
-  orbitx_swap: "orbitx_prepare_buy",
-  trade: "orbitx_prepare_buy",
-  swap: "orbitx_prepare_buy",
-  orbitx_sell: "orbitx_prepare_sell",
+  orbitx_buy: "orbitx_app_buy",
+  orbitx_trade: "orbitx_app_buy",
+  orbitx_swap: "orbitx_app_buy",
+  trade: "orbitx_app_buy",
+  swap: "orbitx_app_buy",
+  buy: "orbitx_app_buy",
+  sell: "orbitx_app_sell",
+  orbitx_sell: "orbitx_app_sell",
   inapp_wallet: "orbitx_app_wallet",
   app_wallet: "orbitx_app_wallet",
   create_app_wallet: "orbitx_app_wallet_create",
