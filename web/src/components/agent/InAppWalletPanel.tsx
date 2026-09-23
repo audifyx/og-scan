@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
 type Row = { publicKey?: string };
@@ -11,7 +12,7 @@ async function token() {
 
 async function api(method: "GET" | "POST", body?: Record<string, unknown>) {
   const t = await token();
-  if (!t) throw new Error("Sign in first");
+  if (!t) throw new Error("Sign in at /auth first");
   const r = await fetch("/api/orbitx-delegated-wallet", {
     method,
     headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
@@ -23,16 +24,29 @@ async function api(method: "GET" | "POST", body?: Record<string, unknown>) {
 }
 
 export function InAppWalletPanel() {
+  const { user } = useAuth();
   const [row, setRow] = useState<Row | null>(null);
   const [err, setErr] = useState("");
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    if (!user) { setRow(null); return; }
     setErr("");
     try { setRow(await api("GET")); } catch (e: any) { setErr(String(e.message || e)); }
-  }, []);
+  }, [user]);
   useEffect(() => { void load(); }, [load]);
+
+  if (!user) {
+    return (
+      <section className="supercomputer-card">
+        <p className="supercomputer-eyebrow">YOUR DESK</p>
+        <h2>Sign in to OrbitX first.</h2>
+        <p>Same account as /auth — X or email. Do not connect a wallet to log in. The desk wallet is created after you are signed in.</p>
+        <a className="supercomputer-button supercomputer-button--primary" href="/auth">Sign in</a>
+      </section>
+    );
+  }
 
   const create = async () => {
     setBusy(true); setErr("");
@@ -40,7 +54,7 @@ export function InAppWalletPanel() {
     finally { setBusy(false); }
   };
   const exp = async () => {
-    if (!window.confirm("Show YOUR private key? This is your desk, not OrbitX treasury.")) return;
+    if (!window.confirm("Show YOUR private key?")) return;
     setBusy(true);
     try {
       const j = await api("POST", { action: "export" });
@@ -60,11 +74,8 @@ export function InAppWalletPanel() {
   return (
     <section className="supercomputer-card">
       <p className="supercomputer-eyebrow">YOUR DESK</p>
-      <h2>Your wallet. Generated for this account.</h2>
-      <p>
-        Same model as orbitxtrade.world: each user gets their own Solana desk.
-        Grok signs that desk in the background. Export the key anytime.
-      </p>
+      <h2>Your wallet. Tied to this OrbitX login.</h2>
+      <p>Logged in as {user.email || user.id}. Create generates a Solana desk for this account. No Phantom login.</p>
       {err ? <p><strong>{err}</strong></p> : null}
       {pk ? (
         <>
