@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-type Row = { publicKey?: string; perTradeCapUsd?: number; lifetimeCapUsd?: number };
+type Row = { publicKey?: string };
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -36,11 +36,11 @@ export function InAppWalletPanel() {
 
   const create = async () => {
     setBusy(true); setErr("");
-    try { setRow(await api("POST", { action: "app" })); } catch (e: any) { setErr(String(e.message || e)); }
+    try { setRow(await api("POST", {})); } catch (e: any) { setErr(String(e.message || e)); }
     finally { setBusy(false); }
   };
   const exp = async () => {
-    if (!window.confirm("Show private key? Backend still signs until you revoke.")) return;
+    if (!window.confirm("Show YOUR private key? This is your desk, not OrbitX treasury.")) return;
     setBusy(true);
     try {
       const j = await api("POST", { action: "export" });
@@ -49,7 +49,7 @@ export function InAppWalletPanel() {
     finally { setBusy(false); }
   };
   const revoke = async () => {
-    if (!window.confirm("Stop backend signing?")) return;
+    if (!window.confirm("Delete this desk wallet for your account?")) return;
     setBusy(true);
     try { await api("POST", { action: "revoke" }); setRow(null); setSecret(""); } catch (e: any) { setErr(String(e.message || e)); }
     finally { setBusy(false); }
@@ -59,26 +59,27 @@ export function InAppWalletPanel() {
 
   return (
     <section className="supercomputer-card">
-      <p className="supercomputer-eyebrow">YOUR WALLET</p>
-      <h2>This is your wallet. Not OrbitX. Not the owner desk.</h2>
-      <p>Created for your account only. New keypair when you tap Create. Export anytime. Fund YOUR pubkey with SOL or USDC. Grok signs YOUR trades in the background — not a shared OrbitX wallet.</p>
+      <p className="supercomputer-eyebrow">YOUR DESK</p>
+      <h2>Your wallet. Generated for this account.</h2>
+      <p>
+        Same model as orbitxtrade.world: each user gets their own Solana desk.
+        Grok signs that desk in the background. Export the key anytime.
+      </p>
       {err ? <p><strong>{err}</strong></p> : null}
       {pk ? (
         <>
           <p><strong>{pk}</strong></p>
-          <p>Cap ${row?.perTradeCapUsd ?? 250}/trade</p>
           <div className="supercomputer-welcome__actions">
-            <button type="button" className="supercomputer-button supercomputer-button--primary" onClick={exp} disabled={busy}><KeyRound size={16} /> Export</button>
-            <button type="button" className="supercomputer-button supercomputer-button--quiet" onClick={revoke} disabled={busy}><Trash2 size={16} /> Revoke</button>
+            <button type="button" className="supercomputer-button supercomputer-button--primary" onClick={exp} disabled={busy}><KeyRound size={16} /> Export key</button>
+            <button type="button" className="supercomputer-button supercomputer-button--quiet" onClick={revoke} disabled={busy}><Trash2 size={16} /> Delete desk</button>
           </div>
           {secret ? <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{secret}</pre> : null}
         </>
       ) : (
         <button type="button" className="supercomputer-button supercomputer-button--primary" onClick={create} disabled={busy}>
-          <Plus size={16} /> Create wallet
+          <Plus size={16} /> Create my desk wallet
         </button>
       )}
-      <p>If create fails, the site encryption key is missing — that key is not a wallet.</p>
     </section>
   );
 }
