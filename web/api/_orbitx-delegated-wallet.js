@@ -2,8 +2,8 @@ import { getUserWallet, createUserWallet, revokeUserWallet, exportUserWalletSecr
 
 async function userFromRequest(req) {
   const auth = req.headers.authorization || "";
-  const url = process.env.SUPABASE_URL || "";
-  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+  const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
   if (!auth.startsWith("Bearer ") || !url || !anon) return null;
   const response = await fetch(`${url}/auth/v1/user`, { headers: { Authorization: auth, apikey: anon } });
   return response.ok ? response.json() : null;
