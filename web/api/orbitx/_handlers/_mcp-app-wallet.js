@@ -8,6 +8,7 @@ import {
   exportUserWalletSecret,
   revokeUserWallet,
   signUserSwap,
+  getDeskSolLamports,
   SOL_MINT,
 } from "./_user-trading-wallet.js";
 
@@ -117,7 +118,7 @@ export async function appWalletStatus(auth) {
   if (!row) {
     return { ok: true, exists: false, signedOn: "backend", dashboard: DASH, message: "No wallet yet. Say create a wallet." };
   }
-  const lamports = await solLamports(row.public_key);
+  const lamports = await getDeskSolLamports(row.public_key);
   const usdcRaw = await tokenBalance(row.public_key, USDC);
   const px = await solUsd();
   return {
@@ -129,8 +130,9 @@ export async function appWalletStatus(auth) {
     sol: lamports / 1e9,
     solUsd: (lamports / 1e9) * px,
     usdc: usdcRaw / 1e6,
-    perTradeCapUsd: Number(row.per_trade_cap_usd),
+    perTradeCapUsd: Number(row.per_trade_cap_usd) || 250,
     dashboard: DASH,
+    message: `Desk ${row.public_key} · ${lamports / 1e9} SOL. Buys use this wallet.`,
   };
 }
 
