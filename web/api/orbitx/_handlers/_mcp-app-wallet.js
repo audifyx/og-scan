@@ -146,8 +146,10 @@ export async function appWalletCreate(auth) {
     publicKey: row.public_key,
     signedOn: "backend",
     clickToSign: false,
-    fund: "Send SOL or USDC here. Then say buy $1 of <CA> with SOL (or USDC).",
-    exportHint: "Say export wallet anytime for the private key.",
+    owner: "user",
+    notOrbitXTreasury: true,
+    fund: "This pubkey is YOURS. Fund YOUR SOL or USDC. Not the OrbitX owner wallet.",
+    exportHint: "Say export wallet for YOUR private key.",
   };
 }
 
