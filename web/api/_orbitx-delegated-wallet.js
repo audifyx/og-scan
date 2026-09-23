@@ -10,6 +10,7 @@ async function userFromRequest(req) {
 }
 
 export default async function handler(req, res) {
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST" && req.method !== "GET") return res.status(405).json({ error: "method_not_allowed" });
   const user = await userFromRequest(req);
   if (!user?.id) return res.status(401).json({ error: "unauthorized" });
