@@ -6326,6 +6326,10 @@ export default async function handler(req, res) {
   const head = parts[0] || "";
 
   try {
+    if (head === "desk-wallet" || head === "orbitx-desk-wallet") {
+      const mod = await import("./_orbitx-delegated-wallet.js");
+      return mod.default(req, res);
+    }
     if (head === "shop") {
       const { handleDeskShop } = await import("./orbitx/_handlers/_desk-shop.js");
       return handleDeskShop(req, res, parts, json);
