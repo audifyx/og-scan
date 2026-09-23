@@ -80,12 +80,41 @@ async function db(path, init = {}) {
 }
 
 export async function getUserWallet(userId) {
-  const rows = await db(
+  if (!userId) return null;
+  const q1 = await db(
     `wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&chain=eq.solana&select=id,user_id,address,ciphertext,created_at&limit=1`,
-  ).catch(() => []);
-  const row = rows?.[0];
+  ).catch((e) => ({ __err: String(e.message || e) }));
+  let row = Array.isArray(q1) ? q1[0] : null;
+  if (!row) {
+    const q2 = await db(
+      `wallet_secrets?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,address,ciphertext,chain,created_at&order=created_at.desc&limit=1`,
+    ).catch(() => []);
+    row = Array.isArray(q2) ? q2[0] : null;
+  }
   if (!row) return null;
-  return { ...row, public_key: row.address };
+  return { ...row, public_key: row.address || row.public_key };
+}
+
+export async function getDeskSolLamports(owner) {
+  if (!owner) return 0;
+  const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
+  const rpcs = [
+    key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : null,
+    "https://api.mainnet-beta.solana.com",
+  ].filter(Boolean);
+  for (const rpc of rpcs) {
+    try {
+      const r = await fetch(rpc, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [owner] }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const j = await r.json();
+      if (typeof j?.result?.value === "number") return j.result.value;
+    } catch {}
+  }
+  return 0;
 }
 
 export async function createUserWallet(userId) {
