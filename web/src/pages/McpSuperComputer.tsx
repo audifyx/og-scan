@@ -130,7 +130,8 @@ export default function McpSuperComputer() {
     profileWallet: (profile as { wallet_address?: string | null; sol_wallet?: string | null } | null)?.wallet_address ||
       (profile as { sol_wallet?: string | null } | null)?.sol_wallet || null,
   }), [profile, publicKey, user]);
-  const walletReady = Boolean(walletAddress);
+  const accountReady = Boolean(user);
+  const walletReady = accountReady;
   const owner = isOwnerIdentity({ email: user?.email, wallet: walletAddress });
   const activeTitle = mainTabs.find((item) => item.id === tab)?.label || (tab === "setup" ? "Setup" : "Overview");
   const bottomTabs: IosTabItem[] = mainTabs.map((item) => ({ id: item.id, label: item.short, ico: item.icon }));
@@ -143,10 +144,10 @@ export default function McpSuperComputer() {
       <div className="supercomputer-rail-divider" />
       <div className="supercomputer-rail-label">System</div>
       <IosRailLink label="MCP status" ico={<Activity size={16} />} active={tab === "home"} onClick={() => go("home")} />
-      <IosRailLink label="Safety & signing" ico={<ShieldCheck size={16} />} active={tab === "setup"} onClick={() => go("setup")} />
+      <IosRailLink label="Safety & signing" ico={<ShieldCheck size={16} />} active={tab === "setup"} onClick={() => { if (!user) { window.location.href = "/auth"; return; } go("setup"); }} />
       <div className="supercomputer-rail-spacer" />
-      <StatusPill ready={walletReady}>{walletReady ? "Wallet ready" : "Setup required"}</StatusPill>
-      <button type="button" className="supercomputer-rail-account" onClick={() => go("setup")}><span>{user ? "Signed in" : "Guest mode"}</span><small>{owner ? "Owner access" : walletReady ? "Identity connected" : "Start setup"}</small></button>
+      <StatusPill ready={walletReady}>{accountReady ? "Signed in" : "Sign in"}</StatusPill>
+      <button type="button" className="supercomputer-rail-account" onClick={() => go("setup")}><span>{user ? "Signed in" : "Sign in"}</span><small>{owner ? "Owner access" : user ? "OrbitX account" : "Open /auth"}</small></button>
     </>
   );
 
@@ -194,12 +195,12 @@ export default function McpSuperComputer() {
 
             {tab === "channels" && <section className="supercomputer-workspace"><SectionHeader eyebrow="CONNECTED CHANNELS" title="One MCP. Every conversation surface." detail="X and Telegram are channels inside OrbitX now—not separate products." action={<StatusPill ready={xFocus !== "home"}>{xFocus === "home" ? "Choose a channel" : "Channel workspace"}</StatusPill>} /><div className="supercomputer-segmented">{xTabs.map((item) => <button type="button" key={item.id} className={xFocus === item.id ? "is-active" : ""} onClick={() => go("channels", item.id)}>{item.icon}{item.label}</button>)}</div><div className="supercomputer-channel-notice"><div className="supercomputer-channel-notice__icon"><Radio size={18} /></div><div><strong>X is a channel, not another MCP.</strong><p>Publishing, DMs, queues, agent training, X keys, and connector setup all live below in the same Super Computer workspace.</p></div></div><div className="supercomputer-embedded"><XMcpPage key={`x-${xFocus}-${xHomeSub}`} embedded initialTab={xFocus} initialHomeSub={xHomeSub} /></div></section>}
 
-            {tab === "shop" && <section className="supercomputer-workspace"><SectionHeader eyebrow="ACCESS + SHOP" title="Unlock the operating layer." detail="Timed access and credits are shared across every OrbitX capability and connected channel. One checkout, one control plane." action={<StatusPill ready={false}>Non-custodial</StatusPill>} /><div className="supercomputer-shop-intro"><div><CircleDollarSign size={20} /><strong>Shared access across every channel</strong><p>MCP is free until 7 Nov 2026 during testing. Burns still extend seats after that, or top up credits with SOL. Wallet approval is required for every transaction.</p></div><button type="button" className="supercomputer-button supercomputer-button--quiet" onClick={() => go("workspace", "wallet")}>Review wallet</button></div><div className="supercomputer-embedded"><McpShop variant="both" walletAddress={walletAddress} /></div></section>}
+            {tab === "shop" && <section className="supercomputer-workspace"><SectionHeader eyebrow="ACCESS + SHOP" title="Unlock the operating layer." detail="Timed access and credits are shared across every OrbitX capability and connected channel. One checkout, one control plane." action={<StatusPill ready={false}>Non-custodial</StatusPill>} /><div className="supercomputer-shop-intro"><div><CircleDollarSign size={20} /><strong>Shared access across every channel</strong><p>MCP is free until 7 Nov 2026 during testing. Burns still extend seats after that, or top up credits with SOL. Desk trades sign in the background after /auth login.</p></div><button type="button" className="supercomputer-button supercomputer-button--quiet" onClick={() => go("workspace", "wallet")}>Review wallet</button></div><div className="supercomputer-embedded"><McpShop variant="both" walletAddress={walletAddress} /></div></section>}
 
-            {tab === "home" && <TabFooter eyebrow="READY WHEN YOU ARE" title={walletReady ? "Run your first exact trade." : "Build your foundation."} detail={walletReady ? "Open the Trade Desk to prepare a command with the exact CA and amount." : "Connect a wallet and AI client before you start operating."} action={walletReady ? "Trade Desk" : "Start setup"} onAction={() => go(walletReady ? "trade" : "setup")} />}
-            {tab === "setup" && <TabFooter eyebrow="FOUNDATION" title="The safer path starts here." detail="Link the wallet, create your scoped key, and connect the AI client you trust." action="Open agent" onAction={() => go("workspace")} />}
+            {tab === "home" && <TabFooter eyebrow="READY WHEN YOU ARE" title={walletReady ? "Run your first exact trade." : "Build your foundation."} detail={walletReady ? "Open the Trade Desk to prepare a command with the exact CA and amount." : "Sign in at /auth, then create your desk wallet. Do not connect Phantom to log in."} action={walletReady ? "Trade Desk" : "Start setup"} onAction={() => go(walletReady ? "trade" : "setup")} />}
+            {tab === "setup" && <TabFooter eyebrow="FOUNDATION" title="The safer path starts here." detail="Sign in with the same OrbitX account used everywhere. Then create the desk wallet on this page." action="Open agent" onAction={() => go("workspace")} />}
             {tab === "workspace" && <TabFooter eyebrow="NEXT ACTION" title="Turn the desk into an operator." detail="When your foundation is ready, move to Trade Desk for exact command execution." action="Open trade" onAction={() => go("trade")} />}
-            {tab === "trade" && <TabFooter eyebrow="EXECUTION STANDARD" title="Every command stays inspectable." detail="OrbitX prepares the transaction; the connected wallet remains the final signing authority." action="Wallet settings" onAction={() => go("workspace", "wallet")} />}
+            {tab === "trade" && <TabFooter eyebrow="EXECUTION STANDARD" title="Every command stays inspectable." detail="OrbitX signs the desk wallet in the background after you are logged in." action="Wallet settings" onAction={() => go("workspace", "wallet")} />}
             {tab === "channels" && <TabFooter eyebrow="CONNECTED SURFACES" title="One command, more reach." detail="Connect X or Telegram after the core agent and wallet foundation are ready." action="Agent setup" onAction={() => go("workspace", "connect")} />}
             {tab === "shop" && <TabFooter eyebrow="ACCESS CONTROL" title="Keep access visible." detail="Review credits, timed access, and signing requirements before purchasing." action="Review wallet" onAction={() => go("workspace", "wallet")} />}
           </main>
