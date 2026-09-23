@@ -95,27 +95,71 @@ export async function getUserWallet(userId) {
   return { ...row, public_key: row.address || row.public_key };
 }
 
+
 export async function getDeskSolLamports(owner) {
-  if (!owner) return 0;
+  const funds = await getDeskFunds(owner);
+  return funds.lamports;
+}
+
+export async function getDeskFunds(owner) {
+  const empty = { owner: owner || "", lamports: 0, sol: 0, usdcRaw: 0, usdc: 0, wsolRaw: 0, rpc: null, error: owner ? null : "no_owner" };
+  if (!owner) return empty;
   const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
   const rpcs = [
-    key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : null,
+    "https://solana-rpc.publicnode.com",
     "https://api.mainnet-beta.solana.com",
+    key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : null,
   ].filter(Boolean);
-  for (const rpc of rpcs) {
-    try {
-      const r = await fetch(rpc, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [owner] }),
-        signal: AbortSignal.timeout(8000),
-      });
-      const j = await r.json();
-      if (typeof j?.result?.value === "number") return j.result.value;
-    } catch {}
+
+  async function rpc(method, params) {
+    let last = "rpc_failed";
+    for (const url of rpcs) {
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+          signal: AbortSignal.timeout(10000),
+        });
+        const j = await r.json();
+        if (j.error) { last = j.error.message || "rpc_error"; continue; }
+        return { ok: true, result: j.result, rpc: url.split("?")[0] };
+      } catch (e) {
+        last = String(e.message || e);
+      }
+    }
+    return { ok: false, error: last };
   }
-  return 0;
+
+  const bal = await rpc("getBalance", [owner, { commitment: "confirmed" }]);
+  let lamports = 0;
+  if (bal.ok) {
+    const v = bal.result && typeof bal.result === "object" ? bal.result.value : bal.result;
+    lamports = Number(v || 0);
+  }
+
+  async function mintAmount(mint) {
+    const out = await rpc("getTokenAccountsByOwner", [owner, { mint }, { encoding: "jsonParsed", commitment: "confirmed" }]);
+    if (!out.ok) return 0;
+    const list = out.result?.value || [];
+    return list.reduce((s, a) => s + Number(a?.account?.data?.parsed?.info?.tokenAmount?.amount || 0), 0);
+  }
+
+  const usdcRaw = await mintAmount("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  const wsolRaw = await mintAmount("So11111111111111111111111111111111111111112");
+  return {
+    owner,
+    lamports,
+    sol: lamports / 1e9,
+    usdcRaw,
+    usdc: usdcRaw / 1e6,
+    wsolRaw,
+    wsol: wsolRaw / 1e9,
+    rpc: bal.rpc || null,
+    error: bal.ok ? null : bal.error,
+  };
 }
+
 
 export async function createUserWallet(userId) {
   const existing = await getUserWallet(userId);
