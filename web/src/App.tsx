@@ -712,6 +712,8 @@ const App = () => (
             <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
             <Route path="/agent/x-mcp-auth" element={<XMcpAuthPage />} />
             <Route path="/mcp-auth" element={<McpAuthPage />} />
+            <Route path="/agent/link-auth" element={<AgentLinkAuthPage />} />
+            <Route path="/agent/x-link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/supercomputer/link-auth" element={<AgentLinkAuthPage />} />
             <Route path="/supercomputer/x-link-auth" element={<XMcpLinkAuthPage />} />
             <Route path="/supercomputer/sign" element={<AgentSignPage />} />
