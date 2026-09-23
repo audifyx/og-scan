@@ -9,6 +9,7 @@ import {
   revokeUserWallet,
   signUserSwap,
   getDeskSolLamports,
+  getDeskFunds,
   SOL_MINT,
 } from "./_user-trading-wallet.js";
 
@@ -118,21 +119,26 @@ export async function appWalletStatus(auth) {
   if (!row) {
     return { ok: true, exists: false, signedOn: "backend", dashboard: DASH, message: "No wallet yet. Say create a wallet." };
   }
-  const lamports = await getDeskSolLamports(row.public_key);
-  const usdcRaw = await tokenBalance(row.public_key, USDC);
+  const funds = await getDeskFunds(row.public_key);
   const px = await solUsd();
+  const solUsdVal = funds.sol * px;
+  const totalUsd = solUsdVal + funds.usdc;
   return {
     ok: true,
     exists: true,
     signedOn: "backend",
     clickToSign: false,
     publicKey: row.public_key,
-    sol: lamports / 1e9,
-    solUsd: (lamports / 1e9) * px,
-    usdc: usdcRaw / 1e6,
+    sol: funds.sol,
+    solUsd: solUsdVal,
+    usdc: funds.usdc,
+    wsol: funds.wsol,
+    totalUsd,
+    rpc: funds.rpc,
+    rpcError: funds.error,
     perTradeCapUsd: Number(row.per_trade_cap_usd) || 250,
     dashboard: DASH,
-    message: `Desk ${row.public_key} · ${lamports / 1e9} SOL. Buys use this wallet.`,
+    message: `Desk ${row.public_key} · ${funds.sol.toFixed(4)} SOL ($${solUsdVal.toFixed(2)}) + ${funds.usdc.toFixed(2)} USDC = $${totalUsd.toFixed(2)} spendable.`,
   };
 }
 
@@ -181,8 +187,10 @@ export async function appWalletBuy(auth, args = {}) {
   if (!row) return { ok: false, error: "no_wallet", message: "Create a wallet first." };
   const mint = String(args.mint || args.ca || "").trim();
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return { ok: false, error: "bad_mint" };
-  const pay = String(args.payWith || args.currency || args.with || "sol").toLowerCase();
-  const useUsdc = pay.includes("usdc");
+  const funds = await getDeskFunds(row.public_key);
+  const pay = String(args.payWith || args.currency || args.with || "").toLowerCase();
+  let useUsdc = pay.includes("usdc");
+  if (!pay) useUsdc = funds.usdc >= 1 && funds.sol * 110 < 1;
   const px = await solUsd();
   let usd = Number(args.usd || args.amountUsd || 0);
   if (!usd && args.amountSol) usd = Number(args.amountSol) * px;
