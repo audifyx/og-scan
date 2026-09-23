@@ -59,9 +59,9 @@ export function InAppWalletPanel() {
 
   return (
     <section className="supercomputer-card">
-      <p className="supercomputer-eyebrow">MCP TRADING WALLET</p>
-      <h2>Backend signs. You never click Sign.</h2>
-      <p>Grok buys and sells from this key in the background. Export anytime. Fund with SOL or USDC.</p>
+      <p className="supercomputer-eyebrow">YOUR WALLET</p>
+      <h2>This is your wallet. Not OrbitX. Not the owner desk.</h2>
+      <p>Created for your account only. New keypair when you tap Create. Export anytime. Fund YOUR pubkey with SOL or USDC. Grok signs YOUR trades in the background — not a shared OrbitX wallet.</p>
       {err ? <p><strong>{err}</strong></p> : null}
       {pk ? (
         <>
@@ -78,7 +78,7 @@ export function InAppWalletPanel() {
           <Plus size={16} /> Create wallet
         </button>
       )}
-      <p>Needs DELEGATED_WALLET_ENC_KEY on Vercel (32-byte base64) or create fails.</p>
+      <p>If create fails, the site encryption key is missing — that key is not a wallet.</p>
     </section>
   );
 }
