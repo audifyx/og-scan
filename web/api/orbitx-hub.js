@@ -3825,6 +3825,10 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     if (args.armed === false) return setHunterArmed(false);
     return setHunterArmed(true);
   }
+  if (isAppWalletTool(name)) {
+    const out = await dispatchAppWalletTool(name, args, auth);
+    if (out) return out;
+  }
   if (name === "orbitx_auth_link") {
     return createAgentLinkAuthSession(req);
   }
