@@ -23,6 +23,18 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   );
 }
 
+if (typeof window !== "undefined") {
+  try {
+    const next = "orbitx-auth";
+    const prev = "sol-tools-auth";
+    if (!window.localStorage.getItem(next) && window.localStorage.getItem(prev)) {
+      window.localStorage.setItem(next, window.localStorage.getItem(prev) || "");
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export const supabase = createClient(
   SUPABASE_URL || "https://placeholder.supabase.co",
   SUPABASE_ANON_KEY || "placeholder-anon-key",
@@ -32,7 +44,7 @@ export const supabase = createClient(
   },
   auth: {
     storage: localStorage,
-    storageKey: "sol-tools-auth",
+    storageKey: "orbitx-auth",
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
