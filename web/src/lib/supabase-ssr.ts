@@ -46,7 +46,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 export const supabase = createClient(SAFE_URL, SAFE_ANON, {
   auth: {
     storage: localStorage,
-    storageKey: "sol-tools-auth",
+    storageKey: "orbitx-auth",
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
