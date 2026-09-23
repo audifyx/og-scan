@@ -102,51 +102,88 @@ export async function getDeskSolLamports(owner) {
 }
 
 export async function getDeskFunds(owner) {
-  const empty = { owner: owner || "", lamports: 0, sol: 0, usdcRaw: 0, usdc: 0, wsolRaw: 0, rpc: null, error: owner ? null : "no_owner" };
+  const empty = {
+    owner: owner || "",
+    lamports: 0,
+    sol: 0,
+    usdcRaw: 0,
+    usdc: 0,
+    wsolRaw: 0,
+    wsol: 0,
+    rpc: null,
+    error: owner ? null : "no_owner",
+  };
   if (!owner) return empty;
+
   const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
   const rpcs = [
-    "https://solana-rpc.publicnode.com",
     "https://api.mainnet-beta.solana.com",
+    "https://solana-rpc.publicnode.com",
+    "https://rpc.ankr.com/solana",
     key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : null,
   ].filter(Boolean);
 
-  async function rpc(method, params) {
-    let last = "rpc_failed";
+  async function call(url, method, params) {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: AbortSignal.timeout(10000),
+    });
+    return r.json();
+  }
+
+  let lamports = 0;
+  let used = null;
+  let lastErr = null;
+  for (const url of rpcs) {
+    try {
+      const j = await call(url, "getBalance", [owner]);
+      if (j.error) {
+        lastErr = j.error.message || "getBalance error";
+        continue;
+      }
+      const raw = j.result && typeof j.result === "object" ? j.result.value : j.result;
+      const n = Number(raw);
+      if (Number.isFinite(n)) {
+        lamports = n;
+        used = url.split("?")[0];
+        break;
+      }
+    } catch (e) {
+      lastErr = String(e.message || e);
+    }
+  }
+
+  if (!used) {
+    try {
+      const { Connection, PublicKey } = await import("@solana/web3.js");
+      const conn = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+      lamports = await conn.getBalance(new PublicKey(owner), "confirmed");
+      used = "web3.js";
+      lastErr = null;
+    } catch (e) {
+      lastErr = String(e.message || e);
+    }
+  }
+
+  async function mintAmt(mint) {
     for (const url of rpcs) {
       try {
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-          signal: AbortSignal.timeout(10000),
-        });
-        const j = await r.json();
-        if (j.error) { last = j.error.message || "rpc_error"; continue; }
-        return { ok: true, result: j.result, rpc: url.split("?")[0] };
-      } catch (e) {
-        last = String(e.message || e);
-      }
+        const j = await call(url, "getTokenAccountsByOwner", [owner, { mint }, { encoding: "jsonParsed" }]);
+        if (j.error) continue;
+        return (j.result?.value || []).reduce(
+          (s, a) => s + Number(a?.account?.data?.parsed?.info?.tokenAmount?.amount || 0),
+          0,
+        );
+      } catch {}
     }
-    return { ok: false, error: last };
+    return 0;
   }
 
-  const bal = await rpc("getBalance", [owner, { commitment: "confirmed" }]);
-  let lamports = 0;
-  if (bal.ok) {
-    const v = bal.result && typeof bal.result === "object" ? bal.result.value : bal.result;
-    lamports = Number(v || 0);
-  }
+  const usdcRaw = await mintAmt("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  const wsolRaw = await mintAmt("So11111111111111111111111111111111111111112");
 
-  async function mintAmount(mint) {
-    const out = await rpc("getTokenAccountsByOwner", [owner, { mint }, { encoding: "jsonParsed", commitment: "confirmed" }]);
-    if (!out.ok) return 0;
-    const list = out.result?.value || [];
-    return list.reduce((s, a) => s + Number(a?.account?.data?.parsed?.info?.tokenAmount?.amount || 0), 0);
-  }
-
-  const usdcRaw = await mintAmount("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-  const wsolRaw = await mintAmount("So11111111111111111111111111111111111111112");
   return {
     owner,
     lamports,
@@ -155,11 +192,10 @@ export async function getDeskFunds(owner) {
     usdc: usdcRaw / 1e6,
     wsolRaw,
     wsol: wsolRaw / 1e9,
-    rpc: bal.rpc || null,
-    error: bal.ok ? null : bal.error,
+    rpc: used,
+    error: used ? null : lastErr,
   };
 }
-
 
 export async function createUserWallet(userId) {
   const existing = await getUserWallet(userId);
