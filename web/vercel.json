@@ -475,10 +475,6 @@
     {
       "path": "/api/orbitx-calls?path=tick",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron-limits-tick",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
