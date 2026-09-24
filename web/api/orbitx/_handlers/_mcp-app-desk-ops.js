@@ -203,15 +203,28 @@ export async function appLaunch(auth, args = {}) {
     };
   }
   const img = await imageToBase64(args);
-  const pinned = await pinMetadata({
-    name,
-    symbol,
-    description: args.description || "",
-    twitter: args.twitter || "",
-    telegram: args.telegram || "",
-    website: args.website || "",
-    ...img,
-  });
+  let pinned;
+  try {
+    pinned = await pinMetadata({
+      name,
+      symbol,
+      description: args.description || "",
+      twitter: args.twitter || "",
+      telegram: args.telegram || "",
+      website: args.website || "",
+      ...img,
+    });
+  } catch (e) {
+    if (/PINATA_JWT/.test(String(e?.message || ""))) {
+      return {
+        ok: false,
+        error: "pinata_not_configured",
+        message: "Launches are free — only gas + mint rent apply. But IPFS pinning isn't set up yet: add PINATA_JWT to Vercel env (Production). Get a key at https://app.pinata.cloud/keys, then retry the launch.",
+        fixUrl: "https://app.pinata.cloud/keys",
+      };
+    }
+    throw e;
+  }
   const vanity = await grindObx(8000);
   const { Keypair } = await import("@solana/web3.js");
   const mintKp = Keypair.fromSecretKey(Uint8Array.from(vanity.secretKey64));
@@ -307,7 +320,16 @@ export async function appBurn(auth, args = {}) {
     amount = String(Number(spec.usd) / info.priceUsd);
   }
   if (percent == null && amount == null) return { ok: false, error: "need_size", message: "Say burn 10%, burn 1000 tokens, or burn 12 cents." };
-  const built = await prepareBurn(row.public_key, mint, amount, percent);
+  let built;
+  try {
+    built = await prepareBurn(row.public_key, mint, amount, percent);
+  } catch (e) {
+    const msg = String(e?.message || "");
+    if (/No balance/i.test(msg)) {
+      return { ok: false, error: "no_balance", message: `Desk holds no ${mint.slice(0, 8)}… to burn.`, mint, wallet: row.public_key };
+    }
+    return { ok: false, error: "burn_build_failed", message: msg || "Could not build burn transaction.", mint };
+  }
   const live = await signAndSendUserTx(row, built.transaction);
   return {
     ok: true,
@@ -330,7 +352,7 @@ export const APP_DESK_OPS_TOOLS = [
   {
     name: "orbitx_app_launch",
     description:
-      "Launch a pump.fun token from the desk wallet. Backend signs. Auto vanity CA ending obx. pair=sol|usdc. Optional imageUrl, devBuySol, devBuyUsdc, usd.",
+      "Launch a pump.fun token from the desk wallet. FREE — no launch fee, just gas + mint rent. Backend signs. Auto vanity CA ending obx. pair=sol|usdc. Optional imageUrl, devBuySol, devBuyUsdc, usd.",
     inputSchema: {
       type: "object",
       properties: {

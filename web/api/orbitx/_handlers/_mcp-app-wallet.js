@@ -243,6 +243,21 @@ export async function appWalletLimit(auth, args = {}) {
   const pct = Number(String(args.trigger || args.percent || args.up || "15").replace(/[^\d.\-]/g, "")) || 15;
   const side = String(args.side || "sell").toLowerCase() === "buy" ? "buy" : "sell";
   const target = info.priceUsd * (side === "sell" ? 1 + pct / 100 : 1 - Math.abs(pct) / 100);
+  // Persist the fill size so the tick fills exactly what was armed (not a hardcoded default).
+  const size = {};
+  if (side === "sell") {
+    // NOTE: `percent` is the trigger here (legacy); sell size uses `fraction` (0-1) or `amount` (raw tokens).
+    if (args.fraction != null && args.fraction !== "") size.fraction = Math.min(1, Math.max(0.01, Number(args.fraction)));
+    else if (args.amount != null && args.amount !== "") size.amount = String(args.amount);
+    else size.fraction = 1;
+  } else {
+    if (args.usd != null && args.usd !== "") size.usd = Number(args.usd);
+    else if (args.amountUsd != null && args.amountUsd !== "") size.usd = Number(args.amountUsd);
+    else if (args.amountSol != null && args.amountSol !== "") size.amountSol = Number(args.amountSol);
+    else if (args.amountUsdc != null && args.amountUsdc !== "") size.amountUsdc = Number(args.amountUsdc);
+    else size.usd = 1;
+    if (args.payWith) size.payWith = String(args.payWith);
+  }
   const client = await sb();
   const order = {
     userId: gate.userId,
@@ -250,25 +265,31 @@ export async function appWalletLimit(auth, args = {}) {
     mint,
     symbol: info.symbol,
     side,
+    size,
     triggerPct: pct,
     entryUsd: info.priceUsd,
     targetUsd: target,
     entryMcap: info.mcap,
     status: "open",
+    attempts: 0,
     at: new Date().toISOString(),
   };
-  if (client) {
-    await client.from("ox_live_events").insert({
-      kind: "app_limit",
-      agent_id: gate.userId,
-      mint,
-      symbol: info.symbol,
-      side,
-      thesis: `${side} ${info.symbol} at ${pct}%`,
-      meta: order,
-    });
+  if (!client) {
+    return { ok: false, error: "db_unavailable", message: "Limit could not be armed — order store unreachable. Retry in a minute." };
   }
-  return { ok: true, signedOn: "backend", order, message: `Limit armed. ${side} ${info.symbol} when price hits $${target.toFixed(8)} (${pct}%). Backend will sign. No click.` };
+  await client.from("ox_live_events").insert({
+    kind: "app_limit",
+    agent_id: gate.userId,
+    mint,
+    symbol: info.symbol,
+    side,
+    thesis: `${side} ${info.symbol} at ${pct}%`,
+    meta: order,
+  });
+  const sizeTxt = side === "sell"
+    ? (size.fraction != null ? `${Math.round(size.fraction * 100)}%` : `${size.amount} tokens`)
+    : (size.usd != null ? `$${size.usd}` : size.amountSol != null ? `${size.amountSol} SOL` : `${size.amountUsdc} USDC`);
+  return { ok: true, signedOn: "backend", order, message: `Limit armed. ${side.toUpperCase()} ${sizeTxt} ${info.symbol} when price hits $${target.toFixed(8)} (${pct}%). Backend auto-fills. No click.` };
 }
 
 export async function appWalletOrders(auth) {
@@ -276,27 +297,123 @@ export async function appWalletOrders(auth) {
   if (!gate.userId) return gate;
   const client = await sb();
   if (!client) return { ok: true, orders: [] };
-  const { data } = await client.from("ox_live_events").select("meta,created_at,mint,symbol,side").eq("kind", "app_limit").eq("agent_id", gate.userId).order("created_at", { ascending: false }).limit(40);
-  return { ok: true, orders: (data || []).map((r) => ({ ...(r.meta || {}), at: r.created_at })) };
+  const { data } = await client.from("ox_live_events").select("id,meta,created_at,mint,symbol,side").eq("kind", "app_limit").eq("agent_id", gate.userId).order("created_at", { ascending: false }).limit(40);
+  return { ok: true, orders: (data || []).map((r) => ({ orderId: r.id, ...(r.meta || {}), at: r.created_at })) };
+}
+
+function fillArgsFor(order) {
+  const s = order.size || {};
+  if (order.side === "sell") {
+    if (s.fraction != null) return { mint: order.mint, fraction: Number(s.fraction) };
+    if (s.amount != null) return { mint: order.mint, amount: s.amount };
+    return { mint: order.mint, fraction: 1 };
+  }
+  const a = { mint: order.mint };
+  if (s.usd != null) a.usd = Number(s.usd);
+  else if (s.amountSol != null) a.amountSol = Number(s.amountSol);
+  else if (s.amountUsdc != null) a.amountUsdc = Number(s.amountUsdc);
+  else a.usd = 1;
+  if (s.payWith) a.payWith = s.payWith;
+  return a;
+}
+
+// Errors that will never succeed on retry — fail the order immediately.
+const LIMIT_FATAL = new Set(["no_balance", "no_wallet", "bad_mint", "size", "need_size"]);
+const LIMIT_MAX_ATTEMPTS = 10;
+
+export async function tickUserLimits(userId) {
+  const client = await sb();
+  if (!client) return { ok: false, error: "db_unavailable" };
+  const { data } = await client.from("ox_live_events").select("id,meta").eq("kind", "app_limit").eq("agent_id", userId).order("created_at", { ascending: false }).limit(100);
+  const fills = [];
+  let checked = 0;
+  for (const r of data || []) {
+    const o = r.meta || {};
+    if ((o.status || "open") !== "open") continue;
+    if (!o.mint || !o.targetUsd) continue;
+    checked += 1;
+    let info;
+    try {
+      info = await tokenInfo(o.mint);
+    } catch {
+      continue; // price feed hiccup — retry next tick, don't burn an attempt
+    }
+    if (!info.priceUsd) continue;
+    const hit = o.side === "sell" ? info.priceUsd >= Number(o.targetUsd) : info.priceUsd <= Number(o.targetUsd);
+    if (!hit) continue;
+    const auth = { userId };
+    let fill;
+    try {
+      fill = o.side === "sell" ? await appWalletSell(auth, fillArgsFor(o)) : await appWalletBuy(auth, fillArgsFor(o));
+    } catch (e) {
+      fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
+    }
+    const attempts = Number(o.attempts || 0) + 1;
+    const fatal = fill && !fill.ok && LIMIT_FATAL.has(String(fill.error || ""));
+    const status = fill && fill.ok ? "filled" : fatal || attempts >= LIMIT_MAX_ATTEMPTS ? "failed" : "open";
+    const patch = {
+      ...o,
+      status,
+      attempts,
+      lastCheckAt: new Date().toISOString(),
+      ...(status !== "open"
+        ? { filledAt: new Date().toISOString(), lastFill: { ok: !!fill?.ok, error: fill?.error || null, message: fill?.message || null, signature: fill?.signature || null } }
+        : { lastError: fill?.error || fill?.message || null }),
+    };
+    try {
+      await client.from("ox_live_events").update({ meta: patch }).eq("id", r.id);
+    } catch {
+      /* status write is best-effort; the fill itself already happened or failed */
+    }
+    fills.push({ orderId: r.id, mint: o.mint, side: o.side, status, attempts, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null } });
+  }
+  return { ok: true, checked, fills };
 }
 
 export async function appWalletTickLimits(auth) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
-  const listed = await appWalletOrders(auth);
-  const fills = [];
-  for (const o of listed.orders || []) {
-    if (o.status && o.status !== "open") continue;
-    if (!o.mint || !o.targetUsd) continue;
-    const info = await tokenInfo(o.mint);
-    const hit = o.side === "sell" ? info.priceUsd >= Number(o.targetUsd) : info.priceUsd <= Number(o.targetUsd);
-    if (!hit) continue;
-    const fill = o.side === "sell"
-      ? await appWalletSell(auth, { mint: o.mint, fraction: 1 })
-      : await appWalletBuy(auth, { mint: o.mint, usd: 1 });
-    fills.push({ order: o, fill });
+  return tickUserLimits(gate.userId);
+}
+
+/** Cron sweep: tick every user that has limit rows. Per-user failures never stop the sweep. */
+export async function tickAllLimits({ maxUsers = 200 } = {}) {
+  const client = await sb();
+  if (!client) return { ok: false, error: "db_unavailable" };
+  const { data } = await client.from("ox_live_events").select("agent_id").eq("kind", "app_limit").limit(2000);
+  const users = [...new Set((data || []).map((r) => r.agent_id).filter(Boolean))].slice(0, maxUsers);
+  const results = [];
+  for (const userId of users) {
+    try {
+      const r = await tickUserLimits(userId);
+      if ((r.fills || []).length || !r.ok) results.push({ userId, ...r });
+    } catch (e) {
+      results.push({ userId, ok: false, error: e?.message || String(e) });
+    }
   }
-  return { ok: true, checked: (listed.orders || []).length, fills };
+  return { ok: true, users: users.length, active: results.length, results };
+}
+
+export async function appWalletCancelOrder(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const client = await sb();
+  if (!client) return { ok: false, error: "db_unavailable" };
+  const idArg = String(args.orderId || args.id || "").trim();
+  const mintArg = String(args.mint || args.ca || "").trim();
+  if (!idArg && !mintArg) return { ok: false, error: "need_order", message: "Pass orderId (from orbitx_app_orders) or mint." };
+  const { data } = await client.from("ox_live_events").select("id,meta").eq("kind", "app_limit").eq("agent_id", gate.userId).limit(100);
+  const targets = (data || []).filter((r) => {
+    if ((r.meta?.status || "open") !== "open") return false;
+    if (idArg) return String(r.id) === idArg;
+    return String(r.meta?.mint || "") === mintArg;
+  });
+  if (!targets.length) return { ok: false, error: "order_not_found", message: "No open order matches." };
+  const now = new Date().toISOString();
+  for (const t of targets) {
+    await client.from("ox_live_events").update({ meta: { ...(t.meta || {}), status: "cancelled", cancelledAt: now } }).eq("id", t.id);
+  }
+  return { ok: true, cancelled: targets.map((t) => ({ orderId: t.id, mint: t.meta?.mint, side: t.meta?.side, symbol: t.meta?.symbol })) };
 }
 
 export async function dispatchAppWalletTool(name, args, auth) {
@@ -308,6 +425,7 @@ export async function dispatchAppWalletTool(name, args, auth) {
   if (name === "orbitx_app_sell") return appWalletSell(auth, args || {});
   if (name === "orbitx_app_limit") return appWalletLimit(auth, args || {});
   if (name === "orbitx_app_orders") return appWalletOrders(auth);
+  if (name === "orbitx_app_cancel_order") return appWalletCancelOrder(auth, args || {});
   if (name === "orbitx_app_limits_tick") return appWalletTickLimits(auth);
   if (name === "orbitx_app_launch") return appLaunch(auth, args || {});
   if (name === "orbitx_app_claim" || name === "orbitx_app_claim_fees") return appClaimFees(auth, args || {});
@@ -338,10 +456,15 @@ export const APP_WALLET_CORE_TOOLS = [
   },
   {
     name: "orbitx_app_limit",
-    description: "Arm a backend limit. Example: sell when up 15%. No click. Backend signs when hit.",
-    inputSchema: { type: "object", properties: { mint: { type: "string" }, trigger: { type: "string" }, percent: { type: "number" }, side: { type: "string" }, authCode }, required: ["mint"] },
+    description: "Arm a backend limit order. trigger/percent = trigger move % (e.g. 15 = sell when up 15%). Sell size: fraction 0-1 or amount (raw tokens), default 100%. Buy size: usd/amountSol/amountUsdc, default $1. Backend checks every few minutes and signs the fill when hit. No click.",
+    inputSchema: { type: "object", properties: { mint: { type: "string" }, trigger: { type: "string" }, percent: { type: "number" }, fraction: { type: "number" }, amount: { type: ["number", "string"] }, usd: { type: "number" }, amountSol: { type: "number" }, amountUsdc: { type: "number" }, payWith: { type: "string" }, side: { type: "string" }, authCode }, required: ["mint"] },
   },
-  { name: "orbitx_app_orders", description: "Open MCP limit orders.", inputSchema: { type: "object", properties: { authCode } } },
+  {
+    name: "orbitx_app_cancel_order",
+    description: "Cancel an open backend limit order. Pass orderId (from orbitx_app_orders) or mint to cancel all open orders for that mint.",
+    inputSchema: { type: "object", properties: { orderId: { type: "string" }, mint: { type: "string" }, authCode }, },
+  },
+  { name: "orbitx_app_orders", description: "List limit orders (open, filled, failed, cancelled) with orderId.", inputSchema: { type: "object", properties: { authCode } } },
   { name: "orbitx_app_limits_tick", description: "Check open limits and fill any that hit. Backend signs.", inputSchema: { type: "object", properties: { authCode } } },
   ...APP_DESK_OPS_TOOLS,
 ];

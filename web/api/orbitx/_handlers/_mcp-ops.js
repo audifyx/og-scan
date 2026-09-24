@@ -291,6 +291,161 @@ export async function prepareBurn(publicKey, mint, amount, percent) {
   };
 }
 
+/**
+ * Build the full Metaplex NFT mint as ONE legacy Transaction (backend-signed by the desk):
+ * create mint account + initializeMint2 (decimals 0) + create ATA + mintTo 1
+ * + createMetadataAccountV3 + createMasterEditionV3.
+ *
+ * NOTE on the metaplex SDK: @metaplex-foundation/mpl-token-metadata@3.x only ships
+ * umi-based helpers (createMetadataAccountV3(context, …), findMetadataPda(context, …) —
+ * both require a umi Context), and the legacy createCreateMetadataAccountV3Instruction /
+ * createCreateMasterEditionV3Instruction names from the 1.x line do not exist in 3.4.0.
+ * To stay dependency-light the two metadata instructions are built directly with
+ * @solana/web3.js, using the exact account metas + data layouts verified against the
+ * 3.4.0 generated source (discriminators 33 / 17, PDA seeds
+ * ["metadata", programId, mint] and ["metadata", programId, mint, "edition"]).
+ * The rent sysvar is passed explicitly, matching the legacy v1 account layout.
+ */
+export async function prepareNftMint({ payer, name, symbol, uri, royaltyBps }) {
+  const { web3, spl } = await loadSolana();
+  const {
+    Connection,
+    PublicKey,
+    SystemProgram,
+    Transaction,
+    TransactionInstruction,
+    Keypair,
+    SYSVAR_RENT_PUBKEY,
+  } = web3;
+  const {
+    TOKEN_PROGRAM_ID,
+    MINT_SIZE,
+    getMinimumBalanceForRentExemptMint,
+    createInitializeMint2Instruction,
+    createAssociatedTokenAccountInstruction,
+    createMintToInstruction,
+    getAssociatedTokenAddressSync,
+  } = spl;
+
+  const payerPk = new PublicKey(String(payer || "").trim());
+  const nftName = String(name || "").trim();
+  const nftSymbol = (String(symbol || "NFT").trim().toUpperCase() || "NFT").slice(0, 10);
+  const nftUri = String(uri || "").trim();
+  if (!nftName || nftName.length > 32) throw new Error("name required (max 32 chars)");
+  if (!/^https?:\/\//i.test(nftUri) || nftUri.length > 200) throw new Error("uri must be a public http(s) URL (max 200 chars)");
+  const sellerFeeBasisPoints = Math.min(10000, Math.max(0, Number(royaltyBps) || 0));
+
+  const conn = new Connection(rpcUrl(), "confirmed");
+  const mintKp = Keypair.generate();
+  const mintPk = mintKp.publicKey;
+  const rentExempt = await getMinimumBalanceForRentExemptMint(conn);
+  const ata = getAssociatedTokenAddressSync(mintPk, payerPk);
+
+  const METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+  const [metadataPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), mintPk.toBuffer()],
+    METADATA_PROGRAM_ID,
+  );
+  const [editionPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), mintPk.toBuffer(), Buffer.from("edition")],
+    METADATA_PROGRAM_ID,
+  );
+
+  // Instruction data encoders — mirror the mpl-token-metadata 3.4.0 generated serializers.
+  const encStr = (s) => {
+    const b = Buffer.from(s, "utf8");
+    const out = Buffer.alloc(4 + b.length);
+    out.writeUInt32LE(b.length, 0);
+    b.copy(out, 4);
+    return out;
+  };
+  const u16 = (n) => {
+    const b = Buffer.alloc(2);
+    b.writeUInt16LE(n, 0);
+    return b;
+  };
+  const u32 = (n) => {
+    const b = Buffer.alloc(4);
+    b.writeUInt32LE(n, 0);
+    return b;
+  };
+  // CreateMetadataAccountV3 (discriminator 33) + DataV2.
+  const metadataData = Buffer.concat([
+    Buffer.from([33]),
+    encStr(nftName),
+    encStr(nftSymbol),
+    encStr(nftUri),
+    u16(sellerFeeBasisPoints),
+    Buffer.concat([
+      Buffer.from([1]), // creators: Some([...])
+      u32(1),
+      payerPk.toBuffer(), // address
+      Buffer.from([1]), // verified
+      Buffer.from([100]), // share
+    ]),
+    Buffer.from([0]), // collection: None
+    Buffer.from([0]), // uses: None
+    Buffer.from([1]), // isMutable
+    Buffer.from([0]), // collectionDetails: None
+  ]);
+  // CreateMasterEditionV3 (discriminator 17) + maxSupply Some(0) = no prints.
+  const editionData = Buffer.concat([
+    Buffer.from([17]),
+    Buffer.from([1]),
+    Buffer.alloc(8),
+  ]);
+
+  const tx = new Transaction();
+  tx.add(
+    SystemProgram.createAccount({
+      fromPubkey: payerPk,
+      newAccountPubkey: mintPk,
+      space: MINT_SIZE,
+      lamports: rentExempt,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    createInitializeMint2Instruction(mintPk, 0, payerPk, payerPk, TOKEN_PROGRAM_ID),
+    createAssociatedTokenAccountInstruction(payerPk, ata, payerPk, mintPk),
+    createMintToInstruction(mintPk, ata, payerPk, 1),
+    new TransactionInstruction({
+      programId: METADATA_PROGRAM_ID,
+      keys: [
+        { pubkey: metadataPda, isSigner: false, isWritable: true },
+        { pubkey: mintPk, isSigner: false, isWritable: false },
+        { pubkey: payerPk, isSigner: true, isWritable: false }, // mintAuthority
+        { pubkey: payerPk, isSigner: true, isWritable: true }, // payer
+        { pubkey: payerPk, isSigner: false, isWritable: false }, // updateAuthority
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      ],
+      data: metadataData,
+    }),
+    new TransactionInstruction({
+      programId: METADATA_PROGRAM_ID,
+      keys: [
+        { pubkey: editionPda, isSigner: false, isWritable: true },
+        { pubkey: mintPk, isSigner: false, isWritable: true },
+        { pubkey: payerPk, isSigner: true, isWritable: false }, // updateAuthority
+        { pubkey: payerPk, isSigner: true, isWritable: false }, // mintAuthority
+        { pubkey: payerPk, isSigner: true, isWritable: true }, // payer
+        { pubkey: metadataPda, isSigner: false, isWritable: true },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      ],
+      data: editionData,
+    }),
+  );
+
+  const { blockhash } = await latestBlockhash(web3.Connection);
+  return {
+    ok: true,
+    mint: mintPk.toBase58(),
+    transaction: serializeTx(tx, blockhash, payerPk),
+    mintSecretKey: Buffer.from(mintKp.secretKey).toString("base64"),
+  };
+}
+
 export async function nftEdge(action, body = {}) {
   const base = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";

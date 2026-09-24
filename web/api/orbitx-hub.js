@@ -1745,6 +1745,7 @@ const SESSION_TOOLS = new Set([
   "orbitx_vc_end",
   "orbitx_gc_start",
   "orbitx_telegram_send",
+  "orbitx_mint_nft",
 ]);
 
 async function getProfileForUser(userId) {
@@ -1788,6 +1789,10 @@ const TOOL_ALIASES = {
   create_token: "orbitx_app_launch",
   claim: "orbitx_app_claim",
   claim_fees: "orbitx_app_claim",
+  cancel_limit: "orbitx_app_cancel_order",
+  cancel_order: "orbitx_app_cancel_order",
+  cancel_limit_order: "orbitx_app_cancel_order",
+  limit_orders: "orbitx_app_orders",
   claim_creator_fees: "orbitx_app_claim",
   burn_tokens: "orbitx_app_burn",
   burn_token: "orbitx_app_burn",
@@ -2673,7 +2678,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_create_token",
     description:
-      "Alias for orbitx_execute_launch — CREATE / finish Pump.fun token via Phantom launchpad openUrl.",
+      "Legacy — superseded by orbitx_app_launch (backend signs, free, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2693,7 +2698,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_prepare_launch",
     description:
-      "Alias for orbitx_execute_launch — use that tool to complete the final pump.fun create in Phantom.",
+      "Legacy — superseded by orbitx_app_launch (backend signs, free, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2714,7 +2719,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_launch_execution",
     description:
-      "Alias for orbitx_execute_launch — the orbit launch execution tool for the final Pump.fun create tx.",
+      "Legacy — superseded by orbitx_app_launch (backend signs, free, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2798,7 +2803,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_claim_fees",
     description:
-      "Claim pump.fun creator fees via Phantom. Returns signUrl — open and approve. Requires publicKey of creator wallet.",
+      "Legacy — superseded by orbitx_app_claim (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: { publicKey: { type: "string" } },
@@ -2808,17 +2813,16 @@ const CORE_TOOLS = [
   {
     name: "orbitx_rent_refund",
     description:
-      "Reclaim rent SOL from empty token accounts via Phantom. Returns signUrl. Requires publicKey.",
+      "Reclaim rent SOL from empty token accounts on the desk wallet. Backend signs. No popup.",
     inputSchema: {
       type: "object",
-      properties: { publicKey: { type: "string" } },
-      required: ["publicKey"],
+      properties: {},
     },
   },
   {
     name: "orbitx_burn",
     description:
-      "Burn tokens via Phantom. Returns signUrl. Use amount (tokens) or percent (0-100). Full burn can close ATA for rent.",
+      "Legacy — superseded by orbitx_app_burn (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2832,7 +2836,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_buy",
-    description: "Alias for orbitx_prepare_buy — returns Jupiter signUrl.",
+    description: "Legacy — superseded by orbitx_app_buy (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2847,7 +2851,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_trade",
-    description: "Alias for orbitx_prepare_buy (/trade). Returns Jupiter signUrl.",
+    description: "Legacy — superseded by orbitx_app_buy (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2862,7 +2866,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_swap",
-    description: "Alias for orbitx_prepare_buy (/swap). Returns Jupiter signUrl.",
+    description: "Legacy — superseded by orbitx_app_buy (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2877,7 +2881,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_sell",
-    description: "Alias for orbitx_prepare_sell — returns Jupiter signUrl.",
+    description: "Legacy — superseded by orbitx_app_sell (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -2892,7 +2896,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_buy_auto",
-    description: "Buy with pool=auto — alias for orbitx_prepare_buy (Jupiter signUrl).",
+    description: "Legacy — superseded by orbitx_app_buy (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -3061,7 +3065,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_sell_pump",
-    description: "Sell on pump pool — alias for orbitx_prepare_sell with pool=pump.",
+    description: "Legacy — superseded by orbitx_app_sell (backend signs, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -3075,7 +3079,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_launch_token",
-    description: "Alias for orbitx_execute_launch — opens Phantom launchpad for final create.",
+    description: "Legacy — superseded by orbitx_app_launch (backend signs, free, no popup). Do not use.",
     inputSchema: {
       type: "object",
       properties: {
@@ -3209,19 +3213,16 @@ const CORE_TOOLS = [
   {
     name: "orbitx_mint_nft",
     description:
-      "MINT a real Metaplex NFT via Phantom. Returns openUrl to /agent/nft-mint — user connects Phantom and approves. Requires metadata uri (JSON URL). Optionally registers on OrbitX marketplace.",
+      "Mint a Metaplex NFT from the desk wallet. Backend signs. No popup.",
     inputSchema: {
       type: "object",
       properties: {
         name: { type: "string" },
         symbol: { type: "string", default: "NFT" },
         uri: { type: "string", description: "Public metadata JSON URL" },
+        metadataUri: { type: "string", description: "Alias for uri" },
         royaltyBps: { type: "integer", default: 500 },
-        collectionMint: { type: "string" },
-        isCollection: { type: "boolean", default: false },
-        imageUrl: { type: "string" },
         register: { type: "boolean", default: true },
-        publicKey: { type: "string" },
       },
       required: ["name", "uri"],
     },
@@ -4471,36 +4472,74 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
 
   if (name === "orbitx_mint_nft") {
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "auth_required",
+        message: "Link OrbitX auth first — NFT minting happens on your desk wallet.",
+        hintTool: "orbitx_auth_link",
+      };
+    }
+    const { getUserWallet, signAndSendUserTx } = await import("./orbitx/_handlers/_user-trading-wallet.js");
+    const wrow = await getUserWallet(auth.userId);
+    if (!wrow) return { ok: false, error: "no_wallet", message: "Create a desk wallet first." };
     const nftName = String(args.name || "").trim();
     const uri = String(args.uri || args.metadataUri || "").trim();
     if (!nftName || !uri) throw new Error("name and uri (metadata JSON URL) required");
-    const q = new URLSearchParams({
+    const symbol = String(args.symbol || "NFT").trim().toUpperCase().slice(0, 10) || "NFT";
+    const royaltyBps =
+      args.royaltyBps == null || args.royaltyBps === ""
+        ? 500
+        : Math.min(10000, Math.max(0, Number(args.royaltyBps) || 0));
+    const ops = await mcpOps();
+    const built = await ops.prepareNftMint({
+      payer: wrow.public_key,
       name: nftName,
-      symbol: String(args.symbol || "NFT").trim().toUpperCase() || "NFT",
+      symbol,
       uri,
-      royaltyBps: String(Number(args.royaltyBps) || 500),
-      register: args.register === false ? "0" : "1",
+      royaltyBps,
     });
-    if (args.collectionMint) q.set("collectionMint", String(args.collectionMint));
-    if (args.isCollection) q.set("isCollection", "1");
-    if (args.imageUrl) q.set("imageUrl", String(args.imageUrl));
-    if (wallet) q.set("publicKey", wallet);
-    const openUrl = `${base}/agent/nft-mint?${q.toString()}`;
+    const { Keypair } = await import("@solana/web3.js");
+    const mintKp = Keypair.fromSecretKey(Buffer.from(built.mintSecretKey, "base64"));
+    const live = await signAndSendUserTx(wrow, built.transaction, [mintKp]);
+    let registered = false;
+    let registerError = null;
+    if (args.register !== false) {
+      try {
+        await sb("rpc/orbitx_register_nft", {
+          method: "POST",
+          body: JSON.stringify({
+            p_mint_address: built.mint,
+            p_creator_wallet: wrow.public_key,
+            p_name: nftName,
+            p_symbol: symbol,
+            p_metadata_uri: uri,
+            p_royalty_bps: royaltyBps,
+          }),
+        });
+        registered = true;
+      } catch (e) {
+        registerError = e?.message || String(e);
+      }
+    }
     return {
       ok: true,
-      status: "awaiting_phantom_mint",
-      requiresSignature: true,
-      openUrl,
-      studioUrl: `${base}/nft/create`,
+      signedOn: "backend",
+      clickToSign: false,
+      action: "mint_nft",
+      mint: built.mint,
       name: nftName,
+      symbol,
       uri,
-      instructions: [
-        "Open openUrl in the user's browser.",
-        "Connect Phantom and click Mint NFT.",
-        "Approve the Metaplex create transaction in Phantom.",
-        "Mint is incomplete until Phantom confirms.",
-      ],
-      note: "Non-custodial Metaplex mint. Never claim minted without a confirmed signature.",
+      signature: live.signature,
+      tx: `https://solscan.io/tx/${live.signature}`,
+      wallet: wrow.public_key,
+      registered,
+      ...(registerError ? { registerError } : {}),
+      headline: `MINTED NFT ${symbol} · ${built.mint}`,
+      message: registered
+        ? "NFT minted and registered on the OrbitX marketplace. Desk signed — no popup."
+        : `NFT minted. Desk signed — no popup.${registerError ? ` Marketplace registration skipped: ${registerError}` : ""}`,
     };
   }
 
@@ -5101,19 +5140,38 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
 
   if (name === "orbitx_rent_refund") {
-    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const q = new URLSearchParams({ kind: "rent", publicKey: wallet });
+    if (!auth?.userId) {
+      return {
+        ok: false,
+        error: "auth_required",
+        message: "Link OrbitX auth first — rent refund closes empty token accounts on your desk wallet.",
+        hintTool: "orbitx_auth_link",
+      };
+    }
+    const { getUserWallet, signAndSendUserTx } = await import("./orbitx/_handlers/_user-trading-wallet.js");
+    const wrow = await getUserWallet(auth.userId);
+    if (!wrow) return { ok: false, error: "no_wallet", message: "Create a desk wallet first." };
+    const { prepareRentRefund } = await mcpOps();
+    const built = await prepareRentRefund(wrow.public_key);
+    if (!built.accounts.length) {
+      return { ok: true, signedOn: "backend", action: "rent_refund", accounts: 0, reclaimableSol: 0, signatures: [], message: "No empty token accounts to close." };
+    }
+    const signatures = [];
+    for (const txB64 of built.transactions) {
+      const live = await signAndSendUserTx(wrow, txB64);
+      signatures.push(live.signature);
+    }
     return {
       ok: true,
-      status: "awaiting_jupiter_signature",
-      requiresSignature: true,
-      signUrl: `${base}/agent/sign?${q.toString()}`,
+      signedOn: "backend",
+      clickToSign: false,
       action: "rent_refund",
-      wallet,
-      instructions: [
-        "Open signUrl — may require signing multiple close-account txs.",
-        "Connect Jupiter Wallet and approve each batch.",
-      ],
+      wallet: wrow.public_key,
+      accounts: built.accounts.length,
+      reclaimableSol: built.reclaimableSol,
+      signatures,
+      tx: signatures.map((s) => `https://solscan.io/tx/${s}`),
+      message: `Closed ${built.accounts.length} empty token account${built.accounts.length === 1 ? "" : "s"}. ~${built.reclaimableSol.toFixed(5)} SOL rent back to desk. No popup.`,
     };
   }
 
