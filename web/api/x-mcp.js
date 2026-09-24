@@ -3523,25 +3523,6 @@ async function handleAgent(req, res, parts) {
     }
   }
 
-  // ── OrbitX limit-order auto-fill tick (external scheduler, every few minutes) ──
-  if (route === "limits/tick") {
-    if (req.method !== "GET" && req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
-    const cronSecret = process.env.CRON_SECRET || "";
-    const authz = String(header(req, "authorization") || "");
-    const vercelCron = String(header(req, "x-vercel-cron") || "");
-    const ok =
-      (cronSecret && authz === `Bearer ${cronSecret}`) ||
-      Boolean(vercelCron) ||
-      (!cronSecret && process.env.VERCEL !== "1");
-    if (!ok) return json(res, { error: "unauthorized" }, 401);
-    try {
-      const { tickAllLimits } = await import("./orbitx/_handlers/_mcp-app-wallet.js");
-      return json(res, await tickAllLimits());
-    } catch (e) {
-      return json(res, { error: e?.message || "limits_tick_failed" }, 500);
-    }
-  }
-
   if (route === "models" && req.method === "GET") {
     return json(res, { models: NIM_MODELS, defaultModel: DEFAULT_NIM_MODEL });
   }
@@ -4187,6 +4168,26 @@ async function handleAgent(req, res, parts) {
 
 async function handleMcp(req, res, parts) {
   const route = parts.slice(1).join("/");
+
+  // ── OrbitX limit-order auto-fill tick (external scheduler, every few minutes) ──
+  if (route === "limits/tick") {
+    if (req.method !== "GET" && req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
+    const cronSecret = process.env.CRON_SECRET || "";
+    const authz = String(header(req, "authorization") || "");
+    const vercelCron = String(header(req, "x-vercel-cron") || "");
+    const ok =
+      (cronSecret && authz === `Bearer ${cronSecret}`) ||
+      Boolean(vercelCron) ||
+      (!cronSecret && process.env.VERCEL !== "1");
+    if (!ok) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const { tickAllLimits } = await import("./orbitx/_handlers/_mcp-app-wallet.js");
+      return json(res, await tickAllLimits());
+    } catch (e) {
+      return json(res, { error: e?.message || "limits_tick_failed" }, 500);
+    }
+  }
+
 
   if (
     (route === ".well-known/oauth-protected-resource" || route === "oauth-protected-resource") &&
