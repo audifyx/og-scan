@@ -4601,7 +4601,7 @@ export default async function handler(req, res) {
     // Normalize: rewrite may pass path=mcp/... or path=agent/...
     const head = parts[0];
     if (head === "agent") return handleAgent(req, res, parts);
-    if (head === "mcp" || !head) return handleMcp(req, res, head === "mcp" ? parts : ["mcp", ...parts]);
+    if (head === "mcp" || head === "limits" || !head) return handleMcp(req, res, head === "mcp" ? parts : ["mcp", ...parts]);
     return json(res, { error: "not_found", path: parts }, 404);
   } catch (e) {
     console.error("[x-mcp]", e);
