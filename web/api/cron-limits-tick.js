@@ -5,7 +5,7 @@
  */
 import { tickAllLimits } from "./orbitx/_handlers/_mcp-app-wallet.js";
 
-export const config = { maxDuration: 120 };
+export const config = { maxDuration: 60 }; // Hobby cap
 
 function json(res, data, status = 200) {
   res.statusCode = status;
