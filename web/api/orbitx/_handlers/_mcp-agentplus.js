@@ -44,11 +44,13 @@ const llmCfg = () => {
     apiKey,
     model:
       String(process.env.AGENT_LLM_MODEL || "").trim() ||
-      // Verified 2026-09-25 via live think calls on Aiden's key: the 404s were
-      // per-account provisioning, not catalog absence. nemotron-3-ultra-550b
-      // is the strongest chat-provisioned model on the key; it returns clean
-      // strict-JSON envelopes. gpt-oss-20b stays the fallback.
-      (nvidia ? "nvidia/nemotron-3-ultra-550b-a55b" : "anthropic/claude-sonnet-4.6"),
+      // Single mind model, verified 2026-09-25 via live think calls on
+      // Aiden's key: nvidia/nemotron-3-ultra-550b-a55b is the best
+      // chat-provisioned model on the key — clean strict-JSON envelopes,
+      // ~3-4s. One model, no fallback chain: the fallback is what turned
+      // every hiccup into a confusing cascade of llm_404/bad_json errors.
+      // (NVIDIA NIM 404s were per-account provisioning, not catalog absence.)
+      "nvidia/nemotron-3-ultra-550b-a55b",
     baseUrl:
       String(process.env.AGENT_LLM_BASE_URL || "").trim().replace(/\/+$/, "") ||
       (nvidia ? "https://integrate.api.nvidia.com/v1" : "https://api.openai.com/v1"),
@@ -134,7 +136,7 @@ async function _pokeThink(client, userId, agentName) {
 /* internals — single code path used by both MCP tools and the mind    */
 /* ------------------------------------------------------------------ */
 
-async function _spawnAgent(client, userId, { name, role, persona, capabilities, model }) {
+async function _spawnAgent(client, userId, { name, role, persona, capabilities }) {
   const clean = trunc(name, 40).trim().toLowerCase();
   if (!NAME_RE.test(clean))
     return { ok: false, error: "bad_name", message: "name must match ^[a-z0-9-]{2,32}$." };
@@ -148,7 +150,6 @@ async function _spawnAgent(client, userId, { name, role, persona, capabilities, 
     role: trunc(role, 120) || null,
     persona: trunc(persona, 4000) || null,
     capabilities: caps,
-    model: trunc(model, 120) || null,
     status: "active",
   };
   if (existing) {
@@ -909,7 +910,9 @@ export async function thinkAgent(agent, opts = {}) {
   // 3. No key → caller falls back to driver-mode deterministic step.
   const cfg = llmCfg();
   if (!cfg.apiKey) return { ok: true, skipped: "no_key" };
-  const model = (agent.model || "").trim() || cfg.model;
+  // Single mind model for every agent — per-agent model overrides are retired
+  // (they were the source of every llm_404 in the log: unprovisioned IDs).
+  const model = cfg.model;
   const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : THINK_TIMEOUT_MS;
 
   // 4. Build the prompt from live state.
@@ -952,25 +955,24 @@ export async function thinkAgent(agent, opts = {}) {
     1,
   );
 
-  // 5-6. Call the LLM (OpenAI-compatible chat completions).
-  // NVIDIA NIM 404s ("Function '<uuid>': Not found for account") when the model
-  // isn't provisioned for the key's account — the catalog is not the grant. On a
-  // 404, a transport failure (e.g. timeout on a slow model), OR an
-  // unparseable envelope (bad_json) all move to the next candidate once
-  // before failing, unless the user pinned a model explicitly (AGENT_LLM_MODEL
-  // or per-agent override). Every attempt is logged. Total LLM time is capped
-  // at timeoutMs across attempts so the 60s function limit can't be blown.
-  const NIM_FALLBACK_MODEL = "openai/gpt-oss-20b";
-  const modelPinned = Boolean((agent.model || "").trim() || String(process.env.AGENT_LLM_MODEL || "").trim());
-  const plan = modelPinned ? [model] : [...new Set([model, NIM_FALLBACK_MODEL])];
+  // 5-6. Call the LLM (OpenAI-compatible chat completions). SINGLE MODEL, no
+  // fallback chain, no per-agent override: nvidia/nemotron-3-ultra-550b-a55b,
+  // verified 2026-09-25 as the best chat-provisioned mind on Aiden's key
+  // (clean strict-JSON envelopes, ~3-4s, 4/4 live smoke tests). The fallback
+  // is what turned every hiccup into a confusing cascade — now errors fail
+  // fast and surface on the dashboard instead of silently degrading.
+  // Retry policy: ONE retry on transient transport errors (timeouts) only.
+  // HTTP errors (404/400/5xx) and unparseable envelopes (bad_json) fail fast
+  // with the real error. Total LLM time stays under timeoutMs so the 60s
+  // function limit can't be blown.
   const started = Date.now();
-  const callThink = async (cand, callTimeoutMs) => {
+  const callThink = async (callTimeoutMs) => {
     try {
       const resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: cand,
+          model,
           messages: [
             { role: "system", content: MIND_SYSTEM },
             { role: "user", content: userPrompt },
@@ -989,30 +991,23 @@ export async function thinkAgent(agent, opts = {}) {
       return { resp: null, raw: "", error: e };
     }
   };
-  let usedModel = model, think = null, usage = {}, ms = 0, lastErr = null;
-  for (let ci = 0; ci < plan.length; ci++) {
-    const cand = plan[ci];
-    usedModel = cand;
-    // Budget split: the primary gets at most 35s so a slow model can't eat the
-    // whole 60s function window; the fallback keeps a usable slice instead of
-    // the 10s dregs. (Observed: 550b is bimodal — ~3s or glacial.)
-    const remaining = ci === 0 ? Math.min(timeoutMs, 35000) : Math.max(15000, timeoutMs - (Date.now() - started));
-    const { resp, raw, error } = await callThink(cand, remaining);
+  let think = null, usage = {}, ms = 0, lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // First attempt gets up to 45s (550b is bimodal: ~3s or glacial); the
+    // single transport retry gets whatever remains, at least 10s.
+    const remaining = attempt === 0 ? Math.min(timeoutMs, 45000) : Math.max(10000, timeoutMs - (Date.now() - started));
+    const { resp, raw, error } = await callThink(remaining);
     ms = Date.now() - started;
     if (error) {
-      await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed (${cand}): ${trunc(error?.message || String(error), 300)}` });
+      await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed (${model}) attempt ${attempt + 1}/2: ${trunc(error?.message || String(error), 300)}` });
       lastErr = { ok: false, error: "llm_unreachable", message: error?.message || String(error) };
-      // Transport failure (e.g. timeout on a slow model) → try the fallback
-      // too, unless the model was pinned.
-      if (!modelPinned) continue;
+      if (attempt === 0) continue; // one retry on transport failure only
       break;
     }
     if (!resp.ok) {
-      await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_${resp.status} on ${cand}: ${trunc(raw, 300)}` });
-      lastErr = { ok: false, error: `llm_${resp.status}` };
-      // 404 → next candidate (the fallback). Any other status → fail fast.
-      if (resp.status === 404 && !modelPinned) continue;
-      break;
+      await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_${resp.status} on ${model}: ${trunc(raw, 300)}` });
+      lastErr = { ok: false, error: `llm_${resp.status}`, detail: trunc(raw, 300) };
+      break; // fail fast — no fallback to hide behind
     }
     let parsed;
     try {
@@ -1028,11 +1023,10 @@ export async function thinkAgent(agent, opts = {}) {
       lastErr = null;
       break;
     }
-    // Unparseable envelope: log the raw head for debuggability, then retry
-    // once with the next candidate (the fallback) unless pinned.
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${cand}: ${trunc(text, 300)}` });
+    // Unparseable envelope: log the raw head for debuggability, then fail
+    // fast — surfaced on the dashboard, never silently degraded.
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${model}: ${trunc(text, 300)}` });
     lastErr = { ok: false, error: "bad_json" };
-    if (!modelPinned) continue;
     break;
   }
   if (!think) return lastErr || { ok: false, error: "bad_json" };
@@ -1043,7 +1037,7 @@ export async function thinkAgent(agent, opts = {}) {
     userId,
     agentId: agent.id,
     kind: "system",
-    body: JSON.stringify({ think: true, model: usedModel, prompt_tokens: usage.prompt_tokens ?? null, completion_tokens: usage.completion_tokens ?? null, ms }),
+    body: JSON.stringify({ think: true, model: model, prompt_tokens: usage.prompt_tokens ?? null, completion_tokens: usage.completion_tokens ?? null, ms }),
   });
 
   // 8. Execute actions through the SAME internals the MCP tools use.
@@ -1084,7 +1078,7 @@ export async function thinkAgent(agent, opts = {}) {
     .from("ap_agents")
     .update({ thinks_today: thinksToday + 1, last_think_at: nowIso(), next_think_at: null })
     .eq("id", agent.id);
-  return { ok: true, model: usedModel, ms, thought: trunc(think.thought, 500), actions: executed };
+  return { ok: true, model: model, ms, thought: trunc(think.thought, 500), actions: executed };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1459,7 +1453,7 @@ export const AGENTPLUS_TOOLS = [
   {
     name: "orbitx_agentplus_spawn",
     description:
-      "Spawn a persistent autonomous agent: identity (name, role, persona), capabilities, optional model override. name must match ^[a-z0-9-]{2,32}$. Archived names can be re-spawned (reactivated). Wakes no mind by itself — assign a task or send a message to trigger thinking.",
+      "Spawn a persistent autonomous agent: identity (name, role, persona), capabilities. name must match ^[a-z0-9-]{2,32}$. Archived names can be re-spawned (reactivated). Wakes no mind by itself — assign a task or send a message to trigger thinking.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1467,7 +1461,6 @@ export const AGENTPLUS_TOOLS = [
         role: { type: "string" },
         persona: { type: "string" },
         capabilities: { type: "array", items: { type: "string" } },
-        model: { type: "string", description: "Per-agent model override (OpenAI-compatible model string)." },
       },
       required: ["name"],
     },
