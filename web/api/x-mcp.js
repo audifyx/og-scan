@@ -4249,6 +4249,13 @@ async function handleMcp(req, res, parts) {
       send: "orbitx_agentplus_send",
       remember: "orbitx_agentplus_remember",
       inbox: "orbitx_agentplus_inbox",
+      get: "orbitx_agentplus_get",
+      recall: "orbitx_agentplus_recall",
+      tasks: "orbitx_agentplus_tasks",
+      files: "orbitx_agentplus_files",
+      file: "orbitx_agentplus_file",
+      think: "orbitx_agentplus_think",
+      models: "orbitx_agentplus_models",
     };
     const toolName = COMMAND_TOOLS[action];
     if (!toolName) return json(res, { ok: false, error: "bad_action", actions: Object.keys(COMMAND_TOOLS) }, 400);
@@ -4258,6 +4265,34 @@ async function handleMcp(req, res, parts) {
       return json(res, out || { ok: false, error: "dispatch_failed" });
     } catch (e) {
       return json(res, { ok: false, error: e?.message || "agentplus_command_failed" }, 500);
+    }
+  }
+
+  // Export: GET agentplus/export?agent=<name>&kind=log|thoughts|files|file&task_id=<id>&path=<p>
+  // kind=log|thoughts → downloadable markdown; kind=files|file → JSON for the
+  // dashboard file browser / website preview pane. Same auth as feed/command.
+  if (route === "agentplus/export" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    const u = new URL(req.url || "/", "http://x");
+    try {
+      const { agentplusExport } = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      const out = await agentplusExport(authUser.userId, {
+        agent: (u.searchParams.get("agent") || "").trim() || null,
+        kind: (u.searchParams.get("kind") || "log").trim(),
+        task_id: (u.searchParams.get("task_id") || "").trim() || null,
+        path: (u.searchParams.get("path") || "").trim() || null,
+      });
+      if (!out || out.ok === false) return json(res, out || { ok: false, error: "export_failed" }, 400);
+      if (out.download) {
+        res.setHeader("Content-Type", out.contentType || "text/markdown; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${out.filename}"`);
+        res.statusCode = 200;
+        return res.end(out.body);
+      }
+      return json(res, out.json);
+    } catch (e) {
+      return json(res, { error: e?.message || "agentplus_export_failed" }, 500);
     }
   }
 

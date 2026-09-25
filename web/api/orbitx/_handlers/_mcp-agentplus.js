@@ -159,6 +159,47 @@ async function _spawnAgent(client, userId, { name, role, persona, capabilities, 
   return { ok: true, agent: { name: a.name, role: a.role, status: a.status, model: a.model }, _agentId: a.id };
 }
 
+/* Parse a think-loop failure into a short code + human hint for dashboards. */
+function parseThinkError(body) {
+  const b = String(body || "");
+  const m = b.match(/think (llm_\d+|llm_unreachable|bad_json)/);
+  if (!m) return null;
+  const code = m[1];
+  const hints = {
+    llm_400: "bad request to the LLM endpoint",
+    llm_401: "key rejected — regenerate it",
+    llm_403: "key not entitled for this endpoint",
+    llm_404: "model not provisioned for this key",
+    llm_429: "rate limited — backing off",
+    llm_500: "LLM provider error",
+    llm_503: "LLM overloaded — retry later",
+    llm_unreachable: "could not reach the LLM endpoint",
+    bad_json: "model returned unparseable output",
+  };
+  return { code, hint: hints[code] || "LLM call failed" };
+}
+
+/* Latest think-loop error per agent (one batched query). */
+async function _lastThinkErrors(client, userId, agentIds) {
+  const map = {};
+  const ids = (agentIds || []).filter(Boolean);
+  if (!ids.length) return map;
+  const { data } = await client
+    .from("ap_agent_logs")
+    .select("agent_id,body,created_at")
+    .eq("user_id", userId)
+    .eq("kind", "error")
+    .in("agent_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(500);
+  for (const r of data || []) {
+    if (map[r.agent_id]) continue;
+    const parsed = parseThinkError(r.body);
+    if (parsed) map[r.agent_id] = { ...parsed, at: r.created_at };
+  }
+  return map;
+}
+
 async function _listAgents(client, userId) {
   const { data } = await client
     .from("ap_agents")
@@ -168,6 +209,11 @@ async function _listAgents(client, userId) {
     .limit(100);
   const live = Boolean(llmCfg().apiKey);
   const agents = [];
+  const errMap = await _lastThinkErrors(
+    client,
+    userId,
+    (data || []).map((a) => a.id),
+  );
   for (const a of data || []) {
     const { count } = await client
       .from("ap_agent_messages")
@@ -185,6 +231,7 @@ async function _listAgents(client, userId) {
       thinks_today: a.thinks_today,
       think_budget_per_day: a.think_budget_per_day,
       last_think_at: a.last_think_at,
+      last_think_error: errMap[a.id] || null,
       created_at: a.created_at,
     });
   }
@@ -208,6 +255,7 @@ async function _getAgentDetail(client, userId, name) {
     .order("created_at", { ascending: false })
     .limit(20);
   const live = Boolean(llmCfg().apiKey);
+  const errMap = await _lastThinkErrors(client, userId, [a.id]);
   return {
     ok: true,
     agent: {
@@ -222,6 +270,7 @@ async function _getAgentDetail(client, userId, name) {
       think_budget_per_day: a.think_budget_per_day,
       think_day: a.think_day,
       last_think_at: a.last_think_at,
+      last_think_error: errMap[a.id] || null,
       next_think_at: a.next_think_at,
       created_at: a.created_at,
     },
@@ -385,7 +434,7 @@ async function _spawnSubtask(client, userId, { agentName, parentTaskId, title, k
 }
 
 async function _listTasks(client, userId, { name, status }) {
-  let q = client.from("ap_agent_tasks").select("id,title,kind,status,created_at").eq("user_id", userId);
+  let q = client.from("ap_agent_tasks").select("id,title,kind,status,steps,created_at").eq("user_id", userId);
   let agentId = null;
   if (name) {
     const a = await _agentByName(client, userId, trunc(name, 40).trim().toLowerCase());
@@ -1016,6 +1065,11 @@ export async function agentplusFeed(userId, { since = 0, agent = null, limit = 1
   }));
   const keyOn = Boolean(llmCfg().apiKey);
   const agentsOut = [];
+  const feedErrMap = await _lastThinkErrors(
+    client,
+    userId,
+    list.map((a) => a.id),
+  );
   for (const a of list) {
     const { count: unread } = await client
       .from("ap_agent_messages")
@@ -1023,9 +1077,66 @@ export async function agentplusFeed(userId, { since = 0, agent = null, limit = 1
       .eq("user_id", userId)
       .eq("read", false)
       .in("to_name", [a.name, "lobby"]);
-    agentsOut.push({ name: a.name, status: a.status, unread: unread || 0, mind: keyOn && a.status === "active" ? "live" : "driver" });
+    agentsOut.push({
+      name: a.name,
+      status: a.status,
+      unread: unread || 0,
+      mind: keyOn && a.status === "active" ? "live" : "driver",
+      last_think_error: feedErrMap[a.id] || null,
+    });
   }
   return { ok: true, events, agents: agentsOut, nextCursor: events.length ? events[events.length - 1].id : sinceId };
+}
+
+/* Export an agent's log / thoughts as downloadable markdown, or a task's
+   workspace file tree / single file as JSON. Used by the /agentplus dashboard
+   ("Download log" buttons, file browser, website preview pane). */
+export async function agentplusExport(userId, { agent = null, kind = "log", task_id = null, path = null } = {}) {
+  const client = await sb();
+  if (!client) return { ok: false, error: "db_unavailable" };
+  const a = agent ? await _agentByName(client, userId, trunc(agent, 40).trim().toLowerCase()) : null;
+  if (agent && !a) return { ok: false, error: "unknown_agent" };
+
+  if (kind === "files" || kind === "file") {
+    const task = await _taskById(client, userId, task_id);
+    if (!task) return { ok: false, error: "unknown_task" };
+    if (a && task.agent_id !== a.id) return { ok: false, error: "wrong_agent" };
+    if (kind === "files") {
+      return { ok: true, json: { task_id: task.id, files: await _latestFiles(client, task.id) } };
+    }
+    const f = await _getFile(client, userId, { task_id: task.id, path });
+    if (!f.ok) return { ok: false, error: f.error, message: f.message };
+    return {
+      ok: true,
+      json: { path: f.file.path, version: f.file.version, sha256: f.file.sha256, content: f.file.content },
+    };
+  }
+
+  if (kind !== "log" && kind !== "thoughts") return { ok: false, error: "bad_kind" };
+  let q = client
+    .from("ap_agent_logs")
+    .select("id,agent_id,kind,body,created_at")
+    .eq("user_id", userId)
+    .order("id", { ascending: true })
+    .limit(5000);
+  if (a) q = q.eq("agent_id", a.id);
+  if (kind === "thoughts") q = q.eq("kind", "thought");
+  const { data } = await q;
+  const { data: agentRows } = await client.from("ap_agents").select("id,name").eq("user_id", userId).limit(100);
+  const byId = new Map((agentRows || []).map((r) => [r.id, r.name]));
+  const title = kind === "thoughts" ? "thoughts" : "full log";
+  const lines = [
+    `# AgentPlus ${title}${a ? ` — ${a.name}` : " (all agents)"}`,
+    "",
+    `_Exported ${nowIso()} · ${(data || []).length} events_`,
+    "",
+  ];
+  for (const l of data || []) {
+    const nm = byId.get(l.agent_id) || "?";
+    lines.push(`## [${l.created_at}] ${l.kind} · ${nm} · #${l.id}`, "", "```", String(l.body || ""), "```", "");
+  }
+  const fname = `${a ? a.name : "all-agents"}-${kind === "thoughts" ? "thoughts-only" : "full-log"}.md`;
+  return { ok: true, download: true, filename: fname, contentType: "text/markdown; charset=utf-8", body: lines.join("\n") };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1042,7 +1153,10 @@ const tool =
     const a = args || {};
     try {
       const out = await run(client, gate.userId, a);
-      if (logKind && !(out && out._logged)) {
+      // Dashboard polls detail views hard — quiet:true skips the audit log for
+      // read-only views so the live stream isn't spammed. Real actions (spawn,
+      // task, send, think, writes) always log.
+      if (logKind && !(out && out._logged) && !a.quiet) {
         const agentId = out && typeof out === "object" ? out._agentId || null : null;
         const taskId = out && typeof out === "object" ? out._taskId || null : null;
         await _logEvent(client, {
@@ -1088,6 +1202,47 @@ const tThink = tool("action", (a) => `think ${a.name}`, async (c, u, a) => {
   if (!agent) return { ok: false, error: "unknown_agent" };
   const r = await thinkAgent(agent);
   return { ...r, _agentId: agent.id };
+});
+/* Diagnostic: list model IDs the configured key can actually call.
+   NVIDIA NIM 404s at chat time for models not provisioned on the key's
+   account ("the catalog is not the grant") — probe before picking
+   AGENT_LLM_MODEL. The key itself is never returned. */
+const tModels = tool("action", "probe llm models", async (c, u) => {
+  const cfg = llmCfg();
+  if (!cfg.apiKey)
+    return { ok: false, error: "no_key", message: "No LLM key configured (AGENT_LLM_API_KEY or NVIDIA_API_KEY)." };
+  let resp;
+  try {
+    resp = await fetch(`${cfg.baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${cfg.apiKey}` },
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch (e) {
+    return { ok: false, error: "models_unreachable", message: trunc(e?.message || String(e), 200) };
+  }
+  const raw = await resp.text();
+  if (!resp.ok) {
+    return {
+      ok: false,
+      error: `models_${resp.status}`,
+      message: trunc(raw, 300),
+      hint:
+        resp.status === 401 || resp.status === 403
+          ? "Key rejected — regenerate it at build.nvidia.com with the Public API Endpoints scope."
+          : resp.status === 404
+            ? "Endpoint not found — check AGENT_LLM_BASE_URL."
+            : undefined,
+    };
+  }
+  let ids = [];
+  try {
+    const j = JSON.parse(raw);
+    const arr = Array.isArray(j.data) ? j.data : Array.isArray(j.models) ? j.models : [];
+    ids = arr.map((m) => (typeof m === "string" ? m : m && m.id)).filter(Boolean);
+  } catch {
+    /* leave empty */
+  }
+  return { ok: true, baseUrl: cfg.baseUrl, defaultModel: cfg.model, count: ids.length, models: ids.slice(0, 200) };
 });
 
 export const AGENTPLUS_TOOLS = [
@@ -1221,6 +1376,12 @@ export const AGENTPLUS_TOOLS = [
     description: "Force an agent's server-side mind to think immediately (budget and key checks apply; without a configured LLM key (AGENT_LLM_API_KEY or NVIDIA_API_KEY) returns skipped:'no_key' — drive it externally instead).",
     inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
   },
+  {
+    name: "orbitx_agentplus_models",
+    description:
+      "Probe the configured LLM endpoint for the model IDs this key can actually call (server-side GET /models). NVIDIA NIM 404s at chat time for models not provisioned on the key's account, so probe before setting AGENT_LLM_MODEL. Never returns the key.",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 export function dispatchAgentPlusTools(name, args, auth) {
@@ -1243,6 +1404,7 @@ export function dispatchAgentPlusTools(name, args, auth) {
     case "orbitx_agentplus_build": return tBuild(auth, args);
     case "orbitx_agentplus_log": return tLog(auth, args);
     case "orbitx_agentplus_think": return tThink(auth, args);
+    case "orbitx_agentplus_models": return tModels(auth, args);
     default: return null;
   }
 }
