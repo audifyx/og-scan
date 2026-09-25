@@ -224,6 +224,7 @@ async function _listAgents(client, userId) {
     .from("ap_agents")
     .select("id,name,role,status,model,think_budget_per_day,thinks_today,think_day,last_think_at,created_at")
     .eq("user_id", userId)
+    .eq("status", "active")
     .order("created_at", { ascending: true })
     .limit(100);
   const live = Boolean(llmCfg().apiKey);
