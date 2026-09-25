@@ -971,7 +971,7 @@ export async function thinkAgent(agent, opts = {}) {
   // with the real error. Total LLM time stays under timeoutMs so the 60s
   // function limit can't be blown.
   const started = Date.now();
-  const callThink = async (callTimeoutMs) => {
+  const callThink = async (callTimeoutMs, temperature = 0.2) => {
     try {
       const resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
         method: "POST",
@@ -983,7 +983,7 @@ export async function thinkAgent(agent, opts = {}) {
             { role: "user", content: userPrompt },
           ],
           // Low temperature: the think envelope is machine-parsed JSON.
-          temperature: 0.2,
+          temperature,
           max_tokens: THINK_MAX_TOKENS,
           // Force strict JSON: the think loop parses the envelope with
           // parseThinkJson, and some instruct models narrate otherwise.
@@ -1001,7 +1001,10 @@ export async function thinkAgent(agent, opts = {}) {
     // First attempt gets up to 45s (550b is bimodal: ~3s or glacial); the
     // single transport retry gets whatever remains, at least 10s.
     const remaining = attempt === 0 ? Math.min(timeoutMs, 45000) : Math.max(10000, timeoutMs - (Date.now() - started));
-    const { resp, raw, error } = await callThink(remaining);
+    // Attempt 2 runs hotter: temp 0.2 is deterministic, so a bad_json would
+    // repeat byte-identical forever and wedge the task. One hotter retry
+    // breaks the loop; anything else still fails fast.
+    const { resp, raw, error } = await callThink(remaining, attempt === 0 ? 0.2 : 0.7);
     ms = Date.now() - started;
     if (error) {
       await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed (${model}) attempt ${attempt + 1}/2: ${trunc(error?.message || String(error), 300)}` });
@@ -1028,10 +1031,14 @@ export async function thinkAgent(agent, opts = {}) {
       lastErr = null;
       break;
     }
-    // Unparseable envelope: log the raw head for debuggability, then fail
-    // fast — surfaced on the dashboard, never silently degraded.
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${model}: ${trunc(text, 300)}` });
+    // Unparseable envelope: log the raw head + finish_reason for
+    // debuggability. One hotter retry (temp 0.7) to break a deterministic
+    // bad_json loop; otherwise fail fast — surfaced on the dashboard, never
+    // silently degraded.
+    const finishReason = parsed?.choices?.[0]?.finish_reason || "?";
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${model} (finish_reason=${finishReason}): ${trunc(text, 300)}` });
     lastErr = { ok: false, error: "bad_json" };
+    if (attempt === 0) continue; // one hotter retry on bad_json only
     break;
   }
   if (!think) return lastErr || { ok: false, error: "bad_json" };
