@@ -1150,7 +1150,7 @@ async function _buildTask(client, userId, { task_id }) {
   }
 }
 
-async function _tailLog(client, userId, { name, task_id, since, limit }) {
+async function _tailLog(client, userId, { name, task_id, since, limit, include_archived = false }) {
   let q = client.from("ap_agent_logs").select("id,agent_id,task_id,kind,body,created_at").eq("user_id", userId);
   let agentId = null;
   if (name) {
@@ -1160,6 +1160,14 @@ async function _tailLog(client, userId, { name, task_id, since, limit }) {
     q = q.eq("agent_id", agentId);
   }
   if (task_id) q = q.eq("task_id", task_id);
+  if (!agentId && !task_id && !include_archived) {
+    // Live fleet only: archived agents' stale events (e.g. bake-off llm_404s)
+    // stay out of the global log tail by default. Pass include_archived=true
+    // to opt back in.
+    const { data: activeAgents } = await client.from("ap_agents").select("id").eq("user_id", userId).eq("status", "active");
+    const activeIds = (activeAgents || []).map((a) => a.id);
+    q = q.in("agent_id", activeIds.length ? activeIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
   const sinceId = Math.max(0, Number(since) || 0);
   const lim = Math.min(500, Math.max(1, Number(limit) || 100));
   const { data } = await q.gt("id", sinceId).order("id", { ascending: true }).limit(lim);
