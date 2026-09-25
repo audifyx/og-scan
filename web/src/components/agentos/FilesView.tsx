@@ -1,14 +1,27 @@
-/* Agent OS v2 — Files: workspace explorer + website gallery. */
+/* Agent OS v2 — Files: workspace explorer (real folder tree) + website gallery. */
 import { useCallback, useEffect, useState } from "react";
 import {
+  Folder,
   FolderOpen,
   FileCode2,
+  FileText,
   ChevronDown,
   ChevronRight,
   Loader2,
   Eye,
   RefreshCw,
   LayoutGrid,
+  Trash2,
+  Pencil,
+  Download,
+  Plus,
+  FilePlus2,
+  X,
+  Check,
+  Braces,
+  Globe,
+  Image as ImageIcon,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -16,12 +29,59 @@ import {
   type TaskInfo,
   type TaskFile,
   postCommand,
+  authedFetch,
+  EXPORT_PATH,
   timeAgo,
 } from "./api";
 import { btnGhost, EmptyState, LoadingState, StatusPill } from "./ui";
 
+export interface FileTreeNode {
+  name: string;
+  type: "dir" | "file";
+  children?: FileTreeNode[];
+  path?: string;
+  version?: number;
+  size?: number;
+  sha256?: string;
+  updated_at?: string;
+}
+
 interface TaskWithFiles extends TaskInfo {
   files: TaskFile[];
+  tree: FileTreeNode[];
+  quota?: { used: number; max: number };
+}
+
+function extIcon(name: string) {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  if (["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rs", "go", "sol"].includes(ext))
+    return <FileCode2 size={13} className="shrink-0 text-sky-300/80" />;
+  if (ext === "json") return <Braces size={13} className="shrink-0 text-amber-300/80" />;
+  if (ext === "html" || ext === "htm") return <Globe size={13} className="shrink-0 text-emerald-300/80" />;
+  if (ext === "css" || ext === "scss") return <Palette size={13} className="shrink-0 text-violet-300/80" />;
+  if (ext === "md" || ext === "txt") return <FileText size={13} className="shrink-0 text-zinc-400" />;
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext))
+    return <ImageIcon size={13} className="shrink-0 text-pink-300/80" />;
+  return <FileCode2 size={13} className="shrink-0 text-zinc-500" />;
+}
+
+function fmtSize(n: number) {
+  if (n >= 1048576) return `${(n / 1048576).toFixed(1)}M`;
+  return `${(n / 1024).toFixed(1)}k`;
+}
+
+async function downloadBlob(url: string, filename: string) {
+  const res = await authedFetch(url);
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 5000);
 }
 
 export function FilesView({ agents, defaultAgent, onOpenFile, onOpenTask }: {
@@ -35,8 +95,13 @@ export function FilesView({ agents, defaultAgent, onOpenFile, onOpenTask }: {
   const [tasks, setTasks] = useState<TaskWithFiles[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
   const [gallery, setGallery] = useState<{ agent: string; task: TaskInfo; html: string }[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // inline editor: {taskId, mode, target}
+  const [editing, setEditing] = useState<{ taskId: string; mode: "new" | "rename"; target?: string } | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const loadExplorer = useCallback(async (name: string) => {
     if (!name) return;
@@ -48,15 +113,22 @@ export function FilesView({ agents, defaultAgent, onOpenFile, onOpenTask }: {
         list.map(async (t) => {
           try {
             const f = await postCommand({ action: "files", task_id: t.id, quiet: true });
-            return { ...t, files: (f.files || []) as TaskFile[] };
+            return { ...t, files: (f.files || []) as TaskFile[], tree: (f.tree || []) as FileTreeNode[], quota: f.quota };
           } catch {
-            return { ...t, files: [] as TaskFile[] };
+            return { ...t, files: [] as TaskFile[], tree: [] as FileTreeNode[] };
           }
         }),
       );
-      setTasks(withFiles.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)));
-      const first = withFiles.find((t) => t.files.length > 0);
+      const sorted = withFiles.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      setTasks(sorted);
+      const first = sorted.find((t) => t.files.length > 0);
       setExpanded(new Set(first ? [first.id] : []));
+      // auto-open top-level folders of the first task with files
+      if (first) {
+        const tops = new Set<string>();
+        for (const n of first.tree) if (n.type === "dir") tops.add(`${first.id}/${n.name}`);
+        setOpenFolders(tops);
+      }
     } catch {
       setTasks([]);
     } finally {
@@ -89,8 +161,9 @@ export function FilesView({ agents, defaultAgent, onOpenFile, onOpenTask }: {
             const idx = files.find((x) => x.path === "index.html") || files.find((x) => x.path.endsWith(".html"));
             if (!idx) return null;
             const c = await postCommand({ action: "file", task_id: task.id, path: idx.path, quiet: true });
-            if (typeof c.content !== "string" || !c.content.trim()) return null;
-            return { agent, task, html: c.content as string };
+            const html = (c.file?.content ?? c.content) as string | undefined;
+            if (typeof html !== "string" || !html.trim()) return null;
+            return { agent, task, html };
           } catch {
             return null;
           }
@@ -120,6 +193,179 @@ export function FilesView({ agents, defaultAgent, onOpenFile, onOpenTask }: {
       else next.add(id);
       return next;
     });
+
+  const toggleFolder = (key: string) =>
+    setOpenFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const refresh = () => loadExplorer(agentName);
+
+  const doDelete = async (taskId: string, node: FileTreeNode, fullPath: string) => {
+    const isDir = node.type === "dir";
+    const label = isDir ? `folder "${fullPath}/" and everything inside it` : `file "${fullPath}"`;
+    if (!window.confirm(`Delete ${label}?\n\nThis cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await postCommand(isDir ? { action: "delete_file", task_id: taskId, prefix: fullPath } : { action: "delete_file", task_id: taskId, path: fullPath });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEdit = (taskId: string, mode: "new" | "rename", target?: string) => {
+    setEditing({ taskId, mode, target });
+    setEditValue(target || "");
+  };
+
+  const submitEdit = async () => {
+    if (!editing || busy) return;
+    const v = editValue.trim();
+    if (!v) {
+      setEditing(null);
+      return;
+    }
+    setBusy(true);
+    try {
+      if (editing.mode === "new") {
+        await postCommand({ action: "write_file", task_id: editing.taskId, path: v, content: "" });
+      } else if (editing.target) {
+        await postCommand({ action: "rename_file", task_id: editing.taskId, from: editing.target, to: v });
+      }
+      setEditing(null);
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadFile = async (taskId: string, path: string) => {
+    try {
+      const c = await postCommand({ action: "file", task_id: taskId, path, quiet: true });
+      const content = (c.file?.content ?? c.content) as string | undefined;
+      const blob = new Blob([typeof content === "string" ? content : ""], { type: "text/plain;charset=utf-8" });
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = path.split("/").pop() || "file";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 5000);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Download failed");
+    }
+  };
+
+  const downloadZip = async (task: TaskWithFiles) => {
+    try {
+      await downloadBlob(`${EXPORT_PATH}&kind=zip&task_id=${encodeURIComponent(task.id)}`, `${task.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) || "workspace"}.zip`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "ZIP download failed");
+    }
+  };
+
+  const renderTree = (task: TaskWithFiles, nodes: FileTreeNode[], depth: number, parentPath: string) => {
+    return nodes.map((n) => {
+      const fullPath = parentPath ? `${parentPath}/${n.name}` : n.name;
+      if (n.type === "dir") {
+        const key = `${task.id}/${fullPath}`;
+        const open = openFolders.has(key);
+        const isEditing = editing?.taskId === task.id && editing.mode === "rename" && editing.target === fullPath;
+        return (
+          <div key={key}>
+            <div
+              className="group flex items-center gap-1.5 rounded-md px-2 py-1 transition hover:bg-white/[0.04]"
+              style={{ paddingLeft: 8 + depth * 16 }}
+            >
+              <button onClick={() => toggleFolder(key)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+                {open ? <ChevronDown size={13} className="shrink-0 text-zinc-500" /> : <ChevronRight size={13} className="shrink-0 text-zinc-500" />}
+                {open ? <FolderOpen size={13} className="shrink-0 text-amber-300/80" /> : <Folder size={13} className="shrink-0 text-amber-300/60" />}
+                {isEditing ? (
+                  <span className="flex min-w-0 flex-1 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      autoFocus
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") submitEdit(); if (e.key === "Escape") setEditing(null); }}
+                      className="min-w-0 flex-1 rounded border border-emerald-400/40 bg-black/60 px-1.5 py-0.5 font-mono text-xs text-zinc-100 outline-none"
+                    />
+                    <button onClick={submitEdit} className="rounded p-0.5 text-emerald-300 hover:bg-white/10" title="Save"><Check size={12} /></button>
+                    <button onClick={() => setEditing(null)} className="rounded p-0.5 text-zinc-500 hover:bg-white/10" title="Cancel"><X size={12} /></button>
+                  </span>
+                ) : (
+                  <span className="truncate font-mono text-xs font-semibold text-zinc-200">{n.name}/</span>
+                )}
+              </button>
+              {!isEditing && (
+                <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                  <button onClick={() => startEdit(task.id, "rename", fullPath)} className="rounded p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" title="Rename folder">
+                    <Pencil size={11} />
+                  </button>
+                  <button onClick={() => doDelete(task.id, n, fullPath)} disabled={busy} className="rounded p-1 text-zinc-500 hover:bg-white/10 hover:text-red-300" title="Delete folder">
+                    <Trash2 size={11} />
+                  </button>
+                </span>
+              )}
+            </div>
+            {open && renderTree(task, n.children || [], depth + 1, fullPath)}
+          </div>
+        );
+      }
+      const isEditing = editing?.taskId === task.id && editing.mode === "rename" && editing.target === fullPath;
+      return (
+        <div
+          key={`${task.id}/${fullPath}`}
+          className="group flex items-center gap-1.5 rounded-md px-2 py-1 transition hover:bg-white/[0.04]"
+          style={{ paddingLeft: 8 + depth * 16 }}
+        >
+          <button onClick={() => onOpenFile(task.agent || agentName, task.id, fullPath)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+            {extIcon(n.name)}
+            {isEditing ? (
+              <span className="flex min-w-0 flex-1 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitEdit(); if (e.key === "Escape") setEditing(null); }}
+                  className="min-w-0 flex-1 rounded border border-emerald-400/40 bg-black/60 px-1.5 py-0.5 font-mono text-xs text-zinc-100 outline-none"
+                />
+                <button onClick={submitEdit} className="rounded p-0.5 text-emerald-300 hover:bg-white/10" title="Save"><Check size={12} /></button>
+                <button onClick={() => setEditing(null)} className="rounded p-0.5 text-zinc-500 hover:bg-white/10" title="Cancel"><X size={12} /></button>
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-200">{n.name}</span>
+            )}
+          </button>
+          {!isEditing && (
+            <>
+              <span className="shrink-0 font-mono text-[10px] text-zinc-600">v{n.version}</span>
+              <span className="shrink-0 font-mono text-[10px] text-zinc-600">{fmtSize(n.size || 0)}</span>
+              <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                <button onClick={() => downloadFile(task.id, fullPath)} className="rounded p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" title="Download file">
+                  <Download size={11} />
+                </button>
+                <button onClick={() => startEdit(task.id, "rename", fullPath)} className="rounded p-1 text-zinc-500 hover:bg-white/10 hover:text-zinc-200" title="Rename">
+                  <Pencil size={11} />
+                </button>
+                <button onClick={() => doDelete(task.id, n, fullPath)} disabled={busy} className="rounded p-1 text-zinc-500 hover:bg-white/10 hover:text-red-300" title="Delete file">
+                  <Trash2 size={11} />
+                </button>
+              </span>
+            </>
+          )}
+        </div>
+      );
+    });
+  };
 
   const totalFiles = tasks.reduce((s, t) => s + t.files.length, 0);
 
@@ -228,42 +474,58 @@ export function FilesView({ agents, defaultAgent, onOpenFile, onOpenTask }: {
           </p>
           {tasks.map((t) => {
             const open = expanded.has(t.id);
+            const creating = editing?.taskId === t.id && editing.mode === "new";
             return (
               <div key={t.id} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
-                <button
-                  onClick={() => toggle(t.id)}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-white/[0.03]"
-                >
-                  {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                  <FolderOpen size={14} className="shrink-0 text-amber-300/80" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{t.title}</span>
+                <div className="flex w-full items-center gap-2 px-3 py-2.5">
+                  <button onClick={() => toggle(t.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                    {open ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
+                    <FolderOpen size={14} className="shrink-0 text-amber-300/80" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{t.title}</span>
+                  </button>
                   <span className="shrink-0 rounded-full bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">
                     {t.kind}
                   </span>
                   <StatusPill status={t.status} />
-                  <span className="shrink-0 font-mono text-[10px] text-zinc-500">{t.files.length} files</span>
-                </button>
+                  <span className="shrink-0 font-mono text-[10px] text-zinc-500" title="workspace quota">
+                    {t.quota ? `${fmtSize(t.quota.used)}/${fmtSize(t.quota.max)}` : `${t.files.length} files`}
+                  </span>
+                  <button
+                    onClick={() => startEdit(t.id, "new")}
+                    className={btnGhost}
+                    title="New file (nested paths like src/ui/Widget.tsx create folders)"
+                  >
+                    <FilePlus2 size={13} />
+                  </button>
+                  <button onClick={() => downloadZip(t)} className={btnGhost} title="Download workspace as .zip">
+                    <Download size={13} />
+                  </button>
+                </div>
                 {open && (
-                  <div className="border-t border-white/5 px-3 py-2">
-                    {t.files.length === 0 ? (
-                      <p className="py-2 text-xs text-zinc-600">No files in this task yet.</p>
-                    ) : (
-                      <div className="space-y-1">
-                        {t.files.map((f) => (
-                          <button
-                            key={f.path}
-                            onClick={() => onOpenFile(t.agent || agentName, t.id, f.path)}
-                            className="flex w-full items-center gap-2 rounded-md bg-black/30 px-2.5 py-1.5 text-left ring-1 ring-white/5 transition hover:bg-white/[0.05]"
-                          >
-                            <FileCode2 size={13} className="shrink-0 text-amber-300/80" />
-                            <span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-200">{f.path}</span>
-                            <span className="shrink-0 font-mono text-[10px] text-zinc-600">v{f.version}</span>
-                            <span className="shrink-0 font-mono text-[10px] text-zinc-600">
-                              {(f.size / 1024).toFixed(1)}k
-                            </span>
-                          </button>
-                        ))}
+                  <div className="border-t border-white/5 px-2 py-2">
+                    {creating && (
+                      <div className="mb-1 flex items-center gap-1.5 rounded-md bg-emerald-400/5 px-2 py-1.5 ring-1 ring-emerald-400/20">
+                        <Plus size={13} className="shrink-0 text-emerald-300" />
+                        <input
+                          autoFocus
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") submitEdit(); if (e.key === "Escape") setEditing(null); }}
+                          placeholder="path/to/file.ext — folders are created from the path"
+                          className="min-w-0 flex-1 bg-transparent font-mono text-xs text-zinc-100 outline-none placeholder:text-zinc-600"
+                        />
+                        <button onClick={submitEdit} disabled={busy} className="rounded p-0.5 text-emerald-300 hover:bg-white/10" title="Create">
+                          <Check size={13} />
+                        </button>
+                        <button onClick={() => setEditing(null)} className="rounded p-0.5 text-zinc-500 hover:bg-white/10" title="Cancel">
+                          <X size={13} />
+                        </button>
                       </div>
+                    )}
+                    {t.tree.length === 0 && !creating ? (
+                      <p className="px-2 py-2 text-xs text-zinc-600">No files in this task yet.</p>
+                    ) : (
+                      renderTree(t, t.tree, 0, "")
                     )}
                   </div>
                 )}

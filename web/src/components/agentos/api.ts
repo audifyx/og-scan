@@ -3,10 +3,11 @@
    FEED:    GET  /api/x-mcp?path=agentplus/feed&since=<id>&agent=<name>&limit=100
    COMMAND: POST /api/x-mcp?path=agentplus/command
             (spawn | task | send | remember | inbox | get | recall | tasks |
-             files | file | think | models | usage | digest | archive)
+             files | file | write_file | delete_file | rename_file |
+             think | models | usage | digest | archive)
             — read-only views pass quiet:true
    EXPORT:  GET  /api/x-mcp?path=agentplus/export&agent=<name>&kind=log|thoughts
-                 (markdown download) | &kind=files|file&task_id=<id>[&fpath=<p>]
+                 (markdown download) | &kind=files|file|zip&task_id=<id>[&fpath=<p>]
    Auth: Authorization: Bearer <supabase access_token> */
 
 import { supabase } from "@/lib/supabase";

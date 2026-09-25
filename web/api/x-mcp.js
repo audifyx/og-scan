@@ -4255,6 +4255,9 @@ async function handleMcp(req, res, parts) {
       tasks: "orbitx_agentplus_tasks",
       files: "orbitx_agentplus_files",
       file: "orbitx_agentplus_file",
+      write_file: "orbitx_agentplus_write_file",
+      delete_file: "orbitx_agentplus_delete_file",
+      rename_file: "orbitx_agentplus_rename_file",
       think: "orbitx_agentplus_think",
       models: "orbitx_agentplus_models",
       usage: "orbitx_agentplus_usage",
@@ -4272,7 +4275,7 @@ async function handleMcp(req, res, parts) {
     }
   }
 
-  // Export: GET agentplus/export?agent=<name>&kind=log|thoughts|files|file&task_id=<id>&fpath=<p>
+  // Export: GET agentplus/export?agent=<name>&kind=log|thoughts|files|file|zip&task_id=<id>&fpath=<p>
   // kind=log|thoughts → downloadable markdown; kind=files|file → JSON for the
   // dashboard file browser / website preview pane. Same auth as feed/command.
   // NOTE: the file path param is `fpath`, NOT `path` — `?path=` carries the

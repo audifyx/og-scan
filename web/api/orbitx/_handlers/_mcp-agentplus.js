@@ -29,6 +29,8 @@ const MSG_BODY_MAX = 2000;
 const LOG_BODY_MAX = 4000;
 const FILE_CONTENT_MAX = 2000000;
 const MIND_CONTENT_MAX = 200000;
+// Per-task workspace quota: sum of latest-version file sizes. Fail closed.
+const TASK_BYTES_MAX = 5000000;
 const DB_DOWN = { ok: false, error: "db_unavailable", message: "Agent store unreachable. Retry in a minute." };
 
 // Mind loop config (env). AGENT_LLM_API_KEY wins when set; NVIDIA_API_KEY
@@ -92,6 +94,113 @@ function cleanPath(p) {
   s = s.split("/").filter(Boolean).join("/");
   if (!s || s.length > 256) return null;
   return s;
+}
+
+// Build a nested folder tree from a flat latest-files list.
+// Node: {name, type:'dir'|'file', children?, ...fileFields}
+function buildTree(files) {
+  const root = { name: "", type: "dir", children: [] };
+  for (const f of files || []) {
+    const parts = String(f.path || "").split("/").filter(Boolean);
+    if (!parts.length) continue;
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      let d = node.children.find((c) => c.type === "dir" && c.name === parts[i]);
+      if (!d) {
+        d = { name: parts[i], type: "dir", children: [] };
+        node.children.push(d);
+      }
+      node = d;
+    }
+    node.children.push({ name: parts[parts.length - 1], type: "file", path: f.path, version: f.version, size: f.size, sha256: f.sha256, updated_at: f.updated_at });
+  }
+  const sort = (n) => {
+    n.children.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1));
+    for (const c of n.children) if (c.type === "dir") sort(c);
+  };
+  sort(root);
+  return root.children;
+}
+
+// CRC32 (ISO 3309) for the stored-ZIP writer.
+const _crcTable = (() => {
+  const t = new Int32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c;
+  }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = _crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// Minimal stored (uncompressed) ZIP writer — no deps. files: [{name, data: Buffer}].
+// Returns a Buffer. Names must already be safe relative paths (cleanPath'd).
+function zipStored(files) {
+  const enc = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+  // DOS timestamp: use a fixed sane date (2026-01-01) to keep output deterministic-ish.
+  const dosTime = (0 << 11) | (0 << 5) | 0; // 00:00:00
+  const dosDate = ((2026 - 1980) << 9) | (1 << 5) | 1; // 2026-01-01
+  for (const f of files) {
+    const nameBuf = Buffer.from(enc.encode(f.name));
+    const data = Buffer.isBuffer(f.data) ? f.data : Buffer.from(f.data || "");
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0); // local file header sig
+    local.writeUInt16LE(20, 4); // version needed
+    local.writeUInt16LE(0x0800, 6); // flags: UTF-8
+    local.writeUInt16LE(0, 8); // method: stored
+    local.writeUInt16LE(dosTime, 10);
+    local.writeUInt16LE(dosDate, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18); // compressed size
+    local.writeUInt32LE(data.length, 22); // uncompressed size
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28); // extra length
+    chunks.push(local, nameBuf, data);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); // central dir sig
+    ch.writeUInt16LE(20, 4); // version made by
+    ch.writeUInt16LE(20, 6); // version needed
+    ch.writeUInt16LE(0x0800, 8);
+    ch.writeUInt16LE(0, 10);
+    ch.writeUInt16LE(dosTime, 12);
+    ch.writeUInt16LE(dosDate, 14);
+    ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(data.length, 20);
+    ch.writeUInt32LE(data.length, 24);
+    ch.writeUInt16LE(nameBuf.length, 28);
+    ch.writeUInt16LE(0, 30); // extra
+    ch.writeUInt16LE(0, 32); // comment
+    ch.writeUInt16LE(0, 34); // disk
+    ch.writeUInt16LE(0, 36); // internal attrs
+    ch.writeUInt32LE(0, 38); // external attrs
+    ch.writeUInt32LE(offset, 42); // local header offset
+    central.push(ch, nameBuf);
+    offset += local.length + nameBuf.length + data.length;
+  }
+  const centralStart = offset;
+  const centralBuf = Buffer.concat(central);
+  chunks.push(centralBuf);
+  offset += centralBuf.length;
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); // end of central dir sig
+  end.writeUInt16LE(0, 4); // disk number
+  end.writeUInt16LE(0, 6); // central dir disk
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(centralBuf.length, 12);
+  end.writeUInt32LE(centralStart, 16);
+  end.writeUInt16LE(0, 20); // comment length
+  chunks.push(end);
+  return Buffer.concat(chunks);
 }
 
 async function _logEvent(client, { userId, agentId = null, taskId = null, kind, body }) {
@@ -519,7 +628,27 @@ async function _writeFile(client, userId, { task_id, path, content }) {
     .eq("path", p)
     .order("version", { ascending: false })
     .limit(1);
-  const version = ((existing || [])[0]?.version || 0) + 1;
+  const prevVersion = (existing || [])[0]?.version || 0;
+  const version = prevVersion + 1;
+  // Per-task workspace quota (sum of latest-version sizes). Fail closed.
+  let prevSize = 0;
+  if (prevVersion > 0) {
+    const { data: prevRow } = await client
+      .from("ap_agent_files")
+      .select("content")
+      .eq("task_id", task.id)
+      .eq("path", p)
+      .order("version", { ascending: false })
+      .limit(1);
+    prevSize = String((prevRow || [])[0]?.content || "").length;
+  }
+  const used = Number(task.file_bytes || 0);
+  if (used + text.length - prevSize > TASK_BYTES_MAX)
+    return {
+      ok: false,
+      error: "task_quota",
+      message: `Task workspace quota exceeded (${TASK_BYTES_MAX / 1e6}MB total). Delete files or split the task.`,
+    };
   const hash = sha256(text);
   const { error } = await client.from("ap_agent_files").insert({
     user_id: userId,
@@ -530,6 +659,15 @@ async function _writeFile(client, userId, { task_id, path, content }) {
     sha256: hash,
   });
   if (error) throw error;
+  // Keep the task's workspace byte accounting in sync (best-effort).
+  try {
+    await client
+      .from("ap_agent_tasks")
+      .update({ file_bytes: Math.max(0, used + text.length - prevSize) })
+      .eq("id", task.id);
+  } catch {
+    /* quota accounting never breaks the write */
+  }
   // NOTE: the log carries path+hash only — never full file content.
   await _logEvent(client, {
     userId,
@@ -558,6 +696,128 @@ async function _appendFile(client, userId, { task_id, path, content }) {
   return _writeFile(client, userId, { task_id, path: p, content: prev.content + String(content ?? "") });
 }
 
+// Escape LIKE wildcards in a literal path prefix.
+function _likeEscape(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+// Rows matching a path exactly or as a folder prefix (target or target/...).
+// Avoids PostgREST .or() so commas in filenames can't break the filter.
+async function _rowsForPath(client, taskId, target) {
+  const esc = _likeEscape(target);
+  const { data: exact } = await client
+    .from("ap_agent_files")
+    .select("path,content,version,sha256,created_at")
+    .eq("task_id", taskId)
+    .eq("path", target)
+    .order("version", { ascending: true });
+  const { data: under } = await client
+    .from("ap_agent_files")
+    .select("path,content,version,sha256,created_at")
+    .eq("task_id", taskId)
+    .like("path", `${esc}/%`)
+    .order("path", { ascending: true })
+    .order("version", { ascending: true });
+  return [...(exact || []), ...(under || [])];
+}
+
+async function _deletePaths(client, taskId, target) {
+  const esc = _likeEscape(target);
+  const r1 = await client.from("ap_agent_files").delete().eq("task_id", taskId).eq("path", target);
+  if (r1.error) throw r1.error;
+  const r2 = await client.from("ap_agent_files").delete().eq("task_id", taskId).like("path", `${esc}/%`);
+  if (r2.error) throw r2.error;
+}
+
+// Delete one file (all versions) or a whole folder tree from a task workspace.
+// {task_id, path} deletes a single file; {task_id, prefix} deletes every file
+// under the folder prefix. Irreversible. Keeps task.file_bytes in sync.
+async function _deleteFile(client, userId, { task_id, path, prefix }) {
+  const task = await _taskById(client, userId, task_id);
+  if (!task) return { ok: false, error: "unknown_task" };
+  const p = path ? cleanPath(path) : null;
+  const pre = !p && prefix ? cleanPath(prefix) : null;
+  const target = p || pre;
+  if (!target) return { ok: false, error: "bad_path", message: "Provide path (file) or prefix (folder)." };
+  const rows = await _rowsForPath(client, task.id, target);
+  // For a single-file delete, only the exact path counts.
+  const hit = p ? rows.filter((r) => r.path === p) : rows;
+  if (hit.length === 0)
+    return { ok: false, error: "not_found", message: p ? "No such file." : "No such folder." };
+  const latest = new Map();
+  for (const r of hit) if (!latest.has(r.path) || latest.get(r.path).version < r.version) latest.set(r.path, r);
+  let freed = 0;
+  for (const r of latest.values()) freed += String(r.content || "").length;
+  if (p) {
+    const { error } = await client.from("ap_agent_files").delete().eq("task_id", task.id).eq("path", p);
+    if (error) throw error;
+  } else {
+    await _deletePaths(client, task.id, pre);
+  }
+  try {
+    await client
+      .from("ap_agent_tasks")
+      .update({ file_bytes: Math.max(0, Number(task.file_bytes || 0) - freed) })
+      .eq("id", task.id);
+  } catch {
+    /* quota accounting never breaks the delete */
+  }
+  const label = p ? `delete ${p}` : `delete_tree ${pre}/ (${latest.size} files)`;
+  await _logEvent(client, { userId, agentId: task.agent_id, taskId: task.id, kind: "file", body: label });
+  return { ok: true, deleted: latest.size, path: p || undefined, prefix: pre || undefined, _agentId: task.agent_id, _taskId: task.id };
+}
+
+// Rename / move a file or a whole folder, preserving full version history.
+async function _renameFile(client, userId, { task_id, from, to }) {
+  const task = await _taskById(client, userId, task_id);
+  if (!task) return { ok: false, error: "unknown_task" };
+  const f = cleanPath(from);
+  const t = cleanPath(to);
+  if (!f || !t) return { ok: false, error: "bad_path", message: "from/to must be relative, no '..', max 256 chars." };
+  if (f === t) return { ok: false, error: "no_op", message: "from and to are identical." };
+  if (t.startsWith(f + "/"))
+    return { ok: false, error: "bad_target", message: "Cannot move a folder into itself." };
+  const srcRows = await _rowsForPath(client, task.id, f);
+  if (!srcRows || srcRows.length === 0) return { ok: false, error: "not_found", message: "No such file or folder." };
+  const isFolder = srcRows.length > 0 && !srcRows.some((r) => r.path === f);
+  const dstPaths = new Set(srcRows.map((r) => (isFolder ? t + r.path.slice(f.length) : t)));
+  // Refuse to overwrite an existing destination.
+  for (const dp of dstPaths) {
+    const { data: clash } = await client
+      .from("ap_agent_files")
+      .select("path")
+      .eq("task_id", task.id)
+      .eq("path", dp)
+      .limit(1);
+    if ((clash || []).length > 0 && !srcRows.some((r) => r.path === dp))
+      return { ok: false, error: "exists", message: `Destination already exists: ${dp}` };
+  }
+  // Copy every version row to the new path, then remove the old rows.
+  const inserts = srcRows.map((r) => ({
+    user_id: userId,
+    task_id: task.id,
+    path: isFolder ? t + r.path.slice(f.length) : t,
+    content: r.content,
+    version: r.version,
+    sha256: r.sha256,
+    created_at: r.created_at,
+  }));
+  // Insert in chunks to stay under PostgREST payload limits.
+  for (let i = 0; i < inserts.length; i += 200) {
+    const { error } = await client.from("ap_agent_files").insert(inserts.slice(i, i + 200));
+    if (error) throw error;
+  }
+  await _deletePaths(client, task.id, f);
+  await _logEvent(client, {
+    userId,
+    agentId: task.agent_id,
+    taskId: task.id,
+    kind: "file",
+    body: `rename ${f} -> ${t} (${dstPaths.size} file${dstPaths.size === 1 ? "" : "s"})`,
+  });
+  return { ok: true, renamed: dstPaths.size, from: f, to: t, _agentId: task.agent_id, _taskId: task.id };
+}
+
 async function _latestFiles(client, taskId) {
   const { data } = await client
     .from("ap_agent_files")
@@ -575,26 +835,51 @@ async function _latestFiles(client, taskId) {
 async function _listFiles(client, userId, { task_id }) {
   const task = await _taskById(client, userId, task_id);
   if (!task) return { ok: false, error: "unknown_task" };
-  return { ok: true, files: await _latestFiles(client, task.id), _agentId: task.agent_id, _taskId: task.id };
+  const files = await _latestFiles(client, task.id);
+  return {
+    ok: true,
+    files,
+    tree: buildTree(files),
+    quota: { used: Number(task.file_bytes || 0), max: TASK_BYTES_MAX },
+    _agentId: task.agent_id,
+    _taskId: task.id,
+  };
 }
 
-async function _getFile(client, userId, { task_id, path }) {
+async function _getFile(client, userId, { task_id, path, version }) {
   const task = await _taskById(client, userId, task_id);
   if (!task) return { ok: false, error: "unknown_task" };
   const p = cleanPath(path);
   if (!p) return { ok: false, error: "bad_path" };
-  const { data } = await client
+  let q = client
     .from("ap_agent_files")
     .select("path,content,version,sha256,created_at")
     .eq("task_id", task.id)
-    .eq("path", p)
-    .order("version", { ascending: false })
-    .limit(1);
+    .eq("path", p);
+  if (Number(version) > 0) q = q.eq("version", Number(version)).limit(1);
+  else q = q.order("version", { ascending: false }).limit(1);
+  const { data } = await q;
   const f = (data || [])[0];
   if (!f) return { ok: false, error: "not_found" };
+  const { data: vers } = await client
+    .from("ap_agent_files")
+    .select("version,sha256,created_at")
+    .eq("task_id", task.id)
+    .eq("path", p)
+    .order("version", { ascending: false })
+    .limit(25);
+  const size = (f.content || "").length;
   return {
     ok: true,
-    file: { path: f.path, version: f.version, size: (f.content || "").length, sha256: f.sha256, updated_at: f.created_at, content: f.content },
+    file: { path: f.path, version: f.version, size, sha256: f.sha256, updated_at: f.created_at, content: f.content },
+    versions: (vers || []).map((v) => ({ version: v.version, sha256: v.sha256, updated_at: v.created_at })),
+    // Top-level conveniences: the dashboard reads j.content directly.
+    path: f.path,
+    version: f.version,
+    size,
+    sha256: f.sha256,
+    updated_at: f.created_at,
+    content: f.content,
     _agentId: task.agent_id,
     _taskId: task.id,
   };
@@ -829,6 +1114,9 @@ RULES
   - send_message {to, body}: to is an agent name, "lobby", or "user". body <= 2000 chars.
   - write_file {task_id, path, content}: create or replace a file in the task workspace. path is relative, never ".." or absolute.
   - append_file {task_id, path, content}: append to an existing file.
+  - delete_file {task_id, path} or {task_id, prefix}: delete one file (all versions) or a whole folder tree. Irreversible.
+  - rename_file {task_id, from, to}: move/rename a file or a whole folder, preserving version history.
+- Folders are implicit: writing "src/ui/Button.tsx" creates the folders — build real project trees, not flat dumps. Delete scratch files, keep the workspace tidy. Total workspace per task is capped at 5MB.
   - advance_step {task_id, step_index, status, result?}: status is pending|in_progress|complete|blocked|skipped. Mark "complete" ONLY for work actually finished (files written, messages sent). Include a short "result" summary.
   - remember {key, value}: persist a fact to long-term memory.
   - spawn_subtask {title, kind?, instructions?, steps?}: create a child task for yourself.
@@ -1063,6 +1351,10 @@ export async function thinkAgent(agent, opts = {}) {
         r = await _writeFile(client, userId, { task_id: a.task_id || activeTask?.id, path: a.path, content: trunc(a.content, MIND_CONTENT_MAX) });
       else if (op === "append_file")
         r = await _appendFile(client, userId, { task_id: a.task_id || activeTask?.id, path: a.path, content: trunc(a.content, MIND_CONTENT_MAX) });
+      else if (op === "delete_file")
+        r = await _deleteFile(client, userId, { task_id: a.task_id || activeTask?.id, path: a.path, prefix: a.prefix });
+      else if (op === "rename_file")
+        r = await _renameFile(client, userId, { task_id: a.task_id || activeTask?.id, from: a.from, to: a.to });
       else if (op === "advance_step")
         r = await _advanceStep(client, userId, { task_id: a.task_id || activeTask?.id, step_index: a.step_index, status: a.status, result: a.result });
       else if (op === "remember") r = await _rememberKV(client, userId, agent.name, a.key, a.value);
@@ -1330,6 +1622,32 @@ export async function agentplusExport(userId, { agent = null, kind = "log", task
     };
   }
 
+  if (kind === "zip") {
+    const task = await _taskById(client, userId, task_id);
+    if (!task) return { ok: false, error: "unknown_task" };
+    if (a && task.agent_id !== a.id) return { ok: false, error: "wrong_agent" };
+    const { data: rows } = await client
+      .from("ap_agent_files")
+      .select("path,content,version")
+      .eq("user_id", userId)
+      .eq("task_id", task.id)
+      .order("path", { ascending: true })
+      .order("version", { ascending: false })
+      .limit(2000);
+    const seen = new Map();
+    for (const r of rows || []) {
+      if (!seen.has(r.path)) seen.set(r.path, r);
+    }
+    if (seen.size === 0) return { ok: false, error: "empty", message: "Task has no files to zip." };
+    const entries = [...seen.values()].map((r) => ({
+      name: r.path,
+      data: Buffer.from(String(r.content || ""), "utf8"),
+    }));
+    const zip = zipStored(entries);
+    const slug = `${a ? a.name : "task"}-${String(task.title || task.id).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "workspace"}`;
+    return { ok: true, download: true, filename: `${slug}.zip`, contentType: "application/zip", body: zip };
+  }
+
   if (kind !== "log" && kind !== "thoughts") return { ok: false, error: "bad_kind" };
   let q = client
     .from("ap_agent_logs")
@@ -1411,6 +1729,8 @@ const tTaskUpdate = tool("action", (a) => `task_update ${trunc(a.task_id, 12)}`,
 // write/append/build log their own kind='file'/'build'/'deploy' entries inside the internals.
 const tWriteFile = tool(null, null, (c, u, a) => _writeFile(c, u, a));
 const tAppendFile = tool(null, null, (c, u, a) => _appendFile(c, u, a));
+const tDeleteFile = tool("file", (a) => `delete ${trunc(a.path || a.prefix || "", 60)}`, (c, u, a) => _deleteFile(c, u, a));
+const tRenameFile = tool("file", (a) => `rename ${trunc(a.from || "", 40)} -> ${trunc(a.to || "", 40)}`, (c, u, a) => _renameFile(c, u, a));
 const tFiles = tool("action", (a) => `files ${trunc(a.task_id, 12)}`, (c, u, a) => _listFiles(c, u, a));
 const tFile = tool("action", (a) => `file ${trunc(a.task_id, 12)}:${trunc(a.path, 60)}`, (c, u, a) => _getFile(c, u, a));
 const tBuild = tool(null, null, (c, u, a) => _buildTask(c, u, a));
@@ -1598,14 +1918,32 @@ export const AGENTPLUS_TOOLS = [
     },
   },
   {
+    name: "orbitx_agentplus_delete_file",
+    description: "Delete a file (all versions) or a whole folder tree from a task's workspace. Pass path for one file, or prefix for a folder (deletes everything under prefix/). Irreversible.",
+    inputSchema: {
+      type: "object",
+      properties: { task_id: { type: "string" }, path: { type: "string" }, prefix: { type: "string" } },
+      required: ["task_id"],
+    },
+  },
+  {
+    name: "orbitx_agentplus_rename_file",
+    description: "Rename or move a file or folder in a task's workspace, preserving full version history. Refuses to overwrite an existing destination.",
+    inputSchema: {
+      type: "object",
+      properties: { task_id: { type: "string" }, from: { type: "string" }, to: { type: "string" } },
+      required: ["task_id", "from", "to"],
+    },
+  },
+  {
     name: "orbitx_agentplus_files",
-    description: "List latest versions of a task's files: path, version, size, sha256.",
+    description: "List a task's workspace: flat files array (path, version, size, sha256), a nested folder tree, and the workspace quota (5MB/task).",
     inputSchema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] },
   },
   {
     name: "orbitx_agentplus_file",
-    description: "Read the latest version of a task file (full content).",
-    inputSchema: { type: "object", properties: { task_id: { type: "string" }, path: { type: "string" } }, required: ["task_id", "path"] },
+    description: "Read a task file (full content), plus its version history. Pass version to read an older version.",
+    inputSchema: { type: "object", properties: { task_id: { type: "string" }, path: { type: "string" }, version: { type: "number" } }, required: ["task_id", "path"] },
   },
   {
     name: "orbitx_agentplus_build",
@@ -1648,6 +1986,8 @@ export function dispatchAgentPlusTools(name, args, auth) {
     case "orbitx_agentplus_task_update": return tTaskUpdate(auth, args);
     case "orbitx_agentplus_write_file": return tWriteFile(auth, args);
     case "orbitx_agentplus_append_file": return tAppendFile(auth, args);
+    case "orbitx_agentplus_delete_file": return tDeleteFile(auth, args);
+    case "orbitx_agentplus_rename_file": return tRenameFile(auth, args);
     case "orbitx_agentplus_files": return tFiles(auth, args);
     case "orbitx_agentplus_file": return tFile(auth, args);
     case "orbitx_agentplus_build": return tBuild(auth, args);

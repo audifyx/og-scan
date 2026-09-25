@@ -857,15 +857,32 @@ function InspectorTask({ task, events, onOpenFile }: {
 function InspectorFile({ agent, taskId, path }: { agent: string; taskId: string; path: string }) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [meta, setMeta] = useState<{ version: number; size: number; sha256: string; updated_at?: string } | null>(null);
+  const [versions, setVersions] = useState<{ version: number; sha256: string; updated_at?: string }[]>([]);
+  const [selVersion, setSelVersion] = useState<number | null>(null);
 
-  useEffect(() => {
+  const load = useCallback((v: number | null) => {
     setLoading(true);
     setContent(null);
-    postCommand({ action: "file", task_id: taskId, path, quiet: true })
-      .then((j) => setContent(typeof j.content === "string" ? (j.content as string) : "(empty)"))
+    postCommand({ action: "file", task_id: taskId, path, ...(v ? { version: v } : {}), quiet: true })
+      .then((j) => {
+        setContent(typeof j.content === "string" ? (j.content as string) : "(empty)");
+        setMeta({ version: j.version, size: j.size, sha256: j.sha256, updated_at: j.updated_at });
+        if (Array.isArray(j.versions)) setVersions(j.versions as { version: number; sha256: string; updated_at?: string }[]);
+      })
       .catch(() => setContent("(failed to load)"))
       .finally(() => setLoading(false));
   }, [taskId, path]);
+
+  useEffect(() => {
+    setSelVersion(null);
+    load(null);
+  }, [taskId, path, load]);
+
+  const pickVersion = (v: number | null) => {
+    setSelVersion(v);
+    load(v);
+  };
 
   return (
     <div className="space-y-2">
@@ -873,7 +890,31 @@ function InspectorFile({ agent, taskId, path }: { agent: string; taskId: string;
         <FileCode2 size={14} className="shrink-0 text-amber-300/80" />
         <h3 className="min-w-0 flex-1 truncate font-mono text-sm font-bold text-zinc-100">{path}</h3>
       </div>
-      <p className="font-mono text-[10px] text-zinc-600">{agent}</p>
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-zinc-500">
+        <span>{agent}</span>
+        {meta && (
+          <>
+            <span className="rounded-full bg-black/40 px-1.5 py-0.5 text-zinc-400">v{meta.version}</span>
+            <span>{(meta.size / 1024).toFixed(1)}k</span>
+            {meta.updated_at && <span>{timeAgo(meta.updated_at)}</span>}
+          </>
+        )}
+        {versions.length > 1 && (
+          <select
+            value={selVersion ?? ""}
+            onChange={(e) => pickVersion(e.target.value ? Number(e.target.value) : null)}
+            className="rounded border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300 outline-none"
+            title="Version history"
+          >
+            <option value="">latest (v{versions[0]?.version})</option>
+            {versions.map((v) => (
+              <option key={v.version} value={v.version}>
+                v{v.version} · {v.sha256?.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
       {loading ? (
         <LoadingState label="Loading file…" />
       ) : (
