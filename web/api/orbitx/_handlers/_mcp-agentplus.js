@@ -2951,6 +2951,7 @@ async function rhCallTool(base, args = {}) {
 }
 
 const HUB_CONTEXT_MSGS = 30;const HUB_LLM_TIMEOUT_MS = 55000;
+const HUB_MSG_MAX = 4000;
 const HUB_MAX_TOKENS = 2000;
 const HUB_MAX_ITERS = 4;
 const HUB_DEADLINE_MS = 100000;
@@ -3326,10 +3327,15 @@ function hubCompactToolLines(tools) {
 }
 async function hubToolCatalog() {
   if (_hubCatalog && Date.now() - _hubCatalogAt < 5 * 60 * 1000) return _hubCatalog;
-  const [{ listAllOrbitXTools }, x, rhTools] = await Promise.all([
+  // Apogee is best-effort: if Robinhood Chain intel is unreachable, the hub
+  // still chats with the Solana + X surfaces instead of failing the turn.
+  const rhTools = await rhCuratedCatalog().catch((e) => {
+    console.error("[hub] apogee catalog unavailable:", e?.message || e);
+    return [];
+  });
+  const [{ listAllOrbitXTools }, x] = await Promise.all([
     import("../../orbitx-hub.js"),
     import("../../x-mcp.js"),
-    rhCuratedCatalog(),
   ]);
   const agentTools = (listAllOrbitXTools() || []).filter((t) => t && t.name && !hubToolExcluded(t.name));
   const xTools = (x.listXHubTools() || []).filter((t) => t && t.name && !hubToolExcluded(t.name));
