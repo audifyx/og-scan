@@ -44,7 +44,11 @@ const llmCfg = () => {
     apiKey,
     model:
       String(process.env.AGENT_LLM_MODEL || "").trim() ||
-      (nvidia ? "nvidia/nemotron-3-super-120b-a12b" : "anthropic/claude-sonnet-4.6"),
+      // Verified 2026-09-25 via live think calls on Aiden's key: the 404s were
+      // per-account provisioning, not catalog absence. nemotron-3-ultra-550b
+      // is the strongest chat-provisioned model on the key; it returns clean
+      // strict-JSON envelopes. gpt-oss-20b stays the fallback.
+      (nvidia ? "nvidia/nemotron-3-ultra-550b-a55b" : "anthropic/claude-sonnet-4.6"),
     baseUrl:
       String(process.env.AGENT_LLM_BASE_URL || "").trim().replace(/\/+$/, "") ||
       (nvidia ? "https://integrate.api.nvidia.com/v1" : "https://api.openai.com/v1"),
@@ -677,7 +681,11 @@ async function _tailLog(client, userId, { name, task_id, since, limit }) {
 const MIND_SYSTEM = `You are the live reasoning mind of a persistent autonomous agent running server-side inside the OrbitX MCP. You wake on a schedule or when events (messages, task assignments, completed steps) wake you. Your persistent state — memory, inbox, task, recent log — is provided as JSON.
 
 RULES
-- Respond with STRICT JSON only: {"thought": string, "actions": [ ... ]}. No markdown fences, no prose outside the JSON.
+- Your ENTIRE response must be exactly one JSON object and nothing else — no
+  markdown fences, no preamble, no explanation, no trailing text. The parser
+  rejects anything that is not a single top-level object.
+- Exact schema: {"thought": string, "actions": [action, ...]} where each
+  action is exactly {"op": "<op>", ...params} with "op" as the FIRST key.
 - "thought": 2-5 sentences. Narrate what you observe in state and what you intend to do. Be honest: describe only actions you actually take in "actions". Never claim work you did not do.
 - "actions": 0 to 5 actions, executed in order. Each action: {"op": "<op>", ...params}.
   - send_message {to, body}: to is an agent name, "lobby", or "user". body <= 2000 chars.
@@ -692,18 +700,40 @@ RULES
 - Do not invent file content claimed to come from elsewhere; everything you write is your own draft.`;
 
 function parseThinkJson(text) {
+  // Strip markdown fences first (models sometimes wrap despite instructions).
   const t = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  // Fast path: the whole thing is JSON.
   try {
     return JSON.parse(t);
   } catch {
-    /* fall through to brace extraction */
+    /* fall through to extraction */
   }
-  const m = t.match(/\{[\s\S]*\}/);
-  if (m) {
-    try {
-      return JSON.parse(m[0]);
-    } catch {
-      /* fall through */
+  // Balanced-brace extraction: find the first '{' and walk depth, respecting
+  // strings and escapes, so trailing prose or a second object can't corrupt it.
+  const start = t.indexOf("{");
+  if (start >= 0) {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < t.length; i++) {
+      const ch = t[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === "\\") esc = true;
+        else if (ch === '"') inStr = false;
+      } else if (ch === '"') {
+        inStr = true;
+      } else if (ch === "{") {
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          try {
+            return JSON.parse(t.slice(start, i + 1));
+          } catch {
+            /* keep scanning for a later balanced object */
+            depth = 0;
+          }
+        }
+      }
     }
   }
   return null;
@@ -773,17 +803,17 @@ export async function thinkAgent(agent, opts = {}) {
   // 5-6. Call the LLM (OpenAI-compatible chat completions).
   // NVIDIA NIM 404s ("Function '<uuid>': Not found for account") when the model
   // isn't provisioned for the key's account — the catalog is not the grant. On a
-  // 404 we retry once with a widely-provisioned fallback before failing, unless
-  // the user pinned a model explicitly (AGENT_LLM_MODEL or per-agent override).
+  // 404 OR an unparseable envelope (bad_json) we try the next candidate once
+  // before failing, unless the user pinned a model explicitly (AGENT_LLM_MODEL
+  // or per-agent override). Every attempt is logged. Total LLM time is capped
+  // at timeoutMs across attempts so the 60s function limit can't be blown.
   const NIM_FALLBACK_MODEL = "openai/gpt-oss-20b";
   const modelPinned = Boolean((agent.model || "").trim() || String(process.env.AGENT_LLM_MODEL || "").trim());
-  const candidates = modelPinned ? [model] : [...new Set([model, NIM_FALLBACK_MODEL])];
+  const plan = modelPinned ? [model] : [...new Set([model, NIM_FALLBACK_MODEL])];
   const started = Date.now();
-  let resp = null, raw = "", usedModel = model, attemptErr = null;
-  for (const cand of candidates) {
-    usedModel = cand;
+  const callThink = async (cand, callTimeoutMs) => {
     try {
-      resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      const resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -792,47 +822,60 @@ export async function thinkAgent(agent, opts = {}) {
             { role: "system", content: MIND_SYSTEM },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
+          // Low temperature: the think envelope is machine-parsed JSON.
+          temperature: 0.2,
           max_tokens: THINK_MAX_TOKENS,
           // Force strict JSON: the think loop parses the envelope with
           // parseThinkJson, and some instruct models narrate otherwise.
           response_format: { type: "json_object" },
         }),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(callTimeoutMs),
       });
+      return { resp, raw: await resp.text(), error: null };
     } catch (e) {
-      attemptErr = e;
-      resp = null;
+      return { resp: null, raw: "", error: e };
+    }
+  };
+  let usedModel = model, think = null, usage = {}, ms = 0, lastErr = null;
+  for (const cand of plan) {
+    usedModel = cand;
+    const remaining = Math.max(10000, timeoutMs - (Date.now() - started));
+    const { resp, raw, error } = await callThink(cand, remaining);
+    ms = Date.now() - started;
+    if (error) {
+      await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed (${cand}): ${trunc(error?.message || String(error), 300)}` });
+      lastErr = { ok: false, error: "llm_unreachable", message: error?.message || String(error) };
       break;
     }
-    raw = await resp.text();
-    if (resp.ok) break;
-    if (resp.status !== 404) break;
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_404 on ${cand}: ${trunc(raw, 200)} — trying fallback model` });
+    if (!resp.ok) {
+      await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_${resp.status} on ${cand}: ${trunc(raw, 300)}` });
+      lastErr = { ok: false, error: `llm_${resp.status}` };
+      // 404 → next candidate (the fallback). Any other status → fail fast.
+      if (resp.status === 404 && !modelPinned) continue;
+      break;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = {};
+    }
+    const text = parsed?.choices?.[0]?.message?.content || "";
+    const t = parseThinkJson(text);
+    if (t && typeof t.thought === "string" && Array.isArray(t.actions)) {
+      think = t;
+      usage = parsed?.usage || {};
+      lastErr = null;
+      break;
+    }
+    // Unparseable envelope: log the raw head for debuggability, then retry
+    // once with the next candidate (the fallback) unless pinned.
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${cand}: ${trunc(text, 300)}` });
+    lastErr = { ok: false, error: "bad_json" };
+    if (!modelPinned) continue;
+    break;
   }
-  if (!resp) {
-    const e = attemptErr;
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed: ${trunc(e?.message || String(e), 300)}` });
-    return { ok: false, error: "llm_unreachable", message: e?.message || String(e) };
-  }
-  const ms = Date.now() - started;
-  if (!resp.ok) {
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_${resp.status} on ${usedModel}: ${trunc(raw, 300)}` });
-    return { ok: false, error: `llm_${resp.status}` };
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    parsed = {};
-  }
-  const text = parsed?.choices?.[0]?.message?.content || "";
-  const usage = parsed?.usage || {};
-  const think = parseThinkJson(text);
-  if (!think || typeof think.thought !== "string" || !Array.isArray(think.actions)) {
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${usedModel}: ${trunc(text, 300)}` });
-    return { ok: false, error: "bad_json" };
-  }
+  if (!think) return lastErr || { ok: false, error: "bad_json" };
 
   // 7. Log the thought VERBATIM + cost-visible system entry.
   await _logEvent(client, { userId, agentId: agent.id, taskId: activeTask?.id || null, kind: "thought", body: trunc(think.thought, LOG_BODY_MAX) });
@@ -881,7 +924,7 @@ export async function thinkAgent(agent, opts = {}) {
     .from("ap_agents")
     .update({ thinks_today: thinksToday + 1, last_think_at: nowIso(), next_think_at: null })
     .eq("id", agent.id);
-  return { ok: true, model, ms, thought: trunc(think.thought, 500), actions: executed };
+  return { ok: true, model: usedModel, ms, thought: trunc(think.thought, 500), actions: executed };
 }
 
 /* ------------------------------------------------------------------ */
