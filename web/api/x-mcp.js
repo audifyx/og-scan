@@ -4317,9 +4317,10 @@ async function handleMcp(req, res, parts) {
   // POST hub/threads {title?}   create thread
   // GET  hub/threads/<id>       thread + messages + pending confirmations
   // DELETE hub/threads/<id>     delete thread
-  // POST hub/chat {thread_id?, message}   agentic chat turn
-  // POST hub/confirm {pending_id, approved}  approve/deny a gated tool call
+  // POST hub/chat {thread_id?, message, mode?, lang?}   agentic chat turn
+  // POST hub/confirm {pending_id, approved, mode?, lang?}  approve/deny a gated tool call
   // GET  hub/models             which mind model the hub uses
+  // GET  hub/export/trades?format=csv   trade history export (csv)
   // Auth: same as agentplus (Bearer cron + ?user=, or Supabase user JWT).
   if (route === "hub/threads" && (req.method === "GET" || req.method === "POST")) {
     const authUser = await agentplusAuth(req);
@@ -4353,7 +4354,7 @@ async function handleMcp(req, res, parts) {
     if (!authUser) return json(res, { error: "unauthorized" }, 401);
     try {
       const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
-      return json(res, await hub.hubChat(authUser.userId, body.thread_id || null, body.message, req));
+      return json(res, await hub.hubChat(authUser.userId, body.thread_id || null, body.message, req, { mode: body.mode, lang: body.lang }));
     } catch (e) {
       return json(res, { error: e?.message || "hub_chat_failed" }, 500);
     }
@@ -4365,9 +4366,24 @@ async function handleMcp(req, res, parts) {
     if (!authUser) return json(res, { error: "unauthorized" }, 401);
     try {
       const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
-      return json(res, await hub.hubConfirm(authUser.userId, body.pending_id, body.approved === true, req));
+      return json(res, await hub.hubConfirm(authUser.userId, body.pending_id, body.approved === true, req, { mode: body.mode, lang: body.lang }));
     } catch (e) {
       return json(res, { error: e?.message || "hub_confirm_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/export/trades" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      const out = await hub.hubExportTrades(authUser.userId, "csv");
+      if (!out.ok) return json(res, out, 500);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="orbitx-trades-${new Date().toISOString().slice(0, 10)}.csv"`);
+      return res.end(out.csv);
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_export_failed" }, 500);
     }
   }
 
@@ -4782,6 +4798,36 @@ async function handleMcp(req, res, parts) {
 
   return json(res, { error: "not_found", route }, 404);
 }
+
+  // ── OrbitX AI Hub: server-side X-tool runner ──
+  // Lets the hub chat (web/api/orbitx/_handlers/_mcp-agentplus.js) execute the
+  // curated CORE X tools through the same internal dispatch as tools/call,
+  // running as the authed dashboard user. Generated pagination tools are NOT
+  // exposed here — CORE_TOOLS only.
+  const X_HUB_PUBLISH = new Set(["x_post", "x_quote", "x_reply", "x_dm", "x_dm_group", "x_agent_approve"]);
+  export function listXHubTools() {
+    return CORE_TOOLS.filter((t) => t && t.name !== "search" && t.name !== "fetch").map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    }));
+  }
+  export function isXHubTool(name) {
+    const n = normalizeXToolName(String(name || ""));
+    return CORE_TOOLS.some((t) => t && t.name === n);
+  }
+  export function xHubPublishGated(name) {
+    return X_HUB_PUBLISH.has(normalizeXToolName(String(name || "")));
+  }
+  export async function runXHubTool({ userId, toolName, args = {}, req = null }) {
+    const uid = String(userId || "").trim();
+    if (!uid) throw Object.assign(new Error("user_required"), { status: 401 });
+    const name = normalizeXToolName(String(toolName || ""));
+    if (!isXHubTool(name)) throw Object.assign(new Error(`Unknown X tool: ${toolName}`), { status: 400 });
+    // Same internal dispatch as the tools/call branch; no telegram push here.
+    const auth = { userId: uid, source: "hub", bearerPresent: true };
+    return callTool(name, args && typeof args === "object" ? args : {}, auth, req);
+  }
 
 export default async function handler(req, res) {
   try {

@@ -105,6 +105,7 @@ export async function orbitxAppAlert(auth, args = {}) {
     mint, symbol: info.symbol, condType: type, condValue: value,
     ...(baselineVol != null ? { baselineVol } : {}),
     action, ...(actionValue != null ? { actionValue } : {}), note,
+    ...(args.hub_thread_id ? { hubThreadId: String(args.hub_thread_id) } : {}),
     status: "open", attempts: 0, createdAt: now,
   };
   const { data, error } = await client.from("ox_live_events").insert({
@@ -262,6 +263,15 @@ export async function tickUserAlerts(userId, ctx) {
       const mod = await import("./_mcp-telegram-push.js");
       await mod.pushMcpResultToTelegram?.({ userId, tool: "orbitx_app_alert", result: summary, source: "alert_tick" });
     } catch { /* best-effort push */ }
+    // Ping the hub thread if this alert was armed from /ai-hub.
+    if (m.hubThreadId) {
+      try {
+        const hub = await import("./_mcp-agentplus.js");
+        const sig = summary.result?.signature ? `\nTx: ${summary.result.signature}` : "";
+        await hub.hubNotifyThread?.(userId, m.hubThreadId,
+          `🔔 Alert fired: ${m.symbol || m.mint} — ${summary.condition}. ${summary.actionDesc}${sig}`);
+      } catch { /* best-effort hub ping */ }
+    }
   }
   return { ok: true, checked, triggered };
 }
