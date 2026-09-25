@@ -47,13 +47,15 @@ const llmCfg = () => {
     apiKey,
     model:
       String(process.env.AGENT_LLM_MODEL || "").trim() ||
-      // Single mind model, verified 2026-09-25 via live think calls on
-      // Aiden's key: nvidia/nemotron-3-ultra-550b-a55b is the best
-      // chat-provisioned model on the key — clean strict-JSON envelopes,
-      // ~3-4s. One model, no fallback chain: the fallback is what turned
-      // every hiccup into a confusing cascade of llm_404/bad_json errors.
+      // Single mind model. 2026-09-25: nvidia/nemotron-3-ultra-550b-a55b was
+      // the best but started flapping (transport timeouts ~13:30-14:35 EDT,
+      // recovered ~25min, dark again by 15:12) — not a working model right
+      // now. Switched to openai/gpt-oss-20b: previously verified as a working
+      // mind (real thinks, ~3.6s). Switch back to the 550b when it's stable.
+      // One model, no fallback chain: the fallback is what turned every
+      // hiccup into a confusing cascade of llm_404/bad_json errors.
       // (NVIDIA NIM 404s were per-account provisioning, not catalog absence.)
-      "nvidia/nemotron-3-ultra-550b-a55b",
+      "openai/gpt-oss-20b",
     baseUrl:
       String(process.env.AGENT_LLM_BASE_URL || "").trim().replace(/\/+$/, "") ||
       (nvidia ? "https://integrate.api.nvidia.com/v1" : "https://api.openai.com/v1"),
@@ -1473,11 +1475,11 @@ export async function thinkAgent(agent, opts = {}) {
   );
 
   // 5-6. Call the LLM (OpenAI-compatible chat completions). SINGLE MODEL, no
-  // fallback chain, no per-agent override: nvidia/nemotron-3-ultra-550b-a55b,
-  // verified 2026-09-25 as the best chat-provisioned mind on Aiden's key
-  // (clean strict-JSON envelopes, ~3-4s, 4/4 live smoke tests). The fallback
-  // is what turned every hiccup into a confusing cascade — now errors fail
-  // fast and surface on the dashboard instead of silently degrading.
+  // fallback chain, no per-agent override: openai/gpt-oss-20b (switched
+  // 2026-09-25 — the 550b started flapping with transport timeouts; gpt-oss-20b
+  // was previously verified as a working mind, ~3.6s). The fallback is what
+  // turned every hiccup into a confusing cascade — now errors fail fast and
+  // surface on the dashboard instead of silently degrading.
   // Retry policy: ONE retry on transient transport errors (timeouts) only.
   // HTTP errors (404/400/5xx) and unparseable envelopes (bad_json) fail fast
   // with the real error. Total LLM time stays under timeoutMs so the 60s
