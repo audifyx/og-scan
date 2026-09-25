@@ -839,9 +839,13 @@ export async function thinkAgent(agent, opts = {}) {
     }
   };
   let usedModel = model, think = null, usage = {}, ms = 0, lastErr = null;
-  for (const cand of plan) {
+  for (let ci = 0; ci < plan.length; ci++) {
+    const cand = plan[ci];
     usedModel = cand;
-    const remaining = Math.max(10000, timeoutMs - (Date.now() - started));
+    // Budget split: the primary gets at most 35s so a slow model can't eat the
+    // whole 60s function window; the fallback keeps a usable slice instead of
+    // the 10s dregs. (Observed: 550b is bimodal — ~3s or glacial.)
+    const remaining = ci === 0 ? Math.min(timeoutMs, 35000) : Math.max(15000, timeoutMs - (Date.now() - started));
     const { resp, raw, error } = await callThink(cand, remaining);
     ms = Date.now() - started;
     if (error) {
