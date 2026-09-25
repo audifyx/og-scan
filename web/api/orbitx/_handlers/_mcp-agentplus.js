@@ -196,8 +196,23 @@ async function _lastThinkErrors(client, userId, agentIds) {
     .in("agent_id", ids)
     .order("created_at", { ascending: false })
     .limit(500);
+  // A recovered mind shouldn't wear its last error forever: only surface an
+  // error if it's newer than the agent's most recent successful thought.
+  const { data: thoughts } = await client
+    .from("ap_agent_logs")
+    .select("agent_id,created_at")
+    .eq("user_id", userId)
+    .eq("kind", "thought")
+    .in("agent_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(500);
+  const lastThoughtAt = {};
+  for (const r of thoughts || []) {
+    if (!lastThoughtAt[r.agent_id]) lastThoughtAt[r.agent_id] = r.created_at;
+  }
   for (const r of data || []) {
     if (map[r.agent_id]) continue;
+    if (lastThoughtAt[r.agent_id] && lastThoughtAt[r.agent_id] >= r.created_at) continue;
     const parsed = parseThinkError(r.body);
     if (parsed) map[r.agent_id] = { ...parsed, at: r.created_at };
   }
@@ -740,6 +755,25 @@ function parseThinkJson(text) {
   return null;
 }
 
+// Models sometimes skip the envelope and emit a bare action (e.g.
+// {"op":"advance_step",...}) or a singular "action" key. Normalize every
+// parseable shape into the canonical {thought, actions[]} envelope instead
+// of failing the think.
+function normalizeThink(t) {
+  if (!t || typeof t !== "object") return null;
+  if (typeof t.thought === "string" && Array.isArray(t.actions)) return t;
+  if (typeof t.op === "string") {
+    return { thought: "(action without narration)", actions: [t] };
+  }
+  if (typeof t.thought === "string" && t.action && typeof t.action === "object") {
+    return { thought: t.thought, actions: [t.action] };
+  }
+  if (Array.isArray(t)) {
+    return { thought: "(action list without narration)", actions: t };
+  }
+  return null;
+}
+
 export async function thinkAgent(agent, opts = {}) {
   const userId = agent.user_id;
   const client = await sb();
@@ -870,7 +904,7 @@ export async function thinkAgent(agent, opts = {}) {
       parsed = {};
     }
     const text = parsed?.choices?.[0]?.message?.content || "";
-    const t = parseThinkJson(text);
+    const t = normalizeThink(parseThinkJson(text));
     if (t && typeof t.thought === "string" && Array.isArray(t.actions)) {
       think = t;
       usage = parsed?.usage || {};
