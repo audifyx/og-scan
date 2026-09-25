@@ -44,7 +44,7 @@ const llmCfg = () => {
     apiKey,
     model:
       String(process.env.AGENT_LLM_MODEL || "").trim() ||
-      (nvidia ? "nvidia/llama-3.1-nemotron-70b-instruct" : "anthropic/claude-sonnet-4.6"),
+      (nvidia ? "nvidia/nemotron-3-super-120b-a12b" : "anthropic/claude-sonnet-4.6"),
     baseUrl:
       String(process.env.AGENT_LLM_BASE_URL || "").trim().replace(/\/+$/, "") ||
       (nvidia ? "https://integrate.api.nvidia.com/v1" : "https://api.openai.com/v1"),
@@ -722,31 +722,50 @@ export async function thinkAgent(agent, opts = {}) {
   );
 
   // 5-6. Call the LLM (OpenAI-compatible chat completions).
+  // NVIDIA NIM 404s ("Function '<uuid>': Not found for account") when the model
+  // isn't provisioned for the key's account — the catalog is not the grant. On a
+  // 404 we retry once with a widely-provisioned fallback before failing, unless
+  // the user pinned a model explicitly (AGENT_LLM_MODEL or per-agent override).
+  const NIM_FALLBACK_MODEL = "openai/gpt-oss-20b";
+  const modelPinned = Boolean((agent.model || "").trim() || String(process.env.AGENT_LLM_MODEL || "").trim());
+  const candidates = modelPinned ? [model] : [...new Set([model, NIM_FALLBACK_MODEL])];
   const started = Date.now();
-  let resp;
-  try {
-    resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: MIND_SYSTEM },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: THINK_MAX_TOKENS,
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (e) {
+  let resp = null, raw = "", usedModel = model, attemptErr = null;
+  for (const cand of candidates) {
+    usedModel = cand;
+    try {
+      resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: cand,
+          messages: [
+            { role: "system", content: MIND_SYSTEM },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: THINK_MAX_TOKENS,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      attemptErr = e;
+      resp = null;
+      break;
+    }
+    raw = await resp.text();
+    if (resp.ok) break;
+    if (resp.status !== 404) break;
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_404 on ${cand}: ${trunc(raw, 200)} — trying fallback model` });
+  }
+  if (!resp) {
+    const e = attemptErr;
     await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed: ${trunc(e?.message || String(e), 300)}` });
     return { ok: false, error: "llm_unreachable", message: e?.message || String(e) };
   }
   const ms = Date.now() - started;
-  const raw = await resp.text();
   if (!resp.ok) {
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_${resp.status}: ${trunc(raw, 300)}` });
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think llm_${resp.status} on ${usedModel}: ${trunc(raw, 300)}` });
     return { ok: false, error: `llm_${resp.status}` };
   }
   let parsed;
@@ -759,7 +778,7 @@ export async function thinkAgent(agent, opts = {}) {
   const usage = parsed?.usage || {};
   const think = parseThinkJson(text);
   if (!think || typeof think.thought !== "string" || !Array.isArray(think.actions)) {
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${model}: ${trunc(text, 300)}` });
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${usedModel}: ${trunc(text, 300)}` });
     return { ok: false, error: "bad_json" };
   }
 
@@ -769,7 +788,7 @@ export async function thinkAgent(agent, opts = {}) {
     userId,
     agentId: agent.id,
     kind: "system",
-    body: JSON.stringify({ think: true, model, prompt_tokens: usage.prompt_tokens ?? null, completion_tokens: usage.completion_tokens ?? null, ms }),
+    body: JSON.stringify({ think: true, model: usedModel, prompt_tokens: usage.prompt_tokens ?? null, completion_tokens: usage.completion_tokens ?? null, ms }),
   });
 
   // 8. Execute actions through the SAME internals the MCP tools use.
