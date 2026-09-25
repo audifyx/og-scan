@@ -27,6 +27,8 @@ import {
   MessagesSquare,
   Send,
   MoonStar,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +39,7 @@ import {
   type TaskFile,
   type DigestResponse,
   type ModelsProbe,
+  type ScheduleInfo,
   postCommand,
   downloadExport,
   extractUrls,
@@ -468,6 +471,136 @@ export function CommandPalette({ open, onClose, agents, tasks, onThink, onSpawn,
 
 /* ── inspector (right panel / mobile sheet) ── */
 
+function SchedulesSection({ name }: { name: string }) {
+  const [schedules, setSchedules] = useState<ScheduleInfo[]>([]);
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"every" | "daily">("every");
+  const [minutes, setMinutes] = useState("30");
+  const [atTime, setAtTime] = useState("09:00");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const j = await postCommand({ action: "schedules", name, quiet: true });
+      setSchedules(Array.isArray(j.schedules) ? (j.schedules as ScheduleInfo[]) : []);
+    } catch {
+      /* keep stale */
+    }
+  }, [name]);
+
+  useEffect(() => {
+    setSchedules([]);
+    setOpen(false);
+    setError(null);
+    load();
+  }, [name, load]);
+
+  const add = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = { action: "schedule", name };
+      if (mode === "every") body.every_minutes = Number(minutes);
+      else body.at_time = atTime;
+      const j = await postCommand(body);
+      if (j && j.ok === false) throw new Error(j.message || j.error || "Failed to create schedule");
+      setOpen(false);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create schedule");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      await postCommand({ action: "unschedule", id });
+      await load();
+    } catch {
+      /* shell flashes */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const describe = (s: ScheduleInfo) =>
+    s.every_minutes ? `Every ${s.every_minutes} min` : `Daily at ${s.at_time}`;
+
+  return (
+    <div className="rounded-lg bg-black/30 p-3 ring-1 ring-white/5">
+      <div className="mb-2 flex items-center justify-between">
+        <SectionTitle icon={Clock} right={<span className="font-mono text-[10px] text-zinc-600">{schedules.length}/5</span>}>Wake-up schedules</SectionTitle>
+        <button onClick={() => setOpen((v) => !v)} className={btnGhost} title="Add a recurring wake-up">
+          <Plus size={11} /> Add
+        </button>
+      </div>
+      {open && (
+        <div className="mb-2 space-y-2 rounded-md bg-white/[0.03] p-2 ring-1 ring-white/5">
+          <div className="flex gap-1">
+            {(["every", "daily"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={cn("flex-1 rounded-md px-2 py-1 text-[11px]", mode === m ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30" : "text-zinc-500 hover:text-zinc-300")}
+              >
+                {m === "every" ? "Every N minutes" : "Daily at time"}
+              </button>
+            ))}
+          </div>
+          {mode === "every" ? (
+            <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+              Every
+              <input
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value.replace(/[^0-9]/g, ""))}
+                className="w-16 rounded-md bg-black/40 px-2 py-1 font-mono text-zinc-200 ring-1 ring-white/10"
+                placeholder="30"
+              />
+              minutes (min 15)
+            </label>
+          ) : (
+            <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+              At
+              <input
+                type="time"
+                value={atTime}
+                onChange={(e) => setAtTime(e.target.value)}
+                className="rounded-md bg-black/40 px-2 py-1 font-mono text-zinc-200 ring-1 ring-white/10"
+              />
+              <span className="text-zinc-600">America/New_York</span>
+            </label>
+          )}
+          {error && <p className="text-[11px] text-red-300">{error}</p>}
+          <button onClick={add} disabled={busy} className={cn(btnPrimary, "w-full justify-center !py-1.5 text-xs")}>
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Clock size={12} />} Set wake-up
+          </button>
+        </div>
+      )}
+      {schedules.length === 0 ? (
+        <p className="text-[11px] text-zinc-600">No wake-ups — the agent only thinks when poked.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {schedules.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 rounded-md bg-white/[0.03] px-2 py-1.5 ring-1 ring-white/5">
+              <Clock size={12} className="shrink-0 text-emerald-300" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-medium text-zinc-200">{describe(s)}</div>
+                <div className="font-mono text-[10px] text-zinc-600">next {formatTime(s.next_fire_at)}{s.fail_streak > 0 ? ` · ${s.fail_streak} missed` : ""}</div>
+              </div>
+              <button onClick={() => remove(s.id)} disabled={busy} className={cn(btnGhost, "!px-1.5 hover:!text-red-300")} title="Remove schedule">
+                <Trash2 size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InspectorAgent({ name, thinkBusy, onThink, onArchive, onOpenTask, unread }: {
   name: string;
   thinkBusy: string | null;
@@ -655,6 +788,8 @@ function InspectorAgent({ name, thinkBusy, onThink, onArchive, onOpenTask, unrea
           </div>
         )}
       </div>
+
+      <SchedulesSection name={detail.name} />
 
       <div className="rounded-lg bg-black/30 p-3 ring-1 ring-white/5">
         <SectionTitle icon={Download}>Export</SectionTitle>

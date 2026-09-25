@@ -1,6 +1,6 @@
 /* Agent OS v2 — Fleet view: live agent cards. */
 import { useMemo } from "react";
-import { Bot, Plus, Play, Archive, MessageSquarePlus, ChevronRight, Brain } from "lucide-react";
+import { Bot, Plus, Play, Archive, MessageSquarePlus, ChevronRight, Brain, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   type AgentInfo,
@@ -113,6 +113,11 @@ export function Fleet({ agents, events, live, thinkBusy, onThink, onArchive, onS
                     {a.name}
                   </button>
                   <MindBadge mind={a.mind} />
+                  {(a.active_schedules || 0) > 0 && (
+                    <span className="flex items-center gap-1 rounded-full bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-bold text-sky-300 ring-1 ring-sky-400/30" title={`${a.active_schedules} wake-up schedule${a.active_schedules === 1 ? "" : "s"}`}>
+                      <Clock size={10} />{a.active_schedules}
+                    </span>
+                  )}
                   {a.unread > 0 && (
                     <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300" title={`${a.unread} unread messages`}>
                       {a.unread}

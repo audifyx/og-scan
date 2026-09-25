@@ -242,6 +242,208 @@ async function _pokeThink(client, userId, agentName) {
 }
 
 /* ------------------------------------------------------------------ */
+/* agent wake-up schedules — "think every 30m" / "check in at 9am"     */
+/* Fired by tickAgentPlus (no new cron): due schedules poke the       */
+/* agent's next_think_at, the existing wake mechanism.                */
+/* ------------------------------------------------------------------ */
+
+const SCHEDULES_MAX_PER_AGENT = 5;
+const SCHEDULE_MIN_MINUTES = 15;
+const SCHEDULE_FAIL_LIMIT = 3;
+
+function validTimezone(tz) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: String(tz) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const HHMM_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+// Convert a wall-clock time in tz to a UTC epoch ms.
+function zonedWallToUtc(y, mo, d, h, mi, tz) {
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const p = Object.fromEntries(fmt.formatToParts(new Date(guess)).map((x) => [x.type, x.value]));
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return guess - (asUtc - guess);
+}
+
+// Next UTC occurrence of "HH:MM" in tz strictly after fromMs.
+function nextDailyFire(hhmm, tz, fromMs) {
+  const m = HHMM_RE.exec(String(hhmm || "").trim());
+  if (!m || !validTimezone(tz)) return null;
+  const H = +m[1], Min = +m[2];
+  const ymd = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  for (let dOff = 0; dOff < 3; dOff++) {
+    const parts = Object.fromEntries(ymd.formatToParts(new Date(fromMs + dOff * 86400000)).map((x) => [x.type, x.value]));
+    const fire = zonedWallToUtc(+parts.year, +parts.month, +parts.day, H, Min, tz);
+    if (fire > fromMs) return fire;
+  }
+  return null;
+}
+
+function scheduleDesc(s) {
+  return s.every_minutes ? `every ${s.every_minutes}m` : `daily at ${s.at_time} (${s.timezone})`;
+}
+
+async function _agentSchedules(client, userId, agentId) {
+  const { data } = await client
+    .from("ap_agent_schedules")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("agent_id", agentId)
+    .eq("active", true)
+    .order("next_fire_at", { ascending: true });
+  return data || [];
+}
+
+async function _createSchedule(client, userId, { agentName, every_minutes, at_time, timezone }) {
+  const agent = await _agentByName(client, userId, trunc(String(agentName || ""), 40).trim().toLowerCase());
+  if (!agent) return { ok: false, error: "unknown_agent" };
+  if (agent.status !== "active") return { ok: false, error: "archived", message: "Agent is archived." };
+  const hasEvery = every_minutes !== undefined && every_minutes !== null && String(every_minutes) !== "";
+  const hasAt = at_time !== undefined && at_time !== null && String(at_time).trim() !== "";
+  if (hasEvery === hasAt)
+    return { ok: false, error: "bad_schedule", message: "Provide exactly one of every_minutes or at_time." };
+  const tz = (timezone || "America/New_York").trim() || "America/New_York";
+  if (!validTimezone(tz)) return { ok: false, error: "bad_timezone", message: "Unknown IANA timezone." };
+  const now = Date.now();
+  let everyMin = null, atTime = null, nextFire;
+  if (hasEvery) {
+    everyMin = Math.floor(Number(every_minutes));
+    if (!Number.isFinite(everyMin) || everyMin < SCHEDULE_MIN_MINUTES)
+      return { ok: false, error: "bad_schedule", message: `every_minutes must be an integer >= ${SCHEDULE_MIN_MINUTES}.` };
+    nextFire = now + everyMin * 60000;
+  } else {
+    atTime = String(at_time).trim();
+    if (!HHMM_RE.test(atTime)) return { ok: false, error: "bad_schedule", message: 'at_time must be "HH:MM" 24h.' };
+    nextFire = nextDailyFire(atTime, tz, now);
+    if (!nextFire) return { ok: false, error: "bad_schedule", message: "Could not compute next fire time." };
+  }
+  const existing = await _agentSchedules(client, userId, agent.id);
+  if (existing.length >= SCHEDULES_MAX_PER_AGENT)
+    return { ok: false, error: "schedule_cap", message: `Max ${SCHEDULES_MAX_PER_AGENT} active schedules per agent.` };
+  const { data, error } = await client
+    .from("ap_agent_schedules")
+    .insert({
+      user_id: userId, agent_id: agent.id, every_minutes: everyMin, at_time: atTime,
+      timezone: tz, next_fire_at: new Date(nextFire).toISOString(),
+    })
+    .select("id,next_fire_at")
+    .limit(1);
+  if (error) throw error;
+  const row = (data || [])[0];
+  await _logEvent(client, {
+    userId, agentId: agent.id, kind: "action",
+    body: `schedule set: ${scheduleDesc({ every_minutes: everyMin, at_time: atTime, timezone: tz })} (next ${row.next_fire_at})`,
+  });
+  return {
+    ok: true,
+    schedule: { id: row.id, agent: agent.name, every_minutes: everyMin, at_time: atTime, timezone: tz, next_fire_at: row.next_fire_at },
+  };
+}
+
+async function _listSchedules(client, userId, { name } = {}) {
+  let q = client
+    .from("ap_agent_schedules")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .order("next_fire_at", { ascending: true })
+    .limit(100);
+  if (name) {
+    const agent = await _agentByName(client, userId, trunc(String(name), 40).trim().toLowerCase());
+    if (!agent) return { ok: false, error: "unknown_agent" };
+    q = q.eq("agent_id", agent.id);
+  }
+  const { data } = await q;
+  const nameById = await _agentNameMap(client, userId);
+  return {
+    ok: true,
+    schedules: (data || []).map((s) => ({
+      id: s.id, agent: nameById[s.agent_id] || null, every_minutes: s.every_minutes,
+      at_time: s.at_time, timezone: s.timezone, last_fired_at: s.last_fired_at,
+      next_fire_at: s.next_fire_at, fail_streak: s.fail_streak, created_at: s.created_at,
+    })),
+  };
+}
+
+async function _unschedule(client, userId, { id }) {
+  if (!id) return { ok: false, error: "bad_id" };
+  const { data } = await client.from("ap_agent_schedules").select("id,agent_id").eq("user_id", userId).eq("id", id).limit(1);
+  const row = (data || [])[0];
+  if (!row) return { ok: false, error: "unknown_schedule" };
+  await client.from("ap_agent_schedules").update({ active: false }).eq("id", row.id);
+  await _logEvent(client, { userId, agentId: row.agent_id, kind: "action", body: `schedule removed: ${String(id).slice(0, 8)}` });
+  return { ok: true, unscheduled: row.id };
+}
+
+// Fire due schedules: poke the agent's wake flag; the tick's agent loop
+// picks it up in the same pass. Returns [{scheduleId, agentId, agentName, fail_streak}].
+async function _fireDueSchedules(client, userId, nowMs) {
+  const { data: due } = await client
+    .from("ap_agent_schedules")
+    .select("id,agent_id,every_minutes,at_time,timezone,fail_streak")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .lte("next_fire_at", new Date(nowMs).toISOString())
+    .limit(50);
+  const fired = [];
+  for (const s of due || []) {
+    try {
+      const { data: agRows } = await client.from("ap_agents").select("id,name,status").eq("id", s.agent_id).limit(1);
+      const ag = (agRows || [])[0];
+      if (!ag || ag.status !== "active") {
+        // Archived agents never fire — retire the schedule quietly.
+        await client.from("ap_agent_schedules").update({ active: false }).eq("id", s.id);
+        await _logEvent(client, { userId, agentId: s.agent_id, kind: "system", body: `schedule retired: agent ${ag ? "archived" : "gone"}` });
+        continue;
+      }
+      const nextFire = s.every_minutes ? nowMs + s.every_minutes * 60000 : nextDailyFire(s.at_time, s.timezone, nowMs);
+      await client.from("ap_agents").update({ next_think_at: new Date(nowMs).toISOString() }).eq("id", ag.id);
+      await client
+        .from("ap_agent_schedules")
+        .update({ last_fired_at: new Date(nowMs).toISOString(), next_fire_at: new Date(nextFire || nowMs + 3600000).toISOString() })
+        .eq("id", s.id);
+      await _logEvent(client, {
+        userId, agentId: ag.id, kind: "system",
+        body: JSON.stringify({ schedule_fired: scheduleDesc(s), next: new Date(nextFire || 0).toISOString() }),
+      });
+      fired.push({ scheduleId: s.id, agentId: ag.id, agentName: ag.name, fail_streak: s.fail_streak || 0 });
+    } catch {
+      /* one bad schedule never breaks the sweep */
+    }
+  }
+  return fired;
+}
+
+// After the tick's agent loop: a schedule whose wake never produced a
+// successful think 3x in a row is auto-deactivated (quiet, logged).
+async function _reconcileScheduleStreaks(client, userId, fired, results) {
+  for (const f of fired) {
+    try {
+      const res = results.find((r) => r.agent === f.agentName);
+      const thinkOk = res && res.ok !== false;
+      const streak = thinkOk ? 0 : f.fail_streak + 1;
+      if (streak >= SCHEDULE_FAIL_LIMIT) {
+        await client.from("ap_agent_schedules").update({ active: false, fail_streak: streak }).eq("id", f.scheduleId);
+        await _logEvent(client, { userId, agentId: f.agentId, kind: "system", body: `schedule auto-deactivated: wake failed ${streak}x in a row` });
+      } else if (streak !== f.fail_streak) {
+        await client.from("ap_agent_schedules").update({ fail_streak: streak }).eq("id", f.scheduleId);
+      }
+    } catch {
+      /* best effort */
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* internals — single code path used by both MCP tools and the mind    */
 /* ------------------------------------------------------------------ */
 
@@ -1120,9 +1322,12 @@ RULES
   - advance_step {task_id, step_index, status, result?}: status is pending|in_progress|complete|blocked|skipped. Mark "complete" ONLY for work actually finished (files written, messages sent). Include a short "result" summary.
   - remember {key, value}: persist a fact to long-term memory.
   - spawn_subtask {title, kind?, instructions?, steps?}: create a child task for yourself.
+  - set_schedule {every_minutes?, at_time?, timezone?}: set a recurring wake-up for yourself. Exactly one of every_minutes (integer >= 15) or at_time ("HH:MM" 24h, timezone is an IANA name, default America/New_York). Offer routines conversationally first, e.g. "want me to check prices every morning at 9?".
+  - cancel_schedule {id}: cancel one of your wake-up schedules.
   - noop {}: deliberately do nothing this turn.
 - If a website task is active: build it incrementally across turns — plan in your thought, write files with write_file/append_file, advance steps as each is truly done, narrate progress.
 - If there is nothing useful to do, return {"thought": "...", "actions": [{"op": "noop"}]}.
+- Your active wake-up schedules are listed in state as "schedules" — mention them when relevant and never create duplicates.
 - Do not invent file content claimed to come from elsewhere; everything you write is your own draft.`;
 
 function parseThinkJson(text) {
@@ -1234,6 +1439,13 @@ export async function thinkAgent(agent, opts = {}) {
     .order("created_at", { ascending: true })
     .limit(1);
   const activeTask = (taskRows || [])[0] || null;
+  const { data: schedRows } = await client
+    .from("ap_agent_schedules")
+    .select("id,every_minutes,at_time,timezone,next_fire_at")
+    .eq("agent_id", agent.id)
+    .eq("active", true)
+    .order("next_fire_at", { ascending: true })
+    .limit(10);
   const userPrompt = JSON.stringify(
     {
       agent: { name: agent.name, role: agent.role, persona: trunc(agent.persona, 2000), capabilities: agent.capabilities },
@@ -1243,6 +1455,7 @@ export async function thinkAgent(agent, opts = {}) {
       active_task: activeTask
         ? { id: activeTask.id, title: activeTask.title, kind: activeTask.kind, instructions: trunc(activeTask.instructions, 1500), status: activeTask.status, steps: (activeTask.steps || []).map((s, i) => ({ index: i, title: s.title, status: s.status })) }
         : null,
+      schedules: (schedRows || []).map((s) => ({ id: s.id, every_minutes: s.every_minutes, at_time: s.at_time, timezone: s.timezone, next_fire_at: s.next_fire_at })),
     },
     null,
     1,
@@ -1360,6 +1573,9 @@ export async function thinkAgent(agent, opts = {}) {
       else if (op === "remember") r = await _rememberKV(client, userId, agent.name, a.key, a.value);
       else if (op === "spawn_subtask")
         r = await _spawnSubtask(client, userId, { agentName: agent.name, parentTaskId: a.task_id || activeTask?.id, title: a.title, kind: a.kind, instructions: a.instructions, steps: a.steps });
+      else if (op === "set_schedule")
+        r = await _createSchedule(client, userId, { agentName: agent.name, every_minutes: a.every_minutes, at_time: a.at_time, timezone: a.timezone });
+      else if (op === "cancel_schedule") r = await _unschedule(client, userId, { id: a.id });
       else if (op === "noop") r = { ok: true, noop: true };
       else {
         await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think unknown op: ${trunc(op, 40)}` });
@@ -1487,6 +1703,9 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
       break;
     }
     const { data: agents } = await client.from("ap_agents").select("*").eq("user_id", userId).eq("status", "active").limit(25);
+    // Wake-up schedules: due schedules poke next_think_at BEFORE the agent
+    // loop, so the same tick picks them up. No new cron needed.
+    const firedSchedules = await _fireDueSchedules(client, userId, now);
     for (const agent of agents || []) {
       if (Date.now() - started > timeBudgetMs || thinks >= THINKS_PER_TICK_CAP) {
         truncated = true;
@@ -1522,6 +1741,7 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
         results.push({ agent: agent.name, ok: false, error: e?.message || String(e) });
       }
     }
+    await _reconcileScheduleStreaks(client, userId, firedSchedules, results);
     if (truncated) break;
   }
   return { ok: true, users: users.length, thinks, driverSteps, truncated, results };
@@ -1575,6 +1795,9 @@ export async function agentplusFeed(userId, { since = 0, agent = null, limit = 1
   }));
   const keyOn = Boolean(llmCfg().apiKey);
   const agentsOut = [];
+  const { data: schedCountRows } = await client.from("ap_agent_schedules").select("agent_id").eq("user_id", userId).eq("active", true);
+  const schedCount = {};
+  for (const s of schedCountRows || []) schedCount[s.agent_id] = (schedCount[s.agent_id] || 0) + 1;
   const feedErrMap = await _lastThinkErrors(
     client,
     userId,
@@ -1591,6 +1814,7 @@ export async function agentplusFeed(userId, { since = 0, agent = null, limit = 1
       name: a.name,
       status: a.status,
       unread: unread || 0,
+      active_schedules: schedCount[a.id] || 0,
       mind: keyOn && a.status === "active" ? "live" : "driver",
       last_think_error: feedErrMap[a.id] || null,
     });
@@ -1741,6 +1965,10 @@ const tThink = tool("action", (a) => `think ${a.name}`, async (c, u, a) => {
   const r = await thinkAgent(agent);
   return { ...r, _agentId: agent.id };
 });
+const tSchedule = tool("action", (a) => `schedule ${a.name}`, (c, u, a) =>
+  _createSchedule(c, u, { agentName: a.name, every_minutes: a.every_minutes, at_time: a.at_time, timezone: a.timezone }));
+const tSchedules = tool("action", (a) => `schedules ${a.name || "all"}`, (c, u, a) => _listSchedules(c, u, { name: a.name }));
+const tUnschedule = tool("action", (a) => `unschedule ${trunc(String(a.id || ""), 8)}`, (c, u, a) => _unschedule(c, u, { id: a.id }));
 /* Dashboard-only: usage + digest. Read-only (quiet via the client), never
    on the MCP tool surface — AGENTPLUS_TOOLS above is untouched. */
 const tUsage = tool(null, null, (c, u) => _usageStats(c, u));
@@ -1951,6 +2179,26 @@ export const AGENTPLUS_TOOLS = [
     inputSchema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] },
   },
   {
+    name: "orbitx_agentplus_schedule",
+    description:
+      "Set a recurring wake-up for an agent — the 5-min tick pokes its mind on schedule (no new cron). Exactly one of every_minutes (integer >= 15) or at_time (\"HH:MM\" 24h). Optional timezone (IANA, default America/New_York). Max 5 active schedules per agent.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, every_minutes: { type: "number" }, at_time: { type: "string" }, timezone: { type: "string" } },
+      required: ["name"],
+    },
+  },
+  {
+    name: "orbitx_agentplus_schedules",
+    description: "List active wake-up schedules — one agent's (name) or all of yours.",
+    inputSchema: { type: "object", properties: { name: { type: "string" } } },
+  },
+  {
+    name: "orbitx_agentplus_unschedule",
+    description: "Deactivate an agent's wake-up schedule by id.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+  },
+  {
     name: "orbitx_agentplus_log",
     description: "Tail the append-only agent log, ascending, with nextCursor. Filter by agent name and/or task_id. since = last seen log id.",
     inputSchema: {
@@ -1993,6 +2241,9 @@ export function dispatchAgentPlusTools(name, args, auth) {
     case "orbitx_agentplus_build": return tBuild(auth, args);
     case "orbitx_agentplus_log": return tLog(auth, args);
     case "orbitx_agentplus_think": return tThink(auth, args);
+    case "orbitx_agentplus_schedule": return tSchedule(auth, args);
+    case "orbitx_agentplus_schedules": return tSchedules(auth, args);
+    case "orbitx_agentplus_unschedule": return tUnschedule(auth, args);
     case "orbitx_agentplus_models": return tModels(auth, args);
     case "orbitx_agentplus_usage": return tUsage(auth, args);
     case "orbitx_agentplus_digest": return tDigest(auth, args);

@@ -48,6 +48,19 @@ export interface AgentInfo {
   last_think_error?: ThinkError | null;
   thinks_today?: number;
   think_budget_per_day?: number;
+  active_schedules?: number;
+}
+
+export interface ScheduleInfo {
+  id: string;
+  agent: string | null;
+  every_minutes: number | null;
+  at_time: string | null;
+  timezone: string;
+  last_fired_at: string | null;
+  next_fire_at: string;
+  fail_streak: number;
+  created_at: string;
 }
 
 export interface AgentDetail {
