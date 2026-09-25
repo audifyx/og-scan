@@ -67,6 +67,15 @@ import {
   dispatchAppWalletTool,
   isAppWalletTool,
 } from "./orbitx/_handlers/_mcp-app-wallet.js";
+// Strategy feature families: copy-trading, trailing stops + take-profit
+// ladders, launch sniper, alert-triggered trades, PnL. Registered here (not
+// in _mcp-app-wallet.js) to avoid an ESM import cycle — they import helpers
+// from _mcp-app-wallet.js, so it must not import them back.
+import { COPY_TOOLS } from "./orbitx/_handlers/_mcp-copy.js";
+import { TRAILING_TOOLS } from "./orbitx/_handlers/_mcp-trailing.js";
+import { SNIPER_TOOLS } from "./orbitx/_handlers/_mcp-sniper.js";
+import { ALERT_TOOLS } from "./orbitx/_handlers/_mcp-alerts.js";
+import { PNL_TOOLS } from "./orbitx/_handlers/_mcp-pnl.js";
 import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
@@ -3721,6 +3730,12 @@ const CORE_TOOLS = [
   ...HUNTER_CORE_TOOLS,
   ...LIVE_CORE_TOOLS,
   ...APP_WALLET_CORE_TOOLS,
+  // Strategy families (see import note above).
+  ...COPY_TOOLS,
+  ...TRAILING_TOOLS,
+  ...SNIPER_TOOLS,
+  ...ALERT_TOOLS,
+  ...PNL_TOOLS,
 ];
 
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));

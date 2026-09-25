@@ -1496,6 +1496,15 @@ export function snapshotFromDexSources({
   pairs = [],
   now = Date.now(),
 } = {}) {
+  // Callers (e.g. the /api/ogdex/token route) pass explicit nulls when a source
+  // is missing; destructuring defaults only cover undefined. Normalize so a
+  // missing safety/intel block can't throw downstream (e.g. safety.mintAuthorityRenounced).
+  if (safety == null) safety = {};
+  if (intel == null) intel = {};
+  if (flags == null) flags = {};
+  if (meta == null) meta = {};
+  if (token == null) token = {};
+  if (pairs == null) pairs = [];
   const created =
     num(Date.parse(meta.createdAt)) ||
     num(Date.parse(token.createdAt)) ||

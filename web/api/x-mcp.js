@@ -4169,7 +4169,10 @@ async function handleAgent(req, res, parts) {
 async function handleMcp(req, res, parts) {
   const route = parts.slice(1).join("/");
 
-  // ── OrbitX limit-order auto-fill tick (external scheduler, every few minutes) ──
+  // ── OrbitX strategy engine tick (external scheduler, every few minutes) ──
+  // Was limits-only; now sweeps limit orders, copy-trading mirrors, trailing
+  // stops + take-profit ladders, the launch sniper, and alert-triggered trades.
+  // Route path stays `limits/tick` so the existing scheduler keeps working.
   if (route === "limits/tick") {
     if (req.method !== "GET" && req.method !== "POST") return json(res, { error: "method_not_allowed" }, 405);
     const cronSecret = process.env.CRON_SECRET || "";
@@ -4181,10 +4184,12 @@ async function handleMcp(req, res, parts) {
       (!cronSecret && process.env.VERCEL !== "1");
     if (!ok) return json(res, { error: "unauthorized" }, 401);
     try {
-      const { tickAllLimits } = await import("./orbitx/_handlers/_mcp-app-wallet.js");
-      return json(res, await tickAllLimits());
+      const proto = header(req, "x-forwarded-proto") || "https";
+      const host = header(req, "x-forwarded-host") || header(req, "host") || "orbitx.world";
+      const { tickAllStrategies } = await import("./orbitx/_handlers/_mcp-strategies.js");
+      return json(res, await tickAllStrategies({ base: `${proto}://${host}` }));
     } catch (e) {
-      return json(res, { error: e?.message || "limits_tick_failed" }, 500);
+      return json(res, { error: e?.message || "strategy_tick_failed" }, 500);
     }
   }
 

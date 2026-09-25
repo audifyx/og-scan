@@ -1496,6 +1496,14 @@ export function snapshotFromDexSources({
   pairs = [],
   now = Date.now(),
 } = {}) {
+  // Explicit nulls bypass destructuring defaults — normalize so missing
+  // safety/intel blocks can't throw downstream (e.g. safety.mintAuthorityRenounced).
+  if (safety == null) safety = {};
+  if (intel == null) intel = {};
+  if (flags == null) flags = {};
+  if (meta == null) meta = {};
+  if (token == null) token = {};
+  if (pairs == null) pairs = [];
   const created =
     num(Date.parse(meta.createdAt)) ||
     num(Date.parse(token.createdAt)) ||

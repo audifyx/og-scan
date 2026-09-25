@@ -13,16 +13,23 @@ import {
   SOL_MINT,
 } from "./_user-trading-wallet.js";
 import { appLaunch, appClaimFees, appBurn, APP_DESK_OPS_TOOLS } from "./_mcp-app-desk-ops.js";
+// NOTE: strategy feature modules (_mcp-copy, _mcp-trailing, _mcp-sniper,
+// _mcp-alerts, _mcp-pnl) import helpers from THIS file. This file must NOT
+// statically import them back (ESM cycle → TDZ crash when a feature module
+// is the import-graph entry). Their TOOLS arrays are registered in
+// orbitx-hub.js CORE_TOOLS; dispatch below reaches them via dynamic import
+// (module-cache hit in production).
 
 const DASH = "https://www.orbitx.world/supercomputer?tab=inapp";
-const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDC = USDC_MINT;
 
-function needAuth(auth) {
+export function needAuth(auth) {
   if (auth?.userId) return { userId: auth.userId };
   return { ok: false, error: "auth_required", dashboard: DASH, message: "Link OrbitX auth first." };
 }
 
-async function sb() {
+export async function sb() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   if (!url || !key) return null;
@@ -30,7 +37,7 @@ async function sb() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-async function tokenInfo(mint) {
+export async function tokenInfo(mint) {
   const r = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + mint, { signal: AbortSignal.timeout(8000) });
   const j = await r.json().catch(() => ({}));
   const p = (j.pairs || []).find((x) => String(x.chainId || "").toLowerCase() === "solana") || (j.pairs || [])[0] || {};
@@ -45,12 +52,12 @@ async function tokenInfo(mint) {
   };
 }
 
-async function solUsd() {
+export async function solUsd() {
   const t = await tokenInfo(SOL_MINT);
   return t.priceUsd || 110;
 }
 
-async function walletRow(userId) {
+export async function walletRow(userId) {
   return getUserWallet(userId);
 }
 
@@ -82,7 +89,7 @@ function receipt({ side, info, usd, signature, owner, payWith }) {
   };
 }
 
-async function tokenBalance(owner, mint) {
+export async function tokenBalance(owner, mint) {
   const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
   const rpc = key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
   const r = await fetch(rpc, {
@@ -357,7 +364,7 @@ export async function tickUserLimits(userId) {
       attempts,
       lastCheckAt: new Date().toISOString(),
       ...(status !== "open"
-        ? { filledAt: new Date().toISOString(), lastFill: { ok: !!fill?.ok, error: fill?.error || null, message: fill?.message || null, signature: fill?.signature || null } }
+        ? { filledAt: new Date().toISOString(), lastFill: { ok: !!fill?.ok, error: fill?.error || null, message: fill?.message || null, signature: fill?.signature || null, priceUsd: info?.priceUsd ?? null, size: o.size || null } }
         : { lastError: fill?.error || fill?.message || null }),
     };
     try {
@@ -430,6 +437,28 @@ export async function dispatchAppWalletTool(name, args, auth) {
   if (name === "orbitx_app_launch") return appLaunch(auth, args || {});
   if (name === "orbitx_app_claim" || name === "orbitx_app_claim_fees") return appClaimFees(auth, args || {});
   if (name === "orbitx_app_burn") return appBurn(auth, args || {});
+  // Strategy families: copy-trading, trailing stops + ladders, sniper,
+  // alerts, PnL. Dynamic import so a broken strategy module can never
+  // take down the core trading dispatcher.
+  const strategyDispatchers = [
+    ["./_mcp-copy.js", "dispatchCopyTools"],
+    ["./_mcp-trailing.js", "dispatchTrailingTools"],
+    ["./_mcp-sniper.js", "dispatchSniperTools"],
+    ["./_mcp-alerts.js", "dispatchAlertTools"],
+    ["./_mcp-pnl.js", "dispatchPnlTools"],
+  ];
+  for (const [modPath, fnName] of strategyDispatchers) {
+    try {
+      const mod = await import(modPath);
+      const fn = mod[fnName];
+      if (typeof fn === "function") {
+        const out = await fn(name, args, auth);
+        if (out) return out;
+      }
+    } catch {
+      /* strategy module failure is isolated; core tools keep working */
+    }
+  }
   return null;
 }
 
