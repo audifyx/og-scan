@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
             (spawn | task | send | remember | inbox | get | recall | tasks |
              files | file | think | models)   — read-only views pass quiet:true
    EXPORT:  GET  /api/x-mcp?path=agentplus/export&agent=<name>&kind=log|thoughts
-                 (markdown download) | &kind=files|file&task_id=<id>[&path=<p>]
+                 (markdown download) | &kind=files|file&task_id=<id>[&fpath=<p>]
    Auth: Authorization: Bearer <supabase access_token>
    ────────────────────────────────────────────────────────────────────── */
 

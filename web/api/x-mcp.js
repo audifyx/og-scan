@@ -4268,9 +4268,11 @@ async function handleMcp(req, res, parts) {
     }
   }
 
-  // Export: GET agentplus/export?agent=<name>&kind=log|thoughts|files|file&task_id=<id>&path=<p>
+  // Export: GET agentplus/export?agent=<name>&kind=log|thoughts|files|file&task_id=<id>&fpath=<p>
   // kind=log|thoughts → downloadable markdown; kind=files|file → JSON for the
   // dashboard file browser / website preview pane. Same auth as feed/command.
+  // NOTE: the file path param is `fpath`, NOT `path` — `?path=` carries the
+  // route itself (agentplus/export) and would shadow it.
   if (route === "agentplus/export" && req.method === "GET") {
     const authUser = await agentplusAuth(req);
     if (!authUser) return json(res, { error: "unauthorized" }, 401);
@@ -4281,7 +4283,7 @@ async function handleMcp(req, res, parts) {
         agent: (u.searchParams.get("agent") || "").trim() || null,
         kind: (u.searchParams.get("kind") || "log").trim(),
         task_id: (u.searchParams.get("task_id") || "").trim() || null,
-        path: (u.searchParams.get("path") || "").trim() || null,
+        path: (u.searchParams.get("fpath") || "").trim() || null,
       });
       if (!out || out.ok === false) return json(res, out || { ok: false, error: "export_failed" }, 400);
       if (out.download) {
