@@ -1242,6 +1242,21 @@ async function getAuthUser(req) {
   return { id: u.id, email: u.email || null };
 }
 
+// Auth for the AgentPlus feed/command branches: Bearer CRON_SECRET
+// (scheduler; the user comes from ?user= or the POST body) or a Supabase
+// user JWT validated via /auth/v1/user. Returns { userId } or null.
+async function agentplusAuth(req, bodyUser) {
+  const authz = String(header(req, "authorization") || "");
+  const cronSecret = process.env.CRON_SECRET || "";
+  if (cronSecret && authz === `Bearer ${cronSecret}`) {
+    const u = new URL(req.url || "/", "http://x");
+    const user = String(u.searchParams.get("user") || bodyUser || "").trim();
+    return user ? { userId: user } : null;
+  }
+  const au = await getAuthUser(req);
+  return au ? { userId: au.id } : null;
+}
+
 async function ensureAgent(userId) {
   const existing = await sb(
     `agents?user_id=eq.${encodeURIComponent(userId)}&order=created_at.asc&limit=1&select=*`,
@@ -4187,9 +4202,62 @@ async function handleMcp(req, res, parts) {
       const proto = header(req, "x-forwarded-proto") || "https";
       const host = header(req, "x-forwarded-host") || header(req, "host") || "orbitx.world";
       const { tickAllStrategies } = await import("./orbitx/_handlers/_mcp-strategies.js");
-      return json(res, await tickAllStrategies({ base: `${proto}://${host}` }));
+      const out = await tickAllStrategies({ base: `${proto}://${host}` });
+      // AgentPlus substrate tick: event-driven + heartbeat mind loop (or
+      // deterministic driver bookkeeping when no LLM key is configured).
+      // Never allowed to throw the whole tick.
+      try {
+        const { tickAgentPlus } = await import("./orbitx/_handlers/_mcp-agentplus.js");
+        out.agentplus = await tickAgentPlus({ base: `${proto}://${host}` });
+      } catch (e) {
+        out.agentplus = { ok: false, error: e?.message || "agentplus_tick_failed" };
+      }
+      return json(res, out);
     } catch (e) {
       return json(res, { error: e?.message || "strategy_tick_failed" }, 500);
+    }
+  }
+
+  // ── AgentPlus: autonomous-agent substrate feed + command ──
+  // Feed: GET agentplus/feed?since=<log id>&agent=<name>&limit=<n>&user=<id>
+  // Command: POST agentplus/command {action, ...params}
+  // Auth: Bearer CRON_SECRET (scheduler; user via ?user= or body.user) OR a
+  // Supabase user JWT validated via GET ${SUPA_URL}/auth/v1/user.
+  if (route === "agentplus/feed" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    const u = new URL(req.url || "/", "http://x");
+    const since = Math.max(0, Number(u.searchParams.get("since") || 0) || 0);
+    const agent = (u.searchParams.get("agent") || "").trim() || null;
+    const limit = Math.min(500, Math.max(1, Number(u.searchParams.get("limit") || 100) || 100));
+    try {
+      const { agentplusFeed } = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await agentplusFeed(authUser.userId, { since, agent, limit }));
+    } catch (e) {
+      return json(res, { error: e?.message || "agentplus_feed_failed" }, 500);
+    }
+  }
+
+  if (route === "agentplus/command" && req.method === "POST") {
+    const body = await readBody(req);
+    const authUser = await agentplusAuth(req, body && body.user);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    const action = String(body.action || "").trim().toLowerCase();
+    const COMMAND_TOOLS = {
+      spawn: "orbitx_agentplus_spawn",
+      task: "orbitx_agentplus_task",
+      send: "orbitx_agentplus_send",
+      remember: "orbitx_agentplus_remember",
+      inbox: "orbitx_agentplus_inbox",
+    };
+    const toolName = COMMAND_TOOLS[action];
+    if (!toolName) return json(res, { ok: false, error: "bad_action", actions: Object.keys(COMMAND_TOOLS) }, 400);
+    try {
+      const { dispatchAgentPlusTools } = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      const out = await dispatchAgentPlusTools(toolName, body, { userId: authUser.userId });
+      return json(res, out || { ok: false, error: "dispatch_failed" });
+    } catch (e) {
+      return json(res, { ok: false, error: e?.message || "agentplus_command_failed" }, 500);
     }
   }
 

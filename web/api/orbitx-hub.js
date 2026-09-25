@@ -76,6 +76,7 @@ import { TRAILING_TOOLS } from "./orbitx/_handlers/_mcp-trailing.js";
 import { SNIPER_TOOLS } from "./orbitx/_handlers/_mcp-sniper.js";
 import { ALERT_TOOLS } from "./orbitx/_handlers/_mcp-alerts.js";
 import { PNL_TOOLS } from "./orbitx/_handlers/_mcp-pnl.js";
+import { AGENTPLUS_TOOLS } from "./orbitx/_handlers/_mcp-agentplus.js";
 import {
   ORBITX_MINT,
   askBuyOrbitxAmount,
@@ -3736,6 +3737,7 @@ const CORE_TOOLS = [
   ...SNIPER_TOOLS,
   ...ALERT_TOOLS,
   ...PNL_TOOLS,
+  ...AGENTPLUS_TOOLS,
 ];
 
 const _coreNames = new Set(CORE_TOOLS.map((t) => t.name));

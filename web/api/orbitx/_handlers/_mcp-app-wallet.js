@@ -446,6 +446,7 @@ export async function dispatchAppWalletTool(name, args, auth) {
     ["./_mcp-sniper.js", "dispatchSniperTools"],
     ["./_mcp-alerts.js", "dispatchAlertTools"],
     ["./_mcp-pnl.js", "dispatchPnlTools"],
+    ["./_mcp-agentplus.js", "dispatchAgentPlusTools"],
   ];
   for (const [modPath, fnName] of strategyDispatchers) {
     try {
@@ -463,7 +464,8 @@ export async function dispatchAppWalletTool(name, args, auth) {
 }
 
 export function isAppWalletTool(name) {
-  return String(name || "").startsWith("orbitx_app_");
+  const n = String(name || "");
+  return n.startsWith("orbitx_app_") || n.startsWith("orbitx_agentplus_");
 }
 
 const authCode = { type: "string" };

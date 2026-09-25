@@ -38,6 +38,7 @@ import Tokens from "./pages/Tokens";
 import Tools from "./pages/Tools";
 // AdvancedTools removed
 import AlphaChat from "./pages/AlphaChat";
+import AgentPlus from "./pages/AgentPlus";
 // Credits page removed
 // Webhooks removed
 import TradingLobbies from "./pages/TradingLobbies";
@@ -720,6 +721,8 @@ const App = () => (
             <Route path="/supercomputer/create-token" element={<AgentCreateTokenPage />} />
             <Route path="/supercomputer/nft-mint" element={<AgentNftMintPage />} />
             <Route path="/supercomputer/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
+            {/* ── AgentPlus — autonomous agent fleet ── */}
+            <Route path="/agentplus" element={<AgentPlus />} />
             <Route path="/:toolSlug" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
