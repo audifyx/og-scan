@@ -3,7 +3,8 @@
  *
  * HONEST MODEL: MCP provides the agent substrate (identity, memory, inbox,
  * append-only log, file workspace, task queue). The mind is whichever LLM
- * drives these tools. When AGENT_LLM_API_KEY is configured, thinkAgent() runs
+ * drives these tools. When an LLM key is configured (AGENT_LLM_API_KEY, or
+ * NVIDIA_API_KEY as fallback), thinkAgent() runs
  * a server-side reasoning loop (the "live" mind): it reads state, thinks in
  * strict JSON, and executes actions through the SAME internal functions the
  * MCP tools use — one code path, never a parallel implementation. Without a
@@ -30,13 +31,25 @@ const FILE_CONTENT_MAX = 2000000;
 const MIND_CONTENT_MAX = 200000;
 const DB_DOWN = { ok: false, error: "db_unavailable", message: "Agent store unreachable. Retry in a minute." };
 
-// Mind loop config (env).
-const llmCfg = () => ({
-  apiKey: String(process.env.AGENT_LLM_API_KEY || "").trim(),
-  model: String(process.env.AGENT_LLM_MODEL || "").trim() || "anthropic/claude-sonnet-4.6",
-  baseUrl:
-    String(process.env.AGENT_LLM_BASE_URL || "").trim().replace(/\/+$/, "") || "https://api.openai.com/v1",
-});
+// Mind loop config (env). AGENT_LLM_API_KEY wins when set; NVIDIA_API_KEY
+// (nvapi-*, NVIDIA NIM, OpenAI-compatible) is the fallback so Aiden's existing
+// Vercel env just works. Model/baseUrl follow the key source unless overridden.
+// Never log the key value.
+const llmCfg = () => {
+  const explicit = String(process.env.AGENT_LLM_API_KEY || "").trim();
+  const nvidiaKey = String(process.env.NVIDIA_API_KEY || "").trim();
+  const apiKey = explicit || nvidiaKey;
+  const nvidia = !explicit && (nvidiaKey.startsWith("nvapi-") || nvidiaKey.length > 0);
+  return {
+    apiKey,
+    model:
+      String(process.env.AGENT_LLM_MODEL || "").trim() ||
+      (nvidia ? "nvidia/llama-3.1-nemotron-70b-instruct" : "anthropic/claude-sonnet-4.6"),
+    baseUrl:
+      String(process.env.AGENT_LLM_BASE_URL || "").trim().replace(/\/+$/, "") ||
+      (nvidia ? "https://integrate.api.nvidia.com/v1" : "https://api.openai.com/v1"),
+  };
+};
 const THINK_TIMEOUT_MS = 55000;
 const THINK_MAX_TOKENS = 1000;
 const MAX_ACTIONS_PER_THINK = 5;
@@ -1186,7 +1199,7 @@ export const AGENTPLUS_TOOLS = [
   },
   {
     name: "orbitx_agentplus_think",
-    description: "Force an agent's server-side mind to think immediately (budget and key checks apply; without AGENT_LLM_API_KEY returns skipped:'no_key' — drive it externally instead).",
+    description: "Force an agent's server-side mind to think immediately (budget and key checks apply; without a configured LLM key (AGENT_LLM_API_KEY or NVIDIA_API_KEY) returns skipped:'no_key' — drive it externally instead).",
     inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
   },
 ];
