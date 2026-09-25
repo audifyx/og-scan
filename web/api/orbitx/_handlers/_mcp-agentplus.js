@@ -710,9 +710,11 @@ function parseThinkJson(text) {
   }
   // Balanced-brace extraction: find the first '{' and walk depth, respecting
   // strings and escapes, so trailing prose or a second object can't corrupt it.
-  const start = t.indexOf("{");
-  if (start >= 0) {
-    let depth = 0, inStr = false, esc = false;
+  // If the first balanced span doesn't parse (e.g. "{ { ..."), re-anchor at
+  // the next '{' and keep looking.
+  let start = t.indexOf("{");
+  while (start >= 0) {
+    let depth = 0, inStr = false, esc = false, end = -1;
     for (let i = start; i < t.length; i++) {
       const ch = t[i];
       if (inStr) {
@@ -725,15 +727,14 @@ function parseThinkJson(text) {
         depth++;
       } else if (ch === "}") {
         depth--;
-        if (depth === 0) {
-          try {
-            return JSON.parse(t.slice(start, i + 1));
-          } catch {
-            /* keep scanning for a later balanced object */
-            depth = 0;
-          }
-        }
+        if (depth === 0) { end = i; break; }
       }
+    }
+    if (end < 0) break;
+    try {
+      return JSON.parse(t.slice(start, end + 1));
+    } catch {
+      start = t.indexOf("{", start + 1);
     }
   }
   return null;
@@ -803,7 +804,8 @@ export async function thinkAgent(agent, opts = {}) {
   // 5-6. Call the LLM (OpenAI-compatible chat completions).
   // NVIDIA NIM 404s ("Function '<uuid>': Not found for account") when the model
   // isn't provisioned for the key's account — the catalog is not the grant. On a
-  // 404 OR an unparseable envelope (bad_json) we try the next candidate once
+  // 404, a transport failure (e.g. timeout on a slow model), OR an
+  // unparseable envelope (bad_json) all move to the next candidate once
   // before failing, unless the user pinned a model explicitly (AGENT_LLM_MODEL
   // or per-agent override). Every attempt is logged. Total LLM time is capped
   // at timeoutMs across attempts so the 60s function limit can't be blown.
@@ -845,6 +847,9 @@ export async function thinkAgent(agent, opts = {}) {
     if (error) {
       await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think transport failed (${cand}): ${trunc(error?.message || String(error), 300)}` });
       lastErr = { ok: false, error: "llm_unreachable", message: error?.message || String(error) };
+      // Transport failure (e.g. timeout on a slow model) → try the fallback
+      // too, unless the model was pinned.
+      if (!modelPinned) continue;
       break;
     }
     if (!resp.ok) {
