@@ -691,6 +691,122 @@ async function _tailLog(client, userId, { name, task_id, since, limit }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Dashboard-only aggregates (NOT on the MCP tool surface — reachable    */
+/* only via the agentplus/command dashboard branch)                     */
+/* ------------------------------------------------------------------ */
+
+async function _agentNameMap(client, userId) {
+  const { data } = await client.from("ap_agents").select("id,name").eq("user_id", userId);
+  const map = {};
+  for (const a of data || []) map[a.id] = a.name;
+  return map;
+}
+
+// Token usage aggregated from kind='system' think receipts
+// ({think:true, model, prompt_tokens, completion_tokens, ms}).
+async function _usageStats(client, userId) {
+  const nameById = await _agentNameMap(client, userId);
+  const { data } = await client
+    .from("ap_agent_logs")
+    .select("agent_id,body,created_at")
+    .eq("user_id", userId)
+    .eq("kind", "system")
+    .order("id", { ascending: false })
+    .limit(2000);
+  const per = {};
+  const daily = {};
+  for (const r of data || []) {
+    let j;
+    try {
+      j = JSON.parse(r.body);
+    } catch {
+      continue;
+    }
+    if (!j || j.think !== true) continue;
+    const name = nameById[r.agent_id] || "unknown";
+    const p = per[name] || (per[name] = { agent: name, thinks: 0, prompt_tokens: 0, completion_tokens: 0, ms: 0, models: {} });
+    p.thinks++;
+    p.prompt_tokens += Number(j.prompt_tokens) || 0;
+    p.completion_tokens += Number(j.completion_tokens) || 0;
+    p.ms += Number(j.ms) || 0;
+    if (j.model) p.models[j.model] = (p.models[j.model] || 0) + 1;
+    const day = String(r.created_at).slice(0, 10);
+    const d = daily[day] || (daily[day] = { day, thinks: 0, tokens: 0 });
+    d.thinks++;
+    d.tokens += (Number(j.prompt_tokens) || 0) + (Number(j.completion_tokens) || 0);
+  }
+  const agents = Object.values(per)
+    .map((p) => ({ ...p, total_tokens: p.prompt_tokens + p.completion_tokens, models: Object.keys(p.models) }))
+    .sort((a, b) => b.total_tokens - a.total_tokens);
+  const totals = agents.reduce(
+    (a, p) => ({
+      thinks: a.thinks + p.thinks,
+      prompt_tokens: a.prompt_tokens + p.prompt_tokens,
+      completion_tokens: a.completion_tokens + p.completion_tokens,
+      total_tokens: a.total_tokens + p.total_tokens,
+      ms: a.ms + p.ms,
+    }),
+    { thinks: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, ms: 0 },
+  );
+  const days = Object.values(daily)
+    .sort((a, b) => (a.day < b.day ? -1 : 1))
+    .slice(-14);
+  return { ok: true, agents, totals, daily: days };
+}
+
+// "While you were away" — event counts since a timestamp (epoch ms or ISO).
+async function _digestStats(client, userId, { since }) {
+  let sinceIso = new Date(0).toISOString();
+  if (since) {
+    const n = Number(since);
+    const d = new Date(Number.isFinite(n) && n > 0 ? n : String(since));
+    if (!Number.isNaN(d.getTime())) sinceIso = d.toISOString();
+  }
+  const nameById = await _agentNameMap(client, userId);
+  const { data } = await client
+    .from("ap_agent_logs")
+    .select("agent_id,kind,body,created_at")
+    .eq("user_id", userId)
+    .gte("created_at", sinceIso)
+    .order("id", { ascending: true })
+    .limit(2000);
+  const totals = { thoughts: 0, files: 0, errors: 0, actions: 0, builds: 0, deploys: 0, messages: 0, steps_advanced: 0 };
+  const perAgent = {};
+  const bump = (name, kind) => {
+    const p = perAgent[name] || (perAgent[name] = { agent: name, thoughts: 0, files: 0, errors: 0, actions: 0 });
+    if (p[kind] !== undefined) p[kind]++;
+  };
+  for (const r of data || []) {
+    const name = nameById[r.agent_id] || "unknown";
+    const k = r.kind;
+    if (k === "thought") {
+      totals.thoughts++;
+      bump(name, "thoughts");
+    } else if (k === "file") {
+      totals.files++;
+      bump(name, "files");
+    } else if (k === "error") {
+      totals.errors++;
+      bump(name, "errors");
+    } else if (k === "build") totals.builds++;
+    else if (k === "deploy") totals.deploys++;
+    else if (k === "message") totals.messages++;
+    else if (k === "action") {
+      totals.actions++;
+      bump(name, "actions");
+      if (String(r.body || "").includes("advance_step")) totals.steps_advanced++;
+    }
+  }
+  return {
+    ok: true,
+    since: sinceIso,
+    totals,
+    per_agent: Object.values(perAgent).sort((a, b) => b.thoughts + b.files - (a.thoughts + a.files)),
+    agents_active: Object.keys(perAgent).length,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* the mind — server-side LLM reasoning loop                          */
 /* ------------------------------------------------------------------ */
 
@@ -1293,6 +1409,10 @@ const tThink = tool("action", (a) => `think ${a.name}`, async (c, u, a) => {
   const r = await thinkAgent(agent);
   return { ...r, _agentId: agent.id };
 });
+/* Dashboard-only: usage + digest. Read-only (quiet via the client), never
+   on the MCP tool surface — AGENTPLUS_TOOLS above is untouched. */
+const tUsage = tool(null, null, (c, u) => _usageStats(c, u));
+const tDigest = tool(null, null, (c, u, a) => _digestStats(c, u, { since: a.since }));
 /* Diagnostic: list model IDs the configured key can actually call.
    NVIDIA NIM 404s at chat time for models not provisioned on the key's
    account ("the catalog is not the grant") — probe before picking
@@ -1495,6 +1615,8 @@ export function dispatchAgentPlusTools(name, args, auth) {
     case "orbitx_agentplus_log": return tLog(auth, args);
     case "orbitx_agentplus_think": return tThink(auth, args);
     case "orbitx_agentplus_models": return tModels(auth, args);
+    case "orbitx_agentplus_usage": return tUsage(auth, args);
+    case "orbitx_agentplus_digest": return tDigest(auth, args);
     default: return null;
   }
 }

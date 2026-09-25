@@ -4256,6 +4256,9 @@ async function handleMcp(req, res, parts) {
       file: "orbitx_agentplus_file",
       think: "orbitx_agentplus_think",
       models: "orbitx_agentplus_models",
+      usage: "orbitx_agentplus_usage",
+      digest: "orbitx_agentplus_digest",
+      archive: "orbitx_agentplus_archive",
     };
     const toolName = COMMAND_TOOLS[action];
     if (!toolName) return json(res, { ok: false, error: "bad_action", actions: Object.keys(COMMAND_TOOLS) }, 400);
