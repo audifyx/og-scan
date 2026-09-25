@@ -4230,9 +4230,10 @@ async function handleMcp(req, res, parts) {
     const since = Math.max(0, Number(u.searchParams.get("since") || 0) || 0);
     const agent = (u.searchParams.get("agent") || "").trim() || null;
     const limit = Math.min(500, Math.max(1, Number(u.searchParams.get("limit") || 100) || 100));
+    const includeArchived = u.searchParams.get("archived") === "1";
     try {
       const { agentplusFeed } = await import("./orbitx/_handlers/_mcp-agentplus.js");
-      return json(res, await agentplusFeed(authUser.userId, { since, agent, limit }));
+      return json(res, await agentplusFeed(authUser.userId, { since, agent, limit, include_archived: includeArchived }));
     } catch (e) {
       return json(res, { error: e?.message || "agentplus_feed_failed" }, 500);
     }

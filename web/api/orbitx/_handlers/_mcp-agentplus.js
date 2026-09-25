@@ -764,6 +764,10 @@ async function _digestStats(client, userId, { since }) {
     if (!Number.isNaN(d.getTime())) sinceIso = d.toISOString();
   }
   const nameById = await _agentNameMap(client, userId);
+  // Digest reflects the LIVE fleet only: archived scratch agents' stale
+  // error events (e.g. bake-off llm_404s) must never surface as problems.
+  const { data: statusRows } = await client.from("ap_agents").select("id,status").eq("user_id", userId);
+  const archivedIds = new Set((statusRows || []).filter((a) => a.status !== "active").map((a) => a.id));
   const { data } = await client
     .from("ap_agent_logs")
     .select("agent_id,kind,body,created_at")
@@ -778,6 +782,7 @@ async function _digestStats(client, userId, { since }) {
     if (p[kind] !== undefined) p[kind]++;
   };
   for (const r of data || []) {
+    if (archivedIds.has(r.agent_id)) continue; // stale history from dead agents
     const name = nameById[r.agent_id] || "unknown";
     const k = r.kind;
     if (k === "thought") {
@@ -1227,7 +1232,7 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
 /* feed for the /agentplus tab                                        */
 /* ------------------------------------------------------------------ */
 
-export async function agentplusFeed(userId, { since = 0, agent = null, limit = 100 } = {}) {
+export async function agentplusFeed(userId, { since = 0, agent = null, limit = 100, include_archived = false } = {}) {
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
   const lim = Math.min(500, Math.max(1, Number(limit) || 100));
@@ -1254,6 +1259,12 @@ export async function agentplusFeed(userId, { since = 0, agent = null, limit = 1
     .order("id", { ascending: true })
     .limit(lim);
   if (agentIdFilter) q = q.eq("agent_id", agentIdFilter);
+  else if (!include_archived) {
+    // Live fleet only: archived agents' stale events (e.g. bake-off llm_404s)
+    // stay out of the Activity timeline by default.
+    const activeIds = list.filter((a) => a.status === "active").map((a) => a.id);
+    q = q.in("agent_id", activeIds.length ? activeIds : ["00000000-0000-0000-0000-000000000000"]);
+  }
   const { data: logs } = await q;
   const events = (logs || []).map((l) => ({
     id: l.id,
@@ -1446,7 +1457,35 @@ const tModels = tool("action", "probe llm models", async (c, u) => {
   } catch {
     /* leave empty */
   }
-  return { ok: true, baseUrl: cfg.baseUrl, defaultModel: cfg.model, count: ids.length, models: ids.slice(0, 200) };
+  // Verified status: the latest successful think receipt for the single mind
+  // model proves the key can actually chat with it (catalog != chat grant).
+  let lastVerified = null;
+  try {
+    const { data: lastSys } = await c
+      .from("ap_agent_logs")
+      .select("body,created_at")
+      .eq("user_id", u)
+      .eq("kind", "system")
+      .order("id", { ascending: false })
+      .limit(1);
+    const row = (lastSys || [])[0];
+    if (row) {
+      let jb = null;
+      try { jb = JSON.parse(row.body); } catch { /* ignore */ }
+      if (jb && jb.think === true && jb.model === cfg.model) {
+        lastVerified = {
+          at: row.created_at,
+          ok: true,
+          ms: jb.ms ?? null,
+          prompt_tokens: jb.prompt_tokens ?? null,
+          completion_tokens: jb.completion_tokens ?? null,
+        };
+      }
+    }
+  } catch {
+    /* verification unavailable */
+  }
+  return { ok: true, baseUrl: cfg.baseUrl, defaultModel: cfg.model, count: ids.length, models: ids.slice(0, 200), lastVerified };
 });
 
 export const AGENTPLUS_TOOLS = [

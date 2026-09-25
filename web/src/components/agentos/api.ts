@@ -121,6 +121,13 @@ export interface ModelsProbe {
   error?: string;
   message?: string;
   hint?: string;
+  lastVerified?: {
+    at?: string;
+    ok?: boolean;
+    ms?: number | null;
+    prompt_tokens?: number | null;
+    completion_tokens?: number | null;
+  } | null;
 }
 
 export interface UsageAgent {

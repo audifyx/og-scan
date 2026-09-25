@@ -669,26 +669,45 @@ function InspectorAgent({ name, thinkBusy, onThink, onArchive, onOpenTask, unrea
       </div>
 
       <div className="rounded-lg bg-black/30 p-3 ring-1 ring-white/5">
-        <SectionTitle icon={Cpu}>LLM models</SectionTitle>
+        <SectionTitle icon={Cpu}>Mind model</SectionTitle>
         <p className="mb-2 text-[10px] leading-relaxed text-zinc-600">
-          Probe which model IDs this key can actually call. The key itself is never shown.
+          One model for every agent — per-agent model overrides are retired. The key itself is never shown.
         </p>
         <button onClick={probeModels} disabled={probeLoading} className={cn(btnGhost, "w-full")}>
-          {probeLoading ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Probe available models
+          {probeLoading ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Verify mind model
         </button>
         {probe && (
           <div className="mt-2 rounded-lg bg-black/40 p-2 text-[10px] ring-1 ring-white/5">
             {probe.ok ? (
               <>
-                <div className="mb-1 font-mono text-zinc-400">{probe.count} models</div>
-                <div className="mb-1 text-zinc-500">default: <span className="font-mono text-emerald-300">{probe.defaultModel}</span></div>
-                <div className="max-h-32 space-y-0.5 overflow-y-auto font-mono">
-                  {(probe.models || []).slice(0, 30).map((m) => (
-                    <div key={m} className={cn("truncate rounded px-1.5 py-0.5", m === probe.defaultModel ? "bg-emerald-400/10 text-emerald-300" : "text-zinc-400")} title={m}>
-                      {m}
-                    </div>
-                  ))}
+                <div className="mb-1 flex items-center gap-1.5">
+                  <Brain size={11} className="shrink-0 text-emerald-300" />
+                  <span className="min-w-0 flex-1 truncate font-mono text-emerald-300" title={probe.defaultModel}>{probe.defaultModel}</span>
                 </div>
+                {probe.lastVerified?.ok ? (
+                  <div className="mb-1 text-zinc-500">
+                    <span className="font-semibold text-emerald-300">verified working</span>
+                    {" — last successful think "}
+                    <span className="font-mono text-zinc-400">{timeAgo(probe.lastVerified.at || "")}</span>
+                    {typeof probe.lastVerified.ms === "number" && (
+                      <span className="font-mono text-zinc-600"> · {(probe.lastVerified.ms / 1000).toFixed(1)}s</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mb-1 text-amber-300/80">No successful think recorded for this model yet.</div>
+                )}
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-zinc-600 hover:text-zinc-400">
+                    Raw provider catalog ({probe.count} IDs — most 404 at chat time)
+                  </summary>
+                  <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto font-mono">
+                    {(probe.models || []).slice(0, 30).map((m) => (
+                      <div key={m} className={cn("truncate rounded px-1.5 py-0.5", m === probe.defaultModel ? "bg-emerald-400/10 text-emerald-300" : "text-zinc-400")} title={m}>
+                        {m}
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </>
             ) : (
               <div className="text-red-300"><span className="font-mono font-bold">{probe.error}</span> — {probe.message}</div>

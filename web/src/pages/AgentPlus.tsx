@@ -2,7 +2,7 @@
    Full-screen ops console: rail nav (Fleet, Activity, Tasks, Files,
    Messages, Usage), right inspector panel, Cmd+K palette, spawn wizard,
    "while you were away" digest, token usage telemetry. */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Bot,
@@ -81,12 +81,12 @@ const AgentPlus = () => {
   const [dispatchAgent, setDispatchAgent] = useState<string | undefined>(undefined);
   const [thinkBusy, setThinkBusy] = useState<string | null>(null);
   const [messagePeer, setMessagePeer] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "err" | "warn"; text: string } | null>(null);
 
   const cursorRef = useRef("");
   const seenIds = useRef<Set<string | number>>(new Set());
 
-  const flash = (kind: "ok" | "err", text: string) => {
+  const flash = (kind: "ok" | "err" | "warn", text: string) => {
     setNotice({ kind, text });
     window.setTimeout(() => setNotice(null), 5000);
   };
@@ -179,12 +179,17 @@ const AgentPlus = () => {
   }, []);
 
   /* ── actions ── */
+  // Actionable surfaces (Cmd+K, dispatch, activity filter) only ever see the
+  // live fleet — archived agents' stale errors must not look like problems.
+  const activeAgents = useMemo(() => agents.filter((a) => a.status === "active"), [agents]);
   const handleThinkNow = async (name: string) => {
     if (thinkBusy) return;
     setThinkBusy(name);
     try {
       const j = await postCommand({ action: "think", name });
-      if (j.ok) flash("ok", `Think complete for ${name}${j.usedModel ? ` (${j.usedModel})` : ""}.`);
+      if (j.skipped === "archived") flash("warn", `"${name}" is archived — its mind is stopped. Nothing to think.`);
+      else if (j.skipped) flash("warn", `Think skipped for ${name} (${j.skipped}).`);
+      else if (j.ok) flash("ok", `Think complete for ${name}${j.usedModel ? ` (${j.usedModel})` : ""}.`);
       else flash("err", `Think failed: ${j.error || "unknown"}`);
     } catch (err) {
       flash("err", err instanceof Error ? err.message : "Think failed");
@@ -277,7 +282,7 @@ const AgentPlus = () => {
   }
 
   const online = feedState === "live";
-  const rosterErrorCount = agents.filter((a) => a.last_think_error).length;
+  const rosterErrorCount = activeAgents.filter((a) => a.last_think_error).length;
   const totalUnread = agents.reduce((s, a) => s + (a.unread || 0), 0);
   const inspectorAgent = selection?.type === "agent" ? selection.agent : null;
 
@@ -356,7 +361,11 @@ const AgentPlus = () => {
             <div
               className={cn(
                 "border-t px-4 py-2 text-xs",
-                notice.kind === "ok" ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-300" : "border-red-400/20 bg-red-400/5 text-red-300",
+                notice.kind === "ok"
+                  ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-300"
+                  : notice.kind === "warn"
+                    ? "border-amber-400/20 bg-amber-400/5 text-amber-300"
+                    : "border-red-400/20 bg-red-400/5 text-red-300",
               )}
             >
               {notice.text}
@@ -404,7 +413,7 @@ const AgentPlus = () => {
                   />
                 )}
                 {view === "activity" && (
-                  <Activity agents={agents} events={events} expandedFiles={expandedFiles} onToggleFile={toggleFile} />
+                  <Activity agents={activeAgents} events={events} expandedFiles={expandedFiles} onToggleFile={toggleFile} />
                 )}
                 {view === "tasks" && (
                   <TasksView
@@ -478,7 +487,7 @@ const AgentPlus = () => {
         <SpawnWizard open={spawnOpen} onClose={() => setSpawnOpen(false)} onSpawned={handleSpawned} />
         <DispatchModal
           open={dispatchOpen}
-          agents={agents}
+          agents={activeAgents}
           presetAgent={dispatchAgent}
           onClose={() => setDispatchOpen(false)}
           onDispatched={handleDispatched}
@@ -486,7 +495,7 @@ const AgentPlus = () => {
         <CommandPalette
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}
-          agents={agents}
+          agents={activeAgents}
           tasks={allTasks}
           onThink={handleThinkNow}
           onSpawn={() => setSpawnOpen(true)}
