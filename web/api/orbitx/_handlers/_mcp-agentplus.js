@@ -794,6 +794,9 @@ export async function thinkAgent(agent, opts = {}) {
           ],
           temperature: 0.7,
           max_tokens: THINK_MAX_TOKENS,
+          // Force strict JSON: the think loop parses the envelope with
+          // parseThinkJson, and some instruct models narrate otherwise.
+          response_format: { type: "json_object" },
         }),
         signal: AbortSignal.timeout(timeoutMs),
       });
