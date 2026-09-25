@@ -29,6 +29,7 @@ import {
   MoonStar,
   Clock,
   Trash2,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -471,6 +472,101 @@ export function CommandPalette({ open, onClose, agents, tasks, onThink, onSpawn,
 
 /* ── inspector (right panel / mobile sheet) ── */
 
+interface PaperPosition {
+  mint: string;
+  symbol: string;
+  tokens: number;
+  avg_price: number;
+  price_usd: number | null;
+  value_usdc: number | null;
+  unrealized_pnl_usdc: number | null;
+}
+interface PaperPortfolio {
+  cash_usdc: number;
+  positions: PaperPosition[];
+  realized_pnl_usdc: number;
+  unrealized_pnl_usdc: number;
+  equity_usdc: number;
+  trade_count: number;
+  note?: string;
+}
+
+function PortfolioSection({ name }: { name: string }) {
+  const [pf, setPf] = useState<PaperPortfolio | null>(null);
+  const load = useCallback(async () => {
+    try {
+      const j = await postCommand({ action: "paper_portfolio", name, quiet: true });
+      if (j && j.ok !== false) setPf(j as PaperPortfolio);
+    } catch {
+      /* keep stale */
+    }
+  }, [name]);
+  useEffect(() => {
+    setPf(null);
+    load();
+    const t = window.setInterval(() => load(), 30000);
+    return () => window.clearInterval(t);
+  }, [name, load]);
+  const fmt = (n: number | null | undefined, d = 2) =>
+    n == null || !isFinite(Number(n)) ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const pnlCls = (n: number | null | undefined) => (n == null ? "text-zinc-500" : n >= 0 ? "text-emerald-300" : "text-red-300");
+  const totalPnl = pf ? Number(pf.realized_pnl_usdc || 0) + Number(pf.unrealized_pnl_usdc || 0) : 0;
+  return (
+    <div className="rounded-lg bg-black/30 p-3 ring-1 ring-white/5">
+      <SectionTitle icon={Wallet} right={<span className="font-mono text-[10px] text-zinc-600">paper</span>}>
+        Portfolio
+      </SectionTitle>
+      {!pf ? (
+        <p className="text-[11px] text-zinc-600">Loading…</p>
+      ) : (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="font-mono text-sm text-zinc-100">${fmt(pf.equity_usdc)}</div>
+              <div className="text-[10px] text-zinc-600">equity</div>
+            </div>
+            <div>
+              <div className="font-mono text-sm text-zinc-100">${fmt(pf.cash_usdc)}</div>
+              <div className="text-[10px] text-zinc-600">cash</div>
+            </div>
+            <div>
+              <div className={cn("font-mono text-sm", pnlCls(totalPnl))}>
+                {totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}
+              </div>
+              <div className="text-[10px] text-zinc-600">total PnL</div>
+            </div>
+          </div>
+          {pf.positions.length === 0 ? (
+            <p className="text-[11px] text-zinc-600">No positions — 10,000 paper USDC ready. The agent paper-trades with paper_buy / paper_sell.</p>
+          ) : (
+            <div className="space-y-1">
+              {pf.positions.map((p) => (
+                <div key={p.mint} className="flex items-center gap-2 rounded-md bg-white/[0.03] px-2 py-1.5 ring-1 ring-white/5">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-[11px] font-medium text-zinc-200">{p.symbol}</div>
+                    <div className="font-mono text-[10px] text-zinc-600">
+                      {fmt(p.tokens, 4)} @ ${fmt(p.avg_price, 6)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-[11px] text-zinc-200">${fmt(p.value_usdc)}</div>
+                    <div className={cn("font-mono text-[10px]", pnlCls(p.unrealized_pnl_usdc))}>
+                      {p.unrealized_pnl_usdc == null ? "" : `${p.unrealized_pnl_usdc >= 0 ? "+" : ""}$${fmt(p.unrealized_pnl_usdc)}`}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="font-mono text-[10px] text-zinc-600">
+            realized ${fmt(pf.realized_pnl_usdc)} · {pf.trade_count} paper trades
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SchedulesSection({ name }: { name: string }) {
   const [schedules, setSchedules] = useState<ScheduleInfo[]>([]);
   const [open, setOpen] = useState(false);
@@ -790,6 +886,8 @@ function InspectorAgent({ name, thinkBusy, onThink, onArchive, onOpenTask, unrea
       </div>
 
       <SchedulesSection name={detail.name} />
+
+      <PortfolioSection name={detail.name} />
 
       <div className="rounded-lg bg-black/30 p-3 ring-1 ring-white/5">
         <SectionTitle icon={Download}>Export</SectionTitle>

@@ -4,6 +4,7 @@
    COMMAND: POST /api/x-mcp?path=agentplus/command
             (spawn | task | send | remember | inbox | get | recall | tasks |
              files | file | write_file | delete_file | rename_file |
+             fetch_url | paper_buy | paper_sell | paper_portfolio |
              think | models | usage | digest | archive)
             — read-only views pass quiet:true
    EXPORT:  GET  /api/x-mcp?path=agentplus/export&agent=<name>&kind=log|thoughts
@@ -21,7 +22,7 @@ export const POLL_MS = 2000;
 export const DETAIL_POLL_MS = 10000;
 export const LAST_VISIT_KEY = "agentos-last-visit";
 
-export type AgentEventKind = "thought" | "action" | "file" | "message" | "build" | "deploy" | "error";
+export type AgentEventKind = "thought" | "action" | "file" | "message" | "build" | "deploy" | "error" | "trade";
 
 export interface AgentEvent {
   id: string | number;

@@ -18,13 +18,14 @@
  */
 import { needAuth, sb } from "./_mcp-app-wallet.js";
 import { createHash } from "node:crypto";
+import { lookup as dnsLookup } from "node:dns/promises";
 
 const NAME_RE = /^[a-z0-9-]{2,32}$/;
 const KEY_RE = /^[\w.\-]{1,64}$/;
 const TASK_KINDS = ["website", "research", "general"];
 const TASK_STATUSES = ["open", "in_progress", "blocked", "done", "cancelled"];
 const STEP_STATUSES = ["pending", "in_progress", "complete", "blocked", "skipped"];
-const LOG_KINDS = ["thought", "action", "file", "message", "build", "deploy", "error", "system"];
+const LOG_KINDS = ["thought", "action", "file", "message", "build", "deploy", "error", "system", "trade"];
 const MSG_BODY_MAX = 2000;
 const LOG_BODY_MAX = 4000;
 const FILE_CONTENT_MAX = 2000000;
@@ -1318,6 +1319,8 @@ RULES
   - append_file {task_id, path, content}: append to an existing file.
   - delete_file {task_id, path} or {task_id, prefix}: delete one file (all versions) or a whole folder tree. Irreversible.
   - rename_file {task_id, from, to}: move/rename a file or a whole folder, preserving version history.
+  - fetch_url {url}: read a web page server-side and get its readable text (scripts/styles stripped, ~12k chars). Use for research — read the page before claiming facts about it. http(s) only; private/localhost URLs are blocked.
+  - paper_buy {mint, usdc_amount} / paper_sell {mint, percent} / paper_portfolio {}: SIMULATED trading only — 10,000 paper USDC per agent at live market prices, zero real money. Never describe paper trades as real trades. Use paper_portfolio to check cash/positions/PnL before sizing.
 - Folders are implicit: writing "src/ui/Button.tsx" creates the folders — build real project trees, not flat dumps. Delete scratch files, keep the workspace tidy. Total workspace per task is capped at 5MB.
   - advance_step {task_id, step_index, status, result?}: status is pending|in_progress|complete|blocked|skipped. Mark "complete" ONLY for work actually finished (files written, messages sent). Include a short "result" summary.
   - remember {key, value}: persist a fact to long-term memory.
@@ -1568,6 +1571,11 @@ export async function thinkAgent(agent, opts = {}) {
         r = await _deleteFile(client, userId, { task_id: a.task_id || activeTask?.id, path: a.path, prefix: a.prefix });
       else if (op === "rename_file")
         r = await _renameFile(client, userId, { task_id: a.task_id || activeTask?.id, from: a.from, to: a.to });
+      else if (op === "fetch_url") r = await _fetchUrl(client, userId, agent.id, { url: a.url });
+      else if (op === "paper_buy") r = await _paperBuy(client, userId, agent, { mint: a.mint, usdc_amount: a.usdc_amount });
+      else if (op === "paper_sell")
+        r = await _paperSell(client, userId, agent, { mint: a.mint, percent: a.percent, tokens: a.tokens });
+      else if (op === "paper_portfolio") r = await _paperPortfolio(client, userId, agent);
       else if (op === "advance_step")
         r = await _advanceStep(client, userId, { task_id: a.task_id || activeTask?.id, step_index: a.step_index, status: a.status, result: a.result });
       else if (op === "remember") r = await _rememberKV(client, userId, agent.name, a.key, a.value);
@@ -1599,6 +1607,381 @@ export async function thinkAgent(agent, opts = {}) {
     .update({ thinks_today: thinksToday + 1, last_think_at: nowIso(), next_think_at: null })
     .eq("id", agent.id);
   return { ok: true, model: model, ms, thought: trunc(think.thought, 500), actions: executed };
+}
+
+/* ------------------------------------------------------------------ */
+/* fetch_url — server-side research reader (read-only)                 */
+/* SSRF-guarded: every redirect hop is DNS-resolved and rejected when  */
+/* it points at private/loopback/link-local/metadata space.           */
+/* ------------------------------------------------------------------ */
+const FETCH_MAX_BYTES = 100 * 1024;
+const FETCH_TIMEOUT_MS = 15000;
+const FETCH_TEXT_MAX = 12000;
+const FETCH_MAX_HOPS = 5;
+
+function isPrivateIp(ip) {
+  const v = String(ip || "").trim();
+  if (!v) return true;
+  if (v.includes(":")) {
+    const l = v.toLowerCase();
+    if (l === "::1" || l === "::ffff:127.0.0.1") return true;
+    if (l.startsWith("fc") || l.startsWith("fd")) return true; // fc00::/7
+    if (l.startsWith("fe80:")) return true; // link-local
+    return false;
+  }
+  const p = v.split(".").map(Number);
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true; // unparseable -> block
+  const [a, b] = p;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true; // link-local + cloud metadata
+  if (a === 0) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a === 192 && b === 0) return true; // 192.0.0.0/24 incl. docs
+  if (a === 192 && b === 2) return true; // TEST-NET-1
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmark
+  if (a === 198 && b === 51) return true; // TEST-NET-2
+  if (a === 203 && b === 0) return true; // TEST-NET-3
+  return false;
+}
+
+async function _hostAllowed(hostname) {
+  const h = String(hostname || "").toLowerCase().replace(/\.$/, "");
+  if (!h) return { ok: false, error: "empty_host" };
+  if (h === "localhost" || h.endsWith(".localhost")) return { ok: false, error: "blocked_host" };
+  let addrs;
+  try {
+    addrs = await dnsLookup(h, { all: true });
+  } catch {
+    return { ok: false, error: "dns_failed" };
+  }
+  if (!addrs || !addrs.length) return { ok: false, error: "dns_failed" };
+  for (const a of addrs) {
+    if (isPrivateIp(a.address)) return { ok: false, error: "blocked_private_ip" };
+  }
+  return { ok: true };
+}
+
+function htmlToText(html) {
+  let t = String(html || "");
+  t = t.replace(/<script[\s\S]*?<\/script\s*>/gi, " ");
+  t = t.replace(/<style[\s\S]*?<\/style\s*>/gi, " ");
+  t = t.replace(/<noscript[\s\S]*?<\/noscript\s*>/gi, " ");
+  t = t.replace(/<!--[\s\S]*?-->/g, " ");
+  t = t.replace(/<[^>]*>/g, " ");
+  t = t
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'");
+  t = t.replace(/&#(\d+);/g, (_, n) => {
+    const c = Number(n);
+    return c > 31 && c < 0x10ffff ? String.fromCodePoint(c) : " ";
+  });
+  t = t.replace(/[ \t\x0b\f\r]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return t;
+}
+
+async function _fetchUrl(client, userId, agentId, { url }) {
+  const raw = String(url || "").trim();
+  if (!raw || raw.length > 2048) return { ok: false, error: "bad_url" };
+  let current;
+  try {
+    current = new URL(raw);
+  } catch {
+    return { ok: false, error: "bad_url" };
+  }
+  if (current.protocol !== "http:" && current.protocol !== "https:")
+    return { ok: false, error: "bad_scheme", message: "Only http(s) URLs can be fetched." };
+  let status = 0, contentType = "", buf = null, hops = 0;
+  while (hops < FETCH_MAX_HOPS) {
+    const gate = await _hostAllowed(current.hostname);
+    if (!gate.ok) return { ok: false, error: gate.error, message: "URL blocked by SSRF guard." };
+    let resp;
+    try {
+      resp = await fetch(current.toString(), {
+        redirect: "manual",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          "User-Agent": "OrbitX-AgentPlus/1.0 (agent research fetch)",
+          Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
+        },
+      });
+    } catch (e) {
+      return { ok: false, error: "fetch_failed", message: trunc(e?.message || String(e), 200) };
+    }
+    status = resp.status;
+    const loc = resp.headers.get("location");
+    if (status >= 300 && status < 400 && loc) {
+      try {
+        current = new URL(loc, current);
+      } catch {
+        return { ok: false, error: "bad_redirect" };
+      }
+      if (current.protocol !== "http:" && current.protocol !== "https:") return { ok: false, error: "bad_scheme" };
+      hops++;
+      continue;
+    }
+    if (status >= 400) return { ok: false, error: `http_${status}`, message: `Page returned HTTP ${status}.` };
+    contentType = (resp.headers.get("content-type") || "").split(";")[0].trim() || "application/octet-stream";
+    const ab = await resp.arrayBuffer().catch(() => null);
+    if (!ab) return { ok: false, error: "read_failed" };
+    buf = Buffer.from(ab).subarray(0, FETCH_MAX_BYTES);
+    break;
+  }
+  if (!buf) return { ok: false, error: "too_many_redirects" };
+  const truncatedBytes = buf.length >= FETCH_MAX_BYTES;
+  let text;
+  if (/html/i.test(contentType)) text = htmlToText(buf.toString("utf8"));
+  else if (/text|json|xml|javascript/i.test(contentType)) text = buf.toString("utf8").replace(/\s+/g, " ").trim();
+  else return { ok: false, error: "unsupported_type", message: `Content-Type ${contentType} is not readable text.` };
+  text = trunc(text, FETCH_TEXT_MAX);
+  await _logEvent(client, {
+    userId,
+    agentId,
+    kind: "action",
+    body: `fetch ${trunc(current.host + current.pathname, 90)} -> ${status} (${text.length} chars${truncatedBytes ? ", truncated" : ""})`,
+  });
+  return { ok: true, url: current.toString(), status, content_type: contentType, bytes: buf.length, truncated: truncatedBytes, text };
+}
+
+/* ------------------------------------------------------------------ */
+/* paper trading — SIMULATED portfolios, zero real money.              */
+/* Prices are live market tape (DexScreener); cash/positions are       */
+/* pure bookkeeping in ap_agent_portfolios. Never real trades.         */
+/* ------------------------------------------------------------------ */
+const PAPER_START_CASH = 10000;
+const PAPER_PRICE_TIMEOUT_MS = 12000;
+const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+async function _paperPrice(mint) {
+  const m = String(mint || "").trim();
+  if (!MINT_RE.test(m)) return { ok: false, error: "bad_mint" };
+  let resp;
+  try {
+    resp = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${m}`, {
+      signal: AbortSignal.timeout(PAPER_PRICE_TIMEOUT_MS),
+      headers: { "User-Agent": "OrbitX-AgentPlus/1.0 (paper pricing)" },
+    });
+  } catch (e) {
+    return { ok: false, error: "price_unavailable", message: trunc(e?.message || String(e), 160) };
+  }
+  if (!resp.ok) return { ok: false, error: "price_unavailable", message: `price feed HTTP ${resp.status}` };
+  const j = await resp.json().catch(() => null);
+  const pairs = ((j && j.pairs) || []).filter((p) => Number(p?.priceUsd) > 0);
+  if (!pairs.length) return { ok: false, error: "no_market", message: "No liquid market found for this mint." };
+  pairs.sort((a, b) => (Number(b?.liquidity?.usd) || 0) - (Number(a?.liquidity?.usd) || 0));
+  const p = pairs[0];
+  return {
+    ok: true,
+    mint: m,
+    symbol: String(p?.baseToken?.symbol || "???").slice(0, 16),
+    price: Number(p.priceUsd),
+    liquidity_usd: Number(p?.liquidity?.usd) || null,
+  };
+}
+
+async function _paperPrices(mints) {
+  const uniq = [...new Set((mints || []).map((x) => String(x || "").trim()).filter((x) => MINT_RE.test(x)))].slice(0, 30);
+  const out = {};
+  if (!uniq.length) return out;
+  try {
+    const resp = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${uniq.join(",")}`, {
+      signal: AbortSignal.timeout(PAPER_PRICE_TIMEOUT_MS),
+      headers: { "User-Agent": "OrbitX-AgentPlus/1.0 (paper pricing)" },
+    });
+    if (resp.ok) {
+      const j = await resp.json().catch(() => null);
+      for (const p of (j && j.pairs) || []) {
+        const addr = p?.baseToken?.address;
+        const px = Number(p?.priceUsd);
+        if (!addr || !(px > 0)) continue;
+        const liq = Number(p?.liquidity?.usd) || 0;
+        if (!out[addr] || liq > out[addr].liq)
+          out[addr] = { price: px, liq, symbol: String(p?.baseToken?.symbol || "???").slice(0, 16) };
+      }
+    }
+  } catch {
+    /* fall through to per-mint fallback below */
+  }
+  for (const m of uniq) {
+    if (!out[m]) {
+      const s = await _paperPrice(m);
+      if (s.ok) out[m] = { price: s.price, liq: s.liquidity_usd || 0, symbol: s.symbol };
+    }
+  }
+  return out;
+}
+
+async function _paperRow(client, userId, agentId, create) {
+  const { data } = await client.from("ap_agent_portfolios").select("*").eq("agent_id", agentId).limit(1);
+  let pf = (data || [])[0] || null;
+  if (!pf && create) {
+    const { data: ins, error } = await client
+      .from("ap_agent_portfolios")
+      .insert({ user_id: userId, agent_id: agentId })
+      .select("*")
+      .limit(1);
+    if (error) throw error;
+    pf = (ins || [])[0] || null;
+  }
+  return pf;
+}
+
+async function _paperSave(client, pf, patch) {
+  const { error } = await client
+    .from("ap_agent_portfolios")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", pf.id);
+  if (error) throw error;
+}
+
+async function _paperBuy(client, userId, agent, { mint, usdc_amount }) {
+  const amt = Number(usdc_amount);
+  if (!(amt > 0) || amt > 1000000)
+    return { ok: false, error: "bad_amount", message: "usdc_amount must be a positive number." };
+  const px = await _paperPrice(mint);
+  if (!px.ok) return px;
+  const pf = await _paperRow(client, userId, agent.id, true);
+  if (!pf) return { ok: false, error: "db_unavailable" };
+  const cash = Number(pf.cash);
+  if (amt > cash)
+    return { ok: false, error: "insufficient_cash", message: `Paper cash $${cash.toFixed(2)} < $${amt.toFixed(2)}.`, cash_usdc: cash };
+  const tokens = amt / px.price;
+  const positions = Array.isArray(pf.positions) ? pf.positions : [];
+  const ex = positions.find((p) => p && p.mint === px.mint);
+  if (ex) {
+    const nt = Number(ex.tokens) + tokens;
+    ex.avg_price = (Number(ex.avg_price) * Number(ex.tokens) + amt) / nt;
+    ex.tokens = nt;
+    ex.symbol = px.symbol;
+  } else {
+    positions.push({ mint: px.mint, symbol: px.symbol, tokens, avg_price: px.price });
+  }
+  await _paperSave(client, pf, { cash: cash - amt, positions, trade_count: Number(pf.trade_count || 0) + 1 });
+  await _logEvent(client, {
+    userId,
+    agentId: agent.id,
+    kind: "trade",
+    body: `paper buy ${tokens.toFixed(4)} ${px.symbol} @ $${px.price} ($${amt.toFixed(2)} paper)`,
+  });
+  return {
+    ok: true,
+    paper: true,
+    mint: px.mint,
+    symbol: px.symbol,
+    price_usd: px.price,
+    tokens_bought: tokens,
+    cost_usdc: amt,
+    cash_usdc: cash - amt,
+  };
+}
+
+async function _paperSell(client, userId, agent, { mint, percent, tokens }) {
+  const px = await _paperPrice(mint);
+  if (!px.ok) return px;
+  const pf = await _paperRow(client, userId, agent.id, false);
+  if (!pf) return { ok: false, error: "no_portfolio", message: "No paper portfolio yet — paper_buy first." };
+  const positions = Array.isArray(pf.positions) ? pf.positions : [];
+  const idx = positions.findIndex((p) => p && p.mint === px.mint);
+  if (idx < 0 || !(Number(positions[idx].tokens) > 0))
+    return { ok: false, error: "no_position", message: `No paper position in ${px.symbol}.` };
+  const ex = positions[idx];
+  let sellTokens = 0;
+  if (percent !== undefined && percent !== null && percent !== "") {
+    const pc = Number(percent);
+    if (!(pc > 0 && pc <= 100)) return { ok: false, error: "bad_percent", message: "percent must be 0-100." };
+    sellTokens = (Number(ex.tokens) * pc) / 100;
+  } else if (tokens !== undefined && tokens !== null && tokens !== "") {
+    sellTokens = Number(tokens);
+    if (!(sellTokens > 0) || sellTokens > Number(ex.tokens) * (1 + 1e-9))
+      return { ok: false, error: "bad_tokens", message: "tokens must be positive and <= position size." };
+  } else {
+    return { ok: false, error: "need_percent_or_tokens", message: "Pass percent (0-100) or tokens." };
+  }
+  sellTokens = Math.min(sellTokens, Number(ex.tokens));
+  const proceeds = sellTokens * px.price;
+  const realized = (px.price - Number(ex.avg_price)) * sellTokens;
+  ex.tokens = Number(ex.tokens) - sellTokens;
+  if (ex.tokens < 1e-9) positions.splice(idx, 1);
+  const cash = Number(pf.cash) + proceeds;
+  const realizedPnl = Number(pf.realized_pnl || 0) + realized;
+  await _paperSave(client, pf, {
+    cash,
+    positions,
+    realized_pnl: realizedPnl,
+    trade_count: Number(pf.trade_count || 0) + 1,
+  });
+  await _logEvent(client, {
+    userId,
+    agentId: agent.id,
+    kind: "trade",
+    body: `paper sell ${sellTokens.toFixed(4)} ${px.symbol} @ $${px.price} -> $${proceeds.toFixed(2)} paper (realized ${realized >= 0 ? "+" : ""}$${realized.toFixed(2)})`,
+  });
+  return {
+    ok: true,
+    paper: true,
+    mint: px.mint,
+    symbol: px.symbol,
+    price_usd: px.price,
+    tokens_sold: sellTokens,
+    proceeds_usdc: proceeds,
+    realized_pnl_usdc: realized,
+    cash_usdc: cash,
+  };
+}
+
+async function _paperPortfolio(client, userId, agent) {
+  const pf = await _paperRow(client, userId, agent.id, false);
+  if (!pf)
+    return {
+      ok: true,
+      paper: true,
+      cash_usdc: PAPER_START_CASH,
+      positions: [],
+      realized_pnl_usdc: 0,
+      unrealized_pnl_usdc: 0,
+      equity_usdc: PAPER_START_CASH,
+      trade_count: 0,
+      note: "No paper trades yet — 10,000 paper USDC ready.",
+    };
+  const positions = Array.isArray(pf.positions) ? pf.positions : [];
+  const prices = await _paperPrices(positions.map((p) => p.mint));
+  let posValue = 0,
+    unreal = 0;
+  const rows = positions.map((p) => {
+    const q = prices[p.mint];
+    const cur = q ? q.price : null;
+    const value = cur != null ? Number(p.tokens) * cur : null;
+    const upnl = cur != null ? (cur - Number(p.avg_price)) * Number(p.tokens) : null;
+    if (value != null) posValue += value;
+    if (upnl != null) unreal += upnl;
+    return {
+      mint: p.mint,
+      symbol: (q && q.symbol) || p.symbol,
+      tokens: Number(p.tokens),
+      avg_price: Number(p.avg_price),
+      price_usd: cur,
+      value_usdc: value,
+      unrealized_pnl_usdc: upnl,
+    };
+  });
+  const cash = Number(pf.cash);
+  return {
+    ok: true,
+    paper: true,
+    cash_usdc: cash,
+    positions: rows,
+    realized_pnl_usdc: Number(pf.realized_pnl || 0),
+    unrealized_pnl_usdc: unreal,
+    equity_usdc: cash + posValue,
+    trade_count: Number(pf.trade_count || 0),
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1955,6 +2338,30 @@ const tWriteFile = tool(null, null, (c, u, a) => _writeFile(c, u, a));
 const tAppendFile = tool(null, null, (c, u, a) => _appendFile(c, u, a));
 const tDeleteFile = tool("file", (a) => `delete ${trunc(a.path || a.prefix || "", 60)}`, (c, u, a) => _deleteFile(c, u, a));
 const tRenameFile = tool("file", (a) => `rename ${trunc(a.from || "", 40)} -> ${trunc(a.to || "", 40)}`, (c, u, a) => _renameFile(c, u, a));
+// fetch_url + paper tools log their own entries inside the internals (fetch logs
+// an action entry; paper trades log kind='trade').
+const tFetchUrl = tool(null, null, async (c, u, a) => {
+  const agent = await _agentByName(c, u, String(a.name || "").trim().toLowerCase());
+  if (!agent) return { ok: false, error: "unknown_agent" };
+  return _fetchUrl(c, u, agent.id, { url: a.url });
+});
+const tPaperBuy = tool(null, null, async (c, u, a) => {
+  const agent = await _agentByName(c, u, String(a.name || "").trim().toLowerCase());
+  if (!agent) return { ok: false, error: "unknown_agent" };
+  if (agent.status !== "active") return { ok: false, error: "archived", message: "Agent is archived." };
+  return _paperBuy(c, u, agent, { mint: a.mint, usdc_amount: a.usdc_amount });
+});
+const tPaperSell = tool(null, null, async (c, u, a) => {
+  const agent = await _agentByName(c, u, String(a.name || "").trim().toLowerCase());
+  if (!agent) return { ok: false, error: "unknown_agent" };
+  if (agent.status !== "active") return { ok: false, error: "archived", message: "Agent is archived." };
+  return _paperSell(c, u, agent, { mint: a.mint, percent: a.percent, tokens: a.tokens });
+});
+const tPaperPortfolio = tool("action", (a) => `paper_portfolio ${a.name}`, async (c, u, a) => {
+  const agent = await _agentByName(c, u, String(a.name || "").trim().toLowerCase());
+  if (!agent) return { ok: false, error: "unknown_agent" };
+  return _paperPortfolio(c, u, agent);
+});
 const tFiles = tool("action", (a) => `files ${trunc(a.task_id, 12)}`, (c, u, a) => _listFiles(c, u, a));
 const tFile = tool("action", (a) => `file ${trunc(a.task_id, 12)}:${trunc(a.path, 60)}`, (c, u, a) => _getFile(c, u, a));
 const tBuild = tool(null, null, (c, u, a) => _buildTask(c, u, a));
@@ -2164,6 +2571,42 @@ export const AGENTPLUS_TOOLS = [
     },
   },
   {
+    name: "orbitx_agentplus_fetch_url",
+    description:
+      "Fetch a URL server-side and return readable text (scripts/styles stripped, ~12k chars). Read-only research tool for agents. http(s) only; private IPs, localhost, and cloud metadata endpoints are blocked (SSRF guard).",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "Agent name (the fetch is logged to their activity)" }, url: { type: "string" } },
+      required: ["name", "url"],
+    },
+  },
+  {
+    name: "orbitx_agentplus_paper_buy",
+    description:
+      "SIMULATED buy: spend an agent's paper USDC on a token at the live market price. Zero real money — each agent starts with 10,000 paper USDC. Returns tokens bought and remaining paper cash.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, mint: { type: "string" }, usdc_amount: { type: "number" } },
+      required: ["name", "mint", "usdc_amount"],
+    },
+  },
+  {
+    name: "orbitx_agentplus_paper_sell",
+    description:
+      "SIMULATED sell of an agent's paper position at the live market price. Pass percent (0-100 of the position) or tokens. Zero real money. Returns proceeds and realized PnL.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, mint: { type: "string" }, percent: { type: "number" }, tokens: { type: "number" } },
+      required: ["name", "mint"],
+    },
+  },
+  {
+    name: "orbitx_agentplus_paper_portfolio",
+    description:
+      "Read an agent's SIMULATED portfolio: paper cash, positions with live prices, realized/unrealized PnL, equity. Zero real money.",
+    inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+  },
+  {
     name: "orbitx_agentplus_files",
     description: "List a task's workspace: flat files array (path, version, size, sha256), a nested folder tree, and the workspace quota (5MB/task).",
     inputSchema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] },
@@ -2236,6 +2679,10 @@ export function dispatchAgentPlusTools(name, args, auth) {
     case "orbitx_agentplus_append_file": return tAppendFile(auth, args);
     case "orbitx_agentplus_delete_file": return tDeleteFile(auth, args);
     case "orbitx_agentplus_rename_file": return tRenameFile(auth, args);
+    case "orbitx_agentplus_fetch_url": return tFetchUrl(auth, args);
+    case "orbitx_agentplus_paper_buy": return tPaperBuy(auth, args);
+    case "orbitx_agentplus_paper_sell": return tPaperSell(auth, args);
+    case "orbitx_agentplus_paper_portfolio": return tPaperPortfolio(auth, args);
     case "orbitx_agentplus_files": return tFiles(auth, args);
     case "orbitx_agentplus_file": return tFile(auth, args);
     case "orbitx_agentplus_build": return tBuild(auth, args);
