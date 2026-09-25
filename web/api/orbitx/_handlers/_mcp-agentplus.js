@@ -2392,10 +2392,47 @@ const tDigest = tool(null, null, (c, u, a) => _digestStats(c, u, { since: a.sinc
    NVIDIA NIM 404s at chat time for models not provisioned on the key's
    account ("the catalog is not the grant") — probe before picking
    AGENT_LLM_MODEL. The key itself is never returned. */
-const tModels = tool("action", "probe llm models", async (c, u) => {
+const tModels = tool("action", "probe llm models", async (c, u, a) => {
   const cfg = llmCfg();
   if (!cfg.apiKey)
     return { ok: false, error: "no_key", message: "No LLM key configured (AGENT_LLM_API_KEY or NVIDIA_API_KEY)." };
+  // Live chat probe: pass {model:"<id>"} to test whether the key can actually
+  // complete a chat call with that model right now (catalog != chat grant, and
+  // a provisioned model can still go dark — e.g. the 550b's 2026-09-25 timeout
+  // streak). Mirrors the think envelope so "valid" means "works as a mind".
+  if (a && a.model) {
+    const mid = trunc(String(a.model), 160).trim();
+    const t0 = Date.now();
+    let resp = null, raw = "", perr = null;
+    try {
+      resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: mid,
+          messages: [
+            { role: "system", content: "Reply with a single JSON object and nothing else." },
+            { role: "user", content: 'Reply with exactly this JSON object: {"thought":"probe ok","actions":[]}' },
+          ],
+          temperature: 0.2,
+          max_tokens: 64,
+          response_format: { type: "json_object" },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+      raw = await resp.text();
+    } catch (e) { perr = e; }
+    const ms = Date.now() - t0;
+    if (perr)
+      return { ok: true, probe: mid, reachable: false, error: "timeout_or_transport", message: trunc(perr?.message || String(perr), 200), ms };
+    if (!resp.ok)
+      return { ok: true, probe: mid, reachable: false, error: `llm_${resp.status}`, detail: trunc(raw, 300), ms };
+    let text = "";
+    try { text = JSON.parse(raw)?.choices?.[0]?.message?.content || ""; } catch { /* ignore */ }
+    const t = normalizeThink(parseThinkJson(text));
+    const valid = !!(t && typeof t.thought === "string" && Array.isArray(t.actions));
+    return { ok: true, probe: mid, reachable: true, valid_envelope: valid, ms, head: trunc(text, 200) };
+  }
   let resp;
   try {
     resp = await fetch(`${cfg.baseUrl}/models`, {
@@ -2665,8 +2702,8 @@ export const AGENTPLUS_TOOLS = [
   {
     name: "orbitx_agentplus_models",
     description:
-      "Probe the configured LLM endpoint for the model IDs this key can actually call (server-side GET /models). NVIDIA NIM 404s at chat time for models not provisioned on the key's account, so probe before setting AGENT_LLM_MODEL. Never returns the key.",
-    inputSchema: { type: "object", properties: {} },
+      "Probe the configured LLM endpoint for the model IDs this key can actually call (server-side GET /models). Pass {model:'<id>'} to run a live chat probe of one model — tests real chat completions with the think envelope, so it catches models that list in the catalog but 404 at chat time or have gone dark (timeouts). NVIDIA NIM 404s at chat time for models not provisioned on the key's account, so probe before setting AGENT_LLM_MODEL. Never returns the key.",
+    inputSchema: { type: "object", properties: { model: { type: "string", description: "Model ID to live-probe with a minimal think-envelope chat call." } } },
   },
 ];
 
