@@ -57,7 +57,7 @@ const llmCfg = () => {
   };
 };
 const THINK_TIMEOUT_MS = 55000;
-const THINK_MAX_TOKENS = 1000;
+const THINK_MAX_TOKENS = 2000; // completion cap — 1000 truncated the 550b mid-actions on long thoughts (bad_json)
 const MAX_ACTIONS_PER_THINK = 5;
 const HEARTBEAT_MS = 30 * 60 * 1000;
 const THINKS_PER_TICK_CAP = 10;
