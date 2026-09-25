@@ -92,7 +92,7 @@ const MIN_SOL = 0.001;
 const MAX_SOL = 100;
 const PLATFORM_CREDITS_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY || "";
@@ -4312,6 +4312,76 @@ async function handleMcp(req, res, parts) {
     }
   }
 
+  // ── OrbitX AI Hub: user-facing chat driving the full MCP catalog ──
+  // GET  hub/threads            list threads
+  // POST hub/threads {title?}   create thread
+  // GET  hub/threads/<id>       thread + messages + pending confirmations
+  // DELETE hub/threads/<id>     delete thread
+  // POST hub/chat {thread_id?, message}   agentic chat turn
+  // POST hub/confirm {pending_id, approved}  approve/deny a gated tool call
+  // GET  hub/models             which mind model the hub uses
+  // Auth: same as agentplus (Bearer cron + ?user=, or Supabase user JWT).
+  if (route === "hub/threads" && (req.method === "GET" || req.method === "POST")) {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      if (req.method === "GET") return json(res, await hub.hubListThreads(authUser.userId));
+      const body = await readBody(req);
+      return json(res, await hub.hubCreateThread(authUser.userId, body && body.title));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_threads_failed" }, 500);
+    }
+  }
+
+  if (route.startsWith("hub/threads/") && (req.method === "GET" || req.method === "DELETE")) {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    const threadId = route.slice("hub/threads/".length).split("/")[0];
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      if (req.method === "GET") return json(res, await hub.hubGetThread(authUser.userId, threadId));
+      return json(res, await hub.hubDeleteThread(authUser.userId, threadId));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_thread_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/chat" && req.method === "POST") {
+    const body = await readBody(req);
+    const authUser = await agentplusAuth(req, body && body.user);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await hub.hubChat(authUser.userId, body.thread_id || null, body.message, req));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_chat_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/confirm" && req.method === "POST") {
+    const body = await readBody(req);
+    const authUser = await agentplusAuth(req, body && body.user);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await hub.hubConfirm(authUser.userId, body.pending_id, body.approved === true, req));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_confirm_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/models" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, hub.hubModelInfo());
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_models_failed" }, 500);
+    }
+  }
+
 
   if (
     (route === ".well-known/oauth-protected-resource" || route === "oauth-protected-resource") &&
@@ -4725,7 +4795,7 @@ export default async function handler(req, res) {
     // Normalize: rewrite may pass path=mcp/... or path=agent/...
     const head = parts[0];
     if (head === "agent") return handleAgent(req, res, parts);
-    if (head === "mcp" || head === "limits" || head === "agentplus" || !head) return handleMcp(req, res, head === "mcp" ? parts : ["mcp", ...parts]);
+    if (head === "mcp" || head === "limits" || head === "agentplus" || head === "hub" || !head) return handleMcp(req, res, head === "mcp" ? parts : ["mcp", ...parts]);
     return json(res, { error: "not_found", path: parts }, 404);
   } catch (e) {
     console.error("[x-mcp]", e);

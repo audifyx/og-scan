@@ -180,6 +180,7 @@ export const AppSidebar = ({
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
     { to: "/agentplus", icon: Bot, label: "AgentPlus", eyebrow: "AI agent fleet" },
+    { to: "/ai-hub", icon: Sparkles, label: "AI Hub", eyebrow: "Chat · Trade · Launch" },
     { id: "community", icon: Hash, label: "Social", eyebrow: "Chat · Rooms · Spaces" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
   ];
