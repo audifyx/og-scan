@@ -81,8 +81,8 @@ export const hubCreateThread = (title?: string) =>
 export const hubGetThread = (id: string) => authedJson(`${HUB_THREADS_PATH}/${encodeURIComponent(id)}`);
 export const hubDeleteThread = (id: string) =>
   authedJson(`${HUB_THREADS_PATH}/${encodeURIComponent(id)}`, { method: "DELETE" });
-export const hubChat = (thread_id: string | null, message: string): Promise<HubChatResponse> =>
-  authedJson(HUB_CHAT_PATH, { method: "POST", body: JSON.stringify({ thread_id, message }) });
+export const hubChat = (thread_id: string | null, message: string, signal?: AbortSignal): Promise<HubChatResponse> =>
+  authedJson(HUB_CHAT_PATH, { method: "POST", body: JSON.stringify({ thread_id, message }), signal });
 export const hubConfirm = (pending_id: string, approved: boolean): Promise<HubChatResponse> =>
   authedJson(HUB_CONFIRM_PATH, { method: "POST", body: JSON.stringify({ pending_id, approved }) });
 export const hubModels = () => authedJson(HUB_MODELS_PATH);
