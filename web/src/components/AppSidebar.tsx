@@ -2,6 +2,7 @@ import { ComponentType } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Bell,
+  Bot,
   Coins,
   Gamepad2,
   Sparkles,
@@ -178,6 +179,7 @@ export const AppSidebar = ({
 
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
+    { to: "/agentplus", icon: Bot, label: "AgentPlus", eyebrow: "AI agent fleet" },
     { id: "community", icon: Hash, label: "Social", eyebrow: "Chat · Rooms · Spaces" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
   ];
