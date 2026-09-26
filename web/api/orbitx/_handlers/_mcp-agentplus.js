@@ -3896,7 +3896,9 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
   // full budget, or dark-spell turns blow past Vercel's 60s kill with no reply.
   const started = Date.now();
   if (onToken) {
-    const s = await hubLlmStreamAttempt(messages, { temperature, timeoutMs, onToken });
+    // Cap the stream attempt at 20s so a hanging SSE connection always leaves
+    // budget for at least one buffered retry (some paths buffer SSE server-side).
+    const s = await hubLlmStreamAttempt(messages, { temperature, timeoutMs: Math.min(timeoutMs, 20000), onToken });
     if (s.ok) {
       const fin = hubLlmFinish({ content: s.raw }, true);
       if (fin.ok) return fin;
