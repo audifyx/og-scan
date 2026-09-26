@@ -3274,6 +3274,47 @@ function hubDetectBareCa(text) {
   return ok ? mints[0] : null;
 }
 
+// Deterministic TOKEN DOSSIER renderer — used when the model is unreachable
+// (dark spells) but the scan data is in hand. Same shape as the template,
+// numbers straight from the scan payload, "n/a" for anything missing.
+function hubRenderDossier(mint, scan) {
+  try {
+    const s = scan && typeof scan === "object" ? scan : JSON.parse(String(scan || ""));
+    if (!s || s.ok === false) return null;
+    const tok = (s.token && s.token.token) || {};
+    const meta = (s.token && s.token.meta) || {};
+    const pair = ((s.token && s.token.pairs) || [])[0] || {};
+    const safety = s.safety || {};
+    const name = tok.name || "Unknown";
+    const symbol = tok.symbol || "???";
+    const verdict = String(safety.verdict || (s.token && s.token.verdict) || "UNKNOWN");
+    const emoji = /DANGER|RUG|HONEYPOT|SCAM/i.test(verdict) ? "🔴"
+      : /RISKY|WARN|CAUTION/i.test(verdict) ? "🟡" : "🟢";
+    const usd = (v) => (v == null || isNaN(Number(v)) ? "n/a"
+      : "$" + Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+    const chg = pair.change24h;
+    const chgStr = chg == null || isNaN(Number(chg)) ? "n/a"
+      : `${Number(chg) >= 0 ? "+" : ""}${Number(chg).toFixed(2)}%`;
+    const rt = safety.roundTripLossPct;
+    return [
+      `🔍 ${name} ($${symbol}) — ${mint}`,
+      ``,
+      `Safety: ${emoji} ${verdict.toUpperCase()} — ${safety.note || "no major flags"}`,
+      ``,
+      `💧 Liq: ${usd(pair.liquidity ?? tok.liquidity)} · 📊 Vol 24h: ${usd(pair.volume24h)} · 💰 MC: ${usd(tok.mcap)}`,
+      `📈 24h ${chgStr}`,
+      `👥 Holders: ${meta.holderCount ?? "n/a"}`,
+      `⚠️ ${rt != null ? `Est. round-trip cost ~${Number(rt).toFixed(1)}%` : "Check liquidity before sizing"}`,
+      ``,
+      `_Live scan data — the AI model is unreachable right now, so this is the raw dossier._`,
+      ``,
+      `Want a chart, an alert, or a deeper dive?`,
+    ].join("\n");
+  } catch {
+    return null;
+  }
+}
+
 function hubDeepFind(obj, keys, depth = 0) {
   if (!obj || typeof obj !== "object" || depth > 4) return undefined;
   for (const k of keys) {
@@ -3976,24 +4017,63 @@ export async function hubChat(userId, threadIdOrNull, message, req, opts = {}) {
   }
   await hubInsertMessage(client, threadId, "user", text);
   const started = Date.now();
-  // Bare contract address → deterministic dossier path: scan it server-side now
-  // and hand the model the data + the TOKEN DOSSIER template, so the turn can
-  // never come back confused about what to do with a pasted CA.
-  let seedMessages = [];
+  // Bare contract address → deterministic dossier path: scan server-side, then
+  // a single fast format call shapes the dossier. If the model is unreachable
+  // (dark spell), render the dossier deterministically from the scan JSON
+  // instead of erroring — the data is in hand, so the turn can't die with no
+  // reply. Worst case ~30s, well under the Vercel 60s limit.
   const bareCa = hubDetectBareCa(text);
   if (bareCa) {
-    let scanText;
+    let scanJson = null;
+    let scanText = "";
+    let scanErr = "";
     try {
       const scan = await hubExecuteTool({ userId, toolName: "orbitx_crypto_scan", args: { mint: bareCa }, req, hubThread: threadId });
+      try {
+        scanJson = typeof scan === "string" ? JSON.parse(scan) : scan;
+      } catch {
+        scanJson = null;
+      }
       scanText = trunc(typeof scan === "string" ? scan : JSON.stringify(scan), 3000);
     } catch (e) {
-      scanText = `scan failed: ${e?.message || String(e)}`;
+      scanErr = e?.message || String(e);
+      scanText = `scan failed: ${scanErr}`;
     }
-    seedMessages = [{
-      role: "user",
-      content: `[input type: contract_address]\nThe user pasted this contract address: ${bareCa}\n[blockchain data: orbitx_crypto_scan]\n${scanText}\n\nPresent this using the TOKEN DOSSIER response template. Do not re-scan — the data above is fresh. Supplement with orbitx_get_token only if price fields are missing.`,
-    }];
+    let reply = null;
+    let degraded = false;
+    try {
+      const catalog = await hubToolCatalog();
+      const llm = await hubLlmCall(
+        [
+          { role: "system", content: hubSystemPrompt(catalog, { mode, lang }) },
+          {
+            role: "user",
+            content:
+              `[input type: contract_address]\n` +
+              `The user pasted this contract address: ${bareCa}\n` +
+              `[blockchain data: orbitx_crypto_scan]\n${scanText}\n\n` +
+              `Present this using the TOKEN DOSSIER response template. Reply with the dossier only — no tool calls needed, the data above is fresh.`,
+          },
+        ],
+        { timeoutMs: 25000 },
+      );
+      if (llm.ok && llm.reply) {
+        reply = llm.reply;
+        degraded = !!llm.degraded;
+      }
+    } catch {
+      reply = null;
+    }
+    if (!reply) {
+      reply =
+        hubRenderDossier(bareCa, scanJson) ||
+        `I couldn't reach the model or scan this address right now.${scanErr ? ` ${scanErr}.` : ""} Please try again in a moment.`;
+      degraded = true;
+    }
+    await hubInsertMessage(client, threadId, "assistant", reply, []);
+    return { ok: true, thread_id: threadId, ms: Date.now() - started, reply, tool_calls: [], pending: [], model: llmCfg().model, degraded };
   }
+  const seedMessages = [];
   try {
     const out = await hubRunLoop({ client, userId, threadId, seedMessages, req, mode, lang });
     return { ok: out.ok, thread_id: threadId, ms: Date.now() - started, ...out };
