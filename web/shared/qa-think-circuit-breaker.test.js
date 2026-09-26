@@ -262,7 +262,7 @@ describe("_providerDark", () => {
 
 describe("_probeProvider", () => {
   it("200 with the single mind model counts as recovered", async () => {
-    process.env.NVIDIA_API_KEY = "nvapi-test-key";
+    process.env.NVIDIA_API_KEY = "FAKE-NVIDIA-KEY-FOR-TESTS";
     let captured = null;
     const b = loadBreaker(async (url, opts) => {
       captured = { url, opts };
@@ -279,7 +279,7 @@ describe("_probeProvider", () => {
   });
 
   it("transport failure keeps the breaker parked", async () => {
-    process.env.NVIDIA_API_KEY = "nvapi-test-key";
+    process.env.NVIDIA_API_KEY = "FAKE-NVIDIA-KEY-FOR-TESTS";
     const b = loadBreaker(async () => { throw new Error("The operation was aborted due to timeout"); });
     const r = await b._probeProvider();
     expect(r.ok).toBe(false);
@@ -287,7 +287,7 @@ describe("_probeProvider", () => {
   });
 
   it("HTTP errors surface the status (fail fast, no retry)", async () => {
-    process.env.NVIDIA_API_KEY = "nvapi-test-key";
+    process.env.NVIDIA_API_KEY = "FAKE-NVIDIA-KEY-FOR-TESTS";
     const b = loadBreaker(async () => ({ ok: false, status: 429, text: async () => "rate limited" }));
     const r = await b._probeProvider();
     expect(r.ok).toBe(false);
