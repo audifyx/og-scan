@@ -3,7 +3,7 @@
  * Conditions: price_above | price_below | whale_buy_min_usd | volume_spike.
  * Actions: buy_usd | sell_percent | notify_only. Backend signs (desk wallet). No popup.
  */
-import { needAuth, sb, tokenInfo, appWalletBuy, appWalletSell } from "./_mcp-app-wallet.js";
+import { needAuth, sb, tokenInfo, appWalletBuy, appWalletSell, claimFillRow, resolveFillRow, isFillOpen, FILL_STATUS } from "./_mcp-app-wallet.js";
 import { evmTrades } from "../../ogdex/_evm.js";
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -208,9 +208,12 @@ export async function tickUserAlerts(userId, ctx) {
     .order("created_at", { ascending: false }).limit(100);
   const triggered = [];
   let checked = 0;
+  let truncated = false;
+  const deadlineMs = Number(ctx?.deadlineMs || 0);
   for (const r of data || []) {
+    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; }
     const m = r.meta || {};
-    if ((m.status || "open") !== "open") continue;
+    if (!isFillOpen(m)) continue;
     if (!m.mint || !m.condType || m.condValue == null) continue;
     checked += 1;
     let res;
@@ -218,13 +221,17 @@ export async function tickUserAlerts(userId, ctx) {
       res = await evaluate(m, client);
     } catch (e) {
       // Feed exception — skip row, no attempt burned. Record a best-effort note.
+      // Guarded: never clobber a concurrent "filling" claim's status.
       try {
-        await client.from("ox_live_events").update({ meta: { ...m, lastCheckAt: new Date().toISOString(), lastNote: String(e?.message || "eval_error").slice(0, 120) } }).eq("id", r.id);
+        await client.from("ox_live_events").update({ meta: { ...m, lastCheckAt: new Date().toISOString(), lastNote: String(e?.message || "eval_error").slice(0, 120) } }).eq("id", r.id).neq("meta->>status", FILL_STATUS);
       } catch { /* best-effort */ }
       continue;
     }
     if (!res || !res.hit) continue;
-    // ── Triggered: one-shot execution ──
+    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; } // don't start an execution we can't resolve
+    // ── Triggered: one-shot execution — claim first so overlapping ticks can't double-fire.
+    const claimed = await claimFillRow(client, r.id, m, { bumpAttempts: false });
+    if (!claimed) continue; // lost the race
     const auth = { userId };
     let result;
     try {
@@ -246,19 +253,16 @@ export async function tickUserAlerts(userId, ctx) {
       triggerPrice: res.price || null,
       result: { ok: !!result?.ok, signature: result?.signature || null, error: result?.error || null, message: result?.message || null },
     };
-    const patch = {
-      ...m,
-      status: "triggered",
+    const resolved = await resolveFillRow(client, r.id, {
+      ...claimed,
       triggeredAt: now,
       triggerPrice: res.price || null,
       ...(res.trade ? { triggerTrade: { volumeUsd: res.trade.volumeUsd, txHash: res.trade.txHash, time: res.trade.time } } : {}),
       ...(res.curVol != null ? { triggerVol: res.curVol } : {}),
       lastResult: { action: m.action, ok: !!result?.ok, signature: result?.signature || null, error: result?.error || null, message: result?.message || null },
-    };
-    try {
-      await client.from("ox_live_events").update({ meta: patch }).eq("id", r.id);
-    } catch { /* trigger status write is best-effort; execution already happened or failed */ }
-    triggered.push(summary);
+    }, "triggered");
+    triggered.push({ ...summary, resolved });
+    if (!resolved) continue; // claim lost mid-flight (re-armed/cancelled) — the owning write handles notify
     try {
       const mod = await import("./_mcp-telegram-push.js");
       await mod.pushMcpResultToTelegram?.({ userId, tool: "orbitx_app_alert", result: summary, source: "alert_tick" });
@@ -273,7 +277,7 @@ export async function tickUserAlerts(userId, ctx) {
       } catch { /* best-effort hub ping */ }
     }
   }
-  return { ok: true, checked, triggered };
+  return { ok: true, checked, triggered, ...(truncated ? { truncated: true } : {}) };
 }
 
 /** Sweep every user that has alert rows. Per-user failures never stop the sweep. */

@@ -18,6 +18,10 @@ import {
   appWalletBuy,
   appWalletSell,
   USDC_MINT,
+  claimFillRow,
+  resolveFillRow,
+  isFillOpen,
+  FILL_STATUS,
 } from "./_mcp-app-wallet.js";
 import { SOL_MINT } from "./_user-trading-wallet.js";
 
@@ -67,7 +71,7 @@ function validateFollow({ wallet, mode, sizeValue }) {
   return null;
 }
 
-async function activeFollowRows(client, userId) {
+async function activeFollowRows(client, userId, includeFilling = false) {
   const { data } = await client
     .from("ox_live_events")
     .select("id,meta")
@@ -75,7 +79,14 @@ async function activeFollowRows(client, userId) {
     .eq("agent_id", userId)
     .order("created_at", { ascending: false })
     .limit(50);
-  return (data || []).filter((r) => (r.meta?.status || "active") === "active" && r.meta?.followedWallet);
+  // includeFilling: follow/unfollow must find a row even while a mirror is
+  // in-flight (otherwise follow would insert a duplicate row). The tick
+  // itself never uses includeFilling — that exclusion IS the fill mutex.
+  return (data || []).filter((r) => {
+    if (!r.meta?.followedWallet) return false;
+    if (includeFilling) return isFillOpen(r.meta, "active") || r.meta?.status === FILL_STATUS;
+    return isFillOpen(r.meta, "active");
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -93,18 +104,20 @@ export async function appCopyFollow(auth, args = {}) {
   const { wallet, label, mode, sizeValue, maxPerTradeUsd } = params;
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable", message: "Follow store unreachable. Retry in a minute." };
-  const rows = await activeFollowRows(client, gate.userId);
+  const rows = await activeFollowRows(client, gate.userId, true);
   const existing = rows.find((r) => r.meta.followedWallet === wallet);
   const now = new Date().toISOString();
   if (existing) {
     // Upsert: update params in place, keep follow history (seenSigs / fills).
+    // Never clobber a "filling" claim — preserve the in-flight status so the
+    // mirroring tick's resolve isn't orphaned (that would re-mirror on reap).
     const merged = {
       ...(existing.meta || {}),
       label,
       mode,
       sizeValue,
       maxPerTradeUsd,
-      status: "active",
+      status: existing.meta?.status === FILL_STATUS ? FILL_STATUS : "active",
       updatedAt: now,
     };
     await client.from("ox_live_events").update({ thesis: `copy ${label || wallet}`, meta: merged }).eq("id", existing.id);
@@ -141,9 +154,11 @@ export async function appCopyUnfollow(auth, args = {}) {
   if (!MINT_RE.test(wallet)) return { ok: false, error: "bad_wallet", message: "wallet must be a base58 pubkey (32-44 chars)." };
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable", message: "Follow store unreachable. Retry in a minute." };
-  const rows = await activeFollowRows(client, gate.userId);
+  const rows = await activeFollowRows(client, gate.userId, true);
   const target = rows.find((r) => r.meta.followedWallet === wallet);
   if (!target) return { ok: false, error: "not_found", message: "No active follow for that wallet." };
+  // Cancelling wins over an in-flight mirror: the tick's guarded resolve
+  // won't clobber this, and a cancelled row is never reaped for re-mirroring.
   await client
     .from("ox_live_events")
     .update({ meta: { ...(target.meta || {}), status: "cancelled", cancelledAt: new Date().toISOString() } })
@@ -229,28 +244,31 @@ async function mintDecimals(mint) {
 /* tick                                                               */
 /* ------------------------------------------------------------------ */
 
-export async function tickUserCopy(userId, ctx) {
+export async function tickUserCopy(userId, ctx = {}) {
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
   const rows = await activeFollowRows(client, userId);
   const mirrors = [];
   let checked = 0;
+  let truncated = false;
+  const deadlineMs = Number(ctx?.deadlineMs || 0);
   for (const row of rows) {
+    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; }
     try {
-      const res = await tickOneFollow(userId, row, client, mirrors);
+      const res = await tickOneFollow(userId, row, client, mirrors, ctx);
       if (res === "ok") checked += 1;
     } catch (e) {
       // One bad follow never stops others.
       mirrors.push({ follow: row.meta?.followedWallet || null, ok: false, error: "follow_threw", message: e?.message || String(e) });
     }
   }
-  if (checked === 0 && rows.length > 0) {
+  if (checked === 0 && rows.length > 0 && !truncated) {
     return { ok: true, checked: 0, note: "history_unavailable", mirrors };
   }
-  return { ok: true, checked, mirrors };
+  return { ok: true, checked, mirrors, ...(truncated ? { truncated: true } : {}) };
 }
 
-async function tickOneFollow(userId, row, client, mirrors) {
+async function tickOneFollow(userId, row, client, mirrors, ctx = {}) {
   const meta = row.meta || {};
   const wallet = meta.followedWallet;
   const mode = COPY_MODES.includes(meta.mode) ? meta.mode : "fixed_usd";
@@ -290,8 +308,30 @@ async function tickOneFollow(userId, row, client, mirrors) {
   const fills = meta.fills || [];
   const now = new Date().toISOString();
   const sizing = { mode, sizeValue, maxPerTradeUsd, followedWallet: wallet };
+  const deadlineMs = Number(ctx?.deadlineMs || 0);
+
+  // Claim-then-execute: serialize overlapping ticks at the follow-row level
+  // so two ticks can't mirror the same new swaps (double-fill race, F1).
+  // The claim also makes the in-memory seenSigs/fills accumulation race-free:
+  // only the claim winner's writeback lands (guarded resolve below).
+  let claimMeta = null;
+  if (todo.length > 0) {
+    if (deadlineMs && Date.now() > deadlineMs) {
+      mirrors.push({ follow: wallet, ok: false, error: "truncated", message: "Tick budget exhausted before mirroring — deferred to next tick." });
+      return "blocked";
+    }
+    claimMeta = await claimFillRow(client, row.id, meta, { openValue: "active", bumpAttempts: false });
+    if (!claimMeta) {
+      mirrors.push({ follow: wallet, ok: false, error: "claim_lost", message: "Another tick is mirroring this follow — skipped." });
+      return "blocked";
+    }
+  }
 
   for (const s of todo) {
+    if (deadlineMs && Date.now() > deadlineMs) {
+      mirrors.push({ follow: wallet, theirSig: s.signature, ok: false, error: "truncated", message: "Tick budget exhausted — remaining mirrors deferred to next tick." });
+      break;
+    }
     try {
       await mirrorSwap(userId, sizing, s, fills, mirrors, now);
     } catch (e) {
@@ -303,15 +343,33 @@ async function tickOneFollow(userId, row, client, mirrors) {
   }
 
   const patch = {
-    ...meta,
+    ...(claimMeta || meta),
     seenSigs: [...seen].slice(-SEEN_CAP),
     fills: fills.slice(-FILLS_CAP),
     lastCheckAt: now,
   };
-  try {
-    await client.from("ox_live_events").update({ meta: patch }).eq("id", row.id);
-  } catch {
-    /* status write is best-effort; the fills themselves already happened or failed */
+  if (claimMeta) {
+    const resolved = await resolveFillRow(client, row.id, patch, "active");
+    if (!resolved) {
+      // Claim lost mid-flight (re-armed/cancelled by the user, or transport
+      // errors exhausted). Mirrors already executed — persist just the
+      // seenSigs under a fillingAt guard so a later reap won't re-mirror
+      // them, without clobbering whatever state the row is in now.
+      try {
+        await client.from("ox_live_events").update({ meta: patch })
+          .eq("id", row.id)
+          .eq("meta->>status", FILL_STATUS)
+          .eq("meta->>fillingAt", claimMeta.fillingAt);
+      } catch { /* best-effort dedup note */ }
+      mirrors.push({ follow: wallet, ok: false, error: "resolve_lost", message: "Mirror claim lost mid-flight — mirrors executed; seenSigs write best-effort." });
+    }
+  } else {
+    try {
+      // Guarded: never clobber a concurrent "filling" claim's status.
+      await client.from("ox_live_events").update({ meta: patch }).eq("id", row.id).neq("meta->>status", FILL_STATUS);
+    } catch {
+      /* best-effort; no fill happened on this path */
+    }
   }
   return "ok";
 }

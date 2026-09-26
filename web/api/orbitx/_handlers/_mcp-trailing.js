@@ -7,7 +7,7 @@
  *
  * Wired by the parent via dispatchTrailingTools / TRAILING_TOOLS / tickUserTrailing.
  */
-import { needAuth, sb, tokenInfo, walletRow, tokenBalance, appWalletSell } from "./_mcp-app-wallet.js";
+import { needAuth, sb, tokenInfo, walletRow, tokenBalance, appWalletSell, claimFillRow, resolveFillRow, isFillOpen, FILL_STATUS } from "./_mcp-app-wallet.js";
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -236,7 +236,7 @@ export async function appTrailingCancel(auth, args = {}) {
   };
 }
 
-async function tickTrailingRow(client, r, userId, now) {
+async function tickTrailingRow(client, r, userId, now, ctx = {}) {
   const m = r.meta || {};
   let info;
   try {
@@ -248,11 +248,17 @@ async function tickTrailingRow(client, r, userId, now) {
   const peak = Number(m.peakUsd) || info.priceUsd;
   const trailPct = Number(m.trailPct) || 10;
   if (info.priceUsd > peak) {
-    await client.from("ox_live_events").update({ meta: { ...m, peakUsd: info.priceUsd, lastCheckAt: now } }).eq("id", r.id);
+    m.peakUsd = info.priceUsd;
+    m.lastCheckAt = now;
+    // Guarded: never clobber a concurrent "filling" claim's status.
+    await client.from("ox_live_events").update({ meta: { ...m } }).eq("id", r.id).neq("meta->>status", FILL_STATUS);
     return null; // new peak — ratchet up, no fill
   }
   if (info.priceUsd > peak * (1 - trailPct / 100)) return null; // still above the trigger
-  // Trigger hit — sell the armed size.
+  if (Number(ctx?.deadlineMs || 0) && Date.now() > Number(ctx.deadlineMs)) return null; // don't start a fill we can't resolve
+  // Trigger hit — claim before selling so overlapping ticks can't double-fill.
+  const claimed = await claimFillRow(client, r.id, m);
+  if (!claimed) return null; // lost the race
   const auth = { userId };
   let fill;
   let execPriceUsd = info.priceUsd;
@@ -276,12 +282,11 @@ async function tickTrailingRow(client, r, userId, now) {
   } catch (e) {
     fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
   }
-  const attempts = Number(m.attempts || 0) + 1;
+  const attempts = Number(claimed.attempts || 0);
   const fatal = fill && !fill.ok && TRAILING_FATAL.has(String(fill.error || ""));
   const status = fill && fill.ok ? "filled" : fatal || attempts >= TRAILING_MAX_ATTEMPTS ? "failed" : "open";
-  const patch = {
-    ...m,
-    status,
+  const resolved = await resolveFillRow(client, r.id, {
+    ...claimed,
     attempts,
     lastCheckAt: now,
     ...(status !== "open"
@@ -297,16 +302,11 @@ async function tickTrailingRow(client, r, userId, now) {
           },
         }
       : { lastError: fill?.error || fill?.message || null }),
-  };
-  try {
-    await client.from("ox_live_events").update({ meta: patch }).eq("id", r.id);
-  } catch {
-    /* status write is best-effort; the fill itself already happened or failed */
-  }
-  return { id: r.id, mint: m.mint, kind: "app_trailing", status, attempts, triggerPct: trailPct, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null, priceUsd: execPriceUsd, estProceedsUsd } };
+  }, status);
+  return { id: r.id, mint: m.mint, kind: "app_trailing", status, attempts, resolved, triggerPct: trailPct, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null, priceUsd: execPriceUsd, estProceedsUsd } };
 }
 
-async function tickLadderRow(client, r, userId, now) {
+async function tickLadderRow(client, r, userId, now, ctx = {}) {
   const m = r.meta || {};
   let info;
   try {
@@ -315,8 +315,14 @@ async function tickLadderRow(client, r, userId, now) {
     return null; // price feed hiccup — retry next tick
   }
   if (!info.priceUsd) return null;
-  const auth = { userId };
   const tranches = (m.tranches || []).map((t) => ({ ...t }));
+  const hittable = tranches.some((t) => t.status === "open" && info.priceUsd >= Number(t.targetUsd));
+  if (!hittable) return null;
+  if (Number(ctx?.deadlineMs || 0) && Date.now() > Number(ctx.deadlineMs)) return null; // don't start fills we can't resolve
+  // Claim the whole row before selling tranches — overlapping ticks can't double-sell.
+  const claimed = await claimFillRow(client, r.id, { ...m, tranches }, { bumpAttempts: false });
+  if (!claimed) return null; // lost the race
+  const auth = { userId };
   const out = [];
   for (const t of tranches) {
     if (t.status !== "open") continue;
@@ -344,19 +350,13 @@ async function tickLadderRow(client, r, userId, now) {
     out.push({ id: r.id, mint: m.mint, kind: "app_ladder", status: t.status, tranche: { mult: t.mult, pct: t.pct }, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null } });
   }
   const allDone = tranches.length > 0 && tranches.every((t) => t.status === "filled" || t.status === "failed");
-  const patch = {
-    ...m,
+  const resolved = await resolveFillRow(client, r.id, {
+    ...claimed,
     tranches,
-    status: allDone ? "filled" : "open",
     lastCheckAt: now,
     ...(allDone ? { filledAt: now } : {}),
-  };
-  try {
-    await client.from("ox_live_events").update({ meta: patch }).eq("id", r.id);
-  } catch {
-    /* status write is best-effort; fills already happened or failed */
-  }
-  return out.length ? out : null;
+  }, allDone ? "filled" : "open");
+  return out.length ? out.map((o) => ({ ...o, resolved })) : null;
 }
 
 /** Tick this user's open trailing stops and take-profit ladders. Per-row failures never stop the tick. */
@@ -373,25 +373,28 @@ export async function tickUserTrailing(userId, ctx) {
     .limit(200);
   const fills = [];
   let checked = 0;
+  let truncated = false;
+  const deadlineMs = Number(ctx?.deadlineMs || 0);
   const now = new Date().toISOString();
   for (const r of data || []) {
+    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; }
     const m = r.meta || {};
-    if ((m.status || "open") !== "open") continue;
+    if (!isFillOpen(m)) continue;
     if (!m.mint) continue;
     checked += 1;
     try {
       if (r.kind === "app_trailing") {
-        const f = await tickTrailingRow(client, r, userId, now);
+        const f = await tickTrailingRow(client, r, userId, now, ctx);
         if (f) fills.push(f);
       } else if (r.kind === "app_ladder") {
-        const fs = await tickLadderRow(client, r, userId, now);
+        const fs = await tickLadderRow(client, r, userId, now, ctx);
         if (fs) fills.push(...fs);
       }
     } catch {
       /* never throw out of the tick */
     }
   }
-  return { ok: true, checked, fills };
+  return { ok: true, checked, fills, ...(truncated ? { truncated: true } : {}) };
 }
 
 export async function appTrailingTick(auth) {

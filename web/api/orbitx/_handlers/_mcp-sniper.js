@@ -13,6 +13,9 @@ import {
   appWalletBuy,
   appWalletSell,
   USDC_MINT,
+  claimFillRow,
+  resolveFillRow,
+  FILL_STATUS,
 } from "./_mcp-app-wallet.js";
 
 const SNIPE_KIND = "app_snipe";
@@ -60,7 +63,7 @@ function rowAgeMin(row) {
   return (Date.now() - ms) / 60000;
 }
 
-async function findActiveRow(client, userId) {
+async function findActiveRow(client, userId, includeFilling = false) {
   const { data } = await client
     .from("ox_live_events")
     .select("id,meta,created_at")
@@ -69,7 +72,10 @@ async function findActiveRow(client, userId) {
     .order("created_at", { ascending: false })
     .limit(20);
   const rows = data || [];
-  return rows.find((r) => (r.meta || {}).status === "active") || null;
+  // includeFilling: for arm/stop, which must find a config even while a buy is
+  // in-flight (otherwise re-arm would insert a duplicate active row). The tick
+  // itself always uses strict "active" — that exclusion IS the fill mutex.
+  return rows.find((r) => (r.meta || {}).status === "active" || (includeFilling && (r.meta || {}).status === FILL_STATUS)) || null;
 }
 
 async function latestRow(client, userId) {
@@ -119,7 +125,7 @@ export async function appSnipe(auth, args = {}) {
   if (!client) return { ok: false, error: "db_unavailable", message: "Sniper config store unreachable. Retry in a minute." };
 
   const today = todayUtc();
-  const existing = await findActiveRow(client, gate.userId);
+  const existing = await findActiveRow(client, gate.userId, true);
   const prev = existing?.meta || {};
   const meta = {
     name,
@@ -161,7 +167,7 @@ export async function appSnipeStop(auth) {
   if (!gate.userId) return gate;
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
-  const existing = await findActiveRow(client, gate.userId);
+  const existing = await findActiveRow(client, gate.userId, true);
   if (!existing) return { ok: false, error: "no_sniper", message: "No active sniper config." };
   const meta = { ...(existing.meta || {}), status: "stopped", stoppedAt: new Date().toISOString() };
   await client.from("ox_live_events").update({ meta }).eq("id", existing.id);
@@ -227,7 +233,8 @@ export async function tickUserSniper(userId, ctx = {}) {
   }
   m.spentUsd = num(m.spentUsd, 0);
   if (m.spentUsd >= num(m.dailyCapUsd, 50)) {
-    await client.from("ox_live_events").update({ meta: { ...m, lastCheckAt: nowIso } }).eq("id", r.id);
+    // Guarded: never clobber a concurrent "filling" claim's status.
+    await client.from("ox_live_events").update({ meta: { ...m, lastCheckAt: nowIso } }).eq("id", r.id).neq("meta->>status", FILL_STATUS);
     return { ok: true, checked: 1, skipped: "daily_cap" };
   }
 
@@ -237,7 +244,8 @@ export async function tickUserSniper(userId, ctx = {}) {
     const j = await fetchJson(`${base}/api/ogdex/screener?type=new&interval=1h&limit=30&chain=solana`, 10000);
     rows = j.rows || j.data || j.tokens;
   } catch (e) {
-    await client.from("ox_live_events").update({ meta: { ...m, lastCheckAt: nowIso, lastError: `screener: ${e?.message || String(e)}` } }).eq("id", r.id);
+    // Guarded: never clobber a concurrent "filling" claim's status.
+    await client.from("ox_live_events").update({ meta: { ...m, lastCheckAt: nowIso, lastError: `screener: ${e?.message || String(e)}` } }).eq("id", r.id).neq("meta->>status", FILL_STATUS);
     return { ok: true, checked: 1, skipped: "screener_error" };
   }
   if (!Array.isArray(rows)) rows = [];
@@ -264,7 +272,10 @@ export async function tickUserSniper(userId, ctx = {}) {
   // Dev-holding gate, fail-safe: reject > cap; skip entirely when unknown.
   const rejects = [];
   let chosen = null;
+  let truncated = false;
+  const deadlineMs = Number(ctx?.deadlineMs || 0);
   for (const c of candidates) {
+    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; }
     let pct = null;
     try {
       const j = await fetchJson(`${base}/api/ogdex/forensics?mint=${c.mint}`, 10000);
@@ -295,12 +306,24 @@ export async function tickUserSniper(userId, ctx = {}) {
   if (chosen) {
     const size = Math.min(num(m.maxBuyUsd, 5), num(m.dailyCapUsd, 50) - m.spentUsd);
     if (size >= 0.5) {
+      if (deadlineMs && Date.now() > deadlineMs) {
+        return { ok: true, checked: 1, candidates: candidates.length, rejects: rejects.slice(0, 10), buys, truncated: true };
+      }
+      // Claim-then-execute: the claim serializes overlapping ticks, so the
+      // in-memory spentUsd += size below can't race (F1), and the spend is
+      // persisted by the guarded resolve.
+      const claimed = await claimFillRow(client, r.id, m, { openValue: "active", bumpAttempts: false });
+      if (!claimed) {
+        // Lost the race — another tick owns this sniper cycle. Touch nothing.
+        return { ok: true, checked: 1, candidates: candidates.length, rejects: rejects.slice(0, 10), buys, skipped: "claim_lost" };
+      }
       let fill;
       try {
         fill = await appWalletBuy({ userId }, { mint: chosen.mint, usd: size });
       } catch (e) {
         fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
       }
+      let metaWriteFailed = false;
       if (fill && fill.ok) {
         let priceUsd = 0;
         try {
@@ -318,15 +341,22 @@ export async function tickUserSniper(userId, ctx = {}) {
       } else {
         m.lastError = fill?.error || fill?.message || "buy_failed";
       }
+      // Guarded resolve (retries transport errors). If it fails, the spend
+      // is NOT silently lost — metaWriteFailed surfaces in the tick result
+      // (F7), and the stale claim is reaped by a later tick.
+      const resolved = await resolveFillRow(client, r.id, m, "active");
+      if (!resolved) metaWriteFailed = true;
+      return { ok: true, checked: 1, candidates: candidates.length, rejects: rejects.slice(0, 10), buys, ...(truncated ? { truncated: true } : {}), ...(metaWriteFailed ? { metaWriteFailed: true } : {}) };
     }
   }
 
   try {
-    await client.from("ox_live_events").update({ meta: m }).eq("id", r.id);
+    // Guarded: never clobber a concurrent "filling" claim's status.
+    await client.from("ox_live_events").update({ meta: m }).eq("id", r.id).neq("meta->>status", FILL_STATUS);
   } catch {
-    /* meta write is best-effort; the fill (if any) already happened */
+    /* meta write is best-effort; no fill happened on this path */
   }
-  return { ok: true, checked: 1, candidates: candidates.length, rejects: rejects.slice(0, 10), buys };
+  return { ok: true, checked: 1, candidates: candidates.length, rejects: rejects.slice(0, 10), buys, ...(truncated ? { truncated: true } : {}) };
 }
 
 export function dispatchSniperTools(name, args, auth) {
