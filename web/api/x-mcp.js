@@ -4201,14 +4201,23 @@ async function handleMcp(req, res, parts) {
     try {
       const proto = header(req, "x-forwarded-proto") || "https";
       const host = header(req, "x-forwarded-host") || header(req, "host") || "orbitx.world";
+      const tickStart = Date.now();
       const { tickAllStrategies } = await import("./orbitx/_handlers/_mcp-strategies.js");
       const out = await tickAllStrategies({ base: `${proto}://${host}` });
       // AgentPlus substrate tick: event-driven + heartbeat mind loop (or
       // deterministic driver bookkeeping when no LLM key is configured).
-      // Never allowed to throw the whole tick.
+      // Never allowed to throw the whole tick — and never allowed to push the
+      // tick past Vercel's 60s function limit. Hanging LLM thinks (e.g. during
+      // Nvidia serving degradation) used to 504 the entire sweep, including
+      // the money-critical strategy fills above. Now the agentplus segment gets
+      // whatever is left of a ~52s total budget, hard-capped via race.
       try {
         const { tickAgentPlus } = await import("./orbitx/_handlers/_mcp-agentplus.js");
-        out.agentplus = await tickAgentPlus({ base: `${proto}://${host}` });
+        const remaining = Math.max(4000, 52000 - (Date.now() - tickStart));
+        out.agentplus = await Promise.race([
+          tickAgentPlus({ base: `${proto}://${host}`, timeBudgetMs: Math.min(40000, remaining) }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("agentplus_tick_timeout")), remaining)),
+        ]);
       } catch (e) {
         out.agentplus = { ok: false, error: e?.message || "agentplus_tick_failed" };
       }
