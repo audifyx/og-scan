@@ -324,110 +324,19 @@ function fillArgsFor(order) {
   return a;
 }
 
-/* ------------------------------------------------------------------ */
-/* Fill-claim mutex (double-fill race fix).                            */
-/*                                                                    */
-/* Every strategy family used to do read → execute-on-chain →          */
-/* unconditional status writeback. Two overlapping tick invocations   */
-/* (cron + manual tick, or a retried tick after a 504) could both read */
-/* "open"/"active" and both fill — the user trades twice. The claim    */
-/* flips the row to status "filling" atomically (conditional on it     */
-/* still being open) BEFORE any on-chain execution; only the claim     */
-/* winner executes. A 10-minute stale window lets a later tick reap   */
-/* claims orphaned by a killed invocation.                             */
-/* ------------------------------------------------------------------ */
-
-export const FILL_STATUS = "filling";
-export const FILL_CLAIM_MS = 10 * 60 * 1000;
-
-export function fillClaimIsStale(meta) {
-  const at = Date.parse(meta?.fillingAt || "");
-  return Number.isFinite(at) && Date.now() - at > FILL_CLAIM_MS;
-}
-
-// Convention-aware "may this row be fill-attempted now?"
-// openValue: "open" (limits/trailing/ladder/alerts) or "active" (copy/sniper).
-export function isFillOpen(meta, openValue = "open") {
-  const s = meta?.status ?? openValue;
-  if (s === openValue) return true;
-  if (s === FILL_STATUS && fillClaimIsStale(meta)) return true;
-  return false;
-}
-
-const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/**
- * Atomically claim a row for filling. Returns the claim patch (meta with
- * status "filling") on success, or null when another tick owns the row.
- * Missing status counts as open (family convention); a stale "filling"
- * claim (older than FILL_CLAIM_MS) may be reaped.
- */
-export async function claimFillRow(client, rowId, meta, opts = {}) {
-  const { openValue = "open", bumpAttempts = true } = opts;
-  const now = new Date().toISOString();
-  const staleBefore = new Date(Date.now() - FILL_CLAIM_MS).toISOString();
-  const patch = { ...(meta || {}), status: FILL_STATUS, fillingAt: now, lastCheckAt: now };
-  if (bumpAttempts) patch.attempts = Number(meta?.attempts || 0) + 1;
-  const orCond =
-    `meta->>status.is.null,meta->>status.eq.${openValue},` +
-    `and(meta->>status.eq.${FILL_STATUS},meta->>fillingAt.lt.${staleBefore})`;
-  try {
-    const { data, error } = await client
-      .from("ox_live_events")
-      .update({ meta: patch })
-      .eq("id", rowId)
-      .or(orCond)
-      .select("id");
-    if (error || !data || data.length === 0) return null;
-    return patch;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve a claim after execution. Guarded on status="filling" so a claim
- * we no longer own (re-armed, cancelled, or re-claimed) is never clobbered.
- * Retries transport errors; returns true when the row was resolved.
- */
-export async function resolveFillRow(client, rowId, metaPatch, finalStatus) {
-  const patch = { ...(metaPatch || {}) };
-  delete patch.fillingAt;
-  patch.status = finalStatus;
-  for (let i = 0; i < 3; i++) {
-    try {
-      const { data, error } = await client
-        .from("ox_live_events")
-        .update({ meta: patch })
-        .eq("id", rowId)
-        .eq("meta->>status", FILL_STATUS)
-        .select("id");
-      if (!error && data && data.length > 0) return true;
-      if (!error) return false; // guard didn't match — not ours anymore; don't retry
-    } catch {
-      /* transport error — retry below */
-    }
-    await _sleep(250 * (i + 1));
-  }
-  return false;
-}
-
 // Errors that will never succeed on retry — fail the order immediately.
 const LIMIT_FATAL = new Set(["no_balance", "no_wallet", "bad_mint", "size", "need_size"]);
 const LIMIT_MAX_ATTEMPTS = 10;
 
-export async function tickUserLimits(userId, ctx = {}) {
+export async function tickUserLimits(userId) {
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
   const { data } = await client.from("ox_live_events").select("id,meta").eq("kind", "app_limit").eq("agent_id", userId).order("created_at", { ascending: false }).limit(100);
   const fills = [];
   let checked = 0;
-  let truncated = false;
-  const deadlineMs = Number(ctx?.deadlineMs || 0);
   for (const r of data || []) {
-    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; }
     const o = r.meta || {};
-    if (!isFillOpen(o)) continue;
+    if ((o.status || "open") !== "open") continue;
     if (!o.mint || !o.targetUsd) continue;
     checked += 1;
     let info;
@@ -439,10 +348,6 @@ export async function tickUserLimits(userId, ctx = {}) {
     if (!info.priceUsd) continue;
     const hit = o.side === "sell" ? info.priceUsd >= Number(o.targetUsd) : info.priceUsd <= Number(o.targetUsd);
     if (!hit) continue;
-    if (deadlineMs && Date.now() > deadlineMs) { truncated = true; break; } // don't start a fill we can't resolve
-    // Claim-then-execute: only the claim winner fills (double-fill race fix).
-    const claimed = await claimFillRow(client, r.id, o);
-    if (!claimed) continue; // lost the race — another tick owns this fill
     const auth = { userId };
     let fill;
     try {
@@ -450,20 +355,26 @@ export async function tickUserLimits(userId, ctx = {}) {
     } catch (e) {
       fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
     }
-    const attempts = Number(claimed.attempts || 0);
+    const attempts = Number(o.attempts || 0) + 1;
     const fatal = fill && !fill.ok && LIMIT_FATAL.has(String(fill.error || ""));
     const status = fill && fill.ok ? "filled" : fatal || attempts >= LIMIT_MAX_ATTEMPTS ? "failed" : "open";
-    const resolved = await resolveFillRow(client, r.id, {
-      ...claimed,
+    const patch = {
+      ...o,
+      status,
       attempts,
       lastCheckAt: new Date().toISOString(),
       ...(status !== "open"
         ? { filledAt: new Date().toISOString(), lastFill: { ok: !!fill?.ok, error: fill?.error || null, message: fill?.message || null, signature: fill?.signature || null, priceUsd: info?.priceUsd ?? null, size: o.size || null } }
         : { lastError: fill?.error || fill?.message || null }),
-    }, status);
-    fills.push({ orderId: r.id, mint: o.mint, side: o.side, status, attempts, resolved, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null } });
+    };
+    try {
+      await client.from("ox_live_events").update({ meta: patch }).eq("id", r.id);
+    } catch {
+      /* status write is best-effort; the fill itself already happened or failed */
+    }
+    fills.push({ orderId: r.id, mint: o.mint, side: o.side, status, attempts, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null } });
   }
-  return { ok: true, checked, fills, ...(truncated ? { truncated: true } : {}) };
+  return { ok: true, checked, fills };
 }
 
 export async function appWalletTickLimits(auth) {

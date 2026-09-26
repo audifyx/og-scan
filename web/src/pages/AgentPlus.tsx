@@ -31,9 +31,6 @@ import {
   type DigestResponse,
   authedFetch,
   postCommand,
-  activeRoster,
-  fleetTasks,
-  rosterKey,
   type FeedResponse,
 } from "@/components/agentos/api";
 import { btnPrimary, btnGhost } from "@/components/agentos/ui";
@@ -89,14 +86,9 @@ const AgentPlus = () => {
   const cursorRef = useRef("");
   const seenIds = useRef<Set<string | number>>(new Set());
 
-  const flashGen = useRef(0);
   const flash = (kind: "ok" | "err" | "warn", text: string) => {
-    const gen = ++flashGen.current;
     setNotice({ kind, text });
-    window.setTimeout(() => {
-      // A newer flash must not be cleared by an older timer.
-      if (flashGen.current === gen) setNotice(null);
-    }, 5000);
+    window.setTimeout(() => setNotice(null), 5000);
   };
 
   /* ── feed polling ── */
@@ -112,14 +104,7 @@ const AgentPlus = () => {
       const fresh = (json.events || []).filter((e) => !seenIds.current.has(e.id));
       fresh.forEach((e) => seenIds.current.add(e.id));
       if (fresh.length) setEvents((prev) => [...prev, ...fresh].slice(-600));
-      if (json.agents) {
-        // The feed delivers a fresh array identity every 2s poll even when
-        // the roster is unchanged. Keep the previous state object in that
-        // case, or every useCallback/useEffect depending on `agents`
-        // (task lists, gallery) refires each poll — a refetch storm.
-        const key = rosterKey(json.agents);
-        setAgents((prev) => (rosterKey(prev) === key ? prev : json.agents));
-      }
+      if (json.agents) setAgents(json.agents);
       if (json.nextCursor !== undefined && json.nextCursor !== null) {
         cursorRef.current = String(json.nextCursor);
         setCursor(String(json.nextCursor));
@@ -144,22 +129,22 @@ const AgentPlus = () => {
   /* ── cross-agent task list (kanban + palette share it) ── */
   const fetchAllTasks = useCallback(async () => {
     try {
-      // Per-agent fetch (not the unscoped endpoint): tasks are attributed to
-      // their owner, so archived agents' tasks can't leak into the palette.
-      const live = activeRoster(agents);
-      const results = await Promise.all(
-        live.map((a) =>
-          postCommand({ action: "tasks", name: a.name, quiet: true })
-            .then((j) => ((j.tasks || []) as TaskInfo[]).map((t) => ({ ...t, agent: a.name })))
-            .catch(() => [] as TaskInfo[]),
-        ),
+      const res = await authedFetch(
+        "/api/x-mcp?path=agentplus/command",
+        {
+          method: "POST",
+          body: JSON.stringify({ action: "tasks", quiet: true }),
+        },
       );
-      const merged = results.flat().sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-      setAllTasks(merged);
+      const j = await res.json().catch(() => ({}));
+      if (j && j.ok !== false && Array.isArray(j.tasks)) {
+        // tasks endpoint without a name returns every task; attribute later per-agent when known
+        setAllTasks(j.tasks as TaskInfo[]);
+      }
     } catch {
       /* keep stale */
     }
-  }, [agents]);
+  }, []);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -194,10 +179,9 @@ const AgentPlus = () => {
   }, []);
 
   /* ── actions ── */
-  // Actionable surfaces (Cmd+K, dispatch, activity filter, fleet roster,
-  // messages, header badge) only ever see the live fleet — archived agents'
-  // stale errors must not look like problems.
-  const activeAgents = useMemo(() => activeRoster(agents), [agents]);
+  // Actionable surfaces (Cmd+K, dispatch, activity filter) only ever see the
+  // live fleet — archived agents' stale errors must not look like problems.
+  const activeAgents = useMemo(() => agents.filter((a) => a.status === "active"), [agents]);
   const handleThinkNow = async (name: string) => {
     if (thinkBusy) return;
     setThinkBusy(name);
@@ -299,7 +283,7 @@ const AgentPlus = () => {
 
   const online = feedState === "live";
   const rosterErrorCount = activeAgents.filter((a) => a.last_think_error).length;
-  const totalUnread = activeAgents.reduce((s, a) => s + (a.unread || 0), 0);
+  const totalUnread = agents.reduce((s, a) => s + (a.unread || 0), 0);
   const inspectorAgent = selection?.type === "agent" ? selection.agent : null;
 
   const railBtn = (v: (typeof VIEWS)[number]) => {
@@ -416,7 +400,7 @@ const AgentPlus = () => {
               <>
                 {view === "fleet" && (
                   <Fleet
-                    agents={activeAgents}
+                    agents={agents}
                     events={events}
                     live={online}
                     thinkBusy={thinkBusy}
@@ -447,13 +431,7 @@ const AgentPlus = () => {
                   />
                 )}
                 {view === "messages" && (
-                  <MessagesView
-                    agents={activeAgents}
-                    feedEvents={events}
-                    initialPeer={messagePeer}
-                    onSent={() => fetchFeed(false)}
-                    onError={(t) => flash("err", t)}
-                  />
+                  <MessagesView agents={agents} feedEvents={events} initialPeer={messagePeer} onSent={() => fetchFeed(false)} />
                 )}
                 {view === "usage" && <UsageView />}
               </>
@@ -518,7 +496,7 @@ const AgentPlus = () => {
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}
           agents={activeAgents}
-          tasks={fleetTasks(allTasks, activeAgents)}
+          tasks={allTasks}
           onThink={handleThinkNow}
           onSpawn={() => setSpawnOpen(true)}
           onGoMessages={goMessages}

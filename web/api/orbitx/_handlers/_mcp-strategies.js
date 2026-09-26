@@ -17,7 +17,7 @@ import { tickUserSniper } from "./_mcp-sniper.js";
 import { tickUserAlerts } from "./_mcp-alerts.js";
 
 const JOBS = [
-  { name: "limits", kinds: ["app_limit"], run: (uid, ctx) => tickUserLimits(uid, ctx) },
+  { name: "limits", kinds: ["app_limit"], run: (uid) => tickUserLimits(uid) },
   { name: "copy", kinds: ["app_copy"], run: (uid, ctx) => tickUserCopy(uid, ctx) },
   { name: "trailing", kinds: ["app_trailing", "app_ladder"], run: (uid, ctx) => tickUserTrailing(uid, ctx) },
   { name: "sniper", kinds: ["app_snipe"], run: (uid, ctx) => tickUserSniper(uid, ctx) },
@@ -44,8 +44,6 @@ const ALL_STRATEGY_KINDS = ["app_limit", "app_copy", "app_trailing", "app_ladder
  * Conservative (fail-open): any doubt → true, run the sweep as before.
  * Family conventions: limits/trailing/ladder/alerts treat missing meta.status
  * as open; copy treats missing as active; sniper requires status === "active".
- * "filling" (a claim held by an in-flight tick) also counts — the sweep must
- * run so stale claims get reaped instead of idling forever.
  */
 export async function hasOpenStrategies() {
   try {
@@ -55,7 +53,7 @@ export async function hasOpenStrategies() {
       .from("ox_live_events")
       .select("id", { count: "exact", head: true })
       .in("kind", ALL_STRATEGY_KINDS)
-      .or("meta->>status.is.null,meta->>status.in.(open,active,filling)")
+      .or("meta->>status.is.null,meta->>status.in.(open,active)")
       .limit(1);
     return (count || 0) > 0;
   } catch {
@@ -71,7 +69,7 @@ export async function tickAllStrategies({ maxUsers = 200, base, timeBudgetMs = 5
   if (!(await hasOpenStrategies())) {
     return { ok: true, strategies: JOBS.map((j) => j.name), users: 0, active: 0, truncated: false, results: [], skipped: "idle_no_open_strategies" };
   }
-  const ctx = { base: base || "https://orbitx.world", deadlineMs: Date.now() + timeBudgetMs };
+  const ctx = { base: base || "https://orbitx.world" };
   const results = [];
   const usersSeen = new Set();
   const started = Date.now();
@@ -94,7 +92,6 @@ export async function tickAllStrategies({ maxUsers = 200, base, timeBudgetMs = 5
       usersSeen.add(userId);
       try {
         const r = await job.run(userId, ctx);
-        if (r?.truncated) truncated = true;
         if (hasAction(r)) results.push({ strategy: job.name, userId, ...r });
       } catch (e) {
         results.push({ strategy: job.name, userId, ok: false, error: e?.message || String(e) });
