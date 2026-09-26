@@ -655,3 +655,159 @@ describe("QA adversarial additions — dossier honesty regressions + normalize e
     expect(hubDetectBareCa(`${MINT} scan this please check it now`)).toBeNull(); // 6 fillers no
   });
 });
+
+describe("QA adversarial — _providerDark circuit breaker (9e8493d)", () => {
+  // _providerDark(client, {windowMin, threshold}) — pure decision logic over a
+  // supabase-like client. Fake client records the query chain and returns
+  // canned results.
+  const darkSrc = [
+    "PROVIDER_DARK_WINDOW_MIN",
+    "PROVIDER_DARK_THRESHOLD",
+    "_providerDark",
+  ]
+    .map(extract)
+    .join("\n");
+  const providerDark = new Function(`${darkSrc}\nreturn _providerDark;`)();
+
+  function fakeClient({ count, countThrows = false, markers = [], markersThrow = false }) {
+    const calls = { writes: [] };
+    return {
+      calls,
+      from(table) {
+        if (table !== "ap_agent_logs") throw new Error("unexpected table " + table);
+        return {
+          select(_cols, opts) {
+            // The real supabase builder returns the same thenable from every
+            // chained call; each method must return `this` (the query object),
+            // never a fresh prototype, or the `then` below is lost and every
+            // query silently resolves to undefined.
+            const isCount = opts && opts.count === "exact" && opts.head === true;
+            const q = {
+              select() { return q; },
+              eq() { return q; },
+              like() { return q; },
+              gte() { return q; },
+              or() { return q; },
+              order() { return q; },
+              limit() { return q; },
+              then(resolve) {
+                if (isCount) {
+                  if (countThrows) resolve({ count: null, error: new Error("db down") });
+                  else resolve({ count, error: null });
+                } else {
+                  if (markersThrow) resolve({ data: null, error: new Error("db down") });
+                  else resolve({ data: markers.map((body) => ({ body })), error: null });
+                }
+              },
+            };
+            return q;
+          },
+        };
+      },
+    };
+  }
+
+  it("trips on >= threshold transport timeouts in the window", async () => {
+    const r = await providerDark(fakeClient({ count: 6 }), { windowMin: 15, threshold: 5 });
+    expect(r.dark).toBe(true);
+    expect(r.sticky).toBe(false);
+    expect(r.timeouts).toBe(6);
+  });
+
+  it("stays open below threshold with no markers", async () => {
+    const r = await providerDark(fakeClient({ count: 2, markers: [] }), { windowMin: 15, threshold: 5 });
+    expect(r.dark).toBe(false);
+    expect(r.sticky).toBe(false);
+  });
+
+  it("sticky-trips on an unrecovered provider_dark marker even with zero fresh timeouts", async () => {
+    const r = await providerDark(
+      fakeClient({ count: 0, markers: ["provider_dark: 9 think transport timeouts in 15m — parking"] }),
+      { windowMin: 15, threshold: 5 },
+    );
+    expect(r.dark).toBe(true);
+    expect(r.sticky).toBe(true);
+  });
+
+  it("disengages after a provider_recovered marker", async () => {
+    const r = await providerDark(
+      fakeClient({ count: 1, markers: ["provider_recovered: probe ok in 1200ms — resuming"] }),
+      { windowMin: 15, threshold: 5 },
+    );
+    expect(r.dark).toBe(false);
+    expect(r.sticky).toBe(false);
+  });
+
+  it("fails open when the count query throws (never parks on doubt)", async () => {
+    const r = await providerDark(fakeClient({ count: 0, countThrows: true }), { windowMin: 15, threshold: 5 });
+    expect(r.dark).toBe(false);
+  });
+
+  it("fails open when the marker read throws and count is below threshold", async () => {
+    const r = await providerDark(fakeClient({ count: 2, markersThrow: true }), { windowMin: 15, threshold: 5 });
+    expect(r.dark).toBe(false);
+  });
+
+  it("only counts think transport failures, not other error kinds", async () => {
+    // Verified by query shape: kind='error' AND body LIKE 'think transport failed%'.
+    expect(darkSrc).toContain('.like("body", "think transport failed%")');
+    expect(darkSrc).toContain('.eq("kind", "error")');
+  });
+});
+
+describe("QA adversarial — _announceProviderDark one-marker-per-episode (9e8493d)", () => {
+  // _announceProviderDark reads PROVIDER_DARK_WINDOW_MIN at runtime; the
+  // constant must be in the sandbox or the reference throws inside the
+  // function's best-effort try/catch and every announce silently no-ops.
+  const annSrc = ["PROVIDER_DARK_WINDOW_MIN", "_announceProviderDark"].map(extract).join("\n");
+  function makeAnn(logged) {
+    const writes = [];
+    const client = {
+      from() {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          or() { return this; },
+          gte() { return this; },
+          order() { return this; },
+          limit() { return this; },
+          then(resolve) { resolve({ data: logged.map((body) => ({ body })) }); },
+        };
+      },
+    };
+    const logEvent = (_c, e) => { writes.push(e); };
+    const raw = new Function("client", "_logEvent", `${annSrc}\nreturn _announceProviderDark;`)(client, logEvent);
+    // _announceProviderDark's first parameter shadows the sandbox binding —
+    // the mock client must be passed as the call's first argument, not rely
+    // on the closure. Bind it here so call sites can't pass the wrong client.
+    const fn = (userId, darkState) => raw(client, userId, darkState);
+    return { fn, writes };
+  }
+
+  it("skips the announce when the trip is sticky (episode already announced)", async () => {
+    const { fn, writes } = makeAnn([]);
+    await fn("u1", { dark: true, sticky: true, timeouts: 0, windowMin: 15 });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("writes one marker on a fresh trip with no recent marker", async () => {
+    const { fn, writes } = makeAnn([]);
+    await fn("u1", { dark: true, sticky: false, timeouts: 7, windowMin: 15 });
+    expect(writes).toHaveLength(1);
+    expect(writes[0].kind).toBe("system");
+    expect(writes[0].body).toMatch(/^provider_dark: 7 think transport timeouts/);
+  });
+
+  it("does not double-announce when a recent provider_dark marker exists", async () => {
+    const { fn, writes } = makeAnn(["provider_dark: 7 think transport timeouts in 15m — parking"]);
+    await fn("u1", { dark: true, sticky: false, timeouts: 7, windowMin: 15 });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("announces a fresh episode after a logged recovery", async () => {
+    const { fn, writes } = makeAnn(["provider_recovered: probe ok in 900ms — resuming"]);
+    await fn("u1", { dark: true, sticky: false, timeouts: 5, windowMin: 15 });
+    expect(writes).toHaveLength(1);
+    expect(writes[0].body).toMatch(/^provider_dark:/);
+  });
+});
