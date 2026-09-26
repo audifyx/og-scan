@@ -76,11 +76,6 @@ const PROVIDER_DARK_WINDOW_MIN = 15;
 const PROVIDER_DARK_THRESHOLD = 5; // transport-timeout thinks inside the window
 const PROVIDER_PROBE_TIMEOUT_MS = 15000;
 
-// Pure park decision (no DB, no network): park scheduled thinks only when the
-// provider is dark AND this deployment has a key. No-key deployments keep
-// flowing into thinkAgent so they fall through to driverStep deterministically.
-const shouldParkThinks = ({ providerDark = false, hasKey = false } = {}) => Boolean(providerDark && hasKey);
-
 // Default plan when a kind='website' task is assigned without explicit steps.
 const WEBSITE_PLAN = ["scaffold", "frontend", "backend", "build/validate", "deploy", "done"].map((title) => ({
   title,
@@ -2254,7 +2249,7 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
         truncated = true;
         break;
       }
-      if (shouldParkThinks({ providerDark, hasKey })) {
+      if (providerDark && hasKey) {
         // Parked: provider is dark. Wake flags are preserved for recovery.
         results.push({ agent: agent.name, mode: "live", skipped: "provider_dark", timeouts: darkState.timeouts });
         continue;
