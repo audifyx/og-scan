@@ -8,6 +8,8 @@ import {
   exportUserWalletSecret,
   revokeUserWallet,
   signUserSwap,
+  coerceSlippageBps,
+  SLIPPAGE_BPS_DEFAULT,
   getDeskSolLamports,
   getDeskFunds,
   SOL_MINT,
@@ -68,7 +70,7 @@ async function ensureWallet(userId, agentId) {
   return walletRow(userId);
 }
 
-function receipt({ side, info, usd, signature, owner, payWith }) {
+function receipt({ side, info, usd, signature, owner, payWith, slippageBps }) {
   return {
     ok: true,
     signedOn: "backend",
@@ -80,6 +82,7 @@ function receipt({ side, info, usd, signature, owner, payWith }) {
     entryUsd: info.priceUsd,
     entryMcap: info.mcap,
     usd,
+    slippageBps: slippageBps ?? SLIPPAGE_BPS_DEFAULT,
     signature,
     wallet: owner,
     tx: signature ? `https://solscan.io/tx/${signature}` : null,
@@ -188,6 +191,46 @@ export async function appWalletRevoke(auth) {
   return { ok: true, revoked: true };
 }
 
+/* ------------------------------------------------------------------ */
+/* Trade-parameter validation (F5/F6). Pure helpers — no network, no   */
+/* DB. Extracted by web/shared/qa-trade-params.test.js via the        */
+/* anchors below; keep this block self-contained (no imports).         */
+/*                                                                    */
+/* F6 root cause: appWalletSell silently clamped out-of-range sizes —  */
+/* percent=0 → 1% sell reported ok:true ("no-op success"),            */
+/* percent=150 → full 100% liquidation ("over-fill"), negative → 1%.  */
+/* F6 root cause (limit trigger): pct<=0 armed an order whose target  */
+/* was already hit → silent immediate fill on the next tick.           */
+/* ------------------------------------------------------------------ */
+export function validateSellSize(args = {}) {
+  if (args.fraction != null && args.fraction !== "") {
+    const f = Number(args.fraction);
+    if (!Number.isFinite(f) || f <= 0 || f > 1) {
+      return { ok: false, error: "bad_fraction", message: "fraction must be > 0 and ≤ 1 (fraction of position)." };
+    }
+    return { ok: true, fraction: f };
+  }
+  if (args.percent != null && args.percent !== "") {
+    const p = Number(args.percent);
+    if (!Number.isFinite(p) || p <= 0 || p > 100) {
+      return { ok: false, error: "bad_percent", message: "percent must be > 0 and ≤ 100 (percent of position)." };
+    }
+    return { ok: true, fraction: p / 100 };
+  }
+  return { ok: true, fraction: 1 };
+}
+
+export function validateTriggerPct(args = {}) {
+  const raw = args.trigger ?? args.percent ?? args.up;
+  if (raw == null || String(raw).trim() === "") return { ok: true, pct: 15 };
+  const pct = Number(String(raw).replace(/[^\d.\-]/g, ""));
+  if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+    return { ok: false, error: "bad_trigger", message: "trigger must be > 0 and ≤ 100 (percent price move)." };
+  }
+  return { ok: true, pct };
+}
+/* End trade-parameter validation (F5/F6). */
+
 export async function appWalletBuy(auth, args = {}) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
@@ -195,6 +238,12 @@ export async function appWalletBuy(auth, args = {}) {
   if (!row) return { ok: false, error: "no_wallet", message: "Create a wallet first." };
   const mint = String(args.mint || args.ca || "").trim();
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return { ok: false, error: "bad_mint" };
+  let slip;
+  try {
+    slip = coerceSlippageBps(args.slippageBps);
+  } catch (e) {
+    return { ok: false, error: "bad_slippage", message: String(e.message || e).replace(/^bad_slippage:\s*/, "") };
+  }
   const funds = await getDeskFunds(row.public_key);
   const pay = String(args.payWith || args.currency || args.with || "").toLowerCase();
   let useUsdc = pay.includes("usdc");
@@ -212,8 +261,8 @@ export async function appWalletBuy(auth, args = {}) {
     amount = Math.floor(usd * 1e6);
   }
   if (amount <= 0) return { ok: false, error: "size" };
-  const live = await signUserSwap(row, { inputMint, outputMint: mint, amount });
-  const rec = receipt({ side: "buy", info, usd, signature: live.signature, owner: live.owner, payWith: useUsdc ? "USDC" : "SOL" });
+  const live = await signUserSwap(row, { inputMint, outputMint: mint, amount, slippageBps: slip });
+  const rec = receipt({ side: "buy", info, usd, signature: live.signature, owner: live.owner, payWith: useUsdc ? "USDC" : "SOL", slippageBps: slip });
   rec.imageHint = "Call orbitx_generate_image with imagePrompt to show the fill card.";
   return rec;
 }
@@ -225,18 +274,27 @@ export async function appWalletSell(auth, args = {}) {
   if (!row) return { ok: false, error: "no_wallet" };
   const mint = String(args.mint || args.ca || "").trim();
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return { ok: false, error: "bad_mint" };
+  let slip;
+  try {
+    slip = coerceSlippageBps(args.slippageBps);
+  } catch (e) {
+    return { ok: false, error: "bad_slippage", message: String(e.message || e).replace(/^bad_slippage:\s*/, "") };
+  }
+  const sizeCheck = validateSellSize(args);
+  if (!sizeCheck.ok) return sizeCheck;
   const raw = await tokenBalance(row.public_key, mint);
-  let amt = raw;
-  if (args.percent != null || args.fraction != null) {
-    const f = args.fraction != null ? Number(args.fraction) : Number(args.percent) / 100;
-    amt = Math.floor(raw * Math.min(1, Math.max(0.01, f)));
-  } else if (args.amount) {
-    amt = Math.floor(Number(args.amount));
+  let amt;
+  if (args.amount != null && args.amount !== "" && args.percent == null && args.fraction == null) {
+    const q = Number(args.amount);
+    if (!Number.isFinite(q) || q <= 0) return { ok: false, error: "bad_amount", message: "amount must be a positive number of tokens." };
+    amt = Math.floor(q);
+  } else {
+    amt = Math.floor(raw * sizeCheck.fraction);
   }
   if (amt <= 0) return { ok: false, error: "no_balance" };
   const info = await tokenInfo(mint);
-  const live = await signUserSwap(row, { inputMint: mint, outputMint: SOL_MINT, amount: amt });
-  return receipt({ side: "sell", info, usd: 0, signature: live.signature, owner: live.owner, payWith: "SOL" });
+  const live = await signUserSwap(row, { inputMint: mint, outputMint: SOL_MINT, amount: amt, slippageBps: slip });
+  return receipt({ side: "sell", info, usd: 0, signature: live.signature, owner: live.owner, payWith: "SOL", slippageBps: slip });
 }
 
 export async function appWalletLimit(auth, args = {}) {
@@ -247,24 +305,41 @@ export async function appWalletLimit(auth, args = {}) {
   const mint = String(args.mint || args.ca || "").trim();
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return { ok: false, error: "bad_mint" };
   const info = await tokenInfo(mint);
-  const pct = Number(String(args.trigger || args.percent || args.up || "15").replace(/[^\d.\-]/g, "")) || 15;
+  const trig = validateTriggerPct(args);
+  if (!trig.ok) return trig;
+  const pct = trig.pct;
+  let slip;
+  try {
+    slip = coerceSlippageBps(args.slippageBps);
+  } catch (e) {
+    return { ok: false, error: "bad_slippage", message: String(e.message || e).replace(/^bad_slippage:\s*/, "") };
+  }
   const side = String(args.side || "sell").toLowerCase() === "buy" ? "buy" : "sell";
   const target = info.priceUsd * (side === "sell" ? 1 + pct / 100 : 1 - Math.abs(pct) / 100);
   // Persist the fill size so the tick fills exactly what was armed (not a hardcoded default).
   const size = {};
   if (side === "sell") {
     // NOTE: `percent` is the trigger here (legacy); sell size uses `fraction` (0-1) or `amount` (raw tokens).
-    if (args.fraction != null && args.fraction !== "") size.fraction = Math.min(1, Math.max(0.01, Number(args.fraction)));
-    else if (args.amount != null && args.amount !== "") size.amount = String(args.amount);
-    else size.fraction = 1;
+    if (args.fraction != null && args.fraction !== "") {
+      const sc = validateSellSize({ fraction: args.fraction });
+      if (!sc.ok) return sc;
+      size.fraction = sc.fraction;
+    } else if (args.amount != null && args.amount !== "") {
+      const q = Number(args.amount);
+      if (!Number.isFinite(q) || q <= 0) return { ok: false, error: "bad_amount", message: "amount must be a positive number of tokens." };
+      size.amount = String(args.amount);
+    } else size.fraction = 1;
   } else {
     if (args.usd != null && args.usd !== "") size.usd = Number(args.usd);
     else if (args.amountUsd != null && args.amountUsd !== "") size.usd = Number(args.amountUsd);
     else if (args.amountSol != null && args.amountSol !== "") size.amountSol = Number(args.amountSol);
     else if (args.amountUsdc != null && args.amountUsdc !== "") size.amountUsdc = Number(args.amountUsdc);
     else size.usd = 1;
+    const buySize = Number(size.usd ?? size.amountSol ?? size.amountUsdc);
+    if (!Number.isFinite(buySize) || buySize <= 0) return { ok: false, error: "bad_size", message: "buy size must be > 0." };
     if (args.payWith) size.payWith = String(args.payWith);
   }
+  size.slippageBps = slip;
   const client = await sb();
   const order = {
     userId: gate.userId,
@@ -310,12 +385,13 @@ export async function appWalletOrders(auth) {
 
 function fillArgsFor(order) {
   const s = order.size || {};
+  const slip = s.slippageBps != null ? { slippageBps: s.slippageBps } : {};
   if (order.side === "sell") {
-    if (s.fraction != null) return { mint: order.mint, fraction: Number(s.fraction) };
-    if (s.amount != null) return { mint: order.mint, amount: s.amount };
-    return { mint: order.mint, fraction: 1 };
+    if (s.fraction != null) return { mint: order.mint, fraction: Number(s.fraction), ...slip };
+    if (s.amount != null) return { mint: order.mint, amount: s.amount, ...slip };
+    return { mint: order.mint, fraction: 1, ...slip };
   }
-  const a = { mint: order.mint };
+  const a = { mint: order.mint, ...slip };
   if (s.usd != null) a.usd = Number(s.usd);
   else if (s.amountSol != null) a.amountSol = Number(s.amountSol);
   else if (s.amountUsdc != null) a.amountUsdc = Number(s.amountUsdc);
@@ -566,18 +642,18 @@ export const APP_WALLET_CORE_TOOLS = [
   { name: "orbitx_app_wallet_revoke", description: "Revoke backend signing for this wallet.", inputSchema: { type: "object", properties: { authCode } } },
   {
     name: "orbitx_app_buy",
-    description: "Buy a token now. Backend signs. payWith: sol | usdc. usd or amountSol or amountUsdc.",
-    inputSchema: { type: "object", properties: { mint: { type: "string" }, usd: { type: "number" }, amountSol: { type: "number" }, amountUsdc: { type: "number" }, payWith: { type: "string" }, authCode }, required: ["mint"] },
+    description: "Buy a token now. Backend signs. payWith: sol | usdc. usd or amountSol or amountUsdc. slippageBps: slippage tolerance in basis points, 0-5000, default 200.",
+    inputSchema: { type: "object", properties: { mint: { type: "string" }, usd: { type: "number" }, amountSol: { type: "number" }, amountUsdc: { type: "number" }, payWith: { type: "string" }, slippageBps: { type: "number", description: "Slippage tolerance in basis points, 0-5000. Default 200." }, authCode }, required: ["mint"] },
   },
   {
     name: "orbitx_app_sell",
-    description: "Sell now. Backend signs. percent 1-100 or fraction 0-1.",
-    inputSchema: { type: "object", properties: { mint: { type: "string" }, percent: { type: "number" }, fraction: { type: "number" }, authCode }, required: ["mint"] },
+    description: "Sell now. Backend signs. percent 1-100 or fraction 0-1. slippageBps: slippage tolerance in basis points, 0-5000, default 200.",
+    inputSchema: { type: "object", properties: { mint: { type: "string" }, percent: { type: "number" }, fraction: { type: "number" }, slippageBps: { type: "number", description: "Slippage tolerance in basis points, 0-5000. Default 200." }, authCode }, required: ["mint"] },
   },
   {
     name: "orbitx_app_limit",
-    description: "Arm a backend limit order. trigger/percent = trigger move % (e.g. 15 = sell when up 15%). Sell size: fraction 0-1 or amount (raw tokens), default 100%. Buy size: usd/amountSol/amountUsdc, default $1. Backend checks every few minutes and signs the fill when hit. No click.",
-    inputSchema: { type: "object", properties: { mint: { type: "string" }, trigger: { type: "string" }, percent: { type: "number" }, fraction: { type: "number" }, amount: { type: ["number", "string"] }, usd: { type: "number" }, amountSol: { type: "number" }, amountUsdc: { type: "number" }, payWith: { type: "string" }, side: { type: "string" }, authCode }, required: ["mint"] },
+    description: "Arm a backend limit order. trigger/percent = trigger move % (1-100, e.g. 15 = sell when up 15%). Sell size: fraction 0-1 or amount (raw tokens), default 100%. Buy size: usd/amountSol/amountUsdc, default $1. slippageBps: slippage tolerance for the fill, 0-5000, default 200. Backend checks every few minutes and signs the fill when hit. No click.",
+    inputSchema: { type: "object", properties: { mint: { type: "string" }, trigger: { type: "string" }, percent: { type: "number" }, fraction: { type: "number" }, amount: { type: ["number", "string"] }, usd: { type: "number" }, amountSol: { type: "number" }, amountUsdc: { type: "number" }, payWith: { type: "string" }, side: { type: "string" }, slippageBps: { type: "number", description: "Slippage tolerance in basis points for the auto-fill, 0-5000. Default 200." }, authCode }, required: ["mint"] },
   },
   {
     name: "orbitx_app_cancel_order",

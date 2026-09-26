@@ -7,6 +7,35 @@ import crypto from "node:crypto";
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 const JUP = "https://lite-api.jup.ag";
 
+/* ------------------------------------------------------------------ */
+/* Slippage validation (F5). The Jupiter quote used to hardcode        */
+/* slippageBps=200 with no caller control. It is now a validated      */
+/* caller-supplied parameter: integer basis points, 0–5000, default   */
+/* 200. Anything outside the range throws BEFORE any network call —   */
+/* a bad slippage must never silently become a fill at any price.     */
+/* ------------------------------------------------------------------ */
+export const SLIPPAGE_BPS_DEFAULT = 200;
+export const SLIPPAGE_BPS_MAX = 5000;
+
+export function coerceSlippageBps(v) {
+  if (v == null || v === "") return SLIPPAGE_BPS_DEFAULT;
+  const n = Number(v);
+  if (!Number.isFinite(n)) {
+    throw new Error(`bad_slippage: slippageBps must be a number 0–${SLIPPAGE_BPS_MAX} (basis points), got ${JSON.stringify(v)}`);
+  }
+  const bps = Math.round(n);
+  if (bps < 0 || bps > SLIPPAGE_BPS_MAX) {
+    throw new Error(`bad_slippage: slippageBps ${bps} out of range 0–${SLIPPAGE_BPS_MAX} (basis points)`);
+  }
+  return bps;
+}
+
+export function jupiterQuoteUrl(inputMint, outputMint, amount, slippageBps) {
+  const amt = String(Math.max(1, Math.floor(Number(amount) || 0)));
+  return `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amt}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`;
+}
+/* End slippage validation (F5). */
+
 function kek() {
   const raw =
     process.env.EMBEDDED_WALLET_SECRET ||
@@ -240,13 +269,13 @@ function rpcUrl() {
   return key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
 }
 
-export async function signUserSwap(row, { inputMint, outputMint, amount }) {
+export async function signUserSwap(row, { inputMint, outputMint, amount, slippageBps }) {
   const { VersionedTransaction } = await import("@solana/web3.js");
   const kp = await loadKeypair(row);
   const owner = kp.publicKey.toBase58();
-  const amt = String(Math.max(1, Math.floor(Number(amount) || 0)));
+  const slip = coerceSlippageBps(slippageBps); // validated before any network call
   const qr = await fetch(
-    `${JUP}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amt}&slippageBps=200&restrictIntermediateTokens=true`,
+    jupiterQuoteUrl(inputMint, outputMint, amount, slip),
     { signal: AbortSignal.timeout(12000) },
   );
   const quote = await qr.json().catch(() => ({}));
@@ -281,7 +310,7 @@ export async function signUserSwap(row, { inputMint, outputMint, amount }) {
   });
   const j = await r.json();
   if (j.error) throw new Error(j.error.message || "rpc send failed");
-  return { ok: true, signature: j.result, owner, outAmount: quote.outAmount };
+  return { ok: true, signature: j.result, owner, outAmount: quote.outAmount, slippageBps: slip };
 }
 
 
