@@ -2954,7 +2954,7 @@ const HUB_CONTEXT_MSGS = 14;const HUB_LLM_TIMEOUT_MS = 30000;
 const HUB_MSG_MAX = 4000;
 const HUB_MAX_TOKENS = 2000;
 const HUB_MAX_ITERS = 4;
-const HUB_DEADLINE_MS = 100000;
+const HUB_DEADLINE_MS = 50000;
 const HUB_PENDING_TTL_MS = 15 * 60 * 1000;
 
 // Tool catalog filters: connector plumbing, the agent substrate, generated
@@ -3891,6 +3891,10 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
   // Streaming path: one SSE attempt with live token forwarding. If the stream
   // fails, yields nothing, or produces an unsalvageable envelope, reset any
   // partial UI text and fall through to the normal buffered attempts below.
+  // One wall-clock budget shared by the streaming attempt and the buffered
+  // attempts: a hanging stream must not grant the buffered retries a fresh
+  // full budget, or dark-spell turns blow past Vercel's 60s kill with no reply.
+  const started = Date.now();
   if (onToken) {
     const s = await hubLlmStreamAttempt(messages, { temperature, timeoutMs, onToken });
     if (s.ok) {
@@ -3901,11 +3905,11 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
       if (onTokenReset) onTokenReset();
     } catch { /* ignore */ }
   }
-  const started = Date.now();
   let lastErr = null;
   let lastText = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const remaining = attempt === 0 ? timeoutMs : Math.max(10000, timeoutMs - (Date.now() - started));
+    const remaining = timeoutMs - (Date.now() - started);
+    if (remaining < 8000) break; // out of budget — salvage below or fail fast
     // Hotter retry: low temp deterministically re-emits the same broken envelope (bad_json loop).
     const temp = attempt === 0 ? temperature : 0.8;
     let resp = null, raw = "", err = null;
@@ -3999,6 +4003,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
   const thoughts = [];
   let pendings = [];
   let finalReply = "";
+  let lastReply = "";
   let model = llmCfg().model;
   let degraded = false;
   try { ev.onStatus && ev.onStatus("Thinking…"); } catch { /* ignore */ }
@@ -4030,6 +4035,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
     model = llm.model || model;
     if (llm.degraded) degraded = true;
     if (llm.thought) thoughts.push(llm.thought);
+    if (llm.reply) lastReply = llm.reply;
     messages.push({ role: "assistant", content: JSON.stringify({ reply: llm.reply, tool_calls: llm.tool_calls }) });
     if (!llm.tool_calls.length) {
       finalReply = llm.reply;
@@ -4113,7 +4119,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
     }
     if (iter === maxIters - 1) finalReply = llm.reply || "";
   }
-  return { ok: true, reply: finalReply, tool_calls: executed, pending: pendings, model, degraded, thoughts };
+  return { ok: true, reply: finalReply || lastReply, tool_calls: executed, pending: pendings, model, degraded, thoughts };
 }
 
 // Trade history export: strategy fills from ox_live_events (limit, copy,
