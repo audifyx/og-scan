@@ -2115,13 +2115,24 @@ async function _providerDark(client, { windowMin = PROVIDER_DARK_WINDOW_MIN, thr
   let timeouts = 0;
   try {
     const since = new Date(Date.now() - windowMin * 60000).toISOString();
-    const { count } = await client
+    // Think-loop timeouts AND hub-turn transport failures both feed the
+    // breaker — hub turns previously never counted, so a hub-only dark spell
+    // could never trip it. Two cheap head-count queries; a broken count never
+    // parks (fail-open below).
+    const thinkQ = client
       .from("ap_agent_logs")
       .select("id", { count: "exact", head: true })
       .eq("kind", "error")
       .like("body", "think transport failed%")
       .gte("created_at", since);
-    timeouts = count || 0;
+    const hubQ = client
+      .from("ap_agent_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "error")
+      .like("body", "hub transport failed:%")
+      .gte("created_at", since);
+    const [thinkRes, hubRes] = await Promise.all([thinkQ, hubQ]);
+    timeouts = (thinkRes.count || 0) + (hubRes.count || 0);
   } catch {
     return failOpen; // a broken count never parks
   }
@@ -2196,7 +2207,7 @@ async function _announceProviderDark(client, userId, darkState) {
       await _logEvent(client, {
         userId,
         kind: "system",
-        body: `provider_dark: ${darkState.timeouts} think transport timeouts in ${darkState.windowMin}m — parking scheduled thinks, probing each tick`,
+        body: `provider_dark: ${darkState.timeouts} transport timeouts in ${darkState.windowMin}m — parking scheduled thinks, probing each tick`,
       });
     }
   } catch {
@@ -4229,6 +4240,20 @@ function hubPrettyTool(name) {
 // onThought(text), onToolCall({name, args_summary}), onToolResult({name, ok, ms})
 async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIters = HUB_MAX_ITERS, mode = "analyst", lang = "en", events = null }) {
   const ev = events || {};
+  // Dark-spell fail-fast: when the breaker is tripped (repeated transport
+  // timeouts in the window), the per-tick probe — not the user's turn — is
+  // what detects recovery. Burning the full ~30s LLM budget here just leaves
+  // the user staring at "Thinking…" before the honest error; say it now.
+  // Fail-open: _providerDark returns dark:false on any read failure, so the
+  // turn proceeds normally whenever the check itself can't run.
+  try {
+    const darkState = await _providerDark(client);
+    if (darkState && darkState.dark) {
+      const humanErr = "The AI model is struggling right now — we've seen repeated timeouts in the last few minutes. Please try again shortly; recovery is checked automatically.";
+      await hubInsertMessage(client, threadId, "assistant", humanErr, []);
+      return { ok: false, error: "llm_unreachable", message: "provider_dark", reply: humanErr, tool_calls: [], pending: [], model: llmCfg().model, degraded: true, thoughts: [] };
+    }
+  } catch { /* fail open — the turn proceeds */ }
   const catalog = await hubToolCatalog();
   const { data: hist } = await client
     .from("hub_messages")
@@ -4255,22 +4280,42 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
     // Stream the reply + thought fields live when the caller wants tokens.
     const replyStreamer = hubJsonFieldStreamer("reply");
     const thoughtStreamer = hubJsonFieldStreamer("thought");
-    const llm = await hubLlmCall(messages, {
-      timeoutMs: remaining,
-      onToken: ev.onToken ? (d) => {
-        const rt = replyStreamer.push(d);
-        if (rt) { try { ev.onToken(rt); } catch { /* ignore */ } }
-        const th = thoughtStreamer.push(d);
-        if (th) { try { ev.onThought && ev.onThought(th); } catch { /* ignore */ } }
-      } : undefined,
-      onTokenReset: ev.onTokenReset ? () => {
-        replyStreamer.reset();
-        thoughtStreamer.reset();
-        try { ev.onTokenReset(); } catch { /* ignore */ }
-      } : undefined,
-    });
+    // Heartbeat: if the model hasn't produced a token 12s in, say so honestly
+    // instead of leaving "Thinking…" frozen — a dark spell otherwise looks
+    // like a dead UI for the whole ~30s budget.
+    let gotToken = false;
+    const heartbeat = setTimeout(() => {
+      if (!gotToken) { try { ev.onStatus && ev.onStatus("Still waiting — the AI model is slow right now…"); } catch { /* ignore */ } }
+    }, 12000);
+    if (heartbeat.unref) heartbeat.unref();
+    let llm;
+    try {
+      llm = await hubLlmCall(messages, {
+        timeoutMs: remaining,
+        onToken: ev.onToken ? (d) => {
+          gotToken = true;
+          const rt = replyStreamer.push(d);
+          if (rt) { try { ev.onToken(rt); } catch { /* ignore */ } }
+          const th = thoughtStreamer.push(d);
+          if (th) { try { ev.onThought && ev.onThought(th); } catch { /* ignore */ } }
+        } : undefined,
+        onTokenReset: ev.onTokenReset ? () => {
+          replyStreamer.reset();
+          thoughtStreamer.reset();
+          try { ev.onTokenReset(); } catch { /* ignore */ }
+        } : undefined,
+      });
+    } finally {
+      clearTimeout(heartbeat);
+    }
     if (!llm.ok) {
       const humanErr = hubHumanLlmError(llm.error);
+      // Feed provider-side failures into the dark-spell breaker: hub turns
+      // previously never counted, so a hub-only dark spell could never trip
+      // the fail-fast above. 4xx is a request problem, not provider health.
+      if (/^llm_(unreachable|empty)$/.test(String(llm.error)) || /^llm_5\d\d$/.test(String(llm.error))) {
+        await _logEvent(client, { userId, kind: "error", body: `hub transport failed: ${llm.error} (thread ${String(threadId).slice(0, 8)})` });
+      }
       await hubInsertMessage(client, threadId, "assistant", humanErr, []);
       return { ok: false, error: llm.error, message: llm.message, reply: humanErr, tool_calls: executed, pending: [], model, thoughts };
     }
@@ -4509,6 +4554,14 @@ export async function hubChat(userId, threadIdOrNull, message, req, opts = {}) {
     let reply = null;
     let degraded = false;
     evSafe(() => ev.onStatus && ev.onStatus("Writing dossier…"));
+    // Dark spell: skip the 25s format call and render the dossier
+    // deterministically from the scan data already in hand — the turn still
+    // delivers instead of burning budget on an unreachable model.
+    let darkSkip = false;
+    try { darkSkip = !!((await _providerDark(client)) || {}).dark; } catch { /* fail open */ }
+    if (darkSkip) {
+      evSafe(() => ev.onStatus && ev.onStatus("Model is down — rendering from scan data…"));
+    } else
     try {
       const catalog = await hubToolCatalog();
       const replyStreamer = hubJsonFieldStreamer("reply");

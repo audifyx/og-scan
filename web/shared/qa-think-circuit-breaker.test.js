@@ -71,29 +71,37 @@ function likePrefix(value, pattern) {
 }
 
 // Flexible supabase-client mock: records the query shape; resolves {count}
-// for the timeout-count query and {data: rows} for the marker query
-// (distinguished by the .or() call); optionally fails either query.
-function mockDb({ count = 0, rows = [], failCount = null, failMarkers = null } = {}) {
+// for the timeout-count queries (think vs hub distinguished by the LIKE
+// pattern — each .like() forks a fresh chain so the two parallel count
+// queries in _providerDark resolve independently) and {data: rows} for the
+// marker query (distinguished by the .or() call); optionally fails either
+// query.
+function mockDb({ thinkCount = 0, hubCount = 0, rows = [], failCount = null, failMarkers = null } = {}) {
   const seen = { tables: [], eq: [], like: [], or: [], gte: [], inserts: [] };
-  const chain = {};
-  chain.from = (t) => { seen.tables.push(t); return chain; };
-  chain.select = () => chain;
-  chain.eq = (k, v) => { seen.eq.push([k, v]); return chain; };
-  chain.like = (k, v) => { seen.like.push([k, v]); return chain; };
-  chain.or = (c) => { seen.or.push(c); return chain; };
-  chain.gte = (k, v) => { seen.gte.push([k, v]); return chain; };
-  chain.order = () => chain;
-  chain.limit = () => chain;
-  chain.insert = (row) => { seen.inserts.push(row); return chain; };
-  chain.then = (res, rej) => {
-    const isMarkerQuery = seen.or.length > 0;
-    const fail = isMarkerQuery ? failMarkers : failCount;
-    if (fail) { rej(fail); return; }
-    if (seen.inserts.length) { res({ data: null, error: null }); return; }
-    if (isMarkerQuery) { res({ data: rows }); return; }
-    res({ count });
+  const makeChain = (likePattern) => {
+    const chain = {};
+    chain.from = (t) => { seen.tables.push(t); return chain; };
+    chain.select = () => chain;
+    chain.eq = (k, v) => { seen.eq.push([k, v]); return chain; };
+    chain.like = (k, v) => { seen.like.push([k, v]); return makeChain(v); };
+    chain.or = (c) => { seen.or.push(c); return chain; };
+    chain.gte = (k, v) => { seen.gte.push([k, v]); return chain; };
+    chain.order = () => chain;
+    chain.limit = () => chain;
+    chain.insert = (row) => { seen.inserts.push(row); return chain; };
+    chain.then = (res, rej) => {
+      // Marker queries never carry a LIKE pattern; count forks always do.
+      const isMarkerQuery = seen.or.length > 0 && !likePattern;
+      const fail = isMarkerQuery ? failMarkers : failCount;
+      if (fail) { rej(fail); return; }
+      if (seen.inserts.length) { res({ data: null, error: null }); return; }
+      if (isMarkerQuery) { res({ data: rows }); return; }
+      const isHub = likePattern && String(likePattern).startsWith("hub transport");
+      res({ count: isHub ? hubCount : thinkCount });
+    };
+    return chain;
   };
-  return { client: chain, seen };
+  return { client: makeChain(null), seen };
 }
 
 function loadBreaker(mockFetch) {
@@ -157,14 +165,15 @@ describe("circuit-breaker constants", () => {
 describe("_providerDark", () => {
   it("trips on the count alone at/above threshold (no marker query needed)", async () => {
     const b = loadBreaker(async () => { throw new Error("no fetch"); });
-    const { client, seen } = mockDb({ count: 6 });
+    const { client, seen } = mockDb({ thinkCount: 4, hubCount: 2 });
     const st = await b._providerDark(client);
     expect(st.dark).toBe(true);
     expect(st.sticky).toBe(false);
-    expect(st.timeouts).toBe(6);
+    expect(st.timeouts).toBe(6); // think + hub transport failures feed the same breaker
     expect(seen.tables).toContain("ap_agent_logs");
     expect(seen.eq).toContainEqual(["kind", "error"]);
     expect(seen.like).toContainEqual(["body", "think transport failed%"]);
+    expect(seen.like).toContainEqual(["body", "hub transport failed:%"]);
     expect(seen.or).toHaveLength(0);
     // Window is ~15 minutes back from now.
     const sinceMs = Date.now() - new Date(seen.gte[0][1]).getTime();
@@ -172,12 +181,20 @@ describe("_providerDark", () => {
     expect(sinceMs).toBeLessThan(16 * 60 * 1000);
   });
 
+  it("hub transport failures alone can trip the breaker", async () => {
+    const b = loadBreaker(async () => { throw new Error("no fetch"); });
+    const { client } = mockDb({ thinkCount: 0, hubCount: 5 });
+    const st = await b._providerDark(client);
+    expect(st.dark).toBe(true);
+    expect(st.timeouts).toBe(5);
+  });
+
   it("stays sticky-dark below threshold when the latest marker is an unrecovered provider_dark", async () => {
     // THE key design property: parked ticks produce no fresh timeout errors,
     // so the raw count decays out of the window while the provider is still
     // down. The unrecovered marker keeps the breaker engaged.
     const b = loadBreaker(async () => { throw new Error("no fetch"); });
-    const { client, seen } = mockDb({ count: 2, rows: [{ body: DARK_MARKER }] });
+    const { client, seen } = mockDb({ thinkCount: 2, rows: [{ body: DARK_MARKER }] });
     const st = await b._providerDark(client);
     expect(st.dark).toBe(true);
     expect(st.sticky).toBe(true);
@@ -189,7 +206,7 @@ describe("_providerDark", () => {
 
   it("opens below threshold when the latest marker is provider_recovered", async () => {
     const b = loadBreaker(async () => { throw new Error("no fetch"); });
-    const { client } = mockDb({ count: 2, rows: [{ body: RECOVERED_MARKER }] });
+    const { client } = mockDb({ thinkCount: 2, rows: [{ body: RECOVERED_MARKER }] });
     const st = await b._providerDark(client);
     expect(st.dark).toBe(false);
     expect(st.sticky).toBe(false);
@@ -197,7 +214,7 @@ describe("_providerDark", () => {
 
   it("opens below threshold with no markers at all", async () => {
     const b = loadBreaker(async () => { throw new Error("no fetch"); });
-    const { client } = mockDb({ count: 0, rows: [] });
+    const { client } = mockDb({ thinkCount: 0, rows: [] });
     const st = await b._providerDark(client);
     expect(st.dark).toBe(false);
     expect(st.sticky).toBe(false);
@@ -213,7 +230,7 @@ describe("_providerDark", () => {
 
   it("fails OPEN when the marker query throws and the count is below threshold", async () => {
     const b = loadBreaker(async () => { throw new Error("no fetch"); });
-    const { client } = mockDb({ count: 2, failMarkers: new Error("db down") });
+    const { client } = mockDb({ thinkCount: 2, failMarkers: new Error("db down") });
     const st = await b._providerDark(client);
     expect(st.dark).toBe(false);
     expect(st.sticky).toBe(false);
@@ -230,6 +247,16 @@ describe("_providerDark", () => {
     for (const body of NON_TIMEOUT_BODIES) {
       expect(likePrefix(body, "think transport failed%")).toBe(false);
     }
+  });
+
+  it("the hub LIKE pattern matches the hubRunLoop transport-failure log line", () => {
+    // Template lives in hubRunLoop's !llm.ok branch; the breaker must match
+    // exactly that family and nothing else.
+    const tplLine = SRC.split("\n").find((l) => l.includes("hub transport failed:"));
+    expect(tplLine).toBeTruthy();
+    expect(likePrefix("hub transport failed: llm_unreachable (thread abc123)", "hub transport failed:%")).toBe(true);
+    expect(likePrefix("hub transport failed: llm_500 (thread abc123)", "hub transport failed:%")).toBe(true);
+    expect(likePrefix("think transport failed (x) attempt 1/2: boom", "hub transport failed:%")).toBe(false);
   });
 });
 
