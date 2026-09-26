@@ -60,6 +60,7 @@ export default {
           cyan: "hsl(var(--og-cyan))",
           blood: "hsl(var(--og-blood))",
           grid: "hsl(var(--og-grid))",
+          iris: "#a78bfa",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

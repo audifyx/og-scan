@@ -13,6 +13,10 @@ export const HUB_CHAT_PATH = "/api/x-mcp?path=hub/chat";
 export const HUB_CONFIRM_PATH = "/api/x-mcp?path=hub/confirm";
 export const HUB_MODELS_PATH = "/api/x-mcp?path=hub/models";
 export const HUB_EXPORT_TRADES_PATH = "/api/x-mcp?path=hub/export/trades";
+export const HUB_STATS_PATH = "/api/x-mcp?path=hub/stats";
+export const HUB_ALERTS_PATH = "/api/x-mcp?path=hub/alerts";
+export const HUB_PENDING_PATH = "/api/x-mcp?path=hub/pending";
+export const HUB_SEARCH_PATH = "/api/x-mcp?path=hub/search";
 
 /** Chat personality mode, persisted per-thread client-side. */
 export type HubMode = "analyst" | "degen";
@@ -153,6 +157,62 @@ export const hubConfirm = (
     body: JSON.stringify({ pending_id, approved, mode: opts?.mode, lang: opts?.lang }),
   });
 export const hubModels = () => authedJson(HUB_MODELS_PATH);
+
+/* ── Hub v2: stats, alerts, pending confirmations, full-text search ── */
+
+export interface HubStats {
+  ok: boolean;
+  portfolioUsd: number | null;
+  pnlUsd: number | null;
+  openAlerts: number;
+  activeStrategies: Record<string, number> | null;
+  wallet: boolean;
+}
+
+export interface HubAlertItem {
+  id: string;
+  mint: string;
+  symbol: string | null;
+  type: string;
+  condition: string | null;
+  action: string | null;
+  actionDesc: string | null;
+  status: string;
+  attempts: number;
+  note: string | null;
+  createdAt: string | null;
+  triggeredAt: string | null;
+}
+
+export interface HubPendingShort {
+  id: string;
+  tool_name: string;
+  args_summary: string;
+  created_at: string;
+}
+
+export interface HubSearchHit {
+  thread_id: string;
+  thread_title: string | null;
+  role: string;
+  snippet: string;
+  created_at: string;
+}
+
+export const hubStats = (): Promise<HubStats> => authedJson(HUB_STATS_PATH);
+export const hubAlertsList = (): Promise<{ ok: boolean; alerts: HubAlertItem[] }> =>
+  authedJson(HUB_ALERTS_PATH);
+export const hubAlertDelete = (id: string): Promise<{ ok: boolean }> =>
+  authedJson(`${HUB_ALERTS_PATH}/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const hubAlertMute = (id: string, muted: boolean): Promise<{ ok: boolean }> =>
+  authedJson(`${HUB_ALERTS_PATH}/${encodeURIComponent(id)}/mute`, {
+    method: "POST",
+    body: JSON.stringify({ muted }),
+  });
+export const hubPendingList = (): Promise<{ ok: boolean; pendings: HubPendingShort[] }> =>
+  authedJson(HUB_PENDING_PATH);
+export const hubSearchMessages = (q: string): Promise<{ ok: boolean; results: HubSearchHit[] }> =>
+  authedJson(`${HUB_SEARCH_PATH}?q=${encodeURIComponent(q)}`);
 
 /** Authenticated GET of the trades CSV export; returns the CSV text. Throws on non-OK. */
 export async function hubExportTradesCsv(): Promise<string> {

@@ -1,7 +1,14 @@
-/* OrbitX AI Hub — ChatGPT-style chat driving the full OrbitX MCP.
-   /ai-hub — authed via the site's Supabase session (same account, all routes).
-   Native OrbitX design language: og-cyan/og-lime/og-gold tokens, AlphaChat
-   message patterns, AgentPlus header/section conventions. */
+/* OrbitX AI Hub — command deck (v2 redesign).
+   Layout: mission sidebar (threads) + stage (chat) + live rail (portfolio/alerts).
+   Visual language: deep-space base, iris/cyan aurora accents, glass cards,
+   uppercase micro-labels, tabular numerals, hub-rise/hub-fade motion.
+   Features: threads CRUD + search (titles + message bodies), pins, mode/lang,
+   voice dictation, per-message TTS, slash menu, Cmd+K, quick prompts, thread
+   templates, exit presets, win cards, chart/safety/quote/bundle/alloc cards,
+   pending confirmations, token mention chips (DexScreener live prices),
+   copy-address chips, mirror-trade fill, markdown export, away digest,
+   alert-fill toasts, live portfolio + alert management rail. */
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
@@ -20,8 +27,6 @@ import {
   ShieldAlert,
   AlertTriangle,
   RotateCcw,
-  Bot,
-  User as UserIcon,
   Zap,
   Mic,
   Volume2,
@@ -34,6 +39,21 @@ import {
   Pin,
   Globe,
   MessageSquare,
+  Sunrise,
+  NotebookPen,
+  Search,
+  Bell,
+  BellRing,
+  BellOff,
+  PanelRight,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  Activity,
+  Clock,
+  History,
+  FileDown,
+  Layers,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +67,12 @@ import {
   hubConfirm,
   hubModels,
   hubExportTradesCsv,
+  hubStats,
+  hubAlertsList,
+  hubAlertDelete,
+  hubAlertMute,
+  hubPendingList,
+  hubSearchMessages,
   type HubThread,
   type HubMessage,
   type HubToolCall,
@@ -56,8 +82,162 @@ import {
   type HubBundleAction,
   type HubChatPending,
   type HubMode,
+  type HubStats,
+  type HubAlertItem,
+  type HubSearchHit,
 } from "@/components/hub/api";
+import {
+  TokenChip,
+  CopyAddr,
+  findTokenMentions,
+  MINT_RE,
+  fmtUsd,
+} from "@/components/hub/tokens";
 
+/* ── thread templates ──────────────────────────────────────────── */
+
+interface ThreadTemplate {
+  id: string;
+  icon: typeof Sunrise;
+  title: string;
+  desc: string;
+  prompt: string;
+}
+
+const THREAD_TEMPLATES: ThreadTemplate[] = [
+  {
+    id: "brief",
+    icon: Sunrise,
+    title: "Morning brief",
+    desc: "PnL, watchlist movers, what's hot",
+    prompt:
+      "Give me my morning brief: portfolio PnL, watchlist movers, and what's trending right now.",
+  },
+  {
+    id: "dive",
+    icon: Search,
+    title: "Token deep dive",
+    desc: "Safety, liquidity, whales, sentiment",
+    prompt:
+      "I want a deep dive on a token. First ask me which token (or paste the mint), then cover safety, liquidity, whales, and X sentiment.",
+  },
+  {
+    id: "journal",
+    icon: NotebookPen,
+    title: "Trade journal",
+    desc: "Log and review your trades",
+    prompt:
+      "Let's start a trade journal thread. Ask me about my open positions and recent trades, then summarize my exposure and the plan for each.",
+  },
+];
+
+/* ── markdown with copy-address chips ──────────────────────────── */
+
+/** Turn bare base58 addresses in prose into [addr](copy:…) links (skips code fences). */
+function linkifyAddresses(text: string): string {
+  return text
+    .split(/(```[\s\S]*?```)/g)
+    .map((seg, i) => {
+      if (i % 2 === 1) return seg; // code fence — leave alone
+      return seg.replace(MINT_RE, (m) => `[${m}](copy:${m})`);
+    })
+    .join("");
+}
+
+function Markdown({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        a: ({ href, children }: any) => {
+          if (href && href.startsWith("copy:")) {
+            return <CopyAddr address={href.slice(5)} />;
+          }
+          return (
+            <a href={href} target="_blank" rel="noreferrer" className="text-iris underline decoration-iris/40 underline-offset-2 hover:decoration-iris">
+              {children}
+            </a>
+          );
+        },
+        code: ({ children }: any) => (
+          <code className="rounded bg-white/[0.07] px-1 py-0.5 font-mono text-[12px] text-iris">{children}</code>
+        ),
+        pre: ({ children }: any) => (
+          <pre className="overflow-x-auto rounded-xl border border-white/[0.08] bg-black/40 p-3 text-[12px]">{children}</pre>
+        ),
+      }}
+    >
+      {linkifyAddresses(text || "")}
+    </ReactMarkdown>
+  );
+}
+
+/** Live token chips for $SYMBOL / mint mentions in a message. */
+function MentionChips({ text, limit = 6 }: { text: string; limit?: number }) {
+  const mentions = findTokenMentions(text).slice(0, limit);
+  if (mentions.length === 0) return null;
+  return (
+    <div className="mb-2 flex flex-wrap gap-1.5">
+      {mentions.map((m, i) => (
+        <TokenChip key={`${m.kind}:${m.value}:${i}`} mint={m.kind === "mint" ? m.value : undefined} symbol={m.kind === "symbol" ? m.value : undefined} />
+      ))}
+    </div>
+  );
+}
+
+/* ── insight cards (top of stage on thread open) ───────────────── */
+
+export interface Insight {
+  id: string;
+  kind: "alerts" | "pending" | "pnl" | "strategies";
+  title: string;
+  body: string;
+  accent: string;
+}
+
+function InsightCards({ insights, onDismiss }: { insights: Insight[]; onDismiss: (id: string) => void }) {
+  if (insights.length === 0) return null;
+  return (
+    <div className="hub-stagger grid gap-2 px-4 pt-3 sm:grid-cols-2 xl:grid-cols-4">
+      {insights.map((ins) => (
+        <div
+          key={ins.id}
+          className="hub-rise relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur"
+        >
+          <div className={cn("absolute inset-x-0 top-0 h-px", ins.accent)} />
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{ins.title}</div>
+            <button
+              type="button"
+              onClick={() => onDismiss(ins.id)}
+              aria-label="Dismiss"
+              className="text-white/25 transition hover:text-white/70"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="mt-1 text-[13px] leading-snug text-white/85">{ins.body}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── skeleton loading ──────────────────────────────────────────── */
+
+function ThreadSkeleton() {
+  return (
+    <div className="space-y-3 px-4 py-4" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className={cn("flex", i % 2 === 0 ? "justify-start" : "justify-end")}>
+          <div className="w-3/4 max-w-md space-y-2">
+            <div className="h-3.5 w-11/12 animate-pulse rounded-lg bg-white/[0.06]" />
+            <div className="h-3.5 w-2/3 animate-pulse rounded-lg bg-white/[0.04]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 const QUICK_PROMPTS = [
   { label: "📄 Dossier a token", prompt: "Give me a full dossier on this token (safety, liquidity, whales, X sentiment): " },
   { label: "⚡ Automate a trade", prompt: "I want to automate a trade. My portfolio PnL and open strategies first, then ask me what to set up." },
@@ -99,11 +279,6 @@ function lsSet(k: string, v: string) {
   } catch {
     /* storage unavailable */
   }
-}
-
-function fmtUsd(n: number | null | undefined): string {
-  if (n == null) return "—";
-  return "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
 function fmtPnl(n: number): string {
@@ -547,7 +722,9 @@ function QuestCard({
       </div>
       <p className="mt-1 text-xs text-white/40">Three quick steps and you're trading like a pro.</p>
       <div className="mt-3 space-y-2">
-        {QUEST_ITEMS.map((item) => (
+        {QUEST_ITEMS.map((item) => {
+          const act = item.action;
+          return (
           <div key={item.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-black/20 p-3">
             <button
               type="button"
@@ -569,24 +746,25 @@ function QuestCard({
               </div>
               <div className="text-[11px] text-white/40">{item.desc}</div>
             </div>
-            {item.action.type === "link" ? (
+            {act.type === "link" ? (
               <Link
-                to={item.action.to}
+                to={act.to}
                 className="shrink-0 rounded-lg border border-og-cyan/30 bg-og-cyan/10 px-3 py-1.5 text-xs font-bold text-og-cyan transition hover:bg-og-cyan/20"
               >
-                {item.action.label}
+                {act.label}
               </Link>
             ) : (
               <button
                 type="button"
-                onClick={() => onFill(item.action.fill)}
+                onClick={() => act.type === "fill" && onFill(act.fill)}
                 className="shrink-0 rounded-lg border border-og-cyan/30 bg-og-cyan/10 px-3 py-1.5 text-xs font-bold text-og-cyan transition hover:bg-og-cyan/20"
               >
-                {item.action.label}
+                {act.label}
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -626,9 +804,10 @@ function StatusPill({ call }: { call: HubToolCall }) {
   );
 }
 
-function ToolCard({ call }: { call: HubToolCall }) {
+function ToolCard({ call, onMirror }: { call: HubToolCall; onMirror?: (call: HubToolCall) => void }) {
   const [open, setOpen] = useState(false);
   const chartUrl = firstDexUrl(call.result_summary || "");
+  const isTrade = /buy|sell|swap|trade|long|short/i.test(call.name);
   return (
     <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.02]">
       <button
@@ -636,12 +815,23 @@ function ToolCard({ call }: { call: HubToolCall }) {
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
-        <Wrench className="h-3.5 w-3.5 shrink-0 text-og-cyan" />
+        <Wrench className="h-3.5 w-3.5 shrink-0 text-iris" />
         <span className="truncate font-mono text-xs text-white/85">{call.name}</span>
         <StatusPill call={call} />
         <ChevronDown className={cn("ml-auto h-3.5 w-3.5 shrink-0 text-white/30 transition-transform", open && "rotate-180")} />
       </button>
       {chartUrl && <div className="border-t border-white/[0.07] px-3 py-2.5"><ChartCard url={chartUrl} /></div>}
+      {isTrade && onMirror && (
+        <div className="border-t border-white/[0.07] px-3 py-2">
+          <button
+            type="button"
+            onClick={() => onMirror(call)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-iris/40 bg-iris/10 px-2.5 py-1.5 text-[11px] font-bold text-iris transition hover:bg-iris/20"
+          >
+            <RotateCcw className="h-3 w-3" /> Mirror this trade
+          </button>
+        </div>
+      )}
       {open && (
         <div className="space-y-2 border-t border-white/[0.07] px-3 py-2.5">
           <div>
@@ -895,8 +1085,14 @@ function PendingCard({ p, onConfirm, busy }: { p: HubPending; onConfirm: (id: st
 
 /* ── page ──────────────────────────────────────────────────────── */
 
+
+/* ════════════════════════════════════════════════════════════════
+   AI Hub command deck
+   ════════════════════════════════════════════════════════════════ */
+
 export default function AiHub() {
   const { user } = useAuth();
+
   const [threads, setThreads] = useState<HubThread[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<HubMessage[]>([]);
@@ -910,69 +1106,71 @@ export default function AiHub() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [failedPrompt, setFailedPrompt] = useState<string | null>(null);
-  // 1. mode picker — persisted per thread in localStorage `hub-mode:<threadId>`
-  const [mode, setMode] = useState<HubMode>("analyst");
-  const modeRef = useRef<HubMode>("analyst");
-  // 7. language — localStorage `hub-lang`, sent on chat + confirm
+  const [mode, setMode] = useState<HubMode>(() =>
+    lsGet("hub-mode:default") === "degen" ? "degen" : "analyst",
+  );
   const [lang, setLang] = useState<string>(() => validLang(lsGet("hub-lang")));
-  const langRef = useRef<string>(lang);
-  // toast
   const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // command palette (Cmd+K / Ctrl+K)
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
   const [cmdHi, setCmdHi] = useState(0);
-  // thread search + pins
   const [threadQuery, setThreadQuery] = useState("");
   const [pinned, setPinned] = useState<string[]>(() => {
     try {
-      const v = JSON.parse(lsGet("hub-pinned") || "[]");
-      return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+      return JSON.parse(lsGet("hub-pinned") || "[]");
     } catch {
       return [];
     }
   });
-  // slash menu highlight
   const [slashHi, setSlashHi] = useState(0);
-  // exit presets
-  const [presets, setPresets] = useState<ExitPreset[]>(loadExitPresets);
+  const [presets, setPresets] = useState<ExitPreset[]>(() => loadExitPresets());
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [presetMint, setPresetMint] = useState("");
   const [presetName, setPresetName] = useState("");
   const [presetTargets, setPresetTargets] = useState("");
-  // trades CSV export
   const [exporting, setExporting] = useState(false);
-  // 3. voice mode
   const [micSupported] = useState(
-    () => typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+    () => typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
   );
   const [speechSupported] = useState(() => typeof window !== "undefined" && "speechSynthesis" in window);
   const [recording, setRecording] = useState(false);
   const [speakingId, setSpeakingId] = useState<number | null>(null);
-  const recRef = useRef<HubSpeechRecognition | null>(null);
-  // 5. onboarding quest
-  const [questDismissed, setQuestDismissed] = useState(() => !!lsGet("hub-quest-done"));
-  const [questOpen, setQuestOpen] = useState(() => !lsGet("hub-quest-done"));
+  const [questDismissed, setQuestDismissed] = useState(() => lsGet("hub-quest-done") === "1");
+  const [questOpen, setQuestOpen] = useState(() => lsGet("hub-quest-done") !== "1");
   const [quest, setQuest] = useState<Record<string, boolean>>(() => {
     try {
-      return JSON.parse(lsGet("hub-quest") || "{}") || {};
+      return JSON.parse(lsGet("hub-quest") || "{}");
     } catch {
       return {};
     }
   });
+  // ── hub v2 state ──
+  const [stats, setStats] = useState<HubStats | null>(null);
+  const [alerts, setAlerts] = useState<HubAlertItem[]>([]);
+  const [alertsBusy, setAlertsBusy] = useState<string | null>(null);
+  const [searchHits, setSearchHits] = useState<HubSearchHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [railOpen, setRailOpen] = useState(false);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [awayInfo, setAwayInfo] = useState<{ threads: number; pendings: number } | null>(null);
+  const [exportingMd, setExportingMd] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const toastTimer = useRef<number | null>(null);
+  const recRef = useRef<HubSpeechRecognition | null>(null);
+  const modeRef = useRef<HubMode>(mode);
+  const langRef = useRef<string>(lang);
+  const activeIdRef = useRef<string | null>(null);
+  const searchTimer = useRef<number | null>(null);
+  const lastSeenMsg = useRef<number>(0);
+  const insightsBuiltFor = useRef<string | null>(null);
 
   useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
-
-  useEffect(() => {
-    langRef.current = lang;
-  }, [lang]);
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   const changeLang = useCallback((l: string) => {
     const v = validLang(l);
@@ -989,7 +1187,7 @@ export default function AiHub() {
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    toastTimer.current = window.setTimeout(() => setToast(null), 4200);
   }, []);
 
   const togglePin = useCallback((id: string) => {
@@ -1022,6 +1220,38 @@ export default function AiHub() {
     }
   }, [exporting, showToast]);
 
+  const exportMarkdown = useCallback(async () => {
+    if (exportingMd || messages.length === 0) return;
+    setExportingMd(true);
+    try {
+      const title = threads.find((t) => t.id === activeId)?.title || "OrbitX AI Hub thread";
+      const lines = [`# ${title}`, `> Exported ${new Date().toLocaleString()} from OrbitX AI Hub`, ""];
+      for (const m of messages) {
+        lines.push(m.role === "user" ? "## You" : "## OrbitX");
+        lines.push(m.content || "");
+        if (m.tool_calls?.length) {
+          lines.push("");
+          for (const c of m.tool_calls) {
+            lines.push(`- \`${c.name}\` ${c.ok ? "✓" : "✗"} — ${(c.result_summary || c.args_summary || "").slice(0, 300)}`);
+          }
+        }
+        lines.push("");
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orbitx-hub-${new Date().toISOString().slice(0, 10)}.md`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      showToast("Thread exported as Markdown");
+    } finally {
+      setExportingMd(false);
+    }
+  }, [exportingMd, messages, threads, activeId, showToast]);
+
   const scrollDown = useCallback(() => {
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));
   }, []);
@@ -1040,40 +1270,185 @@ export default function AiHub() {
     }
   }, []);
 
-  const selectThread = useCallback(async (id: string | null) => {
-    setActiveId(id);
-    setSidebarOpen(false);
-    setFailedPrompt(null);
-    if (!id) {
-      setMessages([]);
-      setPendings([]);
-      return;
-    }
-    // Load this thread's stored mode; keep the current one if nothing stored.
-    const stored = lsGet(`hub-mode:${id}`);
-    setMode(stored === "analyst" || stored === "degen" ? stored : modeRef.current);
-    setLoadingThread(true);
+  /** Live deck data: portfolio stats + alert list. Best-effort, never blocks chat. */
+  const refreshDeck = useCallback(async () => {
     try {
-      const r = await hubGetThread(id);
-      if (r?.ok) {
-        setMessages((r.messages || []).filter((m: HubMessage) => m.role !== "tool"));
-        setPendings(r.pending || []);
-        scrollDown();
-      }
-    } finally {
-      setLoadingThread(false);
+      const s = await hubStats().catch(() => null);
+      if (s?.ok) setStats(s);
+    } catch {
+      /* offline — keep last */
     }
-  }, [scrollDown]);
+    try {
+      const a = await hubAlertsList().catch(() => null);
+      if (a?.ok) setAlerts(a.alerts || []);
+    } catch {
+      /* offline — keep last */
+    }
+  }, []);
+
+  const buildInsights = useCallback(
+    async (threadId: string) => {
+      if (insightsBuiltFor.current === threadId) return;
+      insightsBuiltFor.current = threadId;
+      const list: Insight[] = [];
+      try {
+        const [s, a, p] = await Promise.all([
+          hubStats().catch(() => null),
+          hubAlertsList().catch(() => null),
+          hubPendingList().catch(() => null),
+        ]);
+        const open = (a?.alerts || []).filter((x: HubAlertItem) => x.status === "open");
+        if (open.length > 0) {
+          list.push({
+            id: "alerts",
+            kind: "alerts",
+            title: "Live alerts",
+            body: `${open.length} alert${open.length > 1 ? "s" : ""} watching — ${open
+              .slice(0, 2)
+              .map((x: HubAlertItem) => x.symbol || `${x.mint.slice(0, 4)}…`)
+              .join(", ")}${open.length > 2 ? "…" : ""}`,
+            accent: "bg-gradient-to-r from-iris to-og-cyan",
+          });
+        }
+        const pend = p?.pendings || [];
+        if (pend.length > 0) {
+          list.push({
+            id: "pending",
+            kind: "pending",
+            title: "Needs your call",
+            body: `${pend.length} confirmation${pend.length > 1 ? "s" : ""} waiting — ${truncate(
+              pend[0].args_summary || pend[0].tool_name,
+              64,
+            )}`,
+            accent: "bg-gradient-to-r from-og-gold to-og-lime",
+          });
+        }
+        if (s?.ok && s.pnlUsd != null && s.pnlUsd !== 0) {
+          const v = Number(s.pnlUsd);
+          list.push({
+            id: "pnl",
+            kind: "pnl",
+            title: "Strategy PnL",
+            body: `${v >= 0 ? "+" : "−"}$${Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })} all-time across your strategies`,
+            accent: "bg-gradient-to-r from-og-lime to-og-cyan",
+          });
+        }
+        const strat: Record<string, number> | null | undefined = s?.activeStrategies;
+        const n = strat ? Object.values(strat).reduce<number>((t, v) => t + (Number(v) || 0), 0) : 0;
+        if (n > 0) {
+          list.push({
+            id: "strategies",
+            kind: "strategies",
+            title: "Autopilot",
+            body: `${n} live ${n === 1 ? "strategy" : "strategies"} running on the 5-minute tick`,
+            accent: "bg-gradient-to-r from-og-cyan to-iris",
+          });
+        }
+      } catch {
+        /* best effort */
+      }
+      setInsights(list);
+    },
+    [],
+  );
+
+  const selectThread = useCallback(
+    async (id: string | null) => {
+      setActiveId(id);
+      setSidebarOpen(false);
+      setFailedPrompt(null);
+      setInsights([]);
+      if (!id) {
+        setMessages([]);
+        setPendings([]);
+        return;
+      }
+      const stored = lsGet(`hub-mode:${id}`);
+      setMode(stored === "analyst" || stored === "degen" ? stored : modeRef.current);
+      setLoadingThread(true);
+      try {
+        const r = await hubGetThread(id);
+        if (r?.ok) {
+          const msgs = (r.messages || []).filter((m: HubMessage) => m.role !== "tool");
+          setMessages(msgs);
+          setPendings(r.pending || []);
+          if (msgs.length > 0) lastSeenMsg.current = Math.max(...msgs.map((m: HubMessage) => m.id));
+          scrollDown();
+          void buildInsights(id);
+        }
+      } finally {
+        setLoadingThread(false);
+      }
+    },
+    [scrollDown, buildInsights],
+  );
 
   useEffect(() => {
     loadThreads();
     hubModels().then((r) => r?.ok && setModel(shortModel(r.model)));
-  }, [loadThreads]);
+    void refreshDeck();
+  }, [loadThreads, refreshDeck]);
+
+  // Live deck refresh every 60s.
+  useEffect(() => {
+    const iv = setInterval(() => void refreshDeck(), 60000);
+    return () => clearInterval(iv);
+  }, [refreshDeck]);
+
+  // While-you-were-away digest (once per mount).
+  useEffect(() => {
+    const last = lsGet("hub-last-visit");
+    lsSet("hub-last-visit", new Date().toISOString());
+    if (!last) return;
+    (async () => {
+      try {
+        const [t, p] = await Promise.all([hubListThreads().catch(() => null), hubPendingList().catch(() => null)]);
+        const updated = (t?.threads || []).filter(
+          (th: HubThread) => th.updated_at > last && th.id !== activeIdRef.current,
+        ).length;
+        const pendN = (p?.pendings || []).length;
+        if (updated > 0 || pendN > 0) setAwayInfo({ threads: updated, pendings: pendN });
+      } catch {
+        /* best effort */
+      }
+    })();
+  }, []);
+
+  // Alert-fill toast poll: every 25s, only when visible + idle.
+  useEffect(() => {
+    const iv = setInterval(async () => {
+      if (document.hidden || sending) return;
+      const id = activeIdRef.current;
+      if (!id) return;
+      try {
+        const r = await hubGetThread(id);
+        const msgs: HubMessage[] = (r?.messages || []).filter((m: HubMessage) => m.role === "assistant");
+        if (msgs.length === 0) return;
+        const fired = msgs.filter(
+          (m) => m.id > lastSeenMsg.current && /🔔 Alert fired:/.test(m.content || ""),
+        );
+        lastSeenMsg.current = Math.max(lastSeenMsg.current, ...msgs.map((m) => m.id));
+        if (fired.length > 0) {
+          setMessages((prev) => {
+            const ids = new Set(prev.map((m) => m.id));
+            const extra = msgs.filter((m) => !ids.has(m.id));
+            return extra.length > 0 ? [...prev, ...extra].sort((a, b) => a.id - b.id) : prev;
+          });
+          scrollDown();
+          showToast(`🔔 ${fired.length} alert${fired.length > 1 ? "s" : ""} just fired — scroll up for details`);
+          void refreshDeck();
+        }
+      } catch {
+        /* silent poll */
+      }
+    }, 25000);
+    return () => clearInterval(iv);
+  }, [sending, showToast, scrollDown, refreshDeck]);
 
   useEffect(() => {
     if (sending) {
       const t0 = Date.now();
-      timerRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 500);
+      timerRef.current = window.setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 500);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = null;
@@ -1085,10 +1460,8 @@ export default function AiHub() {
     };
   }, [sending]);
 
-  // Abort an in-flight turn if the page unmounts mid-send.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  // Stop dictation/speech if the page unmounts.
   useEffect(
     () => () => {
       try {
@@ -1105,6 +1478,31 @@ export default function AiHub() {
     [],
   );
 
+  // Sidebar search also sweeps message bodies (debounced).
+  useEffect(() => {
+    const q = threadQuery.trim();
+    if (q.length < 2) {
+      setSearchHits(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(async () => {
+      try {
+        const r = await hubSearchMessages(q);
+        if (r?.ok) setSearchHits(r.results || []);
+      } catch {
+        setSearchHits([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, [threadQuery]);
+
   const pushAssistant = useCallback((content: string, tool_calls: HubToolCall[] | null, id?: number) => {
     setMessages((prev) => [
       ...prev,
@@ -1112,73 +1510,80 @@ export default function AiHub() {
     ]);
   }, []);
 
-  const applyChatResponse = useCallback((r: any) => {
-    if (r?.ok && r.thread_id) {
-      setActiveId(r.thread_id);
-      lsSet(`hub-mode:${r.thread_id}`, modeRef.current);
-      loadThreads();
-    }
-    if (r?.reply !== undefined) {
-      pushAssistant(r.reply || "", r.tool_calls?.length ? r.tool_calls : null);
-    }
-    if (r?.pending?.length) {
-      setPendings((prev) => [
-        ...prev.filter((p) => !r.pending.some((np: HubChatPending) => np.pending_id === p.id)),
-        ...r.pending.map((p: HubChatPending) => ({
-          id: p.pending_id,
-          tool_name: p.tool,
-          args: null,
-          args_summary: p.args_summary,
-          safety: p.safety ?? null,
-          quote: p.quote ?? null,
-          bundle: p.bundle ?? null,
-          status: "pending",
-          created_at: new Date().toISOString(),
-        })),
-      ]);
-    }
-  }, [loadThreads, pushAssistant]);
+  const applyChatResponse = useCallback(
+    (r: any) => {
+      if (r?.ok && r.thread_id) {
+        setActiveId(r.thread_id);
+        lsSet(`hub-mode:${r.thread_id}`, modeRef.current);
+        loadThreads();
+      }
+      if (r?.reply !== undefined) {
+        pushAssistant(r.reply || "", r.tool_calls?.length ? r.tool_calls : null);
+      }
+      if (r?.pending?.length) {
+        setPendings((prev) => [
+          ...prev.filter((p) => !r.pending.some((np: HubChatPending) => np.pending_id === p.id)),
+          ...r.pending.map((p: HubChatPending) => ({
+            id: p.pending_id,
+            tool_name: p.tool,
+            args: null,
+            args_summary: p.args_summary,
+            safety: p.safety ?? null,
+            quote: p.quote ?? null,
+            bundle: p.bundle ?? null,
+            status: "pending",
+            created_at: new Date().toISOString(),
+          })),
+        ]);
+      }
+    },
+    [loadThreads, pushAssistant],
+  );
 
-  const send = useCallback(async (text?: string) => {
-    const msg = (text ?? input).trim();
-    if (!msg || sending || !user) return;
-    setSending(true);
-    setInput("");
-    setFailedPrompt(null);
-    const userMsgId = Date.now();
-    setMessages((prev) => [
-      ...prev,
-      { id: userMsgId, role: "user", content: msg, tool_calls: null, created_at: new Date().toISOString() },
-    ]);
-    scrollDown();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-    try {
-      const r = await hubChat(activeId, msg, { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current });
-      if (!r?.ok && !r?.reply) {
-        setFailedPrompt(msg);
-        pushAssistant(
-          `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`,
-          null,
-        );
-      } else {
-        applyChatResponse(r);
-      }
-    } catch (e: any) {
-      if (e?.name === "AbortError") {
-        pushAssistant(
-          "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
-          null,
-        );
-      } else {
-        setFailedPrompt(msg);
-        pushAssistant("Network error — your message is saved. Hit retry to try again.", null);
-      }
-    } finally {
-      setSending(false);
+  const send = useCallback(
+    async (text?: string) => {
+      const msg = (text ?? input).trim();
+      if (!msg || sending || !user) return;
+      setSending(true);
+      setInput("");
+      setFailedPrompt(null);
+      setInsights([]);
+      const userMsgId = Date.now();
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user", content: msg, tool_calls: null, created_at: new Date().toISOString() },
+      ]);
       scrollDown();
-    }
-  }, [input, sending, user, activeId, scrollDown, applyChatResponse, pushAssistant]);
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      try {
+        const r = await hubChat(activeId, msg, { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current });
+        if (!r?.ok && !r?.reply) {
+          setFailedPrompt(msg);
+          pushAssistant(
+            `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`,
+            null,
+          );
+        } else {
+          applyChatResponse(r);
+        }
+      } catch (e: any) {
+        if (e?.name === "AbortError") {
+          pushAssistant(
+            "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
+            null,
+          );
+        } else {
+          setFailedPrompt(msg);
+          pushAssistant("Network error — your message is saved. Hit retry to try again.", null);
+        }
+      } finally {
+        setSending(false);
+        scrollDown();
+      }
+    },
+    [input, sending, user, activeId, scrollDown, applyChatResponse, pushAssistant],
+  );
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -1186,24 +1591,26 @@ export default function AiHub() {
 
   const retry = useCallback(() => {
     if (failedPrompt && !sending) {
-      // Drop the failed error note, keep the original user message, resend.
       setMessages((prev) => prev.slice(0, -1));
       send(failedPrompt);
     }
   }, [failedPrompt, sending, send]);
 
-  const doConfirm = useCallback(async (pendingId: string, approved: boolean) => {
-    setConfirmBusy(true);
-    try {
-      const r = await hubConfirm(pendingId, approved, { mode: modeRef.current, lang: langRef.current });
-      setPendings((prev) => prev.filter((p) => p.id !== pendingId));
-      if (r?.ok || r?.reply) applyChatResponse(r);
-      else pushAssistant(`Confirmation ${r?.error || "failed"} — ${r?.message || "please try again."}`, null);
-    } finally {
-      setConfirmBusy(false);
-      scrollDown();
-    }
-  }, [applyChatResponse, pushAssistant, scrollDown]);
+  const doConfirm = useCallback(
+    async (pendingId: string, approved: boolean) => {
+      setConfirmBusy(true);
+      try {
+        const r = await hubConfirm(pendingId, approved, { mode: modeRef.current, lang: langRef.current });
+        setPendings((prev) => prev.filter((p) => p.id !== pendingId));
+        if (r?.ok || r?.reply) applyChatResponse(r);
+        else pushAssistant(`Confirmation ${r?.error || "failed"} — ${r?.message || "please try again."}`, null);
+      } finally {
+        setConfirmBusy(false);
+        scrollDown();
+      }
+    },
+    [applyChatResponse, pushAssistant, scrollDown],
+  );
 
   const newChat = useCallback(async () => {
     if (!user) return;
@@ -1214,30 +1621,36 @@ export default function AiHub() {
         selectThread(r.thread.id);
       }
     } catch {
-      /* keep local empty state */
       selectThread(null);
     }
   }, [selectThread, user]);
 
-  const delThread = useCallback(async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const r = await hubDeleteThread(id);
-      if (r?.ok) {
-        setThreads((prev) => prev.filter((t) => t.id !== id));
-        if (activeId === id) selectThread(null);
+  const delThread = useCallback(
+    async (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        const r = await hubDeleteThread(id);
+        if (r?.ok) {
+          setThreads((prev) => prev.filter((t) => t.id !== id));
+          if (activeId === id) selectThread(null);
+        }
+      } catch {
+        /* thread stays; user can retry */
       }
-    } catch { /* thread stays; user can retry */ }
-  }, [activeId, selectThread]);
+    },
+    [activeId, selectThread],
+  );
 
-  // 1. mode picker
-  const changeMode = useCallback((m: HubMode) => {
-    setMode(m);
-    modeRef.current = m;
-    if (activeId) lsSet(`hub-mode:${activeId}`, m);
-  }, [activeId]);
+  const changeMode = useCallback(
+    (m: HubMode) => {
+      setMode(m);
+      modeRef.current = m;
+      lsSet("hub-mode:default", m);
+      if (activeId) lsSet(`hub-mode:${activeId}`, m);
+    },
+    [activeId],
+  );
 
-  // 3. voice dictation (Web Speech API, zero backend)
   const toggleRecording = useCallback(() => {
     if (recording) {
       try {
@@ -1270,43 +1683,45 @@ export default function AiHub() {
     }
   }, [recording]);
 
-  // 3. per-message text-to-speech
-  const toggleSpeak = useCallback((id: number, text: string) => {
-    if (!("speechSynthesis" in window)) return;
-    if (speakingId === id) {
+  const toggleSpeak = useCallback(
+    (id: number, text: string) => {
+      if (!("speechSynthesis" in window)) return;
+      if (speakingId === id) {
+        window.speechSynthesis.cancel();
+        setSpeakingId(null);
+        return;
+      }
       window.speechSynthesis.cancel();
-      setSpeakingId(null);
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const plain = stripMarkdown(text).slice(0, 2000);
-    if (!plain) return;
-    try {
-      const u = new SpeechSynthesisUtterance(plain);
-      u.onend = () => setSpeakingId((cur) => (cur === id ? null : cur));
-      u.onerror = () => setSpeakingId((cur) => (cur === id ? null : cur));
-      window.speechSynthesis.speak(u);
-      setSpeakingId(id);
-    } catch {
-      /* speech unavailable */
-    }
-  }, [speakingId]);
+      const plain = stripMarkdown(text).slice(0, 2000);
+      if (!plain) return;
+      try {
+        const u = new SpeechSynthesisUtterance(plain);
+        u.onend = () => setSpeakingId((cur) => (cur === id ? null : cur));
+        u.onerror = () => setSpeakingId((cur) => (cur === id ? null : cur));
+        window.speechSynthesis.speak(u);
+        setSpeakingId(id);
+      } catch {
+        /* speech unavailable */
+      }
+    },
+    [speakingId],
+  );
 
-  // 4. share as X thread draft (goes through the normal send + confirm gate)
   const shareAsThread = useCallback(() => {
     send(
       "Turn your previous reply into an X thread draft: split it into numbered posts of 280 chars or less, show me the exact text of each, then prepare the first x_post tool call for my approval.",
     );
   }, [send]);
 
-  // 6. post win card summary
-  const postWinCard = useCallback((d: WinCardData) => {
-    send(
-      `Post this win summary to X as a text post (no image): ${fmtPnl(d.pnl_usd)} PnL ${d.period} — ${fmtRate(d.win_rate)} win rate over ${d.trades} trades, best trade ${d.best_trade}.`,
-    );
-  }, [send]);
+  const postWinCard = useCallback(
+    (d: WinCardData) => {
+      send(
+        `Post this win summary to X as a text post (no image): ${fmtPnl(d.pnl_usd)} PnL ${d.period} — ${fmtRate(d.win_rate)} win rate over ${d.trades} trades, best trade ${d.best_trade}.`,
+      );
+    },
+    [send],
+  );
 
-  // 5. onboarding quest
   const toggleQuestItem = useCallback((id: string) => {
     setQuest((prev) => {
       const next = { ...prev, [id]: !prev[id] };
@@ -1330,7 +1745,6 @@ export default function AiHub() {
     inputRef.current?.focus();
   }, []);
 
-  // slash menu: "/" + intent in the composer offers quick fills
   const slashMatch = /^\/(\w{0,20})$/.exec(input);
   const slashItems = slashMatch
     ? SLASH_INTENTS.filter((s) => s.cmd.startsWith(slashMatch[1].toLowerCase()))
@@ -1341,7 +1755,6 @@ export default function AiHub() {
     inputRef.current?.focus();
   }, []);
 
-  // exit presets
   const savePreset = useCallback(() => {
     const mint = presetMint.trim();
     if (!mint) return;
@@ -1368,6 +1781,90 @@ export default function AiHub() {
     setPresetsOpen(false);
     inputRef.current?.focus();
   }, []);
+
+  // ── hub v2 actions ──
+
+  const muteAlert = useCallback(async (a: HubAlertItem) => {
+    const toMuted = a.status !== "muted";
+    setAlertsBusy(a.id);
+    try {
+      const r = await hubAlertMute(a.id, toMuted);
+      if (r?.ok) {
+        setAlerts((prev) => prev.map((x) => (x.id === a.id ? { ...x, status: toMuted ? "muted" : "open" } : x)));
+        showToast(toMuted ? "Alert muted — the tick will skip it" : "Alert unmuted");
+      }
+    } finally {
+      setAlertsBusy(null);
+    }
+  }, [showToast]);
+
+  const deleteAlert = useCallback(
+    async (id: string) => {
+      setAlertsBusy(id);
+      try {
+        const r = await hubAlertDelete(id);
+        if (r?.ok) {
+          setAlerts((prev) => prev.filter((x) => x.id !== id));
+          showToast("Alert deleted");
+        }
+      } finally {
+        setAlertsBusy(null);
+      }
+    },
+    [showToast],
+  );
+
+  const dismissInsight = useCallback((id: string) => {
+    setInsights((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
+  const startTemplate = useCallback(
+    async (t: ThreadTemplate) => {
+      if (!user || sending) return;
+      try {
+        const r = await hubCreateThread(t.title);
+        if (!r?.ok) return;
+        const id = r.thread.id as string;
+        setThreads((prev) => [r.thread, ...prev]);
+        setActiveId(id);
+        setMessages([]);
+        setPendings([]);
+        setInsights([]);
+        setFailedPrompt(null);
+        setSidebarOpen(false);
+        setSending(true);
+        const userMsgId = Date.now();
+        setMessages([
+          { id: userMsgId, role: "user", content: t.prompt, tool_calls: null, created_at: new Date().toISOString() },
+        ]);
+        scrollDown();
+        try {
+          const cr = await hubChat(id, t.prompt, { mode: modeRef.current, lang: langRef.current });
+          if (cr?.ok || cr?.reply) applyChatResponse(cr);
+          else pushAssistant("Couldn't start that template — try sending a message.", null);
+        } catch {
+          pushAssistant("Network error starting the template.", null);
+        } finally {
+          setSending(false);
+          scrollDown();
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [user, sending, scrollDown, applyChatResponse, pushAssistant],
+  );
+
+  const mirrorTrade = useCallback(
+    (call: HubToolCall) => {
+      setInput(
+        "Mirror the trade you just described above — same token and same size. Show me the full plan before anything is placed.",
+      );
+      inputRef.current?.focus();
+      showToast("Composer filled — review and send to mirror the trade");
+    },
+    [showToast],
+  );
 
   // Cmd+K / Ctrl+K command palette
   useEffect(() => {
@@ -1421,7 +1918,7 @@ export default function AiHub() {
       title={m === "analyst" ? "Analyst: measured, data-driven answers" : "Degen: full-send energy"}
       className={cn(
         "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide transition",
-        mode === m ? "bg-og-cyan/15 text-og-cyan ring-1 ring-og-cyan/30" : "text-white/40 hover:text-white/70",
+        mode === m ? "bg-iris/15 text-iris ring-1 ring-iris/40" : "text-white/40 hover:text-white/70",
       )}
     >
       <Icon className="h-3.5 w-3.5" />
@@ -1429,7 +1926,7 @@ export default function AiHub() {
     </button>
   );
 
-  // threads: search filter, pinned sort first
+  // threads: title search filter, pinned sort first
   const tq = threadQuery.trim().toLowerCase();
   const sortedThreads = [...threads]
     .filter((t) => !tq || (t.title || "New chat").toLowerCase().includes(tq))
@@ -1454,9 +1951,18 @@ export default function AiHub() {
       run: () => cycleLang(),
     },
     { id: "export", label: "Export trades CSV", hint: "download history", icon: Download, run: () => exportCsv() },
+    { id: "export-md", label: "Export thread as Markdown", hint: "current chat", icon: FileDown, run: () => exportMarkdown() },
+    { id: "rail", label: "Toggle live rail", hint: "portfolio + alerts", icon: PanelRight, run: () => setRailOpen((o) => !o) },
     ...(micSupported
       ? [{ id: "voice", label: "Start voice dictation", hint: "speak your prompt", icon: Mic, run: () => toggleRecording() }]
       : []),
+    ...THREAD_TEMPLATES.map((t) => ({
+      id: `template:${t.id}`,
+      label: `Template: ${t.title}`,
+      hint: t.desc,
+      icon: t.icon,
+      run: () => startTemplate(t),
+    })),
     ...threads.map((t) => ({
       id: `thread:${t.id}`,
       label: `Go to: ${t.title || "New chat"}`,
@@ -1488,46 +1994,107 @@ export default function AiHub() {
     }
   };
 
+  const activeThread = threads.find((t) => t.id === activeId);
+  const openAlerts = alerts.filter((a) => a.status === "open");
+  const inputMentions = findTokenMentions(input).slice(0, 4);
+
+  /* ── derived rail numbers ── */
+  const stratTotal = stats?.activeStrategies
+    ? Object.values(stats.activeStrategies).reduce((t, v) => t + (Number(v) || 0), 0)
+    : 0;
+
   return (
     <AppLayout>
-      <div className="flex h-[calc(100dvh-4rem)] bg-[#04070f] text-white">
-        {/* ── Thread sidebar ── */}
+      <div className="relative flex h-[calc(100dvh-4rem)] overflow-hidden bg-[#05070e] text-white">
+        {/* aurora wash */}
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          <div className="absolute -top-48 left-1/4 h-[28rem] w-[28rem] rounded-full bg-iris/[0.08] blur-[130px]" />
+          <div className="absolute bottom-0 right-1/5 h-[22rem] w-[22rem] rounded-full bg-og-cyan/[0.06] blur-[130px]" />
+          <div className="absolute left-1/2 top-1/3 h-[18rem] w-[30rem] -translate-x-1/2 rounded-full bg-iris/[0.04] blur-[110px]" />
+        </div>
+
+        {/* ═══ Mission sidebar ═══ */}
         <aside
           className={cn(
-            "z-30 flex w-72 shrink-0 flex-col border-r border-white/[0.07] bg-[#060a14] transition-transform md:static md:translate-x-0",
+            "relative z-30 flex w-[19rem] shrink-0 flex-col border-r border-white/[0.07] bg-[#070b16]/90 backdrop-blur-xl transition-transform duration-300 md:static md:translate-x-0",
             sidebarOpen ? "fixed inset-y-0 left-0 translate-x-0" : "fixed inset-y-0 left-0 -translate-x-full",
           )}
         >
-          <div className="flex items-center gap-2.5 border-b border-white/[0.07] p-4">
+          <div className="flex items-center gap-3 border-b border-white/[0.07] p-4">
             <div className="relative">
-              <div className="absolute inset-0 rounded-xl bg-og-cyan/20 blur-md" />
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-og-cyan/40 bg-og-cyan/10">
-                <Sparkles className="h-4.5 w-4.5 text-og-cyan" />
+              <div className="absolute inset-0 rounded-2xl bg-iris/40 blur-lg" style={{ animation: "hub-glow-pulse 3s ease-in-out infinite" }} />
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-iris/50 bg-gradient-to-br from-iris/30 to-og-cyan/20">
+                <Sparkles className="h-5 w-5 text-iris" />
               </div>
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-black uppercase tracking-wide">AI Hub</div>
-              <div className="text-[11px] text-white/40">Chat · Trade · Launch</div>
+              <div className="text-sm font-black uppercase tracking-[0.22em]">AI Hub</div>
+              <div className="text-[11px] text-white/40">Command deck</div>
             </div>
+          </div>
+
+          <div className="border-b border-white/[0.07] p-3">
             <button
               type="button"
               onClick={newChat}
               disabled={!user}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-og-cyan px-3 py-1.5 text-xs font-bold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-iris to-og-cyan px-4 py-2.5 text-sm font-black uppercase tracking-[0.14em] text-[#0a0618] transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Plus className="h-3.5 w-3.5" /> New
+              <Plus className="h-4 w-4" /> New thread
             </button>
+            <div className="relative mt-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/25" />
+              <input
+                value={threadQuery}
+                onChange={(e) => setThreadQuery(e.target.value)}
+                placeholder="Search chats & messages…"
+                aria-label="Search chats and messages"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2 pl-9 pr-3 text-xs text-white outline-none transition placeholder:text-white/25 focus:border-iris/50"
+              />
+              {searching && <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-iris" />}
+            </div>
           </div>
-          <div className="border-b border-white/[0.07] p-2">
-            <input
-              value={threadQuery}
-              onChange={(e) => setThreadQuery(e.target.value)}
-              placeholder="Search chats…  (⌘K jumps too)"
-              aria-label="Search chats"
-              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-white outline-none transition placeholder:text-white/25 focus:border-og-cyan/40"
-            />
+
+          {/* templates */}
+          <div className="border-b border-white/[0.07] p-3">
+            <div className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Launch from template</div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {THREAD_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => startTemplate(t)}
+                  disabled={!user || sending}
+                  title={`${t.title} — ${t.desc}`}
+                  className="group flex flex-col items-center gap-1.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-1 py-2.5 transition hover:border-iris/40 hover:bg-iris/[0.07] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <t.icon className="h-4 w-4 text-iris transition group-hover:scale-110" />
+                  <span className="text-[10px] font-bold leading-tight text-white/70">{t.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* thread list */}
           <div className="flex-1 overflow-y-auto p-2">
+            {searchHits && searchHits.length > 0 && (
+              <div className="mb-2">
+                <div className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.22em] text-iris/80">
+                  In messages
+                </div>
+                {searchHits.slice(0, 5).map((h, i) => (
+                  <button
+                    key={`${h.thread_id}:${i}`}
+                    type="button"
+                    onClick={() => selectThread(h.thread_id)}
+                    className="hub-rise block w-full rounded-xl px-3 py-2 text-left transition hover:bg-white/[0.04]"
+                  >
+                    <div className="truncate text-xs font-semibold text-white/85">{h.thread_title || "New chat"}</div>
+                    <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/40">{h.snippet}</div>
+                  </button>
+                ))}
+              </div>
+            )}
             {loadError && threads.length === 0 ? (
               <div className="px-2 py-6 text-center">
                 <AlertTriangle className="mx-auto mb-2 h-5 w-5 text-og-gold" />
@@ -1543,20 +2110,22 @@ export default function AiHub() {
             ) : (
               sortedThreads.map((t) => {
                 const isPinned = pinned.includes(t.id);
+                const isActive = activeId === t.id;
                 return (
-                  <button
+                  <div
                     key={t.id}
-                    type="button"
-                    onClick={() => selectThread(t.id)}
                     className={cn(
-                      "group flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition",
-                      activeId === t.id
-                        ? "border border-white/[0.08] bg-white/[0.06] text-white"
-                        : "border border-transparent text-white/60 hover:bg-white/[0.04] hover:text-white",
+                      "group relative mb-1 flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition",
+                      isActive
+                        ? "border-iris/30 bg-gradient-to-r from-iris/[0.12] to-transparent text-white"
+                        : "border-transparent text-white/60 hover:bg-white/[0.04] hover:text-white",
                     )}
                   >
-                    {isPinned && <Pin className="h-3 w-3 shrink-0 fill-og-cyan text-og-cyan" />}
-                    <span className="flex-1 truncate">{t.title || "New chat"}</span>
+                    {isActive && <div className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-gradient-to-b from-iris to-og-cyan" />}
+                    {isPinned && <Pin className="h-3 w-3 shrink-0 fill-iris text-iris" />}
+                    <button type="button" onClick={() => selectThread(t.id)} className="min-w-0 flex-1 truncate text-left">
+                      {t.title || "New chat"}
+                    </button>
                     <Pin
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1564,22 +2133,24 @@ export default function AiHub() {
                       }}
                       aria-label={isPinned ? "Unpin chat" : "Pin chat"}
                       className={cn(
-                        "h-4 w-4 shrink-0 transition hover:text-og-cyan",
-                        isPinned ? "text-og-cyan opacity-100" : "text-white/30 opacity-0 group-hover:opacity-100",
+                        "h-4 w-4 shrink-0 cursor-pointer transition hover:text-iris",
+                        isPinned ? "text-iris opacity-100" : "text-white/30 opacity-0 group-hover:opacity-100",
                       )}
                     />
                     <Trash2
                       onClick={(e) => delThread(t.id, e)}
-                      className="h-4 w-4 shrink-0 text-white/30 opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                      aria-label="Delete chat"
+                      className="h-4 w-4 shrink-0 cursor-pointer text-white/30 opacity-0 transition group-hover:opacity-100 hover:text-red-400"
                     />
-                  </button>
+                  </div>
                 );
               })
             )}
-            {!loadError && threads.length === 0 && (
-              <div className="px-3 py-6 text-center text-xs text-white/30">No chats yet — start one below.</div>
+            {!loadError && threads.length === 0 && !searchHits && (
+              <div className="px-3 py-6 text-center text-xs text-white/30">No chats yet — start one above.</div>
             )}
           </div>
+
           {model && (
             <div className="border-t border-white/[0.07] px-4 py-2.5 text-[11px] text-white/40">
               <span className="inline-flex items-center gap-1.5">
@@ -1590,117 +2161,159 @@ export default function AiHub() {
           )}
         </aside>
         {sidebarOpen && (
-          <div className="fixed inset-0 z-20 bg-black/60 md:hidden" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} />
         )}
 
-        {/* ── Main column ── */}
-        <main className="flex min-w-0 flex-1 flex-col">
+        {/* ═══ Stage ═══ */}
+        <main className="relative flex min-w-0 flex-1 flex-col">
           {/* header */}
-          <header className="flex items-center gap-3 border-b border-white/[0.07] px-4 py-3">
-            <button type="button" className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label="Chats">
-              <Menu className="h-5 w-5 text-white/60" />
+          <header className="flex items-center gap-2 border-b border-white/[0.07] bg-[#05070e]/60 px-3 py-2.5 backdrop-blur-xl sm:gap-3 sm:px-4">
+            <button type="button" className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 md:hidden" onClick={() => setSidebarOpen(true)} aria-label="Chats">
+              <Menu className="h-5 w-5" />
             </button>
-            <div className="relative hidden sm:block">
-              <div className="absolute inset-0 rounded-xl bg-og-cyan/20 blur-lg" />
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-og-cyan/40 bg-og-cyan/10">
-                <Sparkles className="h-5 w-5 text-og-cyan" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-black uppercase tracking-[0.18em]">
+                {activeThread?.title || "New thread"}
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-white/35">
+                <span className={cn("h-1.5 w-1.5 rounded-full", sending ? "animate-pulse bg-iris" : "bg-og-lime")} />
+                {sending ? `Working${elapsed > 2 ? ` · ${elapsed}s` : "…"}` : stats ? `${stratTotal} strategies live` : "Ready"}
               </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-base font-black uppercase tracking-wide">OrbitX AI Hub</h1>
-              <p className="flex items-center gap-1.5 text-[11px] text-white/40">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-og-lime opacity-60" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-og-lime" />
-                </span>
-                {model ? `${model} · full MCP access` : "full MCP access"}
-              </p>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {!questDismissed && (
-                <button
-                  type="button"
-                  onClick={() => setQuestOpen((o) => !o)}
-                  title="Setup quest"
-                  aria-pressed={questOpen}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide transition",
-                    questOpen
-                      ? "border-og-gold/40 bg-og-gold/10 text-og-gold"
-                      : "border-white/[0.08] bg-white/[0.03] text-white/40 hover:text-white/70",
-                  )}
-                >
-                  <Target className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Quest</span>
-                </button>
+            {modeButton("analyst", "Analyst", Brain)}
+            {modeButton("degen", "Degen", Flame)}
+            <button
+              type="button"
+              onClick={cycleLang}
+              title="Switch language"
+              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-bold text-white/40 transition hover:text-white/70"
+            >
+              <Globe className="h-3.5 w-3.5" />
+              <span>{langLabel(lang)}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuestOpen((o) => !o)}
+              title="Setup quest"
+              aria-pressed={questOpen}
+              className={cn(
+                "rounded-lg p-2 transition",
+                questOpen ? "text-og-gold" : "text-white/35 hover:text-white/70",
               )}
-              <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.03] p-1" role="group" aria-label="Chat mode">
-                {modeButton("analyst", "Analyst", Brain)}
-                {modeButton("degen", "Degen", Flame)}
-              </div>
-              <select
-                value={lang}
-                onChange={(e) => changeLang(e.target.value)}
-                aria-label="Response language"
-                title="Response language"
-                className="cursor-pointer rounded-xl border border-white/[0.08] bg-white/[0.03] px-2 py-2 text-[11px] font-bold text-white/70 outline-none transition hover:text-white [&>option]:bg-[#0a101d]"
-              >
-                {LANGS.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
+            >
+              <Target className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setRailOpen((o) => !o)}
+              title="Live rail — portfolio & alerts"
+              aria-pressed={railOpen}
+              className={cn(
+                "relative rounded-lg p-2 transition",
+                railOpen ? "bg-iris/15 text-iris" : "text-white/35 hover:text-white/70",
+              )}
+            >
+              {openAlerts.length > 0 ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+              {openAlerts.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-iris px-1 text-[9px] font-black text-[#0a0618]">
+                  {openAlerts.length}
+                </span>
+              )}
+            </button>
+            <div className="hidden items-center gap-1 sm:flex">
               <button
                 type="button"
-                onClick={() => exportCsv()}
-                disabled={exporting || !user}
-                title="Export trades CSV"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-2.5 py-2 text-[11px] font-bold text-white/60 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={exportMarkdown}
+                disabled={exportingMd || messages.length === 0}
+                title="Export thread as Markdown"
+                className="rounded-lg p-2 text-white/35 transition hover:text-white/70 disabled:opacity-30"
               >
-                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">Export</span>
+                {exportingMd ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={exportCsv}
+                disabled={exporting}
+                title="Export trades CSV"
+                className="rounded-lg p-2 text-white/35 transition hover:text-white/70 disabled:opacity-30"
+              >
+                {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               </button>
             </div>
           </header>
 
+          {/* away digest banner */}
+          {awayInfo && (
+            <div className="hub-rise mx-4 mt-3 flex items-center gap-3 rounded-2xl border border-iris/25 bg-iris/[0.07] px-4 py-2.5 backdrop-blur">
+              <History className="h-4 w-4 shrink-0 text-iris" />
+              <p className="flex-1 text-xs text-white/75">
+                <span className="font-bold text-white">While you were away</span>
+                {awayInfo.threads > 0 && ` — ${awayInfo.threads} thread${awayInfo.threads > 1 ? "s" : ""} updated`}
+                {awayInfo.pendings > 0 && ` · ${awayInfo.pendings} confirmation${awayInfo.pendings > 1 ? "s" : ""} waiting`}
+              </p>
+              <button type="button" onClick={() => setAwayInfo(null)} aria-label="Dismiss" className="text-white/30 transition hover:text-white/70">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          <InsightCards insights={insights} onDismiss={dismissInsight} />
+
           {/* messages */}
           <div className="flex-1 overflow-y-auto px-4 py-5 lg:px-6">
-            <div className="mx-auto flex max-w-3xl flex-col gap-4">
+            <div key={activeId ?? "none"} className="hub-fade mx-auto flex max-w-3xl flex-col gap-4">
               {loadingThread ? (
-                <div className="flex flex-col items-center gap-3 py-16 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-og-cyan" />
-                  <p className="text-sm text-white/40">Loading chat…</p>
-                </div>
+                <ThreadSkeleton />
               ) : (
                 <>
                   {messages.length === 0 && (
-                    <div className="pt-6 text-center">
-                      <div className="relative mx-auto mb-5 h-16 w-16">
-                        <div className="absolute inset-0 rounded-2xl bg-og-cyan/20 blur-xl" />
-                        <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-og-cyan/40 bg-og-cyan/10">
-                          <Sparkles className="h-8 w-8 text-og-cyan" />
+                    <div className="pt-4 text-center sm:pt-8">
+                      <div className="relative mx-auto mb-6 h-20 w-20">
+                        <div className="absolute inset-0 rounded-[1.75rem] bg-iris/30 blur-2xl" style={{ animation: "hub-glow-pulse 3s ease-in-out infinite" }} />
+                        <div className="relative flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-iris/40 bg-gradient-to-br from-iris/25 to-og-cyan/15">
+                          <Sparkles className="h-9 w-9 text-iris" />
                         </div>
                       </div>
-                      <h2 className="text-xl font-black uppercase tracking-wide">What can I help with?</h2>
+                      <h2 className="bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-2xl font-black uppercase tracking-[0.12em] text-transparent sm:text-3xl">
+                        Command deck online
+                      </h2>
                       <p className="mx-auto mt-2 max-w-md text-sm text-white/40">
-                        Scan tokens, check markets, trade, launch coins, run strategies — one account, everything in here.
+                        Scan tokens, run strategies, trade, launch coins — your whole operation in one chat.
                       </p>
-                      <div className="mx-auto mt-6 grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-                        {QUICK_PROMPTS.map((q) => (
+                      <div className="mx-auto mt-6 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+                        {THREAD_TEMPLATES.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => startTemplate(t)}
+                            disabled={!user || sending}
+                            className="group rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 text-left backdrop-blur transition hover:border-iris/40 hover:bg-iris/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <t.icon className="h-5 w-5 text-iris transition group-hover:scale-110" />
+                            <div className="mt-2 text-sm font-bold text-white/90">{t.title}</div>
+                            <div className="mt-0.5 text-[11px] leading-snug text-white/40">{t.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mx-auto mt-4 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+                        {QUICK_PROMPTS.slice(0, 6).map((q) => (
                           <button
                             key={q.label}
                             type="button"
                             onClick={() => send(q.prompt)}
                             disabled={!user || sending}
-                            className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-left transition hover:border-og-cyan/30 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-2.5 text-left transition hover:border-og-cyan/30 hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <div className="text-[13px] font-semibold text-white/85">{q.label}</div>
                             <div className="mt-0.5 truncate text-[11px] text-white/35">{q.prompt}</div>
                           </button>
                         ))}
                       </div>
-                      {questOpen && (
+                      <p className="mt-5 text-[11px] text-white/25">
+                        Press <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono">⌘K</kbd> for commands
+                        {micSupported && " · tap the mic to dictate"}
+                      </p>
+                      {questOpen && !questDismissed && (
                         <QuestCard
                           quest={quest}
                           onToggle={toggleQuestItem}
@@ -1716,37 +2329,42 @@ export default function AiHub() {
                     const pie = m.role === "assistant" ? parseAllocPie(wc ? wc.rest : m.content || "") : null;
                     const body = pie ? pie.rest : wc ? wc.rest : m.content;
                     const dexUrl = m.role === "assistant" ? firstDexUrl(body || "") : null;
+                    const isAlert = m.role === "assistant" && /🔔 Alert fired:/.test(m.content || "");
                     const bubble = (
                       <div
                         className={cn(
-                          "whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                          "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
                           m.role === "assistant"
-                            ? "border border-white/[0.06] bg-white/[0.03] text-white/85"
-                            : "bg-og-lime/15 text-white",
+                            ? cn(
+                                "border bg-white/[0.03] text-white/85 backdrop-blur",
+                                isAlert ? "border-iris/40 shadow-[0_0_24px_-8px_rgba(167,139,250,0.4)]" : "border-white/[0.06]",
+                              )
+                            : "border border-iris/25 bg-gradient-to-br from-iris/[0.16] to-iris/[0.06] text-white",
                         )}
                       >
                         {m.role === "assistant" ? (
-                          <div className="prose prose-invert prose-sm max-w-none [&_a]:text-og-cyan [&_code]:rounded [&_code]:bg-black/40 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-og-cyan [&_p]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-black/40 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_ul]:my-2">
-                            <ReactMarkdown>{body || ""}</ReactMarkdown>
+                          <div className="prose prose-invert prose-sm max-w-none [&_p]:my-2 [&_ul]:my-2">
+                            <Markdown text={body || ""} />
                           </div>
                         ) : (
-                          m.content
+                          <div className="whitespace-pre-wrap">{m.content}</div>
                         )}
                       </div>
                     );
                     return (
-                      <div key={m.id} className={cn("flex gap-3", m.role === "user" && "flex-row-reverse")}>
+                      <div key={m.id} className={cn("hub-rise flex gap-3", m.role === "user" && "flex-row-reverse")}>
                         <div
                           className={cn(
-                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border",
                             m.role === "assistant"
-                              ? "border-og-cyan/30 bg-og-cyan/10 text-og-cyan"
-                              : "border-og-lime/30 bg-og-lime/10 text-og-lime",
+                              ? "border-iris/30 bg-iris/10 text-iris"
+                              : "border-white/15 bg-white/[0.06] text-white/70",
                           )}
                         >
-                          {m.role === "assistant" ? <Bot className="h-4 w-4" /> : <UserIcon className="h-4 w-4" />}
+                          {m.role === "assistant" ? <Sparkles className="h-4 w-4" /> : <span className="text-[11px] font-black">YOU</span>}
                         </div>
-                        <div className="min-w-0 max-w-[85%] flex-1">
+                        <div className="min-w-0 max-w-[88%] flex-1 sm:max-w-[85%]">
+                          {m.role === "assistant" && <MentionChips text={m.content || ""} />}
                           {dexUrl && <ChartCard url={dexUrl} className="mb-3" />}
                           {wc ? (body && body.trim() ? bubble : null) : bubble}
                           {pie && <AllocPie entries={pie.entries} />}
@@ -1754,7 +2372,7 @@ export default function AiHub() {
                           {m.role === "assistant" && (m.tool_calls?.length ? (
                             <div className="mt-2 space-y-2">
                               {m.tool_calls.map((c, i) => (
-                                <ToolCard key={i} call={c} />
+                                <ToolCard key={i} call={c} onMirror={mirrorTrade} />
                               ))}
                             </div>
                           ) : null)}
@@ -1767,7 +2385,7 @@ export default function AiHub() {
                                   title={speakingId === m.id ? "Stop reading" : "Read aloud"}
                                   className={cn(
                                     "rounded-lg p-1.5 text-white/35 transition hover:bg-white/10 hover:text-white/80",
-                                    speakingId === m.id && "text-og-cyan",
+                                    speakingId === m.id && "text-iris",
                                   )}
                                 >
                                   {speakingId === m.id ? (
@@ -1802,17 +2420,21 @@ export default function AiHub() {
                   })}
 
                   {pendings.map((p) => (
-                    <PendingCard key={p.id} p={p} onConfirm={doConfirm} busy={confirmBusy} />
+                    <div key={p.id} className="hub-rise">
+                      <PendingCard p={p} onConfirm={doConfirm} busy={confirmBusy} />
+                    </div>
                   ))}
 
                   {sending && (
-                    <div className="flex gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-cyan/30 bg-og-cyan/10 text-og-cyan">
-                        <Bot className="h-4 w-4" />
+                    <div className="hub-rise flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-iris/30 bg-iris/10 text-iris">
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       </div>
                       <div className="flex items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-2.5 text-sm text-white/50">
-                        <Loader2 className="h-4 w-4 animate-spin" />
                         Thinking{elapsed > 2 ? <span className="font-mono text-xs"> · {elapsed}s</span> : "…"}
+                        <button type="button" onClick={stop} title="Stop" className="ml-1 rounded-lg p-1 text-white/40 transition hover:bg-white/10 hover:text-white">
+                          <Square className="h-3 w-3" />
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1823,14 +2445,21 @@ export default function AiHub() {
           </div>
 
           {/* composer */}
-          <div className="border-t border-white/[0.07] px-4 py-3 lg:px-6">
+          <div className="relative border-t border-white/[0.07] bg-[#05070e]/60 px-4 py-3 backdrop-blur-xl lg:px-6">
             {!user ? (
-              <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-xl border border-og-gold/20 bg-og-gold/5 px-4 py-2.5 text-[12px] text-og-gold/90">
+              <div className="mx-auto flex max-w-3xl items-center gap-2 rounded-2xl border border-og-gold/20 bg-og-gold/5 px-4 py-2.5 text-[12px] text-og-gold/90">
                 <AlertTriangle className="h-4 w-4 shrink-0" /> Sign in to chat with the AI Hub.
               </div>
             ) : (
-              <>
-                <div className="relative mx-auto flex max-w-3xl items-end gap-2">
+              <div className="mx-auto max-w-3xl">
+                {inputMentions.length > 0 && (
+                  <div className="hub-rise mb-2 flex flex-wrap gap-1.5">
+                    {inputMentions.map((m, i) => (
+                      <TokenChip key={`${m.kind}:${m.value}:${i}`} mint={m.kind === "mint" ? m.value : undefined} symbol={m.kind === "symbol" ? m.value : undefined} />
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
                   <button
                     type="button"
                     onClick={() => setPresetsOpen((o) => !o)}
@@ -1838,10 +2467,10 @@ export default function AiHub() {
                     title="Exit presets — save & apply take-profit plans"
                     aria-pressed={presetsOpen}
                     className={cn(
-                      "flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-40",
+                      "flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl border transition disabled:cursor-not-allowed disabled:opacity-40",
                       presetsOpen
-                        ? "border-og-cyan/50 bg-og-cyan/15 text-og-cyan"
-                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10",
+                        ? "border-iris/50 bg-iris/15 text-iris"
+                        : "border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/[0.08]",
                     )}
                   >
                     <Target className="h-5 w-5" />
@@ -1853,10 +2482,10 @@ export default function AiHub() {
                       disabled={sending}
                       title={recording ? "Stop dictation" : "Voice input"}
                       className={cn(
-                        "flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-40",
+                        "flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl border transition disabled:cursor-not-allowed disabled:opacity-40",
                         recording
                           ? "animate-pulse border-red-400/50 bg-red-400/15 text-red-300"
-                          : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10",
+                          : "border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/[0.08]",
                       )}
                     >
                       <Mic className="h-5 w-5" />
@@ -1874,10 +2503,10 @@ export default function AiHub() {
                       rows={1}
                       placeholder={recording ? "Listening…" : "Ask about a token, wallet, or strategy…  ( / for quick intents )"}
                       disabled={sending}
-                      className="max-h-40 min-h-[44px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-og-cyan/40 disabled:opacity-60"
+                      className="max-h-40 min-h-[46px] w-full resize-none rounded-2xl border border-white/[0.1] bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-iris/50 focus:shadow-[0_0_24px_-8px_rgba(167,139,250,0.5)] disabled:opacity-60"
                     />
                     {slashItems.length > 0 && (
-                      <div className="absolute bottom-full left-0 z-40 mb-2 w-72 overflow-hidden rounded-xl border border-white/[0.1] bg-[#0a101d] shadow-2xl">
+                      <div className="absolute bottom-full left-0 z-40 mb-2 w-72 overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0a101d] shadow-2xl">
                         {slashItems.map((s, i) => (
                           <button
                             key={s.cmd}
@@ -1889,10 +2518,10 @@ export default function AiHub() {
                             onMouseEnter={() => setSlashHi(i)}
                             className={cn(
                               "flex w-full items-center gap-2.5 px-3 py-2 text-left",
-                              i === slashHi ? "bg-og-cyan/10" : "",
+                              i === slashHi ? "bg-iris/10" : "",
                             )}
                           >
-                            <span className="rounded-md bg-og-cyan/10 px-1.5 py-0.5 font-mono text-[11px] font-bold text-og-cyan">
+                            <span className="rounded-md bg-iris/15 px-1.5 py-0.5 font-mono text-[11px] font-bold text-iris">
                               /{s.cmd}
                             </span>
                             <span className="min-w-0 flex-1">
@@ -1904,157 +2533,249 @@ export default function AiHub() {
                       </div>
                     )}
                   </div>
-                  {sending ? (
-                    <button
-                      type="button"
-                      onClick={stop}
-                      title="Stop"
-                      className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl border border-red-400/40 bg-red-400/10 text-red-300 transition hover:bg-red-400/20"
-                    >
-                      <Square className="h-5 w-5 fill-current" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => send()}
-                      disabled={!input.trim()}
-                      className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl bg-og-cyan text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Send className="h-5 w-5" />
-                    </button>
-                  )}
-                  {presetsOpen && (
-                    <div className="absolute bottom-full left-0 z-40 mb-2 w-80 rounded-xl border border-white/[0.1] bg-[#0a101d] p-3 shadow-2xl">
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/40">
-                        Exit presets
-                      </div>
-                      {presets.length === 0 && (
-                        <p className="mb-2 text-xs text-white/35">
-                          No presets yet. Save your take-profit ladder — one tap fills the composer.
-                        </p>
-                      )}
-                      <div className="max-h-48 space-y-1.5 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => (sending ? stop() : send())}
+                    disabled={!sending && (!input.trim() || !user)}
+                    title={sending ? "Stop" : "Send"}
+                    className={cn(
+                      "flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
+                      sending
+                        ? "border border-red-400/40 bg-red-400/15 text-red-300"
+                        : "bg-gradient-to-br from-iris to-og-cyan text-[#0a0618] shadow-[0_0_20px_-6px_rgba(167,139,250,0.7)] hover:brightness-110",
+                    )}
+                  >
+                    {sending ? <Square className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                  </button>
+                </div>
+                {/* presets drawer */}
+                {presetsOpen && (
+                  <div className="hub-rise mt-2 rounded-2xl border border-white/[0.08] bg-[#0a101d]/95 p-3 backdrop-blur">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">Exit presets</div>
+                      <button type="button" onClick={() => setPresetsOpen(false)} className="text-white/30 hover:text-white/70">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {presets.length > 0 && (
+                      <div className="mb-2 space-y-1.5">
                         {presets.map((p, i) => (
-                          <div key={i} className="flex items-center gap-2 rounded-lg bg-white/[0.03] p-2">
+                          <div key={i} className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-xs font-bold text-white/85">{p.name}</div>
-                              <div className="truncate font-mono text-[10px] text-white/35">
-                                {truncate(p.mint, 20)} · {p.targets}
-                              </div>
+                              <div className="truncate font-mono text-[10px] text-white/35">{p.targets}</div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => applyPreset(p)}
-                              className="shrink-0 rounded-lg bg-og-cyan/15 px-2.5 py-1 text-[11px] font-bold text-og-cyan transition hover:bg-og-cyan/25"
-                            >
+                            <button type="button" onClick={() => applyPreset(p)} className="rounded-lg bg-iris/15 px-2.5 py-1 text-[11px] font-bold text-iris transition hover:bg-iris/25">
                               Apply
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => delPreset(i)}
-                              aria-label="Delete preset"
-                              className="shrink-0 rounded-lg p-1 text-white/30 transition hover:bg-white/10 hover:text-red-400"
-                            >
-                              <X className="h-3.5 w-3.5" />
+                            <button type="button" onClick={() => delPreset(i)} aria-label="Delete preset" className="text-white/30 hover:text-red-400">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-2 space-y-1.5 border-t border-white/[0.07] pt-2">
-                        <input
-                          value={presetMint}
-                          onChange={(e) => setPresetMint(e.target.value)}
-                          placeholder="Token mint"
-                          className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 font-mono text-xs text-white outline-none placeholder:text-white/25 focus:border-og-cyan/40"
-                        />
-                        <div className="flex gap-1.5">
-                          <input
-                            value={presetName}
-                            onChange={(e) => setPresetName(e.target.value)}
-                            placeholder="Name (e.g. SOL ladder)"
-                            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white outline-none placeholder:text-white/25 focus:border-og-cyan/40"
-                          />
-                          <input
-                            value={presetTargets}
-                            onChange={(e) => setPresetTargets(e.target.value)}
-                            placeholder="2x, 5x, 10x"
-                            className="w-24 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white outline-none placeholder:text-white/25 focus:border-og-cyan/40"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={savePreset}
-                          disabled={!presetMint.trim()}
-                          className="w-full rounded-lg bg-og-cyan py-1.5 text-xs font-bold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Save preset
-                        </button>
-                      </div>
+                    )}
+                    <div className="flex gap-1.5">
+                      <input value={presetMint} onChange={(e) => setPresetMint(e.target.value)} placeholder="Mint" className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 font-mono text-[11px] outline-none placeholder:text-white/25 focus:border-iris/50" />
+                      <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Name" className="w-24 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-[11px] outline-none placeholder:text-white/25 focus:border-iris/50" />
+                      <input value={presetTargets} onChange={(e) => setPresetTargets(e.target.value)} placeholder="2x, 5x, 10x" className="w-28 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-[11px] outline-none placeholder:text-white/25 focus:border-iris/50" />
+                      <button type="button" onClick={savePreset} disabled={!presetMint.trim()} className="rounded-lg bg-iris px-3 py-1.5 text-[11px] font-black text-[#0a0618] transition hover:brightness-110 disabled:opacity-40">
+                        Save
+                      </button>
                     </div>
-                  )}
-                </div>
-                <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-white/20">
-                  OrbitX AI can make mistakes. Verify on-chain before trading. Trades &amp; posts always ask first.
-                </p>
-              </>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </main>
-      </div>
 
-      {/* command palette */}
-      {cmdOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh]"
-          onClick={() => setCmdOpen(false)}
+        {/* ═══ Live rail ═══ */}
+        <aside
+          className={cn(
+            "z-30 flex w-[20rem] shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/[0.07] bg-[#070b16]/90 p-3 backdrop-blur-xl transition-transform duration-300",
+            "fixed inset-y-0 right-0 xl:static",
+            railOpen ? "translate-x-0" : "translate-x-full xl:translate-x-0",
+          )}
         >
-          <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0a101d] shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <input
-              autoFocus
-              value={cmdQuery}
-              onChange={(e) => {
-                setCmdQuery(e.target.value);
-                setCmdHi(0);
-              }}
-              onKeyDown={cmdInputKeyDown}
-              placeholder="Type a command or search chats…"
-              aria-label="Command palette"
-              className="w-full border-b border-white/[0.07] bg-transparent px-4 py-3 text-sm text-white outline-none placeholder:text-white/30"
-            />
-            <div className="max-h-80 overflow-y-auto p-2">
-              {cmdResults.map((a, i) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onMouseEnter={() => setCmdHi(i)}
-                  onClick={() => cmdPick(a)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition",
-                    i === cmdHi ? "bg-og-cyan/10 text-white" : "text-white/70",
-                  )}
-                >
-                  <a.icon className="h-4 w-4 shrink-0 text-og-cyan" />
-                  <span className="flex-1 truncate">{a.label}</span>
-                  <span className="shrink-0 text-[11px] text-white/30">{a.hint}</span>
-                </button>
-              ))}
-              {cmdResults.length === 0 && (
-                <div className="px-3 py-6 text-center text-xs text-white/30">No matches.</div>
+          {/* portfolio */}
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/40">
+                <Wallet className="h-3.5 w-3.5 text-iris" /> Portfolio
+              </div>
+              <button type="button" onClick={() => void refreshDeck()} title="Refresh" className="rounded-lg p-1 text-white/30 transition hover:text-white/70">
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {stats ? (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Total value</div>
+                  <div className="font-mono text-2xl font-black tabular-nums">
+                    {stats.portfolioUsd != null ? fmtUsd(stats.portfolioUsd) : <span className="text-white/30">—</span>}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Total PnL</div>
+                    <div className={cn("flex items-center gap-1 font-mono text-lg font-black tabular-nums", (stats.pnlUsd ?? 0) >= 0 ? "text-og-lime" : "text-red-400")}>
+                      {(stats.pnlUsd ?? 0) >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                      {stats.pnlUsd != null ? `${stats.pnlUsd >= 0 ? "+" : "−"}$${Math.abs(stats.pnlUsd).toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Strategies</div>
+                    <div className="font-mono text-lg font-black tabular-nums text-iris">{stratTotal}</div>
+                  </div>
+                </div>
+                {!stats.wallet && (
+                  <p className="rounded-xl border border-og-gold/20 bg-og-gold/5 px-3 py-2 text-[11px] text-og-gold/90">
+                    No app wallet yet — ask the agent to create one.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2" aria-hidden>
+                <div className="h-7 w-2/3 animate-pulse rounded-lg bg-white/[0.06]" />
+                <div className="h-5 w-1/2 animate-pulse rounded-lg bg-white/[0.04]" />
+              </div>
+            )}
+          </section>
+
+          {/* alerts */}
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/40">
+                <BellRing className="h-3.5 w-3.5 text-iris" /> Price alerts
+              </div>
+              <span className="rounded-full bg-iris/15 px-2 py-0.5 font-mono text-[10px] font-bold text-iris">{openAlerts.length} live</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {alerts.length === 0 && (
+                <p className="text-[11px] leading-relaxed text-white/35">
+                  No alerts yet. Ask the agent — <span className="text-white/60">“alert me when SOL breaks $200”</span> — and they fire right into your chat.
+                </p>
               )}
+              {alerts.map((a) => {
+                const muted = a.status === "muted";
+                const busy = alertsBusy === a.id;
+                return (
+                  <div key={a.id} className={cn("hub-rise rounded-xl border p-2.5", muted ? "border-white/[0.05] bg-white/[0.01] opacity-60" : "border-iris/20 bg-iris/[0.05]")}>
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-bold text-white/90">
+                          {a.symbol || `${a.mint.slice(0, 4)}…${a.mint.slice(-4)}`}
+                          <span className="ml-1.5 font-mono font-normal text-white/40">{a.condition || a.type}</span>
+                        </div>
+                        {a.actionDesc && <div className="truncate text-[10px] text-white/40">{a.actionDesc}</div>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => muteAlert(a)}
+                        disabled={busy}
+                        title={muted ? "Unmute" : "Mute"}
+                        className="rounded-lg p-1.5 text-white/40 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      >
+                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteAlert(a.id)}
+                        disabled={busy}
+                        title="Delete alert"
+                        className="rounded-lg p-1.5 text-white/40 transition hover:bg-white/10 hover:text-red-400 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* activity */}
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-white/40">
+              <Activity className="h-3.5 w-3.5 text-og-cyan" /> Activity
+            </div>
+            <div className="mt-3 space-y-2 text-[11px]">
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.02] px-3 py-2">
+                <span className="flex items-center gap-1.5 text-white/55"><Clock className="h-3 w-3" /> Confirmations waiting</span>
+                <span className="font-mono font-bold text-white/85">{pendings.length}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.02] px-3 py-2">
+                <span className="flex items-center gap-1.5 text-white/55"><Layers className="h-3 w-3" /> Open threads</span>
+                <span className="font-mono font-bold text-white/85">{threads.length}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.02] px-3 py-2">
+                <span className="flex items-center gap-1.5 text-white/55"><Zap className="h-3 w-3" /> Mind model</span>
+                <span className="truncate pl-2 font-mono text-white/85">{model || "—"}</span>
+              </div>
+            </div>
+          </section>
+        </aside>
+        {railOpen && (
+          <div className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm xl:hidden" onClick={() => setRailOpen(false)} />
+        )}
+
+        {/* ═══ overlays ═══ */}
+        {cmdOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-[12vh] backdrop-blur-sm" onClick={() => setCmdOpen(false)}>
+            <div className="hub-rise w-full max-w-lg overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0a101d] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2 border-b border-white/[0.07] px-4 py-3">
+                <Search className="h-4 w-4 text-iris" />
+                <input
+                  autoFocus
+                  value={cmdQuery}
+                  onChange={(e) => {
+                    setCmdQuery(e.target.value);
+                    setCmdHi(0);
+                  }}
+                  onKeyDown={cmdInputKeyDown}
+                  placeholder="Type a command or search threads…"
+                  className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/25"
+                />
+                <kbd className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40">esc</kbd>
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto p-2">
+                {cmdResults.slice(0, 14).map((a, i) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      cmdPick(a);
+                    }}
+                    onMouseEnter={() => setCmdHi(i)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
+                      i === cmdHi ? "bg-iris/10" : "",
+                    )}
+                  >
+                    <a.icon className="h-4 w-4 shrink-0 text-iris" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-white/85">{a.label}</span>
+                    <span className="text-[11px] text-white/30">{a.hint}</span>
+                  </button>
+                ))}
+                {cmdResults.length === 0 && (
+                  <div className="px-3 py-6 text-center text-xs text-white/30">No matches.</div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* toast */}
-      {toast && (
-        <div className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-white/10 bg-[#0a101d] px-4 py-2.5 text-sm text-white shadow-2xl">
-          {toast}
-        </div>
-      )}
+        {toast && (
+          <div className="hub-rise fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+            <div className="flex items-center gap-2 rounded-2xl border border-iris/30 bg-[#0d1424]/95 px-4 py-2.5 text-sm text-white/90 shadow-2xl backdrop-blur">
+              <Sparkles className="h-4 w-4 shrink-0 text-iris" />
+              {toast}
+            </div>
+          </div>
+        )}
+      </div>
     </AppLayout>
   );
 }
