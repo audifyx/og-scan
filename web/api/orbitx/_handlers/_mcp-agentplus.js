@@ -1538,7 +1538,9 @@ export async function thinkAgent(agent, opts = {}) {
       parsed = {};
     }
     const text = parsed?.choices?.[0]?.message?.content || "";
-    const t = normalizeThink(parseThinkJson(text));
+    // Empty content is not bad_json — dark spells return HTTP 200 with no
+    // content. Classify honestly; the single retry below still applies.
+    const t = text.trim() ? normalizeThink(parseThinkJson(text)) : null;
     if (t && typeof t.thought === "string" && Array.isArray(t.actions)) {
       think = t;
       usage = parsed?.usage || {};
@@ -1550,9 +1552,10 @@ export async function thinkAgent(agent, opts = {}) {
     // bad_json loop; otherwise fail fast — surfaced on the dashboard, never
     // silently degraded.
     const finishReason = parsed?.choices?.[0]?.finish_reason || "?";
-    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think bad_json from ${model} (finish_reason=${finishReason}): ${trunc(text, 300)}` });
-    lastErr = { ok: false, error: "bad_json" };
-    if (attempt === 0) continue; // one hotter retry on bad_json only
+    const thinkErrKind = text.trim() ? "bad_json" : "llm_empty";
+    await _logEvent(client, { userId, agentId: agent.id, kind: "error", body: `think ${thinkErrKind} from ${model} (finish_reason=${finishReason}): ${trunc(text, 300) || "(empty response)"}` });
+    lastErr = { ok: false, error: thinkErrKind };
+    if (attempt === 0) continue; // one hotter retry on bad_json/llm_empty
     break;
   }
   if (!think) return lastErr || { ok: false, error: "bad_json" };
@@ -2955,6 +2958,7 @@ const HUB_MSG_MAX = 4000;
 const HUB_MAX_TOKENS = 2000;
 const HUB_MAX_ITERS = 4;
 const HUB_DEADLINE_MS = 50000;
+const HUB_TOOL_TIMEOUT_MS = 25000; // one hanging tool must not kill the turn
 const HUB_PENDING_TTL_MS = 15 * 60 * 1000;
 
 // Tool catalog filters: connector plumbing, the agent substrate, generated
@@ -3850,7 +3854,8 @@ async function hubLlmStreamAttempt(messages, { temperature = 0.4, timeoutMs = HU
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!resp.ok || !resp.body) return { ok: false };
+    if (!resp.ok) return { ok: false, status: resp.status };
+    if (!resp.body) return { ok: false };
     const { raw } = await hubReadSse(resp.body, onToken);
     if (!raw) return { ok: false };
     return { ok: true, raw };
@@ -3874,6 +3879,13 @@ function hubLlmFinish({ rawApi, content, usage }, isLastAttempt) {
       parsed = {};
     }
     text = parsed?.choices?.[0]?.message?.content || "";
+  }
+  // Empty content is NOT bad_json — during dark spells the model answers
+  // HTTP 200 with no content at all. Classify it honestly so the turn never
+  // reports a confusing "bad_json" for a response that was simply empty.
+  if (!String(text || "").trim()) {
+    if (!isLastAttempt) return { retry: true, empty: true };
+    return { ok: false, error: "llm_empty", message: "The model returned an empty response." };
   }
   const norm = hubNormalize(parseThinkJson(text));
   if (norm) return { ok: true, ...norm, model: cfg.model, usage: usage || {} };
@@ -3944,8 +3956,13 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
     if (text && text.length > lastText.length) lastText = text.slice(0, 4000);
     const fin = hubLlmFinish({ rawApi: raw, usage: parsed?.usage || {} }, attempt === 1);
     if (fin.retry) {
-      lastErr = { ok: false, error: "bad_json", message: trunc(text, 300) };
-      continue; // one hotter retry on bad_json
+      // One hotter retry: low temp deterministically re-emits the same broken
+      // envelope (bad_json loop). Empty responses retry too — a transient
+      // serving glitch, not a parse failure — but keep the honest error kind.
+      lastErr = fin.empty
+        ? { ok: false, error: "llm_empty", message: "The model returned an empty response." }
+        : { ok: false, error: "bad_json", message: trunc(text, 300) };
+      continue;
     }
     return fin;
   }
@@ -3987,6 +4004,20 @@ async function hubLoadThread(client, userId, threadId) {
 }
 
 // Core agentic loop shared by hubChat and hubConfirm.
+// Human-friendly LLM failure lines for the chat thread. Raw error codes
+// (bad_json, llm_500…) mean nothing to the user — map them to honest plain
+// language instead of leaking internals into the conversation.
+function hubHumanLlmError(error) {
+  const e = String(error || "");
+  if (e === "llm_unreachable") return "We couldn't reach the AI model just now — it's not responding. Please try again in a moment.";
+  if (e === "llm_empty") return "The AI model came back empty just now. Please try again in a moment.";
+  if (e === "bad_json") return "The AI model's reply came back garbled. Please try again in a moment.";
+  if (e === "llm_unavailable") return "No AI model is configured right now.";
+  if (/^llm_4\d\d$/.test(e)) return "The AI model rejected the request. Please try again in a moment.";
+  if (/^llm_5\d\d$/.test(e)) return "The AI model's servers are having trouble right now. Please try again in a moment.";
+  return "We hit a problem talking to the AI model. Please try again in a moment.";
+}
+
 // Human-friendly tool label for live status lines: orbitx_crypto_scan_solana → "crypto scan".
 function hubPrettyTool(name) {
   return String(name || "").replace(/^orbitx_/, "").replace(/_/g, " ").trim() || "tool";
@@ -4037,8 +4068,9 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
       } : undefined,
     });
     if (!llm.ok) {
-      await hubInsertMessage(client, threadId, "assistant", `I hit a problem reaching the model (${llm.error}). Please try again in a moment.`, []);
-      return { ok: false, error: llm.error, message: llm.message, reply: `I hit a problem reaching the model (${llm.error}). Please try again in a moment.`, tool_calls: executed, pending: [], model, thoughts };
+      const humanErr = hubHumanLlmError(llm.error);
+      await hubInsertMessage(client, threadId, "assistant", humanErr, []);
+      return { ok: false, error: llm.error, message: llm.message, reply: humanErr, tool_calls: executed, pending: [], model, thoughts };
     }
     model = llm.model || model;
     if (llm.degraded) degraded = true;
@@ -4066,7 +4098,20 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
       try { ev.onToolCall && ev.onToolCall({ name: tc.name, args_summary: hubArgsSummary(tc.arguments) }); } catch { /* ignore */ }
       let result, ok = true;
       try {
-        result = await hubExecuteTool({ userId, toolName: tc.name, args: tc.arguments || {}, req, hubThread: threadId });
+        // One hanging tool must not kill the turn: race it against a timeout
+        // so a stuck downstream call degrades to a failed tool result (which
+        // the model then synthesizes honestly) instead of a Vercel 60s kill
+        // with no reply. Only non-gated tools reach here, so an abandoned
+        // late completion has no harmful side effect.
+        let timer;
+        try {
+          result = await Promise.race([
+            hubExecuteTool({ userId, toolName: tc.name, args: tc.arguments || {}, req, hubThread: threadId }),
+            new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("tool_timeout")), HUB_TOOL_TIMEOUT_MS); }),
+          ]);
+        } finally {
+          clearTimeout(timer);
+        }
       } catch (e) {
         ok = false;
         result = { error: e?.message || String(e) };
