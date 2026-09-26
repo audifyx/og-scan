@@ -67,6 +67,15 @@ const MAX_ACTIONS_PER_THINK = 5;
 const HEARTBEAT_MS = 30 * 60 * 1000;
 const THINKS_PER_TICK_CAP = 10;
 
+// Provider dark-spell circuit breaker: N transport timeouts in M minutes
+// means the LLM provider is down, not the agents. Parking scheduled thinks
+// converts hundreds of wasted timeout burns into idle; one cheap probe per
+// tick detects recovery. State is derived from ap_agent_logs (no new table,
+// no migration) and every read fails open — a broken count never parks.
+const PROVIDER_DARK_WINDOW_MIN = 15;
+const PROVIDER_DARK_THRESHOLD = 5; // transport-timeout thinks inside the window
+const PROVIDER_PROBE_TIMEOUT_MS = 15000;
+
 // Default plan when a kind='website' task is assigned without explicit steps.
 const WEBSITE_PLAN = ["scaffold", "frontend", "backend", "build/validate", "deploy", "done"].map((title) => ({
   title,
@@ -2083,6 +2092,92 @@ async function driverStep(client, userId, agent) {
   return { ok: true, unread: unread || 0, advanced, builds: builds.length };
 }
 
+/* ------------------------------------------------------------------ */
+/* provider dark-spell circuit breaker                                  */
+/*                                                                      */
+/* 2026-09-26: 265/277 logged think errors were Nvidia transport        */
+/* timeouts (provider dark spell, ~6% think success/12h), and when      */
+/* attempt 1 timed out the retry failed ~98% of the time — burning a    */
+/* 45s + retry budget per agent per tick for nothing. When the breaker  */
+/* trips, tickAgentPlus parks scheduled thinks (wake flags are kept so  */
+/* they fire on recovery) and runs one cheap probe per tick instead.    */
+/* ------------------------------------------------------------------ */
+
+// Derived dark state: count recent think transport-timeout errors.
+// Fail-open: any read failure returns dark:false (never park on doubt).
+async function _providerDark(client, { windowMin = PROVIDER_DARK_WINDOW_MIN, threshold = PROVIDER_DARK_THRESHOLD } = {}) {
+  try {
+    const since = new Date(Date.now() - windowMin * 60000).toISOString();
+    const { count } = await client
+      .from("ap_agent_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "error")
+      .like("body", "think transport failed%")
+      .gte("created_at", since);
+    const timeouts = count || 0;
+    return { dark: timeouts >= threshold, timeouts, windowMin, threshold };
+  } catch {
+    return { dark: false, timeouts: 0, windowMin, threshold };
+  }
+}
+
+// Cheap liveness probe: one minimal chat completion against the single
+// mind model. Reachability (HTTP 200) is the signal — a 200 with a degraded
+// envelope fails fast downstream, it doesn't burn a think budget.
+async function _probeProvider(timeoutMs = PROVIDER_PROBE_TIMEOUT_MS) {
+  const cfg = llmCfg();
+  if (!cfg.apiKey) return { ok: false, error: "no_key" };
+  const t0 = Date.now();
+  try {
+    const resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: "system", content: "Reply with a single JSON object and nothing else." },
+          { role: "user", content: '{"thought":"probe ok","actions":[]}' },
+        ],
+        temperature: 0.2,
+        max_tokens: 64,
+        response_format: { type: "json_object" },
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    await resp.text();
+    const ms = Date.now() - t0;
+    if (!resp.ok) return { ok: false, error: `llm_${resp.status}`, ms };
+    return { ok: true, ms };
+  } catch (e) {
+    return { ok: false, error: "timeout_or_transport", ms: Date.now() - t0 };
+  }
+}
+
+// One provider_dark marker per dark episode (throttled by checking for an
+// unrecovered marker), so the dashboard feed shows the outage once instead
+// of once per tick.
+async function _announceProviderDark(client, userId, darkState) {
+  try {
+    const since = new Date(Date.now() - PROVIDER_DARK_WINDOW_MIN * 2 * 60000).toISOString();
+    const { data } = await client
+      .from("ap_agent_logs")
+      .select("id")
+      .eq("kind", "system")
+      .like("body", "provider_dark%")
+      .gte("created_at", since)
+      .limit(1);
+    if ((data || []).length === 0) {
+      await _logEvent(client, {
+        userId,
+        kind: "system",
+        body: `provider_dark: ${darkState.timeouts} think transport timeouts in ${darkState.windowMin}m — parking scheduled thinks, probing each tick`,
+      });
+    }
+  } catch {
+    /* best effort */
+  }
+}
+
 export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000 } = {}) {
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
@@ -2094,6 +2189,23 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
   let thinks = 0;
   let driverSteps = 0;
   let truncated = false;
+  // Provider dark-spell circuit breaker: when the provider is down, park
+  // scheduled thinks (their next_think_at wake flags are left intact so they
+  // fire on recovery) and run one cheap probe per tick instead of burning a
+  // 45s+retry timeout per agent. No-key agents still get driverStep — driver
+  // mode costs no LLM calls and keeps the dashboard honest.
+  const darkState = users.length ? await _providerDark(client) : { dark: false, timeouts: 0 };
+  let providerDark = darkState.dark;
+  if (providerDark) {
+    const probe = await _probeProvider();
+    if (probe.ok) {
+      providerDark = false;
+      await _logEvent(client, { userId: users[0], kind: "system", body: `provider_recovered: probe ok in ${probe.ms}ms — resuming scheduled thinks` });
+    } else {
+      await _announceProviderDark(client, users[0], darkState);
+    }
+  }
+  const hasKey = !!llmCfg().apiKey;
   for (const userId of users) {
     if (Date.now() - started > timeBudgetMs) {
       truncated = true;
@@ -2107,6 +2219,11 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
       if (Date.now() - started > timeBudgetMs || thinks >= THINKS_PER_TICK_CAP) {
         truncated = true;
         break;
+      }
+      if (providerDark && hasKey) {
+        // Parked: provider is dark. Wake flags are preserved for recovery.
+        results.push({ agent: agent.name, mode: "live", skipped: "provider_dark", timeouts: darkState.timeouts });
+        continue;
       }
       try {
         const pendingThink = agent.next_think_at && new Date(agent.next_think_at).getTime() <= now;
@@ -2141,7 +2258,7 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
     await _reconcileScheduleStreaks(client, userId, firedSchedules, results);
     if (truncated) break;
   }
-  return { ok: true, users: users.length, thinks, driverSteps, truncated, results };
+  return { ok: true, users: users.length, thinks, driverSteps, truncated, providerDark, providerTimeouts: darkState.timeouts, results };
 }
 
 /* ------------------------------------------------------------------ */
@@ -3298,33 +3415,49 @@ function hubDetectBareCa(text) {
 // Deterministic TOKEN DOSSIER renderer — used when the model is unreachable
 // (dark spells) but the scan data is in hand. Same shape as the template,
 // numbers straight from the scan payload, "n/a" for anything missing.
+// Honesty rules: the safety sub-payload's `tone` (bad/warn/good) decides the
+// emoji — the real verdict strings ("No route", "High tax / impact",
+// "Elevated cost", "Thin liquidity") never matched a naive keyword regex and
+// used to render green for bad/warn outcomes. A missing/failed safety check
+// renders neutral, never "no major flags". No token object (dead scan, token
+// not found) returns null so the caller says so honestly instead of
+// rendering a fake green "Unknown" dossier.
 function hubRenderDossier(mint, scan) {
   try {
     const s = scan && typeof scan === "object" ? scan : JSON.parse(String(scan || ""));
     if (!s || s.ok === false) return null;
-    const tok = (s.token && s.token.token) || {};
-    const meta = (s.token && s.token.meta) || {};
-    const pair = ((s.token && s.token.pairs) || [])[0] || {};
-    const safety = s.safety || {};
+    const sub = (s.token && typeof s.token === "object") ? s.token : {};
+    const tok = (sub.token && typeof sub.token === "object") ? sub.token : null;
+    if (!tok) return null;
+    const meta = (sub.meta && typeof sub.meta === "object") ? sub.meta : {};
+    const pair = (Array.isArray(sub.pairs) ? sub.pairs : [])[0] || {};
+    const safety = (s.safety && typeof s.safety === "object" && s.safety.ok !== false) ? s.safety : null;
+    const tone = String((safety && safety.tone) || "").toLowerCase();
+    const verdictRaw = String((safety && safety.verdict) || "");
+    const emoji = tone === "bad" ? "🔴"
+      : tone === "warn" ? "🟡"
+      : tone === "good" ? "🟢"
+      : /honeypot|no route|high tax|scam|rug/i.test(verdictRaw) ? "🔴"
+      : /elevated|thin|risky|warn|caution/i.test(verdictRaw) ? "🟡"
+      : verdictRaw ? "🟢" : "⚪";
+    const verdict = (verdictRaw || "UNKNOWN").toUpperCase();
+    const safetyNote = safety ? (safety.note || "no major flags") : "safety check unavailable";
     const name = tok.name || "Unknown";
     const symbol = tok.symbol || "???";
-    const verdict = String(safety.verdict || (s.token && s.token.verdict) || "UNKNOWN");
-    const emoji = /DANGER|RUG|HONEYPOT|SCAM/i.test(verdict) ? "🔴"
-      : /RISKY|WARN|CAUTION/i.test(verdict) ? "🟡" : "🟢";
     const usd = (v) => (v == null || isNaN(Number(v)) ? "n/a"
       : "$" + Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
     const chg = pair.change24h;
     const chgStr = chg == null || isNaN(Number(chg)) ? "n/a"
       : `${Number(chg) >= 0 ? "+" : ""}${Number(chg).toFixed(2)}%`;
-    const rt = safety.roundTripLossPct;
+    const rt = safety ? safety.roundTripLossPct : null;
     return [
       `🔍 ${name} ($${symbol}) — ${mint}`,
       ``,
-      `Safety: ${emoji} ${verdict.toUpperCase()} — ${safety.note || "no major flags"}`,
+      `Safety: ${emoji} ${verdict} — ${safetyNote}`,
       ``,
       `💧 Liq: ${usd(pair.liquidity ?? tok.liquidity)} · 📊 Vol 24h: ${usd(pair.volume24h)} · 💰 MC: ${usd(tok.mcap)}`,
       `📈 24h ${chgStr}`,
-      `👥 Holders: ${meta.holderCount ?? "n/a"}`,
+      `👥 Holders: ${tok.holderCount ?? meta.holderCount ?? "n/a"}`,
       `⚠️ ${rt != null ? `Est. round-trip cost ~${Number(rt).toFixed(1)}%` : "Check liquidity before sizing"}`,
       ``,
       `_Live scan data — the AI model is unreachable right now, so this is the raw dossier._`,
@@ -3927,6 +4060,15 @@ function hubLlmFinish({ rawApi, content, usage }, isLastAttempt) {
   return { ok: false, error: "bad_json", message: trunc(text, 300) };
 }
 
+// Stream-attempt cap that always leaves room for the buffered retry: a hung
+// SSE stream must not eat the whole wall-clock budget, or the buffered
+// attempt is skipped (its 8s minimum isn't met) and the turn degrades without
+// ever trying the plain request. Seen live on the 25s dossier budget: the
+// flat 20s stream cap left 5s → buffered never ran, fallback every time.
+function hubStreamCapMs(timeoutMs) {
+  return Math.max(8000, Math.min(20000, timeoutMs - 12000));
+}
+
 async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIMEOUT_MS, onToken = null, onTokenReset = null } = {}) {
   const cfg = llmCfg();
   if (!cfg.apiKey) return { ok: false, error: "llm_unavailable", message: "No LLM key configured." };
@@ -3938,9 +4080,10 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
   // full budget, or dark-spell turns blow past Vercel's 60s kill with no reply.
   const started = Date.now();
   if (onToken) {
-    // Cap the stream attempt at 20s so a hanging SSE connection always leaves
-    // budget for at least one buffered retry (some paths buffer SSE server-side).
-    const s = await hubLlmStreamAttempt(messages, { temperature, timeoutMs: Math.min(timeoutMs, 20000), onToken });
+    // Capped by hubStreamCapMs (not a flat 20s) so a hanging SSE connection
+    // always leaves budget for at least one buffered retry (some paths
+    // buffer SSE server-side).
+    const s = await hubLlmStreamAttempt(messages, { temperature, timeoutMs: hubStreamCapMs(timeoutMs), onToken });
     if (s.ok) {
       const fin = hubLlmFinish({ content: s.raw }, true);
       if (fin.ok) return fin;
@@ -4373,9 +4516,16 @@ export async function hubChat(userId, threadIdOrNull, message, req, opts = {}) {
     }
     if (!reply) {
       const dossier = hubRenderDossier(bareCa, scanJson);
-      reply =
-        dossier ||
-        `I couldn't reach the model or scan this address right now.${scanErr ? ` ${scanErr}.` : ""} Please try again in a moment.`;
+      if (!dossier) {
+        // No dossier and no model: say which failure it was. A scan that ran
+        // but found no token means the address is wrong — retrying won't help.
+        const tokenMissing = !(scanJson && scanJson.token && scanJson.token.token);
+        reply = (tokenMissing && !scanErr)
+          ? `I couldn't find that token — double-check the address and try again.`
+          : `I couldn't reach the model or scan this address right now.${scanErr ? ` ${scanErr}.` : ""} Please try again in a moment.`;
+      } else {
+        reply = dossier;
+      }
       degraded = true;
       // Stream the deterministic dossier too, so the UI never sits silent.
       if (dossier && ev.onToken) {
