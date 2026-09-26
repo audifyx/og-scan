@@ -154,12 +154,30 @@ export async function prepareRentRefund(publicKey) {
   const { web3, spl } = await loadSolana();
   const { Connection, PublicKey, Transaction } = web3;
   const { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, createCloseAccountInstruction } = spl;
-  const conn = new Connection(rpcUrl(), "confirmed");
   const owner = new PublicKey(publicKey);
-  const [legacy, token22] = await Promise.all([
-    conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
-    conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }),
-  ]);
+  // Indexed account scan: some public RPCs 403 getParsedTokenAccountsByOwner
+  // ("Indexed requests require a personal token"). Walk the candidate list
+  // like latestBlockhash() does — first success wins, never a silent zero.
+  let legacy = null;
+  let token22 = null;
+  let lastErr = null;
+  for (const url of rpcCandidates()) {
+    try {
+      const conn = new Connection(url, "confirmed");
+      const [l, t] = await Promise.all([
+        conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
+        conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }),
+      ]);
+      legacy = l;
+      token22 = t;
+      break;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  if (!legacy || !token22) {
+    throw lastErr || new Error("No Solana RPC available for token-account scan");
+  }
   const emptyFixed = [
     ...legacy.value
       .filter((a) => Number(a.account.data.parsed.info.tokenAmount.amount) === 0 && !a.account.data.parsed.info.isNative)
@@ -184,7 +202,7 @@ export async function prepareRentRefund(publicKey) {
     return { ok: true, accounts: [], reclaimableSol: 0, transactions: [], note: "No empty token accounts to close." };
   }
 
-  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const { blockhash } = await latestBlockhash(Connection);
   const batchSize = 20;
   const transactions = [];
   for (let i = 0; i < emptyFixed.length; i += batchSize) {
