@@ -25,11 +25,15 @@ import {
   NEW_SWAPS_PER_TICK,
   heliusKey,
   parseSwap,
+  markStaleBuys,
   activeFollowRows,
   mirrorNewSwaps,
   copyWebhookStatus,
   copyWebhookProvision,
 } from "./_mcp-copy-engine.js";
+
+// Re-exported so the tick's staleness contract is testable at the tick module.
+export { markStaleBuys };
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -236,6 +240,9 @@ async function tickOneFollow(userId, row, client, mirrors, ctx = {}) {
     if (s) swaps.push(s);
   }
   swaps.reverse(); // oldest-first so history replays in order
+  // Staleness guard: flag buys the leader already exited (sold the same
+  // mint in a newer swap) so the mirror never buys what was already dumped.
+  markStaleBuys(swaps);
   const todo = swaps.slice(0, NEW_SWAPS_PER_TICK);
 
   // Shared claim+mirror path with the instant webhook (same seenSigs marking,

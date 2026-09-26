@@ -1,7 +1,7 @@
 /**
- * Staleness-guard unit tests for the copy-trading tick (the production inline
- * version in _mcp-copy.js). markStaleCopyBuys is pure: no trades, no DB, no
- * network. Sibling handler modules are mocked.
+ * Staleness-guard unit tests at the tick module level (_mcp-copy.js re-exports
+ * markStaleBuys from the shared copy engine). markStaleBuys is pure: no
+ * trades, no DB, no network. Sibling handler modules are mocked.
  *
  * Regression test for the 2026-09-26 SIFT incident: the leader bought SIFT at
  * 15:22:52, sold half at 15:25:05, and the tick mirrored the buy at 15:27:47 —
@@ -30,7 +30,7 @@ vi.mock("./_user-trading-wallet.js", () => ({
   TICK_AUTH_SOURCE: "tick",
 }));
 
-import { markStaleCopyBuys } from "./_mcp-copy.js";
+import { markStaleBuys } from "./_mcp-copy.js";
 
 const TOKENX = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 const JUP = "JUP6LkbZVeYwSMM5G8hEfgb5qfxAPK8Q4vGpKq7XyZ12";
@@ -41,42 +41,42 @@ const mk = (signature, bought, sold) => ({
   sold: sold ? { mint: sold, amount: 50 } : null,
 });
 
-describe("markStaleCopyBuys: never mirror a buy the leader already exited", () => {
+describe("markStaleBuys: never mirror a buy the leader already exited", () => {
   it("flags a buy stale when the leader sold the same mint in a newer swap", () => {
     const swaps = [mk("buy1", TOKENX, null), mk("sell1", null, TOKENX)]; // oldest-first
-    markStaleCopyBuys(swaps);
+    markStaleBuys(swaps);
     expect(swaps[0].staleBuy).toBe(true);
     expect(swaps[1].staleBuy).toBe(false); // sells are never "stale buys"
   });
 
   it("leaves a buy fresh when the leader never sold that mint after", () => {
     const swaps = [mk("buy1", TOKENX, null), mk("buy2", JUP, null)];
-    markStaleCopyBuys(swaps);
+    markStaleBuys(swaps);
     expect(swaps[0].staleBuy).toBe(false);
     expect(swaps[1].staleBuy).toBe(false);
   });
 
   it("buy -> sell -> rebuy: first buy stale, rebuy fresh", () => {
     const swaps = [mk("buy1", TOKENX, null), mk("sell1", null, TOKENX), mk("buy2", TOKENX, null)];
-    markStaleCopyBuys(swaps);
+    markStaleBuys(swaps);
     expect(swaps[0].staleBuy).toBe(true);
     expect(swaps[2].staleBuy).toBe(false);
   });
 
   it("a sell of another mint does not stale the buy", () => {
     const swaps = [mk("buy1", TOKENX, null), mk("sell1", null, JUP)];
-    markStaleCopyBuys(swaps);
+    markStaleBuys(swaps);
     expect(swaps[0].staleBuy).toBe(false);
   });
 
   it("an older sell does not stale a newer buy", () => {
     const swaps = [mk("sell1", null, TOKENX), mk("buy1", TOKENX, null)];
-    markStaleCopyBuys(swaps);
+    markStaleBuys(swaps);
     expect(swaps[1].staleBuy).toBe(false);
   });
 
   it("handles empty input", () => {
-    expect(markStaleCopyBuys([])).toEqual([]);
-    expect(markStaleCopyBuys(null)).toEqual(null);
+    expect(markStaleBuys([])).toEqual([]);
+    expect(markStaleBuys(null)).toEqual(null);
   });
 });

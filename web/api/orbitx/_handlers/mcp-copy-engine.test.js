@@ -35,6 +35,7 @@ vi.mock("./_mcp-app-wallet.js", () => ({
 
 import {
   parseSwap,
+  markStaleBuys,
   recordTheirTrades,
   mirrorNewSwaps,
   THEIR_TRADES_CAP,
@@ -239,5 +240,145 @@ describe("mirrorNewSwaps idempotency (mocked trade path — no live trades)", ()
     const r2 = await mirrorNewSwaps("user1", { id: "row1", meta: patch1 }, fakeClient, [s], {});
     expect(r2.mirrors).toHaveLength(0);
     expect(mocks.appWalletBuy).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* markStaleBuys — pure staleness flagging                              */
+/* ------------------------------------------------------------------ */
+
+describe("markStaleBuys: never mirror a buy the leader already exited", () => {
+  const mk = (signature, bought, sold) => ({
+    signature,
+    bought: bought ? { mint: bought, amount: 100 } : null,
+    sold: sold ? { mint: sold, amount: 50 } : null,
+  });
+
+  it("flags a buy stale when the leader sold the same mint in a newer swap", () => {
+    const swaps = [mk("buy1", TOKENX, null), mk("sell1", null, TOKENX)]; // oldest-first
+    markStaleBuys(swaps);
+    expect(swaps[0].staleBuy).toBe(true);
+    expect(swaps[1].staleBuy).toBe(false); // sells are never "stale buys"
+  });
+
+  it("leaves a buy fresh when the leader never sold that mint after", () => {
+    const swaps = [mk("buy1", TOKENX, null), mk("buy2", JUP, null)];
+    markStaleBuys(swaps);
+    expect(swaps[0].staleBuy).toBe(false);
+    expect(swaps[1].staleBuy).toBe(false);
+  });
+
+  it("buy -> sell -> rebuy: first buy stale, rebuy fresh", () => {
+    const swaps = [mk("buy1", TOKENX, null), mk("sell1", null, TOKENX), mk("buy2", TOKENX, null)];
+    markStaleBuys(swaps);
+    expect(swaps[0].staleBuy).toBe(true);
+    expect(swaps[2].staleBuy).toBe(false);
+  });
+
+  it("a sell of another mint does not stale the buy", () => {
+    const swaps = [mk("buy1", TOKENX, null), mk("sell1", null, JUP)];
+    markStaleBuys(swaps);
+    expect(swaps[0].staleBuy).toBe(false);
+  });
+
+  it("an older sell does not stale a newer buy", () => {
+    const swaps = [mk("sell1", null, TOKENX), mk("buy1", TOKENX, null)];
+    markStaleBuys(swaps);
+    expect(swaps[1].staleBuy).toBe(false);
+  });
+
+  it("handles empty input", () => {
+    expect(markStaleBuys([])).toEqual([]);
+    expect(markStaleBuys(null)).toEqual(null);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* mirrorNewSwaps honors the staleness flag — the SIFT incident replay   */
+/* ------------------------------------------------------------------ */
+
+describe("mirrorNewSwaps staleness guard (mocked trade path — no live trades)", () => {
+  let resolvedPatches;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolvedPatches = [];
+    mocks.tokenInfo.mockImplementation(async (mint) => ({ mint, symbol: "TKN", priceUsd: 0.0001 }));
+    mocks.appWalletBuy.mockImplementation(async () => ({ ok: true, signature: "M".repeat(88) }));
+    mocks.claimFillRow.mockImplementation(async (client, rowId, meta) => ({
+      ...meta,
+      status: "filling",
+      fillingAt: new Date().toISOString(),
+    }));
+    mocks.resolveFillRow.mockImplementation(async (client, rowId, patch) => {
+      resolvedPatches.push(patch);
+      return true;
+    });
+  });
+
+  // Replay of the 2026-09-26 SIFT incident: leader buys TOKENX, then sells
+  // TOKENX in a newer swap; the tick sees both in one fetch. The buy must
+  // NOT be mirrored.
+  it("skips the stale buy, mirrors nothing, records the deliberate skip", async () => {
+    const buy = parseSwap(buyTx, WALLET);
+    const sell = parseSwap(sellTx, WALLET);
+    markStaleBuys([buy, sell]); // oldest-first, as the tick passes them
+    expect(buy.staleBuy).toBe(true);
+
+    const r = await mirrorNewSwaps("user1", followRow(), fakeClient, [buy, sell], {});
+    expect(r.status).toBe("ok");
+    expect(mocks.appWalletBuy).not.toHaveBeenCalled(); // NO buy of dumped token
+    expect(mocks.appWalletSell).not.toHaveBeenCalled(); // no position -> sell path untouched here
+
+    const skip = r.mirrors.find((m) => m.error === "stale_buy_leader_sold");
+    expect(skip).toMatchObject({
+      side: "buy",
+      mint: TOKENX,
+      theirSig: buyTx.signature,
+      ok: false,
+      skipped: true,
+    });
+    // Only the sell was executed through the claim path.
+    expect(mocks.claimFillRow).toHaveBeenCalledTimes(1);
+
+    const patch = resolvedPatches[0];
+    expect(patch.seenSigs).toContain(buyTx.signature); // stale sig marked seen — never retried
+    expect(patch.seenSigs).toContain(sellTx.signature);
+    const skipFill = patch.fills.find((f) => f.error === "stale_buy_leader_sold");
+    expect(skipFill).toMatchObject({ side: "buy", mint: TOKENX, ok: false, skipped: true });
+    const skipTrade = patch.theirTrades.find((t) => t.stale === true);
+    expect(skipTrade).toMatchObject({ signature: buyTx.signature, side: "buy", mint: TOKENX });
+
+    // Redelivery: nothing happens again.
+    const r2 = await mirrorNewSwaps("user1", { id: "row1", meta: patch }, fakeClient, [buy, sell], {});
+    expect(r2.mirrors).toHaveLength(0);
+    expect(mocks.appWalletBuy).not.toHaveBeenCalled();
+  });
+
+  it("a fresh buy in the same batch still executes while the stale one skips", async () => {
+    const staleBuy = parseSwap(buyTx, WALLET); // TOKENX buy
+    const sell = parseSwap(sellTx, WALLET); // TOKENX sell (newer)
+    const freshBuyTx = swapTx({
+      signature: "F".repeat(88),
+      from: WALLET,
+      to: WALLET,
+      fromMint: SOL,
+      toMint: JUP,
+      fromAmt: 0.42,
+      toAmt: 15010.5,
+    });
+    const freshBuy = parseSwap(freshBuyTx, WALLET);
+    markStaleBuys([staleBuy, sell, freshBuy]);
+    expect(staleBuy.staleBuy).toBe(true);
+    expect(freshBuy.staleBuy).toBe(false);
+
+    const r = await mirrorNewSwaps("user1", followRow(), fakeClient, [staleBuy, sell, freshBuy], {});
+    expect(r.status).toBe("ok");
+    expect(mocks.appWalletBuy).toHaveBeenCalledTimes(1);
+    expect(mocks.appWalletBuy).toHaveBeenCalledWith(
+      { userId: "user1", source: "tick" },
+      { mint: JUP, usd: 0.5 }
+    );
+    expect(r.mirrors.find((m) => m.error === "stale_buy_leader_sold")).toBeTruthy();
+    expect(r.mirrors.find((m) => m.mint === JUP && m.ok)).toBeTruthy();
   });
 });
