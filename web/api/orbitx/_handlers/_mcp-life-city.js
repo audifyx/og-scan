@@ -854,7 +854,10 @@ export async function dispatchCityTool(name, args, { sb } = {}) {
     }
     return citySnapshot(sb);
   }
-  const kind = inferCityKind(n);
+  // Fuzzy kind inference is a life-city alias convenience — never let it claim
+  // non-life tool names (e.g. orbitx_get_signals was misrouted to postSignal,
+  // returning "Name an agent." instead of the trading-signals feed).
+  const kind = n.startsWith("orbitx_life_") ? inferCityKind(n) : "";
   if (kind === "think") return agentThink(sb, a);
   if (kind === "files") {
     const agent = await loadAliveAgent(sb, a);
