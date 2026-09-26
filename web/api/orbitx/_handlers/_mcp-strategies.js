@@ -35,9 +35,40 @@ function hasAction(r) {
   );
 }
 
+const ALL_STRATEGY_KINDS = ["app_limit", "app_copy", "app_trailing", "app_ladder", "app_snipe", "app_alert"];
+
+/**
+ * Cheap pre-check: is there any open strategy work at all?
+ * Lets the tick skip the expensive per-user sweep when nobody has active
+ * orders — the fill machinery only runs when there are fills to check.
+ * Conservative (fail-open): any doubt → true, run the sweep as before.
+ * Family conventions: limits/trailing/ladder/alerts treat missing meta.status
+ * as open; copy treats missing as active; sniper requires status === "active".
+ */
+export async function hasOpenStrategies() {
+  try {
+    const client = await sb();
+    if (!client) return true;
+    const { count } = await client
+      .from("ox_live_events")
+      .select("id", { count: "exact", head: true })
+      .in("kind", ALL_STRATEGY_KINDS)
+      .or("meta->>status.is.null,meta->>status.in.(open,active)")
+      .limit(1);
+    return (count || 0) > 0;
+  } catch {
+    return true;
+  }
+}
+
 export async function tickAllStrategies({ maxUsers = 200, base, timeBudgetMs = 50000 } = {}) {
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
+  // Idle short-circuit: no open orders anywhere → skip the sweep entirely.
+  // (The AgentPlus mind-loop segment of the tick still runs separately.)
+  if (!(await hasOpenStrategies())) {
+    return { ok: true, strategies: JOBS.map((j) => j.name), users: 0, active: 0, truncated: false, results: [], skipped: "idle_no_open_strategies" };
+  }
   const ctx = { base: base || "https://orbitx.world" };
   const results = [];
   const usersSeen = new Set();
