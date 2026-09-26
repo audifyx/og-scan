@@ -20,16 +20,18 @@ import {
   formatTime,
   fmtTokens,
   fmtMs,
+  dmErrorText,
 } from "./api";
 import { cardCls, btnPrimary, btnGhost, SectionTitle, EmptyState, LoadingState, MindBadge } from "./ui";
 
 /* ── messages ── */
 
-export function MessagesView({ agents, feedEvents, initialPeer, onSent }: {
+export function MessagesView({ agents, feedEvents, initialPeer, onSent, onError }: {
   agents: AgentInfo[];
   feedEvents: AgentEvent[];
   initialPeer: string | null;
   onSent: () => void;
+  onError: (text: string) => void;
 }) {
   const [peer, setPeer] = useState<string>(initialPeer || "lobby");
   const [inboxMsgs, setInboxMsgs] = useState<InboxMsg[]>([]);
@@ -77,8 +79,10 @@ export function MessagesView({ agents, feedEvents, initialPeer, onSent }: {
       setBody("");
       if (peer !== "lobby") await loadInbox(peer);
       onSent();
-    } catch {
-      /* shell flashes the error */
+    } catch (err) {
+      // A failed send must be visible: the backend rejects archived
+      // recipients, and network/auth failures must not look like silence.
+      onError(dmErrorText(err, peer));
     } finally {
       setSending(false);
     }

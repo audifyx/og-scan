@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   extractSseMessages,
+  hubDoneFailureText,
   reduceHubThinking,
+  withDegradedFlag,
+  type HubChatResponse,
   type HubStreamEvent,
   type HubThinking,
 } from "./api";
@@ -89,5 +92,121 @@ describe("reduceHubThinking", () => {
     const t = fresh();
     const out = reduceHubThinking(t, { event: "fancy_new_thing" } as unknown as HubStreamEvent);
     expect(out).toEqual(t);
+  });
+});
+
+describe("hubDoneFailureText — the done-with-ok:false contract", () => {
+  // The backend's hub/stream route sends server-side failures (db_unavailable,
+  // not_found, hub_chat_failed…) as `done` with ok:false and NO reply — NOT as
+  // the `error` event (that's only for hubChat throwing outright). The client
+  // must surface these honestly instead of ending on a silent empty bubble.
+  it("returns null for a healthy result", () => {
+    expect(hubDoneFailureText({ ok: true, reply: "hi" } as HubChatResponse)).toBeNull();
+  });
+
+  it("returns null when the failure already carries a reply (LLM-failure path)", () => {
+    // hubRunLoop LLM failures return ok:false WITH a human-readable reply —
+    // that reply IS the honest message, so no extra bubble is needed.
+    expect(
+      hubDoneFailureText({ ok: false, error: "llm_unreachable", reply: "The model timed out." } as HubChatResponse),
+    ).toBeNull();
+  });
+
+  it("returns an honest message for each reply-less backend failure shape", () => {
+    for (const error of ["db_unavailable", "not_found", "hub_chat_failed"]) {
+      const text = hubDoneFailureText({ ok: false, error } as HubChatResponse);
+      expect(text).toContain(error);
+      expect(text).toContain("retry");
+    }
+  });
+
+  it("falls back to 'unknown error' when the result is missing or has no error", () => {
+    expect(hubDoneFailureText(null)).toContain("unknown error");
+    expect(hubDoneFailureText(undefined)).toContain("unknown error");
+    expect(hubDoneFailureText({ ok: false } as HubChatResponse)).toContain("unknown error");
+  });
+
+  it("treats an explicitly empty reply as a reply (backend never emits this)", () => {
+    expect(hubDoneFailureText({ ok: false, reply: "" } as HubChatResponse)).toBeNull();
+  });
+});
+
+describe("SSE done-failure contract end to end", () => {
+  it("a failed turn's raw bytes parse into a done the client handles honestly", () => {
+    // Exact bytes the hub/stream route emits when hubChat returns
+    // { ok:false, error:"db_unavailable" } (Supabase down mid-turn).
+    const raw =
+      'data: {"event":"start"}\n\n' +
+      'data: {"event":"status","text":"Thinking…"}\n\n' +
+      'data: {"event":"done","result":{"ok":false,"error":"db_unavailable"}}\n\n';
+    const { events } = extractSseMessages(raw);
+    expect(events.map((e) => e.event)).toEqual(["start", "status", "done"]);
+    const done = events[2] as Extract<HubStreamEvent, { event: "done" }>;
+    // The old finalizeStream ended here on a silent empty bubble. Now the
+    // contract demands an honest message instead.
+    const text = hubDoneFailureText(done.result);
+    expect(text).toContain("db_unavailable");
+    expect(text).toContain("retry");
+  });
+
+  it("a healthy turn's done result needs no failure text", () => {
+    const raw =
+      'data: {"event":"start"}\n\n' +
+      'data: {"event":"token","text":"hello"}\n\n' +
+      'data: {"event":"done","result":{"ok":true,"thread_id":"t1","reply":"hello","tool_calls":[],"pending":[]}}\n\n';
+    const { events } = extractSseMessages(raw);
+    const done = events[events.length - 1] as Extract<HubStreamEvent, { event: "done" }>;
+    expect(hubDoneFailureText(done.result)).toBeNull();
+  });
+});
+
+describe("reduceHubThinking tolerates non-trace events", () => {
+  it("no-ops on start / done / error / token / token_reset (handled by the caller)", () => {
+    const t = fresh();
+    for (const e of [
+      { event: "start" },
+      { event: "done", result: { ok: true } },
+      { event: "error", error: "x" },
+      { event: "token", text: "hi" },
+      { event: "token_reset" },
+    ] as HubStreamEvent[]) {
+      expect(reduceHubThinking(t, e)).toEqual(t);
+    }
+  });
+});
+
+describe("withDegradedFlag — the done.result.degraded contract", () => {
+  // The backend marks turns that didn't go through the normal LLM path
+  // (salvaged reply with forfeited tool calls, deterministic dossier during
+  // a dark spell) with degraded:true inside done.result. The client must
+  // surface the flag in the thinking trace instead of ignoring it.
+  it("sets the flag when the done result is degraded", () => {
+    const t = fresh();
+    const out = withDegradedFlag(t, { ok: true, reply: "hi", degraded: true } as HubChatResponse);
+    expect(out.degraded).toBe(true);
+    expect(out.tools).toEqual(t.tools);
+    expect(out.thoughts).toEqual(t.thoughts);
+  });
+
+  it("leaves the trace untouched when the result is clean, missing, or explicitly not degraded", () => {
+    const t = fresh();
+    expect(withDegradedFlag(t, { ok: true, reply: "hi" } as HubChatResponse)).toEqual(t);
+    expect(withDegradedFlag(t, { ok: true, degraded: false } as HubChatResponse)).toEqual(t);
+    expect(withDegradedFlag(t, null)).toEqual(t);
+    expect(withDegradedFlag(t, undefined)).toEqual(t);
+  });
+
+  it("a degraded done's raw bytes parse and the flag flows end to end", () => {
+    // Exact shape the hub/stream route emits on the salvage path.
+    const raw =
+      'data: {"event":"start"}\n\n' +
+      'data: {"event":"token","text":"partial"}\n\n' +
+      'data: {"event":"done","result":{"ok":true,"thread_id":"t1","reply":"partial","tool_calls":[],"pending":[],"degraded":true}}\n\n';
+    const { events } = extractSseMessages(raw);
+    const done = events[events.length - 1] as Extract<HubStreamEvent, { event: "done" }>;
+    expect(done.result?.degraded).toBe(true);
+    // A degraded-but-successful turn is NOT a failure: no failure text.
+    expect(hubDoneFailureText(done.result)).toBeNull();
+    expect(withDegradedFlag(fresh(), done.result).degraded).toBe(true);
   });
 });

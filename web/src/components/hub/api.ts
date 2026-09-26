@@ -71,6 +71,10 @@ export interface HubThinking {
   thoughts: string[];
   status?: string;
   ms?: number;
+  /** set when the backend marked this turn degraded (done.result.degraded) —
+   *  salvaged reply with forfeited tool calls, or the deterministic dossier
+   *  path. The trace pill surfaces it so a degraded turn never looks clean. */
+  degraded?: boolean;
 }
 
 /** Safety screening attached to a gated action (e.g. a token trade). */
@@ -129,6 +133,10 @@ export interface HubChatResponse {
   thoughts?: string[];
   error?: string;
   message?: string;
+  /** the backend marks turns that didn't go through the normal LLM path —
+   *  salvaged reply with forfeited tool calls, or the deterministic dossier
+   *  path during a dark spell. The client surfaces it in the thinking trace. */
+  degraded?: boolean;
 }
 
 export interface HubChatOptions {
@@ -243,6 +251,27 @@ export type HubStreamEvent =
   | { event: "tool_result"; name?: string; ok?: boolean; ms?: number }
   | { event: "done"; result?: HubChatResponse }
   | { event: "error"; error?: string };
+
+/** Fold a `done` result's turn-level flags into the thinking trace. Pure.
+ *  The backend marks turns that didn't go through the normal LLM path with
+ *  `degraded: true` (salvaged reply with forfeited tool calls, deterministic
+ *  dossier during a dark spell) — the trace pill surfaces the flag so a
+ *  degraded turn never looks identical to a clean one. No-op otherwise. */
+export function withDegradedFlag(t: HubThinking, r: HubChatResponse | null | undefined): HubThinking {
+  return r?.degraded ? { ...t, degraded: true } : t;
+}
+
+/** Honest user-facing text for a `done` result that carries a server-side
+ *  failure with no usable reply (db_unavailable, not_found, hub_chat_failed…).
+ *  The backend's hub/stream route sends these shapes as `done` (not the
+ *  `error` event, which is only for hubChat throwing outright), so without
+ *  this the turn would end on a silent empty bubble. Returns null when the
+ *  result is fine or already carries a reply (e.g. the LLM-failure path,
+ *  whose human-readable error IS the reply). Pure + unit-tested. */
+export function hubDoneFailureText(r: HubChatResponse | null | undefined): string | null {
+  if (r && (r.ok || r.reply !== undefined)) return null;
+  return `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`;
+}
 
 export const hubChatStream = (
   thread_id: string | null,

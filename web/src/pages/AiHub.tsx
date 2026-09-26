@@ -65,6 +65,8 @@ import {
   hubDeleteThread,
   hubChat,
   hubChatStream,
+  hubDoneFailureText,
+  withDegradedFlag,
   reduceHubThinking,
   hubConfirm,
   hubModels,
@@ -891,6 +893,7 @@ function ThinkingTrace({ thinking, streaming }: { thinking: HubThinking | null; 
             </>
           )}
           {ms != null && ms > 0 ? ` · ${(ms / 1000).toFixed(1)}s` : ""}
+          {thinking.degraded ? " · degraded" : ""}
         </span>
         <ChevronDown
           className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
@@ -1736,16 +1739,33 @@ export default function AiHub() {
         // Flush first: tokens still sitting in the batch window belong to this turn.
         flushTokens();
         clearTokenQueue();
+        const failureText = hubDoneFailureText(r);
+        if (failureText) {
+          // The turn failed server-side with no usable reply (db_unavailable,
+          // not_found, hub_chat_failed…). The placeholder may hold partial
+          // output — keep it, mark interrupted tools failed, and say so
+          // honestly, exactly like the `error` SSE event path below.
+          patchStream(markInterruptedTools);
+          const errId = Date.now() + 2;
+          pushAssistant(failureText, null, errId);
+          setFailedPrompt(msg);
+          failedMsgIdRef.current = errId;
+          applyPendings(r);
+          return;
+        }
         patchStream((m) => ({
           ...m,
           content: r.reply !== undefined ? r.reply : m.content,
           streaming: false,
           tool_calls: r.tool_calls?.length ? r.tool_calls : null,
-          thinking: {
-            ...(m.thinking || freshThinking()),
-            thoughts: [...(m.thinking?.thoughts || []), ...(r.thoughts || [])].slice(-4),
-            ms: r.ms,
-          },
+          thinking: withDegradedFlag(
+            {
+              ...(m.thinking || freshThinking()),
+              thoughts: [...(m.thinking?.thoughts || []), ...(r.thoughts || [])].slice(-4),
+              ms: r.ms,
+            },
+            r,
+          ),
         }));
         if (!r.ok) {
           setFailedPrompt(msg);
@@ -1757,15 +1777,12 @@ export default function AiHub() {
       const bufferedSend = async () => {
         try {
           const r = await hubChat(activeId, msg, { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current });
-          if (!r?.ok && !r?.reply) {
+          const failureText = hubDoneFailureText(r);
+          if (failureText) {
             const errId = Date.now() + 3;
             setFailedPrompt(msg);
             failedMsgIdRef.current = errId;
-            pushAssistant(
-              `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`,
-              null,
-              errId,
-            );
+            pushAssistant(failureText, null, errId);
           } else {
             applyChatResponse(r);
           }
