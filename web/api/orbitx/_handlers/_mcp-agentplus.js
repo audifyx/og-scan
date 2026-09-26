@@ -67,15 +67,6 @@ const MAX_ACTIONS_PER_THINK = 5;
 const HEARTBEAT_MS = 30 * 60 * 1000;
 const THINKS_PER_TICK_CAP = 10;
 
-// Provider dark-spell circuit breaker: N transport timeouts in M minutes
-// means the LLM provider is down, not the agents. Parking scheduled thinks
-// converts hundreds of wasted timeout burns into idle; one cheap probe per
-// tick detects recovery. State is derived from ap_agent_logs (no new table,
-// no migration) and every read fails open — a broken count never parks.
-const PROVIDER_DARK_WINDOW_MIN = 15;
-const PROVIDER_DARK_THRESHOLD = 5; // transport-timeout thinks inside the window
-const PROVIDER_PROBE_TIMEOUT_MS = 15000;
-
 // Default plan when a kind='website' task is assigned without explicit steps.
 const WEBSITE_PLAN = ["scaffold", "frontend", "backend", "build/validate", "deploy", "done"].map((title) => ({
   title,
@@ -2092,92 +2083,6 @@ async function driverStep(client, userId, agent) {
   return { ok: true, unread: unread || 0, advanced, builds: builds.length };
 }
 
-/* ------------------------------------------------------------------ */
-/* provider dark-spell circuit breaker                                  */
-/*                                                                      */
-/* 2026-09-26: 265/277 logged think errors were Nvidia transport        */
-/* timeouts (provider dark spell, ~6% think success/12h), and when      */
-/* attempt 1 timed out the retry failed ~98% of the time — burning a    */
-/* 45s + retry budget per agent per tick for nothing. When the breaker  */
-/* trips, tickAgentPlus parks scheduled thinks (wake flags are kept so  */
-/* they fire on recovery) and runs one cheap probe per tick instead.    */
-/* ------------------------------------------------------------------ */
-
-// Derived dark state: count recent think transport-timeout errors.
-// Fail-open: any read failure returns dark:false (never park on doubt).
-async function _providerDark(client, { windowMin = PROVIDER_DARK_WINDOW_MIN, threshold = PROVIDER_DARK_THRESHOLD } = {}) {
-  try {
-    const since = new Date(Date.now() - windowMin * 60000).toISOString();
-    const { count } = await client
-      .from("ap_agent_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("kind", "error")
-      .like("body", "think transport failed%")
-      .gte("created_at", since);
-    const timeouts = count || 0;
-    return { dark: timeouts >= threshold, timeouts, windowMin, threshold };
-  } catch {
-    return { dark: false, timeouts: 0, windowMin, threshold };
-  }
-}
-
-// Cheap liveness probe: one minimal chat completion against the single
-// mind model. Reachability (HTTP 200) is the signal — a 200 with a degraded
-// envelope fails fast downstream, it doesn't burn a think budget.
-async function _probeProvider(timeoutMs = PROVIDER_PROBE_TIMEOUT_MS) {
-  const cfg = llmCfg();
-  if (!cfg.apiKey) return { ok: false, error: "no_key" };
-  const t0 = Date.now();
-  try {
-    const resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [
-          { role: "system", content: "Reply with a single JSON object and nothing else." },
-          { role: "user", content: '{"thought":"probe ok","actions":[]}' },
-        ],
-        temperature: 0.2,
-        max_tokens: 64,
-        response_format: { type: "json_object" },
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    await resp.text();
-    const ms = Date.now() - t0;
-    if (!resp.ok) return { ok: false, error: `llm_${resp.status}`, ms };
-    return { ok: true, ms };
-  } catch (e) {
-    return { ok: false, error: "timeout_or_transport", ms: Date.now() - t0 };
-  }
-}
-
-// One provider_dark marker per dark episode (throttled by checking for an
-// unrecovered marker), so the dashboard feed shows the outage once instead
-// of once per tick.
-async function _announceProviderDark(client, userId, darkState) {
-  try {
-    const since = new Date(Date.now() - PROVIDER_DARK_WINDOW_MIN * 2 * 60000).toISOString();
-    const { data } = await client
-      .from("ap_agent_logs")
-      .select("id")
-      .eq("kind", "system")
-      .like("body", "provider_dark%")
-      .gte("created_at", since)
-      .limit(1);
-    if ((data || []).length === 0) {
-      await _logEvent(client, {
-        userId,
-        kind: "system",
-        body: `provider_dark: ${darkState.timeouts} think transport timeouts in ${darkState.windowMin}m — parking scheduled thinks, probing each tick`,
-      });
-    }
-  } catch {
-    /* best effort */
-  }
-}
-
 export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000 } = {}) {
   const client = await sb();
   if (!client) return { ok: false, error: "db_unavailable" };
@@ -2189,23 +2094,6 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
   let thinks = 0;
   let driverSteps = 0;
   let truncated = false;
-  // Provider dark-spell circuit breaker: when the provider is down, park
-  // scheduled thinks (their next_think_at wake flags are left intact so they
-  // fire on recovery) and run one cheap probe per tick instead of burning a
-  // 45s+retry timeout per agent. No-key agents still get driverStep — driver
-  // mode costs no LLM calls and keeps the dashboard honest.
-  const darkState = users.length ? await _providerDark(client) : { dark: false, timeouts: 0 };
-  let providerDark = darkState.dark;
-  if (providerDark) {
-    const probe = await _probeProvider();
-    if (probe.ok) {
-      providerDark = false;
-      await _logEvent(client, { userId: users[0], kind: "system", body: `provider_recovered: probe ok in ${probe.ms}ms — resuming scheduled thinks` });
-    } else {
-      await _announceProviderDark(client, users[0], darkState);
-    }
-  }
-  const hasKey = !!llmCfg().apiKey;
   for (const userId of users) {
     if (Date.now() - started > timeBudgetMs) {
       truncated = true;
@@ -2219,11 +2107,6 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
       if (Date.now() - started > timeBudgetMs || thinks >= THINKS_PER_TICK_CAP) {
         truncated = true;
         break;
-      }
-      if (providerDark && hasKey) {
-        // Parked: provider is dark. Wake flags are preserved for recovery.
-        results.push({ agent: agent.name, mode: "live", skipped: "provider_dark", timeouts: darkState.timeouts });
-        continue;
       }
       try {
         const pendingThink = agent.next_think_at && new Date(agent.next_think_at).getTime() <= now;
@@ -2258,7 +2141,7 @@ export async function tickAgentPlus({ base, maxUsers = 200, timeBudgetMs = 40000
     await _reconcileScheduleStreaks(client, userId, firedSchedules, results);
     if (truncated) break;
   }
-  return { ok: true, users: users.length, thinks, driverSteps, truncated, providerDark, providerTimeouts: darkState.timeouts, results };
+  return { ok: true, users: users.length, thinks, driverSteps, truncated, results };
 }
 
 /* ------------------------------------------------------------------ */
