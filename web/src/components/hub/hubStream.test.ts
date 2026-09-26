@@ -210,3 +210,60 @@ describe("withDegradedFlag — the done.result.degraded contract", () => {
     expect(withDegradedFlag(fresh(), done.result).degraded).toBe(true);
   });
 });
+
+describe("SSE full-turn contract at the byte level", () => {
+  it("a tool-using turn's raw bytes fold into exactly the trace the UI renders", () => {
+    // Every event the hub/stream route can emit, in backend emission order.
+    const raw =
+      'data: {"event":"start"}\n\n' +
+      'data: {"event":"status","text":"Scanning…"}\n\n' +
+      'data: {"event":"thought","text":"checking holders"}\n\n' +
+      'data: {"event":"tool_call","name":"orbitx_crypto_scan","args_summary":"{mint: 13H4…}"}\n\n' +
+      'data: {"event":"tool_result","name":"orbitx_crypto_scan","ok":true,"ms":812}\n\n' +
+      'data: {"event":"token","text":"av"}\n\n' +
+      'data: {"event":"token_reset"}\n\n' +
+      'data: {"event":"token","text":"full reply"}\n\n' +
+      'data: {"event":"done","result":{"ok":true,"thread_id":"t1","reply":"full reply","tool_calls":[],"pending":[],"thoughts":["checking holders"]}}\n\n';
+    const { events } = extractSseMessages(raw);
+    expect(events.map((e) => e.event)).toEqual([
+      "start",
+      "status",
+      "thought",
+      "tool_call",
+      "tool_result",
+      "token",
+      "token_reset",
+      "token",
+      "done",
+    ]);
+    // Fold the trace events exactly the way AiHub's onEvent switch does.
+    let t = fresh();
+    for (const e of events) t = reduceHubThinking(t, e);
+    expect(t.status).toBe("Scanning…");
+    expect(t.thoughts).toEqual(["checking holders"]);
+    expect(t.tools).toEqual([
+      { name: "orbitx_crypto_scan", args_summary: "{mint: 13H4…}", running: false, ok: true, ms: 812 },
+    ]);
+    const done = events[events.length - 1] as Extract<HubStreamEvent, { event: "done" }>;
+    expect(hubDoneFailureText(done.result)).toBeNull();
+    expect(withDegradedFlag(t, done.result).degraded).toBeUndefined();
+  });
+
+  it("an error turn's raw bytes carry no done — the client must surface it, never re-run it", () => {
+    // Exact bytes when hubChat throws server-side: the error event is
+    // terminal and no done follows. (The old client swallowed this and
+    // silently re-ran the turn via the buffered fallback — double tool
+    // execution. AiHub now keys off streamError instead.)
+    const raw =
+      'data: {"event":"start"}\n\n' +
+      'data: {"event":"status","text":"Thinking…"}\n\n' +
+      'data: {"event":"error","error":"boom"}\n\n';
+    const { events } = extractSseMessages(raw);
+    expect(events.map((e) => e.event)).toEqual(["start", "status", "error"]);
+    expect(events.some((e) => e.event === "done")).toBe(false);
+    const err = events[events.length - 1] as Extract<HubStreamEvent, { event: "error" }>;
+    expect(err.error).toBe("boom");
+    // The trace reducer ignores the error event (the caller handles it).
+    expect(reduceHubThinking(fresh(), err)).toEqual(fresh());
+  });
+});
