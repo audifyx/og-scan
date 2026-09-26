@@ -3407,7 +3407,7 @@ RESPONSE TEMPLATES — fixed shapes for common inputs. When the input matches a 
 
 A. CONTRACT ADDRESS (user pastes a bare mint/CA, e.g. "7xKXtg2CW..." or "scan this 7xKXtg2CW..."):
 A pasted CA always means "scan this token". The fresh scan result is provided in context — do not re-scan. Reply with the TOKEN DOSSIER, exactly this shape:
-🔍 <name> ($<symbol>) — `<mint>`
+🔍 <name> ($<symbol>) — <mint>
 Safety: <🟢 SAFE | 🟡 RISKY | 🔴 DANGER> — <top risk flag, or "no major flags">
 💧 Liq: $<x> · 📊 Vol 24h: $<y> · 💰 MC: $<z>
 📈 1h <a>% · 24h <b>%
