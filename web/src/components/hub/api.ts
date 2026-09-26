@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 
 export const HUB_THREADS_PATH = "/api/x-mcp?path=hub/threads";
 export const HUB_CHAT_PATH = "/api/x-mcp?path=hub/chat";
+export const HUB_STREAM_PATH = "/api/x-mcp?path=hub/stream";
 export const HUB_CONFIRM_PATH = "/api/x-mcp?path=hub/confirm";
 export const HUB_MODELS_PATH = "/api/x-mcp?path=hub/models";
 export const HUB_EXPORT_TRADES_PATH = "/api/x-mcp?path=hub/export/trades";
@@ -49,6 +50,27 @@ export interface HubMessage {
   content: string | null;
   tool_calls: HubToolCall[] | null;
   created_at: string;
+  /** client-side: message is currently streaming in */
+  streaming?: boolean;
+  /** client-side: live thinking trace (tools + thoughts) */
+  thinking?: HubThinking;
+}
+
+/** One tool invocation in the thinking trace. */
+export interface HubThinkTool {
+  name: string;
+  args_summary?: string;
+  ok?: boolean;
+  ms?: number;
+  running?: boolean;
+}
+
+/** Client-side thinking trace attached to an assistant message. */
+export interface HubThinking {
+  tools: HubThinkTool[];
+  thoughts: string[];
+  status?: string;
+  ms?: number;
 }
 
 /** Safety screening attached to a gated action (e.g. a token trade). */
@@ -103,6 +125,8 @@ export interface HubChatResponse {
   pending?: HubChatPending[];
   model?: string;
   ms?: number;
+  /** one-line plans the model stated per iteration (streamed live too) */
+  thoughts?: string[];
   error?: string;
   message?: string;
 }
@@ -147,6 +171,75 @@ export const hubChat = (thread_id: string | null, message: string, opts?: HubCha
     body: JSON.stringify({ thread_id, message, mode: opts?.mode, lang: opts?.lang }),
     signal: opts?.signal,
   });
+
+/** Streamed hub chat (SSE). Resolves with the done result, or null if the
+ *  stream ended without one. Falls back to hubChat when SSE is unavailable. */
+export type HubStreamEvent =
+  | { event: "start" }
+  | { event: "status"; text?: string }
+  | { event: "token"; text?: string }
+  | { event: "token_reset" }
+  | { event: "thought"; text?: string }
+  | { event: "tool_call"; name?: string; args_summary?: string }
+  | { event: "tool_result"; name?: string; ok?: boolean; ms?: number }
+  | { event: "done"; result?: HubChatResponse }
+  | { event: "error"; error?: string };
+
+export const hubChatStream = (
+  thread_id: string | null,
+  message: string,
+  opts: HubChatOptions = {},
+  onEvent: (e: HubStreamEvent) => void,
+): Promise<HubChatResponse | null> =>
+  (async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const res = await fetch(HUB_STREAM_PATH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ thread_id, message, mode: opts.mode, lang: opts.lang }),
+      signal: opts.signal,
+    });
+    if (!res.ok || !res.body) throw new Error(`stream_unavailable_${res.status}`);
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("text/event-stream")) throw new Error("stream_unavailable_not_sse");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let doneResult: HubChatResponse | null = null;
+    let sawEvent = false;
+    const dispatch = (line: string) => {
+      const t = line.trim();
+      if (!t.startsWith("data:")) return;
+      try {
+        const e = JSON.parse(t.slice(5)) as HubStreamEvent;
+        sawEvent = true;
+        if (e.event === "done") doneResult = (e.result as HubChatResponse) || null;
+        onEvent(e);
+      } catch {
+        /* malformed SSE line — skip */
+      }
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        for (const line of chunk.split("\n")) dispatch(line);
+      }
+    }
+    for (const line of buf.split("\n")) dispatch(line);
+    if (!sawEvent) throw new Error("stream_unavailable_empty");
+    return doneResult;
+  })();
 export const hubConfirm = (
   pending_id: string,
   approved: boolean,

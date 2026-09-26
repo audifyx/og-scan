@@ -4369,6 +4369,52 @@ async function handleMcp(req, res, parts) {
     }
   }
 
+  // Streaming hub chat: server-sent events for live tokens + tool trace.
+  // Events: start, status{ text }, token{ text }, token_reset, thought{ text },
+  // tool_call{ name, args_summary }, tool_result{ name, ok, ms }, done{ result }, error{ error }
+  if (route === "hub/stream" && req.method === "POST") {
+    const body = await readBody(req);
+    const authUser = await agentplusAuth(req, body && body.user);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    let hub;
+    try {
+      hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_stream_failed" }, 500);
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    let closed = false;
+    req.on("close", () => { closed = true; });
+    const send = (obj) => {
+      if (closed) return;
+      try {
+        res.write(`data: ${JSON.stringify(obj)}\n\n`);
+      } catch { /* client gone */ }
+    };
+    const events = {
+      onStatus: (text) => send({ event: "status", text: String(text || "") }),
+      onToken: (text) => { if (text) send({ event: "token", text }); },
+      onTokenReset: () => send({ event: "token_reset" }),
+      onThought: (text) => { if (text) send({ event: "thought", text }); },
+      onToolCall: (tc) => send({ event: "tool_call", name: tc && tc.name, args_summary: tc && tc.args_summary }),
+      onToolResult: (tr) => send({ event: "tool_result", name: tr && tr.name, ok: !!(tr && tr.ok), ms: tr && tr.ms }),
+    };
+    try {
+      send({ event: "start" });
+      const result = await hub.hubChat(authUser.userId, body.thread_id || null, body.message, req, { mode: body.mode, lang: body.lang, events });
+      send({ event: "done", result });
+    } catch (e) {
+      send({ event: "error", error: e?.message || "hub_stream_failed" });
+    }
+    try { res.end(); } catch { /* ignore */ }
+    return;
+  }
+
   if (route === "hub/confirm" && req.method === "POST") {
     const body = await readBody(req);
     const authUser = await agentplusAuth(req, body && body.user);

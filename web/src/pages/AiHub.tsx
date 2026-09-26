@@ -64,6 +64,7 @@ import {
   hubGetThread,
   hubDeleteThread,
   hubChat,
+  hubChatStream,
   hubConfirm,
   hubModels,
   hubExportTradesCsv,
@@ -76,6 +77,9 @@ import {
   type HubThread,
   type HubMessage,
   type HubToolCall,
+  type HubThinking,
+  type HubStreamEvent,
+  type HubChatResponse,
   type HubPending,
   type HubSafety,
   type HubQuote,
@@ -859,6 +863,79 @@ const VERDICT_STYLE: Record<HubSafety["verdict"], string> = {
   unknown: "bg-white/5 text-white/40 ring-white/10",
 };
 
+/* ── Thinking trace: a tiny collapsible under the bubble showing what the
+   assistant did — tools called (with timing) and its one-line plan.
+   Collapsed by default so it stays out of the way. ── */
+function ThinkingTrace({ thinking, streaming }: { thinking: HubThinking | null; streaming?: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (!thinking) return null;
+  const tools = thinking.tools || [];
+  const thoughts = thinking.thoughts || [];
+  if (!tools.length && !thoughts.length) return null;
+  const doneCount = tools.filter((t) => !t.running).length;
+  const anyRunning = tools.some((t) => t.running);
+  const ms = thinking.ms;
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-1 text-[11px] text-white/35 transition hover:text-white/65"
+      >
+        <Wrench className="h-3 w-3" />
+        <span>
+          {anyRunning || streaming ? "working" : "thought"} · {doneCount}/{tools.length}{" "}
+          {tools.length === 1 ? "tool" : "tools"}
+          {ms != null && ms > 0 ? ` · ${(ms / 1000).toFixed(1)}s` : ""}
+        </span>
+        <ChevronDown
+          className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="mt-1 max-w-full space-y-1 overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+          {thoughts.map((t, i) => (
+            <div key={`th-${i}`} className="flex items-start gap-1.5 text-[11px] italic leading-relaxed text-white/45">
+              <Brain className="mt-0.5 h-3 w-3 shrink-0" />
+              <span className="min-w-0">{t}</span>
+            </div>
+          ))}
+          {tools.map((t, i) => (
+            <div
+              key={`tl-${i}`}
+              className="flex items-center gap-1.5 text-[11px]"
+              title={t.args_summary || undefined}
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  t.running ? "animate-pulse bg-iris" : t.ok === false ? "bg-red-400" : "bg-og-lime",
+                )}
+              />
+              <span className="min-w-0 truncate font-mono text-white/55">{t.name}</span>
+              {t.ms != null && <span className="shrink-0 text-white/25">{(t.ms / 1000).toFixed(1)}s</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Thinking trace for a message: live data for streamed turns, stored
+ *  tool_calls for history. */
+function thinkingFor(m: HubMessage): HubThinking | null {
+  const t = m.thinking;
+  if (t && (t.tools.length || t.thoughts.length)) return t;
+  if (m.role === "assistant" && m.tool_calls?.length) {
+    return {
+      tools: m.tool_calls.map((c) => ({ name: c.name, args_summary: c.args_summary, ok: c.ok })),
+      thoughts: [],
+    };
+  }
+  return null;
+}
+
 function SafetyPanel({ s }: { s: HubSafety }) {
   return (
     <div className="mt-3 rounded-xl border border-white/[0.07] bg-black/30 p-3">
@@ -1556,26 +1633,180 @@ export default function AiHub() {
       scrollDown();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+      // Live placeholder: fills in as the stream arrives.
+      const streamId = Date.now() + 1;
+      const freshThinking = (): HubThinking => ({ tools: [], thoughts: [] });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: streamId,
+          role: "assistant",
+          content: "",
+          tool_calls: null,
+          created_at: new Date().toISOString(),
+          streaming: true,
+          thinking: freshThinking(),
+        },
+      ]);
+      scrollDown();
+      const dropPlaceholder = () => setMessages((prev) => prev.filter((m) => m.id !== streamId));
+      const patchStream = (fn: (m: HubMessage) => HubMessage) =>
+        setMessages((prev) => prev.map((m) => (m.id === streamId ? fn(m) : m)));
+      const patchThinking = (fn: (t: HubThinking) => HubThinking) =>
+        patchStream((m) => ({ ...m, thinking: fn(m.thinking || freshThinking()) }));
+      // Token batching: flush accumulated tokens ~8x/sec so markdown re-renders stay cheap.
+      let tokenAcc = "";
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      const flushTokens = () => {
+        flushTimer = null;
+        const chunk = tokenAcc;
+        tokenAcc = "";
+        if (chunk) {
+          patchStream((m) => ({ ...m, content: (m.content || "") + chunk }));
+          scrollDown();
+        }
+      };
+      const queueToken = (t: string) => {
+        if (!t) return;
+        tokenAcc += t;
+        if (!flushTimer) flushTimer = setTimeout(flushTokens, 120);
+      };
+      const clearTokenQueue = () => {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        tokenAcc = "";
+      };
+      const applyPendings = (r: HubChatResponse) => {
+        if (r?.pending?.length) {
+          setPendings((prev) => [
+            ...prev.filter((p) => !r.pending!.some((np: HubChatPending) => np.pending_id === p.id)),
+            ...r.pending!.map((p: HubChatPending) => ({
+              id: p.pending_id,
+              tool_name: p.tool,
+              args: null,
+              args_summary: p.args_summary,
+              safety: p.safety ?? null,
+              quote: p.quote ?? null,
+              bundle: p.bundle ?? null,
+              status: "pending",
+              created_at: new Date().toISOString(),
+            })),
+          ]);
+        }
+      };
+      const finalizeStream = (r: HubChatResponse) => {
+        clearTokenQueue();
+        flushTokens();
+        patchStream((m) => ({
+          ...m,
+          content: r.reply !== undefined ? r.reply : m.content,
+          streaming: false,
+          tool_calls: r.tool_calls?.length ? r.tool_calls : null,
+          thinking: {
+            ...(m.thinking || freshThinking()),
+            thoughts: [...(m.thinking?.thoughts || []), ...(r.thoughts || [])].slice(-4),
+            ms: r.ms,
+          },
+        }));
+        if (!r.ok) setFailedPrompt(msg);
+        applyPendings(r);
+      };
+      // Classic buffered send (fallback when SSE is unavailable).
+      const bufferedSend = async () => {
+        try {
+          const r = await hubChat(activeId, msg, { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current });
+          if (!r?.ok && !r?.reply) {
+            setFailedPrompt(msg);
+            pushAssistant(
+              `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`,
+              null,
+            );
+          } else {
+            applyChatResponse(r);
+          }
+        } catch (e: any) {
+          if (e?.name === "AbortError") {
+            pushAssistant(
+              "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
+              null,
+            );
+          } else {
+            setFailedPrompt(msg);
+            pushAssistant("Network error — your message is saved. Hit retry to try again.", null);
+          }
+        }
+      };
+      let streamedAny = false;
       try {
-        const r = await hubChat(activeId, msg, { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current });
-        if (!r?.ok && !r?.reply) {
-          setFailedPrompt(msg);
-          pushAssistant(
-            `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`,
-            null,
-          );
+        const doneResult = await hubChatStream(
+          activeId,
+          msg,
+          { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current },
+          (e: HubStreamEvent) => {
+            switch (e.event) {
+              case "token":
+                streamedAny = true;
+                queueToken(e.text || "");
+                break;
+              case "token_reset":
+                clearTokenQueue();
+                patchStream((m) => ({ ...m, content: "" }));
+                break;
+              case "status":
+                patchThinking((t) => ({ ...t, status: e.text || "" }));
+                break;
+              case "thought":
+                if (e.text)
+                  patchThinking((t) => ({ ...t, thoughts: [...t.thoughts, e.text as string].slice(-4) }));
+                break;
+              case "tool_call":
+                patchThinking((t) => ({
+                  ...t,
+                  tools: [...t.tools, { name: e.name || "tool", args_summary: e.args_summary, running: true }],
+                }));
+                break;
+              case "tool_result": {
+                const nm = e.name;
+                patchThinking((t) => ({
+                  ...t,
+                  tools: t.tools.map((tool) =>
+                    tool.running && (!nm || tool.name === nm)
+                      ? { ...tool, running: false, ok: e.ok, ms: e.ms }
+                      : tool,
+                  ),
+                }));
+                break;
+              }
+              default:
+                break;
+            }
+          },
+        );
+        if (doneResult) {
+          finalizeStream(doneResult);
         } else {
-          applyChatResponse(r);
+          // Stream ended with no result.
+          throw new Error("stream_empty");
         }
       } catch (e: any) {
+        clearTokenQueue();
         if (e?.name === "AbortError") {
+          dropPlaceholder();
           pushAssistant(
             "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
             null,
           );
+        } else if (!streamedAny) {
+          // SSE unavailable — fall back to the classic buffered call.
+          dropPlaceholder();
+          await bufferedSend();
         } else {
+          // Stream died mid-turn after showing content — keep what arrived.
+          flushTokens();
+          patchStream((m) => ({ ...m, streaming: false }));
           setFailedPrompt(msg);
-          pushAssistant("Network error — your message is saved. Hit retry to try again.", null);
         }
       } finally {
         setSending(false);
@@ -2344,7 +2575,17 @@ export default function AiHub() {
                       >
                         {m.role === "assistant" ? (
                           <div className="prose prose-invert prose-sm max-w-none [&_p]:my-2 [&_ul]:my-2">
-                            <Markdown text={body || ""} />
+                            {m.streaming && !body?.trim() ? (
+                              <span className="inline-flex items-center gap-2 text-white/40">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-iris" />
+                                {m.thinking?.status || "Thinking…"}
+                              </span>
+                            ) : (
+                              <>
+                                <Markdown text={body || ""} />
+                                {m.streaming && <span className="ml-0.5 inline-block h-4 w-[7px] animate-pulse rounded-[2px] bg-iris/80 align-[-2px]" />}
+                              </>
+                            )}
                           </div>
                         ) : (
                           <div className="whitespace-pre-wrap">{m.content}</div>
@@ -2376,6 +2617,9 @@ export default function AiHub() {
                               ))}
                             </div>
                           ) : null)}
+                          {m.role === "assistant" && (
+                            <ThinkingTrace thinking={thinkingFor(m)} streaming={m.streaming} />
+                          )}
                           {m.role === "assistant" && (
                             <div className="mt-1.5 flex items-center gap-1">
                               {speechSupported && (
