@@ -3626,8 +3626,11 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
   const cfg = llmCfg();
   if (!cfg.apiKey) return { ok: false, error: "llm_unavailable", message: "No LLM key configured." };
   const started = Date.now();
+  let lastErr = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const remaining = attempt === 0 ? timeoutMs : Math.max(10000, timeoutMs - (Date.now() - started));
+    // Hotter retry: low temp deterministically re-emits the same broken envelope (bad_json loop).
+    const temp = attempt === 0 ? temperature : 0.8;
     let resp = null, raw = "", err = null;
     try {
       resp = await fetch(`${cfg.baseUrl}/chat/completions`, {
@@ -3636,7 +3639,7 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
         body: JSON.stringify({
           model: cfg.model,
           messages,
-          temperature,
+          temperature: temp,
           max_tokens: HUB_MAX_TOKENS,
           response_format: { type: "json_object" },
         }),
@@ -3647,8 +3650,9 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
       err = e;
     }
     if (err) {
+      lastErr = { ok: false, error: "llm_unreachable", message: err?.message || String(err) };
       if (attempt === 0) continue; // one retry on transport failure only
-      return { ok: false, error: "llm_unreachable", message: err?.message || String(err) };
+      return lastErr;
     }
     if (!resp.ok) return { ok: false, error: `llm_${resp.status}`, message: trunc(raw, 300) };
     let parsed;
@@ -3656,9 +3660,11 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
     const text = parsed?.choices?.[0]?.message?.content || "";
     const norm = hubNormalize(parseThinkJson(text));
     if (norm) return { ok: true, ...norm, model: cfg.model, usage: parsed?.usage || {} };
-    return { ok: false, error: "bad_json", message: trunc(text, 300) };
+    lastErr = { ok: false, error: "bad_json", message: trunc(text, 300) };
+    if (attempt === 0) continue; // one hotter retry on bad_json
+    return lastErr;
   }
-  return { ok: false, error: "llm_unreachable" };
+  return lastErr || { ok: false, error: "llm_unreachable" };
 }
 
 const hubArgsSummary = (args) => trunc(JSON.stringify(args || {}), 300);
