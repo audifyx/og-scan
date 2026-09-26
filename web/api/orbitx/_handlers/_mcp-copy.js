@@ -6,48 +6,36 @@
  * appWalletBuy / appWalletSell. One row per (user, followedWallet) in ox_live_events
  * (kind "app_copy"), status lifecycle in meta like the limit system.
  *
+ * Swap parsing, mirror execution, and the claim+mirror writeback path live in
+ * ./_mcp-copy-engine.js — shared verbatim with the instant Helius webhook
+ * receiver (web/api/orbitx/copy-hook.js) so the two can never double-fill.
+ *
  * Wired by parent: dispatchCopyTools(name, args, auth), COPY_TOOLS, tickUserCopy(userId, ctx).
  * No trades execute at import time. No side effects, no top-level await.
  */
 import {
   needAuth,
   sb,
-  tokenInfo,
   walletRow,
-  tokenBalance,
-  appWalletBuy,
-  appWalletSell,
-  USDC_MINT,
-  claimFillRow,
-  resolveFillRow,
-  isFillOpen,
   FILL_STATUS,
 } from "./_mcp-app-wallet.js";
-import { SOL_MINT, TICK_AUTH_SOURCE } from "./_user-trading-wallet.js";
+import {
+  COPY_MODES,
+  HELIUS_LIMIT,
+  NEW_SWAPS_PER_TICK,
+  heliusKey,
+  parseSwap,
+  activeFollowRows,
+  mirrorNewSwaps,
+  copyWebhookStatus,
+  copyWebhookProvision,
+} from "./_mcp-copy-engine.js";
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-const COPY_MODES = ["fixed_usd", "percent_of_their_size", "mirror_ratio"];
-// Lazy: SOL_MINT/USDC_MINT come from _mcp-app-wallet.js, which imports this
-// module back (cycle) — building the Set at module top-level would read the
-// bindings before they initialize.
-function quoteSet() {
-  return new Set([SOL_MINT, USDC_MINT]);
-}
-const HELIUS_LIMIT = 15;
-const NEW_SWAPS_PER_TICK = 5;
-const SEEN_CAP = 100;
-const FILLS_CAP = 20;
-const DUST_USD = 0.5;
 
 // Fatal-ish codes carried for consistency with the limit system. Copy ticks skip
 // gracefully (never burn attempts), so this set is mostly documentary.
 export const FATAL_COPY = new Set(["no_balance", "no_wallet", "bad_mint", "size", "need_size"]);
-
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-
-function heliusKey() {
-  return String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
-}
 
 function normalizeParams(args = {}) {
   const wallet = String(args.wallet || "").trim();
@@ -69,24 +57,6 @@ function validateFollow({ wallet, mode, sizeValue }) {
   if (mode === "mirror_ratio" && (sizeValue < 0.01 || sizeValue > 10))
     return { ok: false, error: "bad_size", message: "mirror_ratio size is a multiplier and must be 0.01-10." };
   return null;
-}
-
-async function activeFollowRows(client, userId, includeFilling = false) {
-  const { data } = await client
-    .from("ox_live_events")
-    .select("id,meta")
-    .eq("kind", "app_copy")
-    .eq("agent_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-  // includeFilling: follow/unfollow must find a row even while a mirror is
-  // in-flight (otherwise follow would insert a duplicate row). The tick
-  // itself never uses includeFilling — that exclusion IS the fill mutex.
-  return (data || []).filter((r) => {
-    if (!r.meta?.followedWallet) return false;
-    if (includeFilling) return isFillOpen(r.meta, "active") || r.meta?.status === FILL_STATUS;
-    return isFillOpen(r.meta, "active");
-  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,6 +101,7 @@ export async function appCopyFollow(auth, args = {}) {
       status: "active",
       seenSigs: [],
       fills: [],
+      theirTrades: [],
       createdAt: now,
       lastCheckAt: null,
     };
@@ -184,6 +155,7 @@ export async function appCopyList(auth) {
         sizeValue: m.sizeValue,
         maxPerTradeUsd: m.maxPerTradeUsd,
         fills: (m.fills || []).length,
+        theirTrades: (m.theirTrades || []).length,
         createdAt: m.createdAt || null,
         lastCheckAt: m.lastCheckAt || null,
       };
@@ -192,52 +164,15 @@ export async function appCopyList(auth) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Helius swap parsing                                                */
+/* webhook provision/status (MCP tool — same impl as the HTTP admin)   */
 /* ------------------------------------------------------------------ */
 
-function parseSwap(tx, wallet) {
-  const transfers = tx?.tokenTransfers || [];
-  const looksLikeSwap =
-    tx?.type === "SWAP" ||
-    (transfers.some((t) => t.toUserAccount === wallet) && transfers.some((t) => t.fromUserAccount === wallet));
-  if (!looksLikeSwap) return null;
-  const net = {};
-  for (const t of transfers) {
-    const mint = t?.mint;
-    if (!mint) continue;
-    const amt = Number(t.tokenAmount || 0);
-    if (!Number.isFinite(amt) || amt <= 0) continue;
-    net[mint] = net[mint] || 0;
-    if (t.toUserAccount === wallet) net[mint] += amt;
-    if (t.fromUserAccount === wallet) net[mint] -= amt;
-  }
-  let bought = null;
-  let sold = null;
-  for (const [mint, a] of Object.entries(net)) {
-    if (quoteSet().has(mint)) continue; // quote leg of the swap (SOL/USDC) — not the mirrored asset
-    if (a > 0 && (!bought || a > bought.amount)) bought = { mint, amount: a };
-    if (a < 0 && (!sold || -a > sold.amount)) sold = { mint, amount: -a };
-  }
-  if (!bought && !sold) return null;
-  return { signature: tx.signature, bought, sold };
-}
-
-async function mintDecimals(mint) {
-  const key = heliusKey();
-  const rpc = key ? `https://mainnet.helius-rpc.com/?api-key=${encodeURIComponent(key)}` : "https://api.mainnet-beta.solana.com";
-  try {
-    const r = await fetch(rpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTokenSupply", params: [mint] }),
-      signal: AbortSignal.timeout(8000),
-    });
-    const j = await r.json();
-    const d = Number(j?.result?.value?.decimals);
-    return Number.isFinite(d) && d >= 0 ? d : 6;
-  } catch {
-    return 6;
-  }
+export async function appCopyProvision(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const action = String(args.action || "status").trim().toLowerCase();
+  if (action === "provision") return copyWebhookProvision();
+  return copyWebhookStatus();
 }
 
 /* ------------------------------------------------------------------ */
@@ -271,9 +206,6 @@ export async function tickUserCopy(userId, ctx = {}) {
 async function tickOneFollow(userId, row, client, mirrors, ctx = {}) {
   const meta = row.meta || {};
   const wallet = meta.followedWallet;
-  const mode = COPY_MODES.includes(meta.mode) ? meta.mode : "fixed_usd";
-  const sizeValue = Number(meta.sizeValue) > 0 ? Number(meta.sizeValue) : 1;
-  const maxPerTradeUsd = Number(meta.maxPerTradeUsd) > 0 ? Number(meta.maxPerTradeUsd) : 25;
 
   const key = heliusKey();
   if (!key) {
@@ -305,144 +237,13 @@ async function tickOneFollow(userId, row, client, mirrors, ctx = {}) {
   }
   swaps.reverse(); // oldest-first so history replays in order
   const todo = swaps.slice(0, NEW_SWAPS_PER_TICK);
-  const fills = meta.fills || [];
-  const now = new Date().toISOString();
-  const sizing = { mode, sizeValue, maxPerTradeUsd, followedWallet: wallet };
-  const deadlineMs = Number(ctx?.deadlineMs || 0);
 
-  // Claim-then-execute: serialize overlapping ticks at the follow-row level
-  // so two ticks can't mirror the same new swaps (double-fill race, F1).
-  // The claim also makes the in-memory seenSigs/fills accumulation race-free:
-  // only the claim winner's writeback lands (guarded resolve below).
-  let claimMeta = null;
-  if (todo.length > 0) {
-    if (deadlineMs && Date.now() > deadlineMs) {
-      mirrors.push({ follow: wallet, ok: false, error: "truncated", message: "Tick budget exhausted before mirroring — deferred to next tick." });
-      return "blocked";
-    }
-    claimMeta = await claimFillRow(client, row.id, meta, { openValue: "active", bumpAttempts: false });
-    if (!claimMeta) {
-      mirrors.push({ follow: wallet, ok: false, error: "claim_lost", message: "Another tick is mirroring this follow — skipped." });
-      return "blocked";
-    }
-  }
-
-  for (const s of todo) {
-    if (deadlineMs && Date.now() > deadlineMs) {
-      mirrors.push({ follow: wallet, theirSig: s.signature, ok: false, error: "truncated", message: "Tick budget exhausted — remaining mirrors deferred to next tick." });
-      break;
-    }
-    try {
-      await mirrorSwap(userId, sizing, s, fills, mirrors, now);
-    } catch (e) {
-      const rec = { sig: null, side: null, mint: null, symbol: null, usd: 0, priceUsd: 0, theirSig: s.signature, at: now, ok: false, error: "mirror_threw", message: e?.message || String(e) };
-      fills.push(rec);
-      mirrors.push({ follow: wallet, theirSig: s.signature, ok: false, error: "mirror_threw", message: rec.message });
-    }
-    seen.add(s.signature);
-  }
-
-  const patch = {
-    ...(claimMeta || meta),
-    seenSigs: [...seen].slice(-SEEN_CAP),
-    fills: fills.slice(-FILLS_CAP),
-    lastCheckAt: now,
-  };
-  if (claimMeta) {
-    const resolved = await resolveFillRow(client, row.id, patch, "active");
-    if (!resolved) {
-      // Claim lost mid-flight (re-armed/cancelled by the user, or transport
-      // errors exhausted). Mirrors already executed — persist just the
-      // seenSigs under a fillingAt guard so a later reap won't re-mirror
-      // them, without clobbering whatever state the row is in now.
-      try {
-        await client.from("ox_live_events").update({ meta: patch })
-          .eq("id", row.id)
-          .eq("meta->>status", FILL_STATUS)
-          .eq("meta->>fillingAt", claimMeta.fillingAt);
-      } catch { /* best-effort dedup note */ }
-      mirrors.push({ follow: wallet, ok: false, error: "resolve_lost", message: "Mirror claim lost mid-flight — mirrors executed; seenSigs write best-effort." });
-    }
-  } else {
-    try {
-      // Guarded: never clobber a concurrent "filling" claim's status.
-      await client.from("ox_live_events").update({ meta: patch }).eq("id", row.id).neq("meta->>status", FILL_STATUS);
-    } catch {
-      /* best-effort; no fill happened on this path */
-    }
-  }
-  return "ok";
-}
-
-async function mirrorSwap(userId, sizing, s, fills, mirrors, now) {
-  const auth = { userId, source: TICK_AUTH_SOURCE };
-  const pushRec = (rec) => {
-    fills.push(rec);
-    mirrors.push({ follow: sizing.followedWallet, theirSig: s.signature, side: rec.side, mint: rec.mint, symbol: rec.symbol, usd: rec.usd, ok: rec.ok, pending: !!rec.pending, error: rec.error, signature: rec.sig });
-  };
-  const priceOf = async (mint) => {
-    try {
-      return await tokenInfo(mint);
-    } catch {
-      return { symbol: "?", priceUsd: 0 };
-    }
-  };
-
-  // Mirror their BUY: they accumulated a non-quote token.
-  if (s.bought) {
-    const { mint, amount } = s.bought;
-    const info = await priceOf(mint);
-    const theirUsd = info.priceUsd * amount; // estimated from price at execution time
-    let usd;
-    if (sizing.mode === "fixed_usd") usd = sizing.sizeValue;
-    else if (sizing.mode === "percent_of_their_size") usd = (theirUsd * sizing.sizeValue) / 100;
-    else usd = theirUsd * sizing.sizeValue;
-    usd = Math.min(usd, sizing.maxPerTradeUsd);
-    if (!(usd >= DUST_USD)) {
-      pushRec({ sig: null, side: "buy", mint, symbol: info.symbol, usd: Number(usd) || 0, priceUsd: info.priceUsd, theirUsd, theirSig: s.signature, at: now, ok: false, error: "dust", skipped: true, estimate: sizing.mode !== "fixed_usd", message: `Mirror size $${(Number(usd) || 0).toFixed(2)} below dust floor — skipped.` });
-    } else {
-      let live;
-      try {
-        live = await appWalletBuy(auth, { mint, usd });
-      } catch (e) {
-        live = { ok: false, error: "buy_threw", message: e?.message || String(e) };
-      }
-      pushRec({ sig: live?.signature || null, side: "buy", mint, symbol: info.symbol, usd, priceUsd: info.priceUsd, theirUsd, theirSig: s.signature, at: now, ok: !!live?.ok, pending: !!live?.pending, error: live?.error || live?.message || null, estimate: sizing.mode !== "fixed_usd" });
-    }
-  }
-
-  // Mirror their SELL: they dumped a non-quote token — exit the same fraction of OUR position.
-  if (s.sold) {
-    const { mint, amount } = s.sold;
-    const info = await priceOf(mint);
-    const theirUsd = info.priceUsd * amount; // informational only for sells
-    const row = await walletRow(userId);
-    if (!row) {
-      pushRec({ sig: null, side: "sell", mint, symbol: info.symbol, usd: 0, priceUsd: info.priceUsd, theirUsd, theirSig: s.signature, at: now, ok: false, error: "no_wallet", skipped: true, message: "No desk wallet — nothing to mirror-sell." });
-    } else {
-      const raw = await tokenBalance(row.public_key, mint);
-      if (!raw || raw <= 0) {
-        pushRec({ sig: null, side: "sell", mint, symbol: info.symbol, usd: 0, priceUsd: info.priceUsd, theirUsd, theirSig: s.signature, at: now, ok: false, error: "no_balance", skipped: true, message: "We hold none of this token — nothing to mirror-sell." });
-      } else {
-        let fraction;
-        if (sizing.mode === "fixed_usd") {
-          const decimals = await mintDecimals(mint);
-          const ourAmount = raw / 10 ** decimals;
-          const ourPositionUsd = info.priceUsd * ourAmount;
-          fraction = ourPositionUsd > 0 ? clamp(sizing.sizeValue / ourPositionUsd, 0.01, 1) : 1;
-        } else {
-          fraction = clamp(sizing.sizeValue / 100, 0.01, 1);
-        }
-        let live;
-        try {
-          live = await appWalletSell(auth, { mint, fraction });
-        } catch (e) {
-          live = { ok: false, error: "sell_threw", message: e?.message || String(e) };
-        }
-        pushRec({ sig: live?.signature || null, side: "sell", mint, symbol: info.symbol, usd: 0, priceUsd: info.priceUsd, theirUsd, fraction, theirSig: s.signature, at: now, ok: !!live?.ok, pending: !!live?.pending, error: live?.error || live?.message || null });
-      }
-    }
-  }
+  // Shared claim+mirror path with the instant webhook (same seenSigs marking,
+  // same fill mutex, same meta writeback) — the tick stays the fallback and
+  // the reconciliation pass even with the webhook live.
+  const res = await mirrorNewSwaps(userId, row, client, todo, ctx);
+  mirrors.push(...res.mirrors);
+  return res.status;
 }
 
 /* ------------------------------------------------------------------ */
@@ -479,11 +280,24 @@ export const COPY_TOOLS = [
     description: "List wallets you are copy-trading: mode, size, maxPerTradeUsd, mirror-fill counts.",
     inputSchema: { type: "object", properties: { authCode } },
   },
+  {
+    name: "orbitx_app_copy_provision",
+    description:
+      "Check or register the instant Helius webhook that pushes the followed wallets' swaps here seconds after they confirm (the 5-min tick stays the fallback). action=status: show the registered webhook, watched wallets, and whether the webhook secret is configured. action=provision: create (or update) the Helius enhanced webhook for all actively-followed wallets. Refuses to provision unless COPY_HOOK_SECRET is set server-side. Uses the server-side Helius key — never exposed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["status", "provision"] },
+        authCode,
+      },
+    },
+  },
 ];
 
 export function dispatchCopyTools(name, args, auth) {
   if (name === "orbitx_app_copy_follow") return appCopyFollow(auth, args || {});
   if (name === "orbitx_app_copy_unfollow") return appCopyUnfollow(auth, args || {});
   if (name === "orbitx_app_copy_list") return appCopyList(auth);
+  if (name === "orbitx_app_copy_provision") return appCopyProvision(auth, args || {});
   return null;
 }

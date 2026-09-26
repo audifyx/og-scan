@@ -91,7 +91,7 @@ describe("F2: signing-auth provenance gate", () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const families = [
       ["_mcp-app-wallet.js", "tickUserLimits"],
-      ["_mcp-copy.js", "mirrorSwap"],
+      ["_mcp-copy-engine.js", "mirrorSwap"],
       ["_mcp-trailing.js", "trailing"],
       ["_mcp-sniper.js", "sniper"],
       ["_mcp-alerts.js", "alerts"],

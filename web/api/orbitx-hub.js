@@ -6526,6 +6526,18 @@ export default async function handler(req, res) {
       const { handleDeskShop } = await import("./orbitx/_handlers/_desk-shop.js");
       return handleDeskShop(req, res, parts, json);
     }
+    if (head === "copy-dashboard") {
+      const { handleCopyDashboard } = await import("./orbitx/copy-dashboard.js");
+      return handleCopyDashboard(req, res, parts, json);
+    }
+    if (head === "copy-hook") {
+      const mod = await import("./orbitx/copy-hook.js");
+      return mod.default(req, res);
+    }
+    if (head === "copy-admin") {
+      const mod = await import("./orbitx/copy-admin.js");
+      return mod.default(req, res);
+    }
     if (head === "desk-unlock" || head === "orbitx-desk-unlock") {
       const mod = await import("./_orbitx-desk-unlock.js");
       return mod.default(req, res);
@@ -6543,7 +6555,7 @@ export default async function handler(req, res) {
       return json(res, {
         ok: true,
         service: "orbitx",
-        routes: ["agent", "mcp", "shop", "crypto-scan", "anti-vamp-check", "telegram-mcp"],
+        routes: ["agent", "mcp", "shop", "copy-dashboard", "copy-hook", "copy-admin", "crypto-scan", "anti-vamp-check", "telegram-mcp"],
         agent: "/api/orbitx-agent",
         mcp: "/api/orbitx-mcp",
         antiVamp: "/api/orbitx/anti-vamp-check",

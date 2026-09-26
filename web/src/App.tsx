@@ -39,6 +39,7 @@ import Tools from "./pages/Tools";
 // AdvancedTools removed
 import AlphaChat from "./pages/AlphaChat";
 import AgentPlus from "./pages/AgentPlus";
+import CopyTrading from "./pages/CopyTrading";
 import AiHub from "./pages/AiHub";
 // Credits page removed
 // Webhooks removed
@@ -724,6 +725,8 @@ const App = () => (
             <Route path="/supercomputer/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
             {/* ── AgentPlus — autonomous agent fleet ── */}
             <Route path="/agentplus" element={<AgentPlus />} />
+            {/* ── Copy Trading — live wallet mirror dashboard ── */}
+            <Route path="/copy" element={<ProtectedRoute><CopyTrading /></ProtectedRoute>} />
             {/* ── OrbitX AI Hub — chat + full MCP in our own UI ── */}
             <Route path="/ai-hub" element={<AiHub />} />
             <Route path="/:toolSlug" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
