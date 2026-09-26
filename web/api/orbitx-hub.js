@@ -198,7 +198,10 @@ function mcpUrls(req) {
 const AGENT_AUTH_CODE_PROP = {
   type: "string",
   description:
-    "OrbitX authCode from the dashboard paste message or orbitx_auth_link. After auth, pass this on every tool call (required for Grok).",
+    "OrbitX authCode from the dashboard paste message or orbitx_auth_link. After auth, pass this on every tool call (required for Grok). " +
+    "Auth contract: signing tools (backend-signed trades, launches, burns, NFT mints) accept EITHER a valid authCode OR an authenticated session " +
+    "(OAuth/API-key bearer from a linked chat). The 5-minute auto-fill sweep and other server-side jobs run under their own internal credential — " +
+    "they never take an authCode. An authCode is sufficient but not the only accepted credential; a missing/invalid credential is rejected, never silently trusted.",
 };
 
 function withAuthCodeSchema(schema, toolName) {
@@ -4519,6 +4522,29 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     const { Keypair } = await import("@solana/web3.js");
     const mintKp = Keypair.fromSecretKey(Buffer.from(built.mintSecretKey, "base64"));
     const live = await signAndSendUserTx(wrow, built.transaction, [mintKp]);
+    // F3: broadcast is not success — never register/claim a mint that didn't confirm.
+    if (live.pending || !live.ok) {
+      return {
+        ok: false,
+        pending: !!live.pending,
+        status: live.pending ? "pending" : "failed",
+        error: live.error || "tx_failed",
+        signedOn: "backend",
+        clickToSign: false,
+        action: "mint_nft",
+        mint: built.mint,
+        name: nftName,
+        symbol,
+        uri,
+        signature: live.signature || null,
+        tx: live.signature ? `https://solscan.io/tx/${live.signature}` : null,
+        wallet: wrow.public_key,
+        confirmationStatus: live.confirmationStatus || null,
+        message:
+          live.message ||
+          "The mint transaction did not confirm. The NFT was NOT minted and NOT registered — check the explorer before retrying; do NOT blindly re-submit.",
+      };
+    }
     let registered = false;
     let registerError = null;
     if (args.register !== false) {
@@ -5174,9 +5200,30 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
       return { ok: true, signedOn: "backend", action: "rent_refund", accounts: 0, reclaimableSol: 0, signatures: [], message: "No empty token accounts to close." };
     }
     const signatures = [];
+    let pendingCount = 0;
+    let failedCount = 0;
     for (const txB64 of built.transactions) {
       const live = await signAndSendUserTx(wrow, txB64);
       signatures.push(live.signature);
+      if (live.pending) pendingCount++;
+      else if (!live.ok) failedCount++;
+    }
+    // F3: broadcast is not success — report pending/failed honestly.
+    if (pendingCount > 0 || failedCount > 0) {
+      return {
+        ok: false,
+        pending: pendingCount > 0,
+        status: pendingCount > 0 ? "pending" : "failed",
+        signedOn: "backend",
+        clickToSign: false,
+        action: "rent_refund",
+        wallet: wrow.public_key,
+        accounts: built.accounts.length,
+        reclaimableSol: built.reclaimableSol,
+        signatures,
+        tx: signatures.map((s) => `https://solscan.io/tx/${s}`),
+        message: `${failedCount} transaction(s) failed${pendingCount ? `, ${pendingCount} still pending confirmation` : ""}. Rent may not have been reclaimed for those — check the explorer before retrying; do NOT blindly re-submit.`,
+      };
     }
     return {
       ok: true,

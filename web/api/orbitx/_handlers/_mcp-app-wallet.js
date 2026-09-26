@@ -13,6 +13,9 @@ import {
   getDeskSolLamports,
   getDeskFunds,
   SOL_MINT,
+  isSigningAuth,
+  TICK_AUTH_SOURCE,
+  getTxConfirmationStatus,
 } from "./_user-trading-wallet.js";
 import { appLaunch, appClaimFees, appBurn, APP_DESK_OPS_TOOLS } from "./_mcp-app-desk-ops.js";
 // NOTE: strategy feature modules (_mcp-copy, _mcp-trailing, _mcp-sniper,
@@ -27,7 +30,11 @@ export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDC = USDC_MINT;
 
 export function needAuth(auth) {
-  if (auth?.userId) return { userId: auth.userId };
+  // F2: { userId } alone is NOT enough — require provenance. Every credential
+  // minted by the dashboard auth flow carries `source` (bearer | oauth_token |
+  // link_auth | link_session); the server-side auto-fill tick stamps "tick".
+  // A forged literal with no source is rejected like a missing credential.
+  if (isSigningAuth(auth)) return { userId: auth.userId };
   return { ok: false, error: "auth_required", dashboard: DASH, message: "Link OrbitX auth first." };
 }
 
@@ -90,6 +97,55 @@ function receipt({ side, info, usd, signature, owner, payWith, slippageBps }) {
     headline: `${side.toUpperCase()} ${info.symbol} @ $${info.priceUsd} · MC $${Math.round(info.mcap).toLocaleString()}`,
     imagePrompt: `Dark neon crypto trade receipt card, OrbitX, ${side.toUpperCase()} ${info.symbol}, entry $${info.priceUsd}, market cap $${Math.round(info.mcap).toLocaleString()}, tx success, no logos of other brands.`,
   };
+}
+
+/* F3: interpret a signUserSwap result honestly. Broadcast acceptance is NOT
+ * success — a pending (unconfirmed) or failed swap must never come back as
+ * an ok:true receipt. Returns { kind: "filled" | "pending" | "failed", ... }.
+ * Tick families branch on kind === "pending" to renew the fill claim with
+ * the signature instead of re-executing (which would double-fill). */
+function swapOutcome({ side, info, usd, live, payWith, slippageBps }) {
+  const base = {
+    side,
+    payWith: payWith || "SOL",
+    symbol: info.symbol,
+    mint: info.mint,
+    usd,
+    slippageBps: slippageBps ?? SLIPPAGE_BPS_DEFAULT,
+    signature: live?.signature || null,
+    wallet: live?.owner || null,
+    tx: live?.signature ? `https://solscan.io/tx/${live.signature}` : null,
+    chart: info.url,
+  };
+  if (live?.pending) {
+    return {
+      ...base,
+      ok: false,
+      pending: true,
+      status: "pending",
+      error: live.error || "tx_unconfirmed",
+      confirmationStatus: live.confirmationStatus || "unknown",
+      headline: `${side.toUpperCase()} ${info.symbol} broadcast — awaiting confirmation`,
+      message:
+        live.message ||
+        "Swap broadcast accepted by the RPC but not confirmed yet. It may still land — check the explorer before retrying; do NOT blindly re-submit.",
+    };
+  }
+  if (!live?.ok) {
+    return {
+      ...base,
+      ok: false,
+      status: "failed",
+      error: live?.error || "swap_failed",
+      confirmationStatus: live?.confirmationStatus || null,
+      headline: `${side.toUpperCase()} ${info.symbol} failed`,
+      message: live?.message || "The swap did not complete.",
+    };
+  }
+  const rec = receipt({ side, info, usd, signature: live.signature, owner: live.owner, payWith, slippageBps });
+  rec.confirmed = true;
+  rec.confirmationStatus = live.confirmationStatus || "confirmed";
+  return rec;
 }
 
 export async function tokenBalance(owner, mint) {
@@ -262,9 +318,9 @@ export async function appWalletBuy(auth, args = {}) {
   }
   if (amount <= 0) return { ok: false, error: "size" };
   const live = await signUserSwap(row, { inputMint, outputMint: mint, amount, slippageBps: slip });
-  const rec = receipt({ side: "buy", info, usd, signature: live.signature, owner: live.owner, payWith: useUsdc ? "USDC" : "SOL", slippageBps: slip });
-  rec.imageHint = "Call orbitx_generate_image with imagePrompt to show the fill card.";
-  return rec;
+  const out = swapOutcome({ side: "buy", info, usd, live, payWith: useUsdc ? "USDC" : "SOL", slippageBps: slip });
+  if (out.ok) out.imageHint = "Call orbitx_generate_image with imagePrompt to show the fill card.";
+  return out;
 }
 
 export async function appWalletSell(auth, args = {}) {
@@ -294,7 +350,7 @@ export async function appWalletSell(auth, args = {}) {
   if (amt <= 0) return { ok: false, error: "no_balance" };
   const info = await tokenInfo(mint);
   const live = await signUserSwap(row, { inputMint: mint, outputMint: SOL_MINT, amount: amt, slippageBps: slip });
-  return receipt({ side: "sell", info, usd: 0, signature: live.signature, owner: live.owner, payWith: "SOL", slippageBps: slip });
+  return swapOutcome({ side: "sell", info, usd: 0, live, payWith: "SOL", slippageBps: slip });
 }
 
 export async function appWalletLimit(auth, args = {}) {
@@ -437,9 +493,22 @@ const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * status "filling") on success, or null when another tick owns the row.
  * Missing status counts as open (family convention); a stale "filling"
  * claim (older than FILL_CLAIM_MS) may be reaped.
+ *
+ * F3: a stale "filling" claim carrying a pendingSignature is a
+ * broadcast-but-unconfirmed fill. It is settled by signature status —
+ * confirmed → marked filled, failed/expired → clean reap, unknown but
+ * recent → claim renewed — and NEVER re-executed blindly (that would
+ * double-fill if the first tx lands late). Returns null unless the claim
+ * was cleanly reaped, in which case the returned patch has the pending
+ * fields cleared.
  */
 export async function claimFillRow(client, rowId, meta, opts = {}) {
-  const { openValue = "open", bumpAttempts = true } = opts;
+  const { openValue = "open", bumpAttempts = true, getTxStatus } = opts;
+  if (meta?.status === FILL_STATUS && meta?.pendingSignature && fillClaimIsStale(meta)) {
+    const settle = await settlePendingClaim(client, rowId, meta, getTxStatus);
+    if (settle.action !== "reap") return null; // filled, renewed, or lost — never re-execute
+    meta = settle.meta; // clean reap: pending fields cleared, safe to claim
+  }
   const now = new Date().toISOString();
   const staleBefore = new Date(Date.now() - FILL_CLAIM_MS).toISOString();
   const patch = { ...(meta || {}), status: FILL_STATUS, fillingAt: now, lastCheckAt: now };
@@ -488,6 +557,129 @@ export async function resolveFillRow(client, rowId, metaPatch, finalStatus) {
   return false;
 }
 
+/* ------------------------------------------------------------------ */
+/* Pending-fill settlement (F3).                                       */
+/*                                                                     */
+/* A fill that was broadcast but never confirmed leaves a "filling"    */
+/* claim carrying pendingSignature/pendingSince. When the claim goes    */
+/* stale, the next tick settles it by the signature's on-chain status: */
+/*                                                                     */
+/*   confirmed/finalized → the tx landed while unwatched: mark filled  */
+/*   (per-tranche for ladders), NEVER re-execute.                       */
+/*   failed on-chain   → the tx died: clean reap, safe to retry.        */
+/*   unknown + recent  → may still land: renew the claim, keep waiting. */
+/*   unknown + old     → blockhash long dead, cannot land: clean reap.  */
+/*                                                                     */
+/* The guarded updates (status=filling AND fillingAt match) keep this  */
+/* atomic against overlapping ticks: only one settler wins.            */
+/* ------------------------------------------------------------------ */
+
+export const PENDING_SIG_MAX_AGE_MS = 30 * 60 * 1000;
+
+/**
+ * Renew a "filling" claim we still own (e.g. after a pending broadcast).
+ * Guarded on status="filling" so a re-armed/cancelled row is never clobbered.
+ * Returns true when the renewal landed.
+ */
+export async function renewFillClaim(client, rowId, metaPatch) {
+  const now = new Date().toISOString();
+  const patch = { ...(metaPatch || {}), status: FILL_STATUS, fillingAt: now, lastCheckAt: now };
+  try {
+    const { data, error } = await client
+      .from("ox_live_events")
+      .update({ meta: patch })
+      .eq("id", rowId)
+      .eq("meta->>status", FILL_STATUS)
+      .select("id");
+    return !error && !!data && data.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function clearPending(t) {
+  const c = { ...(t || {}) };
+  delete c.pendingSignature;
+  delete c.pendingSince;
+  return c;
+}
+
+/**
+ * Settle a stale "filling" claim that carries a pendingSignature.
+ * getTxStatus defaults to the real getTxConfirmationStatus; tests inject a stub.
+ * Returns { action, meta? } — action ∈ filled | renewed | reap | lost.
+ */
+export async function settlePendingClaim(client, rowId, meta, getTxStatus) {
+  const sig = meta?.pendingSignature;
+  const getStatus =
+    getTxStatus ||
+    (typeof getTxConfirmationStatus === "function" ? getTxConfirmationStatus : null);
+  if (!sig || !getStatus) {
+    return { action: "reap", meta: clearPending(meta) };
+  }
+  let st = null;
+  try {
+    st = await getStatus(sig, { searchHistory: true });
+  } catch {
+    st = null; // RPC hiccup — treat as unknown below, never as failure
+  }
+  const now = new Date().toISOString();
+  // NOTE: a tx can be "confirmed" (included in a block) yet failed execution
+  // (err set) — check failed FIRST, never treat it as a landed fill.
+  const failed = !!st?.failed;
+  const confirmed = !failed && (st?.status === "confirmed" || st?.status === "finalized");
+  const cleanTranches = (tr) =>
+    (Array.isArray(tr) ? tr : []).map((t) =>
+      t?.pendingSignature === sig
+        ? confirmed
+          ? { ...clearPending(t), status: "filled", filledAt: now, signature: sig, lastError: null }
+          : { ...clearPending(t), status: "open", lastError: st?.failed ? `tx_failed_onchain: ${JSON.stringify(st.err)}` : t.lastError || "tx_unconfirmed_expired" }
+        : t
+    );
+  if (confirmed) {
+    // Landed while unwatched — mark it filled. Never re-execute.
+    const hasTranches = Array.isArray(meta.tranches);
+    const patch = {
+      ...clearPending(meta),
+      lastCheckAt: now,
+      filledAt: now,
+      lastFill: { signature: sig, at: now, confirmed: true, settled: "stale_claim", confirmationStatus: st.status },
+    };
+    let finalStatus = "filled";
+    if (hasTranches) {
+      const tranches = cleanTranches(meta.tranches);
+      patch.tranches = tranches;
+      const allDone = tranches.length > 0 && tranches.every((t) => t.status === "filled" || t.status === "failed");
+      if (!allDone) { finalStatus = "open"; delete patch.filledAt; }
+    }
+    const ok = await resolveFillRow(client, rowId, patch, finalStatus);
+    return { action: ok ? "filled" : "lost" };
+  }
+  const pendingSince = Date.parse(meta.pendingSince || meta.fillingAt || "") || 0;
+  const expired = !!st?.failed || Date.now() - pendingSince > PENDING_SIG_MAX_AGE_MS;
+  if (expired) {
+    // Died on-chain, or the blockhash is long dead so it cannot land — clean reap.
+    const cleaned = { ...clearPending(meta), lastCheckAt: now };
+    if (Array.isArray(meta.tranches)) cleaned.tranches = cleanTranches(meta.tranches);
+    return { action: "reap", meta: cleaned };
+  }
+  // Unknown but possibly still alive — renew the claim; do NOT re-execute.
+  const patch = { ...(meta || {}), fillingAt: now, lastCheckAt: now };
+  try {
+    const { data, error } = await client
+      .from("ox_live_events")
+      .update({ meta: patch })
+      .eq("id", rowId)
+      .eq("meta->>status", FILL_STATUS)
+      .eq("meta->>fillingAt", meta.fillingAt)
+      .select("id");
+    if (!error && data && data.length > 0) return { action: "renewed" };
+  } catch {
+    /* lost below */
+  }
+  return { action: "lost" };
+}
+
 // Errors that will never succeed on retry — fail the order immediately.
 const LIMIT_FATAL = new Set(["no_balance", "no_wallet", "bad_mint", "size", "need_size"]);
 const LIMIT_MAX_ATTEMPTS = 10;
@@ -519,12 +711,21 @@ export async function tickUserLimits(userId, ctx = {}) {
     // Claim-then-execute: only the claim winner fills (double-fill race fix).
     const claimed = await claimFillRow(client, r.id, o);
     if (!claimed) continue; // lost the race — another tick owns this fill
-    const auth = { userId };
+    const auth = { userId, source: TICK_AUTH_SOURCE };
     let fill;
     try {
       fill = o.side === "sell" ? await appWalletSell(auth, fillArgsFor(o)) : await appWalletBuy(auth, fillArgsFor(o));
     } catch (e) {
       fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
+    }
+    // F3: broadcast-but-unconfirmed — renew the claim with the signature so
+    // later ticks settle by signature status. NEVER fall through to "open"
+    // here: re-executing would double-fill if the first tx lands late.
+    if (fill?.pending) {
+      const nowIso = new Date().toISOString();
+      await renewFillClaim(client, r.id, { ...claimed, pendingSignature: fill.signature, pendingSince: nowIso });
+      fills.push({ orderId: r.id, mint: o.mint, side: o.side, status: "pending", attempts: Number(claimed.attempts || 0), renewed: true, fill: { ok: false, pending: true, error: fill.error || "tx_unconfirmed", signature: fill.signature || null } });
+      continue;
     }
     const attempts = Number(claimed.attempts || 0);
     const fatal = fill && !fill.ok && LIMIT_FATAL.has(String(fill.error || ""));

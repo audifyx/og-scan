@@ -2,7 +2,7 @@
  * Desk-signed pump launch, creator-fee claim, and flexible burn.
  * Same model as orbitx_app_buy: backend signs, no Phantom popup.
  */
-import { getUserWallet, getDeskFunds, signAndSendUserTx, SOL_MINT } from "./_user-trading-wallet.js";
+import { getUserWallet, getDeskFunds, signAndSendUserTx, SOL_MINT, isSigningAuth } from "./_user-trading-wallet.js";
 import { prepareBurn, preparePumpClaim } from "./_mcp-ops.js";
 
 const DASH = "https://www.orbitx.world/supercomputer?tab=inapp";
@@ -11,8 +11,37 @@ const FALLBACK_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAhUlEQVR4nO3QsQ0AIAwDsPL+Q6eLFyBFykx+Vck7AAAAAAAAAAAAAAD4r7X2zMyyM7O9997M3Hs/M3vvzcyyM7O99wAAAAAAAAAAAAD8X2vtzMyyM7O9997M3Hs/M3vvzcyyM7O99wAAAAAAAAAAAAD8X2vtlZllZ2Z7772Zufd+Zvbem5llZ2Z77wEAAAAAAAAAAIAfH3YGBQ2yXq8AAAAASUVORK5CYII=";
 
 function needAuth(auth) {
-  if (auth?.userId) return { userId: auth.userId };
+  // F2: same provenance gate as _mcp-app-wallet.js — { userId } alone is not
+  // enough; the credential must carry a source stamped by the auth flow.
+  if (isSigningAuth(auth)) return { userId: auth.userId };
   return { ok: false, error: "auth_required", dashboard: DASH, message: "Link OrbitX auth first." };
+}
+
+/* F3: interpret a signAndSendUserTx result honestly. Broadcast acceptance is
+ * NOT success — pending/failed must never come back as ok:true. */
+function sendOutcome(live, successFields) {
+  const base = {
+    signature: live?.signature || null,
+    wallet: live?.owner || null,
+    tx: live?.signature ? `https://solscan.io/tx/${live.signature}` : null,
+    confirmationStatus: live?.confirmationStatus || null,
+  };
+  if (live?.pending) {
+    return {
+      ...base,
+      ok: false,
+      pending: true,
+      status: "pending",
+      error: live.error || "tx_unconfirmed",
+      message:
+        live.message ||
+        "Transaction broadcast accepted by the RPC but not confirmed yet. It may still land — check the explorer before retrying; do NOT blindly re-submit.",
+    };
+  }
+  if (!live?.ok) {
+    return { ...base, ok: false, status: "failed", error: live?.error || "tx_failed", message: live?.message || "The transaction did not complete." };
+  }
+  return { ...base, ok: true, signedOn: "backend", clickToSign: false, confirmed: true, ...successFields };
 }
 
 function pairOf(args = {}) {
@@ -239,10 +268,7 @@ export async function appLaunch(auth, args = {}) {
     slippage: Number(args.slippage || 15),
   });
   const live = await signAndSendUserTx(row, built.txBase64, [mintKp]);
-  return {
-    ok: true,
-    signedOn: "backend",
-    clickToSign: false,
+  return sendOutcome(live, {
     action: "launch",
     name,
     symbol,
@@ -254,15 +280,12 @@ export async function appLaunch(auth, args = {}) {
     quote: built.usedPair === "usdc" ? "USDC" : "SOL",
     metadataUri: pinned.metadataUri,
     image: pinned.imageUri,
-    signature: live.signature,
-    wallet: live.owner,
-    tx: `https://solscan.io/tx/${live.signature}`,
     pump: `https://pump.fun/${vanity.publicKey}`,
     headline: `LAUNCHED ${symbol} · ${vanity.publicKey} · ${built.usedPair.toUpperCase()} pair`,
     message: vanity.vanity
       ? `Live. CA ends in obx. ${built.usedPair.toUpperCase()} pair. Desk signed — no popup.`
       : `Live (random CA, vanity budget missed obx). ${built.usedPair.toUpperCase()} pair. Desk signed.`,
-  };
+  });
 }
 
 export async function appClaimFees(auth, args = {}) {
@@ -274,17 +297,11 @@ export async function appClaimFees(auth, args = {}) {
   const built = await preparePumpClaim(row.public_key, quote);
   if (!built?.transaction) return { ok: false, error: "claim_build_failed", built };
   const live = await signAndSendUserTx(row, built.transaction);
-  return {
-    ok: true,
-    signedOn: "backend",
-    clickToSign: false,
+  return sendOutcome(live, {
     action: "claim_fees",
     quote: quote ? "USDC" : "SOL",
-    signature: live.signature,
-    wallet: live.owner,
-    tx: `https://solscan.io/tx/${live.signature}`,
     message: "Creator fees claimed to your desk wallet.",
-  };
+  });
 }
 
 function parseBurnSpec(args = {}) {
@@ -331,21 +348,15 @@ export async function appBurn(auth, args = {}) {
     return { ok: false, error: "burn_build_failed", message: msg || "Could not build burn transaction.", mint };
   }
   const live = await signAndSendUserTx(row, built.transaction);
-  return {
-    ok: true,
-    signedOn: "backend",
-    clickToSign: false,
+  return sendOutcome(live, {
     action: "burn",
     mint,
     amountRaw: built.amountRaw,
     percent: percent ?? null,
     usd: spec.usd ?? null,
     closesAccount: built.closesAccount,
-    signature: live.signature,
-    wallet: live.owner,
-    tx: `https://solscan.io/tx/${live.signature}`,
     message: built.closesAccount ? "Full bag burned. ATA closed, rent back to desk." : "Partial burn sent from desk. No popup.",
-  };
+  });
 }
 
 export const APP_DESK_OPS_TOOLS = [

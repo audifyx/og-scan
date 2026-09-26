@@ -7,7 +7,8 @@
  *
  * Wired by the parent via dispatchTrailingTools / TRAILING_TOOLS / tickUserTrailing.
  */
-import { needAuth, sb, tokenInfo, walletRow, tokenBalance, appWalletSell, claimFillRow, resolveFillRow, isFillOpen, FILL_STATUS } from "./_mcp-app-wallet.js";
+import { needAuth, sb, tokenInfo, walletRow, tokenBalance, appWalletSell, claimFillRow, resolveFillRow, renewFillClaim, isFillOpen, FILL_STATUS } from "./_mcp-app-wallet.js";
+import { TICK_AUTH_SOURCE } from "./_user-trading-wallet.js";
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -259,7 +260,7 @@ async function tickTrailingRow(client, r, userId, now, ctx = {}) {
   // Trigger hit — claim before selling so overlapping ticks can't double-fill.
   const claimed = await claimFillRow(client, r.id, m);
   if (!claimed) return null; // lost the race
-  const auth = { userId };
+  const auth = { userId, source: TICK_AUTH_SOURCE };
   let fill;
   let execPriceUsd = info.priceUsd;
   let estProceedsUsd = null;
@@ -281,6 +282,14 @@ async function tickTrailingRow(client, r, userId, now, ctx = {}) {
     }
   } catch (e) {
     fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
+  }
+  // F3: broadcast-but-unconfirmed — renew the claim with the signature; later
+  // ticks settle by signature status. Never fall through to "open" (re-execution
+  // would double-sell if the tx lands late).
+  if (fill?.pending) {
+    const nowIso = new Date().toISOString();
+    await renewFillClaim(client, r.id, { ...claimed, pendingSignature: fill.signature, pendingSince: nowIso });
+    return { id: r.id, mint: m.mint, kind: "app_trailing", status: "pending", attempts: Number(claimed.attempts || 0), renewed: true, triggerPct: trailPct, fill: { ok: false, pending: true, error: fill.error || "tx_unconfirmed", signature: fill.signature || null, priceUsd: execPriceUsd, estProceedsUsd } };
   }
   const attempts = Number(claimed.attempts || 0);
   const fatal = fill && !fill.ok && TRAILING_FATAL.has(String(fill.error || ""));
@@ -322,9 +331,12 @@ async function tickLadderRow(client, r, userId, now, ctx = {}) {
   // Claim the whole row before selling tranches — overlapping ticks can't double-sell.
   const claimed = await claimFillRow(client, r.id, { ...m, tranches }, { bumpAttempts: false });
   if (!claimed) return null; // lost the race
-  const auth = { userId };
+  // F3: a clean reap may have rewritten the tranches (cleared stale pending
+  // fields) — work from the claimed patch so the loop and the resolve agree.
+  const liveTranches = Array.isArray(claimed.tranches) ? claimed.tranches : tranches;
+  const auth = { userId, source: TICK_AUTH_SOURCE };
   const out = [];
-  for (const t of tranches) {
+  for (const t of liveTranches) {
     if (t.status !== "open") continue;
     if (info.priceUsd < Number(t.targetUsd)) continue;
     let fill;
@@ -339,6 +351,15 @@ async function tickLadderRow(client, r, userId, now, ctx = {}) {
       t.signature = fill.signature || null;
       t.priceUsd = Number(fill.entryUsd) || info.priceUsd;
       t.lastError = null;
+    } else if (fill?.pending) {
+      // F3: broadcast-but-unconfirmed — park the tranche as pending with the
+      // signature (row-level pendingSignature too, so the stale-claim settle
+      // can find it). Later ticks settle by signature status; the tranche is
+      // never re-executed blindly.
+      t.status = "pending";
+      t.pendingSignature = fill.signature || null;
+      t.pendingSince = now;
+      t.lastError = fill.error || "tx_unconfirmed";
     } else {
       t.attempts = Number(t.attempts || 0) + 1;
       t.lastError = fill?.error || fill?.message || null;
@@ -347,15 +368,20 @@ async function tickLadderRow(client, r, userId, now, ctx = {}) {
         t.failedAt = now;
       }
     }
-    out.push({ id: r.id, mint: m.mint, kind: "app_ladder", status: t.status, tranche: { mult: t.mult, pct: t.pct }, fill: { ok: !!fill?.ok, error: fill?.error || null, signature: fill?.signature || null } });
+    out.push({ id: r.id, mint: m.mint, kind: "app_ladder", status: t.status, tranche: { mult: t.mult, pct: t.pct }, fill: { ok: !!fill?.ok, pending: !!fill?.pending, error: fill?.error || null, signature: fill?.signature || null } });
   }
-  const allDone = tranches.length > 0 && tranches.every((t) => t.status === "filled" || t.status === "failed");
-  const resolved = await resolveFillRow(client, r.id, {
-    ...claimed,
-    tranches,
-    lastCheckAt: now,
-    ...(allDone ? { filledAt: now } : {}),
-  }, allDone ? "filled" : "open");
+  const pendingSig = liveTranches.find((t) => t.status === "pending" && t.pendingSignature)?.pendingSignature || null;
+  const allDone = liveTranches.length > 0 && liveTranches.every((t) => t.status === "filled" || t.status === "failed");
+  const resolved = await (pendingSig
+    // F3: at least one tranche is pending — renew the claim with the signature
+    // instead of resolving to "open" (which would let the next tick re-sell).
+    ? renewFillClaim(client, r.id, { ...claimed, tranches: liveTranches, pendingSignature: pendingSig, pendingSince: now, lastCheckAt: now })
+    : resolveFillRow(client, r.id, {
+        ...claimed,
+        tranches: liveTranches,
+        lastCheckAt: now,
+        ...(allDone ? { filledAt: now } : {}),
+      }, allDone ? "filled" : "open"));
   return out.length ? out.map((o) => ({ ...o, resolved })) : null;
 }
 

@@ -23,7 +23,7 @@ import {
   isFillOpen,
   FILL_STATUS,
 } from "./_mcp-app-wallet.js";
-import { SOL_MINT } from "./_user-trading-wallet.js";
+import { SOL_MINT, TICK_AUTH_SOURCE } from "./_user-trading-wallet.js";
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const COPY_MODES = ["fixed_usd", "percent_of_their_size", "mirror_ratio"];
@@ -375,10 +375,10 @@ async function tickOneFollow(userId, row, client, mirrors, ctx = {}) {
 }
 
 async function mirrorSwap(userId, sizing, s, fills, mirrors, now) {
-  const auth = { userId };
+  const auth = { userId, source: TICK_AUTH_SOURCE };
   const pushRec = (rec) => {
     fills.push(rec);
-    mirrors.push({ follow: sizing.followedWallet, theirSig: s.signature, side: rec.side, mint: rec.mint, symbol: rec.symbol, usd: rec.usd, ok: rec.ok, error: rec.error, signature: rec.sig });
+    mirrors.push({ follow: sizing.followedWallet, theirSig: s.signature, side: rec.side, mint: rec.mint, symbol: rec.symbol, usd: rec.usd, ok: rec.ok, pending: !!rec.pending, error: rec.error, signature: rec.sig });
   };
   const priceOf = async (mint) => {
     try {
@@ -407,7 +407,7 @@ async function mirrorSwap(userId, sizing, s, fills, mirrors, now) {
       } catch (e) {
         live = { ok: false, error: "buy_threw", message: e?.message || String(e) };
       }
-      pushRec({ sig: live?.signature || null, side: "buy", mint, symbol: info.symbol, usd, priceUsd: info.priceUsd, theirUsd, theirSig: s.signature, at: now, ok: !!live?.ok, error: live?.error || live?.message || null, estimate: sizing.mode !== "fixed_usd" });
+      pushRec({ sig: live?.signature || null, side: "buy", mint, symbol: info.symbol, usd, priceUsd: info.priceUsd, theirUsd, theirSig: s.signature, at: now, ok: !!live?.ok, pending: !!live?.pending, error: live?.error || live?.message || null, estimate: sizing.mode !== "fixed_usd" });
     }
   }
 
@@ -439,7 +439,7 @@ async function mirrorSwap(userId, sizing, s, fills, mirrors, now) {
         } catch (e) {
           live = { ok: false, error: "sell_threw", message: e?.message || String(e) };
         }
-        pushRec({ sig: live?.signature || null, side: "sell", mint, symbol: info.symbol, usd: 0, priceUsd: info.priceUsd, theirUsd, fraction, theirSig: s.signature, at: now, ok: !!live?.ok, error: live?.error || live?.message || null });
+        pushRec({ sig: live?.signature || null, side: "sell", mint, symbol: info.symbol, usd: 0, priceUsd: info.priceUsd, theirUsd, fraction, theirSig: s.signature, at: now, ok: !!live?.ok, pending: !!live?.pending, error: live?.error || live?.message || null });
       }
     }
   }

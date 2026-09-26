@@ -3,7 +3,8 @@
  * Conditions: price_above | price_below | whale_buy_min_usd | volume_spike.
  * Actions: buy_usd | sell_percent | notify_only. Backend signs (desk wallet). No popup.
  */
-import { needAuth, sb, tokenInfo, appWalletBuy, appWalletSell, claimFillRow, resolveFillRow, isFillOpen, FILL_STATUS } from "./_mcp-app-wallet.js";
+import { needAuth, sb, tokenInfo, appWalletBuy, appWalletSell, claimFillRow, resolveFillRow, renewFillClaim, isFillOpen, FILL_STATUS } from "./_mcp-app-wallet.js";
+import { TICK_AUTH_SOURCE } from "./_user-trading-wallet.js";
 import { evmTrades } from "../../ogdex/_evm.js";
 
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -232,7 +233,7 @@ export async function tickUserAlerts(userId, ctx) {
     // ── Triggered: one-shot execution — claim first so overlapping ticks can't double-fire.
     const claimed = await claimFillRow(client, r.id, m, { bumpAttempts: false });
     if (!claimed) continue; // lost the race
-    const auth = { userId };
+    const auth = { userId, source: TICK_AUTH_SOURCE };
     let result;
     try {
       if (m.action === "buy_usd") {
@@ -246,6 +247,26 @@ export async function tickUserAlerts(userId, ctx) {
       result = { ok: false, error: "action_threw", message: e?.message || String(e) };
     }
     const now = new Date().toISOString();
+    // F3: broadcast-but-unconfirmed — renew the claim with the signature so
+    // later ticks settle by signature status. Never resolve to "triggered"
+    // (terminal) and never re-fire: the action may still land.
+    if (result?.pending) {
+      await renewFillClaim(client, r.id, { ...claimed, pendingSignature: result.signature, pendingSince: now, triggerPrice: res.price || null, lastCheckAt: now });
+      const pendingSummary = {
+        id: r.id, mint: m.mint, symbol: m.symbol, type: m.condType,
+        condition: condText(m.condType, m.condValue),
+        action: m.action, actionDesc: actionText(m.action, m.actionValue),
+        triggerPrice: res.price || null,
+        result: { ok: false, pending: true, signature: result.signature || null, error: result.error || "tx_unconfirmed", message: result.message || null },
+        renewed: true,
+      };
+      triggered.push(pendingSummary);
+      try {
+        const mod = await import("./_mcp-telegram-push.js");
+        await mod.pushMcpResultToTelegram?.({ userId, tool: "orbitx_app_alert", result: pendingSummary, source: "alert_tick" });
+      } catch { /* best-effort push */ }
+      continue;
+    }
     const summary = {
       id: r.id, mint: m.mint, symbol: m.symbol, type: m.condType,
       condition: condText(m.condType, m.condValue),

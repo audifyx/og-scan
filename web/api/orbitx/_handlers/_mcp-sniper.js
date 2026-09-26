@@ -15,8 +15,10 @@ import {
   USDC_MINT,
   claimFillRow,
   resolveFillRow,
+  renewFillClaim,
   FILL_STATUS,
 } from "./_mcp-app-wallet.js";
+import { TICK_AUTH_SOURCE } from "./_user-trading-wallet.js";
 
 const SNIPE_KIND = "app_snipe";
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -319,11 +321,19 @@ export async function tickUserSniper(userId, ctx = {}) {
       }
       let fill;
       try {
-        fill = await appWalletBuy({ userId }, { mint: chosen.mint, usd: size });
+        fill = await appWalletBuy({ userId, source: TICK_AUTH_SOURCE }, { mint: chosen.mint, usd: size });
       } catch (e) {
         fill = { ok: false, error: "fill_threw", message: e?.message || String(e) };
       }
       let metaWriteFailed = false;
+      if (fill?.pending) {
+        // F3: broadcast-but-unconfirmed — do NOT count the spend (unproven).
+        // Renew the claim with the signature; later ticks settle by signature
+        // status. Never fall through to a retry that could double-buy.
+        await renewFillClaim(client, r.id, { ...claimed, pendingSignature: fill.signature, pendingSince: nowIso, lastCheckAt: nowIso });
+        buys.push({ mint: chosen.mint, symbol: chosen.symbol, usd: size, signature: fill.signature || null, pending: true, status: "pending", error: fill.error || "tx_unconfirmed" });
+        return { ok: true, checked: 1, candidates: candidates.length, rejects: rejects.slice(0, 10), buys, ...(truncated ? { truncated: true } : {}) };
+      }
       if (fill && fill.ok) {
         let priceUsd = 0;
         try {
