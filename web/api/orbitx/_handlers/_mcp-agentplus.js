@@ -481,7 +481,7 @@ async function _spawnAgent(client, userId, { name, role, persona, capabilities }
 /* Parse a think-loop failure into a short code + human hint for dashboards. */
 function parseThinkError(body) {
   const b = String(body || "");
-  const m = b.match(/think (llm_\d+|llm_unreachable|bad_json)/);
+  const m = b.match(/think (llm_\d+|llm_unreachable|llm_empty|bad_json)/);
   if (!m) return null;
   const code = m[1];
   const hints = {
@@ -493,6 +493,7 @@ function parseThinkError(body) {
     llm_500: "LLM provider error",
     llm_503: "LLM overloaded — retry later",
     llm_unreachable: "could not reach the LLM endpoint",
+    llm_empty: "model returned an empty response",
     bad_json: "model returned unparseable output",
   };
   return { code, hint: hints[code] || "LLM call failed" };
@@ -3251,6 +3252,22 @@ async function hubExecuteTool({ userId, toolName, args = {}, req = null, hubThre
   return runEmbeddedAgentTool({ userId, toolName: name, args, req, skipTelegramPush: true });
 }
 
+// Time-boxed hubExecuteTool: one hanging downstream call must not kill the
+// turn. Races the tool against HUB_TOOL_TIMEOUT_MS so a stuck call degrades
+// to a failed result (which the model then synthesizes honestly) instead of
+// a Vercel 60s kill with no reply.
+async function hubExecuteToolTimed(args) {
+  let timer;
+  try {
+    return await Promise.race([
+      hubExecuteTool(args),
+      new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("tool_timeout")), HUB_TOOL_TIMEOUT_MS); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Extract a Solana mint/CA from tool args (buy/swap/quote shapes).
 function hubExtractMint(args) {
   const a = args || {};
@@ -3334,7 +3351,7 @@ function hubDeepFind(obj, keys, depth = 0) {
 // Auto safety scan attached to buy/swap pendings — never ape blind.
 async function hubAutoSafety(userId, mint, req) {
   try {
-    const scan = await hubExecuteTool({ userId, toolName: "orbitx_crypto_scan", args: { mint }, req });
+    const scan = await hubExecuteToolTimed({ userId, toolName: "orbitx_crypto_scan", args: { mint }, req });
     const s = scan && typeof scan === "object" ? scan : {};
     const flagsRaw = hubDeepFind(s, ["flags", "rugFlags", "warnings", "risks", "redFlags"]);
     const flags = Array.isArray(flagsRaw) ? flagsRaw.map((f) => String(f && f.text || f).slice(0, 120)).slice(0, 8) : [];
@@ -3361,7 +3378,7 @@ async function hubAutoSafety(userId, mint, req) {
 // Auto quote attached to SOL→token buy pendings (price/slippage before approve).
 async function hubAutoQuote(userId, mint, amountSol, slippage, req) {
   try {
-    const q = await hubExecuteTool({ userId, toolName: "orbitx_trade_quote", args: { mint, amountSol, slippage: slippage || 1 }, req });
+    const q = await hubExecuteToolTimed({ userId, toolName: "orbitx_trade_quote", args: { mint, amountSol, slippage: slippage || 1 }, req });
     const s = q && typeof q === "object" ? q : {};
     return {
       amount_sol: amountSol,
@@ -4098,20 +4115,9 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
       try { ev.onToolCall && ev.onToolCall({ name: tc.name, args_summary: hubArgsSummary(tc.arguments) }); } catch { /* ignore */ }
       let result, ok = true;
       try {
-        // One hanging tool must not kill the turn: race it against a timeout
-        // so a stuck downstream call degrades to a failed tool result (which
-        // the model then synthesizes honestly) instead of a Vercel 60s kill
-        // with no reply. Only non-gated tools reach here, so an abandoned
-        // late completion has no harmful side effect.
-        let timer;
-        try {
-          result = await Promise.race([
-            hubExecuteTool({ userId, toolName: tc.name, args: tc.arguments || {}, req, hubThread: threadId }),
-            new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("tool_timeout")), HUB_TOOL_TIMEOUT_MS); }),
-          ]);
-        } finally {
-          clearTimeout(timer);
-        }
+        // Time-boxed: only non-gated tools reach here, so an abandoned late
+        // completion has no harmful side effect.
+        result = await hubExecuteToolTimed({ userId, toolName: tc.name, args: tc.arguments || {}, req, hubThread: threadId });
       } catch (e) {
         ok = false;
         result = { error: e?.message || String(e) };
@@ -4302,7 +4308,9 @@ export async function hubChat(userId, threadIdOrNull, message, req, opts = {}) {
     let scanErr = "";
     evSafe(() => ev.onStatus && ev.onStatus("Scanning token…"));
     try {
-      const scan = await hubExecuteTool({ userId, toolName: "orbitx_crypto_scan", args: { mint: bareCa }, req, hubThread: threadId });
+      // Time-boxed: a hanging scan must not blow the Vercel 60s limit — the
+      // deterministic dossier below renders from whatever we have.
+      const scan = await hubExecuteToolTimed({ userId, toolName: "orbitx_crypto_scan", args: { mint: bareCa }, req, hubThread: threadId });
       try {
         scanJson = typeof scan === "string" ? JSON.parse(scan) : scan;
       } catch {
@@ -4310,7 +4318,7 @@ export async function hubChat(userId, threadIdOrNull, message, req, opts = {}) {
       }
       scanText = trunc(typeof scan === "string" ? scan : JSON.stringify(scan), 3000);
     } catch (e) {
-      scanErr = e?.message || String(e);
+      scanErr = e?.message === "tool_timeout" ? "scan timed out" : e?.message || String(e);
       scanText = `scan failed: ${scanErr}`;
     }
     let reply = null;
@@ -4395,7 +4403,9 @@ export async function hubConfirm(userId, pendingId, approved, req, opts = {}) {
       const jobs = isBundle ? prow.args.bundle : [{ tool_name: prow.tool_name, args: prow.args || {} }];
       const outs = [];
       for (const j of jobs) {
-        const result = await hubExecuteTool({ userId, toolName: j.tool_name, args: j.args || {}, req });
+        // Time-boxed: an approved trade that hangs must surface as a timeout
+        // result, not a Vercel 60s kill with no reply.
+        const result = await hubExecuteToolTimed({ userId, toolName: j.tool_name, args: j.args || {}, req });
         outs.push({ tool: j.tool_name, ok: true, result: trunc(typeof result === "string" ? result : JSON.stringify(result), 1200) });
       }
       toolResultText = isBundle ? trunc(JSON.stringify(outs), 2000) : outs[0].result;
