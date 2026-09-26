@@ -8,7 +8,7 @@
  *
  * Swap parsing, mirror execution, and the claim+mirror writeback path live in
  * ./_mcp-copy-engine.js — shared verbatim with the instant Helius webhook
- * receiver (web/api/orbitx/copy-hook.js) so the two can never double-fill.
+ * receiver (web/api/orbitx/_copy-hook.js (via orbitx-hub ?path=copy-hook)) so the two can never double-fill.
  *
  * Wired by parent: dispatchCopyTools(name, args, auth), COPY_TOOLS, tickUserCopy(userId, ctx).
  * No trades execute at import time. No side effects, no top-level await.

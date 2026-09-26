@@ -4,9 +4,9 @@
  *
  * Imported by BOTH:
  *   - the 5-min tick (tickUserCopy in ./_mcp-copy.js), and
- *   - the instant Helius webhook receiver (web/api/orbitx/copy-hook.js),
+ *   - the instant Helius webhook receiver (web/api/orbitx/_copy-hook.js (via orbitx-hub ?path=copy-hook)),
  * plus the webhook provision/status helpers shared by the HTTP admin
- * endpoint (web/api/orbitx/copy-admin.js) and the orbitx_app_copy_provision
+ * endpoint (web/api/orbitx/_copy-admin.js (via orbitx-hub ?path=copy-admin)) and the orbitx_app_copy_provision
  * MCP tool.
  *
  * The webhook and the tick run the SAME claim+mirror path (mirrorNewSwaps),
@@ -40,7 +40,7 @@ export const THEIR_TRADES_CAP = 200;
 export const DUST_USD = 0.5;
 
 // Public URL of the instant webhook receiver (Vercel file routing:
-// web/api/orbitx/copy-hook.js -> POST /api/orbitx/copy-hook).
+// web/api/orbitx/_copy-hook.js (via orbitx-hub ?path=copy-hook) -> POST /api/orbitx/copy-hook).
 export const COPY_HOOK_URL = "https://www.orbitx.world/api/orbitx/copy-hook";
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));

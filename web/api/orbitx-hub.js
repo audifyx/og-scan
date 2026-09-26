@@ -6527,15 +6527,15 @@ export default async function handler(req, res) {
       return handleDeskShop(req, res, parts, json);
     }
     if (head === "copy-dashboard") {
-      const { handleCopyDashboard } = await import("./orbitx/copy-dashboard.js");
+      const { handleCopyDashboard } = await import("./orbitx/_copy-dashboard.js");
       return handleCopyDashboard(req, res, parts, json);
     }
     if (head === "copy-hook") {
-      const mod = await import("./orbitx/copy-hook.js");
+      const mod = await import("./orbitx/_copy-hook.js");
       return mod.default(req, res);
     }
     if (head === "copy-admin") {
-      const mod = await import("./orbitx/copy-admin.js");
+      const mod = await import("./orbitx/_copy-admin.js");
       return mod.default(req, res);
     }
     if (head === "desk-unlock" || head === "orbitx-desk-unlock") {

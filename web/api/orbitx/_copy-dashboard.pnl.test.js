@@ -3,7 +3,7 @@
  * Pure functions, no DB, no network.
  */
 import { describe, it, expect } from "vitest";
-import { buildBook, finalize } from "./copy-dashboard.js";
+import { buildBook, finalize } from "./_copy-dashboard.js";
 
 const T = "So11111111111111111111111111111111111111112";
 const prices = new Map([[T, { price: 1.5, symbol: "TOK" }]]);
