@@ -480,22 +480,22 @@ interface QuestItem {
 
 const QUEST_ITEMS: QuestItem[] = [
   {
-    id: "wallet",
-    label: "Connect your wallet",
-    desc: "Fund it and you're trade-ready.",
-    action: { type: "link", label: "Open /wallet", to: "/wallet" },
-  },
-  {
-    id: "x",
-    label: "Connect X on /x",
-    desc: "Draft and post straight to your timeline.",
-    action: { type: "link", label: "Open /x", to: "/x" },
-  },
-  {
     id: "paper",
     label: "Make your first paper trade",
     desc: "Risk-free practice with $1,000 in fake money.",
     action: { type: "fill", label: "Try it", fill: "I want to make a paper trade with $1000 fake money" },
+  },
+  {
+    id: "scan",
+    label: "Scan a token for rugs",
+    desc: "Safety check any coin before you touch it.",
+    action: { type: "fill", label: "Try it", fill: "Scan SOL and tell me if it's safe to buy" },
+  },
+  {
+    id: "alert",
+    label: "Set your first price alert",
+    desc: "The hub watches the chart so you don't have to.",
+    action: { type: "fill", label: "Try it", fill: "Alert me when SOL crosses $250" },
   },
 ];
 
@@ -517,7 +517,7 @@ function QuestCard({
         <div className="text-4xl">🎉</div>
         <div className="mt-2 text-lg font-black uppercase tracking-wide">You're set up 🎉</div>
         <p className="mt-1 text-xs text-white/50">
-          Wallet, X, and paper trading are off your list — go make the hub work for you.
+          Paper trading, token scans, and price alerts are off your list — go make the hub work for you.
         </p>
         <button
           type="button"
