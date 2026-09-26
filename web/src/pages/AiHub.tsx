@@ -65,10 +65,10 @@ import {
   hubDeleteThread,
   hubChat,
   hubChatStream,
+  reduceHubThinking,
   hubConfirm,
   hubModels,
-  hubExportTradesCsv,
-  hubStats,
+  hubExportTradesCsv,  hubStats,
   hubAlertsList,
   hubAlertDelete,
   hubAlertMute,
@@ -884,8 +884,12 @@ function ThinkingTrace({ thinking, streaming }: { thinking: HubThinking | null; 
       >
         <Wrench className="h-3 w-3" />
         <span>
-          {anyRunning || streaming ? "working" : "thought"} · {doneCount}/{tools.length}{" "}
-          {tools.length === 1 ? "tool" : "tools"}
+          {anyRunning || streaming ? "working" : "thought"}
+          {tools.length > 0 && (
+            <>
+              {" "}· {doneCount}/{tools.length} {tools.length === 1 ? "tool" : "tools"}
+            </>
+          )}
           {ms != null && ms > 0 ? ` · ${(ms / 1000).toFixed(1)}s` : ""}
         </span>
         <ChevronDown
@@ -1235,6 +1239,12 @@ export default function AiHub() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Why the in-flight stream was aborted: "stop" via the stop button vs
+  // "switch" when changing threads (the old turn must not bleed over).
+  const abortReasonRef = useRef<"stop" | "switch" | null>(null);
+  // Assistant message id backing the current retry prompt — retry removes
+  // exactly this message instead of blindly slicing the last one.
+  const failedMsgIdRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const toastTimer = useRef<number | null>(null);
   const recRef = useRef<HubSpeechRecognition | null>(null);
@@ -1431,9 +1441,16 @@ export default function AiHub() {
 
   const selectThread = useCallback(
     async (id: string | null) => {
+      if (abortRef.current) {
+        // Don't let the old thread's turn bleed into the new one — its pending
+        // approvals would land in the wrong thread's list.
+        abortReasonRef.current = "switch";
+        abortRef.current.abort();
+      }
       setActiveId(id);
       setSidebarOpen(false);
       setFailedPrompt(null);
+      failedMsgIdRef.current = null;
       setInsights([]);
       if (!id) {
         setMessages([]);
@@ -1580,12 +1597,22 @@ export default function AiHub() {
     };
   }, [threadQuery]);
 
-  const pushAssistant = useCallback((content: string, tool_calls: HubToolCall[] | null, id?: number) => {
-    setMessages((prev) => [
-      ...prev,
-      { id: id ?? Date.now(), role: "assistant", content, tool_calls, created_at: new Date().toISOString() },
-    ]);
-  }, []);
+  const pushAssistant = useCallback(
+    (content: string, tool_calls: HubToolCall[] | null, id?: number, thinking?: HubThinking) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: id ?? Date.now(),
+          role: "assistant",
+          content,
+          tool_calls,
+          thinking,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    },
+    [],
+  );
 
   const applyChatResponse = useCallback(
     (r: any) => {
@@ -1595,7 +1622,14 @@ export default function AiHub() {
         loadThreads();
       }
       if (r?.reply !== undefined) {
-        pushAssistant(r.reply || "", r.tool_calls?.length ? r.tool_calls : null);
+        // Buffered turns carry the model's one-line plans too — keep them in the trace.
+        const thoughts = Array.isArray(r.thoughts) ? r.thoughts.slice(-4) : [];
+        pushAssistant(
+          r.reply || "",
+          r.tool_calls?.length ? r.tool_calls : null,
+          undefined,
+          thoughts.length || typeof r.ms === "number" ? { tools: [], thoughts, ms: r.ms } : undefined,
+        );
       }
       if (r?.pending?.length) {
         setPendings((prev) => [
@@ -1624,6 +1658,8 @@ export default function AiHub() {
       setSending(true);
       setInput("");
       setFailedPrompt(null);
+      failedMsgIdRef.current = null;
+      abortReasonRef.current = null;
       setInsights([]);
       const userMsgId = Date.now();
       setMessages((prev) => [
@@ -1697,8 +1733,9 @@ export default function AiHub() {
         }
       };
       const finalizeStream = (r: HubChatResponse) => {
-        clearTokenQueue();
+        // Flush first: tokens still sitting in the batch window belong to this turn.
         flushTokens();
+        clearTokenQueue();
         patchStream((m) => ({
           ...m,
           content: r.reply !== undefined ? r.reply : m.content,
@@ -1710,7 +1747,10 @@ export default function AiHub() {
             ms: r.ms,
           },
         }));
-        if (!r.ok) setFailedPrompt(msg);
+        if (!r.ok) {
+          setFailedPrompt(msg);
+          failedMsgIdRef.current = streamId;
+        }
         applyPendings(r);
       };
       // Classic buffered send (fallback when SSE is unavailable).
@@ -1718,27 +1758,51 @@ export default function AiHub() {
         try {
           const r = await hubChat(activeId, msg, { signal: ctrl.signal, mode: modeRef.current, lang: langRef.current });
           if (!r?.ok && !r?.reply) {
+            const errId = Date.now() + 3;
             setFailedPrompt(msg);
+            failedMsgIdRef.current = errId;
             pushAssistant(
               `Something went wrong (${r?.error || "unknown error"}). Your message is saved — hit retry to try again.`,
               null,
+              errId,
             );
           } else {
             applyChatResponse(r);
           }
         } catch (e: any) {
           if (e?.name === "AbortError") {
-            pushAssistant(
-              "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
-              null,
-            );
+            // Thread switch aborts quietly; the stop button explains itself.
+            if (abortReasonRef.current !== "switch") {
+              pushAssistant(
+                "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
+                null,
+              );
+            }
           } else {
+            const errId = Date.now() + 3;
             setFailedPrompt(msg);
-            pushAssistant("Network error — your message is saved. Hit retry to try again.", null);
+            failedMsgIdRef.current = errId;
+            pushAssistant("Network error — your message is saved. Hit retry to try again.", null, errId);
           }
         }
       };
-      let streamedAny = false;
+      // True once the user has seen anything worth keeping (tokens, thoughts,
+      // tool activity, status). Decides keep-partial vs buffered-retry on death.
+      let hadVisible = false;
+      // Backend-reported failure for this turn (the `error` SSE event). When set,
+      // the turn already failed server-side — re-running it via the buffered
+      // fallback would just burn a second turn, so we surface it honestly.
+      let streamError: string | null = null;
+      // Tools left "running" when a stream dies never get their result event —
+      // mark them failed so the trace doesn't pulse forever on a dead turn.
+      const markInterruptedTools = (m: HubMessage): HubMessage => ({
+        ...m,
+        streaming: false,
+        thinking: {
+          ...(m.thinking || freshThinking()),
+          tools: (m.thinking?.tools || []).map((t) => (t.running ? { ...t, running: false, ok: false } : t)),
+        },
+      });
       try {
         const doneResult = await hubChatStream(
           activeId,
@@ -1747,39 +1811,25 @@ export default function AiHub() {
           (e: HubStreamEvent) => {
             switch (e.event) {
               case "token":
-                streamedAny = true;
+                hadVisible = true;
                 queueToken(e.text || "");
                 break;
               case "token_reset":
                 clearTokenQueue();
                 patchStream((m) => ({ ...m, content: "" }));
                 break;
-              case "status":
-                patchThinking((t) => ({ ...t, status: e.text || "" }));
+              case "error":
+                // hubChat threw server-side; the stream ends here with no `done`.
+                streamError = e.error || "hub_stream_failed";
                 break;
-              case "thought":
-                if (e.text)
-                  patchThinking((t) => ({ ...t, thoughts: [...t.thoughts, e.text as string].slice(-4) }));
+              case "start":
+              case "done":
                 break;
-              case "tool_call":
-                patchThinking((t) => ({
-                  ...t,
-                  tools: [...t.tools, { name: e.name || "tool", args_summary: e.args_summary, running: true }],
-                }));
-                break;
-              case "tool_result": {
-                const nm = e.name;
-                patchThinking((t) => ({
-                  ...t,
-                  tools: t.tools.map((tool) =>
-                    tool.running && (!nm || tool.name === nm)
-                      ? { ...tool, running: false, ok: e.ok, ms: e.ms }
-                      : tool,
-                  ),
-                }));
-                break;
-              }
               default:
+                // status / thought / tool_call / tool_result / future events.
+                // reduceHubThinking tolerates unknown shapes (no-op).
+                hadVisible = true;
+                patchThinking((t) => reduceHubThinking(t, e));
                 break;
             }
           },
@@ -1792,21 +1842,39 @@ export default function AiHub() {
         }
       } catch (e: any) {
         clearTokenQueue();
-        if (e?.name === "AbortError") {
+        const switched = e?.name === "AbortError" && abortReasonRef.current === "switch";
+        abortReasonRef.current = null;
+        if (switched) {
+          // Moved to another thread mid-turn — the placeholder left with the old thread.
+          dropPlaceholder();
+        } else if (e?.name === "AbortError") {
           dropPlaceholder();
           pushAssistant(
             "Stopped. The turn may still finish on the server — reopen this chat to see the result.",
             null,
           );
-        } else if (!streamedAny) {
+        } else if (streamError) {
+          // Backend already failed this turn — keep any partial output, don't re-run it.
+          flushTokens();
+          patchStream(markInterruptedTools);
+          const errId = Date.now() + 2;
+          pushAssistant(
+            `Something went wrong (${streamError}). Your message is saved — hit retry to try again.`,
+            null,
+            errId,
+          );
+          setFailedPrompt(msg);
+          failedMsgIdRef.current = errId;
+        } else if (!hadVisible) {
           // SSE unavailable — fall back to the classic buffered call.
           dropPlaceholder();
           await bufferedSend();
         } else {
           // Stream died mid-turn after showing content — keep what arrived.
           flushTokens();
-          patchStream((m) => ({ ...m, streaming: false }));
+          patchStream(markInterruptedTools);
           setFailedPrompt(msg);
+          failedMsgIdRef.current = streamId;
         }
       } finally {
         setSending(false);
@@ -1817,12 +1885,16 @@ export default function AiHub() {
   );
 
   const stop = useCallback(() => {
+    abortReasonRef.current = "stop";
     abortRef.current?.abort();
   }, []);
 
   const retry = useCallback(() => {
     if (failedPrompt && !sending) {
-      setMessages((prev) => prev.slice(0, -1));
+      // Remove exactly the failed assistant message — alert polls may have
+      // appended messages after it, so slice(0, -1) could eat the wrong one.
+      const failedId = failedMsgIdRef.current;
+      if (failedId != null) setMessages((prev) => prev.filter((m) => m.id !== failedId));
       send(failedPrompt);
     }
   }, [failedPrompt, sending, send]);

@@ -172,6 +172,65 @@ export const hubChat = (thread_id: string | null, message: string, opts?: HubCha
     signal: opts?.signal,
   });
 
+/** Parse complete SSE messages ("data: {...}\n\n") out of a text buffer.
+ *  Pure + unit-tested. Normalizes CRLF (some proxies rewrite line endings,
+ *  which would otherwise delay every event until the stream ends), skips
+ *  malformed lines, and returns the unparsed remainder for the next chunk.
+ *  Unknown event shapes pass through untouched — callers must tolerate them. */
+export function extractSseMessages(buf: string): { events: HubStreamEvent[]; rest: string } {
+  const events: HubStreamEvent[] = [];
+  let rest = buf.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  let idx: number;
+  while ((idx = rest.indexOf("\n\n")) !== -1) {
+    const chunk = rest.slice(0, idx);
+    rest = rest.slice(idx + 2);
+    for (const line of chunk.split("\n")) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      try {
+        events.push(JSON.parse(t.slice(5)) as HubStreamEvent);
+      } catch {
+        /* malformed SSE line — skip */
+      }
+    }
+  }
+  return { events, rest };
+}
+
+/** Pure reducer: fold one SSE stream event into the live thinking trace.
+ *  tool_result completes only the FIRST matching running tool (the backend can
+ *  run same-name tools in parallel — completing all of them on the first
+ *  result lies about the others). Unknown events are no-ops. */
+export function reduceHubThinking(t: HubThinking, e: HubStreamEvent): HubThinking {
+  switch (e.event) {
+    case "status":
+      return { ...t, status: e.text || "" };
+    case "thought":
+      return e.text ? { ...t, thoughts: [...t.thoughts, e.text].slice(-4) } : t;
+    case "tool_call":
+      return {
+        ...t,
+        tools: [...t.tools, { name: e.name || "tool", args_summary: e.args_summary, running: true }],
+      };
+    case "tool_result": {
+      const nm = e.name;
+      let matched = false;
+      return {
+        ...t,
+        tools: t.tools.map((tool) => {
+          if (!matched && tool.running && (!nm || tool.name === nm)) {
+            matched = true;
+            return { ...tool, running: false, ok: e.ok, ms: e.ms };
+          }
+          return tool;
+        }),
+      };
+    }
+    default:
+      return t;
+  }
+}
+
 /** Streamed hub chat (SSE). Resolves with the done result, or null if the
  *  stream ended without one. Falls back to hubChat when SSE is unavailable. */
 export type HubStreamEvent =
@@ -213,30 +272,24 @@ export const hubChatStream = (
     let buf = "";
     let doneResult: HubChatResponse | null = null;
     let sawEvent = false;
-    const dispatch = (line: string) => {
-      const t = line.trim();
-      if (!t.startsWith("data:")) return;
-      try {
-        const e = JSON.parse(t.slice(5)) as HubStreamEvent;
-        sawEvent = true;
-        if (e.event === "done") doneResult = (e.result as HubChatResponse) || null;
-        onEvent(e);
-      } catch {
-        /* malformed SSE line — skip */
-      }
+    const emit = (e: HubStreamEvent) => {
+      sawEvent = true;
+      if (e.event === "done") doneResult = (e.result as HubChatResponse) || null;
+      // Unknown future events flow through to onEvent untouched — the caller's
+      // switch must tolerate them (default branch), never crash on them.
+      onEvent(e);
     };
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       buf += decoder.decode(value, { stream: true });
-      let idx: number;
-      while ((idx = buf.indexOf("\n\n")) !== -1) {
-        const chunk = buf.slice(0, idx);
-        buf = buf.slice(idx + 2);
-        for (const line of chunk.split("\n")) dispatch(line);
-      }
+      const parsed = extractSseMessages(buf);
+      buf = parsed.rest;
+      for (const e of parsed.events) emit(e);
     }
-    for (const line of buf.split("\n")) dispatch(line);
+    // Flush any trailing partial message (a proxy may have swallowed the terminator).
+    const tail = extractSseMessages(buf + "\n\n");
+    for (const e of tail.events) emit(e);
     if (!sawEvent) throw new Error("stream_unavailable_empty");
     return doneResult;
   })();
