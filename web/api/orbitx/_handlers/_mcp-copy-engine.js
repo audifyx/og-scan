@@ -221,6 +221,27 @@ export async function mirrorSwap(userId, sizing, s, fills, mirrors, now) {
 }
 
 /* ------------------------------------------------------------------ */
+/* staleness guard — never mirror a buy the leader already exited      */
+/* ------------------------------------------------------------------ */
+
+// Pure: flag buys whose signal died before we could act. Walk newest-first;
+// any buy of a mint the leader SOLD in a newer swap is stale — mirroring it
+// would buy what the leader already dumped. Mutates the swap objects (sets
+// s.staleBuy) and returns them. Called by the tick, which sees the whole new
+// batch at once; the instant webhook delivers single swaps and sets no flag
+// (nothing newer to compare against — and it fires seconds after confirm).
+export function markStaleBuys(swaps) {
+  const soldMints = new Set();
+  for (let i = (swaps || []).length - 1; i >= 0; i--) {
+    const s = swaps[i];
+    if (!s) continue;
+    if (s.sold) soldMints.add(s.sold.mint);
+    s.staleBuy = Boolean(s.bought && soldMints.has(s.bought.mint));
+  }
+  return swaps;
+}
+
+/* ------------------------------------------------------------------ */
 /* theirTrades: persistent log of THEIR swap events on the follow row  */
 /* ------------------------------------------------------------------ */
 
@@ -263,8 +284,16 @@ export async function mirrorNewSwaps(userId, row, client, swaps, ctx = {}) {
   // Belt & braces: the tick pre-filters, the webhook doesn't. Marking here
   // keeps both paths identical — a signature is mirrored at most once.
   const todo = [];
+  const skippedStale = [];
   for (const s of swaps || []) {
     if (!s?.signature || seen.has(s.signature)) continue;
+    // Staleness guard: the leader sold this mint in a newer swap, so the buy
+    // signal is dead. Never execute it — mark seen so it isn't retried and
+    // record the deliberate skip.
+    if (s.staleBuy && s.bought) {
+      skippedStale.push(s);
+      continue;
+    }
     todo.push(s);
   }
 
@@ -316,6 +345,51 @@ export async function mirrorNewSwaps(userId, row, client, swaps, ctx = {}) {
         at: now,
       });
     }
+  }
+
+  // Record the stale-buy skips: seen (never retried), visible in mirrors,
+  // and logged in theirTrades with stale:true so the audit trail shows the
+  // leader's buy was seen and deliberately not mirrored.
+  for (const s of skippedStale) {
+    seen.add(s.signature);
+    fills.push({
+      sig: null,
+      side: "buy",
+      mint: s.bought.mint,
+      symbol: null,
+      usd: 0,
+      priceUsd: 0,
+      theirUsd: 0,
+      theirSig: s.signature,
+      at: now,
+      ok: false,
+      error: "stale_buy_leader_sold",
+      skipped: true,
+      message: "Buy signal stale — the leader sold this mint in a newer swap before we could mirror. Skipped.",
+    });
+    mirrors.push({
+      follow: wallet,
+      theirSig: s.signature,
+      side: "buy",
+      mint: s.bought.mint,
+      symbol: null,
+      usd: 0,
+      ok: false,
+      error: "stale_buy_leader_sold",
+      skipped: true,
+      signature: null,
+    });
+    theirTrades.push({
+      signature: s.signature,
+      side: "buy",
+      mint: s.bought.mint,
+      symbol: "?",
+      amount: Number(s.bought.amount) || 0,
+      theirUsd: 0,
+      priceUsd: 0,
+      at: now,
+      stale: true,
+    });
   }
 
   const patch = {

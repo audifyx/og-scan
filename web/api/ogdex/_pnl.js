@@ -13,43 +13,10 @@ async function solPrice() {
   } catch {}
   return SOLP_CACHE.v;
 }
-/* RPC read path with public fallback (qa-wallet-rpc-fallback).
- *
- * Same stale-zero root cause as _routes/_wallet.js: every swap-history read
- * went through the keyed Supabase `rpc-proxy` hop only, and any failure
- * there silently produced an empty/zeroed PnL (no positions, no trades).
- * When the proxy yields nothing, read the chain directly over the public
- * RPC before giving up. Proxy stays primary.
- */
-const PUBLIC_RPC_URL = "https://api.mainnet-beta.solana.com";
-
-async function rpcDirect(method, params) {
-  const r = await fetch(PUBLIC_RPC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    signal: AbortSignal.timeout(10000),
-  });
-  const j = await r.json();
-  if (j?.error) throw new Error(`public rpc ${method} failed`);
-  return j?.result ?? null;
-}
-
 async function rpc(method, params) {
-  try {
-    const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
-    const v = r?.data?.result ?? r?.result ?? null;
-    if (v != null) return v;
-  } catch {
-    /* proxy hop failed — fall through to direct RPC */
-  }
-  try {
-    return await rpcDirect(method, params);
-  } catch {
-    return null;
-  }
+  const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
+  return r?.data?.result ?? r?.result ?? null;
 }
-/* End RPC read path (qa-wallet-rpc-fallback). */
 
 // One retry on null/throw — getTransaction is frequently rate-limited under load.
 async function rpcTx(signature) {
