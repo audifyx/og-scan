@@ -3976,3 +3976,139 @@ export function hubModelInfo() {
   const cfg = llmCfg();
   return { ok: true, model: cfg.model, hint: "Single mind model shared with the AgentPlus mind loop. No fallback chain." };
 }
+
+/* ── Hub dashboard helpers: stats, alerts, message search, open pendings ──
+   Back the /ai-hub UI: portfolio stats bar, alert manager, full-text search,
+   and the "while you were away" digest. All read-only except alert mute/cancel. */
+
+export async function hubStats(userId) {
+  const out = { ok: true, portfolioUsd: null, pnlUsd: null, openAlerts: 0, activeStrategies: null, wallet: false };
+  try {
+    const w = await import("./_mcp-app-wallet.js");
+    const st = await w.appWalletStatus({ userId }).catch(() => null);
+    if (st && st.ok && st.exists && typeof st.totalUsd === "number") {
+      out.wallet = true;
+      out.portfolioUsd = Math.round(st.totalUsd * 100) / 100;
+    }
+  } catch { /* best-effort */ }
+  try {
+    const p = await import("./_mcp-pnl.js");
+    const pnl = await p.appWalletPnl({ userId }).catch(() => null);
+    if (pnl && pnl.ok && pnl.totals) {
+      out.pnlUsd = typeof pnl.totals.totalPnlUsd === "number" ? pnl.totals.totalPnlUsd : null;
+      out.activeStrategies = pnl.activeStrategies || null;
+    }
+  } catch { /* best-effort */ }
+  try {
+    const a = await import("./_mcp-alerts.js");
+    const al = await a.orbitxAppAlertsList({ userId }).catch(() => null);
+    if (al && al.ok && Array.isArray(al.alerts)) {
+      out.openAlerts = al.alerts.filter((x) => (x.status || "open") === "open").length;
+    }
+  } catch { /* best-effort */ }
+  return out;
+}
+
+export async function hubListAlerts(userId) {
+  try {
+    const a = await import("./_mcp-alerts.js");
+    return await a.orbitxAppAlertsList({ userId });
+  } catch (e) {
+    return { ok: false, error: e?.message || "alerts_failed" };
+  }
+}
+
+export async function hubAlertCancel(userId, id) {
+  try {
+    const a = await import("./_mcp-alerts.js");
+    return await a.orbitxAppAlertCancel({ userId }, { id });
+  } catch (e) {
+    return { ok: false, error: e?.message || "alert_cancel_failed" };
+  }
+}
+
+// Mute = status "muted". The 5-min tick only fires alerts with status "open",
+// so muted alerts stay armed-but-silent; unmute restores "open".
+export async function hubAlertMute(userId, id, muted) {
+  try {
+    const client = await sb();
+    if (!client) return { ok: false, error: "db_unavailable" };
+    const aid = String(id || "").trim();
+    if (!aid) return { ok: false, error: "id_required" };
+    const { data } = await client.from("ox_live_events")
+      .select("id,meta").eq("kind", "app_alert").eq("agent_id", userId).limit(200);
+    const row = (data || []).find((r) => String(r.id) === aid);
+    if (!row) return { ok: false, error: "not_found" };
+    const m = { ...(row.meta || {}), status: muted ? "muted" : "open" };
+    if (muted) m.mutedAt = new Date().toISOString();
+    else delete m.mutedAt;
+    const { error } = await client.from("ox_live_events").update({ meta: m }).eq("id", row.id);
+    if (error) throw error;
+    return { ok: true, id: row.id, muted: !!muted };
+  } catch (e) {
+    return { ok: false, error: e?.message || "alert_mute_failed" };
+  }
+}
+
+function hubSearchSnippet(content, q) {
+  const text = String(content || "").replace(/\s+/g, " ").trim();
+  const i = text.toLowerCase().indexOf(String(q).toLowerCase());
+  if (i < 0) return text.slice(0, 140);
+  const s = Math.max(0, i - 60);
+  return (s > 0 ? "…" : "") + text.slice(s, s + 160) + (s + 160 < text.length ? "…" : "");
+}
+
+export async function hubSearchMessages(userId, q) {
+  const query = String(q || "").trim().slice(0, 80);
+  if (query.length < 2) return { ok: true, results: [] };
+  try {
+    const client = await sb();
+    if (!client) return { ok: false, error: "db_unavailable" };
+    const { data: threads } = await client.from("hub_threads").select("id,title").eq("user_id", userId).limit(200);
+    const tmap = new Map((threads || []).map((t) => [t.id, t.title]));
+    if (!tmap.size) return { ok: true, results: [] };
+    const { data, error } = await client.from("hub_messages")
+      .select("id,thread_id,role,content,created_at")
+      .in("thread_id", [...tmap.keys()])
+      .ilike("content", `%${query.replace(/[\\%_]/g, (c) => "\\" + c)}%`)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return {
+      ok: true,
+      results: (data || []).map((r) => ({
+        thread_id: r.thread_id,
+        thread_title: tmap.get(r.thread_id) || "Untitled",
+        role: r.role,
+        snippet: hubSearchSnippet(r.content, query),
+        created_at: r.created_at,
+      })),
+    };
+  } catch (e) {
+    return { ok: false, error: e?.message || "hub_search_failed" };
+  }
+}
+
+export async function hubListPendings(userId) {
+  try {
+    const client = await sb();
+    if (!client) return { ok: false, error: "db_unavailable" };
+    const { data, error } = await client.from("hub_pending")
+      .select("id,tool_name,args,thread_id,created_at")
+      .eq("user_id", userId).eq("status", "pending")
+      .order("created_at", { ascending: false }).limit(20);
+    if (error) throw error;
+    const now = Date.now();
+    return {
+      ok: true,
+      pendings: (data || [])
+        .filter((r) => now - new Date(r.created_at).getTime() < HUB_PENDING_TTL_MS)
+        .map((r) => ({
+          id: r.id, tool_name: r.tool_name, args_summary: hubArgsSummary(r.args),
+          thread_id: r.thread_id, created_at: r.created_at,
+        })),
+    };
+  } catch (e) {
+    return { ok: false, error: e?.message || "hub_pendings_failed" };
+  }
+}

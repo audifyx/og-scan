@@ -4398,6 +4398,71 @@ async function handleMcp(req, res, parts) {
     }
   }
 
+  // ── Hub dashboard helpers: stats bar, alert manager, message search, away digest ──
+  if (route === "hub/stats" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await hub.hubStats(authUser.userId));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_stats_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/alerts" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await hub.hubListAlerts(authUser.userId));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_alerts_failed" }, 500);
+    }
+  }
+
+  if (route.startsWith("hub/alerts/") && (req.method === "DELETE" || req.method === "POST")) {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    const rest = route.slice("hub/alerts/".length).split("/");
+    const alertId = decodeURIComponent(rest[0] || "");
+    const action = rest[1] || "";
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      if (req.method === "DELETE") return json(res, await hub.hubAlertCancel(authUser.userId, alertId));
+      if (action === "mute") {
+        const body = await readBody(req).catch(() => ({}));
+        return json(res, await hub.hubAlertMute(authUser.userId, alertId, body && body.muted !== false));
+      }
+      return json(res, { error: "unknown_action" }, 400);
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_alert_action_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/search" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const u = new URL(req.url || "/", "http://x");
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await hub.hubSearchMessages(authUser.userId, u.searchParams.get("q") || ""));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_search_failed" }, 500);
+    }
+  }
+
+  if (route === "hub/pending" && req.method === "GET") {
+    const authUser = await agentplusAuth(req);
+    if (!authUser) return json(res, { error: "unauthorized" }, 401);
+    try {
+      const hub = await import("./orbitx/_handlers/_mcp-agentplus.js");
+      return json(res, await hub.hubListPendings(authUser.userId));
+    } catch (e) {
+      return json(res, { error: e?.message || "hub_pendings_failed" }, 500);
+    }
+  }
+
 
   if (
     (route === ".well-known/oauth-protected-resource" || route === "oauth-protected-resource") &&
