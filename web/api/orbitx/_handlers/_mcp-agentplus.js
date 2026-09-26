@@ -3987,6 +3987,11 @@ async function hubLoadThread(client, userId, threadId) {
 }
 
 // Core agentic loop shared by hubChat and hubConfirm.
+// Human-friendly tool label for live status lines: orbitx_crypto_scan_solana → "crypto scan".
+function hubPrettyTool(name) {
+  return String(name || "").replace(/^orbitx_/, "").replace(/_/g, " ").trim() || "tool";
+}
+
 // events (all optional): onStatus(text), onToken(text), onTokenReset(),
 // onThought(text), onToolCall({name, args_summary}), onToolResult({name, ok, ms})
 async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIters = HUB_MAX_ITERS, mode = "analyst", lang = "en", events = null }) {
@@ -4008,11 +4013,12 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
   let lastReply = "";
   let model = llmCfg().model;
   let degraded = false;
-  try { ev.onStatus && ev.onStatus("Thinking…"); } catch { /* ignore */ }
 
   for (let iter = 0; iter < maxIters && Date.now() < deadline; iter++) {
     const remaining = Math.min(HUB_LLM_TIMEOUT_MS, deadline - Date.now());
     if (remaining < 8000) break;
+    // Say what this phase actually is: deciding on iter 0, synthesizing after tools.
+    try { ev.onStatus && ev.onStatus(iter === 0 ? "Thinking…" : "Writing the reply…"); } catch { /* ignore */ }
     // Stream the reply + thought fields live when the caller wants tokens.
     const replyStreamer = hubJsonFieldStreamer("reply");
     const thoughtStreamer = hubJsonFieldStreamer("thought");
@@ -4053,7 +4059,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
     const gi = gatedFlags.findIndex(Boolean);
     const runNow = gi === -1 ? tcs : tcs.slice(0, gi);
     if (runNow.length) {
-      try { ev.onStatus && ev.onStatus(runNow.length === 1 ? `Running ${runNow[0].name}…` : `Running ${runNow.length} tools…`); } catch { /* ignore */ }
+      try { ev.onStatus && ev.onStatus(runNow.length === 1 ? `Running ${hubPrettyTool(runNow[0].name)}…` : `Running ${runNow.length} tools…`); } catch { /* ignore */ }
     }
     const outs = await Promise.all(runNow.map(async (tc) => {
       const t0 = Date.now();
