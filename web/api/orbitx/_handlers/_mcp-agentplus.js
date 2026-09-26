@@ -3622,11 +3622,38 @@ function hubNormalize(parsed) {
   return { reply, tool_calls: toolCalls };
 }
 
+// Last-resort reply salvage for dark-model spells: when the model returns
+// non-empty text that isn't a parseable envelope (truncated JSON, bare prose),
+// extract something human-readable instead of failing the turn with bad_json.
+// Tool calls are forfeited — the user still gets an answer.
+function hubSalvageReply(text) {
+  const t = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  if (!t) return null;
+  // 1) Tolerant "reply" field extraction — works even when the closing
+  //    quote/brace was truncated off the end.
+  const m = t.match(/"reply"\s*:\s*"/);
+  if (m) {
+    let buf = "", esc = false;
+    for (let i = m.index + m[0].length; i < t.length; i++) {
+      const ch = t[i];
+      if (esc) { buf += ch === "n" ? "\n" : ch === "t" ? "\t" : ch; esc = false; }
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') break;
+      else buf += ch;
+    }
+    if (buf.trim()) return buf.trim().slice(0, 4000);
+  }
+  // 2) Plain prose (not JSON-looking) — return as-is.
+  if (!/^[{[]/.test(t)) return t.slice(0, 4000);
+  return null;
+}
+
 async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIMEOUT_MS } = {}) {
   const cfg = llmCfg();
   if (!cfg.apiKey) return { ok: false, error: "llm_unavailable", message: "No LLM key configured." };
   const started = Date.now();
   let lastErr = null;
+  let lastText = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const remaining = attempt === 0 ? timeoutMs : Math.max(10000, timeoutMs - (Date.now() - started));
     // Hotter retry: low temp deterministically re-emits the same broken envelope (bad_json loop).
@@ -3658,12 +3685,19 @@ async function hubLlmCall(messages, { temperature = 0.4, timeoutMs = HUB_LLM_TIM
     let parsed;
     try { parsed = JSON.parse(raw); } catch { parsed = {}; }
     const text = parsed?.choices?.[0]?.message?.content || "";
+    if (text && text.length > lastText.length) lastText = text.slice(0, 4000);
     const norm = hubNormalize(parseThinkJson(text));
     if (norm) return { ok: true, ...norm, model: cfg.model, usage: parsed?.usage || {} };
     lastErr = { ok: false, error: "bad_json", message: trunc(text, 300) };
     if (attempt === 0) continue; // one hotter retry on bad_json
+    // Both attempts failed to parse — salvage a human-readable reply rather
+    // than failing the turn. Tool calls are forfeited in this path.
+    const salvaged = hubSalvageReply(lastText);
+    if (salvaged) return { ok: true, reply: salvaged, tool_calls: [], degraded: true, model: cfg.model, usage: parsed?.usage || {} };
     return lastErr;
   }
+  const salvaged = hubSalvageReply(lastText);
+  if (salvaged) return { ok: true, reply: salvaged, tool_calls: [], degraded: true, model: cfg.model, usage: {} };
   return lastErr || { ok: false, error: "llm_unreachable" };
 }
 
@@ -3715,6 +3749,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
   let pendings = [];
   let finalReply = "";
   let model = llmCfg().model;
+  let degraded = false;
 
   for (let iter = 0; iter < maxIters && Date.now() < deadline; iter++) {
     const remaining = Math.min(HUB_LLM_TIMEOUT_MS, deadline - Date.now());
@@ -3725,6 +3760,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
       return { ok: false, error: llm.error, message: llm.message, reply: `I hit a problem reaching the model (${llm.error}). Please try again in a moment.`, tool_calls: executed, pending: [], model };
     }
     model = llm.model || model;
+    if (llm.degraded) degraded = true;
     messages.push({ role: "assistant", content: JSON.stringify({ reply: llm.reply, tool_calls: llm.tool_calls }) });
     if (!llm.tool_calls.length) {
       finalReply = llm.reply;
@@ -3791,7 +3827,7 @@ async function hubRunLoop({ client, userId, threadId, seedMessages, req, maxIter
     }
     if (iter === maxIters - 1) finalReply = llm.reply || "";
   }
-  return { ok: true, reply: finalReply, tool_calls: executed, pending: pendings, model };
+  return { ok: true, reply: finalReply, tool_calls: executed, pending: pendings, model, degraded };
 }
 
 // Trade history export: strategy fills from ox_live_events (limit, copy,
