@@ -3707,16 +3707,29 @@ PLAYBOOKS — real working flows through real tools:
 }
 
 // Accept the hub envelope shapes: {reply, tool_calls[]}, {reply, tool_call{}},
+function hubCoerceArgs(a) {
+  // Models sometimes emit arguments as a JSON string instead of an object —
+  // parse it so the call doesn't silently run with {}.
+  if (a && typeof a === "object" && !Array.isArray(a)) return a;
+  if (typeof a === "string" && a.trim()) {
+    try {
+      const p = JSON.parse(a.trim());
+      if (p && typeof p === "object" && !Array.isArray(p)) return p;
+    } catch { /* fall through to {} */ }
+  }
+  return {};
+}
 function hubNormalize(parsed) {
   if (!parsed || typeof parsed !== "object") return null;
   const reply = typeof parsed.reply === "string" ? parsed.reply : "";
   let calls = [];
   if (Array.isArray(parsed.tool_calls)) calls = parsed.tool_calls;
+  else if (parsed.tool_calls && typeof parsed.tool_calls === "object") calls = [parsed.tool_calls]; // single object, not an array
   else if (parsed.tool_call && typeof parsed.tool_call === "object") calls = [parsed.tool_call];
   else if (Array.isArray(parsed.actions)) calls = parsed.actions; // tolerate agent-style
   const toolCalls = calls
-    .filter((c) => c && typeof c === "object" && typeof c.name === "string" && c.name)
-    .map((c) => ({ name: String(c.name).trim(), arguments: c.arguments && typeof c.arguments === "object" ? c.arguments : {} }))
+    .filter((c) => c && typeof c === "object" && typeof c.name === "string" && String(c.name).trim())
+    .map((c) => ({ name: String(c.name).trim(), arguments: hubCoerceArgs(c.arguments) }))
     .slice(0, 5);
   const thought = typeof parsed.thought === "string" ? parsed.thought.slice(0, 300) : "";
   if (!reply && toolCalls.length === 0) return null;
