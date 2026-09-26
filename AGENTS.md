@@ -74,3 +74,9 @@ Smoke: `bash scripts/qa/run-smoke.sh`
 - Bug backlog: `docs/audit/BUG_BACKLOG.md`
 - 30/60/90 roadmap: `docs/audit/ROADMAP_30_60_90.md`
 <!-- ORBITX PLATFORM + QA SWARM END -->
+
+## Hard-won git + hub lessons (2026-09-25)
+
+- `git fetch origin main` BEFORE `git reset --hard origin/main` — the local origin/main ref goes stale (missed 5 commits once); resetting to a stale ref wipes uncommitted work. Never reset with uncommitted changes on disk: commit/stash first.
+- `node --check` PASSES on template-literal-breaking backticks inside `hubSystemPrompt` (e.g. a raw backtick pair around `<mint>` makes `<mint>` parse as a JS identifier) — it throws `ReferenceError` at runtime on EVERY hub turn instead. Always eval `hubSystemPrompt` directly after editing it.
+- Hub chat turns: Nvidia dark spells are the #1 latency killer. Design turns to degrade gracefully — deterministic server-side fallbacks (bare-CA dossier), one hotter bad_json retry (same single model, no fallback chain), 30s LLM timeout, streaming SSE so the user sees words immediately.
