@@ -1,7 +1,7 @@
 /**
  * Public MCP group-chat list + transcript for /gc/:slug.
  */
-import { getGroupChat, historyGroupChat, listGroupChats } from "./orbitx/_handlers/_mcp-group-chat.js";
+import { getGroupChat, historyGroupChat, listGroupChats, safeAuthorLabel } from "./orbitx/_handlers/_mcp-group-chat.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -59,7 +59,12 @@ export default async function handler(req, res) {
     const chat = await getGroupChat(sb, { slug, name: slug });
     if (!chat.ok) return json(res, chat, 404);
     const hist = await historyGroupChat(sb, { slug, limit: 50 });
-    return json(res, { ...chat, messages: hist.messages || [], message: hist.message });
+    // Defensive: never serve an email address as an author label.
+    const messages = (hist.messages || []).map((m) => ({
+      ...m,
+      author_label: safeAuthorLabel(m.author_label),
+    }));
+    return json(res, { ...chat, messages, message: hist.message });
   } catch (e) {
     return json(res, { ok: false, error: "gc_failed", message: e?.message || String(e) }, 500);
   }

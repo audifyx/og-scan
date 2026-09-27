@@ -34,6 +34,24 @@ function asUuid(id) {
   return UUID_RE.test(v) ? v : null;
 }
 
+// Never surface an email address (or the auto-generated "Default" agent
+// placeholder) as a chat author — usernames / non-identifying fallbacks only.
+const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const PLACEHOLDER_LABELS = new Set(["default", "guest", "anon", "anonymous", "user"]);
+
+function cleanName(v) {
+  const s = String(v || "").trim().slice(0, 40);
+  if (!s) return "";
+  if (EMAIL_RE.test(s)) return "";
+  if (PLACEHOLDER_LABELS.has(s.toLowerCase())) return "";
+  return s;
+}
+
+/** Last-resort sanitizer for any author label about to be displayed. */
+export function safeAuthorLabel(v) {
+  return cleanName(v) || "anon";
+}
+
 export function slugifyGcName(name) {
   return (
     String(name || "")
@@ -72,11 +90,36 @@ export function gcSessionKey(auth = {}) {
 }
 
 export function gcAuthorLabel(auth = {}) {
+  const a = auth || {};
   return (
-    String(auth.agentName || auth.displayName || auth.email || "").trim().slice(0, 40) ||
-    (asUuid(auth.userId) ? `user-${String(auth.userId).slice(0, 8)}` : "") ||
-    (auth.mcpSessionId ? `Guest-${String(auth.mcpSessionId).slice(-4)}` : "Guest")
+    cleanName(a.agentName) ||
+    cleanName(a.displayName) ||
+    cleanName(a.username) ||
+    (asUuid(a.userId) ? `user-${String(a.userId).slice(0, 8)}` : "") ||
+    (a.mcpSessionId ? `Guest-${String(a.mcpSessionId).slice(-4)}` : "Guest")
   );
+}
+
+/** Resolve the best display name: profiles.username first, then the sync label. Never an email. */
+async function profileDisplayName(sb, userId) {
+  const id = asUuid(userId);
+  if (!id) return "";
+  try {
+    const rows = await sb(
+      `profiles?user_id=eq.${encodeURIComponent(id)}&select=username,display_name&limit=1`,
+    );
+    const p = Array.isArray(rows) ? rows[0] : null;
+    return cleanName(p?.username) || cleanName(p?.display_name);
+  } catch {
+    return "";
+  }
+}
+
+export async function resolveGcAuthorLabel(sb, auth = {}) {
+  const a = auth || {};
+  const named = await profileDisplayName(sb, a.userId);
+  if (named) return named;
+  return gcAuthorLabel(a);
 }
 
 export function extractChatUtterance(name, args = {}) {
@@ -129,7 +172,7 @@ function publicChat(row, extra = {}) {
 }
 
 function formatTranscript(chat, messages, { focused = false, hint = "" } = {}) {
-  const lines = (messages || []).map((m) => `${m.author_label || "anon"}: ${m.body}`);
+  const lines = (messages || []).map((m) => `${safeAuthorLabel(m.author_label)}: ${m.body}`);
   const head = focused
     ? `[${chat.name} GC] You are IN this group chat. Every message you send is posted here until you say “leave GC” (tool orbitx_gc_leave).`
     : `[${chat.name} GC]`;
@@ -270,7 +313,7 @@ export async function startGroupChat(sb, { name, topic, auth } = {}) {
   const slug = slugifyGcName(title);
   const existing = await getGroupChat(sb, { slug, name: title });
   const userId = asUuid(auth?.userId);
-  const hostLabel = gcAuthorLabel(auth);
+  const hostLabel = await resolveGcAuthorLabel(sb, auth);
   const key = gcSessionKey(auth);
   if (existing.ok) {
     if (key) {
@@ -341,7 +384,7 @@ export async function joinGroupChat(sb, { slug, name, auth } = {}) {
   }
   const found = await getGroupChat(sb, { slug, name });
   if (!found.ok) return found;
-  const label = gcAuthorLabel(auth);
+  const label = await resolveGcAuthorLabel(sb, auth);
   await ensureMember(sb, {
     chatId: found.id,
     sessionKey: key,
@@ -377,7 +420,7 @@ export async function focusGroupChat(sb, { slug, name, auth } = {}) {
       chatId: chat.id,
       sessionKey: key,
       userId: asUuid(auth?.userId),
-      authorLabel: gcAuthorLabel(auth),
+      authorLabel: await resolveGcAuthorLabel(sb, auth),
     });
   } else {
     const mem = await latestMembership(sb, key);
@@ -399,7 +442,7 @@ export async function focusGroupChat(sb, { slug, name, auth } = {}) {
     }
     chat = publicChat(row);
   }
-  const label = gcAuthorLabel(auth);
+  const label = await resolveGcAuthorLabel(sb, auth);
   try {
     await upsert(sb, "mcp_group_focus", "session_key", {
       session_key: key,
@@ -445,7 +488,7 @@ export async function sendGroupChat(sb, { text, auth } = {}) {
       message: "You are not in a group chat. Join one, then say “I want to chat in the group chat”.",
     };
   }
-  const label = gcAuthorLabel(auth);
+  const label = await resolveGcAuthorLabel(sb, auth);
   try {
     await sb("mcp_group_messages", {
       method: "POST",
