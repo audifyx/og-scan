@@ -36,6 +36,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <script>
+      // OrbitX Home OS — pre-paint theme init. Reads the saved theme and sets
+      // data-os-* attributes before first paint so there is no theme flash.
+      (function () {
+        try {
+          var raw = localStorage.getItem("orbitx-os-theme");
+          var t = raw ? JSON.parse(raw) : {};
+          var root = document.documentElement;
+          root.setAttribute("data-os-device", t.device || "orbitx");
+          root.setAttribute("data-os-bg", t.bg || "default");
+          root.setAttribute("data-os-accent", t.accent || "gold");
+        } catch (e) {
+          var r = document.documentElement;
+          r.setAttribute("data-os-device", "orbitx");
+          r.setAttribute("data-os-bg", "default");
+          r.setAttribute("data-os-accent", "gold");
+        }
+      })();
+    </script>
   </head>
 
   <body>

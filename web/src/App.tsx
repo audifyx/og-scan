@@ -7,6 +7,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
+// OrbitX Home OS theme engine (aliased — the app has its own ThemeProvider).
+import { ThemeProvider as OsThemeProvider } from "@/home-os/os-theme-provider";
+import { OsBoot } from "@/home-os/os-boot";
+import { OsFx } from "@/home-os/os-fx";
+import { HomeOS } from "@/home-os/home-os";
 import { OrbitAtmosphereProvider } from "@/hooks/useOrbitAtmosphere";
 import { OrbitAtmosphereLayer } from "@/components/theme/OrbitAtmosphereLayer";
 import { PlatformDock } from "@/components/theme/PlatformDock";
@@ -288,6 +293,7 @@ const App = () => (
   <ErrorBoundary>
   <MaintenanceLock>
   <QueryClientProvider client={queryClient}>
+    <OsThemeProvider>
     <AuthProvider>
       <SolanaWalletProvider>
       <EvmWalletProvider>
@@ -311,7 +317,7 @@ const App = () => (
           <UsernameClaimGate />
           <Routes>
             {/* ── Public routes (no auth required) ── */}
-            <Route path="/" element={<Splash />} />
+            <Route path="/" element={<HomeOS />} />
             <Route path="/beta" element={<BetaHome />} />
             <Route path="/splash" element={<Splash />} />
             <Route path="/waitlist" element={<OgdexRedirect to="/auth?mode=signup" />} />
@@ -733,12 +739,15 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        <OsBoot />
+        <OsFx />
       </TooltipProvider>
       </OrbitAtmosphereProvider>
       </ThemeProvider>
       </EvmWalletProvider>
       </SolanaWalletProvider>
     </AuthProvider>
+    </OsThemeProvider>
   </QueryClientProvider>
   </MaintenanceLock>
   </ErrorBoundary>

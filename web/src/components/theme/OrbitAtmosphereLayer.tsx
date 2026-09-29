@@ -43,7 +43,7 @@ export function OrbitAtmosphereLayer() {
   return (
     <>
       {show && (
-        <div className="ox-atmosphere" aria-hidden>
+        <div className="ox-atmosphere os-bg-layer" aria-hidden>
           <BackgroundFX mode={mode} wallpaper={wallpaper} />
           <div className="ox-atmosphere__veil" />
         </div>

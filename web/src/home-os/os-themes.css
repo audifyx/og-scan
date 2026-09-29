@@ -1,0 +1,824 @@
+/* ==========================================================================
+   OrbitX Home OS — theme engine (Vite port)
+   Keyed off data-os-device / data-os-bg / data-os-accent on <html>.
+   Every rule here is additive: the default (orbitx) look needs no overrides.
+
+   Vite mappings appended at the end:
+   - .pad-panel base + .font-display (this app has .glass-card, not .pad-panel)
+   - .glass-tab device rules mirrored onto .glass-bottom-nav (this app's dock)
+   - [data-slot="button"] device rules mirrored onto .glass-btn
+   ========================================================================== */
+
+/* Font fallbacks — Next.js font vars don't exist in the Vite app. */
+:root {
+  --font-pixel: "Courier New", ui-monospace, monospace;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ------------------------- device variable sets ------------------------ */
+
+[data-os-device="xbox360"] {
+  --background: #0c120c;
+  --foreground: #eef4e6;
+  --card: #162013;
+  --card-foreground: #eef4e6;
+  --popover: #162013;
+  --popover-foreground: #eef4e6;
+  --primary: #7ac142;
+  --primary-foreground: #0a1206;
+  --secondary: #1b2618;
+  --secondary-foreground: #eef4e6;
+  --muted: #141b12;
+  --muted-foreground: #9db38f;
+  --accent: #a4d65e;
+  --accent-foreground: #0a1206;
+  --destructive: #ff5a5a;
+  --border: rgb(122 193 66 / 22%);
+  --input: rgb(255 255 255 / 10%);
+  --ring: #7ac142;
+  --radius: 0.45rem;
+  --color-gold: #a4d65e;
+}
+
+[data-os-device="ps4"] {
+  --background: #0a1428;
+  --foreground: #e8eefc;
+  --card: #0f1c34;
+  --card-foreground: #e8eefc;
+  --popover: #0f1c34;
+  --popover-foreground: #e8eefc;
+  --primary: #2d7ff9;
+  --primary-foreground: #04122e;
+  --secondary: #13233f;
+  --secondary-foreground: #e8eefc;
+  --muted: #0d1830;
+  --muted-foreground: #8fa3c8;
+  --accent: #5aa2ff;
+  --accent-foreground: #04122e;
+  --border: rgb(45 127 249 / 22%);
+  --ring: #2d7ff9;
+  --radius: 0.6rem;
+  --color-gold: #5aa2ff;
+}
+
+[data-os-device="wii"] {
+  --background: #eef3f7;
+  --foreground: #1c2b3a;
+  --card: #ffffff;
+  --card-foreground: #1c2b3a;
+  --popover: #ffffff;
+  --popover-foreground: #1c2b3a;
+  --primary: #2aa9e0;
+  --primary-foreground: #ffffff;
+  --secondary: #e2ecf3;
+  --secondary-foreground: #1c2b3a;
+  --muted: #e8eef4;
+  --muted-foreground: #5d7285;
+  --accent: #2aa9e0;
+  --accent-foreground: #ffffff;
+  --destructive: #e0445e;
+  --border: rgb(42 169 224 / 28%);
+  --input: rgb(28 43 58 / 10%);
+  --ring: #2aa9e0;
+  --radius: 1.4rem;
+  --color-gold: #2aa9e0;
+  --color-parchment: #1c2b3a;
+}
+
+[data-os-device="tds"] {
+  --background: #1a1d29;
+  --foreground: #f2ecff;
+  --card: #222839;
+  --card-foreground: #f2ecff;
+  --popover: #222839;
+  --popover-foreground: #f2ecff;
+  --primary: #ff7a59;
+  --primary-foreground: #2b0f08;
+  --secondary: #262c42;
+  --secondary-foreground: #f2ecff;
+  --muted: #1f2436;
+  --muted-foreground: #9aa3c0;
+  --accent: #ffd166;
+  --accent-foreground: #2b1d05;
+  --border: rgb(255 122 89 / 25%);
+  --ring: #ff7a59;
+  --radius: 1rem;
+  --color-gold: #ffd166;
+}
+
+[data-os-device="gameboy"] {
+  --background: #0f380f;
+  --foreground: #9bbc0f;
+  --card: #0f380f;
+  --card-foreground: #9bbc0f;
+  --popover: #0f380f;
+  --popover-foreground: #9bbc0f;
+  --primary: #9bbc0f;
+  --primary-foreground: #0f380f;
+  --secondary: #1a4a1a;
+  --secondary-foreground: #9bbc0f;
+  --muted: #14301a;
+  --muted-foreground: #6d8f2f;
+  --accent: #9bbc0f;
+  --accent-foreground: #0f380f;
+  --destructive: #9bbc0f;
+  --border: #306230;
+  --input: #1a4a1a;
+  --ring: #9bbc0f;
+  --radius: 0;
+  --color-gold: #9bbc0f;
+  --color-parchment: #9bbc0f;
+  --color-buy: #9bbc0f;
+  --color-sell: #9bbc0f;
+  --color-teal: #9bbc0f;
+  --font-display: var(--font-pixel);
+}
+
+[data-os-device="winpc"] {
+  --background: #0d1626;
+  --foreground: #e8eef4;
+  --card: #13202f;
+  --card-foreground: #e8eef4;
+  --popover: #13202f;
+  --popover-foreground: #e8eef4;
+  --primary: #3b9eff;
+  --primary-foreground: #04182e;
+  --secondary: #18293d;
+  --secondary-foreground: #e8eef4;
+  --muted: #101b2b;
+  --muted-foreground: #8ba0b8;
+  --accent: #3b9eff;
+  --accent-foreground: #04182e;
+  --border: rgb(59 158 255 / 22%);
+  --ring: #3b9eff;
+  --radius: 0.35rem;
+  --color-gold: #3b9eff;
+}
+
+[data-os-device="ios"] {
+  --background: #000000;
+  --foreground: #f2f2f7;
+  --card: #141419;
+  --card-foreground: #f2f2f7;
+  --popover: #1c1c22;
+  --popover-foreground: #f2f2f7;
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: #1c1c22;
+  --secondary-foreground: #f2f2f7;
+  --muted: #101014;
+  --muted-foreground: #9898a3;
+  --accent: #0a84ff;
+  --accent-foreground: #ffffff;
+  --border: rgb(255 255 255 / 10%);
+  --ring: #0a84ff;
+  --radius: 1.25rem;
+  --color-gold: #0a84ff;
+}
+
+[data-os-device="macos"] {
+  --background: #0b0d12;
+  --foreground: #eceef2;
+  --card: #15181f;
+  --card-foreground: #eceef2;
+  --popover: #1a1e27;
+  --popover-foreground: #eceef2;
+  --primary: #5ac8fa;
+  --primary-foreground: #06222e;
+  --secondary: #1a1e27;
+  --secondary-foreground: #eceef2;
+  --muted: #11141b;
+  --muted-foreground: #8e96a6;
+  --accent: #5ac8fa;
+  --accent-foreground: #06222e;
+  --border: rgb(255 255 255 / 10%);
+  --ring: #5ac8fa;
+  --radius: 0.8rem;
+  --color-gold: #5ac8fa;
+}
+
+[data-os-device="linux"] {
+  --background: #050505;
+  --foreground: #c8ffd8;
+  --card: #0a0f0a;
+  --card-foreground: #c8ffd8;
+  --popover: #0a0f0a;
+  --popover-foreground: #c8ffd8;
+  --primary: #33ff66;
+  --primary-foreground: #031007;
+  --secondary: #0d140d;
+  --secondary-foreground: #c8ffd8;
+  --muted: #080c08;
+  --muted-foreground: #5f8f6d;
+  --accent: #33ff66;
+  --accent-foreground: #031007;
+  --border: rgb(51 255 102 / 20%);
+  --input: rgb(51 255 102 / 8%);
+  --ring: #33ff66;
+  --radius: 0.25rem;
+  --color-gold: #33ff66;
+  --color-parchment: #c8ffd8;
+  --font-sans: var(--font-geist-mono);
+  --font-display: var(--font-geist-mono);
+}
+
+[data-os-device="cyberpunk"] {
+  --background: #0d0221;
+  --foreground: #ffe9f4;
+  --card: #150832;
+  --card-foreground: #ffe9f4;
+  --popover: #150832;
+  --popover-foreground: #ffe9f4;
+  --primary: #ff2a6d;
+  --primary-foreground: #2b0413;
+  --secondary: #1d0b40;
+  --secondary-foreground: #ffe9f4;
+  --muted: #12042b;
+  --muted-foreground: #a48fc9;
+  --accent: #05d9e8;
+  --accent-foreground: #03252a;
+  --destructive: #ff2a6d;
+  --border: rgb(255 42 109 / 28%);
+  --ring: #ff2a6d;
+  --radius: 0.25rem;
+  --color-gold: #ff2a6d;
+  --color-teal: #05d9e8;
+}
+
+[data-os-device="midnight"] {
+  --background: #000000;
+  --foreground: #f2f4f6;
+  --card: #08090b;
+  --card-foreground: #f2f4f6;
+  --popover: #08090b;
+  --popover-foreground: #f2f4f6;
+  --primary: #d6ff3d;
+  --primary-foreground: #081000;
+  --secondary: #0c0d10;
+  --secondary-foreground: #f2f4f6;
+  --muted: #060708;
+  --muted-foreground: #7d8590;
+  --accent: #d6ff3d;
+  --accent-foreground: #081000;
+  --border: rgb(255 255 255 / 9%);
+  --ring: #d6ff3d;
+  --radius: 0.9rem;
+}
+
+[data-os-device="arcade"] {
+  --background: #12041f;
+  --foreground: #f6ecff;
+  --card: #1c0a30;
+  --card-foreground: #f6ecff;
+  --popover: #1c0a30;
+  --popover-foreground: #f6ecff;
+  --primary: #ffe74c;
+  --primary-foreground: #2b2004;
+  --secondary: #241040;
+  --secondary-foreground: #f6ecff;
+  --muted: #170826;
+  --muted-foreground: #a78fd0;
+  --accent: #ff5da2;
+  --accent-foreground: #2b0413;
+  --border: rgb(255 231 76 / 22%);
+  --ring: #ffe74c;
+  --radius: 0.5rem;
+  --color-gold: #ffe74c;
+  --font-display: var(--font-pixel);
+}
+
+/* ------------------------------- chrome -------------------------------- */
+/* Shared surfaces re-skinned per device. These hit every route. */
+
+/* Xbox 360 — glossy blades */
+[data-os-device="xbox360"] .glass-nav {
+  background: linear-gradient(180deg, rgb(60 90 40 / 92%), rgb(20 30 16 / 94%));
+  border-bottom: 2px solid rgb(122 193 66 / 55%);
+  box-shadow: 0 2px 18px rgb(122 193 66 / 25%);
+}
+[data-os-device="xbox360"] .pad-panel,
+[data-os-device="xbox360"] .glass {
+  background: linear-gradient(180deg, rgb(38 54 30 / 88%), rgb(18 26 15 / 90%));
+  border: 1px solid rgb(122 193 66 / 30%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%), 0 8px 28px rgb(0 0 0 / 45%);
+}
+[data-os-device="xbox360"] [data-slot="button"] {
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, #8fd44f, #5da02c);
+  color: #0a1206;
+  font-weight: 700;
+  border: 1px solid rgb(255 255 255 / 25%);
+}
+
+/* PS4 — floating strip + wave calm */
+[data-os-device="ps4"] .glass-tab {
+  background: rgb(10 20 40 / 82%);
+  backdrop-filter: blur(30px) saturate(1.4);
+  border: 1px solid rgb(45 127 249 / 30%);
+  border-radius: 1.25rem;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(0.9rem + env(safe-area-inset-bottom));
+  box-shadow: 0 12px 44px rgb(45 127 249 / 22%);
+}
+[data-os-device="ps4"] .glass-nav {
+  background: linear-gradient(180deg, rgb(8 16 34 / 90%), rgb(8 16 34 / 55%));
+  border-bottom: 1px solid rgb(45 127 249 / 25%);
+}
+[data-os-device="ps4"] .pad-panel {
+  border: 1px solid rgb(45 127 249 / 22%);
+  box-shadow: 0 0 44px rgb(45 127 249 / 8%), inset 0 1px 0 rgb(255 255 255 / 6%);
+}
+
+/* Wii — bubbly channels */
+[data-os-device="wii"] .pad-panel,
+[data-os-device="wii"] .glass,
+[data-os-device="wii"] [data-slot="card"] {
+  border-radius: 1.6rem;
+  background: #ffffff;
+  border: 2px solid rgb(42 169 224 / 35%);
+  box-shadow: 0 10px 26px rgb(42 169 224 / 14%), inset 0 2px 0 #ffffff;
+  color: #1c2b3a;
+}
+[data-os-device="wii"] .glass-nav {
+  background: rgb(255 255 255 / 92%);
+  border-bottom: 2px solid rgb(42 169 224 / 30%);
+}
+[data-os-device="wii"] .glass-tab {
+  background: rgb(255 255 255 / 94%);
+  border-top: 2px solid rgb(42 169 224 / 30%);
+}
+[data-os-device="wii"] [data-slot="button"] {
+  border-radius: 999px;
+  box-shadow: 0 4px 0 rgb(42 169 224 / 35%);
+}
+[data-os-device="wii"] .text-white { color: #1c2b3a !important; }
+[data-os-device="wii"] .text-white\/55,
+[data-os-device="wii"] .text-white\/70,
+[data-os-device="wii"] .text-white\/35 { color: rgb(28 43 58 / 0.62) !important; }
+
+/* 3DS — dual-pane gloss */
+[data-os-device="tds"] .pad-panel {
+  border: 2px solid rgb(255 122 89 / 30%);
+  border-radius: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+[data-os-device="tds"] .pad-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 34%;
+  background: linear-gradient(180deg, rgb(255 255 255 / 9%), transparent);
+  pointer-events: none;
+}
+[data-os-device="tds"] .glass-nav {
+  background: linear-gradient(180deg, #2b2136, #1a1d29);
+  border-bottom: 2px solid rgb(255 122 89 / 40%);
+}
+[data-os-device="tds"] [data-slot="button"] { border-radius: 0.9rem; }
+
+/* Game Boy — chunky pixel */
+[data-os-device="gameboy"] .pad-panel,
+[data-os-device="gameboy"] .glass,
+[data-os-device="gameboy"] [data-slot="card"] {
+  border: 4px solid #306230;
+  border-radius: 0;
+  background: #0f380f;
+  box-shadow: 6px 6px 0 #071f07;
+}
+[data-os-device="gameboy"] .glass-nav,
+[data-os-device="gameboy"] .glass-tab {
+  background: #0f380f;
+  border-color: #306230;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+[data-os-device="gameboy"] [data-slot="button"] {
+  border: 4px solid #9bbc0f;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 #071f07;
+  text-transform: uppercase;
+}
+[data-os-device="gameboy"] img { image-rendering: pixelated; }
+[data-os-device="gameboy"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgb(0 0 0 / 14%) 0 2px, transparent 2px 4px);
+}
+
+/* Windows PC — taskbar + windowed panels */
+[data-os-device="winpc"] .glass-tab {
+  background: rgb(16 28 46 / 97%);
+  border-top: 2px solid rgb(59 158 255 / 45%);
+  border-radius: 0;
+  backdrop-filter: none;
+}
+[data-os-device="winpc"] .pad-panel {
+  border: 1px solid rgb(59 158 255 / 30%);
+  border-radius: 0.35rem;
+  position: relative;
+  padding-top: 2.4rem !important;
+  overflow: hidden;
+}
+[data-os-device="winpc"] .pad-panel::before {
+  content: "◉ ◉ ◉";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+  color: rgb(59 158 255 / 80%);
+  background: linear-gradient(180deg, rgb(59 158 255 / 16%), rgb(59 158 255 / 5%));
+  border-bottom: 1px solid rgb(59 158 255 / 25%);
+}
+[data-os-device="winpc"] .glass-nav {
+  background: rgb(13 22 38 / 96%);
+  border-bottom: 2px solid rgb(59 158 255 / 40%);
+}
+
+/* iOS — frosted dock */
+[data-os-device="ios"] .glass-tab {
+  background: rgb(20 20 26 / 62%);
+  backdrop-filter: blur(34px) saturate(1.8);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 1.75rem;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: calc(0.9rem + env(safe-area-inset-bottom));
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+}
+[data-os-device="ios"] .glass-nav {
+  background: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(28px) saturate(1.8);
+}
+[data-os-device="ios"] .pad-panel,
+[data-os-device="ios"] [data-slot="card"] {
+  border-radius: 1.5rem;
+  background: rgb(22 22 30 / 78%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgb(255 255 255 / 10%);
+}
+
+/* macOS — traffic lights + menu bar */
+[data-os-device="macos"] .pad-panel {
+  position: relative;
+  padding-top: 2.5rem !important;
+  overflow: hidden;
+}
+[data-os-device="macos"] .pad-panel::before {
+  content: "";
+  position: absolute;
+  top: 0.85rem; left: 1rem;
+  width: 3.2rem; height: 0.8rem;
+  background:
+    radial-gradient(circle 0.4rem at 0.4rem 50%, #ff5f57 98%, transparent),
+    radial-gradient(circle 0.4rem at 1.6rem 50%, #febc2e 98%, transparent),
+    radial-gradient(circle 0.4rem at 2.8rem 50%, #28c840 98%, transparent);
+  background-repeat: no-repeat;
+}
+[data-os-device="macos"] .glass-nav {
+  background: rgb(11 13 18 / 72%);
+  backdrop-filter: blur(26px) saturate(1.6);
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+[data-os-device="macos"] .glass-tab {
+  background: rgb(18 20 27 / 68%);
+  backdrop-filter: blur(30px) saturate(1.7);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1.25rem;
+  left: 1rem; right: 1rem;
+  bottom: calc(0.8rem + env(safe-area-inset-bottom));
+}
+
+/* Linux — terminal soul */
+[data-os-device="linux"] body {
+  font-family: var(--font-geist-mono), monospace;
+}
+[data-os-device="linux"] .pad-panel {
+  border: 1px solid rgb(51 255 102 / 30%);
+  border-radius: 0.25rem;
+  background: rgb(6 10 6 / 88%);
+  box-shadow: 0 0 26px rgb(51 255 102 / 7%);
+}
+[data-os-device="linux"] .glass-nav { border-bottom: 1px solid rgb(51 255 102 / 30%); }
+[data-os-device="linux"] [data-slot="button"] {
+  border: 1px solid rgb(51 255 102 / 55%);
+  border-radius: 0.25rem;
+  text-transform: lowercase;
+}
+[data-os-device="linux"] [data-slot="button"]::before { content: "$ "; opacity: 0.7; }
+
+/* Cyberpunk — neon angular */
+[data-os-device="cyberpunk"] .pad-panel,
+[data-os-device="cyberpunk"] .glass {
+  border: 1px solid rgb(255 42 109 / 40%);
+  border-radius: 0.25rem;
+  box-shadow: 0 0 32px rgb(255 42 109 / 14%), inset 0 0 24px rgb(255 42 109 / 5%);
+  background: linear-gradient(180deg, rgb(24 10 52 / 88%), rgb(15 5 34 / 92%));
+}
+[data-os-device="cyberpunk"] [data-slot="button"] {
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+[data-os-device="cyberpunk"] .font-display { text-shadow: 0 0 22px rgb(255 42 109 / 55%); }
+
+/* Midnight OLED — restraint */
+[data-os-device="midnight"] .pad-panel,
+[data-os-device="midnight"] .glass,
+[data-os-device="midnight"] [data-slot="card"] {
+  background: #050607;
+  border: 1px solid rgb(255 255 255 / 8%);
+  box-shadow: none;
+}
+[data-os-device="midnight"] .glass-nav,
+[data-os-device="midnight"] .glass-tab { background: rgb(0 0 0 / 88%); }
+
+/* Arcade — cabinet glow */
+[data-os-device="arcade"] .pad-panel {
+  border: 2px solid rgb(255 231 76 / 35%);
+  box-shadow: 0 0 34px rgb(255 93 162 / 16%), inset 0 0 30px rgb(255 231 76 / 4%);
+  background: linear-gradient(180deg, rgb(30 12 50 / 90%), rgb(18 6 32 / 94%));
+}
+[data-os-device="arcade"] .font-display {
+  text-shadow: 0 0 18px rgb(255 231 76 / 60%), 3px 3px 0 rgb(255 93 162 / 70%);
+}
+[data-os-device="arcade"] [data-slot="button"] {
+  border: 2px solid #ffe74c;
+  box-shadow: 0 0 18px rgb(255 231 76 / 35%);
+  text-transform: uppercase;
+}
+
+/* ------------------------- background themes --------------------------- */
+/* .os-bg-layer is the PadBackground root (class added in pad-background). */
+
+.os-bg-layer { transition: background-color 400ms ease; }
+
+[data-os-bg="starfield"] .os-bg-layer::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, #fff 100%, transparent 100%),
+    radial-gradient(1px 1px at 68% 8%, #fff 100%, transparent 100%),
+    radial-gradient(2px 2px at 84% 64%, #fff 100%, transparent 100%),
+    radial-gradient(1px 1px at 34% 78%, #fff 100%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 52% 42%, #fff 100%, transparent 100%),
+    radial-gradient(1px 1px at 8% 58%, #fff 100%, transparent 100%),
+    radial-gradient(2px 2px at 92% 30%, #cfe4ff 100%, transparent 100%),
+    radial-gradient(1px 1px at 44% 12%, #fff 100%, transparent 100%);
+  background-size: 480px 480px, 620px 620px, 380px 380px, 540px 540px, 420px 420px, 700px 700px, 460px 460px, 580px 580px;
+  animation: os-star-drift 90s linear infinite;
+  opacity: 0.85;
+}
+@keyframes os-star-drift {
+  from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0; }
+  to { background-position: 480px 960px, -620px 620px, 380px 760px, -540px 1080px, 420px 840px, -700px 700px, 460px 920px, -580px 1160px; }
+}
+
+[data-os-bg="grid"] .os-bg-layer::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--ring) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ring) 1px, transparent 1px);
+  background-size: 56px 56px;
+  opacity: 0.10;
+  mask-image: linear-gradient(180deg, transparent, black 30%, black 75%, transparent);
+  transform: perspective(700px) rotateX(24deg) scale(1.6);
+  transform-origin: 50% 100%;
+}
+
+[data-os-bg="waves"] .os-bg-layer::after {
+  content: "";
+  position: absolute; inset: -20%;
+  background:
+    radial-gradient(60% 45% at 20% 30%, rgb(45 127 249 / 22%), transparent 70%),
+    radial-gradient(55% 40% at 80% 65%, rgb(5 217 232 / 14%), transparent 70%),
+    radial-gradient(45% 38% at 55% 85%, rgb(255 42 109 / 12%), transparent 70%);
+  animation: os-waves 16s ease-in-out infinite alternate;
+  filter: blur(30px);
+}
+@keyframes os-waves {
+  from { transform: translate3d(-4%, -2%, 0) rotate(-2deg); }
+  to { transform: translate3d(4%, 3%, 0) rotate(2deg); }
+}
+
+[data-os-bg="aurora"] .os-bg-layer::after {
+  content: "";
+  position: absolute; inset: -20%;
+  background:
+    conic-gradient(from 120deg at 30% 20%, rgb(61 255 208 / 16%), transparent 32%, rgb(139 92 246 / 14%) 55%, transparent 78%, rgb(61 255 208 / 12%)),
+    radial-gradient(50% 35% at 70% 80%, rgb(90 200 250 / 12%), transparent 70%);
+  animation: os-aurora 22s ease-in-out infinite alternate;
+  filter: blur(36px);
+}
+@keyframes os-aurora {
+  from { transform: translate3d(0, -3%, 0) scale(1.02); }
+  to { transform: translate3d(0, 3%, 0) scale(1.08); }
+}
+
+[data-os-bg="none"] .os-bg-layer > * { display: none; }
+[data-os-bg="none"] .os-bg-layer { background: var(--background); }
+
+/* ------------------------------ accents -------------------------------- */
+/* Accents re-tint the brand color everywhere (they compose over devices). */
+
+[data-os-accent="teal"] {
+  --primary: #3dffd0; --primary-foreground: #03251f;
+  --accent: #3dffd0; --accent-foreground: #03251f;
+  --ring: #3dffd0; --color-gold: #3dffd0;
+}
+[data-os-accent="violet"] {
+  --primary: #8b5cf6; --primary-foreground: #f4efff;
+  --accent: #8b5cf6; --accent-foreground: #f4efff;
+  --ring: #8b5cf6; --color-gold: #a78bfa;
+}
+[data-os-accent="ember"] {
+  --primary: #ff5a1f; --primary-foreground: #2b0f04;
+  --accent: #ff5a1f; --accent-foreground: #2b0f04;
+  --ring: #ff5a1f; --color-gold: #ff7a45;
+}
+[data-os-accent="ice"] {
+  --primary: #5ac8fa; --primary-foreground: #06222e;
+  --accent: #5ac8fa; --accent-foreground: #06222e;
+  --ring: #5ac8fa; --color-gold: #7fd4fb;
+}
+[data-os-accent="rose"] {
+  --primary: #ff4b63; --primary-foreground: #2b0710;
+  --accent: #ff4b63; --accent-foreground: #2b0710;
+  --ring: #ff4b63; --color-gold: #ff7a8d;
+}
+/* gold is the default — no overrides needed */
+
+/* gameboy + arcade keep their monochrome/neon identity regardless of accent */
+[data-os-device="gameboy"][data-os-accent] {
+  --primary: #9bbc0f; --accent: #9bbc0f; --ring: #9bbc0f; --color-gold: #9bbc0f;
+}
+
+/* --------------------------- OS home tiles ----------------------------- */
+/* Icon shapes per device — the springboard feel. */
+
+.os-app-tile { border-radius: 1.1rem; transition: transform 160ms ease, box-shadow 160ms ease; }
+[data-os-device="wii"] .os-app-tile { border-radius: 28%; }
+[data-os-device="ios"] .os-app-tile { border-radius: 27%; }
+[data-os-device="gameboy"] .os-app-tile { border-radius: 0; border: 3px solid currentColor; }
+[data-os-device="winpc"] .os-app-tile { border-radius: 0.3rem; }
+[data-os-device="tds"] .os-app-tile { border-radius: 1.4rem; }
+[data-os-device="xbox360"] .os-app-tile { border-radius: 0.5rem; }
+[data-os-device="ps4"] .os-app-tile { border-radius: 0.9rem; }
+[data-os-device="linux"] .os-app-tile { border-radius: 0.2rem; }
+[data-os-device="cyberpunk"] .os-app-tile {
+  border-radius: 0.2rem;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.os-app-tile[data-dragging="true"] {
+  transform: scale(1.12);
+  z-index: 50;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 55%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-os-bg="starfield"] .os-bg-layer::after,
+  [data-os-bg="waves"] .os-bg-layer::after,
+  [data-os-bg="aurora"] .os-bg-layer::after { animation: none; }
+}
+
+/* ==========================================================================
+   Vite mappings — this app's classes don't match the Next.js chrome names.
+   ========================================================================== */
+
+/* .pad-panel: the Home OS components' panel class (this app uses .glass-card). */
+.pad-panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%),
+    rgba(13, 17, 24, 0.72);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 10px 34px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.font-display {
+  font-family: "Bricolage Grotesque", "Outfit", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* .glass-bottom-nav mirrors the .glass-tab device rules (this app's dock). */
+[data-os-device="ps4"] .glass-bottom-nav {
+  background: rgb(10 20 40 / 82%);
+  backdrop-filter: blur(30px) saturate(1.4);
+  border: 1px solid rgb(45 127 249 / 30%);
+  border-radius: 1.25rem;
+  left: 1rem; right: 1rem;
+  bottom: calc(0.9rem + env(safe-area-inset-bottom));
+  box-shadow: 0 12px 44px rgb(45 127 249 / 22%);
+}
+[data-os-device="wii"] .glass-bottom-nav {
+  background: rgb(255 255 255 / 94%);
+  border-top: 2px solid rgb(42 169 224 / 30%);
+}
+[data-os-device="gameboy"] .glass-bottom-nav {
+  background: #0f380f;
+  border-color: #306230;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+[data-os-device="winpc"] .glass-bottom-nav {
+  background: rgb(16 28 46 / 97%);
+  border-top: 2px solid rgb(59 158 255 / 45%);
+  border-radius: 0;
+  backdrop-filter: none;
+}
+[data-os-device="ios"] .glass-bottom-nav {
+  background: rgb(20 20 26 / 62%);
+  backdrop-filter: blur(34px) saturate(1.8);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 1.75rem;
+  left: 0.9rem; right: 0.9rem;
+  bottom: calc(0.9rem + env(safe-area-inset-bottom));
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+}
+[data-os-device="macos"] .glass-bottom-nav {
+  background: rgb(18 20 27 / 68%);
+  backdrop-filter: blur(30px) saturate(1.7);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1.25rem;
+  left: 1rem; right: 1rem;
+  bottom: calc(0.8rem + env(safe-area-inset-bottom));
+}
+[data-os-device="midnight"] .glass-bottom-nav { background: rgb(0 0 0 / 88%); }
+
+/* .glass-btn mirrors the [data-slot="button"] device rules. */
+[data-os-device="xbox360"] .glass-btn {
+  border-radius: 0.4rem;
+  background: linear-gradient(180deg, #8fd44f, #5da02c);
+  color: #0a1206;
+  font-weight: 700;
+  border: 1px solid rgb(255 255 255 / 25%);
+}
+[data-os-device="wii"] .glass-btn {
+  border-radius: 999px;
+  box-shadow: 0 4px 0 rgb(42 169 224 / 35%);
+}
+[data-os-device="tds"] .glass-btn { border-radius: 0.9rem; }
+[data-os-device="gameboy"] .glass-btn {
+  border: 4px solid #9bbc0f;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 #071f07;
+  text-transform: uppercase;
+}
+[data-os-device="linux"] .glass-btn {
+  border: 1px solid rgb(51 255 102 / 55%);
+  border-radius: 0.25rem;
+  text-transform: lowercase;
+}
+[data-os-device="cyberpunk"] .glass-btn {
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+[data-os-device="arcade"] .glass-btn {
+  border: 2px solid #ffe74c;
+  box-shadow: 0 0 18px rgb(255 231 76 / 35%);
+  text-transform: uppercase;
+}
+
+/* .glass-card mirrors the [data-slot="card"] device rules. */
+[data-os-device="wii"] .glass-card {
+  border-radius: 1.6rem;
+  background: #ffffff;
+  border: 2px solid rgb(42 169 224 / 35%);
+  box-shadow: 0 10px 26px rgb(42 169 224 / 14%), inset 0 2px 0 #ffffff;
+  color: #1c2b3a;
+}
+[data-os-device="gameboy"] .glass-card {
+  border: 4px solid #306230;
+  border-radius: 0;
+  background: #0f380f;
+  box-shadow: 6px 6px 0 #071f07;
+}
+[data-os-device="midnight"] .glass-card {
+  background: #050607;
+  border: 1px solid rgb(255 255 255 / 8%);
+  box-shadow: none;
+}
+[data-os-device="cyberpunk"] .glass-card {
+  border: 1px solid rgb(255 42 109 / 40%);
+  border-radius: 0.25rem;
+  box-shadow: 0 0 32px rgb(255 42 109 / 14%), inset 0 0 24px rgb(255 42 109 / 5%);
+  background: linear-gradient(180deg, rgb(24 10 52 / 88%), rgb(15 5 34 / 92%));
+}
+[data-os-device="ios"] .glass-card {
+  border-radius: 1.5rem;
+  background: rgb(22 22 30 / 78%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgb(255 255 255 / 10%);
+}

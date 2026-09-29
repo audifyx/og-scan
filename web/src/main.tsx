@@ -9,6 +9,10 @@ import { createRoot } from "react-dom/client";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import App from "./App.tsx";
 import "./index.css";
+// OrbitX Home OS theme engine — CSS variables + chrome rules keyed off
+// data-os-* attributes on <html>. Applies platform-wide.
+import "./home-os/os-themes.css";
+import "./home-os/os-fx.css";
 
 // Auto-recover from stale chunk references after a new deploy. Two failure
 // shapes show up in practice:

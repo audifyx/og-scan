@@ -1,0 +1,298 @@
+/* ==========================================================================
+   OrbitX Home OS — motion design: boot sequences, wipes, toast, particles
+   All animations are transform/opacity only. Respects reduced motion.
+   ========================================================================== */
+
+/* ------------------------------ boot overlay --------------------------- */
+
+.os-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--background);
+  transition: opacity 320ms ease;
+}
+.os-boot[data-leaving="true"] { opacity: 0; pointer-events: none; }
+
+.os-boot-ring {
+  width: 84px; height: 84px;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  border-top-color: var(--color-gold, #d6ff3d);
+  animation: os-spin 900ms linear infinite;
+}
+@keyframes os-spin { to { transform: rotate(360deg); } }
+
+.os-boot-word {
+  font-family: var(--font-display, serif);
+  font-size: 1.9rem;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
+  animation: os-boot-pulse 1400ms ease-in-out infinite;
+}
+@keyframes os-boot-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+/* xbox360 — expanding rings */
+.os-boot-xbox .os-boot-ring {
+  border: none;
+  box-shadow: 0 0 0 3px #7ac142;
+  animation: os-xbox-ring 1200ms ease-out infinite;
+}
+@keyframes os-xbox-ring {
+  0% { box-shadow: 0 0 0 3px #7ac142; opacity: 1; transform: scale(0.7); }
+  100% { box-shadow: 0 0 0 3px transparent; opacity: 0; transform: scale(1.5); }
+}
+
+/* ps4 — sweeping bar */
+.os-boot-ps4bar {
+  width: min(320px, 70vw); height: 4px;
+  border-radius: 999px;
+  background: rgb(45 127 249 / 20%);
+  overflow: hidden;
+  position: relative;
+}
+.os-boot-ps4bar::after {
+  content: ""; position: absolute; inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, #2d7ff9, transparent);
+  animation: os-ps4-sweep 1100ms ease-in-out infinite;
+}
+@keyframes os-ps4-sweep { 0% { left: -40%; } 100% { left: 100%; } }
+
+/* wii — bouncing dots */
+.os-boot-wii-dots { display: flex; gap: 10px; }
+.os-boot-wii-dots span {
+  width: 14px; height: 14px; border-radius: 999px;
+  background: #2aa9e0;
+  animation: os-wii-bounce 800ms ease-in-out infinite;
+}
+.os-boot-wii-dots span:nth-child(2) { animation-delay: 120ms; background: #7cc7ec; }
+.os-boot-wii-dots span:nth-child(3) { animation-delay: 240ms; background: #b5e2f7; }
+@keyframes os-wii-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-18px); } }
+.os-boot-press {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.8rem; letter-spacing: 0.3em;
+  color: var(--foreground);
+  animation: os-blink 900ms steps(2) infinite;
+}
+@keyframes os-blink { 50% { opacity: 0.15; } }
+
+/* tds — dual panels */
+.os-boot-tds { display: flex; flex-direction: column; gap: 8px; width: min(300px, 70vw); }
+.os-boot-tds i {
+  display: block; height: 64px; border-radius: 14px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 14%), transparent), #2a3049;
+  border: 2px solid rgb(255 122 89 / 45%);
+}
+.os-boot-tds i:first-child { animation: os-tds-top 1100ms ease-in-out infinite; }
+.os-boot-tds i:last-child { animation: os-tds-bottom 1100ms ease-in-out infinite; }
+@keyframes os-tds-top { 0%, 100% { transform: translateY(6px); } 50% { transform: translateY(-6px); } }
+@keyframes os-tds-bottom { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(6px); } }
+
+/* gameboy — dropping wordmark */
+.os-boot-gb-word {
+  font-family: var(--font-pixel, monospace);
+  font-size: 1.4rem;
+  color: #9bbc0f;
+  animation: os-gb-drop 1200ms steps(8) infinite;
+  text-shadow: 4px 4px 0 #071f07;
+}
+@keyframes os-gb-drop {
+  0% { transform: translateY(-26px); opacity: 0; }
+  40% { transform: translateY(0); opacity: 1; }
+  80%, 100% { transform: translateY(0); opacity: 1; }
+}
+
+/* winpc — loading bar */
+.os-boot-winbar {
+  width: min(280px, 66vw); height: 10px;
+  border: 2px solid rgb(59 158 255 / 60%);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.os-boot-winbar i {
+  display: block; height: 100%; width: 30%;
+  background: #3b9eff;
+  animation: os-win-load 1000ms linear infinite;
+}
+@keyframes os-win-load { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+
+/* ios — popping dots */
+.os-boot-ios-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.os-boot-ios-grid span {
+  width: 34px; height: 34px; border-radius: 26%;
+  background: linear-gradient(135deg, #0a84ff, #5e5ce6);
+  animation: os-ios-pop 1000ms ease-in-out infinite;
+}
+.os-boot-ios-grid span:nth-child(2n) { animation-delay: 120ms; background: linear-gradient(135deg, #5e5ce6, #bf5af2); }
+.os-boot-ios-grid span:nth-child(3n) { animation-delay: 240ms; background: linear-gradient(135deg, #30d158, #0a84ff); }
+@keyframes os-ios-pop { 0%, 100% { transform: scale(0.8); opacity: 0.6; } 50% { transform: scale(1.1); opacity: 1; } }
+
+/* macos — breathing glow */
+.os-boot-mac-glow {
+  width: 90px; height: 90px; border-radius: 999px;
+  background: radial-gradient(circle, rgb(90 200 250 / 80%), transparent 70%);
+  animation: os-mac-breathe 1600ms ease-in-out infinite;
+}
+@keyframes os-mac-breathe { 0%, 100% { transform: scale(0.85); opacity: 0.6; } 50% { transform: scale(1.15); opacity: 1; } }
+
+/* linux — boot lines */
+.os-boot-linux-lines {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.78rem; line-height: 1.7;
+  color: #33ff66;
+  width: min(320px, 78vw);
+}
+.os-boot-linux-lines p { overflow: hidden; white-space: nowrap; margin: 0; }
+.os-boot-linux-lines p:nth-child(1) { animation: os-linux-type 500ms steps(24) both; }
+.os-boot-linux-lines p:nth-child(2) { animation: os-linux-type 500ms steps(24) 350ms both; }
+.os-boot-linux-lines p:nth-child(3) { animation: os-linux-type 500ms steps(24) 700ms both; }
+@keyframes os-linux-type { from { width: 0; } to { width: 100%; } }
+
+/* cyberpunk — glitch */
+.os-boot-glitch {
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 2rem; font-weight: 800;
+  color: #ff2a6d;
+  text-shadow: 3px 0 #05d9e8, -3px 0 #ff2a6d;
+  animation: os-glitch 700ms steps(2) infinite;
+}
+@keyframes os-glitch {
+  0%, 100% { transform: translate(0); }
+  25% { transform: translate(-3px, 2px) skewX(4deg); }
+  50% { transform: translate(3px, -2px); }
+  75% { transform: translate(-2px, -1px) skewX(-4deg); }
+}
+
+/* midnight — expanding line */
+.os-boot-line {
+  width: 0; height: 2px;
+  background: #d6ff3d;
+  box-shadow: 0 0 18px #d6ff3d;
+  animation: os-line-grow 1200ms ease-out forwards;
+}
+@keyframes os-line-grow { to { width: min(280px, 66vw); } }
+
+/* arcade — insert coin */
+.os-boot-coin {
+  font-family: var(--font-pixel, monospace);
+  font-size: 1.15rem;
+  color: #ffe74c;
+  text-shadow: 0 0 14px rgb(255 231 76 / 70%);
+  animation: os-blink 800ms steps(2) infinite;
+}
+
+/* --------------------------- app wipe transitions ---------------------- */
+
+.os-wipe {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  pointer-events: none;
+  background: var(--background);
+  animation: os-wipe-fade 300ms ease forwards;
+}
+@keyframes os-wipe-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* xbox blade sweep */
+.os-wipe[data-os-device="xbox360"] {
+  background: linear-gradient(100deg, transparent 20%, rgb(122 193 66 / 85%) 42%, rgb(164 214 94 / 95%) 50%, rgb(122 193 66 / 85%) 58%, transparent 80%);
+  background-size: 250% 100%;
+  animation: os-wipe-sweep 320ms ease forwards;
+}
+@keyframes os-wipe-sweep { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+
+/* ps4 wave wash */
+.os-wipe[data-os-device="ps4"] {
+  background: linear-gradient(180deg, rgb(45 127 249 / 55%), rgb(10 20 40 / 96%));
+  animation: os-wipe-rise 320ms ease forwards;
+}
+@keyframes os-wipe-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* wii playful pop */
+.os-wipe[data-os-device="wii"] { animation: os-wipe-pop 300ms ease forwards; }
+@keyframes os-wipe-pop {
+  from { opacity: 0; transform: scale(1.15); border-radius: 3rem; }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* gameboy pixel dissolve */
+.os-wipe[data-os-device="gameboy"] {
+  background:
+    conic-gradient(#0f380f 25%, transparent 0 50%, #0f380f 0 75%, transparent 0);
+  background-size: 26px 26px;
+  animation: os-wipe-pixels 300ms steps(4) forwards;
+}
+@keyframes os-wipe-pixels { from { opacity: 0; } to { opacity: 1; } }
+
+/* winpc window zoom */
+.os-wipe[data-os-device="winpc"] { animation: os-wipe-zoom 300ms ease forwards; }
+@keyframes os-wipe-zoom { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+
+/* linux terminal clear */
+.os-wipe[data-os-device="linux"]::after {
+  content: "$ clear";
+  position: absolute; top: 42%; left: 8%;
+  font-family: var(--font-geist-mono, monospace);
+  color: #33ff66; font-size: 1.1rem;
+}
+
+/* cyberpunk slash */
+.os-wipe[data-os-device="cyberpunk"] {
+  background: linear-gradient(115deg, transparent 30%, rgb(255 42 109 / 75%) 48%, rgb(5 217 232 / 75%) 52%, transparent 70%);
+  background-size: 280% 100%;
+  animation: os-wipe-sweep 300ms ease forwards;
+}
+
+/* arcade scanline flash */
+.os-wipe[data-os-device="arcade"] {
+  background: repeating-linear-gradient(0deg, #12041f 0 6px, rgb(255 231 76 / 25%) 6px 8px);
+  animation: os-wipe-fade 300ms steps(3) forwards;
+}
+
+/* ------------------------------- toast --------------------------------- */
+
+.os-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(20px);
+  z-index: 210;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  border-radius: 1rem;
+  padding: 0.7rem 1.2rem;
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  transition: opacity 250ms ease, transform 250ms ease;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 50%);
+}
+.os-toast[data-show="true"] { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ------------------------------ particles ------------------------------ */
+
+.os-particles {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-boot-ring, .os-boot-xbox .os-boot-ring, .os-boot-ps4bar::after,
+  .os-boot-wii-dots span, .os-boot-press, .os-boot-tds i,
+  .os-boot-gb-word, .os-boot-winbar i, .os-boot-ios-grid span,
+  .os-boot-mac-glow, .os-boot-linux-lines p, .os-boot-glitch,
+  .os-boot-line, .os-boot-coin, .os-boot-word { animation: none !important; }
+  .os-wipe { animation-duration: 1ms !important; }
+}
