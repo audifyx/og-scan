@@ -1,5 +1,9 @@
 import * as THREE from "three";
-import { buildCity, HALF, type CityData, type Collider } from "./CityBuilder";
+import { buildCity, HALF, BLOCKS, type CityData, type Collider } from "./CityBuilder";
+import {
+  buildAllExteriors, facadeColliders, bridgeDriveBoxes, islandColliders,
+  BRIDGE, ISLAND_ZONES, type DriveBox,
+} from "../modules/districts";
 import { createHumanoid, PED_COLORS, type Humanoid } from "./Humanoid";
 import {
   createCarMesh, createTrafficCar, updateTrafficCar, resolveCircleColliders,
@@ -16,7 +20,19 @@ export interface HudState {
   isNight: boolean;
 }
 
-export interface Quote { price: number; change24h: number }
+export interface Quote { price: number; change24h: number; marketCap?: number }
+
+/**
+ * Character movement hooks — stat modifiers consumed by the core player
+ * controller from the character module's `getDerivedEffects(profile)`
+ * (gym stats, outfit buffs). Values are multipliers around 1; clamped on set.
+ */
+export interface MovementMods {
+  /** Sprint top-speed multiplier (default 1). */
+  sprintSpeedMult?: number;
+  /** Acceleration multiplier (default 1). */
+  accelMult?: number;
+}
 
 export interface WorldOpts {
   canvas: HTMLCanvasElement;
@@ -64,16 +80,38 @@ export class GTAWorld {
   private dragDX = 0;
   private dragDY = 0;
 
+  // character movement hooks (character module stat effects, default neutral)
+  private moveMods = { sprintSpeedMult: 1, accelMult: 1 };
+
   // cars
   private drivables: Drivable[] = [];
   private traffic: TrafficCar[] = [];
   private inCar: Drivable | null = null;
   private peds: Ped[] = [];
 
+  /** District exteriors scene (bank/dealership/shops facades, bridge, islands). */
+  private exteriors: { group: THREE.Group; dispose(): void } | null = null;
+  /** Drivable bridge-deck boxes — ground height for cars + player on the bridge. */
+  private driveBoxes: DriveBox[] = [];
+
   // lights
   private sun!: THREE.DirectionalLight;
   private hemi!: THREE.HemisphereLight;
+  /** The player headlight is parented to the specific car being driven. */
   private headlight: THREE.SpotLight | null = null;
+
+  /**
+   * Detach the headlight from its car. Root cause fix: the old code only set
+   * visible=false on exit, so (a) the stale reference blocked creating a
+   * headlight when entering a DIFFERENT car, and (b) the old parked car kept
+   * a burning spotlight at night.
+   */
+  private detachHeadlight() {
+    if (!this.headlight) return;
+    this.headlight.parent?.remove(this.headlight);
+    this.headlight.target.parent?.remove(this.headlight.target);
+    this.headlight = null;
+  }
 
   private hudT = 0;
   private mmT = 0;
@@ -96,6 +134,18 @@ export class GTAWorld {
     this.city = buildCity();
     this.scene.add(this.city.group);
     this.scene.fog = new THREE.Fog(0x0a0e16, 180, 900);
+
+    // district exteriors: bank, dealership, shops, facades, bridge + islands
+    // (the buildings team built these but never mounted them — without this
+    // the doors led nowhere and the bridge/island were invisible)
+    const ext = buildAllExteriors();
+    this.scene.add(ext.group);
+    this.exteriors = ext;
+    this.city.colliders.push(
+      ...facadeColliders(),
+      ...ISLAND_ZONES.flatMap((z) => islandColliders(z)),
+    );
+    this.driveBoxes = bridgeDriveBoxes(BRIDGE);
 
     // lights
     this.sun = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -124,13 +174,13 @@ export class GTAWorld {
       this.drivables.push({ mesh, phys: new CarPhysics(p.x, p.z, p.heading), taken: false });
     }
 
-    // traffic
+    // traffic (full 9x9 grid — indices 0..BLOCKS)
     for (let i = 0; i < 8; i++) {
-      const ci = 1 + Math.floor(Math.random() * 4);
-      const cj = 1 + Math.floor(Math.random() * 4);
+      const ci = Math.floor(Math.random() * (BLOCKS + 1));
+      const cj = Math.floor(Math.random() * (BLOCKS + 1));
       const dir = Math.floor(Math.random() * 4);
-      const ni = Math.min(5, Math.max(0, ci + (dir === 0 ? 1 : dir === 1 ? -1 : 0)));
-      const nj = Math.min(5, Math.max(0, cj + (dir === 2 ? 1 : dir === 3 ? -1 : 0)));
+      const ni = Math.min(BLOCKS, Math.max(0, ci + (dir === 0 ? 1 : dir === 1 ? -1 : 0)));
+      const nj = Math.min(BLOCKS, Math.max(0, cj + (dir === 2 ? 1 : dir === 3 ? -1 : 0)));
       if (ni === ci && nj === cj) continue;
       const car = createTrafficCar(this.city.nodes, ci, cj, ni, nj);
       this.scene.add(car.mesh.group);
@@ -163,12 +213,47 @@ export class GTAWorld {
     this.pVel.add(v);
   }
 
+  /**
+   * Character movement hooks: apply stat modifiers (sprint speed ×,
+   * acceleration ×) from the character module's getDerivedEffects(profile)
+   * to the player controller. Module teams call this via
+   * api.getWorld()?.setMovementMods(effects) when the profile's effects
+   * change; core never imports module code (no circular deps).
+   */
+  setMovementMods(mods: MovementMods) {
+    if (mods.sprintSpeedMult !== undefined && Number.isFinite(mods.sprintSpeedMult)) {
+      this.moveMods.sprintSpeedMult = Math.max(0.2, Math.min(3, mods.sprintSpeedMult));
+    }
+    if (mods.accelMult !== undefined && Number.isFinite(mods.accelMult)) {
+      this.moveMods.accelMult = Math.max(0.2, Math.min(3, mods.accelMult));
+    }
+  }
+
+  /**
+   * Ground height under (x, z) from the bridge drive boxes. 0 on the
+   * mainland / everywhere else. Cars + player use this so they ride up
+   * the bridge ramps onto the deck instead of clipping through it.
+   */
+  private groundHeightAt(x: number, z: number): number {
+    let g = 0;
+    for (const b of this.driveBoxes) {
+      if (x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ && b.topY > g) {
+        g = b.topY;
+      }
+    }
+    return g;
+  }
+
   setPaused(b: boolean) {
     this.paused = b;
     if (b) this.audio.engineLevel(0, false);
   }
 
   updatePrices(quotes: Record<string, Quote>) {
+    // live token facades: tower windows track 24h price action, tower height
+    // tracks market cap when the quote carries it (useLivePrices feeds it —
+    // see useGtaGame; without marketCap the towers hold neutral height)
+    this.city.applyMarketData(quotes);
     const arr = Object.entries(quotes)
       .filter(([, q]) => q.price > 0)
       .sort((a, b) => Math.abs(b[1].change24h) - Math.abs(a[1].change24h))
@@ -198,14 +283,14 @@ export class GTAWorld {
       const c = this.inCar;
       const sx = c.phys.pos.x + Math.cos(c.phys.heading) * 2.6;
       const sz = c.phys.pos.z - Math.sin(c.phys.heading) * 2.6;
-      this.pPos.set(sx, 0, sz);
+      this.pPos.set(sx, this.groundHeightAt(sx, sz), sz);
       this.pVel.set(0, 0, 0);
       c.phys.speed = 0;
       this.player.group.visible = true;
       this.inCar = null;
       this.audio.door();
       this.audio.engineLevel(0, false);
-      if (this.headlight) { this.headlight.visible = false; }
+      this.detachHeadlight();
       return;
     }
     let best: Drivable | null = null;
@@ -257,6 +342,18 @@ export class GTAWorld {
     }
   }
 
+  /**
+   * Dealership delivery: spawn a drivable car (integrator's onDeliver hook —
+   * core never imports module code, so the integrator passes the paint).
+   */
+  deliverVehicle(color: number, x: number, z: number, heading = 0) {
+    const mesh = createCarMesh(color);
+    mesh.group.position.set(x, 0, z);
+    mesh.group.rotation.y = heading;
+    this.scene.add(mesh.group);
+    this.drivables.push({ mesh, phys: new CarPhysics(x, z, heading), taken: false });
+  }
+
   /** Direct access to the Three.js scene for module teams (additive only). */
   get sceneRef(): THREE.Scene {
     return this.scene;
@@ -273,8 +370,8 @@ export class GTAWorld {
   }
 
   private randomSidewalk(): THREE.Vector3 {
-    const i = Math.floor(Math.random() * 6);
-    const j = Math.floor(Math.random() * 6);
+    const i = Math.floor(Math.random() * (BLOCKS + 1));
+    const j = Math.floor(Math.random() * (BLOCKS + 1));
     const n = this.city.nodes[i][j];
     return new THREE.Vector3(
       n.x + (Math.random() - 0.5) * 20,
@@ -331,7 +428,7 @@ export class GTAWorld {
     const mx = inp.moveX, my = inp.moveY;
     const moving = Math.hypot(mx, my) > 0.08;
     const sprint = inp.sprint && my > 0.1;
-    const speed = sprint ? 9.5 : 5.2;
+    const speed = (sprint ? 9.5 : 5.2) * (sprint ? this.moveMods.sprintSpeedMult : 1);
 
     if (moving) {
       // move relative to camera yaw
@@ -342,8 +439,9 @@ export class GTAWorld {
       this.pHeading += dh * Math.min(1, dt * 10);
       const tx = Math.sin(this.pHeading) * speed;
       const tz = Math.cos(this.pHeading) * speed;
-      this.pVel.x += (tx - this.pVel.x) * Math.min(1, dt * 10);
-      this.pVel.z += (tz - this.pVel.z) * Math.min(1, dt * 10);
+      const accel = Math.min(1, dt * 10 * this.moveMods.accelMult);
+      this.pVel.x += (tx - this.pVel.x) * accel;
+      this.pVel.z += (tz - this.pVel.z) * accel;
       // auto-align camera behind when not recently dragged
       if (this.time - this.lastDragT > 2.2) {
         let dy = (this.pHeading + Math.PI) - this.camYaw;
@@ -356,15 +454,16 @@ export class GTAWorld {
       this.pVel.z *= Math.max(0, 1 - dt * 10);
     }
 
-    // jump / gravity
+    // jump / gravity (ground = bridge deck when on the bridge)
     if (inp.jump && this.onGround) {
       this.pVy = 5.2;
       this.onGround = false;
       inp.jump = false;
     }
     this.pVy -= 14 * dt;
+    const gy = this.groundHeightAt(this.pPos.x, this.pPos.z);
     let ny = this.pPos.y + this.pVy * dt;
-    if (ny <= 0) { ny = 0; this.pVy = 0; this.onGround = true; }
+    if (ny <= gy) { ny = gy; this.pVy = 0; this.onGround = true; }
 
     this.pPos.x += this.pVel.x * dt;
     this.pPos.z += this.pVel.z * dt;
@@ -391,6 +490,8 @@ export class GTAWorld {
     };
     const { crashed } = car.phys.update(dt, drive, this.city.colliders);
     if (crashed && Math.abs(car.phys.speed) > 6) this.audio.crash();
+    // ride the bridge deck / ramps when on them (0 on the mainland)
+    car.phys.pos.y = this.groundHeightAt(car.phys.pos.x, car.phys.pos.z);
     car.mesh.group.position.copy(car.phys.pos);
     car.mesh.group.rotation.y = car.phys.heading;
     const spin = car.phys.speed * dt * 2.6;
@@ -518,10 +619,10 @@ export class GTAWorld {
     // roads
     ctx.strokeStyle = "#3d4657";
     ctx.lineWidth = Math.max(1, 14 * k);
-    for (let i = 0; i <= 5; i++) {
-      const n0 = this.city.nodes[i][0], n1 = this.city.nodes[i][5];
+    for (let i = 0; i <= BLOCKS; i++) {
+      const n0 = this.city.nodes[i][0], n1 = this.city.nodes[i][BLOCKS];
       ctx.beginPath(); ctx.moveTo(px(n0.x), px(n0.z)); ctx.lineTo(px(n1.x), px(n1.z)); ctx.stroke();
-      const m0 = this.city.nodes[0][i], m1 = this.city.nodes[5][i];
+      const m0 = this.city.nodes[0][i], m1 = this.city.nodes[BLOCKS][i];
       ctx.beginPath(); ctx.moveTo(px(m0.x), px(m0.z)); ctx.lineTo(px(m1.x), px(m1.z)); ctx.stroke();
     }
     // cars
@@ -554,6 +655,8 @@ export class GTAWorld {
     cancelAnimationFrame(this.raf);
     window.removeEventListener("resize", this.resize);
     this.audio.engineStop();
+    this.exteriors?.dispose();
+    this.exteriors = null;
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {

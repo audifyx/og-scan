@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Collider, RoadNode } from "./CityBuilder";
+import { BLOCKS, type Collider, type RoadNode } from "./CityBuilder";
 
 export interface CarMesh {
   group: THREE.Group;
@@ -224,7 +224,7 @@ export function updateTrafficCar(
   if (car.t >= 1) {
     // arrive at node: pick next (no U-turn unless dead end)
     const opts: [number, number][] = [];
-    if (car.ni + 1 <= 5) opts.push([car.ni + 1, car.nj]);
+    if (car.ni + 1 <= BLOCKS) opts.push([car.ni + 1, car.nj]);
     if (car.ni - 1 >= 0) opts.push([car.ni - 1, car.nj]);
     if (car.nj + 1 <= 5) opts.push([car.ni, car.nj + 1]);
     if (car.nj - 1 >= 0) opts.push([car.ni, car.nj - 1]);

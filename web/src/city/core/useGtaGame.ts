@@ -47,10 +47,6 @@ export function useGtaGame() {
   const audioRef = useRef<GameAudio>(new GameAudio());
   const kbRef = useRef<KeyboardInput | null>(null);
   const orbitRef = useRef<OrbitDrag | null>(null);
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
-  const pausedRef = useRef(paused);
-  pausedRef.current = paused;
 
   const { prices, connected } = useLivePrices(MARKET_MINTS, 15_000);
 
@@ -58,7 +54,7 @@ export function useGtaGame() {
     const q: Record<string, Quote> = {};
     MARKET_MINTS.forEach((mint, i) => {
       const p = prices[mint];
-      if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h };
+      if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h, marketCap: p.marketCap };
     });
     return q;
   }, [prices]);
@@ -129,7 +125,7 @@ export function useGtaGame() {
         const q: Record<string, Quote> = {};
         MARKET_MINTS.forEach((mint, i) => {
           const p = prices[mint];
-          if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h };
+          if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h, marketCap: p.marketCap };
         });
         return q;
       })(),
