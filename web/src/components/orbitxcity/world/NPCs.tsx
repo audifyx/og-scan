@@ -7,6 +7,7 @@ import { collidesAt, mulberry32, randomOpenPoint } from "@/lib/orbitxcity/collis
 import type { AvatarAppearance, StreetSegment, WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { RECKLESS_SPEED, useGameStore } from "@/lib/orbitxcity/gameStore";
 import { CharacterMesh } from "./CharacterMesh";
 
 const TALK_RADIUS = 2.1;
@@ -44,6 +45,8 @@ const PHRASES = [
   "my bags are heavy",
 ];
 
+const FLEE_PHRASES = ["AHH!", "watch it!!", "crazy driver!", "run!!", "not my bags!!"];
+
 const NAMES = ["Pepe", "Wojak", "Ser", "Anon", "Doge", "Ape", "Chad", "Gm", "Bags", "Sol"];
 
 const NPC_COLORS = ["#5cb85c", "#8b93a3", "#c5a26f", "#e8a54b", "#6ec8ff", "#ff7a9a"];
@@ -68,6 +71,13 @@ type StreetNpcLive = {
 
 /** Shared registry so the crowd can report the nearest talkable local. */
 const liveNpcs = new Map<string, StreetNpcLive>();
+
+/** Live pedestrian positions for the minimap + reckless-driving checks. */
+export function getLiveNpcPositions(): Array<{ x: number; z: number }> {
+  const out: Array<{ x: number; z: number }> = [];
+  for (const n of liveNpcs.values()) out.push({ x: n.x, z: n.z });
+  return out;
+}
 
 function StreetLocal({
   seed,
@@ -108,12 +118,16 @@ function StreetLocal({
   const lineRef = useRef(PHRASES[seed % PHRASES.length]!);
   const noticedRef = useRef(false);
   const lastEmoteRef = useRef(0);
+  // Player-speed estimate (for fleeing fast cars) — local delta tracking.
+  const playerTrack = useRef({ x: playerPos.x, z: playerPos.z, t: performance.now(), speed: 0 });
+  const fleeingRef = useRef(false);
+  const fleeCooldown = useRef(0);
 
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     const localRand = mulberry32(seed ^ 0x51f15e);
     const cycle = setInterval(() => {
-      if (noticedRef.current) return;
+      if (noticedRef.current || fleeingRef.current) return;
       if (localRand() > (idle ? 0.25 : 0.45)) {
         const line = PHRASES[Math.floor(localRand() * PHRASES.length)]!;
         lineRef.current = line;
@@ -135,7 +149,42 @@ function StreetLocal({
     const playerDist = Math.hypot(toPlayerX, toPlayerZ);
     const noticing = playerDist < TALK_RADIUS;
 
-    if (noticing && !noticedRef.current) {
+    // --- Threat check: fast car nearby, or city-wide high heat ---
+    const pt = playerTrack.current;
+    const nowMs = performance.now();
+    const pdt = Math.max((nowMs - pt.t) / 1000, 0.001);
+    const instSpeed = Math.hypot(playerPos.x - pt.x, playerPos.z - pt.z) / pdt;
+    pt.speed = pt.speed + (instSpeed - pt.speed) * Math.min(1, dt * 5);
+    pt.x = playerPos.x;
+    pt.z = playerPos.z;
+    pt.t = nowMs;
+    const heat = useGameStore.getState().heat;
+    const threat =
+      (pt.speed > RECKLESS_SPEED && playerDist < 11) || (heat >= 60 && playerDist < 13);
+
+    if (threat && !fleeingRef.current) {
+      fleeingRef.current = true;
+      fleeCooldown.current = 0;
+      const yell = FLEE_PHRASES[seed % FLEE_PHRASES.length]!;
+      lineRef.current = yell;
+      setBubble(yell);
+    } else if (!threat && fleeingRef.current) {
+      fleeCooldown.current += dt;
+      if (fleeCooldown.current > 1.6) {
+        fleeingRef.current = false;
+        setBubble(null);
+      }
+    }
+
+    if (fleeingRef.current) {
+      // Run directly away from the player, fast.
+      const away = Math.hypot(toPlayerX, toPlayerZ) || 1;
+      const ax = pos.current.x - (toPlayerX / away) * 16;
+      const az = pos.current.z - (toPlayerZ / away) * 16;
+      target.current = { x: ax, z: az };
+    }
+
+    if (noticing && !noticedRef.current && !fleeingRef.current) {
       noticedRef.current = true;
       const greet = PHRASES[(seed + Math.floor(playerPos.x * 3)) % PHRASES.length]!;
       lineRef.current = greet;
@@ -152,7 +201,9 @@ function StreetLocal({
       setBubble(hype);
     }
 
-    if (!idle && !noticing) {
+    const fleeing = fleeingRef.current;
+    const moveSpeed = fleeing ? 4.6 : speed;
+    if ((!idle || fleeing) && !(noticing && !fleeing)) {
       const dx = target.current.x - pos.current.x;
       const dz = target.current.z - pos.current.z;
       const dist = Math.hypot(dx, dz);
@@ -165,8 +216,8 @@ function StreetLocal({
           block,
         );
       } else {
-        const nx = pos.current.x + (dx / dist) * speed * dt;
-        const nz = pos.current.z + (dz / dist) * speed * dt;
+        const nx = pos.current.x + (dx / dist) * moveSpeed * dt;
+        const nz = pos.current.z + (dz / dist) * moveSpeed * dt;
         if (!collidesAt(nx, nz, 0.4, block)) {
           pos.current.set(nx, 0, nz);
           nowMoving = true;
@@ -211,7 +262,7 @@ function StreetLocal({
 
   return (
     <group ref={group} position={[start.x, 0, start.z]}>
-      {idle && (
+      {idle && !fleeingRef.current && (
         <mesh position={[0, 0.03, 0.35]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[0.55, 20]} />
           <meshStandardMaterial color="#1a222c" roughness={0.85} />

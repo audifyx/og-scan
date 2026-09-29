@@ -11,7 +11,8 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
-import { BlockBuilding, type BlockKind } from "./BlockBuilding";
+import { FillBuilding } from "./FillBuilding";
+import type { BlockKind } from "./BlockBuilding";
 import { ShopInterior, type ShopKind } from "./ShopInterior";
 
 export interface CityFillProps {
@@ -424,17 +425,15 @@ export function CityFill({
         return (
           <group key={`l${i}`}>
             <GrassPad lot={lot} />
-            <BlockBuilding
+            <FillBuilding
               position={[lot.x, 0.16, lot.z]}
               width={lot.w}
               depth={lot.d}
               floors={lot.floors}
-              kind={lot.kind}
               color={lot.color}
               trim={lot.trim}
               glass={lot.glass}
               rotationY={lot.rot}
-              studs={!lite && lot.floors <= 6}
               sign={lot.sign}
             />
             {lot.shop && (

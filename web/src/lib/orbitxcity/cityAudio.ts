@@ -17,6 +17,8 @@ export interface AudioSnapshot {
   unlocked: boolean;
   musicOn: boolean;
   sfxOn: boolean;
+  /** Master mute — silences music + sfx + engine + sirens in one switch. */
+  muted: boolean;
   musicVol: number;
   sfxVol: number;
   mode: ThemeMode;
@@ -25,8 +27,25 @@ export interface AudioSnapshot {
   tracks: ThemeTrack[];
 }
 
+/** Every one-shot sound the game can fire. SFX routing: UI / events / pickups. */
+export type SfxKind =
+  | "ui"
+  | "confirm"
+  | "interact"
+  | "coin"
+  | "enter"
+  | "deny"
+  | "error"
+  | "whoosh"
+  | "missionStart"
+  | "missionComplete"
+  | "missionFail"
+  | "crash"
+  | "horn";
+
 const MUSIC_KEY = "oxc_music_on";
 const SFX_KEY = "oxc_sfx_on";
+const MASTER_MUTE_KEY = "oxc_master_muted";
 const MUSIC_VOL_KEY = "oxc_music_vol";
 const SFX_VOL_KEY = "oxc_sfx_vol";
 const TRACK_KEY = "oxc_theme_track";
@@ -108,6 +127,7 @@ type Listener = () => void;
 class CityAudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private masterConnected = false;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private ambientGain: GainNode | null = null;
@@ -115,6 +135,21 @@ class CityAudioEngine {
   private ambientNoise: AudioBufferSourceNode | null = null;
   private ambientStopTimer: number | null = null;
   private ambientRunning = false;
+  /** Random city events (horn / distant siren) scheduled while the world bed runs. */
+  private ambientEventTimer: number | null = null;
+  /** Engine hum nodes (started while driving). */
+  private engineNodes: {
+    osc: OscillatorNode;
+    sub: OscillatorNode;
+    filter: BiquadFilterNode;
+    gain: GainNode;
+  } | null = null;
+  /** Optional speed source registered by the vehicle worker (0..1, normalized). */
+  private vehicleSpeedSource: (() => number) | null = null;
+  /** Wanted-siren loop nodes. */
+  private sirenNodes: { osc: OscillatorNode; lfo: OscillatorNode; lfoGain: GainNode; gain: GainNode } | null = null;
+  private heatLevel = 0;
+  private lastFootstepAt = 0;
   private mediaEl: HTMLAudioElement | null = null;
   private mediaNode: MediaElementAudioSourceNode | null = null;
   private graphOk = false;
@@ -124,6 +159,7 @@ class CityAudioEngine {
   private mode: ThemeMode = "off";
   private musicOn = readBool(MUSIC_KEY, true);
   private sfxOn = readBool(SFX_KEY, true);
+  private muted = readBool(MASTER_MUTE_KEY, false);
   private musicVol = readNum(MUSIC_VOL_KEY, 0.45);
   private sfxVol = readNum(SFX_VOL_KEY, 0.7);
   private trackId = readTrackId();
@@ -146,6 +182,7 @@ class CityAudioEngine {
       unlocked: this.unlocked,
       musicOn: this.musicOn,
       sfxOn: this.sfxOn,
+      muted: this.muted,
       musicVol: this.musicVol,
       sfxVol: this.sfxVol,
       mode: this.mode,
@@ -169,8 +206,7 @@ class CityAudioEngine {
     if (!this.ctx) {
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 1;
-      this.master.connect(this.ctx.destination);
+      this.applyMasterMute();
 
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = 0;
@@ -263,6 +299,23 @@ class CityAudioEngine {
     this.notify();
   }
 
+  /** Master kill-switch — silences music, sfx, engine hum, and sirens at once. */
+  setMasterMuted(on: boolean) {
+    this.muted = on;
+    writeBool(MASTER_MUTE_KEY, on);
+    this.applyMasterMute();
+    this.notify();
+  }
+
+  private applyMasterMute() {
+    if (!this.master || !this.ctx) return;
+    if (!this.masterConnected) {
+      this.master.connect(this.ctx.destination);
+      this.masterConnected = true;
+    }
+    this.master.gain.value = this.muted ? 0 : 1;
+  }
+
   setMusicVol(v: number) {
     this.musicVol = Math.min(1, Math.max(0, v));
     writeNum(MUSIC_VOL_KEY, this.musicVol);
@@ -321,6 +374,7 @@ class CityAudioEngine {
     if (mode === "off") {
       void this.fadeThemeTo(0, true);
       this.stopWorldAmbient();
+      this.stopWantedSiren();
     } else if (mode === "world") {
       // Fade menu theme; keep a soft procedural Midtown bed under the streets.
       void this.fadeThemeTo(0, true);
@@ -388,6 +442,37 @@ class CityAudioEngine {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(target, t0 + 1.4);
     this.ambientRunning = true;
+    this.scheduleAmbientEvent();
+  }
+
+  /** Occasional distant horn / siren so the city feels alive. Low volume, routed to the ambient bed. */
+  private scheduleAmbientEvent() {
+    if (this.ambientEventTimer != null) {
+      window.clearTimeout(this.ambientEventTimer);
+      this.ambientEventTimer = null;
+    }
+    if (!this.ctx || !this.ambientGain || !this.musicOn) return;
+    const delay = 9000 + Math.random() * 17000;
+    this.ambientEventTimer = window.setTimeout(() => {
+      this.ambientEventTimer = null;
+      if (this.ambientRunning && this.mode === "world" && this.musicOn) {
+        this.playAmbientEvent();
+        this.scheduleAmbientEvent();
+      }
+    }, delay);
+  }
+
+  private playAmbientEvent() {
+    if (!this.ctx || !this.ambientGain) return;
+    const roll = Math.random();
+    if (roll < 0.55) {
+      // Car horn, distant: two detuned square tones, quiet.
+      this.tone(349, 0.45, "square", 0.016, this.ambientGain);
+      this.tone(440, 0.45, "square", 0.014, this.ambientGain);
+    } else {
+      // Distant siren sweep passing by.
+      this.tone(620, 1.6, "sine", 0.012, this.ambientGain, 0, 1180);
+    }
   }
 
   private stopWorldAmbient() {
@@ -408,6 +493,10 @@ class CityAudioEngine {
   }
 
   private teardownAmbientNodes() {
+    if (this.ambientEventTimer != null) {
+      window.clearTimeout(this.ambientEventTimer);
+      this.ambientEventTimer = null;
+    }
     for (const o of this.ambientOsc) {
       try {
         o.stop();
@@ -549,8 +638,13 @@ class CityAudioEngine {
     src.stop(t0 + dur);
   }
 
+  /** Alias used by gameplay systems: cityAudio.sfx("coin"), cityAudio.sfx("missionComplete"), … */
+  sfx(kind: SfxKind): void {
+    this.play(kind);
+  }
+
   /** One-shot SFX */
-  play(kind: "ui" | "confirm" | "interact" | "coin" | "enter" | "deny" | "whoosh") {
+  play(kind: SfxKind) {
     void this.unlock();
     if (!this.ctx || !this.sfxGain || !this.sfxOn) return;
 
@@ -578,19 +672,209 @@ class CityAudioEngine {
       case "deny":
         this.tone(180, 0.2, "sawtooth", 0.12, this.sfxGain);
         break;
+      case "error":
+        this.tone(220, 0.16, "sawtooth", 0.12, this.sfxGain);
+        this.tone(165, 0.24, "sawtooth", 0.12, this.sfxGain, 0.14);
+        break;
       case "whoosh":
         this.noiseBurst(0.25, 0.12, this.sfxGain, 0, 600);
         this.tone(400, 0.25, "sine", 0.06, this.sfxGain, 0, 120);
+        break;
+      case "missionStart":
+        [NOTE.C4, NOTE.E4, NOTE.G4, NOTE.C5].forEach((f, i) => {
+          this.tone(f, 0.22, "triangle", 0.14, this.sfxGain, i * 0.09);
+        });
+        break;
+      case "missionComplete":
+        [NOTE.E4, NOTE.G4, NOTE.C5, NOTE.E5, NOTE.G4, NOTE.C5].forEach((f, i) => {
+          this.tone(f, 0.26, "triangle", 0.15, this.sfxGain, i * 0.1);
+        });
+        this.noiseBurst(0.5, 0.05, this.sfxGain, 0.2, 3000);
+        break;
+      case "missionFail":
+        [NOTE.A3, NOTE.G3, NOTE.E3, NOTE.D3].forEach((f, i) => {
+          this.tone(f, 0.3, "sawtooth", 0.1, this.sfxGain, i * 0.13);
+        });
+        break;
+      case "crash":
+        this.noiseBurst(0.32, 0.28, this.sfxGain, 0, 120);
+        this.tone(72, 0.42, "sine", 0.3, this.sfxGain, 0, 30);
+        break;
+      case "horn":
+        this.tone(370, 0.5, "square", 0.07, this.sfxGain);
+        this.tone(466, 0.5, "square", 0.06, this.sfxGain);
         break;
       default:
         break;
     }
   }
 
+  /**
+   * Footstep tick for the walk cycle. Throttled internally (~110ms) so rapid
+   * calls from a frame loop stay musical instead of stacking noise.
+   * Call from the character controller on each step, or let useCityAudioEvents
+   * auto-drive it from virtualInput axes.
+   */
+  footstep(): void {
+    if (!this.ctx || !this.sfxGain || !this.sfxOn || !this.unlocked) return;
+    const now = performance.now();
+    if (now - this.lastFootstepAt < 110) return;
+    this.lastFootstepAt = now;
+    this.noiseBurst(0.07, 0.09, this.sfxGain, 0, 260);
+    this.tone(95, 0.08, "sine", 0.1, this.sfxGain, 0, 48);
+  }
+
+  // ---------------------------------------------------------------- engine
+  /**
+   * Register a normalized vehicle-speed source (0..1). Called by the vehicle
+   * worker once its store exists; the engine loop polls it every frame and
+   * starts/stops the hum automatically. Safe to never call — the engine just
+   * stays silent.
+   */
+  registerVehicleSpeedSource(fn: (() => number) | null): void {
+    this.vehicleSpeedSource = fn;
+  }
+
+  /** Normalized vehicle speed 0..1 from the registered source (0 when none). */
+  getVehicleSpeed(): number {
+    try {
+      const v = this.vehicleSpeedSource?.() ?? 0;
+      return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** Start the engine hum (idempotent). Route: sfx bus, respects sfx volume/mute. */
+  engineStart(): void {
+    if (!this.ctx || !this.sfxGain || this.engineNodes) return;
+    const t0 = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.value = 52;
+    const sub = this.ctx.createOscillator();
+    sub.type = "square";
+    sub.frequency.value = 26;
+    const subGain = this.ctx.createGain();
+    subGain.gain.value = 0.4;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 320;
+    filter.Q.value = 2;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.0001;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(0.1, t0 + 0.4);
+    osc.connect(filter);
+    sub.connect(subGain);
+    subGain.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(t0);
+    sub.start(t0);
+    this.engineNodes = { osc, sub, filter, gain };
+  }
+
+  /** Pitch follows normalized speed 0..1. Glide-smoothed so gear changes don't zip. */
+  engineSetSpeed(v: number): void {
+    if (!this.ctx || !this.engineNodes) return;
+    const speed = Math.max(0, Math.min(1, v));
+    const t = this.ctx.currentTime;
+    const freq = 52 + speed * 165;
+    this.engineNodes.osc.frequency.setTargetAtTime(freq, t, 0.06);
+    this.engineNodes.sub.frequency.setTargetAtTime(freq / 2, t, 0.06);
+    this.engineNodes.filter.frequency.setTargetAtTime(320 + speed * 1400, t, 0.08);
+    this.engineNodes.gain.gain.setTargetAtTime(0.08 + speed * 0.12, t, 0.08);
+  }
+
+  /** Stop the engine hum (idempotent). */
+  engineStop(): void {
+    if (!this.ctx || !this.engineNodes) return;
+    const { osc, sub, gain } = this.engineNodes;
+    const t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setTargetAtTime(0.0001, t, 0.12);
+    window.setTimeout(() => {
+      try {
+        osc.stop();
+        sub.stop();
+      } catch {
+        /* already stopped */
+      }
+    }, 420);
+    this.engineNodes = null;
+  }
+
+  // ---------------------------------------------------------------- sirens
+  /**
+   * Wanted heat from the gameplay worker (gameStore: 0..100). Siren loop
+   * starts at heat >= 60 (3 stars — patrols closing in) and stops below it.
+   * Route: sfx bus.
+   */
+  setHeat(heat: number): void {
+    this.heatLevel = Math.max(0, Math.min(100, Math.floor(heat || 0)));
+    if (this.heatLevel >= 60) this.startWantedSiren();
+    else this.stopWantedSiren();
+  }
+
+  private startWantedSiren(): void {
+    if (!this.ctx || !this.sfxGain || this.sirenNodes || !this.unlocked) return;
+    const t0 = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = 720;
+    const lfo = this.ctx.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = 0.55;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 175;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.0001;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(0.05, t0 + 0.6);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(t0);
+    lfo.start(t0);
+    this.sirenNodes = { osc, lfo, lfoGain, gain };
+  }
+
+  private stopWantedSiren(): void {
+    if (!this.ctx || !this.sirenNodes) return;
+    const { osc, lfo, lfoGain, gain } = this.sirenNodes;
+    const t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setTargetAtTime(0.0001, t, 0.15);
+    window.setTimeout(() => {
+      try {
+        osc.stop();
+        lfo.stop();
+        lfoGain.disconnect();
+      } catch {
+        /* already stopped */
+      }
+    }, 520);
+    this.sirenNodes = null;
+  }
+
   dispose() {
     if (this.fadeTimer != null) window.clearTimeout(this.fadeTimer);
     if (this.ambientStopTimer != null) window.clearTimeout(this.ambientStopTimer);
     this.teardownAmbientNodes();
+    this.stopWantedSiren();
+    this.heatLevel = 0;
+    if (this.engineNodes) {
+      try {
+        this.engineNodes.osc.stop();
+        this.engineNodes.sub.stop();
+      } catch {
+        /* ignore */
+      }
+      this.engineNodes = null;
+    }
+    this.vehicleSpeedSource = null;
     try {
       this.mediaEl?.pause();
     } catch {
@@ -603,6 +887,7 @@ class CityAudioEngine {
     void this.ctx?.close();
     this.ctx = null;
     this.master = null;
+    this.masterConnected = false;
     this.musicGain = null;
     this.sfxGain = null;
     this.unlocked = false;

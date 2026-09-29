@@ -14,6 +14,7 @@ import {
 import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
+import { useVehicleStore, getCarBody } from "@/lib/orbitxcity/vehicleStore";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const WALK_SPEED = 7.5;
@@ -114,6 +115,9 @@ export function PlayerAvatar({
   const reportAcc = useRef(0);
   const lastReported = useRef({ x: spawn.x, z: spawn.z, yaw: 0 });
   const [chat, setChat] = useState<string | null>(null);
+  // WORKER 2 (vehicles): camera/movement yield + enter-car animation beat.
+  const vehicleMode = useVehicleStore((s) => s.mode);
+  const enterAnim = useRef<{ carId: string; t: number; fromX: number; fromZ: number } | null>(null);
 
   // Respawn when the selected city block changes
   useEffect(() => {
@@ -149,6 +153,53 @@ export function PlayerAvatar({
     // Allow up to 120ms steps so low-FPS devices keep full movement speed
     const t = Math.min(rawDt, 0.12);
     if (transitionCd.current > 0) transitionCd.current -= t;
+
+    // --- Vehicle handoff (WORKER 2): while driving, VehicleController owns
+    // movement + camera, so the avatar yields completely here.
+    const vs = useVehicleStore.getState();
+    if (vs.mode === "driving") return;
+
+    // Enter-car beat: walk to the driver-side door and shrink into the car
+    // over 0.45s, then hand control to the vehicle system.
+    if (vs.enteringCarId) {
+      const car = getCarBody(vs.enteringCarId);
+      if (!car) {
+        vs.cancelEnter();
+        enterAnim.current = null;
+      } else {
+        if (!enterAnim.current || enterAnim.current.carId !== vs.enteringCarId) {
+          enterAnim.current = { carId: vs.enteringCarId, t: 0, fromX: pos.current.x, fromZ: pos.current.z };
+        }
+        const a = enterAnim.current;
+        a.t += t / 0.45;
+        const kk = Math.min(1, a.t);
+        const e = kk * kk * (3 - 2 * kk);
+        const dx = car.pos.x + Math.cos(car.yaw) * 1.6;
+        const dz = car.pos.z - Math.sin(car.yaw) * 1.6;
+        pos.current.x = a.fromX + (dx - a.fromX) * e;
+        pos.current.z = a.fromZ + (dz - a.fromZ) * e;
+        if (Math.abs(dx - pos.current.x) + Math.abs(dz - pos.current.z) > 0.01) {
+          yaw.current = Math.atan2(dx - pos.current.x, dz - pos.current.z);
+        }
+        characterAnimation.current.moving = true;
+        characterAnimation.current.time = clock.elapsedTime * 2.2;
+        characterAnimation.current.walkIntensity = 1;
+        if (group.current) {
+          group.current.position.set(pos.current.x, 0, pos.current.z);
+          group.current.rotation.y = yaw.current;
+          group.current.scale.setScalar(Math.max(0.02, 1 - e * 0.98));
+        }
+        if (kk >= 1) {
+          enterAnim.current = null;
+          if (group.current) group.current.scale.setScalar(1);
+          vs.completeEnter();
+        }
+        return; // camera holds still during the beat
+      }
+    } else {
+      enterAnim.current = null;
+    }
+
     let inputX = 0;
     let inputZ = 0;
     if (keys.has("KeyW") || keys.has("ArrowUp")) inputZ -= 1;
@@ -313,6 +364,10 @@ export function PlayerAvatar({
     const show = lc && Date.now() - lc.at < 4500 ? lc.text : null;
     if (show !== chat) setChat(show);
   });
+
+  // Hidden while driving — the seated driver inside DrivableCar represents
+  // the player instead (WORKER 2 vehicle handoff).
+  if (vehicleMode === "driving") return null;
 
   return (
     <group ref={group} position={[spawn.x, 0, spawn.z]}>

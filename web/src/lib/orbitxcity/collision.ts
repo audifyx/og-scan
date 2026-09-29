@@ -76,6 +76,42 @@ function inDoorwaySlot(x: number, z: number, radius: number, b: BuildingDefiniti
   return Math.abs(x - cx) + radius <= halfDoor && z + radius > minZ && z - radius < maxZ;
 }
 
+/** Axis-aligned building footprint + height, for characters/cars/AI. */
+export interface BuildingAABB {
+  id: string;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  height: number;
+}
+
+/** Building AABBs for the whole block — cached per block object. */
+const aabbCache = new WeakMap<WorldBlockConfig, Array<{ aabb: BuildingAABB; def: BuildingDefinition }>>();
+export function getBuildingAABBs(block: WorldBlockConfig = NYC_DEMO_BLOCK): BuildingAABB[] {
+  let cached = aabbCache.get(block);
+  if (!cached) {
+    cached = block.buildings.map((b) => ({
+      def: b,
+      aabb: {
+        id: b.id,
+        minX: b.position.x - b.size.width / 2,
+        maxX: b.position.x + b.size.width / 2,
+        minZ: b.position.z - b.size.depth / 2,
+        maxZ: b.position.z + b.size.depth / 2,
+        height: b.size.height,
+      },
+    }));
+    aabbCache.set(block, cached);
+  }
+  return cached.map((c) => c.aabb);
+}
+
+/** City bounds (walkable rectangle) for the block. */
+export function getCityBounds(block: WorldBlockConfig = NYC_DEMO_BLOCK): WorldBlockConfig["bounds"] {
+  return block.bounds;
+}
+
 /** 2D collision against building AABBs + world bounds, with south doorway gaps. */
 export function collidesAt(
   x: number,
@@ -85,14 +121,12 @@ export function collidesAt(
   ignoreBuildingId?: string | null,
 ): boolean {
   const { bounds } = block;
-  for (const b of block.buildings) {
+  getBuildingAABBs(block); // warm the per-block cache
+  const cached = aabbCache.get(block)!;
+  for (const { aabb: b, def } of cached) {
     if (ignoreBuildingId && b.id === ignoreBuildingId) continue;
-    const minX = b.position.x - b.size.width / 2;
-    const maxX = b.position.x + b.size.width / 2;
-    const minZ = b.position.z - b.size.depth / 2;
-    const maxZ = b.position.z + b.size.depth / 2;
-    if (x + radius > minX && x - radius < maxX && z + radius > minZ && z - radius < maxZ) {
-      if (inDoorwaySlot(x, z, radius, b)) continue;
+    if (x + radius > b.minX && x - radius < b.maxX && z + radius > b.minZ && z - radius < b.maxZ) {
+      if (inDoorwaySlot(x, z, radius, def)) continue;
       return true;
     }
   }
@@ -194,7 +228,30 @@ export function hashSeed(s: string): number {
   return h >>> 0;
 }
 
-function cameraSolidsFor(block: WorldBlockConfig, ignoreBuildingId?: string | null) {
+interface CameraSolid {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  minY: number;
+  maxY: number;
+}
+
+/** Cached per block — pointInBuilding runs every frame for the chase camera. */
+const cameraSolidsCache = new WeakMap<WorldBlockConfig, CameraSolid[]>();
+function cameraSolidsFor(block: WorldBlockConfig, ignoreBuildingId?: string | null): CameraSolid[] {
+  if (!ignoreBuildingId) {
+    let cached = cameraSolidsCache.get(block);
+    if (!cached) {
+      cached = buildCameraSolids(block, null);
+      cameraSolidsCache.set(block, cached);
+    }
+    return cached;
+  }
+  return buildCameraSolids(block, ignoreBuildingId);
+}
+
+function buildCameraSolids(block: WorldBlockConfig, ignoreBuildingId?: string | null): CameraSolid[] {
   return [
     ...block.buildings
       .filter((b) => !ignoreBuildingId || b.id !== ignoreBuildingId)

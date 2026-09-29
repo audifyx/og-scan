@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { getDayNight } from "@/lib/orbitxcity/dayNight";
 
 interface DroneSpec {
   radius: number;
@@ -33,7 +34,9 @@ function Drone({ spec, origin }: { spec: DroneSpec; origin: { x: number; z: numb
     }
     if (lamp.current) {
       const mat = lamp.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.5 + Math.abs(Math.sin(clock.elapsedTime * 4 + spec.phase)) * 0.5;
+      // Nav light strobes harder at night.
+      const nightBoost = 0.45 + getDayNight().lampLevel * 0.55;
+      mat.opacity = (0.5 + Math.abs(Math.sin(clock.elapsedTime * 4 + spec.phase)) * 0.5) * nightBoost;
     }
   });
 

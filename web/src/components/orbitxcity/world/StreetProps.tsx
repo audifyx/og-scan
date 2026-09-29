@@ -1,7 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
+import { getDayNight } from "@/lib/orbitxcity/dayNight";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
@@ -11,6 +13,7 @@ const LAMP_SPACING = 16;
 /** Instanced street lamps generated along every street segment. */
 function LampField({ block }: { block: WorldBlockConfig }) {
   const streets = getWorldStreets(block.cityId);
+  const headMat = useRef<THREE.MeshStandardMaterial | null>(null);
   const { poles, heads } = useMemo(() => {
     const spots: Array<[number, number]> = [];
     for (const s of streets) {
@@ -31,14 +34,15 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     const polesMesh = new THREE.InstancedMesh(poleGeo, poleMat, spots.length);
 
     const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.28);
-    const headMat = new THREE.MeshStandardMaterial({
+    const headsMat = new THREE.MeshStandardMaterial({
       color: "#d8d2c0",
-      emissive: "#c4b896",
+      emissive: "#ffd9a0",
       emissiveIntensity: 0.45,
       metalness: 0.35,
       roughness: 0.4,
     });
-    const headsMesh = new THREE.InstancedMesh(headGeo, headMat, spots.length);
+    headMat.current = headsMat;
+    const headsMesh = new THREE.InstancedMesh(headGeo, headsMat, spots.length);
 
     const m = new THREE.Matrix4();
     spots.forEach(([x, z], i) => {
@@ -51,6 +55,13 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     headsMesh.instanceMatrix.needsUpdate = true;
     return { poles: polesMesh, heads: headsMesh };
   }, [block, streets]);
+
+  // Lamp heads glow harder at night, dim at noon — one material mutation.
+  useFrame(() => {
+    if (!headMat.current) return;
+    const dn = getDayNight();
+    headMat.current.emissiveIntensity = 0.12 + dn.lampLevel * 1.5;
+  });
 
   if (!poles || !heads) return null;
 
@@ -65,6 +76,7 @@ function LampField({ block }: { block: WorldBlockConfig }) {
 function StreetLampLights({ block }: { block: WorldBlockConfig }) {
   const { quality } = useCity();
   const high = quality === "high";
+  const lights = useRef<Array<THREE.PointLight | null>>([]);
   const spots = useMemo(() => {
     const streets = getWorldStreets(block.cityId);
     const out: Array<[number, number]> = [];
@@ -79,6 +91,15 @@ function StreetLampLights({ block }: { block: WorldBlockConfig }) {
     return out.slice(0, high ? 14 : 6);
   }, [block, high]);
 
+  // Real lights fade in at dusk and out at dawn — capped count (14 / 6).
+  useFrame(() => {
+    const dn = getDayNight();
+    const base = high ? 1.35 : 0.95;
+    lights.current.forEach((l) => {
+      if (l) l.intensity = base * dn.lampLevel;
+    });
+  });
+
   return (
     <group>
       {spots.map(([x, z], i) => (
@@ -88,8 +109,11 @@ function StreetLampLights({ block }: { block: WorldBlockConfig }) {
             <meshBasicMaterial color="#f0e2b8" toneMapped={false} />
           </mesh>
           <pointLight
-            intensity={high ? 1.35 : 0.95}
-            color={i % 3 === 0 ? "#00ff9f" : "#f0d7a0"}
+            ref={(l) => {
+              lights.current[i] = l;
+            }}
+            intensity={0}
+            color={i % 3 === 0 ? "#7dffc8" : "#f0d7a0"}
             distance={high ? 18 : 14}
             decay={2}
           />
