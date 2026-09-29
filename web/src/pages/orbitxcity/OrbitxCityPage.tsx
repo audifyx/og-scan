@@ -1,69 +1,35 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CityProvider, useCity } from "./CityProvider";
-import { WorldCanvas } from "@/components/orbitxcity/WorldCanvas";
-import { MainMenu } from "@/components/orbitxcity/ui/MainMenu";
-import { CharacterSelect } from "@/components/orbitxcity/ui/CharacterSelect";
-import { LobbiesGate } from "@/components/orbitxcity/ui/LobbiesGate";
-import { SettingsGate } from "@/components/orbitxcity/ui/SettingsGate";
-import { CityHUD } from "@/components/orbitxcity/ui/CityHUD";
-import { CityAudioController } from "@/components/orbitxcity/ui/CityAudioController";
-import { CitySaveController } from "@/components/orbitxcity/ui/CitySaveController";
-import { LoadingScreen } from "@/components/orbitxcity/ui/LoadingScreen";
-import { fetchCityMarketSnapshot } from "@/lib/orbitxcity/marketData";
-import { preloadCityAssets } from "@/lib/orbitxcity/assets/preload";
+import { Suspense, lazy, useEffect } from "react";
 import "./city.css";
 
-function CityShell() {
-  const { gate, entered } = useCity();
-  const [worldReady, setWorldReady] = useState(false);
+const OrbitxCityGTA = lazy(() => import("@/city/core/OrbitxCityGTA"));
 
-  const { data: market } = useQuery({
-    queryKey: ["orbitxcity-market"],
-    queryFn: fetchCityMarketSnapshot,
-    refetchInterval: 30_000,
-    staleTime: 15_000,
-    enabled: entered,
-  });
-
+/**
+ * /Orbitxcity — GTA-style open world. Heavy Three.js code is lazy-loaded
+ * so it never touches the main bundle. CityProvider.tsx is intentionally
+ * left in place: other workstreams (3D metaverse components) import it.
+ */
+export default function OrbitxCityPage() {
   useEffect(() => {
     document.body.classList.add("oxc-lock");
-    preloadCityAssets();
     return () => document.body.classList.remove("oxc-lock");
   }, []);
 
-  useEffect(() => {
-    if (gate !== "world") setWorldReady(false);
-  }, [gate]);
-
-  const inWorld = gate === "world" && entered;
-
   return (
-    <div className="oxc-root">
-      <CityAudioController />
-      <CitySaveController />
-      {gate === "menu" && <MainMenu />}
-      {gate === "characters" && <CharacterSelect />}
-      {gate === "lobbies" && <LobbiesGate />}
-      {gate === "settings" && <SettingsGate />}
-      {inWorld && !worldReady && (
-        <LoadingScreen ready onEnter={() => setWorldReady(true)} />
-      )}
-      {inWorld && worldReady && (
-        <>
-          <WorldCanvas tickerRows={market?.trending ?? []} />
-          <CityHUD />
-        </>
-      )}
+    <div className="ocg-root">
+      <Suspense
+        fallback={
+          <div className="ocg-screen">
+            <div className="ocg-screen-bg" />
+            <div className="ocg-title-wrap">
+              <p className="ocg-kicker">OrbitX presents</p>
+              <h1 className="ocg-logo">ORBITX<span>CITY</span></h1>
+              <p className="ocg-tagline">Loading the city…</p>
+            </div>
+          </div>
+        }
+      >
+        <OrbitxCityGTA />
+      </Suspense>
     </div>
-  );
-}
-
-/** Immersive OrbitX City — AAA menu → characters/lobbies → multi-city world. */
-export default function OrbitxCityPage() {
-  return (
-    <CityProvider>
-      <CityShell />
-    </CityProvider>
   );
 }
