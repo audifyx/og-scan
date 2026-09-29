@@ -153,7 +153,9 @@ function nvidiaKey() {
   return trim(process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "");
 }
 function nvidiaModel() {
-  return trim(process.env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct");
+  // 2026-09-29: NVIDIA retired meta/llama-3.3-70b-instruct (HTTP 410 on every
+  // tick). Default to the account's single working model; NVIDIA_MODEL still overrides.
+  return trim(process.env.NVIDIA_MODEL || "openai/gpt-oss-20b");
 }
 
 async function nvidiaThesis(token, thesis) {
