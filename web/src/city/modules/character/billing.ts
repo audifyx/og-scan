@@ -18,6 +18,7 @@
  */
 import { useMemo, useRef, useState } from "react";
 import type { BurnReceipt, CharacterBillingProvider } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 const NOT_CONNECTED: CharacterBillingProvider = {
   ready: false,
@@ -46,13 +47,24 @@ export async function purchaseBurn(
     return { ok: false, code: "not-connected", message: "Connect your OrbitX wallet to burn ORBITX for purchases." };
   }
   try {
-    const ref = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const { signature } = await billing.spend({ amount, reason: `city:character:${kind}:${itemId}`, ref });
+    // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
+    const res = await burnPurchase(billing, {
+      amount,
+      itemId: `${kind}:${itemId}`,
+      label: `Character ${kind}: ${itemId}`,
+      reason: `city:character:${kind}:${itemId}`,
+      module: "character",
+    });
+    if (!res.ok) {
+      return {
+        ok: false as const,
+        code: (res.code === "not-authed" ? "not-connected" : "failed") as "not-connected" | "failed",
+        message: res.message,
+      };
+    }
     return {
       ok: true,
-      receipt: { itemId, kind, amount, signature, at: Date.now() },
+      receipt: { itemId, kind, amount, signature: res.signature, at: Date.now() },
     };
   } catch (err) {
     return { ok: false, code: "failed", message: err instanceof Error ? err.message : "Burn failed." };

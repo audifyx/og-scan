@@ -16,6 +16,7 @@ import type {
   EventsWallet,
   OrbitxBillingProvider,
 } from "../types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 export type MarketCurrency = "CITY" | "ORBITX";
 
@@ -94,12 +95,16 @@ export async function buyMarketItem(
     return { ok: false, message: "ORBITX checkout needs wallet auth — connect to burn & claim." };
   }
   try {
-    const ref = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
-    const { signature } = await ctx.billing.spend({
+    // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
+    const res = await burnPurchase(ctx.billing, {
       amount: Math.ceil(item.price),
-      reason: `city-bank:${item.id}`,
-      ref,
+      itemId: item.id,
+      label: item.label,
+      reason: `city:events:market:${item.id}`,
+      module: "events",
     });
+    if (!res.ok) return { ok: false, message: res.message };
+    const { signature } = res;
     const reward: EventReward = { kind: "cosmetic", itemId: item.id, label: `${item.label} (burn ${signature.slice(0, 8)}…)` };
     ctx.onReward?.(reward);
     return { ok: true, message: `${item.label} claimed — ${item.price} ORBITX burned.`, reward };

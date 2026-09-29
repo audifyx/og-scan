@@ -33,6 +33,7 @@ import type {
   PostBountyError,
   PostBountyResult,
 } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 export const BOUNTY_STORAGE_KEY = "orbitxcity:bounties:v1";
 
@@ -271,11 +272,19 @@ export class BountyStore {
       const billing = ports.billing;
       if (!billing || !billing.ready) return { ok: false, error: "billing_not_ready" };
       try {
-        const { signature } = await billing.spend({
+        // Canonical buy-and-burn — the burn tx IS the escrow funding; the
+        // backend escrow service indexes by escrowRef and holds the value.
+        // Dry-run safe: records the would-be call without touching the chain.
+        const res = await burnPurchase(billing, {
           amount: bounty.amount,
+          itemId: bounty.id,
+          label: `Bounty escrow: ${bounty.id}`,
           reason: `city:bounty:${bounty.id}`,
           ref: bounty.escrowRef,
+          module: "bounty",
         });
+        if (!res.ok) throw new Error(res.message);
+        const { signature } = res;
         bounty.burnSignature = signature;
         this.escrow.push({
           bountyId: bounty.id,

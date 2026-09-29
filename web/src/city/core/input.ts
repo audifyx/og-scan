@@ -12,8 +12,18 @@ export interface InputState {
   handbrake: boolean;
 }
 
+/**
+ * The live input state the touch layer writes into. The touch joystick
+ * (HUD) talks to module-level setters, not to an InputState instance, so
+ * createInput registers each state here and the setters write through to it.
+ * Only one game session is live at a time; the newest registration wins.
+ */
+let boundInput: InputState | null = null;
+
 export function createInput(): InputState {
-  return { moveX: 0, moveY: 0, sprint: false, jump: false, action: false, handbrake: false };
+  const s: InputState = { moveX: 0, moveY: 0, sprint: false, jump: false, action: false, handbrake: false };
+  boundInput = s;
+  return s;
 }
 
 const KEYMAP: Record<string, "up" | "down" | "left" | "right"> = {
@@ -94,10 +104,19 @@ let touchSprint = false;
 
 export function setTouchMove(x: number, y: number) {
   touchActive = x !== 0 || y !== 0;
+  // The joystick is useless if it never reaches the game state (root cause of
+  // dead mobile movement): write the axes straight into the bound InputState.
+  if (boundInput) {
+    boundInput.moveX = Math.max(-1, Math.min(1, x));
+    boundInput.moveY = Math.max(-1, Math.min(1, y));
+  }
 }
 
 export function setTouchSprint(v: boolean) {
   touchSprint = v;
+  // KeyboardInput.recompute() only runs on keyboard events, so a pure-touch
+  // device would never observe this flag — write it through directly.
+  if (boundInput) boundInput.sprint = v;
 }
 
 /** Camera orbit drag (pointer) — the world reads the accumulated deltas. */

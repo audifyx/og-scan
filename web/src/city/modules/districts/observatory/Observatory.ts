@@ -15,15 +15,17 @@ import * as THREE from "three";
 import type { Constellation, DoorTrigger, Vec3T } from "../types";
 
 export const OBSERVATORY_INTERIOR_ID = "observatory";
+/** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
+export const OBSERVATORY_FACADE_CENTER: Vec3T = [-95, 0, -78];
 export const OBSERVATORY_DOOR: DoorTrigger = {
   id: "door:observatory",
   label: "OrbitX Observatory",
-  position: [-110, 0, -110],
+  position: [-95, 0, -63],
   radius: 5,
   prompt: "Enter Observatory",
   interiorId: OBSERVATORY_INTERIOR_ID,
   interiorSpawn: [0, 0, 8],
-  exitPosition: [-110, 0, -105],
+  exitPosition: [-95, 0, -64],
 };
 
 /* ------------------------------ star field data ----------------------------- */
@@ -266,6 +268,6 @@ export function buildObservatoryExterior(): THREE.Group {
   slit.position.set(0, 9.5, 6.4);
   slit.rotation.x = 0.35;
   g.add(slit);
-  g.position.set(...OBSERVATORY_DOOR.position);
+  g.position.set(...OBSERVATORY_FACADE_CENTER);
   return g;
 }

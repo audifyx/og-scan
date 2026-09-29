@@ -23,6 +23,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import type { BurnRecord, OrbitxBillingProvider } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 const BURN_LOG_KEY = "orbitxcity:burn-log:v1";
 const MAX_BURNS = 100;
@@ -38,14 +39,6 @@ function loadBurns(): BurnRecord[] {
     /* ignore */
   }
   return [];
-}
-
-function saveBurns(burns: BurnRecord[]) {
-  try {
-    localStorage.setItem(BURN_LOG_KEY, JSON.stringify(burns.slice(0, MAX_BURNS)));
-  } catch {
-    /* ignore */
-  }
 }
 
 export interface CityBilling {
@@ -80,23 +73,21 @@ export function useCityBilling(provider?: OrbitxBillingProvider): CityBilling {
       if (amount <= 0) throw new Error("Invalid amount");
       setBusy(true);
       try {
-        const ref = crypto.randomUUID();
-        const { signature } = await provider.spend({
+        // Canonical buy-and-burn: validates, normalizes the reason,
+        // writes the shared burn ledger, and (outside dry-run) calls the
+        // real backend-signed burn via provider.spend().
+        const res = await burnPurchase(provider, {
           amount,
-          reason: `city-bank:${itemId}`,
-          ref,
-        });
-        const record: BurnRecord = {
-          at: Date.now(),
           itemId,
-          itemLabel,
-          amount,
-          signature,
-          ref,
-        };
-        saveBurns([record, ...loadBurns()]);
+          label: itemLabel,
+          reason: `city:bank:${itemId}`,
+          module: "economy",
+        });
+        if (!res.ok) throw new Error(res.message);
+        // burnPurchase already appended to the shared burn log (same key);
+        // refresh the local view instead of double-writing.
         setBurns(loadBurns());
-        return { signature };
+        return { signature: res.signature };
       } finally {
         setBusy(false);
       }

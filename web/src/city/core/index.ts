@@ -5,13 +5,17 @@
  * controller, enter/exit + arcade car driving, camera, day/night cycle,
  * collision, mobile touch controls. GTA-style, realistic, not blocky.
  *
+ * Character movement hooks: GTAWorld.setMovementMods() consumes stat
+ * modifiers (sprint speed ×, acceleration ×) from the character module's
+ * getDerivedEffects(profile) — core never imports module code.
+ *
  * Module teams (`web/src/city/modules/*`): import what you need from here.
  * Document your needs in your MODULE.md. Additive scene work only — never
  * fight the core loop for player/vehicle control.
  */
 
 export { GTAWorld } from "./World";
-export type { HudState, Quote, WorldOpts } from "./World";
+export type { HudState, Quote, WorldOpts, MovementMods } from "./World";
 
 export {
   createInput,

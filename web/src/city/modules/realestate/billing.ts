@@ -23,6 +23,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import type { BurnRecord, OrbitxBillingProvider } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 /** Shared with the economy module's bank so burn history is unified. */
 const BURN_LOG_KEY = "orbitxcity:burn-log:v1";
@@ -39,14 +40,6 @@ function loadBurns(): BurnRecord[] {
     /* ignore */
   }
   return [];
-}
-
-function saveBurns(burns: BurnRecord[]) {
-  try {
-    localStorage.setItem(BURN_LOG_KEY, JSON.stringify(burns.slice(0, MAX_BURNS)));
-  } catch {
-    /* ignore */
-  }
 }
 
 export interface RealEstateBilling {
@@ -82,23 +75,19 @@ export function useRealEstateBilling(provider?: OrbitxBillingProvider): RealEsta
       const whole = Math.ceil(amount); // ORBITX spends are whole tokens
       setBusy(true);
       try {
-        const ref = crypto.randomUUID();
-        const { signature } = await provider.spend({
+        // Canonical buy-and-burn (dry-run safe, normalized reason, shared ledger).
+        const res = await burnPurchase(provider, {
           amount: whole,
-          reason: `city-realestate:${itemId}`,
-          ref,
-        });
-        const record: BurnRecord = {
-          at: Date.now(),
           itemId,
-          itemLabel,
-          amount: whole,
-          signature,
-          ref,
-        };
-        saveBurns([record, ...loadBurns()]);
+          label: itemLabel,
+          reason: `city:realestate:${itemId}`,
+          module: "realestate",
+        });
+        if (!res.ok) throw new Error(res.message);
+        // burnPurchase already appended to the shared burn log (same key);
+        // refresh the local view instead of double-writing.
         setBurns(loadBurns());
-        return { signature };
+        return { signature: res.signature };
       } finally {
         setBusy(false);
       }

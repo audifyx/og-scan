@@ -14,19 +14,12 @@ import { useState } from "react";
 import { GADGET_CATALOG, catalogBurnTotal } from "./catalog";
 import { useGadgetInventory } from "./store";
 import type { GadgetBillingProvider, GadgetId } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 export interface GadgetShopProps {
   /** Billing provider injected by the integrator. Null = not available yet. */
   billing: GadgetBillingProvider | null;
   onClose: () => void;
-}
-
-function makeRef(): string {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `gadget-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
-  }
 }
 
 export function GadgetShop({ billing, onClose }: GadgetShopProps) {
@@ -43,13 +36,17 @@ export function GadgetShop({ billing, onClose }: GadgetShopProps) {
     if (!item || owns(id)) return;
     setBuying(id);
     setError(null);
-    const ref = makeRef();
     try {
-      const { signature } = await billing.spend({
+      // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
+      const res = await burnPurchase(billing, {
         amount: item.priceOrbitx,
+        itemId: id,
+        label: item.label,
         reason: `city:gadget:${id}`,
-        ref,
+        module: "gadgets",
       });
+      if (!res.ok) throw new Error(res.message);
+      const { signature, ref } = res;
       recordPurchase(id, {
         at: Date.now(),
         gadgetId: id,

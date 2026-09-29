@@ -16,6 +16,7 @@
  * Never imports `@/tokenomics/*` — would break the build.
  */
 import type { BurnReceipt } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 export interface BurnOpts {
   amount: number; // whole ORBITX tokens
@@ -67,12 +68,17 @@ export function adaptBillingToBurnProvider(billing: BillingLike): IBurnProvider 
     log,
     burn: async (opts) => {
       if (!billing.ready) throw new Error("Wallet auth required — run the dashboard auth flow first");
-      const { signature } = await billing.spend({
+      // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
+      const res = await burnPurchase(billing, {
         amount: opts.amount,
+        itemId: opts.reason,
+        label: "Vehicles purchase",
         reason: opts.reason,
         ref: opts.ref ?? `veh-${Date.now()}`,
+        module: "vehicles",
       });
-      const r: BurnReceipt = { ok: true, signature, amount: opts.amount, reason: opts.reason, paperOnly: false };
+      if (!res.ok) throw new Error(res.message);
+      const r: BurnReceipt = { ok: true, signature: res.signature, amount: opts.amount, reason: opts.reason, paperOnly: false };
       log.push(r);
       return r;
     },

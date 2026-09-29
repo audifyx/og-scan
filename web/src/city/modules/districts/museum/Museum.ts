@@ -15,15 +15,17 @@ import * as THREE from "three";
 import type { DoorTrigger, RugExhibit, TokenQuote, Vec3T } from "../types";
 
 export const MUSEUM_INTERIOR_ID = "museum-of-rugs";
+/** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
+export const MUSEUM_FACADE_CENTER: Vec3T = [78, 0, 156];
 export const MUSEUM_DOOR: DoorTrigger = {
   id: "door:museum",
   label: "Museum of Rugs",
-  position: [30, 0, 90],
+  position: [78, 0, 173],
   radius: 4,
   prompt: "Enter Museum of Rugs",
   interiorId: MUSEUM_INTERIOR_ID,
   interiorSpawn: [0, 0, 16],
-  exitPosition: [30, 0, 86],
+  exitPosition: [78, 0, 172],
 };
 
 const EXHIBITS_KEY = "orbitxcity:rug-exhibits:v1";
@@ -294,7 +296,7 @@ export function buildMuseumExterior(): THREE.Group {
   );
   stone.position.set(8, 1.5, D / 2 + 4);
   g.add(stone);
-  g.position.set(...MUSEUM_DOOR.position);
+  g.position.set(...MUSEUM_FACADE_CENTER);
   return g;
 }
 

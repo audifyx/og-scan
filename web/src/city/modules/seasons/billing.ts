@@ -22,6 +22,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { SeasonBillingProvider } from "./types";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 export interface SeasonBilling {
   /** True once the tokenomics provider is injected AND auth-once is complete. */
@@ -62,13 +63,20 @@ export function useSeasonBilling(provider?: SeasonBillingProvider | null): Seaso
       setBusy(true);
       setError(null);
       try {
-        // Backend-signed burn — no wallet popup, ever.
-        const { signature } = await provider.spend({
+        // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
+        const res = await burnPurchase(provider, {
           amount: Math.floor(amount),
+          itemId: seasonId,
+          label: `Season pass: ${seasonId}`,
           reason: `city:season-pass:${seasonId}`,
-          ref: newId(),
+          module: "seasons",
         });
-        return { signature };
+        if (!res.ok) {
+          const msg = res.message;
+          setError(msg);
+          throw new Error(msg);
+        }
+        return { signature: res.signature };
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Burn failed — no ORBITX was spent.";
         setError(msg);
@@ -93,12 +101,4 @@ export function useSeasonBilling(provider?: SeasonBillingProvider | null): Seaso
     }),
     [provider, busy, error, enterPremium, beginAuth, clearError],
   );
-}
-
-function newId(): string {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return `ref-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
-  }
 }

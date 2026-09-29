@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
+import { GtaBootScreen } from "@/city/core/GtaScreens";
 import "./city.css";
 
 const OrbitxCityGTA = lazy(() => import("@/city/core/OrbitxCityGTA"));
@@ -16,18 +17,7 @@ export default function OrbitxCityPage() {
 
   return (
     <div className="ocg-root">
-      <Suspense
-        fallback={
-          <div className="ocg-screen">
-            <div className="ocg-screen-bg" />
-            <div className="ocg-title-wrap">
-              <p className="ocg-kicker">OrbitX presents</p>
-              <h1 className="ocg-logo">ORBITX<span>CITY</span></h1>
-              <p className="ocg-tagline">Loading the city…</p>
-            </div>
-          </div>
-        }
-      >
+      <Suspense fallback={<GtaBootScreen />}>
         <OrbitxCityGTA />
       </Suspense>
     </div>

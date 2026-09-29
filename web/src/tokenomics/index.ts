@@ -16,6 +16,18 @@ export type { McpToolResult, DeskWalletInfo, BurnResult } from "./mcpClient";
 export { useOrbitxBilling, getSpendLedger } from "./useOrbitxBilling";
 export type { SpendArgs, SpendLedgerEntry } from "./useOrbitxBilling";
 
+export {
+  burnPurchase,
+  burnReason,
+  normalizeBurnReason,
+  getBurnLedger,
+  getBurnDryRunLog,
+  clearBurnDryRunLog,
+  setBurnDryRun,
+  isBurnDryRun,
+} from "./burnFlow";
+export type { BurnBillingLike, BurnLogRecord, BurnPurchaseArgs, BurnPurchaseResult } from "./burnFlow";
+
 export { meetsHold, useAlphaGate, useProAccess, grantProUnlock, useFeeDiscount, useSupportPriority } from "./gating";
 
 export { createAuction, settleAuctionPure, useAuctions } from "./auction";

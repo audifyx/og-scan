@@ -23,9 +23,9 @@ export type {
 } from "./types";
 
 /* ---------------------------------- billing --------------------------------- */
-export type { DistrictsBilling } from "./billing";
+export type { DistrictsBilling, BurnPurchaseLike } from "./billing";
 export {
-  NoopBilling, billingFromTokenomicsHook, premiumPriceLabel,
+  NoopBilling, billingFromTokenomicsHook, billingFromBurnPurchase, premiumPriceLabel,
 } from "./billing";
 
 /* ------------------------------- paper wallet -------------------------------- */
@@ -51,11 +51,15 @@ import { LIBRARY_DOOR } from "./library/Library";
 import { OBSERVATORY_DOOR } from "./observatory/Observatory";
 import { LIGHTHOUSE_DOOR } from "./lighthouse/Lighthouse";
 import { CITYHALL_DOOR } from "./cityhall/CityHall";
+import { BANK_DOOR } from "./bank/Bank";
+import { DEALERSHIP_DOOR } from "./dealership/Dealership";
+import { SHOPS_DOOR } from "./shops/Shops";
 
 /** All outdoor door triggers shipped by this module (climb included). */
 export const DISTRICT_DOORS = [
   EXCHANGE_DOOR, HOSPITAL_DOOR, MUSEUM_DOOR, LIBRARY_DOOR,
   OBSERVATORY_DOOR, LIGHTHOUSE_DOOR, CITYHALL_DOOR,
+  BANK_DOOR, DEALERSHIP_DOOR, SHOPS_DOOR,
 ] as const;
 
 /** Register every district door with the DoorSystem. Call once at world boot. */
@@ -135,22 +139,121 @@ export { default as CityHallUI } from "./cityhall/CityHallUI";
 
 /* ------------------------------- 9. second island ------------------------------ */
 export {
-  BRIDGE, ISLAND_ZONES,
-  registerIslandBuilder, buildBridge, bridgeCollider,
-  buildIslandScene, buildAllIslands,
+  BRIDGE, BRIDGE_RAMP_MAIN, BRIDGE_RAMP_ISLAND, ISLAND_SURFACE_Y, ISLAND_ZONES,
+  registerIslandBuilder, buildBridge, bridgeCollider, bridgeDriveBoxes,
+  buildIslandScene, buildAllIslands, islandColliders,
 } from "./second-island/SecondIsland";
-export type { BridgeSeamSpec, IslandBuilder, IslandScene } from "./second-island/SecondIsland";
+export type { BridgeSeamSpec, IslandBuilder, IslandScene, DriveBox } from "./second-island/SecondIsland";
+
+/* ------------------------------ 10. orbitx bank ------------------------------ */
+export {
+  BANK_INTERIOR_ID, BANK_DOOR, BANK_FACADE_CENTER,
+  VAULT_COST_ORBITX, VAULT_BURN_REASON, SAFE_BOX_COST_CITY,
+  getBankState, buySafeBox, markVaultMember,
+  buildBankExterior, buildBankInterior,
+} from "./bank/Bank";
+export type { BankInterior, BankState } from "./bank/Bank";
+export { default as BankUI } from "./bank/BankUI";
+
+/* ------------------------------ 11. car dealership ---------------------------- */
+export {
+  DEALERSHIP_INTERIOR_ID, DEALERSHIP_DOOR, DEALERSHIP_FACADE_CENTER,
+  SHOWROOM, vehicleBurnReason, ownedVehicles, ownsVehicle,
+  buyVehiclePaper, buyVehiclePremium,
+  buildDealershipExterior, buildDealershipInterior, buildDemoCar,
+} from "./dealership/Dealership";
+export type { DealershipInterior, ShowroomVehicle } from "./dealership/Dealership";
+export { default as DealershipUI } from "./dealership/DealershipUI";
+
+/* --------------------------------- 12. shops --------------------------------- */
+export {
+  SHOPS_INTERIOR_ID, SHOPS_DOOR, SHOPS_FACADE_CENTER,
+  SHOP_CATALOG, shopBurnReason, shopInventory,
+  buyShopItemPaper, buyShopItemPremium,
+  buildShopsExterior, buildShopsInterior,
+} from "./shops/Shops";
+export type { ShopsInterior, ShopItem } from "./shops/Shops";
+export { default as ShopsUI } from "./shops/ShopsUI";
 
 /* ------------------------------ bulk scene helpers --------------------------- */
-import { buildExchangeExterior } from "./exchange/Exchange";
-import { buildHospitalExterior } from "./hospital/Hospital";
-import { buildMuseumExterior } from "./museum/Museum";
-import { buildLibraryExterior } from "./library/Library";
-import { buildObservatoryExterior } from "./observatory/Observatory";
+import { buildExchangeExterior, EXCHANGE_FACADE_CENTER } from "./exchange/Exchange";
+import { buildHospitalExterior, HOSPITAL_FACADE_CENTER } from "./hospital/Hospital";
+import { buildMuseumExterior, MUSEUM_FACADE_CENTER } from "./museum/Museum";
+import { buildLibraryExterior, LIBRARY_FACADE_CENTER } from "./library/Library";
+import { buildObservatoryExterior, OBSERVATORY_FACADE_CENTER } from "./observatory/Observatory";
 import { buildLighthouse } from "./lighthouse/Lighthouse";
-import { buildCityHallExterior } from "./cityhall/CityHall";
+import { buildCityHallExterior, CITYHALL_FACADE_CENTER } from "./cityhall/CityHall";
+import { buildBankExterior, BANK_FACADE_CENTER } from "./bank/Bank";
+import { buildDealershipExterior, DEALERSHIP_FACADE_CENTER } from "./dealership/Dealership";
+import { buildShopsExterior, SHOPS_FACADE_CENTER } from "./shops/Shops";
 import { buildBridge, buildAllIslands, ISLAND_ZONES as ZONES } from "./second-island/SecondIsland";
 import { CONSTRUCTION_SITES as SITES, buildConstructionSite } from "./construction/Construction";
+
+/**
+ * Reserved city lots for the district facades (center + half extents).
+ * Core's CityBuilder reads this to keep random generation off these plots —
+ * the single source of truth for door/facade placement.
+ */
+export interface FacadePlot {
+  /** Door id this plot belongs to (e.g. "door:exchange"). */
+  id: string;
+  cx: number;
+  cz: number;
+  halfW: number;
+  halfD: number;
+}
+
+export const FACADE_PLOTS: FacadePlot[] = [
+  { id: "door:exchange", cx: EXCHANGE_FACADE_CENTER[0], cz: EXCHANGE_FACADE_CENTER[2], halfW: 25, halfD: 16 },
+  { id: "door:hospital", cx: HOSPITAL_FACADE_CENTER[0], cz: HOSPITAL_FACADE_CENTER[2], halfW: 23, halfD: 15 },
+  { id: "door:museum", cx: MUSEUM_FACADE_CENTER[0], cz: MUSEUM_FACADE_CENTER[2], halfW: 23, halfD: 15 },
+  { id: "door:library", cx: LIBRARY_FACADE_CENTER[0], cz: LIBRARY_FACADE_CENTER[2], halfW: 21, halfD: 14 },
+  { id: "door:observatory", cx: OBSERVATORY_FACADE_CENTER[0], cz: OBSERVATORY_FACADE_CENTER[2], halfW: 13, halfD: 13 },
+  { id: "door:cityhall", cx: CITYHALL_FACADE_CENTER[0], cz: CITYHALL_FACADE_CENTER[2], halfW: 24, halfD: 16 },
+  { id: "door:bank", cx: BANK_FACADE_CENTER[0], cz: BANK_FACADE_CENTER[2], halfW: 21, halfD: 15 },
+  { id: "door:dealership", cx: DEALERSHIP_FACADE_CENTER[0], cz: DEALERSHIP_FACADE_CENTER[2], halfW: 27, halfD: 18 },
+  { id: "door:shops", cx: SHOPS_FACADE_CENTER[0], cz: SHOPS_FACADE_CENTER[2], halfW: 23, halfD: 13 },
+];
+
+/** Outdoor AABB colliders for the district facades — the integrator adds these to its collision set. */
+export function facadeColliders(): { minX: number; maxX: number; minZ: number; maxZ: number }[] {
+  return FACADE_PLOTS.map((p) => ({
+    minX: p.cx - p.halfW,
+    maxX: p.cx + p.halfW,
+    minZ: p.cz - p.halfD,
+    maxZ: p.cz + p.halfD,
+  }));
+}
+
+/**
+ * Door id → interior builder. The integrator can replace its hand-rolled
+ * INTERIOR_BUILDERS map with this one call (`"door:lighthouse"` returns
+ * null — it's a deck teleport, not a scene).
+ */
+import { buildExchangeInterior } from "./exchange/Exchange";
+import { buildHospitalInterior } from "./hospital/Hospital";
+import { buildMuseumInterior } from "./museum/Museum";
+import { buildLibraryInterior } from "./library/Library";
+import { buildObservatoryInterior } from "./observatory/Observatory";
+import { buildCityHallInterior } from "./cityhall/CityHall";
+import { buildBankInterior } from "./bank/Bank";
+import { buildDealershipInterior } from "./dealership/Dealership";
+import { buildShopsInterior } from "./shops/Shops";
+
+export function buildInteriorForDoor(doorId: string): { group: THREE.Group; dispose(): void } | null {
+  switch (doorId) {
+    case "door:exchange": return buildExchangeInterior();
+    case "door:hospital": return buildHospitalInterior();
+    case "door:museum": return buildMuseumInterior();
+    case "door:library": return buildLibraryInterior();
+    case "door:observatory": return buildObservatoryInterior();
+    case "door:cityhall": return buildCityHallInterior();
+    case "door:bank": return buildBankInterior();
+    case "door:dealership": return buildDealershipInterior();
+    case "door:shops": return buildShopsInterior();
+    default: return null;
+  }
+}
 
 /** Build every outdoor structure (facades, lighthouse, bridge, islands, sites). */
 export function buildAllExteriors(): { group: THREE.Group; dispose(): void } {
@@ -163,6 +266,9 @@ export function buildAllExteriors(): { group: THREE.Group; dispose(): void } {
     buildObservatoryExterior(),
     buildLighthouse(),
     buildCityHallExterior(),
+    buildBankExterior(),
+    buildDealershipExterior(),
+    buildShopsExterior(),
     buildBridge(),
     ...buildAllIslands().map((s) => s.group),
     ...SITES.map((spec) => buildConstructionSite(spec).group),

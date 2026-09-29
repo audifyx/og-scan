@@ -16,15 +16,17 @@ import { paperWallet } from "../paper/PaperWallet";
 import type { DistrictsBilling } from "../billing";
 
 export const HOSPITAL_INTERIOR_ID = "hospital";
+/** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
+export const HOSPITAL_FACADE_CENTER: Vec3T = [-78, 0, 78];
 export const HOSPITAL_DOOR: DoorTrigger = {
   id: "door:hospital",
   label: "OrbitX General Hospital",
-  position: [-70, 0, 55],
+  position: [-78, 0, 95],
   radius: 4,
   prompt: "Enter Hospital",
   interiorId: HOSPITAL_INTERIOR_ID,
   interiorSpawn: [0, 0, 12],
-  exitPosition: [-70, 0, 51],
+  exitPosition: [-78, 0, 94],
 };
 
 export const HOSPITAL_RESPAWN: RespawnConfig = {
@@ -73,7 +75,7 @@ export function buildHospitalExterior(): THREE.Group {
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.9), new THREE.MeshBasicMaterial({ map: tex }));
   sign.position.set(0, 3.2, D / 2 + 6.1);
   g.add(sign);
-  g.position.set(...HOSPITAL_DOOR.position);
+  g.position.set(...HOSPITAL_FACADE_CENTER);
   return g;
 }
 

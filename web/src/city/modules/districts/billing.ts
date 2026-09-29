@@ -66,3 +66,71 @@ export function premiumPriceLabel(amount: number, billing: DistrictsBilling): st
   if (billing.state === "auth-required") return `${amount} ORBITX · auth required`;
   return `${amount} ORBITX · soon`;
 }
+
+/* ------------------------------------------------------------------ */
+/* cityPorts burn-adapter wiring (no import cycle)                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Structural shape of the canonical burn API in
+ * `web/src/city/integration/cityPorts.ts` (`burnPurchase`). Declared
+ * structurally (not imported) because integration imports this module —
+ * importing cityPorts here would create a module cycle.
+ */
+export interface BurnPurchaseLike {
+  (args: {
+    amount: number;
+    itemId: string;
+    label?: string;
+    reason: string;
+    ref?: string;
+    module?: string;
+  }): Promise<{ ok: boolean; signature?: string; message?: string }>;
+}
+
+/**
+ * Build a LIVE DistrictsBilling backed by the canonical cityPorts burn flow.
+ * The integrator wires it once (it owns the SharedBilling from
+ * CityBillingHost):
+ *
+ *   import { burnPurchase, burnReason } from "@/city/integration/cityPorts";
+ *   import { billingFromBurnPurchase } from "@/city/modules/districts";
+ *   const billing = useSharedBilling();
+ *   const districtsBilling = billingFromBurnPurchase({
+ *     burn: (a) => burnPurchase(billing, { ...a, module: "districts" }),
+ *     isReady: () => billing?.ready ?? false,
+ *     getBalance: () => billing?.balance ?? null,
+ *   });
+ *
+ * Every premium district purchase (bank vault, hypercar trim, shop
+ * cosmetics, hospital expedited wipe, city-hall premium firm) then routes
+ * through `burnPurchase`: namespaced reasons, shared burn ledger, dry-run
+ * support, backend-signed ORBITX burn. No district feature code changes.
+ */
+export function billingFromBurnPurchase(deps: {
+  burn: BurnPurchaseLike;
+  isReady: () => boolean;
+  getBalance: () => number | null;
+}): DistrictsBilling {
+  return {
+    get ready() { return deps.isReady(); },
+    get state() { return deps.isReady() ? "live" : "auth-required"; },
+    get orbitxBalance() { return deps.getBalance(); },
+    async spendPremium(opts: { amount: number; reason: string; ref?: string }) {
+      if (!deps.isReady()) {
+        throw new Error("ORBITX billing isn't authed yet — run the one-time dashboard link first.");
+      }
+      const r = await deps.burn({
+        amount: Math.floor(opts.amount),
+        itemId: opts.reason,
+        reason: opts.reason,
+        ref: opts.ref,
+        module: "districts",
+      });
+      if (!r.ok || !r.signature) {
+        throw new Error(r.message ?? "Burn failed — nothing was charged.");
+      }
+      return { signature: r.signature };
+    },
+  };
+}

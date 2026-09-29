@@ -1,3 +1,9 @@
+/* eslint-disable react-refresh/only-export-components --
+ * This file intentionally co-exports CityProvider, CityContext, and useCity.
+ * CityContext must be importable by 20+ consumers (incl. the R3F canvas bridge
+ * in WorldCanvas.tsx, a different team's file) and splitting the exports
+ * would churn all of their imports. Fast refresh for this provider file is
+ * knowingly sacrificed. */
 import {
   createContext,
   useCallback,
@@ -197,12 +203,22 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [shards, setShards] = useState(0);
+  /**
+   * Source of truth for claimed missions. claimMission reads this ref instead
+   * of checking inside a setState updater — updaters must be pure (React may
+   * invoke them twice in StrictMode, which would double-grant shards and
+   * double-play the sound if side effects lived inside one).
+   */
+  const claimedIdsRef = useRef<string[]>([]);
   const [claimedMissionIds, setClaimedMissionIds] = useState<string[]>(() => {
+    let initial: string[] = [];
     try {
-      return JSON.parse(localStorage.getItem("oxc_claimed_missions") ?? "[]") as string[];
+      initial = JSON.parse(localStorage.getItem("oxc_claimed_missions") ?? "[]") as string[];
     } catch {
-      return [];
+      /* local persistence is optional */
     }
+    claimedIdsRef.current = initial;
+    return initial;
   });
   const [missionClaimReadyAt, setMissionClaimReadyAt] = useState(0);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -373,21 +389,17 @@ export function CityProvider({ children }: { children: ReactNode }) {
         toast.message("Mission cooldown", { description: `Ready in ${secs}s` });
         return false;
       }
-      let claimed = false;
-      setClaimedMissionIds((current) => {
-        if (current.includes(missionId)) return current;
-        claimed = true;
-        const next = [...current, missionId];
-        try {
-          localStorage.setItem("oxc_claimed_missions", JSON.stringify(next));
-        } catch {
-          /* local persistence is optional */
-        }
-        setShards((shardCount) => shardCount + reward);
-        cityAudio.play("confirm");
-        return next;
-      });
-      if (!claimed) return false;
+      if (claimedIdsRef.current.includes(missionId)) return false;
+      const next = [...claimedIdsRef.current, missionId];
+      claimedIdsRef.current = next;
+      setClaimedMissionIds(next);
+      try {
+        localStorage.setItem("oxc_claimed_missions", JSON.stringify(next));
+      } catch {
+        /* local persistence is optional */
+      }
+      setShards((shardCount) => shardCount + reward);
+      cityAudio.play("confirm");
       const block = getWorldBlock(selectedCityId);
       const interior = interiorBuildingId
         ? block.buildings.find((b) => b.id === interiorBuildingId)

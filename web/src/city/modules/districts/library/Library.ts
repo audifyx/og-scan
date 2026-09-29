@@ -11,15 +11,17 @@ import * as THREE from "three";
 import type { ArchiveEntry, DoorTrigger, Vec3T } from "../types";
 
 export const LIBRARY_INTERIOR_ID = "library";
+/** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
+export const LIBRARY_FACADE_CENTER: Vec3T = [-78, 0, -156];
 export const LIBRARY_DOOR: DoorTrigger = {
   id: "door:library",
   label: "OrbitX Library",
-  position: [-30, 0, -90],
+  position: [-78, 0, -140],
   radius: 4,
   prompt: "Enter Library",
   interiorId: LIBRARY_INTERIOR_ID,
   interiorSpawn: [0, 0, 14],
-  exitPosition: [-30, 0, -86],
+  exitPosition: [-78, 0, -141],
 };
 
 /** The canon. Curated from real OrbitX history. */
@@ -226,6 +228,6 @@ export function buildLibraryExterior(): THREE.Group {
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(14, 1.75), new THREE.MeshBasicMaterial({ map: tex }));
   sign.position.set(0, H - 2, D / 2 + 0.3);
   g.add(sign);
-  g.position.set(...LIBRARY_DOOR.position);
+  g.position.set(...LIBRARY_FACADE_CENTER);
   return g;
 }

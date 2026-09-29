@@ -13,6 +13,7 @@ import {
 } from "./photo";
 import { addShot } from "./gallery";
 import { MediaRuntime, getMediaSettings, updateMediaSettings } from "./store";
+import { burnPurchase } from "@/tokenomics/burnFlow";
 
 interface PhotoModeProps {
   adapter: MediaWorldAdapter;
@@ -154,7 +155,15 @@ export function PhotoMode({ adapter, billing, onClose, onShare }: PhotoModeProps
     if (!billing.ready) { billing.beginAuth(); setBuyErr("Finish wallet auth, then tap buy again."); return; }
     setBuying(true); setBuyErr(null);
     try {
-      await billing.spend({ amount: PREMIUM_FILTER_PACK.price, reason: PREMIUM_FILTER_PACK.reason, ref: crypto.randomUUID() });
+      // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
+      const res = await burnPurchase(billing, {
+        amount: PREMIUM_FILTER_PACK.price,
+        itemId: PREMIUM_FILTER_PACK.id,
+        label: PREMIUM_FILTER_PACK.name,
+        reason: PREMIUM_FILTER_PACK.reason,
+        module: "media",
+      });
+      if (!res.ok) throw new Error(res.message);
       updateMediaSettings({ unlockedFilterPacks: [...getMediaSettings().unlockedFilterPacks, PREMIUM_FILTER_PACK.id] });
       setFilterId("nightops");
     } catch (err) {

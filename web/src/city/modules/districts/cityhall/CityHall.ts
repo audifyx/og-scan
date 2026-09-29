@@ -16,15 +16,17 @@ import type { DistrictsBilling } from "../billing";
 import { premiumPriceLabel } from "../billing";
 
 export const CITYHALL_INTERIOR_ID = "city-hall";
+/** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
+export const CITYHALL_FACADE_CENTER: Vec3T = [0, 0, -78];
 export const CITYHALL_DOOR: DoorTrigger = {
   id: "door:cityhall",
   label: "OrbitX City Hall",
-  position: [0, 0, -110],
+  position: [0, 0, -60],
   radius: 5,
   prompt: "Enter City Hall",
   interiorId: CITYHALL_INTERIOR_ID,
   interiorSpawn: [0, 0, 14],
-  exitPosition: [0, 0, -105],
+  exitPosition: [0, 0, -61],
 };
 
 export const FIRM_COST_CITY = 500; // paper CITY, standard
@@ -309,6 +311,6 @@ export function buildCityHallExterior(): THREE.Group {
     g.add(col);
   }
   for (let i = 0; i < 4; i++) g.add(box(W * 0.55, 0.45, 3, 0xa89c86, 0, 0.22 + i * 0.45, D / 2 + 3 + i * 0.8));
-  g.position.set(...CITYHALL_DOOR.position);
+  g.position.set(...CITYHALL_FACADE_CENTER);
   return g;
 }
