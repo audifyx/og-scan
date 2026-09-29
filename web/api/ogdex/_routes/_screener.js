@@ -73,11 +73,14 @@ function normPump(t) {
 }
 
 // ── GeckoTerminal pool normalizer ─────────────────────────────────────────────
-function normGecko(item, tokenMap = {}) {
+function normGecko(item, tokenMap = {}, fallbackChain) {
   if (!item) return null;
   const a   = item.attributes || {};
   const rel = item.relationships || {};
-  const netId       = rel.network?.data?.id || "solana";
+  // Per-network GeckoTerminal endpoints (e.g. /networks/eth/trending_pools)
+  // omit the `network` relationship, so fall back to the caller's chain —
+  // never hardcode "solana", or ETH/Base/etc tokens get mislabeled.
+  const netId       = rel.network?.data?.id || fallbackChain || "solana";
   const baseTokenId = rel.base_token?.data?.id;
   const bt  = tokenMap[baseTokenId] || {};
   // Prefer included token attrs; when GT omits `included` (rate-limit / trunc),
@@ -267,7 +270,7 @@ export default async function handler(req, res) {
       const tokenMap = { ...trend.tokenMap, ...newP.tokenMap };
       rows = dedup(
         [...trend.data, ...newP.data]
-          .map(p => normGecko(p, tokenMap))
+          .map(p => normGecko(p, tokenMap, chain))
           .filter(Boolean)
           .filter(r => !STABLES.has(String(r.symbol || "").toUpperCase()))
           .filter(r => (r.volume ?? 0) >= minVol || (r.liquidity ?? 0) >= 500)
