@@ -1,0 +1,108 @@
+/* Retro CRT — phosphor terminal homage. */
+html[data-device-theme="crt"] {
+  --dt-bg: #020604;
+  --dt-bg-2: #031007;
+  --dt-surface: rgba(3, 16, 7, 0.94);
+  --dt-surface-2: rgba(4, 22, 10, 0.97);
+  --dt-line: rgba(51, 255, 102, 0.22);
+  --dt-line-strong: rgba(51, 255, 102, 0.5);
+  --dt-fg: #33ff66;
+  --dt-muted: #1fae4b;
+  --dt-faint: #147a34;
+  --dt-accent: #33ff66;
+  --dt-on-accent: #020604;
+  --dt-accent-soft: rgba(51, 255, 102, 0.12);
+  --dt-accent-2: #b6ff5c;
+  --dt-danger: #ff5c5c;
+  --dt-font-display: "VT323", ui-monospace, monospace;
+  --dt-font-body: "VT323", ui-monospace, monospace;
+  --dt-font-mono: "VT323", ui-monospace, monospace;
+  --dt-radius: 0;
+  --dt-radius-sm: 0;
+  --dt-icon-radius: 0;
+  --dt-shadow: none;
+  --dt-glow: 0 0 12px rgba(51, 255, 102, 0.55);
+  --dt-transition: 0s;
+  --dt-heading-spacing: 0.08em;
+  --dt-chrome-bg: rgba(2, 8, 4, 0.96);
+  --dt-icon-bg: #031007;
+  --dt-icon-fg: #33ff66;
+  --dt-wallpaper: #020604;
+  color-scheme: dark;
+}
+
+/* phosphor glow across the platform */
+html[data-device-theme="crt"] body {
+  text-shadow: 0 0 6px rgba(51, 255, 102, 0.65);
+  font-size: 19px;
+  letter-spacing: 0.04em;
+}
+html[data-device-theme="crt"] h1,
+html[data-device-theme="crt"] h2,
+html[data-device-theme="crt"] h3 { text-transform: uppercase; }
+
+/* scanlines + vignette + flicker, non-interactive */
+html[data-device-theme="crt"] body::after {
+  content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0,0,0,.5) 100%);
+  animation: dt-crt-flicker 4s steps(60) infinite;
+}
+@keyframes dt-crt-flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.86; }
+  94% { opacity: 1; }
+  97% { opacity: 0.94; }
+  98% { opacity: 1; }
+}
+
+html[data-device-theme="crt"] .osh-term-line { border-bottom: 1px dashed var(--dt-line); }
+html[data-device-theme="crt"] .osh-term-line:hover { background: rgba(51,255,102,.08); }
+html[data-device-theme="crt"] .osh-term-prompt { color: var(--dt-accent-2); }
+html[data-device-theme="crt"] .osh-cursor {
+  display: inline-block; width: 0.6em; height: 1.1em;
+  background: var(--dt-accent); vertical-align: -0.15em;
+  animation: dt-blink 1.06s steps(1) infinite;
+  box-shadow: var(--dt-glow);
+}
+@keyframes dt-blink { 50% { opacity: 0; } }
+html[data-device-theme="crt"] .osh-icon-tile {
+  border: 2px solid var(--dt-line-strong);
+  box-shadow: var(--dt-glow);
+}
+html[data-device-theme="crt"] .osh-dock { border-top: 2px solid var(--dt-line-strong); background: var(--dt-chrome-bg); }
+
+/* ============================================================================
+   CRT FILTER (ideas 24 + 25) — platform-wide overlay for ANY device theme.
+   Toggled by data-crt-fx="on" on <html>; intensity via --dt-scanline,
+   --dt-phosphor, --dt-pixel (see themes/crtFx.ts). Non-interactive layers.
+   ========================================================================== */
+html[data-crt-fx="on"] body::before {
+  content: ""; position: fixed; inset: 0; z-index: 9998; pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, var(--dt-scanline, 0.28)) 0 1px,
+    transparent 1px 3px
+  );
+}
+html[data-crt-fx="on"] body::after {
+  content: ""; position: fixed; inset: 0; z-index: 9998; pointer-events: none;
+  /* phosphor glow: soft bloom + vignette, strength scales with --dt-phosphor */
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, calc(var(--dt-phosphor, 0.5) * 0.55)) 100%);
+  box-shadow: inset 0 0 calc(var(--dt-phosphor, 0.5) * 140px) rgba(120, 255, 170, calc(var(--dt-phosphor, 0.5) * 0.08));
+}
+/* pixelation approximation: mosaic overlay sized by --dt-pixel (0 = off) */
+html[data-crt-fx="on"] .osh-wallpaper::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.35) 1px, transparent 1px);
+  background-size: var(--dt-pixel, 0px) var(--dt-pixel, 0px);
+  opacity: 0;
+}
+html[data-crt-fx="on"] .osh-wallpaper[data-pixelated="1"]::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-crt-fx="on"] body::before, html[data-crt-fx="on"] body::after { animation: none; }
+}

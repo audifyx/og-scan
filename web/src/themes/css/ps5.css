@@ -1,0 +1,63 @@
+/* PlayStation 5 — next-gen XMB homage: deep ink, frosted rail, white glow. */
+html[data-device-theme="ps5"] {
+  --dt-bg: #06070c;
+  --dt-bg-2: #0a0d16;
+  --dt-surface: rgba(12, 16, 26, 0.88);
+  --dt-surface-2: rgba(18, 24, 40, 0.94);
+  --dt-line: rgba(140, 180, 255, 0.18);
+  --dt-line-strong: rgba(140, 180, 255, 0.42);
+  --dt-fg: #f2f5ff;
+  --dt-muted: #9aa8c9;
+  --dt-faint: #66718f;
+  --dt-accent: #7aa8ff;
+  --dt-accent-2: #004098;
+  --dt-accent-soft: rgba(122, 168, 255, 0.14);
+  --dt-on-accent: #0a1440;
+  --dt-font-display: "SST", "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "SST", "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 10px;
+  --dt-radius-sm: 6px;
+  --dt-icon-radius: 22%;
+  --dt-shadow: 0 20px 56px rgba(0, 0, 0, 0.7);
+  --dt-glow: 0 0 28px rgba(122, 168, 255, 0.5);
+  --dt-transition: 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  --dt-heading-spacing: 0.04em;
+  --dt-chrome-bg: rgba(5, 8, 15, 0.88);
+  --dt-icon-bg: linear-gradient(145deg, rgba(44, 68, 112, 0.95), rgba(10, 15, 28, 0.95));
+  --dt-wallpaper: radial-gradient(1100px 520px at 50% 112%, rgba(0,64,152,.5), transparent 62%), radial-gradient(640px 380px at 82% 6%, rgba(122,168,255,.14), transparent 55%), linear-gradient(180deg,#0a0f1c 0%,#04060b 100%);
+}
+
+/* ps5: tall frosted rail, larger focused category, pill items */
+html[data-device-theme="ps5"] .osh-xmb-rail {
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.03));
+  border-top: 1px solid var(--dt-line-strong);
+  border-bottom: 1px solid var(--dt-line-strong);
+  backdrop-filter: blur(18px);
+}
+html[data-device-theme="ps5"] .osh-xmb-cat {
+  opacity: 0.5;
+  filter: saturate(0.6);
+  transition: var(--dt-transition);
+}
+html[data-device-theme="ps5"] .osh-xmb-cat[data-active="true"] {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.22);
+}
+html[data-device-theme="ps5"] .osh-xmb-cat[data-active="true"] .osh-icon-tile {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.4), var(--dt-glow);
+}
+html[data-device-theme="ps5"] .osh-xmb-item {
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,.09), rgba(255,255,255,.02));
+  border-left: none;
+}
+html[data-device-theme="ps5"] .osh-xmb-item:hover,
+html[data-device-theme="ps5"] .osh-xmb-item:focus-visible {
+  background: linear-gradient(90deg, var(--dt-accent-soft), transparent);
+  outline: 1px solid var(--dt-line-strong);
+}
+html[data-device-theme="ps5"] .osh-xmb-apps {
+  backdrop-filter: blur(10px);
+}

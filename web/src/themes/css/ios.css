@@ -1,0 +1,58 @@
+/* iOS — springboard homage. Squircles, glass dock. */
+html[data-device-theme="ios"] {
+  --dt-bg: #0b1020;
+  --dt-bg-2: #101828;
+  --dt-surface: rgba(18, 24, 40, 0.78);
+  --dt-surface-2: rgba(26, 34, 54, 0.9);
+  --dt-line: rgba(255, 255, 255, 0.12);
+  --dt-line-strong: rgba(255, 255, 255, 0.25);
+  --dt-fg: #f4f6fb;
+  --dt-muted: #a3adbf;
+  --dt-faint: #6b7488;
+  --dt-accent-2: #0a84ff;
+  --dt-font-display: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 20px;
+  --dt-radius-sm: 12px;
+  --dt-icon-radius: 27%;
+  --dt-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --dt-glow: 0 8px 28px rgba(10, 132, 255, 0.35);
+  --dt-transition: 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  --dt-heading-spacing: -0.01em;
+  --dt-chrome-bg: rgba(20, 26, 42, 0.55);
+  --dt-icon-bg: linear-gradient(160deg, #3a4a6e 0%, #1b2340 100%);
+  --dt-wallpaper: radial-gradient(700px 700px at 20% 10%, rgba(88,101,242,.35), transparent 60%), radial-gradient(800px 600px at 85% 80%, rgba(10,132,255,.3), transparent 60%), linear-gradient(180deg,#101a33 0%,#0a0f22 100%);
+}
+
+html[data-device-theme="ios"] .osh-icon-tile {
+  border: none;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+}
+html[data-device-theme="ios"] .osh-icon { transition: transform var(--dt-transition); }
+html[data-device-theme="ios"] .osh-icon:active { transform: scale(0.88); }
+html[data-device-theme="ios"] .osh-icon:hover .osh-icon-tile { transform: scale(1.08); box-shadow: var(--dt-glow); }
+html[data-device-theme="ios"] .osh-icon-label { font-weight: 500; font-size: 11px; }
+html[data-device-theme="ios"] .osh-dock {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: var(--dt-shadow);
+}
+html[data-device-theme="ios"] .osh-dock-item {
+  background: transparent;
+  border: none;
+}
+html[data-device-theme="ios"] .osh-launcher-panel {
+  background: rgba(16, 22, 38, 0.72);
+  backdrop-filter: blur(30px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+/* springboard jiggle in edit mode */
+html[data-device-theme="ios"] .osh-grid[data-editing="true"] .osh-icon {
+  animation: dt-jiggle 0.32s ease-in-out infinite;
+}
+html[data-device-theme="ios"] .osh-grid[data-editing="true"] .osh-icon:nth-child(2n) { animation-delay: -0.16s; }
+@keyframes dt-jiggle {
+  0%, 100% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.6deg); }
+}

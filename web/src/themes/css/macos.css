@@ -1,0 +1,58 @@
+/* macOS — menu bar + magnifying dock homage. */
+html[data-device-theme="macos"] {
+  --dt-bg: #10141c;
+  --dt-bg-2: #161c26;
+  --dt-surface: rgba(22, 28, 40, 0.8);
+  --dt-surface-2: rgba(30, 38, 54, 0.9);
+  --dt-line: rgba(255, 255, 255, 0.1);
+  --dt-line-strong: rgba(255, 255, 255, 0.22);
+  --dt-fg: #f0f3f8;
+  --dt-muted: #a8b2c6;
+  --dt-faint: #6e788d;
+  --dt-accent-2: #0a84ff;
+  --dt-font-display: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 10px;
+  --dt-radius-sm: 7px;
+  --dt-icon-radius: 24%;
+  --dt-shadow: 0 18px 46px rgba(0, 0, 0, 0.55);
+  --dt-glow: 0 0 18px rgba(10, 132, 255, 0.35);
+  --dt-transition: 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  --dt-heading-spacing: -0.01em;
+  --dt-chrome-bg: rgba(16, 20, 28, 0.66);
+  --dt-chrome-fg: #f0f3f8;
+  --dt-icon-bg: linear-gradient(165deg, #39445e 0%, #1a2130 100%);
+  --dt-wallpaper: radial-gradient(900px 600px at 75% 15%, rgba(120,140,200,.25), transparent 60%), radial-gradient(700px 500px at 15% 85%, rgba(60,90,160,.2), transparent 60%), linear-gradient(180deg,#18202f 0%,#0d1219 100%);
+}
+
+html[data-device-theme="macos"] .osh-menubar {
+  background: var(--dt-chrome-bg);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border-bottom: 1px solid var(--dt-line);
+  font-size: 13px;
+}
+html[data-device-theme="macos"] .osh-menu-item { border-radius: 6px; padding: 2px 10px; }
+html[data-device-theme="macos"] .osh-menu-item:hover { background: rgba(255, 255, 255, 0.14); }
+html[data-device-theme="macos"] .osh-dock {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(26px) saturate(1.7);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: var(--dt-shadow);
+}
+/* magnification */
+html[data-device-theme="macos"] .osh-dock-item { transition: transform 0.18s ease; transform-origin: bottom center; }
+html[data-device-theme="macos"] .osh-dock-item:hover { transform: scale(1.45) translateY(-6px); }
+html[data-device-theme="macos"] .osh-icon-tile {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+html[data-device-theme="macos"] .osh-icon:hover .osh-icon-tile { transform: scale(1.07); box-shadow: var(--dt-glow); }
+html[data-device-theme="macos"] .osh-window {
+  box-shadow: var(--dt-shadow);
+  border: 1px solid var(--dt-line-strong);
+}
+html[data-device-theme="macos"] .osh-traffic { display: inline-flex; gap: 7px; }
+html[data-device-theme="macos"] .osh-traffic i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+html[data-device-theme="macos"] .osh-traffic i:nth-child(1) { background: #ff5f57; }
+html[data-device-theme="macos"] .osh-traffic i:nth-child(2) { background: #febc2e; }
+html[data-device-theme="macos"] .osh-traffic i:nth-child(3) { background: #28c840; }

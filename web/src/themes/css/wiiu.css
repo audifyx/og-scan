@@ -1,0 +1,68 @@
+/* Wii U — homage: clean white + blue, TV screen showcase above gamepad grid. */
+html[data-device-theme="wiiu"] {
+  --dt-bg: #dfe7f0;
+  --dt-bg-2: #cfd9e6;
+  --dt-surface: rgba(255, 255, 255, 0.92);
+  --dt-surface-2: rgba(240, 245, 252, 0.96);
+  --dt-line: rgba(10, 90, 190, 0.22);
+  --dt-line-strong: rgba(10, 90, 190, 0.5);
+  --dt-fg: #1b2a44;
+  --dt-muted: #4d6080;
+  --dt-faint: #8a9ab5;
+  --dt-accent: #0a5abe;
+  --dt-accent-2: #4fc3f7;
+  --dt-accent-soft: rgba(10, 90, 190, 0.12);
+  --dt-on-accent: #ffffff;
+  --dt-font-display: "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 18px;
+  --dt-radius-sm: 12px;
+  --dt-icon-radius: 28%;
+  --dt-shadow: 0 12px 32px rgba(20, 50, 100, 0.22);
+  --dt-glow: 0 0 20px rgba(10, 90, 190, 0.35);
+  --dt-transition: 0.2s ease;
+  --dt-heading-spacing: 0em;
+  --dt-chrome-bg: rgba(255, 255, 255, 0.94);
+  --dt-icon-bg: linear-gradient(150deg, #ffffff, #e8eef7);
+  --dt-wallpaper: linear-gradient(180deg,#eef3fa 0%,#d5deeb 100%);
+  color-scheme: light;
+}
+
+/* wiiu: dual screens with soft blue glow, gamepad-feel tiles below */
+html[data-device-theme="wiiu"] .osh-dual {
+  gap: 16px;
+}
+html[data-device-theme="wiiu"] .osh-screen-top {
+  background: linear-gradient(180deg, #0d1526 0%, #16233f 100%);
+  border: 6px solid #1c2530;
+  border-radius: 22px;
+  box-shadow: var(--dt-shadow), inset 0 0 60px rgba(10, 90, 190, 0.25);
+}
+html[data-device-theme="wiiu"] .osh-screen-bottom {
+  background: var(--dt-chrome-bg);
+  border: 2px solid var(--dt-line);
+  border-radius: 22px;
+  box-shadow: var(--dt-shadow);
+}
+html[data-device-theme="wiiu"] .osh-dual-grid .osh-icon-tile {
+  border: 2px solid var(--dt-line);
+  box-shadow: var(--dt-shadow);
+  transition: transform var(--dt-transition), border-color var(--dt-transition), box-shadow var(--dt-transition);
+}
+html[data-device-theme="wiiu"] .osh-dual-grid .osh-icon:hover .osh-icon-tile {
+  border-color: var(--dt-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--dt-glow), var(--dt-shadow);
+}
+html[data-device-theme="wiiu"] .osh-dual-showcase {
+  color: #eaf2ff;
+}
+html[data-device-theme="wiiu"] .osh-dual-launch {
+  background: var(--dt-accent);
+  color: var(--dt-on-accent);
+  border-radius: 999px;
+  font-weight: 700;
+}
+html[data-device-theme="wiiu"] .osh-dual-launch:hover {
+  box-shadow: var(--dt-glow);
+}

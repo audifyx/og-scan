@@ -1,0 +1,53 @@
+/* Android — Material You homage. Pills, blobs, dynamic color. */
+html[data-device-theme="android"] {
+  --dt-bg: #0b120d;
+  --dt-bg-2: #101a12;
+  --dt-surface: rgba(20, 32, 24, 0.9);
+  --dt-surface-2: rgba(28, 44, 32, 0.95);
+  --dt-line: rgba(255, 255, 255, 0.1);
+  --dt-line-strong: rgba(61, 220, 132, 0.4);
+  --dt-fg: #e9f2ec;
+  --dt-muted: #a9bcb0;
+  --dt-faint: #6f7f74;
+  --dt-accent-2: #3ddc84;
+  --dt-font-display: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 28px;
+  --dt-radius-sm: 16px;
+  --dt-icon-radius: 32%;
+  --dt-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  --dt-glow: 0 6px 24px rgba(61, 220, 132, 0.35);
+  --dt-transition: 0.25s cubic-bezier(0.2, 0, 0, 1);
+  --dt-heading-spacing: 0;
+  --dt-chrome-bg: rgba(14, 22, 16, 0.7);
+  --dt-icon-bg: linear-gradient(150deg, #2c4a35 0%, #16241a 100%);
+  --dt-wallpaper: radial-gradient(600px 600px at 15% 20%, rgba(61,220,132,.16), transparent 60%), radial-gradient(700px 500px at 90% 75%, rgba(208,188,255,.12), transparent 60%), linear-gradient(180deg,#0d150f 0%,#080d09 100%);
+}
+
+html[data-device-theme="android"] .osh-icon-tile {
+  border: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+html[data-device-theme="android"] .osh-icon:hover .osh-icon-tile,
+html[data-device-theme="android"] .osh-icon:active .osh-icon-tile {
+  transform: scale(1.1);
+  box-shadow: var(--dt-glow);
+}
+/* material ripple-ish press */
+html[data-device-theme="android"] .osh-icon:active .osh-icon-tile::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: radial-gradient(circle, rgba(255,255,255,.35) 0%, transparent 70%);
+}
+html[data-device-theme="android"] .osh-dock {
+  background: rgba(28, 44, 32, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 32px;
+}
+html[data-device-theme="android"] .osh-launcher-panel {
+  border-radius: 28px 28px 0 0;
+}
+html[data-device-theme="android"] .osh-search-trigger,
+html[data-device-theme="android"] .osh-launcher-input {
+  border-radius: 999px;
+}

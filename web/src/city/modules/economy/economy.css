@@ -1,0 +1,192 @@
+/* OrbitXCity economy module — self-contained styles (ox-eco-* namespace). */
+.ox-eco-hub {
+  --eco-bg: rgba(8, 10, 18, 0.96);
+  --eco-panel: rgba(16, 20, 34, 0.9);
+  --eco-line: rgba(255, 255, 255, 0.09);
+  --eco-txt: #eef1ff;
+  --eco-dim: #9aa3c7;
+  --eco-accent: #6ee7ff;
+  --eco-gold: #ffd166;
+  --eco-green: #22e58a;
+  --eco-red: #ff4d6d;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(2, 4, 10, 0.72);
+  backdrop-filter: blur(6px);
+  color: var(--eco-txt);
+  font-family: inherit;
+}
+.ox-eco-card {
+  width: min(560px, 100%);
+  max-height: min(84vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: var(--eco-bg);
+  border: 1px solid var(--eco-line);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+}
+.ox-eco-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--eco-line);
+  background: linear-gradient(180deg, rgba(110, 231, 255, 0.08), transparent);
+}
+.ox-eco-title { font-weight: 800; letter-spacing: 0.4px; font-size: 15px; }
+.ox-eco-close {
+  border: 1px solid var(--eco-line);
+  background: transparent;
+  color: var(--eco-dim);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ox-eco-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+  overflow-x: auto;
+}
+.ox-eco-tab {
+  flex: 1 0 auto;
+  border: 1px solid var(--eco-line);
+  background: transparent;
+  color: var(--eco-dim);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ox-eco-tab.active {
+  background: rgba(110, 231, 255, 0.14);
+  color: var(--eco-txt);
+  border-color: rgba(110, 231, 255, 0.4);
+}
+.ox-eco-body {
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ox-eco-balrow {
+  display: flex;
+  gap: 10px;
+}
+.ox-eco-balance {
+  flex: 1;
+  background: var(--eco-panel);
+  border: 1px solid var(--eco-line);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.ox-eco-balance .lbl { font-size: 11px; color: var(--eco-dim); text-transform: uppercase; letter-spacing: 0.8px; }
+.ox-eco-balance .val { font-size: 22px; font-weight: 800; margin-top: 2px; }
+.ox-eco-balance .val.gold { color: var(--eco-gold); }
+.ox-eco-balance .val.cyan { color: var(--eco-accent); }
+.ox-eco-balance .sub { font-size: 11px; color: var(--eco-dim); margin-top: 2px; }
+.ox-eco-section-title { font-size: 12px; font-weight: 800; color: var(--eco-dim); text-transform: uppercase; letter-spacing: 1px; }
+.ox-eco-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--eco-panel);
+  border: 1px solid var(--eco-line);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.ox-eco-item .icon { font-size: 26px; }
+.ox-eco-item .meta { flex: 1; min-width: 0; }
+.ox-eco-item .name { font-weight: 700; font-size: 14px; }
+.ox-eco-item .desc { font-size: 12px; color: var(--eco-dim); margin-top: 2px; }
+.ox-eco-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  color: #06121a;
+  background: linear-gradient(135deg, var(--eco-accent), #4aa8ff);
+}
+.ox-eco-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ox-eco-btn.ghost {
+  background: transparent;
+  color: var(--eco-accent);
+  border: 1px solid rgba(110, 231, 255, 0.4);
+}
+.ox-eco-btn.danger { background: linear-gradient(135deg, var(--eco-red), #ff7a5c); color: #fff; }
+.ox-eco-btn.up { background: linear-gradient(135deg, var(--eco-green), #7dffb0); color: #04220f; }
+.ox-eco-btn.down { background: linear-gradient(135deg, var(--eco-red), #ff7a5c); color: #fff; }
+.ox-eco-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.ox-eco-tx {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--eco-line);
+  border-radius: 10px;
+}
+.ox-eco-tx .pos { color: var(--eco-green); font-weight: 700; white-space: nowrap; }
+.ox-eco-tx .neg { color: var(--eco-red); font-weight: 700; white-space: nowrap; }
+.ox-eco-tx .meta { color: var(--eco-dim); }
+.ox-eco-note {
+  font-size: 12px;
+  color: var(--eco-dim);
+  background: rgba(110, 231, 255, 0.06);
+  border: 1px dashed rgba(110, 231, 255, 0.3);
+  border-radius: 12px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+.ox-eco-note.warn { border-color: rgba(255, 209, 102, 0.4); background: rgba(255, 209, 102, 0.06); }
+.ox-eco-row { display: flex; gap: 8px; align-items: center; }
+.ox-eco-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--eco-line);
+  border-radius: 12px;
+  color: var(--eco-txt);
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 0;
+}
+.ox-eco-chart { width: 100%; height: auto; background: rgba(255,255,255,0.02); border: 1px solid var(--eco-line); border-radius: 12px; }
+.ox-eco-chart-empty {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--eco-dim); font-size: 12px;
+  border: 1px dashed var(--eco-line); border-radius: 12px;
+}
+.ox-eco-candown { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ox-eco-pick { display: flex; gap: 8px; }
+.ox-eco-pick .ox-eco-btn { flex: 1; padding: 14px; font-size: 15px; }
+.ox-eco-status { font-size: 13px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--eco-line); }
+.ox-eco-status.win { border-color: rgba(34, 229, 138, 0.5); color: var(--eco-green); }
+.ox-eco-status.lose { border-color: rgba(255, 77, 109, 0.5); color: var(--eco-red); }
+.ox-eco-kv { display: flex; justify-content: space-between; font-size: 12px; color: var(--eco-dim); }
+.ox-eco-kv b { color: var(--eco-txt); }
+.ox-eco-sig { font-family: monospace; font-size: 10px; color: var(--eco-dim); word-break: break-all; }
+@media (max-width: 480px) {
+  .ox-eco-card { max-height: 92vh; }
+  .ox-eco-balrow { flex-direction: column; }
+}

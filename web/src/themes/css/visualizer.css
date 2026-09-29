@@ -1,0 +1,74 @@
+/* ============================================================================
+   Music visualizer (idea 3) + icon packs (idea 10) + modes (ideas 35/36)
+   Reactive styles driven by:
+     --dt-pulse            0..1 audio energy (themes/audioPulse.ts)
+     data-audio-pulse="on" pulsing active
+     data-icon-pack         neon | pixel | mono | native
+     data-streamer-mode     masks [data-sensitive] + known balance selectors
+     data-guest-mode        guest banner hook
+   ========================================================================== */
+
+/* ---------- visualizer: wallpaper breathes with the music ---------- */
+html[data-audio-pulse="on"] .osh-wallpaper {
+  transform: scale(calc(1 + var(--dt-pulse, 0) * 0.045));
+  filter: brightness(calc(1 + var(--dt-pulse, 0) * 0.35)) saturate(calc(1 + var(--dt-pulse, 0) * 0.4));
+  transition: transform 0.12s linear, filter 0.12s linear;
+}
+html[data-audio-pulse="on"] .osh-wallpaper::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(closest-side, var(--dt-accent-soft), transparent 70%);
+  opacity: var(--dt-pulse, 0);
+  transition: opacity 0.12s linear;
+}
+/* beat ring on the OS stage */
+html[data-audio-pulse="on"] .osh-stage::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border: 2px solid var(--dt-accent);
+  border-radius: 24px;
+  opacity: calc(var(--dt-pulse, 0) * 0.35);
+  transform: scale(calc(0.985 + var(--dt-pulse, 0) * 0.03));
+  transition: opacity 0.1s linear, transform 0.1s linear;
+}
+
+/* ---------- icon packs ---------- */
+/* neon outline */
+html[data-icon-pack="neon"] .osh-icon-tile {
+  background: rgba(6, 10, 16, 0.72) !important;
+  border: 1.5px solid var(--dt-accent) !important;
+  box-shadow: 0 0 14px var(--dt-accent-soft), inset 0 0 12px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 18% !important;
+}
+/* pixel */
+html[data-icon-pack="pixel"] .osh-icon-tile {
+  border-radius: 0 !important;
+  image-rendering: pixelated;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55) !important;
+  border: 2px solid var(--dt-line-strong) !important;
+}
+html[data-icon-pack="pixel"] .osh-icon-glyph { image-rendering: pixelated; }
+/* mono ink */
+html[data-icon-pack="mono"] .osh-icon-tile {
+  background: transparent !important;
+  border: 1px solid var(--dt-line) !important;
+  box-shadow: none !important;
+}
+html[data-icon-pack="mono"] .osh-icon-glyph { color: var(--dt-fg) !important; }
+
+/* ---------- streamer mode: mask sensitive values ---------- */
+html[data-streamer-mode="on"] [data-sensitive],
+html[data-streamer-mode="on"] .dt-balance,
+html[data-streamer-mode="on"] .balance-amount,
+html[data-streamer-mode="on"] .wallet-balance,
+html[data-streamer-mode="on"] .pnl-value,
+html[data-streamer-mode="on"] .portfolio-value {
+  filter: blur(9px);
+  user-select: none;
+  pointer-events: none;
+}
+/* ---------- guest mode banner hook ---------- */
+html[data-guest-mode="on"] .osh-stage { padding-top: 34px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-audio-pulse="on"] .osh-wallpaper,
+  html[data-audio-pulse="on"] .osh-stage::after { transition: none; }
+}

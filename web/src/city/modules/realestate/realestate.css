@@ -1,0 +1,320 @@
+/**
+ * OrbitXCity — Real Estate module styles. Scoped to the `ox-re-*` namespace
+ * so nothing leaks into core or other modules. Mobile-first: touch-size
+ * targets (min 44px), overlay fits small screens, cards stack.
+ */
+
+.ox-re-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgba(4, 6, 14, 0.82);
+  backdrop-filter: blur(6px);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #e8ecf4;
+}
+
+.ox-re-panel {
+  width: min(960px, 100%);
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #0b1020 0%, #070b16 100%);
+  border-left: 1px solid #1e2a45;
+  border-right: 1px solid #1e2a45;
+}
+
+.ox-re-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #1e2a45;
+  background: rgba(10, 15, 30, 0.9);
+}
+
+.ox-re-header h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+
+.ox-re-header .ox-re-sub {
+  display: block;
+  font-size: 11px;
+  color: #8b98b8;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.ox-re-close {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #2a3a5f;
+  border-radius: 10px;
+  background: #131c33;
+  color: #e8ecf4;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.ox-re-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid #1e2a45;
+}
+
+.ox-re-tab {
+  flex: 1 0 auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid #22304f;
+  border-radius: 10px;
+  background: #0e1530;
+  color: #aab6d3;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ox-re-tab.active {
+  background: #1d2b52;
+  color: #fff;
+  border-color: #38bdf8;
+}
+
+.ox-re-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ox-re-card {
+  border: 1px solid #22304f;
+  border-radius: 14px;
+  background: rgba(14, 21, 48, 0.75);
+  padding: 14px;
+}
+
+.ox-re-card h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.ox-re-card p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #aab6d3;
+  line-height: 1.45;
+}
+
+.ox-re-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.ox-re-chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #16203c;
+  border: 1px solid #2a3a5f;
+  color: #c6d2ec;
+}
+
+.ox-re-chip.hot { border-color: #f0f; color: #ffd7fb; }
+.ox-re-chip.gold { border-color: #fbbf24; color: #ffe9b0; }
+.ox-re-chip.green { border-color: #2dd4bf; color: #bdf7ec; }
+.ox-re-chip.red { border-color: #f87171; color: #ffd7d7; }
+
+.ox-re-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ox-re-row .grow { flex: 1; }
+
+.ox-re-btn {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #2a3a5f;
+  border-radius: 10px;
+  background: #16203c;
+  color: #e8ecf4;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ox-re-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ox-re-btn.primary {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+.ox-re-btn.burn {
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  border-color: #fb923c;
+  color: #fff;
+}
+
+.ox-re-btn.ghost {
+  background: transparent;
+}
+
+.ox-re-btn.small {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.ox-re-input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #2a3a5f;
+  border-radius: 10px;
+  background: #0a0f22;
+  color: #e8ecf4;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ox-re-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.ox-re-notice {
+  border: 1px dashed #2a3a5f;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #8b98b8;
+  background: rgba(10, 15, 34, 0.6);
+}
+
+.ox-re-notice strong { color: #e8ecf4; }
+
+.ox-re-auth {
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #ffe9b0;
+  background: rgba(60, 40, 5, 0.35);
+}
+
+.ox-re-err {
+  border: 1px solid #f87171;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #ffd7d7;
+  background: rgba(60, 10, 10, 0.35);
+}
+
+.ox-re-auction-hero {
+  text-align: center;
+  padding: 18px 14px;
+  border: 1px solid #2a3a5f;
+  border-radius: 16px;
+  background: radial-gradient(120% 160% at 50% 0%, #1a1440 0%, #0b1020 70%);
+}
+
+.ox-re-auction-hero .glyph {
+  font-size: 56px;
+  line-height: 1;
+}
+
+.ox-re-auction-hero h3 {
+  margin: 8px 0 2px;
+  font-size: 22px;
+}
+
+.ox-re-countdown {
+  font-variant-numeric: tabular-nums;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffd7fb;
+  text-shadow: 0 0 18px rgba(255, 0, 255, 0.45);
+}
+
+.ox-re-bid {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #16203c;
+  font-size: 13px;
+}
+
+.ox-re-bid:last-child { border-bottom: none; }
+
+.ox-re-bid .who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ox-re-bid .amt { font-weight: 700; color: #ffd7fb; font-variant-numeric: tabular-nums; }
+.ox-re-bid .npc-tag { font-size: 10px; color: #8b98b8; border: 1px solid #2a3a5f; border-radius: 6px; padding: 1px 6px; }
+.ox-re-bid .burn-tag { font-size: 10px; color: #fdba74; }
+
+.ox-re-balance {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #8b98b8;
+}
+
+.ox-re-balance strong { color: #e8ecf4; font-size: 13px; }
+
+.ox-re-furniture {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.ox-re-furn {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  border: 1px solid #2a3a5f;
+  border-radius: 10px;
+  background: #0a0f22;
+}
+
+.ox-re-footer {
+  padding: 10px 14px;
+  border-top: 1px solid #1e2a45;
+  font-size: 11px;
+  color: #64748b;
+}
+
+@media (max-width: 560px) {
+  .ox-re-header h2 { font-size: 16px; }
+  .ox-re-countdown { font-size: 28px; }
+  .ox-re-grid { grid-template-columns: 1fr; }
+}

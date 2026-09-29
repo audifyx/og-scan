@@ -1,0 +1,55 @@
+/* Windows PC — desktop + taskbar + start menu homage. */
+html[data-device-theme="windows"] {
+  --dt-bg: #0e2233;
+  --dt-bg-2: #12293d;
+  --dt-surface: rgba(16, 34, 52, 0.92);
+  --dt-surface-2: rgba(24, 46, 68, 0.96);
+  --dt-line: rgba(120, 180, 230, 0.18);
+  --dt-line-strong: rgba(0, 120, 212, 0.6);
+  --dt-fg: #eef4fa;
+  --dt-muted: #9db4c8;
+  --dt-faint: #64798d;
+  --dt-accent-2: #0078d4;
+  --dt-font-display: "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 4px;
+  --dt-radius-sm: 2px;
+  --dt-icon-radius: 6px;
+  --dt-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  --dt-glow: 0 0 16px rgba(0, 120, 212, 0.5);
+  --dt-transition: 0.15s ease;
+  --dt-heading-spacing: 0;
+  --dt-chrome-bg: rgba(8, 20, 34, 0.96);
+  --dt-icon-bg: linear-gradient(145deg, rgba(40, 70, 100, 0.9), rgba(14, 28, 44, 0.9));
+  --dt-wallpaper: radial-gradient(900px 500px at 70% 20%, rgba(0,120,212,.25), transparent 60%), linear-gradient(160deg,#0f2a40 0%,#0a1c2c 100%);
+}
+
+html[data-device-theme="windows"] .osh-taskbar {
+  background: linear-gradient(180deg, rgba(60,100,140,.35), rgba(0,0,0,.25)), var(--dt-chrome-bg);
+  border-top: 1px solid var(--dt-line-strong);
+  backdrop-filter: blur(10px);
+}
+html[data-device-theme="windows"] .osh-start-btn {
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0) 50%), #12395c;
+  border: 1px solid var(--dt-line-strong);
+  font-weight: 600;
+}
+html[data-device-theme="windows"] .osh-start-btn:hover { background: #1a4a78; box-shadow: var(--dt-glow); }
+html[data-device-theme="windows"] .osh-taskbar-item[data-active="true"] {
+  background: rgba(255, 255, 255, 0.12);
+  border-bottom: 3px solid var(--dt-accent);
+}
+html[data-device-theme="windows"] .osh-icon-tile {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+html[data-device-theme="windows"] .osh-icon:hover .osh-icon-tile {
+  border-color: var(--dt-accent);
+  box-shadow: var(--dt-glow);
+}
+html[data-device-theme="windows"] .osh-icon-label {
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+html[data-device-theme="windows"] .osh-launcher-panel {
+  border: 1px solid var(--dt-line-strong);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6), var(--dt-shadow);
+}

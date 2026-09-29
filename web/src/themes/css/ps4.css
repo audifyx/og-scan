@@ -1,0 +1,63 @@
+/* PlayStation 4 — XMB cross-media bar homage. */
+html[data-device-theme="ps4"] {
+  --dt-bg: #0a1420;
+  --dt-bg-2: #0e1a2a;
+  --dt-surface: rgba(13, 24, 40, 0.88);
+  --dt-surface-2: rgba(20, 34, 56, 0.94);
+  --dt-line: rgba(120, 170, 255, 0.16);
+  --dt-line-strong: rgba(120, 170, 255, 0.38);
+  --dt-fg: #eef4ff;
+  --dt-muted: #93a5c4;
+  --dt-faint: #5f6f8c;
+  --dt-accent-2: #0070d1;
+  --dt-font-display: "SST", "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "SST", "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 4px;
+  --dt-radius-sm: 3px;
+  --dt-icon-radius: 18%;
+  --dt-shadow: 0 16px 44px rgba(0, 0, 0, 0.6);
+  --dt-glow: 0 0 24px rgba(0, 112, 209, 0.45);
+  --dt-transition: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --dt-heading-spacing: 0.03em;
+  --dt-chrome-bg: rgba(7, 13, 24, 0.85);
+  --dt-icon-bg: linear-gradient(145deg, rgba(38, 62, 100, 0.95), rgba(12, 20, 34, 0.95));
+  --dt-wallpaper: radial-gradient(1100px 500px at 50% 110%, rgba(0,112,209,.35), transparent 60%), radial-gradient(700px 400px at 85% 10%, rgba(120,170,255,.12), transparent 55%), linear-gradient(180deg,#0b1626 0%,#070e18 100%);
+}
+
+/* XMB: frosted horizontal rail, tall app column */
+html[data-device-theme="ps4"] .osh-xmb-rail {
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02));
+  border-top: 1px solid var(--dt-line-strong);
+  border-bottom: 1px solid var(--dt-line-strong);
+  backdrop-filter: blur(14px);
+}
+html[data-device-theme="ps4"] .osh-xmb-cat {
+  opacity: 0.55;
+  filter: grayscale(0.4);
+  transition: var(--dt-transition);
+}
+html[data-device-theme="ps4"] .osh-xmb-cat[data-active="true"] {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.18);
+}
+html[data-device-theme="ps4"] .osh-xmb-cat[data-active="true"] .osh-icon-tile {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.35), var(--dt-glow);
+}
+html[data-device-theme="ps4"] .osh-xmb-item {
+  background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  border-left: 3px solid transparent;
+}
+html[data-device-theme="ps4"] .osh-xmb-item:hover,
+html[data-device-theme="ps4"] .osh-xmb-item:focus-visible {
+  border-left-color: var(--dt-accent);
+  background: linear-gradient(90deg, var(--dt-accent-soft), transparent);
+}
+html[data-device-theme="ps4"] .osh-dock {
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,0) 40%), var(--dt-chrome-bg);
+  border-top: 1px solid var(--dt-line-strong);
+}
+html[data-device-theme="ps4"] .osh-icon-tile {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}

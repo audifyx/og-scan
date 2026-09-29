@@ -1,0 +1,56 @@
+/* Nintendo 3DS — dual-screen homage. */
+html[data-device-theme="n3ds"] {
+  --dt-bg: #0d0d10;
+  --dt-bg-2: #141419;
+  --dt-surface: #1b1b22;
+  --dt-surface-2: #23232c;
+  --dt-line: rgba(255, 255, 255, 0.1);
+  --dt-line-strong: rgba(230, 0, 18, 0.55);
+  --dt-fg: #f2f2f5;
+  --dt-muted: #9aa0b4;
+  --dt-faint: #62687e;
+  --dt-accent: #ff2b3e;
+  --dt-on-accent: #fff;
+  --dt-accent-soft: rgba(230, 0, 18, 0.16);
+  --dt-accent-2: #3de7ff;
+  --dt-font-display: "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 10px;
+  --dt-radius-sm: 6px;
+  --dt-icon-radius: 20%;
+  --dt-shadow: 0 14px 34px rgba(0, 0, 0, 0.65);
+  --dt-glow: 0 0 20px rgba(230, 0, 18, 0.4);
+  --dt-transition: 0.2s ease;
+  --dt-heading-spacing: 0.02em;
+  --dt-chrome-bg: rgba(10, 10, 14, 0.94);
+  --dt-icon-bg: linear-gradient(145deg, #2c2c36, #17171d);
+  --dt-wallpaper: linear-gradient(180deg,#101014 0%,#0a0a0d 100%);
+}
+
+/* dual screens: bezel + inner screens */
+html[data-device-theme="n3ds"] .osh-screen {
+  background: #000;
+  border: 10px solid #1e1e26;
+  border-radius: 18px;
+  box-shadow: var(--dt-shadow), inset 0 0 0 2px #33333f;
+}
+html[data-device-theme="n3ds"] .osh-screen-top {
+  background: radial-gradient(600px 300px at 50% 0%, rgba(230,0,18,.12), transparent 60%), #0c0c10;
+}
+html[data-device-theme="n3ds"] .osh-screen-bottom {
+  background: #101014;
+}
+html[data-device-theme="n3ds"] .osh-icon-tile {
+  border: 2px solid #33333f;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
+html[data-device-theme="n3ds"] .osh-icon:hover .osh-icon-tile,
+html[data-device-theme="n3ds"] .osh-icon[data-selected="true"] .osh-icon-tile {
+  border-color: var(--dt-accent);
+  box-shadow: var(--dt-glow);
+  transform: translateY(-3px);
+}
+html[data-device-theme="n3ds"] .osh-dock {
+  background: var(--dt-chrome-bg);
+  border-top: 3px solid #2a2a34;
+}

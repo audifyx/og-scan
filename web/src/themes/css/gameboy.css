@@ -1,0 +1,74 @@
+/* Game Boy — dot-matrix monochrome homage. */
+html[data-device-theme="gameboy"] {
+  --dt-bg: #0f380f;
+  --dt-bg-2: #0f380f;
+  --dt-surface: #0f380f;
+  --dt-surface-2: #183818;
+  --dt-line: #306230;
+  --dt-line-strong: #8bac0f;
+  --dt-fg: #9bbc0f;
+  --dt-muted: #8bac0f;
+  --dt-faint: #306230;
+  --dt-accent: #9bbc0f;
+  --dt-on-accent: #0f380f;
+  --dt-accent-soft: rgba(155, 188, 15, 0.16);
+  --dt-accent-2: #8bac0f;
+  --dt-danger: #9bbc0f;
+  --dt-warning: #8bac0f;
+  --dt-font-display: "Press Start 2P", monospace;
+  --dt-font-body: "Press Start 2P", monospace;
+  --dt-font-mono: "Press Start 2P", monospace;
+  --dt-radius: 0;
+  --dt-radius-sm: 0;
+  --dt-icon-radius: 0;
+  --dt-shadow: none;
+  --dt-glow: none;
+  --dt-transition: 0s;
+  --dt-heading-spacing: 0;
+  --dt-chrome-bg: #0f380f;
+  --dt-chrome-fg: #9bbc0f;
+  --dt-icon-bg: #0f380f;
+  --dt-icon-fg: #9bbc0f;
+  --dt-wallpaper: #0f380f;
+  color-scheme: dark;
+}
+
+/* the whole platform goes dot-matrix */
+html[data-device-theme="gameboy"] body { font-size: 13px; line-height: 1.7; }
+html[data-device-theme="gameboy"] img,
+html[data-device-theme="gameboy"] video,
+html[data-device-theme="gameboy"] canvas { image-rendering: pixelated; }
+html[data-device-theme="gameboy"] button,
+html[data-device-theme="gameboy"] input,
+html[data-device-theme="gameboy"] select,
+html[data-device-theme="gameboy"] textarea { border-radius: 0 !important; border: 3px solid #8bac0f !important; background: #0f380f !important; color: #9bbc0f !important; box-shadow: none !important; }
+html[data-device-theme="gameboy"] h1,
+html[data-device-theme="gameboy"] h2,
+html[data-device-theme="gameboy"] h3,
+html[data-device-theme="gameboy"] h4 { text-transform: uppercase; }
+
+/* pixel list rows */
+html[data-device-theme="gameboy"] .osh-pixel-row {
+  border: 3px solid #306230;
+  background: #0f380f;
+}
+html[data-device-theme="gameboy"] .osh-pixel-row:hover,
+html[data-device-theme="gameboy"] .osh-pixel-row:focus-visible,
+html[data-device-theme="gameboy"] .osh-pixel-row[data-active="true"] {
+  border-color: #9bbc0f;
+  background: #9bbc0f;
+  color: #0f380f;
+}
+html[data-device-theme="gameboy"] .osh-pixel-row:hover .osh-icon-glyph,
+html[data-device-theme="gameboy"] .osh-pixel-row[data-active="true"] .osh-icon-glyph { color: #0f380f; }
+html[data-device-theme="gameboy"] .osh-icon-tile {
+  border: 3px solid #8bac0f;
+  box-shadow: 4px 4px 0 #306230;
+}
+html[data-device-theme="gameboy"] .osh-icon-label { text-transform: uppercase; font-size: 9px; }
+html[data-device-theme="gameboy"] .osh-dock { border-top: 4px solid #8bac0f; background: #0f380f; }
+html[data-device-theme="gameboy"] .osh-wallpaper::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(0,0,0,.28) 1px, transparent 1.6px);
+  background-size: 4px 4px;
+}

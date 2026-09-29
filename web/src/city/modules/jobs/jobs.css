@@ -1,0 +1,140 @@
+/* OrbitXCity jobs module styles — self-contained, mobile-first. */
+.oj-board {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(4, 6, 10, 0.72);
+  backdrop-filter: blur(6px);
+  padding: 0;
+}
+.oj-board-sheet {
+  width: 100%;
+  max-width: 860px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #10141c 0%, #0a0d13 100%);
+  border: 1px solid #232b3a;
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+  color: #eef2f8;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+@media (min-width: 720px) {
+  .oj-board { align-items: center; padding: 24px; }
+  .oj-board-sheet { border-radius: 20px; border-bottom: 1px solid #232b3a; }
+}
+.oj-board-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.oj-board-top h2 { margin: 0; font-size: 20px; letter-spacing: 0.5px; }
+.oj-wallet {
+  display: flex; align-items: center; gap: 10px;
+  background: #0d1420; border: 1px solid #2a3f2f; border-radius: 12px;
+  padding: 8px 12px; margin: 10px 0 14px; font-size: 14px;
+}
+.oj-wallet b { color: #00ff9f; font-size: 16px; }
+.oj-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 560px) { .oj-grid { grid-template-columns: 1fr 1fr; } }
+.oj-card {
+  background: #141a26; border: 1px solid #232b3a; border-radius: 14px;
+  padding: 12px; display: flex; gap: 12px; align-items: flex-start;
+}
+.oj-card.active { border-color: #00ff9f; box-shadow: 0 0 0 1px #00ff9f33; }
+.oj-card-icon { font-size: 30px; line-height: 1; }
+.oj-card-main { flex: 1; min-width: 0; }
+.oj-card-main b { font-size: 15px; }
+.oj-card-tag { font-size: 12.5px; color: #9fb0c8; margin: 3px 0; }
+.oj-card-pay { font-size: 12px; color: #00ff9f; margin-bottom: 8px; }
+.oj-card-lvl { font-size: 11px; color: #8b93a7; margin-left: 6px; }
+.oj-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.oj-btn {
+  appearance: none; border: 1px solid #2e3a52; background: #1b2334; color: #eef2f8;
+  border-radius: 10px; padding: 10px 14px; font-size: 14px; font-weight: 600;
+  cursor: pointer; min-height: 44px; touch-action: manipulation;
+}
+.oj-btn:active { transform: scale(0.97); }
+.oj-btn.primary { background: #00c878; border-color: #00c878; color: #04120a; }
+.oj-btn.danger { background: #3a1c22; border-color: #7a2e3a; color: #ffb3bd; }
+.oj-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.oj-btn.small { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+.oj-premium { background: #2a1f3d; border-color: #6a4bbd; color: #cdbcf5; width: 100%; margin-top: 8px; }
+.oj-howto { font-size: 12.5px; color: #8b93a7; margin-top: 10px; line-height: 1.5; }
+
+/* Active job floating panel */
+.oj-panel {
+  position: fixed; z-index: 55;
+  left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+  max-width: 420px; margin: 0 auto;
+  background: rgba(10, 14, 21, 0.94); border: 1px solid #2a3f2f; border-radius: 16px;
+  color: #eef2f8; font-family: system-ui, -apple-system, sans-serif;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+@media (min-width: 720px) {
+  .oj-panel { left: auto; right: 16px; bottom: 16px; width: 360px; }
+}
+.oj-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #1d2534; }
+.oj-icon { font-size: 24px; }
+.oj-title { flex: 1; display: flex; flex-direction: column; }
+.oj-title b { font-size: 14px; }
+.oj-status { font-size: 12px; color: #00ff9f; }
+.oj-x { background: none; border: none; color: #8b93a7; font-size: 18px; cursor: pointer; padding: 8px; }
+.oj-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; max-height: 46dvh; overflow-y: auto; }
+.oj-stat { display: flex; justify-content: space-between; font-size: 13px; }
+.oj-stat-label { color: #8b93a7; }
+.oj-stat-value { font-weight: 600; }
+.oj-accent { color: #00ff9f; }
+.oj-hint { font-size: 12.5px; color: #9fb0c8; line-height: 1.5; }
+.oj-buffs { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 12px 0; }
+.oj-buff { font-size: 11px; background: #2a2410; border: 1px solid #8a7326; color: #ffd97a; border-radius: 20px; padding: 3px 9px; }
+.oj-progress { height: 8px; background: #1b2334; border-radius: 6px; overflow: hidden; }
+.oj-progress > div { height: 100%; background: #00c878; transition: width 0.2s; }
+.oj-stars { display: flex; gap: 6px; }
+.oj-stars button { font-size: 26px; background: none; border: none; cursor: pointer; padding: 4px; }
+.oj-toast-stack {
+  position: fixed; z-index: 70; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 6px; align-items: center;
+  pointer-events: none; width: max-content; max-width: 92vw;
+}
+.oj-toast {
+  background: rgba(10, 16, 12, 0.95); border: 1px solid #2a3f2f; color: #eef2f8;
+  border-radius: 12px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+  animation: oj-toast-in 0.25s ease-out;
+}
+.oj-toast.cash { border-color: #00c878; color: #b6ffdc; }
+.oj-toast.warn { border-color: #a33; color: #ffc9c9; }
+@keyframes oj-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; } }
+.oj-board-close {
+  background: #1b2334; border: 1px solid #2e3a52; color: #eef2f8;
+  border-radius: 10px; padding: 8px 14px; font-size: 14px; cursor: pointer; min-height: 44px;
+}
+.oj-kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 13px; }
+.oj-kv dt { color: #8b93a7; } .oj-kv dd { margin: 0; font-weight: 600; text-align: right; }
+.oj-trade-up { color: #00ff9f; } .oj-trade-down { color: #ff6b6b; }
+.oj-lineup { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.oj-suspect { background: #141a26; border: 2px solid #232b3a; border-radius: 12px; padding: 10px; cursor: pointer; text-align: center; }
+.oj-suspect.sel { border-color: #00c878; }
+.oj-suspect .face { font-size: 30px; }
+.oj-suspect .nm { font-size: 12px; font-weight: 600; margin-top: 4px; }
+
+/* Floating jobs button */
+.oj-fab {
+  position: fixed; z-index: 55;
+  left: 14px; bottom: calc(14px + env(safe-area-inset-bottom));
+  width: 52px; height: 52px; border-radius: 50%;
+  background: #00c878; border: none; font-size: 24px;
+  cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 4px 18px rgba(0, 200, 120, 0.45);
+}
+.oj-fab:active { transform: scale(0.94); }
+@media (min-width: 720px) {
+  .oj-fab { left: 20px; bottom: 20px; }
+}
+
+/* Truck / restaurant rows inside job panels */
+.oj-truck {
+  background: #141a26; border: 1px solid #232b3a; border-radius: 12px;
+  padding: 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.oj-between { justify-content: space-between; align-items: center; width: 100%; }

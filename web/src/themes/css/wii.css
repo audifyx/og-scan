@@ -1,0 +1,58 @@
+/* Wii — channels grid homage. Light, bubbly, friendly. */
+html[data-device-theme="wii"] {
+  --dt-bg: #e9f3fa;
+  --dt-bg-2: #dcebf6;
+  --dt-surface: rgba(255, 255, 255, 0.92);
+  --dt-surface-2: #ffffff;
+  --dt-line: rgba(30, 120, 180, 0.22);
+  --dt-line-strong: rgba(30, 120, 180, 0.5);
+  --dt-fg: #1d2f42;
+  --dt-muted: #5d7a95;
+  --dt-faint: #93a9bd;
+  --dt-accent-2: #34b6e8;
+  --dt-font-display: "Trebuchet MS", "Segoe UI Rounded", system-ui, sans-serif;
+  --dt-font-body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --dt-radius: 20px;
+  --dt-radius-sm: 12px;
+  --dt-icon-radius: 22%;
+  --dt-shadow: 0 10px 26px rgba(30, 110, 170, 0.18);
+  --dt-glow: 0 0 20px rgba(52, 182, 232, 0.4);
+  --dt-transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dt-heading-spacing: 0.01em;
+  --dt-chrome-bg: rgba(255, 255, 255, 0.85);
+  --dt-chrome-fg: #1d2f42;
+  --dt-icon-bg: linear-gradient(160deg, #ffffff 0%, #eef6fc 100%);
+  --dt-icon-fg: #1d2f42;
+  --dt-wallpaper: radial-gradient(800px 500px at 50% -10%, rgba(255,255,255,.9), transparent 60%), linear-gradient(180deg,#cfe8f7 0%,#e9f3fa 60%,#d9ecf8 100%);
+  color-scheme: light;
+}
+
+html[data-device-theme="wii"] .osh-channel {
+  background: var(--dt-icon-bg);
+  border: 3px solid #b9d9ee;
+  box-shadow: var(--dt-shadow), inset 0 2px 0 #fff;
+}
+html[data-device-theme="wii"] .osh-channel:hover,
+html[data-device-theme="wii"] .osh-channel:focus-visible {
+  border-color: var(--dt-accent);
+  transform: scale(1.05);
+  box-shadow: var(--dt-glow), var(--dt-shadow);
+}
+html[data-device-theme="wii"] .osh-channel .osh-icon-glyph { color: #2a7fb8; }
+html[data-device-theme="wii"] .osh-wii-topbar {
+  background: linear-gradient(180deg, #ffffff, #e3f1fa);
+  border-bottom: 2px solid #b9d9ee;
+  color: #2a7fb8;
+}
+html[data-device-theme="wii"] .osh-dock {
+  background: linear-gradient(180deg, #ffffff, #dcebf6);
+  border-top: 2px solid #b9d9ee;
+}
+html[data-device-theme="wii"] .osh-dock-item {
+  background: linear-gradient(180deg, #fff, #e6f2fa);
+  border: 2px solid #b9d9ee;
+  color: #2a7fb8;
+}
+html[data-device-theme="wii"] .osh-icon-label { color: #33506b; font-weight: 600; }
+/* light chrome text for the rest of the platform */
+html[data-device-theme="wii"] body { color: #1d2f42; }

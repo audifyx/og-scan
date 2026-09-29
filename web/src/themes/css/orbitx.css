@@ -1,0 +1,63 @@
+/* OrbitX Native — neon cyberpunk command deck. Default theme. */
+html[data-device-theme="orbitx"] {
+  --dt-bg: #05080c;
+  --dt-bg-2: #0a1018;
+  --dt-surface: rgba(12, 18, 28, 0.86);
+  --dt-surface-2: rgba(20, 28, 42, 0.94);
+  --dt-line: rgba(23, 255, 77, 0.14);
+  --dt-line-strong: rgba(23, 255, 77, 0.4);
+  --dt-fg: #e8f0f8;
+  --dt-muted: #8b98ab;
+  --dt-faint: #5a6577;
+  --dt-accent-2: #3de7ff;
+  --dt-font-display: "Orbitron", "Segoe UI", system-ui, sans-serif;
+  --dt-font-body: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --dt-radius: 14px;
+  --dt-radius-sm: 8px;
+  --dt-icon-radius: 26%;
+  --dt-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  --dt-glow: 0 0 26px var(--dt-accent-soft), 0 0 60px rgba(23, 255, 77, 0.06);
+  --dt-transition: 0.22s ease;
+  --dt-heading-spacing: 0.06em;
+  --dt-chrome-bg: rgba(6, 10, 16, 0.78);
+  --dt-icon-bg: linear-gradient(145deg, rgba(34, 46, 68, 0.95), rgba(10, 15, 24, 0.95));
+}
+
+html[data-device-theme="orbitx"] .osh-icon-tile {
+  border: 1px solid var(--dt-line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--dt-shadow);
+}
+html[data-device-theme="orbitx"] .osh-icon:hover .osh-icon-tile,
+html[data-device-theme="orbitx"] .osh-icon:focus-visible .osh-icon-tile {
+  border-color: var(--dt-accent);
+  box-shadow: var(--dt-glow), var(--dt-shadow);
+  transform: translateY(-4px) scale(1.05);
+}
+html[data-device-theme="orbitx"] .osh-dock {
+  background: var(--dt-chrome-bg);
+  border: 1px solid var(--dt-line);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--dt-shadow);
+}
+
+/* orbit layout: apps circle a live core */
+html[data-device-theme="orbitx"] .osh-orbit-core {
+  border: 2px solid var(--dt-accent);
+  box-shadow: var(--dt-glow), inset 0 0 40px rgba(23, 255, 77, 0.08);
+  animation: dt-core-pulse 4s ease-in-out infinite;
+}
+@keyframes dt-core-pulse {
+  0%, 100% { box-shadow: 0 0 22px var(--dt-accent-soft), inset 0 0 40px rgba(23,255,77,.08); }
+  50% { box-shadow: 0 0 46px var(--dt-accent-soft), inset 0 0 60px rgba(23,255,77,.14); }
+}
+html[data-device-theme="orbitx"] .osh-orbit-ring {
+  border: 1px dashed color-mix(in srgb, var(--dt-accent) 30%, transparent);
+  animation: dt-orbit-spin 90s linear infinite;
+}
+html[data-device-theme="orbitx"] .osh-orbit-ring.ring-2 { animation-duration: 140s; animation-direction: reverse; }
+@keyframes dt-orbit-spin { to { transform: rotate(360deg); } }
+@keyframes dt-orbit-spin-rev { to { transform: rotate(-360deg); } }
+html[data-device-theme="orbitx"] .osh-orbit-node-inner { animation: dt-orbit-spin-rev 90s linear infinite; }
+html[data-device-theme="orbitx"] .ring-2 .osh-orbit-node-inner { animation-duration: 140s; animation-direction: normal; }
+html[data-device-theme="orbitx"] .osh-orbit-stage:hover .osh-orbit-ring,
+html[data-device-theme="orbitx"] .osh-orbit-stage:hover .osh-orbit-node-inner { animation-play-state: paused; }

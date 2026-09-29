@@ -1,0 +1,56 @@
+/* Xbox Series X — modern Xbox homage: carbon dark, glowing green grid. */
+html[data-device-theme="seriesx"] {
+  --dt-bg: #0b0d0a;
+  --dt-bg-2: #10130f;
+  --dt-surface: rgba(16, 21, 17, 0.9);
+  --dt-surface-2: rgba(24, 30, 25, 0.94);
+  --dt-line: rgba(82, 197, 75, 0.22);
+  --dt-line-strong: rgba(82, 197, 75, 0.5);
+  --dt-fg: #f0f5ef;
+  --dt-muted: #a9b8a6;
+  --dt-faint: #6f7d6c;
+  --dt-accent: #52c54b;
+  --dt-accent-2: #9dce0a;
+  --dt-accent-soft: rgba(82, 197, 75, 0.14);
+  --dt-on-accent: #08120a;
+  --dt-font-display: "Segoe UI", Tahoma, system-ui, sans-serif;
+  --dt-font-body: "Segoe UI", Tahoma, system-ui, sans-serif;
+  --dt-radius: 8px;
+  --dt-radius-sm: 6px;
+  --dt-icon-radius: 6px;
+  --dt-shadow: 0 18px 48px rgba(0, 0, 0, 0.65);
+  --dt-glow: 0 0 26px rgba(82, 197, 75, 0.4);
+  --dt-transition: 0.2s ease;
+  --dt-heading-spacing: 0.01em;
+  --dt-chrome-bg: rgba(10, 13, 10, 0.92);
+  --dt-icon-bg: linear-gradient(150deg, rgba(42, 52, 40, 0.96), rgba(14, 18, 13, 0.96));
+  --dt-wallpaper: radial-gradient(900px 520px at 50% -10%, rgba(82,197,75,.22), transparent 55%), linear-gradient(180deg,#0e120d 0%,#080a07 100%);
+}
+
+/* seriesx: big square tiles, sharp corners, green power glow on hover */
+html[data-device-theme="seriesx"] .osh-icon-tile {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--dt-shadow);
+  transition: transform var(--dt-transition), box-shadow var(--dt-transition), border-color var(--dt-transition);
+}
+html[data-device-theme="seriesx"] .osh-icon:hover .osh-icon-tile {
+  border-color: var(--dt-accent);
+  box-shadow: 0 0 0 1px var(--dt-accent), var(--dt-glow);
+  transform: translateY(-3px);
+}
+html[data-device-theme="seriesx"] .osh-dock {
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%), var(--dt-chrome-bg);
+  border-top: 1px solid var(--dt-line-strong);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+}
+html[data-device-theme="seriesx"] .osh-search-trigger,
+html[data-device-theme="seriesx"] .osh-tray {
+  border: 1px solid var(--dt-line);
+  background: var(--dt-surface);
+}
+html[data-device-theme="seriesx"] .osh-hint {
+  color: var(--dt-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
