@@ -13,6 +13,8 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { mulberry32, hashSeed } from "@/lib/orbitxcity/collision";
 import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
+import { BlockyBuildingMesh } from "./BlockyBuildingMesh";
+import { Baseplate } from "./BlockBuilding";
 import { CityFill } from "./CityFill";
 import { OrbitxBillboardRing } from "./OrbitxBillboard";
 import { BillboardMesh } from "./BillboardMesh";
@@ -27,12 +29,21 @@ import { ChartBoard, usePriceHistory } from "./ChartBoard";
 import { OxiGuide } from "./OxiGuide";
 import { Park } from "./Park";
 import { Traffic } from "./Traffic";
+import { DrivableCars } from "./DrivableCars";
 import { SkyCycle } from "./SkyCycle";
 import { UrbanNature } from "./UrbanNature";
 import { PropScatter } from "./PropScatter";
 import { LandmarkMesh } from "./LandmarkMesh";
 import { landmarkModelId } from "@/lib/orbitxcity/assets/catalog";
 import type { LandmarkDefinition } from "@/lib/orbitxcity/types";
+
+/**
+ * Blocky (Roblox-style) world render mode. Set VITE_OXC_BLOCKY=0 to fall back
+ * to the legacy Manhattan facade renderer. Collision is unaffected either way.
+ */
+const BLOCKY_WORLD: boolean =
+  (import.meta.env?.VITE_OXC_BLOCKY ?? "1") !== "0";
+
 
 function cityTheme(cityId: CityId) {
   return getWorldTheme(cityId);
@@ -426,18 +437,24 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       )}
       <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.7} color={theme.neon} distance={28} />
 
-      {/* Realistic city layer: streets, outer-city fill, billboard ring */}
-      <Ground block={block} />
-      <CityFill
-        seed={`orbitx-${block.id ?? "nyc"}`}
-        lite={!high}
-        outerRadius={high ? 250 : 170}
-      />
-      <OrbitxBillboardRing
-        radius={high ? 150 : 110}
-        count={high ? 8 : 4}
-        lite={!high}
-      />
+      {BLOCKY_WORLD ? (
+        <>
+          <Baseplate size={900} color="#7fbf6a" grid="#6aa858" />
+          <Ground block={block} />
+          <CityFill
+            seed={`orbitx-${block.id ?? "nyc"}`}
+            lite={!high}
+            outerRadius={high ? 250 : 170}
+          />
+          <OrbitxBillboardRing
+            radius={high ? 150 : 110}
+            count={high ? 8 : 4}
+            lite={!high}
+          />
+        </>
+      ) : (
+        <Ground block={block} />
+      )}
       <UrbanNature block={block} lite={!high} />
       <Skyline block={block} lite={!high} />
       <StreetProps block={block} />
@@ -446,9 +463,13 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <PropScatter block={block} />
       {high && <GraffitiLayer block={block} />}
 
-      {block.buildings.map((b) => (
-        <BuildingMesh key={b.id} building={b} />
-      ))}
+      {block.buildings.map((b) =>
+        BLOCKY_WORLD ? (
+          <BlockyBuildingMesh key={b.id} building={b} />
+        ) : (
+          <BuildingMesh key={b.id} building={b} />
+        ),
+      )}
 
       {landmarks.map((lm) => (
         <LandmarkMesh key={lm.id} landmark={lm} />
@@ -478,7 +499,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
           }
         />
       )}
-      <NPCs block={block} count={high ? 9 : 4} />
+      <NPCs block={block} count={high ? 18 : 8} />
       {high && !paused && <Drones origin={{ x: block.spawn.x, z: block.spawn.z }} />}
       {high && <OxiGuide spawn={block.spawn} />}
       <Park
@@ -486,6 +507,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
         lite={!high}
       />
       <Traffic count={high ? 10 : 3} block={block} paused={paused} />
+      {!paused && <DrivableCars block={block} />}
     </group>
   );
 }

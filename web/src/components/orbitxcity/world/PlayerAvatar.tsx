@@ -85,7 +85,7 @@ export function PlayerAvatar({
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
   const { camera } = useThree();
-  const { quality } = useCity();
+  const { quality, playerHidden } = useCity();
   useKeyboard();
 
   const spawn = block.spawn;
@@ -332,7 +332,7 @@ export function PlayerAvatar({
   });
 
   return (
-    <group ref={group} position={[spawn.x, 0, spawn.z]}>
+    <group ref={group} position={[spawn.x, 0, spawn.z]} visible={!playerHidden}>
       <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
       {quality === "high" && (
         <pointLight position={[0.35, 1.6, 0.55]} intensity={0.55} color="#e8d8b0" distance={4.5} decay={2} />

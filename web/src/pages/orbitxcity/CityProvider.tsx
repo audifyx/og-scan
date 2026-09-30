@@ -60,6 +60,9 @@ interface CityContextValue {
   setPlayerPos: (p: Vec3) => void;
   playerYaw: number;
   setPlayerYaw: (y: number) => void;
+  /** True while the player is inside a vehicle (avatar hidden, camera follows car). */
+  playerHidden: boolean;
+  setPlayerHidden: (h: boolean) => void;
   avatar: AvatarAppearance;
   setAvatar: (a: AvatarAppearance) => void;
   inventory: InventoryItem[];
@@ -200,6 +203,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
   const [playerPos, setPlayerPos] = useState<Vec3>(getWorldBlock("nyc").spawn);
   const [playerYaw, setPlayerYaw] = useState(0);
+  const [playerHidden, setPlayerHidden] = useState(false);
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [shards, setShards] = useState(0);
@@ -606,6 +610,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setPlayerPos,
       playerYaw,
       setPlayerYaw,
+      playerHidden,
+      setPlayerHidden,
       avatar,
       setAvatar,
       inventory,
