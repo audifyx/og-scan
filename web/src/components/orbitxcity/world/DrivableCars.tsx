@@ -103,12 +103,9 @@ export function DrivableCars({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockCon
     carState.current = cars.map((c) => ({ x: c.x, z: c.z, yaw: c.yaw, speed: 0 }));
   }, [cars]);
 
-  // Enter / exit on KeyE.
+  // Enter / exit on KeyE or mobile car button (oxc:car-interact event).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code !== "KeyE") return;
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+    const doInteract = () => {
       if (drivingRef.current !== null) {
         // Bail out — drop the player beside the car.
         const c = carState.current[drivingRef.current];
@@ -134,8 +131,19 @@ export function DrivableCars({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockCon
         }
       }
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "KeyE") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      doInteract();
+    };
+    const onMobile = () => doInteract();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("oxc:car-interact", onMobile);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("oxc:car-interact", onMobile);
+    };
   }, [nearCar, setPlayerPos, setPlayerHidden]);
 
   useFrame((_, rawDt) => {
