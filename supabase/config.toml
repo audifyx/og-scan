@@ -43,6 +43,8 @@ verify_jwt = false
 verify_jwt = false
 
 # --- functions added from production deployment ---
+# Gateway JWT stays off: the public anon key is itself a JWT, so verify_jwt
+# would not stop strangers. The function requires X_REPLY_BOT_SECRET.
 [functions.ai-reply-webhook]
 verify_jwt = false
 [functions.auth-signin]
@@ -91,6 +93,7 @@ verify_jwt = true
 verify_jwt = false
 [functions.wallet-manager]
 verify_jwt = true
+# Gateway JWT stays off (anon key is a JWT). Function requires X_REPLY_BOT_SECRET.
 [functions.x-reply-bot]
 verify_jwt = false
 [functions.x-stream-listener]
