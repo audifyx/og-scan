@@ -56,6 +56,36 @@ const CLASS_FLAVOR: Record<
     perk: "Free contract inspect at any terminal",
     role: "Architect",
   },
+  trump: {
+    lore: "Tremendous trader. Everybody says so. Makes gains so huge you'll get tired of winning.",
+    perk: "Gold-trimmed presence aura in-world",
+    role: "Legend",
+  },
+  orangie: {
+    lore: "Orange-pilled and proud. Sees alpha in every candle, vibes in every wick.",
+    perk: "Citrus glow trail while sprinting",
+    role: "Vibes",
+  },
+  brez: {
+    lore: "Cold-blooded. Scales tip green before the chart even knows. Never chases, always early.",
+    perk: "Laser-eye intimidation radius",
+    role: "Sniper",
+  },
+  tjr: {
+    lore: "Lives in the replies. Reads every thread twice and still deploys first.",
+    perk: "Early-access lobby pings",
+    role: "Intel",
+  },
+  kol_moon: {
+    lore: "Professional moon-pointer. Has never seen a chart he didn't want to send.",
+    perk: "Rocket emote unlocked by default",
+    role: "Hype",
+  },
+  kol_degen: {
+    lore: "Ape first, questions never. Portfolio is a crime scene and he loves it.",
+    perk: "Faster respawn after rugs",
+    role: "Degen",
+  },
 };
 
 export function CharacterSelect() {

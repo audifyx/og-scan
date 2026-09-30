@@ -123,6 +123,84 @@ export function MascotPortrait({ id }: { id: CharacterClassId }) {
       </svg>
     );
   }
+  if (id === "trump") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <rect x="18" y="20" width="28" height="26" rx="6" fill="#e8a87c" />
+        <path d="M14 22c2-10 36-10 38 2-8-6-30-6-38-2z" fill="#e8b84b" />
+        <path d="M14 22c10-2 28-2 38 0l-2 8c-10-4-24-4-34 0z" fill="#f5d67b" />
+        <circle cx="26" cy="32" r="2.4" fill="#1a1612" />
+        <circle cx="38" cy="32" r="2.4" fill="#1a1612" />
+        <path d="M26 40c4 2 8 2 12 0" fill="none" stroke="#8a5a3a" strokeWidth="1.8" strokeLinecap="round" />
+        <rect x="28" y="46" width="8" height="10" fill="#1a2a6c" />
+        <rect x="30" y="46" width="4" height="10" fill="#c41e3a" />
+      </svg>
+    );
+  }
+  if (id === "orangie") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <circle cx="32" cy="32" r="18" fill="#ff8c00" />
+        <circle cx="32" cy="32" r="14" fill="#ffa940" opacity="0.6" />
+        <circle cx="25" cy="30" r="3" fill="#1a1008" />
+        <circle cx="39" cy="30" r="3" fill="#1a1008" />
+        <circle cx="25" cy="30" r="1" fill="#ff8c00" />
+        <circle cx="39" cy="30" r="1" fill="#ff8c00" />
+        <path d="M24 40c5 4 11 4 16 0" fill="none" stroke="#7a3a00" strokeWidth="2" strokeLinecap="round" />
+        <path d="M32 12c-2-4-6-6-10-6 4 2 6 6 6 10z" fill="#4fa64a" />
+      </svg>
+    );
+  }
+  if (id === "brez") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <ellipse cx="32" cy="34" rx="16" ry="14" fill="#166534" />
+        <ellipse cx="32" cy="38" rx="10" ry="8" fill="#4ade80" opacity="0.5" />
+        <rect x="20" y="28" width="9" height="3.5" fill="#ff2a2a" />
+        <rect x="35" y="28" width="9" height="3.5" fill="#ff2a2a" />
+        <path d="M24 44c5 3 11 3 16 0" fill="none" stroke="#0d3a1f" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M16 20l-6-8 10 4z" fill="#14532d" />
+        <path d="M48 20l6-8-10 4z" fill="#14532d" />
+      </svg>
+    );
+  }
+  if (id === "tjr") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <rect x="20" y="18" width="24" height="28" rx="5" fill="#d4a574" />
+        <rect x="18" y="12" width="28" height="10" rx="5" fill="#1e3a8a" />
+        <rect x="18" y="18" width="28" height="4" fill="#3b82f6" />
+        <circle cx="26" cy="32" r="2.4" fill="#1a1612" />
+        <circle cx="38" cy="32" r="2.4" fill="#1a1612" />
+        <path d="M27 40c3 2 7 2 10 0" fill="none" stroke="#8a5a3a" strokeWidth="1.6" strokeLinecap="round" />
+        <rect x="24" y="46" width="16" height="6" fill="#60a5fa" />
+      </svg>
+    );
+  }
+  if (id === "kol_moon") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <circle cx="32" cy="32" r="16" fill="#c9a87c" />
+        <path d="M16 24c4-10 28-10 32 0l-4 2c-8-6-16-6-24 0z" fill="#7c3aed" />
+        <circle cx="26" cy="33" r="2.6" fill="#e879f9" />
+        <circle cx="38" cy="33" r="2.6" fill="#e879f9" />
+        <path d="M25 41c4 3 10 3 14 0" fill="none" stroke="#6b4f34" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M46 12l4 8-8-2z" fill="#e879f9" />
+      </svg>
+    );
+  }
+  if (id === "kol_degen") {
+    return (
+      <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
+        <rect x="18" y="20" width="28" height="26" rx="4" fill="#b08968" />
+        <rect x="20" y="28" width="24" height="6" rx="3" fill="#1a1210" />
+        <rect x="24" y="29" width="7" height="4" fill="#f43f5e" />
+        <rect x="33" y="29" width="7" height="4" fill="#f43f5e" />
+        <path d="M24 42h16" stroke="#5a3a28" strokeWidth="2" strokeLinecap="round" />
+        <rect x="14" y="14" width="36" height="6" rx="3" fill="#881337" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 64 64" className="oxc-mascot-face" aria-hidden>
       <circle cx="32" cy="32" r="18" fill="#4fa64a" />
