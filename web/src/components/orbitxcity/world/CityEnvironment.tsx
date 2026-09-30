@@ -30,6 +30,7 @@ import { OxiGuide } from "./OxiGuide";
 import { Park } from "./Park";
 import { Traffic } from "./Traffic";
 import { DrivableCars } from "./DrivableCars";
+import { PoliceChasers } from "./PoliceChasers";
 import { SkyCycle } from "./SkyCycle";
 import { UrbanNature } from "./UrbanNature";
 import { PropScatter } from "./PropScatter";
@@ -508,6 +509,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       />
       <Traffic count={high ? 10 : 3} block={block} paused={paused} />
       {!paused && <DrivableCars block={block} />}
+      {!paused && <PoliceChasers block={block} />}
     </group>
   );
 }

@@ -183,11 +183,13 @@ export function PlayerAvatar({
       camFwd.normalize();
       const camRight = new THREE.Vector3().crossVectors(camFwd, new THREE.Vector3(0, 1, 0));
       // cross(fwd, up) = camera's right in three.js right-handed coords.
+      // Analog magnitude: stick tilt controls speed, not just direction.
+      const mag = Math.min(1, Math.hypot(inputX, inputZ));
       const moveX = camFwd.x * -inputZ + camRight.x * inputX;
       const moveZ = camFwd.z * -inputZ + camRight.z * inputX;
       const len = Math.hypot(moveX, moveZ) || 1;
-      const nx = (moveX / len) * speed;
-      const nz = (moveZ / len) * speed;
+      const nx = (moveX / len) * speed * mag;
+      const nz = (moveZ / len) * speed * mag;
       // Smooth turning: lerp yaw toward target instead of snapping
       const targetYaw = Math.atan2(nx, nz);
       let dy = targetYaw - yaw.current;

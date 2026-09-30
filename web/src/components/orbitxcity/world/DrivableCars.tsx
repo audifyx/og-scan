@@ -169,34 +169,41 @@ export function DrivableCars({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockCon
       setNearCar(null);
     }
 
-    // Driving physics.
+    // Driving physics — fully analog: stick tilt = pedal/steering amount.
     const di = drivingRef.current;
     if (di !== null) {
       const c = carState.current[di];
       const g = groups.current[di];
       if (c && g) {
-        const fwd =
-          (DRIVE_KEYS.has("KeyW") || DRIVE_KEYS.has("ArrowUp") ? 1 : 0) +
-          (virtualInput.axisZ < -0.3 ? 1 : 0);
-        const back =
-          (DRIVE_KEYS.has("KeyS") || DRIVE_KEYS.has("ArrowDown") ? 1 : 0) +
-          (virtualInput.axisZ > 0.3 ? 1 : 0);
-        const left =
-          (DRIVE_KEYS.has("KeyA") || DRIVE_KEYS.has("ArrowLeft") ? 1 : 0) +
-          (virtualInput.axisX < -0.3 ? 1 : 0);
-        const right =
-          (DRIVE_KEYS.has("KeyD") || DRIVE_KEYS.has("ArrowRight") ? 1 : 0) +
-          (virtualInput.axisX > 0.3 ? 1 : 0);
+        // Throttle: -1 (full reverse) .. +1 (full gas). Keyboard is digital, stick is analog.
+        let throttle = 0;
+        if (DRIVE_KEYS.has("KeyW") || DRIVE_KEYS.has("ArrowUp")) throttle += 1;
+        if (DRIVE_KEYS.has("KeyS") || DRIVE_KEYS.has("ArrowDown")) throttle -= 1;
+        throttle += -virtualInput.axisZ; // stick up (axisZ<0) = gas
+        throttle = Math.max(-1, Math.min(1, throttle));
+        // Steering: -1 (left) .. +1 (right).
+        let steerInput = 0;
+        if (DRIVE_KEYS.has("KeyA") || DRIVE_KEYS.has("ArrowLeft")) steerInput -= 1;
+        if (DRIVE_KEYS.has("KeyD") || DRIVE_KEYS.has("ArrowRight")) steerInput += 1;
+        steerInput += virtualInput.axisX;
+        steerInput = Math.max(-1, Math.min(1, steerInput));
 
-        if (fwd > 0) c.speed = Math.min(TOP_SPEED, c.speed + ACCEL * dt);
-        else if (back > 0) {
-          c.speed = c.speed > 0.5 ? c.speed - BRAKE * dt : Math.max(-TOP_SPEED * 0.4, c.speed - ACCEL * 0.6 * dt);
+        if (throttle > 0.05) {
+          c.speed = Math.min(TOP_SPEED, c.speed + ACCEL * throttle * dt);
+        } else if (throttle < -0.05) {
+          c.speed =
+            c.speed > 0.5
+              ? c.speed + BRAKE * throttle * dt // braking (throttle negative)
+              : Math.max(-TOP_SPEED * 0.4, c.speed + ACCEL * 0.6 * throttle * dt); // reverse
         } else {
+          // Coast: gentle friction.
           c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 6 * dt);
         }
 
-        const steer = (left - right) * TURN_RATE * dt * Math.min(1, Math.abs(c.speed) / 6) * Math.sign(c.speed || 1);
-        c.yaw += steer;
+        // Steering scales with speed so the car doesn't spin in place, and
+        // fades at very high speed for stability.
+        const speedFactor = Math.min(1, Math.abs(c.speed) / 6) * (1 - Math.min(0.4, Math.abs(c.speed) / TOP_SPEED * 0.4));
+        c.yaw += steerInput * TURN_RATE * dt * speedFactor * Math.sign(c.speed || 1);
 
         const nx = c.x + Math.sin(c.yaw) * c.speed * dt;
         const nz = c.z + Math.cos(c.yaw) * c.speed * dt;
