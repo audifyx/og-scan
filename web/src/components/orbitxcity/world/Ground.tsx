@@ -1,16 +1,12 @@
 /**
- * City ground — procedural canvas textures (asphalt / cement / grass), street
- * network with instanced lane paint, raised sidewalks + curbs, road cracks.
- *
- * Perf: all lane dashes and crosswalk bars across every street live in two
- * shared InstancedMeshes (2 draw calls total for paint).
+ * City ground — wet reflective pad, asphalt streets, extruded crack shards, sidewalks.
  */
 import { useMemo } from "react";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { getWorldSize, getWorldStreets } from "@/lib/orbitxcity/worlds";
-import type { StreetSegment, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { collidesAt, mulberry32 } from "@/lib/orbitxcity/collision";
 
@@ -72,7 +68,7 @@ function RoadCracks({ block, dense }: { block: WorldBlockConfig; dense: boolean 
     let placed = 0;
     for (let i = 0; placed < count && i < count * 8; i++) {
       const x = block.bounds.minX + 4 + rand() * (block.bounds.maxX - block.bounds.minX - 8);
-      const z = block.bounds.minZ + 4 + rand() * (block.bounds.maxX - block.bounds.minX - 8);
+      const z = block.bounds.minZ + 4 + rand() * (block.bounds.maxZ - block.bounds.minZ - 8);
       if (collidesAt(x, z, 0.6, block)) continue;
       const len = 1.2 + rand() * 3.5;
       const thick = 0.04 + rand() * 0.06;
@@ -171,93 +167,6 @@ function makeCementTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-interface PaintSpot {
-  x: number;
-  y: number;
-  z: number;
-  rotY: number;
-}
-
-/**
- * All lane dashes + crosswalk bars for every street, baked into two shared
- * InstancedMeshes (one per paint shape). ~2 draw calls instead of ~300.
- */
-function RoadPaint({ streets }: { streets: StreetSegment[] }) {
-  const { dashes, bars } = useMemo(() => {
-    const dashList: PaintSpot[] = [];
-    const barList: PaintSpot[] = [];
-    streets.forEach((s, i) => {
-      const len = s.to - s.from;
-      const horizontal = s.o === "h";
-      const y = 0.046 + i * 0.002;
-      // Dashed center line
-      const n = Math.max(2, Math.floor(Math.abs(len) / 4.5));
-      for (let di = 0; di < n; di++) {
-        const t = (di + 0.5) / n;
-        const along = s.from + (s.to - s.from) * t;
-        dashList.push({
-          x: horizontal ? along : s.at,
-          y,
-          z: horizontal ? s.at : along,
-          rotY: horizontal ? 0 : Math.PI / 2,
-        });
-      }
-      // Crosswalk bars near both ends of the segment
-      for (const t of [0.12, 0.88]) {
-        const along = s.from + (s.to - s.from) * t;
-        for (let bi = -2; bi <= 2; bi++) {
-          const lat = bi * 0.46;
-          barList.push({
-            x: horizontal ? along : s.at + lat,
-            y: y + 0.002,
-            z: horizontal ? s.at + lat : along,
-            rotY: horizontal ? 0 : Math.PI / 2,
-          });
-        }
-      }
-    });
-    const fill = (list: PaintSpot[], geo: THREE.BufferGeometry, mat: THREE.Material) => {
-      if (!list.length) return null;
-      const mesh = new THREE.InstancedMesh(geo, mat, list.length);
-      const m = new THREE.Matrix4();
-      const q = new THREE.Quaternion();
-      const e = new THREE.Euler();
-      const one = new THREE.Vector3(1, 1, 1);
-      list.forEach((p, idx) => {
-        e.set(-Math.PI / 2, 0, p.rotY);
-        q.setFromEuler(e);
-        m.compose(new THREE.Vector3(p.x, p.y, p.z), q, one);
-        mesh.setMatrixAt(idx, m);
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.frustumCulled = false;
-      return mesh;
-    };
-    const dashGeo = new THREE.PlaneGeometry(1.4, 0.13);
-    const dashMat = new THREE.MeshStandardMaterial({
-      color: "#d8d2b8",
-      transparent: true,
-      opacity: 0.55,
-      roughness: 0.7,
-    });
-    const barGeo = new THREE.PlaneGeometry(0.55, 0.3);
-    const barMat = new THREE.MeshStandardMaterial({
-      color: "#e8e4d4",
-      transparent: true,
-      opacity: 0.5,
-      roughness: 0.75,
-    });
-    return { dashes: fill(dashList, dashGeo, dashMat), bars: fill(barList, barGeo, barMat) };
-  }, [streets]);
-
-  return (
-    <group>
-      {dashes && <primitive object={dashes} />}
-      {bars && <primitive object={bars} />}
-    </group>
-  );
-}
-
 /** Street network + wet cracked asphalt + soft grass shoulders. */
 export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   const { quality } = useCity();
@@ -317,24 +226,24 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
       <RoadCracks block={block} dense={high} />
 
       {grassPatches.map((p, i) => (
-        <mesh key={`grass-${i}`} rotation={[-Math.PI / 2, 0, p.rot]} position={[p.x, 0.03, p.z]} receiveShadow>
+        <mesh key={`grass-${i}`} rotation={[-Math.PI / 2, 0, p.rot]} position={[p.x, 0.015, p.z]} receiveShadow>
           <circleGeometry args={[p.r, high ? 28 : 16]} />
-          <meshStandardMaterial map={grassMap} color={i % 2 === 0 ? "#3d5c3a" : "#456846"} roughness={0.98} metalness={0} />
+          <meshStandardMaterial map={grassMap} color={i % 2 === 0 ? "#3d5c3a" : "#456846"} roughness={0.98} metalness={0} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
         </mesh>
       ))}
       <GrassTufts block={block} dense={high} />
-
-      <RoadPaint streets={streets} />
 
       {streets.map((s, i) => {
         const len = s.to - s.from;
         const mid = (s.from + s.to) / 2;
         const horizontal = s.o === "h";
-        const pos: [number, number, number] = horizontal ? [mid, 0.03 + i * 0.002, s.at] : [s.at, 0.03 + i * 0.002, mid];
+        // Layer stack with clear separation to kill z-fighting: streets sit
+        // well above grass (0.015) and pad (0), markings above streets.
+        const sy = 0.05 + i * 0.008;
+        const pos: [number, number, number] = horizontal ? [mid, sy, s.at] : [s.at, sy, mid];
         const planeSize: [number, number] = horizontal ? [len, s.w] : [s.w, len];
         return (
           <group key={`street-${i}`}>
-            {/* Asphalt strip */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={pos} receiveShadow>
               <planeGeometry args={planeSize} />
               {high ? (
@@ -349,31 +258,69 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                   mirror={0.14}
                 />
               ) : (
-                <meshStandardMaterial map={asphaltMap} color="#1a1e24" metalness={0.22} roughness={0.7} />
+                <meshStandardMaterial map={asphaltMap} color="#1a1e24" metalness={0.22} roughness={0.7} polygonOffset polygonOffsetFactor={2} polygonOffsetUnits={2} />
               )}
             </mesh>
-            {/* Raised sidewalks */}
+            {/* Center dashed lane paint */}
+            {Array.from({ length: Math.max(2, Math.floor(Math.abs(len) / 4.5)) }).map((_, di) => {
+              const t = (di + 0.5) / Math.max(1, Math.floor(Math.abs(len) / 4.5));
+              const along = s.from + (s.to - s.from) * t;
+              return (
+                <mesh
+                  key={`dash-${di}`}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  position={horizontal ? [along, sy + 0.012, s.at] : [s.at, sy + 0.012, along]}
+                >
+                  <planeGeometry args={horizontal ? [1.4, 0.12] : [0.12, 1.4]} />
+                  <meshStandardMaterial color="#d8d2b8" transparent opacity={0.55} roughness={0.7} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+                </mesh>
+              );
+            })}
+            {/* Crosswalk bars near segment ends */}
+            {[0.12, 0.88].map((t) => {
+              const along = s.from + (s.to - s.from) * t;
+              return (
+                <group key={`xw-${t}`}>
+                  {Array.from({ length: 5 }).map((_, bi) => {
+                    const lat = (bi - 2) * 0.42;
+                    return (
+                      <mesh
+                        key={bi}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        position={
+                          horizontal
+                            ? [along, sy + 0.014, s.at + lat]
+                            : [s.at + lat, sy + 0.014, along]
+                        }
+                      >
+                        <planeGeometry args={horizontal ? [0.55, 0.28] : [0.28, 0.55]} />
+                        <meshStandardMaterial color="#e8e4d4" transparent opacity={0.5} roughness={0.75} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+                      </mesh>
+                    );
+                  })}
+                </group>
+              );
+            })}
             {[-1, 1].map((side) => {
               const off = s.at + side * (s.w / 2 + 0.95);
               return (
                 <mesh
                   key={`walk-${side}`}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  position={horizontal ? [mid, 0.09 + i * 0.002, off] : [off, 0.09 + i * 0.002, mid]}
+                  position={horizontal ? [mid, sy + 0.02, off] : [off, sy + 0.02, mid]}
                   receiveShadow
                 >
-                  <planeGeometry args={horizontal ? [len, 1.7] : [1.7, len]} />
-                  <meshStandardMaterial map={cementMap} color="#6a7178" roughness={0.9} metalness={0.04} />
+                  <planeGeometry args={horizontal ? [len, 1.55] : [1.55, len]} />
+                  <meshStandardMaterial map={cementMap} color="#6a7178" roughness={0.9} metalness={0.04} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
                 </mesh>
               );
             })}
-            {/* Curbs */}
             {[-1, 1].map((side) => {
               const off = s.at + side * (s.w / 2 + 0.22);
               return (
                 <mesh
-                  key={`curb-${side}`}
-                  position={horizontal ? [mid, 0.08, off] : [off, 0.08, mid]}
+                  key={side}
+                  position={horizontal ? [mid, sy + 0.06, off] : [off, sy + 0.06, mid]}
                   castShadow
                   receiveShadow
                 >
