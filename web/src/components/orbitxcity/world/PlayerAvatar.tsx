@@ -188,7 +188,12 @@ export function PlayerAvatar({
       const len = Math.hypot(moveX, moveZ) || 1;
       const nx = (moveX / len) * speed;
       const nz = (moveZ / len) * speed;
-      yaw.current = Math.atan2(nx, nz);
+      // Smooth turning: lerp yaw toward target instead of snapping
+      const targetYaw = Math.atan2(nx, nz);
+      let dy = targetYaw - yaw.current;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      yaw.current += dy * Math.min(1, t * 12);
 
       const nextX = pos.current.x + nx * t;
       const nextZ = pos.current.z + nz * t;

@@ -173,7 +173,7 @@ export interface AvatarAppearance {
   skinColor: string;
   name: string;
   /** Selected mascot (crypto-native) or a legacy class alias. */
-  classId?: "pepe" | "wojak" | "chad" | "doge" | "anon" | "trader" | "builder" | "gamer" | "creator" | "explorer";
+  classId?: "pepe" | "wojak" | "chad" | "doge" | "anon" | "trader" | "builder" | "gamer" | "creator" | "explorer" | "trump" | "orangie" | "brez" | "tjr" | "kol_moon" | "kol_degen";
   /** Sims-style cosmetics rendered by CharacterMesh. */
   hairStyle: HairStyle;
   hairColor: string;

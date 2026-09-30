@@ -42,11 +42,11 @@ const TARGET_H = 2.3;
 const UNIT = TARGET_H / STUD_H;
 
 const HEAD_SHAPE: Record<string, [number, number, number]> = {
-  round: [1.5, 1.25, 1.4],
-  block: [1.7, 1.3, 1.45],
-  wide: [1.85, 1.15, 1.5],
-  tall: [1.35, 1.5, 1.3],
-  snout: [1.5, 1.25, 1.6],
+  round: [1.6, 1.6, 1.6],
+  block: [1.7, 1.7, 1.7],
+  wide: [1.9, 1.5, 1.6],
+  tall: [1.5, 1.9, 1.5],
+  snout: [1.6, 1.6, 1.8],
 };
 
 const TORSO_W_BY_BUILD: Record<string, number> = {
@@ -211,6 +211,25 @@ export function BlockCharacter({
               <boxGeometry args={[head[0] * 1.05, 0.44, head[2] * 1.05]} />
               {flat(accent)}
             </mesh>
+          )}
+
+          {build.headgear === "hair" && (
+            <group>
+              {/* Blocky swept hair — signature blonde combover */}
+              <mesh position={[0, head[1] / 2 + 0.14, 0]} castShadow={castShadow}>
+                <boxGeometry args={[head[0] * 1.08, 0.42, head[2] * 1.08]} />
+                {flat("#e8b84b")}
+              </mesh>
+              <mesh position={[0.1, head[1] / 2 + 0.3, head[2] * 0.28]} castShadow={castShadow}>
+                <boxGeometry args={[head[0] * 0.9, 0.3, head[2] * 0.5]} />
+                {flat("#f5d67b")}
+              </mesh>
+              {/* Side sweep */}
+              <mesh position={[-head[0] * 0.42, head[1] * 0.28, 0]} castShadow={castShadow}>
+                <boxGeometry args={[0.22, head[1] * 0.5, head[2] * 0.9]} />
+                {flat("#e8b84b")}
+              </mesh>
+            </group>
           )}
 
           {build.headgear === "hood" && (

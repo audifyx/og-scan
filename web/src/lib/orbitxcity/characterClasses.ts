@@ -20,7 +20,13 @@ export type CharacterClassId =
   | "whale"
   | "bot"
   | "oracle"
-  | "miner";
+  | "miner"
+  | "trump"
+  | "orangie"
+  | "brez"
+  | "tjr"
+  | "kol_moon"
+  | "kol_degen";
 
 /** Legacy class ids still stored on interiors / old sessions. */
 export type LegacyClassId =
@@ -62,7 +68,7 @@ export interface CharacterBuild {
   /** Torso mass. */
   torso: "slim" | "regular" | "broad" | "bulk";
   /** Signature headgear rendered above the head. */
-  headgear: "none" | "cap" | "hood" | "visor" | "crown" | "beanie";
+  headgear: "none" | "cap" | "hood" | "visor" | "crown" | "beanie" | "hair";
   /** Emissive eye treatment. */
   eyes: "flat" | "laser" | "glow" | "shade";
   /** Trailing accessory. */
@@ -309,6 +315,138 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
       { label: "Grit", value: 96 },
       { label: "Pace", value: 66 },
       { label: "Focus", value: 83 },
+    ],
+  },
+  {
+    id: "trump",
+    name: "Trump",
+    handle: "@trump.ox",
+    tagline: "Make OrbitX great again · huge gains",
+    rarity: "legendary",
+    neon: "#ffd700",
+    gold: "#ffe27a",
+    bodyColor: "#1a2a6c",
+    accentColor: "#c41e3a",
+    skinColor: "#e8a87c",
+    trimColor: "#ffd700",
+    scale: { x: 1.12, y: 1.04, z: 1.08 },
+    movement: { speed: 0.95, jump: 1.0, accel: 0.96 },
+    build: { head: "block", torso: "broad", headgear: "hair", eyes: "flat", trail: "cape" },
+    stats: [
+      { label: "Charisma", value: 99 },
+      { label: "Gains", value: 97 },
+      { label: "Pace", value: 72 },
+      { label: "Focus", value: 88 },
+    ],
+  },
+  {
+    id: "orangie",
+    name: "Orangie",
+    handle: "@orangie.ox",
+    tagline: "Orange pilled · CT's citrus king",
+    rarity: "epic",
+    neon: "#ff8c00",
+    gold: "#ffb84d",
+    bodyColor: "#ff8c00",
+    accentColor: "#ff4500",
+    skinColor: "#f5a623",
+    trimColor: "#cc6600",
+    scale: { x: 1.0, y: 1.0, z: 1.0 },
+    movement: { speed: 1.05, jump: 1.05, accel: 1.02 },
+    build: { head: "round", torso: "regular", headgear: "none", eyes: "glow", trail: "none" },
+    stats: [
+      { label: "Vibes", value: 95 },
+      { label: "Alpha", value: 90 },
+      { label: "Pace", value: 84 },
+      { label: "Focus", value: 79 },
+    ],
+  },
+  {
+    id: "brez",
+    name: "Brez",
+    handle: "@brez.ox",
+    tagline: "Scales tip green · cold-blooded trader",
+    rarity: "epic",
+    neon: "#4ade80",
+    gold: "#a7f3d0",
+    bodyColor: "#166534",
+    accentColor: "#4ade80",
+    skinColor: "#86efac",
+    trimColor: "#14532d",
+    scale: { x: 1.06, y: 0.98, z: 1.04 },
+    movement: { speed: 1.08, jump: 1.0, accel: 1.05 },
+    build: { head: "wide", torso: "regular", headgear: "hood", eyes: "laser", trail: "tail" },
+    stats: [
+      { label: "Precision", value: 94 },
+      { label: "Stealth", value: 91 },
+      { label: "Pace", value: 86 },
+      { label: "Focus", value: 93 },
+    ],
+  },
+  {
+    id: "tjr",
+    name: "TJR",
+    handle: "@tjr.ox",
+    tagline: "Threads reader · always early",
+    rarity: "rare",
+    neon: "#60a5fa",
+    gold: "#bfdbfe",
+    bodyColor: "#1e3a8a",
+    accentColor: "#60a5fa",
+    skinColor: "#d4a574",
+    trimColor: "#3b82f6",
+    scale: { x: 0.98, y: 1.02, z: 0.98 },
+    movement: { speed: 1.1, jump: 1.08, accel: 1.04 },
+    build: { head: "tall", torso: "slim", headgear: "beanie", eyes: "flat", trail: "scarf" },
+    stats: [
+      { label: "Speed", value: 92 },
+      { label: "Intel", value: 89 },
+      { label: "Pace", value: 90 },
+      { label: "Focus", value: 85 },
+    ],
+  },
+  {
+    id: "kol_moon",
+    name: "Moonboy",
+    handle: "@moonboy.ox",
+    tagline: "To the moon · KOL of the people",
+    rarity: "rare",
+    neon: "#e879f9",
+    gold: "#f5d0fe",
+    bodyColor: "#7c3aed",
+    accentColor: "#e879f9",
+    skinColor: "#c9a87c",
+    trimColor: "#a855f7",
+    scale: { x: 1.0, y: 1.0, z: 1.0 },
+    movement: { speed: 1.0, jump: 1.12, accel: 1.0 },
+    build: { head: "round", torso: "regular", headgear: "cap", eyes: "glow", trail: "none" },
+    stats: [
+      { label: "Hype", value: 93 },
+      { label: "Reach", value: 91 },
+      { label: "Pace", value: 80 },
+      { label: "Focus", value: 74 },
+    ],
+  },
+  {
+    id: "kol_degen",
+    name: "Degen",
+    handle: "@degen.ox",
+    tagline: "Ape first · ask questions later",
+    rarity: "common",
+    neon: "#f43f5e",
+    gold: "#fda4af",
+    bodyColor: "#881337",
+    accentColor: "#f43f5e",
+    skinColor: "#b08968",
+    trimColor: "#fb7185",
+    scale: { x: 1.04, y: 0.98, z: 1.02 },
+    movement: { speed: 1.12, jump: 0.95, accel: 1.08 },
+    build: { head: "block", torso: "broad", headgear: "none", eyes: "shade", trail: "none" },
+    stats: [
+      { label: "Courage", value: 99 },
+      { label: "Caution", value: 12 },
+      { label: "Pace", value: 88 },
+      { label: "Focus", value: 45 },
     ],
   },
 ];
