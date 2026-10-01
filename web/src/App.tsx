@@ -7,11 +7,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
-// OrbitX Home OS theme engine (aliased — the app has its own ThemeProvider).
-import { ThemeProvider as OsThemeProvider } from "@/home-os/os-theme-provider";
-import { OsBoot } from "@/home-os/os-boot";
-import { OsFx } from "@/home-os/os-fx";
-import { HomeOS } from "@/home-os/home-os";
 import { OrbitAtmosphereProvider } from "@/hooks/useOrbitAtmosphere";
 import { OrbitAtmosphereLayer } from "@/components/theme/OrbitAtmosphereLayer";
 import { PlatformDock } from "@/components/theme/PlatformDock";
@@ -156,6 +151,8 @@ import PlatformRoadmap from "./pages/platform/Roadmap";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { EvmWalletProvider } from "@/hooks/useEvmWallet";
+import { DeviceThemeProvider } from "@/themes/DeviceThemeProvider";
+import OsHomePage from "@/oshome/OsHomePage";
 import { WalletAuthBridge } from "@/components/WalletAuthBridge";
 import { UsernameClaimGate } from "@/components/UsernameClaimModal";
 import Games from "./pages/Games";
@@ -242,6 +239,9 @@ const queryClient = new QueryClient({
 });
 const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
 const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCityPage"));
+const McpMarketplacePage = lazyWithRetry(() => import("./pages/orbitxmcp/MarketplaceHome"));
+const McpDetailPage = lazyWithRetry(() => import("./pages/orbitxmcp/McpDetailPage"));
+const McpSubmitPage = lazyWithRetry(() => import("./pages/orbitxmcp/SubmitMcpPage"));
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
 
@@ -293,10 +293,10 @@ const App = () => (
   <ErrorBoundary>
   <MaintenanceLock>
   <QueryClientProvider client={queryClient}>
-    <OsThemeProvider>
     <AuthProvider>
       <SolanaWalletProvider>
       <EvmWalletProvider>
+      <DeviceThemeProvider>
       <ThemeProvider>
       <OrbitAtmosphereProvider>
       <TooltipProvider>
@@ -317,7 +317,7 @@ const App = () => (
           <UsernameClaimGate />
           <Routes>
             {/* ── Public routes (no auth required) ── */}
-            <Route path="/" element={<HomeOS />} />
+            <Route path="/" element={<OsHomePage />} />
             <Route path="/beta" element={<BetaHome />} />
             <Route path="/splash" element={<Splash />} />
             <Route path="/waitlist" element={<OgdexRedirect to="/auth?mode=signup" />} />
@@ -349,6 +349,11 @@ const App = () => (
               }
             />
             <Route path="/orbitxcity" element={<Navigate to="/Orbitxcity" replace />} />
+
+            {/* ── OrbitX MCP Marketplace ── */}
+            <Route path="/orbitxmcp" element={<McpMarketplacePage />} />
+            <Route path="/orbitxmcp/submit" element={<McpSubmitPage />} />
+            <Route path="/orbitxmcp/:slug" element={<McpDetailPage />} />
 
             {/* ── OrbitX AI — wallet-authenticated, token-gated super app ── */}
             <Route
@@ -739,15 +744,13 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-        <OsBoot />
-        <OsFx />
       </TooltipProvider>
       </OrbitAtmosphereProvider>
       </ThemeProvider>
+      </DeviceThemeProvider>
       </EvmWalletProvider>
       </SolanaWalletProvider>
     </AuthProvider>
-    </OsThemeProvider>
   </QueryClientProvider>
   </MaintenanceLock>
   </ErrorBoundary>
