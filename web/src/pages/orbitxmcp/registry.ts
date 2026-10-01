@@ -95,8 +95,8 @@ export const MCP_REGISTRY: McpEntry[] = [
     tagline: "Bitcoin intelligence for agents",
     description: "BTC price, address balances, transaction history, fee estimates, and mempool stats.",
     longDescription: "Luna is the Bitcoin MCP, powered by the public mempool.space API — live price, address intel, recommended fees, and mempool depth.",
-    category: "chains", endpoint: "https://luna-mcp.vercel.app/api/mcp",
-    siteUrl: "https://luna-mcp.vercel.app", kicker: "Chain: Bitcoin · No auth", version: "1.0.0",
+    category: "chains", endpoint: "https://luna-mcp-smoky.vercel.app/api/mcp",
+    siteUrl: "https://luna-mcp-smoky.vercel.app", kicker: "Chain: Bitcoin · No auth", version: "1.0.0",
   },
   {
     slug: "venus", name: "Venus", emoji: "📈", accent: "#00D4FF",
@@ -145,8 +145,8 @@ export const MCP_REGISTRY: McpEntry[] = [
     tagline: "Stock market data for agents",
     description: "Free stock quotes and price history for any ticker — no key.",
     longDescription: "Orion serves stock market data from free public feeds — live quotes and daily history for US equities.",
-    category: "market", endpoint: "https://orion-mcp.vercel.app/api/mcp",
-    siteUrl: "https://orion-mcp.vercel.app", kicker: "Equities · No auth", version: "1.0.0",
+    category: "market", endpoint: "https://orion-mcp-three.vercel.app/api/mcp",
+    siteUrl: "https://orion-mcp-three.vercel.app", kicker: "Equities · No auth", version: "1.0.0",
   },
   {
     slug: "europa", name: "Europa", emoji: "💱", accent: "#2196F3",
@@ -169,8 +169,8 @@ export const MCP_REGISTRY: McpEntry[] = [
     tagline: "Market sentiment for agents",
     description: "Fear & Greed index history and global crypto market overview.",
     longDescription: "Pulse reads the market's mood — the Fear & Greed index with history plus global market cap and BTC dominance.",
-    category: "market", endpoint: "https://pulse-mcp.vercel.app/api/mcp",
-    siteUrl: "https://pulse-mcp.vercel.app", kicker: "Sentiment · No auth", version: "1.0.0",
+    category: "market", endpoint: "https://pulse-sentiment-mcp.vercel.app/api/mcp",
+    siteUrl: "https://pulse-sentiment-mcp.vercel.app", kicker: "Sentiment · No auth", version: "1.0.0",
   },
   {
     slug: "harbor", name: "Harbor", emoji: "⚓", accent: "#009688",
@@ -203,8 +203,8 @@ export const MCP_REGISTRY: McpEntry[] = [
     tagline: "Weather for agents",
     description: "Current weather and forecasts for anywhere on Earth — free, no key.",
     longDescription: "Aurora serves weather from Open-Meteo — geocode any place, get current conditions and 7-day forecasts.",
-    category: "verticals", endpoint: "https://aurora-mcp.vercel.app/api/mcp",
-    siteUrl: "https://aurora-mcp.vercel.app", kicker: "Weather · No auth", version: "1.0.0",
+    category: "verticals", endpoint: "https://aurora-mcp-ten.vercel.app/api/mcp",
+    siteUrl: "https://aurora-mcp-ten.vercel.app", kicker: "Weather · No auth", version: "1.0.0",
   },
   {
     slug: "herald", name: "Herald", emoji: "📰", accent: "#9C27B0",
