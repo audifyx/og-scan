@@ -300,3 +300,13 @@
 .oxc-quest-claim:active { background: rgba(217, 164, 65, 0.32); }
 .oxc-quest-done { color: #17e6d4; font-size: 18px; font-weight: 800; }
 .oxc-quest-count { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); font-variant-numeric: tabular-nums; }
+/* economy dock strip under the ticker — horizontal scroll on phones */
+.oxc-dockrow {
+  overflow-x: auto;
+  padding: 8px 12px 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.oxc-dockrow::-webkit-scrollbar { display: none; }
+.oxc-dockrow .oxe-dock { min-width: max-content; padding: 8px 4px; }
+.oxc-dockrow .oxe-btn { flex: none; white-space: nowrap; }
