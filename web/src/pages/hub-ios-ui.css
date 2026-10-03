@@ -675,3 +675,79 @@ a.ios-cell {
   font-size: 15px; font-weight: 800; color: rgba(255, 255, 255, 0.85);
   background: linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04));
 }
+
+/* ---------- Pulse tab: segmented feed + featured carousel (2026-10-03) ---------- */
+.pulse-seg {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin: 2px 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pulse-seg__btn {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ios-secondary-label, rgba(255, 255, 255, 0.6));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.pulse-seg__btn.is-on {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.pulse-feat {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 -4px 6px;
+  padding: 4px 4px 10px;
+}
+.pulse-feat::-webkit-scrollbar { display: none; }
+.pulse-card {
+  appearance: none;
+  flex: 0 0 148px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 12px 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+.pulse-card:active { transform: scale(0.96); }
+.pulse-card__img {
+  width: 44px; height: 44px; border-radius: 50%;
+  object-fit: cover; margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.pulse-card__img--fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: rgba(255, 255, 255, 0.85);
+}
+.pulse-card__name {
+  font-size: 14px; font-weight: 700; color: #fff;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pulse-card__sym { font-size: 11px; color: rgba(255, 255, 255, 0.5); font-weight: 600; }
+.pulse-card__price { font-size: 13px; font-weight: 700; color: #fff; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.pulse-card__chg { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
