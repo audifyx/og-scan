@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 // Credits removed
 import { ThemePicker } from "@/components/settings/ThemePicker";
+import { DeviceThemePicker } from "@/components/settings/DeviceThemePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -835,7 +836,7 @@ const Settings = () => {
               <Palette className="h-5 w-5 text-white/40" />
               <h2 className="text-[20px] font-bold">Themes</h2>
             </div>
-            <div className="max-w-4xl"><ThemePicker /></div>
+            <div className="max-w-4xl"><DeviceThemePicker /><ThemePicker /></div>
           </div>)}
 
           {/* ── Notifications Tab ── */}
