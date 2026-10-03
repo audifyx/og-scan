@@ -57,14 +57,14 @@ export const AuditLog = () => {
     const q = search.toLowerCase();
     return (l.action || "").toLowerCase().includes(q)
       || (l.target_type || "").toLowerCase().includes(q)
-      || (l.admin_id || "").toLowerCase().includes(q)
+      || (l.admin_user_id || "").toLowerCase().includes(q)
       || (l.target_id || "").toLowerCase().includes(q);
   });
 
   const exportCSV = () => {
     const rows = ["id,admin_id,action,target_type,target_id,created_at"];
     filtered.forEach((l) => {
-      rows.push(`${l.id},${l.admin_id},${(l.action || "").replace(/,/g, ";")},${l.target_type || ""},${l.target_id || ""},${l.created_at}`);
+      rows.push(`${l.id},${l.admin_user_id},${(l.action || "").replace(/,/g, ";")},${l.target_type || ""},${l.target_id || ""},${l.created_at}`);
     });
     const blob = new Blob([rows.join("\n")], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "audit_log.csv"; a.click();
@@ -130,7 +130,7 @@ export const AuditLog = () => {
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium ${actionColor(l.action)}`}>{l.action}</p>
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
-                      <span className="flex items-center gap-1"><Shield className="h-3 w-3" />{shortId(l.admin_id)}</span>
+                      <span className="flex items-center gap-1"><Shield className="h-3 w-3" />{shortId(l.admin_user_id)}</span>
                       {l.target_type && <Badge variant="outline" className="text-[10px]">{l.target_type}</Badge>}
                       {l.target_id && <code>{shortId(l.target_id)}</code>}
                     </div>
@@ -163,17 +163,17 @@ export const AuditLog = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div><Label className="text-xs text-muted-foreground">Action</Label><p className={`text-sm font-medium ${actionColor(selected.action)}`}>{selected.action}</p></div>
-                  <div><Label className="text-xs text-muted-foreground">Admin</Label><code className="text-xs">{selected.admin_id}</code></div>
+                  <div><Label className="text-xs text-muted-foreground">Admin</Label><code className="text-xs">{selected.admin_user_id}</code></div>
                   <div><Label className="text-xs text-muted-foreground">Target Type</Label><p className="text-sm">{selected.target_type || "—"}</p></div>
                   <div><Label className="text-xs text-muted-foreground">Target ID</Label><code className="text-xs">{selected.target_id || "—"}</code></div>
                   <div><Label className="text-xs text-muted-foreground">Timestamp</Label><p className="text-sm">{format(new Date(selected.created_at), "PPpp")}</p></div>
                   <div><Label className="text-xs text-muted-foreground">ID</Label><code className="text-xs">{selected.id}</code></div>
                 </div>
-                {selected.old_data && (
-                  <div><Label className="text-xs text-muted-foreground">Previous Data</Label><pre className="text-xs bg-white/[0.03] p-3 rounded-lg mt-1 overflow-auto max-h-[150px]">{JSON.stringify(selected.old_data, null, 2)}</pre></div>
+                {selected.old_values && (
+                  <div><Label className="text-xs text-muted-foreground">Previous Data</Label><pre className="text-xs bg-white/[0.03] p-3 rounded-lg mt-1 overflow-auto max-h-[150px]">{JSON.stringify(selected.old_values, null, 2)}</pre></div>
                 )}
-                {selected.new_data && (
-                  <div><Label className="text-xs text-muted-foreground">New Data</Label><pre className="text-xs bg-white/[0.03] p-3 rounded-lg mt-1 overflow-auto max-h-[150px]">{JSON.stringify(selected.new_data, null, 2)}</pre></div>
+                {selected.new_values && (
+                  <div><Label className="text-xs text-muted-foreground">New Data</Label><pre className="text-xs bg-white/[0.03] p-3 rounded-lg mt-1 overflow-auto max-h-[150px]">{JSON.stringify(selected.new_values, null, 2)}</pre></div>
                 )}
               </div>
             </>
