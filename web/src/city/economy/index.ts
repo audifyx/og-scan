@@ -6,6 +6,8 @@ export { default as CityShop } from "./CityShop";
 export { default as TradePanel } from "./TradePanel";
 export { default as LaunchTerminal } from "./LaunchTerminal";
 export { default as ArcadeGame } from "./ArcadeGame";
+export { default as RamenOrder } from "./RamenOrder";
+export type { RamenBuff } from "./RamenOrder";
 export { default as ReceiptModal, solscanTxLink, solscanAddressLink } from "./ReceiptModal";
 export { default as EconomyDock } from "./EconomyDock";
 export { useCityInventory } from "./useCityInventory";
