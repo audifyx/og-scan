@@ -242,3 +242,30 @@
   .oxc-ctl { width: 64px; height: 64px; }
   .oxc-stick { width: 104px; height: 104px; }
 }
+
+/* ── character juice: speed lines + emote picker ── */
+.oxc-speedlines {
+  position: fixed; inset: 0; pointer-events: none; z-index: 6;
+  background: repeating-conic-gradient(from 0deg at 50% 50%,
+    transparent 0deg 9deg, rgba(23, 230, 212, 0.055) 9deg 11deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 40%, black 76%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 40%, black 76%);
+  animation: oxc-speedspin 0.8s linear infinite;
+}
+@keyframes oxc-speedspin { to { transform: rotate(28deg); } }
+.oxc-emote-picker {
+  position: fixed; right: 92px; bottom: 200px; z-index: 40;
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(8, 12, 20, 0.92);
+  border: 1px solid rgba(23, 230, 212, 0.35);
+  border-radius: 18px; padding: 10px;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(23, 230, 212, 0.12);
+}
+.oxc-emote-picker button {
+  min-height: 44px; padding: 0 18px; border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff; font-size: 14px; font-weight: 700;
+}
+.oxc-emote-picker button:active { background: rgba(23, 230, 212, 0.2); border-color: rgba(23, 230, 212, 0.6); }
