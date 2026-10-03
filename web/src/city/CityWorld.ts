@@ -29,6 +29,7 @@ export interface CityHudState {
   speedKmh: number;
   isNight: boolean;
   poiToast?: string;
+  insidePoi: string | null;
 }
 
 export interface Quote { price: number; change24h: number; marketCap?: number }
@@ -225,6 +226,11 @@ export class CityWorld {
   // weather
   private weather!: CityWeather;
   private traffic!: CityTraffic;
+  // ramen buffs
+  private speedBuffUntil = 0;
+  private glowTrailUntil = 0;
+  private trail: { sp: THREE.Sprite; life: number }[] = [];
+  private trailT = 0;
   private streakMats: THREE.MeshBasicMaterial[] = [];
 
   // dust
@@ -1015,7 +1021,8 @@ export class CityWorld {
     const mx = inp.moveX, my = inp.moveY;
     const moving = Math.hypot(mx, my) > 0.08;
     const sprint = inp.sprint && my > 0.1;
-    const speed = sprint ? 9.5 : 5.2;
+    const buffed = this.time < this.speedBuffUntil;
+    const speed = (sprint ? 9.5 : 5.2) * (buffed ? 1.35 : 1);
 
     // camera orbit from drag
     this.camYaw -= this.dragDX * 0.004;
@@ -1103,6 +1110,7 @@ export class CityWorld {
     this.blob.position.set(this.pPos.x, 0.02, this.pPos.z);
     const blobS = Math.max(0.6, 1 - this.pPos.y * 0.25);
     this.blob.scale.set(blobS, blobS, 1);
+    this.updateGlowTrail(dt, moving);
 
     this.updateCamera(dt);
     this.updateAtmosphere(dt);
@@ -1123,6 +1131,46 @@ export class CityWorld {
     }
     this.updateHud(dt);
     this.drawMinimap(dt);
+  }
+
+  /** Ramen buffs: speed (+35%) or glow trail, 60s. Lucky is instant CITY. */
+  setBuff(kind: "speed" | "glow", secs: number): void {
+    if (kind === "speed") this.speedBuffUntil = this.time + secs;
+    else this.glowTrailUntil = this.time + secs;
+  }
+
+  getInsidePoi(): string | null {
+    return this.insidePoi ?? null;
+  }
+
+  private updateGlowTrail(dt: number, moving: boolean): void {
+    const active = this.time < this.glowTrailUntil;
+    if (active && moving && this.glowTex) {
+      this.trailT -= dt;
+      if (this.trailT <= 0) {
+        this.trailT = 0.06;
+        const sm = new THREE.SpriteMaterial({
+          map: this.glowTex, color: 0x17e6d4, transparent: true,
+          opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false,
+        });
+        const sp = new THREE.Sprite(sm);
+        sp.scale.set(0.9, 0.9, 1);
+        sp.position.set(this.pPos.x, 0.9, this.pPos.z);
+        this.scene.add(sp);
+        this.trail.push({ sp, life: 0.7 });
+        this.disposables.push(sm);
+      }
+    }
+    for (let i = this.trail.length - 1; i >= 0; i--) {
+      const t = this.trail[i];
+      t.life -= dt;
+      if (t.life <= 0) {
+        this.scene.remove(t.sp);
+        this.trail.splice(i, 1);
+        continue;
+      }
+      (t.sp.material as THREE.SpriteMaterial).opacity = 0.55 * (t.life / 0.7);
+    }
   }
 
   /** Follow cam: dist 8, pitch 0.32, FOV 62, lookAt focus+1.5y — critically-damped spring. */
@@ -1223,6 +1271,7 @@ export class CityWorld {
       speedKmh: Math.hypot(this.pVel.x, this.pVel.z) * 3.6,
       isNight: true,
       poiToast: this.time < this.poiToastUntil ? this.poiToast : undefined,
+      insidePoi: this.insidePoi ?? null,
     };
     if (clock !== this.lastClock) this.lastClock = clock;
     this.onHud(h);
