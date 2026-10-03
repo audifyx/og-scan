@@ -410,7 +410,7 @@ export default function Hub() {
   );
 
   const appRows = (apps: AppItem[]) => (
-    <div className="ios-group">
+    <div className="ios-group ios-group--apps">
       {apps.map((app) => (
         <button key={app.key} type="button" className="ios-cell" onClick={() => push({ id: "app", appKey: app.key })}>
           {renderMark(app, "ios-appico")}
