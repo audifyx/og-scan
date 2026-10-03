@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Zap, ArrowUp, Crosshair, Wallet } from "lucide-react";
 import { useCityWallet } from "./economy/useCityWallet";
+import RamenOrder, { type RamenBuff } from "./economy/RamenOrder";
+import { Soup } from "lucide-react";
 import { setTouchMove } from "./core/input";
 import type { GtaApi } from "./core/useGtaGame";
 
@@ -202,7 +204,14 @@ function HookIcon() {
 
 export function CityHud({ api }: { api: GtaApi }) {
   const [sprintOn, setSprintOn] = useState(false);
+  const [ramenOpen, setRamenOpen] = useState(false);
   const toast = api.hud?.poiToast;
+  const insideRamen = api.hud?.insidePoi === "Ramen House";
+
+  const applyRamenBuff = (buff: RamenBuff) => {
+    if (buff === "lucky") return; // instant CITY handled in the modal
+    api.getWorld()?.setBuff(buff, 60);
+  };
 
   const scan = () => api.getWorld()?.scanPulse();
   const hook = () => {
@@ -230,7 +239,13 @@ export function CityHud({ api }: { api: GtaApi }) {
         <button className="oxc-pill" onPointerDown={(e) => { e.preventDefault(); hook(); }}>
           <HookIcon /> HOOK
         </button>
+        {insideRamen && (
+          <button className="oxc-pill gold" onPointerDown={(e) => { e.preventDefault(); setRamenOpen(true); }}>
+            <Soup size={16} /> ORDER
+          </button>
+        )}
       </div>
+      {ramenOpen && <RamenOrder onClose={() => setRamenOpen(false)} onBuff={applyRamenBuff} />}
 
       {/* right: RUN / JUMP / PPS */}
       <div className="oxc-right" data-hud>
