@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Zap, ArrowUp, Crosshair, Wallet } from "lucide-react";
 import { useCityWallet } from "./economy/useCityWallet";
 import RamenOrder, { type RamenBuff } from "./economy/RamenOrder";
+import { questProgress, claimQuest, type QuestProgress } from "./quests";
 import { Soup } from "lucide-react";
 import { setTouchMove } from "./core/input";
 import type { GtaApi } from "./core/useGtaGame";
@@ -194,6 +195,83 @@ function Joystick({ api }: { api: GtaApi }) {
   );
 }
 
+function QuestChip({ api }: { api: GtaApi }) {
+  const wallet = useCityWallet();
+  const [open, setOpen] = useState(false);
+  const [progs, setProgs] = useState<QuestProgress[]>([]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const w = api.getWorld();
+      if (!w) return;
+      setProgs(
+        questProgress(wallet.address, {
+          dist: w.getSessionDistance(),
+          scanned: w.getScannedPois(),
+          visited: w.getVisitedPois(),
+        }),
+      );
+    }, 2000);
+    return () => clearInterval(id);
+  }, [api, wallet.address]);
+
+  const doneCount = progs.filter((p) => p.done).length;
+  const claimable = progs.some((p) => p.done && !p.claimed);
+  return (
+    <div data-hud>
+      <button
+        className={`oxc-pill${claimable ? " gold pulse" : ""}`}
+        onPointerDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+        aria-label="Daily quests"
+      >
+        🗺 QUESTS {doneCount}/3
+      </button>
+      {open && (
+        <div className="oxc-quest-panel">
+          <div className="oxc-quest-title">DAILY QUESTS</div>
+          {progs.map((p) => (
+            <div key={p.def.id} className="oxc-quest-row">
+              <div className="oxc-quest-info">
+                <b>{p.def.name}</b>
+                <small>{p.def.desc} · +{p.def.reward} CITY</small>
+                <div className="oxc-quest-bar">
+                  <div style={{ width: `${(p.have / p.def.target) * 100}%` }} />
+                </div>
+              </div>
+              {p.claimed ? (
+                <span className="oxc-quest-done">✓</span>
+              ) : p.done ? (
+                <button
+                  className="oxc-quest-claim"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    claimQuest(wallet.address, p.def.id);
+                    const w = api.getWorld();
+                    if (w) {
+                      setProgs(
+                        questProgress(wallet.address, {
+                          dist: w.getSessionDistance(),
+                          scanned: w.getScannedPois(),
+                          visited: w.getVisitedPois(),
+                        }),
+                      );
+                    }
+                  }}
+                >
+                  CLAIM
+                </button>
+              ) : (
+                <span className="oxc-quest-count">{p.have}/{p.def.target}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HookIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
@@ -262,6 +340,7 @@ export function CityHud({ api }: { api: GtaApi }) {
         <button className="oxc-pill" onPointerDown={(e) => { e.preventDefault(); hook(); }}>
           <HookIcon /> HOOK
         </button>
+        <QuestChip api={api} />
         {insideRamen && (
           <button className="oxc-pill gold" onPointerDown={(e) => { e.preventDefault(); setRamenOpen(true); }}>
             <Soup size={16} /> ORDER
