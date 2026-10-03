@@ -1055,7 +1055,8 @@ export class CityWorld {
     const prevX = this.pPos.x, prevZ = this.pPos.z;
 
     if (moving) {
-      const wish = Math.atan2(mx, my) + this.camYaw + Math.PI;
+      // camera-relative: stick up = away from camera, stick right = camera-right
+      const wish = -Math.atan2(mx, my) + this.camYaw + Math.PI;
       let dh = wish - this.pHeading;
       while (dh > Math.PI) dh -= Math.PI * 2;
       while (dh < -Math.PI) dh += Math.PI * 2;
