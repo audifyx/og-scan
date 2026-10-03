@@ -284,7 +284,7 @@ export const ACCENTS: AccentDef[] = [
 export const DEVICE_THEME_KEY = "orbitx-device-theme";
 export const BG_THEME_KEY = "orbitx-bg-theme";
 export const ACCENT_KEY = "orbitx-accent";
-export const OS_LAYOUT_KEY = "orbitx-os-layout-v1";
+export const OS_LAYOUT_KEY = "orbitx-os-layout-v2";
 
 export const DEFAULT_DEVICE_THEME = "orbitx";
 export const DEFAULT_BG_THEME = "nebula";
