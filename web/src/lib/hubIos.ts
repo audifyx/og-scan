@@ -4,8 +4,11 @@ export function islandQuickAccess<T>(apps: T[], extra: T[] = []): T[] {
 }
 
 export function groupAppsByLetter<T extends { name: string }>(apps: T[]): { letter: string; apps: T[] }[] {
+  // NOTE: no alphabetical sort — apps stay in curated catalog order so the
+  // home screen layout is stable and screenshot-friendly. Buckets follow
+  // first-appearance order of the initial letter.
   const map = new Map<string, T[]>();
-  for (const app of [...apps].sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const app of apps) {
     const letter = (app.name[0] || "#").toUpperCase();
     const key = /[A-Z]/.test(letter) ? letter : "#";
     const list = map.get(key) || [];
