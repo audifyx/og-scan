@@ -177,6 +177,7 @@ export default function Hub() {
     { mint: string; symbol: string; name: string; image?: string; price: number; mcap: number; change24h: number }[]
   >([]);
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
+  const [pulseTab, setPulseTab] = useState<"trending" | "runners" | "new">("trending");
   const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
   const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -357,7 +358,7 @@ export default function Hub() {
     };
     // Same feed as the DEX app home (TradeHome default tab)
     const fetchTrending = () =>
-      fetch("/api/ogdex/screener?type=trending&interval=1h&limit=30&chain=solana")
+      fetch(`/api/ogdex/screener?type=${pulseTab}&interval=1h&limit=30&chain=solana`)
         .then((r) => r.json())
         .then((d) => {
           if (on && Array.isArray(d?.rows))
@@ -384,7 +385,7 @@ export default function Hub() {
       on = false;
       clearInterval(iv);
     };
-  }, []);
+  }, [pulseTab]);
 
   useEffect(() => {
     let on = true;
@@ -566,11 +567,64 @@ export default function Hub() {
   const rootActivity = (
     <div className="ios-pane">
       <h1 className="ios-large">Pulse</h1>
+
+      <div className="pulse-seg" role="tablist" aria-label="Feed">
+        {(
+          [
+            ["trending", "Trending"],
+            ["runners", "Runners"],
+            ["new", "New"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={pulseTab === id}
+            className={`pulse-seg__btn${pulseTab === id ? " is-on" : ""}`}
+            onClick={() => setPulseTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {!!trending.length && (
         <>
-          <div className="ios-group__head">Trending · live from DEX</div>
+          <div className="pulse-feat">
+            {trending.slice(0, 5).map((t) => (
+              <button
+                key={t.mint}
+                type="button"
+                className="pulse-card"
+                onClick={() => window.location.assign(`/ORBITX_DEX?mint=${encodeURIComponent(t.mint)}`)}
+              >
+                {t.image ? (
+                  <img
+                    src={t.image}
+                    alt={t.symbol}
+                    className="pulse-card__img"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <span className="pulse-card__img pulse-card__img--fallback">{t.symbol.slice(0, 1)}</span>
+                )}
+                <span className="pulse-card__name">{t.name || t.symbol}</span>
+                <span className="pulse-card__sym">${t.symbol}</span>
+                <span className="pulse-card__price">
+                  {t.price > 0 ? `$${t.price < 0.01 ? t.price.toFixed(6) : t.price.toFixed(4)}` : "—"}
+                </span>
+                <span className="pulse-card__chg" style={{ color: changeColor(t.change24h) }}>
+                  {t.change24h >= 0 ? "+" : ""}
+                  {t.change24h.toFixed(1)}%
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="ios-group__head">More</div>
           <div className="ios-group">
-            {trending.map((t) => (
+            {trending.slice(5, 13).map((t) => (
               <button
                 key={t.mint}
                 type="button"
@@ -588,10 +642,11 @@ export default function Hub() {
                   <span className="ios-coin ios-coin--fallback">{t.symbol.slice(0, 1)}</span>
                 )}
                 <span className="ios-cell__meta">
-                  <span className="ios-cell__title">${t.symbol}</span>
+                  <span className="ios-cell__title">{t.name || t.symbol}</span>
                   <span className="ios-cell__sub">
-                    {t.price > 0 ? `$${t.price < 0.01 ? t.price.toFixed(6) : t.price.toFixed(4)}` : "—"}
-                    {t.mcap > 0 ? ` · ${(t.mcap / 1e6).toFixed(1)}M mcap` : ""}
+                    ${t.symbol}
+                    {t.price > 0 ? ` · $${t.price < 0.01 ? t.price.toFixed(6) : t.price.toFixed(4)}` : ""}
+                    {t.mcap > 0 ? ` · ${(t.mcap / 1e6).toFixed(1)}M` : ""}
                   </span>
                 </span>
                 <span className="ios-cell__value" style={{ color: changeColor(t.change24h) }}>
