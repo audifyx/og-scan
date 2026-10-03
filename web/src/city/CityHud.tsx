@@ -202,6 +202,7 @@ function HookIcon() {
 
 export function CityHud({ api }: { api: GtaApi }) {
   const [sprintOn, setSprintOn] = useState(false);
+  const toast = api.hud?.poiToast;
 
   const scan = () => api.getWorld()?.scanPulse();
   const hook = () => {
@@ -214,6 +215,11 @@ export function CityHud({ api }: { api: GtaApi }) {
   return (
     <div className="oxc-hud">
       <Ticker api={api} />
+      {toast && (
+        <div className="oxc-poi-toast" data-hud key={toast}>
+          {toast}
+        </div>
+      )}
 
       {/* left: minimap + SCAN + HOOK */}
       <div className="oxc-left" data-hud>

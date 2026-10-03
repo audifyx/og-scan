@@ -26,6 +26,7 @@ export interface CityHudState {
   cityPoints: number;
   speedKmh: number;
   isNight: boolean;
+  poiToast?: string;
 }
 
 export interface Quote { price: number; change24h: number; marketCap?: number }
@@ -41,8 +42,51 @@ export interface CityWorldOpts {
 
 interface Col { minX: number; maxX: number; minZ: number; maxZ: number }
 
+interface BuildingDef {
+  name: string;
+  x: number; z: number; rotY: number;
+  hx: number; hz: number; height: number;
+  door?: { from: number; to: number }; // door gap on local +z face (local x range)
+  label: string;
+  poi?: boolean;
+}
+
+/**
+ * GLB-accurate footprints (measured from the meshes).
+ * Door gaps measured from the actual door meshes — the player walks through
+ * the visual door, not an imagined one.
+ */
+const BUILDINGS: BuildingDef[] = [
+  { name: "shop",        x: -13, z: -17, rotY: 0,            hx: 5.2,  hz: 5.15, height: 6.2,  door: { from: -2.8, to: -0.2 }, label: "OrbitX Shop", poi: true },
+  { name: "apartment",   x: 14,  z: -16, rotY: 0,            hx: 4.2,  hz: 4.7,  height: 9.0,  label: "Apartments" },
+  { name: "lobby",       x: -15, z: 15,  rotY: 0,            hx: 7.2,  hz: 5.25, height: 8.7,  label: "Tower Lobby", poi: true },
+  { name: "garage",      x: 15,  z: 16,  rotY: 0,            hx: 4.7,  hz: 4.2,  height: 5.0,  label: "Garage" },
+  { name: "deli",        x: -25, z: -17, rotY: Math.PI / 2,  hx: 5.3,  hz: 4.85, height: 7.3,  label: "Corner Deli", poi: true },
+  { name: "ramen",       x: 25,  z: -17, rotY: -Math.PI / 2, hx: 5.0,  hz: 6.15, height: 6.4,  door: { from: -3.8, to: 3.8 }, label: "Ramen House", poi: true },
+  { name: "arcade",      x: -26, z: 0,   rotY: Math.PI / 2,  hx: 6.0,  hz: 6.6,  height: 6.9,  door: { from: -4.8, to: 4.8 }, label: "Neon Arcade", poi: true },
+  { name: "apartments2", x: 25,  z: 4,   rotY: -Math.PI / 2, hx: 6.3,  hz: 5.3,  height: 20.0, label: "Apartments" },
+  { name: "tower",       x: -2,  z: 28,  rotY: Math.PI,      hx: 7.3,  hz: 7.3,  height: 30.5, label: "OrbitX Tower", poi: true },
+  { name: "pawn",        x: 3,   z: -25, rotY: 0,            hx: 4.8,  hz: 3.8,  height: 6.3,  label: "Pawn Shop" },
+  { name: "parking",     x: 25,  z: -31, rotY: 0,            hx: 9.75, hz: 6.15, height: 11.3, label: "Parking" },
+];
+
+const POIS: { x: number; z: number; label: string }[] = BUILDINGS.filter((b) => b.poi).map((b) => ({
+  x: b.x, z: b.z, label: b.label,
+}));
+
 const loader = new GLTFLoader();
 const bldCache = new Map<string, Promise<THREE.Group | null>>();
+const propCache = new Map<string, Promise<THREE.Group | null>>();
+
+function loadProp(name: string): Promise<THREE.Group | null> {
+  const url = `/city/props/${name}.glb`;
+  let p = propCache.get(url);
+  if (!p) {
+    p = loader.loadAsync(url).then((g) => g.scene).catch(() => null);
+    propCache.set(url, p);
+  }
+  return p;
+}
 
 function loadBuilding(name: string): Promise<THREE.Group | null> {
   const url = `/city/buildings/${name}.glb`;
@@ -191,6 +235,15 @@ export class CityWorld {
   private distAccum = 0;
   private cityPoints = 0;
   private lastClock = "";
+  private poiToast = "";
+  private poiToastUntil = 0;
+  private insidePoi: string | null = null;
+
+  // npcs
+  private npcs: { group: THREE.Group; phase: number; mode: "idle" | "walk"; a: THREE.Vector3; b: THREE.Vector3; t: number; speed: number }[] = [];
+
+  // poi labels
+  private poiLabels: THREE.Sprite[] = [];
 
   constructor(opts: CityWorldOpts) {
     this.input = opts.input;
@@ -384,33 +437,92 @@ export class CityWorld {
     // street first (defines the ground), then buildings in parallel
     const street = await loadBuilding("street");
     if (this.disposed) return;
-    if (street) this.mountGlb(street, 0, 0, 0, "street");
-    else this.buildFallbackStreet();
+    if (street) {
+      this.mountGlb(street, 0, 0, 0, "street");
+      this.addStreetPropColliders();
+    } else {
+      this.buildFallbackStreet();
+    }
 
-    await Promise.all([
-      this.placeBuilding("shop", -13, -17, 0, "shop"),
-      this.placeBuilding("apartment", 14, -16, 0, "tower"),
-      this.placeBuilding("lobby", -15, 15, 0, "lobby"),
-      this.placeBuilding("garage", 15, 16, 0, "garage"),
-    ]);
+    await Promise.all(BUILDINGS.map((def) => this.placeBuildingDef(def)));
+    if (this.disposed) return;
+    // greenery, props, npcs, poi labels (non-blocking)
+    void this.buildGreenery();
+    void this.buildProps();
+    this.buildNpcs();
+    this.buildPoiLabels();
   }
 
-  private async placeBuilding(name: string, x: number, z: number, rotY: number, kind: "shop" | "tower" | "lobby" | "garage"): Promise<void> {
+  private async placeBuildingDef(def: BuildingDef): Promise<void> {
     if (this.disposed) return;
-    const glb = await loadBuilding(name);
+    const glb = await loadBuilding(def.name);
     if (this.disposed) return;
     if (glb) {
       const inst = glb.clone(true);
       this.tagGlb(inst);
-      inst.position.set(x, 0, z);
-      inst.rotation.y = rotY;
+      inst.position.set(def.x, 0, def.z);
+      inst.rotation.y = def.rotY;
       this.scene.add(inst);
-      this.registerEmissive(inst, name, x, z);
+      this.registerEmissive(inst, def.name, def.x, def.z);
+    } else if (def.name === "shop") {
+      this.buildFallbackShop(def.x, def.z);
     } else {
-      if (kind === "shop") this.buildFallbackShop(x, z);
-      else this.buildFallbackBlock(kind, x, z);
+      this.buildFallbackBlock(def);
     }
-    this.addColliders(kind, x, z);
+    this.addBuildingColliders(def);
+    this.addInteriorColliders(def);
+  }
+
+  /** Colliders for street.glb props (the fallback builds its own). Measured from the mesh. */
+  private addStreetPropColliders(): void {
+    const dot = (x: number, z: number, r: number) =>
+      this.colliders.push({ minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r });
+    dot(13.2, -9, 0.7);   // tree
+    dot(-12.3, 8, 0.4);   // lamp 0
+    dot(12.3, -2, 0.4);   // lamp 1
+    dot(-12.2, 6, 0.35);  // signal
+  }
+
+  /** Transform a local-space rect to world space (rotY in {0, ±π/2, π}). */
+  private xformRect(x0: number, z0: number, x1: number, z1: number, def: BuildingDef): Col {
+    const c = Math.round(Math.cos(def.rotY)), s = Math.round(Math.sin(def.rotY));
+    const pts = [[x0, z0], [x1, z0], [x0, z1], [x1, z1]].map(
+      ([lx, lz]) => [def.x + lx * c + lz * s, def.z - lx * s + lz * c],
+    );
+    const wx = pts.map((p) => p[0]), wz = pts.map((p) => p[1]);
+    return { minX: Math.min(...wx), maxX: Math.max(...wx), minZ: Math.min(...wz), maxZ: Math.max(...wz) };
+  }
+
+  /** Wall colliders from the GLB-accurate footprint, with a real door gap. */
+  private addBuildingColliders(def: BuildingDef): void {
+    const { hx, hz, door } = def;
+    const T = 0.35;
+    const rects: [number, number, number, number][] = [
+      [-hx, -hz - T, hx, -hz + T],
+      [-hx - T, -hz, -hx + T, hz],
+      [hx - T, -hz, hx + T, hz],
+    ];
+    if (door) {
+      rects.push([-hx, hz - T, door.from, hz + T]);
+      rects.push([door.to, hz - T, hx, hz + T]);
+    } else {
+      rects.push([-hx, hz - T, hx, hz + T]);
+    }
+    for (const [x0, z0, x1, z1] of rects) this.colliders.push(this.xformRect(x0, z0, x1, z1, def));
+  }
+
+  /** Interior obstacles (GLB-measured, local coords). */
+  private addInteriorColliders(def: BuildingDef): void {
+    const put = (x0: number, z0: number, x1: number, z1: number) =>
+      this.colliders.push(this.xformRect(x0, z0, x1, z1, def));
+    if (def.name === "shop") {
+      put(-1.2, -2.55, 2.2, -1.45); // counter (measured)
+    } else if (def.name === "ramen") {
+      put(-2.8, -3.8, 2.8, -2.6);   // counter
+    } else if (def.name === "arcade") {
+      put(-4.45, -5.05, -3.35, -4.15); put(3.35, -5.05, 4.45, -4.15); // back cabinets
+      put(-4.45, 2.05, -3.35, 2.95);   put(3.35, 2.05, 4.45, 2.95);   // mid cabinets
+    }
   }
 
   private mountGlb(root: THREE.Group, x: number, y: number, z: number, name: string): void {
@@ -453,6 +565,14 @@ export class CityWorld {
       }
       this.signalMats.push(...mats);
       this.glowAtMesh(m, 0xff3b3b, 2.4);
+    }
+    // generic emissive signs → glow sprite so they read at night
+    for (const m of findParts(root, ["sign"])) {
+      const mats = uniqueMats([m]);
+      const em = mats.length ? (mats[0].emissive as THREE.Color) : null;
+      if (em && (em.r + em.g + em.b) > 0.1) {
+        this.glowAtMesh(m, em.getHex(), 4.5);
+      }
     }
     // windows / interiorlight: leave their authored emissive, just register glow for neon-ish ones
     if (name === "shop") {
@@ -532,6 +652,7 @@ export class CityWorld {
 
   private buildFallbackShop(x: number, z: number): void {
     // footprint 14×10 centered (x,z), front wall at z+5 facing +z (street)
+    // door gap matches the GLB: local x∈[-2.8,-0.2]
     const W = 14, D = 10, H = 6;
     const wall = 0x3a3f4c;
     const put = (mesh: THREE.Mesh, px: number, py: number, pz: number) => {
@@ -543,11 +664,12 @@ export class CityWorld {
     put(this.box(W, H, 0.4, wall), x, H / 2, z - D / 2);
     put(this.box(0.4, H, D, wall), x - W / 2, H / 2, z);
     put(this.box(0.4, H, D, wall), x + W / 2, H / 2, z);
-    // front wall with 2.4w × 3.2h door gap centered
-    const segW = (W - 2.4) / 2;
-    put(this.box(segW, H, 0.4, wall), x - 2.4 / 2 - segW / 2, H / 2, z + D / 2);
-    put(this.box(segW, H, 0.4, wall), x + 2.4 / 2 + segW / 2, H / 2, z + D / 2);
-    put(this.box(2.4, H - 3.2, 0.4, wall), x, 3.2 + (H - 3.2) / 2, z + D / 2); // lintel
+    // front wall with door gap at local [-2.8,-0.2] (matches GLB + colliders)
+    const gapL = -2.8, gapR = -0.2, gapC = (gapL + gapR) / 2, gapW = gapR - gapL;
+    const segLW = W / 2 + gapL, segRW = W / 2 - gapR;
+    put(this.box(segLW, H, 0.4, wall), x + (-W / 2 + gapL) / 2, H / 2, z + D / 2);
+    put(this.box(segRW, H, 0.4, wall), x + (gapR + W / 2) / 2, H / 2, z + D / 2);
+    put(this.box(gapW, H - 3.2, 0.4, wall), x + gapC, 3.2 + (H - 3.2) / 2, z + D / 2); // lintel
     put(this.box(W + 0.4, 0.4, D + 0.4, 0x2a2e38), x, H + 0.2, z); // roof
     // interior floor (warm wood, board 5)
     const fg = new THREE.PlaneGeometry(W - 0.8, D - 0.8);
@@ -564,11 +686,11 @@ export class CityWorld {
     const neonM = new THREE.MeshBasicMaterial({ map: neonTex });
     const neon = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), neonM);
     neon.name = "neon";
-    neon.position.set(x, 4.7, z + D / 2 + 0.25);
+    neon.position.set(x - 1.5, 4.7, z + D / 2 + 0.25);
     this.scene.add(neon);
     this.disposables.push(neon.geometry, neonM);
-    this.addGlow(x, 4.7, z + D / 2 + 0.6, 0x17e6d4, 6.5);
-    this.streak(x, z + D / 2 + 1.5, 0x17e6d4, 9, 2.4);
+    this.addGlow(x - 1.5, 4.7, z + D / 2 + 0.6, 0x17e6d4, 6.5);
+    this.streak(x - 1.5, z + D / 2 + 1.5, 0x17e6d4, 9, 2.4);
 
     // chart screens (contractual "chart1"/"chart2") — canvas textures, stepping ticker
     const mkChart = (name: string, px: number) => {
@@ -618,9 +740,10 @@ export class CityWorld {
     }
   }
 
-  private buildFallbackBlock(kind: "tower" | "lobby" | "garage", x: number, z: number): void {
-    const dims = kind === "tower" ? [12, 17, 10] : kind === "lobby" ? [12, 7, 9] : [13, 5, 11];
-    const [W, H, D] = dims;
+  private buildFallbackBlock(def: BuildingDef): void {
+    const { x, z } = def;
+    const W = def.hx * 2, H = def.height, D = def.hz * 2;
+    const kind = def.name;
     const body = this.box(W, H, D, kind === "tower" ? 0x2b2f3a : 0x33363f, 0.9);
     body.position.set(x, H / 2, z);
     this.scene.add(body);
@@ -644,23 +767,206 @@ export class CityWorld {
     }
   }
 
-  private addColliders(kind: "shop" | "tower" | "lobby" | "garage", x: number, z: number): void {
-    const dims = kind === "shop" ? [14, 10] : kind === "tower" ? [12, 10] : kind === "lobby" ? [12, 9] : [13, 11];
-    const [W, D] = dims;
-    if (kind === "shop") {
-      // walls with a walkable door gap: front wall z+D/2, gap 2.4w×3.2h centered
-      const fz = z + D / 2, bz = z - D / 2, lx = x - W / 2, rx = x + W / 2;
-      const segW = (W - 2.4) / 2;
-      this.colliders.push(
-        { minX: lx, maxX: rx, minZ: bz - 0.2, maxZ: bz + 0.2 },                       // back
-        { minX: lx - 0.2, maxX: lx + 0.2, minZ: bz, maxZ: fz },                       // left
-        { minX: rx - 0.2, maxX: rx + 0.2, minZ: bz, maxZ: fz },                       // right
-        { minX: lx, maxX: x - 1.2, minZ: fz - 0.2, maxZ: fz + 0.2 },                  // front-left
-        { minX: x + 1.2, maxX: rx, minZ: fz - 0.2, maxZ: fz + 0.2 },                  // front-right
-        { minX: x - 4.2, maxX: x - 0.8, minZ: z - 1.6, maxZ: z - 0.4 },              // counter
-      );
-    } else {
-      this.colliders.push({ minX: x - W / 2, maxX: x + W / 2, minZ: z - D / 2, maxZ: z + D / 2 });
+  // (replaced by addBuildingColliders/addInteriorColliders above)
+
+  // ── world buildout: greenery / props / npcs / poi labels ──
+
+  private insideAnyCollider(x: number, z: number): boolean {
+    for (const c of this.colliders) {
+      if (x >= c.minX - 0.4 && x <= c.maxX + 0.4 && z >= c.minZ - 0.4 && z <= c.maxZ + 0.4) return true;
+    }
+    return false;
+  }
+
+  private async buildGreenery(): Promise<void> {
+    if (this.disposed) return;
+    const [treeGlb, grassGlb, planterGlb] = await Promise.all([
+      loadProp("tree"), loadProp("grass"), loadProp("planter"),
+    ]);
+    if (this.disposed) return;
+
+    const treePos: [number, number][] = [
+      [-14, -9], [-14, 3], [14, 3], [-8, 22], [8, 22], [-20, 22],
+      [20, 22], [-14, -22], [14, -22], [-28, -8], [28, -8], [-8, -28],
+    ];
+    if (treeGlb) {
+      const parts: THREE.Mesh[] = [];
+      treeGlb.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) parts.push(m); });
+      const m4 = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const e = new THREE.Euler();
+      const v = new THREE.Vector3();
+      for (const part of parts) {
+        const im = new THREE.InstancedMesh(part.geometry, part.material, treePos.length);
+        treePos.forEach(([x, z], i) => {
+          const s = 0.85 + ((i * 37) % 10) / 25;
+          e.set(0, (i * 1.7) % (Math.PI * 2), 0);
+          q.setFromEuler(e);
+          v.set(s, s, s);
+          m4.compose(new THREE.Vector3(x, 0, z), q, v);
+          im.setMatrixAt(i, m4);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        this.scene.add(im);
+        // geometry/material owned by the prop cache — never dispose
+      }
+      for (const [x, z] of treePos) {
+        this.colliders.push({ minX: x - 0.5, maxX: x + 0.5, minZ: z - 0.5, maxZ: z + 0.5 });
+      }
+    }
+    if (grassGlb) {
+      let gmesh: THREE.Mesh | null = null;
+      grassGlb.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !gmesh) gmesh = m; });
+      if (gmesh) {
+        const gm = gmesh as THREE.Mesh;
+        const spots: [number, number][] = [];
+        const bands: [number, number, number, number][] = [
+          [-11, -30, -9, 30], [9, -30, 11, 30], [-30, 21, 30, 23], [-30, -23, 30, -21],
+        ];
+        let seed = 12345;
+        const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        for (const [x0, z0, x1, z1] of bands) {
+          for (let i = 0; i < 28; i++) {
+            const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
+            if (this.insideAnyCollider(x, z)) continue;
+            spots.push([x, z]);
+          }
+        }
+        if (spots.length) {
+          const im = new THREE.InstancedMesh(gm.geometry, gm.material, spots.length);
+          const m4 = new THREE.Matrix4();
+          spots.forEach(([x, z], i) => {
+            const s = 0.8 + rnd() * 0.7;
+            m4.makeRotationY(rnd() * Math.PI * 2);
+            m4.scale(new THREE.Vector3(s, s, s));
+            m4.setPosition(x, 0, z);
+            im.setMatrixAt(i, m4);
+          });
+          im.instanceMatrix.needsUpdate = true;
+          this.scene.add(im);
+        }
+      }
+    }
+    if (planterGlb) {
+      for (const [x, z, ry] of [[-6, 20, 0], [6, 20, 0], [-6, -20, 0], [6, -20, 0], [-18, 12, 0.4], [18, -12, -0.4]] as [number, number, number][]) {
+        const inst = planterGlb.clone(true);
+        this.tagGlb(inst);
+        inst.position.set(x, 0, z);
+        inst.rotation.y = ry;
+        this.scene.add(inst);
+        this.colliders.push({ minX: x - 1.1, maxX: x + 1.1, minZ: z - 0.5, maxZ: z + 0.5 });
+      }
+    }
+  }
+
+  private async buildProps(): Promise<void> {
+    if (this.disposed) return;
+    const [lampGlb, carTeal, carRed, carDark, benchGlb, hydGlb, trashGlb, sigGlb] = await Promise.all([
+      loadProp("lamp"), loadProp("car_teal"), loadProp("car_red"), loadProp("car_dark"),
+      loadProp("bench"), loadProp("hydrant"), loadProp("trashcan"), loadProp("signal"),
+    ]);
+    if (this.disposed) return;
+    const put = (glb: THREE.Group | null, x: number, z: number, ry = 0, cr = 0) => {
+      if (!glb) return;
+      const inst = glb.clone(true);
+      this.tagGlb(inst);
+      inst.position.set(x, 0, z);
+      inst.rotation.y = ry;
+      this.scene.add(inst);
+      this.registerEmissive(inst, "prop", x, z);
+      if (cr > 0) this.colliders.push({ minX: x - cr, maxX: x + cr, minZ: z - cr, maxZ: z + cr });
+    };
+    const putCar = (glb: THREE.Group | null, x: number, z: number, ry: number) => {
+      put(glb, x, z, ry, 0);
+      // car is 4.8 long (local x) × 2.2 wide; rotate the collider with it
+      const along = Math.abs(Math.round(Math.cos(ry))) === 1;
+      const hx = along ? 2.4 : 1.1, hz = along ? 1.1 : 2.4;
+      this.colliders.push({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+    };
+    put(lampGlb, -8, -14, 0, 0.4); put(lampGlb, 8, -14, 0, 0.4);
+    put(lampGlb, -8, 14, 0, 0.4);  put(lampGlb, 8, 14, 0, 0.4);
+    putCar(carTeal, 6, -10, Math.PI / 2); putCar(carRed, -6, 10, Math.PI / 2);
+    putCar(carDark, 6, 22, 0);            putCar(carTeal, -6, -22, 0);
+    put(benchGlb, -4, 12, 0, 1.1); put(benchGlb, 4, -12, 0, 1.1);
+    put(hydGlb, -11, 5, 0, 0.4);   put(hydGlb, 11, -5, 0, 0.4);
+    put(trashGlb, -10, -8, 0, 0.4); put(trashGlb, 10, 8, 0, 0.4); put(trashGlb, 0, 18, 0, 0.4);
+    put(sigGlb, 8, 6, 0, 0.3);     put(sigGlb, -8, 2, Math.PI, 0.3);
+  }
+
+  private buildNpcs(): void {
+    const mkNpc = (color: number): THREE.Group => {
+      const g = new THREE.Group();
+      const bodyM = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
+      const skinM = new THREE.MeshStandardMaterial({ color: 0xc9a684, roughness: 0.8 });
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.75, 4, 10), bodyM);
+      body.position.y = 0.95;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), skinM);
+      head.position.y = 1.72;
+      g.add(body, head);
+      this.disposables.push(body.geometry, head.geometry, bodyM, skinM);
+      return g;
+    };
+    const defs: { x: number; z: number; mode: "idle" | "walk"; a?: [number, number]; b?: [number, number]; color: number }[] = [
+      { x: -10, z: -11, mode: "idle", color: 0x2a4a6b },
+      { x: -13, z: 11, mode: "idle", color: 0x6b2a4a },
+      { x: 10, z: -12, mode: "walk", a: [4, -12], b: [14, -12], color: 0x3a6b2a },
+      { x: -5, z: 19, mode: "walk", a: [-8, 19], b: [2, 19], color: 0x6b5a2a },
+      { x: 21, z: -13, mode: "idle", color: 0x4a2a6b },
+      { x: -22, z: -4, mode: "idle", color: 0x2a6b5a },
+    ];
+    for (const d of defs) {
+      const g = mkNpc(d.color);
+      g.position.set(d.x, 0, d.z);
+      this.scene.add(g);
+      this.npcs.push({
+        group: g, phase: Math.random() * 10, mode: d.mode,
+        a: new THREE.Vector3(d.a?.[0] ?? d.x, 0, d.a?.[1] ?? d.z),
+        b: new THREE.Vector3(d.b?.[0] ?? d.x, 0, d.b?.[1] ?? d.z),
+        t: Math.random(), speed: 0.9 + Math.random() * 0.5,
+      });
+    }
+  }
+
+  private updateNpcs(dt: number): void {
+    for (const n of this.npcs) {
+      n.phase += dt * 2;
+      if (n.mode === "idle") {
+        n.group.position.y = Math.abs(Math.sin(n.phase)) * 0.04;
+      } else {
+        n.t += dt * n.speed * 0.07;
+        if (n.t > 1) n.t = 0;
+        const px = n.a.x + (n.b.x - n.a.x) * n.t;
+        const pz = n.a.z + (n.b.z - n.a.z) * n.t;
+        n.group.position.set(px, Math.abs(Math.sin(n.phase * 2)) * 0.05, pz);
+        n.group.rotation.y = Math.atan2(n.b.x - n.a.x, n.b.z - n.a.z);
+      }
+    }
+  }
+
+  private makeTextSprite(text: string): THREE.Sprite {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 96;
+    const ctx = c.getContext("2d")!;
+    ctx.font = "bold 44px system-ui, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = "#17e6d4"; ctx.shadowBlur = 18;
+    ctx.fillStyle = "#d9fbff";
+    ctx.fillText(text.toUpperCase(), 256, 48);
+    const tex = new THREE.CanvasTexture(c);
+    const sm = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false });
+    const sp = new THREE.Sprite(sm);
+    sp.scale.set(7, 1.3, 1);
+    this.disposables.push(tex, sm);
+    return sp;
+  }
+
+  private buildPoiLabels(): void {
+    for (const p of POIS) {
+      const sp = this.makeTextSprite(p.label);
+      const def = BUILDINGS.find((b) => b.label === p.label);
+      sp.position.set(p.x, (def ? def.height : 6) + 2.4, p.z);
+      this.scene.add(sp);
+      this.poiLabels.push(sp);
     }
   }
 
@@ -752,6 +1058,26 @@ export class CityWorld {
       this.cityPoints = addCityPoints(n);
     }
 
+    // POI entry: toast + bonus points when walking into a landmark
+    let inside: string | null = null;
+    for (const def of BUILDINGS) {
+      if (!def.poi) continue;
+      const ex = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hz : def.hx;
+      const ez = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hx : def.hz;
+      if (Math.abs(this.pPos.x - def.x) < ex && Math.abs(this.pPos.z - def.z) < ez) {
+        inside = def.label;
+        break;
+      }
+    }
+    if (inside && inside !== this.insidePoi) {
+      this.insidePoi = inside;
+      this.cityPoints = addCityPoints(5);
+      this.poiToast = `+5 CITY — ${inside}`;
+      this.poiToastUntil = this.time + 2.5;
+    } else if (!inside) {
+      this.insidePoi = null;
+    }
+
     this.rig.group.position.copy(this.pPos);
     this.rig.group.rotation.y = this.pHeading;
     const spd01 = Math.min(1, Math.hypot(this.pVel.x, this.pVel.z) / 9.5);
@@ -763,6 +1089,14 @@ export class CityWorld {
     this.updateCamera(dt);
     this.updateAtmosphere(dt);
     this.updateScan(dt);
+    this.updateNpcs(dt);
+    // POI labels fade in while the scan pulse is live
+    const scanning = this.time < this.scanUntil;
+    for (const sp of this.poiLabels) {
+      const m = sp.material as THREE.SpriteMaterial;
+      const target = scanning ? 0.95 : 0;
+      m.opacity += (target - m.opacity) * Math.min(1, dt * 6);
+    }
     this.updateHud(dt);
     this.drawMinimap(dt);
   }
@@ -789,6 +1123,15 @@ export class CityWorld {
     this.camVel.y += ((tmpV.y - this.camPos.y) * k - this.camVel.y * c) * dt;
     this.camVel.z += ((tmpV.z - this.camPos.z) * k - this.camVel.z * c) * dt;
     this.camPos.addScaledVector(this.camVel, dt);
+    // keep the camera out of building volumes (no clipping through roofs/walls)
+    for (const def of BUILDINGS) {
+      const ex = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hz : def.hx;
+      const ez = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hx : def.hz;
+      if (Math.abs(this.camPos.x - def.x) < ex + 0.5 && Math.abs(this.camPos.z - def.z) < ez + 0.5) {
+        const minY = def.height + 1.0;
+        if (this.camPos.y < minY) this.camPos.y = minY;
+      }
+    }
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(focus.x, focus.y + 1.5, focus.z);
     this.pitchKick *= Math.exp(-dt * 6);
@@ -855,6 +1198,7 @@ export class CityWorld {
       cityPoints: this.cityPoints,
       speedKmh: Math.hypot(this.pVel.x, this.pVel.z) * 3.6,
       isNight: true,
+      poiToast: this.time < this.poiToastUntil ? this.poiToast : undefined,
     };
     if (clock !== this.lastClock) this.lastClock = clock;
     this.onHud(h);
@@ -876,20 +1220,16 @@ export class CityWorld {
     // street block
     ctx.fillStyle = "#232833";
     ctx.fillRect(px(-35), py(-35), 70 * k, 70 * k);
-    // buildings
-    const bld: [number, number, number, number, string][] = [
-      [-20, -22, 14, 10, "#3d4657"], // shop
-      [8, -21, 12, 10, "#333947"],   // apartment
-      [-21, 10.5, 12, 9, "#333947"], // lobby
-      [8.5, 10.5, 13, 11, "#333947"],// garage
-    ];
-    for (const [x0, z0, w, d, col] of bld) {
-      ctx.fillStyle = col;
-      ctx.fillRect(px(x0), py(z0), w * k, d * k);
+    // buildings (from the data-driven defs)
+    for (const def of BUILDINGS) {
+      const ex = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hz : def.hx;
+      const ez = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hx : def.hz;
+      ctx.fillStyle = def.poi ? "#3d4657" : "#2c3340";
+      ctx.fillRect(px(def.x - ex), py(def.z - ez), ex * 2 * k, ez * 2 * k);
     }
-    // POIs: shop + lobby dots (pop during scan)
+    // POIs: dots pop during scan
     const scanning = this.time < this.scanUntil;
-    const pois: [number, number][] = [[-13, -12], [-15, 10.5]];
+    const pois: [number, number][] = POIS.map((p) => [p.x, p.z]);
     for (const [x, z] of pois) {
       const r = scanning ? 4 + Math.sin(this.time * 10) * 1.5 : 2.6;
       ctx.fillStyle = scanning ? "#17e6d4" : "rgba(23,230,212,0.75)";
