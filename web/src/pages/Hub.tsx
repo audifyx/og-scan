@@ -25,7 +25,7 @@ import {
   visiblePlatformSections,
   type PlatformApp,
 } from "@/lib/orbitxPlatforms";
-import { groupAppsByLetter, islandQuickAccess } from "@/lib/hubIos";
+import { islandQuickAccess } from "@/lib/hubIos";
 import "./hub-deck.css";
 import "./hub-ios-ui.css";
 
@@ -495,59 +495,17 @@ export default function Hub() {
     </div>
   );
 
+  
   const rootApps = (() => {
     const q = appsQ.trim().toLowerCase();
-    const sections = [
-      ...platformSections,
-      ...(showAdminApps
-        ? [{ id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }]
-        : []),
-    ].filter((section) => matchQ(`${section.title} ${section.subtitle}`, q));
-    const az = groupAppsByLetter(
-      searchableApps.filter((a) => matchQ(`${a.name} ${a.caption}`, q)),
-    );
+    // Single scrolling list in curated catalog order — no folders, no A-Z.
+    const apps = searchableApps.filter((a) => matchQ(`${a.name} ${a.caption}`, q));
     return (
       <div className="ios-pane ios-pane--wide">
         <h1 className="ios-large">Apps</h1>
         <IosSearch value={appsQ} onChange={setAppsQ} placeholder="Search" />
-        <div className="ios-lib">
-          {sections.map((section) => {
-            const apps =
-              section.id === "admin"
-                ? OWNER_ADMIN_APPS
-                : section.keys.map((k) => PLATFORM_BY_KEY[k]).filter(Boolean);
-            return (
-              <button
-                key={section.id}
-                type="button"
-                className="ios-folder"
-                onClick={() => push({ id: "section", sectionId: section.id })}
-              >
-                <div className="ios-folder__glass">
-                  {Array.from({ length: 4 }, (_, i) => {
-                    const app = apps[i];
-                    return app ? (
-                      <div key={app.key} className="ios-folder__ico" style={{ background: app.iconBg }}>
-                        {app.glyph}
-                      </div>
-                    ) : (
-                      <div key={`empty-${section.id}-${i}`} className="ios-folder__ico" style={{ background: "rgba(255,255,255,0.06)" }} />
-                    );
-                  })}
-                </div>
-                <span className="ios-folder__name">{section.title}</span>
-                <span className="ios-folder__n">{apps.length}</span>
-              </button>
-            );
-          })}
-        </div>
-        {az.map((bucket) => (
-          <div key={bucket.letter}>
-            <div className="ios-az__letter">{bucket.letter}</div>
-            {appRows(bucket.apps)}
-          </div>
-        ))}
-        {!sections.length && !az.length && <div className="ios-hint">No apps match that search.</div>}
+        {appRows(apps)}
+        {!apps.length && <div className="ios-hint">No apps match that search.</div>}
       </div>
     );
   })();
