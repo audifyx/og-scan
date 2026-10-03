@@ -20,7 +20,9 @@ export const DESK_NAV: DeskNavGroup[] = [
       { id: "live_users", label: "Live Users", icon: "Radio", short: "Live" },
       { id: "user_activity", label: "User Activity", icon: "Activity", short: "Activity" },
       { id: "users", label: "Users", icon: "Users", short: "Users" },
+      { id: "tokens", label: "Token Submissions", icon: "Coins", short: "Tokens" },
       { id: "analytics", label: "Analytics", icon: "TrendingUp" },
+      { id: "advanced_analytics", label: "Advanced Analytics", icon: "LineChart" },
     ],
   },
   {
@@ -32,6 +34,7 @@ export const DESK_NAV: DeskNavGroup[] = [
       { id: "onchain", label: "On-chain costs", icon: "Link2", short: "Chain" },
       { id: "transactions", label: "Transactions", icon: "Activity", short: "Tx" },
       { id: "jupiter", label: "Jupiter Transactions", icon: "Rocket" },
+      { id: "wallets", label: "Wallets", icon: "Wallet" },
     ],
   },
   {
@@ -64,6 +67,12 @@ export const DESK_NAV: DeskNavGroup[] = [
       { id: "announcements", label: "Announcements", icon: "Megaphone" },
       { id: "api", label: "API Settings", icon: "KeyRound" },
       { id: "admin_apps", label: "Admin Apps", icon: "PanelTop" },
+      { id: "chat", label: "Chat", icon: "MessageSquare", short: "Chat" },
+      { id: "notifications", label: "Notifications", icon: "Bell", short: "Notify" },
+      { id: "alerts", label: "Price Alerts", icon: "BellRing" },
+      { id: "media", label: "Media", icon: "Image" },
+      { id: "tools", label: "Tools", icon: "Wrench" },
+      { id: "org_affiliates", label: "Org Affiliates", icon: "Building2" },
     ],
   },
 ];
