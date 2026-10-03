@@ -19,3 +19,6 @@ export {
   toBaseUnits, fromBaseUnits,
 } from "./jupiterSwap";
 export type { JupQuote, JupTokenMeta } from "./jupiterSwap";
+export { default as StoreMenu, STORE_MENUS, storeKeyForLabel, isStoreKey } from "./StoreMenu";
+export type { StoreKey, StoreBuff, StoreMenuDef } from "./StoreMenu";
+export { subscribeStoreMenu, openStoreMenu } from "./storeMenuBus";
