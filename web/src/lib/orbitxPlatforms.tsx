@@ -208,10 +208,7 @@ export const PLATFORM_APPS: PlatformApp[] = [
   { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
   { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
-  { key: "telegram", name: "Telegram", caption: "Official @theorbitxmcpbot", href: "/telegram", tone: "#2AABEE", iconBg: "linear-gradient(145deg, #6FD0FF 0%, #2AABEE 48%, #0B5F8A 100%)", glyph: PlatformGlyph.telegram },
-  { key: "agents", name: "Agents", caption: "Live agent OS", href: "/orbitxagents", tone: "#E5E5E5", iconBg: "linear-gradient(145deg, #A3A3A3 0%, #525252 50%, #0A0A0A 100%)", glyph: PlatformGlyph.terminal },
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
-  { key: "play", name: "Play", caption: "Games & missions", href: "/play", tone: "#FF5BBD", iconBg: "linear-gradient(145deg, #F9A8D4 0%, #FF3EAA 48%, #9D174D 100%)", glyph: PlatformGlyph.play },
   { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #00C776 48%, #047857 100%)", glyph: PlatformGlyph.nft },
   { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(145deg, #FDE68A 0%, #F0C75E 48%, #B8860B 100%)", glyph: PlatformGlyph.bagwork },
   { key: "education", name: "Education", caption: "Learn the ecosystem", href: "/education", tone: "#22D3EE", iconBg: "linear-gradient(145deg, #67E8F9 0%, #22D3EE 48%, #0E7490 100%)", glyph: PlatformGlyph.education, dock: true },
@@ -229,10 +226,10 @@ export const PLATFORM_BY_KEY = Object.fromEntries(PLATFORM_APPS.map((a) => [a.ke
 export type PlatformSection = { id: string; title: string; subtitle: string; keys: string[] };
 
 export const PLATFORM_SECTIONS: PlatformSection[] = [
-  { id: "world", title: "World", subtitle: "City, agents, play, and education", keys: ["city", "agents", "play", "gaming", "education"] },
+  { id: "world", title: "World", subtitle: "City, agents, play, and education", keys: ["city", "gaming", "education"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, launch", keys: ["dex", "trade", "scanner", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Trackers and alerts", keys: ["koltracker", "pnltracker"] },
-  { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "telegram", "shop"] },
+  { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "shop"] },
   { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "NFTs and tasks", keys: ["nft", "bagwork"] },
 ];
