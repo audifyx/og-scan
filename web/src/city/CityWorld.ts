@@ -225,6 +225,11 @@ export class CityWorld {
 
   // weather
   private weather!: CityWeather;
+  // day/night cycle (24 real minutes; night-dominant, dips to dusk)
+  private hemi!: THREE.HemisphereLight;
+  private moon!: THREE.DirectionalLight;
+  private cycleT = 0;
+  private nightness = 1;
   private traffic!: CityTraffic;
   // ramen buffs
   private speedBuffUntil = 0;
@@ -276,10 +281,10 @@ export class CityWorld {
     // ── night atmosphere (phone-safe: no postprocessing) ──
     this.scene.background = new THREE.Color(0x05070d);
     this.scene.fog = new THREE.FogExp2(0x05070d, 0.028);
-    const hemi = new THREE.HemisphereLight(0x2a3a5f, 0x0a0c12, 0.55);
-    const moon = new THREE.DirectionalLight(0x8fb4ff, 0.4);
-    moon.position.set(-60, 90, 40);
-    this.scene.add(hemi, moon);
+    this.hemi = new THREE.HemisphereLight(0x2a3a5f, 0x0a0c12, 0.55);
+    this.moon = new THREE.DirectionalLight(0x8fb4ff, 0.4);
+    this.moon.position.set(-60, 90, 40);
+    this.scene.add(this.hemi, this.moon);
     // warm interior light inside the shop
     const shopGlow = new THREE.PointLight(0xffb35c, 30, 20, 1.6);
     shopGlow.position.set(-13, 3.4, -17);
@@ -1120,12 +1125,13 @@ export class CityWorld {
     this.updateGlowTrail(dt, moving);
 
     this.updateCamera(dt);
+    this.updateDayNight(dt);
     this.updateAtmosphere(dt);
     // weather: rain / splashes / fog / lightning; wetness ramps reflections
     this.weather.update(dt, this.pPos, this.time);
     const streakOp = 0.14 + this.weather.wetness * 0.38;
     for (const m of this.streakMats) m.opacity = streakOp;
-    (this.scene.fog as THREE.FogExp2).density = this.weather.fogDensity;
+    (this.scene.fog as THREE.FogExp2).density = this.weather.fogDensity * (0.85 + 0.3 * this.nightness);
     this.traffic.update(dt, this.pPos, this.audio);
     // ambient rain bed follows the weather
     const rg = this.weather.rainGain;
@@ -1232,12 +1238,37 @@ export class CityWorld {
     this.pitchKick *= Math.exp(-dt * 6);
   }
 
+  /** 24-minute cycle; nightness 0.65 (dusk) → 1.0 (deep night). Never full day. */
+  private updateDayNight(dt: number): void {
+    this.cycleT = (this.cycleT + dt) % 1440;
+    const ph = (this.cycleT / 1440) * Math.PI * 2;
+    this.nightness = 0.65 + 0.35 * (0.5 - 0.5 * Math.cos(ph));
+    const n = this.nightness;
+    // lightning flash owns the background while strobing
+    if (!this.weather.flashActive) {
+      (this.scene.background as THREE.Color)
+        .setHex(0x0b1020).lerp(new THREE.Color(0x05070d), n);
+    }
+    (this.scene.fog as THREE.FogExp2).color.copy(this.scene.background as THREE.Color);
+    this.hemi.intensity = 0.78 - 0.28 * n;
+    this.moon.intensity = 0.12 + 0.38 * n;
+  }
+
+  /** Game clock: 24 game-hours per 24 real minutes, starts 21:42. */
+  private gameClock(): string {
+    const hrs = (21.7 + this.cycleT / 60) % 24;
+    const h = Math.floor(hrs);
+    const m = Math.floor((hrs - h) * 60);
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
   private updateAtmosphere(dt: number): void {
     const t = this.time;
     // lamp flicker (emissive noise on lampbulb0/1)
+    const lampK = 0.75 + 0.5 * this.nightness;
     for (let i = 0; i < this.lampMats.length; i++) {
       const mt = this.lampMats[i];
-      mt.emissiveIntensity = 2.3 + Math.sin(t * 31 + i * 2.7) * 0.22 + Math.sin(t * 7.3 + i) * 0.12;
+      mt.emissiveIntensity = (2.3 + Math.sin(t * 31 + i * 2.7) * 0.22 + Math.sin(t * 7.3 + i) * 0.12) * lampK;
     }
     // traffic signal alternates red/green every 4s
     const green = Math.floor(t / 4) % 2 === 1;
@@ -1286,8 +1317,7 @@ export class CityWorld {
     this.hudT += dt;
     if (this.hudT < 0.2) return; // 5Hz
     this.hudT = 0;
-    const d = new Date();
-    const clock = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const clock = this.gameClock();
     const h: CityHudState = {
       clock,
       cityPoints: this.cityPoints,
