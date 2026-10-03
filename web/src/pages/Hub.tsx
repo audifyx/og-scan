@@ -189,7 +189,8 @@ export default function Hub() {
   const homeGridKeys = useMemo(() => visibleHomeGridKeys(showOwnerSurfaces), [showOwnerSurfaces]);
   const platformSections = useMemo(() => visiblePlatformSections(showOwnerSurfaces), [showOwnerSurfaces]);
   const searchableApps = useMemo(() => {
-    const base = showAdminApps ? [...catalogApps, ...OWNER_ADMIN_APPS] : [...catalogApps];
+    // Admin apps live ONLY behind the Admin button — never duplicated in the regular list.
+    const base = [...catalogApps];
     // Owner-only: Coming Soon button lives in the Apps list for audifyx@gmail.com.
     if (isOwnerIdentity) {
       base.push({
@@ -212,7 +213,7 @@ export default function Hub() {
       });
     }
     return base;
-  }, [catalogApps, showAdminApps, isOwnerIdentity]);
+  }, [catalogApps, isOwnerIdentity]);
 
   const stack = stacks[tab];
   const top = stack[stack.length - 1] || { id: "root" as const };
@@ -913,7 +914,7 @@ export default function Hub() {
 
       <Ios27Island
         now={now}
-        apps={islandQuickAccess(catalogApps, showAdminApps ? OWNER_ADMIN_APPS : [])}
+        apps={islandQuickAccess(catalogApps)}
         open={islandOpen}
         onToggle={() => setIslandOpen((v) => !v)}
         onClose={() => setIslandOpen(false)}
