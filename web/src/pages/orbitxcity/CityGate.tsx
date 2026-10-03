@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 const CITY_CODE = "2026";
 const STORAGE_KEY = "orbitx-city-unlocked";
@@ -10,7 +9,7 @@ export default function CityGate({ children }: { children: React.ReactNode }) {
     try { return localStorage.getItem(STORAGE_KEY) === "1"; } catch { return false; }
   });
   const [pin, setPin] = useState("");
-  const [shake, setShake] = useState(0);
+  const [wrong, setWrong] = useState(false);
 
   const press = useCallback((d: string) => {
     setPin((p) => {
@@ -21,8 +20,8 @@ export default function CityGate({ children }: { children: React.ReactNode }) {
           try { localStorage.setItem(STORAGE_KEY, "1"); } catch {}
           setTimeout(() => setUnlocked(true), 220);
         } else {
-          setShake((s) => s + 1);
-          setTimeout(() => setPin(""), 450);
+          setWrong(true);
+          setTimeout(() => { setPin(""); setWrong(false); }, 600);
         }
       }
       return next;
@@ -45,13 +44,11 @@ export default function CityGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-[#04070f] px-6 text-white">
+      <style>{`@keyframes city-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(10px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }`}</style>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_30%,rgba(23,255,77,0.08),transparent_70%)]" />
-      <motion.div
-        key={shake}
-        initial={false}
-        animate={shake ? { x: [0, -10, 10, -6, 6, 0] } : { x: 0 }}
-        transition={{ duration: 0.4 }}
+      <div
         className="relative flex w-full max-w-[320px] flex-col items-center"
+        style={wrong ? { animation: "city-shake 0.4s ease" } : undefined}
       >
         <div className="mb-2 text-4xl">🏙️</div>
         <h1 className="font-mono text-sm font-bold uppercase tracking-[0.35em] text-[#17ff4d]">
@@ -99,19 +96,12 @@ export default function CityGate({ children }: { children: React.ReactNode }) {
             &#9003;
           </button>
         </div>
-        <AnimatePresence>
-          {shake > 0 && pin === "" && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="mt-4 font-mono text-[11px] uppercase tracking-[0.2em] text-red-400"
-            >
-              Wrong code
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        {wrong && (
+          <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.2em] text-red-400">
+            Wrong code
+          </p>
+        )}
+      </div>
     </div>
   );
 }
