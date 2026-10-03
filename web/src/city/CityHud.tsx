@@ -3,6 +3,8 @@ import * as THREE from "three";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Zap, ArrowUp, Crosshair, Wallet } from "lucide-react";
 import { useCityWallet } from "./economy/useCityWallet";
 import RamenOrder, { type RamenBuff } from "./economy/RamenOrder";
+import StoreMenu, { storeKeyForLabel, type StoreKey } from "./economy/StoreMenu";
+import { subscribeStoreMenu } from "./economy/storeMenuBus";
 import { questProgress, claimQuest, type QuestProgress } from "./quests";
 import { Soup } from "lucide-react";
 import { setTouchMove } from "./core/input";
@@ -284,7 +286,11 @@ function HookIcon() {
 export function CityHud({ api }: { api: GtaApi }) {
   const [sprintOn, setSprintOn] = useState(false);
   const [ramenOpen, setRamenOpen] = useState(false);
+  const [storeOpen, setStoreOpen] = useState<StoreKey | null>(null);
   const [emoteOpen, setEmoteOpen] = useState(false);
+
+  // NPC worker TALK hook: openStoreMenu(storeKey) from ./economy/storeMenuBus
+  useEffect(() => subscribeStoreMenu((key) => setStoreOpen(key)), []);
   const ppsTimer = useRef<number | null>(null);
   const ppsLong = useRef(false);
 
@@ -308,6 +314,7 @@ export function CityHud({ api }: { api: GtaApi }) {
   };
   const toast = api.hud?.poiToast;
   const insideRamen = api.hud?.insidePoi === "Ramen House";
+  const storeKey = storeKeyForLabel(api.hud?.insidePoi);
 
   const applyRamenBuff = (buff: RamenBuff) => {
     if (buff === "lucky") return; // instant CITY handled in the modal
@@ -341,13 +348,14 @@ export function CityHud({ api }: { api: GtaApi }) {
           <HookIcon /> HOOK
         </button>
         <QuestChip api={api} />
-        {insideRamen && (
-          <button className="oxc-pill gold" onPointerDown={(e) => { e.preventDefault(); setRamenOpen(true); }}>
+        {(insideRamen || storeKey) && (
+          <button className="oxc-pill gold" onPointerDown={(e) => { e.preventDefault(); if (insideRamen) setRamenOpen(true); else if (storeKey) setStoreOpen(storeKey); }}>
             <Soup size={16} /> ORDER
           </button>
         )}
       </div>
       {ramenOpen && <RamenOrder onClose={() => setRamenOpen(false)} onBuff={applyRamenBuff} />}
+      {storeOpen && <StoreMenu storeKey={storeOpen} onClose={() => setStoreOpen(null)} onBuff={applyRamenBuff} />}
 
       {/* right: RUN / JUMP / PPS */}
       <div className="oxc-right" data-hud>
