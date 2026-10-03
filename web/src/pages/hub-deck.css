@@ -784,3 +784,36 @@ button.ox-tel {
     animation: none;
   }
 }
+
+/* ---------- mobile home: denser, faster, less scroll (2026-10-03) ---------- */
+@media (max-width: 640px) {
+  .ox-deck__hero { gap: 14px; }
+  .ox-deck__intro h1 { font-size: 26px; margin-bottom: 4px; }
+  .ox-deck__intro p { font-size: 13px; }
+
+  /* ticker: 3 compact columns instead of a tall stacked list */
+  .ox-deck__ticker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .ox-tel { padding: 8px 6px; border-radius: 14px; }
+  .ox-tel__k { font-size: 9px; }
+  .ox-tel__v { font-size: 13px; }
+  .ox-tel__m { display: none; }
+
+  /* gates: 2-up compact grid */
+  .ox-deck__gates { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .ox-gate { min-height: 0; padding: 12px; border-radius: 16px; grid-template-columns: 36px 1fr; grid-template-rows: auto auto; column-gap: 10px; }
+  .ox-gate__orb { width: 36px; height: 36px; border-radius: 12px; }
+  .ox-gate__go { display: none; }
+  .ox-gate__cap { font-size: 10.5px; }
+
+  /* stations: tighter + skip the expensive blur on mobile GPUs */
+  .ox-stations { gap: 8px; }
+  .ox-station, .ox-row, .ox-card, .ox-gate {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.045);
+  }
+  .ox-station { content-visibility: auto; contain-intrinsic-size: auto 72px; padding: 10px 12px; border-radius: 16px; }
+  .ox-deck__section { margin-top: 4px; }
+  .ox-deck__section h2 { font-size: 16px; margin-bottom: 2px; }
+  .ox-deck__section p { font-size: 12px; margin-bottom: 10px; }
+}
