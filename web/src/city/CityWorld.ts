@@ -236,6 +236,8 @@ export class CityWorld {
   private glowTrailUntil = 0;
   private trail: { sp: THREE.Sprite; life: number }[] = [];
   private trailT = 0;
+  // landing dust puffs
+  private puffs: { sp: THREE.Sprite; vel: THREE.Vector3; life: number }[] = [];
   // ambient audio state
   private rainOn = false;
   private stepAccum = 0;
@@ -1072,7 +1074,10 @@ export class CityWorld {
     this.pVy -= 14 * dt;
     let ny = this.pPos.y + this.pVy * dt;
     if (ny <= 0) {
-      if (wasAir && this.pVy < -3) this.pitchKick = Math.min(0.09, 0.03 - this.pVy * 0.008); // landing dip
+      if (wasAir && this.pVy < -3) {
+        this.pitchKick = Math.min(0.09, 0.03 - this.pVy * 0.008); // landing dip
+        this.burstPuffs(this.pPos.x, 0.15, this.pPos.z, 8);
+      }
       ny = 0; this.pVy = 0; this.onGround = true;
     }
 
@@ -1123,6 +1128,7 @@ export class CityWorld {
     const blobS = Math.max(0.6, 1 - this.pPos.y * 0.25);
     this.blob.scale.set(blobS, blobS, 1);
     this.updateGlowTrail(dt, moving);
+    this.updatePuffs(dt);
 
     this.updateCamera(dt);
     this.updateDayNight(dt);
@@ -1172,6 +1178,11 @@ export class CityWorld {
     return this.insidePoi ?? null;
   }
 
+  /** Character juice: play a dance/wave emote. */
+  triggerEmote(name: "dance" | "wave"): void {
+    this.rig.setEmote(name);
+  }
+
   private updateGlowTrail(dt: number, moving: boolean): void {
     const active = this.time < this.glowTrailUntil;
     if (active && moving && this.glowTex) {
@@ -1199,6 +1210,45 @@ export class CityWorld {
         continue;
       }
       (t.sp.material as THREE.SpriteMaterial).opacity = 0.55 * (t.life / 0.7);
+    }
+  }
+
+  /** Landing dust puff: pooled additive sprites, rise + fade. */
+  private burstPuffs(x: number, y: number, z: number, n: number): void {
+    if (!this.glowTex) return;
+    for (let i = 0; i < n; i++) {
+      const sm = new THREE.SpriteMaterial({
+        map: this.glowTex, color: 0x8a93a8, transparent: true,
+        opacity: 0.5, depthWrite: false,
+      });
+      const sp = new THREE.Sprite(sm);
+      sp.scale.set(0.5, 0.5, 1);
+      sp.position.set(x + (Math.random() - 0.5) * 0.5, y, z + (Math.random() - 0.5) * 0.5);
+      this.scene.add(sp);
+      this.puffs.push({
+        sp,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 2.4, 0.8 + Math.random() * 1.2, (Math.random() - 0.5) * 2.4),
+        life: 0.55,
+      });
+      this.disposables.push(sm);
+    }
+  }
+
+  private updatePuffs(dt: number): void {
+    for (let i = this.puffs.length - 1; i >= 0; i--) {
+      const p = this.puffs[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        this.scene.remove(p.sp);
+        this.puffs.splice(i, 1);
+        continue;
+      }
+      p.sp.position.addScaledVector(p.vel, dt);
+      p.vel.y -= 3 * dt;
+      const k = p.life / 0.55;
+      (p.sp.material as THREE.SpriteMaterial).opacity = 0.5 * k;
+      const s = 0.5 + (1 - k) * 0.9;
+      p.sp.scale.set(s, s, 1);
     }
   }
 
