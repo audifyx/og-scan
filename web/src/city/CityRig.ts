@@ -31,6 +31,7 @@ export interface CityRig {
   group: THREE.Group;
   bones: RigBones;
   update: (dt: number, speed01: number) => void;
+  setEmote: (name: "dance" | "wave" | null) => void;
   dispose: () => void;
 }
 
@@ -233,10 +234,50 @@ export function buildRig(style: StyleId): CityRig {
     });
   }
 
+  // ── emotes (dance / wave) override the walk cycle ──
+  let emote: "dance" | "wave" | null = null;
+  let emoteT = 0;
+  const setEmote = (name: "dance" | "wave" | null) => {
+    emote = name;
+    emoteT = name ? 4 : 0;
+  };
+
   // ── walk cycle (ported from Humanoid.ts) ──
   let phase = Math.random() * 10;
   const update = (dt: number, speed01: number) => {
     const moving = speed01 > 0.03;
+    // emote playback (cancels on real movement)
+    if (emote) {
+      emoteT -= dt;
+      if (emoteT <= 0 || speed01 > 0.3) {
+        emote = null;
+        spine.rotation.y = 0;
+        head.rotation.z = 0;
+      } else {
+        const et = performance.now() / 1000;
+        if (emote === "dance") {
+          hips.position.y = 0.95 - Math.abs(Math.sin(et * 7)) * 0.12;
+          armL.rotation.x = -2.6 + Math.sin(et * 7) * 0.55;
+          armR.rotation.x = -2.6 - Math.sin(et * 7) * 0.55;
+          armL.rotation.z = 0.55;
+          armR.rotation.z = -0.55;
+          legL.rotation.x = 0;
+          legR.rotation.x = 0;
+          head.rotation.z = Math.sin(et * 3.5) * 0.16;
+          spine.rotation.y = Math.sin(et * 3.5) * 0.22;
+        } else {
+          armR.rotation.x = -2.5 + Math.sin(et * 6) * 0.28;
+          armR.rotation.z = -0.4;
+          armL.rotation.x = Math.sin(et * 2) * 0.12;
+          armL.rotation.z = 0.12;
+          legL.rotation.x = 0;
+          legR.rotation.x = 0;
+          head.rotation.y = Math.sin(et * 2) * 0.14;
+          hips.position.y = 0.95 + Math.sin(et * 2) * 0.012;
+        }
+        return;
+      }
+    }
     phase += dt * (4 + speed01 * 9);
     const amp = moving ? 0.25 + speed01 * 0.55 : 0;
     const swing = Math.sin(phase) * amp;
@@ -267,7 +308,7 @@ export function buildRig(style: StyleId): CityRig {
     group.clear();
   };
 
-  return { group, bones: { hips, spine, head, armL, armR, legL, legR }, update, dispose };
+  return { group, bones: { hips, spine, head, armL, armR, legL, legR }, update, setEmote, dispose };
 }
 
 /** Also export the parts map so previews/world stay in sync. */
