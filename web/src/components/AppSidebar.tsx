@@ -33,10 +33,12 @@ import {
   X,
   Rocket,
   Briefcase,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useStealthAdmin } from "@/hooks/useStealthAdmin";
 
 type TabId =
   | "overview"
@@ -177,6 +179,7 @@ export const AppSidebar = ({
 }) => {
   const location = useLocation();
   const { isAdmin } = useAdmin();
+  const { stealthAdminVisible } = useStealthAdmin();
 
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
@@ -275,6 +278,16 @@ export const AppSidebar = ({
                   onClose={onClose}
                 />
               ))}
+              {stealthAdminVisible && (
+                <NavRow
+                  key="/coming-soon"
+                  item={{ to: "/coming-soon", icon: FlaskConical, label: "Coming Soon", eyebrow: "Shelved routes" }}
+                  activeId={activeId}
+                  currentPath={location.pathname}
+                  onNavigate={onNavigate}
+                  onClose={onClose}
+                />
+              )}
             </div>
           </div>
         )}
