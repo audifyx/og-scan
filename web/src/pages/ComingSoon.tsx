@@ -10,6 +10,9 @@ const HIDDEN_ROUTES = [
   { path: "/ai", label: "AI Hub", desc: "AI assistant hub" },
   { path: "/os", label: "OS", desc: "OS-style home" },
   { path: "/predictions", label: "Predictions", desc: "Prediction markets" },
+  { path: "/orbitxagents", label: "Agents", desc: "Agent world" },
+  { path: "/play", label: "Play", desc: "Games hub" },
+  { path: "/telegram", label: "Telegram", desc: "Telegram bot companion" },
 ];
 
 const ComingSoon = () => {
