@@ -60,6 +60,7 @@ export class GameAudio {
           this.master.gain.setTargetAtTime(0, t, 0.06);
           window.setTimeout(() => {
             this.engineStop();
+            this.trafficStop();
             this.sirenStop(true);
           }, 220);
         } else {
@@ -239,6 +240,43 @@ export class GameAudio {
     const t = this.ctx.currentTime;
     this.engGain.gain.setTargetAtTime(on ? 0.05 : 0, t, 0.15);
     this.engOsc.frequency.setTargetAtTime(55 + speed01 * 90, t, 0.2);
+  }
+
+  /** Distant traffic bed: one looped voice, level driven per-frame by proximity. */
+  private trafOsc: OscillatorNode | null = null;
+  private trafGain: GainNode | null = null;
+
+  trafficStart() {
+    const c = this.ac();
+    const dest = this.out();
+    if (!c || !dest || this.trafOsc) return;
+    try {
+      this.trafOsc = c.createOscillator();
+      this.trafGain = c.createGain();
+      this.trafOsc.type = "sawtooth";
+      this.trafOsc.frequency.value = 46;
+      this.trafGain.gain.value = 0;
+      const filt = c.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = 240;
+      this.trafOsc.connect(filt).connect(this.trafGain).connect(dest);
+      this.trafOsc.start();
+    } catch { /* noop */ }
+  }
+
+  trafficLevel(v: number) {
+    if (!this.trafOsc || !this.trafGain || !this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      this.trafGain.gain.setTargetAtTime(Math.max(0, Math.min(1, v)) * 0.045, t, 0.25);
+      this.trafOsc.frequency.setTargetAtTime(46 + v * 26, t, 0.3);
+    } catch { /* noop */ }
+  }
+
+  trafficStop() {
+    try { this.trafOsc?.stop(); } catch { /* noop */ }
+    this.trafOsc = null;
+    this.trafGain = null;
   }
 
   engineStop() {
