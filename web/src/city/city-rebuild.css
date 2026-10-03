@@ -1,0 +1,116 @@
+/* OrbitX City rebuild — select screen + HUD. Phone-first, cyan/gold on near-black. */
+
+:root {
+  --oxc-cyan: #17e6d4;
+  --oxc-gold: #e8a93a;
+  --oxc-bg: #04070d;
+  --oxc-panel: rgba(10, 16, 26, 0.72);
+  --oxc-line: rgba(23, 230, 212, 0.28);
+}
+
+/* ── SELECT TRADER ─────────────────────────────────────────── */
+
+.oxc-select {
+  position: absolute; inset: 0; z-index: 20;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(23, 230, 212, 0.08), transparent 60%),
+    var(--oxc-bg);
+  display: flex; flex-direction: column; align-items: center;
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  animation: oxc-fadein 0.35s ease;
+}
+
+.oxc-select-head { width: 100%; display: flex; justify-content: flex-start; }
+.oxc-brand { font: 700 22px/1 system-ui; color: #fff; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
+.oxc-brand b { color: var(--oxc-cyan); }
+.oxc-brand-x {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--oxc-cyan), #0a8f84);
+  color: #04211e; font-weight: 900; font-size: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.oxc-select-title {
+  margin: 14px 0 4px; display: flex; align-items: center; gap: 14px;
+  font: 800 30px/1 system-ui; letter-spacing: 0.14em; color: var(--oxc-cyan);
+  text-shadow: 0 0 24px rgba(23, 230, 212, 0.45);
+}
+.oxc-select-title i { display: block; width: 64px; height: 2px; background: linear-gradient(90deg, transparent, var(--oxc-cyan)); }
+.oxc-select-title i:last-child { background: linear-gradient(90deg, var(--oxc-cyan), transparent); }
+.oxc-select-sub { margin: 0 0 14px; font: 600 12px/1 system-ui; letter-spacing: 0.32em; color: #8a93a6; }
+
+.oxc-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  width: 100%; max-width: 460px;
+}
+
+.oxc-card {
+  position: relative; border-radius: 16px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(16, 24, 38, 0.85), rgba(8, 12, 20, 0.9));
+  border: 1px solid rgba(120, 140, 170, 0.18);
+  padding: 0 0 10px; cursor: pointer;
+  opacity: 0; transform: translateY(18px) scale(0.96);
+  animation: oxc-spring 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.oxc-card:active { transform: scale(0.96); }
+.oxc-card.sel {
+  border-color: var(--oxc-cyan);
+  box-shadow: 0 0 0 1.5px var(--oxc-cyan), 0 0 26px rgba(23, 230, 212, 0.35);
+}
+.oxc-card.gold.sel {
+  border-color: var(--oxc-gold);
+  box-shadow: 0 0 0 1.5px var(--oxc-gold), 0 0 26px rgba(232, 169, 58, 0.4);
+}
+
+.oxc-card-preview { position: relative; display: block; height: 196px; }
+.oxc-card-canvas { width: 100%; height: 100%; display: block; }
+
+.oxc-shimmer {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 235, 190, 0.22) 50%, transparent 60%);
+  background-size: 250% 100%;
+  animation: oxc-shimmer 3.2s ease-in-out infinite;
+}
+
+.oxc-card-divider { display: flex; align-items: center; gap: 8px; padding: 2px 18px 6px; }
+.oxc-card-divider::before, .oxc-card-divider::after {
+  content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--oxc-cyan));
+}
+.oxc-card-divider::after { background: linear-gradient(90deg, var(--oxc-cyan), transparent); }
+.oxc-card.gold .oxc-card-divider::before { background: linear-gradient(90deg, transparent, var(--oxc-gold)); }
+.oxc-card.gold .oxc-card-divider::after { background: linear-gradient(90deg, var(--oxc-gold), transparent); }
+.oxc-card-divider i { width: 7px; height: 7px; transform: rotate(45deg); background: var(--oxc-cyan); box-shadow: 0 0 8px var(--oxc-cyan); }
+.oxc-card.gold .oxc-card-divider i { background: var(--oxc-gold); box-shadow: 0 0 8px var(--oxc-gold); }
+
+.oxc-card-name {
+  display: block; font: 800 19px/1 system-ui; letter-spacing: 0.22em;
+  color: var(--oxc-cyan); text-shadow: 0 0 14px rgba(23, 230, 212, 0.4);
+}
+.oxc-card.gold .oxc-card-name { color: var(--oxc-gold); text-shadow: 0 0 14px rgba(232, 169, 58, 0.45); }
+
+.oxc-launch {
+  margin-top: 18px; width: 100%; max-width: 460px; min-height: 56px;
+  border-radius: 14px; border: 1.5px solid rgba(23, 230, 212, 0.55);
+  background: linear-gradient(180deg, rgba(23, 230, 212, 0.14), rgba(23, 230, 212, 0.05));
+  color: var(--oxc-cyan); font: 800 18px/1 system-ui; letter-spacing: 0.24em;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  cursor: pointer; transition: transform 0.1s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.oxc-launch:active { transform: scale(0.97); box-shadow: 0 0 30px rgba(23, 230, 212, 0.4); }
+.oxc-launch-play { font-size: 15px; }
+
+@keyframes oxc-spring {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes oxc-shimmer {
+  0%, 100% { background-position: 120% 0; }
+  50% { background-position: -20% 0; }
+}
+@keyframes oxc-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
