@@ -207,6 +207,8 @@ export class CityWorld {
   private camYaw = Math.PI + Math.PI; // behind player (heading PI → camYaw = heading+PI)
   private camPitch = 0.32;
   private camDist = 8;
+  private camDistT = 8; // lerped target — shortens when the player is indoors
+  private insideBld: BuildingDef | null = null; // building whose interior the player is in
   private camPos = new THREE.Vector3();
   private camVel = new THREE.Vector3();
   private camInit = false;
@@ -1137,6 +1139,21 @@ export class CityWorld {
       this.insidePoi = null;
     }
 
+    // interior detection: player inside a walkable building volume (has a door gap)
+    let insideBld: BuildingDef | null = null;
+    for (const def of BUILDINGS) {
+      if (!def.door) continue;
+      const bx = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hz : def.hx;
+      const bz = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hx : def.hz;
+      if (Math.abs(this.pPos.x - def.x) < bx - 0.3 && Math.abs(this.pPos.z - def.z) < bz - 0.3) {
+        insideBld = def;
+        break;
+      }
+    }
+    this.insideBld = insideBld;
+    this.camDistT = insideBld ? 4.2 : 8;
+    this.camDist += (this.camDistT - this.camDist) * Math.min(1, dt * 5);
+
     this.rig.group.position.copy(this.pPos);
     this.rig.group.rotation.y = this.pHeading;
     const spd01 = Math.min(1, Math.hypot(this.pVel.x, this.pVel.z) / 9.5);
@@ -1272,7 +1289,7 @@ export class CityWorld {
   /** Follow cam: dist 8, pitch 0.32, FOV 62, lookAt focus+1.5y — critically-damped spring. */
   private updateCamera(dt: number): void {
     const focus = this.pPos;
-    const pitch = this.camPitch + this.pitchKick;
+    const pitch = this.camPitch + this.pitchKick + (this.insideBld ? 0.18 : 0);
     const yaw = this.camYaw;
     const dist = this.camDist;
     tmpV.set(
@@ -1293,12 +1310,23 @@ export class CityWorld {
     this.camPos.addScaledVector(this.camVel, dt);
     // keep the camera out of building volumes (no clipping through roofs/walls)
     for (const def of BUILDINGS) {
+      if (def === this.insideBld) continue; // interior handled below — don't shove above the roof
       const ex = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hz : def.hx;
       const ez = def.rotY === Math.PI / 2 || def.rotY === -Math.PI / 2 ? def.hx : def.hz;
       if (Math.abs(this.camPos.x - def.x) < ex + 0.5 && Math.abs(this.camPos.z - def.z) < ez + 0.5) {
         const minY = def.height + 1.0;
         if (this.camPos.y < minY) this.camPos.y = minY;
       }
+    }
+    // interior camera: stay inside the room so the player can see it (never in a wall)
+    const ib = this.insideBld;
+    if (ib) {
+      const ex = ib.rotY === Math.PI / 2 || ib.rotY === -Math.PI / 2 ? ib.hz : ib.hx;
+      const ez = ib.rotY === Math.PI / 2 || ib.rotY === -Math.PI / 2 ? ib.hx : ib.hz;
+      const m = 0.45;
+      this.camPos.x = Math.max(ib.x - ex + m, Math.min(ib.x + ex - m, this.camPos.x));
+      this.camPos.z = Math.max(ib.z - ez + m, Math.min(ib.z + ez - m, this.camPos.z));
+      this.camPos.y = Math.min(this.camPos.y, ib.height - 0.7);
     }
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(focus.x, focus.y + 1.5, focus.z);
