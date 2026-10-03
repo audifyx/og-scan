@@ -154,7 +154,7 @@ function Badge({ bg, children }: { bg: string; children: ReactNode }) {
 export default function Hub() {
   const now = useClock();
   const { signOut, profile, user } = useAuth();
-  const { isAdmin, isOwnerIdentity } = useAdmin();
+  const { isOwnerIdentity } = useAdmin();
   const [tab, setTab] = useState<TabId>("home");
   const [stacks, setStacks] = useState<Record<TabId, Frame[]>>({
     home: [{ id: "root" }],
