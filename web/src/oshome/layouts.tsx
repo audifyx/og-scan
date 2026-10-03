@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BatteryMedium,
   ChevronRight,
@@ -8,6 +8,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { APP_CATALOG, APP_CATEGORIES, type AppCategory, type OsHomeApp } from "./appsCatalog";
+import { useStealthAdmin } from "@/hooks/useStealthAdmin";
 import { OS_LAYOUT_KEY } from "../themes/themes";
 
 /* ------------------------------------------------------------------ */
@@ -802,6 +803,19 @@ export function TerminalLayout(p: LayoutProps) {
 
 export function OrbitLayout(p: LayoutProps) {
   const stageRef = useRef<HTMLDivElement>(null);
+  // Secret admin trigger: 5 rapid taps on the orbit core toggles the
+  // stealth admin UI (default hidden, so demos/screenshots stay clean).
+  // Invisible — no visual hint. Normal clicks are unaffected.
+  const { toggleStealthAdmin } = useStealthAdmin();
+  const tapTimes = useRef<number[]>([]);
+  const handleCoreTap = useCallback(() => {
+    const now = Date.now();
+    tapTimes.current = [...tapTimes.current.filter((t) => now - t < 3000), now];
+    if (tapTimes.current.length >= 5) {
+      tapTimes.current = [];
+      toggleStealthAdmin();
+    }
+  }, [toggleStealthAdmin]);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   useEffect(() => {
     const el = stageRef.current;
@@ -840,7 +854,7 @@ export function OrbitLayout(p: LayoutProps) {
       <div className="osh-orbit-ring ring-2" style={{ width: r2 * 2, height: r2 * 2, left: `calc(50% - ${r2}px)`, top: `calc(50% - ${r2}px)` }}>
         {outer.map((a, i) => node(a, (360 / outer.length) * i, r2))}
       </div>
-      <div className="osh-orbit-core">
+      <div className="osh-orbit-core" onClick={handleCoreTap}>
         <Clock />
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           <button className="osh-x-btn" onClick={p.onOpenLauncher} title="Search apps" aria-label="Search apps">
