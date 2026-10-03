@@ -24,6 +24,7 @@ import Hub from "./pages/Hub";
 import KOLTracker from "./pages/KOLTracker";
 import PnlTracker from "./pages/PnlTracker";
 import NotFound from "./pages/NotFound";
+import ComingSoon from "./pages/ComingSoon";
 import Auth from "./pages/Auth";
 import AuthWallet from "./pages/AuthWallet";
 import Setup from "./pages/Setup";
@@ -611,6 +612,7 @@ const App = () => (
 
             {/* ── Owner desk (obscure path; not linked in product chrome) ── */}
             <Route path="/ox-desk-m4k9q" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/coming-soon" element={<AdminRoute><ComingSoon /></AdminRoute>} />
             <Route path="/calls" element={<AdminRoute><CallsDesk /></AdminRoute>} />
             <Route path="/agentcalls" element={<AgentCalls />} />
             <Route path="/agent-calls" element={<Navigate to="/agentcalls" replace />} />
