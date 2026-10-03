@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { buildRig, type CityRig } from "./CityRig";
 import { CityWeather, type WeatherMode } from "./CityWeather";
 import { CityTraffic } from "./CityTraffic";
+import { NpcSystem } from "./npcs/NpcAI";
 import { getStyle, getCityPoints, addCityPoints } from "./cityState";
 import { resolveCircleColliders } from "./core/Vehicle";
 import type { InputState } from "./core/input";
@@ -294,6 +295,8 @@ export class CityWorld {
 
   // npcs
   private npcs: { group: THREE.Group; phase: number; mode: "idle" | "walk"; a: THREE.Vector3; b: THREE.Vector3; t: number; speed: number }[] = [];
+  /** NPC AI system: cops, civilians, store workers (mega-expansion lane). */
+  private npcSys: NpcSystem | null = null;
 
   // poi labels
   private poiLabels: THREE.Sprite[] = [];
@@ -327,6 +330,10 @@ export class CityWorld {
     // dynamic weather (default: light drizzle for mood)
     this.weather = new CityWeather(this.scene, () => { this.audio?.thunder(); });
     this.traffic = new CityTraffic(this.scene);
+
+    // ── NPC AI: cops, civilians, store workers ──
+    this.npcSys = new NpcSystem({ scene: this.scene });
+    this.npcSys.addDefaultStoreWorkers();
 
     // ── player rig (selected trader style; degen default) ──
     this.rig = buildRig(getStyle());
@@ -418,6 +425,8 @@ export class CityWorld {
 
   /** Integration hosts (systems/apps shells) mount against these. */
   get sceneRef(): THREE.Scene { return this.scene; }
+  /** NPC AI system (for HUD talk prompts / job board). */
+  getNpcSys(): NpcSystem | null { return this.npcSys; }
   get cameraRef(): THREE.PerspectiveCamera { return this.camera; }
   get collidersRef(): Col[] { return this.colliders; }
 
@@ -1245,6 +1254,14 @@ export class CityWorld {
     for (const m of this.streakMats) m.opacity = streakOp;
     (this.scene.fog as THREE.FogExp2).density = this.weather.fogDensity * (0.85 + 0.3 * this.nightness);
     this.traffic.update(dt, this.pPos, this.audio);
+    // NPC AI: cops patrol + ticket speeders, civilians stroll + wave at scans, workers idle at counters
+    this.npcSys?.update(dt, {
+      time: this.time,
+      playerPos: this.pPos,
+      sprinting: inp.sprint && (Math.abs(inp.moveX) + Math.abs(inp.moveY)) > 0.1,
+      scanPulseActive: this.time < this.scanUntil,
+      onToast: (t) => { this.poiToast = t; this.poiToastUntil = this.time + 2.5; },
+    });
     // ambient rain bed follows the weather
     const rg = this.weather.rainGain;
     if (rg > 0.02) {
