@@ -269,3 +269,34 @@
   color: #fff; font-size: 14px; font-weight: 700;
 }
 .oxc-emote-picker button:active { background: rgba(23, 230, 212, 0.2); border-color: rgba(23, 230, 212, 0.6); }
+
+/* ── daily quests ── */
+.oxc-pill.pulse { animation: oxc-pillpulse 1.6s ease-in-out infinite; }
+@keyframes oxc-pillpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 164, 65, 0.0); }
+  50% { box-shadow: 0 0 18px 2px rgba(217, 164, 65, 0.55); }
+}
+.oxc-quest-panel {
+  margin-top: 8px; width: 230px;
+  background: rgba(8, 12, 20, 0.94);
+  border: 1px solid rgba(23, 230, 212, 0.3);
+  border-radius: 16px; padding: 10px 12px;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.oxc-quest-title { font-size: 11px; font-weight: 800; letter-spacing: 0.18em; color: #17e6d4; margin-bottom: 8px; }
+.oxc-quest-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+.oxc-quest-row:first-of-type { border-top: none; }
+.oxc-quest-info { flex: 1; min-width: 0; }
+.oxc-quest-info b { font-size: 13px; color: #fff; }
+.oxc-quest-info small { display: block; font-size: 11px; color: rgba(255,255,255,0.55); margin: 1px 0 5px; }
+.oxc-quest-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.oxc-quest-bar > div { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #17e6d4, #d9a441); transition: width 0.4s ease; }
+.oxc-quest-claim {
+  min-height: 44px; padding: 0 14px; border-radius: 12px; flex-shrink: 0;
+  border: 1px solid rgba(217, 164, 65, 0.7); background: rgba(217, 164, 65, 0.16);
+  color: #ffd98a; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
+}
+.oxc-quest-claim:active { background: rgba(217, 164, 65, 0.32); }
+.oxc-quest-done { color: #17e6d4; font-size: 18px; font-weight: 800; }
+.oxc-quest-count { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); font-variant-numeric: tabular-nums; }
