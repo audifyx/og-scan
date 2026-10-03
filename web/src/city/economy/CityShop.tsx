@@ -17,6 +17,7 @@ import { CITY_SHOP_ITEMS, type CityShopItem } from "./shopItems";
 import { useCityInventory } from "./useCityInventory";
 import { useCityWallet } from "./useCityWallet";
 import ReceiptModal from "./ReceiptModal";
+import "./economy.css";
 
 type Receipt = { title: string; amount: string; signature: string } | null;
 
