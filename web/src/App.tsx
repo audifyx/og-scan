@@ -152,7 +152,6 @@ import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { EvmWalletProvider } from "@/hooks/useEvmWallet";
 import { DeviceThemeProvider } from "@/themes/DeviceThemeProvider";
-import OsHomePage from "@/oshome/OsHomePage";
 import { WalletAuthBridge } from "@/components/WalletAuthBridge";
 import { UsernameClaimGate } from "@/components/UsernameClaimModal";
 import Games from "./pages/Games";
@@ -317,7 +316,7 @@ const App = () => (
           <UsernameClaimGate />
           <Routes>
             {/* ── Public routes (no auth required) ── */}
-            <Route path="/" element={<OsHomePage />} />
+            <Route path="/" element={<Splash />} />
             <Route path="/beta" element={<BetaHome />} />
             <Route path="/splash" element={<Splash />} />
             <Route path="/waitlist" element={<OgdexRedirect to="/auth?mode=signup" />} />
