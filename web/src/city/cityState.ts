@@ -39,3 +39,10 @@ export function addCityPoints(n: number): number {
   try { localStorage.setItem(POINTS_KEY, String(total)); } catch { /* noop */ }
   return total;
 }
+
+/** Spend points (never below 0), persist, return the new total. */
+export function spendCityPoints(n: number): number {
+  const total = Math.max(0, getCityPoints() - Math.max(0, Math.floor(n)));
+  try { localStorage.setItem(POINTS_KEY, String(total)); } catch { /* noop */ }
+  return total;
+}
