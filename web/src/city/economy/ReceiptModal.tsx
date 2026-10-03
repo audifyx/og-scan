@@ -4,6 +4,7 @@
  * tx signature and a Solscan link. Dark glass, cyan/gold, 44px+ targets.
  */
 import { CheckCircle2, ExternalLink, X } from "lucide-react";
+import "./economy.css";
 
 export interface ReceiptRow {
   label: string;
