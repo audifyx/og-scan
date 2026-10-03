@@ -4,6 +4,28 @@
   "ignoreCommand": "bash ../scripts/vercel-only-rork.sh",
   "redirects": [
     {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "ogscan.fun"
+        }
+      ],
+      "destination": "https://orbitx.world/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.ogscan.fun"
+        }
+      ],
+      "destination": "https://orbitx.world/$1",
+      "permanent": true
+    },
+    {
       "source": "/AI",
       "destination": "/ai",
       "permanent": false
