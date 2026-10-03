@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Zap, ArrowUp, Crosshair, Wallet } from "lucide-react";
 import { useCityWallet } from "./economy/useCityWallet";
@@ -8,6 +8,12 @@ import { subscribeStoreMenu } from "./economy/storeMenuBus";
 import { questProgress, claimQuest, type QuestProgress } from "./quests";
 import { Soup } from "lucide-react";
 import { setTouchMove } from "./core/input";
+import EconomyDock from "./economy/EconomyDock";
+import JobBoard, { TalkPrompt, type CityJobsApi } from "./jobs/JobBoard";
+import ArcadeGame from "./economy/ArcadeGame";
+import CityShop from "./economy/CityShop";
+import { isStoreKey } from "./economy/StoreMenu";
+import type { NpcSystem } from "./npcs/NpcAI";
 import type { GtaApi } from "./core/useGtaGame";
 
 /**
@@ -288,9 +294,67 @@ export function CityHud({ api }: { api: GtaApi }) {
   const [ramenOpen, setRamenOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState<StoreKey | null>(null);
   const [emoteOpen, setEmoteOpen] = useState(false);
+  const [arcadeTalkOpen, setArcadeTalkOpen] = useState(false);
+  const [shopTalkOpen, setShopTalkOpen] = useState(false);
+  const [talkToast, setTalkToast] = useState<string | null>(null);
+  const { address: walletAddr } = useCityWallet();
 
   // NPC worker TALK hook: openStoreMenu(storeKey) from ./economy/storeMenuBus
   useEffect(() => subscribeStoreMenu((key) => setStoreOpen(key)), []);
+  // Jobs board api: world accessors for jobs, talk prompts, session stats.
+  const jobsApi = useMemo<CityJobsApi>(() => ({
+    wallet: walletAddr,
+    onToast: (msg: string) => {
+      setTalkToast(msg);
+      window.setTimeout(() => setTalkToast((t) => (t === msg ? null : t)), 3000);
+    },
+    getWorld: () => {
+      const w = api.getWorld();
+      if (!w) return null;
+      return {
+        scene: w.sceneRef,
+        playerPos: () => {
+          const p = w.getPlayerState().pos;
+          return { x: p.x, z: p.z };
+        },
+      };
+    },
+    getNpcs: () => {
+      const w = api.getWorld() as unknown as { getNpcSys?: () => NpcSystem | null } | null;
+      return w?.getNpcSys?.() ?? null;
+    },
+    getSession: () => {
+      const w = api.getWorld();
+      return {
+        dist: w?.getSessionDistance() ?? 0,
+        scanned: w?.getScannedPois() ?? [],
+        visited: w?.getVisitedPois() ?? [],
+      };
+    },
+  }), [api, walletAddr]);
+
+  // Wire NPC worker TALK -> the right order menu (world may mount after the HUD).
+  useEffect(() => {
+    let tries = 0;
+    const id = window.setInterval(() => {
+      const w = api.getWorld() as unknown as { getNpcSys?: () => NpcSystem | null } | null;
+      const npc = w?.getNpcSys?.() ?? null;
+      if (npc) {
+        npc.onTalkToWorker = (key: string) => {
+          if (key === "ramen") { setRamenOpen(true); return; }
+          if (key === "arcade") { setArcadeTalkOpen(true); return; }
+          if (key === "shop") { setShopTalkOpen(true); return; }
+          if (isStoreKey(key)) { setStoreOpen(key); return; }
+          setTalkToast("\U0001F44B How's the city treating you?");
+          window.setTimeout(() => setTalkToast(null), 2500);
+        };
+        window.clearInterval(id);
+      } else if (++tries > 40) {
+        window.clearInterval(id);
+      }
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [api]);
   const ppsTimer = useRef<number | null>(null);
   const ppsLong = useRef(false);
 
@@ -332,9 +396,17 @@ export function CityHud({ api }: { api: GtaApi }) {
   return (
     <div className="oxc-hud">
       <Ticker api={api} />
+      <div className="oxc-dockrow" data-hud>
+        <EconomyDock />
+      </div>
       {toast && (
         <div className="oxc-poi-toast" data-hud key={toast}>
           {toast}
+        </div>
+      )}
+      {talkToast && (
+        <div className="oxc-poi-toast" data-hud key={talkToast}>
+          {talkToast}
         </div>
       )}
 
@@ -356,6 +428,8 @@ export function CityHud({ api }: { api: GtaApi }) {
       </div>
       {ramenOpen && <RamenOrder onClose={() => setRamenOpen(false)} onBuff={applyRamenBuff} />}
       {storeOpen && <StoreMenu storeKey={storeOpen} onClose={() => setStoreOpen(null)} onBuff={applyRamenBuff} />}
+      {arcadeTalkOpen && <ArcadeGame onClose={() => setArcadeTalkOpen(false)} />}
+      {shopTalkOpen && <CityShop onClose={() => setShopTalkOpen(false)} />}
 
       {/* right: RUN / JUMP / PPS */}
       <div className="oxc-right" data-hud>
@@ -402,6 +476,8 @@ export function CityHud({ api }: { api: GtaApi }) {
       )}
       {api.hud && api.hud.speedKmh > 26 && <div className="oxc-speedlines" aria-hidden />}
 
+      <JobBoard api={jobsApi} />
+      <TalkPrompt api={jobsApi} />
       <Joystick api={api} />
     </div>
   );
