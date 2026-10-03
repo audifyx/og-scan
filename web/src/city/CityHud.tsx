@@ -206,6 +206,28 @@ function HookIcon() {
 export function CityHud({ api }: { api: GtaApi }) {
   const [sprintOn, setSprintOn] = useState(false);
   const [ramenOpen, setRamenOpen] = useState(false);
+  const [emoteOpen, setEmoteOpen] = useState(false);
+  const ppsTimer = useRef<number | null>(null);
+  const ppsLong = useRef(false);
+
+  const ppsDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    ppsLong.current = false;
+    ppsTimer.current = window.setTimeout(() => {
+      ppsLong.current = true;
+      setEmoteOpen(true);
+    }, 550);
+  };
+  const ppsUp = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (ppsTimer.current) { clearTimeout(ppsTimer.current); ppsTimer.current = null; }
+    if (!ppsLong.current) scan();
+    ppsLong.current = false;
+  };
+  const emote = (name: "dance" | "wave") => {
+    api.getWorld()?.triggerEmote(name);
+    setEmoteOpen(false);
+  };
   const toast = api.hud?.poiToast;
   const insideRamen = api.hud?.insidePoi === "Ramen House";
 
@@ -273,11 +295,25 @@ export function CityHud({ api }: { api: GtaApi }) {
           <ArrowUp size={20} />
           <span>JUMP</span>
         </button>
-        <button className="oxc-ctl diamond" onPointerDown={(e) => { e.preventDefault(); scan(); }} aria-label="PPS system">
+        <button
+          className="oxc-ctl diamond"
+          onPointerDown={ppsDown}
+          onPointerUp={ppsUp}
+          onPointerCancel={ppsUp}
+          aria-label="PPS system (long-press for emotes)"
+        >
           <Crosshair size={20} />
           <span>PPS</span>
         </button>
       </div>
+      {emoteOpen && (
+        <div className="oxc-emote-picker" data-hud>
+          <button onClick={() => emote("dance")} aria-label="Dance emote">💃 Dance</button>
+          <button onClick={() => emote("wave")} aria-label="Wave emote">👋 Wave</button>
+          <button onClick={() => setEmoteOpen(false)} aria-label="Close emotes">✕</button>
+        </div>
+      )}
+      {api.hud && api.hud.speedKmh > 26 && <div className="oxc-speedlines" aria-hidden />}
 
       <Joystick api={api} />
     </div>
