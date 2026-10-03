@@ -848,7 +848,7 @@ export class CityWorld {
       }
     }
     if (planterGlb) {
-      for (const [x, z, ry] of [[-6, 20, 0], [6, 20, 0], [-6, -20, 0], [6, -20, 0], [-18, 12, 0.4], [18, -12, -0.4]] as [number, number, number][]) {
+      for (const [x, z, ry] of [[-6, 20, 0], [6, 20, 0], [-6, -20, 0], [6, -20, 0], [-18, 6, 0.4], [18, -8, -0.4]] as [number, number, number][]) {
         const inst = planterGlb.clone(true);
         this.tagGlb(inst);
         inst.position.set(x, 0, z);
@@ -884,7 +884,7 @@ export class CityWorld {
       this.colliders.push({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
     };
     put(lampGlb, -8, -14, 0, 0.4); put(lampGlb, 8, -14, 0, 0.4);
-    put(lampGlb, -8, 14, 0, 0.4);  put(lampGlb, 8, 14, 0, 0.4);
+    put(lampGlb, -4, 14, 0, 0.4);  put(lampGlb, 8, 14, 0, 0.4);
     putCar(carTeal, 6, -10, Math.PI / 2); putCar(carRed, -6, 10, Math.PI / 2);
     putCar(carDark, 6, 22, 0);            putCar(carTeal, -6, -22, 0);
     put(benchGlb, -4, 12, 0, 1.1); put(benchGlb, 4, -12, 0, 1.1);
@@ -909,9 +909,9 @@ export class CityWorld {
     const defs: { x: number; z: number; mode: "idle" | "walk"; a?: [number, number]; b?: [number, number]; color: number }[] = [
       { x: -10, z: -11, mode: "idle", color: 0x2a4a6b },
       { x: -13, z: 11, mode: "idle", color: 0x6b2a4a },
-      { x: 10, z: -12, mode: "walk", a: [4, -12], b: [14, -12], color: 0x3a6b2a },
+      { x: 10, z: -8, mode: "walk", a: [4, -8], b: [14, -8], color: 0x3a6b2a },
       { x: -5, z: 19, mode: "walk", a: [-8, 19], b: [2, 19], color: 0x6b5a2a },
-      { x: 21, z: -13, mode: "idle", color: 0x4a2a6b },
+      { x: 17, z: -10, mode: "idle", color: 0x4a2a6b },
       { x: -22, z: -4, mode: "idle", color: 0x2a6b5a },
     ];
     for (const d of defs) {
