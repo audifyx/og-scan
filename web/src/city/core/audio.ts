@@ -61,6 +61,7 @@ export class GameAudio {
           window.setTimeout(() => {
             this.engineStop();
             this.trafficStop();
+            this.rainStop();
             this.sirenStop(true);
           }, 220);
         } else {
@@ -277,6 +278,75 @@ export class GameAudio {
     try { this.trafOsc?.stop(); } catch { /* noop */ }
     this.trafOsc = null;
     this.trafGain = null;
+  }
+
+  /** Rain patter bed: looped band-passed noise, level driven by weather. */
+  private rainSrc: AudioBufferSourceNode | null = null;
+  private rainGainN: GainNode | null = null;
+
+  rainStart() {
+    const c = this.ac();
+    const dest = this.out();
+    if (!c || !dest || this.rainSrc) return;
+    try {
+      const len = c.sampleRate * 2;
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.rainSrc = c.createBufferSource();
+      this.rainSrc.buffer = buf;
+      this.rainSrc.loop = true;
+      const bp = c.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 2600;
+      bp.Q.value = 0.5;
+      this.rainGainN = c.createGain();
+      this.rainGainN.gain.value = 0;
+      this.rainSrc.connect(bp).connect(this.rainGainN).connect(dest);
+      this.rainSrc.start();
+    } catch { /* noop */ }
+  }
+
+  rainLevel(v: number) {
+    if (!this.rainGainN || !this.ctx) return;
+    try {
+      this.rainGainN.gain.setTargetAtTime(Math.max(0, Math.min(1, v)) * 0.09, this.ctx.currentTime, 0.4);
+    } catch { /* noop */ }
+  }
+
+  rainStop() {
+    try { this.rainSrc?.stop(); } catch { /* noop */ }
+    this.rainSrc = null;
+    this.rainGainN = null;
+  }
+
+  /** Short filtered noise tick — call on stride. */
+  footstep(run: boolean) {
+    const c = this.ac();
+    const dest = this.out();
+    if (!c || !dest) return;
+    try {
+      const t0 = c.currentTime;
+      const dur = 0.09;
+      const buf = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * dur)), c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const lp = c.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = run ? 720 : 480;
+      const g = c.createGain();
+      g.gain.value = run ? 0.15 : 0.09;
+      src.connect(lp).connect(g).connect(dest);
+      src.start(t0);
+    } catch { /* decorative */ }
+  }
+
+  /** Door chime: bright two-tone ding on shop entry. */
+  chime() {
+    this.blip(880, 0.16, "sine", 0.06);
+    window.setTimeout(() => this.blip(1174, 0.22, "sine", 0.06), 130);
   }
 
   engineStop() {
