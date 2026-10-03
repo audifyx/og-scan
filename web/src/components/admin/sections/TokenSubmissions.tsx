@@ -58,11 +58,14 @@ export const TokenSubmissions = () => {
   const updateSubmission = async (id: string, updates: Partial<Submission>) => {
     if (!admin) return;
     setProcessing(true);
-    const { error } = await supabase.from("pump_v5_submissions").update({
-      ...updates, approved_by: admin.id, approved_at: new Date().toISOString(),
-    }).eq("id", id);
+    const updatesWithAudit: Partial<Submission> = { ...updates };
+    if (updates.status === "approved") {
+      updatesWithAudit.approved_by = admin.id;
+      updatesWithAudit.approved_at = new Date().toISOString();
+    }
+    const { error } = await supabase.from("pump_v5_submissions").update(updatesWithAudit).eq("id", id);
     if (!error) {
-      await logAudit(admin.id, `Submission ${updates.status || "edit"}`, "pump_v5_submissions", id, undefined, updates);
+      await logAudit(admin.id, `Submission ${updates.status || "edit"}`, "pump_v5_submissions", id, undefined, updatesWithAudit);
       toast.success("Updated");
       fetch();
     } else toast.error("Failed");
