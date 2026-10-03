@@ -201,6 +201,15 @@ export default function Hub() {
         iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)",
         glyph: <span style={{ fontSize: 18 }}>🧪</span>,
       });
+      base.push({
+        key: "__admin",
+        name: "Admin",
+        caption: "All admin routes",
+        href: "/ox-desk-m4k9q",
+        tone: "#60A5FA",
+        iconBg: "linear-gradient(135deg, #60A5FA, #1D4ED8)",
+        glyph: <span style={{ fontSize: 18 }}>🛡️</span>,
+      });
     }
     return base;
   }, [catalogApps, showAdminApps, isOwnerIdentity]);
@@ -448,6 +457,10 @@ export default function Hub() {
             onClick={() => {
               if (app.key === "__coming_soon") {
                 window.location.assign("/coming-soon");
+                return;
+              }
+              if (app.key === "__admin") {
+                push({ id: "section", sectionId: "admin" });
                 return;
               }
               push({ id: "app", appKey: app.key });
@@ -787,13 +800,13 @@ export default function Hub() {
     body = tab === "home" ? rootHome : tab === "apps" ? rootApps : tab === "activity" ? rootActivity : rootAccount;
   } else if (top.id === "section") {
     const section =
-      top.sectionId === "admin" && showAdminApps
+      top.sectionId === "admin" && isOwnerIdentity
         ? { id: "admin", title: "Owner Admin", subtitle: "Private ops", keys: OWNER_ADMIN_APPS.map((a) => a.key) }
         : top.sectionId === "admin"
           ? null
           : platformSections.find((s) => s.id === top.sectionId);
     const apps =
-      top.sectionId === "admin" && showAdminApps
+      top.sectionId === "admin" && isOwnerIdentity
         ? OWNER_ADMIN_APPS
         : (section?.keys || []).map((k) => PLATFORM_BY_KEY[k]).filter(Boolean);
     body = (
