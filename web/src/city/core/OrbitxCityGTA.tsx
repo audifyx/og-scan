@@ -1,5 +1,8 @@
 import { useGtaGame } from "./useGtaGame";
-import { GtaHud } from "./GtaHud";
+import { CityHud as GtaHud } from "../CityHud";
+import CitySelect from "../CitySelect";
+import { setStyle } from "../cityState";
+import "../city-rebuild.css";
 import { GtaTitleScreen, GtaHowToScreen, GtaPauseOverlay } from "./GtaScreens";
 import { CityBillingProvider } from "@/city/integration/CityBillingHost";
 import { CitySystemsHost } from "@/city/integration/CitySystemsHost";
@@ -27,6 +30,14 @@ export default function OrbitxCityGTA() {
         </CityBillingProvider>
       )}
       {api.phase === "title" && <GtaTitleScreen api={api} />}
+      {api.phase === "select" && (
+        <CitySelect
+          onLaunch={(style) => {
+            setStyle(style);
+            api.start();
+          }}
+        />
+      )}
       {api.phase === "howto" && <GtaHowToScreen api={api} />}
       <GtaPauseOverlay api={api} />
     </div>
