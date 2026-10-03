@@ -239,6 +239,7 @@ const queryClient = new QueryClient({
 });
 const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
 const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCityPage"));
+const CityGate = lazyWithRetry(() => import("./pages/orbitxcity/CityGate"));
 const McpMarketplacePage = lazyWithRetry(() => import("./pages/orbitxmcp/MarketplaceHome"));
 const McpDetailPage = lazyWithRetry(() => import("./pages/orbitxmcp/McpDetailPage"));
 const McpSubmitPage = lazyWithRetry(() => import("./pages/orbitxmcp/SubmitMcpPage"));
@@ -344,7 +345,9 @@ const App = () => (
               path="/Orbitxcity"
               element={
                 <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#04070f] font-mono text-xs uppercase tracking-[0.2em] text-[#17ff4d]">Loading OrbitX City…</div>}>
-                  <OrbitxCityPage />
+                  <CityGate>
+                    <OrbitxCityPage />
+                  </CityGate>
                 </Suspense>
               }
             />
