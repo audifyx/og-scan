@@ -188,10 +188,22 @@ export default function Hub() {
   const catalogApps = useMemo(() => visiblePlatformApps(showOwnerSurfaces), [showOwnerSurfaces]);
   const homeGridKeys = useMemo(() => visibleHomeGridKeys(showOwnerSurfaces), [showOwnerSurfaces]);
   const platformSections = useMemo(() => visiblePlatformSections(showOwnerSurfaces), [showOwnerSurfaces]);
-  const searchableApps = useMemo(
-    () => (showAdminApps ? [...catalogApps, ...OWNER_ADMIN_APPS] : catalogApps),
-    [catalogApps, showAdminApps],
-  );
+  const searchableApps = useMemo(() => {
+    const base = showAdminApps ? [...catalogApps, ...OWNER_ADMIN_APPS] : [...catalogApps];
+    // Owner-only: Coming Soon button lives in the Apps list for audifyx@gmail.com.
+    if (isOwnerIdentity) {
+      base.push({
+        key: "__coming_soon",
+        name: "Coming Soon",
+        caption: "Shelved routes",
+        href: "/coming-soon",
+        tone: "#F0C75E",
+        iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)",
+        glyph: <span style={{ fontSize: 18 }}>🧪</span>,
+      });
+    }
+    return base;
+  }, [catalogApps, showAdminApps, isOwnerIdentity]);
 
   const stack = stacks[tab];
   const top = stack[stack.length - 1] || { id: "root" as const };
@@ -429,7 +441,18 @@ export default function Hub() {
   const appRows = (apps: AppItem[]) => (
     <div className="ios-group ios-group--apps">
       {apps.map((app) => (
-        <button key={app.key} type="button" className="ios-cell" onClick={() => push({ id: "app", appKey: app.key })}>
+        <button
+            key={app.key}
+            type="button"
+            className="ios-cell"
+            onClick={() => {
+              if (app.key === "__coming_soon") {
+                window.location.assign("/coming-soon");
+                return;
+              }
+              push({ id: "app", appKey: app.key });
+            }}
+          >
           {renderMark(app, "ios-appico")}
           <span className="ios-cell__meta">
             <span className="ios-cell__title">{app.name}</span>
