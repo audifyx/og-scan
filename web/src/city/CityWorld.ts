@@ -7,6 +7,8 @@ import { getStyle, getCityPoints, addCityPoints } from "./cityState";
 import { resolveCircleColliders } from "./core/Vehicle";
 import type { InputState } from "./core/input";
 import type { GameAudio } from "./core/audio";
+import { DISTRICT_BUILDINGS, mountDistrict } from "./CityDistrict";
+import { disposeFurnishFx } from "./furnish";
 
 /**
  * OrbitX City (rebuild) — one night block traced from the reference boards.
@@ -45,13 +47,14 @@ export interface CityWorldOpts {
 
 interface Col { minX: number; maxX: number; minZ: number; maxZ: number }
 
-interface BuildingDef {
+export interface BuildingDef {
   name: string;
   x: number; z: number; rotY: number;
   hx: number; hz: number; height: number;
   door?: { from: number; to: number }; // door gap on local +z face (local x range)
   label: string;
   poi?: boolean;
+  open?: boolean; // open-air (plaza): no wall colliders; ground built by the district
 }
 
 /**
@@ -71,6 +74,8 @@ const BUILDINGS: BuildingDef[] = [
   { name: "tower",       x: -2,  z: 28,  rotY: Math.PI,      hx: 7.3,  hz: 7.3,  height: 30.5, label: "OrbitX Tower", poi: true },
   { name: "pawn",        x: 3,   z: -25, rotY: 0,            hx: 4.8,  hz: 3.8,  height: 6.3,  label: "Pawn Shop" },
   { name: "parking",     x: 25,  z: -31, rotY: 0,            hx: 9.75, hz: 6.15, height: 11.3, label: "Parking" },
+  // downtown district (CityDistrict.ts) — placement, POIs, minimap, scan pick these up automatically
+  ...DISTRICT_BUILDINGS,
 ];
 
 const POIS: { x: number; z: number; label: string }[] = BUILDINGS.filter((b) => b.poi).map((b) => ({
@@ -151,6 +156,24 @@ function makeNeonTexture(): THREE.Texture {
   ctx.shadowColor = "#17e6d4"; ctx.shadowBlur = 28;
   ctx.fillStyle = "#aef7ff";
   ctx.fillText("OrbitX", 256, 66);
+  return new THREE.CanvasTexture(c);
+}
+
+/** Parody storefront sign (original text, no real logos). */
+function makeLabelTexture(text: string): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 96;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "rgba(6,10,18,0.92)";
+  ctx.fillRect(0, 0, 512, 96);
+  ctx.strokeStyle = "#d9a441";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(4, 4, 504, 88);
+  ctx.font = "bold 52px system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowColor = "#d9a441"; ctx.shadowBlur = 18;
+  ctx.fillStyle = "#ffe9b8";
+  ctx.fillText(text.toUpperCase().slice(0, 20), 256, 50);
   return new THREE.CanvasTexture(c);
 }
 
@@ -447,6 +470,11 @@ export class CityWorld {
     this.disposables.push(sm);
   }
 
+  /** District furnishing registers lamp materials here for the flicker pass. */
+  addLampMat(m: THREE.MeshStandardMaterial): void {
+    this.lampMats.push(m);
+  }
+
   private glowAtMesh(m: THREE.Mesh, color: number, scale: number, dy = 0): void {
     m.getWorldPosition(tmpV);
     this.addGlow(tmpV.x, tmpV.y + dy, tmpV.z, color, scale);
@@ -495,6 +523,9 @@ export class CityWorld {
 
     await Promise.all(BUILDINGS.map((def) => this.placeBuildingDef(def)));
     if (this.disposed) return;
+    // downtown district: ring roads, plaza, parking, street props, furnished interiors
+    await mountDistrict(this);
+    if (this.disposed) return;
     // greenery, props, npcs, poi labels (non-blocking)
     void this.buildGreenery();
     void this.buildProps();
@@ -504,6 +535,7 @@ export class CityWorld {
 
   private async placeBuildingDef(def: BuildingDef): Promise<void> {
     if (this.disposed) return;
+    if (def.open) return; // open-air plaza: mountDistrict builds ground + fountain, no shell
     const glb = await loadBuilding(def.name);
     if (this.disposed) return;
     if (glb) {
@@ -544,6 +576,7 @@ export class CityWorld {
 
   /** Wall colliders from the GLB-accurate footprint, with a real door gap. */
   private addBuildingColliders(def: BuildingDef): void {
+    if (def.open) return; // plaza: walkable, no walls
     const { hx, hz, door } = def;
     const T = 0.35;
     const rects: [number, number, number, number][] = [
@@ -790,30 +823,67 @@ export class CityWorld {
   }
 
   private buildFallbackBlock(def: BuildingDef): void {
-    const { x, z } = def;
-    const W = def.hx * 2, H = def.height, D = def.hz * 2;
-    const kind = def.name;
-    const body = this.box(W, H, D, kind === "tower" ? 0x2b2f3a : 0x33363f, 0.9);
-    body.position.set(x, H / 2, z);
-    this.scene.add(body);
-    // emissive window grid on the street-facing side (contractual "windows")
-    const winM = this.emissive(kind === "garage" ? 0x17e6d4 : 0xffb35c, 1.5);
-    const cols = Math.floor(W / 2.2), rows = Math.floor(H / 2.6);
-    const wg = new THREE.PlaneGeometry(1.1, 1.4);
-    this.disposables.push(wg);
-    // face toward origin (street): pick the side with min |coord|
-    const faceZ = z > 0 ? z - D / 2 - 0.06 : z + D / 2 + 0.06;
-    const rotY = z > 0 ? Math.PI : 0;
-    for (let cxi = 0; cxi < cols; cxi++) {
-      for (let ryi = 0; ryi < rows; ryi++) {
-        if ((cxi * 7 + ryi * 3 + (x > 0 ? 1 : 0)) % 4 === 0) continue; // some dark windows
-        const wmesh = new THREE.Mesh(wg, winM);
-        wmesh.name = "windows";
-        wmesh.position.set(x - W / 2 + 1.2 + cxi * 2.2, 2 + ryi * 2.6, faceZ);
-        wmesh.rotation.y = rotY;
-        this.scene.add(wmesh);
+    // Procedural shell with a real door gap on the local +z face, rotated by
+    // def.rotY — same footprint/colliders as the GLB kit, so a missing GLB
+    // never strands the player inside a solid box.
+    const W = def.hx * 2, H = def.height, D = def.hz * 2, T = 0.35;
+    const g = new THREE.Group();
+    const wallC = def.name === "tower" || def.name === "officetower2" ? 0x2b2f3a : 0x33363f;
+    const put = (w: number, h: number, d: number, lx: number, y: number, lz: number) => {
+      const m = this.box(w, h, d, wallC, 0.9);
+      m.position.set(lx, y, lz);
+      g.add(m);
+    };
+    put(W, H, T, 0, H / 2, -D / 2);          // back
+    put(T, H, D, -W / 2, H / 2, 0);          // left
+    put(T, H, D, W / 2, H / 2, 0);           // right
+    if (def.door) {
+      const { from, to } = def.door;
+      const segL = from + W / 2, segR = W / 2 - to;
+      put(segL, H, T, -W / 2 + segL / 2, H / 2, D / 2);
+      put(segR, H, T, W / 2 - segR / 2, H / 2, D / 2);
+      const lh = Math.max(0.4, H - 3.2);
+      put(to - from, lh, T, (from + to) / 2, 3.2 + lh / 2, D / 2); // lintel
+    } else {
+      put(W, H, T, 0, H / 2, D / 2);         // front (no door)
+    }
+    put(W + 0.6, 0.4, D + 0.6, 0, H + 0.2, 0); // roof
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(W - 0.6, D - 0.6),
+      new THREE.MeshStandardMaterial({ color: 0x232833, roughness: 0.9 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0.02;
+    g.add(floor);
+    this.disposables.push(floor.geometry, floor.material as THREE.Material);
+    // parody label sign above the door
+    const signTex = makeLabelTexture(def.label);
+    this.disposables.push(signTex);
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(Math.min(W * 0.72, 9), 1.25),
+      new THREE.MeshBasicMaterial({ map: signTex, transparent: true }),
+    );
+    sign.position.set(0, Math.min(H - 1.1, 5.2), D / 2 + 0.25);
+    g.add(sign);
+    // emissive window bands on tall buildings (keeps the old tower look)
+    if (H > 10) {
+      const winM = this.emissive(0xffb35c, 1.5);
+      const wg = new THREE.PlaneGeometry(1.1, 1.4);
+      this.disposables.push(wg);
+      const cols = Math.floor(W / 2.2), rows = Math.floor((H - 4) / 2.6);
+      for (let cxi = 0; cxi < cols; cxi++) {
+        for (let ryi = 0; ryi < rows; ryi++) {
+          if ((cxi * 7 + ryi * 3 + (def.x > 0 ? 1 : 0)) % 4 === 0) continue; // some dark windows
+          const wmesh = new THREE.Mesh(wg, winM);
+          wmesh.name = "windows";
+          wmesh.position.set(-W / 2 + 1.2 + cxi * 2.2, 5 + ryi * 2.6, D / 2 + 0.06);
+          g.add(wmesh);
+        }
       }
     }
+    g.position.set(def.x, 0, def.z);
+    g.rotation.y = def.rotY;
+    this.scene.add(g);
   }
 
   // (replaced by addBuildingColliders/addInteriorColliders above)
@@ -1100,8 +1170,8 @@ export class CityWorld {
     this.pPos.x += this.pVel.x * dt;
     this.pPos.z += this.pVel.z * dt;
     this.pPos.y = ny;
-    this.pPos.x = Math.max(-34, Math.min(34, this.pPos.x));
-    this.pPos.z = Math.max(-34, Math.min(34, this.pPos.z));
+    this.pPos.x = Math.max(-66, Math.min(66, this.pPos.x));
+    this.pPos.z = Math.max(-66, Math.min(66, this.pPos.z));
     resolveCircleColliders(this.pPos, 0.55, this.colliders);
 
     // CITY points: +1 per 10m traveled
@@ -1132,7 +1202,9 @@ export class CityWorld {
       this.poiToast = `+5 CITY — ${inside}`;
       this.poiToastUntil = this.time + 2.5;
       // door chime on entering walkable shops
-      if (inside === "OrbitX Shop" || inside === "Ramen House" || inside === "Neon Arcade" || inside === "Corner Deli") {
+      if (inside === "OrbitX Shop" || inside === "Ramen House" || inside === "Neon Arcade" || inside === "Corner Deli" ||
+        inside === "McOrbit's" || inside === "Burger Khan" || inside === "Wenda's" ||
+        inside === "Pizza Orbit" || inside === "Moonbux" || inside === "WallOrbit") {
         this.audio?.chime();
       }
     } else if (!inside) {
@@ -1388,8 +1460,8 @@ export class CityWorld {
       arr[i + 1] += this.dustVel[i + 1] * dt;
       arr[i + 2] += this.dustVel[i + 2] * dt;
       if (arr[i + 1] < 0.2) arr[i + 1] = 10;
-      if (arr[i] > 36) arr[i] = -36; else if (arr[i] < -36) arr[i] = 36;
-      if (arr[i + 2] > 36) arr[i + 2] = -36; else if (arr[i + 2] < -36) arr[i + 2] = 36;
+      if (arr[i] > 68) arr[i] = -68; else if (arr[i] < -68) arr[i] = 68;
+      if (arr[i + 2] > 68) arr[i + 2] = -68; else if (arr[i + 2] < -68) arr[i + 2] = 68;
     }
     p.needsUpdate = true;
   }
@@ -1433,12 +1505,14 @@ export class CityWorld {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     const S = c.width;
-    const k = S / 76; // world ±34 → pad
+    const k = S / 144; // world ±66 + pad
     const px = (x: number) => S / 2 + x * k;
     const py = (z: number) => S / 2 + z * k;
     ctx.fillStyle = "rgba(5,8,14,0.92)";
     ctx.fillRect(0, 0, S, S);
-    // street block
+    // street blocks: downtown district ring, then the core block on top
+    ctx.fillStyle = "#1b1f27";
+    ctx.fillRect(px(-70), py(-70), 140 * k, 140 * k);
     ctx.fillStyle = "#232833";
     ctx.fillRect(px(-35), py(-35), 70 * k, 70 * k);
     // buildings (from the data-driven defs)
@@ -1486,6 +1560,7 @@ export class CityWorld {
     cancelAnimationFrame(this.raf);
     this.weather.dispose();
     this.traffic.dispose();
+    disposeFurnishFx();
     window.removeEventListener("resize", this.resize);
     this.rig.dispose();
     this.glbRoots.forEach((r) => r.parent?.remove(r));
