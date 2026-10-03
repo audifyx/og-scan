@@ -231,6 +231,9 @@ export class CityWorld {
   private glowTrailUntil = 0;
   private trail: { sp: THREE.Sprite; life: number }[] = [];
   private trailT = 0;
+  // ambient audio state
+  private rainOn = false;
+  private stepAccum = 0;
   private streakMats: THREE.MeshBasicMaterial[] = [];
 
   // dust
@@ -1099,6 +1102,10 @@ export class CityWorld {
       this.cityPoints = addCityPoints(5);
       this.poiToast = `+5 CITY — ${inside}`;
       this.poiToastUntil = this.time + 2.5;
+      // door chime on entering walkable shops
+      if (inside === "OrbitX Shop" || inside === "Ramen House" || inside === "Neon Arcade" || inside === "Corner Deli") {
+        this.audio?.chime();
+      }
     } else if (!inside) {
       this.insidePoi = null;
     }
@@ -1120,6 +1127,22 @@ export class CityWorld {
     for (const m of this.streakMats) m.opacity = streakOp;
     (this.scene.fog as THREE.FogExp2).density = this.weather.fogDensity;
     this.traffic.update(dt, this.pPos, this.audio);
+    // ambient rain bed follows the weather
+    const rg = this.weather.rainGain;
+    if (rg > 0.02) {
+      if (!this.rainOn) { this.audio?.rainStart(); this.rainOn = true; }
+      this.audio?.rainLevel(rg);
+    } else if (this.rainOn) {
+      this.audio?.rainStop();
+      this.rainOn = false;
+    }
+    // footsteps on stride
+    this.stepAccum += Math.hypot(this.pPos.x - prevX, this.pPos.z - prevZ);
+    const stride = sprint ? 2.9 : 2.1;
+    if (this.stepAccum >= stride && this.onGround && moving) {
+      this.stepAccum = 0;
+      this.audio?.footstep(sprint);
+    }
     this.updateScan(dt);
     this.updateNpcs(dt);
     // POI labels fade in while the scan pulse is live
