@@ -27,7 +27,7 @@ function useMenuApps(): PlatformApp[] {
 // App wheel shows on every route — no hide lists.
 
 const POS_KEY = "orbitx.platformFab.pos.v2";
-const FAB_SIZE = 52;
+const FAB_SIZE = 58;
 
 type Pos = { x: number; y: number };
 
