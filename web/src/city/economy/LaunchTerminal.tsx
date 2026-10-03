@@ -14,6 +14,7 @@ import type { VersionedTransaction } from "@solana/web3.js";
 import { useConnection, useWallet } from "@/wallets/hub";
 import { launchPumpCoin } from "@/lib/orbitx/pumpLaunch";
 import ReceiptModal from "./ReceiptModal";
+import "./economy.css";
 
 function fileToBase64(file: File): Promise<{ base64: string; mime: string }> {
   return new Promise((resolve, reject) => {
