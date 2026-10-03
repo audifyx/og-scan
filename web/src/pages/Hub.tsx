@@ -204,7 +204,7 @@ export default function Hub() {
       base.push({
         key: "__admin",
         name: "Admin",
-        caption: "All admin routes",
+        caption: "Admin dashboard",
         href: "/ox-desk-m4k9q",
         tone: "#60A5FA",
         iconBg: "linear-gradient(135deg, #60A5FA, #1D4ED8)",
@@ -460,7 +460,7 @@ export default function Hub() {
                 return;
               }
               if (app.key === "__admin") {
-                push({ id: "section", sectionId: "admin" });
+                window.location.assign("/ox-desk-m4k9q");
                 return;
               }
               push({ id: "app", appKey: app.key });
