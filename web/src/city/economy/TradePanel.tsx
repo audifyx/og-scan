@@ -19,6 +19,7 @@ import {
   type JupTokenMeta,
 } from "./jupiterSwap";
 import ReceiptModal from "./ReceiptModal";
+import "./economy.css";
 
 function TokenPicker({
   label,
