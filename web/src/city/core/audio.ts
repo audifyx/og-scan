@@ -113,6 +113,41 @@ export class GameAudio {
   }
 
   click() { this.blip(660, 0.06, "square", 0.04); }
+
+  /** Lightning thunder: filtered noise crack + sub-bass rumble tail. */
+  thunder() {
+    const c = this.ac();
+    const dest = this.out();
+    if (!c || !dest) return;
+    try {
+      const t0 = c.currentTime + 0.05;
+      const dur = 2.0;
+      const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.4);
+      }
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const lp = c.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 380;
+      const g = c.createGain();
+      g.gain.value = 0.55;
+      src.connect(lp).connect(g).connect(dest);
+      src.start(t0);
+      const o = c.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(52, t0);
+      o.frequency.exponentialRampToValueAtTime(26, t0 + dur);
+      const og = c.createGain();
+      og.gain.setValueAtTime(0.24, t0);
+      og.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(og).connect(dest);
+      o.start(t0);
+      o.stop(t0 + dur + 0.1);
+    } catch { /* decorative */ }
+  }
   door() { this.blip(160, 0.14, "triangle", 0.14, 80); this.blip(320, 0.08, "sine", 0.06); }
   horn() { this.blip(370, 0.35, "sawtooth", 0.07); this.blip(466, 0.35, "sawtooth", 0.05); }
   crash() { this.blip(120, 0.25, "sawtooth", 0.12, 50); }
