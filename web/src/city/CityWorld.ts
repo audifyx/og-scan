@@ -4,7 +4,7 @@ import { buildRig, type CityRig } from "./CityRig";
 import { CityWeather, type WeatherMode } from "./CityWeather";
 import { CityTraffic } from "./CityTraffic";
 import { NpcSystem } from "./npcs/NpcAI";
-import { getStyle, getCityPoints, addCityPoints } from "./cityState";
+import { getStyle, setStyle, getCityPoints, addCityPoints, type StyleId } from "./cityState";
 import { resolveCircleColliders } from "./core/Vehicle";
 import type { InputState } from "./core/input";
 import type { GameAudio } from "./core/audio";
@@ -401,6 +401,18 @@ export class CityWorld {
 
   /** Velocity impulse (HOOK dash). */
   addPlayerVelocity(v: THREE.Vector3): void { this.pVel.add(v); }
+
+  /** Swap the player rig in place (FIT dock). Keeps position and heading. */
+  applyStyle(style: StyleId): void {
+    setStyle(style);
+    const next = buildRig(style);
+    next.group.position.copy(this.pPos);
+    next.group.rotation.y = this.pHeading;
+    this.scene.add(next.group);
+    this.scene.remove(this.rig.group);
+    this.rig.dispose();
+    this.rig = next;
+  }
 
   teleport(x: number, z: number, heading?: number): void {
     this.pPos.set(x, 0, z);

@@ -7,7 +7,8 @@
  * the boards call for it.
  */
 import { useState } from "react";
-import { ArrowDownUp, Building2, Flame, Gamepad2, Rocket } from "lucide-react";
+import { ArrowDownUp, Building2, Flame, Gamepad2, Rocket, Shirt } from "lucide-react";
+import { getStyle, STYLES, setStyle, type StyleId } from "../cityState";
 import CityShop from "./CityShop";
 import TradePanel from "./TradePanel";
 import LaunchTerminal from "./LaunchTerminal";
@@ -15,7 +16,7 @@ import ArcadeGame from "./ArcadeGame";
 import { PropertyPanel } from "../realestate/PropertyPanel";
 import "./economy.css";
 
-type Panel = "shop" | "trade" | "launch" | "arcade" | "estate" | null;
+type Panel = "shop" | "trade" | "launch" | "arcade" | "estate" | "fit" | null;
 
 export default function EconomyDock() {
   const [panel, setPanel] = useState<Panel>(null);
@@ -38,6 +39,9 @@ export default function EconomyDock() {
         <button className="oxe-btn" onClick={() => setPanel("estate")} aria-label="Open real estate">
           <Building2 className="oxe-ic-sm" /> ESTATE
         </button>
+        <button className="oxe-btn" onClick={() => setPanel("fit")} aria-label="Change trader style">
+          <Shirt className="oxe-ic-sm" /> FIT
+        </button>
       </div>
       {panel === "shop" && <CityShop onClose={() => setPanel(null)} />}
       {panel === "trade" && <TradePanel onClose={() => setPanel(null)} />}
@@ -59,6 +63,38 @@ export default function EconomyDock() {
               </button>
             </div>
             <PropertyPanel />
+          </div>
+        </div>
+      )}
+
+      {panel === "fit" && (
+        <div className="oxe-overlay" data-hud onClick={() => setPanel(null)}>
+          <div className="oxe-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="oxe-sheet-head">
+              <div className="oxe-sheet-title">
+                <Shirt className="oxe-ic" />
+                <div>
+                  <div className="oxe-t1">TRADER FIT</div>
+                  <div className="oxe-t2">Swap style without leaving the block</div>
+                </div>
+              </div>
+              <button className="oxe-x" onClick={() => setPanel(null)} aria-label="Close fit">✕</button>
+            </div>
+            <div className="oxe-fit-grid">
+              {STYLES.map((s) => (
+                <button
+                  key={s.id}
+                  className={`oxe-btn${getStyle() === s.id ? " oxe-btn-primary" : ""}`}
+                  onClick={() => {
+                    setStyle(s.id);
+                    window.dispatchEvent(new CustomEvent("oxc-style", { detail: s.id satisfies StyleId }));
+                    setPanel(null);
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

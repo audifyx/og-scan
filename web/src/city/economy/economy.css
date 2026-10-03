@@ -278,3 +278,5 @@
   max-width: 180px; padding: 0 4px;
 }
 .oxe-ic-xs { width: 12px; height: 12px; opacity: 0.7; }
+
+.oxe-fit-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 12px; }

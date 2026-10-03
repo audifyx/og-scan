@@ -1,6 +1,16 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { spendCityPoints } from "../cityState";
+import { buildRig } from "../CityRig";
+import type { StyleId } from "../cityState";
+
+const WORKER_STYLE: Record<string, StyleId> = {
+  shop: "degen",
+  ramen: "fox",
+  arcade: "bomber",
+  deli: "suit",
+};
+
 
 /**
  * OrbitX City — NPC AI (cops, civilians, store workers).
@@ -367,9 +377,14 @@ export class NpcSystem {
     void (async () => {
       const glb = await loadNpcGlb("worker");
       for (const s of spots) {
+        const style = WORKER_STYLE[storeKey] ?? "degen";
         const fig: Figure = glb
           ? { group: glb.clone(), armR: null, disposables: [] }
-          : makeFigure(0xd8b93a, 0xc9a684, { vest: true });
+          : (() => {
+              const rig = buildRig(style);
+              rig.group.scale.setScalar(0.96);
+              return { group: rig.group, armR: null, disposables: [{ dispose: () => rig.dispose() }] };
+            })();
         fig.group.position.set(s.x, 0, s.z);
         fig.group.rotation.y = s.rotY ?? 0;
         this.scene.add(fig.group);

@@ -15,6 +15,7 @@ import CityShop from "./economy/CityShop";
 import { isStoreKey } from "./economy/StoreMenu";
 import type { NpcSystem } from "./npcs/NpcAI";
 import type { GtaApi } from "./core/useGtaGame";
+import type { StyleId } from "./cityState";
 
 /**
  * City HUD (boards 2/3/4): top ticker chips, minimap + SCAN + HOOK (left),
@@ -355,6 +356,17 @@ export function CityHud({ api }: { api: GtaApi }) {
     }, 250);
     return () => window.clearInterval(id);
   }, [api]);
+
+  useEffect(() => {
+    const onStyle = (e: Event) => {
+      const id = (e as CustomEvent<StyleId>).detail;
+      const w = api.getWorld() as unknown as { applyStyle?: (s: StyleId) => void } | null;
+      w?.applyStyle?.(id);
+    };
+    window.addEventListener("oxc-style", onStyle);
+    return () => window.removeEventListener("oxc-style", onStyle);
+  }, [api]);
+
   const ppsTimer = useRef<number | null>(null);
   const ppsLong = useRef(false);
 
