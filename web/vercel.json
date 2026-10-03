@@ -4,6 +4,16 @@
   "ignoreCommand": "bash ../scripts/vercel-only-rork.sh",
   "redirects": [
     {
+      "source": "/orbitxlaunch",
+      "destination": "https://orbitxtrade.world",
+      "permanent": true
+    },
+    {
+      "source": "/orbitxlaunch/:path*",
+      "destination": "https://orbitxtrade.world/:path*",
+      "permanent": true
+    },
+    {
       "source": "/(.*)",
       "has": [
         {
