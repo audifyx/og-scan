@@ -10,8 +10,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Activity,
   BarChart3,
+  Bell,
+  BellRing,
+  Building2,
   ChevronLeft,
   ChevronRight,
+  Coins,
   FileText,
   Flame,
   Gamepad2,
@@ -19,10 +23,13 @@ import {
   Headphones,
   Headset,
   HeartPulse,
+  Image,
   KeyRound,
   LayoutDashboard,
+  LineChart,
   Link2,
   Megaphone,
+  MessageSquare,
   Mic,
   MoreHorizontal,
   PanelTop,
@@ -34,12 +41,21 @@ import {
   UserCheck,
   Users,
   Wallet,
+  Wrench,
   X,
 } from "lucide-react";
 import type { AdminSection } from "./types";
 import { DESK_MOBILE_TABS, DESK_NAV } from "./deskNav";
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
+  Bell,
+  BellRing,
+  Building2,
+  Coins,
+  Image,
+  LineChart,
+  MessageSquare,
+  Wrench,
   Activity,
   BarChart3,
   FileText,
