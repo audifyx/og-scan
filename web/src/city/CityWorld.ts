@@ -238,6 +238,10 @@ export class CityWorld {
   private trailT = 0;
   // landing dust puffs
   private puffs: { sp: THREE.Sprite; vel: THREE.Vector3; life: number }[] = [];
+  // quest tracking
+  private sessionDist = 0;
+  private scannedPois = new Set<string>();
+  private visitedPois = new Set<string>();
   // ambient audio state
   private rainOn = false;
   private stepAccum = 0;
@@ -410,7 +414,16 @@ export class CityWorld {
     this.scanRing = ring;
     this.scanT = 0;
     this.disposables.push(g, m);
+    // quest: POIs revealed by this scan
+    for (const p of POIS) {
+      if (Math.hypot(p.x - this.pPos.x, p.z - this.pPos.z) < 25) this.scannedPois.add(p.label);
+    }
   }
+
+  /** Quest stats (polled by the HUD quest chip). */
+  getSessionDistance(): number { return this.sessionDist; }
+  getScannedPois(): string[] { return [...this.scannedPois]; }
+  getVisitedPois(): string[] { return [...this.visitedPois]; }
 
   // ── block construction ──────────────────────────────────────
 
@@ -1089,7 +1102,9 @@ export class CityWorld {
     resolveCircleColliders(this.pPos, 0.55, this.colliders);
 
     // CITY points: +1 per 10m traveled
-    this.distAccum += Math.hypot(this.pPos.x - prevX, this.pPos.z - prevZ);
+    const stepD = Math.hypot(this.pPos.x - prevX, this.pPos.z - prevZ);
+    this.distAccum += stepD;
+    this.sessionDist += stepD;
     if (this.distAccum >= 10) {
       const n = Math.floor(this.distAccum / 10);
       this.distAccum -= n * 10;
@@ -1109,6 +1124,7 @@ export class CityWorld {
     }
     if (inside && inside !== this.insidePoi) {
       this.insidePoi = inside;
+      this.visitedPois.add(inside);
       this.cityPoints = addCityPoints(5);
       this.poiToast = `+5 CITY — ${inside}`;
       this.poiToastUntil = this.time + 2.5;
