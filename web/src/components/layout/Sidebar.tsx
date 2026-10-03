@@ -1,10 +1,11 @@
 import {
-  Coins, Compass, Hash, LogOut, Mail, Pencil,
+  Coins, Compass, FlaskConical, Hash, LogOut, Mail, Pencil,
   Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home, FileText, Bell, Trophy, Radar, LineChart, Sparkles, Gamepad2} from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useStealthAdmin } from "@/hooks/useStealthAdmin";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -76,6 +77,7 @@ const SectionLabel = ({ label }: { label: string }) => (
 export const Sidebar = () => {
   const { user, profile, signOut } = useAuth();
   const { isAdmin } = useAdmin();
+  const { stealthAdminVisible } = useStealthAdmin();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -166,6 +168,12 @@ export const Sidebar = () => {
                   item={{ to: "/ox-desk-m4k9q", icon: Shield, label: "Owner desk", eyebrow: "Private ops" }}
                   onClick={closeMobile}
                 />
+                {stealthAdminVisible && (
+                  <NavRow
+                    item={{ to: "/coming-soon", icon: FlaskConical, label: "Coming Soon", eyebrow: "Shelved routes" }}
+                    onClick={closeMobile}
+                  />
+                )}
               </div>
             </div>
           )}
