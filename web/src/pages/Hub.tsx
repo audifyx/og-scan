@@ -173,7 +173,9 @@ export default function Hub() {
   const [orbitxPrice, setOrbitxPrice] = useState<number | null>(null);
   const [orbitxChange, setOrbitxChange] = useState<number | null>(null);
   const [caCopied, setCaCopied] = useState(false);
-  const [trending, setTrending] = useState<{ mint: string; symbol: string; priceUsd: number | null; change24h: number | null }[]>([]);
+  const [trending, setTrending] = useState<
+    { mint: string; symbol: string; name: string; image?: string; price: number; mcap: number; change24h: number }[]
+  >([]);
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
   const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
   const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
@@ -319,11 +321,26 @@ export default function Hub() {
 
   useEffect(() => {
     let on = true;
+    const mapRow = (row: any) => {
+      const mint = String(row?.mint || "").trim();
+      if (!mint) return null;
+      return {
+        mint,
+        symbol: row.symbol || "???",
+        name: row.name || row.symbol || "",
+        image: row.icon || row.image_url || undefined,
+        price: Number(row.priceUsd ?? row.price_usd) || 0,
+        mcap: Number(row.mcap ?? row.fdv ?? row.market_cap) || 0,
+        change24h: Number(row.change24h ?? row.change1h ?? row.change5m) || 0,
+      };
+    };
+    // Same feed as the DEX app home (TradeHome default tab)
     const fetchTrending = () =>
-      fetch("/api/ogdex/screener?type=trending&interval=24h&limit=6")
+      fetch("/api/ogdex/screener?type=trending&interval=1h&limit=30&chain=solana")
         .then((r) => r.json())
         .then((d) => {
-          if (on && d?.rows) setTrending(d.rows.filter((x: { symbol?: string }) => x.symbol).slice(0, 5));
+          if (on && Array.isArray(d?.rows))
+            setTrending(d.rows.map(mapRow).filter(Boolean).slice(0, 15));
         })
         .catch(() => {});
     const fetchPosts = () =>
@@ -515,7 +532,7 @@ export default function Hub() {
       <h1 className="ios-large">Pulse</h1>
       {!!trending.length && (
         <>
-          <div className="ios-group__head">Trending</div>
+          <div className="ios-group__head">Trending · live from DEX</div>
           <div className="ios-group">
             {trending.map((t) => (
               <button
@@ -524,13 +541,26 @@ export default function Hub() {
                 className="ios-cell ios-cell--bare"
                 onClick={() => window.location.assign(`/ORBITX_DEX?mint=${encodeURIComponent(t.mint)}`)}
               >
+                {t.image ? (
+                  <img
+                    src={t.image}
+                    alt={t.symbol}
+                    className="ios-coin"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <span className="ios-coin ios-coin--fallback">{t.symbol.slice(0, 1)}</span>
+                )}
                 <span className="ios-cell__meta">
                   <span className="ios-cell__title">${t.symbol}</span>
-                  <span className="ios-cell__sub">24h</span>
+                  <span className="ios-cell__sub">
+                    {t.price > 0 ? `$${t.price < 0.01 ? t.price.toFixed(6) : t.price.toFixed(4)}` : "—"}
+                    {t.mcap > 0 ? ` · ${(t.mcap / 1e6).toFixed(1)}M mcap` : ""}
+                  </span>
                 </span>
                 <span className="ios-cell__value" style={{ color: changeColor(t.change24h) }}>
-                  {(t.change24h ?? 0) >= 0 ? "+" : ""}
-                  {(t.change24h ?? 0).toFixed(1)}%
+                  {t.change24h >= 0 ? "+" : ""}
+                  {t.change24h.toFixed(1)}%
                 </span>
                 <IosChevron />
               </button>
