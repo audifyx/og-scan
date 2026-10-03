@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { buildRig, type CityRig } from "./CityRig";
 import { CityWeather, type WeatherMode } from "./CityWeather";
+import { CityTraffic } from "./CityTraffic";
 import { getStyle, getCityPoints, addCityPoints } from "./cityState";
 import { resolveCircleColliders } from "./core/Vehicle";
 import type { InputState } from "./core/input";
@@ -223,6 +224,7 @@ export class CityWorld {
 
   // weather
   private weather!: CityWeather;
+  private traffic!: CityTraffic;
   private streakMats: THREE.MeshBasicMaterial[] = [];
 
   // dust
@@ -279,6 +281,7 @@ export class CityWorld {
 
     // dynamic weather (default: light drizzle for mood)
     this.weather = new CityWeather(this.scene, () => { this.audio?.thunder(); });
+    this.traffic = new CityTraffic(this.scene);
 
     // ── player rig (selected trader style; degen default) ──
     this.rig = buildRig(getStyle());
@@ -1108,6 +1111,7 @@ export class CityWorld {
     const streakOp = 0.14 + this.weather.wetness * 0.38;
     for (const m of this.streakMats) m.opacity = streakOp;
     (this.scene.fog as THREE.FogExp2).density = this.weather.fogDensity;
+    this.traffic.update(dt, this.pPos, this.audio);
     this.updateScan(dt);
     this.updateNpcs(dt);
     // POI labels fade in while the scan pulse is live
@@ -1284,6 +1288,7 @@ export class CityWorld {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.weather.dispose();
+    this.traffic.dispose();
     window.removeEventListener("resize", this.resize);
     this.rig.dispose();
     this.glbRoots.forEach((r) => r.parent?.remove(r));
