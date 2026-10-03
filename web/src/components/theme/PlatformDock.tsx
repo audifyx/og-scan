@@ -24,38 +24,7 @@ function useMenuApps(): PlatformApp[] {
 }
 
 /* Hide on marketing / auth / embeds — show FAB everywhere else in the app. */
-const HIDE_ON_EXACT = new Set([
-  "/",
-  "/splash",
-  "/beta",
-  "/waitlist",
-  "/auth",
-  "/auth/email",
-  "/setup",
-  "/terms",
-  "/privacy",
-  "/vamp",
-  "/whitepaper",
-  "/roadmap",
-  "/AI",
-  "/ai",
-  "/cc-callback",
-  "/x-callback",
-]);
-const HIDE_ON_PREFIX = [
-  "/auth/",
-  "/embed",
-  "/r/",
-  "/share/",
-  "/supercomputer/sign",
-  "/supercomputer/link-auth",
-  "/supercomputer/x-link-auth",
-  "/supercomputer/x-mcp-auth",
-  "/education",
-  "/orbitxagents",
-  "/Orbitxagents",
-  "/life",
-];
+// App wheel shows on every route — no hide lists.
 
 const POS_KEY = "orbitx.platformFab.pos.v2";
 const FAB_SIZE = 52;
@@ -93,10 +62,7 @@ function clampPos(p: Pos): Pos {
   };
 }
 
-function visibleOn(pathname: string) {
-  const p = pathname || "/";
-  if (HIDE_ON_EXACT.has(p)) return false;
-  if (HIDE_ON_PREFIX.some((pre) => p === pre || p.startsWith(pre))) return false;
+function visibleOn(_pathname: string) {
   return true;
 }
 
@@ -248,7 +214,7 @@ export function PlatformDock() {
         >
           <div className="ox-platform-fab__panel-title">OrbitX</div>
           <PlatformLinkItems pathname={pathname} onNavigate={() => setOpen(false)} />
-          <p className="ox-platform-fab__hint">Shop · City · OS · Play · Intel · Trade</p>
+          <p className="ox-platform-fab__hint">Shop · City · Trade · Social</p>
         </nav>
       )}
 
