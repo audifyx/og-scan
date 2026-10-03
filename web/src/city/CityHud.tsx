@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Zap, ArrowUp, Crosshair, Wallet } from "lucide-react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useCityWallet } from "./economy/useCityWallet";
 import { setTouchMove } from "./core/input";
 import type { GtaApi } from "./core/useGtaGame";
 
@@ -18,8 +18,9 @@ function fmtP(p: number): string {
   return p.toPrecision(4);
 }
 
-function shortAddr(a: string): string {
-  return a.length > 9 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a;
+function fmtBal(v: number | null): string {
+  if (v == null) return "—";
+  return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
 /** Animated count-up toward the live CITY points total. */
@@ -60,8 +61,7 @@ function useClock(): string {
 function Ticker({ api }: { api: GtaApi }) {
   const clock = useClock();
   const points = useCityPoints(api);
-  const { publicKey } = useWallet();
-  const addr = publicKey?.toBase58();
+  const wallet = useCityWallet();
   const orx = api.quotes["ORBITX"];
   const sol = api.quotes["SOL"];
 
@@ -97,13 +97,18 @@ function Ticker({ api }: { api: GtaApi }) {
           {pct(sol)}
         </span>
       </div>
-      <div className="oxc-chip wallet">
+      <button
+        type="button"
+        className="oxc-chip wallet"
+        title={wallet.address ?? "Connect wallet"}
+        onClick={() => { if (!wallet.connected && !wallet.connecting) wallet.connect(); }}
+      >
         <Wallet size={15} className="cyan-ico" />
         <span className="oxc-chip-body">
-          <small>{addr ? shortAddr(addr) : "—"}</small>
-          <b className="dim">—</b>
+          <small>{wallet.short ?? (wallet.connecting ? "…" : "Connect")}</small>
+          <b className="dim">{wallet.connected ? `${fmtBal(wallet.orbitx)} ORBITX` : "—"}</b>
         </span>
-      </div>
+      </button>
       <div className="oxc-chip clock">
         <span className="oxc-clock-ico" aria-hidden>◷</span>
         <b>{clock}</b>
