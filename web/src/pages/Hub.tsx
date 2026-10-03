@@ -183,7 +183,6 @@ export default function Hub() {
   const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
   const { openTheme, themeOpen, closeTheme } = useOrbitAtmosphere();
 
-  const showAdminApps = Boolean(isAdmin);
   const showOwnerSurfaces = Boolean(isOwnerIdentity);
   const catalogApps = useMemo(() => visiblePlatformApps(showOwnerSurfaces), [showOwnerSurfaces]);
   const homeGridKeys = useMemo(() => visibleHomeGridKeys(showOwnerSurfaces), [showOwnerSurfaces]);
