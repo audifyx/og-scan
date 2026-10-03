@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLivePrices } from "@/hooks/useLivePrices";
-import { GTAWorld, type HudState, type Quote } from "./World";
+import { CityWorld as GTAWorld, type CityHudState as HudState, type Quote } from "../CityWorld";
 import { createInput, KeyboardInput, OrbitDrag, setTouchSprint, type InputState } from "./input";
 import { GameAudio } from "./audio";
 
@@ -15,7 +15,7 @@ const MARKET_SYMBOLS = ["SOL", "ORBITX", "BONK", "JUP", "WIF"];
 
 const SETTINGS_KEY = "orbitxcity.gta.settings.v1";
 
-export type GtaPhase = "title" | "howto" | "playing";
+export type GtaPhase = "title" | "select" | "howto" | "playing";
 
 interface Settings { sound: boolean; quality: "high" | "low" }
 

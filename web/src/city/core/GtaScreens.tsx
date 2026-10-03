@@ -78,7 +78,7 @@ export function GtaTitleScreen({ api }: { api: GtaApi }) {
           <b> live token prices</b> light up the billboards.
         </p>
         <div className="ocg-menu-actions">
-          <button className="ocg-btn primary big" onClick={api.start}>
+          <button className="ocg-btn primary big" onClick={() => api.setPhase("select")}>
             <Play size={16} /> Enter the city
           </button>
           <button className="ocg-btn" onClick={() => api.setPhase("howto")}>How to play</button>
@@ -151,7 +151,7 @@ export function GtaHowToScreen({ api }: { api: GtaApi }) {
             </>
           ) : (
             <>
-              <button className="ocg-btn primary" onClick={api.start}><Play size={14} /> Enter the city</button>
+              <button className="ocg-btn primary" onClick={() => api.setPhase("select")}><Play size={14} /> Enter the city</button>
               <button className="ocg-btn" onClick={() => api.setPhase("title")}>Back</button>
             </>
           )}
