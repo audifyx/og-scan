@@ -664,3 +664,14 @@ a.ios-cell {
   .ios-group--apps .ios-chev { display: none; }
   .ios-group--apps .ios-cell__title { font-size: 13px; }
 }
+
+/* ---------- Pulse feed coin avatars (2026-10-03) ---------- */
+.ios-coin {
+  width: 36px; height: 36px; border-radius: 50%; flex: none; object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+.ios-coin--fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04));
+}
