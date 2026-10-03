@@ -1,4 +1,7 @@
-import { Play, Pause, Home, Car, PersonStanding, Moon, Sun, Keyboard, Star } from "lucide-react";
+import { useState } from "react";
+import { Play, Pause, Home, Car, PersonStanding, Moon, Sun, Keyboard, Star, CloudRain } from "lucide-react";
+import type { WeatherMode } from "../CityWeather";
+import { WEATHER_MODES } from "../CityWeather";
 import type { GtaApi } from "./useGtaGame";
 
 /**
@@ -161,6 +164,28 @@ export function GtaHowToScreen({ api }: { api: GtaApi }) {
   );
 }
 
+function WeatherToggle({ api }: { api: GtaApi }) {
+  const [mode, setMode] = useState<WeatherMode>(() => api.getWorld()?.getWeather() ?? "drizzle");
+  const pick = (m: WeatherMode) => {
+    setMode(m);
+    api.getWorld()?.setWeather(m);
+  };
+  return (
+    <div className="ocg-weather-btns">
+      {WEATHER_MODES.map((m) => (
+        <button
+          key={m}
+          type="button"
+          className={`ocg-btn small${mode === m ? " primary" : ""}`}
+          onClick={() => pick(m)}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function GtaPauseOverlay({ api }: { api: GtaApi }) {
   if (!api.paused || api.phase !== "playing") return null;
   return (
@@ -168,6 +193,10 @@ export function GtaPauseOverlay({ api }: { api: GtaApi }) {
       <div className="ocg-modal ocg-pause-modal">
         <h2><Pause size={18} /> Paused</h2>
         <p className="ocg-hint">The city keeps breathing. Take your time.</p>
+        <div className="ocg-weather-row" data-hud>
+          <span><CloudRain size={13} /> Weather</span>
+          <WeatherToggle api={api} />
+        </div>
         <div className="ocg-modal-actions">
           <button className="ocg-btn primary" onClick={api.togglePause}><Play size={14} /> Resume</button>
           <button className="ocg-btn" onClick={() => api.setPhase("howto")}>How to play</button>
