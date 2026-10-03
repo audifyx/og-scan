@@ -7,6 +7,7 @@
  */
 import { Wallet } from "lucide-react";
 import { useCityWallet } from "./useCityWallet";
+import "./economy.css";
 
 function fmt(n: number | null, digits = 2): string {
   if (n === null || !Number.isFinite(n)) return "—";
