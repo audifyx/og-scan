@@ -81,6 +81,7 @@ export default async function handler(req, res) {
     const action = String(body.action || req.query?.action || "overview");
     const limit = Math.min(Math.max(Number(body.limit || req.query?.limit) || 50, 1), 200);
     const adminId = user?.id || null;
+    const email = user?.email || null;
 
     if (action === "overview") {
       const data = await buildOverview(sb);
