@@ -61,7 +61,8 @@ function useClock(): string {
 }
 
 function Ticker({ api }: { api: GtaApi }) {
-  const clock = useClock();
+  const realClock = useClock();
+  const clock = api.hud?.clock ?? realClock;
   const points = useCityPoints(api);
   const wallet = useCityWallet();
   const orx = api.quotes["ORBITX"];
