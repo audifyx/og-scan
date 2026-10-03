@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Zap, ArrowUp, Crosshair, Wallet } from "lucide-react";
 import { useCityWallet } from "./economy/useCityWallet";
@@ -288,7 +288,7 @@ export function CityHud({ api }: { api: GtaApi }) {
   const ppsTimer = useRef<number | null>(null);
   const ppsLong = useRef(false);
 
-  const ppsDown = (e: React.PointerEvent) => {
+  const ppsDown = (e: ReactPointerEvent) => {
     e.preventDefault();
     ppsLong.current = false;
     ppsTimer.current = window.setTimeout(() => {
@@ -296,7 +296,7 @@ export function CityHud({ api }: { api: GtaApi }) {
       setEmoteOpen(true);
     }, 550);
   };
-  const ppsUp = (e: React.PointerEvent) => {
+  const ppsUp = (e: ReactPointerEvent) => {
     e.preventDefault();
     if (ppsTimer.current) { clearTimeout(ppsTimer.current); ppsTimer.current = null; }
     if (!ppsLong.current) scan();
