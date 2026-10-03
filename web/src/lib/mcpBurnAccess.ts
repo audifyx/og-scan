@@ -87,7 +87,9 @@ export async function getMcpBurnAccess(wallet?: string | null): Promise<McpBurnA
   const r = await fetch(`${AGENT_API}/mcp-access${q}`, { headers });
   const data = await readJson(r);
   if (!r.ok) {
-    if (r.status === 401 && wallet) {
+    // 401 = not signed in / no access yet — not an error state. Show the
+    // locked card with a friendly message instead of the raw server body.
+    if (r.status === 401) {
       return {
         ok: true,
         active: false,
