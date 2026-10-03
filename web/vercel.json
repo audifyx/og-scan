@@ -26,6 +26,11 @@
       "permanent": true
     },
     {
+      "source": "/",
+      "destination": "/app",
+      "permanent": true
+    },
+    {
       "source": "/AI",
       "destination": "/ai",
       "permanent": false
@@ -290,10 +295,6 @@
     },
     {
       "source": "/life/(.*)",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/",
       "destination": "/app.html"
     },
     {
