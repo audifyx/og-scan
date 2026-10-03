@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { buildRig, type CityRig } from "./CityRig";
+import { CityWeather, type WeatherMode } from "./CityWeather";
 import { getStyle, getCityPoints, addCityPoints } from "./cityState";
 import { resolveCircleColliders } from "./core/Vehicle";
 import type { InputState } from "./core/input";
@@ -218,6 +219,11 @@ export class CityWorld {
   private signalMats: THREE.MeshStandardMaterial[] = [];
   private chartTex: THREE.Texture[] = [];
   private glowTex: THREE.Texture | null = null;
+  private audio: GameAudio | null = null;
+
+  // weather
+  private weather!: CityWeather;
+  private streakMats: THREE.MeshBasicMaterial[] = [];
 
   // dust
   private dust!: THREE.Points;
@@ -248,6 +254,7 @@ export class CityWorld {
   constructor(opts: CityWorldOpts) {
     this.input = opts.input;
     this.onHud = opts.onHud;
+    this.audio = opts.audio ?? null;
     this.minimap = opts.minimap;
     this.cityPoints = getCityPoints();
 
@@ -269,6 +276,9 @@ export class CityWorld {
 
     this.glowTex = makeGlowTexture();
     this.disposables.push(this.glowTex);
+
+    // dynamic weather (default: light drizzle for mood)
+    this.weather = new CityWeather(this.scene, () => { this.audio?.thunder(); });
 
     // ── player rig (selected trader style; degen default) ──
     this.rig = buildRig(getStyle());
@@ -329,6 +339,10 @@ export class CityWorld {
 
   /** No cars in the rebuild — E does nothing. */
   toggleEnterExit(): void { /* noop */ }
+
+  /** Weather control (pause menu). */
+  setWeather(mode: WeatherMode): void { this.weather.setMode(mode); }
+  getWeather(): WeatherMode { return this.weather.mode; }
 
   /** Velocity impulse (HOOK dash). */
   addPlayerVelocity(v: THREE.Vector3): void { this.pVel.add(v); }
@@ -425,6 +439,7 @@ export class CityWorld {
       map: this.glowTex, color, transparent: true, opacity: 0.28,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
+    this.streakMats.push(sm);
     const p = new THREE.Mesh(new THREE.PlaneGeometry(w, len), sm);
     p.rotation.x = -Math.PI / 2;
     p.position.set(x, 0.03, z + len * 0.25);
@@ -1088,6 +1103,11 @@ export class CityWorld {
 
     this.updateCamera(dt);
     this.updateAtmosphere(dt);
+    // weather: rain / splashes / fog / lightning; wetness ramps reflections
+    this.weather.update(dt, this.pPos, this.time);
+    const streakOp = 0.14 + this.weather.wetness * 0.38;
+    for (const m of this.streakMats) m.opacity = streakOp;
+    (this.scene.fog as THREE.FogExp2).density = this.weather.fogDensity;
     this.updateScan(dt);
     this.updateNpcs(dt);
     // POI labels fade in while the scan pulse is live
@@ -1263,6 +1283,7 @@ export class CityWorld {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.weather.dispose();
     window.removeEventListener("resize", this.resize);
     this.rig.dispose();
     this.glbRoots.forEach((r) => r.parent?.remove(r));
