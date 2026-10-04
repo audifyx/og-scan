@@ -132,18 +132,28 @@ export default function VoiceLobbyBrowser() {
     }
   };
 
+  // Join is effect-driven so it always uses the fresh roomName closure.
+  const [pendingJoin, setPendingJoin] = useState<LobbyEntry | null>(null);
+  useEffect(() => {
+    if (pendingJoin && !voice.connected && !voice.connecting) {
+      setPendingJoin(null);
+      voice.join();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJoin, voice.connected, voice.connecting]);
+
   const joinLobby = useCallback(
     async (lobby: LobbyEntry) => {
-      if (activeRoom?.id === lobby.id) return;
-      if (voice.connected) await voice.leave();
+      if (activeRoom?.id === lobby.id && (voice.connected || voice.connecting)) return;
+      if (voice.connected || voice.connecting) await voice.leave();
       setActiveRoom(lobby);
-      // join after state settles
-      setTimeout(() => voice.join(), 50);
+      setPendingJoin(lobby);
     },
     [activeRoom, voice]
   );
 
   const leaveLobby = useCallback(async () => {
+    setPendingJoin(null);
     await voice.leave();
     setActiveRoom(null);
   }, [voice]);
