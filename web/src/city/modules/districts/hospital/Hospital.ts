@@ -46,6 +46,23 @@ function box(w: number, h: number, d: number, color: number, x = 0, y = 0, z = 0
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
+function makeTextPlane(text: string, w: number, h: number, color: string, x: number, y: number, z: number) {
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0a0c10";
+  ctx.fillRect(0, 0, 1024, 128);
+  ctx.fillStyle = color;
+  ctx.font = "bold 72px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 512, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+  m.position.set(x, y, z);
+  return m;
+}
 
 /** Modern hospital block exterior. */
 export function buildHospitalExterior(): THREE.Group {
@@ -135,6 +152,64 @@ export function buildHospitalInterior(): HospitalInterior {
     const l = new THREE.PointLight(0xffffff, 500, 40);
     l.position.set(ix * 14, H - 1, iz * 10);
     g.add(l);
+  }
+
+  /* ------------------------- furnished interior ------------------------- */
+
+  // RECEPTION sign above the billing desk (desk + deskPosition unchanged)
+  const recSign = makeTextPlane("RECEPTION", 8, 1, "#ffffff", -12, 4.4, 13.2);
+  recSign.rotation.y = Math.PI;
+  g.add(recSign);
+
+  // EMERGENCY sign on the entrance wall
+  const erSign = makeTextPlane("EMERGENCY", 10, 1.25, "#ff4444", 8, 5.8, D / 2 - 0.15);
+  erSign.rotation.y = Math.PI;
+  g.add(erSign);
+
+  // waiting-room bench rows (connected seats — fewer meshes than chairs)
+  for (const rz of [7.5, 11]) {
+    g.add(box(13, 0.15, 1.2, 0x3d6b8a, 12, 0.75, rz));      // seat
+    g.add(box(13, 0.9, 0.15, 0x2f556e, 12, 1.2, rz + 0.62)); // backrest
+    for (const bx of [6.5, 12, 17.5]) g.add(box(0.5, 0.68, 1, 0x555555, bx, 0.34, rz));
+  }
+
+  // medical crosses on all four walls
+  const crossGrp = (x: number, y: number, z: number, ry = 0) => {
+    const grp = new THREE.Group();
+    const cm = mat(0xe02b2b, { emissive: 0xe02b2b, emissiveIntensity: 0.25 });
+    const a = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.8, 0.15), cm);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.4, 0.15), cm);
+    grp.add(a, b);
+    grp.position.set(x, y, z); grp.rotation.y = ry;
+    return grp;
+  };
+  g.add(crossGrp(-15, 5, -D / 2 + 0.15));
+  g.add(crossGrp(15, 5, -D / 2 + 0.15));
+  g.add(crossGrp(-W / 2 + 0.15, 5, 0, Math.PI / 2));
+  g.add(crossGrp(W / 2 - 0.15, 5, 0, -Math.PI / 2));
+
+  // pharmacy cabinet on the west wall with medicine bottles
+  g.add(box(1.4, 3.4, 4, 0xf5f8fa, -W / 2 + 1, 1.7, -2));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3),
+    new THREE.MeshStandardMaterial({ color: 0xbfd9e8, transparent: true, opacity: 0.4 }));
+  glass.position.set(-W / 2 + 1.75, 1.7, -2); glass.rotation.y = Math.PI / 2;
+  g.add(glass);
+  const medColors = [0xd45a5a, 0x5a8ad4, 0x5ad47a];
+  for (let s = 0; s < 2; s++) for (let i = 0; i < 6; i++)
+    g.add(box(0.3, 0.5, 0.3, medColors[(i + s) % 3], -W / 2 + 1.5, 1.1 + s * 0.9, -3.5 + i * 0.6));
+
+  // floor directory stand near the entrance
+  g.add(box(0.15, 2.6, 0.15, 0x777777, -4, 1.3, 15.5));
+  const dir = makeTextPlane("HOSPITAL DIRECTORY", 7, 0.9, "#ffffff", -4, 3, 15.5);
+  dir.rotation.y = Math.PI;
+  g.add(dir);
+
+  // ceiling light panels (emissive quads at each PointLight)
+  for (let ix = -1; ix <= 1; ix++) for (let iz = -1; iz <= 1; iz++) {
+    const panel = box(6, 0.12, 3, 0xf8fcff, ix * 14, H - 0.08, iz * 10);
+    const pm = panel.material as THREE.MeshStandardMaterial;
+    pm.emissive = new THREE.Color(0xffffff); pm.emissiveIntensity = 0.55;
+    g.add(panel);
   }
 
   return {
