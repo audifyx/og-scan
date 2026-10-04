@@ -1,34 +1,29 @@
 /**
  * OrbitX City — Real Estate: on-chain property registry + buy/sell engine.
  *
- * Flow:
+ * Flow (desk wallet, backend-signed — no Phantom / injected wallets):
  *  - Primary purchase (unowned, city-listed): the buyer BURNS `price` ORBITX
- *    from their own wallet (real user-signed SPL burn, hub wallet popup),
- *    then POSTs the signature to /api/city-property which validates the burn
- *    on-chain and records the deed in Supabase (service role).
- *  - Secondary purchase (owned, for_sale): one user-signed transaction with
- *    TWO instructions — 95% ORBITX transfer to the current owner + 5% burned
- *    as the city tax — then the API validates both instructions on-chain and
- *    transfers the deed.
+ *    from their in-app (desk) wallet via orbitx_app_burn (backend signs, no
+ *    popup), then POSTs the signature to /api/city-property which validates
+ *    the burn on-chain and records the deed in Supabase (service role).
+ *  - Secondary purchase (owned, for_sale): NOT supported from the desk
+ *    wallet — it needs a direct 95% ORBITX transfer to the seller plus a 5%
+ *    burn in one transaction, and the backend exposes no transfer signer.
+ *    Callers must show the honest "not supported yet" state, never a fake.
  *  - Listing / unlisting: the owner signs a short message with their wallet;
- *    the API verifies the ed25519 signature against the recorded owner.
+ *    the desk wallet cannot sign messages, so these are honestly disabled
+ *    until a backend signing path exists.
  *
- * Real transactions only. If the wallet is not connected, callers must show
- * "Connect wallet" — never a fake deed.
+ * Real transactions only. If the wallet is not linked, callers must show
+ * "Link in-app wallet" — never a fake deed.
  *
  * Supabase reads go through the city project (anon key, RLS public-read).
  * Writes go through /api/city-property (service role). The client never
  * holds the service key.
  */
 
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import {
-  createBurnInstruction,
-  createTransferInstruction,
-  getAssociatedTokenAddress,
-  TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { burnOrbitxViaDesk } from "@/tokenomics/mcpClient";
 
 /* ── constants ─────────────────────────────────────────────────────── */
 
@@ -131,59 +126,13 @@ export async function fetchProperty(key: string): Promise<PropertyRow | null> {
   return (data ?? null) as PropertyRow | null;
 }
 
-/* ── wallet surface (hub wallet, NOT wallet-adapter-react) ─────────── */
+/* ── desk-wallet surface (in-app wallet, backend-signed) ────────────── */
 
-export interface ChainWallet {
-  publicKey: PublicKey;
-  sendTransaction: (tx: Transaction, connection: Connection) => Promise<string>;
-  signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
-}
-
-/* ── on-chain helpers ───────────────────────────────────────────────── */
-
-async function orbitxDecimals(connection: Connection): Promise<number> {
-  const info = await connection.getMint(new PublicKey(ORBITX_MINT));
-  return info.decimals;
-}
-
-function toRaw(priceOrbitx: number, decimals: number): bigint {
-  return BigInt(Math.round(priceOrbitx * 10 ** decimals));
-}
-
-async function requireOrbitxBalance(
-  connection: Connection,
-  ata: PublicKey,
-  needRaw: bigint
-): Promise<void> {
-  let bal: bigint;
-  try {
-    const r = await connection.getTokenAccountBalance(ata);
-    bal = BigInt(r.value.amount);
-  } catch {
-    throw new Error("No ORBITX token account found in this wallet — buy some ORBITX first.");
-  }
-  if (bal < needRaw) {
-    throw new Error(
-      `Insufficient ORBITX balance for this purchase (need ${(Number(needRaw) / 1e9).toFixed(2)} raw units).`
-    );
-  }
-}
-
-async function sendAndConfirm(
-  connection: Connection,
-  wallet: ChainWallet,
-  tx: Transaction
-): Promise<string> {
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  tx.recentBlockhash = blockhash;
-  tx.feePayer = wallet.publicKey;
-  const signature = await wallet.sendTransaction(tx, connection);
-  const conf = await connection.confirmTransaction(
-    { signature, blockhash, lastValidBlockHeight },
-    "confirmed"
-  );
-  if (conf.value.err) throw new Error(`Transaction failed on-chain: ${JSON.stringify(conf.value.err)}`);
-  return signature;
+export interface DeskWallet {
+  /** Desk wallet address (billing.wallet). */
+  address: string;
+  /** Billing authCode (getBillingAuthCode()). */
+  authCode: string;
 }
 
 async function postDeedApi(body: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
@@ -213,130 +162,85 @@ export interface BuyResult {
 }
 
 /**
- * Buy a for-sale property. Primary (city-owned): burns the full price.
- * Secondary (player-owned): transfers 95% to the owner, burns 5% city tax —
- * both in ONE user-signed transaction. Then the API validates the tx on-chain
- * and records the deed.
+ * Buy a for-sale property with the in-app (desk) wallet.
+ * Primary (city-owned): burns the full price via the backend-signed
+ * orbitx_app_burn, then the API validates the burn on-chain and records
+ * the deed. Secondary (player-owned) is honestly unsupported — it needs a
+ * direct ORBITX transfer to the seller that the desk wallet cannot sign.
  */
 export async function buyProperty(opts: {
-  connection: Connection;
-  wallet: ChainWallet;
+  wallet: DeskWallet;
   buildingKey: string;
 }): Promise<BuyResult> {
-  const { connection, wallet, buildingKey } = opts;
-  if (!wallet.publicKey) throw new Error("Connect wallet");
+  const { wallet, buildingKey } = opts;
+  if (!wallet.address || !wallet.authCode) throw new Error("Link in-app wallet");
 
   const row = await fetchProperty(buildingKey);
   if (!row) throw new Error(`Unknown property: ${buildingKey}`);
   if (!row.for_sale) throw new Error(`${row.label} is not for sale.`);
-  const buyer = wallet.publicKey.toBase58();
-  if (row.owner_wallet && row.owner_wallet === buyer) {
+  if (row.owner_wallet && row.owner_wallet === wallet.address) {
     throw new Error("You already own this property.");
   }
-
-  const decimals = await orbitxDecimals(connection);
-  const priceRaw = toRaw(row.price_orbitx, decimals);
-  const mint = new PublicKey(ORBITX_MINT);
-  const buyerAta = await getAssociatedTokenAddress(mint, wallet.publicKey);
-  await requireOrbitxBalance(connection, buyerAta, priceRaw);
-
-  const tx = new Transaction();
-  let seller: string | null = null;
   if (row.owner_wallet) {
-    // Secondary: 95% to the seller, 5% burned as city tax (BigInt — no float dust).
-    seller = row.owner_wallet;
-    const sellerAta = await getAssociatedTokenAddress(mint, new PublicKey(seller));
-    const acct = await connection.getAccountInfo(sellerAta);
-    if (!acct) throw new Error("Seller has no ORBITX token account — sale cannot settle.");
-    const toSeller = (priceRaw * BigInt(10000 - CITY_TAX_BPS)) / 10000n;
-    const toBurn = priceRaw - toSeller;
-    tx.add(
-      createTransferInstruction(buyerAta, sellerAta, wallet.publicKey, toSeller, [], TOKEN_PROGRAM_ID)
+    throw new Error(
+      "Player resales aren't supported from the in-app wallet yet — they need a direct " +
+        "ORBITX transfer to the seller that the desk wallet can't sign. City-owned deeds work."
     );
-    tx.add(createBurnInstruction(buyerAta, mint, wallet.publicKey, toBurn, [], TOKEN_PROGRAM_ID));
-  } else {
-    // Primary: the full price is burned.
-    tx.add(createBurnInstruction(buyerAta, mint, wallet.publicKey, priceRaw, [], TOKEN_PROGRAM_ID));
   }
 
-  const signature = await sendAndConfirm(connection, wallet, tx);
+  const price = Math.floor(Number(row.price_orbitx));
+  if (!Number.isFinite(price) || price <= 0) throw new Error("This property has no valid price.");
+
+  // Primary: the full price is burned from the desk wallet (backend signs).
+  const burn = await burnOrbitxViaDesk({ authCode: wallet.authCode, amount: price });
+  if (!burn.ok || !burn.signature) {
+    throw new Error(burn.message || burn.error || "ORBITX burn failed.");
+  }
 
   await postDeedApi({
-    action: row.owner_wallet ? "buyFromOwner" : "buy",
+    action: "buy",
     buildingKey,
-    wallet: buyer,
-    signature,
+    wallet: wallet.address,
+    signature: burn.signature,
   });
 
   return {
-    signature,
+    signature: burn.signature,
     priceOrbitx: row.price_orbitx,
-    burnedOrbitx: row.owner_wallet ? row.price_orbitx * 0.05 : row.price_orbitx,
-    kind: row.owner_wallet ? "secondary" : "primary",
-    sellerWallet: seller,
+    burnedOrbitx: row.price_orbitx,
+    kind: "primary",
+    sellerWallet: null,
   };
 }
 
-/* ── list / unlist (owner-signed message, API-verified) ─────────────── */
+/* ── list / unlist (honestly disabled: desk wallet can't sign messages) ── */
 
-function b64(bytes: Uint8Array): string {
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s);
-}
-
-function listMessage(buildingKey: string, priceOrbitx: number): string {
-  return [
-    "OrbitX City — list property for sale",
-    `key: ${buildingKey}`,
-    `price: ${priceOrbitx} ORBITX`,
-    `nonce: ${Date.now()}`,
-  ].join("\n");
-}
-
-/** Owner lists their property at a price (whole ORBITX). */
-export async function listForSale(opts: {
-  wallet: ChainWallet;
+/**
+ * Owner lists their property at a price (whole ORBITX).
+ * DISABLED: listing needs an owner-signed message and the desk wallet has
+ * no message-signing path. Throws a clear error instead of a fake listing.
+ */
+export async function listForSale(_opts: {
+  wallet: DeskWallet;
   buildingKey: string;
   priceOrbitx: number;
 }): Promise<void> {
-  const { wallet, buildingKey, priceOrbitx } = opts;
-  if (!wallet.publicKey) throw new Error("Connect wallet");
-  if (!wallet.signMessage) throw new Error("This wallet cannot sign messages.");
-  if (!Number.isFinite(priceOrbitx) || priceOrbitx < 1000 || priceOrbitx > 10_000_000) {
-    throw new Error("List price must be between 1,000 and 10,000,000 ORBITX.");
-  }
-  const message = listMessage(buildingKey, Math.floor(priceOrbitx));
-  const sig = await wallet.signMessage(new TextEncoder().encode(message));
-  await postDeedApi({
-    action: "list",
-    buildingKey,
-    wallet: wallet.publicKey.toBase58(),
-    priceOrbitx: Math.floor(priceOrbitx),
-    messageB64: b64(new TextEncoder().encode(message)),
-    sigB64: b64(sig),
-  });
+  throw new Error(
+    "Listing isn't supported from the in-app wallet yet — it needs a message signature " +
+      "the desk wallet can't produce. Your owned buildings stay yours."
+  );
 }
 
-/** Owner takes their property off the market. */
-export async function unlistProperty(opts: {
-  wallet: ChainWallet;
+/**
+ * Owner takes their property off the market.
+ * DISABLED: same message-signing limitation as listForSale.
+ */
+export async function unlistProperty(_opts: {
+  wallet: DeskWallet;
   buildingKey: string;
 }): Promise<void> {
-  const { wallet, buildingKey } = opts;
-  if (!wallet.publicKey) throw new Error("Connect wallet");
-  if (!wallet.signMessage) throw new Error("This wallet cannot sign messages.");
-  const message = [
-    "OrbitX City — delist property",
-    `key: ${buildingKey}`,
-    `nonce: ${Date.now()}`,
-  ].join("\n");
-  const sig = await wallet.signMessage(new TextEncoder().encode(message));
-  await postDeedApi({
-    action: "unlist",
-    buildingKey,
-    wallet: wallet.publicKey.toBase58(),
-    messageB64: b64(new TextEncoder().encode(message)),
-    sigB64: b64(sig),
-  });
+  throw new Error(
+    "Delisting isn't supported from the in-app wallet yet — it needs a message signature " +
+      "the desk wallet can't produce."
+  );
 }
