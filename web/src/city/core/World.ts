@@ -62,7 +62,8 @@ export class GTAWorld {
   private disposed = false;
   private paused = false;
   private time = 0;
-  private dayT = 0.3;
+  /** Locked to solar noon — user order: the city is ALWAYS daytime, no day/night cycle. */
+  private dayT = 0.5;
 
   // player
   private player!: Humanoid;
@@ -395,7 +396,6 @@ export class GTAWorld {
     const dt = Math.min(0.05, this.clock.getDelta());
     if (!this.paused) {
       this.time += dt;
-      this.dayT = (this.dayT + dt / DAY_LENGTH) % 1;
       this.update(dt);
     }
     this.renderer.render(this.scene, this.camera);
