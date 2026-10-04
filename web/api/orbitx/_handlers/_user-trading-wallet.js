@@ -422,7 +422,7 @@ export async function signUserSwap(row, { inputMint, outputMint, amount, slippag
       userPublicKey: owner,
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
-      prioritizationFeeLamports: 50000,
+      prioritizationFeeLamports: 100000,
     }),
     signal: AbortSignal.timeout(12000),
   });
@@ -434,14 +434,14 @@ export async function signUserSwap(row, { inputMint, outputMint, amount, slippag
   const { signature } = await broadcastTx(b64);
   // F3: broadcast acceptance is NOT success — confirm on-chain before
   // claiming it. Honest outcomes only: confirmed | failed | pending.
-  const conf = await pollTxConfirmation(signature);
+  const conf = await pollTxConfirmation(signature, { budgetMs: 60000 });
   if (conf.confirmed) {
     return { ok: true, signature, owner, outAmount: quote.outAmount, slippageBps: slip, confirmed: true, confirmationStatus: conf.confirmationStatus };
   }
   if (conf.failed) {
     return { ok: false, signature, owner, outAmount: quote.outAmount, slippageBps: slip, confirmed: false, error: "tx_failed_onchain", confirmationStatus: conf.confirmationStatus, message: `Swap broadcast but failed on-chain: ${JSON.stringify(conf.txError)}` };
   }
-  return { ok: false, pending: true, signature, owner, outAmount: quote.outAmount, slippageBps: slip, confirmed: false, error: "tx_unconfirmed", confirmationStatus: "unknown", message: "Swap broadcast accepted by the RPC but not confirmed within 20s. It may still land — check the explorer before retrying; do NOT blindly re-submit." };
+  return { ok: false, pending: true, signature, owner, outAmount: quote.outAmount, slippageBps: slip, confirmed: false, error: "tx_unconfirmed", confirmationStatus: "unknown", message: `Swap broadcast accepted but not confirmed within 60s. It may still land — check https://solscan.io/tx/${signature} before retrying; do NOT blindly re-submit.` };
 }
 
 
@@ -468,12 +468,12 @@ export async function signAndSendUserTx(row, txBase64, extraSigners = []) {
   const { signature } = await broadcastTx(serialized);
   // F3: broadcast acceptance is NOT success — confirm on-chain before
   // claiming it. Honest outcomes only: confirmed | failed | pending.
-  const conf = await pollTxConfirmation(signature);
+  const conf = await pollTxConfirmation(signature, { budgetMs: 60000 });
   if (conf.confirmed) {
     return { ok: true, signature, owner: kp.publicKey.toBase58(), confirmed: true, confirmationStatus: conf.confirmationStatus };
   }
   if (conf.failed) {
     return { ok: false, signature, owner: kp.publicKey.toBase58(), confirmed: false, error: "tx_failed_onchain", confirmationStatus: conf.confirmationStatus, message: `Transaction broadcast but failed on-chain: ${JSON.stringify(conf.txError)}` };
   }
-  return { ok: false, pending: true, signature, owner: kp.publicKey.toBase58(), confirmed: false, error: "tx_unconfirmed", confirmationStatus: "unknown", message: "Transaction broadcast accepted by the RPC but not confirmed within 20s. It may still land — check the explorer before retrying; do NOT blindly re-submit." };
+  return { ok: false, pending: true, signature, owner: kp.publicKey.toBase58(), confirmed: false, error: "tx_unconfirmed", confirmationStatus: "unknown", message: `Transaction broadcast accepted but not confirmed within 60s. It may still land — check https://solscan.io/tx/${signature} before retrying; do NOT blindly re-submit.` };
 }
