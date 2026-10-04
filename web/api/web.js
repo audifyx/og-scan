@@ -1,10 +1,3 @@
-import adminTokens from "./_admin-tokens.ts";
-import signupCheck from "./_signup-check.ts";
-import bagwork from "./_bagwork.ts";
-import pumpCreate from "./_pump-create.ts";
-import orbitxWorld from "./_orbitx-world.ts";
-import kol from "./_kol.ts";
-
 function pausedFeature(req, res) {
   res.statusCode = 503;
   res.setHeader("Content-Type", "application/json");
@@ -18,24 +11,37 @@ function pausedFeature(req, res) {
   }));
 }
 
-const ROUTES = {
-  "admin-tokens": adminTokens,
-  "signup-check": signupCheck,
-  bagwork,
-  "pump-create": pumpCreate,
-  "orbitx-world": orbitxWorld,
-  kol,
-  "city-property": (req, res) => import("./_city-property.js").then((m) => m.default(req, res)),
-  paused: pausedFeature,
+// Lazy-load every route so one broken module can't crash all /api/web routes.
+const LAZY = {
+  "admin-tokens": () => import("./_admin-tokens.ts"),
+  "signup-check": () => import("./_signup-check.ts"),
+  "bagwork": () => import("./_bagwork.ts"),
+  "pump-create": () => import("./_pump-create.ts"),
+  "orbitx-world": () => import("./_orbitx-world.ts"),
+  "kol": () => import("./_kol.ts"),
+  "city-property": () => import("./_city-property.js"),
 };
 
 export default async function handler(req, res) {
   const raw = req.query?.path || req.query?.route || "";
   const key = String(raw).split("/").filter(Boolean)[0];
-  const route = ROUTES[key];
-  if (!route) {
+  if (key === "paused") return pausedFeature(req, res);
+  const load = LAZY[key];
+  if (!load) {
     res.statusCode = 404;
     return res.end("Not found");
   }
-  return route(req, res);
+  try {
+    const fn = (await load()).default;
+    return fn(req, res);
+  } catch (e) {
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    return res.end(JSON.stringify({
+      ok: false,
+      error: "route_failed",
+      route: key,
+      detail: String((e && e.message) || e).slice(0, 200),
+    }));
+  }
 }
