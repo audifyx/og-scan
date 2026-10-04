@@ -120,6 +120,10 @@
       "destination": "/api/web?path=pump-create"
     },
     {
+      "source": "/api/city-property",
+      "destination": "/api/web?path=city-property"
+    },
+    {
       "source": "/api/orbitx-world/(.*)",
       "destination": "/api/web?path=orbitx-world/$1"
     },
