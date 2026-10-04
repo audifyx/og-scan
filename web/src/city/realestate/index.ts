@@ -1,9 +1,10 @@
 /**
  * OrbitX City — Real Estate public API.
  *
- * Mount <PropertyPanel /> inside the city HUD when the wallet hub is present.
- * District/world code can call setPropertyOwnerLabel() and attachPropertySign()
- * to show owner plaques above building doors.
+ * Mount <PropertyPanel /> inside the city HUD. District/world code can call
+ * setPropertyOwnerLabel() and attachPropertySign() to show owner plaques
+ * above building doors. All transactions go through the in-app (desk)
+ * wallet — no injected wallets.
  */
 
 export {
@@ -21,7 +22,7 @@ export {
   listForSale,
   unlistProperty,
 } from "./RealEstate";
-export type { PropertyDef, PropertyRow, ChainWallet, BuyResult } from "./RealEstate";
+export type { PropertyDef, PropertyRow, DeskWallet, BuyResult } from "./RealEstate";
 
 export { PropertyPanel } from "./PropertyPanel";
 
