@@ -1,14 +1,25 @@
 /**
- * OrbitX custom wallet hub — Phantom + Jupiter via extension inject only.
- * Replaces @solana/wallet-adapter-react for connect, login, and signing.
+ * OrbitX wallet hub — the in-app (desk) wallet is the ONLY wallet.
+ *
+ * Previously Phantom + Jupiter via extension inject. Per owner order, all
+ * extension wallets are removed: one wallet, one address, everywhere.
+ *
+ * Identity comes from `useOrbitxBilling()` (backend-signed desk wallet).
+ * `connect()` runs the one-time dashboard auth-code link flow (`beginAuth`).
+ * The desk wallet signs on the backend — there is no client-side signer, so
+ * `signTransaction` / `signMessage` / `sendTransaction` are intentionally
+ * unavailable here. Backend-enabled flows (trades via orbitx_app_buy/sell,
+ * burns via burnPurchase/spend) call the supercomputer MCP directly.
+ *
+ * This module keeps the historical wallet-adapter-shaped interface because
+ * vite.config.ts aliases `@solana/wallet-adapter-react` to this file — every
+ * `useWallet()` / `useConnection()` call site in the app resolves here.
  */
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
 import {
@@ -17,18 +28,10 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { browserWalletRpcUrl, sendRawWithFallback } from "@/lib/solanaRpc";
-import {
-  connectInjectWallet,
-  hubWalletFromName,
-  injectInstallHint,
-  isInjectWalletReady,
-  subscribeHubWalletSession,
-  subscribeInjectWallets,
-  type InjectWallet,
-  type InjectWalletSession,
-} from "@/lib/injectWallets";
-import { normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { getBillingAuthCode, requestBillingAuth } from "@/tokenomics/auth";
+import { fetchDeskWallet } from "@/tokenomics/mcpClient";
 
 export const WalletReadyState = {
   Installed: "Installed",
@@ -38,7 +41,8 @@ export const WalletReadyState = {
 
 export type WalletReadyState = (typeof WalletReadyState)[keyof typeof WalletReadyState];
 
-export type HubWalletName = "Phantom" | "Jupiter";
+/** Single wallet identity across OrbitX. */
+export type HubWalletName = "In-App";
 
 type Tx = Transaction | VersionedTransaction;
 
@@ -85,135 +89,82 @@ type WalletContextValue = {
 const WalletCtx = createContext<WalletContextValue | null>(null);
 const ConnectionCtx = createContext<{ connection: Connection } | null>(null);
 
-const INSTALL = {
-  phantom: "https://phantom.app",
-  jupiter: "https://jup.ag",
-} as const;
-
-function displayName(name: InjectWallet): HubWalletName {
-  return name === "jupiter" ? "Jupiter" : "Phantom";
+/** The desk wallet signs on the backend — no client-side signing exists. */
+function backendSigningError(action = "This action"): Error {
+  return new Error(
+    `${action} needs the in-app wallet's backend signer, which isn't enabled for custom transactions yet. ` +
+      "Trades run through the Trade tab and burns through the Shop — both are backend-signed. " +
+      "Link your in-app wallet once to use them.",
+  );
 }
 
 export function OrbitxWalletHub({ children }: { children: ReactNode }) {
   const connection = useMemo(() => new Connection(browserWalletRpcUrl(), "confirmed"), []);
-  const [selected, setSelected] = useState<InjectWallet>("phantom");
-  const [session, setSession] = useState<InjectWalletSession | null>(null);
-  const [connecting, setConnecting] = useState(false);
-  const [phantomOn, setPhantomOn] = useState(() => isInjectWalletReady("phantom"));
-  const [jupiterOn, setJupiterOn] = useState(() => isInjectWalletReady("jupiter"));
-
-  useEffect(() => subscribeInjectWallets(() => {
-    setPhantomOn(isInjectWalletReady("phantom"));
-    setJupiterOn(isInjectWalletReady("jupiter"));
-  }), []);
-
-  useEffect(() => subscribeHubWalletSession((next) => {
-    setSelected(next.name);
-    setSession(next);
-  }), []);
-
-  const connectNamed = useCallback(async (name: InjectWallet) => {
-    setConnecting(true);
-    try {
-      const next = await connectInjectWallet(name);
-      setSelected(name);
-      setSession(next);
-    } finally {
-      setConnecting(false);
-    }
-  }, []);
-
-  const select = useCallback((name: string) => {
-    const mapped = hubWalletFromName(name);
-    if (!mapped) {
-      throw new Error("OrbitX wallet connect supports Phantom and Jupiter only.");
-    }
-    setSelected(mapped);
-  }, []);
-
-  const connect = useCallback(async () => {
-    await connectNamed(selected);
-  }, [connectNamed, selected]);
-
-  const disconnect = useCallback(async () => {
-    try {
-      await session?.disconnect();
-    } catch {
-      /* already gone */
-    }
-    setSession(null);
-  }, [session]);
+  const billing = useOrbitxBilling();
 
   const publicKey = useMemo(() => {
-    if (!session?.publicKey) return null;
+    if (!billing.wallet) return null;
     try {
-      return new PublicKey(session.publicKey);
+      return new PublicKey(billing.wallet);
     } catch {
       return null;
     }
-  }, [session]);
+  }, [billing.wallet]);
 
-  const makeAdapter = useCallback((name: InjectWallet, ready: boolean): HubAdapter => {
-    const label = displayName(name);
-    const active = session?.name === name ? session : null;
-    let pk: PublicKey | null = null;
-    if (active?.publicKey) {
-      try { pk = new PublicKey(active.publicKey); } catch { pk = null; }
-    }
-    return {
-      name: label,
-      icon: "",
-      url: INSTALL[name],
-      publicKey: pk,
-      connected: Boolean(active),
-      connecting: connecting && selected === name,
-      readyState: ready ? WalletReadyState.Installed : WalletReadyState.Loadable,
-      connect: () => connectNamed(name),
-      disconnect,
-      signMessage: active?.signMessage,
-      signTransaction: active?.signTransaction,
-      signAllTransactions: active?.signAllTransactions,
-    };
-  }, [connectNamed, connecting, disconnect, selected, session]);
+  const connected = billing.ready && Boolean(publicKey);
 
-  const wallets: HubWallet[] = useMemo(() => [
-    { adapter: makeAdapter("phantom", phantomOn), readyState: phantomOn ? WalletReadyState.Installed : WalletReadyState.Loadable },
-    { adapter: makeAdapter("jupiter", jupiterOn), readyState: jupiterOn ? WalletReadyState.Installed : WalletReadyState.Loadable },
-  ], [jupiterOn, makeAdapter, phantomOn]);
+  const connect = useCallback(async () => {
+    // One-time dashboard auth-code link — after this the desk wallet is the identity.
+    billing.beginAuth();
+  }, [billing]);
 
-  const wallet = wallets.find((w) => w.adapter.name === displayName(selected)) ?? wallets[0];
+  const disconnect = useCallback(async () => {
+    billing.resetAuth();
+  }, [billing]);
 
-  const sendTransaction = useCallback(async (
-    transaction: Tx,
-    conn: Connection,
-    options?: { skipPreflight?: boolean; maxRetries?: number },
-  ) => {
-    if (!session) throw new Error("Connect Phantom or Jupiter first");
-    const signed = await session.signTransaction(transaction);
-    const raw = "version" in signed
-      ? (signed as VersionedTransaction).serialize()
-      : (signed as Transaction).serialize();
-    return normalizeTxSignatureBase58(await sendRawWithFallback(raw, conn, {
-      skipPreflight: options?.skipPreflight ?? false,
-      maxRetries: options?.maxRetries ?? 3,
-    }));
-  }, [session]);
+  const select = useCallback((_name: string) => {
+    // One wallet — nothing to select.
+  }, []);
+
+  const sendTransaction = useCallback(async () => {
+    throw backendSigningError("Sending this transaction");
+  }, []);
+
+  const adapter: HubAdapter = useMemo(() => ({
+    name: "In-App",
+    icon: "",
+    url: "",
+    publicKey,
+    connected,
+    connecting: false,
+    readyState: WalletReadyState.Installed,
+    connect,
+    disconnect,
+    signMessage: undefined,
+    signTransaction: undefined,
+    signAllTransactions: undefined,
+  }), [publicKey, connected, connect, disconnect]);
+
+  const hubWallet: HubWallet = useMemo(() => ({
+    adapter,
+    readyState: WalletReadyState.Installed,
+  }), [adapter]);
 
   const value = useMemo<WalletContextValue>(() => ({
     publicKey,
-    connected: Boolean(session && publicKey),
-    connecting,
+    connected,
+    connecting: false,
     disconnecting: false,
-    wallet,
-    wallets,
+    wallet: hubWallet,
+    wallets: [hubWallet],
     select,
     connect,
     disconnect,
-    signMessage: session?.signMessage,
-    signTransaction: session?.signTransaction,
-    signAllTransactions: session?.signAllTransactions,
+    signMessage: undefined,
+    signTransaction: undefined,
+    signAllTransactions: undefined,
     sendTransaction,
-  }), [connect, connecting, disconnect, publicKey, select, sendTransaction, session, wallet, wallets]);
+  }), [publicKey, connected, select, connect, disconnect, hubWallet, sendTransaction]);
 
   return (
     <ConnectionCtx.Provider value={{ connection }}>
@@ -234,14 +185,14 @@ export function useWallet(): WalletContextValue {
     wallets: [],
     select: () => {},
     connect: async () => {
-      throw new Error("Connect Phantom or Jupiter from the wallet hub");
+      throw new Error("Link your in-app wallet first");
     },
     disconnect: async () => {},
     signMessage: undefined,
     signTransaction: undefined,
     signAllTransactions: undefined,
     sendTransaction: async () => {
-      throw new Error("Connect Phantom or Jupiter from the wallet hub");
+      throw backendSigningError("Sending this transaction");
     },
   };
 }
@@ -254,13 +205,31 @@ export function useConnection(): { connection: Connection } {
   return ctx;
 }
 
-export async function connectHubWallet(name?: string | null): Promise<string> {
-  const mapped = hubWalletFromName(name);
-  if (name && !mapped) {
-    throw new Error("OrbitX wallet connect supports Phantom and Jupiter only.");
+/**
+ * Link (or re-resolve) the in-app wallet outside React. Runs the dashboard
+ * auth-code flow when no code is stored, then returns the desk wallet address.
+ */
+export async function connectHubWallet(_name?: string | null): Promise<string> {
+  let code = getBillingAuthCode();
+  if (!code) {
+    code = await requestBillingAuth();
   }
-  const session = await connectInjectWallet(mapped ?? "phantom");
-  return session.publicKey;
+  const info = await fetchDeskWallet(code);
+  if (!info.ok || !info.exists || !info.publicKey) {
+    throw new Error(info.message || "No in-app wallet found for this auth.");
+  }
+  return info.publicKey;
 }
 
-export { injectInstallHint, isInjectWalletReady };
+/** @deprecated Extension wallets are removed — the in-app wallet is always ready. */
+export function isInjectWalletReady(_name?: string | null): boolean {
+  return false;
+}
+
+/** @deprecated Extension wallets are removed — no install needed. */
+export function injectInstallHint(_name?: string | null): string {
+  return "OrbitX now uses your in-app wallet — no extension needed. Link it once and you're set.";
+}
+
+/** @deprecated Phantom/Jupiter inject names — kept for import compatibility. */
+export type InjectWallet = "phantom" | "jupiter";

@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { signInWithInjectWallet, connectInjectWallet, isInjectWalletReady, hubWalletFromName, subscribeInjectWallets, type InjectWallet } from "@/lib/injectWallets";
+/**
+ * In-app wallet sign-in — the wallet half of auth across OrbitX.
+ *
+ * Previously Phantom/Jupiter extension pickers. Now: one wallet (the in-app
+ * desk wallet), linked once via the dashboard auth-code flow. Sign-in session
+ * (Supabase) is separate — this hook only links the wallet identity.
+ */
+import { useCallback, useMemo, useState } from "react";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { WalletReadyState } from "@/wallets/hub";
 
 export interface PickableWallet {
@@ -9,46 +16,44 @@ export interface PickableWallet {
   adapter: { name: string; icon: string; url: string };
 }
 
-const HUB: Array<{ id: InjectWallet; name: string; url: string }> = [
-  { id: "phantom", name: "Phantom", url: "https://phantom.app" },
-  { id: "jupiter", name: "Jupiter", url: "https://jup.ag" },
-];
+const IN_APP: PickableWallet = {
+  name: "In-App",
+  icon: "",
+  readyState: WalletReadyState.Installed,
+  adapter: { name: "In-App", icon: "", url: "" },
+};
 
 export function useWalletSignIn() {
+  const billing = useOrbitxBilling();
   const [busy, setBusy] = useState<string | null>(null);
-  const [readyAt, setReadyAt] = useState(0);
 
-  useEffect(() => subscribeInjectWallets(() => setReadyAt((n) => n + 1)), []);
+  const pickable: PickableWallet[] = useMemo(() => [IN_APP], []);
 
-  const pickable: PickableWallet[] = useMemo(() => HUB.map((w) => ({
-    name: w.name,
-    icon: "",
-    readyState: isInjectWalletReady(w.id) ? WalletReadyState.Installed : WalletReadyState.Loadable,
-    adapter: { name: w.name, icon: "", url: w.url },
-  })), [readyAt]);
-
-  const signInWith = useCallback(async (name: string, opts?: { replaceEmailSession?: boolean; connectOnly?: boolean }): Promise<{ isNew: boolean }> => {
-    const id = hubWalletFromName(name);
-    if (!id) throw new Error("OrbitX wallet connect supports Phantom and Jupiter only.");
-    setBusy(name);
+  /**
+   * Link the in-app wallet (dashboard auth-code flow, one-time). The name arg
+   * is accepted for call-site compatibility and ignored — there is only one wallet.
+   */
+  const signInWith = useCallback(async (
+    _name: string,
+    _opts?: { replaceEmailSession?: boolean; connectOnly?: boolean },
+  ): Promise<{ isNew: boolean }> => {
+    setBusy("In-App");
     try {
-      if (opts?.connectOnly) {
-        await connectInjectWallet(id);
-        return { isNew: false };
-      }
-      return await signInWithInjectWallet(id);
+      // Kicks the one-time dashboard auth-code link. The billing hook resolves
+      // the wallet address + balances on its own once the code lands; any
+      // failure surfaces on billing.error for the UI.
+      billing.beginAuth();
+      return { isNew: false };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/reject|cancel|denied/i.test(msg)) throw new Error(`${id === "jupiter" ? "Jupiter" : "Phantom"} signature was rejected`);
-      throw err instanceof Error ? err : new Error(msg || "Sign-in failed");
+      throw err instanceof Error ? err : new Error("In-app wallet link failed");
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [billing]);
 
   const disconnect = useCallback(async () => {
-    /* hub disconnect is owned by OrbitxWalletHub */
-  }, []);
+    billing.resetAuth();
+  }, [billing]);
 
   return { pickable, signInWith, busy, disconnect };
 }

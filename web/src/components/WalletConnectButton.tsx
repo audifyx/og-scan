@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, LogOut, Settings, Wallet, ChevronDown, Loader2, Image, GitMerge } from "lucide-react";
 import { useWallet } from "@/wallets/hub";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { useAuth } from "@/hooks/useAuth";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
 import { UsernameClaimModal } from "@/components/UsernameClaimModal";
@@ -12,7 +13,8 @@ import { cn } from "@/lib/utils";
 
 export function WalletConnectButton() {
   const { user, profile, signOut, loading } = useAuth();
-  const { disconnect, publicKey } = useWallet();
+  const { disconnect } = useWallet();
+  const billing = useOrbitxBilling();
   const navigate = useNavigate();
   const [merge, setMerge] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -21,11 +23,13 @@ export function WalletConnectButton() {
   const doSignOut = async () => {
     await signOut().catch(() => {});
     await disconnect().catch(() => {});
+    billing.resetAuth();
     setMenu(false);
   };
 
+  // Single wallet identity: the in-app (desk) wallet first, then profile fallbacks.
   const walletPk =
-    publicKey?.toBase58() ||
+    billing.wallet ||
     (profile as { sol_wallet?: string | null } | null)?.sol_wallet ||
     (user?.user_metadata?.wallet as string | undefined) ||
     null;

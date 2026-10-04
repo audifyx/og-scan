@@ -1,5 +1,5 @@
-// OrbitX sign-in modal — same Supabase methods as /auth (X, Web3 SIWS, email).
-// Phantom/Jupiter still sign a free SIWS message; this is not wallet-adapter.
+// OrbitX sign-in modal — X, in-app wallet link, or email.
+// The in-app wallet is the only wallet; linking it is one tap, no extension.
 import { createPortal } from "react-dom";
 import { X, Loader2, Wallet, Mail } from "lucide-react";
 import type { PickableWallet } from "@/hooks/useWalletSignIn";
@@ -22,10 +22,9 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
 
   const next = currentPath();
   const walletOnly = Boolean(user);
-  const rows = (wallets.length ? wallets : [
-    { name: "Phantom", icon: "", readyState: "Loadable" as const, adapter: { name: "Phantom", icon: "", url: "https://phantom.app" } },
-    { name: "Jupiter", icon: "", readyState: "Loadable" as const, adapter: { name: "Jupiter", icon: "", url: "https://jup.ag" } },
-  ]).filter((w) => /phantom|jupiter/i.test(w.name));
+  const rows = wallets.length ? wallets : [
+    { name: "In-App", icon: "", readyState: "Installed" as const, adapter: { name: "In-App", icon: "", url: "" } },
+  ];
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
@@ -36,12 +35,12 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
           </button>
           <div className="ox-auth-kicker">Secure access</div>
           <h3 id="ox-auth-picker-title" className="ox-auth-title ox-auth-title--modal">
-            {walletOnly ? "Connect a wallet" : "Welcome back"}
+            {walletOnly ? "Link your wallet" : "Welcome back"}
           </h3>
           <p className="ox-auth-sub">
             {walletOnly
-              ? "Phantom or Jupiter. You'll sign a free message — no transaction, no fees."
-              : "Continue with X, a Solana wallet, or email."}
+              ? "Your OrbitX in-app wallet — one link, no extension, no popups after."
+              : "Continue with X, your in-app wallet, or email."}
           </p>
 
           {!walletOnly && (
@@ -59,10 +58,10 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
                 type="button"
                 onClick={() => onPick(w.name)}
                 disabled={!!busy}
-                className={/jupiter/i.test(w.name) ? "ox-auth-btn" : "ox-auth-btn ox-auth-btn--blue"}
+                className="ox-auth-btn ox-auth-btn--blue"
               >
                 {busy === w.name ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                Connect {w.name}
+                Link in-app wallet
               </button>
             ))}
           </div>

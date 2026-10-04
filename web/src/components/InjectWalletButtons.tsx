@@ -1,8 +1,16 @@
+/**
+ * In-app wallet link button — the wallet half of sign-in.
+ * Previously "Connect Phantom" / "Connect Jupiter". Now one button, one wallet.
+ */
 import { useState } from "react";
 import { Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { signInWithInjectWallet, type InjectWallet } from "@/lib/injectWallets";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import "@/pages/auth.css";
+
+export function shortAddr(a: string, n = 4): string {
+  return a.length > n * 2 ? `${a.slice(0, n)}…${a.slice(-n)}` : a;
+}
 
 export function InjectWalletButtons({
   onSignedIn,
@@ -11,23 +19,24 @@ export function InjectWalletButtons({
   onSignedIn?: (isNew: boolean) => void;
   disabled?: boolean;
 }) {
-  const [busy, setBusy] = useState<InjectWallet | null>(null);
+  const billing = useOrbitxBilling();
+  const [busy, setBusy] = useState(false);
+  const linked = billing.ready && !!billing.wallet;
 
-  const run = async (name: InjectWallet) => {
-    setBusy(name);
+  const run = async () => {
+    if (linked) {
+      onSignedIn?.(false);
+      return;
+    }
+    setBusy(true);
     try {
-      const { isNew } = await signInWithInjectWallet(name);
-      toast.success(`Signed in with ${name === "jupiter" ? "Jupiter" : "Phantom"}`);
-      onSignedIn?.(isNew);
+      billing.beginAuth();
+      // The billing hook resolves the wallet once the auth code lands.
+      onSignedIn?.(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Sign-in failed";
-      if (/reject|cancel|denied/i.test(msg)) {
-        toast.error(`${name === "jupiter" ? "Jupiter" : "Phantom"} signature was rejected`);
-      } else {
-        toast.error(msg);
-      }
+      toast.error(err instanceof Error ? err.message : "Wallet link failed");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
@@ -36,23 +45,16 @@ export function InjectWalletButtons({
       <button
         type="button"
         className="ox-auth-btn ox-auth-btn--blue"
-        disabled={disabled || !!busy}
-        onClick={() => void run("phantom")}
+        disabled={disabled || busy}
+        onClick={() => void run()}
       >
-        {busy === "phantom" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-        Connect Phantom
-      </button>
-      <button
-        type="button"
-        className="ox-auth-btn"
-        disabled={disabled || !!busy}
-        onClick={() => void run("jupiter")}
-      >
-        {busy === "jupiter" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-        Connect Jupiter
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+        {linked && billing.wallet ? `In-app wallet ${shortAddr(billing.wallet)}` : "Link in-app wallet"}
       </button>
       <p className="ox-auth-sub" style={{ margin: "12px 0 0" }}>
-        Connect Phantom or Jupiter. Supabase Web3 verifies a free Sign-in-with-Solana message — no transaction, no fees.
+        {billing.error
+          ? billing.error
+          : "Your OrbitX in-app wallet — the only wallet across OrbitX. One link, then trades and burns are seamless with no popups."}
       </p>
     </div>
   );
