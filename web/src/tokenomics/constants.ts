@@ -11,7 +11,7 @@ export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 export const ORBITX_SYMBOL = "ORBITX";
 
 /** Supercomputer MCP endpoint — JSON-RPC tools/call, CORS-open, no session needed. */
-export const SUPERCOMPUTER_MCP_URL = "https://www.orbitx.world/api/supercomputer-mcp";
+export const SUPERCOMPUTER_MCP_URL = "https://www.orbitx.world/api/mcp";
 
 /** localStorage keys (never secrets — the authCode is a scoped spend credential). */
 export const BILLING_AUTHCODE_KEY = "orbitx.billing.authCode";
