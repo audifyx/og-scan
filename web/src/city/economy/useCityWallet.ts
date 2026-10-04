@@ -7,11 +7,21 @@
  * is never used in the city. Exposes live SOL + ORBITX balances for the
  * HUD wallet chip. Same exported interface as before so HUD mounts keep
  * working.
+ *
+ * Sign-in aware: the wallet link needs a Supabase session (the backend
+ * mints the authCode against it). `signedIn` exposes that state so the
+ * chip can route to /auth first instead of failing confusingly. If the
+ * user was sent to /auth from here (pending-link flag), the link is
+ * auto-retried once they're back with a session.
  */
 import { useCallback, useEffect, useState } from "react";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { getBillingAuthCode } from "@/tokenomics/auth";
 import { browserWalletRpcUrl } from "@/lib/solanaRpc";
+
+/** sessionStorage flag: user was sent to /auth to sign in, link on return. */
+export const CITY_PENDING_LINK_KEY = "ox_city_pending_link";
 
 export function shortAddress(addr: string): string {
   return addr.length > 12 ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : addr;
@@ -26,6 +36,8 @@ export interface CityWallet {
   sol: number | null;
   orbitx: number | null;
   balancesLoading: boolean;
+  /** Platform sign-in state: null = still checking, boolean once known. */
+  signedIn: boolean | null;
   /** Last billing/auth error, for UI display. */
   error: string | null;
   connect: () => Promise<void>;
@@ -37,6 +49,50 @@ export function useCityWallet(): CityWallet {
   const billing = useOrbitxBilling();
   const [sol, setSol] = useState<number | null>(null);
   const [solLoading, setSolLoading] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+
+  const checkSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      const { data } = await supabase.auth.getSession();
+      const ok = !!data.session;
+      setSignedIn(ok);
+      return ok;
+    } catch {
+      setSignedIn(false);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
+  // Auto-complete a pending wallet link after returning from sign-in.
+  // The flag is consumed on first run, so re-runs are harmless no-ops.
+  useEffect(() => {
+    let pending = false;
+    try {
+      pending = sessionStorage.getItem(CITY_PENDING_LINK_KEY) === "1";
+    } catch {
+      /* storage unavailable */
+    }
+    if (!pending) return;
+    let cancelled = false;
+    (async () => {
+      const ok = await checkSession();
+      if (cancelled) return;
+      try {
+        sessionStorage.removeItem(CITY_PENDING_LINK_KEY);
+      } catch {
+        /* noop */
+      }
+      if (ok && !getBillingAuthCode()) billing.beginAuth();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [billing, checkSession]);
 
   const refreshSol = useCallback(async (addr: string | null) => {
     if (!addr) {
@@ -68,9 +124,10 @@ export function useCityWallet(): CityWallet {
   }, [billing.wallet, refreshSol]);
 
   const refresh = useCallback(async () => {
+    await checkSession();
     billing.refresh();
     await refreshSol(billing.wallet);
-  }, [billing, refreshSol]);
+  }, [billing, refreshSol, checkSession]);
 
   const address = billing.wallet;
 
@@ -84,6 +141,7 @@ export function useCityWallet(): CityWallet {
     orbitx: billing.balance,
     balancesLoading:
       solLoading || (billing.ready && !!address && billing.balance === null),
+    signedIn,
     error: billing.error,
     connect: async () => {
       billing.beginAuth();
