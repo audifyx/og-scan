@@ -1,15 +1,17 @@
 /**
  * OrbitX City — game wallet connection.
  *
- * Wraps the app's OrbitxWalletHub (@/wallets/hub): Phantom / Jupiter inject,
- * no wallet-adapter-react. This is the wallet that signs in-world swaps and
- * token launches. Exposes live SOL + ORBITX balances for the HUD wallet chip.
+ * Wraps the shared OrbitX billing primitive (@/tokenomics/useOrbitxBilling):
+ * the user's in-app (desk) wallet, backend-signed. No Phantom / Jupiter
+ * injected wallets — those silently fail on mobile, which is why the hub
+ * is never used in the city. Exposes live SOL + ORBITX balances for the
+ * HUD wallet chip. Same exported interface as before so HUD mounts keep
+ * working.
  */
 import { useCallback, useEffect, useState } from "react";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { useConnection, useWallet } from "@/wallets/hub";
-import { ORBITX_MINT } from "@/tokenomics/constants";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 
 export function shortAddress(addr: string): string {
   return addr.length > 12 ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : addr;
@@ -24,65 +26,72 @@ export interface CityWallet {
   sol: number | null;
   orbitx: number | null;
   balancesLoading: boolean;
+  /** Last billing/auth error, for UI display. */
+  error: string | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 export function useCityWallet(): CityWallet {
-  const hub = useWallet();
-  const { connection } = useConnection();
+  const billing = useOrbitxBilling();
   const [sol, setSol] = useState<number | null>(null);
-  const [orbitx, setOrbitx] = useState<number | null>(null);
-  const [balancesLoading, setBalancesLoading] = useState(false);
+  const [solLoading, setSolLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
-    const pk = hub.publicKey;
-    if (!pk) {
+  const refreshSol = useCallback(async (addr: string | null) => {
+    if (!addr) {
       setSol(null);
-      setOrbitx(null);
       return;
     }
-    setBalancesLoading(true);
+    setSolLoading(true);
     try {
-      const lamports = await connection.getBalance(pk, "confirmed");
+      const conn = new Connection(browserWalletRpcUrl(), "confirmed");
+      const lamports = await conn.getBalance(new PublicKey(addr), "confirmed");
       setSol(lamports / LAMPORTS_PER_SOL);
     } catch {
       setSol(null);
+    } finally {
+      setSolLoading(false);
     }
-    try {
-      const ata = await getAssociatedTokenAddress(new PublicKey(ORBITX_MINT), pk);
-      const bal = await connection.getTokenAccountBalance(ata, "confirmed");
-      setOrbitx(Number(bal.value.uiAmount ?? 0));
-    } catch {
-      setOrbitx(0);
-    }
-    setBalancesLoading(false);
-  }, [connection, hub.publicKey]);
+  }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    refreshSol(billing.wallet);
+  }, [billing.wallet, refreshSol]);
 
   useEffect(() => {
-    if (!hub.publicKey) return;
+    if (!billing.wallet) return;
     const t = setInterval(() => {
-      refresh();
+      refreshSol(billing.wallet);
     }, 30000);
     return () => clearInterval(t);
-  }, [hub.publicKey, refresh]);
+  }, [billing.wallet, refreshSol]);
+
+  const refresh = useCallback(async () => {
+    billing.refresh();
+    await refreshSol(billing.wallet);
+  }, [billing, refreshSol]);
+
+  const address = billing.wallet;
 
   return {
-    connected: hub.connected,
-    connecting: hub.connecting,
-    address: hub.publicKey ? hub.publicKey.toBase58() : null,
-    short: hub.publicKey ? shortAddress(hub.publicKey.toBase58()) : null,
-    walletName: hub.wallet?.adapter?.name ?? null,
+    connected: billing.ready && !!address,
+    connecting: false,
+    address,
+    short: address ? shortAddress(address) : null,
+    walletName: "OrbitX In-App",
     sol,
-    orbitx,
-    balancesLoading,
-    connect: hub.connect,
-    disconnect: hub.disconnect,
+    orbitx: billing.balance,
+    balancesLoading:
+      solLoading || (billing.ready && !!address && billing.balance === null),
+    error: billing.error,
+    connect: async () => {
+      billing.beginAuth();
+    },
+    disconnect: async () => {
+      billing.resetAuth();
+      setSol(null);
+    },
     refresh,
   };
 }
