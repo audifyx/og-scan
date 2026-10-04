@@ -242,29 +242,82 @@ export function buildDealershipInterior(): DealershipInterior {
   key.position.set(0, H - 1.5, 0);
   g.add(key);
 
-  // 4 display platforms with demo cars
+  // 4 display platforms with demo cars — the Aurora spins on a turntable
+  let turntable: THREE.Group | null = null;
   SHOWROOM.forEach((v, i) => {
     const x = (i % 2 === 0 ? -1 : 1) * 13;
     const z = (i < 2 ? -1 : 1) * 9 - 2;
+    const host = new THREE.Group();
+    host.position.set(x, 0, z);
     const plat = new THREE.Mesh(new THREE.CylinderGeometry(5, 5.4, 0.6, 24), mat(0x2a2e35));
-    plat.position.set(x, 0.3, z);
+    plat.position.set(0, 0.3, 0);
     plat.receiveShadow = true;
-    g.add(plat);
+    host.add(plat);
     const rim = new THREE.Mesh(
       new THREE.TorusGeometry(5.1, 0.12, 8, 32),
       new THREE.MeshBasicMaterial({ color: 0x22e5ff }),
     );
     rim.rotation.x = Math.PI / 2;
-    rim.position.set(x, 0.62, z);
-    g.add(rim);
+    rim.position.set(0, 0.62, 0);
+    host.add(rim);
     const car = buildDemoCar(v.color, 1.1);
-    car.position.set(x, 0.6, z);
+    car.position.set(0, 0.6, 0);
     car.rotation.y = 0.5 + i * 0.4;
-    g.add(car);
-    g.add(makeTextPlane(`${v.name}`, 7, 1.1, "#ffffff", x, 3.4, z + 5.2));
-    const price = v.priceCity > 0 ? `${v.priceCity.toLocaleString()} CITY` : `🔥 ${v.priceOrbitx} ORBITX`;
-    g.add(makeTextPlane(price, 7, 1.1, v.priceCity > 0 ? "#34d399" : "#fbbf24", x, 2.1, z + 5.2));
+    host.add(car);
+    g.add(host);
+    if (i === 3) turntable = host; // Aurora Hypercar turntable
+    // placard stand beneath the floating name/price
+    const pz = z + 5.2;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 1.5, 8), mat(0x3a3f47));
+    pole.position.set(x, 0.75, pz);
+    g.add(pole);
+    const panel = box(3.2, 1.15, 0.12, 0x14171c, x, 1.62, pz);
+    panel.rotation.x = -0.18;
+    g.add(panel);
+    g.add(makeTextPlane(`${v.name}`, 7, 1.1, "#ffffff", x, 3.4, pz));
+    const price = v.priceCity > 0 ? `${v.priceCity.toLocaleString()} CITY` : `LIMITED · ${v.priceOrbitx} ORBITX`;
+    g.add(makeTextPlane(price, 7, 1.1, v.priceCity > 0 ? "#34d399" : "#fbbf24", x, 2.1, pz));
   });
+  // slow turntable spin (cleared in dispose)
+  const spinTimer = setInterval(() => { if (turntable) turntable.rotation.y += 0.02; }, 50);
+
+  // showroom spotlights — fake light cones + glowing ceiling heads (no real lights, mobile-cheap)
+  for (const px of [-13, 13]) for (const pz of [-11, 7]) {
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(2.4, 7.6, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xdfe8ff, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    cone.position.set(px, 5.8, pz);
+    g.add(cone);
+    const head = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.5, 0.4, 10),
+      new THREE.MeshStandardMaterial({ color: 0x111318, emissive: 0xdfe8ff, emissiveIntensity: 1.8 }),
+    );
+    head.position.set(px, 9.6, pz);
+    g.add(head);
+  }
+
+  // ORBITX MOTORS sign on the back wall
+  g.add(box(20, 2.6, 0.4, 0x0d1116, 0, 6.6, -D / 2 + 0.3));
+  g.add(makeTextPlane("ORBITX MOTORS", 19, 2.2, "#22e5ff", 0, 6.6, -D / 2 + 0.55));
+
+  // customer lounge (west corner)
+  g.add(box(1.3, 0.6, 3.4, 0x2e3a4a, -25.5, 0.5, 12)); // sofa base
+  g.add(box(0.35, 1.3, 3.4, 0x2e3a4a, -26.3, 0.95, 12)); // sofa back
+  g.add(box(1.3, 0.9, 0.35, 0x2e3a4a, -25.5, 0.75, 10.45)); // arm
+  g.add(box(1.3, 0.9, 0.35, 0x2e3a4a, -25.5, 0.75, 13.55)); // arm
+  g.add(box(1.6, 0.1, 1.1, 0x1e1812, -23.3, 0.55, 12)); // coffee table top
+  g.add(box(0.5, 0.5, 0.5, 0x1e1812, -23.3, 0.28, 12)); // coffee table base
+  for (const az of [9.8, 14.2]) {
+    g.add(box(1.1, 0.5, 1.1, 0x3a2e20, -23.3, 0.45, az)); // armchair seat
+    g.add(box(0.25, 1.0, 1.1, 0x3a2e20, -22.85, 0.9, az)); // armchair back (faces -x)
+  }
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(5, 6), mat(0x232a33, { roughness: 0.95 }));
+  rug.rotation.x = -Math.PI / 2; rug.position.set(-24, 0.02, 12); rug.receiveShadow = true;
+  g.add(rug);
+  const loungeLight = new THREE.PointLight(0xffd9a0, 250, 28);
+  loungeLight.position.set(-24, 6.5, 12);
+  g.add(loungeLight);
 
   // sales desk near the entrance
   const deskPosition: Vec3T = [0, 0, 14];
@@ -278,6 +331,7 @@ export function buildDealershipInterior(): DealershipInterior {
     group: g,
     deskPosition,
     dispose() {
+      clearInterval(spinTimer);
       g.traverse((o) => {
         const m = o as THREE.Mesh;
         if (m.geometry) m.geometry.dispose();
