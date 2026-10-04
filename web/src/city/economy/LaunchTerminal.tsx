@@ -1,18 +1,19 @@
 /**
  * OrbitX City — token launch terminal.
  *
- * Runs the REAL platform launchpad flow (@/lib/orbitx/pumpLaunch):
- * IPFS metadata via /api/pump-create → vanity mint ("obx" suffix) via
- * /api/vanity-mint → create tx via PumpPortal → the player's hub wallet
- * (Phantom / Jupiter) signs. The token deploys on pump.fun and surfaces in
- * the platform's launch feeds like any other launch. The player pays gas —
- * product law holds, the platform never funds launches.
+ * Runs the REAL desk-wallet launch flow: orbitx_app_launch (Supercomputer
+ * MCP) — the backend signs the pump.fun create from the user's sealed
+ * in-app wallet, auto vanity *obx mint, no launch fee, just gas + mint
+ * rent. Then orbitx_launch_record surfaces the coin in the platform's
+ * launch feeds like any other launch. The player pays gas + dev buy from
+ * the desk wallet — product law holds, the platform never funds launches.
+ * Every launch shows a receipt with mint + signature + Solscan link.
  */
 import { useRef, useState } from "react";
 import { Rocket, Upload, X } from "lucide-react";
-import type { VersionedTransaction } from "@solana/web3.js";
-import { useConnection, useWallet } from "@/wallets/hub";
-import { launchPumpCoin } from "@/lib/orbitx/pumpLaunch";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { getBillingAuthCode } from "@/tokenomics/auth";
+import { callSupercomputerTool } from "@/tokenomics/mcpClient";
 import ReceiptModal from "./ReceiptModal";
 import "./economy.css";
 
@@ -31,8 +32,8 @@ function fileToBase64(file: File): Promise<{ base64: string; mime: string }> {
 }
 
 export default function LaunchTerminal({ onClose }: { onClose: () => void }) {
-  const hub = useWallet();
-  const { connection } = useConnection();
+  const billing = useOrbitxBilling();
+  const authed = billing.ready && !!getBillingAuthCode();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [name, setName] = useState("");
@@ -63,27 +64,42 @@ export default function LaunchTerminal({ onClose }: { onClose: () => void }) {
   }
 
   async function launch() {
-    if (!valid || !hub.publicKey || !hub.signTransaction || !image) return;
+    const authCode = getBillingAuthCode();
+    if (!authCode || !valid || !image) return;
     setError(null);
     setLaunching(true);
-    setStatus("Starting…");
+    setStatus("Building coin…");
     try {
-      const res = await launchPumpCoin({
-        connection,
-        publicKey: hub.publicKey,
-        signTransaction: hub.signTransaction as <T extends VersionedTransaction>(tx: T) => Promise<T>,
-        sendTransaction: hub.sendTransaction,
-        walletName: hub.wallet?.adapter?.name ?? null,
-        imageBase64: image.base64,
-        imageMimeType: image.mime,
+      const devBuySol = Math.max(0, Number(devBuy) || 0);
+      const res = await callSupercomputerTool(
+        "orbitx_app_launch",
+        {
+          authCode,
+          name: name.trim(),
+          symbol: symbol.trim().toUpperCase(),
+          description: description.trim(),
+          imageBase64: image.base64,
+          imageMimeType: image.mime,
+          pair: "sol",
+          devBuySol,
+        },
+        { timeoutMs: 120000 },
+      );
+      if (!res.ok || typeof res.signature !== "string" || typeof res.mint !== "string") {
+        throw new Error(res.message || res.error || "Launch failed.");
+      }
+      setStatus("Recording launch…");
+      // Surface the coin in the platform's launch feeds (best-effort).
+      await callSupercomputerTool("orbitx_launch_record", {
+        authCode,
+        mint: res.mint,
+        signature: res.signature,
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
-        description: description.trim(),
-        devBuySol: Math.max(0, Number(devBuy) || 0),
-        onStatus: setStatus,
-      });
+      }).catch(() => {});
       setReceipt({ mint: res.mint, sig: res.signature });
       setStatus(null);
+      billing.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Launch failed.");
       setStatus(null);
@@ -100,7 +116,7 @@ export default function LaunchTerminal({ onClose }: { onClose: () => void }) {
             <Rocket className="oxe-ic" />
             <div>
               <div className="oxe-t1">LAUNCH TERMINAL</div>
-              <div className="oxe-t2">Real pump.fun deployment · vanity *obx mint</div>
+              <div className="oxe-t2">Real pump.fun deployment · vanity *obx mint · desk-wallet signed</div>
             </div>
           </div>
           <button className="oxe-x" onClick={onClose} aria-label="Close launch terminal">
@@ -108,12 +124,15 @@ export default function LaunchTerminal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {!hub.connected ? (
+        {!authed ? (
           <div className="oxe-notice">
-            <div className="oxe-notice-t">Connect a wallet to launch</div>
-            <div className="oxe-notice-s">You sign the deploy — you pay gas, you own the dev wallet.</div>
-            <button className="oxe-btn oxe-btn-primary" onClick={() => hub.connect().catch(() => {})}>
-              Connect wallet
+            <div className="oxe-notice-t">Link your in-app wallet to launch</div>
+            <div className="oxe-notice-s">
+              One dashboard link, then launches are signed by the backend — no popups, ever.
+            </div>
+            {billing.error && <div className="oxe-err oxe-err-block">{billing.error}</div>}
+            <button className="oxe-btn oxe-btn-primary" onClick={() => billing.beginAuth()}>
+              Link in-app wallet
             </button>
           </div>
         ) : (
@@ -161,6 +180,7 @@ export default function LaunchTerminal({ onClose }: { onClose: () => void }) {
               <span className="oxe-mini-chip">PAIR · SOL</span>
               <span className="oxe-mini-chip">VANITY · *obx</span>
               <span className="oxe-mini-chip">VIA · pump.fun</span>
+              <span className="oxe-mini-chip">SIGNS · desk wallet</span>
             </div>
 
             {status && <div className="oxe-status">{status}</div>}
@@ -172,7 +192,9 @@ export default function LaunchTerminal({ onClose }: { onClose: () => void }) {
                 {launching ? "Launching…" : "Launch token"}
               </button>
             </div>
-            <div className="oxe-t2 oxe-center">Your wallet signs · you pay gas · token hits the launch feed</div>
+            <div className="oxe-t2 oxe-center">
+              Desk wallet pays gas + dev buy · free launch · token hits the launch feed
+            </div>
           </>
         )}
       </div>
