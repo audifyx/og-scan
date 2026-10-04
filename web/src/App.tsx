@@ -213,6 +213,7 @@ import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
 import { SecurityTracker } from "./components/SecurityTracker";
 
 const McpVoiceRoom = lazyWithRetry(() => import("./pages/McpVoiceRoom"));
+const VoiceLobbyBrowser = lazyWithRetry(() => import("./voice/VoiceLobbyBrowser"));
 const McpGroupChat = lazyWithRetry(() => import("./pages/McpGroupChat"));
 const OrbitxAgentsWorld = lazyWithRetry(() => import("./pages/OrbitxAgentsWorld"));
 const OrbitxAgentsHub = lazyWithRetry(() => import("./pages/OrbitxAgentsHub"));
@@ -714,6 +715,7 @@ const App = () => (
             <Route path="/mcp" element={<RedirectPreserveSearch to="/supercomputer" />} />
             <Route path="/vc" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/vc/:slug" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
+            <Route path="/voice" element={<Suspense fallback={<RouteFallback label="Voice" />}><VoiceLobbyBrowser /></Suspense>} />
             <Route path="/gc" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
             <Route path="/gc/:slug" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
             <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
