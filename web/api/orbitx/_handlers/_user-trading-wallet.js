@@ -294,9 +294,60 @@ async function loadKeypair(row) {
   return Keypair.fromSecretKey(bs58.decode(opened.secret));
 }
 
-function rpcUrl() {
+function rpcUrls() {
   const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
-  return key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
+  const list = [
+    key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : null,
+    "https://api.mainnet-beta.solana.com",
+    "https://solana-rpc.publicnode.com",
+    "https://rpc.ankr.com/solana",
+    "https://rpc.solanatracker.io/public",
+  ].filter(Boolean);
+  return list;
+}
+function rpcUrl() { return rpcUrls()[0]; }
+
+// Broadcast a signed tx, trying each RPC in order. Returns the signature
+// from the first RPC that accepts it. Never depends on a single provider.
+async function broadcastTx(b64, opts) {
+  const body = JSON.stringify({
+    jsonrpc: "2.0", id: 1, method: "sendTransaction",
+    params: [b64, Object.assign({ encoding: "base64", skipPreflight: true, maxRetries: 4 }, opts || {})],
+  });
+  let lastErr = null;
+  for (const url of rpcUrls()) {
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body, signal: AbortSignal.timeout(20000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.error) { lastErr = j.error.message || "rpc send failed"; continue; }
+      if (j.result) return { signature: j.result, rpc: url.split("?")[0] };
+      lastErr = "empty rpc response";
+    } catch (e) { lastErr = String((e && e.message) || e); }
+  }
+  throw new Error(lastErr || "all broadcast RPCs failed");
+}
+
+// Read-only RPC call with fallback across providers.
+async function rpcCall(method, params, timeoutMs) {
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
+  let lastErr = null;
+  for (const url of rpcUrls()) {
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body, signal: AbortSignal.timeout(timeoutMs || 10000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.error) { lastErr = j.error.message; continue; }
+      return j.result;
+    } catch (e) { lastErr = String((e && e.message) || e); }
+  }
+  throw new Error(lastErr || "all RPCs failed");
 }
 
 /* ------------------------------------------------------------------ */
@@ -314,19 +365,11 @@ function rpcUrl() {
 /* ------------------------------------------------------------------ */
 
 export async function getTxConfirmationStatus(signature, { searchHistory = false } = {}) {
-  const r = await fetch(rpcUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getSignatureStatuses",
-      params: [[signature], { searchTransactionHistory: !!searchHistory }],
-    }),
-    signal: AbortSignal.timeout(10000),
-  });
-  const j = await r.json().catch(() => ({}));
-  const v = j?.result?.value?.[0];
+  let v;
+  try {
+    const result = await rpcCall("getSignatureStatuses", [[signature], { searchTransactionHistory: !!searchHistory }]);
+    v = result?.value?.[0];
+  } catch { v = null; }
   if (!v) return { status: "unknown", signature };
   if (v.err) {
     return { status: v.confirmationStatus || "processed", failed: true, err: v.err, signature };
@@ -388,20 +431,7 @@ export async function signUserSwap(row, { inputMint, outputMint, amount, slippag
   const tx = VersionedTransaction.deserialize(Buffer.from(sw.swapTransaction, "base64"));
   tx.sign([kp]);
   const b64 = Buffer.from(tx.serialize()).toString("base64");
-  const r = await fetch(rpcUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "sendTransaction",
-      params: [b64, { encoding: "base64", skipPreflight: true, maxRetries: 4 }],
-    }),
-    signal: AbortSignal.timeout(20000),
-  });
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message || "rpc send failed");
-  const signature = j.result;
+  const { signature } = await broadcastTx(b64);
   // F3: broadcast acceptance is NOT success — confirm on-chain before
   // claiming it. Honest outcomes only: confirmed | failed | pending.
   const conf = await pollTxConfirmation(signature);
@@ -435,20 +465,7 @@ export async function signAndSendUserTx(row, txBase64, extraSigners = []) {
     tx.partialSign(...signers);
     serialized = tx.serialize().toString("base64");
   }
-  const r = await fetch(rpcUrl(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "sendTransaction",
-      params: [serialized, { encoding: "base64", skipPreflight: true, maxRetries: 4 }],
-    }),
-    signal: AbortSignal.timeout(20000),
-  });
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message || "rpc send failed");
-  const signature = j.result;
+  const { signature } = await broadcastTx(serialized);
   // F3: broadcast acceptance is NOT success — confirm on-chain before
   // claiming it. Honest outcomes only: confirmed | failed | pending.
   const conf = await pollTxConfirmation(signature);
