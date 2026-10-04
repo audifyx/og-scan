@@ -37,7 +37,7 @@ export default function ShopPage() {
       brandHref="/shop"
       brandSub="Shop"
       footerBrand="OrbitX Shop"
-      footerNote="One Phantom sign buys $ORBITX and burns it. Same items as the Solana-betting shop. Then copy the note and send it to the team."
+      footerNote="Your in-app wallet buys $ORBITX and burns it. Same items as the Solana-betting shop. Then copy the note and send it to the team."
       siblingHref="/supercomputer?tab=shop"
       siblingLabel="Super Computer"
       siblingIcon="◆"
@@ -52,7 +52,7 @@ export default function ShopPage() {
           </div>
           <div className="ox-agent__panel-b">
             <p className="ox-agent__note" style={{ marginTop: 0 }}>
-              Connect your Solana wallet. Desk shop items buy $ORBITX and burn in one Phantom transaction.
+              Link your in-app wallet. Desk shop items buy $ORBITX and burn via your in-app wallet.
             </p>
             <div className="ox-agent__btn-row">
               {pickable.slice(0, 3).map((w) => (

@@ -4,8 +4,10 @@ import { ArrowDown, Loader2, Search, ShieldCheck, Zap } from "lucide-react";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import { ToolHeader } from "@/components/ToolPageShell";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { getBillingAuthCode } from "@/tokenomics/auth";
+import { callSupercomputerTool } from "@/tokenomics/mcpClient";
 import {
-  jupQuote,
   jupGetTokens,
   jupSearchToken,
   SOL_MINT,
@@ -24,10 +26,14 @@ type Props = {
 type SwapTab = "quote" | "search";
 
 export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
+  const billing = useOrbitxBilling();
   const [solAmount, setSolAmount] = useState<string>("1");
   const [activeTab, setActiveTab] = useState<SwapTab>("quote");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const [buySig, setBuySig] = useState<string | null>(null);
   const lamports = useMemo(() => {
     const n = Number(solAmount);
     if (!isFinite(n) || n <= 0) return "0";
@@ -50,7 +56,18 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
 
   const { data: quote, isFetching, error } = useQuery({
     queryKey: ["quote", ogMint, lamports],
-    queryFn: () => jupQuote(SOL_MINT, ogMint, lamports, 100),
+    queryFn: async () => {
+      const res = await callSupercomputerTool("orbitx_trade_quote", {
+        mint: ogMint,
+        amountSol: Number(solAmount) || 0,
+      });
+      if (!res.ok) throw new Error(res.message || res.error || "Quote failed");
+      return {
+        outAmount: String(res.outAmount ?? "0"),
+        priceImpactPct: String(res.priceImpactPct ?? "0"),
+        routePlan: [] as { swapInfo: { label: string } }[],
+      };
+    },
     enabled: !!ogMint && lamports !== "0",
     refetchInterval: 12_000,
     retry: 1,
@@ -78,6 +95,45 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
     setActiveTab("quote");
   };
 
+  async function executeBuy() {
+    const code = getBillingAuthCode();
+    if (!code) {
+      setBuyError("Link your in-app wallet first — one tap, then swaps are seamless.");
+      billing.beginAuth();
+      return;
+    }
+    const amt = Number(solAmount);
+    if (!isFinite(amt) || amt <= 0) {
+      setBuyError("Enter a SOL amount.");
+      return;
+    }
+    if (amt > 250) {
+      setBuyError("Per-trade cap is $250 worth of SOL.");
+      return;
+    }
+    setBuyError(null);
+    setBuySig(null);
+    setBuying(true);
+    try {
+      const res = await callSupercomputerTool("orbitx_app_buy", {
+        authCode: code,
+        mint: ogMint,
+        amountSol: amt,
+        payWith: "sol",
+        slippageBps: 100,
+      });
+      if (!res.ok || typeof res.signature !== "string") {
+        throw new Error(res.message || res.error || "Buy failed.");
+      }
+      setBuySig(res.signature);
+      billing.refresh();
+    } catch (e) {
+      setBuyError(e instanceof Error ? e.message : "Buy failed.");
+    } finally {
+      setBuying(false);
+    }
+  }
+
   return (
     <section id="swap" className="relative scroll-mt-36">
       <div className="grid gap-8 lg:grid-cols-5">
@@ -85,10 +141,10 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
           <ToolHeader
             icon={Zap}
             title={`Swap — $${og?.symbol ?? "OG"}`}
-            subtitle="Live quote routed through Jupiter's aggregator — the same engine that powers jup.ag. Connect your Phantom wallet to execute."
+            subtitle="Live quotes, executed by your in-app wallet. Backend-signed, no extension needed."
             gradient="from-emerald-500 to-lime-400"
             glowColor="rgba(16,185,129,0.25)"
-            badge="JUPITER"
+            badge="IN-APP"
             badgeColor="lime"
           />
           <div className="grid gap-2">
@@ -196,18 +252,18 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
               </div>
 
               <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <a
-                  href={`https://phantom.app/ul/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${ogMint}&amount=${lamports}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group flex items-center justify-center gap-2 border border-og-lime bg-og-lime py-4 text-sm font-bold uppercase tracking-[0.3em] text-og-ink transition hover:bg-og-lime/90 pulse-glow"
+                <button
+                  onClick={() => void executeBuy()}
+                  disabled={buying || !quote}
+                  className="group flex items-center justify-center gap-2 border border-og-lime bg-og-lime py-4 text-sm font-bold uppercase tracking-[0.3em] text-og-ink transition hover:bg-og-lime/90 pulse-glow disabled:opacity-50"
                 >
-                  <Zap className="h-4 w-4" />
-                  SWAP ON PHANTOM
-                </a>
+                  {buying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                  {buying ? "SWAPPING…" : "SWAP NOW"}
+                </button>
                 {og && <CoinDetailDialog token={og} onOpenScanner={() => onSelectMint(og.id)} actionLabel="Load" className="min-h-12 px-4" />}
               </div>
-              {error && <div className="text-center text-[10px] uppercase tracking-widest text-og-blood">{(error as Error).message}</div>}
+              {(error || buyError) && <div className="text-center text-[10px] uppercase tracking-widest text-og-blood">{buyError || (error as Error).message}</div>}
+              {buySig && <div className="text-center text-[10px] uppercase tracking-widest text-og-lime">Swap complete — <a className="underline" href={`https://solscan.io/tx/${buySig}`} target="_blank" rel="noreferrer">view on Solscan</a></div>}
             </div>
             )}
 

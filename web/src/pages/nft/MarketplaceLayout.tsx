@@ -63,7 +63,7 @@ function titleFor(pathname: string): string {
 
 function WalletLogin() {
   const { connection } = useConnection();
-  const { publicKey, connected, wallets, select, connect, disconnect } = useWallet();
+  const { publicKey, connected, connect, disconnect } = useWallet();
   const addr = publicKey?.toBase58();
   const navigate = useNavigate();
 
@@ -80,10 +80,8 @@ function WalletLogin() {
 
   const onClick = async () => {
     if (connected) { await disconnect().catch(() => undefined); return; }
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name);
     try { await connect(); }
-    catch { if (!phantom) window.open("https://phantom.app", "_blank", "noopener,noreferrer"); }
+    catch { /* in-app wallet link handles its own flow */ }
   };
 
   if (!connected || !addr) {

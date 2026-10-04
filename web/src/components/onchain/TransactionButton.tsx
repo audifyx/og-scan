@@ -63,12 +63,13 @@ export function TransactionButton({
     <div className="space-y-2">
       <button
         type="button"
-        disabled={disabled || state === "pending" || !publicKey}
-        onClick={() => void run()}
+        disabled
+        title="On-chain attestations need the in-app wallet's backend signer for custom transactions — coming soon."
         className="inline-flex items-center justify-center rounded-lg border border-[#F0C75E]/50 bg-[#F0C75E]/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#F0C75E] disabled:opacity-40"
       >
         {label}
       </button>
+      <p className="text-[10px] uppercase tracking-widest text-white/40">On-chain attestations coming soon</p>
       <TransactionStatus state={state} signature={sig} error={error} onRetry={() => void run()} />
     </div>
   );

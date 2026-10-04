@@ -112,8 +112,8 @@ export function McpCreditsBuyCard({ usage, onPurchased, toolHint }: Props) {
       </div>
       <div className="ox-agent__panel-b">
         <p className="ox-agent__note" style={{ marginTop: 0 }}>
-          Phantom sends SOL to the OrbitX desk wallet. Credits apply after confirm and work for Agent MCP
-          and X MCP. {toolHint || "In chat: orbitx_credits_buy or x_credits_buy / x_buy what=credits."}
+          Send SOL to the OrbitX desk wallet from your in-app wallet, then paste the transaction signature below.
+          Credits apply after confirm and work for Agent MCP and X MCP. {toolHint || "In chat: orbitx_credits_buy or x_credits_buy / x_buy what=credits."}
         </p>
         <div className="ox-x-packs">
           {packs.map((p) => (
@@ -164,10 +164,11 @@ export function McpCreditsBuyCard({ usage, onPurchased, toolHint }: Props) {
         {error && <div className="ox-agent__alert">{error}</div>}
         {buyNote && <p className="ox-agent__note ox-x-buy__ok">{buyNote}</p>}
         <div className="ox-agent__actions" style={{ marginTop: "0.75rem" }}>
-          <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled={buyBusy} onClick={() => void onBuy()}>
-            {buyBusy ? "Processing…" : connected ? "Pay with wallet" : "Connect wallet to pay"}
+          <button type="button" className="ox-agent__btn ox-agent__btn--primary" disabled title="One-tap pay needs the in-app wallet's backend signer — coming soon. For now, send SOL manually and paste the signature below.">
+            Pay with wallet
           </button>
         </div>
+        <p className="text-[10px] uppercase tracking-widest text-white/40 mt-1">One-tap pay coming soon — use manual below</p>
         <div className="ox-x-buy__manual">
           <label className="ox-agent__label" htmlFor="ox-shop-buy-sig">
             Already paid? Paste signature

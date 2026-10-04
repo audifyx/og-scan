@@ -20,7 +20,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { detectMobileWallet, connectPhantomMobile, isRunningInPhantomApp } from "@/lib/mobile-wallet";
 import {
   Keypair, VersionedTransaction, Transaction,
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,

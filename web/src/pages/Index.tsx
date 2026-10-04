@@ -97,7 +97,7 @@ const importCommunityHubPage = () => import("./CommunityHub");
 const importXSocialApp = () => import("@/components/social-x/XSocialApp");
 const importToolsHubPage = () => import("./ToolsHub");
 const importChartsPage = () => import("./Charts");
-const importLiveTradingPage = () => import("./LiveTrading");
+const importLiveTradingPage = () => import("@/components/trading/TradingTerminal").then(m => ({ default: m.TradingTerminal }));
 const importLiveFeedPage = () => import("./LiveFeed");
 const importTokenManagerPage = () => import("./TokenManager");
 const CommunitiesPage = lazy(importCommunitiesPage);

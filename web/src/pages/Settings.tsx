@@ -25,6 +25,7 @@ import { DeviceThemePicker } from "@/components/settings/DeviceThemePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { toast } from "sonner";
 import {
   canUseReservedUsername,
@@ -2468,29 +2469,11 @@ function DiscordCard() {
   );
 }
 
-/* WalletCard — link a Solana wallet (Phantom / Solflare / Backpack) via injection. */
+/* WalletCard — the in-app (desk) wallet is the only wallet. Link it once here. */
 function WalletCard() {
-  const [addr, setAddr] = useState<string | null>(() => localStorage.getItem("og_linked_wallet"));
-  const [busy, setBusy] = useState<string | null>(null);
-  const providers: { key: string; label: string; get: () => any }[] = [
-    { key: "phantom", label: "Phantom", get: () => (window as any).solana?.isPhantom ? (window as any).solana : null },
-    { key: "solflare", label: "Solflare", get: () => (window as any).solflare },
-    { key: "backpack", label: "Backpack", get: () => (window as any).backpack?.solana || ((window as any).backpack) },
-  ];
-  const connect = async (p: { key: string; label: string; get: () => any }) => {
-    const prov = p.get();
-    if (!prov) { toast.error(`${p.label} not detected. Install the extension.`); return; }
-    setBusy(p.key);
-    try {
-      const res = await prov.connect();
-      const pk = (res?.publicKey || prov.publicKey)?.toString();
-      if (!pk) throw new Error("No public key returned");
-      localStorage.setItem("og_linked_wallet", pk);
-      setAddr(pk);
-      toast.success(`${p.label} linked`);
-    } catch (e: any) { toast.error(e?.message || "Connect cancelled"); } finally { setBusy(null); }
-  };
-  const disconnect = () => { localStorage.removeItem("og_linked_wallet"); setAddr(null); toast.success("Wallet unlinked"); };
+  const billing = useOrbitxBilling();
+  const addr = billing.wallet;
+  const unlink = () => { billing.resetAuth(); toast.success("Wallet unlinked"); };
 
   return (
     <Card className="p-5 glass-card">
@@ -2512,20 +2495,18 @@ function WalletCard() {
               <div className="flex items-center gap-2 mt-4">
                 <a href={`/intelligence?q=${encodeURIComponent("analyze wallet " + addr)}`}
                   className="flex items-center gap-1.5 rounded-xl bg-[#22d3ee] text-black font-bold text-[13px] px-4 py-2 hover:bg-[#22d3ee]/90">💀 Ask Grim about my wallet</a>
-                <Button variant="outline" size="sm" onClick={disconnect} className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
+                <Button variant="outline" size="sm" onClick={unlink} className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
                   <LogOut className="h-3.5 w-3.5 mr-1.5" /> Unlink
                 </Button>
               </div>
             </>
           ) : (
             <>
-              <p className="text-white/45 text-[13px] leading-relaxed mt-1">Link a Solana wallet to run Grim's wallet intel on your own holdings and unlock portfolio features.</p>
+              <p className="text-white/45 text-[13px] leading-relaxed mt-1">Link your in-app wallet to run Grim's wallet intel on your own holdings and unlock portfolio features.</p>
               <div className="flex flex-wrap gap-2 mt-3">
-                {providers.map((p) => (
-                  <Button key={p.key} onClick={() => connect(p)} disabled={!!busy} variant="outline" className="border-white/10 bg-white/5 rounded-xl">
-                    {busy === p.key ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Wallet className="h-4 w-4 mr-1.5" />} {p.label}
-                  </Button>
-                ))}
+                <Button onClick={() => billing.beginAuth()} variant="outline" className="border-white/10 bg-white/5 rounded-xl">
+                  <Wallet className="h-4 w-4 mr-1.5" /> Link in-app wallet
+                </Button>
               </div>
             </>
           )}

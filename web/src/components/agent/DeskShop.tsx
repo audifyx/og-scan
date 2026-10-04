@@ -78,7 +78,7 @@ export function DeskShop() {
     setReceipt(null);
     setCopied(false);
     if (!connected || !wallet) {
-      setError("Connect Phantom to check out.");
+      setError("Link your in-app wallet to check out.");
       return;
     }
     if (item.needsMint && !mintOk) {
@@ -176,7 +176,7 @@ export function DeskShop() {
       <div className="ox-agent__hero">
         <h1 className="ox-agent__title">OrbitX shop</h1>
         <p className="ox-agent__lead">
-          You are not paying the desk. One Phantom sign, Jupiter swap buys $ORBITX, and that supply
+          You are not paying the desk. Your in-app wallet buys $ORBITX and that supply
           burns. Same catalog as the Solana-betting shop — {ORBITX_SHOP_SKUS.length} utilities.
         </p>
       </div>
@@ -297,15 +297,16 @@ export function DeskShop() {
                       </p>
                       <h3>{item.name}</h3>
                       <p className="ox-desk-shop__blurb">{item.blurb}</p>
-                      <p className="ox-desk-shop__meta">{hoursLabel(item.hours)} · one Jupiter tx</p>
+                      <p className="ox-desk-shop__meta">{hoursLabel(item.hours)} · in-app wallet</p>
                       <button
                         type="button"
                         className="ox-agent__btn ox-agent__btn--primary"
-                        disabled={Boolean(busySku)}
-                        onClick={() => void onBuy(item)}
+                        disabled
+                        title="Checkout needs the in-app wallet's backend signer for custom transactions — coming soon. The in-app wallet is the only wallet."
                       >
-                        {busy ? "Jupiter swap…" : `Burn $${item.usd} · ${sol} SOL`}
+                        {`Burn $${item.usd} · ${sol} SOL`}
                       </button>
+                      <p className="text-[10px] uppercase tracking-widest text-white/40 mt-1">In-app checkout coming soon</p>
                     </article>
                   );
                 })}

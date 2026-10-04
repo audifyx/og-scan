@@ -7,7 +7,7 @@
  *   3. View current on-chain metadata (name, symbol, image, description, links)
  *   4. Edit fields → upload new image to Supabase Storage → build new metadata JSON
  *   5. Upload metadata JSON to Supabase Storage
- *   6. Sign UpdateMetadataAccountV2 tx via Phantom
+ *   6. Sign UpdateMetadataAccountV2 tx via in-app wallet (backend-signed where supported)
  *   7. Done — metadata updated on every platform
  */
 
@@ -121,11 +121,8 @@ async function fetchTokensByAuthority(
 
 /* ─── Main Component ─── */
 export default function TokenManager() {
-  const { publicKey, signTransaction, sendTransaction, connected, wallets, select, connect, disconnect, wallet, connecting } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected, connect, disconnect, connecting } = useWallet();
   const { connection } = useConnection();
-  const availableWallets = wallets.filter(
-    (w) => w.adapter.name === "Phantom",
-  );
 
   /* Match ConnectedWalletTab: gate on `connected` only.
    * publicKey always arrives in the same render cycle as connected=true,
@@ -208,32 +205,6 @@ export default function TokenManager() {
    * browser, and on desktop/in-app browser select + connect via the
    * provider (so publicKey + signTransaction populate) while surfacing
    * real errors. */
-  const [pendingConnect, setPendingConnect] = useState<string | null>(null);
-
-  const isMobile =
-    typeof navigator !== "undefined" &&
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent,
-    );
-
-  const getInjectedProvider = useCallback((name: string): unknown => {
-    if (typeof window === "undefined") return null;
-    const w = window as any;
-    if (name === "Solflare") return w.solflare?.isSolflare ? w.solflare : null;
-    if (w.phantom?.solana?.isPhantom) return w.phantom.solana;
-    if (w.solana?.isPhantom) return w.solana;
-    return null;
-  }, []);
-
-  const buildWalletDeepLink = useCallback((name: string): string => {
-    const url = window.location.href;
-    const ref = window.location.origin;
-    if (name === "Solflare") {
-      return `https://solflare.com/ul/v1/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(ref)}`;
-    }
-    return `https://phantom.app/ul/browse/${encodeURIComponent(url)}?ref=${encodeURIComponent(ref)}`;
-  }, []);
-
   const reportConnectError = useCallback((err: any) => {
     const msg = err?.message || String(err);
     if (!/user rejected|user denied|already pending|request reset|wallet not selected/i.test(msg)) {
@@ -243,50 +214,13 @@ export default function TokenManager() {
   }, []);
 
   const handleConnect = useCallback(
-    (name: string) => {
+    (_name: string) => {
       setError(null);
-      const target = wallets.find((w) => w.adapter.name === name);
-      const injected =
-        !!getInjectedProvider(name) || target?.adapter.readyState === "Installed";
-
-      if (!injected) {
-        if (isMobile) {
-          window.location.href = buildWalletDeepLink(name);
-          return;
-        }
-        setError(`${name} not detected. Install the ${name} extension, then refresh this page.`);
-        return;
-      }
-      if (!target) {
-        setError(`${name} is not available.`);
-        return;
-      }
-
-      if (wallet?.adapter.name === name) {
-        connect().catch(reportConnectError);
-      } else {
-        setPendingConnect(name);
-        select(name as any);
-      }
-    },
-    [wallets, wallet, select, connect, isMobile, getInjectedProvider, buildWalletDeepLink, reportConnectError],
-  );
-
-  useEffect(() => {
-    if (
-      pendingConnect &&
-      wallet?.adapter.name === pendingConnect &&
-      !connected &&
-      !connecting
-    ) {
-      setPendingConnect(null);
+      // One wallet: the in-app wallet. The hub's connect() runs the auth-code link flow.
       connect().catch(reportConnectError);
-    }
-  }, [pendingConnect, wallet, connected, connecting, connect, reportConnectError]);
-
-  useEffect(() => {
-    if (connected && pendingConnect) setPendingConnect(null);
-  }, [connected, pendingConnect]);
+    },
+    [connect, reportConnectError],
+  );
 
   /* ─── Wallet connect handler (same as ConnectedWalletTab) ─── */
 
@@ -717,22 +651,13 @@ export default function TokenManager() {
               </p>
             </div>
             <div className="flex flex-col gap-3">
-              {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).map(w => (
-                <button key={w.adapter.name} onClick={() => handleConnect(w.adapter.name)} disabled={connecting || pendingConnect === w.adapter.name}
-                  className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
-                  {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-7 h-7 rounded-lg" />}
-                  <span className="font-semibold text-sm">{w.adapter.name}</span>
-                  <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">{(connecting || pendingConnect === w.adapter.name) ? "Connecting…" : (isMobile ? "Open app →" : "Connect →")}</span>
-                </button>
-              ))}
-              {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).length === 0 && (
-                <div className="text-center text-sm text-white/40 py-4">
-                  <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-yellow-500" />
-                  No wallets detected. Install <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-lime))] underline">Phantom</a> first.
-                </div>
-              )}
+              <button onClick={() => handleConnect("In-App")} disabled={connecting}
+                className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
+                <span className="font-semibold text-sm">In-App Wallet</span>
+                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">{connecting ? "Connecting…" : "Connect →"}</span>
+              </button>
             </div>
-            <p className="text-[11px] text-white/25">Your keys never leave your wallet.</p>
+            <p className="text-[11px] text-white/25">Your in-app wallet is the only wallet across OrbitX.</p>
           </div>
         </div>
       )}
