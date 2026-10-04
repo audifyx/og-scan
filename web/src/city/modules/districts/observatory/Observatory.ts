@@ -142,6 +142,35 @@ export function discoveryProgress(gazedStarIndices: number[]): { constellation: 
 
 /* --------------------------------- interior --------------------------------- */
 
+/* ------------------------------ shared helpers ------------------------------ */
+
+function mat(color: number, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.3, ...opts });
+}
+function box(w: number, h: number, d: number, color: number, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function makeTextPlane(text: string, w: number, h: number, color: string, x: number, y: number, z: number) {
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0a0c10";
+  ctx.fillRect(0, 0, 1024, 128);
+  ctx.fillStyle = color;
+  ctx.font = "bold 72px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 512, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+  m.position.set(x, y, z);
+  return m;
+}
+
 export interface ObservatoryInterior {
   group: THREE.Group;
   /** Dome radius — star field is rendered at this radius. */
@@ -196,27 +225,129 @@ export function buildObservatoryInterior(): ObservatoryInterior {
     g.add(new THREE.Line(lineGeo, lineMat));
   }
 
-  // telescope
+  // central telescope — pier, equatorial mount, long tube angled up through the dome slit
   const tele = new THREE.Group();
+  const pier = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.9, 1.2, 2.2, 12),
+    mat(0x3a4048, { metalness: 0.6 })
+  );
+  pier.position.y = 1.1; pier.castShadow = true;
+  tele.add(pier);
+  const head = box(1.6, 0.7, 1.6, 0x2b3138, 0, 2.5, 0);
+  tele.add(head);
+  const tilt = new THREE.Group();
+  tilt.position.y = 2.9;
+  tilt.rotation.x = -0.95; // ~54° elevation toward the dome slit (+z)
+  tele.add(tilt);
   const tube = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.65, 4.4, 14),
+    new THREE.CylinderGeometry(0.55, 0.7, 6.4, 16),
     new THREE.MeshStandardMaterial({ color: 0xb8c0cc, metalness: 0.85, roughness: 0.3 })
   );
-  tube.rotation.x = Math.PI / 2.6;
-  tube.position.y = 1.6;
-  tele.add(tube);
-  const mount = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.35, 0.5, 1.6, 10),
-    new THREE.MeshStandardMaterial({ color: 0x3a4048, metalness: 0.6, roughness: 0.5 })
+  tube.rotation.x = Math.PI / 2; // lie along z inside the tilt group
+  tube.position.z = 0.6;
+  tube.castShadow = true;
+  tilt.add(tube);
+  const dew = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.68, 0.62, 0.7, 16),
+    mat(0x22262c, { metalness: 0.5 })
   );
-  mount.position.y = 0.8;
-  tele.add(mount);
-  tele.position.set(0, 0, 0);
+  dew.rotation.x = Math.PI / 2;
+  dew.position.z = 3.9;
+  tilt.add(dew);
+  const finder = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.14, 1.6, 8),
+    mat(0x22262c)
+  );
+  finder.rotation.x = Math.PI / 2;
+  finder.position.set(0.75, 0.4, 0.9);
+  tilt.add(finder);
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.09, 1.8, 8),
+    mat(0x555c66)
+  );
+  shaft.position.set(0, -0.9, -1.2);
+  shaft.rotation.x = 0.5;
+  tilt.add(shaft);
+  const weight = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.35, 0.5, 12),
+    mat(0x1c1f24)
+  );
+  weight.rotation.x = Math.PI / 2 + 0.5;
+  weight.position.set(0, -1.25, -1.85);
+  tilt.add(weight);
   g.add(tele);
 
-  const dim = new THREE.PointLight(0x334455, 200, 30);
-  dim.position.set(0, 6, 0);
-  g.add(dim);
+  // control desk with star-chart monitors (faces the telescope)
+  const desk = new THREE.Group();
+  desk.position.set(7.5, 0, 4.5);
+  desk.rotation.y = Math.atan2(-7.5, -4.5);
+  const dtop = box(3.4, 0.14, 1.4, 0x3a3f47, 0, 1.0, 0);
+  desk.add(dtop);
+  for (const lx of [-1.4, 1.4]) {
+    const leg = box(0.14, 1.0, 1.2, 0x2b3138, lx, 0.5, 0);
+    desk.add(leg);
+  }
+  for (let mi = -1; mi <= 1; mi++) {
+    const frame = box(1.0, 0.78, 0.1, 0x14171c, mi * 1.1, 1.55, -0.45);
+    desk.add(frame);
+    const scr = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.88, 0.64),
+      new THREE.MeshStandardMaterial({ color: 0x060a12, emissive: 0x2a5a8a, emissiveIntensity: 0.9 })
+    );
+    scr.position.set(mi * 1.1, 1.55, -0.39);
+    scr.rotation.y = Math.PI; // face the operator
+    desk.add(scr);
+  }
+  const kb = box(1.2, 0.06, 0.4, 0x1c1f24, 0, 1.1, 0.35);
+  desk.add(kb);
+  desk.add(makeTextPlane("TELESCOPE CONTROL", 3.2, 0.5, "#9fd8ff", 0, 0.62, 0.72));
+  g.add(desk);
+
+  // observer chairs ringing the telescope
+  for (const a of [0.7, 2.8, 4.9]) {
+    const chair = new THREE.Group();
+    chair.position.set(Math.sin(a) * 5.5, 0, Math.cos(a) * 5.5);
+    chair.rotation.y = a; // backrest away from the telescope
+    const seat = box(0.9, 0.12, 0.9, 0x4a3b2e, 0, 0.85, 0);
+    chair.add(seat);
+    const back = box(0.9, 1.0, 0.12, 0x4a3b2e, 0, 1.4, 0.42);
+    chair.add(back);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.85, 8), mat(0x22262c));
+    post.position.y = 0.42;
+    chair.add(post);
+    g.add(chair);
+  }
+
+  // constellation plaques around the dome wall
+  CONSTELLATIONS.forEach((c, i) => {
+    const phi = Math.PI + (i - 2) * 0.55; // spread across the back wall
+    const px = Math.sin(phi) * 13.6, pz = Math.cos(phi) * 13.6;
+    const backing = box(7.8, 1.6, 0.15, 0x2b2118, Math.sin(phi) * 13.75, 3.6, Math.cos(phi) * 13.75);
+    backing.rotation.y = phi + Math.PI;
+    g.add(backing);
+    const plaque = makeTextPlane(`${c.name} · ${c.symbol}`, 7.4, 1.2, "#f5c518", px, 3.6, pz);
+    plaque.rotation.y = phi + Math.PI;
+    g.add(plaque);
+  });
+
+  // OBSERVATORY sign above the entrance
+  const osign = makeTextPlane("OBSERVATORY", 10, 1.4, "#9fd8ff", 0, 5.2, 12.8);
+  osign.rotation.y = Math.PI; // face the room from the entrance side
+  g.add(osign);
+
+  // red night lighting — dim so the star field stays readable
+  const night = new THREE.PointLight(0xff2a2a, 120, 28);
+  night.position.set(-6, 3.4, 6);
+  g.add(night);
+  const lampPole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.2, 8), mat(0x22262c));
+  lampPole.position.set(-6, 1.6, 6);
+  g.add(lampPole);
+  const lampBulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 10, 10),
+    new THREE.MeshStandardMaterial({ color: 0x330a0a, emissive: 0xff2a2a, emissiveIntensity: 2.2 })
+  );
+  lampBulb.position.set(-6, 3.3, 6);
+  g.add(lampBulb);
 
   return {
     group: g,
