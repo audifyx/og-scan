@@ -125,6 +125,23 @@ function box(w: number, h: number, d: number, color: number, x = 0, y = 0, z = 0
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
+function makeTextPlane(text: string, w: number, h: number, color: string, x: number, y: number, z: number) {
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0a0c10";
+  ctx.fillRect(0, 0, 1024, 128);
+  ctx.fillStyle = color;
+  ctx.font = "bold 72px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 512, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+  m.position.set(x, y, z);
+  return m;
+}
 
 /** Grand reading room: double-height, shelf walls, long oak tables, green lamps. */
 export function buildLibraryInterior(): LibraryInterior {
@@ -196,6 +213,70 @@ export function buildLibraryInterior(): LibraryInterior {
   );
   sky.rotation.x = Math.PI / 2; sky.position.y = H - 0.1;
   g.add(sky);
+
+  /* ------------------------- furnished reading room ------------------------- */
+
+  // freestanding double-sided shelf aisles (kept sparse for perf)
+  const aisleCols = [0x7a2e2e, 0x2e5a7a, 0x3d6b35, 0x8a6b2e, 0x5a3d7a];
+  for (const ax of [-16, 16]) {
+    for (const ez of [-6.2, 6.2]) g.add(box(1.4, 4.4, 0.35, 0x2e2418, ax, 2.2, ez));
+    g.add(box(1.4, 0.3, 12.8, 0x2e2418, ax, 0.15, 0));
+    for (let s = 0; s < 3; s++) {
+      const y = 1.3 + s * 1.3;
+      g.add(box(1.2, 0.12, 12.4, 0x2e2418, ax, y, 0));
+      for (let i = 0; i < 10; i++) {
+        const bw = 0.7 + (i % 3) * 0.15;
+        const bh = 0.9 + ((i * 5 + s) % 4) * 0.12;
+        for (const side of [-1, 1]) {
+          g.add(box(0.45, bh, bw, aisleCols[(i + s + (side > 0 ? 2 : 0)) % aisleCols.length],
+            ax + side * 0.32, y + bh / 2 + 0.07, -5.6 + i * 1.14));
+        }
+      }
+    }
+  }
+
+  // rug under the center reading table
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(7, 24), mat(0x5a1f1f, { roughness: 0.95 }));
+  rug.rotation.x = -Math.PI / 2; rug.position.set(0, 0.02, 0); rug.receiveShadow = true;
+  g.add(rug);
+
+  // chairs on the far side of the center table (front-side chairs + terminalPositions unchanged)
+  for (let l = -2; l <= 2; l++) {
+    const x = l * 4;
+    g.add(box(1, 0.15, 1, 0x4a3423, x, 0.75, -2.6));
+    g.add(box(1, 1.1, 0.15, 0x4a3423, x, 1.3, -3.05));
+  }
+
+  // librarian desk near the entrance
+  g.add(box(6, 1.1, 2, 0x5a4028, 8, 0.55, 14.5));
+  g.add(box(6, 0.12, 2, 0x6b4e30, 8, 1.16, 14.5));
+  const libSign = makeTextPlane("LIBRARIAN", 5, 0.62, "#f5c518", 8, 3.2, 14.5);
+  libSign.rotation.y = Math.PI;
+  g.add(libSign);
+  g.add(box(1, 0.15, 1, 0x4a3423, 8, 0.75, 16.2));
+  g.add(box(1, 1.1, 0.15, 0x4a3423, 8, 1.3, 16.65));
+
+  // QUIET PLEASE signs on the side walls
+  const q1 = makeTextPlane("QUIET PLEASE", 8, 1, "#ffffff", -W / 2 + 0.2, 7, -8);
+  q1.rotation.y = Math.PI / 2;
+  const q2 = makeTextPlane("QUIET PLEASE", 8, 1, "#ffffff", W / 2 - 0.2, 7, 8);
+  q2.rotation.y = -Math.PI / 2;
+  g.add(q1, q2);
+
+  // globe in the corner
+  g.add(box(1.2, 0.15, 1.2, 0x3a2a18, -10, 0.07, 14.5));
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1, 8), mat(0x8a7a3a));
+  pole.position.set(-10, 0.6, 14.5); g.add(pole);
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(0.85, 16, 12), mat(0x2e6b8a, { roughness: 0.5 }));
+  globe.position.set(-10, 1.5, 14.5); globe.castShadow = true; g.add(globe);
+
+  // wall clock on the east wall (shelf walls are on z — side walls are free)
+  const clockFace = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.15, 24), mat(0xf0ead8));
+  clockFace.rotation.z = Math.PI / 2; clockFace.position.set(W / 2 - 0.2, 8, 0);
+  g.add(clockFace);
+  const hand1 = box(0.08, 0.9, 0.06, 0x222222, W / 2 - 0.35, 8.2, 0);
+  const hand2 = box(0.08, 0.6, 0.06, 0x222222, W / 2 - 0.35, 8, 0.25);
+  g.add(hand1, hand2);
 
   return {
     group: g,
