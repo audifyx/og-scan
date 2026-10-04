@@ -2,7 +2,7 @@
  * OrbitX City — economy dock.
  *
  * Three plug-in buttons for the game HUD: SHOP (burn ORBITX for items),
- * TRADE (Jupiter swaps), LAUNCH (real token launch terminal). Each opens its
+ * TRADE (in-app wallet swaps), LAUNCH (real token launch terminal). Each opens its
  * panel as an overlay. Drop <EconomyDock /> into the rebuilt HUD wherever
  * the boards call for it.
  */

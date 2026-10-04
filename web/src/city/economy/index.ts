@@ -1,4 +1,4 @@
-/** OrbitX City economy — wallet, shop (ORBITX burns), Jupiter trade, token launches. */
+/** OrbitX City economy — in-app wallet, shop (ORBITX burns), desk-wallet trade, token launches. */
 export { useCityWallet, shortAddress } from "./useCityWallet";
 export type { CityWallet } from "./useCityWallet";
 export { default as CityWalletChip } from "./CityWalletChip";
@@ -13,12 +13,6 @@ export { default as EconomyDock } from "./EconomyDock";
 export { useCityInventory } from "./useCityInventory";
 export { CITY_SHOP_ITEMS, shopItemById } from "./shopItems";
 export type { CityShopItem, CityShopKind } from "./shopItems";
-export {
-  SOL_MINT, USDC_MINT, ORBITX_MINT,
-  getJupQuote, buildJupSwapTransaction, searchJupTokens, defaultSwapTokens,
-  toBaseUnits, fromBaseUnits,
-} from "./jupiterSwap";
-export type { JupQuote, JupTokenMeta } from "./jupiterSwap";
 export { default as StoreMenu, STORE_MENUS, storeKeyForLabel, isStoreKey } from "./StoreMenu";
 export type { StoreKey, StoreBuff, StoreMenuDef } from "./StoreMenu";
 export { subscribeStoreMenu, openStoreMenu } from "./storeMenuBus";
