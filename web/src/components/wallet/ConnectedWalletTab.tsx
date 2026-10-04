@@ -1,7 +1,7 @@
 /**
- * ConnectedWalletTab — Full on-chain wallet terminal powered by Phantom.
- * Features: connect, portfolio, inline charts, live data feed per token,
- * buys/sells, PnL dashboard, volume tracker, tx history.
+ * ConnectedWalletTab — Full on-chain wallet terminal for the in-app wallet.
+ * Features: link, portfolio, inline charts, live data feed per token,
+ * buys/sells (backend-signed), PnL dashboard, volume tracker, tx history.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -9,7 +9,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
   Copy, ExternalLink, RefreshCw, TrendingUp, TrendingDown,
   ArrowUpRight, ArrowDownLeft, Coins, Clock, Zap, ChevronDown,
-  BarChart3, Wallet, Check, X, AlertTriangle, Search, ArrowLeftRight,
+  BarChart3, Wallet, Check, X, Search, ArrowLeftRight,
   Shield, DollarSign, Activity, Target, Trophy, Skull, Flame, ChevronUp,
   Globe, Twitter, MessageCircle, Filter, Eye, Layers, PieChart, Volume2,
   Plus, Minus
@@ -31,9 +31,9 @@ import {
 import { HELIUS_RPC, HELIUS_API_KEY, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
 import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED, deriveFeeAccount } from "@/lib/platformFee";
 import { formatDistanceToNow } from "date-fns";
-import { VersionedTransaction } from "@solana/web3.js";
-import { adapterNameMatches, connectSolanaWallet } from "@/lib/connectSolanaWallet";
-import { confirmSentTransaction, sendWalletTransaction, walletCapsFromAdapter } from "@/lib/orbitx/sendWalletTx";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { deskBuy, deskSell } from "@/lib/deskTrades";
+import { confirmSentTransaction } from "@/lib/orbitx/sendWalletTx";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface RichToken {
@@ -66,35 +66,7 @@ type EnrichedTx = ParsedTransaction & {
 // Re-export WalletPnLSummary type alias
 type WalletPnL = WalletPnLSummary;
 
-/* ─── Phantom native swap ────────────────────────────────────────── */
-function base64ToUint8Array(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-async function phantomSwap(
-  fromMint: string, toMint: string, amountLamports: number,
-  slippageBps: number, userPublicKey: string
-): Promise<string> {
-  const phantom = (window as any).phantom?.solana;
-  if (!phantom?.isPhantom) throw new Error("Phantom wallet not detected");
-  const quoteRes = await fetch(
-    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true${PLATFORM_FEE_ENABLED ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : ""}`,
-    { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
-  );
-  if (!quoteRes.ok) throw new Error("Failed to get swap quote");
-  const quote = await quoteRes.json();
-  const swapRes = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${JUPITER_API_KEY}` },
-    body: JSON.stringify({ quoteResponse: quote, userPublicKey, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: "auto", ...(PLATFORM_FEE_ENABLED ? { feeAccount: deriveFeeAccount(toMint) } : {}) }),
-  });
-  if (!swapRes.ok) throw new Error("Failed to build swap transaction");
-  const { swapTransaction } = await swapRes.json();
-  return swapTransaction;
-}
+/* ─── In-app wallet swap (backend-signed) ─────────────────────────── */
 
 /* ─── Helpers ───────────────────────────────────────────────────── */
 function getTypeIcon(tx: EnrichedTx) {
@@ -143,8 +115,9 @@ function fmtNum(n: number) {
    Main Component
    ═══════════════════════════════════════════════════════════════════ */
 export function ConnectedWalletTab() {
-  const { publicKey, connect, disconnect, connected, wallet, wallets, select, sendTransaction, signTransaction } = useWallet();
+  const { publicKey, disconnect, connected, wallet } = useWallet();
   const { connection } = useConnection();
+  const billing = useOrbitxBilling();
 
   const [overview, setOverview] = useState<WalletOverview | null>(null);
   const [tokens, setTokens] = useState<RichToken[]>([]);
@@ -388,26 +361,27 @@ export function ConnectedWalletTab() {
     return () => clearTimeout(timeout);
   }, [swapOpen, swapToken, swapAmount, swapMode, slippage]);
 
-  /* ── Execute swap ── */
+  /* ── Execute swap via the in-app wallet (backend-signed) ── */
   const executeSwap = async () => {
     if (!swapToken || !swapAmount || !publicKey) return;
+    if (!billing.ready) {
+      billing.beginAuth();
+      toast({ title: "Link in-app wallet", description: "One tap to link, then the trade runs.", variant: "destructive" });
+      return;
+    }
     setSwapLoading(true);
     try {
-      const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
-      const outputMint = swapMode === "buy" ? swapToken.mint : SOL_MINT;
-      const decimals = swapMode === "buy" ? 9 : swapToken.decimals;
-      const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
-      const swapTxBase64 = await phantomSwap(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
-      const txBytes = base64ToUint8Array(swapTxBase64);
-      const tx = VersionedTransaction.deserialize(txBytes);
-      const sig = await sendWalletTransaction(
-        connection,
-        walletCapsFromAdapter(wallet, {
-          sendTransaction: sendTransaction ?? undefined,
-          signTransaction: signTransaction ?? undefined,
-        }),
-        tx,
-      );
+      const slippageBps = Math.round(Number(slippage) * 100);
+      let sig: string;
+      if (swapMode === "buy") {
+        sig = await deskBuy(swapToken.mint, Number(swapAmount), slippageBps);
+      } else {
+        // deskSell takes a percent of the position; the UI quotes a token amount.
+        const bal = Number(swapToken.balance) || 0;
+        if (bal <= 0) throw new Error("No token balance to sell.");
+        const pct = Math.min(100, (Number(swapAmount) / bal) * 100);
+        sig = await deskSell(swapToken.mint, pct, slippageBps);
+      }
       await confirmSentTransaction(connection, sig, { commitment: "confirmed" });
       toast({ title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`, description: `TX: ${formatAddress(sig, 6)}` });
       setSwapOpen(false); setSwapAmount("");
@@ -445,28 +419,24 @@ export function ConnectedWalletTab() {
             <Wallet className="h-10 w-10 text-[hsl(var(--og-ink))]" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
+            <h2 className="text-2xl font-bold mb-2">Link your in-app wallet</h2>
             <p className="text-white/50 text-sm leading-relaxed">
-              Connect Phantom or Solflare to view your portfolio, trade tokens, track PnL, volume, and full live data feeds — all inside OrbitX.
+              View your portfolio, trade tokens, track PnL, volume, and full live data feeds — all inside OrbitX. One wallet, one address, everywhere.
             </p>
           </div>
           <div className="flex flex-col gap-3">
-            {wallets.filter(w => ["Phantom", "Jupiter", "Solflare"].some((n) => adapterNameMatches(String(w.adapter.name), n))).map(w => (
-              <button key={w.adapter.name} onClick={() => { void connectSolanaWallet({ wallets, select, connect, preferredName: w.adapter.name }).catch((e) => toast({ title: "Connect failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" })); }}
-                className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
-                {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-7 h-7 rounded-lg" />}
-                <span className="font-semibold text-sm">{w.adapter.name}</span>
-                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">Connect →</span>
-              </button>
-            ))}
-            {wallets.filter(w => ["Phantom", "Jupiter", "Solflare"].some((n) => adapterNameMatches(String(w.adapter.name), n))).length === 0 && (
-              <div className="text-center text-sm text-white/40 py-4">
-                <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-yellow-500" />
-                No wallets detected. Install <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-lime))] underline">Phantom</a> first.
-              </div>
+            <button
+              onClick={() => billing.beginAuth()}
+              className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
+              <Wallet className="w-7 h-7 text-white/60" />
+              <span className="font-semibold text-sm">In-App Wallet</span>
+              <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">Link →</span>
+            </button>
+            {billing.error && (
+              <p className="text-xs text-red-400/80">{billing.error}</p>
             )}
           </div>
-          <p className="text-[11px] text-white/25">Your keys never leave your wallet. OrbitX only reads on-chain data.</p>
+          <p className="text-[11px] text-white/25">No extension needed. Trades sign on the backend — no popups.</p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 max-w-sm">
           {["Portfolio overview", "Buy & sell tokens", "Per-token live feeds", "PnL tracker", "Volume analytics", "Trade history"].map(f => (
@@ -1149,7 +1119,7 @@ export function ConnectedWalletTab() {
                 onClick={executeSwap}>
                 {swapLoading ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" />Signing...</> : <><Zap className="h-4 w-4 mr-2" />{swapMode === "buy" ? `Buy ${swapToken?.symbol ?? "Token"}` : `Sell ${swapToken?.symbol ?? "Token"}`}</>}
               </Button>
-              <p className="text-center text-[10px] text-white/25">Powered by Jupiter · Signed by your wallet</p>
+              <p className="text-center text-[10px] text-white/25">Backend-signed by your in-app wallet</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1321,7 +1291,7 @@ export function ConnectedWalletTab() {
               disabled={!swapAmount || swapLoading || !swapQuote} onClick={executeSwap}>
               {swapLoading ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" />Sending to wallet...</> : <><Zap className="h-4 w-4 mr-2" />{swapMode === "buy" ? `Buy ${swapToken?.symbol}` : `Sell ${swapToken?.symbol}`}</>}
             </Button>
-            <p className="text-center text-[10px] text-white/20">Powered by Jupiter · Signed by your wallet extension</p>
+            <p className="text-center text-[10px] text-white/20">Backend-signed by your in-app wallet extension</p>
           </div>
         </DialogContent>
       </Dialog>

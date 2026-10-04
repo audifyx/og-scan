@@ -1,11 +1,13 @@
 /**
- * Shared wallet send helper for OrbitX Trade tools (burn, claim, rent, unwrap).
+ * Shared wallet send helpers for OrbitX.
  *
- * Prefer Jupiter `signAndSendTransaction` (window.jupiter.solana) when the
- * connected wallet is Jupiter or the fee-payer matches the Jupiter inject.
- * Manual `signTransaction` + `sendRawTransaction` can return an unsigned
- * legacy tx from some adapters, which then throws:
- * "Signature verification failed. Missing signature for public key …"
+ * The in-app (desk) wallet is the only wallet and it signs on the backend —
+ * there is no client-side signer anymore (Phantom/Jupiter extension paths
+ * removed). `sendWalletTransaction` is kept for import compatibility but
+ * throws a clear error: backend-enabled flows (trades via orbitx_app_buy/sell,
+ * burns via burnPurchase/spend) call the supercomputer MCP directly.
+ *
+ * Pure helpers (serialize, fee-payer, confirm) are unchanged.
  */
 import {
   Connection,
@@ -13,13 +15,6 @@ import {
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import {
-  getJupiterProvider,
-  isJupiterWalletName,
-  jupiterProviderPublicKey,
-  jupiterSignAndSendTransaction,
-  toVersionedTransaction,
-} from "@/lib/wallets/jupiterWalletAdapter";
 import { normalizeTxSignatureBase58 } from "@/lib/wallets/walletNormalize";
 import { confirmSignatureWithFallback, sendRawWithFallback } from "@/lib/solanaRpc";
 
@@ -30,16 +25,16 @@ export type WalletSendCaps = {
     options?: { skipPreflight?: boolean; maxRetries?: number },
   ) => Promise<string>;
   signTransaction?: <T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>;
-  /** Adapter display name — "Jupiter" / "Jupiter Wallet" routes to the Jupiter inject. */
+  /** @deprecated — the in-app wallet is the only wallet now. */
   walletName?: string | null;
-  /** Force the Jupiter inject even when the adapter name is missing. */
+  /** @deprecated — Jupiter inject removed. */
   preferJupiter?: boolean;
-  /** Legacy flag — ignored when preferJupiter is set. Sign page never uses Phantom Connect. */
+  /** @deprecated — Phantom removed. */
   preferPhantom?: boolean;
 };
 
 export function walletCapsFromAdapter(
-  wallet: { adapter?: { name?: string } | null } | null | undefined,
+  wallet: { adapter?: { name?: string } | null } | undefined,
   caps: Pick<WalletSendCaps, "sendTransaction" | "signTransaction">,
 ): WalletSendCaps {
   return {
@@ -55,7 +50,15 @@ export type WalletSendOptions = {
   maxRetries?: number;
 };
 
-export { toVersionedTransaction };
+export function toVersionedTransaction(tx: Transaction | VersionedTransaction): VersionedTransaction {
+  if (isVersionedTx(tx)) return tx;
+  // Legacy -> versioned is only meaningful pre-sign; the in-app wallet has no
+  // client signer, so this is a structural helper for compat call sites.
+  throw new Error(
+    "Legacy transaction conversion needs a client signer, which no longer exists. " +
+      "Use backend-signed trade/burn flows instead.",
+  );
+}
 
 export function isVersionedTx(
   tx: Transaction | VersionedTransaction,
@@ -74,9 +77,7 @@ export function serializeSigned(signed: Transaction | VersionedTransaction): Uin
   if (isVersionedTx(signed)) {
     const missing = signed.signatures.some((s) => !s || s.every((b) => b === 0));
     if (missing) {
-      throw new Error(
-        "Wallet returned an unsigned versioned transaction. Reconnect Jupiter and try again.",
-      );
+      throw new Error("Transaction is missing a signature.");
     }
     return signed.serialize();
   }
@@ -85,32 +86,23 @@ export function serializeSigned(signed: Transaction | VersionedTransaction): Uin
   const unsignedKey = missing?.publicKey ?? (sigs.length === 0 ? signed.feePayer : null);
   if (unsignedKey) {
     throw new Error(
-      `Wallet returned an unsigned transaction (missing signature for ${unsignedKey.toBase58()}). Reconnect Jupiter and try again.`,
+      `Transaction is unsigned (missing signature for ${unsignedKey.toBase58()}).`,
     );
   }
   return signed.serialize();
 }
 
-export function isPhantomWalletName(name?: string | null): boolean {
-  return Boolean(name && /phantom/i.test(name));
+/** @deprecated — Jupiter inject removed. Always false. */
+export function isPhantomWalletName(_name?: string | null): boolean {
+  return false;
 }
 
-export function shouldUseJupiterInject(
-  wallet: Pick<WalletSendCaps, "walletName" | "preferJupiter" | "preferPhantom">,
-  feePayer?: string | null,
-): boolean {
-  if (!getJupiterProvider()?.signAndSendTransaction) return false;
-  // Browser Phantom (and other named non-Jupiter adapters) must sign themselves.
-  // preferJupiter must not steal those sends when both extensions are installed.
-  if (isPhantomWalletName(wallet.walletName)) return false;
-  if (wallet.preferPhantom) return false;
-  if (isJupiterWalletName(wallet.walletName)) return true;
-  if (wallet.preferJupiter) return true;
-  const jupiterPk = jupiterProviderPublicKey();
-  return Boolean(feePayer && jupiterPk && feePayer === jupiterPk);
+/** @deprecated — Jupiter inject removed. Always false. */
+export function shouldUseJupiterInject(): boolean {
+  return false;
 }
 
-/** Sign with a local Keypair and broadcast (no extension wallet). */
+/** Sign with a Keypair and broadcast (no extension wallet). */
 export async function sendWithKeypair(
   connection: Connection,
   keypair: Keypair,
@@ -129,32 +121,22 @@ export async function sendWithKeypair(
   return sendRawWithFallback(serializeSigned(tx), connection, opts);
 }
 
-/** Sign and broadcast one legacy or versioned transaction. */
+/**
+ * Sign and broadcast one legacy or versioned transaction.
+ *
+ * The in-app wallet signs on the backend — client-side signing no longer
+ * exists. This throws a clear error instead of silently failing.
+ */
 export async function sendWalletTransaction(
-  connection: Connection,
-  wallet: WalletSendCaps,
-  tx: Transaction | VersionedTransaction,
-  options?: WalletSendOptions,
+  _connection: Connection,
+  _wallet: WalletSendCaps,
+  _tx: Transaction | VersionedTransaction,
+  _options?: WalletSendOptions,
 ): Promise<string> {
-  const opts = {
-    skipPreflight: options?.skipPreflight ?? false,
-    maxRetries: options?.maxRetries ?? 3,
-  };
-  const feePayer = transactionFeePayer(tx);
-
-  if (shouldUseJupiterInject(wallet, feePayer)) {
-    return normalizeTxSignatureBase58(await jupiterSignAndSendTransaction(tx, opts));
-  }
-
-  const versioned = toVersionedTransaction(tx);
-  if (wallet.sendTransaction) {
-    return normalizeTxSignatureBase58(await wallet.sendTransaction(versioned, connection, opts));
-  }
-  if (wallet.signTransaction) {
-    const signed = await wallet.signTransaction(tx);
-    return normalizeTxSignatureBase58(await sendRawWithFallback(serializeSigned(signed), connection, opts));
-  }
-  throw new Error("This wallet can't sign here — connect Phantom, Jupiter, or Solflare in this browser");
+  throw new Error(
+    "Custom transactions need the in-app wallet's backend signer, which isn't enabled yet. " +
+      "Trades run through the Trade tab (orbitx_app_buy/sell) and burns through the Shop — both backend-signed.",
+  );
 }
 
 export type ConfirmSentOptions = {
@@ -164,9 +146,7 @@ export type ConfirmSentOptions = {
 };
 
 /**
- * Confirm a wallet-sent tx. Always normalizes Phantom base64 signatures first.
- * If the swap already landed, treat encoding / "already processed" as success
- * so the sign page can finish the workflow.
+ * Confirm a wallet-sent tx. Treats encoding / "already processed" as success.
  */
 export async function confirmSentTransaction(
   connection: Connection,
