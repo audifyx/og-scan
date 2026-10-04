@@ -1,86 +1,54 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  LOCAL_WALLETS_CHANGED,
-  createLocalTradingWallet,
-  exportLocalTradingWalletSecret,
-  getDefaultLocalWalletId,
-  getTradingWalletMode,
-  importLocalTradingWallet,
-  listLocalTradingWallets,
-  loadDefaultLocalKeypair,
-  loadLocalTradingKeypair,
-  removeLocalTradingWallet,
-  renameLocalTradingWallet,
-  setDefaultLocalWallet,
-  setTradingWalletMode,
-  type LocalTradingWalletMeta,
-  type TradingWalletMode,
-} from "@/lib/tradeWallets/localTradingWallets";
+/**
+ * RETIRED — local trading-wallet key import is removed.
+ *
+ * Per owner order the in-app (desk) wallet is the only wallet across OrbitX:
+ * one wallet, one address, everywhere. Importing private keys into the
+ * browser fragments that identity, so the local-wallet feature is gone.
+ *
+ * This module keeps the old export shape so existing imports don't break at
+ * build time; every mutating call throws a clear error.
+ */
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 
-function snapshot() {
-  return {
-    wallets: listLocalTradingWallets(),
-    defaultId: getDefaultLocalWalletId(),
-    mode: getTradingWalletMode(),
-  };
+export type LocalTradingWalletMeta = {
+  id: string;
+  label: string;
+  publicKey: string;
+};
+
+export type TradingWalletMode = "connected" | "local";
+
+function retired(what: string): Error {
+  return new Error(
+    `${what} is retired — the in-app wallet is now the only wallet across OrbitX. ` +
+      "Link it once and trade from there.",
+  );
 }
 
 export function useLocalTradingWallets() {
-  const [state, setState] = useState(snapshot);
+  const billing = useOrbitxBilling();
+  const inApp: LocalTradingWalletMeta | null = billing.wallet
+    ? { id: "in-app", label: "In-App Wallet", publicKey: billing.wallet }
+    : null;
 
-  const refresh = useCallback(() => setState(snapshot()), []);
-
-  useEffect(() => {
-    const onChange = () => refresh();
-    window.addEventListener(LOCAL_WALLETS_CHANGED, onChange);
-    window.addEventListener("storage", onChange);
-    return () => {
-      window.removeEventListener(LOCAL_WALLETS_CHANGED, onChange);
-      window.removeEventListener("storage", onChange);
-    };
-  }, [refresh]);
-
-  const defaultWallet =
-    state.wallets.find((w) => w.id === state.defaultId) ?? state.wallets[0] ?? null;
+  const no = () => {
+    throw retired("Local trading wallets");
+  };
 
   return {
-    wallets: state.wallets as LocalTradingWalletMeta[],
-    defaultId: state.defaultId,
-    defaultWallet,
-    mode: state.mode as TradingWalletMode,
-    setMode: (mode: TradingWalletMode) => {
-      setTradingWalletMode(mode);
-      refresh();
-    },
-    importWallet: async (secret: string, label?: string) => {
-      const meta = await importLocalTradingWallet(secret, label);
-      // Importing a trading key implies Local mode — otherwise claim/trade keep using Phantom.
-      setTradingWalletMode("local");
-      refresh();
-      return meta;
-    },
-    createWallet: async (label?: string) => {
-      const meta = await createLocalTradingWallet(label);
-      setTradingWalletMode("local");
-      refresh();
-      return meta;
-    },
-    setDefault: (id: string) => {
-      setDefaultLocalWallet(id);
-      setTradingWalletMode("local");
-      refresh();
-    },
-    rename: (id: string, label: string) => {
-      renameLocalTradingWallet(id, label);
-      refresh();
-    },
-    remove: (id: string) => {
-      removeLocalTradingWallet(id);
-      refresh();
-    },
-    exportSecret: (id: string) => exportLocalTradingWalletSecret(id),
-    loadKeypair: (id: string) => loadLocalTradingKeypair(id),
-    loadDefaultKeypair: () => loadDefaultLocalKeypair(),
-    refresh,
+    wallets: inApp ? [inApp] : [],
+    defaultId: inApp ? inApp.id : null,
+    defaultWallet: inApp,
+    mode: "connected" as TradingWalletMode,
+    setMode: (_mode: TradingWalletMode) => {},
+    importWallet: async (_secret: string, _label?: string) => { throw no(); },
+    createWallet: async (_label?: string) => { throw no(); },
+    setDefault: (_id: string) => {},
+    rename: (_id: string, _label: string) => {},
+    remove: (_id: string) => {},
+    exportSecret: (_id: string) => { throw no(); },
+    loadKeypair: (_id: string) => { throw no(); },
+    loadDefaultKeypair: async () => { throw no(); },
+    refresh: () => {},
   };
 }

@@ -1,195 +1,118 @@
 /**
  * Active trading identity for OrbitX Trade tools.
  *
- * When walletMode === "local" and a default local wallet exists, tools use that
- * pubkey + local keypair signing. Otherwise Phantom / extension adapter.
+ * The in-app (desk) wallet is the ONLY trading wallet — one wallet, one
+ * address, everywhere. The old "local keypair import" and "connected
+ * extension" modes are retired.
  *
- * Critical: in Local mode we NEVER fall back to the adapter pubkey for identity
- * or signing — that was the bug that made claim/trade ignore imported wallets.
+ * - Identity: desk wallet address via useOrbitxBilling().
+ * - Trades: `buy` / `sell` via the backend-signed orbitx_app_buy/sell MCP tools.
+ * - Custom transactions: the desk wallet has no client-side signer, so
+ *   `sendTx` / `signMessage` throw a clear error directing to supported flows.
  */
 import { useCallback, useMemo } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import {
-  Connection,
-  PublicKey,
-  Transaction,
-  VersionedTransaction,
-} from "@solana/web3.js";
-import { ed25519 } from "@noble/curves/ed25519";
-import { toast } from "sonner";
-import { useLocalTradingWallets } from "@/hooks/useLocalTradingWallets";
-import {
-  getTradingWalletMode,
-  loadDefaultLocalKeypair,
-} from "@/lib/tradeWallets/localTradingWallets";
-import {
-  sendWalletTransaction,
-  sendWithKeypair,
-  type WalletSendOptions,
-} from "@/lib/orbitx/sendWalletTx";
-import { connectSolanaWallet } from "@/lib/connectSolanaWallet";
-import { normalizeSignatureBytes } from "@/lib/wallets/walletNormalize";
+import { PublicKey } from "@solana/web3.js";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { deskBuy, deskSell, solscanTxUrl } from "@/lib/deskTrades";
 
 function shortAddr(a: string, n = 4): string {
   return a.length > n * 2 ? `${a.slice(0, n)}…${a.slice(-n)}` : a;
 }
 
-export function useActiveTradingWallet() {
-  const {
-    publicKey: adapterPk,
-    connected,
-    signTransaction,
-    sendTransaction,
-    signMessage: adapterSignMessage,
-    wallet: adapterWallet,
-    wallets,
-    select,
-    connect,
-  } = useWallet();
-  const {
-    mode,
-    setMode,
-    defaultWallet,
-    loadDefaultKeypair,
-    wallets: localWallets,
-  } = useLocalTradingWallets();
+function backendSigningError(action = "This action"): Error {
+  return new Error(
+    `${action} needs the in-app wallet's backend signer, which isn't enabled for custom transactions yet. ` +
+      "Use the Trade tab for buys/sells and the Shop for burns — both are backend-signed.",
+  );
+}
 
-  /** Prefer live localStorage so sign path can't drift from a stale React render. */
-  const modeNow = getTradingWalletMode();
-  const hasLocalWallet = Boolean(defaultWallet?.publicKey);
-  const localActive = (mode === "local" || modeNow === "local") && hasLocalWallet;
+export function useActiveTradingWallet() {
+  const billing = useOrbitxBilling();
 
   const publicKey = useMemo(() => {
-    if (localActive) {
-      if (!defaultWallet?.publicKey) return null;
-      try {
-        return new PublicKey(defaultWallet.publicKey);
-      } catch {
-        return null;
-      }
+    if (!billing.wallet) return null;
+    try {
+      return new PublicKey(billing.wallet);
+    } catch {
+      return null;
     }
-    return adapterPk;
-  }, [localActive, defaultWallet, adapterPk]);
+  }, [billing.wallet]);
 
-  const address = publicKey?.toBase58() ?? null;
-  const ready = localActive
-    ? Boolean(publicKey && defaultWallet)
-    : Boolean(connected && adapterPk);
+  const address = billing.wallet;
+  const ready = billing.ready && Boolean(publicKey);
+  const connected = ready;
 
   const label = useMemo(() => {
     if (!address) return null;
-    return localActive ? `Local ${shortAddr(address)}` : `Ext ${shortAddr(address)}`;
-  }, [address, localActive]);
+    return `In-App ${shortAddr(address)}`;
+  }, [address]);
 
-  /** Connect a specific extension by name (Phantom / Jupiter / Solflare). No auto-fallback. */
-  const connectNamedWallet = useCallback(
-    async (name: string) => {
-      setMode("connected");
-      try {
-        await connectSolanaWallet({
-          wallets,
-          select,
-          connect,
-          preferredName: name,
-        });
-        toast.success(`${name} connected`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err || "Could not connect wallet");
-        toast.error(msg);
-        throw err;
-      }
+  /** Backend-signed market buy. Returns the tx signature. */
+  const buy = useCallback(
+    async (mint: string, amountSol: number, slippageBps = 200): Promise<string> => {
+      return deskBuy(mint, amountSol, slippageBps);
     },
-    [wallets, select, connect, setMode],
+    [],
   );
 
-  /**
-   * @deprecated Prefer Trade wallet picker (`useTradeWalletPicker`) so the user
-   * chooses Phantom / Jupiter / Solflare. Kept for non-Trade call sites; connects
-   * Phantom only (no Solflare fallback).
-   */
+  /** Backend-signed market sell of `percent` (1-100). Returns the tx signature. */
+  const sell = useCallback(
+    async (mint: string, percent: number, slippageBps = 200): Promise<string> => {
+      return deskSell(mint, percent, slippageBps);
+    },
+    [],
+  );
+
+  /** Link the in-app wallet (one-time dashboard auth-code flow). */
+  const connectNamedWallet = useCallback(
+    async (_name?: string): Promise<string | null> => {
+      billing.beginAuth();
+      return billing.wallet;
+    },
+    [billing],
+  );
+
+  /** @deprecated alias — there is only the in-app wallet now. */
   const connectPhantom = useCallback(async () => {
-    return connectNamedWallet("Phantom");
+    return connectNamedWallet("In-App");
   }, [connectNamedWallet]);
 
-  const sendTx = useCallback(
-    async (
-      connection: Connection,
-      tx: Transaction | VersionedTransaction,
-      options?: WalletSendOptions,
-    ): Promise<string> => {
-      // Re-read mode at call time — never trust a stale closure over Phantom.
-      const useLocal = getTradingWalletMode() === "local";
-      if (useLocal) {
-        const kp = await loadDefaultLocalKeypair();
-        if (!kp) {
-          throw new Error("No default local trading wallet — set one in Trading wallets");
-        }
-        try {
-          return await sendWithKeypair(connection, kp, tx, options);
-        } finally {
-          kp.secretKey.fill(0);
-        }
-      }
-      if (!sendTransaction && !signTransaction) {
-        throw new Error("This wallet can't sign here — connect Phantom or Jupiter");
-      }
-      return sendWalletTransaction(
-        connection,
-        {
-          sendTransaction: sendTransaction ?? undefined,
-          signTransaction: signTransaction ?? undefined,
-          walletName: adapterWallet?.adapter?.name ?? null,
-        },
-        tx,
-        options,
-      );
-    },
-    [sendTransaction, signTransaction, adapterWallet],
-  );
+  /** Custom transactions are not client-signed — throws a clear error. */
+  const sendTx = useCallback(async (): Promise<string> => {
+    throw backendSigningError("Sending this transaction");
+  }, []);
 
-  /** Sign an arbitrary message for wallet-proof APIs (alerts CRUD). */
-  const signMessage = useCallback(
-    async (message: Uint8Array): Promise<Uint8Array> => {
-      const useLocal = getTradingWalletMode() === "local";
-      if (useLocal) {
-        const kp = await loadDefaultLocalKeypair();
-        if (!kp) {
-          throw new Error("No default local trading wallet — set one in Trading wallets");
-        }
-        try {
-          // Solana secretKey is 64 bytes (seed||pubkey); ed25519.sign wants 32-byte seed.
-          const seed = kp.secretKey.slice(0, 32);
-          return ed25519.sign(message, seed);
-        } finally {
-          kp.secretKey.fill(0);
-        }
-      }
-      if (!adapterSignMessage) {
-        throw new Error("This wallet can't sign messages — connect Phantom, Jupiter, or Solflare");
-      }
-      return normalizeSignatureBytes(await adapterSignMessage(message));
-    },
-    [adapterSignMessage],
-  );
+  /** The desk wallet signs on the backend — no client-side message signing. */
+  const signMessage = useCallback(async (): Promise<Uint8Array> => {
+    throw backendSigningError("Signing this message");
+  }, []);
 
   return {
-    mode,
-    setMode,
-    localActive,
+    // core identity (same names as before)
+    mode: "connected" as const,
+    setMode: (_mode: string) => {},
+    localActive: false,
     publicKey,
     address,
     ready,
     label,
     shortAddress: address ? shortAddr(address) : null,
-    defaultWallet,
-    localWallets,
+    defaultWallet: null,
+    localWallets: [] as never[],
     connected,
-    adapterPublicKey: adapterPk,
+    adapterPublicKey: publicKey,
+    // trading (backend-signed)
+    buy,
+    sell,
+    solscanTxUrl,
+    // legacy compat — custom tx paths now throw honest errors
     sendTx,
     signMessage,
-    loadDefaultKeypair,
+    loadDefaultKeypair: async () => null,
     connectNamedWallet,
     connectPhantom,
-    signingSource: (localActive ? "local" : "connected") as "local" | "connected",
+    signingSource: "connected" as const,
+    // billing passthrough
+    billing,
   };
 }
