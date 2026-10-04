@@ -54,12 +54,17 @@ import { CITYHALL_DOOR } from "./cityhall/CityHall";
 import { BANK_DOOR } from "./bank/Bank";
 import { DEALERSHIP_DOOR } from "./dealership/Dealership";
 import { SHOPS_DOOR } from "./shops/Shops";
+import { BARBER_DOOR } from "./barber/Barber";
+import { COFFEE_DOOR } from "./coffee/Coffee";
+import { PHARMACY_DOOR } from "./pharmacy/Pharmacy";
+import { GYM_DOOR } from "./gym/Gym";
 
 /** All outdoor door triggers shipped by this module (climb included). */
 export const DISTRICT_DOORS = [
   EXCHANGE_DOOR, HOSPITAL_DOOR, MUSEUM_DOOR, LIBRARY_DOOR,
   OBSERVATORY_DOOR, LIGHTHOUSE_DOOR, CITYHALL_DOOR,
   BANK_DOOR, DEALERSHIP_DOOR, SHOPS_DOOR,
+  BARBER_DOOR, COFFEE_DOOR, PHARMACY_DOOR, GYM_DOOR,
 ] as const;
 
 /** Register every district door with the DoorSystem. Call once at world boot. */
@@ -175,6 +180,34 @@ export {
 export type { ShopsInterior, ShopItem } from "./shops/Shops";
 export { default as ShopsUI } from "./shops/ShopsUI";
 
+/* ------------------------------- 13. barber shop ------------------------------ */
+export {
+  BARBER_INTERIOR_ID, BARBER_DOOR, BARBER_FACADE_CENTER,
+  buildBarberExterior, buildBarberInterior,
+} from "./barber/Barber";
+export type { BarberInterior } from "./barber/Barber";
+
+/* ------------------------------- 14. coffee shop ------------------------------ */
+export {
+  COFFEE_INTERIOR_ID, COFFEE_DOOR, COFFEE_FACADE_CENTER,
+  buildCoffeeExterior, buildCoffeeInterior,
+} from "./coffee/Coffee";
+export type { CoffeeInterior } from "./coffee/Coffee";
+
+/* -------------------------------- 15. pharmacy ------------------------------- */
+export {
+  PHARMACY_INTERIOR_ID, PHARMACY_DOOR, PHARMACY_FACADE_CENTER,
+  buildPharmacyExterior, buildPharmacyInterior,
+} from "./pharmacy/Pharmacy";
+export type { PharmacyInterior } from "./pharmacy/Pharmacy";
+
+/* ---------------------------------- 16. gym ---------------------------------- */
+export {
+  GYM_INTERIOR_ID, GYM_DOOR, GYM_FACADE_CENTER,
+  buildGymExterior, buildGymInterior,
+} from "./gym/Gym";
+export type { GymInterior } from "./gym/Gym";
+
 /* ------------------------------ bulk scene helpers --------------------------- */
 import { buildExchangeExterior, EXCHANGE_FACADE_CENTER } from "./exchange/Exchange";
 import { buildHospitalExterior, HOSPITAL_FACADE_CENTER } from "./hospital/Hospital";
@@ -186,6 +219,10 @@ import { buildCityHallExterior, CITYHALL_FACADE_CENTER } from "./cityhall/CityHa
 import { buildBankExterior, BANK_FACADE_CENTER } from "./bank/Bank";
 import { buildDealershipExterior, DEALERSHIP_FACADE_CENTER } from "./dealership/Dealership";
 import { buildShopsExterior, SHOPS_FACADE_CENTER } from "./shops/Shops";
+import { buildBarberExterior, BARBER_FACADE_CENTER } from "./barber/Barber";
+import { buildCoffeeExterior, COFFEE_FACADE_CENTER } from "./coffee/Coffee";
+import { buildPharmacyExterior, PHARMACY_FACADE_CENTER } from "./pharmacy/Pharmacy";
+import { buildGymExterior, GYM_FACADE_CENTER } from "./gym/Gym";
 import { buildBridge, buildAllIslands, ISLAND_ZONES as ZONES } from "./second-island/SecondIsland";
 import { CONSTRUCTION_SITES as SITES, buildConstructionSite } from "./construction/Construction";
 
@@ -213,6 +250,10 @@ export const FACADE_PLOTS: FacadePlot[] = [
   { id: "door:bank", cx: BANK_FACADE_CENTER[0], cz: BANK_FACADE_CENTER[2], halfW: 21, halfD: 15 },
   { id: "door:dealership", cx: DEALERSHIP_FACADE_CENTER[0], cz: DEALERSHIP_FACADE_CENTER[2], halfW: 27, halfD: 18 },
   { id: "door:shops", cx: SHOPS_FACADE_CENTER[0], cz: SHOPS_FACADE_CENTER[2], halfW: 23, halfD: 13 },
+  { id: "door:barber", cx: BARBER_FACADE_CENTER[0], cz: BARBER_FACADE_CENTER[2], halfW: 18, halfD: 12 },
+  { id: "door:coffee", cx: COFFEE_FACADE_CENTER[0], cz: COFFEE_FACADE_CENTER[2], halfW: 18, halfD: 12 },
+  { id: "door:pharmacy", cx: PHARMACY_FACADE_CENTER[0], cz: PHARMACY_FACADE_CENTER[2], halfW: 18, halfD: 12 },
+  { id: "door:gym", cx: GYM_FACADE_CENTER[0], cz: GYM_FACADE_CENTER[2], halfW: 20, halfD: 14 },
 ];
 
 /** Outdoor AABB colliders for the district facades — the integrator adds these to its collision set. */
@@ -239,6 +280,10 @@ import { buildCityHallInterior } from "./cityhall/CityHall";
 import { buildBankInterior } from "./bank/Bank";
 import { buildDealershipInterior } from "./dealership/Dealership";
 import { buildShopsInterior } from "./shops/Shops";
+import { buildBarberInterior } from "./barber/Barber";
+import { buildCoffeeInterior } from "./coffee/Coffee";
+import { buildPharmacyInterior } from "./pharmacy/Pharmacy";
+import { buildGymInterior } from "./gym/Gym";
 
 export function buildInteriorForDoor(doorId: string): { group: THREE.Group; dispose(): void } | null {
   switch (doorId) {
@@ -251,6 +296,10 @@ export function buildInteriorForDoor(doorId: string): { group: THREE.Group; disp
     case "door:bank": return buildBankInterior();
     case "door:dealership": return buildDealershipInterior();
     case "door:shops": return buildShopsInterior();
+    case "door:barber": return buildBarberInterior();
+    case "door:coffee": return buildCoffeeInterior();
+    case "door:pharmacy": return buildPharmacyInterior();
+    case "door:gym": return buildGymInterior();
     default: return null;
   }
 }
@@ -269,6 +318,10 @@ export function buildAllExteriors(): { group: THREE.Group; dispose(): void } {
     buildBankExterior(),
     buildDealershipExterior(),
     buildShopsExterior(),
+    buildBarberExterior(),
+    buildCoffeeExterior(),
+    buildPharmacyExterior(),
+    buildGymExterior(),
     buildBridge(),
     ...buildAllIslands().map((s) => s.group),
     ...SITES.map((spec) => buildConstructionSite(spec).group),
