@@ -164,6 +164,33 @@ function plaqueTexture(ex: RugExhibit): THREE.CanvasTexture {
   return tex;
 }
 
+function mat(color: number, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.2, ...opts });
+}
+function box(w: number, h: number, d: number, color: number, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function makeTextPlane(text: string, w: number, h: number, color: string, x: number, y: number, z: number) {
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0a0c10";
+  ctx.fillRect(0, 0, 1024, 128);
+  ctx.fillStyle = color;
+  ctx.font = "bold 72px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 512, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+  m.position.set(x, y, z);
+  return m;
+}
+
 export function buildMuseumInterior(): MuseumInterior {
   const g = new THREE.Group();
   const W = 56, D = 48, H = 10;
@@ -208,6 +235,67 @@ export function buildMuseumInterior(): MuseumInterior {
 
   const plaquesGroup = new THREE.Group();
   g.add(plaquesGroup);
+
+  /* -------------------- furnished hall: exhibit pedestals -------------------- */
+  const ARTIFACT_COLORS: Record<RugExhibit["verdict"], number> = {
+    "confirmed-rug": 0xff3344,
+    "slow-bleed": 0xff8833,
+    "comeback?": 0xffdd44,
+    "hall-of-fame": 0x22ff88,
+  };
+  rooms.forEach((verdict, ri) => {
+    const x = (ri - 1.5) * 14;
+    for (const pz of [4, 12]) {
+      // pedestal + cap
+      g.add(box(1.6, 1.2, 1.6, 0x2e2a2a, x, 0.6, pz));
+      g.add(box(1.9, 0.15, 1.9, 0x6b5a2e, x, 1.28, pz));
+      // "rugged token" artifact: glowing crystal
+      const art = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.55),
+        new THREE.MeshStandardMaterial({
+          color: ARTIFACT_COLORS[verdict], emissive: ARTIFACT_COLORS[verdict],
+          emissiveIntensity: 0.6, roughness: 0.2,
+        })
+      );
+      art.position.set(x, 2.1, pz); art.castShadow = true;
+      g.add(art);
+      // name plate on the pedestal face
+      g.add(makeTextPlane("RUGGED TOKEN", 2.6, 0.33, "#dddddd", x, 0.85, pz + 0.82));
+      // red rope barrier: 4 brass posts + 4 rope spans
+      for (const [ox, oz] of [[-1.7, -1.7], [1.7, -1.7], [-1.7, 1.7], [1.7, 1.7]] as const) {
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.06, 0.08, 1.1, 8),
+          mat(0xc9a227, { metalness: 0.8, roughness: 0.3 })
+        );
+        post.position.set(x + ox, 0.55, pz + oz); post.castShadow = true;
+        g.add(post);
+      }
+      const ropeSpan = (rx: number, rz: number, alongX: boolean) => {
+        const rope = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.045, 0.045, 3.4, 8), mat(0x7a1010, { roughness: 0.9 }));
+        rope.position.set(x + rx, 0.95, pz + rz);
+        rope.rotation[alongX ? "z" : "x"] = Math.PI / 2;
+        g.add(rope);
+      };
+      ropeSpan(0, -1.7, true); ropeSpan(0, 1.7, true);
+      ropeSpan(-1.7, 0, false); ropeSpan(1.7, 0, false);
+      // spotlight over the exhibit
+      const spot = new THREE.PointLight(new THREE.Color(ARTIFACT_COLORS[verdict]).getHex(), 150, 14);
+      spot.position.set(x, H - 1.5, pz);
+      g.add(spot);
+    }
+  });
+
+  // big entrance sign over the door (faces into the hall)
+  const big = makeTextPlane("MUSEUM OF RUGS", 20, 2.5, "#ff3344", 0, 7.6, D / 2 - 0.2);
+  big.rotation.y = Math.PI;
+  g.add(big);
+
+  // center benches flanking the entrance aisle
+  for (const bx of [-3.5, 3.5]) {
+    g.add(box(3, 0.15, 1.2, 0x3a2a20, bx, 0.6, 10));
+    for (const lx of [-1.2, 1.2]) g.add(box(0.25, 0.55, 1, 0x2a1f18, bx + lx, 0.28, 10));
+  }
 
   function updateExhibits(exhibits: RugExhibit[]) {
     while (plaquesGroup.children.length) plaquesGroup.remove(plaquesGroup.children[0]);
