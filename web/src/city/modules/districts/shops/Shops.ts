@@ -253,6 +253,63 @@ export function buildShopsInterior(): ShopsInterior {
 
   g.add(makeTextPlane("◀ EXIT", 4, 1, "#ff5544", 0, 3.4, D / 2 - 0.3));
 
+  // wall coolers with glowing contents (back wall)
+  for (const cx of [-7, 7]) {
+    g.add(box(6, 2.7, 1.3, 0x39424c, cx, 1.35, -16.2));
+    const glass = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.6, 2.3),
+      new THREE.MeshStandardMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.28, roughness: 0.1, emissive: 0x3a6a8a, emissiveIntensity: 0.5 })
+    );
+    glass.position.set(cx, 1.35, -15.5);
+    g.add(glass);
+    g.add(box(5.6, 0.08, 1.0, 0x9aa2ac, cx, 1.35, -16.1)); // shelf
+    for (let k = 0; k < 4; k++) {
+      const item = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 0.9, 0.8),
+        new THREE.MeshStandardMaterial({ color: AISLE_COLORS[(k + (cx > 0 ? 3 : 0)) % AISLE_COLORS.length], emissive: 0xffffff, emissiveIntensity: 0.25 })
+      );
+      item.position.set(cx - 2.1 + k * 1.4, 1.85, -16.1);
+      g.add(item);
+    }
+  }
+
+  // produce stands
+  const produceCols = [0xe2482e, 0xf5a623, 0x7ac74c];
+  for (const sx of [-1, 1]) {
+    const px = sx * 8, pz = 11;
+    g.add(box(3.2, 0.9, 2.2, 0x6b4a2e, px, 0.45, pz)); // crate
+    const tray = box(3.2, 0.18, 2.2, 0x8a5f3a, px, 1.0, pz);
+    tray.rotation.x = -0.12;
+    g.add(tray);
+    for (let k = 0; k < 6; k++) {
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), mat(produceCols[k % 3], { roughness: 0.5 }));
+      p.position.set(px - 1.05 + (k % 3) * 1.05, 1.3 + Math.floor(k / 3) * 0.35, pz - 0.4 + Math.floor(k / 3) * 0.8);
+      p.castShadow = true;
+      g.add(p);
+    }
+  }
+
+  // hanging sale signs
+  const hangSigns: [string, string, number, number][] = [
+    ["SALE", "#ff5544", 0, -4],
+    ["2 FOR 1", "#ffd166", -10, 6],
+    ["FRESH DAILY", "#34d399", 10, 6],
+  ];
+  for (const [txt, col, hx, hz] of hangSigns) {
+    const s = makeTextPlane(txt, 4.6, 1.1, col, hx, 6.3, hz);
+    s.rotation.y = Math.PI / 2;
+    (s.material as THREE.MeshBasicMaterial).side = THREE.DoubleSide;
+    g.add(s);
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 6), mat(0x555c66));
+    wire.position.set(hx, 7.3, hz);
+    g.add(wire);
+  }
+
+  // shopping basket stack near the entrance
+  for (let i = 0; i < 5; i++) {
+    g.add(box(1.0 - i * 0.06, 0.5, 0.7 - i * 0.04, 0xc23b3b, -5.5, 0.28 + i * 0.52, 13.5));
+  }
+
   return {
     group: g,
     checkoutPosition,
