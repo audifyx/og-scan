@@ -4,9 +4,11 @@
  * Portfolio (owned buildings + total value), buy / sell / list UI, and the
  * paper-CITY rent claim (1 CITY/hour per owned building, claimable).
  *
- * Real transactions only: every buy goes through the hub wallet popup and
- * on-chain validation. When the wallet is not connected the panel shows
- * "Connect wallet" — never a fake deed.
+ * Real transactions only: primary buys burn the price from the in-app (desk)
+ * wallet via the backend-signed orbitx_app_burn — no popups. When the wallet
+ * is not linked the panel shows "Link in-app wallet" — never a fake deed.
+ * Player resales + listing/delisting are honestly disabled until the desk
+ * wallet can sign transfers/messages.
  *
  * Mount inside the city HUD wherever <CityHud> renders its panels:
  *   import { PropertyPanel } from "@/city/realestate";
@@ -14,7 +16,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useWallet, useConnection } from "@/wallets/hub";
+import { useCityWallet } from "@/city/economy/useCityWallet";
+import { getBillingAuthCode } from "@/tokenomics/auth";
 import { getCityPoints, addCityPoints } from "@/city/cityState";
 import {
   shortWallet,
@@ -34,7 +37,7 @@ function readRentClaims(): Record<string, number> {
   try {
     return JSON.parse(localStorage.getItem(RENT_KEY) || "{}") as Record<string, number>;
   } catch {
-    return {};
+    return {} as Record<string, number>;
   }
 }
 
@@ -87,6 +90,12 @@ const btnDanger: React.CSSProperties = {
   color: "#ff9a9a",
 };
 
+const btnDisabled: React.CSSProperties = {
+  ...btn,
+  opacity: 0.45,
+  cursor: "not-allowed",
+};
+
 const card: React.CSSProperties = {
   border: "1px solid #223349",
   borderRadius: 10,
@@ -95,21 +104,22 @@ const card: React.CSSProperties = {
   background: "rgba(255,255,255,0.02)",
 };
 
+const NOT_YET =
+  "Not supported from the in-app wallet yet — the desk wallet can't sign transfers or messages. Coming soon.";
+
 export function PropertyPanel() {
-  const { publicKey, connected, connect, connecting, sendTransaction, signMessage } = useWallet();
-  const { connection } = useConnection();
+  const w = useCityWallet();
   const [rows, setRows] = useState<PropertyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<{ title: string; lines: ReceiptLine[]; signature?: string | null; note?: string } | null>(null);
-  const [listKey, setListKey] = useState<string | null>(null);
-  const [listPrice, setListPrice] = useState("");
   const [points, setPoints] = useState(getCityPoints());
   const [tick, setTick] = useState(Date.now());
 
-  const walletAddr = publicKey?.toBase58() ?? null;
+  const walletAddr = w.address;
+  const connected = w.connected;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -151,16 +161,16 @@ export function PropertyPanel() {
   const pendingRent = useMemo(() => accruedHours(owned, claims, tick) * RENT_CITY_PER_HOUR, [owned, claims, tick]);
 
   async function onBuy(row: PropertyRow) {
-    if (!publicKey) return;
+    const authCode = getBillingAuthCode();
+    if (!walletAddr || !authCode) return;
     setError(null);
     setBusyKey(row.building_key);
     try {
       const res = await buyProperty({
-        connection,
-        wallet: { publicKey, sendTransaction, signMessage },
+        wallet: { address: walletAddr, authCode },
         buildingKey: row.building_key,
       });
-      setPropertyOwnerLabel(row.building_key, shortWallet(publicKey.toBase58()));
+      setPropertyOwnerLabel(row.building_key, shortWallet(walletAddr));
       // Seed the rent clock at purchase time so accrual starts now.
       const c = readRentClaims();
       c[row.building_key] = Date.now();
@@ -171,16 +181,14 @@ export function PropertyPanel() {
         lines: [
           { label: "Property", value: row.label, highlight: true },
           { label: "Price", value: `${res.priceOrbitx.toLocaleString()} ORBITX` },
-          { label: "Sale", value: res.kind === "primary" ? "City deed (full burn)" : "Player resale" },
-          ...(res.sellerWallet
-            ? [{ label: "Seller", value: shortWallet(res.sellerWallet) }]
-            : []),
+          { label: "Sale", value: "City deed (full burn)" },
           { label: "Burned", value: `${res.burnedOrbitx.toLocaleString()} ORBITX 🔥` },
-          { label: "Owner", value: shortWallet(publicKey.toBase58()) },
+          { label: "Owner", value: shortWallet(walletAddr) },
         ],
         signature: res.signature,
         note: "Deed recorded on-chain. The building's door plaque now shows your address.",
       });
+      await w.refresh();
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Purchase failed.");
@@ -190,54 +198,29 @@ export function PropertyPanel() {
   }
 
   async function onList(row: PropertyRow) {
-    if (!publicKey) return;
-    const price = Math.floor(Number(listPrice));
-    if (!Number.isFinite(price) || price < 1000) {
-      setError("Enter a list price of at least 1,000 ORBITX.");
-      return;
-    }
+    if (!walletAddr) return;
     setError(null);
-    setBusyKey(row.building_key);
     try {
       await listForSale({
-        wallet: { publicKey, sendTransaction, signMessage },
+        wallet: { address: walletAddr, authCode: getBillingAuthCode() ?? "" },
         buildingKey: row.building_key,
-        priceOrbitx: price,
+        priceOrbitx: Math.floor(Number(row.price_orbitx)),
       });
-      setListKey(null);
-      setListPrice("");
-      setReceipt({
-        title: `Listed — ${row.label}`,
-        lines: [
-          { label: "Property", value: row.label, highlight: true },
-          { label: "List price", value: `${price.toLocaleString()} ORBITX` },
-          { label: "Your cut on sale", value: `${(price * 0.95).toLocaleString()} ORBITX (95%)` },
-          { label: "City tax on sale", value: `${(price * 0.05).toLocaleString()} ORBITX burned (5%)` },
-        ],
-        note: "Buyers pay you 95% and burn 5% as the city tax, in one transaction.",
-      });
-      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Listing failed.");
-    } finally {
-      setBusyKey(null);
     }
   }
 
   async function onUnlist(row: PropertyRow) {
-    if (!publicKey) return;
+    if (!walletAddr) return;
     setError(null);
-    setBusyKey(row.building_key);
     try {
       await unlistProperty({
-        wallet: { publicKey, sendTransaction, signMessage },
+        wallet: { address: walletAddr, authCode: getBillingAuthCode() ?? "" },
         buildingKey: row.building_key,
       });
-      await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delist failed.");
-    } finally {
-      setBusyKey(null);
     }
   }
 
@@ -267,10 +250,15 @@ export function PropertyPanel() {
         <div style={{ fontWeight: 800, fontSize: 15, color: "#00ffc8", marginBottom: 8 }}>🏙️ Real Estate</div>
         <div style={{ color: "#9fb3c8", marginBottom: 12 }}>
           Own a piece of OrbitX City. Deeds are bought with real ORBITX — primary sales burn the
-          full price, resales pay the owner 95% and burn 5% city tax.
+          full price, straight from your in-app wallet. No popups, no Phantom.
         </div>
-        <button style={btn} onClick={() => void connect()} disabled={connecting}>
-          {connecting ? "Connecting…" : "Connect wallet"}
+        {w.error && (
+          <div style={{ ...card, borderColor: "rgba(255,120,120,0.5)", color: "#ff9a9a", marginBottom: 10 }}>
+            {w.error}
+          </div>
+        )}
+        <button style={btn} onClick={() => void w.connect()}>
+          Link in-app wallet
         </button>
       </div>
     );
@@ -306,34 +294,19 @@ export function PropertyPanel() {
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               {r.for_sale ? (
-                <button style={btnDanger} disabled={busyKey === r.building_key} onClick={() => void onUnlist(r)}>
-                  {busyKey === r.building_key ? "…" : "Unlist"}
+                <button style={btnDisabled} title={NOT_YET} onClick={() => void onUnlist(r)}>
+                  Unlist
                 </button>
               ) : (
-                <button style={btn} onClick={() => { setListKey(r.building_key); setListPrice(String(Math.floor(Number(r.price_orbitx)))); }}>
+                <button style={btnDisabled} title={NOT_YET} onClick={() => void onList(r)}>
                   Sell
                 </button>
               )}
             </div>
           </div>
-          {listKey === r.building_key && (
-            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-              <input
-                value={listPrice}
-                onChange={(e) => setListPrice(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="Price in ORBITX"
-                inputMode="numeric"
-                style={{
-                  flex: 1, background: "#0a0f1a", border: "1px solid #2a3a4d", color: "#e8f4ff",
-                  borderRadius: 8, padding: "7px 10px", fontSize: 12,
-                }}
-              />
-              <button style={btn} disabled={busyKey === r.building_key} onClick={() => void onList(r)}>
-                {busyKey === r.building_key ? "…" : "List"}
-              </button>
-              <button style={btnDanger} onClick={() => setListKey(null)}>✕</button>
-            </div>
-          )}
+          <div style={{ color: "#5f7285", fontSize: 11, marginTop: 6 }}>
+            Listing from the in-app wallet coming soon.
+          </div>
         </div>
       ))}
       {owned.length > 0 && (
@@ -348,6 +321,7 @@ export function PropertyPanel() {
       {!loading && listings.length === 0 && <div style={{ color: "#8fa3b8" }}>Nothing on the market right now.</div>}
       {listings.map((r) => {
         const mine = walletAddr === r.owner_wallet;
+        const playerOwned = !!r.owner_wallet && !mine;
         return (
           <div key={r.building_key} style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -357,9 +331,14 @@ export function PropertyPanel() {
                   {Number(r.price_orbitx).toLocaleString()} ORBITX · owner {r.owner_wallet ? shortWallet(r.owner_wallet) : "City 🏛️"}
                 </div>
               </div>
-              {!mine && (
+              {!mine && !playerOwned && (
                 <button style={btn} disabled={busyKey === r.building_key} onClick={() => void onBuy(r)}>
-                  {busyKey === r.building_key ? "Confirm in wallet…" : `Buy — ${Number(r.price_orbitx).toLocaleString()}`}
+                  {busyKey === r.building_key ? "Burning…" : `Buy — ${Number(r.price_orbitx).toLocaleString()}`}
+                </button>
+              )}
+              {!mine && playerOwned && (
+                <button style={btnDisabled} title="Player resales aren't supported from the in-app wallet yet.">
+                  Buy — soon
                 </button>
               )}
               {mine && <span style={{ color: "#8fa3b8", fontSize: 12 }}>your listing</span>}
@@ -369,8 +348,8 @@ export function PropertyPanel() {
       })}
 
       <div style={{ color: "#5f7285", fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>
-        Primary deeds burn the full price. Resales: 95% to the seller, 5% burned as city tax — one
-        wallet signature, verified on-chain. CITY balance: {points.toLocaleString()}
+        Primary deeds burn the full price from your in-app wallet — backend-signed, no popup.
+        Player resales + listing from the in-app wallet are coming soon. CITY balance: {points.toLocaleString()}
       </div>
 
       <ReceiptModal
