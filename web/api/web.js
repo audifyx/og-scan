@@ -4,7 +4,6 @@ import bagwork from "./_bagwork.ts";
 import pumpCreate from "./_pump-create.ts";
 import orbitxWorld from "./_orbitx-world.ts";
 import kol from "./_kol.ts";
-import cityProperty from "./_city-property.js";
 
 function pausedFeature(req, res) {
   res.statusCode = 503;
@@ -26,7 +25,7 @@ const ROUTES = {
   "pump-create": pumpCreate,
   "orbitx-world": orbitxWorld,
   kol,
-  "city-property": cityProperty,
+  "city-property": (req, res) => import("./_city-property.js").then((m) => m.default(req, res)),
   paused: pausedFeature,
 };
 
