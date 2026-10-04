@@ -3,14 +3,14 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 // Rewritten from /api/kol/<action> via vercel.json (same pattern as /api/ogdex).
 // (Hobby plan caps functions per deployment; implementations live in _handlers/,
 // which Vercel ignores — same pattern as api/ogdex/_routes).
-import transactions from "./kol/_handlers/_transactions.ts";
-import chatId from "./kol/_handlers/_chat-id.ts";
-import sendAlert from "./kol/_handlers/_send-alert.ts";
-import botSetup from "./kol/_handlers/_bot-setup.ts";
-import webhook from "./kol/_handlers/_webhook.ts";
-import syncWebhook from "./kol/_handlers/_sync-webhook.ts";
-import newLaunches from "./kol/_handlers/_new-launches.ts";
-import launchDigest from "./kol/_handlers/_launch-digest.ts";
+import transactions from "./kol/_handlers/_transactions.js";
+import chatId from "./kol/_handlers/_chat-id.js";
+import sendAlert from "./kol/_handlers/_send-alert.js";
+import botSetup from "./kol/_handlers/_bot-setup.js";
+import webhook from "./kol/_handlers/_webhook.js";
+import syncWebhook from "./kol/_handlers/_sync-webhook.js";
+import newLaunches from "./kol/_handlers/_new-launches.js";
+import launchDigest from "./kol/_handlers/_launch-digest.js";
 
 type Handler = (req: VercelRequest, res: VercelResponse) => unknown | Promise<unknown>;
 
