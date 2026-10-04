@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchGeckoNewPools, getLaunches, type Launch } from "./_new-launches.js";
-import { sendTelegram } from "./_send-alert.js";
+import { fetchGeckoNewPools, getLaunches, type Launch } from "./_new-launches.ts";
+import { sendTelegram } from "./_send-alert.ts";
 
 // /api/kol/launch-digest
 // GET (Vercel cron, hourly):
