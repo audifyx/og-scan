@@ -96,14 +96,14 @@ function Ticker({ api }: { api: GtaApi }) {
           <b>{points.toLocaleString("en-US")}</b>
         </span>
       </div>
-      <div className="oxc-chip">
+      <div className="oxc-chip orbx">
         <span className="oxc-chip-body">
           <small>ORBITX</small>
           <b className="cyan">{fmtP(orx?.price ?? 0)}</b>
           {pct(orx)}
         </span>
       </div>
-      <div className="oxc-chip">
+      <div className="oxc-chip sol">
         <span className="oxc-chip-body">
           <small>SOL</small>
           <b className="cyan">{fmtP(sol?.price ?? 0)}</b>

@@ -69,7 +69,7 @@ export default function JobBoard({ api }: { api: CityJobsApi }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        style={{ ...btn, position: "fixed", right: 12, bottom: 76, zIndex: 60 }}
+        style={{ ...btn, position: "fixed", right: 12, bottom: "calc(248px + env(safe-area-inset-bottom))", zIndex: 60 }}
         aria-label="Open job board"
       >
         💼 JOBS

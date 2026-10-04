@@ -134,18 +134,24 @@
 
 .oxc-ticker {
   position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 8px; right: 8px;
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch;
-  pointer-events: none;
+  display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  pointer-events: none; padding-bottom: 2px;
 }
-.oxc-ticker > * { pointer-events: auto; }
+.oxc-ticker::-webkit-scrollbar { display: none; }
+.oxc-ticker > * { pointer-events: auto; flex: 0 0 auto; }
 
 .oxc-chip {
   display: flex; align-items: center; gap: 8px;
   background: var(--oxc-panel); border: 1px solid var(--oxc-line);
   border-radius: 12px; padding: 6px 10px; min-height: 44px;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  min-width: 0; max-width: 44vw;
 }
-.oxc-chip-body { display: flex; flex-direction: column; line-height: 1.15; }
+.oxc-chip-body { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; flex: 1; }
+.oxc-chip-body small, .oxc-chip-body b {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
 .oxc-chip-body small { font: 700 9px/1 system-ui; letter-spacing: 0.18em; color: #8a93a6; }
 .oxc-chip-body b { font: 800 15px/1.2 system-ui; color: #fff; font-variant-numeric: tabular-nums; }
 .oxc-chip-body b.cyan { color: var(--oxc-cyan); }
@@ -170,11 +176,25 @@
 }
 .oxc-iconbtn:active { transform: scale(0.92); box-shadow: 0 0 16px rgba(23, 230, 212, 0.5); }
 
+/* CityAppsShell always-on chips: third top row, scrollable, never overlapping */
+.oxc-hud-chips {
+  position: absolute;
+  top: calc(124px + env(safe-area-inset-top));
+  left: 8px; right: 8px;
+  display: flex; gap: 6px; align-items: stretch;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  pointer-events: none;
+}
+.oxc-hud-chips::-webkit-scrollbar { display: none; }
+.oxc-hud-chips > * { flex: 0 0 auto; pointer-events: auto; }
+
 /* left column: minimap + SCAN + HOOK */
 .oxc-left {
   position: absolute; left: calc(8px + env(safe-area-inset-left)); bottom: calc(8px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  z-index: 11;
 }
+.oxc-left > * { flex-shrink: 0; position: relative; }
 .oxc-minimap {
   width: 132px; height: 132px; border-radius: 12px;
   border: 1px solid var(--oxc-line); background: rgba(5, 8, 14, 0.85);
@@ -194,7 +214,9 @@
 .oxc-right {
   position: absolute; right: calc(8px + env(safe-area-inset-right)); bottom: calc(8px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 10px; align-items: center;
+  z-index: 11;
 }
+.oxc-right > * { flex-shrink: 0; }
 .oxc-ctl {
   width: 72px; height: 72px; border-radius: 50%;
   background: var(--oxc-panel); border: 1px solid rgba(120, 140, 170, 0.35);
@@ -219,7 +241,7 @@
 /* MOVE stick */
 .oxc-stick {
   position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: calc(10px + env(safe-area-inset-bottom));
+  bottom: calc(18px + env(safe-area-inset-bottom));
   width: 118px; height: 118px; border-radius: 50%;
   background: rgba(10, 16, 26, 0.6); border: 1px solid rgba(120, 140, 170, 0.35);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -237,10 +259,20 @@
   font: 700 10px/1 system-ui; letter-spacing: 0.3em; color: #8a93a6;
 }
 
-@media (max-width: 380px) {
-  .oxc-minimap { width: 112px; height: 112px; }
+@media (max-width: 480px) {
+  .oxc-minimap { width: 92px; height: 92px; }
   .oxc-ctl { width: 64px; height: 64px; }
+  .oxc-ctl.diamond { width: 60px; height: 60px; }
   .oxc-stick { width: 104px; height: 104px; }
+  /* ticker priority: CITY, ORBITX, clock, Connect — SOL hides on tiny screens */
+  .oxc-chip.city { order: 1; }
+  .oxc-chip.orbx { order: 2; }
+  .oxc-chip.clock { order: 3; }
+  .oxc-chip.wallet { order: 4; }
+  .oxc-chip.sol { display: none; }
+  .oxc-iconbtns { order: 5; }
+  .oxc-iconbtns .oxc-iconbtn { width: 40px; height: 40px; }
+  .oxc-pill { min-height: 44px; font-size: 13px; letter-spacing: 0.14em; }
 }
 
 /* ── character juice: speed lines + emote picker ── */
@@ -302,11 +334,30 @@
 .oxc-quest-count { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); font-variant-numeric: tabular-nums; }
 /* economy dock strip under the ticker — horizontal scroll on phones */
 .oxc-dockrow {
+  position: absolute;
+  top: calc(62px + env(safe-area-inset-top));
+  left: 0; right: 0;
   overflow-x: auto;
-  padding: 8px 12px 0;
+  padding: 8px 12px 4px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
 .oxc-dockrow::-webkit-scrollbar { display: none; }
 .oxc-dockrow .oxe-dock { min-width: max-content; padding: 8px 4px; }
 .oxc-dockrow .oxe-btn { flex: none; white-space: nowrap; }
+
+/* CityAppsShell APPS drawer button: styled pill, fixed in the right-edge stack above JOBS */
+.oxc-apps-btn {
+  position: fixed;
+  right: 12px;
+  bottom: calc(300px + env(safe-area-inset-bottom));
+  z-index: 60;
+  min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  background: rgba(23, 230, 212, 0.13);
+  border: 1px solid var(--oxc-cyan);
+  color: #d9fbff; font: 700 14px/1 system-ui;
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 0 16px rgba(23, 230, 212, 0.18);
+}
+.oxc-apps-btn:active { transform: scale(0.95); }
