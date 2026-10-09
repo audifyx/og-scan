@@ -12,8 +12,6 @@
  * once it lands (see MODULE.md).
  */
 
-import { burnPurchase } from "@/tokenomics/burnFlow";
-
 export type {
   Vec2,
   VehicleLike,
@@ -127,18 +125,7 @@ export function adaptBillingToBurnProvider(billing: BillingLike): import("./econ
     get balance() {
       return billing.balance;
     },
-    burn: async (opts: { amount: number; reason: string; ref: string }) => {
-      // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
-      const res = await burnPurchase(billing, {
-        amount: opts.amount,
-        itemId: opts.reason,
-        label: "Racing entry fee",
-        reason: opts.reason,
-        ref: opts.ref,
-        module: "racing",
-      });
-      if (!res.ok) throw new Error(res.message);
-      return { signature: res.signature };
-    },
+    burn: (opts: { amount: number; reason: string; ref: string }) =>
+      billing.spend({ amount: opts.amount, reason: opts.reason, ref: opts.ref }),
   };
 }

@@ -60,7 +60,7 @@ export function startHeading(circuit: StreetCircuit): number {
 
 /**
  * Build the street-circuit catalogue from the core road grid.
- * Expects nodes[i][j] with i,j in 0..9 (core BLOCKS=9 grid).
+ * Expects nodes[i][j] with i,j in 0..5 (core BLOCKS=5 grid).
  */
 export function buildStreetCircuits(nodes: Vec2[][]): StreetCircuit[] {
   const n = (i: number, j: number) => at(nodes, i, j);
@@ -68,26 +68,26 @@ export function buildStreetCircuits(nodes: Vec2[][]): StreetCircuit[] {
 
   // Perimeter loop — the big one, full city block ring.
   const perimeter: Vec2[] = [];
-  for (let i = 0; i <= 9; i++) perimeter.push(n(i, 0));
-  for (let j = 1; j <= 9; j++) perimeter.push(n(9, j));
-  for (let i = 8; i >= 0; i--) perimeter.push(n(i, 9));
-  for (let j = 8; j >= 1; j--) perimeter.push(n(0, j));
+  for (let i = 0; i <= 5; i++) perimeter.push(n(i, 0));
+  for (let j = 1; j <= 5; j++) perimeter.push(n(5, j));
+  for (let i = 4; i >= 0; i--) perimeter.push(n(i, 5));
+  for (let j = 4; j >= 1; j--) perimeter.push(n(0, j));
 
   // Inner ring — tighter, more technical.
   const inner: Vec2[] = [];
-  for (let i = 2; i <= 7; i++) inner.push(n(i, 2));
-  for (let j = 3; j <= 7; j++) inner.push(n(7, j));
-  for (let i = 6; i >= 2; i--) inner.push(n(i, 7));
-  for (let j = 6; j >= 3; j--) inner.push(n(2, j));
+  for (let i = 1; i <= 4; i++) inner.push(n(i, 1));
+  for (let j = 2; j <= 4; j++) inner.push(n(4, j));
+  for (let i = 3; i >= 1; i--) inner.push(n(i, 4));
+  for (let j = 3; j >= 2; j--) inner.push(n(1, j));
 
   // Night market loop — short central loop for quick pink-slip duels.
-  const market: Vec2[] = [n(4, 4), n(5, 4), n(5, 5), n(4, 5)];
+  const market: Vec2[] = [n(2, 2), n(3, 2), n(3, 3), n(2, 3)];
 
   // Financial sprint — point-to-point across the north edge.
-  const sprint: Vec2[] = [n(0, 0), n(1, 0), n(2, 0), n(3, 0), n(4, 0), n(5, 0), n(6, 0), n(7, 0), n(8, 0), n(9, 0)];
+  const sprint: Vec2[] = [n(0, 0), n(1, 0), n(2, 0), n(3, 0), n(4, 0), n(5, 0)];
 
   // Harbor run — point-to-point down the east edge with a chicane.
-  const harbor: Vec2[] = [n(9, 0), n(9, 1), n(8, 1), n(8, 2), n(9, 2), n(9, 4), n(8, 4), n(8, 6), n(9, 6), n(9, 8), n(9, 9)];
+  const harbor: Vec2[] = [n(5, 0), n(5, 1), n(4, 1), n(4, 2), n(5, 2), n(5, 3), n(5, 4), n(5, 5)];
 
   const mk = (
     id: string, name: string, description: string,
@@ -144,36 +144,35 @@ function makePaceNotes(cps: Vec2[]): string[] {
 
 /**
  * Desert rally routes. Coordinates are world metres; the city spans
- * roughly ±358 m (core HALF), so these all live out in the west desert
- * flats — clear of the city, the east forest and the north hills.
+ * roughly ±202 m (core HALF), so these all live out in the dunes.
  * Stage terrain is open sand — checkpoints only, no building colliders.
  */
 export function buildRallyRoutes(): RallyRoute[] {
   const routes: { id: string; name: string; description: string; cps: Vec2[] }[] = [
     {
       id: "dust-bowl-dash", name: "Dust Bowl Dash",
-      description: "Fast, flowing opener in the west desert flats. Keep it pinned.",
+      description: "Fast, flowing opener east of the city. Keep it pinned.",
       cps: [
-        { x: -420, z: -120 }, { x: -520, z: -180 }, { x: -620, z: -120 },
-        { x: -690, z: -200 }, { x: -600, z: -280 }, { x: -480, z: -240 },
+        { x: 260, z: -120 }, { x: 380, z: -180 }, { x: 500, z: -120 },
+        { x: 620, z: -200 }, { x: 740, z: -140 }, { x: 860, z: -180 },
       ],
     },
     {
       id: "cactus-run", name: "Cactus Run",
       description: "Tight and twisty through the rock gardens. Precision over power.",
       cps: [
-        { x: -430, z: 160 }, { x: -540, z: 260 }, { x: -630, z: 200 },
-        { x: -700, z: 320 }, { x: -600, z: 400 }, { x: -480, z: 340 },
-        { x: -420, z: 220 },
+        { x: 240, z: 160 }, { x: 340, z: 260 }, { x: 430, z: 200 },
+        { x: 480, z: 320 }, { x: 590, z: 260 }, { x: 660, z: 380 },
+        { x: 780, z: 320 },
       ],
     },
     {
       id: "mirage-crossing", name: "Mirage Crossing",
       description: "The long one. Big dunes, blind crests, no mercy.",
       cps: [
-        { x: -430, z: -80 }, { x: -580, z: -160 }, { x: -700, z: -120 },
-        { x: -660, z: -300 }, { x: -520, z: -420 }, { x: -380, z: -500 },
-        { x: -450, z: -340 },
+        { x: -260, z: 240 }, { x: -400, z: 180 }, { x: -520, z: 300 },
+        { x: -680, z: 220 }, { x: -800, z: 340 }, { x: -940, z: 260 },
+        { x: -1080, z: 360 },
       ],
     },
   ];

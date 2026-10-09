@@ -13,17 +13,15 @@ import type { DoorTrigger, TokenQuote, Vec3T } from "../types";
 import { paperWallet } from "../paper/PaperWallet";
 
 export const EXCHANGE_INTERIOR_ID = "stock-exchange";
-/** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
-export const EXCHANGE_FACADE_CENTER: Vec3T = [78, 0, -78];
 export const EXCHANGE_DOOR: DoorTrigger = {
   id: "door:exchange",
   label: "OrbitX Stock Exchange",
-  position: [78, 0, -60],
+  position: [60, 0, -40],
   radius: 4,
   prompt: "Enter Stock Exchange",
   interiorId: EXCHANGE_INTERIOR_ID,
   interiorSpawn: [0, 0, 14],
-  exitPosition: [78, 0, -61],
+  exitPosition: [60, 0, -36],
 };
 
 /* ---------------------------------- shared ---------------------------------- */
@@ -77,7 +75,7 @@ export function buildExchangeExterior(): THREE.Group {
   glow.position.set(0, 3, D / 2 + 0.2);
   g.add(glow);
 
-  g.position.set(...EXCHANGE_FACADE_CENTER);
+  g.position.set(...EXCHANGE_DOOR.position);
   return g;
 }
 

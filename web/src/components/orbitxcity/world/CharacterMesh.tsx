@@ -30,7 +30,7 @@ export interface CharacterMeshProps {
  * CityEnvironment so the world and its inhabitants stay stylistically in sync.
  */
 const BLOCKY_AVATARS: boolean =
-  (import.meta.env?.VITE_OXC_BLOCKY ?? "0") !== "0";
+  (import.meta.env?.VITE_OXC_BLOCKY ?? "1") !== "0";
 
 export function CharacterMesh(props: CharacterMeshProps) {
   const appearance = props.appearance ?? {

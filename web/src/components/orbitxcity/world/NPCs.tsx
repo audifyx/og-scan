@@ -56,12 +56,6 @@ const CLASSES: NonNullable<AvatarAppearance["classId"]>[] = [
   "chad",
   "doge",
   "anon",
-  "trump",
-  "orangie",
-  "brez",
-  "tjr",
-  "kol_moon",
-  "kol_degen",
 ];
 
 type StreetNpcLive = {

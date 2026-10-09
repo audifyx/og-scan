@@ -85,7 +85,7 @@ export function PlayerAvatar({
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
   const { camera } = useThree();
-  const { quality, playerHidden } = useCity();
+  const { quality } = useCity();
   useKeyboard();
 
   const spawn = block.spawn;
@@ -173,29 +173,10 @@ export function PlayerAvatar({
     const prevZ = pos.current.z;
 
     if (moving) {
-      // Camera-relative movement: joystick up = away from camera (screen up),
-      // joystick right = camera's right (screen right). Works regardless of
-      // camera yaw so the stick always matches what the player sees.
-      const camFwd = new THREE.Vector3();
-      camera.getWorldDirection(camFwd);
-      camFwd.y = 0;
-      if (camFwd.lengthSq() < 1e-6) camFwd.set(0, 0, -1);
-      camFwd.normalize();
-      const camRight = new THREE.Vector3().crossVectors(camFwd, new THREE.Vector3(0, 1, 0));
-      // cross(fwd, up) = camera's right in three.js right-handed coords.
-      // Analog magnitude: stick tilt controls speed, not just direction.
-      const mag = Math.min(1, Math.hypot(inputX, inputZ));
-      const moveX = camFwd.x * -inputZ + camRight.x * inputX;
-      const moveZ = camFwd.z * -inputZ + camRight.z * inputX;
-      const len = Math.hypot(moveX, moveZ) || 1;
-      const nx = (moveX / len) * speed * mag;
-      const nz = (moveZ / len) * speed * mag;
-      // Smooth turning: lerp yaw toward target instead of snapping
-      const targetYaw = Math.atan2(nx, nz);
-      let dy = targetYaw - yaw.current;
-      while (dy > Math.PI) dy -= Math.PI * 2;
-      while (dy < -Math.PI) dy += Math.PI * 2;
-      yaw.current += dy * Math.min(1, t * 12);
+      const len = Math.hypot(inputX, inputZ) || 1;
+      const nx = (inputX / len) * speed;
+      const nz = (inputZ / len) * speed;
+      yaw.current = Math.atan2(nx, nz);
 
       const nextX = pos.current.x + nx * t;
       const nextZ = pos.current.z + nz * t;
@@ -334,7 +315,7 @@ export function PlayerAvatar({
   });
 
   return (
-    <group ref={group} position={[spawn.x, 0, spawn.z]} visible={!playerHidden}>
+    <group ref={group} position={[spawn.x, 0, spawn.z]}>
       <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
       {quality === "high" && (
         <pointLight position={[0.35, 1.6, 0.55]} intensity={0.55} color="#e8d8b0" distance={4.5} decay={2} />

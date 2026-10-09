@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLivePrices } from "@/hooks/useLivePrices";
-import { CityWorld as GTAWorld, type CityHudState as HudState, type Quote } from "../CityWorld";
+import { GTAWorld, type HudState, type Quote } from "./World";
 import { createInput, KeyboardInput, OrbitDrag, setTouchSprint, type InputState } from "./input";
 import { GameAudio } from "./audio";
 
@@ -15,7 +15,7 @@ const MARKET_SYMBOLS = ["SOL", "ORBITX", "BONK", "JUP", "WIF"];
 
 const SETTINGS_KEY = "orbitxcity.gta.settings.v1";
 
-export type GtaPhase = "title" | "select" | "howto" | "playing";
+export type GtaPhase = "title" | "howto" | "playing";
 
 interface Settings { sound: boolean; quality: "high" | "low" }
 
@@ -47,6 +47,10 @@ export function useGtaGame() {
   const audioRef = useRef<GameAudio>(new GameAudio());
   const kbRef = useRef<KeyboardInput | null>(null);
   const orbitRef = useRef<OrbitDrag | null>(null);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   const { prices, connected } = useLivePrices(MARKET_MINTS, 15_000);
 
@@ -54,7 +58,7 @@ export function useGtaGame() {
     const q: Record<string, Quote> = {};
     MARKET_MINTS.forEach((mint, i) => {
       const p = prices[mint];
-      if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h, marketCap: p.marketCap };
+      if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h };
     });
     return q;
   }, [prices]);
@@ -125,7 +129,7 @@ export function useGtaGame() {
         const q: Record<string, Quote> = {};
         MARKET_MINTS.forEach((mint, i) => {
           const p = prices[mint];
-          if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h, marketCap: p.marketCap };
+          if (p && p.price > 0) q[MARKET_SYMBOLS[i]] = { price: p.price, change24h: p.priceChange24h };
         });
         return q;
       })(),

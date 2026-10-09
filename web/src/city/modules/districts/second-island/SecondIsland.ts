@@ -38,28 +38,19 @@ export interface BridgeSeamSpec {
 export const BRIDGE: BridgeSeamSpec = {
   id: "bridge:harbor",
   name: "Harbor Bridge",
-  from: [-20, 0, 440],
-  to: [-20, 0, 590],
+  from: [-20, 0, 175],
+  to: [-20, 0, 290],
   deckY: 6,
   lanes: 2,
 };
 
-/**
- * Approach ramps (world coords, axis-aligned along z):
- * mainland ramp climbs y 0 → deckY, island ramp descends deckY → ISLAND_SURFACE_Y.
- */
-export const BRIDGE_RAMP_MAIN = { z0: 404, z1: 440, y0: 0, y1: 6 };
-export const BRIDGE_RAMP_ISLAND = { z0: 590, z1: 606, y0: 6, y1: 4 };
-/** Island ground surface height (baseTerrain cylinder top). */
-export const ISLAND_SURFACE_Y = 4;
-
-/** Default island — the neon docks expansion across the strait. */
+/** Default island — the harbor expansion construction site ferries here. */
 export const ISLAND_ZONES: IslandZoneSpec[] = [
   {
     id: "island:neon-docks",
     name: "Neon Docks",
     biome: "neon-docks",
-    center: [-20, 0, 740],
+    center: [-20, 0, 440],
     radius: 150,
     tagline: "Container port turned neon playground. The bridge was worth it.",
   },
@@ -209,162 +200,51 @@ function buildVolcanic(zone: IslandZoneSpec): THREE.Group {
   return g;
 }
 
-function neonSign(text: string, w: number, color: string): THREE.Mesh {
-  const c = document.createElement("canvas");
-  c.width = 1024; c.height = 128;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, 1024, 128);
-  ctx.fillStyle = color; ctx.font = "bold 72px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(text, 512, 68);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.125), new THREE.MeshBasicMaterial({ map: tex }));
-}
-
-/** Fixed island structures (local coords) — also the source for islandColliders(). */
-const ISLAND_STRUCTURES: { cx: number; cz: number; hw: number; hd: number }[] = [
-  { cx: 0, cz: -40, hw: 15, hd: 9 },    // dock warehouse
-  { cx: 60, cz: -20, hw: 12, hd: 8 },   // neon arcade
-  { cx: -70, cz: 30, hw: 9, hd: 6 },    // diner
-  { cx: -40, cz: -70, hw: 8, hd: 6 },   // dock office A
-  { cx: 30, cz: 70, hw: 7, hd: 5 },     // dock office B
-  { cx: 80, cz: 60, hw: 22, hd: 8 },    // fuel tank farm
-  { cx: -60, cz: 20, hw: 26, hd: 20 },  // container yard
-];
-
 function buildNeonDocks(zone: IslandZoneSpec): THREE.Group {
   const g = baseTerrain(zone, 0x3a3f45, 0x2a2e33);
-  const S = ISLAND_SURFACE_Y; // local ground height
   const containerColors = [0xc23b3b, 0x2a6bc2, 0x2e9e5a, 0xd8a02e, 0x7a3bc2];
-
-  // ring road around the island
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(96, 110, 48),
-    mat(0x1c1f24, { roughness: 0.95 }),
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = S + 0.06;
-  ring.receiveShadow = true;
-  g.add(ring);
-  // ring-road lamps
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    const x = Math.cos(a) * 103, z = Math.sin(a) * 103;
-    g.add(box(0.35, 9, 0.35, 0x2a2e33, x, S + 4.5, z));
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffe9b0 }));
-    bulb.position.set(x, S + 9.2, z);
-    g.add(bulb);
-  }
-
-  // container yard — fixed grid (deterministic, collider-friendly)
-  for (let gx = 0; gx < 4; gx++) {
-    for (let gz = 0; gz < 3; gz++) {
-      const x = -80 + gx * 13;
-      const z = 5 + gz * 12;
-      const h = 1 + ((gx + gz) % 3);
-      for (let i = 0; i < h; i++) {
-        g.add(box(6, 2.6, 2.6, containerColors[(gx * 3 + gz + i) % containerColors.length], x, S + 1.3 + i * 2.7, z));
-      }
+  // container stacks
+  for (const [x, z] of scatter(zone, 14, 40)) {
+    const h = 1 + Math.floor(rnd() * 3);
+    for (let i = 0; i < h; i++) {
+      g.add(box(6, 2.6, 2.6, containerColors[Math.floor(rnd() * containerColors.length)], x, 5.3 + i * 2.7, z));
     }
   }
-
-  // piers (north edge, facing the mainland)
+  // piers
   for (const px of [-50, 0, 50]) {
-    g.add(box(10, 1, 30, 0x6b5a44, px, S - 0.5, zone.radius - 25));
-    for (let i = 0; i < 4; i++) g.add(box(0.6, 4, 0.6, 0x4a3d2e, px - 4, S - 2, zone.radius - 38 + i * 9));
+    g.add(box(10, 1, 30, 0x6b5a44, px, 3.5, zone.radius - 25));
+    for (let i = 0; i < 4; i++) g.add(box(0.6, 4, 0.6, 0x4a3d2e, px - 4, 2, zone.radius - 38 + i * 9));
   }
-  // ferry boat moored at the middle pier
-  const ferry = new THREE.Group();
-  const fhull = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 22), mat(0xe8e8e8));
-  fhull.position.y = 1;
-  ferry.add(fhull);
-  const fcabin = new THREE.Mesh(new THREE.BoxGeometry(6, 3.4, 12), mat(0x2a6bc2));
-  fcabin.position.y = 4;
-  ferry.add(fcabin);
-  ferry.position.set(0, -0.5, zone.radius - 8);
-  g.add(ferry);
-  const ferrySign = neonSign("FERRY · HARBOR", 14, "#22e5ff");
-  ferrySign.position.set(0, S + 8, zone.radius - 22);
-  g.add(ferrySign);
-
   // neon sign poles
   const neonColors = [0xff2a7a, 0x22e5ff, 0xb8ff2a, 0xff8a2a];
   for (let i = 0; i < 8; i++) {
     const [x, z] = scatter(zone, 1, 60)[0];
-    g.add(box(0.4, 12, 0.4, 0x22262b, x, S + 6, z));
+    g.add(box(0.4, 12, 0.4, 0x22262b, x, 10, z));
     const tube = new THREE.Mesh(
       new THREE.SphereGeometry(0.55, 10, 10),
       new THREE.MeshBasicMaterial({ color: neonColors[i % neonColors.length] })
     );
-    tube.position.set(x, S + 12.4, z);
+    tube.position.set(x, 16.4, z);
     g.add(tube);
     const light = new THREE.PointLight(neonColors[i % neonColors.length], 500, 34);
-    light.position.set(x, S + 11, z);
+    light.position.set(x, 15, z);
     g.add(light);
   }
-
   // dock warehouse
-  g.add(box(30, 9, 18, 0x4a5058, 0, S + 4.5, -40));
-  const whSign = neonSign("NEON DOCKS", 20, "#22e5ff");
-  whSign.position.set(0, S + 7, -30.8);
-  g.add(whSign);
-
-  // neon arcade
-  g.add(box(24, 10, 16, 0x1e1428, 60, S + 5, -20));
-  const arcadeSign = neonSign("★ ARCADE ★", 18, "#ff2a7a");
-  arcadeSign.position.set(60, S + 8, -11.8);
-  g.add(arcadeSign);
-  const arcadeGlow = new THREE.PointLight(0xff2a7a, 800, 40);
-  arcadeGlow.position.set(60, S + 9, -8);
-  g.add(arcadeGlow);
-
-  // diner
-  g.add(box(18, 7, 12, 0xd8d0c0, -70, S + 3.5, 30));
-  const dinerSign = neonSign("24H DINER", 14, "#ffb02a");
-  dinerSign.position.set(-70, S + 6.4, 36.2);
-  g.add(dinerSign);
-
-  // dock offices
-  g.add(box(16, 8, 12, 0x3a4a5a, -40, S + 4, -70));
-  g.add(box(14, 6, 10, 0x4a3a5a, 30, S + 3, 70));
-  const offSign = neonSign("HARBOR OPS", 12, "#b8ff2a");
-  offSign.position.set(-40, S + 7, -63.8);
-  g.add(offSign);
-
-  // fuel tank farm
-  for (let i = 0; i < 3; i++) {
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 10, 18), mat(0x8a8f96, { metalness: 0.5 }));
-    tank.position.set(66 + i * 14, S + 5, 60);
-    tank.castShadow = true;
-    g.add(tank);
-  }
-  const tankSign = neonSign("FUEL", 8, "#ff8a2a");
-  tankSign.position.set(80, S + 11.5, 53.8);
-  g.add(tankSign);
-
-  // palms along the beach ring
-  for (const [x, z] of scatter(zone, 18, 12)) {
-    const r = Math.hypot(x, z);
-    if (r < zone.radius - 22) continue; // keep the interior clear
-    g.add(palmTree(x, z, 0.8 + rnd() * 0.5));
-  }
-
+  g.add(box(30, 9, 18, 0x4a5058, 0, 8.5, -40));
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, 1024, 128);
+  ctx.fillStyle = "#22e5ff"; ctx.font = "bold 72px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("NEON DOCKS", 512, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(20, 2.5), new THREE.MeshBasicMaterial({ map: tex }));
+  sign.position.set(0, 11, -30.8);
+  g.add(sign);
   g.position.set(zone.center[0], 0, zone.center[2]);
   return g;
-}
-
-/**
- * Absolute-world AABB colliders for the island's fixed structures.
- * The integrator adds these to its collision set so the island is drivable.
- */
-export function islandColliders(zone: IslandZoneSpec): { minX: number; maxX: number; minZ: number; maxZ: number }[] {
-  const [cx, , cz] = zone.center;
-  return ISLAND_STRUCTURES.map((s) => ({
-    minX: cx + s.cx - s.hw,
-    maxX: cx + s.cx + s.hw,
-    minZ: cz + s.cz - s.hd,
-    maxZ: cz + s.cz + s.hd,
-  }));
 }
 
 function buildArctic(zone: IslandZoneSpec): THREE.Group {
@@ -486,31 +366,6 @@ export function buildBridge(seam: BridgeSeamSpec = BRIDGE): THREE.Group {
   midLight.position.set(0, y + 8, len / 2);
   g.add(midLight);
 
-  // approach ramps — mainland climbs 0 → deckY, island descends deckY → surface.
-  // Local +z runs from→to: a ramp rising toward +z needs rotation.x < 0.
-  const addRamp = (zA: number, zB: number, yA: number, yB: number) => {
-    const run = zB - zA;
-    const rise = yB - yA;
-    const rampLen = Math.hypot(run, rise);
-    const pitch = -Math.atan2(rise, Math.abs(run));
-    const ramp = new THREE.Mesh(
-      new THREE.BoxGeometry(width, 1.2, rampLen),
-      mat(0x4a4f55, { roughness: 0.8 })
-    );
-    ramp.position.set(0, (yA + yB) / 2 - 0.2, (zA + zB) / 2);
-    ramp.rotation.x = pitch;
-    ramp.castShadow = true; ramp.receiveShadow = true;
-    g.add(ramp);
-    for (const sx of [-1, 1]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.1, rampLen), mat(0x2a2e33));
-      rail.position.set(sx * (width / 2 - 0.3), (yA + yB) / 2 + 0.9, (zA + zB) / 2);
-      rail.rotation.x = pitch;
-      g.add(rail);
-    }
-  };
-  addRamp(-(BRIDGE_RAMP_MAIN.z1 - BRIDGE_RAMP_MAIN.z0), 0, BRIDGE_RAMP_MAIN.y0, BRIDGE_RAMP_MAIN.y1);
-  addRamp(len, len + (BRIDGE_RAMP_ISLAND.z1 - BRIDGE_RAMP_ISLAND.z0), BRIDGE_RAMP_ISLAND.y0, BRIDGE_RAMP_ISLAND.y1);
-
   // orient: local +z along from→to, origin at `from`
   const dir = to.clone().sub(from);
   const yaw = Math.atan2(dir.x, dir.z);
@@ -531,54 +386,6 @@ export function bridgeCollider(seam: BridgeSeamSpec = BRIDGE): {
   const minZ = Math.min(seam.from[2], seam.to[2]);
   const maxZ = Math.max(seam.from[2], seam.to[2]);
   return { minX, maxX, minZ, maxZ, topY: seam.deckY + 0.6 };
-}
-
-export interface DriveBox { minX: number; maxX: number; minZ: number; maxZ: number; topY: number }
-
-/**
- * Full drivable path: stepped collider boxes for the deck AND both approach
- * ramps. The integrator should add ALL of these to its collision set (and
- * use them for the car/ped "on bridge" ground-height check) — `bridgeCollider`
- * alone leaves cars unable to climb onto the deck.
- */
-export function bridgeDriveBoxes(seam: BridgeSeamSpec = BRIDGE): DriveBox[] {
-  const width = seam.lanes * 3.5 + 4;
-  const half = width / 2 + 0.5;
-  // The shipped seam runs along +z at fixed x; interpolate parametrically so
-  // custom seams still get sane boxes.
-  const fx = seam.from[0], fz = seam.from[2];
-  const tx = seam.to[0], tz = seam.to[2];
-  const at = (t: number): [number, number] => [fx + (tx - fx) * t, fz + (tz - fz) * t];
-  const boxes: DriveBox[] = [];
-  const push = (t0: number, t1: number, topY: number) => {
-    const [x0, z0] = at(t0);
-    const [x1, z1] = at(t1);
-    boxes.push({
-      minX: Math.min(x0, x1) - half,
-      maxX: Math.max(x0, x1) + half,
-      minZ: Math.min(z0, z1) - half,
-      maxZ: Math.max(z0, z1) + half,
-      topY,
-    });
-  };
-  const deckLen = Math.hypot(tx - fx, tz - fz);
-  const mainRun = BRIDGE_RAMP_MAIN.z1 - BRIDGE_RAMP_MAIN.z0;   // 36
-  const islRun = BRIDGE_RAMP_ISLAND.z1 - BRIDGE_RAMP_ISLAND.z0; // 16
-  // mainland ramp: t < 0 (before `from`), 3 steps 0 → deckY
-  const mainStep = mainRun / deckLen / 3;
-  for (let k = 0; k < 3; k++) {
-    const topY = seam.deckY * ((k + 1) / 3) + 0.8;
-    push(-(3 - k) * mainStep, -(2 - k) * mainStep, topY);
-  }
-  // deck
-  push(0, 1, seam.deckY + 0.8);
-  // island ramp: t > 1, 2 steps deckY → ISLAND_SURFACE_Y
-  const islStep = islRun / deckLen / 2;
-  for (let k = 0; k < 2; k++) {
-    const topY = seam.deckY - (seam.deckY - ISLAND_SURFACE_Y) * ((k + 1) / 2) + 0.8;
-    push(1 + k * islStep, 1 + (k + 1) * islStep, topY);
-  }
-  return boxes;
 }
 
 /* --------------------------------- assembly --------------------------------- */

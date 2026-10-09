@@ -1,13 +1,9 @@
 import { useGtaGame } from "./useGtaGame";
-import { CityHud as GtaHud } from "../CityHud";
-import CitySelect from "../CitySelect";
-import { setStyle } from "../cityState";
-import "../city-rebuild.css";
+import { GtaHud } from "./GtaHud";
 import { GtaTitleScreen, GtaHowToScreen, GtaPauseOverlay } from "./GtaScreens";
 import { CityBillingProvider } from "@/city/integration/CityBillingHost";
 import { CitySystemsHost } from "@/city/integration/CitySystemsHost";
 import { CityAppsShell } from "@/city/integration/CityAppsShell";
-import { ProximityVoiceHost } from "../voice/ProximityVoiceHost";
 
 /**
  * ORBITXCITY — GTA-style open world (Three.js).
@@ -26,20 +22,11 @@ export default function OrbitxCityGTA() {
         <CityBillingProvider>
           <canvas ref={api.canvasRef} className="ocg-canvas" />
           <GtaHud api={api} />
-          <ProximityVoiceHost api={api} />
           <CitySystemsHost api={api} />
           <CityAppsShell api={api} />
         </CityBillingProvider>
       )}
       {api.phase === "title" && <GtaTitleScreen api={api} />}
-      {api.phase === "select" && (
-        <CitySelect
-          onLaunch={(style) => {
-            setStyle(style);
-            api.start();
-          }}
-        />
-      )}
       {api.phase === "howto" && <GtaHowToScreen api={api} />}
       <GtaPauseOverlay api={api} />
     </div>

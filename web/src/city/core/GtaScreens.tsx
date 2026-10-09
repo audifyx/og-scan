@@ -1,78 +1,10 @@
-import { useState } from "react";
-import { Play, Pause, Home, Car, PersonStanding, Moon, Sun, Keyboard, Star, CloudRain } from "lucide-react";
-import type { WeatherMode } from "../CityWeather";
-import { WEATHER_MODES } from "../CityWeather";
+import { Play, Pause, Home, Car, PersonStanding, Moon, Sun, Keyboard } from "lucide-react";
 import type { GtaApi } from "./useGtaGame";
-
-/**
- * GtaBootScreen — the stunning boot/loading experience.
- * NOTE (integrator): swap this into the Suspense fallback in
- * pages/orbitxcity/OrbitxCityPage.tsx to replace the plain "Loading the city…" text:
- *   fallback={<GtaBootScreen />}
- */
-const BOOT_TIPS = [
-  "Walk up to any parked car and press E to take it",
-  "Night falls fast — streetlights and billboards glow after dark",
-  "Billboards stream live token prices from DexScreener",
-  "Hold Shift to sprint · Space to jump · drag to orbit the camera",
-];
-
-export function GtaBootScreen() {
-  return (
-    <div className="ocg-screen ocg-boot">
-      <div className="ocg-boot-sky" aria-hidden>
-        <div className="ocg-boot-stars" />
-        <div className="ocg-boot-glow" />
-        <svg className="ocg-boot-skyline" viewBox="0 0 800 220" preserveAspectRatio="xMidYMax slice" aria-hidden>
-          <g fill="#0a0f1c">
-            <rect x="20" y="80" width="70" height="140" />
-            <rect x="110" y="40" width="60" height="180" />
-            <rect x="190" y="95" width="80" height="125" />
-            <rect x="290" y="25" width="55" height="195" />
-            <rect x="365" y="70" width="90" height="150" />
-            <rect x="475" y="45" width="65" height="175" />
-            <rect x="560" y="90" width="75" height="130" />
-            <rect x="655" y="35" width="60" height="185" />
-            <rect x="735" y="85" width="50" height="135" />
-          </g>
-          <g className="ocg-boot-windows" fill="#00ff9f">
-            <rect x="125" y="55" width="8" height="6" /><rect x="145" y="55" width="8" height="6" />
-            <rect x="125" y="80" width="8" height="6" /><rect x="305" y="40" width="7" height="6" />
-            <rect x="305" y="70" width="7" height="6" /><rect x="490" y="60" width="8" height="6" />
-            <rect x="510" y="60" width="8" height="6" /><rect x="490" y="95" width="8" height="6" />
-            <rect x="670" y="50" width="8" height="6" /><rect x="670" y="90" width="8" height="6" />
-            <rect x="380" y="85" width="9" height="6" /><rect x="405" y="85" width="9" height="6" />
-          </g>
-          <rect x="0" y="218" width="800" height="2" fill="#00ff9f" opacity="0.5" />
-        </svg>
-      </div>
-      <div className="ocg-boot-content">
-        <p className="ocg-kicker">OrbitX presents</p>
-        <h1 className="ocg-logo ocg-boot-logo">ORBITX<span>CITY</span></h1>
-        <div className="ocg-boot-bar" role="progressbar" aria-label="Loading the city">
-          <div className="ocg-boot-bar-fill" />
-        </div>
-        <div className="ocg-boot-tips" aria-hidden>
-          {BOOT_TIPS.map((t, i) => (
-            <span key={t} className="ocg-boot-tip" style={{ animationDelay: `${i * 4}s` }}>
-              <Star size={11} className="ocg-boot-tip-star" /> {t}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function GtaTitleScreen({ api }: { api: GtaApi }) {
   return (
     <div className="ocg-screen">
       <div className="ocg-screen-bg" />
-      <div className="ocg-screen-orbs" aria-hidden>
-        <span className="ocg-orb orb-a" />
-        <span className="ocg-orb orb-b" />
-        <span className="ocg-orb orb-c" />
-      </div>
       <div className="ocg-title-wrap">
         <p className="ocg-kicker">OrbitX presents</p>
         <h1 className="ocg-logo">ORBITX<span>CITY</span></h1>
@@ -81,7 +13,7 @@ export function GtaTitleScreen({ api }: { api: GtaApi }) {
           <b> live token prices</b> light up the billboards.
         </p>
         <div className="ocg-menu-actions">
-          <button className="ocg-btn primary big" onClick={() => api.setPhase("select")}>
+          <button className="ocg-btn primary big" onClick={api.start}>
             <Play size={16} /> Enter the city
           </button>
           <button className="ocg-btn" onClick={() => api.setPhase("howto")}>How to play</button>
@@ -154,7 +86,7 @@ export function GtaHowToScreen({ api }: { api: GtaApi }) {
             </>
           ) : (
             <>
-              <button className="ocg-btn primary" onClick={() => api.setPhase("select")}><Play size={14} /> Enter the city</button>
+              <button className="ocg-btn primary" onClick={api.start}><Play size={14} /> Enter the city</button>
               <button className="ocg-btn" onClick={() => api.setPhase("title")}>Back</button>
             </>
           )}
@@ -164,39 +96,13 @@ export function GtaHowToScreen({ api }: { api: GtaApi }) {
   );
 }
 
-function WeatherToggle({ api }: { api: GtaApi }) {
-  const [mode, setMode] = useState<WeatherMode>(() => api.getWorld()?.getWeather() ?? "drizzle");
-  const pick = (m: WeatherMode) => {
-    setMode(m);
-    api.getWorld()?.setWeather(m);
-  };
-  return (
-    <div className="ocg-weather-btns">
-      {WEATHER_MODES.map((m) => (
-        <button
-          key={m}
-          type="button"
-          className={`ocg-btn small${mode === m ? " primary" : ""}`}
-          onClick={() => pick(m)}
-        >
-          {m}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function GtaPauseOverlay({ api }: { api: GtaApi }) {
   if (!api.paused || api.phase !== "playing") return null;
   return (
     <div className="ocg-overlay">
-      <div className="ocg-modal ocg-pause-modal">
+      <div className="ocg-modal">
         <h2><Pause size={18} /> Paused</h2>
         <p className="ocg-hint">The city keeps breathing. Take your time.</p>
-        <div className="ocg-weather-row" data-hud>
-          <span><CloudRain size={13} /> Weather</span>
-          <WeatherToggle api={api} />
-        </div>
         <div className="ocg-modal-actions">
           <button className="ocg-btn primary" onClick={api.togglePause}><Play size={14} /> Resume</button>
           <button className="ocg-btn" onClick={() => api.setPhase("howto")}>How to play</button>

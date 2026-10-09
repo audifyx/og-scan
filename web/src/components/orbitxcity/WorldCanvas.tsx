@@ -14,8 +14,6 @@ import { InteractionMarkers } from "./world/InteractionMarkers";
 import { CoinField } from "./world/CoinField";
 import { FXPipeline } from "./world/FXPipeline";
 import { InteriorRoom } from "./world/InteriorRoom";
-import { VehicleSystem } from "./world/VehicleSystem";
-import { MissionMarkers } from "./world/MissionMarkers";
 
 function safeWorldBlock(cityId: string | undefined) {
   try {
@@ -96,8 +94,6 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         locked={locked}
       />
       <RemoteAvatars client={realtime} />
-      <VehicleSystem block={block} />
-      <MissionMarkers />
       {!locked && (
         <InteractionMarkers
           zones={block.zones ?? []}

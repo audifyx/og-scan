@@ -8,6 +8,7 @@
  */
 import * as THREE from "three";
 import type { DoorTrigger, Vec3T } from "../types";
+import { mountAsset } from "@/city/modules/assets/loadAsset";
 
 export const GYM_INTERIOR_ID = "gym";
 /** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
@@ -62,18 +63,25 @@ export function buildGymExterior(): THREE.Group {
   const g = new THREE.Group();
   const W = 40, H = 10, D = 28;
 
-  g.add(box(W, H, D, 0x3a3f46, 0, H / 2, 0));
+  // Procedural body — fallback until the GLB strip loads.
+  const body = new THREE.Group();
+  body.userData.proceduralBody = true;
+  body.add(box(W, H, D, 0x3a3f46, 0, H / 2, 0));
   // glass storefront
   const glass = new THREE.Mesh(
     new THREE.PlaneGeometry(W * 0.9, H * 0.6),
     new THREE.MeshStandardMaterial({ color: 0xb8d8ff, transparent: true, opacity: 0.5, roughness: 0.2, emissive: 0x88aacc, emissiveIntensity: 0.35 }),
   );
   glass.position.set(0, H * 0.42, D / 2 + 0.1);
-  g.add(glass);
+  body.add(glass);
   // dark steel awning
   const awning = box(W * 0.9, 0.25, 3, 0x1a1d22, 0, H * 0.74, D / 2 + 1.4);
   awning.rotation.x = 0.2;
-  g.add(awning);
+  body.add(awning);
+  g.add(body);
+  // Real GLB commercial strip (Kenney CC0) — swaps the procedural body when loaded.
+  mountAsset(g, "buildings/commercial/shop-g", { position: [-11, 0, 0], scale: 8 });
+  mountAsset(g, "buildings/commercial/shop-h", { position: [8, 0, 0], scale: 8 });
   // sign
   g.add(box(W * 0.72, 1.8, 0.6, 0x0c0e12, 0, H - 1.4, D / 2 + 0.4));
   g.add(makeTextPlane("IRON ORBIT GYM", W * 0.64, 1.5, "#ff8c42", 0, H - 1.4, D / 2 + 0.75));

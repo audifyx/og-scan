@@ -16,14 +16,14 @@
  * Mounted next to <GtaHud/> while in-world. Renders only the door
  * prompt chips; everything else is headless.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, createContext, useContext } from "react";
+import { useEffect, useRef, useState, createContext, useContext } from "react";
 import * as THREE from "three";
 import { useLivePrices } from "@/hooks/useLivePrices";
 import type { GtaApi } from "@/city/core/useGtaGame";
 import { createHumanoid } from "@/city/core/Humanoid";
 import { createCarMesh } from "@/city/core/Vehicle";
 import { useSharedBilling } from "./CityBillingHost";
-import { burnWith, burnPurchase } from "./cityPorts";
+import { burnWith } from "./cityPorts";
 
 // ambient
 import { AmbientSystem, chaosBus } from "@/city/modules/ambient";
@@ -43,20 +43,20 @@ import { getFactionsStore } from "@/city/modules/factions";
 // districts
 import {
   registerDistrictDoors,
+  buildAllExteriors,
   nearestDoor,
   doorPromptLabel,
-  buildInteriorForDoor,
-  billingFromBurnPurchase,
-  DEALERSHIP_DOOR,
-  SHOWROOM,
   type DoorTrigger,
   type DoorHit,
-  type TokenQuote,
-  type DistrictsBilling,
+  buildExchangeInterior,
+  buildHospitalInterior,
+  buildMuseumInterior,
+  buildLibraryInterior,
+  buildObservatoryInterior,
+  buildCityHallInterior,
+  buildLighthouse,
 } from "@/city/modules/districts";
-import BankUI from "@/city/modules/districts/bank/BankUI";
-import DealershipUI from "@/city/modules/districts/dealership/DealershipUI";
-import ShopsUI from "@/city/modules/districts/shops/ShopsUI";
+import { preloadPilotAssets } from "@/city/modules/assets/loadAsset";
 
 const MARKET_MINTS = [
   "So11111111111111111111111111111111111111112",
@@ -66,7 +66,15 @@ const MARKET_MINTS = [
   "EKpQGSJtjMFqKZ9KQanSqYXRcwiUd5R8ZEWHz5MCFG4rq",
 ];
 
-const MARKET_SYMBOLS = ["SOL", "ORBITX", "BONK", "JUP", "WIF"];
+/** Door id → interior builder (lighthouse is a deck teleport, no interior). */
+const INTERIOR_BUILDERS: Record<string, () => { group: THREE.Group }> = {
+  "door:exchange": () => buildExchangeInterior(),
+  "door:hospital": () => buildHospitalInterior(),
+  "door:museum": () => buildMuseumInterior(),
+  "door:library": () => buildLibraryInterior(),
+  "door:observatory": () => buildObservatoryInterior(),
+  "door:cityhall": () => buildCityHallInterior(),
+};
 
 const _v3 = new THREE.Vector3();
 
@@ -86,45 +94,6 @@ export function CitySystemsHost({ api }: { api: GtaApi }) {
   const [doorHit, setDoorHit] = useState<DoorHit | null>(null);
   const [insideDoor, setInsideDoor] = useState<DoorTrigger | null>(null);
   const [ambientUi, setAmbientUi] = useState<UiState | null>(null);
-
-  /** Live districts billing: premium bank/dealership/shop/hospital/city-hall
-   *  purchases burn real ORBITX through the canonical cityPorts burn flow. */
-  const districtsBilling: DistrictsBilling = useMemo(
-    () =>
-      billingFromBurnPurchase({
-        burn: (a) => burnPurchase(billing, { ...a, module: "districts" }),
-        isReady: () => billing?.ready ?? false,
-        getBalance: () => billing?.balance ?? null,
-      }),
-    [billing],
-  );
-
-  /** Live token quotes for the bank UI (from the shared useLivePrices feed). */
-  const tokenQuotes: TokenQuote[] = useMemo(
-    () =>
-      MARKET_MINTS.map((mint, i) => {
-        const p = prices[mint];
-        return {
-          symbol: MARKET_SYMBOLS[i],
-          mint,
-          price: p?.price ?? 0,
-          change24h: p?.priceChange24h ?? 0,
-        };
-      }),
-    [prices],
-  );
-
-  /** Dealership delivery: spawn the purchased drivable outside the showroom. */
-  const deliverVehicle = useCallback(
-    (vehicleId: string) => {
-      const world = api.getWorld();
-      if (!world) return;
-      const v = SHOWROOM.find((s) => s.id === vehicleId);
-      const [x, , z] = DEALERSHIP_DOOR.exitPosition;
-      world.deliverVehicle(v?.color ?? 0x2a6bc2, x + 6, z + 4, Math.PI / 2);
-    },
-    [api],
-  );
   const sysRef = useRef<{
     ambient: AmbientSystem;
     events: EventsSystem;
@@ -154,7 +123,13 @@ export function CitySystemsHost({ api }: { api: GtaApi }) {
       }
       const scene = world.sceneRef;
 
+      // Warm the real-asset GLB cache before exteriors mount (non-blocking).
+      preloadPilotAssets();
       registerDistrictDoors();
+
+      // ---- district exteriors: real GLB buildings, street props, parked cars ----
+      const exteriors = buildAllExteriors();
+      scene.add(exteriors.group);
 
       // ---- ambient ----
       const ambientCtx: AmbientCtx = {
@@ -336,6 +311,8 @@ export function CitySystemsHost({ api }: { api: GtaApi }) {
           unsubPolice();
           ambient.dispose();
           events.dispose();
+          scene.remove(exteriors.group);
+          exteriors.dispose();
           for (const [, g] of copMeshes) scene.remove(g);
           copMeshes.clear();
         },
@@ -389,12 +366,12 @@ export function CitySystemsHost({ api }: { api: GtaApi }) {
       setInsideDoor(door);
       return;
     }
-    const build = buildInteriorForDoor(door.id);
+    const build = INTERIOR_BUILDERS[door.id];
     if (!build) return;
     let g = interiorsRef.current.get(door.id);
     if (!g) {
       try {
-        g = build.group;
+        g = build().group;
       } catch {
         return;
       }
@@ -443,15 +420,6 @@ export function CitySystemsHost({ api }: { api: GtaApi }) {
             <span>Back to the street</span>
           </div>
         </button>
-      )}
-      {insideDoor?.id === "door:bank" && (
-        <BankUI open onClose={exitDoor} billing={districtsBilling} quotes={tokenQuotes} />
-      )}
-      {insideDoor?.id === "door:dealership" && (
-        <DealershipUI open onClose={exitDoor} billing={districtsBilling} onDeliver={deliverVehicle} />
-      )}
-      {insideDoor?.id === "door:shops" && (
-        <ShopsUI open onClose={exitDoor} billing={districtsBilling} />
       )}
       {ambientUi && ambientUi.toasts.length > 0 && (
         <div data-hud className="ocg-ambient-toast">

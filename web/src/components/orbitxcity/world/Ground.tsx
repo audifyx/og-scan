@@ -226,9 +226,9 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
       <RoadCracks block={block} dense={high} />
 
       {grassPatches.map((p, i) => (
-        <mesh key={`grass-${i}`} rotation={[-Math.PI / 2, 0, p.rot]} position={[p.x, 0.015, p.z]} receiveShadow>
+        <mesh key={`grass-${i}`} rotation={[-Math.PI / 2, 0, p.rot]} position={[p.x, 0.03, p.z]} receiveShadow>
           <circleGeometry args={[p.r, high ? 28 : 16]} />
-          <meshStandardMaterial map={grassMap} color={i % 2 === 0 ? "#3d5c3a" : "#456846"} roughness={0.98} metalness={0} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
+          <meshStandardMaterial map={grassMap} color={i % 2 === 0 ? "#3d5c3a" : "#456846"} roughness={0.98} metalness={0} />
         </mesh>
       ))}
       <GrassTufts block={block} dense={high} />
@@ -237,10 +237,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
         const len = s.to - s.from;
         const mid = (s.from + s.to) / 2;
         const horizontal = s.o === "h";
-        // Layer stack with clear separation to kill z-fighting: streets sit
-        // well above grass (0.015) and pad (0), markings above streets.
-        const sy = 0.05 + i * 0.008;
-        const pos: [number, number, number] = horizontal ? [mid, sy, s.at] : [s.at, sy, mid];
+        const pos: [number, number, number] = horizontal ? [mid, 0.03 + i * 0.002, s.at] : [s.at, 0.03 + i * 0.002, mid];
         const planeSize: [number, number] = horizontal ? [len, s.w] : [s.w, len];
         return (
           <group key={`street-${i}`}>
@@ -258,7 +255,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                   mirror={0.14}
                 />
               ) : (
-                <meshStandardMaterial map={asphaltMap} color="#1a1e24" metalness={0.22} roughness={0.7} polygonOffset polygonOffsetFactor={2} polygonOffsetUnits={2} />
+                <meshStandardMaterial map={asphaltMap} color="#1a1e24" metalness={0.22} roughness={0.7} />
               )}
             </mesh>
             {/* Center dashed lane paint */}
@@ -269,10 +266,10 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                 <mesh
                   key={`dash-${di}`}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  position={horizontal ? [along, sy + 0.012, s.at] : [s.at, sy + 0.012, along]}
+                  position={horizontal ? [along, 0.046 + i * 0.002, s.at] : [s.at, 0.046 + i * 0.002, along]}
                 >
                   <planeGeometry args={horizontal ? [1.4, 0.12] : [0.12, 1.4]} />
-                  <meshStandardMaterial color="#d8d2b8" transparent opacity={0.55} roughness={0.7} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+                  <meshStandardMaterial color="#d8d2b8" transparent opacity={0.55} roughness={0.7} />
                 </mesh>
               );
             })}
@@ -289,12 +286,12 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                         rotation={[-Math.PI / 2, 0, 0]}
                         position={
                           horizontal
-                            ? [along, sy + 0.014, s.at + lat]
-                            : [s.at + lat, sy + 0.014, along]
+                            ? [along, 0.048 + i * 0.002, s.at + lat]
+                            : [s.at + lat, 0.048 + i * 0.002, along]
                         }
                       >
                         <planeGeometry args={horizontal ? [0.55, 0.28] : [0.28, 0.55]} />
-                        <meshStandardMaterial color="#e8e4d4" transparent opacity={0.5} roughness={0.75} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+                        <meshStandardMaterial color="#e8e4d4" transparent opacity={0.5} roughness={0.75} />
                       </mesh>
                     );
                   })}
@@ -307,11 +304,11 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                 <mesh
                   key={`walk-${side}`}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  position={horizontal ? [mid, sy + 0.02, off] : [off, sy + 0.02, mid]}
+                  position={horizontal ? [mid, 0.055 + i * 0.002, off] : [off, 0.055 + i * 0.002, mid]}
                   receiveShadow
                 >
                   <planeGeometry args={horizontal ? [len, 1.55] : [1.55, len]} />
-                  <meshStandardMaterial map={cementMap} color="#6a7178" roughness={0.9} metalness={0.04} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
+                  <meshStandardMaterial map={cementMap} color="#6a7178" roughness={0.9} metalness={0.04} />
                 </mesh>
               );
             })}
@@ -320,7 +317,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
               return (
                 <mesh
                   key={side}
-                  position={horizontal ? [mid, sy + 0.06, off] : [off, sy + 0.06, mid]}
+                  position={horizontal ? [mid, 0.08, off] : [off, 0.08, mid]}
                   castShadow
                   receiveShadow
                 >

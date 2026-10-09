@@ -8,6 +8,7 @@
  */
 import * as THREE from "three";
 import type { DoorTrigger, Vec3T } from "../types";
+import { mountAsset } from "@/city/modules/assets/loadAsset";
 
 export const COFFEE_INTERIOR_ID = "coffee";
 /** Outdoor facade footprint center — the reserved city lot (see FACADE_PLOTS). */
@@ -84,14 +85,17 @@ export function buildCoffeeExterior(): THREE.Group {
   const g = new THREE.Group();
   const W = 36, H = 9, D = 24;
 
-  g.add(box(W, H, D, 0x8a7a66, 0, H / 2, 0));
+  // Procedural body — fallback until the GLB strip loads.
+  const body = new THREE.Group();
+  body.userData.proceduralBody = true;
+  body.add(box(W, H, D, 0x8a7a66, 0, H / 2, 0));
   // glass storefront
   const glass = new THREE.Mesh(
     new THREE.PlaneGeometry(W * 0.9, H * 0.62),
     new THREE.MeshStandardMaterial({ color: 0xffe9b0, transparent: true, opacity: 0.5, roughness: 0.2, emissive: 0xffd9a0, emissiveIntensity: 0.4 }),
   );
   glass.position.set(0, H * 0.42, D / 2 + 0.1);
-  g.add(glass);
+  body.add(glass);
   // warm cream awning stripes
   for (let i = 0; i < 9; i++) {
     const stripe = new THREE.Mesh(
@@ -100,8 +104,12 @@ export function buildCoffeeExterior(): THREE.Group {
     );
     stripe.position.set(-W * 0.45 + i * W * 0.1 + W * 0.05, H * 0.78, D / 2 + 1.2);
     stripe.rotation.x = 0.25;
-    g.add(stripe);
+    body.add(stripe);
   }
+  g.add(body);
+  // Real GLB commercial strip (Kenney CC0) — swaps the procedural body when loaded.
+  mountAsset(g, "buildings/commercial/shop-a", { position: [-10, 0, 0], scale: 10 });
+  mountAsset(g, "buildings/commercial/shop-e", { position: [7, 0, 0], scale: 10 });
   // sign
   g.add(box(W * 0.72, 1.8, 0.6, 0x101418, 0, H - 1.4, D / 2 + 0.4));
   g.add(makeTextPlane("MOONBEAM COFFEE", W * 0.56, 1.5, "#ffd166", 0.8, H - 1.4, D / 2 + 0.75));

@@ -20,17 +20,16 @@ export const LIGHTHOUSE_INTERIOR_ID = "lighthouse";
 export const LIGHTHOUSE_DOOR: DoorTrigger = {
   id: "door:lighthouse",
   label: "OrbitX Lighthouse",
-  position: [250, 0, 415],
+  position: [150, 0, 130],
   radius: 5,
   prompt: "Climb Lighthouse",
   interiorId: LIGHTHOUSE_INTERIOR_ID,
   interiorSpawn: [0, 0, 0],
-  exitPosition: [250, 0, 410],
+  exitPosition: [150, 0, 125],
 };
 
 /** Deck viewpoint (world coords) — best panorama vantage. */
-/** Deck the player climbs to (absolute world coords — south beach). */
-export const LIGHTHOUSE_DECK: Vec3T = [250, 26, 415];
+export const LIGHTHOUSE_DECK: Vec3T = [150, 26, 130];
 export const LIGHTHOUSE_DECK_HEADING = Math.PI; // face the city
 
 function mat(color: number, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) {
@@ -164,14 +163,14 @@ export const PANORAMA_SPOTS: PanoramaSpot[] = [
   {
     id: "spot:exchange-steps",
     name: "Exchange Steps",
-    position: [78, 2, -60],
+    position: [60, 2, -28],
     heading: Math.PI,
     hint: "Neoclassical columns with the ticker glow behind.",
   },
   {
     id: "spot:observatory-hill",
     name: "Observatory Hill",
-    position: [-95, 4, -63],
+    position: [-110, 4, -100],
     heading: 0.6,
     hint: "City lights below, dome behind. Best at night.",
   },

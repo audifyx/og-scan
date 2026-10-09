@@ -106,15 +106,15 @@ export const GYM_EXERCISES: GymExercise[] = [
 
 /**
  * Shop locations on the city grid (streets at i*PITCH offsets; see
- * core/CityBuilder — BLOCK=64, ROAD_W=14, PITCH=78, HALF=358).
+ * core/CityBuilder — BLOCK=64, ROAD_W=14, PITCH=78, HALF=202).
  * Integrator: place 3D storefront markers at these coords; the "enter"
  * interaction teleports to the shop UI (core teleport()).
  */
 export const STORES: StoreLocation[] = [
-  { id: "threads", name: "THREADS", kind: "clothing", x: -160, z: -230, blurb: "Full fits. Buffs included." },
-  { id: "fadez", name: "FADEZ Barber", kind: "barber", x: 80, z: -50, blurb: "Cuts from 3 ORBITX." },
-  { id: "inkd", name: "INK'D Parlor", kind: "tattoo", x: 210, z: 150, blurb: "Permanent statements." },
-  { id: "ironhouse", name: "IRON HOUSE Gym", kind: "gym", x: -70, z: 250, blurb: "Strength and stamina, for real." },
+  { id: "threads", name: "THREADS", kind: "clothing", x: -24, z: -108, blurb: "Full fits. Buffs included." },
+  { id: "fadez", name: "FADEZ Barber", kind: "barber", x: 52, z: 44, blurb: "Cuts from 3 ORBITX." },
+  { id: "inkd", name: "INK'D Parlor", kind: "tattoo", x: -114, z: -30, blurb: "Permanent statements." },
+  { id: "ironhouse", name: "IRON HOUSE Gym", kind: "gym", x: 128, z: 122, blurb: "Strength and stamina, for real." },
 ];
 
 /** Companion bot name presets — nod to the OrbitX agent theme. */

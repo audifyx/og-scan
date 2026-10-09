@@ -19,13 +19,6 @@ interface LaneCar {
   body: string;
 }
 
-/** Live traffic positions for the minimap. */
-const liveCars = new Map<number, { x: number; z: number }>();
-
-export function getLiveCarPositions(): Array<{ x: number; z: number }> {
-  return [...liveCars.values()];
-}
-
 function segmentLength(s: StreetSegment): number {
   return Math.abs(s.to - s.from);
 }
@@ -45,7 +38,6 @@ function pointOnSegment(
 }
 
 function StreetCar({
-  carId,
   segment,
   phase,
   speed,
@@ -55,7 +47,6 @@ function StreetCar({
   block,
   paused,
 }: {
-  carId: number;
   segment: StreetSegment;
   phase: number;
   speed: number;
@@ -72,28 +63,10 @@ function StreetCar({
   const { playerPos } = useCity();
   const playerRef = useRef(playerPos);
   playerRef.current = playerPos;
-  const brakeRef = useRef<THREE.PointLight>(null);
 
   useFrame((_, rawDt) => {
     if (paused || !group.current) return;
     const dt = Math.min(rawDt, 0.05);
-
-    // Look ahead: brake when the player is on the road in front of the car.
-    const probeT = (t.current + (dir.current * speed * 0.9) / len + 1) % 1;
-    const probe = pointOnSegment(segment, probeT, dir.current < 0);
-    const pdx = probe.x - playerRef.current.x;
-    const pdz = probe.z - playerRef.current.z;
-    const probeDistSq = pdx * pdx + pdz * pdz;
-    const braking = probeDistSq < 30; // ~5.5m ahead
-
-    if (braking) {
-      // Hold position, flash brake lights.
-      if (brakeRef.current) brakeRef.current.intensity = 5 + Math.sin(performance.now() / 90) * 3;
-      liveCars.set(carId, { x: group.current.position.x, z: group.current.position.z });
-      return;
-    }
-    if (brakeRef.current) brakeRef.current.intensity = 0;
-
     const nextT = (t.current + (dir.current * speed * dt) / len + 1) % 1;
     const p = pointOnSegment(segment, nextT, dir.current < 0);
     const dx = p.x - playerRef.current.x;
@@ -111,14 +84,12 @@ function StreetCar({
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     group.current.rotation.y += dy * Math.min(1, dt * 10);
-    liveCars.set(carId, { x: p.x, z: p.z });
   });
 
   const start = pointOnSegment(segment, phase, reverse);
   return (
     <group ref={group} position={[start.x, 0, start.z]} rotation={[0, start.yaw, 0]}>
       <CityCarMesh glow={glow} body={body} />
-      <pointLight ref={brakeRef} color="#ff2222" intensity={0} distance={6} position={[0, 1, -1.6]} />
     </group>
   );
 }
@@ -170,7 +141,6 @@ export function Traffic({
         return (
           <StreetCar
             key={i}
-            carId={i}
             segment={segment}
             phase={c.phase}
             speed={c.speed}

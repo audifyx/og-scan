@@ -1,8 +1,7 @@
 import { useSyncExternalStore } from "react";
-import { ChevronLeft, ChevronRight, Gamepad2, Gauge, Music2, RotateCcw, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ChevronLeft, ChevronRight, Gamepad2, Gauge, Music2, Sparkles, Volume2 } from "lucide-react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
-import { resetSave } from "@/lib/orbitxcity/saveGame";
 
 export function SettingsPanel() {
   const { quality, setQuality, touchControls, setTouchControls } = useCity();
@@ -17,28 +16,6 @@ export function SettingsPanel() {
       </div>
 
       <div className="oxc-settings-list">
-        <div className="oxc-settings-row">
-          <div>
-            <div className="oxc-settings-title">
-              <VolumeX className="h-4 w-4" /> Master mute
-            </div>
-            <p>Silences everything at once: music, SFX, engine hum, and sirens.</p>
-          </div>
-          <button
-            type="button"
-            className={`oxc-switch ${audio.muted ? "on" : ""}`}
-            onClick={() => {
-              void cityAudio.unlock();
-              cityAudio.setMasterMuted(!audio.muted);
-              cityAudio.play("ui");
-            }}
-            aria-pressed={audio.muted}
-          >
-            <span />
-            {audio.muted ? "Muted" : "On"}
-          </button>
-        </div>
-
         <div className="oxc-settings-row">
           <div>
             <div className="oxc-settings-title">
@@ -238,25 +215,6 @@ export function SettingsPanel() {
             </div>
             <p>Phones and tablets should use Lite plus touch controls. Desktop rigs can run High.</p>
           </div>
-        </div>
-
-        <div className="oxc-settings-row">
-          <div>
-            <div className="oxc-settings-title">
-              <RotateCcw className="h-4 w-4" /> Reset save
-            </div>
-            <p>Wipes your local save (credits, avatar, settings, mission history). Cannot be undone.</p>
-          </div>
-          <button
-            type="button"
-            className="oxc-btn ghost compact"
-            onClick={() => {
-              resetSave();
-              cityAudio.play("confirm");
-            }}
-          >
-            Reset
-          </button>
         </div>
       </div>
     </section>

@@ -37,7 +37,6 @@ import type {
   Sentence,
   WantedStars,
 } from "./types";
-import { burnPurchase } from "@/tokenomics/burnFlow";
 
 export const POLICE_STORAGE_KEY = "orbitxcity:police:v1";
 
@@ -351,17 +350,11 @@ export class PoliceStore {
     }
     const ref = uid("police-bribe");
     try {
-      // Canonical buy-and-burn — dry-run safe, normalized reason, shared ledger.
-      const res = await burnPurchase(billing, {
+      const { signature } = await billing.spend({
         amount,
-        itemId: "bribe",
-        label: "Police bribe",
         reason: "city:police-bribe",
         ref,
-        module: "police",
       });
-      if (!res.ok) throw new Error(res.message);
-      const { signature } = res;
       this.s.heat = 0;
       this.s.rap.bribes += 1;
       this.s.rap.orbitxBurnedOnBribes += amount;

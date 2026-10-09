@@ -29,8 +29,6 @@ import { ChartBoard, usePriceHistory } from "./ChartBoard";
 import { OxiGuide } from "./OxiGuide";
 import { Park } from "./Park";
 import { Traffic } from "./Traffic";
-import { DrivableCars } from "./DrivableCars";
-import { PoliceChasers } from "./PoliceChasers";
 import { SkyCycle } from "./SkyCycle";
 import { UrbanNature } from "./UrbanNature";
 import { PropScatter } from "./PropScatter";
@@ -500,7 +498,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
           }
         />
       )}
-      <NPCs block={block} count={high ? 18 : 8} />
+      <NPCs block={block} count={high ? 9 : 4} />
       {high && !paused && <Drones origin={{ x: block.spawn.x, z: block.spawn.z }} />}
       {high && <OxiGuide spawn={block.spawn} />}
       <Park
@@ -508,8 +506,6 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
         lite={!high}
       />
       <Traffic count={high ? 10 : 3} block={block} paused={paused} />
-      {!paused && <DrivableCars block={block} />}
-      {!paused && <PoliceChasers block={block} />}
     </group>
   );
 }

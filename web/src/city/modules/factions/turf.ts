@@ -1,18 +1,18 @@
 /**
  * ORBITXCITY — Factions module: turf districts + turf wars.
  *
- * The 9x9 city grid (core CityBuilder) is carved into 5 named districts.
+ * The 5x5 city grid (core CityBuilder) is carved into 5 named districts.
  * Firms battle for district control; the controlling firm skims a fee
  * share off the district's paper CITY yield.
  *
  * Geometry constants mirror core CityBuilder (self-contained, no core
- * imports): BLOCKS=9, BLOCK=64, ROAD_W=14, PITCH=78, CITY_SPAN=716, HALF=358.
+ * imports): BLOCKS=5, BLOCK=64, ROAD_W=14, PITCH=78, CITY_SPAN=404, HALF=202.
  * Block (bi,bj) center: x = -HALF + ROAD_W + bi*PITCH + BLOCK/2.
  */
 import type { District, FactionId, TurfWar } from "./types";
 import { FACTION_IDS } from "./factions";
 
-const HALF = 358;
+const HALF = 202;
 const ROAD_W = 14;
 const BLOCK = 64;
 const PITCH = 78;
@@ -39,15 +39,6 @@ function initialInfluence(): Record<FactionId, number> {
   return { bulls: 25, bears: 25, whales: 25, apes: 25 };
 }
 
-/** All blocks in the inclusive rectangle [bi0..bi1] × [bj0..bj1] (9x9 grid). */
-function rect(bi0: number, bi1: number, bj0: number, bj1: number): [number, number][] {
-  const cells: [number, number][] = [];
-  for (let bi = bi0; bi <= bi1; bi++) {
-    for (let bj = bj0; bj <= bj1; bj++) cells.push([bi, bj]);
-  }
-  return cells;
-}
-
 export function buildDistricts(): District[] {
   const defs: Array<{
     id: string;
@@ -60,36 +51,36 @@ export function buildDistricts(): District[] {
       id: "old-town",
       name: "Old Town",
       blurb: "Brick tenements and corner bodegas. First ink on these walls.",
-      cells: rect(0, 2, 0, 5),
-      yieldPerHour: 430,
+      cells: [[0, 0], [0, 1], [1, 0], [1, 1], [0, 2]],
+      yieldPerHour: 120,
     },
     {
       id: "skyline",
       name: "Skyline Heights",
       blurb: "Glass towers, rooftop deals, the money end of town.",
-      cells: rect(6, 8, 0, 5),
-      yieldPerHour: 720,
+      cells: [[3, 0], [4, 0], [2, 0], [3, 1], [4, 1]],
+      yieldPerHour: 200,
     },
     {
       id: "foundry",
       name: "The Foundry",
       blurb: "Industrial heart. Every firm wants the center.",
-      cells: rect(3, 5, 0, 5),
-      yieldPerHour: 650,
+      cells: [[1, 2], [2, 1], [2, 2], [2, 3], [3, 2]],
+      yieldPerHour: 180,
     },
     {
       id: "docks",
       name: "Neon Docks",
       blurb: "Warehouses and night markets glowing on the water.",
-      cells: rect(0, 4, 6, 8),
-      yieldPerHour: 450,
+      cells: [[0, 3], [1, 3], [0, 4], [1, 4], [2, 4]],
+      yieldPerHour: 150,
     },
     {
       id: "mirage",
       name: "The Mirage",
       blurb: "Casinos, arcades, and paper that moves fast.",
-      cells: rect(5, 8, 6, 8),
-      yieldPerHour: 410,
+      cells: [[3, 3], [4, 3], [3, 4], [4, 4], [4, 2]],
+      yieldPerHour: 170,
     },
   ];
   return defs.map((d) => {

@@ -1,27 +1,14 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
-import { useCityAudioEvents } from "@/lib/orbitxcity/useCityAudioEvents";
-import { useGameStore } from "@/lib/orbitxcity/gameStore";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 /**
  * Mount once inside OrbitX City — unlocks audio on first gesture, drives
- * menu vs world theme beds, keeps mute prefs in sync, bridges wanted heat
- * into the siren loop, and runs the engine-hum + footstep event loop while
- * the world is live.
+ * menu vs world theme beds, and keeps mute prefs in sync.
  */
 export function CityAudioController() {
   const { gate, entered } = useCity();
   const snap = useSyncExternalStore(cityAudio.subscribe, () => cityAudio.getState(), () => cityAudio.getState());
-
-  useCityAudioEvents(entered && gate === "world");
-
-  // Wanted heat → patrol siren loop (gameStore heat 0..100; siren at >= 60).
-  useEffect(() => {
-    cityAudio.setHeat(useGameStore.getState().heat);
-    const unsub = useGameStore.subscribe((s) => cityAudio.setHeat(s.heat));
-    return unsub;
-  }, []);
 
   // Unlock on first user gesture (autoplay policy)
   useEffect(() => {

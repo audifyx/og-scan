@@ -26,59 +26,42 @@ world loop.
 districts/
   index.ts            — public surface (doors, builders, UIs, data). Start here.
   types.ts            — shared types (DoorTrigger, TokenQuote, WantedProvider, …)
-  billing.ts          — DistrictsBilling interface + NoopBilling fallback +
-                        billingFromBurnPurchase (cityPorts burn adapter wiring)
+  billing.ts          — DistrictsBilling interface + NoopBilling fallback
   paper/PaperWallet.ts— paper CITY ledger + paper-trading positions (localStorage)
   doors/DoorSystem.ts — door trigger registry + proximity lookup
   exchange/          — walkable stock exchange: trading floor interior + paper-trading terminal UI
   hospital/          — respawn + wanted-clear billing UI
-  bank/              — ORBITX Bank: tellers, vault, ATMs, safe-deposit boxes (CITY) + vault membership (ORBITX burn)
-  dealership/        — OrbitX Motors: glass showroom, demo cars, paper-CITY sales + ORBITX-burn hypercar trim
-  shops/             — OrbitX Market: stocked aisles, checkout, paper-CITY goods + ORBITX-burn cosmetics
   construction/      — data-driven construction sites (city grows as features ship)
   museum/            — Museum of Rugs: dead-token hall of fame/shame (real data)
   library/           — OrbitX history archive + famous trades reader UI
   observatory/       — stargazing dome; star discovery → constellation NFTs (design-time)
   lighthouse/        — climbable lighthouse + panoramic screenshot helpers
   cityhall/          — pay fines, register firms, run for mayor + vote
-  second-island/     — pluggable island zones + bridge seam spec + drivable ramp colliders
+  second-island/     — pluggable island zones + bridge seam spec
 ```
 
 ## Door triggers (outdoor mount points)
 
 Register once at world boot: `registerDistrictDoors()`.
 
-Trigger positions sit a few meters IN FRONT of each facade entrance (the
-facade itself occupies the reserved lot — see `FACADE_PLOTS`); exit positions
-drop the player just outside the facade collider.
-
 | Door id | Prompt | Outdoor pos `[x, y, z]` | Radius | Interior id | Interior spawn | Exit pos |
 |---|---|---|---|---|---|---|
-| `door:exchange` | Enter Stock Exchange | `[78, 0, -60]` | 4 | `stock-exchange` | `[0, 0, 14]` | `[78, 0, -61]` |
-| `door:hospital` | Enter Hospital | `[-78, 0, 95]` | 4 | `hospital` | `[0, 0, 12]` | `[-78, 0, 94]` |
-| `door:museum` | Enter Museum of Rugs | `[78, 0, 173]` | 4 | `museum-of-rugs` | `[0, 0, 16]` | `[78, 0, 172]` |
-| `door:library` | Enter Library | `[-78, 0, -140]` | 4 | `library` | `[0, 0, 14]` | `[-78, 0, -141]` |
-| `door:observatory` | Enter Observatory | `[-95, 0, -63]` | 5 | `observatory` | `[0, 0, 8]` | `[-95, 0, -64]` |
-| `door:cityhall` | Enter City Hall | `[0, 0, -60]` | 5 | `city-hall` | `[0, 0, 14]` | `[0, 0, -61]` |
-| `door:bank` | Enter ORBITX Bank | `[0, 0, 27]` | 4 | `bank` | `[0, 0, 12]` | `[0, 0, 26]` |
-| `door:dealership` | Enter Dealership | `[-158, 0, 88]` | 5 | `dealership` | `[0, 0, 14]` | `[-158, 0, 87]` |
-| `door:shops` | Enter OrbitX Market | `[156, 0, 15]` | 4 | `shops` | `[0, 0, 10]` | `[156, 0, 14]` |
-| `door:lighthouse` | Climb Lighthouse | `[250, 0, 415]` | 5 | `lighthouse` | — (deck teleport) | `[250, 0, 410]` |
+| `door:exchange` | Enter Stock Exchange | `[60, 0, -40]` | 4 | `stock-exchange` | `[0, 0, 14]` | `[60, 0, -36]` |
+| `door:hospital` | Enter Hospital | `[-70, 0, 55]` | 4 | `hospital` | `[0, 0, 12]` | `[-70, 0, 51]` |
+| `door:museum` | Enter Museum of Rugs | `[30, 0, 90]` | 4 | `museum-of-rugs` | `[0, 0, 16]` | `[30, 0, 86]` |
+| `door:library` | Enter Library | `[-30, 0, -90]` | 4 | `library` | `[0, 0, 14]` | `[-30, 0, -86]` |
+| `door:observatory` | Enter Observatory | `[-110, 0, -110]` | 5 | `observatory` | `[0, 0, 8]` | `[-110, 0, -105]` |
+| `door:cityhall` | Enter City Hall | `[0, 0, -110]` | 5 | `city-hall` | `[0, 0, 14]` | `[0, 0, -105]` |
+| `door:lighthouse` | Climb Lighthouse | `[150, 0, 130]` | 5 | `lighthouse` | — (deck teleport) | `[150, 0, 125]` |
 
 Notes:
-- Facade footprint centers live next to each door as `<X>_FACADE_CENTER`;
-  `FACADE_PLOTS` aggregates them (center + half extents) and core's
-  `CityBuilder` reserves those lots so generated buildings never overlap a
-  facade or a door trigger. `facadeColliders()` returns the matching outdoor
-  AABBs for the integrator's collision set.
-- `buildAllExteriors()` adds all facades (+ lighthouse, bridge, islands,
-  construction sites) to one `THREE.Group` you drop into the world scene.
-  **The integrator must actually mount it** (`scene.add(buildAllExteriors().group)`)
-  plus `facadeColliders()` — doors prompt without visible buildings otherwise.
+- Positions are world meters; core's city spawns around the origin. Facades are
+  built at their door positions by `build*Exterior()`; `buildAllExteriors()`
+  adds all of them (+ lighthouse, bridge, islands, construction sites) to one
+  `THREE.Group` you drop into the world scene.
 - The lighthouse has **no interior scene** — climbing teleports the player to
-  `LIGHTHOUSE_DECK = [250, 26, 415]` on the south beach, heading
-  `LIGHTHOUSE_DECK_HEADING = π` (facing the city). Exiting returns them to
-  `exitPosition`.
+  `LIGHTHOUSE_DECK = [150, 26, 130]`, heading `LIGHTHOUSE_DECK_HEADING = π`
+  (facing the city). Exiting returns them to `exitPosition`.
 
 ## Teleport hooks (integrator responsibilities)
 
@@ -96,9 +79,6 @@ The canonical flow:
    | `library` | `buildLibraryInterior()` → `{ group, terminalPositions }` | terminals open `<LibraryReader>` |
    | `observatory` | `buildObservatoryInterior()` → `{ group, domeRadius, aimTelescope }` | telescope aims via `aimTelescope(yaw, pitch)`; feed hits to `trackGaze` |
    | `city-hall` | `buildCityHallInterior()` → `{ group, clerkPosition, ballotPosition }` | clerk opens `<CityHallUI billing owner>` (fines/firms tabs); ballot opens the mayor tab |
-   | `bank` | `buildBankInterior()` → `{ group, updateQuotes, atmPositions }` | ATMs at `atmPositions` open `<BankUI billing quotes>` (ticker fed from `useLivePrices`) |
-   | `dealership` | `buildDealershipInterior()` → `{ group, deskPosition }` | desk opens `<DealershipUI billing onDeliver>` (showroom catalog; delivery via `onDeliver`) |
-   | `shops` | `buildShopsInterior()` → `{ group, checkoutPosition }` | checkout opens `<ShopsUI billing>` |
    | `lighthouse` | deck teleport (no builder) | `PANORAMA_SPOTS` for screenshot cams; `capturePanorama(canvas)` / `downloadPanorama(canvas)` |
 
 3. Teleport the player to `door.interiorSpawn`, swap the visible scene
@@ -107,12 +87,18 @@ The canonical flow:
    traffic, and wanted ticking while inside.
 4. On exit, restore the outdoor scene and teleport to `door.exitPosition`.
 
-Ready-made registry (no hand-rolled map needed):
+Suggested registry (integrator-owned, not in this module):
 
 ```ts
-import { buildInteriorForDoor } from "@/city/modules/districts";
-// buildInteriorForDoor("door:bank") → { group, dispose } | null
-// ("door:lighthouse" → null: deck teleport instead of a scene)
+const INTERIORS: Record<string, () => { group: THREE.Group; dispose(): void }> = {
+  "stock-exchange": buildExchangeInterior,
+  "hospital": buildHospitalInterior,
+  "museum-of-rugs": buildMuseumInterior,
+  "library": buildLibraryInterior,
+  "observatory": buildObservatoryInterior,
+  "city-hall": buildCityHallInterior,
+  // "lighthouse": deck teleport instead of a scene
+};
 ```
 
 Call each builder's `dispose()` when unmounting to free geometries/textures.
@@ -142,36 +128,17 @@ Interiors create their own `PointLight`s — keep at most one interior mounted.
 
 - `NoopBilling` (`state: "coming-soon"`) is the default — premium UI renders
   "soon / auth required" and the world runs on paper CITY. Integrator swaps in
-  a live implementation without touching district feature code.
-- **Live wiring (canonical):** `billingFromBurnPurchase({ burn, isReady,
-  getBalance })` — the integrator passes the cityPorts `burnPurchase` burn
-  adapter (structural type `BurnPurchaseLike`, deliberately not imported to
-  avoid an integration→districts→integration cycle). Every premium district
-  purchase then flows through the canonical burn: namespaced `city:districts:*`
-  reasons, the shared burn ledger, dry-run support, backend-signed ORBITX.
-  ```ts
-  const districtsBilling = billingFromBurnPurchase({
-    burn: (a) => burnPurchase(billing, { ...a, module: "districts" }),
-    isReady: () => billing?.ready ?? false,
-    getBalance: () => billing?.balance ?? null,
-  });
-  ```
-- Legacy path: `billingFromTokenomicsHook(useOrbitxBilling())` still works if
-  the tokenomics hook shape is preferred.
+  `billingFromTokenomicsHook(useOrbitxBilling())` once the tokenomics team's
+  `web/src/tokenomics/useOrbitxBilling` lands. **No district feature code
+  changes when that happens.**
 - Premium price tags use `premiumPriceLabel(amount, billing)` — never
   hardcode "ORBITX".
 - Premium entry points: hospital expedited wipe (`EXPEDITED_WIPE_COST_ORBITX
   = 5` ORBITX, reason `city-hospital:expedited-wipe`), city-hall premium firm
-  (`FIRM_COST_PREMIUM_ORBITX = 25` ORBITX, reason `city-hall:firm-premium`),
-  bank vault membership (`VAULT_COST_ORBITX = 10`, reason
-  `city:districts:bank-vault`), dealership hypercar trim (25 ORBITX, reason
-  `city:districts:dealership:aurora-hypercar`), shop cosmetics (5/15 ORBITX,
-  reasons `city:districts:shop:<id>`). All call `spendPremium` only when
-  `billing.state === "live"`; premium UI gates on the same flag and renders
-  an honest "wallet auth required" state otherwise.
+  (`FIRM_COST_PREMIUM_ORBITX = 25` ORBITX, reason `city-hall:firm-premium`).
+  All call `spendPremium` only when `billing.state === "live"`.
 - Paper-CITY prices: wanted clear 250/star, treatment bill 100, firm 500,
-  candidacy 1000, vote 10, safe-deposit box 500, shop goods 50–150, showroom
-  cars 2500–9800 — all via `paperWallet` (`STARTING_CITY = 10_000`).
+  candidacy 1000, vote 10 — all via `paperWallet` (`STARTING_CITY = 10_000`).
 
 ## Bridge / world-seam interface (second island)
 
@@ -179,25 +146,17 @@ Core owns the ocean, sky, weather, and day/night — this module owns the island
 ground, dressing, and the bridge seam spec.
 
 - `BRIDGE: BridgeSeamSpec` — id `bridge:harbor`, name "Harbor Bridge",
-  mainland-side deck start `from: [-20, 0, 440]` (beach waterline),
-  island-side end `to: [-20, 0, 590]`, `deckY: 6` (must stay > core's water
-  plane `y = -0.6`), `lanes: 2` (driving width = lanes × 3.5 m + 4 m shoulders).
-- Approach ramps are built into `buildBridge`: mainland ramp climbs
-  `BRIDGE_RAMP_MAIN` (z 404 → 440, y 0 → 6), island ramp descends
-  `BRIDGE_RAMP_ISLAND` (z 590 → 606, y 6 → 4 = `ISLAND_SURFACE_Y`).
-- `bridgeCollider(seam = BRIDGE)` returns the deck box (`topY = deckY + 0.6`).
-  **`bridgeDriveBoxes(seam = BRIDGE)` is the one to use for driving** — stepped
-  boxes covering deck + both ramps. Add ALL of them to the collision set and
-  use them for the car/ped ground-height check on the bridge.
+  mainland-side deck start `from: [-20, 0, 175]`, island-side end
+  `to: [-20, 0, 290]`, `deckY: 6` (must stay > core's water plane `y = 0`),
+  `lanes: 2` (driving width = lanes × 3.5 m + 4 m shoulders).
+- `buildBridge(seam = BRIDGE)` builds a suspension bridge whose local +z runs
+  from `from` → `to` (yaw = `atan2(dir.x, dir.z)`), origin at `from`.
+- `bridgeCollider(seam = BRIDGE)` returns the integrator's deck collider:
+  `{ minX, maxX, minZ, maxZ, topY }` (`topY = deckY + 0.6`). The integrator
+  adds this box to its collision set and gates car/ped entry onto the deck.
 - `ISLAND_ZONES` — default zone `island:neon-docks` (biome `neon-docks`,
-  center `[-20, 0, 740]`, radius 150 m). The island is fully built out: ring
-  road with lamps, container yard, 3 piers + moored ferry, dock warehouse,
-  neon arcade, 24h diner, harbor ops offices, fuel tank farm, beach palms.
-  Zone groups are positioned at absolute world coords; drop
-  `buildAllIslands()` groups into the world scene.
-- `islandColliders(zone)` returns absolute-world AABBs for the island's fixed
-  structures — add to the collision set so the island is drivable on foot
-  and by car.
+  center `[-20, 0, 440]`, radius 150 m). Zone groups are positioned at absolute
+  world coords; drop `buildAllIslands()` groups into the world scene.
 - Pluggability: `registerIslandBuilder(biome, builder)` overrides per biome
   (`tropical | volcanic | neon-docks | arctic`); future teams add zones by
   pushing to `ISLAND_ZONES` + registering a builder — no edits needed here.
@@ -234,21 +193,16 @@ ground, dressing, and the bridge seam spec.
 ## Integration checklist
 
 - [ ] `registerDistrictDoors()` at world boot
-- [ ] `buildAllExteriors().group` added to the outdoor scene (+ `facadeColliders()` in the collision set)
+- [ ] `buildAllExteriors().group` added to the outdoor scene
 - [ ] Per-frame `nearestDoor` + prompt rendering (`doorPromptLabel`)
-- [ ] Interior registry + scene swap + teleport on confirm — or just `buildInteriorForDoor(door.id)`
+- [ ] Interior registry + scene swap + teleport on confirm (table above)
 - [ ] Interior UIs wired: ExchangeTerminal (quotes), HospitalBilling
-      (wanted, billing), LibraryReader, CityHallUI (billing, owner),
-      BankUI (billing, quotes), DealershipUI (billing, onDeliver),
-      ShopsUI (billing)
-- [ ] `useLivePrices` → `updateQuotes` / `curateExhibits` feeds; bank ticker too
+      (wanted, billing), LibraryReader, CityHallUI (billing, owner)
+- [ ] `useLivePrices` → `updateQuotes` / `curateExhibits` feeds
 - [ ] `WantedProvider` adapter from the wanted system
-- [ ] `DistrictsBilling`: start with `new NoopBilling()`; go live with
-      `billingFromBurnPurchase(...)` wired to the cityPorts `burnPurchase`
-- [ ] CityData `applyMarketData(quotes)` called from the live-price feed
-      (market-cap tower heights + price-action windows)
+- [ ] `DistrictsBilling`: start with `new NoopBilling()`; swap to
+      `billingFromTokenomicsHook(...)` when tokenomics lands
 - [ ] Respawn hook → `HOSPITAL_RESPAWN` bed spawn + `chargeTreatmentBill()`
-- [ ] `bridgeDriveBoxes(BRIDGE)` added to collision; deck driving gated;
-      `islandColliders(ISLAND_ZONES[0])` added too
+- [ ] `bridgeCollider(BRIDGE)` added to collision; deck driving gated
 - [ ] `updateLighthouseBeacon(group, t)` in the frame loop
 - [ ] Renderer with `preserveDrawingBuffer: true` if panorama capture is wanted

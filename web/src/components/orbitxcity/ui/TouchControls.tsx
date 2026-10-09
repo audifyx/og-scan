@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Car, Footprints, Hand, Music2, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowUp, Footprints, Hand, Music2, ZoomIn, ZoomOut } from "lucide-react";
 import { addZoom, clearAxis, queueJump, resetVirtualInput, setAxis, setSprint } from "@/lib/orbitxcity/input";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
@@ -11,7 +11,7 @@ const STICK_RADIUS = 44;
  * so it coexists with keyboard input on hybrid devices.
  */
 export function TouchControls() {
-  const { interact, activeZone, triggerEmote, panel, playerHidden } = useCity();
+  const { interact, activeZone, triggerEmote, panel } = useCity();
   const locked = panel !== "none";
 
   useEffect(() => () => resetVirtualInput(), []);
@@ -131,15 +131,6 @@ export function TouchControls() {
           <button type="button" className="oxc-touch-btn jump" onPointerDown={() => queueJump()} aria-label="Jump">
             <ArrowUp className="h-5 w-5" />
             <span>JUMP</span>
-          </button>
-          <button
-            type="button"
-            className={`oxc-touch-btn ${playerHidden ? "accent pulse" : ""}`}
-            onPointerDown={() => window.dispatchEvent(new Event("oxc:car-interact"))}
-            aria-label={playerHidden ? "Exit car" : "Enter car"}
-          >
-            <Car className="h-5 w-5" />
-            <span>{playerHidden ? "BAIL" : "CAR"}</span>
           </button>
         </div>
       </div>
