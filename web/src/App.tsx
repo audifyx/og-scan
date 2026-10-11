@@ -295,7 +295,7 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
 const App = () => (
   <ErrorBoundary>
   <MaintenanceLock>
-        {/* <HumanGate /> TEMP-DEMO-DISABLED */}
+        <HumanGate />
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <SolanaWalletProvider>
