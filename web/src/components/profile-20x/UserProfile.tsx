@@ -51,6 +51,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
+import { OrbitxGoldGlobe } from "@/components/OrbitxGoldGlobe";
+import { isOfficialOrbitxUsername, isOrbitxGoldGlobeProfile } from "@/lib/orbitxOfficial";
 import { useAuth } from "@/hooks/useAuth";
 import { FollowerRecord, useFriends } from "@/hooks/useFriends";
 import { supabase } from "@/lib/supabase";
@@ -409,14 +411,10 @@ function CommunityProfileImage({
   );
 }
 
-// Official OrbitX brand account(s): recognized by username so they always show
-// the gold verified badge and fall back to brand name/avatar/bio when unset.
-const OFFICIAL_USERNAMES = ["orbitx.world", "orbitxworld", "orbitx"];
+// Official OrbitX brand account(s): gold globe next to the name, never a mint-as-name.
 const ORBITX_BIO = "OrbitX \u2014 the on-chain OS for Solana. Trade, scan, launch, predict and connect, all in one place. orbitx.world";
-const isOfficialUsername = (u?: string | null) =>
-  OFFICIAL_USERNAMES.includes((u || "").toLowerCase().replace(/^@/, ""));
 const applyOfficialBrand = <T extends Partial<ProfileData>>(p: T): T => {
-  if (!isOfficialUsername(p.username)) return p;
+  if (!isOfficialOrbitxUsername(p.username) && !p.is_official_account) return p;
   return {
     ...p,
     is_official_account: true,
@@ -426,10 +424,6 @@ const applyOfficialBrand = <T extends Partial<ProfileData>>(p: T): T => {
     bio: p.bio || ORBITX_BIO,
     banner_url: p.banner_url || "/orbitx-banner.jpg",
   };
-};
-
-const isGoldVerifiedProfile = (profile: Pick<ProfileData, "is_official_account" | "affiliate_org_id"> | null | undefined, isOwnerProfile = false) => {
-  return Boolean(profile?.is_official_account || profile?.affiliate_org_id || isOwnerProfile);
 };
 
 function VerificationBadge({ tone = "blue", className }: { tone?: "blue" | "gold"; className?: string }) {
@@ -653,6 +647,7 @@ function MiniFollowerCard({
   onOpen: (userId: string) => void;
 }) {
   const avatar = safeAvatarUrl(record.avatar_url) || dices(record.username || record.user_id);
+  const isGoldGlobe = isOrbitxGoldGlobeProfile(record);
   const isTeam = Boolean(record.is_official_account || record.affiliate_org_id);
 
   return (
@@ -665,7 +660,7 @@ function MiniFollowerCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-semibold text-white">{record.display_name || record.username || "OG User"}</p>
-          {isTeam ? <VerificationBadge tone="gold" className="h-3.5 w-3.5" /> : record.verified ? <VerificationBadge tone="blue" className="h-3.5 w-3.5" /> : null}
+          {isGoldGlobe ? <OrbitxGoldGlobe className="h-3.5 w-3.5" /> : isTeam ? <VerificationBadge tone="gold" className="h-3.5 w-3.5" /> : record.verified ? <VerificationBadge tone="blue" className="h-3.5 w-3.5" /> : null}
         </div>
         <p className="truncate text-xs text-white/40">{record.username ? `@${record.username}` : record.user_id}</p>
       </div>
@@ -685,14 +680,16 @@ function PostCard({
     avatarUrl: string;
     verified?: boolean | null;
     official?: boolean | null;
+    goldGlobe?: boolean | null;
   };
   showPinned?: boolean;
 }) {
   const avatar = authorOverride?.avatarUrl || safeAvatarUrl(post.avatar_url) || dices(post.username || post.user_id || "ogscan-post");
   const displayName = authorOverride?.displayName || post.username || "OrbitX";
   const handle = authorOverride?.handle || (post.username ? `@${post.username}` : "@ogscan");
-  const official = Boolean(authorOverride?.official);
-  const verified = Boolean(authorOverride?.verified) && !official;
+  const goldGlobe = Boolean(authorOverride?.goldGlobe);
+  const official = Boolean(authorOverride?.official) && !goldGlobe;
+  const verified = Boolean(authorOverride?.verified) && !official && !goldGlobe;
 
   return (
     <article className="border-b border-white/10 bg-black px-4 py-4 transition sm:px-5">
@@ -709,7 +706,7 @@ function PostCard({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[15px] leading-none">
                 <p className="truncate font-bold text-white">{displayName}</p>
-                {official ? <VerificationBadge tone="gold" className="h-4 w-4" /> : verified ? <VerificationBadge tone="blue" className="h-4 w-4" /> : null}
+                {goldGlobe ? <OrbitxGoldGlobe className="h-4 w-4" /> : official ? <VerificationBadge tone="gold" className="h-4 w-4" /> : verified ? <VerificationBadge tone="blue" className="h-4 w-4" /> : null}
                 <p className="truncate text-white/40">{handle}</p>
                 <span className="text-white/30">·</span>
                 <p className="shrink-0 text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
@@ -830,7 +827,7 @@ function AchievementCard({
 
 export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const { user } = useAuth();
-  const { isAdmin, isOwner } = useAdmin();
+  const { isAdmin, isOwner, isOwnerIdentity } = useAdmin();
   const navigate = useNavigate();
   const location = useLocation();
   const friends = useFriends();
@@ -1010,8 +1007,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
           avatar_url: record?.avatar_url || null,
           bio: record?.bio || null,
           badge: record?.badge || null,
-          verified: Boolean(record?.verified) || isOfficialUsername(record?.username),
-          is_official_account: Boolean(record?.is_official_account) || isOfficialUsername(record?.username),
+          verified: Boolean(record?.verified) || isOfficialOrbitxUsername(record?.username),
+          is_official_account: Boolean(record?.is_official_account) || isOfficialOrbitxUsername(record?.username),
           affiliate_org_id: record?.affiliate_org_id || null,
         };
       };
@@ -1425,8 +1422,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   }, [isAdmin, isOwnProfile, isOwner, profileData?.affiliate_org_id, profileData?.badge, profileData?.is_official_account, profileData?.mcp_beta_access, profileData?.verified]);
 
   const roleTags = identityBadges.slice(0, 5);
-  const goldVerified = isGoldVerifiedProfile(profileData, Boolean(isOwnProfile && isOwner));
-  const blueVerified = Boolean(profileData?.verified && !goldVerified);
+  const goldGlobe = isOrbitxGoldGlobeProfile(profileData, Boolean(isOwnProfile && isOwnerIdentity));
+  const blueVerified = Boolean(profileData?.verified && !goldGlobe);
   const profileIsOnline = isProfileCurrentlyOnline(profileData, presenceNow);
   const profilePresenceSubtitle = getPresenceSubtitle(profileData, presenceNow);
 
@@ -1550,7 +1547,10 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
           </button>
 
           <div className="min-w-0 flex-1 px-3 text-center">
-            <p className="truncate text-[15px] font-semibold text-white">{displayName}</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <p className="truncate text-[15px] font-semibold text-white">{displayName}</p>
+              {goldGlobe ? <OrbitxGoldGlobe className="h-4 w-4" /> : blueVerified ? <VerificationBadge tone="blue" className="h-4 w-4" /> : null}
+            </div>
             <p className="truncate text-[12px] text-white/40">{handle}</p>
           </div>
 
@@ -1617,7 +1617,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-[32px] font-extrabold leading-none tracking-tight text-white">{displayName}</h1>
-                  {goldVerified ? <VerificationBadge tone="gold" className="h-5 w-5" /> : blueVerified ? <VerificationBadge tone="blue" className="h-5 w-5" /> : null}
+                  {goldGlobe ? <OrbitxGoldGlobe className="h-7 w-7" /> : blueVerified ? <VerificationBadge tone="blue" className="h-5 w-5" /> : null}
                 </div>
                 <p className="mt-1 text-[15px] text-white/40">{handle}</p>
               </div>
@@ -1782,6 +1782,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                             avatarUrl,
                             verified: profileData?.verified,
                             official: Boolean(profileData?.is_official_account || profileData?.affiliate_org_id),
+                            goldGlobe,
                           } : undefined}
                           showPinned={index === 0 && Boolean(profileData?.is_official_account || profileData?.affiliate_org_id)}
                         />

@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import { safeAvatarUrl, cn } from "@/lib/utils";
+import { OrbitxGoldGlobe } from "@/components/OrbitxGoldGlobe";
+import { isOrbitxGoldGlobeProfile } from "@/lib/orbitxOfficial";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
@@ -615,7 +617,9 @@ export default function UserPublicPage() {
               {/* Name badges */}
               <div className="flex flex-wrap items-center gap-2 mb-0.5">
                 <h1 className="text-2xl md:text-3xl font-bold text-white">{displayName}</h1>
-                {(profile.is_official_account || profile.affiliate_org_id) ? (
+                {isOrbitxGoldGlobeProfile(profile) ? (
+                  <OrbitxGoldGlobe className="h-6 w-6" />
+                ) : (profile.is_official_account || profile.affiliate_org_id) ? (
                   <svg viewBox="0 0 22 22" className="h-5 w-5 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.4)]" fill="currentColor" aria-hidden="true">
                     <path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.274-.586-.705-1.084-1.246-1.439-.54-.354-1.17-.551-1.816-.569-.646.018-1.275.215-1.816.57-.54.354-.972.852-1.246 1.438-.607-.223-1.264-.27-1.897-.14-.634.131-1.218.437-1.687.882-.445.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.705-1.439 1.246-.354.54-.551 1.17-.569 1.816.018.646.215 1.275.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.218.882 1.687.47.445 1.053.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.646-.018 1.275-.215 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.218-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z" />
                   </svg>
