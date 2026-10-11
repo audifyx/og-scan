@@ -14,6 +14,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { OwnerPreviewRoute } from "@/components/OwnerPreviewRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
+import { HumanGate } from "@/components/HumanGate";
 import { IntercomSync } from "@/components/IntercomSync";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -294,6 +295,7 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
 const App = () => (
   <ErrorBoundary>
   <MaintenanceLock>
+        <HumanGate />
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <SolanaWalletProvider>
