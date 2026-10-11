@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import { facadeTexture, roadTexture, sidewalkTexture, billboardFace, type BillboardFace } from "./textures";
+import {
+  roadTexture, sidewalkTexture, crosswalkTexture, grassTexture,
+  cloudTexture, billboardFace, type BillboardFace,
+} from "./textures";
+import { loadAsset } from "./assetLoader";
+import { pickBuilding, BUILDINGS, CARS, type AssetEntry } from "./assetManifest";
 
 export const BLOCKS = 5;          // blocks per side
 export const BLOCK = 64;          // block size (m)
@@ -24,11 +29,40 @@ export interface CityData {
   windowMats: THREE.MeshStandardMaterial[];
   parked: ParkedCar[];
   spawn: { x: number; z: number; heading: number };
+  /** Building lots awaiting GLB hydration (filled by buildCity, consumed by hydrateBuildings) */
+  slots: BuildingSlot[];
+}
+
+/** A lot reserved for a GLB building model. */
+export interface BuildingSlot {
+  cx: number; cz: number;
+  lotW: number; lotD: number;
+  downtown: boolean;   // center blocks → skyscrapers
+  wantShop: boolean;   // street-level retail
 }
 
 function streetCoord(i: number): number {
   return -HALF + ROAD_W / 2 + i * PITCH;
 }
+
+// shared materials / geometries (module-level, reused across meshes)
+const MAT = {
+  curb: new THREE.MeshStandardMaterial({ color: 0xd9d5cb, roughness: 0.9 }),
+  pole: new THREE.MeshStandardMaterial({ color: 0x707880, roughness: 0.5, metalness: 0.6 }),
+  benchWood: new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.8 }),
+  benchIron: new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.6, metalness: 0.4 }),
+  hydrant: new THREE.MeshStandardMaterial({ color: 0xc23b2e, roughness: 0.55 }),
+  hydrantCap: new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.5 }),
+  busRoof: new THREE.MeshStandardMaterial({ color: 0x2e6f8e, roughness: 0.6 }),
+  busGlass: new THREE.MeshStandardMaterial({ color: 0xbcd8ee, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.5 }),
+  acUnit: new THREE.MeshStandardMaterial({ color: 0xb9bdc2, roughness: 0.7, metalness: 0.3 }),
+  waterTank: new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.9 }),
+  parapet: new THREE.MeshStandardMaterial({ color: 0xcac5b8, roughness: 0.95 }),
+  trunk: new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 1 }),
+  white: new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.8 }),
+};
+
+const TREE_GREENS = [0x3e8e3a, 0x4da34a, 0x5cb85a, 0x2f7a32, 0x6faf4e];
 
 export function buildCity(): CityData {
   const group = new THREE.Group();
@@ -37,11 +71,12 @@ export function buildCity(): CityData {
   const windowMats: THREE.MeshStandardMaterial[] = [];
   const billboards: Billboard[] = [];
   const parked: ParkedCar[] = [];
+  const treeSpots: { x: number; z: number }[] = [];
 
-  // --- ground ---
+  // --- ground: distant terrain (sage green) + city base (warm light gray) ---
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(1400, 1400),
-    new THREE.MeshStandardMaterial({ color: 0x070a10, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: 0x8fa383, roughness: 1 }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.05;
@@ -49,15 +84,18 @@ export function buildCity(): CityData {
 
   const cityBase = new THREE.Mesh(
     new THREE.PlaneGeometry(CITY_SPAN + 60, CITY_SPAN + 60),
-    new THREE.MeshStandardMaterial({ color: 0x0c1017, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: 0xb3aca0, roughness: 1 }),
   );
   cityBase.rotation.x = -Math.PI / 2;
   cityBase.position.y = 0;
+  cityBase.receiveShadow = true;
   group.add(cityBase);
 
-  // --- roads (strips) ---
+  // --- roads (strips) + curbs ---
   const roadTex = roadTexture();
   const roadLen = CITY_SPAN;
+  const curbGeoH = new THREE.BoxGeometry(roadLen, 0.16, 0.35);
+  const curbGeoV = new THREE.BoxGeometry(0.35, 0.16, roadLen);
   for (let i = 0; i <= BLOCKS; i++) {
     const c = streetCoord(i);
     for (const horizontal of [true, false]) {
@@ -70,7 +108,17 @@ export function buildCity(): CityData {
       m.rotation.x = -Math.PI / 2;
       if (horizontal) { m.position.set(0, 0.02, c); m.rotation.z = Math.PI / 2; }
       else m.position.set(c, 0.015, 0);
+      m.receiveShadow = true;
       group.add(m);
+      // curbs both sides
+      for (const side of [-1, 1]) {
+        const off = side * (ROAD_W / 2 + 0.17);
+        const curb = new THREE.Mesh(horizontal ? curbGeoH : curbGeoV, MAT.curb);
+        if (horizontal) curb.position.set(0, 0.08, c + off);
+        else curb.position.set(c + off, 0.08, 0);
+        curb.receiveShadow = true;
+        group.add(curb);
+      }
     }
     // --- sidewalks both sides of each street ---
     const swTex = sidewalkTexture();
@@ -88,7 +136,25 @@ export function buildCity(): CityData {
         const off = side * (ROAD_W / 2 + SIDEWALK_W / 2);
         if (horizontal) m.position.set(0, 0.03, c + off);
         else m.position.set(c + off, 0.03, 0);
+        m.receiveShadow = true;
         group.add(m);
+      }
+    }
+    // --- street trees along this street (both sides, skipping intersections) ---
+    for (const horizontal of [true, false]) {
+      for (const side of [-1, 1]) {
+        const tOff = side * (ROAD_W / 2 + SIDEWALK_W + 1.6);
+        for (let d = -HALF + 18; d < HALF - 12; d += 27) {
+          let nearX = false;
+          for (let j = 0; j <= BLOCKS; j++) {
+            if (Math.abs(d - streetCoord(j)) < 13) { nearX = true; break; }
+          }
+          if (nearX) continue;
+          const tx = horizontal ? d : streetCoord(i) + tOff;
+          const tz = horizontal ? streetCoord(i) + tOff : d;
+          treeSpots.push({ x: tx, z: tz });
+          colliders.push({ minX: tx - 0.5, maxX: tx + 0.5, minZ: tz - 0.5, maxZ: tz + 0.5 });
+        }
       }
     }
   }
@@ -102,10 +168,36 @@ export function buildCity(): CityData {
     }
   }
 
-  // --- buildings per block ---
-  const facades = [facadeTexture(0), facadeTexture(1), facadeTexture(2), facadeTexture(3), facadeTexture(4)];
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x11141a, roughness: 1 });
-  let styleFlip = 0;
+  // --- crosswalks at every intersection ---
+  {
+    const cwTex = crosswalkTexture();
+    const cwTexR = cwTex.clone();
+    cwTexR.needsUpdate = true;
+    cwTexR.center.set(0.5, 0.5);
+    cwTexR.rotation = Math.PI / 2;
+    const matH = new THREE.MeshStandardMaterial({ map: cwTex, roughness: 0.95 });
+    const matV = new THREE.MeshStandardMaterial({ map: cwTexR, roughness: 0.95 });
+    const geoH = new THREE.PlaneGeometry(4, ROAD_W);   // crosses horizontal roads
+    const geoV = new THREE.PlaneGeometry(ROAD_W, 4);   // crosses vertical roads
+    for (let i = 0; i <= BLOCKS; i++) {
+      for (let j = 0; j <= BLOCKS; j++) {
+        const sx = streetCoord(i), sz = streetCoord(j);
+        for (const s of [-1, 1]) {
+          const a = new THREE.Mesh(geoH, matH);
+          a.rotation.x = -Math.PI / 2;
+          a.position.set(sx + s * (ROAD_W / 2 + 2.6), 0.035, sz);
+          group.add(a);
+          const b = new THREE.Mesh(geoV, matV);
+          b.rotation.x = -Math.PI / 2;
+          b.position.set(sx, 0.035, sz + s * (ROAD_W / 2 + 2.6));
+          group.add(b);
+        }
+      }
+    }
+  }
+
+  // --- building lots per block (slots for GLB hydration; see hydrateBuildings) ---
+  const slots: BuildingSlot[] = [];
 
   for (let bi = 0; bi < BLOCKS; bi++) {
     for (let bj = 0; bj < BLOCKS; bj++) {
@@ -124,35 +216,64 @@ export function buildCity(): CityData {
           const cz = (lotZ0 + lotZ1) / 2;
           const roll = Math.random();
           if (roll < 0.16) {
-            addPark(group, colliders, cx, cz, lotX1 - lotX0, lotZ1 - lotZ0);
+            addPark(group, colliders, treeSpots, cx, cz, lotX1 - lotX0, lotZ1 - lotZ0);
           } else if (roll < 0.3) {
             addParkingLot(group, parked, cx, cz, lotX1 - lotX0, lotZ1 - lotZ0);
           } else {
             const distC = Math.hypot(bi - (BLOCKS - 1) / 2, bj - (BLOCKS - 1) / 2);
-            const h = 16 + Math.random() * 30 + Math.max(0, 26 - distC * 9);
-            const w = (lotX1 - lotX0) * (0.62 + Math.random() * 0.2);
-            const d = (lotZ1 - lotZ0) * (0.62 + Math.random() * 0.2);
-            addBuilding(group, colliders, windowMats, facades, roofMat, cx, cz, w, h, d, styleFlip++ % facades.length);
+            slots.push({
+              cx, cz,
+              lotW: lotX1 - lotX0, lotD: lotZ1 - lotZ0,
+              downtown: distC < 1.6,
+              wantShop: !slots.length || Math.random() < 0.22,
+            });
           }
         }
       }
     }
   }
 
-  // --- streetlights ---
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x2a2e35, roughness: 0.6, metalness: 0.6 });
+  // --- instanced street + park trees (2 draw calls for all trees) ---
+  {
+    const trunkGeo = new THREE.CylinderGeometry(0.28, 0.45, 3.4, 7);
+    const leafGeo = new THREE.IcosahedronGeometry(2.7, 1);
+    const leafMat = new THREE.MeshStandardMaterial({ roughness: 1 });
+    const trunks = new THREE.InstancedMesh(trunkGeo, MAT.trunk, treeSpots.length);
+    const leaves = new THREE.InstancedMesh(leafGeo, leafMat, treeSpots.length);
+    const dummy = new THREE.Object3D();
+    const col = new THREE.Color();
+    treeSpots.forEach((t, i) => {
+      const s = 0.85 + Math.random() * 0.5;
+      dummy.position.set(t.x, 1.7 * s, t.z);
+      dummy.scale.setScalar(s);
+      dummy.rotation.y = Math.random() * Math.PI * 2;
+      dummy.updateMatrix();
+      trunks.setMatrixAt(i, dummy.matrix);
+      dummy.position.set(t.x, (3.4 + 1.6) * s, t.z);
+      dummy.updateMatrix();
+      leaves.setMatrixAt(i, dummy.matrix);
+      col.setHex(TREE_GREENS[i % TREE_GREENS.length]).offsetHSL(0, 0, (Math.random() - 0.5) * 0.06);
+      leaves.setColorAt(i, col);
+    });
+    trunks.castShadow = leaves.castShadow = true;
+    trunks.instanceMatrix.needsUpdate = leaves.instanceMatrix.needsUpdate = true;
+    if (leaves.instanceColor) leaves.instanceColor.needsUpdate = true;
+    group.add(trunks, leaves);
+  }
+
+  // --- streetlights (galvanized poles, lamps off in daytime) ---
   for (let i = 0; i <= BLOCKS; i++) {
     for (let d = -HALF + 20; d < HALF - 10; d += 42) {
       for (const horizontal of [true, false]) {
         const c = streetCoord(i);
         const lampMat = new THREE.MeshStandardMaterial({
-          color: 0x444444, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.4,
+          color: 0xf8f8f8, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.4,
         });
         lampMats.push(lampMat);
         const g = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 8, 8), poleMat);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 8, 8), MAT.pole);
         pole.position.y = 4;
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 3.2), poleMat);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 3.2), MAT.pole);
         arm.position.set(0, 7.8, 1.4);
         const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), lampMat);
         lamp.position.set(0, 7.6, 2.8);
@@ -163,6 +284,9 @@ export function buildCity(): CityData {
       }
     }
   }
+
+  // --- street props: benches, hydrants, bus stops ---
+  addProps(group, colliders);
 
   // --- billboards (live market data faces) ---
   const bbSpots: { x: number; z: number; ry: number }[] = [
@@ -175,11 +299,11 @@ export function buildCity(): CityData {
     const frame = new THREE.Group();
     const panel = new THREE.Mesh(
       new THREE.BoxGeometry(13, 7, 0.6),
-      new THREE.MeshStandardMaterial({ map: face.texture, emissive: 0xffffff, emissiveMap: face.texture, emissiveIntensity: 0.9 }),
+      new THREE.MeshStandardMaterial({ map: face.texture, emissive: 0xffffff, emissiveMap: face.texture, emissiveIntensity: 0.55 }),
     );
     panel.position.y = 11;
     panel.userData.isBuilding = true; // token-scanner raycast target (gadgets module)
-    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 11, 8), poleMat);
+    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 11, 8), MAT.pole);
     p1.position.set(-4, 5.5, 0);
     const p2 = p1.clone();
     p2.position.x = 4;
@@ -191,77 +315,155 @@ export function buildCity(): CityData {
     colliders.push({ minX: s.x - 7, maxX: s.x + 7, minZ: s.z - 1, maxZ: s.z + 1 });
   }
 
+  // --- clouds (static daytime puffs) ---
+  {
+    const ct = cloudTexture();
+    for (let i = 0; i < 12; i++) {
+      const sm = new THREE.SpriteMaterial({ map: ct, transparent: true, opacity: 0.85, depthWrite: false, fog: false });
+      const sp = new THREE.Sprite(sm);
+      const sc = 120 + Math.random() * 110;
+      sp.scale.set(sc, sc * 0.5, 1);
+      sp.position.set((Math.random() - 0.5) * 1200, 170 + Math.random() * 90, (Math.random() - 0.5) * 1200);
+      group.add(sp);
+    }
+  }
+
   const spawn = { x: streetCoord(2) + ROAD_W / 2 + SIDEWALK_W / 2, z: streetCoord(2), heading: Math.PI };
-  return { group, colliders, nodes, billboards, lampMats, windowMats, parked, spawn };
+  return { group, colliders, nodes, billboards, lampMats, windowMats, parked, spawn, slots };
 }
 
-function addBuilding(
-  group: THREE.Group, colliders: Collider[], windowMats: THREE.MeshStandardMaterial[],
-  facades: { map: THREE.CanvasTexture; emissive: THREE.CanvasTexture }[],
-  roofMat: THREE.Material,
-  cx: number, cz: number, w: number, h: number, d: number, style: number,
+/**
+ * Async GLB hydration: loads real 3D building models for each reserved slot.
+ * - Skyscrapers in the downtown core, shops at street level, mid-rise elsewhere
+ * - Varies rotation (0/90/180/270) and scale (0.9–1.1); avoids repeating the same
+ *   model on adjacent lots
+ * - Colliders use the model's manifest footprint (rotation-aware)
+ * - Falls back to procedural boxes via assetLoader if a GLB fails
+ */
+export async function hydrateBuildings(city: CityData): Promise<{ buildings: number; glbCars: number }> {
+  const ROTS = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+  let placed = 0;
+  let lastPath = "";
+
+  // Pre-pick all models first (fast, sync) so we can dedupe adjacents
+  const picks: { slot: BuildingSlot; entry: AssetEntry }[] = [];
+  for (const slot of city.slots) {
+    let entry = pickBuilding(slot.lotW, slot.lotD, slot.downtown);
+    // shops: prefer shop models for street-level retail lots
+    if (slot.wantShop && !slot.downtown) {
+      const shops = BUILDINGS.filter(b => b.kind === "shop"
+        && b.footprint[0] <= slot.lotW && b.footprint[1] <= slot.lotD);
+      if (shops.length) entry = shops[Math.floor(Math.random() * shops.length)];
+    }
+    // avoid same model twice in a row (adjacent lots are sequential)
+    if (entry.path === lastPath) {
+      const alt = pickBuilding(slot.lotW, slot.lotD, slot.downtown);
+      if (alt.path !== lastPath) entry = alt;
+    }
+    lastPath = entry.path;
+    picks.push({ slot, entry });
+  }
+
+  // Load + place (sequential to keep memory spikes low on mobile)
+  for (const { slot, entry } of picks) {
+    try {
+      const model = await loadAsset(entry);
+      const rot = ROTS[Math.floor(Math.random() * ROTS.length)];
+      const s = 0.9 + Math.random() * 0.2;
+      model.rotation.y = rot;
+      model.scale.setScalar(s);
+      model.position.set(slot.cx, 0, slot.cz);
+      // token-scanner raycast target (matches old procedural behavior)
+      model.traverse(o => { o.userData.isBuilding = true; });
+      city.group.add(model);
+
+      // collider from manifest footprint (swap dims on 90° rotations)
+      const swap = Math.abs(Math.sin(rot)) > 0.5;
+      const fw = (swap ? entry.footprint[1] : entry.footprint[0]) * s;
+      const fd = (swap ? entry.footprint[0] : entry.footprint[1]) * s;
+      city.colliders.push({
+        minX: slot.cx - fw / 2, maxX: slot.cx + fw / 2,
+        minZ: slot.cz - fd / 2, maxZ: slot.cz + fd / 2,
+      });
+      placed++;
+    } catch {
+      // loadAsset already falls back to procedural; this is a last-resort guard
+    }
+  }
+
+  // GLB parked cars in parking lots (static decoration; drivables stay procedural)
+  let glbCars = 0;
+  const carPicks = CARS.slice(0, 8);
+  for (const p of city.parked) {
+    if (Math.random() < 0.5) continue; // only decorate ~half the spots
+    try {
+      const entry = carPicks[Math.floor(Math.random() * carPicks.length)];
+      const car = await loadAsset(entry);
+      car.rotation.y = p.heading;
+      car.position.set(p.x, 0, p.z);
+      city.group.add(car);
+      glbCars++;
+      if (glbCars >= 15) break; // cap for mobile
+    } catch { /* skip */ }
+  }
+
+  return { buildings: placed, glbCars };
+}
+
+function addPark(
+  group: THREE.Group, colliders: Collider[], treeSpots: { x: number; z: number }[],
+  cx: number, cz: number, w: number, d: number,
 ) {
-  const f = facades[style];
-  const map = f.map.clone();
-  map.needsUpdate = true;
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(Math.max(1, Math.round(w / 14)), Math.max(1, Math.round(h / 14)));
-  const em = f.emissive.clone();
-  em.needsUpdate = true;
-  em.wrapS = em.wrapT = THREE.RepeatWrapping;
-  em.repeat.copy(map.repeat);
-  const side = new THREE.MeshStandardMaterial({
-    map, emissiveMap: em, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85,
-  });
-  windowMats.push(side);
-  const mats = [side, side, roofMat, roofMat, side, side];
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
-  mesh.position.set(cx, h / 2, cz);
-  mesh.castShadow = mesh.receiveShadow = true;
-  mesh.userData.isBuilding = true; // token-scanner raycast target (gadgets module)
-  group.add(mesh);
-  // rooftop box
-  const rb = new THREE.Mesh(
-    new THREE.BoxGeometry(w * 0.3, 3, d * 0.3),
-    new THREE.MeshStandardMaterial({ color: 0x1a1e25, roughness: 1 }),
-  );
-  rb.position.set(cx + w * 0.15, h + 1.5, cz - d * 0.1);
-  group.add(rb);
-  colliders.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 });
-}
-
-function addPark(group: THREE.Group, colliders: Collider[], cx: number, cz: number, w: number, d: number) {
+  const gtex = grassTexture();
+  gtex.repeat.set(Math.max(1, Math.round(w / 9)), Math.max(1, Math.round(d / 9)));
   const grass = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    new THREE.MeshStandardMaterial({ color: 0x14331f, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ map: gtex, roughness: 1 }),
   );
   grass.rotation.x = -Math.PI / 2;
   grass.position.set(cx, 0.04, cz);
+  grass.receiveShadow = true;
   group.add(grass);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 1 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x1f5c2e, roughness: 1 });
-  const n = 3 + Math.floor(Math.random() * 3);
+  // concrete walking paths (cross)
+  const pathMat = new THREE.MeshStandardMaterial({ color: 0xd6cfbd, roughness: 1 });
+  const p1 = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.92, 2.6), pathMat);
+  p1.rotation.x = -Math.PI / 2;
+  p1.position.set(cx, 0.055, cz);
+  const p2 = new THREE.Mesh(new THREE.PlaneGeometry(2.6, d * 0.92), pathMat);
+  p2.rotation.x = -Math.PI / 2;
+  p2.position.set(cx, 0.055, cz);
+  p1.receiveShadow = p2.receiveShadow = true;
+  group.add(p1, p2);
+  // lush trees (added to instanced set)
+  const n = 5 + Math.floor(Math.random() * 4);
   for (let i = 0; i < n; i++) {
-    const tx = cx + (Math.random() - 0.5) * w * 0.7;
-    const tz = cz + (Math.random() - 0.5) * d * 0.7;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3.4, 7), trunkMat);
-    trunk.position.set(tx, 1.7, tz);
-    const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(2.4 + Math.random(), 1), leafMat);
-    leaf.position.set(tx, 4.6, tz);
-    leaf.castShadow = true;
-    group.add(trunk, leaf);
-    colliders.push({ minX: tx - 0.6, maxX: tx + 0.6, minZ: tz - 0.6, maxZ: tz + 0.6 });
+    const tx = cx + (Math.random() - 0.5) * w * 0.75;
+    const tz = cz + (Math.random() - 0.5) * d * 0.75;
+    if (Math.abs(tx - cx) < 2.4 || Math.abs(tz - cz) < 2.4) continue; // keep paths clear
+    treeSpots.push({ x: tx, z: tz });
+    colliders.push({ minX: tx - 0.5, maxX: tx + 0.5, minZ: tz - 0.5, maxZ: tz + 0.5 });
   }
+  // park benches
+  addBench(group, colliders, cx - w * 0.28, cz + 2.2, 0);
+  addBench(group, colliders, cx + w * 0.28, cz - 2.2, Math.PI);
 }
 
 function addParkingLot(group: THREE.Group, parked: ParkedCar[], cx: number, cz: number, w: number, d: number) {
   const lot = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 1 }),
+    new THREE.MeshStandardMaterial({ color: 0x94979b, roughness: 1 }),
   );
   lot.rotation.x = -Math.PI / 2;
   lot.position.set(cx, 0.04, cz);
+  lot.receiveShadow = true;
   group.add(lot);
+  // painted stall dividers
+  const rows = Math.max(2, Math.floor(d / 7));
+  for (let r = 0; r <= rows; r++) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.02, 0.18), MAT.white);
+    line.position.set(cx, 0.06, cz - d / 2 + (d / rows) * r);
+    group.add(line);
+  }
   const n = 2 + Math.floor(Math.random() * 3);
   for (let i = 0; i < n; i++) {
     parked.push({
@@ -270,4 +472,98 @@ function addParkingLot(group: THREE.Group, parked: ParkedCar[], cx: number, cz: 
       heading: Math.random() < 0.5 ? 0 : Math.PI / 2,
     });
   }
+}
+
+function addBench(group: THREE.Group, colliders: Collider[], x: number, z: number, ry: number) {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 0.55), MAT.benchWood);
+  seat.position.y = 0.55;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 0.1), MAT.benchWood);
+  back.position.set(0, 0.95, -0.28);
+  back.rotation.x = -0.15;
+  g.add(seat, back);
+  for (const s of [-0.7, 0.7]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.5), MAT.benchIron);
+    leg.position.set(s, 0.28, 0);
+    g.add(leg);
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = ry;
+  g.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
+  group.add(g);
+  colliders.push({ minX: x - 1, maxX: x + 1, minZ: z - 0.5, maxZ: z + 0.5 });
+}
+
+function addHydrant(group: THREE.Group, colliders: Collider[], x: number, z: number) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.75, 10), MAT.hydrant);
+  body.position.y = 0.45;
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), MAT.hydrant);
+  dome.position.y = 0.85;
+  const capT = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 8), MAT.hydrantCap);
+  capT.position.y = 1.02;
+  g.add(body, dome, capT);
+  for (const s of [-1, 1]) {
+    const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 8), MAT.hydrantCap);
+    noz.rotation.z = Math.PI / 2;
+    noz.position.set(s * 0.3, 0.6, 0);
+    g.add(noz);
+  }
+  g.position.set(x, 0, z);
+  g.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = true; });
+  group.add(g);
+  colliders.push({ minX: x - 0.4, maxX: x + 0.4, minZ: z - 0.4, maxZ: z + 0.4 });
+}
+
+function addBusStop(group: THREE.Group, colliders: Collider[], x: number, z: number, ry: number) {
+  const g = new THREE.Group();
+  for (const s of [-1.4, 1.4]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.7, 0.16), MAT.pole);
+    post.position.set(s, 1.35, 0);
+    g.add(post);
+  }
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.14, 1.8), MAT.busRoof);
+  roof.position.y = 2.75;
+  roof.castShadow = true;
+  const glassBack = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.4, 0.06), MAT.busGlass);
+  glassBack.position.set(0, 1.5, -0.8);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.1, 0.45), MAT.benchWood);
+  seat.position.set(0, 0.6, -0.5);
+  g.add(roof, glassBack, seat);
+  // sign
+  const signPole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 8), MAT.pole);
+  signPole.position.set(1.9, 1.3, 0);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0x1e5fa8, roughness: 0.5 }));
+  sign.position.set(1.9, 2.5, 0);
+  g.add(signPole, sign);
+  g.position.set(x, 0, z);
+  g.rotation.y = ry;
+  group.add(g);
+  colliders.push({ minX: x - 1.8, maxX: x + 1.8, minZ: z - 1, maxZ: z + 1 });
+}
+
+/** Benches, hydrants, bus stops placed along main streets. */
+function addProps(group: THREE.Group, colliders: Collider[]) {
+  // benches on the two central streets
+  for (const si of [2, 3]) {
+    for (let d = -HALF + 40; d < HALF - 30; d += 90) {
+      const c = streetCoord(si);
+      addBench(group, colliders, d, c + ROAD_W / 2 + SIDEWALK_W - 1.2, 0);
+      addBench(group, colliders, d + 45, c - ROAD_W / 2 - SIDEWALK_W + 1.2, Math.PI);
+    }
+  }
+  // hydrants near intersections
+  let hn = 0;
+  for (let i = 1; i < BLOCKS && hn < 10; i++) {
+    for (let j = 1; j < BLOCKS && hn < 10; j += 2) {
+      addHydrant(group, colliders, streetCoord(i) + ROAD_W / 2 + SIDEWALK_W - 0.8, streetCoord(j) + ROAD_W / 2 + 3);
+      hn++;
+    }
+  }
+  // bus stops
+  addBusStop(group, colliders, streetCoord(1) - 20, streetCoord(2) + ROAD_W / 2 + SIDEWALK_W - 1, 0);
+  addBusStop(group, colliders, streetCoord(4) + 20, streetCoord(3) - ROAD_W / 2 - SIDEWALK_W + 1, Math.PI);
+  addBusStop(group, colliders, streetCoord(2) + ROAD_W / 2 + SIDEWALK_W - 1, streetCoord(4) - 25, Math.PI / 2);
+  addBusStop(group, colliders, streetCoord(3) - ROAD_W / 2 - SIDEWALK_W + 1, streetCoord(1) + 25, -Math.PI / 2);
 }

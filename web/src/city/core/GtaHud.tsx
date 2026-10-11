@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX, HelpCircle, Home, Gauge } from "lucide-react";
 import { setTouchMove } from "./input";
 import type { GtaApi } from "./useGtaGame";
+import { QuestHud } from "./QuestHud";
 
 const SYMBOLS = ["SOL", "ORBITX", "BONK", "JUP", "WIF"];
 
@@ -112,6 +113,7 @@ export function GtaHud({ api }: { api: GtaApi }) {
           <button className="ocg-iconbtn" onClick={api.toTitle} aria-label="Quit to menu">
             <Home size={15} />
           </button>
+          <QuestHud api={api} />
         </div>
       </div>
 

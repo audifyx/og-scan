@@ -1,9 +1,17 @@
 /** Minimal WebAudio: engine hum + UI SFX. No assets. */
+interface NoiseLoop {
+  src: AudioBufferSourceNode;
+  gain: GainNode;
+}
 
 export class GameAudio {
   private ctx: AudioContext | null = null;
   private engOsc: OscillatorNode | null = null;
   private engGain: GainNode | null = null;
+  private noiseBuf: AudioBuffer | null = null;
+  private rainLoop: NoiseLoop | null = null;
+  private trafficOsc: OscillatorNode | null = null;
+  private trafficGain: GainNode | null = null;
   enabled = true;
 
   private ac(): AudioContext | null {
@@ -95,5 +103,118 @@ export class GameAudio {
     } catch { /* noop */ }
     this.engOsc = null;
     this.engGain = null;
+    // insane-mode ambient loops stop with the engine bus
+    this.rainStop();
+    this.trafficStop();
+  }
+
+  /* ---------------- insane mode: weather + traffic ambience ---------------- */
+
+  private noise(): AudioBuffer | null {
+    const c = this.ac();
+    if (!c) return null;
+    if (!this.noiseBuf) {
+      const len = c.sampleRate * 2;
+      this.noiseBuf = c.createBuffer(1, len, c.sampleRate);
+      const d = this.noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return this.noiseBuf;
+  }
+
+  /** Synthesized thunder clap: lowpassed noise burst, slow decay. */
+  thunder() {
+    const c = this.ac();
+    const buf = this.noise();
+    if (!c || !buf) return;
+    try {
+      const t0 = c.currentTime;
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const filt = c.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.setValueAtTime(420, t0);
+      filt.frequency.exponentialRampToValueAtTime(60, t0 + 2.2);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.6);
+      src.connect(filt).connect(g).connect(c.destination);
+      src.start(t0);
+      src.stop(t0 + 2.8);
+    } catch { /* decorative */ }
+  }
+
+  /** Looped rain hiss; drive per-frame with rainLevel(0..1). */
+  rainStart() {
+    const c = this.ac();
+    const buf = this.noise();
+    if (!c || !buf || this.rainLoop) return;
+    try {
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const filt = c.createBiquadFilter();
+      filt.type = "bandpass";
+      filt.frequency.value = 2600;
+      filt.Q.value = 0.4;
+      const g = c.createGain();
+      g.gain.value = 0;
+      src.connect(filt).connect(g).connect(c.destination);
+      src.start();
+      this.rainLoop = { src, gain: g };
+    } catch { /* noop */ }
+  }
+
+  rainLevel(v: number) {
+    if (!this.rainLoop || !this.ctx) return;
+    try {
+      this.rainLoop.gain.gain.setTargetAtTime(
+        Math.max(0, Math.min(1, v)) * 0.16, this.ctx.currentTime, 0.4);
+    } catch { /* decorative */ }
+  }
+
+  rainStop() {
+    const l = this.rainLoop;
+    this.rainLoop = null;
+    if (!l) return;
+    try {
+      l.gain.gain.setTargetAtTime(0, this.ctx?.currentTime ?? 0, 0.15);
+      window.setTimeout(() => { try { l.src.stop(); } catch { /* noop */ } }, 600);
+    } catch { /* noop */ }
+  }
+
+  /** Distance-faded engine hum for ambient traffic. Driven by CityTraffic. */
+  trafficStart() {
+    const c = this.ac();
+    if (!c || this.trafficOsc) return;
+    try {
+      this.trafficOsc = c.createOscillator();
+      this.trafficGain = c.createGain();
+      this.trafficOsc.type = "sawtooth";
+      this.trafficOsc.frequency.value = 48;
+      const filt = c.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = 240;
+      this.trafficGain.gain.value = 0;
+      this.trafficOsc.connect(filt).connect(this.trafficGain).connect(c.destination);
+      this.trafficOsc.start();
+    } catch { /* noop */ }
+  }
+
+  trafficLevel(v: number) {
+    if (!this.trafficOsc || !this.trafficGain || !this.ctx) return;
+    try {
+      this.trafficGain.gain.setTargetAtTime(
+        Math.max(0, Math.min(1, v)) * 0.05, this.ctx.currentTime, 0.25);
+      this.trafficOsc.frequency.setTargetAtTime(48 + v * 40, this.ctx.currentTime, 0.3);
+    } catch { /* decorative */ }
+  }
+
+  trafficStop() {
+    try { this.trafficOsc?.stop(); } catch { /* noop */ }
+    this.trafficOsc = null;
+    this.trafficGain = null;
   }
 }

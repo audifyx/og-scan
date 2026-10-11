@@ -20,6 +20,8 @@ import type { GtaApi } from "@/city/core/useGtaGame";
 import { useSharedBilling } from "./CityBillingHost";
 import { useCitySystems, settlePendingVotes } from "./CitySystemsHost";
 import { bountyPaper, policePaper, cityPlayer } from "./cityPorts";
+import ArcadeGame from "@/city/core/ArcadeGame";
+import RamenOrder from "@/city/core/RamenOrder";
 
 // module UIs
 import { EconomyHub, usePaperWallet, formatCity } from "@/city/modules/economy";
@@ -42,7 +44,7 @@ import { allDoors, doorPromptLabel } from "@/city/modules/districts";
 type AppId =
   | "bank" | "bounties" | "character" | "estate" | "jobs" | "factions"
   | "police" | "gadgets" | "phone" | "media" | "seasons" | "events"
-  | "districts" | "heists" | "racing" | "sports";
+  | "districts" | "heists" | "racing" | "sports" | "arcade" | "ramen";
 
 const APPS: Array<{ id: AppId; icon: string; label: string; sub: string }> = [
   { id: "bank", icon: "🏦", label: "ORBITX Bank", sub: "Burn for premium" },
@@ -61,6 +63,8 @@ const APPS: Array<{ id: AppId; icon: string; label: string; sub: string }> = [
   { id: "heists", icon: "💰", label: "Heists", sub: "Crew jobs" },
   { id: "racing", icon: "🏁", label: "Racing", sub: "Circuits + rally" },
   { id: "sports", icon: "🏄", label: "Sports", sub: "Venues" },
+  { id: "arcade", icon: "🕹️", label: "Neon Arcade", sub: "10 ORBITX per play" },
+  { id: "ramen", icon: "🍜", label: "Ramen House", sub: "Order with ORBITX" },
   // vehicles + ambient are systems-only in v1 (see notes below)
 ];
 
@@ -188,6 +192,27 @@ export function CityAppsShell({ api }: { api: GtaApi }) {
   const me = useMemo(() => cityPlayer(), []);
 
   const closeApp = () => setApp(null);
+
+  // Sync events weather machine → visual CityWeather (daytime only).
+  useEffect(() => {
+    if (!systems?.events) return;
+    const sync = () => {
+      const w = systems.events.snapshot.weather.current;
+      const world = api.getWorld();
+      if (!world) return;
+      const map: Record<string, "clear" | "drizzle" | "rain" | "storm"> = {
+        clear: "clear",
+        rain: "rain",
+        storm: "storm",
+        fog: "drizzle",
+        heat: "clear",
+        neon: "clear",
+      };
+      world.setWeatherMode(map[w] ?? "drizzle");
+    };
+    sync();
+    return systems.events.subscribe(sync);
+  }, [systems, api]);
 
   // MediaWorldAdapter (checklist 15): frame capture + pause + teleport
   const mediaAdapter: MediaWorldAdapter = useMemo(
@@ -359,6 +384,10 @@ export function CityAppsShell({ api }: { api: GtaApi }) {
         return <RacingApp />;
       case "sports":
         return <SportsApp />;
+      case "arcade":
+        return <ArcadeGame onClose={onClose} />;
+      case "ramen":
+        return <RamenOrder onClose={onClose} onBuff={() => { /* buff applied via receipt */ }} />;
       default:
         return null;
     }

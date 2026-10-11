@@ -28,12 +28,19 @@ export class KeyboardInput {
   private input: InputState;
   private onAction: () => void;
   private onPause: () => void;
+  private onEmote: (kind: "wave" | "dance" | "bow") => void;
   private disposed = false;
 
-  constructor(input: InputState, onAction: () => void, onPause: () => void) {
+  constructor(
+    input: InputState,
+    onAction: () => void,
+    onPause: () => void,
+    onEmote: (kind: "wave" | "dance" | "bow") => void = () => {},
+  ) {
     this.input = input;
     this.onAction = onAction;
     this.onPause = onPause;
+    this.onEmote = onEmote;
     window.addEventListener("keydown", this.down);
     window.addEventListener("keyup", this.up);
     window.addEventListener("blur", this.clear);
@@ -61,6 +68,9 @@ export class KeyboardInput {
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     if (e.code === "KeyE") { this.onAction(); return; }
     if (e.code === "Escape" || e.code === "KeyP") { this.onPause(); return; }
+    if (e.code === "KeyZ") { this.onEmote("wave"); return; }
+    if (e.code === "KeyX") { this.onEmote("dance"); return; }
+    if (e.code === "KeyC") { this.onEmote("bow"); return; }
     if (e.code === "Space") { this.input.jump = true; e.preventDefault(); return; }
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") { this.keys.add("sprint"); this.recompute(); return; }
     const dir = KEYMAP[e.code];

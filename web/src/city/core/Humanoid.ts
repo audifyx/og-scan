@@ -12,8 +12,12 @@ export interface Humanoid {
   group: THREE.Group;
   /** Advance the walk cycle. speed01 = 0 idle → 1 full run. */
   update: (dt: number, speed01: number) => void;
+  /** Keybind-triggered gesture (wave/dance/bow). Decorative, auto-finishes. */
+  playEmote: (kind: EmoteKind) => void;
   dispose: () => void;
 }
+
+export type EmoteKind = "wave" | "dance" | "bow";
 
 function mat(color: number, rough = 0.8): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness: rough });
@@ -120,10 +124,51 @@ export function createHumanoid(opts: HumanoidOpts = {}): Humanoid {
   const legR = mkLeg(1);
 
   let phase = Math.random() * 10;
+  let emote: EmoteKind | null = null;
+  let emoteT = 0;
+  const EMOTE_DUR: Record<EmoteKind, number> = { wave: 1.6, dance: 2.4, bow: 1.4 };
+
+  const playEmote = (kind: EmoteKind) => {
+    emote = kind;
+    emoteT = 0;
+  };
 
   const update = (dt: number, speed01: number) => {
     const moving = speed01 > 0.03;
     phase += dt * (4 + speed01 * 9);
+
+    // emote override (decorative, auto-finishes)
+    if (emote) {
+      emoteT += dt;
+      const dur = EMOTE_DUR[emote];
+      const t = emoteT / dur;
+      if (t >= 1) {
+        emote = null;
+      } else {
+        const k = Math.sin(t * Math.PI); // 0→1→0 envelope
+        if (emote === "wave") {
+          armR.rotation.x = -2.4 * k;
+          armR.rotation.z = -0.5 - Math.sin(emoteT * 12) * 0.4 * k;
+          armL.rotation.x = 0; armL.rotation.z = 0.12;
+          neckG.rotation.y = Math.sin(emoteT * 6) * 0.1 * k;
+        } else if (emote === "dance") {
+          const b = emoteT * 8;
+          armL.rotation.x = Math.sin(b) * 1.2 * k;
+          armR.rotation.x = Math.sin(b + Math.PI) * 1.2 * k;
+          armL.rotation.z = 0.9 * k; armR.rotation.z = -0.9 * k;
+          hips.position.y = 0.98 * s - Math.abs(Math.sin(b * 0.5)) * 0.12 * s * k;
+          hips.rotation.y = Math.sin(b * 0.5) * 0.3 * k;
+        } else if (emote === "bow") {
+          hips.rotation.x = 0.9 * k;
+          neckG.rotation.x = 0.4 * k;
+          armL.rotation.x = 0.5 * k; armR.rotation.x = 0.5 * k;
+        }
+        legL.hip.rotation.x = 0; legR.hip.rotation.x = 0;
+        return;
+      }
+      hips.rotation.x = 0; hips.rotation.y = 0; neckG.rotation.x = 0;
+    }
+
     const amp = moving ? 0.25 + speed01 * 0.55 : 0;
     const swing = Math.sin(phase) * amp;
     const swingO = Math.sin(phase + Math.PI) * amp;
@@ -144,7 +189,7 @@ export function createHumanoid(opts: HumanoidOpts = {}): Humanoid {
     mats.forEach((m) => m.dispose());
   };
 
-  return { group, update, dispose };
+  return { group, update, playEmote, dispose };
 }
 
 export const PED_COLORS: HumanoidOpts[] = [

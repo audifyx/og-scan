@@ -109,6 +109,7 @@ export function useGtaGame() {
       input,
       () => world.toggleEnterExit(),
       () => setPaused((p) => { const n = !p; world.setPaused(n); return n; }),
+      (kind) => world.playEmote(kind),
     );
     // orbit drag on canvas, but not when the gesture starts on HUD controls
     orbitRef.current = new OrbitDrag(canvas, (x, y) => {

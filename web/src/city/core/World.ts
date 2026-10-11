@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { buildCity, HALF, type CityData, type Collider } from "./CityBuilder";
+import { buildCity, hydrateBuildings, HALF, type CityData, type Collider } from "./CityBuilder";
 import { createHumanoid, PED_COLORS, type Humanoid } from "./Humanoid";
 import {
   createCarMesh, createTrafficCar, updateTrafficCar, resolveCircleColliders,
@@ -7,6 +7,8 @@ import {
 } from "./Vehicle";
 import type { InputState } from "./input";
 import type { GameAudio } from "./audio";
+import { CityWeather, type WeatherMode } from "./CityWeather";
+import { CityTraffic } from "./CityTraffic";
 
 export interface HudState {
   speedKmh: number;
@@ -79,6 +81,12 @@ export class GTAWorld {
   private mmT = 0;
   private lastHud: HudState | null = null;
 
+  // insane-mode systems
+  private weather!: CityWeather;
+  private ambientTraffic!: CityTraffic;
+  /** Cumulative walk distance (meters) for daily quests. */
+  private walkDist = 0;
+
   constructor(opts: WorldOpts) {
     this.input = opts.input;
     this.audio = opts.audio;
@@ -95,18 +103,22 @@ export class GTAWorld {
 
     this.city = buildCity();
     this.scene.add(this.city.group);
-    this.scene.fog = new THREE.Fog(0x0a0e16, 180, 900);
+    // async GLB hydration: real 3D buildings pop in as they load (cached, with fallback)
+    hydrateBuildings(this.city).then(({ buildings, glbCars }) => {
+      console.log(`[city] GLB hydration: ${buildings} buildings, ${glbCars} cars`);
+    }).catch((e) => console.warn("[city] GLB hydration failed", e));
+    this.scene.fog = new THREE.Fog(0xc3d7ea, 180, 900);
 
-    // lights
-    this.sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    // lights — warm golden high-noon sun, bright blue sky bounce
+    this.sun = new THREE.DirectionalLight(0xfff1d6, 2.8);
     this.sun.castShadow = opts.quality === "high";
     this.sun.shadow.mapSize.set(1024, 1024);
     const sc = this.sun.shadow.camera;
     sc.left = -220; sc.right = 220; sc.top = 220; sc.bottom = -220; sc.far = 800;
     this.scene.add(this.sun, this.sun.target);
-    this.hemi = new THREE.HemisphereLight(0x8fb4dd, 0x1a1410, 0.7);
+    this.hemi = new THREE.HemisphereLight(0xbfd9ff, 0x9a8a6a, 0.9);
     this.scene.add(this.hemi);
-    this.scene.add(new THREE.AmbientLight(0x223044, 0.5));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
     // player
     this.player = createHumanoid({ shirt: 0x00c98a, pants: 0x23262e });
@@ -146,9 +158,32 @@ export class GTAWorld {
       this.peds.push({ h, pos, target: this.randomSidewalk(), speed: 1.2 + Math.random() * 0.8 });
     }
 
+    // insane-mode: dynamic weather (daytime only) + ambient traffic
+    this.weather = new CityWeather(this.scene, () => this.audio.thunder());
+    this.ambientTraffic = new CityTraffic(this.scene);
+
     this.resize();
     window.addEventListener("resize", this.resize);
     this.loop();
+  }
+
+  /** Set weather mode externally (HUD debug / events). Never darkens to night. */
+  setWeatherMode(mode: WeatherMode): void {
+    this.weather?.setMode(mode);
+  }
+
+  getWeatherMode(): WeatherMode {
+    return this.weather?.mode ?? "drizzle";
+  }
+
+  /** Cumulative meters walked on foot (for daily quests). */
+  getWalkDistance(): number {
+    return this.walkDist;
+  }
+
+  /** Trigger a player emote (wave/dance/bow). */
+  playEmote(kind: "wave" | "dance" | "bow"): void {
+    if (!this.inCar) this.player.playEmote(kind);
   }
 
   /** External camera-orbit deltas from pointer drag. */
@@ -322,6 +357,11 @@ export class GTAWorld {
     this.updateTraffic(dt);
     this.updatePeds(dt);
     this.updateDayNight();
+    // weather after day/night so lightning flash takes precedence (daytime only)
+    this.weather.update(dt, this.pPos, this.time);
+    this.ambientTraffic.update(dt, this.pPos, this.audio);
+    // drive rain audio level from weather
+    this.audio.rainLevel?.(this.weather.rainGain ?? 0);
     this.updateCamera(dt);
     this.updateHud(dt);
     this.drawMinimap(dt);
@@ -367,9 +407,12 @@ export class GTAWorld {
     let ny = this.pPos.y + this.pVy * dt;
     if (ny <= 0) { ny = 0; this.pVy = 0; this.onGround = true; }
 
+    const prevX = this.pPos.x, prevZ = this.pPos.z;
     this.pPos.x += this.pVel.x * dt;
     this.pPos.z += this.pVel.z * dt;
     this.pPos.y = ny;
+    // track walk distance for quests
+    this.walkDist += Math.hypot(this.pPos.x - prevX, this.pPos.z - prevZ);
     // clamp to world
     this.pPos.x = Math.max(-HALF - 40, Math.min(HALF + 40, this.pPos.x));
     this.pPos.z = Math.max(-HALF - 40, Math.min(HALF + 40, this.pPos.z));
@@ -435,9 +478,9 @@ export class GTAWorld {
     const day = Math.max(0, Math.min(1, elev * 2.5));
 
     this.sun.position.set(Math.cos(sunA) * 400, Math.max(20, elev * 400), 160);
-    this.sun.intensity = 0.15 + day * 2.2;
-    this.sun.color.setHSL(0.12, 0.5, 0.5 + day * 0.35);
-    this.hemi.intensity = 0.25 + day * 0.55;
+    this.sun.intensity = 0.15 + day * 2.7;
+    this.sun.color.setHSL(0.11, 0.45, 0.5 + day * 0.42); // warm golden noon
+    this.hemi.intensity = 0.25 + day * 0.7;
     // sky — rich daytime blue at noon
     const sky = new THREE.Color().setHSL(0.6, 0.5, 0.04 + day * 0.32 - night * 0.015);
     if (day > 0.95) sky.setHSL(0.585, 0.68, 0.44); // pinned-noon: vivid blue
@@ -556,6 +599,8 @@ export class GTAWorld {
     cancelAnimationFrame(this.raf);
     window.removeEventListener("resize", this.resize);
     this.audio.engineStop();
+    this.weather?.dispose();
+    this.ambientTraffic?.dispose();
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
