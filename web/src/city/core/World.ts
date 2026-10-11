@@ -335,6 +335,9 @@ export class GTAWorld {
       this.time += dt;
       // Permanently daytime — sun pinned at high noon (t=0.5), no night cycle.
       this.dayT = 0.5;
+      // Branded building animations (neon pulse, etc.)
+      const tickers = (this.city as any)?.tickers as ((t: number) => void)[] | undefined;
+      if (tickers) for (const tick of tickers) tick(this.time);
       this.update(dt);
     }
     this.renderer.render(this.scene, this.camera);

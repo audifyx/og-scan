@@ -4,6 +4,8 @@ import {
   cloudTexture, billboardFace, type BillboardFace,
 } from "./textures";
 import { loadAsset } from "./assetLoader";
+import { buildOrbitXTower, buildOrbitXShop, buildOrbitXApartment, type BrandedBuilding } from "./OrbitXBuildings";
+import { buildKOLCharacter, buildNeonCar, buildAdBillboard, KOLS } from "./OrbitXProps";
 import { pickBuilding, BUILDINGS, CARS, type AssetEntry } from "./assetManifest";
 
 export const BLOCKS = 5;          // blocks per side
@@ -31,6 +33,8 @@ export interface CityData {
   spawn: { x: number; z: number; heading: number };
   /** Building lots awaiting GLB hydration (filled by buildCity, consumed by hydrateBuildings) */
   slots: BuildingSlot[];
+  /** per-frame animation callbacks for branded buildings */
+  tickers: ((t: number) => void)[];
 }
 
 /** A lot reserved for a GLB building model. */
@@ -198,6 +202,7 @@ export function buildCity(): CityData {
 
   // --- building lots per block (slots for GLB hydration; see hydrateBuildings) ---
   const slots: BuildingSlot[] = [];
+  const tickers: ((t: number) => void)[] = [];
 
   for (let bi = 0; bi < BLOCKS; bi++) {
     for (let bj = 0; bj < BLOCKS; bj++) {
@@ -345,6 +350,73 @@ export async function hydrateBuildings(city: CityData): Promise<{ buildings: num
   let placed = 0;
   let lastPath = "";
 
+  // ── OrbitX branded landmark buildings ──
+  // Signature tower at the downtown core (most central slot)
+  const downtownSlots = city.slots.filter(s => s.downtown);
+  if (downtownSlots.length > 0) {
+    // Pick the slot closest to city center (0,0)
+    downtownSlots.sort((a, b) =>
+      (a.cx * a.cx + a.cz * a.cz) - (b.cx * b.cx + b.cz * b.cz));
+    const towerSlot = downtownSlots[0];
+    const tower = buildOrbitXTower("#00f0ff", 48);
+    tower.group.position.set(towerSlot.cx, 0, towerSlot.cz);
+    tower.group.traverse(o => { o.userData.isBuilding = true; o.userData.isLandmark = true; });
+    city.group.add(tower.group);
+    city.tickers.push(tower.tick);
+    const [tw, td] = tower.footprint;
+    city.colliders.push({
+      minX: towerSlot.cx - tw / 2, maxX: towerSlot.cx + tw / 2,
+      minZ: towerSlot.cz - td / 2, maxZ: towerSlot.cz + td / 2,
+    });
+    placed++;
+    // Remove this slot from the GLB pool so we don't double-place
+    city.slots.splice(city.slots.indexOf(towerSlot), 1);
+
+    // Branded shops near the tower (street-level retail)
+    const shopColors = ["#ff00ff", "#00f0ff", "#a855f7"];
+    let shopsPlaced = 0;
+    for (const s of city.slots) {
+      if (shopsPlaced >= 3) break;
+      if (s.wantShop && !s.downtown) {
+        const shop = buildOrbitXShop(shopColors[shopsPlaced % shopColors.length]);
+        shop.group.position.set(s.cx, 0, s.cz);
+        shop.group.rotation.y = ROTS[Math.floor(Math.random() * ROTS.length)];
+        shop.group.traverse(o => { o.userData.isBuilding = true; });
+        city.group.add(shop.group);
+        city.tickers.push(shop.tick);
+        const [sw, sd] = shop.footprint;
+        city.colliders.push({
+          minX: s.cx - sw / 2, maxX: s.cx + sw / 2,
+          minZ: s.cz - sd / 2, maxZ: s.cz + sd / 2,
+        });
+        placed++;
+        shopsPlaced++;
+        city.slots.splice(city.slots.indexOf(s), 1);
+      }
+    }
+
+    // Apartment blocks in outer areas
+    let aptsPlaced = 0;
+    for (const s of [...city.slots]) {
+      if (aptsPlaced >= 2) break;
+      if (!s.downtown && !s.wantShop) {
+        const apt = buildOrbitXApartment(6 + Math.floor(Math.random() * 3), "#a855f7");
+        apt.group.position.set(s.cx, 0, s.cz);
+        apt.group.traverse(o => { o.userData.isBuilding = true; });
+        city.group.add(apt.group);
+        city.tickers.push(apt.tick);
+        const [aw, ad] = apt.footprint;
+        city.colliders.push({
+          minX: s.cx - aw / 2, maxX: s.cx + aw / 2,
+          minZ: s.cz - ad / 2, maxZ: s.cz + ad / 2,
+        });
+        placed++;
+        aptsPlaced++;
+        city.slots.splice(city.slots.indexOf(s), 1);
+      }
+    }
+  }
+
   // Pre-pick all models first (fast, sync) so we can dedupe adjacents
   const picks: { slot: BuildingSlot; entry: AssetEntry }[] = [];
   for (const slot of city.slots) {
@@ -405,6 +477,64 @@ export async function hydrateBuildings(city: CityData): Promise<{ buildings: num
       glbCars++;
       if (glbCars >= 15) break; // cap for mobile
     } catch { /* skip */ }
+  }
+
+  // ── KOL character NPCs (plaza gathering near downtown) ──
+  // Find a park or open area near center for the KOL plaza
+  const kolSpots: { x: number; z: number }[] = [];
+  const plazaCx = 0, plazaCz = 0;
+  KOLS.forEach((def, i) => {
+    const angle = (i / KOLS.length) * Math.PI * 2;
+    const r = 8 + (i % 3) * 4;
+    kolSpots.push({
+      x: plazaCx + Math.cos(angle) * r,
+      z: plazaCz + Math.sin(angle) * r,
+    });
+  });
+  for (let i = 0; i < KOLS.length && i < kolSpots.length; i++) {
+    const npc = buildKOLCharacter(KOLS[i]);
+    npc.group.position.set(kolSpots[i].x, 0, kolSpots[i].z);
+    // Face center
+    npc.group.rotation.y = Math.atan2(plazaCx - kolSpots[i].x, plazaCz - kolSpots[i].z);
+    city.group.add(npc.group);
+    city.tickers.push(npc.tick);
+  }
+
+  // ── Ad billboards (OrbitX branded, at key intersections) ──
+  const billboardAds = [
+    "ORBITX CITY\nTRADE \u2022 LAUNCH \u2022 LIVE",
+    "BURN $ORBITX\nEVERY PURCHASE",
+    "KOL ZONE\nANSEM \u2022 CUPSEY \u2022 ORANGIE",
+    "OWN THE CITY\nBUY BUILDINGS ON-CHAIN",
+  ];
+  const bbPositions = [
+    { x: -40, z: 0, ry: Math.PI / 2 },
+    { x: 40, z: 0, ry: -Math.PI / 2 },
+    { x: 0, z: 40, ry: Math.PI },
+    { x: 0, z: -40, ry: 0 },
+  ];
+  for (let i = 0; i < billboardAds.length; i++) {
+    const bb = buildAdBillboard(billboardAds[i], "#00f0ff");
+    bb.group.position.set(bbPositions[i].x, 0, bbPositions[i].z);
+    bb.group.rotation.y = bbPositions[i].ry;
+    city.group.add(bb.group);
+    city.tickers.push(bb.tick);
+  }
+
+  // ── Neon cars (parked decoration) ──
+  const neonColors: [string, string][] = [
+    ["#ff00ff", "#00f0ff"],
+    ["#00f0ff", "#ff00ff"],
+    ["#f97316", "#ffffff"],
+  ];
+  for (let i = 0; i < 3 && i < city.parked.length; i++) {
+    const p = city.parked[i * 2];
+    if (!p) continue;
+    const [color, accent] = neonColors[i % neonColors.length];
+    const car = buildNeonCar(color, accent);
+    car.position.set(p.x, 0, p.z);
+    car.rotation.y = p.heading;
+    city.group.add(car);
   }
 
   return { buildings: placed, glbCars };
