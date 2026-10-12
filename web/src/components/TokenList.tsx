@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { SafeLink } from "@/lib/safeMarkdown";
 
 interface TokenListProps {
   tokens: TokenAsset[];
@@ -257,6 +258,10 @@ export function TokenList({ tokens }: TokenListProps) {
                   <div className="prose prose-invert prose-sm max-w-none bg-white/[0.04] rounded-xl p-4">
                     <ReactMarkdown
                       components={{
+                        // SafeLink sanitizes hrefs — blocks javascript:/data: URLs from AI output
+                        a: ({ href, children }: any) => (
+                          <SafeLink href={href} className="text-primary underline underline-offset-2">{children}</SafeLink>
+                        ),
                         h1: ({ children }) => <h1 className="text-lg font-bold text-foreground mt-4 mb-2">{children}</h1>,
                         h2: ({ children }) => <h2 className="text-base font-semibold text-foreground mt-3 mb-2">{children}</h2>,
                         h3: ({ children }) => <h3 className="text-sm font-semibold text-foreground mt-2 mb-1">{children}</h3>,

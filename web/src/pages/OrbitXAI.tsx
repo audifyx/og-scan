@@ -62,6 +62,7 @@ import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { TokenGatingVerifier } from "@/components/agent/token-gating-verifier";
 import { McpBurnAccessCard } from "@/components/agent/McpBurnAccessCard";
 import { AGENT_HOLD_MIN_USD, AGENT_HOLD_MINT } from "@/lib/agentTokenGate";
+import { sanitizeHref } from "@/lib/safeMarkdown";
 import { OGSCAN_TOKEN_SYMBOL } from "@/lib/og";
 import {
   bootstrapOrbitXAi,
@@ -732,7 +733,12 @@ function ChatMessage({
           ) : (
             <ReactMarkdown
               components={{
-                a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
+                // sanitizeHref blocks javascript:/data: URLs injected via AI output
+                a: (props: any) => {
+                  const safe = sanitizeHref(props.href);
+                  if (!safe) return <span>{props.children}</span>;
+                  return <a {...props} href={safe} target="_blank" rel="noopener noreferrer" />;
+                },
               }}
             >
               {message.content}

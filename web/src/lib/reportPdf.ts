@@ -292,7 +292,7 @@ function buildReportHtml(d: {
             return `<tr>
               <td>${i + 1}</td>
               <td>${esc(shortCa(h.wallet))}</td>
-              <td>${h.classification || 'Tracked'}</td>
+              <td>${esc(h.classification || 'Tracked')}</td>
               <td>${own.toFixed(2)}%</td>
               <td>${fmtUsd(h.balanceUsd)}</td>
               <td class="pos">+${(h.unrealizedPnL || 0).toFixed(1)}%</td>

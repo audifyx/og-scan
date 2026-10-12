@@ -15,6 +15,7 @@ import {
   ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins, Image as ImageIcon, Smile,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
@@ -405,8 +406,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     setUploadingImg(true);
     try {
       for (const file of Array.from(files).slice(0, 4)) {
-        if (!file.type.startsWith("image/")) continue;
-        const ext = (file.name.split(".").pop() || "png").toLowerCase();
+        if (validateUploadFile(file, { maxMB: 5 })) continue;
+        const ext = safeExtForMime(file.type);
         const path = `posts/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error } = await supabase.storage.from("profile-media").upload(path, file, { contentType: file.type, upsert: false });
         if (error) { toast.error("Image upload failed"); continue; }

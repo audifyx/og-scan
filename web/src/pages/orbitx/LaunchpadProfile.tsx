@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { listByCreator, getProfile, upsertProfile, getReferralStats, syncAchievements, getAchievementHistory, type OrbitxProfile, type OrbitxToken } from "@/lib/orbitx/registry";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { TokenCard, shortAddr, GRADUATION_MC_USD } from "./_shared";
 import { useMarketMap, fmtCompactUsd } from "./lpx";
 import {
@@ -34,7 +35,9 @@ function EditProfileModal({ wallet, profile, onClose, onSaved }: { wallet: strin
   const uploadAvatar = async (file: File) => {
     setUploading(true); setErr(null);
     try {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const fileErr = validateUploadFile(file, { maxMB: 5 });
+      if (fileErr) throw new Error(fileErr);
+      const ext = safeExtForMime(file.type);
       const path = `orbitxprofiles/${wallet}/avatar-${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("profile-media").upload(path, file, { contentType: file.type, upsert: true });
       if (error) throw error;

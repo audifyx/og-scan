@@ -6,6 +6,8 @@
  */
 export const config = { maxDuration: 120 };
 
+import { timingSafeEqual } from "node:crypto";
+
 import {
   formatMcpResultForTelegram,
   isAgentTelegramToolAllowed,
@@ -362,7 +364,16 @@ export default async function handler(req, res) {
     if (!bot?.bot_token) return ok(res);
 
     const secret = header(req, "x-telegram-bot-api-secret-token");
-    if (secret && secret !== bot.webhook_secret) {
+    // Fail closed: a missing header or an unconfigured bot secret must never
+    // be treated as authorized (the old `secret && ...` check let callers
+    // with NO header forge Telegram updates and impersonate the owner).
+    const expected = String(bot.webhook_secret || "");
+    const provided = String(secret || "");
+    const okSecret =
+      expected.length > 0 &&
+      provided.length === expected.length &&
+      timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+    if (!okSecret) {
       res.statusCode = 403;
       return res.end("forbidden");
     }

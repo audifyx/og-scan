@@ -3,7 +3,16 @@
  * Alert-only. Same NEON / WARDEN / RAID tape as the dashboard.
  */
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import { adminCredentialOk } from "../../../shared/desk-unlock.js";
+
+/** Constant-time secret comparison — never short-circuit on a missing value. */
+function safeSecretEq(a, b) {
+  const A = Buffer.from(String(a || ""));
+  const B = Buffer.from(String(b || ""));
+  if (A.length === 0 || A.length !== B.length) return false;
+  return timingSafeEqual(A, B);
+}
 import {
   LIVE_AGENTS,
   rankForLiveStyle,
@@ -459,7 +468,13 @@ export async function ingestCallsHook({ body, secret, sb: sbIn, send, live } = {
   const sb = sbIn || adminSb();
   if (!sb) return { ok: false, error: "supabase_unconfigured" };
   const desk = await loadDesk(sb);
-  if (desk.webhook_secret && secret && secret !== desk.webhook_secret) return { ok: false, error: "bad_secret" };
+  // Webhook auth is fail-closed: without a configured webhook_secret the
+  // endpoint accepts nothing, and a missing/wrong secret is rejected.
+  // (Previously `secret && secret !== ...` let callers with NO secret header
+  // ingest forged Telegram updates, arming the desk and rebinding the
+  // broadcast channel to an attacker's chat.)
+  if (!desk.webhook_secret) return { ok: false, error: "webhook_not_configured" };
+  if (!safeSecretEq(secret, desk.webhook_secret)) return { ok: false, error: "bad_secret" };
   const row = chatFromTelegramUpdate(body || {});
   if (!row) return { ok: true, ignored: true };
   await upsertChat(sb, row);

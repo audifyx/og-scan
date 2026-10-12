@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { timingSafeEqual } from "crypto";
 import { parseTrade } from "./_transactions.js";
 import { buildAlertText, sendTelegram } from "./_send-alert.js";
 
@@ -44,7 +45,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ ok: false, error: "HELIUS_WEBHOOK_SECRET not configured" });
   }
   const auth = String(req.headers["authorization"] || req.headers["x-webhook-secret"] || "");
-  if (auth !== WEBHOOK_SECRET && auth !== `Bearer ${WEBHOOK_SECRET}`) {
+  // Timing-safe compare: strip an optional "Bearer " prefix, then require an
+  // exact constant-time match. Fail closed on missing/short secrets.
+  const provided = auth.replace(/^Bearer\s+/i, "");
+  const expected = WEBHOOK_SECRET;
+  const p = Buffer.from(provided);
+  const e = Buffer.from(expected);
+  if (p.length === 0 || p.length !== e.length || !timingSafeEqual(p, e)) {
     return res.status(401).json({ ok: false, error: "unauthorized" });
   }
   if (!SERVICE_KEY) {

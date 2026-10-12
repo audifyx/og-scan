@@ -58,6 +58,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { sanitizeHref } from "@/lib/safeMarkdown";
 import {
   hubListThreads,
   hubCreateThread,
@@ -158,8 +159,11 @@ function Markdown({ text }: { text: string }) {
           if (href && href.startsWith("copy:")) {
             return <CopyAddr address={href.slice(5)} />;
           }
+          // sanitizeHref blocks javascript:/data: URLs that AI output could inject
+          const safe = sanitizeHref(href);
+          if (!safe) return <span className="text-iris">{children}</span>;
           return (
-            <a href={href} target="_blank" rel="noreferrer" className="text-iris underline decoration-iris/40 underline-offset-2 hover:decoration-iris">
+            <a href={safe} target="_blank" rel="noopener noreferrer" className="text-iris underline decoration-iris/40 underline-offset-2 hover:decoration-iris">
               {children}
             </a>
           );

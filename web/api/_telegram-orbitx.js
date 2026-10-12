@@ -9,7 +9,7 @@
  */
 export const config = { maxDuration: 120 };
 
-import { randomUUID } from "crypto";
+import { randomUUID, timingSafeEqual } from "crypto";
 import {
   OFFICIAL_BOT_ABOUT,
   OFFICIAL_BOT_NAME,
@@ -2053,12 +2053,19 @@ export default async function handler(req, res) {
     }
 
     const strictSecret = process.env.TELEGRAM_ORBITX_WEBHOOK_SECRET || "";
+    // Timing-safe compare; a missing/empty header must NEVER pass (the old
+    // `secret && ...` guard let header-less callers forge Telegram updates).
+    const secretsMatch = (provided, expected) => {
+      const p = Buffer.from(String(provided || ""));
+      const e = Buffer.from(String(expected || ""));
+      return p.length > 0 && p.length === e.length && timingSafeEqual(p, e);
+    };
     if (strictSecret) {
-      if (secret !== strictSecret) {
+      if (!secretsMatch(secret, strictSecret)) {
         res.statusCode = 403;
         return res.end("forbidden");
       }
-    } else if (WEBHOOK_SECRET && secret && secret !== WEBHOOK_SECRET) {
+    } else if (WEBHOOK_SECRET && !secretsMatch(secret, WEBHOOK_SECRET)) {
       res.statusCode = 403;
       return res.end("forbidden");
     }

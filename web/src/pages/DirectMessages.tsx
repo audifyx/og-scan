@@ -12,6 +12,7 @@ import {
   Pin, PinOff, Archive, Inbox,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
 import { isUserOnline, usePresenceTick } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -557,9 +558,12 @@ const DirectMessages: React.FC = () => {
   };
 
   /* ─── Media: image + voice notes (dm-media bucket) ─── */
-  const uploadDM = async (file: Blob, ext: string): Promise<string | null> => {
+  const uploadDM = async (file: Blob, ext: string, allow?: readonly string[]): Promise<string | null> => {
     if (!user) return null;
-    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const vErr = validateUploadFile(file, { maxMB: 5, allow });
+    if (vErr) { toast.error(vErr); return null; }
+    const safeExt = safeExtForMime((file as File).type || "");
+    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
     const { error } = await supabase.storage.from("dm-media").upload(path, file, { contentType: (file as File).type || undefined, upsert: false });
     if (error) { toast.error("Upload failed"); return null; }
     return supabase.storage.from("dm-media").getPublicUrl(path).data.publicUrl;
@@ -591,7 +595,7 @@ const DirectMessages: React.FC = () => {
         setRecSecs(0);
         if (blob.size < 800 || !user || !activeConvo) return;
         setUploading(true);
-        const url = await uploadDM(blob, "webm");
+        const url = await uploadDM(blob, "webm", MEDIA_MIME_ALLOWLIST);
         setUploading(false);
         if (!url) return;
         await supabase.from("dm_messages").insert({ conversation_id: activeConvo.id, sender_id: user.id, body: "", audio_url: url, audio_duration_ms: dur, message_type: "voice", read: false });

@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import {
@@ -433,10 +434,11 @@ const Profile = () => {
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("Max 5 MB"); return; }
+    const fileErr = validateUploadFile(file, { maxMB: 5 });
+    if (fileErr) { toast.error(fileErr); return; }
     setUploadingBanner(true);
     try {
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const ext = safeExtForMime(file.type);
       const path = `${user.id}/banner-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("profile-media").upload(path, file, { upsert: true });
       if (upErr) throw upErr;

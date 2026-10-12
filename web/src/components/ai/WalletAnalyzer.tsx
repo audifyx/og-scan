@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getWalletOverview, getAssets, getTransactions, isValidSolanaAddress } from "@/lib/solana-api";
 import { toast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
+import { SafeLink } from "@/lib/safeMarkdown";
 import { useCredits } from "@/hooks/useCredits";
 import { CreditCostLabel } from "@/components/credits/CreditCostLabel";
 import { CreditConfirmDialog } from "@/components/credits/CreditConfirmDialog";
@@ -141,6 +142,10 @@ export const WalletAnalyzer = () => {
           <div className="prose prose-invert prose-sm max-w-none">
             <ReactMarkdown
               components={{
+                // SafeLink sanitizes hrefs — blocks javascript:/data: URLs from AI output
+                a: ({ href, children }: any) => (
+                  <SafeLink href={href} className="text-primary underline underline-offset-2">{children}</SafeLink>
+                ),
                 h1: ({ children }) => <h1 className="text-xl font-bold mt-4 mb-2 text-foreground">{children}</h1>,
                 h2: ({ children }) => <h2 className="text-lg font-semibold mt-4 mb-2 text-foreground">{children}</h2>,
                 h3: ({ children }) => <h3 className="text-base font-medium mt-3 mb-1 text-foreground">{children}</h3>,

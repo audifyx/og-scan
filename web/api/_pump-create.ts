@@ -22,6 +22,62 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+/* ─── Upload validation (security) ─────────────────────────────────────
+ * Token images are pinned to IPFS and served to every visitor of the token
+ * page — an SVG/HTML payload here is stored XSS. Enforce an image-only
+ * allowlist, a size cap, and magic-byte verification (never trust the
+ * client-supplied MIME type or extension).
+ */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGES: Record<string, { ext: string; magic: number[][] }> = {
+  "image/png": { ext: "png", magic: [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]] },
+  "image/jpeg": { ext: "jpg", magic: [[0xff, 0xd8, 0xff]] },
+  "image/gif": { ext: "gif", magic: [[0x47, 0x49, 0x46, 0x38]] },
+  "image/webp": { ext: "webp", magic: [[0x52, 0x49, 0x46, 0x46]] }, // RIFF....WEBP (tail checked below)
+};
+
+function matchesMagic(buf: Buffer, sig: number[]): boolean {
+  if (buf.length < sig.length) return false;
+  for (let i = 0; i < sig.length; i++) if (buf[i] !== sig[i]) return false;
+  return true;
+}
+
+export function validateUploadImage(
+  imageBase64: string,
+  imageMimeType?: string,
+): { ok: true; buffer: Buffer; mime: string; ext: string } | { ok: false; error: string } {
+  const mime = String(imageMimeType || "image/png").split(";")[0].trim().toLowerCase();
+  const rule = ALLOWED_IMAGES[mime];
+  if (!rule) {
+    return { ok: false, error: "Unsupported image type. Use PNG, JPG, GIF, or WebP." };
+  }
+  if (typeof imageBase64 !== "string" || !imageBase64.length) {
+    return { ok: false, error: "Missing image data" };
+  }
+  // Reject oversized payloads before decoding (base64 inflates ~4/3).
+  if (imageBase64.length > Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4096) {
+    return { ok: false, error: "Image must be under 5 MB" };
+  }
+  let buf: Buffer;
+  try {
+    buf = Buffer.from(imageBase64, "base64");
+  } catch {
+    return { ok: false, error: "Invalid base64 image data" };
+  }
+  if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) {
+    return { ok: false, error: "Image must be under 5 MB" };
+  }
+  const magicOk = rule.magic.some((sig) => matchesMagic(buf, sig));
+  const webpTailOk =
+    mime !== "image/webp" ||
+    (buf.length >= 12 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50); // "WEBP"
+  if (!magicOk || !webpTailOk) {
+    return { ok: false, error: "Image content does not match its declared type" };
+  }
+  return { ok: true, buffer: buf, mime, ext: rule.ext };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") return res.status(200).setHeader("Access-Control-Allow-Origin", "*").end();
 
@@ -60,13 +116,16 @@ async function handleIpfs(body: any, res: VercelResponse) {
     throw new Error("PINATA_JWT is not configured on the server");
   }
 
-  // Convert base64 to buffer
-  const imageBuffer = Buffer.from(imageBase64, "base64");
-  const ext = (imageMimeType || "image/png").split("/")[1] || "png";
+  // Validate the image (allowlist + size + magic bytes) before touching IPFS.
+  const validated = validateUploadImage(imageBase64, imageMimeType);
+  if (!validated.ok) {
+    return res.status(400).json({ error: validated.error });
+  }
+  const { buffer: imageBuffer, mime: safeMime, ext } = validated;
 
   // 1 — pin the image itself to IPFS via Pinata
   const imgForm = new FormData();
-  imgForm.append("file", new Blob([imageBuffer], { type: imageMimeType || "image/png" }), `token.${ext}`);
+  imgForm.append("file", new Blob([imageBuffer], { type: safeMime }), `token.${ext}`);
   imgForm.append("pinataMetadata", JSON.stringify({ name: `${symbol}-image` }));
 
   const imgRes = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {

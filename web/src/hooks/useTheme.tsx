@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { useAuth } from "./useAuth";
 import {
   THEME_PRESETS as BASE_PRESETS,
@@ -158,7 +159,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   const uploadWallpaper = useCallback(async (file: File): Promise<string | null> => {
     if (!user) return null;
-    const ext = file.name.split(".").pop();
+    if (validateUploadFile(file, { maxMB: 5 })) return null;
+    const ext = safeExtForMime(file.type);
     const path = `${user.id}/wallpaper-${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("wallpapers").upload(path, file, { upsert: true });
     if (error) return null;

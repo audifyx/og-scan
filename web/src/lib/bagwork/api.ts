@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
 import type {
   BagworkLeaderRow,
   BagworkStats,
@@ -158,8 +159,12 @@ export async function countUserSubmissionsForTask(userId: string, taskId: string
   return count ?? 0;
 }
 
+const PROOF_ALLOW = [...MEDIA_MIME_ALLOWLIST, "application/pdf"] as const;
+
 export async function uploadProofFile(userId: string, file: File): Promise<{ url: string; fileName: string }> {
-  const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+  const fileErr = validateUploadFile(file, { allow: PROOF_ALLOW, maxMB: 10 });
+  if (fileErr) throw new Error(fileErr);
+  const ext = safeExtForMime(file.type);
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from(PROOF_BUCKET).upload(path, file, {
     cacheControl: "3600",

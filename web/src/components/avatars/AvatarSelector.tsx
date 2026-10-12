@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles, Crown, Star, Zap, Upload, Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 
 interface Avatar {
   id: string;
@@ -84,8 +85,9 @@ export const AvatarSelector = ({ currentAvatar, userId, onSelect, trigger }: Ava
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File must be under 5 MB");
+    const fileErr = validateUploadFile(file, { maxMB: 5 });
+    if (fileErr) {
+      setUploadError(fileErr);
       return;
     }
     setUploadError(null);
@@ -94,7 +96,7 @@ export const AvatarSelector = ({ currentAvatar, userId, onSelect, trigger }: Ava
       const { data: { user } } = await supabase.auth.getUser();
       const uid = userId || user?.id;
       if (!uid) throw new Error("Not signed in");
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const ext = safeExtForMime(file.type);
       const path = `${uid}/avatar-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("profile-media")

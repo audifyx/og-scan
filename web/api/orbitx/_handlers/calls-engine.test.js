@@ -8,6 +8,7 @@ function memSb() {
         id: "main",
         bot_token: "123456:TESTTOKENTESTTOKENTESTTOKEN12",
         bot_username: "orbitxcallsbot",
+        webhook_secret: "test-hook-secret-123",
         channel_id: "-1001",
         channel_title: "OrbitX Calls",
         broadcast_groups: true,
@@ -217,6 +218,7 @@ describe("calls engine tick", () => {
     const out = await ingestCallsHook({
       sb,
       live: { feed: [] },
+      secret: "test-hook-secret-123",
       body: { message: { chat: { id: -2002, title: "OrbitX group", type: "supergroup" }, text: "hello" } },
       send: async (_t, method, body) => {
         sent.push({ method, body });
@@ -227,5 +229,27 @@ describe("calls engine tick", () => {
     expect(sb._tables.ox_calls_chats[0].chat_id).toBe("-2002");
     expect(sb._tables.ox_calls_desk[0].armed).toBe(true);
     expect(sent.some((s) => String(s.body.text).includes("live desk linked"))).toBe(true);
+  });
+
+  it("rejects forged webhook updates without a valid secret", async () => {
+    const sb = memSb();
+    sb._tables.ox_calls_chats = [];
+    const body = { message: { chat: { id: -9999, title: "Evil", type: "supergroup" }, text: "hello" } };
+    const noSecret = await ingestCallsHook({ sb, body, send: async () => ({ ok: true }) });
+    expect(noSecret.error).toBe("bad_secret");
+    const wrongSecret = await ingestCallsHook({ sb, body, secret: "wrong", send: async () => ({ ok: true }) });
+    expect(wrongSecret.error).toBe("bad_secret");
+    expect(sb._tables.ox_calls_chats).toHaveLength(0);
+  });
+
+  it("fails closed when no webhook secret is configured", async () => {
+    const sb = memSb();
+    sb._tables.ox_calls_desk[0].webhook_secret = null;
+    const out = await ingestCallsHook({
+      sb,
+      secret: "anything",
+      body: { message: { chat: { id: -9999, title: "Evil", type: "supergroup" }, text: "hello" } },
+    });
+    expect(out.error).toBe("webhook_not_configured");
   });
 });

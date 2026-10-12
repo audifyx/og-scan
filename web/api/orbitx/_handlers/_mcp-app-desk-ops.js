@@ -64,6 +64,52 @@ async function tokenInfo(mint) {
   };
 }
 
+/* ─── Upload validation (security) ─────────────────────────────────────
+ * Token images are pinned to IPFS and served to every visitor — an SVG/HTML
+ * payload here is stored XSS. Enforce an image-only allowlist, a size cap,
+ * and magic-byte verification (never trust client-supplied MIME/extension).
+ */
+const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_UPLOAD_IMAGES = {
+  "image/png": { ext: "png", magic: [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]] },
+  "image/jpeg": { ext: "jpg", magic: [[0xff, 0xd8, 0xff]] },
+  "image/gif": { ext: "gif", magic: [[0x47, 0x49, 0x46, 0x38]] },
+  "image/webp": { ext: "webp", magic: [[0x52, 0x49, 0x46, 0x46]] }, // RIFF....WEBP
+};
+function _uploadMatchesMagic(buf, sig) {
+  if (buf.length < sig.length) return false;
+  for (let i = 0; i < sig.length; i++) if (buf[i] !== sig[i]) return false;
+  return true;
+}
+/** Validate raw bytes; returns the VERIFIED mime/ext (not the claimed one). */
+function validateUploadImageBytes(buf) {
+  if (!buf || buf.length === 0 || buf.length > MAX_UPLOAD_IMAGE_BYTES)
+    return { ok: false, error: "Image must be under 5 MB" };
+  for (const [mime, rule] of Object.entries(ALLOWED_UPLOAD_IMAGES)) {
+    const magicOk = rule.magic.some((sig) => _uploadMatchesMagic(buf, sig));
+    if (!magicOk) continue;
+    if (mime === "image/webp") {
+      if (!(buf.length >= 12 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50))
+        continue;
+    }
+    return { ok: true, buffer: buf, mime, ext: rule.ext };
+  }
+  return { ok: false, error: "Unsupported image type. Use PNG, JPG, GIF, or WebP." };
+}
+function validateUploadImageB64(imageBase64) {
+  if (typeof imageBase64 !== "string" || !imageBase64.length)
+    return { ok: false, error: "Missing image data" };
+  if (imageBase64.length > Math.ceil((MAX_UPLOAD_IMAGE_BYTES * 4) / 3) + 4096)
+    return { ok: false, error: "Image must be under 5 MB" };
+  let buf;
+  try {
+    buf = Buffer.from(imageBase64, "base64");
+  } catch {
+    return { ok: false, error: "Invalid base64 image data" };
+  }
+  return validateUploadImageBytes(buf);
+}
+
 async function imageToBase64(args = {}) {
   if (args.imageBase64) {
     return {
@@ -72,12 +118,41 @@ async function imageToBase64(args = {}) {
     };
   }
   const url = String(args.imageUrl || args.image || "").trim();
-  if (/^https?:\/\//i.test(url)) {
+  if (/^https:\/\//i.test(url)) {
+    // SSRF guard: only public https hosts, no credentials in URL.
+    let host = "";
+    try {
+      const u = new URL(url);
+      host = u.hostname.toLowerCase();
+      if (u.username || u.password) throw new Error("bad url");
+    } catch {
+      throw new Error("invalid image URL");
+    }
+    if (
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host === "metadata.google.internal" ||
+      host === "169.254.169.254" ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      /^127\./.test(host) ||
+      host === "::1" ||
+      host === "0.0.0.0"
+    ) {
+      throw new Error("image URL host not allowed");
+    }
     const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!r.ok) throw new Error("image fetch failed");
+    const mime = String(r.headers.get("content-type") || "image/png").split(";")[0].trim();
+    const len = Number(r.headers.get("content-length") || "0");
+    if (len > MAX_UPLOAD_IMAGE_BYTES) throw new Error("image too large");
     const buf = Buffer.from(await r.arrayBuffer());
-    const mime = r.headers.get("content-type") || "image/png";
-    return { imageBase64: buf.toString("base64"), imageMimeType: mime.split(";")[0] };
+    if (buf.length > MAX_UPLOAD_IMAGE_BYTES) throw new Error("image too large");
+    // Trust the bytes, not the remote content-type: magic-byte check decides.
+    const probe = validateUploadImageBytes(buf);
+    if (!probe.ok) throw new Error(probe.error);
+    return { imageBase64: buf.toString("base64"), imageMimeType: probe.mime };
   }
   return { imageBase64: FALLBACK_PNG, imageMimeType: "image/png" };
 }
@@ -85,10 +160,14 @@ async function imageToBase64(args = {}) {
 async function pinMetadata({ name, symbol, description, twitter, telegram, website, imageBase64, imageMimeType }) {
   const PINATA_JWT = process.env.PINATA_JWT;
   if (!PINATA_JWT) throw new Error("PINATA_JWT is not configured");
-  const imageBuffer = Buffer.from(imageBase64, "base64");
-  const ext = (imageMimeType || "image/png").split("/")[1] || "png";
+  // Validate the image bytes (allowlist + size + magic bytes) before IPFS.
+  // The verified mime/ext are used — never the caller-supplied values.
+  const validated = validateUploadImageB64(imageBase64);
+  if (!validated.ok) throw new Error(validated.error);
+  const imageBuffer = validated.buffer;
+  const ext = validated.ext;
   const imgForm = new FormData();
-  imgForm.append("file", new Blob([imageBuffer], { type: imageMimeType || "image/png" }), `token.${ext}`);
+  imgForm.append("file", new Blob([imageBuffer], { type: validated.mime }), `token.${ext}`);
   imgForm.append("pinataMetadata", JSON.stringify({ name: `${symbol}-image` }));
   const imgRes = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
     method: "POST",

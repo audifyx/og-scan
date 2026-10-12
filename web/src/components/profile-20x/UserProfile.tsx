@@ -54,6 +54,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { FollowerRecord, useFriends } from "@/hooks/useFriends";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { isUserOnline, presenceTimestamp } from "@/lib/presence";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 
@@ -1228,10 +1229,15 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const handleBannerUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
+    const fileErr = validateUploadFile(file, { maxMB: 5 });
+    if (fileErr) {
+      toast.error(fileErr);
+      return;
+    }
 
     setUploadingBanner(true);
     try {
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const ext = safeExtForMime(file.type);
       const path = `${user.id}/banner-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("profile-media").upload(path, file, {
         upsert: true,

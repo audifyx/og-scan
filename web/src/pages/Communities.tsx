@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -99,7 +100,9 @@ interface CommunityMember {
 /* ── Upload helper — uploads file to Supabase storage, returns public URL ── */
 const UPLOAD_BUCKET = "profile-media";
 async function uploadImage(file: File, folder: string): Promise<string> {
-  const ext = file.name.split(".").pop() ?? "jpg";
+  const fileErr = validateUploadFile(file, { maxMB: 5 });
+  if (fileErr) throw new Error(fileErr);
+  const ext = safeExtForMime(file.type);
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from(UPLOAD_BUCKET).upload(path, file, { upsert: true, contentType: file.type });
   if (error) throw error;

@@ -2,6 +2,7 @@
 // Storage (same public "profile-media" bucket the token launch lanes already
 // use), producing a public HTTPS metadata URI suitable for on-chain `uri`.
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime, MEDIA_MIME_ALLOWLIST } from "@/lib/safeUpload";
 import type { NftAttribute } from "@/lib/orbitx/nftMint";
 
 export interface NftMetaInput {
@@ -15,15 +16,19 @@ export interface NftMetaInput {
   collectionName?: string;
 }
 
-const ACCEPTED_MIME_PREFIXES = ["image/", "video/", "audio/"];
+// Explicit media allowlist — notably EXCLUDES image/svg+xml (scriptable,
+// stored-XSS risk when the public bucket serves it inline).
+const ACCEPTED_NFT_MIME = MEDIA_MIME_ALLOWLIST;
 
 export function isAcceptedNftMedia(file: File): boolean {
-  return ACCEPTED_MIME_PREFIXES.some((p) => file.type.startsWith(p));
+  return !validateUploadFile(file, { allow: ACCEPTED_NFT_MIME, maxMB: 50 });
 }
 
 export async function uploadNftAssets(seed: string, mediaFile: File, meta: NftMetaInput): Promise<{ mediaUrl: string; uri: string }> {
+  const fileErr = validateUploadFile(mediaFile, { allow: ACCEPTED_NFT_MIME, maxMB: 50 });
+  if (fileErr) throw new Error(fileErr);
   const mime = mediaFile.type || "image/png";
-  const ext = (mime.split("/")[1] || "png").replace("jpeg", "jpg");
+  const ext = safeExtForMime(mime);
   const mediaPath = `orbitxnft/${seed}/media.${ext}`;
   const { error: mediaErr } = await supabase.storage.from("profile-media").upload(mediaPath, mediaFile, { contentType: mime, upsert: true });
   if (mediaErr) throw new Error(`Media upload failed: ${mediaErr.message}`);

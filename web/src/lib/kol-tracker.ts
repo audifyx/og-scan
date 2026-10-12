@@ -7,6 +7,7 @@
  * on select). A local copy is kept only in this browser for direct dispatch.
  */
 import { supabase } from "@/lib/supabase";
+import { validateUploadFile, safeExtForMime } from "./safeUpload";
 
 export type TrackerMode = "all_kols" | "specific_wallet" | "custom_list";
 
@@ -318,7 +319,8 @@ export async function fetchKolList(): Promise<KolListEntry[]> {
 
 export async function uploadBotImage(userId: string, file: File): Promise<string | null> {
   try {
-    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    if (validateUploadFile(file, { maxMB: 5 })) return null;
+    const ext = safeExtForMime(file.type);
     const path = `${userId}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("kol-bot-assets").upload(path, file, { upsert: true });
     if (error) return null;
