@@ -159,6 +159,8 @@ export const UI_TOOL_WIDGET = {
   orbitx_adv_forensics_solana: "ui://widget/orbitx-token.html",
   orbitx_get_forensics: "ui://widget/orbitx-token.html",
   orbitx_dex_chart: "ui://widget/orbitx-token.html",
+  orbitx_leaderboard: "ui://widget/orbitx-token.html",
+  orbitx_platform_stats: "ui://widget/orbitx-token.html",
   // wallet
   orbitx_get_wallet: "ui://widget/orbitx-wallet.html",
   orbitx_adv_wallet_pnl: "ui://widget/orbitx-wallet.html",

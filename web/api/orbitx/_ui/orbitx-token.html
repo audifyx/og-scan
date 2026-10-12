@@ -10,7 +10,8 @@
   Bridge: window.OrbitX.callTool(name, args) when hosted in the OrbitX bridge,
           else standalone fallback POSTs to https://www.orbitx.world/api/mcp
   Tools: orbitx_search, orbitx_crypto_scan, orbitx_screen_tokens,
-         orbitx_get_forensics, orbitx_dex_chart, orbitx_get_chart
+         orbitx_get_forensics, orbitx_dex_chart, orbitx_get_chart,
+         orbitx_leaderboard, orbitx_platform_stats (#22 Leaderboards tab)
   Charts: OrbitX OHLC hero (real candles from orbitx_get_chart, 1m/5m/15m/1h/4h/1d
           re-query) + DexScreener preview card (server-verified pairAddress/embedUrl/pageUrl
           from orbitx_dex_chart; embed iframe is user-gated, never auto-rendered in the
@@ -202,7 +203,8 @@ const S = { screen:"explore", q:"", results:[], token:null, mint:null,
   discType:"trending", discInterval:"1h", disc:[], forensics:null,
   chartTab:"ohlc", tf:"1h", ohlc:null, dexInfo:null, tvSym:null,
   dexEmbedded:false, chartScroll:false, sparkQ:false,
-  fetchedAt:0, error:"", loading:false, lastQ:"", copied:false };
+  fetchedAt:0, error:"", loading:false, lastQ:"", copied:false,
+  boardSub:"traders", lb:null, lbTokens:[], lbStats:null, lbExpanded:null };
 /* Timeframes (re-query orbitx_get_chart / orbitx_dex_chart) */
 const TF_LIST=["1m","5m","15m","1h","4h","1d"];
 /* TradingView only lists major pairs — arbitrary mints render TV's own
@@ -251,12 +253,14 @@ function goBack(){ S.screen="explore"; render(); }
 function render(){
   if(S.screen==="explore") renderExplore();
   else if(S.screen==="discover") renderDiscover();
+  else if(S.screen==="boards") renderBoards();
   else if(S.screen==="token") renderToken();
 }
 function tabsHTML(){
   return `<div class="tabs">
     <div class="tab ${S.screen==="explore"?"on":""}" onclick="S.screen='explore';render()">🔍 Explore</div>
     <div class="tab ${S.screen==="discover"?"on":""}" onclick="S.screen='discover';render();loadDiscover()">🔥 Discover</div>
+    <div class="tab ${S.screen==="boards"?"on":""}" onclick="S.screen='boards';render();loadBoards()">🏆 Boards</div>
     <div class="tab ${S.token?"":""}" style="${S.token?"":"opacity:.35;pointer-events:none"}" onclick="S.screen='token';render()">🪙 Token</div>
   </div>`;
 }
@@ -267,6 +271,7 @@ function errHTML(){ return S.error?`<div class="err">⚠️ ${esc(S.error)}
 function retryLast(){
   if(S.screen==="token"&&S.mint) inspect(S.mint,true);
   else if(S.screen==="discover") loadDiscover();
+  else if(S.screen==="boards") loadBoards();
   else if(S.lastQ) doSearch(S.lastQ);
 }
 
@@ -662,6 +667,126 @@ async function loadDiscover(){
   }catch(e){ setErr(e); }
   S.loading=false; renderDiscover();
 }
+/* ---------- Leaderboards (#22) ----------
+   Traders: orbitx_leaderboard (realized PnL + win rate, rank best-first).
+   Tokens: orbitx_screen_tokens type=runners 24h (real screener data).
+   Platform: orbitx_platform_stats (live snapshot). No mocks anywhere.
+   The leaderboard tool exposes only {limit} — no period selector exists server-side. */
+function renderBoards(){
+  app.innerHTML = header(false,"LEADERBOARDS")+tabsHTML()+`
+  <div class="chips">
+    <div class="chip ${S.boardSub==="traders"?"on":""}" onclick="S.boardSub='traders';renderBoards()">🏆 Traders</div>
+    <div class="chip ${S.boardSub==="tokens"?"on":""}" onclick="S.boardSub='tokens';renderBoards()">🪙 Tokens</div>
+    <div class="chip ${S.boardSub==="platform"?"on":""}" onclick="S.boardSub='platform';renderBoards()">📊 Platform</div>
+  </div>
+  ${errHTML()}
+  <div id="boardlist">${S.loading?skelRows(6):boardHTML()}</div>
+  <div class="mut" style="text-align:center;margin-top:14px">Every number below is pulled live from OrbitX.<br>Nothing is cached, nothing is made up.</div>
+  ${staleBar()}`;
+}
+function boardHTML(){
+  if(S.boardSub==="tokens") return boardTokensHTML();
+  if(S.boardSub==="platform") return boardStatsHTML();
+  return boardTradersHTML();
+}
+function boardTradersHTML(){
+  const entries=(S.lb&&S.lb.entries)||[];
+  if(!entries.length) return `<div class="empty"><div class="big">🏆</div>
+    ${S.error?"":"Pulling the trader leaderboard…"}</div>`;
+  return entries.map(traderRow).join("");
+}
+function traderRow(e){
+  const name=e.name||(e.twitter?"@"+e.twitter:null)||shortMint(e.address);
+  const pnl=e.realizedPnlUsd, wr=e.winRate;
+  const medal=e.rank===1?"🥇":e.rank===2?"🥈":e.rank===3?"🥉":null;
+  const open=S.lbExpanded===e.address;
+  return `<div class="card" style="padding:12px;margin-bottom:8px;cursor:pointer" onclick="toggleTrader('${esc(e.address)}')">
+    <div class="row">
+      <div style="width:34px;font-size:19px;text-align:center;font-weight:800">${medal||`<span class="mut">${e.rank}</span>`}</div>
+      <div style="flex:1;min-width:0">
+        <div class="tname">${esc(name)}${e.tags&&e.tags.length?` <span class="badge info">${esc(String(e.tags[0]).toUpperCase())}</span>`:""}</div>
+        <div class="tsym mono">${shortMint(e.address)}</div>
+      </div>
+      <div class="tprice"><div class="${pctCls(pnl)}">${fmtUSD(pnl)}</div>
+        <div class="tchg">${wr!=null&&!isNaN(Number(wr))?Number(wr).toFixed(1)+"% WR":"— WR"}</div></div>
+    </div>
+    ${open?traderDetail(e):""}
+  </div>`;
+}
+function traderDetail(e){
+  return `<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:6px">
+    ${frow("PnL (SOL)",fmt(e.realizedPnlSol))}
+    ${frow("Closed trades",fmt(e.closedTrades))}
+    ${frow("Open positions",fmt(e.openPositions))}
+    ${frow("Total swaps",fmt(e.totalSwaps))}
+    ${frow("Wallet",'<span class="mono">'+esc(e.address)+"</span>",true)}
+    <div class="row" style="margin-top:10px;gap:8px">
+      <button class="btn sm ghost" style="flex:1" onclick="event.stopPropagation();navigator.clipboard.writeText('${esc(e.address)}');toast('Wallet copied')">Copy wallet</button>
+      ${e.twitterUrl?`<button class="btn sm ghost" style="flex:1" onclick="event.stopPropagation();openUrl('${esc(e.twitterUrl)}')">X profile ↗</button>`:""}
+    </div>
+    <div class="mut" style="margin-top:8px;font-size:11px">PnL + win rate computed from real on-chain swap history.</div>
+  </div>`;
+}
+function toggleTrader(addr){ S.lbExpanded=S.lbExpanded===addr?null:addr; renderBoards(); }
+function boardTokensHTML(){
+  if(!S.lbTokens.length) return `<div class="empty"><div class="big">🪙</div>
+    ${S.error?"":"Pulling top tokens…"}</div>`;
+  return S.lbTokens.map((t,i)=>{
+    const p=t.priceUsd??t.price, c=t.change24h??t.priceChange24h??t.change;
+    const v=t.volume24h??t.volume??t.vol24h;
+    return `<div class="tokenrow" onclick="inspect('${esc(t.mint||t.address||"")}')">
+      <div style="width:28px;font-weight:800;color:var(--neon);text-align:center">${i+1}</div>
+      <div class="ticon">${t.icon?`<img src="${esc(t.icon)}" onerror="this.remove()">`:""}<span>${esc((t.symbol||"?").slice(0,3))}</span></div>
+      <div><div class="tname">${esc(t.name||t.symbol||"Unknown")}</div>
+        <div class="tsym">${esc(t.symbol||"")} · Vol ${fmtUSD(v)}</div></div>
+      <button class="chartbtn" title="Open chart" onclick="openChart('${esc(t.mint||t.address||"")}',event)">📈</button>
+      <div class="tprice"><div>${fmtUSD(p)}</div>
+        <div class="tchg ${pctCls(c)}">${fmtPct(c)}</div></div>
+    </div>`; }).join("")+
+    `<div class="mut" style="text-align:center;font-size:11px;margin-top:8px">Top runners · 24h screener · tap a token for the full dossier</div>`;
+}
+function boardStatsHTML(){
+  const s=S.lbStats;
+  if(!s||s.ok===false) return `<div class="empty"><div class="big">📊</div>Platform stats unavailable right now.</div>`;
+  const cells=[
+    ["Active users",fmt(s.activeUsers??s.users)],
+    ["Volume",s.volume||"—"],
+    ["Wallets tracked",fmt(s.walletsTracked??s.kols)],
+    ["Communities",fmt(s.communities)],
+    ["Spaces",fmt(s.spaces)],
+    ["X followers",fmt(s.xFollowers)],
+    ["Telegram",fmt(s.telegram)],
+    ["Tokens indexed",fmt(s.tokenCount??s.tokens)],
+    ["Days live",fmt(s.daysLive)]
+  ];
+  return `<div class="statgrid">${cells.map(c=>
+    `<div class="stat"><div class="v">${esc(String(c[1]))}</div><div class="l">${esc(c[0])}</div></div>`).join("")}</div>
+    <div class="mut" style="text-align:center;margin-top:10px;font-size:11px">Live platform snapshot · source: ${esc(s.source||"orbitx")}</div>`;
+}
+async function loadBoards(){
+  if(S.screen!=="boards") return;
+  S.loading=true; S.error=""; renderBoards();
+  const a=getAuth();
+  try{
+    const [lb, stats, toks] = await Promise.all([
+      Bridge.callTool("orbitx_leaderboard",{limit:25, authCode:a}),
+      Bridge.callTool("orbitx_platform_stats",{authCode:a}).catch(()=>null),
+      Bridge.callTool("orbitx_screen_tokens",{type:"runners",interval:"24h",limit:10,chain:"solana",authCode:a}).catch(()=>null)
+    ]);
+    if(lb&&lb.ok===false){ S.lb=null; S.error="Trader leaderboard: "+(lb.error||"feed failed"); }
+    else{
+      const entries=(lb&&(lb.entries||lb.rows||lb.traders||lb.data))||[];
+      S.lb={entries:entries.slice(0,25), at:lb.at||Date.now(), cached:!!lb.cached};
+      if(!S.lb.entries.length&&!S.error) S.error="Leaderboard returned no entries right now. Try again in a bit.";
+    }
+    S.lbStats=(stats&&stats.ok!==false)?stats:null;
+    const tl=(toks&&(toks.rows||toks.results||toks.tokens||toks.data))||[];
+    S.lbTokens=tl.slice(0,10);
+    S.fetchedAt=Date.now();
+  }catch(e){ setErr(e); }
+  S.loading=false; renderBoards();
+}
+
 /* ---------- Boot ---------- */
 renderExplore();
 /* Standalone (no host bridge): auto-load trending so the widget shows real
