@@ -279,9 +279,35 @@ function publicToolList(list) {
  * existing clients see the same fields plus _meta on UI-bound tools.
  */
 function withUiListingMeta(t, listed) {
-  // TEMP-DIAG 2026-10-12: _meta stripped to isolate ChatGPT discovery failure.
-  // Revert after diagnosis.
+  const m = toolListingMeta(t);
+  if (m) listed._meta = { ...(listed._meta && typeof listed._meta === "object" ? listed._meta : {}), ...m };
   return listed;
+}
+
+// ChatGPT (Web) cannot handle the full 2,500+ tool catalog — discovery
+// returns zero callable tools. Serve it a compact curated surface (<50).
+// The `search` tool provides access to the rest of the catalog.
+const CHATGPT_TOOL_NAMES = new Set([
+  // auth
+  "orbitx_auth_link", "orbitx_auth_status", "orbitx_whoami",
+  // trade
+  "orbitx_trade_quote", "orbitx_quote_slip10_auto", "orbitx_app_buy", "orbitx_app_sell", "orbitx_swap",
+  // token
+  "orbitx_crypto_scan", "orbitx_screen_tokens", "orbitx_screen_trending_1m_solana",
+  "orbitx_adv_forensics_solana", "orbitx_get_forensics", "orbitx_dex_chart",
+  // wallet
+  "orbitx_get_wallet", "orbitx_adv_wallet_pnl", "orbitx_adv_wallet_swaps", "orbitx_app_pnl", "orbitx_get_swaps",
+  // media
+  "orbitx_generate_image", "orbitx_x_post", "orbitx_app_launch",
+  // group chat
+  "orbitx_gc_chat",
+  // dashboard + discovery
+  "orbitx_menu", "orbitx_tools_help", "search", "orbitx_why",
+]);
+
+function isChatGPT(req) {
+  const ua = String(req?.headers?.["user-agent"] || "").toLowerCase();
+  return /chatgpt|openai/.test(ua);
 }
 
 function listLiveTools(cursor) {
@@ -6090,7 +6116,7 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: negotiatedVersion,
             // TEMP-DIAG 2026-10-12: resources capability stripped to isolate ChatGPT discovery failure.
-            capabilities: { tools: {} },
+            capabilities: { tools: {}, resources: {} },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
               "OrbitX Agent MCP. Coverage, not a tour: we do not tell users to use every surface. Each door is for a trading group. If they ask why use this MCP, why so many tools, or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
@@ -6106,6 +6132,31 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/list") {
       const cursor = params?.cursor;
+      // ChatGPT gets a compact curated surface — the full 2,500+ catalog
+      // breaks its discovery (zero callable tools). No pagination for ChatGPT;
+      // `search` provides access to the rest.
+      if (isChatGPT(req) && !cursor) {
+        const compact = publicToolList(CORE_TOOLS.filter((t) => CHATGPT_TOOL_NAMES.has(t.name))).map((t) =>
+          withUiListingMeta(t, {
+            name: t.name,
+            description: t.description,
+            inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+            annotations: toolAuthMeta(t.name),
+          }),
+        );
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            tools: compact,
+            _meta: {
+              totalAvailable: TOOLS.length,
+              compactFor: "chatgpt",
+              note: "Compact surface for ChatGPT compatibility. Use the search tool to find any of the 2,500+ tools by keyword.",
+            },
+          },
+        });
+      }
       const listed = listLiveTools(cursor);
       return json(res, {
         jsonrpc: "2.0",
