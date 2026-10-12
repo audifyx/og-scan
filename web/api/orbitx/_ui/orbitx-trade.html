@@ -217,10 +217,13 @@ const Bridge = {
     }
     else out=j.result;
     }
-    // widgetAction hook (e.g. DCA schedule import from orbitx_dca_create)
+    // widgetAction hook (e.g. DCA schedule import from orbitx_dca_create, agent auto-start)
     try{
       const wa=out&&typeof out==="object"?(out.widgetAction||(out.structuredContent&&out.structuredContent.widgetAction)):null;
-      if(wa&&typeof dcaHandleWidgetAction==="function") dcaHandleWidgetAction(wa);
+      if(wa){
+        if(typeof dcaHandleWidgetAction==="function") dcaHandleWidgetAction(wa);
+        if(typeof asnipeHandleWidgetAction==="function") asnipeHandleWidgetAction(wa);
+      }
     }catch(e){}
     return out;
   }
@@ -628,7 +631,7 @@ function mapErr(e){
    Auth: authCode from localStorage on every write call (CONTRACT.md).
    ============================================================ */
 const AUTH_RE2 = /auth|unauthor|expir|invalid code|session|forbidden|not (linked|connected|signed)|sign.?in|token|credential/i;
-const TABS = [["trade","⚡","Trade"],["ord","🔔","Orders"],["dca","🔁","DCA"],["cpy","🪞","Copy"],["snp","🎯","Snipe"],["ppr","📄","Paper"]];
+const TABS = [["trade","⚡","Trade"],["ord","🔔","Orders"],["dca","🔁","DCA"],["cpy","🪞","Copy"],["snp","🎯","Snipe"],["ppr","📄","Paper"],["asnipe","🤖","Sniper"],["alpha","⚡","Alpha"]];
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 function tabBar(active){
@@ -636,12 +639,14 @@ function tabBar(active){
     `<button class="tab${t[0]===active?" on":""}" onclick="goTab('${t[0]}')">${t[1]} ${t[2]}</button>`).join("")+`</div>`;
 }
 function goTab(t){
-  clearTimer(); S.dErr=""; S.tab=t; S.screen="search";
+  clearTimer(); stopAsnipeTimer(); S.dErr=""; S.tab=t; S.screen="search";
   if(t==="ord"){ S.screen="ord"; render(); loadOrders(); return; }
   if(t==="dca"){ S.screen="dca"; render(); loadDca(); return; }
   if(t==="cpy"){ S.screen="cpy"; render(); loadCopy(); return; }
   if(t==="snp"){ S.screen="snp"; render(); loadSnipe(); return; }
   if(t==="ppr"){ S.screen="ppr"; render(); loadPaper(); return; }
+  if(t==="asnipe"){ S.screen="asnipe"; render(); loadAsnipe(); return; }
+  if(t==="alpha"){ S.screen="alpha"; render(); loadAlpha(); return; }
   render();
 }
 /* dashboard state */
@@ -1540,12 +1545,329 @@ function scrPprReset(el){
   const b=document.getElementById("rstBtn"); if(b&&S.d23.resetBusy) b.disabled=true;
 }
 
+/* ============================================================
+   AGENT TABS — zero-SQL, widget-managed.
+   S.asnipe / S.alpha state below; screens registered in
+   DASH_SCREENS further down. Scan/feed timers stop on tab
+   switch (see goTab → stopAsnipeTimer).
+   ============================================================ */
+
+/* ============================================================
+   🤖 SNIPER AGENT — orbitx_agent_snipe
+   Scans fresh launches every 15s while running; PASS launches get
+   a one-tap buy. Config + positions persist in localStorage.
+   Honest: the scan loop runs only while this tab is open.
+   ============================================================ */
+S.asnipe={running:false,config:null,launches:[],positions:[],timer:null,lastScan:0,
+  mb:"0.5",ml:"10000",md:"10",ms:"60",scanning:false,startBusy:false,buying:-1,pnlBusy:false,pendingStart:false};
+const ASN_CFG_KEY="orbitx.agentSnipe.config";
+const ASN_POS_KEY="orbitx.agentSnipe.positions";
+const ASN_SCAN_MS=15000;
+function asnipeLoadCfg(){ try{ const r=localStorage.getItem(ASN_CFG_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function asnipeSaveCfg(c){ try{ localStorage.setItem(ASN_CFG_KEY,JSON.stringify(c)); }catch(e){} }
+function asnipeLoadPos(){ try{ const r=localStorage.getItem(ASN_POS_KEY); const l=r?JSON.parse(r):[]; return Array.isArray(l)?l:[]; }catch(e){ return []; } }
+function asnipeSavePos(l){ try{ localStorage.setItem(ASN_POS_KEY,JSON.stringify(l)); }catch(e){} }
+function asnipeArgs(){
+  const n=(v,def)=>{ const x=Number(v); return isFinite(x)&&x>0?x:def; };
+  return {maxBuySol:n(S.asnipe.mb,0.5),
+    filters:{minLiquidityUsd:n(S.asnipe.ml,10000),maxDevPct:n(S.asnipe.md,10),minScore:n(S.asnipe.ms,60)}};
+}
+function asnipeApplyCfg(c){
+  if(!c||typeof c!=="object") return;
+  if(c.maxBuySol!=null&&isFinite(Number(c.maxBuySol))) S.asnipe.mb=String(c.maxBuySol);
+  const f=c.filters||{};
+  if(f.minLiquidityUsd!=null&&isFinite(Number(f.minLiquidityUsd))) S.asnipe.ml=String(f.minLiquidityUsd);
+  if(f.maxDevPct!=null&&isFinite(Number(f.maxDevPct))) S.asnipe.md=String(f.maxDevPct);
+  if(f.minScore!=null&&isFinite(Number(f.minScore))) S.asnipe.ms=String(f.minScore);
+}
+function stopAsnipeTimer(){ if(S.asnipe.timer){ clearInterval(S.asnipe.timer); S.asnipe.timer=null; } }
+function startAsnipeTimer(){ stopAsnipeTimer(); S.asnipe.timer=setInterval(asnipeScan,ASN_SCAN_MS); asnipeScan(); }
+async function loadAsnipe(){
+  const a=S.asnipe;
+  if(!S.authCode){ render(); return; }
+  a.positions=asnipeLoadPos();
+  asnipeApplyCfg(asnipeLoadCfg());
+  S.dErr="";
+  try{
+    const r=await Bridge.callTool("orbitx_agent_snipe",{action:"status",authCode:S.authCode});
+    if(r&&typeof r==="object"){
+      if(r.config){ a.config=r.config; asnipeSaveCfg(r.config); asnipeApplyCfg(r.config); }
+      if(r.running===true||String(r.status||"").toLowerCase()==="running") a.running=true;
+    }
+  }catch(e){ /* status is best-effort; local state stands */ }
+  if(a.pendingStart){ a.pendingStart=false; await asnipeStart(); return; }
+  render();
+  if(a.running) startAsnipeTimer();
+}
+async function asnipeStart(){
+  const a=S.asnipe;
+  if(a.startBusy||a.running) return;
+  a.startBusy=true; S.dErr=""; render();
+  try{
+    const args=Object.assign({action:"start"},asnipeArgs(),{authCode:S.authCode});
+    const r=await Bridge.callTool("orbitx_agent_snipe",args);
+    if(r&&(r.ok===false||r.error)) throw new Error(r.error||r.message||"Sniper start failed.");
+    a.config=(r&&r.config)||args; asnipeSaveCfg(a.config); asnipeApplyCfg(a.config);
+    a.running=true;
+    startAsnipeTimer();
+  }catch(e){ if(!dashAuthErr(e)) S.dErr=mapErr(e); }
+  a.startBusy=false; render();
+}
+async function asnipeStop(){
+  const a=S.asnipe;
+  stopAsnipeTimer(); a.running=false;
+  try{ await Bridge.callTool("orbitx_agent_snipe",{action:"stop",authCode:S.authCode}); }catch(e){}
+  render();
+}
+async function asnipeScan(){
+  const a=S.asnipe;
+  if(!a.running||a.scanning||!S.authCode) return;
+  a.scanning=true;
+  try{
+    const args=Object.assign({action:"scan"},asnipeArgs(),{authCode:S.authCode});
+    const r=await Bridge.callTool("orbitx_agent_snipe",args);
+    if(r&&(r.ok===false||r.error)) throw new Error(r.error||r.message||"Scan failed.");
+    const L=(r&&(r.launches||r.data))||[];
+    a.launches=Array.isArray(L)?L:[];
+    a.lastScan=Date.now(); S.dErr="";
+  }catch(e){
+    if(dashAuthErr(e)){ a.running=false; stopAsnipeTimer(); }
+    else S.dErr=mapErr(e);
+  }
+  a.scanning=false; render();
+}
+/* one-shot preview scan without starting the loop */
+async function asnipeScanOnce(){
+  const a=S.asnipe;
+  if(a.running){ asnipeScan(); return; }
+  if(a.scanning) return;
+  const was=false; a.running=true;
+  try{ await asnipeScan(); }finally{ if(!was){ a.running=false; stopAsnipeTimer(); } }
+}
+async function asnipeBuy(i){
+  const a=S.asnipe; const L=a.launches[i]; if(!L) return;
+  const mint=String(L.mint||"").trim();
+  if(!MINT_RE.test(mint)){ S.dErr="Bad mint on this launch — skipped."; render(); return; }
+  a.buying=i; S.dErr=""; render();
+  try{
+    const amt=Number(L.maxBuySol)||Number(a.mb)||0.5;
+    const r=await Bridge.callTool("orbitx_app_buy",{mint:mint,amountSol:amt,authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.error||r.message||"Buy failed.");
+    const sig=r.signature||r.tx||"";
+    const pos={mint:mint,symbol:L.symbol||"",amountSol:amt,time:new Date().toISOString(),
+      txUrl:sig?("https://solscan.io/tx/"+sig):(r.txUrl||""),
+      priceUsd:L.priceUsd!=null?Number(L.priceUsd):null};
+    const list=asnipeLoadPos(); list.unshift(pos); asnipeSavePos(list); a.positions=list;
+  }catch(e){ if(!dashAuthErr(e)) S.dErr=mapErr(e); }
+  a.buying=-1; render();
+}
+async function asnipeRefreshPnl(){
+  const a=S.asnipe; if(a.pnlBusy) return; a.pnlBusy=true; render();
+  for(const p of a.positions){
+    if(!p||!p.mint||p.priceUsd==null) continue;
+    try{ const t=await lookupToken(p.mint); if(t&&t.price!=null) p.curUsd=Number(t.price); }catch(e){}
+  }
+  asnipeSavePos(a.positions);
+  a.pnlBusy=false; render();
+}
+function asnipeHandleWidgetAction(action){
+  if(action&&action.tab==="asnipe"&&action.startAgent){
+    asnipeApplyCfg(action.startAgent);
+    S.asnipe.pendingStart=true;
+    goTab("asnipe");
+  }
+}
+function asnipeCard(L,i){
+  const pass=!!L.pass;
+  const score=Number(L.safetyScore); const sc=isFinite(score)?Math.max(0,Math.min(100,score)):0;
+  const scColor=sc>=80?"var(--neon)":sc>=60?"var(--amber)":"var(--red)";
+  const chip=pass
+    ?'<span class="chip2" style="color:var(--neon);border-color:var(--neon)">PASS</span>'
+    :'<span class="chip2" style="color:var(--red);border-color:var(--red)">FAIL</span>';
+  const reasons=Array.isArray(L.reasons)&&L.reasons.length
+    ?'<p class="tiny mut" style="margin:6px 0 0">'+esc(L.reasons.join(" · "))+"</p>":"";
+  const url=L.url||("https://solscan.io/token/"+encodeURIComponent(L.mint||""));
+  const amt=Number(L.maxBuySol)||Number(S.asnipe.mb)||0.5;
+  return '<div class="card" style="margin-bottom:10px">'
+    +'<div class="row" style="align-items:center;margin-bottom:8px">'
+    +'<div style="flex:1"><b>'+esc(L.symbol||shortMint(L.mint||""))+'</b> '+chip
+    +'<span class="tiny mut" style="margin-left:8px">'+esc(shortMint(L.mint||""))+"</span></div>"
+    +'<a href="'+esc(url)+'" target="_blank" rel="noopener" class="tiny" style="color:var(--neon)">↗</a></div>'
+    +'<div class="qrow"><span class="k">Price</span><span class="v">'+fmtUSD(L.priceUsd)+"</span></div>"
+    +'<div class="qrow"><span class="k">Mcap</span><span class="v">'+fmtUSD(L.mcap)+"</span></div>"
+    +'<div class="qrow"><span class="k">Liquidity</span><span class="v">'+fmtUSD(L.liquidity)+"</span></div>"
+    +'<div class="qrow"><span class="k">Dev holding</span><span class="v">'+(L.devPct!=null?esc(String(L.devPct))+"%":"—")+"</span></div>"
+    +'<div class="qrow"><span class="k">Safety score</span><span class="v" style="color:'+scColor+'">'+(isFinite(score)?esc(String(score)):"—")+"</span></div>"
+    +'<div style="height:6px;background:var(--line);border-radius:3px;margin:8px 0;overflow:hidden">'
+    +'<div style="height:100%;width:'+sc+'%;background:'+scColor+';border-radius:3px"></div></div>'
+    +reasons
+    +(pass?'<div style="margin-top:10px"><button class="btn btn-neon" style="padding:10px;font-size:13px" '
+      +(S.asnipe.buying===i?"disabled":"")+' onclick="asnipeBuy('+i+')">'
+      +(S.asnipe.buying===i?"Sniping…":"🎯 Snipe now ("+esc(String(amt))+" SOL)")+"</button></div>":"")
+    +"</div>";
+}
+function asnipePosCard(p){
+  const entry=p.priceUsd!=null?Number(p.priceUsd):null;
+  const cur=p.curUsd!=null?Number(p.curUsd):null;
+  const pnl=(entry&&cur)?(cur-entry)/entry*100:null;
+  const pnlTxt=pnl==null?"—":(pnl>=0?"+":"")+pnl.toFixed(1)+"%";
+  const pnlColor=pnl==null?"var(--mut)":pnl>=0?"var(--neon)":"var(--red)";
+  return '<div class="card" style="margin-bottom:10px">'
+    +'<div class="row" style="align-items:center;margin-bottom:6px">'
+    +'<div style="flex:1"><b>'+esc(p.symbol||shortMint(p.mint||""))+'</b>'
+    +'<span class="tiny mut" style="margin-left:8px">'+esc(ago(p.time))+"</span></div>"
+    +(p.txUrl?'<a href="'+esc(p.txUrl)+'" target="_blank" rel="noopener" class="tiny" style="color:var(--neon)">tx ↗</a>':"")
+    +"</div>"
+    +'<div class="qrow"><span class="k">Size</span><span class="v">'+esc(String(p.amountSol))+" SOL</span></div>"
+    +'<div class="qrow"><span class="k">Entry</span><span class="v">'+(entry?fmtUSD(entry):"—")+"</span></div>"
+    +'<div class="qrow"><span class="k">Now</span><span class="v">'+(cur?fmtUSD(cur):"—")+"</span></div>"
+    +'<div class="qrow"><span class="k">PnL</span><span class="v" style="color:'+pnlColor+'">'+pnlTxt+"</span></div>"
+    +"</div>";
+}
+function scrAsnipe(el){
+  if(!S.authCode){ scrAuthGate(el,"asnipe",loadAsnipe); return; }
+  const a=S.asnipe;
+  const stPill=a.running
+    ?'<span class="pill" style="color:var(--neon);border-color:var(--neon)">🟢 RUNNING</span>'
+    :'<span class="pill" style="color:var(--red);border-color:var(--red)">🔴 STOPPED</span>';
+  el.innerHTML=header(false)+tabBar("asnipe")
+  +'<div class="card neon"><div class="row" style="align-items:center;margin-bottom:10px">'
+  +'<div style="flex:1"><h2 style="margin:0">🤖 Sniper Agent</h2>'
+  +'<p class="sub" style="margin:2px 0 0">Fresh-launch scanner · runs while this widget is open</p></div>'+stPill+"</div>"
+  +(a.running
+    ?'<button class="btn btn-danger" onclick="asnipeStop()">⏹ Stop sniper</button>'
+    :'<button class="btn btn-neon" '+(a.startBusy?"disabled":"")+' onclick="asnipeStart()">'+(a.startBusy?"Starting…":"▶ Start sniper")+"</button>")
+  +(a.lastScan?'<p class="tiny mut" style="margin:8px 0 0">Last scan: '+esc(ago(a.lastScan))+(a.scanning?" · scanning…":"")+"</p>":"")
+  +dErrHtml()+"</div>"
+  +'<div class="card"><h2>Filters</h2><p class="sub">Applied to every scan. Changing them takes effect on the next scan.</p>'
+  +'<div class="field"><span class="flabel">MAX BUY (SOL)</span>'
+  +'<input type="number" inputmode="decimal" min="0.01" max="100" step="0.05" value="'+esc(a.mb)+'" oninput="S.asnipe.mb=this.value"></div>'
+  +'<div class="field"><span class="flabel">MIN LIQUIDITY (USD)</span>'
+  +'<input type="number" inputmode="numeric" min="0" step="1000" value="'+esc(a.ml)+'" oninput="S.asnipe.ml=this.value"></div>'
+  +'<div class="field"><span class="flabel">MAX DEV HOLDING (%)</span>'
+  +'<input type="number" inputmode="decimal" min="0" max="100" step="1" value="'+esc(a.md)+'" oninput="S.asnipe.md=this.value"></div>'
+  +'<div class="field"><span class="flabel">MIN SAFETY SCORE (0–100)</span>'
+  +'<input type="number" inputmode="numeric" min="0" max="100" step="1" value="'+esc(a.ms)+'" oninput="S.asnipe.ms=this.value"></div>'
+  +'<button class="btn btn-ghost" style="padding:10px;font-size:13px" '+(a.scanning?"disabled":"")+' onclick="asnipeScanOnce()">↻ Preview scan</button></div>'
+  +'<div class="card"><div class="row" style="align-items:center;margin-bottom:10px">'
+  +'<div style="flex:1"><h2 style="margin:0">Live feed</h2>'
+  +'<p class="sub" style="margin:2px 0 0">'+a.launches.length+" launch"+(a.launches.length===1?"":"es")+" in latest scan</p></div></div>"
+  +(a.launches.length?a.launches.map(asnipeCard).join("")
+    :'<div class="empty"><div class="empty-ico">🤖</div><p><b>No launches scanned yet</b></p>'
+    +'<p class="sub">Run a preview scan or start the sniper — fresh launches appear here every 15s.</p></div>')
+  +"</div>"
+  +'<div class="card"><div class="row" style="align-items:center;margin-bottom:10px">'
+  +'<div style="flex:1"><h2 style="margin:0">Positions</h2>'
+  +'<p class="sub" style="margin:2px 0 0">'+a.positions.length+" snipe buys · saved on this device</p></div>"
+  +'<button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" '+(a.pnlBusy?"disabled":"")+' onclick="asnipeRefreshPnl()">'+(a.pnlBusy?"…":"↻ PnL")+"</button></div>"
+  +(a.positions.length?a.positions.map(asnipePosCard).join("")
+    :'<div class="empty"><div class="empty-ico">💼</div><p class="sub">No snipe buys yet — PASS launches get a one-tap buy button.</p></div>')
+  +"</div>";
+  goBack=function(){S.screen="search";render();};
+}
+
+/* ============================================================
+   ⚡ ALPHA FINDER — orbitx_agent_alpha
+   Ranks smart-money wallets by hot streak; one-tap copy-follow
+   via orbitx_app_copy_follow (defaults match the Copy tab).
+   ============================================================ */
+S.alpha={wallets:[],loading:false,minTrades:"5",timeframe:"7d",followBusy:-1,followed:{},scanCount:0};
+function hotFlames(hs){
+  const h=Number(hs)||0;
+  if(h>=80) return "🔥🔥🔥";
+  if(h>=50) return "🔥🔥";
+  if(h>=25) return "🔥";
+  return "—";
+}
+async function loadAlpha(){
+  if(!S.authCode){ render(); return; }
+  render();
+}
+async function alphaScan(){
+  const a=S.alpha;
+  a.loading=true; S.dErr=""; render();
+  try{
+    const mt=parseInt(a.minTrades,10);
+    const r=await Bridge.callTool("orbitx_agent_alpha",{action:"scan",
+      minTrades:(isFinite(mt)&&mt>0)?mt:5,timeframe:a.timeframe,authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.error||r.message||"Alpha scan failed.");
+    const W=(r&&(r.wallets||r.data))||[];
+    a.wallets=Array.isArray(W)?W:[];
+    a.scanCount++;
+  }catch(e){ dashAuthErr(e); }
+  a.loading=false; render();
+}
+async function alphaFollow(i){
+  const a=S.alpha; const w=a.wallets[i]; if(!w||!w.wallet) return;
+  const addr=String(w.wallet).trim();
+  if(!MINT_RE.test(addr)){ S.dErr="Bad wallet address on this card."; render(); return; }
+  a.followBusy=i; S.dErr=""; render();
+  try{
+    await Bridge.callTool("orbitx_app_copy_follow",{wallet:addr,mode:"fixed_usd",size:1,
+      maxPerTradeUsd:25,label:"alpha",authCode:S.authCode});
+    a.followed[addr]=true;
+  }catch(e){ if(!dashAuthErr(e)) S.dErr=mapErr(e); }
+  a.followBusy=-1; render();
+}
+function alphaCard(w,i){
+  const hs=Number(w.hotScore); const hsc=isFinite(hs)?Math.max(0,Math.min(100,hs)):0;
+  const hscColor=hsc>=80?"var(--neon)":hsc>=50?"var(--amber)":"var(--mut)";
+  const addr=String(w.wallet||"");
+  const followed=!!S.alpha.followed[addr];
+  const toks=Array.isArray(w.tokens)?w.tokens:[];
+  return '<div class="card" style="margin-bottom:10px">'
+    +'<div class="row" style="align-items:center;margin-bottom:8px">'
+    +'<div style="flex:1"><span class="tiny mut" style="margin-right:8px">#'+(i+1)+'</span>'
+    +'<b>'+esc(shortMint(addr))+'</b>'
+    +'<span style="margin-left:8px">'+hotFlames(hs)+"</span></div>"
+    +'<a href="'+esc(w.url||("https://solscan.io/account/"+encodeURIComponent(addr)))+'" target="_blank" rel="noopener" class="tiny" style="color:var(--neon)">solscan ↗</a></div>'
+    +'<div class="qrow"><span class="k">Hot score</span><span class="v" style="color:'+hscColor+'">'+(isFinite(hs)?esc(String(hs)):"—")+"</span></div>"
+    +'<div style="height:6px;background:var(--line);border-radius:3px;margin:8px 0;overflow:hidden">'
+    +'<div style="height:100%;width:'+hsc+'%;background:'+hscColor+';border-radius:3px"></div></div>'
+    +'<div class="qrow"><span class="k">Buys</span><span class="v">'+esc(String(w.buys!=null?w.buys:"—"))+"</span></div>"
+    +'<div class="qrow"><span class="k">Volume</span><span class="v">'+fmtUSD(w.volumeUsd)+"</span></div>"
+    +'<div class="qrow"><span class="k">Tokens traded</span><span class="v">'+(toks.length?toks.length:"—")+"</span></div>"
+    +(toks.length?'<p class="tiny mut" style="margin:6px 0 0">'+toks.slice(0,6).map(esc).join(" · ")+(toks.length>6?" …":"")+"</p>":"")
+    +'<div style="margin-top:10px">'
+    +(followed
+      ?'<span class="chip2" style="color:var(--neon);border-color:var(--neon)">✓ following</span>'
+      :'<button class="btn btn-ghost" style="padding:10px;font-size:13px" '+(S.alpha.followBusy===i?"disabled":"")+' onclick="alphaFollow('+i+')">'
+        +(S.alpha.followBusy===i?"Following…":"🪞 Follow wallet")+"</button>")
+    +"</div></div>";
+}
+function scrAlpha(el){
+  if(!S.authCode){ scrAuthGate(el,"alpha",loadAlpha); return; }
+  const a=S.alpha;
+  el.innerHTML=header(false)+tabBar("alpha")
+  +'<div class="card neon"><div class="row" style="align-items:center;margin-bottom:10px">'
+  +'<div style="flex:1"><h2 style="margin:0">⚡ Alpha Finder</h2>'
+  +'<p class="sub" style="margin:2px 0 0">Smart-money wallets ranked by hot streak · one-tap copy-follow</p></div></div>'
+  +'<div class="field"><span class="flabel">MIN TRADES</span>'
+  +'<input type="number" inputmode="numeric" min="1" max="500" value="'+esc(a.minTrades)+'" oninput="S.alpha.minTrades=this.value"></div>'
+  +'<div class="field"><span class="flabel">TIMEFRAME</span><div class="seg">'
+  +["24h","7d","30d"].map(f=>'<button class="'+(a.timeframe===f?"on":"")+'" onclick="S.alpha.timeframe=\''+f+'\';render()">'+f+"</button>").join("")
+  +'</div></div>'
+  +'<button class="btn btn-neon" '+(a.loading?"disabled":"")+' onclick="alphaScan()">'+(a.loading?"Scanning…":"⚡ Scan for alpha")+"</button>"
+  +dErrHtml()+"</div>"
+  +'<div class="card"><div class="row" style="align-items:center;margin-bottom:10px">'
+  +'<div style="flex:1"><h2 style="margin:0">Ranked wallets</h2>'
+  +'<p class="sub" style="margin:2px 0 0">'+(a.scanCount?a.wallets.length+" wallets · latest scan":"No scan yet")+"</p></div>"
+  +(a.loading?"":'<button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" onclick="alphaScan()">↻</button>')+"</div>"
+  +(a.loading?skelList(3)
+    :(a.wallets.length?a.wallets.map(alphaCard).join("")
+      :'<div class="empty"><div class="empty-ico">⚡</div><p><b>No wallets yet</b></p>'
+      +'<p class="sub">Run a scan to find wallets on a hot streak right now.</p></div>'))
+  +"</div>";
+  goBack=function(){S.screen="search";render();};
+}
+
 /* ---- dashboard screen registry (merged into render()) ---- */
 const DASH_SCREENS={ord:scrOrd,ordPreview:scrOrdPreview,ordDone:scrOrdDone,
   dca:scrDca,
   cpy:scrCpy,cpyPreview:scrCpyPreview,
   snp:scrSnp,snpCfg:scrSnpCfg,snpPreview:scrSnpPreview,snpKill:scrSnpKill,
-  ppr:scrPpr,pprPreview:scrPprPreview,pprReset:scrPprReset};
+  ppr:scrPpr,pprPreview:scrPprPreview,pprReset:scrPprReset,
+  asnipe:scrAsnipe,alpha:scrAlpha};
 </script>
 
 <script>
