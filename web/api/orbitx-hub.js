@@ -6367,6 +6367,14 @@ async function handleMcp(req, res, parts) {
           source: auth?.source || "mcp",
         });
         const wrapped = wrapMcpToolContent(result);
+        // ChatGPT Mini App: attach widget _meta to the RESULT (not just the
+        // tool definition) so ChatGPT renders the UI widget instead of raw JSON.
+        try {
+          const widgetMeta = toolListingMeta({ name });
+          if (widgetMeta && typeof wrapped === "object" && wrapped) {
+            wrapped._meta = { ...(wrapped._meta && typeof wrapped._meta === "object" ? wrapped._meta : {}), ...widgetMeta };
+          }
+        } catch {}
         return json(res, {
           jsonrpc: "2.0",
           id,
