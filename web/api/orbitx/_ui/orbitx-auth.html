@@ -171,6 +171,67 @@ p.sub{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px}
 .foot b{color:var(--muted)}
 .mode-note{margin-top:10px;text-align:center;font-size:11px;color:var(--faint)}
 .mode-note code{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:10.5px}
+/* ---------- agentplus (#24) ---------- */
+.tabs{display:flex;gap:8px;overflow-x:auto;margin:2px -4px 16px;padding:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:44px}
+.tab.on{background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.45);color:var(--neon)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.1em;padding:5px 11px;border-radius:999px;text-transform:uppercase;border:1px solid transparent;white-space:nowrap}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;flex:none}
+.chip .dot.pulse{animation:pulse 1.8s ease infinite}
+.chip.ok{color:var(--neon);background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.35)}
+.chip.teal{color:var(--teal);background:rgba(45,212,191,.1);border-color:rgba(45,212,191,.35)}
+.chip.pause{color:var(--gold);background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.35)}
+.chip.bad{color:var(--danger);background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.35)}
+.chip.mut{color:var(--muted);background:rgba(255,255,255,.05);border-color:var(--line)}
+.acard{background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:16px;padding:15px 16px;margin-bottom:10px;cursor:pointer;transition:transform .12s ease,border-color .2s}
+.acard:active{transform:scale(.985)}
+.acard:hover{border-color:rgba(52,211,153,.3)}
+.acard .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.acard .nm{font-size:16px;font-weight:700}
+.acard .role{font-size:12px;color:var(--muted);margin-bottom:8px}
+.acard .meta{font-size:12px;color:var(--faint);line-height:1.7}
+.acard .meta b{color:var(--muted);font-weight:600}
+.acard .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.frow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.stat{background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:13px;padding:10px 6px;text-align:center}
+.stat .n{font-size:16px;font-weight:700;color:var(--neon);font-family:'JetBrains Mono',monospace}
+.stat .l{font-size:9.5px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+.field input[type=text],.field input[type=number],.field input[type=time],.field textarea,.field select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:13px;padding:14px;font-family:inherit;font-size:14px;color:var(--txt);outline:none;transition:border-color .2s,box-shadow .2s}
+.field textarea{min-height:96px;resize:vertical;line-height:1.55;font-family:'JetBrains Mono',monospace;font-size:13px}
+.field select{appearance:none;-webkit-appearance:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(52,211,153,.15)}
+.seg{display:flex;border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:6px}
+.seg button{flex:1;padding:13px 6px;background:transparent;border:none;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;min-height:48px}
+.seg button.on{background:rgba(52,211,153,.14);color:var(--neon)}
+.logbox{background:#04060b;border:1px solid var(--line);border-radius:14px;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;max-height:340px;overflow-y:auto}
+.logrow{padding:9px 2px;border-bottom:1px dashed rgba(255,255,255,.07);line-height:1.55}
+.logrow:last-child{border-bottom:none}
+.logrow .lk{color:var(--teal);font-weight:500}
+.logrow .lt{color:var(--faint);font-size:10.5px;display:block;margin-top:2px}
+.logrow .lb{color:#c9cede;word-break:break-word}
+.trow{background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
+.trow summary{list-style:none;cursor:pointer;padding:14px 15px;display:flex;align-items:center;gap:10px}
+.trow summary::-webkit-details-marker{display:none}
+.trow summary .tt{flex:1;min-width:0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .tbody{padding:12px 15px 15px;border-top:1px solid var(--line)}
+.steprow{display:flex;gap:10px;align-items:flex-start;padding:7px 0;font-size:13px;color:var(--muted);line-height:1.5}
+.steprow .st{flex:none;width:20px;text-align:center}
+.steprow.done{color:var(--faint);text-decoration:line-through}
+.fitem{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.fitem:active{transform:scale(.98)}
+.fitem .fp{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fitem .fm{font-size:10.5px;color:var(--faint);font-family:'JetBrains Mono',monospace;flex:none}
+pre.code{background:#04060b;border:1px solid var(--line);border-radius:14px;padding:14px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;color:#c9cede;white-space:pre-wrap;word-break:break-word;max-height:380px;overflow-y:auto;margin-top:10px}
+.btn-danger{background:linear-gradient(135deg,#f87171,#ef4444);color:#2a0a0a;box-shadow:0 8px 28px rgba(248,113,113,.35),inset 0 1px 0 rgba(255,255,255,.3)}
+.overlay{position:fixed;inset:0;z-index:60;background:rgba(3,5,10,.72);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(20px + var(--sab));backdrop-filter:blur(6px);animation:viewIn .25s ease both}
+.sheet{width:100%;max-width:420px;background:linear-gradient(165deg,#141a28,#0a0d16);border:1px solid rgba(248,113,113,.35);border-radius:22px;padding:24px 20px 20px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.empty{text-align:center;padding:28px 12px;color:var(--faint);font-size:13.5px;line-height:1.7}
+.empty .big{font-size:34px;display:block;margin-bottom:10px}
+.mini{font-size:11.5px;color:var(--faint)}
+.hrow{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.hrow .avatar{width:52px;height:52px;border-radius:16px}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
 }
@@ -530,6 +591,7 @@ function signedInView(){
     <div class="kv"><span class="k">Wallet</span><span class="v"><span class="mono-trunc">${esc(trunc(id.wallet))}</span><button class="copybtn" data-copy="${esc(id.wallet)}">Copy</button></span></div>
     <div class="kv"><span class="k">Tier</span><span class="v"><span class="tier">${esc(id.tier)}</span></span></div>
     <button class="btn btn-primary" id="btnTest" ${S.busy?'disabled':''}>${S.busy?'<span class="spin"></span> Checking…':'↻ Verify connection'}</button>
+    <button class="btn btn-ghost" id="btnAgents">🤖 My Agents</button>
     <button class="btn btn-danger-ghost" id="btnDisconnect">Disconnect wallet</button>
     <p class="hint" style="text-align:center">Disconnecting clears this device's saved session only. Your wallet itself is untouched.</p>
   </div>`;
@@ -554,6 +616,10 @@ function render(){
   else if(S.view==='link') html=linkView();
   else if(S.view==='signed-in') html=signedInView();
   else if(S.view==='auth-error') html=authErrorView();
+  else if(S.view==='agents') html=apListView();
+  else if(S.view==='agents-spawn') html=apSpawnView();
+  else if(S.view==='agent-detail') html=apDetailView();
+  else if(S.view==='agent-tasks') html=apTasksView();
   app.innerHTML=html;
   wire();
 }
@@ -581,6 +647,7 @@ function wire(){
   if(anchor) anchor.addEventListener('click',e=>{ if(window.OrbitX&&window.OrbitX.openUrl){ e.preventDefault(); openUrl(S.authUrl); } });
   const inp=document.getElementById('codeInput');
   if(inp){ inp.addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('btnActivate').click(); }); }
+  wireAP();
 }
 
 /* ---------------- flow ---------------- */
@@ -686,6 +753,652 @@ async function boot(){
   S.view='signed-out'; render();
 }
 
+/* =====================================================================
+   #24 AgentPlus dashboard
+   Real data via orbitx_agentplus_* MCP tools (no mocks). All calls go
+   through apCall(), which attaches the session authCode and routes auth
+   failures to failAuth() per CONTRACT.md. The authCode is never rendered
+   into the DOM.
+   Lifecycle mapping (server has no native pause):
+   - Pause   = soft pause: clears the agent's wake-up schedules, stashing
+               their definitions in agent memory (ui.paused_schedules) so
+               Resume can restore them. The mind still wakes on new tasks
+               or messages while paused — the UI says so.
+   - Resume  = restores the stashed schedules.
+   - Terminate = orbitx_agentplus_archive (server kill switch).
+   ===================================================================== */
+const AP={
+  agents:[], detail:null, detailTab:'tasks', detailTasks:[],
+  tasks:[], taskFilter:'all',
+  memKeys:[], memVal:null,
+  logs:[], logCursor:0,
+  fileTaskId:'', files:[], quota:null, fileSel:null, fileContent:null, fileVersions:[], fileVer:null,
+  logTaskId:'', scheds:[],
+  loading:false, loadLabel:'', error:'',
+  confirm:null,
+};
+async function apCall(name,args){
+  const a=Object.assign({},args||{});
+  if(S.authCode) a.authCode=S.authCode;
+  try{ return await withTimeout(hostCallTool(name,a)); }
+  catch(e){
+    if(looksLikeAuthError(e)&&S.authCode) failAuth(e.message);
+    throw e;
+  }
+}
+function apOk(res){
+  if(res&&res.ok===false){
+    const msg=String(res.message||res.error||'Request failed');
+    if(S.authCode&&looksLikeAuthError(msg+' '+String(res.error||''))) failAuth(msg);
+    throw new Error(msg);
+  }
+  return res||{};
+}
+const apShort=(s,n)=>{ s=String(s==null?'':s); n=n||80; return s.length>n?s.slice(0,n)+'…':s; };
+function apTime(iso){ if(!iso) return '—'; const d=new Date(iso); return isNaN(d.getTime())?'—':d.toLocaleString(); }
+function apErrHTML(){ return AP.error?`<div class="errbox">${esc(AP.error)}</div>`:''; }
+function apSkCards(n){ let h=''; for(let i=0;i<(n||3);i++) h+=`<div class="sk" style="height:84px;border-radius:16px;margin-bottom:10px"></div>`; return h; }
+function apLoadingView(){
+  return `<div class="view"><div class="eyebrow">AGENTPLUS</div>
+    <div class="sk" style="height:28px;width:60%;margin-bottom:12px"></div>
+    <p class="sub">${esc(AP.loadLabel||'Loading…')}</p>${apSkCards(3)}</div>`;
+}
+function apStatusChip(a){
+  if(a._paused) return `<span class="chip pause"><span class="dot"></span>paused</span>`;
+  if(a.status==='active') return `<span class="chip ok"><span class="dot pulse"></span>active</span>`;
+  return `<span class="chip mut"><span class="dot"></span>${esc(a.status||'—')}</span>`;
+}
+function apMindChip(mind){
+  return mind==='live'?`<span class="chip ok">live mind</span>`:`<span class="chip mut">${esc(mind||'driver')}</span>`;
+}
+function apTaskChip(st){
+  const m={open:'ok',in_progress:'teal',blocked:'pause',done:'mut',cancelled:'bad'};
+  const lbl={open:'open',in_progress:'running',blocked:'blocked',done:'done',cancelled:'cancelled'};
+  return `<span class="chip ${m[st]||'mut'}">${esc(lbl[st]||st||'—')}</span>`;
+}
+
+/* ---------------- navigation / loaders ---------------- */
+function apGoList(){ S.view='agents'; apLoadList(); }
+function apBack(){ S.view='signed-in'; render(); }
+async function apPausedFlag(name){
+  try{
+    const r=await apCall('orbitx_agentplus_recall',{name,key:'ui.paused_schedules'});
+    return !!(r&&r.ok&&r.memory&&r.memory.value);
+  }catch(e){ return false; }
+}
+async function apLoadList(){
+  S.view='agents'; AP.loading=true; AP.loadLabel='Loading your agents…'; AP.error=''; AP.confirm=null; render();
+  try{
+    const res=apOk(await apCall('orbitx_agentplus_list',{}));
+    const agents=res.agents||[];
+    AP.agents=await Promise.all(agents.map(async a=>{
+      let detail=null;
+      try{ detail=apOk(await apCall('orbitx_agentplus_get',{name:a.name})); }catch(e){}
+      const paused=await apPausedFlag(a.name);
+      return Object.assign({},a,{_detail:detail,_paused:paused});
+    }));
+  }catch(e){ if(S.view==='agents'){ AP.error=e.message||'Could not load agents.'; } }
+  AP.loading=false; render();
+}
+async function apOpenDetail(name){
+  AP.detail=null; AP.detailTab='tasks'; AP.detailTasks=[];
+  AP.memKeys=[]; AP.memVal=null; AP.logs=[]; AP.logCursor=0;
+  AP.files=[]; AP.quota=null; AP.fileSel=null; AP.fileContent=null; AP.fileVersions=[]; AP.fileVer=null;
+  AP.fileTaskId=''; AP.logTaskId=''; AP.scheds=[]; AP.error=''; AP.confirm=null;
+  S.view='agent-detail'; AP.loading=true; AP.loadLabel='Loading agent…'; render();
+  try{
+    const det=apOk(await apCall('orbitx_agentplus_get',{name}));
+    det._paused=await apPausedFlag(name);
+    AP.detail=det;
+    await apLoadDetailTabData();
+  }catch(e){ if(S.view==='agent-detail') AP.error=e.message||'Could not load agent.'; }
+  AP.loading=false; render();
+}
+async function apLoadDetailTab(){
+  if(!AP.detail) return;
+  AP.loading=true; AP.error=''; render();
+  try{ await apLoadDetailTabData(); }
+  catch(e){ AP.error=e.message||'Load failed.'; }
+  AP.loading=false; render();
+}
+async function apLoadDetailTabData(){
+  const name=AP.detail.agent.name;
+  if(AP.detailTab==='tasks'){
+    const r=apOk(await apCall('orbitx_agentplus_tasks',{name}));
+    AP.detailTasks=r.tasks||[];
+  }else if(AP.detailTab==='files'){
+    const t=apOk(await apCall('orbitx_agentplus_tasks',{name}));
+    AP.detailTasks=t.tasks||[];
+    if(!AP.fileTaskId&&AP.detailTasks.length) AP.fileTaskId=AP.detailTasks[0].id;
+    AP.files=[]; AP.quota=null;
+    if(AP.fileTaskId){
+      const f=apOk(await apCall('orbitx_agentplus_files',{task_id:AP.fileTaskId}));
+      AP.files=f.files||[]; AP.quota=f.quota||null;
+    }
+  }else if(AP.detailTab==='memory'){
+    const r=apOk(await apCall('orbitx_agentplus_recall',{name}));
+    AP.memKeys=(r.memory&&r.memory.key)?[r.memory]:(r.memory||[]);
+  }else if(AP.detailTab==='logs'){
+    // page forward to the tail (up to 300 events), keep newest 100
+    let all=[], since=0, pages=0;
+    for(;;){
+      const args={name,limit:100,since}; if(AP.logTaskId) args.task_id=AP.logTaskId;
+      const r=apOk(await apCall('orbitx_agentplus_log',args));
+      const evs=r.events||[]; all=all.concat(evs); pages++;
+      if(evs.length<100||pages>=3) break;
+      since=r.nextCursor||0;
+    }
+    AP.logs=all.slice(-100); AP.logCursor=all.length?all[all.length-1].id:0;
+  }else if(AP.detailTab==='schedules'){
+    const r=apOk(await apCall('orbitx_agentplus_schedules',{name}));
+    AP.scheds=r.schedules||[];
+  }
+}
+async function apLoadTasks(){
+  S.view='agent-tasks'; AP.loading=true; AP.loadLabel='Loading task queue…'; AP.error=''; render();
+  try{
+    if(!AP.agents.length){
+      const l=apOk(await apCall('orbitx_agentplus_list',{}));
+      AP.agents=(l.agents||[]).map(a=>Object.assign({},a,{_paused:false}));
+    }
+    const per=await Promise.all(AP.agents.map(a=>
+      apCall('orbitx_agentplus_tasks',{name:a.name})
+        .then(r=>({agent:a.name,tasks:(r&&r.ok!==false&&r.tasks)||[]}))
+        .catch(()=>({agent:a.name,tasks:[]}))));
+    AP.tasks=[];
+    per.forEach(p=>p.tasks.forEach(t=>AP.tasks.push(Object.assign({_agent:p.agent},t))));
+    AP.tasks.sort((x,y)=>String(y.created_at||'').localeCompare(String(x.created_at||'')));
+  }catch(e){ if(S.view==='agent-tasks') AP.error=e.message||'Could not load tasks.'; }
+  AP.loading=false; render();
+}
+
+/* ---------------- actions ---------------- */
+async function apSubmitSpawn(){
+  const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const name=g('apName').toLowerCase();
+  AP.error='';
+  if(!/^[a-z0-9-]{2,32}$/.test(name)){ AP.error='Name must be 2–32 chars: lowercase letters, digits, hyphens.'; render(); return; }
+  AP.loading=true; AP.loadLabel='Spawning agent…'; render();
+  try{
+    const body={name};
+    const role=g('apRole'); if(role) body.role=role;
+    const persona=g('apPersona'); if(persona) body.persona=persona;
+    const caps=g('apCaps').split(',').map(s=>s.trim()).filter(Boolean);
+    if(caps.length) body.capabilities=caps;
+    const res=apOk(await apCall('orbitx_agentplus_spawn',body));
+    const segBtn=document.querySelector('#apSchedSeg button.on');
+    const sm=segBtn?segBtn.getAttribute('data-val'):'none';
+    const tz=g('apTz')||'America/New_York';
+    if(sm==='every'){
+      const m=parseInt(g('apEvery'),10);
+      if(!(m>=15)) throw new Error('Schedule: every_minutes must be an integer ≥ 15.');
+      apOk(await apCall('orbitx_agentplus_schedule',{name,every_minutes:m,timezone:tz}));
+    }else if(sm==='daily'){
+      const t=g('apAt');
+      if(!/^\d{2}:\d{2}$/.test(t)) throw new Error('Schedule: daily time must be HH:MM (24h).');
+      apOk(await apCall('orbitx_agentplus_schedule',{name,at_time:t,timezone:tz}));
+    }
+    const tt=g('apTaskTitle');
+    if(tt){
+      const kind=(document.getElementById('apTaskKind')||{}).value||'general';
+      const ti=g('apTaskInstr');
+      apOk(await apCall('orbitx_agentplus_task',{name,title:tt,kind,instructions:ti||undefined}));
+    }
+    toast(res.reactivated?'Agent reactivated ✓':'Agent spawned ✓');
+    await apOpenDetail(name);
+  }catch(e){ AP.loading=false; AP.error=e.message||'Spawn failed.'; render(); }
+}
+async function apPauseAgent(name){
+  AP.loading=true; AP.loadLabel='Pausing schedules…'; AP.error=''; render();
+  try{
+    const s=apOk(await apCall('orbitx_agentplus_schedules',{name}));
+    const defs=(s.schedules||[]).map(x=>({every_minutes:x.every_minutes!=null?x.every_minutes:null,at_time:x.at_time||null,timezone:x.timezone||'America/New_York'}));
+    apOk(await apCall('orbitx_agentplus_remember',{name,key:'ui.paused_schedules',value:JSON.stringify({paused_at:new Date().toISOString(),schedules:defs})}));
+    for(const x of (s.schedules||[])){ try{ await apCall('orbitx_agentplus_unschedule',{id:x.id}); }catch(e){} }
+    toast(defs.length?('Paused — '+defs.length+' schedule'+(defs.length>1?'s':'')+' cleared'):'Paused ✓');
+    await apOpenDetail(name);
+  }catch(e){ AP.loading=false; AP.error=e.message||'Pause failed.'; render(); }
+}
+async function apResumeAgent(name){
+  AP.loading=true; AP.loadLabel='Restoring schedules…'; AP.error=''; render();
+  try{
+    let defs=[];
+    try{
+      const r=await apCall('orbitx_agentplus_recall',{name,key:'ui.paused_schedules'});
+      defs=(JSON.parse((r&&r.memory&&r.memory.value)||'{}').schedules)||[];
+    }catch(e){}
+    let n=0;
+    for(const d of defs){
+      const args={name,timezone:d.timezone||'America/New_York'};
+      if(d.every_minutes) args.every_minutes=d.every_minutes;
+      else if(d.at_time) args.at_time=d.at_time;
+      else continue;
+      try{ apOk(await apCall('orbitx_agentplus_schedule',args)); n++; }catch(e){}
+    }
+    try{ await apCall('orbitx_agentplus_remember',{name,key:'ui.paused_schedules',value:''}); }catch(e){}
+    toast(n?('Resumed — '+n+' schedule'+(n>1?'s':'')+' restored'):'Resumed ✓');
+    await apOpenDetail(name);
+  }catch(e){ AP.loading=false; AP.error=e.message||'Resume failed.'; render(); }
+}
+async function apDoTerminate(){
+  const name=AP.confirm&&AP.confirm.name; if(!name) return;
+  AP.confirm=null; AP.loading=true; AP.loadLabel='Archiving agent…'; AP.error=''; render();
+  try{
+    apOk(await apCall('orbitx_agentplus_archive',{name}));
+    toast('Agent archived ✓');
+    apGoList();
+  }catch(e){ AP.loading=false; AP.error=e.message||'Archive failed.'; render(); }
+}
+async function apAssignTask(){
+  const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const title=g('apNewTaskTitle');
+  if(!title){ AP.error='Task title is required.'; render(); return; }
+  const kind=(document.getElementById('apNewTaskKind')||{}).value||'general';
+  const instr=g('apNewTaskInstr');
+  AP.loading=true; AP.loadLabel='Assigning task…'; AP.error=''; render();
+  try{
+    apOk(await apCall('orbitx_agentplus_task',{name:AP.detail.agent.name,title,kind,instructions:instr||undefined}));
+    toast('Task assigned ✓');
+    await apLoadDetailTabData();
+  }catch(e){ AP.error=e.message||'Assign failed.'; }
+  AP.loading=false; render();
+}
+async function apUpdateTask(taskId,status){
+  AP.loading=true; AP.loadLabel='Updating task…'; AP.error=''; render();
+  try{
+    apOk(await apCall('orbitx_agentplus_task_update',{task_id:taskId,status}));
+    toast(status==='done'?'Task done ✓':'Task cancelled');
+    await apLoadDetailTabData();
+  }catch(e){ AP.error=e.message||'Update failed.'; }
+  AP.loading=false; render();
+}
+async function apLoadFiles(){
+  AP.loading=true; AP.error=''; render();
+  try{
+    const f=apOk(await apCall('orbitx_agentplus_files',{task_id:AP.fileTaskId}));
+    AP.files=f.files||[]; AP.quota=f.quota||null;
+  }catch(e){ AP.error=e.message||'Could not list files.'; }
+  AP.loading=false; render();
+}
+async function apViewFile(path){
+  AP.fileSel=path; AP.fileVer=null; AP.fileContent=null; AP.fileVersions=[];
+  AP.loading=true; AP.loadLabel='Reading file…'; AP.error=''; render();
+  try{
+    const r=apOk(await apCall('orbitx_agentplus_file',{task_id:AP.fileTaskId,path}));
+    AP.fileContent=r.file||r; AP.fileVersions=r.versions||[];
+  }catch(e){ AP.error=e.message||'Could not read file.'; }
+  AP.loading=false; render();
+}
+async function apReloadFile(){
+  if(!AP.fileSel) return;
+  AP.loading=true; AP.error=''; render();
+  try{
+    const args={task_id:AP.fileTaskId,path:AP.fileSel};
+    if(AP.fileVer) args.version=AP.fileVer;
+    const r=apOk(await apCall('orbitx_agentplus_file',args));
+    AP.fileContent=r.file||r;
+  }catch(e){ AP.error=e.message||'Could not read file.'; }
+  AP.loading=false; render();
+}
+async function apViewMemory(key){
+  AP.loading=true; AP.loadLabel='Recalling…'; AP.error=''; render();
+  try{
+    const r=apOk(await apCall('orbitx_agentplus_recall',{name:AP.detail.agent.name,key}));
+    AP.memVal=r.memory||null;
+  }catch(e){ AP.error=e.message||'Recall failed.'; }
+  AP.loading=false; render();
+}
+async function apRemember(){
+  const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const k=g('apMemKey');
+  const vEl=document.getElementById('apMemVal'); const v=vEl?vEl.value:'';
+  if(!k){ AP.error='Memory key is required.'; render(); return; }
+  AP.loading=true; AP.loadLabel='Remembering…'; AP.error=''; render();
+  try{
+    apOk(await apCall('orbitx_agentplus_remember',{name:AP.detail.agent.name,key:k,value:v}));
+    toast('Remembered ✓');
+    await apLoadDetailTabData();
+  }catch(e){ AP.error=e.message||'Remember failed.'; }
+  AP.loading=false; render();
+}
+async function apAddSchedule(){
+  const g=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+  const segBtn=document.querySelector('#apNewSchedSeg button.on');
+  const mode=segBtn?segBtn.getAttribute('data-val'):'every';
+  const tz=g('apNewTz')||'America/New_York';
+  const args={name:AP.detail.agent.name,timezone:tz};
+  if(mode==='every'){
+    const m=parseInt(g('apNewEvery'),10);
+    if(!(m>=15)){ AP.error='every_minutes must be an integer ≥ 15.'; render(); return; }
+    args.every_minutes=m;
+  }else{
+    const t=g('apNewAt');
+    if(!/^\d{2}:\d{2}$/.test(t)){ AP.error='Daily time must be HH:MM (24h).'; render(); return; }
+    args.at_time=t;
+  }
+  AP.loading=true; AP.loadLabel='Adding schedule…'; AP.error=''; render();
+  try{
+    apOk(await apCall('orbitx_agentplus_schedule',args));
+    toast('Schedule added ✓');
+    await apLoadDetailTabData();
+  }catch(e){ AP.error=e.message||'Add failed.'; }
+  AP.loading=false; render();
+}
+async function apUnschedule(id){
+  AP.loading=true; AP.loadLabel='Removing schedule…'; AP.error=''; render();
+  try{
+    apOk(await apCall('orbitx_agentplus_unschedule',{id}));
+    toast('Schedule removed ✓');
+    await apLoadDetailTabData();
+  }catch(e){ AP.error=e.message||'Remove failed.'; }
+  AP.loading=false; render();
+}
+
+/* ---------------- views ---------------- */
+function apListView(){
+  if(AP.loading) return apLoadingView();
+  let body;
+  if(!AP.agents.length){
+    body=`<div class="empty"><span class="big">🤖</span>No agents yet.<br>Spawn your first persistent agent to get started.</div>`;
+  }else{
+    body=AP.agents.map(a=>{
+      const cur=(a._detail&&a._detail.open_tasks&&a._detail.open_tasks[0])||null;
+      const unread=a.unread?` <span class="chip teal">${a.unread} new</span>`:'';
+      return `<div class="acard" data-ap-agent="${esc(a.name)}" role="button" tabindex="0" aria-label="Open agent ${esc(a.name)}">
+        <div class="top"><div class="nm">${esc(a.name)}</div><div class="chips">${apStatusChip(a)}${unread}</div></div>
+        ${a.role?`<div class="role">${esc(a.role)}</div>`:''}
+        <div class="meta"><b>Task:</b> ${cur?esc(apShort(cur.title,60)):'<span class="mini">idle — no open tasks</span>'}<br>
+        <b>Mind:</b> ${esc(a.mind||'—')} · <b>Thinks:</b> ${a.thinks_today!=null?a.thinks_today:'—'}/${a.think_budget_per_day!=null?a.think_budget_per_day:'—'}<br>
+        <b>Created:</b> ${esc(apTime(a.created_at))}</div>
+      </div>`;
+    }).join('');
+  }
+  return `<div class="view">
+    <div class="eyebrow">AGENTPLUS · FLEET</div>
+    <h2 class="title">Your AI <span class="glow">agents</span></h2>
+    <p class="sub">Persistent agents with files, memory, schedules and tasks — spawned and driven by the AgentPlus engine.</p>
+    ${apErrHTML()}
+    <div class="btn-row" style="margin:0 0 16px">
+      <button class="btn btn-primary" id="btnApSpawn" style="margin-top:0">＋ Spawn agent</button>
+      <button class="btn btn-ghost" id="btnApTaskQueue" style="margin-top:0">☰ Task queue</button>
+    </div>
+    ${body}
+    <button class="backlink" id="btnAgentsBack">← Back to account</button>
+  </div>`;
+}
+function apSpawnView(){
+  if(AP.loading) return apLoadingView();
+  const inp='autocomplete="off" autocapitalize="off" spellcheck="false"';
+  return `<div class="view">
+    <div class="eyebrow">AGENTPLUS · SPAWN</div>
+    <h2 class="title">Spawn a new <span class="glow">agent</span></h2>
+    <p class="sub">A persistent autonomous agent. It wakes when you assign a task, send it a message, or on its schedule.</p>
+    ${apErrHTML()}
+    <div class="field"><label for="apName">Name *</label>
+      <input id="apName" type="text" ${inp} placeholder="e.g. market-scout" maxlength="32">
+      <p class="hint">2–32 chars: lowercase letters, digits, hyphens.</p></div>
+    <div class="field"><label for="apRole">Role</label>
+      <input id="apRole" type="text" ${inp} placeholder="e.g. Market researcher"></div>
+    <div class="field"><label for="apPersona">Persona / instructions</label>
+      <textarea id="apPersona" ${inp} placeholder="How this agent thinks and behaves…"></textarea></div>
+    <div class="field"><label for="apCaps">Capabilities <span class="mini">(comma separated)</span></label>
+      <input id="apCaps" type="text" ${inp} placeholder="e.g. web-research, paper-trading"></div>
+    <div class="field"><label>Wake-up schedule <span class="mini">(optional)</span></label>
+      <div class="seg" id="apSchedSeg">
+        <button type="button" data-val="none" class="on">None</button>
+        <button type="button" data-val="every">Every N min</button>
+        <button type="button" data-val="daily">Daily</button>
+      </div>
+      <div id="apSchedEvery" style="display:none"><input id="apEvery" type="number" min="15" value="60" ${inp}><p class="hint">Minimum 15 minutes · max 5 schedules per agent.</p></div>
+      <div id="apSchedDaily" style="display:none"><input id="apAt" type="time" value="09:00"></div>
+      <div style="margin-top:8px"><input id="apTz" type="text" value="America/New_York" ${inp} aria-label="Timezone"><p class="hint">IANA timezone for daily schedules.</p></div>
+    </div>
+    <div class="field"><label>First task <span class="mini">(optional)</span></label>
+      <input id="apTaskTitle" type="text" ${inp} placeholder="Task title">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <select id="apTaskKind" style="flex:none;width:132px" aria-label="Task kind"><option value="general">general</option><option value="research">research</option><option value="website">website</option></select>
+        <input id="apTaskInstr" type="text" ${inp} placeholder="Instructions (optional)">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnApSpawnSubmit">Spawn agent →</button>
+    <button class="backlink" id="btnApDetailBack">← Agents</button>
+  </div>`;
+}
+function apConfirmSheet(){
+  const name=AP.confirm.name;
+  return `<div class="overlay" id="apOverlay"><div class="sheet" role="alertdialog" aria-label="Confirm terminate">
+    <div class="eyebrow" style="color:var(--danger)">CONFIRM TERMINATE</div>
+    <h2 class="title" style="font-size:22px">Archive <span style="color:var(--danger)">${esc(name)}</span>?</h2>
+    <p class="sub">This stops the agent's mind loop immediately. Its files, memory and task history are kept — and the name can be re-spawned later.</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="apConfirmCancel" style="margin-top:0">Cancel</button>
+      <button class="btn btn-danger" id="apConfirmGo" style="margin-top:0">Terminate</button>
+    </div>
+  </div></div>`;
+}
+function apDetailView(){
+  const d=AP.detail;
+  if(AP.loading&&!d) return apLoadingView();
+  if(!d) return `<div class="view"><div class="eyebrow">AGENTPLUS</div>${apErrHTML()}<button class="backlink" id="btnApDetailBack">← Agents</button></div>`;
+  const a=d.agent;
+  const tabs=[['tasks','Tasks'],['files','Files'],['memory','Memory'],['logs','Logs'],['schedules','Schedules']];
+  let tabBody='';
+  if(AP.loading) tabBody=apSkCards(3);
+  else if(AP.detailTab==='tasks') tabBody=apDetailTasksTab();
+  else if(AP.detailTab==='files') tabBody=apDetailFilesTab();
+  else if(AP.detailTab==='memory') tabBody=apDetailMemoryTab();
+  else if(AP.detailTab==='logs') tabBody=apDetailLogsTab();
+  else if(AP.detailTab==='schedules') tabBody=apDetailSchedTab();
+  const errBox=(a.last_think_error&&typeof a.last_think_error==='object'&&a.last_think_error.at)
+    ?`<div class="errbox" style="margin-top:10px"><b>Last think error:</b> ${esc(a.last_think_error.error||JSON.stringify(a.last_think_error))}</div>`:'';
+  return `<div class="view">
+    <div class="hrow">
+      <div class="avatar">${identicon(a.name)}</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:19px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.name)}</div>
+        <div class="chips" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${apStatusChip(Object.assign({},a,{_paused:d._paused}))}${apMindChip(a.mind)}</div>
+      </div>
+    </div>
+    ${a.role?`<p class="sub" style="margin-bottom:12px">${esc(a.role)}</p>`:''}
+    ${a.persona?`<p class="mini" style="margin-bottom:12px;line-height:1.6"><b style="color:var(--muted)">PERSONA</b><br>${esc(apShort(a.persona,220))}</p>`:''}
+    <div class="stat3">
+      <div class="stat"><div class="n">${a.thinks_today!=null?a.thinks_today:'—'}</div><div class="l">thinks today</div></div>
+      <div class="stat"><div class="n">${a.think_budget_per_day!=null?a.think_budget_per_day:'—'}</div><div class="l">daily budget</div></div>
+      <div class="stat"><div class="n">${d.open_tasks?d.open_tasks.length:'—'}</div><div class="l">open tasks</div></div>
+    </div>
+    <div class="kv"><span class="k">Model</span><span class="v"><span class="mono-trunc">${esc(a.model||'—')}</span></span></div>
+    <div class="kv"><span class="k">Last think</span><span class="v mini">${esc(apTime(a.last_think_at))}</span></div>
+    <div class="kv"><span class="k">Next wake</span><span class="v mini">${esc(apTime(a.next_think_at))}</span></div>
+    <div class="kv"><span class="k">Created</span><span class="v mini">${esc(apTime(a.created_at))}</span></div>
+    ${errBox}
+    <div class="btn-row" style="margin-top:14px">
+      ${d._paused
+        ?`<button class="btn btn-primary" id="btnApResume" style="margin-top:0">▶ Resume</button>`
+        :`<button class="btn btn-ghost" id="btnApPause" style="margin-top:0">⏸ Pause</button>`}
+      <button class="btn btn-danger-ghost" id="btnApTerminate" style="margin-top:0">Terminate</button>
+    </div>
+    <p class="hint">Pause stops scheduled wake-ups (the agent still wakes on new tasks or messages). Terminate archives the agent and stops its mind loop immediately.</p>
+    <div class="tabs" style="margin-top:14px" role="tablist">${tabs.map(t=>`<button class="tab${AP.detailTab===t[0]?' on':''}" data-ap-tab="${t[0]}" role="tab">${t[1]}</button>`).join('')}</div>
+    ${apErrHTML()}
+    ${tabBody}
+    <button class="backlink" id="btnApDetailBack">← Agents</button>
+    ${AP.confirm?apConfirmSheet():''}
+  </div>`;
+}
+function apDetailTasksTab(){
+  const rows=(AP.detailTasks||[]).map(t=>{
+    const steps=(t.steps||[]).map(s=>{
+      const title=typeof s==='string'?s:(s.title||'step');
+      const st=typeof s==='string'?'pending':(s.status||'pending');
+      const done=st==='complete';
+      const icon=done?'✅':st==='in_progress'?'🔄':st==='blocked'?'⛔':st==='skipped'?'⏭':'⬜';
+      const res=(typeof s==='object'&&s.result)?`<br><span class="mini">${esc(apShort(s.result,160))}</span>`:'';
+      return `<div class="steprow${done?' done':''}"><span class="st">${icon}</span><span>${esc(title)}${res}</span></div>`;
+    }).join('');
+    const canMod=t.status==='open'||t.status==='in_progress'||t.status==='blocked';
+    return `<details class="trow">
+      <summary><span class="tt">${esc(t.title)}</span>${apTaskChip(t.status)}</summary>
+      <div class="tbody">
+        <div class="mini" style="margin-bottom:8px">kind: ${esc(t.kind||'—')} · created ${esc(apTime(t.created_at))}<br><span style="font-family:'JetBrains Mono',monospace">${esc(t.id||'')}</span></div>
+        ${steps||'<p class="mini">No steps.</p>'}
+        ${canMod?`<div class="btn-row"><button class="btn btn-ghost" data-ap-taskdone="${esc(t.id)}" style="min-height:44px;font-size:13px">✓ Mark done</button><button class="btn btn-danger-ghost" data-ap-taskcancel="${esc(t.id)}" style="min-height:44px;font-size:13px">Cancel</button></div>`:''}
+      </div>
+    </details>`;
+  }).join('');
+  const inp='autocomplete="off" autocapitalize="off" spellcheck="false"';
+  return `<div class="field"><label for="apNewTaskTitle">Assign a task</label>
+      <input id="apNewTaskTitle" type="text" ${inp} placeholder="Task title">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <select id="apNewTaskKind" style="flex:none;width:132px" aria-label="Task kind"><option value="general">general</option><option value="research">research</option><option value="website">website</option></select>
+        <input id="apNewTaskInstr" type="text" ${inp} placeholder="Instructions (optional)">
+      </div>
+      <button class="btn btn-primary" id="btnApNewTask" style="margin-top:10px;min-height:48px">Assign task →</button>
+    </div>
+    <div class="eyebrow" style="margin:18px 0 10px">TASK HISTORY</div>
+    ${rows||'<div class="empty">No tasks yet — assign the first one above.</div>'}`;
+}
+function apDetailFilesTab(){
+  const tasks=AP.detailTasks||[];
+  if(!tasks.length) return '<div class="empty">No tasks — files live inside task workspaces.</div>';
+  const opts=tasks.map(t=>`<option value="${esc(t.id)}"${String(t.id)===String(AP.fileTaskId)?' selected':''}>${esc(apShort(t.title,34))}</option>`).join('');
+  let body=`<div class="field"><label for="apFileTask">Task workspace</label><select id="apFileTask">${opts}</select></div>`;
+  if(AP.quota) body+=`<p class="mini" style="margin-bottom:10px">Workspace quota: ${AP.quota.used} / ${AP.quota.max} bytes</p>`;
+  body+=(AP.files||[]).map(f=>`<div class="fitem" data-ap-file="${esc(f.path)}" role="button" tabindex="0"><span class="fp">${esc(f.path)}</span><span class="fm">v${f.version} · ${f.size}b</span></div>`).join('')
+    ||'<div class="empty">No files in this workspace yet.</div>';
+  if(AP.fileSel){
+    const fc=AP.fileContent||{};
+    const vers=(AP.fileVersions||[]).map(v=>`<option value="${v.version}"${(AP.fileVer||fc.version)===v.version?' selected':''}>v${v.version} · ${esc(apTime(v.updated_at))}</option>`).join('');
+    const content=fc.content!=null?String(fc.content):'';
+    const cut=content.length>15000;
+    body+=`<div style="margin-top:14px">
+      <div class="frow"><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(AP.fileSel)}</div>
+      <button class="btn btn-ghost" id="btnApFileBack" style="width:auto;margin-top:0;min-height:40px;padding:8px 14px;font-size:12px;flex:none">✕</button></div>
+      ${vers?`<div class="field" style="margin-top:8px"><label for="apFileVer">Version</label><select id="apFileVer">${vers}</select></div>`:''}
+      <pre class="code">${esc(cut?content.slice(0,15000):content)}${cut?'\n…truncated ('+content.length+' chars total)':''}</pre>
+    </div>`;
+  }
+  return body;
+}
+function apDetailMemoryTab(){
+  const inp='autocomplete="off" autocapitalize="off" spellcheck="false"';
+  let body=`<div class="field"><label for="apMemKey">Remember a fact</label>
+      <input id="apMemKey" type="text" ${inp} placeholder="key (letters, digits, _ . -)">
+      <textarea id="apMemVal" ${inp} style="margin-top:8px" placeholder="value"></textarea>
+      <button class="btn btn-primary" id="btnApRemember" style="margin-top:10px;min-height:48px">Remember ✓</button>
+    </div>
+    <div class="eyebrow" style="margin:18px 0 10px">MEMORY KEYS</div>`;
+  if(AP.memVal){
+    body+=`<div class="kv"><span class="k" style="font-family:'JetBrains Mono',monospace">${esc(AP.memVal.key)}</span><span class="v mini">${esc(apTime(AP.memVal.updated_at))}</span></div>
+      <pre class="code">${esc(String(AP.memVal.value==null?'':AP.memVal.value))}</pre>
+      <button class="btn btn-ghost" id="btnApMemBack" style="min-height:48px">← All keys</button>`;
+  }else{
+    body+=(AP.memKeys||[]).map(m=>`<div class="fitem" data-ap-memkey="${esc(m.key)}" role="button" tabindex="0"><span class="fp">${esc(m.key)}</span><span class="fm">${esc(apTime(m.updated_at))}</span></div>`).join('')
+      ||'<div class="empty">No memory yet — teach this agent something above.</div>';
+  }
+  return body;
+}
+function apDetailLogsTab(){
+  const tasks=AP.detailTasks||[];
+  const opts=`<option value="">All tasks</option>`+tasks.map(t=>`<option value="${esc(t.id)}"${String(t.id)===String(AP.logTaskId)?' selected':''}>${esc(apShort(t.title,34))}</option>`).join('');
+  const rows=(AP.logs||[]).map(e=>`<div class="logrow"><span class="lk">[${esc(e.kind||'log')}]</span> <span class="lb">${esc(apShort(e.body||'',400))}</span><span class="lt">${e.agent?esc(e.agent)+' · ':''}${esc(apTime(e.created_at))}${e.task_id?' · task '+esc(apShort(e.task_id,8)):''}</span></div>`).join('');
+  return `<div class="field"><label for="apLogTask">Filter by task</label><select id="apLogTask">${opts}</select></div>
+    <div class="logbox" id="apLogBox">${rows||'<div class="empty">No log events yet.</div>'}</div>
+    <p class="mini" style="margin-top:8px">Newest ${AP.logs.length} events · <span id="btnApLogRefresh" role="button" tabindex="0" style="color:var(--neon);cursor:pointer;font-weight:700">↻ Refresh</span></p>`;
+}
+function apDetailSchedTab(){
+  const rows=(AP.scheds||[]).map(s=>{
+    const desc=s.every_minutes?('every '+s.every_minutes+' min'):('daily at '+(s.at_time||'—'));
+    return `<div class="kv"><span class="k" style="line-height:1.7">${esc(desc)}<br><span class="mini">${esc(s.timezone||'')} · next ${esc(apTime(s.next_fire_at))}</span></span><span class="v"><button class="copybtn" data-ap-unsched="${esc(s.id)}" style="color:var(--danger);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)">Remove</button></span></div>`;
+  }).join('');
+  const inp='autocomplete="off" autocapitalize="off" spellcheck="false"';
+  return `${rows||'<div class="empty">No wake-up schedules.<br>Add one below — the 5-min tick pokes the agent on schedule.</div>'}
+    <div class="field" style="margin-top:6px"><label>Add schedule</label>
+      <div class="seg" id="apNewSchedSeg">
+        <button type="button" data-val="every" class="on">Every N min</button>
+        <button type="button" data-val="daily">Daily</button>
+      </div>
+      <div id="apNewSchedEvery"><input id="apNewEvery" type="number" min="15" value="60" ${inp}></div>
+      <div id="apNewSchedDaily" style="display:none"><input id="apNewAt" type="time" value="09:00"></div>
+      <div style="margin-top:8px"><input id="apNewTz" type="text" value="America/New_York" ${inp} aria-label="Timezone"></div>
+      <button class="btn btn-primary" id="btnApSchedAdd" style="margin-top:10px;min-height:48px">Add schedule →</button>
+    </div>`;
+}
+function apTasksView(){
+  if(AP.loading) return apLoadingView();
+  const filters=[['all','All'],['open','Open'],['in_progress','Running'],['blocked','Blocked'],['done','Done'],['cancelled','Cancelled']];
+  const list=AP.taskFilter==='all'?AP.tasks:AP.tasks.filter(t=>t.status===AP.taskFilter);
+  const rows=list.map(t=>`<div class="trow"><div style="padding:14px 15px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</div>
+      <div class="mini">${esc(t._agent)} · ${esc(t.kind||'')} · ${esc(apTime(t.created_at))}</div></div>
+      ${apTaskChip(t.status)}</div></div>`).join('');
+  return `<div class="view">
+    <div class="eyebrow">AGENTPLUS · TASKS</div>
+    <h2 class="title">Task <span class="glow">queue</span></h2>
+    <p class="sub">Every task across your fleet, newest first.</p>
+    ${apErrHTML()}
+    <div class="tabs" role="tablist">${filters.map(f=>`<button class="tab${AP.taskFilter===f[0]?' on':''}" data-ap-tfilter="${f[0]}" role="tab">${f[1]}</button>`).join('')}</div>
+    ${rows||'<div class="empty">No tasks match this filter.</div>'}
+    <button class="backlink" id="btnApTaskBack">← Agents</button>
+  </div>`;
+}
+
+/* ---------------- wiring ---------------- */
+function wireAP(){
+  const on=(id,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener('click',fn); };
+  on('btnAgents',()=>{ if(S.view==='signed-in') apGoList(); });
+  on('btnAgentsBack',apBack);
+  on('btnApSpawn',()=>{ S.view='agents-spawn'; AP.error=''; AP.loading=false; render(); });
+  on('btnApTaskQueue',apLoadTasks);
+  on('btnApSpawnSubmit',apSubmitSpawn);
+  on('btnApDetailBack',apGoList);
+  on('btnApTaskBack',apGoList);
+  on('btnApPause',()=>{ if(AP.detail) apPauseAgent(AP.detail.agent.name); });
+  on('btnApResume',()=>{ if(AP.detail) apResumeAgent(AP.detail.agent.name); });
+  on('btnApTerminate',()=>{ if(AP.detail){ AP.confirm={name:AP.detail.agent.name}; render(); } });
+  on('apConfirmCancel',()=>{ AP.confirm=null; render(); });
+  on('apConfirmGo',apDoTerminate);
+  on('btnApNewTask',apAssignTask);
+  on('btnApRemember',apRemember);
+  on('btnApMemBack',()=>{ AP.memVal=null; render(); });
+  on('btnApFileBack',()=>{ AP.fileSel=null; AP.fileContent=null; render(); });
+  on('btnApLogRefresh',apLoadDetailTab);
+  on('btnApSchedAdd',apAddSchedule);
+  const ov=document.getElementById('apOverlay');
+  if(ov) ov.addEventListener('click',e=>{ if(e.target===ov){ AP.confirm=null; render(); } });
+  const openDetail=el=>apOpenDetail(el.getAttribute('data-ap-agent'));
+  app.querySelectorAll('[data-ap-agent]').forEach(b=>{
+    b.addEventListener('click',()=>openDetail(b));
+    b.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openDetail(b); } });
+  });
+  app.querySelectorAll('[data-ap-tab]').forEach(b=>b.addEventListener('click',()=>{ AP.detailTab=b.getAttribute('data-ap-tab'); apLoadDetailTab(); }));
+  app.querySelectorAll('[data-ap-tfilter]').forEach(b=>b.addEventListener('click',()=>{ AP.taskFilter=b.getAttribute('data-ap-tfilter'); render(); }));
+  app.querySelectorAll('[data-ap-memkey]').forEach(b=>b.addEventListener('click',()=>apViewMemory(b.getAttribute('data-ap-memkey'))));
+  app.querySelectorAll('[data-ap-file]').forEach(b=>b.addEventListener('click',()=>apViewFile(b.getAttribute('data-ap-file'))));
+  app.querySelectorAll('[data-ap-unsched]').forEach(b=>b.addEventListener('click',()=>apUnschedule(b.getAttribute('data-ap-unsched'))));
+  app.querySelectorAll('[data-ap-taskdone]').forEach(b=>b.addEventListener('click',()=>apUpdateTask(b.getAttribute('data-ap-taskdone'),'done')));
+  app.querySelectorAll('[data-ap-taskcancel]').forEach(b=>b.addEventListener('click',()=>apUpdateTask(b.getAttribute('data-ap-taskcancel'),'cancelled')));
+  const fts=document.getElementById('apFileTask');
+  if(fts) fts.addEventListener('change',()=>{ AP.fileTaskId=fts.value; AP.fileSel=null; AP.fileContent=null; AP.fileVersions=[]; apLoadFiles(); });
+  const fvs=document.getElementById('apFileVer');
+  if(fvs) fvs.addEventListener('change',()=>{ AP.fileVer=parseInt(fvs.value,10)||null; apReloadFile(); });
+  const lts=document.getElementById('apLogTask');
+  if(lts) lts.addEventListener('change',()=>{ AP.logTaskId=lts.value; apLoadDetailTab(); });
+  // segmented schedule pickers toggle without re-render (keeps form input)
+  [['apSchedSeg','apSchedEvery','apSchedDaily'],['apNewSchedSeg','apNewSchedEvery','apNewSchedDaily']].forEach(([seg,every,daily])=>{
+    const s=document.getElementById(seg);
+    if(!s) return;
+    s.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+      s.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+      const v=b.getAttribute('data-val');
+      const e1=document.getElementById(every), e2=document.getElementById(daily);
+      if(e1) e1.style.display=v==='every'?'':'none';
+      if(e2) e2.style.display=v==='daily'?'':'none';
+    }));
+  });
+  const lb=document.getElementById('apLogBox');
+  if(lb) lb.scrollTop=lb.scrollHeight;
+}
+
 /* public surface for host / sibling widgets */
 window.OrbitXAuth={
   state:()=>({view:S.view,connected:S.view==='signed-in',
@@ -693,6 +1406,7 @@ window.OrbitXAuth={
   refresh:()=>boot(),
   showAuthError:(msg)=>failAuth(msg||'Session expired.'),
   disconnect:()=>disconnect(),
+  agents:()=>{ if(S.view==='signed-in') apGoList(); },
 };
 window.OrbitX=window.OrbitX||{};
 if(!window.OrbitX.callTool) window.OrbitX._standalone=true;
