@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>OrbitX Token Explorer</title>
+<!--
+  OrbitX ChatGPT Mini App — Token Explorer + Discovery + Security
+  resourceUri: ui://widget/orbitx-token.html
+  Bridge: window.OrbitX.callTool(name, args) when hosted in the OrbitX bridge,
+          else standalone fallback POSTs to https://www.orbitx.world/api/mcp
+  Tools: orbitx_search, orbitx_crypto_scan, orbitx_screen_tokens,
+         orbitx_get_forensics, orbitx_dex_chart, orbitx_get_chart
+  Charts: real DexScreener embed (real pair address from scan) + TradingView +
+          real OrbitX OHLCV candles. Never drawn approximations.
+-->
+<style>
+:root{
+  --bg:#04070a; --panel:#0a0f14; --panel2:#0d141b; --line:#14202a;
+  --neon:#00ff88; --neon2:#00d4ff; --dim:#8fa3b3; --txt:#eaf4ee;
+  --red:#ff4d5e; --amber:#ffb02e; --violet:#b06bff;
+  --r:16px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  min-height:100vh}
+#bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+   radial-gradient(600px 300px at 15% -5%, rgba(0,255,136,.09), transparent 60%),
+   radial-gradient(700px 380px at 90% 10%, rgba(0,212,255,.07), transparent 60%),
+   radial-gradient(500px 500px at 50% 110%, rgba(0,255,136,.05), transparent 60%);}
+#app{position:relative;z-index:1;max-width:620px;margin:0 auto;padding:14px 14px 60px}
+.header{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+.logo svg{width:30px;height:30px;filter:drop-shadow(0 0 8px rgba(0,255,136,.7))}
+.brand{font-weight:800;letter-spacing:2px;font-size:17px}
+.brand small{display:block;font-size:9px;letter-spacing:3px;color:var(--neon);font-weight:600}
+.back{margin-left:auto;background:#0d151c;border:1px solid var(--line);color:var(--txt);
+  border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer}
+.tabs{display:flex;gap:8px;margin-bottom:14px;position:sticky;top:0;z-index:5;
+  background:rgba(4,7,10,.9);backdrop-filter:blur(10px);padding:8px 0}
+.tab{flex:1;text-align:center;padding:10px 6px;border-radius:12px;font-size:13px;font-weight:700;
+  background:var(--panel);border:1px solid var(--line);color:var(--dim);cursor:pointer;letter-spacing:.5px}
+.tab.on{background:rgba(0,255,136,.1);border-color:var(--neon);color:var(--neon);
+  box-shadow:0 0 14px rgba(0,255,136,.25)}
+.card{background:linear-gradient(160deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px;
+  box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.card.glow{border-color:rgba(0,255,136,.4);box-shadow:0 0 20px rgba(0,255,136,.12)}
+.row{display:flex;align-items:center;gap:10px}
+.mut{color:var(--dim);font-size:12px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+input[type=text],input[type=url],input[type=number],textarea,select{
+  width:100%;background:#080d12;border:1px solid var(--line);border-radius:12px;
+  color:var(--txt);padding:12px 14px;font-size:15px;outline:none}
+input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,255,136,.2)}
+.btn{background:linear-gradient(135deg,#00ff88,#00c86e);border:0;color:#03130b;font-weight:800;
+  border-radius:12px;padding:13px 16px;font-size:15px;cursor:pointer;width:100%;letter-spacing:.5px}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:#0d151c;color:var(--neon);border:1px solid var(--neon)}
+.btn.sm{width:auto;padding:8px 14px;font-size:13px}
+.searchbar{display:flex;gap:8px;margin-bottom:12px}
+.searchbar .btn{width:auto;white-space:nowrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+  color:var(--dim);font-size:13px;font-weight:600;cursor:pointer}
+.chip.on{border-color:var(--neon);color:var(--neon);background:rgba(0,255,136,.08)}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{background:#080d12;border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center}
+.stat .v{font-size:15px;font-weight:800;color:var(--txt)}
+.stat .v.up{color:var(--neon)} .stat .v.down{color:var(--red)}
+.stat .l{font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:4px;text-transform:uppercase}
+.tokenrow{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;
+  background:var(--panel);border:1px solid var(--line);margin-bottom:8px;cursor:pointer}
+.tokenrow:active{transform:scale(.99)}
+.ticon{width:42px;height:42px;border-radius:50%;background:#0d151c;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;
+  color:var(--neon);flex-shrink:0;overflow:hidden}
+.ticon img{width:100%;height:100%;object-fit:cover}
+.tname{font-weight:700;font-size:15px}
+.tsym{color:var(--dim);font-size:12px}
+.tprice{margin-left:auto;text-align:right;font-weight:800}
+.tchg{font-size:12px;font-weight:700}
+.up{color:var(--neon)} .down{color:var(--red)}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.5px}
+.badge.good{background:rgba(0,255,136,.12);color:var(--neon);border:1px solid rgba(0,255,136,.4)}
+.badge.warn{background:rgba(255,176,46,.12);color:var(--amber);border:1px solid rgba(255,176,46,.4)}
+.badge.bad{background:rgba(255,77,94,.12);color:var(--red);border:1px solid rgba(255,77,94,.4)}
+.badge.info{background:rgba(0,212,255,.1);color:var(--neon2);border:1px solid rgba(0,212,255,.35)}
+.score{width:54px;height:54px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:17px;border:3px solid var(--neon);
+  box-shadow:0 0 12px rgba(0,255,136,.35);background:#080d12}
+.skel{position:relative;overflow:hidden;background:#0d141b;border-radius:12px;min-height:18px}
+.skel::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(0,255,136,.08),transparent);
+  animation:sh 1.2s infinite}
+@keyframes sh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.err{background:rgba(255,77,94,.08);border:1px solid rgba(255,77,94,.4);border-radius:14px;
+  padding:14px;color:#ffb9c0;font-size:14px;margin-bottom:12px}
+.empty{text-align:center;padding:34px 18px;color:var(--dim);font-size:14px}
+.empty .big{font-size:40px;margin-bottom:10px}
+.stale{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);margin-top:10px}
+.stale button{background:none;border:1px solid var(--line);color:var(--neon);border-radius:8px;
+  padding:4px 10px;font-size:11px;cursor:pointer}
+.sect{font-size:12px;letter-spacing:2px;color:var(--neon);font-weight:800;margin:16px 0 8px;text-transform:uppercase}
+.frow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #0f1720;font-size:14px}
+.frow:last-child{border-bottom:0}
+.frow .k{color:var(--dim)}
+.frow .val{text-align:right;font-weight:600;word-break:break-all}
+.disclaim{background:rgba(255,176,46,.07);border:1px solid rgba(255,176,46,.35);border-radius:14px;
+  padding:12px 14px;font-size:12.5px;color:#ffd9a0;margin-bottom:12px;line-height:1.5}
+.chartwrap{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#000;margin-top:10px}
+.chartwrap iframe{width:100%;height:420px;border:0;display:block}
+.ctabs{display:flex;gap:6px;margin-top:10px}
+.ctab{flex:1;padding:9px 4px;font-size:12px;font-weight:700;text-align:center;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);color:var(--dim);cursor:pointer}
+.ctab.on{color:var(--neon);border-color:var(--neon);background:rgba(0,255,136,.07)}
+#ohlcCanvas{width:100%;height:340px;display:block;background:#05080b}
+.copybtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+  padding:2px 8px;font-size:11px;cursor:pointer;margin-left:6px}
+.copybtn:active{color:var(--neon);border-color:var(--neon)}
+</style>
+</head>
+<body>
+<div id="bgfx"></div>
+<div id="app"></div>
+<script>
+"use strict";
+/* ================= Bridge (CONTRACT.md v1) ================= */
+const MCP_URL = "https://www.orbitx.world/api/mcp";
+const Bridge = {
+  async callTool(name, args){
+    if (window.openai && typeof window.openai.callTool === "function"){
+      return await window.openai.callTool(name, args);
+    }
+    if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
+      return await window.OrbitX.callTool(name, args); // hosted bridge (CONTRACT.md)
+    }
+    // standalone fallback: POST MCP JSON-RPC directly
+    const res = await fetch(MCP_URL, {
+      method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"t"+Date.now(), method:"tools/call",
+        params:{name, arguments:args||{}}})
+    });
+    if(!res.ok) throw new Error("MCP HTTP "+res.status);
+    const j = await res.json();
+    if(j.error) throw new Error(j.error.message||"tool error");
+    const r = j.result||{};
+    if(r.structuredContent) return r.structuredContent;
+    const content = r.content;
+    if(Array.isArray(content)){
+      const t = content.find(c=>c.type==="text");
+      if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
+      return content;
+    }
+    return r;
+  }
+};
+/* Auth: contract key `orbitx.authCode` (legacy `orbitx_auth_code` still read) */
+const AUTH_KEYS = ["orbitx.authCode","orbitx_auth_code"];
+const getAuth = ()=>{ try{ for(const k of AUTH_KEYS){ const v=localStorage.getItem(k); if(v) return v; } }catch(e){} return ""; };
+const AUTH_ERR_RE=/auth|unauthor|expir|invalid code|session|forbidden|not (linked|connected|signed)|sign.?in|token|credential/i;
+function authFail(e){ const m=String((e&&e.message)||e||"");
+  if(AUTH_ERR_RE.test(m)){ try{ window.dispatchEvent(new CustomEvent("orbitx-auth-error",{detail:{message:m}})); }catch(x){} return true; }
+  return false; }
+function setErr(e){ if(authFail(e)) S.error="Session expired — reconnect via the OrbitX auth widget, then retry.";
+  else S.error=String(e.message||e); }
+function openUrl(href){ if(!href) return;
+  try{
+    if(window.openai&&typeof window.openai.openExternal==="function"){ window.openai.openExternal({href}); return; }
+    if(window.OrbitX&&typeof window.OrbitX.openUrl==="function"){ window.OrbitX.openUrl(href); return; }
+  }catch(e){}
+  window.open(href,"_blank","noopener"); }
+function standaloneNote(){ const hosted=(window.openai&&window.openai.callTool)||(window.OrbitX&&window.OrbitX.callTool);
+  return hosted?"":`<div class="mut" style="text-align:center;font-size:11px;margin-bottom:10px;opacity:.8">⚙ standalone preview — reads work live; writes need the OrbitX bridge</div>`; }
+document.addEventListener("click",e=>{
+  const a=e.target&&e.target.closest?e.target.closest("a[target='_blank']"):null;
+  if(a&&a.href){ e.preventDefault(); openUrl(a.href); } });
+window.addEventListener("orbitx-auth-changed",()=>{ if(typeof render==="function") render(); });
+
+/* ================= State ================= */
+const S = { screen:"explore", q:"", results:[], token:null, mint:null,
+  discType:"trending", discInterval:"1h", disc:[], forensics:null,
+  chartTab:"dex", ohlc:null, fetchedAt:0, error:"", loading:false,
+  lastQ:"", copied:false };
+
+/* ================= Helpers ================= */
+const app = document.getElementById("app");
+const esc = s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n,d)=>{ if(n==null||n===""||isNaN(Number(n))) return "—";
+  const x=Number(n); const neg=x<0?"-":""; const a=Math.abs(x);
+  const s = a>=1e9?(a/1e9).toFixed(2)+"B":a>=1e6?(a/1e6).toFixed(2)+"M":
+    a>=1e3?(a/1e3).toFixed(2)+"K":a.toFixed(d!=null?d:(a<1?6:2));
+  return neg+s; };
+const fmtUSD = n=>{ if(n==null||isNaN(Number(n))) return "—"; const x=Number(n);
+  return x<0.01&&x>0 ? "$"+Math.abs(x).toExponential(2) : (x<0?"-$":"$")+fmt(Math.abs(x)); };
+const fmtPct = n=>{ if(n==null||isNaN(Number(n))) return "—";
+  const x=Number(n); return (x>=0?"+":"")+x.toFixed(2)+"%"; };
+const pctCls = n=>Number(n)>=0?"up":"down";
+const shortMint = m=>m&&m.length>10?m.slice(0,4)+"…"+m.slice(-4):esc(m||"");
+const looksMint = q=>/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test((q||"").trim());
+const ago = ts=>{ if(!ts) return "—"; const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return s+"s ago"; if(s<3600) return Math.floor(s/60)+"m ago";
+  return Math.floor(s/3600)+"h ago"; };
+const timeHM = ts=>ts?new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
+function staleBar(){ return S.fetchedAt?
+  `<div class="stale"><span>🕐 Updated ${esc(timeHM(S.fetchedAt))} (${esc(ago(S.fetchedAt))})</span>
+   <button onclick="refreshCurrent()">↻ Refresh</button></div>`:""; }
+function header(showBack, sub){
+  return `<div class="header">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7L12 2z" stroke="#00ff88" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="#00ff88"/></svg></div>
+    <div class="brand">ORBITX<small>${esc(sub||"TOKEN EXPLORER")}</small></div>
+    ${showBack?'<button class="back" onclick="goBack()">← Back</button>':""}
+  </div>`+standaloneNote();
+}
+function toast(msg){ const t=document.createElement("div");
+  t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d151c;border:1px solid #00ff88;color:#00ff88;padding:10px 18px;border-radius:12px;font-size:13px;z-index:99";
+  t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
+</script>
+
+<script>
+"use strict";
+/* ================= Screens ================= */
+function goBack(){ S.screen="explore"; render(); }
+function render(){
+  if(S.screen==="explore") renderExplore();
+  else if(S.screen==="discover") renderDiscover();
+  else if(S.screen==="token") renderToken();
+}
+function tabsHTML(){
+  return `<div class="tabs">
+    <div class="tab ${S.screen==="explore"?"on":""}" onclick="S.screen='explore';render()">🔍 Explore</div>
+    <div class="tab ${S.screen==="discover"?"on":""}" onclick="S.screen='discover';render();loadDiscover()">🔥 Discover</div>
+    <div class="tab ${S.token?"":""}" style="${S.token?"":"opacity:.35;pointer-events:none"}" onclick="S.screen='token';render()">🪙 Token</div>
+  </div>`;
+}
+function skelRows(n){ let h=""; for(let i=0;i<n;i++)
+  h+=`<div class="skel" style="height:66px;margin-bottom:8px"></div>`; return h; }
+function errHTML(){ return S.error?`<div class="err">⚠️ ${esc(S.error)}
+  <div style="margin-top:8px"><button class="btn sm ghost" onclick="retryLast()">Retry</button></div></div>`:""; }
+function retryLast(){
+  if(S.screen==="token"&&S.mint) inspect(S.mint,true);
+  else if(S.screen==="discover") loadDiscover();
+  else if(S.lastQ) doSearch(S.lastQ);
+}
+
+/* ---------- Explore ---------- */
+function renderExplore(){
+  app.innerHTML = header(false,"TOKEN EXPLORER")+tabsHTML()+`
+  <div class="searchbar">
+    <input type="text" id="q" placeholder="Search name, symbol or paste mint…" value="${esc(S.q)}"
+      onkeydown="if(event.key==='Enter')doSearch()" autocapitalize="off" spellcheck="false">
+    <button class="btn" onclick="doSearch()">Scan</button>
+  </div>
+  <div class="chips">
+    <div class="chip" onclick="quickScan('So11111111111111111111111111111111111111112')">SOL</div>
+    <div class="chip" onclick="quickScan('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')">USDC</div>
+    <div class="chip" onclick="S.screen='discover';render();loadDiscover()">🔥 Trending</div>
+  </div>
+  ${errHTML()}
+  <div id="results">${S.loading?skelRows(4):resultsHTML()}</div>
+  <div class="mut" style="text-align:center;margin-top:14px">Every number below is pulled live from OrbitX scanners.<br>Nothing is cached, nothing is made up.</div>`;
+  const qi=document.getElementById("q"); if(qi&&!S.loading) qi.focus();
+}
+function resultsHTML(){
+  if(!S.results.length) return `<div class="empty"><div class="big">🛰</div>
+    Search any Solana token by name, symbol or mint address.<br>Scans pull live price, holders, forensics & trust verdict.</div>`;
+  return S.results.map((t,i)=>{
+    const p=t.priceUsd??t.price; const c=t.change24h??t.priceChange24h;
+    return `<div class="tokenrow" onclick="inspect('${esc(t.mint||t.address||"")}')">
+      <div class="ticon">${t.icon?`<img src="${esc(t.icon)}" onerror="this.remove()">`:""}<span>${esc((t.symbol||"?").slice(0,3))}</span></div>
+      <div><div class="tname">${esc(t.name||t.symbol||"Unknown")}</div>
+        <div class="tsym">${esc(t.symbol||"")} · <span class="mono">${shortMint(t.mint||t.address)}</span></div></div>
+      <div class="tprice"><div>${fmtUSD(p)}</div>
+        <div class="tchg ${pctCls(c)}">${fmtPct(c)}</div></div>
+    </div>`; }).join("");
+}
+function quickScan(mint){ S.q=mint; inspect(mint); }
+async function doSearch(q){
+  S.q = q!=null?q:(document.getElementById("q")||{}).value||"";
+  const query=S.q.trim(); if(!query) return;
+  S.lastQ=query; S.error=""; S.results=[];
+  if(looksMint(query)){ inspect(query); return; }
+  S.loading=true; renderExplore();
+  try{
+    const r=await Bridge.callTool("orbitx_search",{q:query, authCode:getAuth()});
+    const list=r.rows||r.results||r.tokens||r.data||[];
+    S.results=list.slice(0,15);
+    if(!S.results.length) S.error="No tokens found for “"+query+"”. Try a symbol (e.g. BONK) or paste a mint address.";
+  }catch(e){ setErr(e); }
+  S.loading=false; renderExplore();
+}
+</script>
+
+<script>
+"use strict";
+/* ---------- Inspect (scan + forensics) ---------- */
+async function inspect(mint, force){
+  if(!mint) return;
+  S.screen="token"; S.mint=mint; S.token=null; S.forensics=null; S.ohlc=null;
+  S.chartTab="dex"; S.error=""; S.loading=true; S.fetchedAt=0; renderToken();
+  try{
+    const r=await Bridge.callTool("orbitx_crypto_scan",{mint, authCode:getAuth()});
+    if(r.ok===false) throw new Error(r.error||r.message||"scan failed");
+    S.token=r; S.fetchedAt=Date.now();
+    try{
+      const f=await Bridge.callTool("orbitx_get_forensics",{mint, authCode:getAuth()});
+      if(f.ok!==false) S.forensics=f;
+    }catch(e){ /* forensics optional — scan still stands */ }
+  }catch(e){ setErr(e); }
+  S.loading=false; renderToken();
+}
+function refreshCurrent(){ if(S.screen==="token"&&S.mint) inspect(S.mint,true); }
+
+/* ---------- Token screen ---------- */
+function renderToken(){
+  const t=S.token, tk=t&&t.token? (t.token.token||t.token):null;
+  const meta=t&&t.token?t.token.meta:null;
+  const score=t&&t.token?t.token.score:null;
+  app.innerHTML = header(true,"TOKEN DOSSIER")+tabsHTML()+errHTML()+(S.loading?tokenSkel():tokenHTML(t,tk,meta,score))+staleBar();
+  if(!S.loading&&t) paintChart();
+}
+function tokenSkel(){
+  return `<div class="card glow"><div class="skel" style="height:120px"></div></div>
+  <div class="card"><div class="skel" style="height:90px"></div></div>
+  <div class="card"><div class="skel" style="height:300px"></div></div>`;
+}
+function verdictBadge(v){
+  v=String(v||"").toLowerCase();
+  if(/good|safe|strong|high/.test(v)) return `<span class="badge good">${esc(v.toUpperCase()||"—")}</span>`;
+  if(/warn|caution|medium|mixed/.test(v)) return `<span class="badge warn">${esc(v.toUpperCase())}</span>`;
+  if(/bad|risk|danger|scam|avoid|rugged/.test(v)) return `<span class="badge bad">${esc(v.toUpperCase())}</span>`;
+  return `<span class="badge info">${esc(v.toUpperCase()||"UNKNOWN")}</span>`;
+}
+function bestPair(t){
+  const pairs=(t&&t.token&&t.token.pairs)||[];
+  if(!pairs.length) return null;
+  return pairs.slice().sort((a,b)=>(b.liquidity||0)-(a.liquidity||0))[0];
+}
+function tokenHTML(t,tk,meta,score){
+  if(!t) return `<div class="empty"><div class="big">🪙</div>Scan a token to open its dossier.</div>`;
+  const chg=tk.change24h, sc=score?score.total:null;
+  const foren=t.forensics||{}, sf=foren.safetyFlags||{};
+  return `
+  <div class="disclaim">⚠️ This dossier is <b>intel, not financial advice</b>. A good score never promises a token is safe — verify everything yourself before touching it.</div>
+  <div class="card glow">
+    <div class="row">
+      <div class="ticon" style="width:52px;height:52px;font-size:18px">${tk.icon?`<img src="${esc(tk.icon)}" onerror="this.remove()">`:""}<span>${esc((tk.symbol||"?").slice(0,3))}</span></div>
+      <div style="flex:1">
+        <div class="tname" style="font-size:18px">${esc(tk.name||"Unknown")}</div>
+        <div class="tsym">$${esc(tk.symbol||"—")} · <span class="mono">${shortMint(tk.mint)}</span>
+          <button class="copybtn" onclick="navigator.clipboard.writeText('${esc(tk.mint)}');toast('Mint copied')">copy</button></div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${verdictBadge(t.token.verdict)}
+          ${tk.isVerified?'<span class="badge info">✓ VERIFIED</span>':""}
+          ${tk.organicScoreLabel?`<span class="badge info">ORGANIC: ${esc(String(tk.organicScoreLabel).toUpperCase())}</span>`:""}</div>
+      </div>
+      ${sc!=null?`<div class="score" title="OG Score">${sc}</div>`:""}
+    </div>
+    <div class="row" style="margin-top:12px;align-items:baseline">
+      <div style="font-size:30px;font-weight:800">${fmtUSD(tk.priceUsd)}</div>
+      <div class="tchg ${pctCls(chg)}" style="font-size:16px">${fmtPct(chg)} <span class="mut">24h</span></div>
+    </div>
+    <div class="statgrid">
+      <div class="stat"><div class="v">${fmtUSD(tk.mcap)}</div><div class="l">Mkt Cap</div></div>
+      <div class="stat"><div class="v">${fmt(tk.holderCount||meta&&meta.holderCount)}</div><div class="l">Holders</div></div>
+      <div class="stat"><div class="v">${fmtUSD(tk.liquidity)}</div><div class="l">Liquidity</div></div>
+      <div class="stat"><div class="v">${fmtUSD(tk.volume)}</div><div class="l">Vol 24h</div></div>
+      <div class="stat"><div class="v ${pctCls(tk.change1h)}">${fmtPct(tk.change1h)}</div><div class="l">1h</div></div>
+      <div class="stat"><div class="v ${pctCls(tk.change5m)}">${fmtPct(tk.change5m)}</div><div class="l">5m</div></div>
+    </div>
+  </div>
+
+  <div class="sect">📈 Live Chart — real candles</div>
+  <div class="card">
+    <div class="ctabs">
+      <div class="ctab ${S.chartTab==="dex"?"on":""}" onclick="S.chartTab='dex';renderToken()">DexScreener</div>
+      <div class="ctab ${S.chartTab==="tv"?"on":""}" onclick="S.chartTab='tv';renderToken()">TradingView</div>
+      <div class="ctab ${S.chartTab==="ohlc"?"on":""}" onclick="S.chartTab='ohlc';renderToken();loadOHLC()">OrbitX OHLC</div>
+    </div>
+    <div id="chartbox" class="chartwrap"></div>
+    <div class="mut" style="margin-top:6px">Pair: <span class="mono" id="pairaddr">resolving…</span></div>
+  </div>
+
+  <div class="sect">🔬 Forensics</div>
+  <div class="card">${forensicsHTML(t,foren,sf)}</div>
+
+  <div class="sect">📊 Market Intel</div>
+  <div class="card">
+    ${frow("FDV",fmtUSD(tk.fdv))}${frow("Circ Supply",fmt(tk.circSupply))}${frow("Total Supply",fmt(tk.totalSupply))}
+    ${frow("Buy Vol 24h",fmtUSD(tk.buyVolume))}${frow("Sell Vol 24h",fmtUSD(tk.sellVolume))}
+    ${frow("Traders 24h",fmt(tk.numTraders))}${frow("Net Buyers",fmt(tk.netBuyers))}
+    ${frow("ATH Price",fmtUSD(t.athPrice||t.token.athPrice))}${frow("Age",tk.ageDays!=null?tk.ageDays+" days":"—")}
+    ${frow("Chain","solana")}${frow("Token Program","<span class='mono'>"+shortMint(tk.tokenProgram)+"</span>",true)}
+  </div>`;
+}
+function frow(k,v,raw){ return `<div class="frow"><div class="k">${esc(k)}</div><div class="val">${raw?v:esc(v)}</div></div>`; }
+
+/* Forensics: VERIFIED vs RISK vs MISSING — never promise safety */
+function forensicsHTML(t,foren,sf){
+  const v=[], r=[], m=[];
+  const chk=(label,val,ok)=>{ if(val==null||val===""||val===false&&ok===false) m.push(label);
+    else v.push([label, val]); };
+  chk("Dev wallet", foren.dev?'<span class="mono">'+shortMint(foren.dev)+"</span>":null, true);
+  chk("First buyer", foren.firstBuyer?'<span class="mono">'+shortMint(foren.firstBuyer)+"</span>":null, true);
+  if(foren.concentration){
+    const c=foren.concentration;
+    if(c.top10Pct!=null) v.push(["Top-10 holders", Number(c.top10Pct).toFixed(1)+"%"]);
+    else m.push("Top-10 concentration");
+    if(c.totalHolders!=null) v.push(["Total holders", fmt(c.totalHolders)]); else m.push("Holder count");
+  } else m.push("Concentration data");
+  if(sf.lpLockedPct!=null) v.push(["LP locked", Number(sf.lpLockedPct).toFixed(1)+"%"]); else m.push("LP lock %");
+  if(sf.mintRenounced!=null) v.push(["Mint authority", sf.mintRenounced?"renounced ✓":"NOT renounced"]); else m.push("Mint authority");
+  if(sf.freezeRenounced!=null) v.push(["Freeze authority", sf.freezeRenounced?"renounced ✓":"NOT renounced"]); else m.push("Freeze authority");
+  if(sf.rugged!=null) r.push(["Rugged flag", sf.rugged?"⚠️ TRUE — treat as rugged":"not flagged"]);
+  if(foren.bundledPct!=null||foren.bundles!=null) v.push(["Bundled supply", (foren.bundledPct??foren.bundles)+"%"]); else m.push("Bundle data");
+  if(sf.riskScore!=null) v.push(["Risk score", sf.riskScore+"/100"]);
+  if(t.safety){ const s=t.safety;
+    if(s.canBuy===false||s.canSell===false) r.push(["Trade route", "⚠️ "+esc(s.note||"no route found — honeypot risk")]);
+    if(s.verdict) v.push(["Route verdict", esc(s.verdict)]);
+  }
+  if(foren.isPumpFun!=null) v.push(["Pump.fun", foren.isPumpFun?(foren.bondingComplete?"bonded ✓":"bonding…"):"no"]);
+  let h=`<div class="frow"><div class="k" style="color:var(--neon);font-weight:800">✅ VERIFIED DATA</div><div class="val"></div></div>`;
+  h+= v.length? v.map(x=>`<div class="frow"><div class="k">${esc(x[0])}</div><div class="val">${x[1]}</div></div>`).join("")
+    : `<div class="mut" style="padding:8px 0">No verified datapoints returned.</div>`;
+  h+=`<div class="frow" style="margin-top:8px"><div class="k" style="color:var(--amber);font-weight:800">⚠️ RISK INDICATORS</div><div class="val"></div></div>`;
+  h+= r.length? r.map(x=>`<div class="frow"><div class="k">${esc(x[0])}</div><div class="val" style="color:var(--amber)">${x[1]}</div></div>`).join("")
+    : `<div class="mut" style="padding:8px 0">No explicit risk flags — <b>absence of flags is not proof of safety</b>.</div>`;
+  h+=`<div class="frow" style="margin-top:8px"><div class="k" style="color:var(--dim);font-weight:800">❓ MISSING INFO</div><div class="val"></div></div>`;
+  h+= m.length? `<div class="mut" style="padding:8px 0">Not reported by scanners: ${m.map(esc).join(", ")}. Treat gaps as unknown risk.</div>`
+    : `<div class="mut" style="padding:8px 0">Full coverage.</div>`;
+  return h;
+}
+
+/* ---------- Charts ---------- */
+function paintChart(){
+  const box=document.getElementById("chartbox"); if(!box||!S.token) return;
+  const tk=S.token.token.token||S.token.token, pair=bestPair(S.token);
+  const pa=document.getElementById("pairaddr");
+  if(pair&&pa) pa.textContent=pair.dex+" · "+pair.address.slice(0,8)+"…";
+  else if(pa) pa.textContent="no pair data";
+  if(S.chartTab==="dex"){
+    const addr=(pair&&pair.address)||tk.mint;
+    box.innerHTML=`<iframe src="https://dexscreener.com/solana/${esc(addr)}?embed=1&theme=dark&trades=0&info=0"
+      title="DexScreener chart" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>`;
+  } else if(S.chartTab==="tv"){
+    const sym="CRYPTO:"+String(tk.symbol||"SOL").toUpperCase()+"USD";
+    box.innerHTML=`<div class="tradingview-widget-container" style="height:420px;width:100%">
+      <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>`;
+    // innerHTML scripts never run — inject the TradingView embed properly
+    const sc=document.createElement("script");
+    sc.src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    sc.async=true;
+    sc.textContent=JSON.stringify({symbol:sym,theme:"dark",style:"1",locale:"en",
+      hide_side_toolbar:true,allow_symbol_change:true,autosize:true,
+      backgroundColor:"rgba(4,7,10,1)"});
+    box.querySelector(".tradingview-widget-container").appendChild(sc);
+    const note=document.createElement("div");
+    note.className="mut"; note.style.marginTop="6px";
+    note.textContent="TradingView symbol "+sym+" — TradingView only lists major pairs; arbitrary mints show its own 'invalid symbol' state. DexScreener tab always works.";
+    box.appendChild(note);
+  } else {
+    box.innerHTML=`<div style="padding:20px"><div class="skel" style="height:300px" id="ohlcskel"></div>
+      <canvas id="ohlcCanvas" style="display:none"></canvas><div class="mut" id="ohlcmsg" style="margin-top:6px"></div></div>`;
+    if(S.ohlc) drawOHLC(); else loadOHLC();
+  }
+}
+async function loadOHLC(){
+  const msg=document.getElementById("ohlcmsg"); const sk=document.getElementById("ohlcskel");
+  try{
+    const r=await Bridge.callTool("orbitx_get_chart",{mint:S.mint,interval:"1h",limit:60,chain:"solana",authCode:getAuth()});
+    const c=r.candles||r.data||r.ohlc||[];
+    S.ohlc=c;
+    if(sk) sk.style.display="none";
+    const cv=document.getElementById("ohlcCanvas"); if(cv) cv.style.display="block";
+    if(!c.length){ if(msg) msg.textContent="No candle data returned for this token."; return; }
+    drawOHLC();
+    if(msg) msg.textContent=c.length+" real 1h candles from OrbitX — never simulated.";
+  }catch(e){ if(msg) msg.textContent="Candle feed error: "+e.message; if(sk) sk.style.display="none"; }
+}
+function drawOHLC(){
+  const cv=document.getElementById("ohlcCanvas"); if(!cv||!S.ohlc) return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||560, H=340;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const x=cv.getContext("2d"); x.scale(dpr,dpr);
+  const rows=S.ohlc.map(c=>({o:+c.open??+c.o,h:+c.high??+c.h,l:+c.low??+c.l,cl:+c.close??+c.c,t:c.time||c.timestamp}));
+  const hs=rows.map(r=>r.h), ls=rows.map(r=>r.l);
+  const mx=Math.max(...hs), mn=Math.min(...ls), rg=(mx-mn)||1;
+  const cw=W/rows.length;
+  x.clearRect(0,0,W,H);
+  x.strokeStyle="#14202a"; x.fillStyle="#5b6b7a"; x.font="10px monospace";
+  for(let i=0;i<5;i++){ const v=mx-rg*i/4, y=10+(H-40)*i/4;
+    x.beginPath(); x.moveTo(0,y); x.lineTo(W,y); x.stroke();
+    x.fillText("$"+fmt(v), 4, y-3); }
+  rows.forEach((r,i)=>{
+    const cx=i*cw+cw/2, bw=Math.max(2,cw*0.6);
+    const y=o=>10+(H-40)*(1-(o-mn)/rg);
+    const up=r.cl>=r.o, col=up?"#00ff88":"#ff4d5e";
+    x.strokeStyle=col; x.fillStyle=col;
+    x.beginPath(); x.moveTo(cx,y(r.h)); x.lineTo(cx,y(r.l)); x.stroke();
+    const yo=y(r.o), yc=y(r.cl);
+    x.fillRect(cx-bw/2, Math.min(yo,yc), bw, Math.max(2,Math.abs(yc-yo)));
+  });
+  const last=rows[rows.length-1];
+  x.fillStyle="#00d4ff"; x.font="bold 12px monospace";
+  x.fillText("LAST $"+fmt(last.cl), 8, H-8);
+}
+</script>
+
+<script>
+"use strict";
+/* ---------- Discover ---------- */
+const DISC_TYPES=["trending","new","runners","fomo","graduating","kol"];
+const DISC_IV=["5m","1h","6h","24h"];
+function renderDiscover(){
+  app.innerHTML = header(false,"DISCOVERY")+tabsHTML()+`
+  <div class="chips">${DISC_TYPES.map(t=>`<div class="chip ${S.discType===t?"on":""}" onclick="S.discType='${t}';loadDiscover()">${t}</div>`).join("")}</div>
+  <div class="chips">${DISC_IV.map(i=>`<div class="chip ${S.discInterval===i?"on":""}" onclick="S.discInterval='${i}';loadDiscover()">${i}</div>`).join("")}</div>
+  ${errHTML()}
+  <div id="disclist">${S.loading?skelRows(6):discHTML()}</div>
+  ${staleBar()}`;
+}
+function discHTML(){
+  if(!S.disc.length) return `<div class="empty"><div class="big">🔥</div>Pulling the ${esc(S.discType)} list…</div>`;
+  return S.disc.map(t=>{
+    const p=t.priceUsd??t.price, c=t.change24h??t.priceChange24h??t.change;
+    return `<div class="tokenrow" onclick="inspect('${esc(t.mint||t.address||"")}')">
+      <div class="ticon">${t.icon?`<img src="${esc(t.icon)}" onerror="this.remove()">`:""}<span>${esc((t.symbol||"?").slice(0,3))}</span></div>
+      <div><div class="tname">${esc(t.name||t.symbol||"Unknown")}</div>
+        <div class="tsym">${esc(t.symbol||"")} · ${fmtUSD(t.mcap)} mcap</div></div>
+      <div class="tprice"><div>${fmtUSD(p)}</div>
+        <div class="tchg ${pctCls(c)}">${fmtPct(c)}</div></div>
+    </div>`; }).join("");
+}
+async function loadDiscover(){
+  if(S.screen!=="discover") return;
+  S.loading=true; S.error=""; renderDiscover();
+  try{
+    const r=await Bridge.callTool("orbitx_screen_tokens",
+      {type:S.discType, interval:S.discInterval, limit:20, chain:"solana", authCode:getAuth()});
+    const list=r.rows||r.results||r.tokens||r.data||[];
+    S.disc=list.slice(0,20); S.fetchedAt=Date.now();
+    if(!S.disc.length) S.error="Screener returned no "+S.discType+" tokens for "+S.discInterval+". Try another list.";
+  }catch(e){ setErr(e); }
+  S.loading=false; renderDiscover();
+}
+/* ---------- Boot ---------- */
+renderExplore();
+</script>
+</body>
+</html>
