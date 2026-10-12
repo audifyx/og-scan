@@ -13,7 +13,7 @@
 -->
 <style>
 :root{
-  --neon:#00ff88; --neon-dim:#00cc6a; --bg:#05080a; --card:#0b1116;
+  --neon:#17ff4d; --neon-dim:#00cc6a; --bg:#05080a; --card:#0b1116;
   --card2:#0e151b; --line:#1b2a33; --txt:#eafff2; --mut:#8fa3ad;
   --red:#ff5470; --amber:#ffb02e;
   --r:18px; --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
@@ -28,19 +28,19 @@ body{padding:var(--sat) 0 var(--sab) 0;display:flex;justify-content:center}
 /* ambient background */
 #bgfx{position:absolute;inset:0;pointer-events:none;z-index:0;
   background:
-    radial-gradient(600px 300px at 50% -80px, rgba(0,255,136,.10), transparent 70%),
-    radial-gradient(400px 240px at 90% 110%, rgba(0,255,136,.05), transparent 70%);}
+    radial-gradient(600px 300px at 50% -80px, rgba(23,255,77,.10), transparent 70%),
+    radial-gradient(400px 240px at 90% 110%, rgba(23,255,77,.05), transparent 70%);}
 #bgfx::after{content:"";position:absolute;inset:0;opacity:.5;
-  background-image:linear-gradient(rgba(0,255,136,.05) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(0,255,136,.05) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(23,255,77,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(23,255,77,.05) 1px,transparent 1px);
   background-size:36px 36px;
   mask-image:radial-gradient(500px 500px at 50% 0%, #000 30%, transparent 80%);}
 .screen{position:relative;z-index:1;animation:rise .35s cubic-bezier(.2,.9,.25,1)}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
 .logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
-  background:linear-gradient(135deg,#062b1a,#03120b);border:1px solid rgba(0,255,136,.35);
-  box-shadow:0 0 22px rgba(0,255,136,.25), inset 0 0 12px rgba(0,255,136,.12)}
+  background:linear-gradient(135deg,#062b1a,#03120b);border:1px solid rgba(23,255,77,.35);
+  box-shadow:0 0 22px rgba(23,255,77,.25), inset 0 0 12px rgba(23,255,77,.12)}
 .logo img.oxlogo{width:38px;height:38px;border-radius:12px}
 .brand{font-weight:800;letter-spacing:.14em;font-size:15px}
 .brand small{display:block;font-weight:500;letter-spacing:.32em;font-size:9px;color:var(--mut)}
@@ -49,17 +49,17 @@ body{padding:var(--sat) 0 var(--sab) 0;display:flex;justify-content:center}
 .card{background:linear-gradient(180deg,rgba(17,26,32,.92),rgba(10,16,20,.96));
   border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px;
   box-shadow:0 12px 32px rgba(0,0,0,.45)}
-.card.neon{border-color:rgba(0,255,136,.35);box-shadow:0 0 0 1px rgba(0,255,136,.08),0 14px 40px rgba(0,0,0,.5),0 0 34px rgba(0,255,136,.08)}
+.card.neon{border-color:rgba(23,255,77,.35);box-shadow:0 0 0 1px rgba(23,255,77,.08),0 14px 40px rgba(0,0,0,.5),0 0 34px rgba(23,255,77,.08)}
 h2{margin:0 0 4px;font-size:20px;font-weight:800}
 .sub{color:var(--mut);font-size:13px;margin:0 0 14px;line-height:1.5}
 input[type=text],input[type=number]{width:100%;background:#060b0e;border:1px solid var(--line);
   color:var(--txt);border-radius:14px;padding:14px;font-size:16px;outline:none;transition:.2s}
-input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,255,136,.12)}
+input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(23,255,77,.12)}
 .btn{display:block;width:100%;border:none;cursor:pointer;border-radius:16px;padding:16px;
   font-size:16px;font-weight:800;letter-spacing:.02em;transition:transform .12s, box-shadow .2s, opacity .2s}
 .btn:active{transform:scale(.98)}
-.btn-neon{background:linear-gradient(180deg,#0bff96,#00d970);color:#03130b;
-  box-shadow:0 8px 28px rgba(0,255,136,.35)}
+.btn-neon{background:linear-gradient(180deg,#17ff4d,#17ff4d);color:#03130b;
+  box-shadow:0 8px 28px rgba(23,255,77,.35)}
 .btn-neon:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
 .btn-ghost{background:var(--card2);color:var(--txt);border:1px solid var(--line)}
 .btn-danger{background:rgba(255,84,112,.1);color:var(--red);border:1px solid rgba(255,84,112,.4)}
@@ -68,22 +68,22 @@ input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,255,136,.12)}
 /* search results */
 .tok{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;
   border:1px solid transparent;cursor:pointer;transition:.15s}
-.tok:hover,.tok:active{background:rgba(0,255,136,.05);border-color:rgba(0,255,136,.25)}
+.tok:hover,.tok:active{background:rgba(23,255,77,.05);border-color:rgba(23,255,77,.25)}
 .tok .avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none;
-  font-weight:800;font-size:15px;color:#03130b;background:linear-gradient(135deg,#0bff96,#00b4ff)}
+  font-weight:800;font-size:15px;color:#03130b;background:linear-gradient(135deg,#17ff4d,#00b4ff)}
 .tok .meta{flex:1;min-width:0}.tok .sym{font-weight:800;font-size:15px}
 .tok .name{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tok .num{text-align:right;font-size:13px}.tok .num b{display:block;font-size:14px}
 .tok .num span{color:var(--mut);font-size:11px}
-.verified{font-size:10px;color:var(--neon);border:1px solid rgba(0,255,136,.4);
+.verified{font-size:10px;color:var(--neon);border:1px solid rgba(23,255,77,.4);
   border-radius:6px;padding:1px 5px;margin-left:6px}
 /* side toggle */
 .side-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#060b0e;
   border:1px solid var(--line);border-radius:16px;padding:6px;margin-bottom:12px}
 .side-toggle button{border:none;background:transparent;color:var(--mut);font-weight:800;
   font-size:15px;padding:12px;border-radius:12px;cursor:pointer;transition:.2s}
-.side-toggle button.on-buy{background:linear-gradient(180deg,#0bff96,#00d970);color:#03130b;
-  box-shadow:0 4px 18px rgba(0,255,136,.35)}
+.side-toggle button.on-buy{background:linear-gradient(180deg,#17ff4d,#17ff4d);color:#03130b;
+  box-shadow:0 4px 18px rgba(23,255,77,.35)}
 .side-toggle button.on-sell{background:linear-gradient(180deg,#ff6b8a,#e83a5f);color:#fff;
   box-shadow:0 4px 18px rgba(255,84,112,.35)}
 /* amount */
@@ -91,13 +91,13 @@ input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,255,136,.12)}
 .amtwrap input{flex:1;font-size:22px;font-weight:800;text-align:right}
 .curtog{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
 .curtog button{background:#060b0e;border:none;color:var(--mut);padding:8px 14px;font-weight:800;font-size:13px;cursor:pointer}
-.curtog button.on{background:rgba(0,255,136,.14);color:var(--neon)}
+.curtog button.on{background:rgba(23,255,77,.14);color:var(--neon)}
 /* slippage */
 .slips{display:flex;gap:8px;flex-wrap:wrap}
 .slip{border:1px solid var(--line);background:#060b0e;color:var(--mut);border-radius:12px;
   padding:10px 14px;font-weight:700;font-size:14px;cursor:pointer;transition:.15s}
-.slip.on{border-color:var(--neon);color:var(--neon);background:rgba(0,255,136,.08);
-  box-shadow:0 0 14px rgba(0,255,136,.15)}
+.slip.on{border-color:var(--neon);color:var(--neon);background:rgba(23,255,77,.08);
+  box-shadow:0 0 14px rgba(23,255,77,.15)}
 /* quote rows */
 .qrow{display:flex;justify-content:space-between;align-items:center;padding:11px 2px;
   border-bottom:1px dashed rgba(27,42,51,.8);font-size:14px}
@@ -115,10 +115,10 @@ input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,255,136,.12)}
 /* status */
 .status-hero{text-align:center;padding:26px 0 10px}
 .spinner{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;
-  border:3px solid rgba(0,255,136,.15);border-top-color:var(--neon);animation:spin 1s linear infinite}
+  border:3px solid rgba(23,255,77,.15);border-top-color:var(--neon);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .checkmark{width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;
-  background:rgba(0,255,136,.12);border:2px solid var(--neon);box-shadow:0 0 30px rgba(0,255,136,.4);
+  background:rgba(23,255,77,.12);border:2px solid var(--neon);box-shadow:0 0 30px rgba(23,255,77,.4);
   animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
 @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
 .xmark{width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;
@@ -134,7 +134,7 @@ input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,255,136,.12)}
 .countdown{font-variant-numeric:tabular-nums;font-weight:800;color:var(--amber)}
 .link{color:var(--neon);text-decoration:none;font-weight:700}
 .divider{height:1px;background:var(--line);margin:14px 0}
-.chip{display:inline-block;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);
+.chip{display:inline-block;background:rgba(23,255,77,.1);border:1px solid rgba(23,255,77,.3);
   color:var(--neon);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
 .hidden{display:none!important}
 </style>
@@ -499,7 +499,7 @@ function scrDone(el){
   el.innerHTML=header(false)+`
   <div class="card neon center">
     <div class="status-hero" style="padding-top:6px">
-      ${ok?'<div class="checkmark"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3"><path d="M4 12.5l5 5L20 6.5"/></svg></div>'
+      ${ok?'<div class="checkmark"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#17ff4d" stroke-width="3"><path d="M4 12.5l5 5L20 6.5"/></svg></div>'
           :'<div class="checkmark" style="border-color:var(--amber);box-shadow:0 0 30px rgba(255,176,46,.4)"><span style="font-size:28px">⏳</span></div>'}
       <h2>${ok?sideT+" ✓":"Submitted"}</h2>
       <p class="sub">${ok?"Confirmed on-chain.":"Broadcast — confirmation pending. Verify below."}</p>

@@ -60,6 +60,20 @@ export const UI_WIDGETS = [
     description: "Live group-chat feed with composer. Polls the GC transcript, posts via orbitx_gc_chat.",
     file: "orbitx-groupchat.html",
   },
+  {
+    uri: "ui://widget/orbitx-dashboard.html",
+    name: "orbitx-dashboard",
+    title: "OrbitX Dashboard",
+    description: "Home screen: portfolio snapshot, trending tokens, PnL summary, quick actions to every widget.",
+    file: "orbitx-dashboard.html",
+  },
+  {
+    uri: "ui://widget/orbitx-tools.html",
+    name: "orbitx-tools",
+    title: "OrbitX Tools",
+    description: "Browsable directory of everything the MCP can do — 24 categories, quick-open buttons.",
+    file: "orbitx-tools.html",
+  },
 ];
 
 const WIDGET_BY_URI = Object.fromEntries(UI_WIDGETS.map((w) => [w.uri, w]));
@@ -77,6 +91,8 @@ function loadAllWidgetHtml() {
     "ui://widget/orbitx-wallet.html": join(HERE, "orbitx-wallet.html"),
     "ui://widget/orbitx-media.html": join(HERE, "orbitx-media.html"),
     "ui://widget/orbitx-groupchat.html": join(HERE, "orbitx-groupchat.html"),
+    "ui://widget/orbitx-dashboard.html": join(HERE, "orbitx-dashboard.html"),
+    "ui://widget/orbitx-tools.html": join(HERE, "orbitx-tools.html"),
   };
   for (const [uri, path] of Object.entries(files)) {
     try {
@@ -155,6 +171,9 @@ export const UI_TOOL_WIDGET = {
   orbitx_app_launch: "ui://widget/orbitx-media.html",
   // group chat
   orbitx_gc_chat: "ui://widget/orbitx-groupchat.html",
+  // dashboard (home) + tools directory
+  orbitx_menu: "ui://widget/orbitx-dashboard.html",
+  orbitx_tools_help: "ui://widget/orbitx-tools.html",
 };
 
 /**

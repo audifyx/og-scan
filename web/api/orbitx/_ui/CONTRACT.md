@@ -6,7 +6,14 @@ Shared contract for the `ui://` widget set. Published from `web/api/orbitx/_ui/`
 
 | Resource URI | File | Widget |
 |---|---|---|
-| `ui://widget/orbitx-auth.html` | `web/api/orbitx/_ui/orbitx-auth.html` | Wallet connect / sign-in (Builder A) |
+| `ui://widget/orbitx-auth.html` | `web/api/orbitx/_ui/orbitx-auth.html` | Wallet connect / sign-in |
+| `ui://widget/orbitx-trade.html` | `web/api/orbitx/_ui/orbitx-trade.html` | Quote → confirm → trade |
+| `ui://widget/orbitx-token.html` | `web/api/orbitx/_ui/orbitx-token.html` | Token intel: scan, screeners, forensics, DEX chart hero |
+| `ui://widget/orbitx-wallet.html` | `web/api/orbitx/_ui/orbitx-wallet.html` | Wallet balances / PnL / swaps |
+| `ui://widget/orbitx-media.html` | `web/api/orbitx/_ui/orbitx-media.html` | Image gen / X post / launch |
+| `ui://widget/orbitx-groupchat.html` | `web/api/orbitx/_ui/orbitx-groupchat.html` | Group chat feed + composer |
+| `ui://widget/orbitx-dashboard.html` | `web/api/orbitx/_ui/orbitx-dashboard.html` | Dashboard home |
+| `ui://widget/orbitx-tools.html` | `web/api/orbitx/_ui/orbitx-tools.html` | Tools directory |
 
 Each tool that surfaces a widget links it via `_meta.ui.resourceUri` on the
 tool definition.
@@ -91,7 +98,7 @@ every async step, `prefers-reduced-motion` respected.
 
 ## Server contract (Builder D) — Apps SDK plumbing
 
-### Resources (all five, final URIs)
+### Resources (all eight, final URIs)
 
 | Resource URI | File | Widget | Tool→UI map |
 |---|---|---|---|
@@ -101,6 +108,8 @@ every async step, `prefers-reduced-motion` respected.
 | `ui://widget/orbitx-wallet.html` | `orbitx-wallet.html` | Balances / PnL / swaps | `orbitx_get_wallet`, `orbitx_adv_wallet_pnl`, `orbitx_adv_wallet_swaps`, `orbitx_app_pnl`, `orbitx_get_swaps` |
 | `ui://widget/orbitx-media.html` | `orbitx-media.html` | Image gen / X post / launch | `orbitx_generate_image` ✅ schema OK, `orbitx_x_post` ✅ schema OK, `orbitx_app_launch` ✅ schema OK |
 | `ui://widget/orbitx-groupchat.html` | `orbitx-groupchat.html` | Group chat feed + composer | `orbitx_gc_chat` ✅ schema OK |
+| `ui://widget/orbitx-dashboard.html` | `orbitx-dashboard.html` | Dashboard home: portfolio, trending, quick actions | `orbitx_menu` ✅ schema OK |
+| `ui://widget/orbitx-tools.html` | `orbitx-tools.html` | Tools directory: 24 categories, quick-open | `orbitx_tools_help` ✅ schema OK |
 
 ### Tool `_meta` (verified against current Apps SDK docs — set on every UI-bound tool)
 

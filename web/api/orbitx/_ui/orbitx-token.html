@@ -11,13 +11,16 @@
           else standalone fallback POSTs to https://www.orbitx.world/api/mcp
   Tools: orbitx_search, orbitx_crypto_scan, orbitx_screen_tokens,
          orbitx_get_forensics, orbitx_dex_chart, orbitx_get_chart
-  Charts: real DexScreener embed (real pair address from scan) + TradingView +
-          real OrbitX OHLCV candles. Never drawn approximations.
+  Charts: OrbitX OHLC hero (real candles from orbitx_get_chart, 1m/5m/15m/1h/4h/1d
+          re-query) + DexScreener preview card (server-verified pairAddress/embedUrl/pageUrl
+          from orbitx_dex_chart; embed iframe is user-gated, never auto-rendered in the
+          Apps SDK sandbox) + TradingView (tab shown only for mapped major symbols).
+          Never drawn approximations, never a dead/blank iframe.
 -->
 <style>
 :root{
   --bg:#04070a; --panel:#0a0f14; --panel2:#0d141b; --line:#14202a;
-  --neon:#00ff88; --neon2:#00d4ff; --dim:#8fa3b3; --txt:#eaf4ee;
+  --neon:#17ff4d; --neon2:#00d4ff; --dim:#8fa3b3; --txt:#eaf4ee;
   --red:#ff4d5e; --amber:#ffb02e; --violet:#b06bff;
   --r:16px;
 }
@@ -27,12 +30,12 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
   min-height:100vh}
 #bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-   radial-gradient(600px 300px at 15% -5%, rgba(0,255,136,.09), transparent 60%),
+   radial-gradient(600px 300px at 15% -5%, rgba(23,255,77,.09), transparent 60%),
    radial-gradient(700px 380px at 90% 10%, rgba(0,212,255,.07), transparent 60%),
-   radial-gradient(500px 500px at 50% 110%, rgba(0,255,136,.05), transparent 60%);}
+   radial-gradient(500px 500px at 50% 110%, rgba(23,255,77,.05), transparent 60%);}
 #app{position:relative;z-index:1;max-width:620px;margin:0 auto;padding:14px 14px 60px}
 .header{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
-.logo img.oxlogo{width:30px;height:30px;border-radius:8px;filter:drop-shadow(0 0 8px rgba(0,255,136,.7))}
+.logo img.oxlogo{width:30px;height:30px;border-radius:8px;filter:drop-shadow(0 0 8px rgba(23,255,77,.7))}
 .brand{font-weight:800;letter-spacing:2px;font-size:17px}
 .brand small{display:block;font-size:9px;letter-spacing:3px;color:var(--neon);font-weight:600}
 .back{margin-left:auto;background:#0d151c;border:1px solid var(--line);color:var(--txt);
@@ -41,20 +44,20 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
   background:rgba(4,7,10,.9);backdrop-filter:blur(10px);padding:8px 0}
 .tab{flex:1;text-align:center;padding:10px 6px;border-radius:12px;font-size:13px;font-weight:700;
   background:var(--panel);border:1px solid var(--line);color:var(--dim);cursor:pointer;letter-spacing:.5px}
-.tab.on{background:rgba(0,255,136,.1);border-color:var(--neon);color:var(--neon);
-  box-shadow:0 0 14px rgba(0,255,136,.25)}
+.tab.on{background:rgba(23,255,77,.1);border-color:var(--neon);color:var(--neon);
+  box-shadow:0 0 14px rgba(23,255,77,.25)}
 .card{background:linear-gradient(160deg,var(--panel),var(--panel2));
   border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px;
   box-shadow:0 6px 24px rgba(0,0,0,.4)}
-.card.glow{border-color:rgba(0,255,136,.4);box-shadow:0 0 20px rgba(0,255,136,.12)}
+.card.glow{border-color:rgba(23,255,77,.4);box-shadow:0 0 20px rgba(23,255,77,.12)}
 .row{display:flex;align-items:center;gap:10px}
 .mut{color:var(--dim);font-size:12px}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 input[type=text],input[type=url],input[type=number],textarea,select{
   width:100%;background:#080d12;border:1px solid var(--line);border-radius:12px;
   color:var(--txt);padding:12px 14px;font-size:15px;outline:none}
-input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,255,136,.2)}
-.btn{background:linear-gradient(135deg,#00ff88,#00c86e);border:0;color:#03130b;font-weight:800;
+input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(23,255,77,.2)}
+.btn{background:linear-gradient(135deg,#17ff4d,#00c86e);border:0;color:#03130b;font-weight:800;
   border-radius:12px;padding:13px 16px;font-size:15px;cursor:pointer;width:100%;letter-spacing:.5px}
 .btn:active{transform:scale(.98)}
 .btn.ghost{background:#0d151c;color:var(--neon);border:1px solid var(--neon)}
@@ -64,7 +67,7 @@ input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
   color:var(--dim);font-size:13px;font-weight:600;cursor:pointer}
-.chip.on{border-color:var(--neon);color:var(--neon);background:rgba(0,255,136,.08)}
+.chip.on{border-color:var(--neon);color:var(--neon);background:rgba(23,255,77,.08)}
 .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
 .stat{background:#080d12;border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center}
 .stat .v{font-size:15px;font-weight:800;color:var(--txt)}
@@ -83,16 +86,16 @@ input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,
 .tchg{font-size:12px;font-weight:700}
 .up{color:var(--neon)} .down{color:var(--red)}
 .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.5px}
-.badge.good{background:rgba(0,255,136,.12);color:var(--neon);border:1px solid rgba(0,255,136,.4)}
+.badge.good{background:rgba(23,255,77,.12);color:var(--neon);border:1px solid rgba(23,255,77,.4)}
 .badge.warn{background:rgba(255,176,46,.12);color:var(--amber);border:1px solid rgba(255,176,46,.4)}
 .badge.bad{background:rgba(255,77,94,.12);color:var(--red);border:1px solid rgba(255,77,94,.4)}
 .badge.info{background:rgba(0,212,255,.1);color:var(--neon2);border:1px solid rgba(0,212,255,.35)}
 .score{width:54px;height:54px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
   font-weight:800;font-size:17px;border:3px solid var(--neon);
-  box-shadow:0 0 12px rgba(0,255,136,.35);background:#080d12}
+  box-shadow:0 0 12px rgba(23,255,77,.35);background:#080d12}
 .skel{position:relative;overflow:hidden;background:#0d141b;border-radius:12px;min-height:18px}
 .skel::after{content:"";position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(0,255,136,.08),transparent);
+  background:linear-gradient(90deg,transparent,rgba(23,255,77,.08),transparent);
   animation:sh 1.2s infinite}
 @keyframes sh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .err{background:rgba(255,77,94,.08);border:1px solid rgba(255,77,94,.4);border-radius:14px;
@@ -110,12 +113,21 @@ input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,
 .disclaim{background:rgba(255,176,46,.07);border:1px solid rgba(255,176,46,.35);border-radius:14px;
   padding:12px 14px;font-size:12.5px;color:#ffd9a0;margin-bottom:12px;line-height:1.5}
 .chartwrap{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#000;margin-top:10px}
-.chartwrap iframe{width:100%;height:420px;border:0;display:block}
+.chartwrap.hero{min-height:480px}
+.chartwrap iframe{width:100%;height:480px;border:0;display:block}
+.tfx{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+.tfx .lbl{font-size:11px;color:var(--dim);letter-spacing:1px;margin-right:2px}
+.tfx .chip{padding:7px 12px;font-size:12px}
+.dexprev{padding:16px}
+.bigpx{font-size:24px;font-weight:800}
+.chartbtn{background:#0d151c;border:1px solid var(--line);border-radius:10px;color:var(--neon);
+  font-size:15px;padding:8px 10px;cursor:pointer;flex-shrink:0}
+.chartbtn:active{transform:scale(.95)}
 .ctabs{display:flex;gap:6px;margin-top:10px}
 .ctab{flex:1;padding:9px 4px;font-size:12px;font-weight:700;text-align:center;border-radius:10px;
   background:var(--panel);border:1px solid var(--line);color:var(--dim);cursor:pointer}
-.ctab.on{color:var(--neon);border-color:var(--neon);background:rgba(0,255,136,.07)}
-#ohlcCanvas{width:100%;height:340px;display:block;background:#05080b}
+.ctab.on{color:var(--neon);border-color:var(--neon);background:rgba(23,255,77,.07)}
+#ohlcCanvas{width:100%;height:440px;display:block;background:#05080b}
 .copybtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
   padding:2px 8px;font-size:11px;cursor:pointer;margin-left:6px}
 .copybtn:active{color:var(--neon);border-color:var(--neon)}
@@ -181,8 +193,15 @@ window.addEventListener("orbitx-auth-changed",()=>{ if(typeof render==="function
 /* ================= State ================= */
 const S = { screen:"explore", q:"", results:[], token:null, mint:null,
   discType:"trending", discInterval:"1h", disc:[], forensics:null,
-  chartTab:"dex", ohlc:null, fetchedAt:0, error:"", loading:false,
-  lastQ:"", copied:false };
+  chartTab:"ohlc", tf:"1h", ohlc:null, dexInfo:null, tvSym:null,
+  dexEmbedded:false, chartScroll:false, sparkQ:false,
+  fetchedAt:0, error:"", loading:false, lastQ:"", copied:false };
+/* Timeframes (re-query orbitx_get_chart / orbitx_dex_chart) */
+const TF_LIST=["1m","5m","15m","1h","4h","1d"];
+/* TradingView only lists major pairs — arbitrary mints render TV's own
+   "invalid symbol" state, so the tab is hidden unless we map a real symbol. */
+const TV_MAP={SOL:"COINBASE:SOLUSD",USDC:"CRYPTO:USDCUSD",USDT:"CRYPTO:USDTUSD",
+  BTC:"COINBASE:BTCUSD",ETH:"COINBASE:ETHUSD"};
 
 /* ================= Helpers ================= */
 const app = document.getElementById("app");
@@ -214,7 +233,7 @@ function header(showBack, sub){
   </div>`+standaloneNote();
 }
 function toast(msg){ const t=document.createElement("div");
-  t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d151c;border:1px solid #00ff88;color:#00ff88;padding:10px 18px;border-radius:12px;font-size:13px;z-index:99";
+  t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d151c;border:1px solid #17ff4d;color:#17ff4d;padding:10px 18px;border-radius:12px;font-size:13px;z-index:99";
   t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
 </script>
 
@@ -271,6 +290,7 @@ function resultsHTML(){
       <div class="ticon">${t.icon?`<img src="${esc(t.icon)}" onerror="this.remove()">`:""}<span>${esc((t.symbol||"?").slice(0,3))}</span></div>
       <div><div class="tname">${esc(t.name||t.symbol||"Unknown")}</div>
         <div class="tsym">${esc(t.symbol||"")} · <span class="mono">${shortMint(t.mint||t.address)}</span></div></div>
+      <button class="chartbtn" title="Open chart" onclick="openChart('${esc(t.mint||t.address||"")}',event)">📈</button>
       <div class="tprice"><div>${fmtUSD(p)}</div>
         <div class="tchg ${pctCls(c)}">${fmtPct(c)}</div></div>
     </div>`; }).join("");
@@ -298,11 +318,17 @@ async function doSearch(q){
 async function inspect(mint, force){
   if(!mint) return;
   S.screen="token"; S.mint=mint; S.token=null; S.forensics=null; S.ohlc=null;
-  S.chartTab="dex"; S.error=""; S.loading=true; S.fetchedAt=0; renderToken();
+  S.chartTab="ohlc"; S.dexInfo=null; S.tvSym=null; S.dexEmbedded=false; S.sparkQ=false;
+  S.error=""; S.loading=true; S.fetchedAt=0; renderToken();
   try{
     const r=await Bridge.callTool("orbitx_crypto_scan",{mint, authCode:getAuth()});
     if(r.ok===false) throw new Error(r.error||r.message||"scan failed");
     S.token=r; S.fetchedAt=Date.now();
+    /* TradingView: only show the tab when a real symbol resolves */
+    try{ const tk2=(r.token&&r.token.token)||r.token||{};
+      S.tvSym=TV_MAP[String(tk2.symbol||"").toUpperCase()]||null; }catch(e){ S.tvSym=null; }
+    /* DexScreener: server-verified pair address + embed/page URLs (real fields) */
+    loadDexInfo(mint);
     try{
       const f=await Bridge.callTool("orbitx_get_forensics",{mint, authCode:getAuth()});
       if(f.ok!==false) S.forensics=f;
@@ -312,6 +338,24 @@ async function inspect(mint, force){
 }
 function refreshCurrent(){ if(S.screen==="token"&&S.mint) inspect(S.mint,true); }
 
+/* Server-verified DexScreener data: pairAddress/embedUrl/pageUrl/priceUsd/change24h.
+   Falls back to scan pair data if the call fails — never a guessed address. */
+async function loadDexInfo(mint){
+  try{
+    const r=await Bridge.callTool("orbitx_dex_chart",{ca:mint,interval:S.tf,authCode:getAuth()});
+    if(S.mint!==mint) return; /* user moved on */
+    if(r&&r.ok!==false&&r.pairAddress){
+      S.dexInfo=r;
+      if(S.chartTab==="dex") paintChart();
+      else { const pa=document.getElementById("pairaddr");
+        if(pa) pa.textContent=(r.dex||"dex")+" · "+String(r.pairAddress).slice(0,8)+"…"; }
+    }
+  }catch(e){ /* dex preview degrades to scan pair data */ }
+}
+/* Per-row "chart" affordance: open the dossier straight at the chart hero */
+function openChart(mint,ev){ if(ev&&ev.stopPropagation) ev.stopPropagation();
+  S.chartTab="ohlc"; S.chartScroll=true; inspect(mint); }
+
 /* ---------- Token screen ---------- */
 function renderToken(){
   const t=S.token, tk=t&&t.token? (t.token.token||t.token):null;
@@ -319,6 +363,9 @@ function renderToken(){
   const score=t&&t.token?t.token.score:null;
   app.innerHTML = header(true,"TOKEN DOSSIER")+tabsHTML()+errHTML()+(S.loading?tokenSkel():tokenHTML(t,tk,meta,score))+staleBar();
   if(!S.loading&&t) paintChart();
+  if(S.chartScroll){ S.chartScroll=false;
+    const el=document.getElementById("chartsect");
+    if(el) setTimeout(()=>{ try{el.scrollIntoView({behavior:"smooth",block:"start"});}catch(e){} },80); }
 }
 function tokenSkel(){
   return `<div class="card glow"><div class="skel" style="height:120px"></div></div>
@@ -370,14 +417,17 @@ function tokenHTML(t,tk,meta,score){
     </div>
   </div>
 
-  <div class="sect">📈 Live Chart — real candles</div>
-  <div class="card">
-    <div class="ctabs">
-      <div class="ctab ${S.chartTab==="dex"?"on":""}" onclick="S.chartTab='dex';renderToken()">DexScreener</div>
-      <div class="ctab ${S.chartTab==="tv"?"on":""}" onclick="S.chartTab='tv';renderToken()">TradingView</div>
-      <div class="ctab ${S.chartTab==="ohlc"?"on":""}" onclick="S.chartTab='ohlc';renderToken();loadOHLC()">OrbitX OHLC</div>
+  <div class="sect">📈 Live Chart — real market data</div>
+  <div class="card glow" id="chartsect">
+    <div class="tfx"><span class="lbl">TIMEFRAME</span>
+      ${TF_LIST.map(f=>`<div class="chip ${S.tf===f?"on":""}" onclick="setTF('${f}')">${f}</div>`).join("")}
     </div>
-    <div id="chartbox" class="chartwrap"></div>
+    <div class="ctabs">
+      <div class="ctab ${S.chartTab==="ohlc"?"on":""}" onclick="setChartTab('ohlc')">OrbitX OHLC</div>
+      <div class="ctab ${S.chartTab==="dex"?"on":""}" onclick="setChartTab('dex')">DexScreener</div>
+      ${S.tvSym?`<div class="ctab ${S.chartTab==="tv"?"on":""}" onclick="setChartTab('tv')">TradingView</div>`:""}
+    </div>
+    <div id="chartbox" class="chartwrap hero"></div>
     <div class="mut" style="margin-top:6px">Pair: <span class="mono" id="pairaddr">resolving…</span></div>
   </div>
 
@@ -432,54 +482,115 @@ function forensicsHTML(t,foren,sf){
 }
 
 /* ---------- Charts ---------- */
+function setChartTab(t){ S.chartTab=t; renderToken(); }
+function setTF(tf){ S.tf=tf; S.ohlc=null; S.sparkQ=false;
+  S.dexInfo=null; S.dexEmbedded=false;           /* re-resolve dex embed at the new interval */
+  if(S.mint) loadDexInfo(S.mint);
+  renderToken(); }
+function toggleDexEmbed(){ S.dexEmbedded=true; paintChart(); }
+
 function paintChart(){
   const box=document.getElementById("chartbox"); if(!box||!S.token) return;
-  const tk=S.token.token.token||S.token.token, pair=bestPair(S.token);
+  const tk=S.token.token.token||S.token.token;
+  const dx=S.dexInfo;
+  const pair=dx?{address:dx.pairAddress,dex:dx.dex||"dexscreener"}:bestPair(S.token);
   const pa=document.getElementById("pairaddr");
-  if(pair&&pa) pa.textContent=pair.dex+" · "+pair.address.slice(0,8)+"…";
+  if(pair&&pa) pa.textContent=(pair.dex||"")+" · "+String(pair.address).slice(0,8)+"…";
   else if(pa) pa.textContent="no pair data";
-  if(S.chartTab==="dex"){
-    const addr=(pair&&pair.address)||tk.mint;
-    box.innerHTML=`<iframe src="https://dexscreener.com/solana/${esc(addr)}?embed=1&theme=dark&trades=0&info=0"
-      title="DexScreener chart" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>`;
-  } else if(S.chartTab==="tv"){
-    const sym="CRYPTO:"+String(tk.symbol||"SOL").toUpperCase()+"USD";
-    box.innerHTML=`<div class="tradingview-widget-container" style="height:420px;width:100%">
-      <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>`;
-    // innerHTML scripts never run — inject the TradingView embed properly
-    const sc=document.createElement("script");
-    sc.src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    sc.async=true;
-    sc.textContent=JSON.stringify({symbol:sym,theme:"dark",style:"1",locale:"en",
-      hide_side_toolbar:true,allow_symbol_change:true,autosize:true,
-      backgroundColor:"rgba(4,7,10,1)"});
-    box.querySelector(".tradingview-widget-container").appendChild(sc);
-    const note=document.createElement("div");
-    note.className="mut"; note.style.marginTop="6px";
-    note.textContent="TradingView symbol "+sym+" — TradingView only lists major pairs; arbitrary mints show its own 'invalid symbol' state. DexScreener tab always works.";
-    box.appendChild(note);
-  } else {
-    box.innerHTML=`<div style="padding:20px"><div class="skel" style="height:300px" id="ohlcskel"></div>
-      <canvas id="ohlcCanvas" style="display:none"></canvas><div class="mut" id="ohlcmsg" style="margin-top:6px"></div></div>`;
-    if(S.ohlc) drawOHLC(); else loadOHLC();
+  if(S.chartTab==="tv"&&!S.tvSym) S.chartTab="ohlc";
+  if(S.chartTab==="dex") paintDex(box,tk,pair,dx);
+  else if(S.chartTab==="tv") paintTV(box);
+  else paintOHLCBox(box);
+}
+/* OrbitX OHLC hero — real candles from orbitx_get_chart, re-queried per timeframe */
+function paintOHLCBox(box){
+  box.innerHTML=`<div style="padding:16px"><div class="skel" style="height:440px" id="ohlcskel"></div>
+    <canvas id="ohlcCanvas" style="display:none"></canvas><div class="mut" id="ohlcmsg" style="margin-top:6px"></div></div>`;
+  if(S.ohlc) drawOHLC(); else loadOHLC();
+}
+/* DexScreener tab — honest preview card FIRST (real data), embed only on user tap.
+   Never auto-renders a possibly-blocked iframe in the Apps SDK sandbox. */
+function paintDex(box,tk,pair,dx){
+  if(S.dexEmbedded&&dx&&dx.embedUrl){
+    const page=dx.pageUrl||(pair?"https://dexscreener.com/solana/"+pair.address:"https://dexscreener.com");
+    box.innerHTML=`<iframe src="${esc(dx.embedUrl)}" title="DexScreener chart" loading="lazy"
+      sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+      <div style="padding:10px 14px 14px">
+        <button class="btn sm ghost" style="width:100%" onclick="openUrl('${esc(page)}')">Open live chart ↗</button>
+      </div>`;
+    return;
   }
+  const addr=pair&&pair.address;
+  const page=dx&&dx.pageUrl?dx.pageUrl:(addr?"https://dexscreener.com/solana/"+addr:"https://dexscreener.com");
+  const px=dx&&dx.priceUsd!=null?dx.priceUsd:tk.priceUsd;
+  const ch=dx&&dx.change24h!=null?dx.change24h:tk.change24h;
+  box.innerHTML=`<div class="dexprev">
+    <div class="row" style="justify-content:space-between">
+      <div><div class="mut">LAST PRICE</div><div class="bigpx">${fmtUSD(px)}</div></div>
+      <div style="text-align:right"><div class="mut">24H</div>
+        <div class="bigpx ${pctCls(ch)}">${fmtPct(ch)}</div></div>
+    </div>
+    <canvas id="dexspark" style="width:100%;height:90px;margin:10px 0;display:block"></canvas>
+    <div class="mut mono" style="margin-bottom:10px">Pair ${addr?esc(String(addr)):"—"} · ${dx?"verified via OrbitX dex feed":"resolving via OrbitX dex feed…"}</div>
+    <button class="btn" style="margin-bottom:8px" onclick="openUrl('${esc(page)}')">Open live chart ↗</button>
+    ${addr?`<button class="btn ghost" onclick="toggleDexEmbed()">Try embedded chart</button>`
+      :`<div class="mut">No pair address yet — live link still works.</div>`}
+    <div class="mut" style="margin-top:8px;font-size:11px">Embedded charts can be blocked inside the ChatGPT sandbox — the live link always works.</div>
+  </div>`;
+  const cv=document.getElementById("dexspark");
+  if(!cv) return;
+  if(S.ohlc&&S.ohlc.length) drawSpark(cv,S.ohlc);
+  else if(!S.sparkQ&&S.mint){ S.sparkQ=true;
+    Bridge.callTool("orbitx_get_chart",{mint:S.mint,interval:"15m",limit:48,chain:"solana",authCode:getAuth()})
+      .then(r=>{ const c=r.candles||r.data||r.ohlc||[];
+        if(c.length){ S.ohlc=c; if(S.chartTab==="dex") paintChart(); } })
+      .catch(()=>{}); }
+}
+/* TradingView — only reachable when a real symbol resolved (tab is hidden otherwise) */
+function paintTV(box){
+  box.innerHTML=`<div class="tradingview-widget-container" style="height:480px;width:100%">
+    <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>`;
+  // innerHTML scripts never run — inject the TradingView embed properly
+  const sc=document.createElement("script");
+  sc.src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+  sc.async=true;
+  sc.textContent=JSON.stringify({symbol:S.tvSym,theme:"dark",style:"1",locale:"en",
+    hide_side_toolbar:true,allow_symbol_change:true,autosize:true,
+    backgroundColor:"rgba(4,7,10,1)"});
+  box.querySelector(".tradingview-widget-container").appendChild(sc);
+}
+/* Mini sparkline from real OHLC closes */
+function drawSpark(cv,rows){
+  try{
+    const dpr=window.devicePixelRatio||1, W=cv.clientWidth||520, H=90;
+    cv.width=W*dpr; cv.height=H*dpr;
+    const x=cv.getContext("2d"); x.scale(dpr,dpr);
+    const cl=rows.map(c=>Number(c.close!=null?c.close:c.c)).filter(Number.isFinite);
+    if(cl.length<2) return;
+    const mx=Math.max.apply(null,cl), mn=Math.min.apply(null,cl), rg=(mx-mn)||1;
+    x.strokeStyle=cl[cl.length-1]>=cl[0]?"#17ff4d":"#ff4d5e"; x.lineWidth=2; x.beginPath();
+    cl.forEach((v,i)=>{ const px=i/(cl.length-1)*W, py=6+(H-12)*(1-(v-mn)/rg);
+      i?x.lineTo(px,py):x.moveTo(px,py); });
+    x.stroke();
+  }catch(e){}
 }
 async function loadOHLC(){
   const msg=document.getElementById("ohlcmsg"); const sk=document.getElementById("ohlcskel");
   try{
-    const r=await Bridge.callTool("orbitx_get_chart",{mint:S.mint,interval:"1h",limit:60,chain:"solana",authCode:getAuth()});
+    const r=await Bridge.callTool("orbitx_get_chart",{mint:S.mint,interval:S.tf,limit:60,chain:"solana",authCode:getAuth()});
     const c=r.candles||r.data||r.ohlc||[];
     S.ohlc=c;
     if(sk) sk.style.display="none";
     const cv=document.getElementById("ohlcCanvas"); if(cv) cv.style.display="block";
-    if(!c.length){ if(msg) msg.textContent="No candle data returned for this token."; return; }
+    if(!c.length){ if(msg) msg.textContent="No candle data returned for this token at "+S.tf+"."; return; }
     drawOHLC();
-    if(msg) msg.textContent=c.length+" real 1h candles from OrbitX — never simulated.";
+    if(msg) msg.textContent=c.length+" real "+S.tf+" candles from OrbitX — never simulated.";
+    if(S.chartTab==="dex") paintChart(); /* refresh dex preview sparkline */
   }catch(e){ if(msg) msg.textContent="Candle feed error: "+e.message; if(sk) sk.style.display="none"; }
 }
 function drawOHLC(){
   const cv=document.getElementById("ohlcCanvas"); if(!cv||!S.ohlc) return;
-  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||560, H=340;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||560, H=440;
   cv.width=W*dpr; cv.height=H*dpr;
   const x=cv.getContext("2d"); x.scale(dpr,dpr);
   const rows=S.ohlc.map(c=>({o:+c.open??+c.o,h:+c.high??+c.h,l:+c.low??+c.l,cl:+c.close??+c.c,t:c.time||c.timestamp}));
@@ -494,7 +605,7 @@ function drawOHLC(){
   rows.forEach((r,i)=>{
     const cx=i*cw+cw/2, bw=Math.max(2,cw*0.6);
     const y=o=>10+(H-40)*(1-(o-mn)/rg);
-    const up=r.cl>=r.o, col=up?"#00ff88":"#ff4d5e";
+    const up=r.cl>=r.o, col=up?"#17ff4d":"#ff4d5e";
     x.strokeStyle=col; x.fillStyle=col;
     x.beginPath(); x.moveTo(cx,y(r.h)); x.lineTo(cx,y(r.l)); x.stroke();
     const yo=y(r.o), yc=y(r.cl);
@@ -527,6 +638,7 @@ function discHTML(){
       <div class="ticon">${t.icon?`<img src="${esc(t.icon)}" onerror="this.remove()">`:""}<span>${esc((t.symbol||"?").slice(0,3))}</span></div>
       <div><div class="tname">${esc(t.name||t.symbol||"Unknown")}</div>
         <div class="tsym">${esc(t.symbol||"")} · ${fmtUSD(t.mcap)} mcap</div></div>
+      <button class="chartbtn" title="Open chart" onclick="openChart('${esc(t.mint||t.address||"")}',event)">📈</button>
       <div class="tprice"><div>${fmtUSD(p)}</div>
         <div class="tchg ${pctCls(c)}">${fmtPct(c)}</div></div>
     </div>`; }).join("");

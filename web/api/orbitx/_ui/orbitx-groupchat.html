@@ -20,7 +20,7 @@
 <style>
 :root{
   --bg:#04070a; --panel:#0a0f14; --panel2:#0d141b; --line:#14202a;
-  --neon:#00ff88; --neon2:#00d4ff; --dim:#8fa3b3; --txt:#eaf4ee;
+  --neon:#17ff4d; --neon2:#00d4ff; --dim:#8fa3b3; --txt:#eaf4ee;
   --red:#ff4d5e; --amber:#ffb02e; --r:16px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -28,12 +28,12 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;min-height:100vh}
 #bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-   radial-gradient(600px 300px at 15% -5%, rgba(0,255,136,.09), transparent 60%),
+   radial-gradient(600px 300px at 15% -5%, rgba(23,255,77,.09), transparent 60%),
    radial-gradient(700px 380px at 90% 10%, rgba(0,212,255,.07), transparent 60%),
-   radial-gradient(500px 500px at 50% 110%, rgba(0,255,136,.05), transparent 60%);}
+   radial-gradient(500px 500px at 50% 110%, rgba(23,255,77,.05), transparent 60%);}
 #app{position:relative;z-index:1;max-width:620px;margin:0 auto;padding:14px 14px 90px}
 .header{display:flex;align-items:center;gap:10px;margin:4px 0 6px}
-.logo img.oxlogo{width:30px;height:30px;border-radius:8px;filter:drop-shadow(0 0 8px rgba(0,255,136,.7))}
+.logo img.oxlogo{width:30px;height:30px;border-radius:8px;filter:drop-shadow(0 0 8px rgba(23,255,77,.7))}
 .brand{font-weight:800;letter-spacing:2px;font-size:17px}
 .brand small{display:block;font-size:9px;letter-spacing:3px;color:var(--neon);font-weight:600}
 .livepill{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);
@@ -58,12 +58,12 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
 #composer .row{max-width:620px;margin:0 auto;display:flex;gap:8px}
 #msgin{flex:1;background:#080d12;border:1px solid var(--line);border-radius:14px;color:var(--txt);
   padding:13px 14px;font-size:15px;outline:none;font-family:inherit;resize:none;max-height:110px}
-#msgin:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,255,136,.2)}
-#sendbtn{background:linear-gradient(135deg,#00ff88,#00c86e);border:0;color:#03130b;font-weight:800;
+#msgin:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(23,255,77,.2)}
+#sendbtn{background:linear-gradient(135deg,#17ff4d,#00c86e);border:0;color:#03130b;font-weight:800;
   border-radius:14px;padding:0 20px;font-size:15px;cursor:pointer;min-height:50px}
 #sendbtn:disabled{opacity:.45;cursor:default}
 #sendbtn:active{transform:scale(.97)}
-.btn{background:linear-gradient(135deg,#00ff88,#00c86e);border:0;color:#03130b;font-weight:800;
+.btn{background:linear-gradient(135deg,#17ff4d,#00c86e);border:0;color:#03130b;font-weight:800;
   border-radius:12px;padding:13px 16px;font-size:15px;cursor:pointer;width:100%}
 .btn.ghost{background:#0d151c;color:var(--neon);border:1px solid var(--neon)}
 .btn.sm{width:auto;padding:8px 14px;font-size:13px}
@@ -80,7 +80,7 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
 .empty .big{font-size:44px;margin-bottom:10px}
 .skel{position:relative;overflow:hidden;background:#0d141b;border-radius:12px;min-height:18px;margin-bottom:8px}
 .skel::after{content:"";position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(0,255,136,.08),transparent);animation:sh 1.2s infinite}
+  background:linear-gradient(90deg,transparent,rgba(23,255,77,.08),transparent);animation:sh 1.2s infinite}
 @keyframes sh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .upd{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);margin:10px 2px 0}
 .upd button{background:none;border:1px solid var(--line);color:var(--neon);border-radius:8px;
