@@ -34,6 +34,7 @@ import {
   Rocket,
   Briefcase,
   FlaskConical,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -186,6 +187,7 @@ export const AppSidebar = ({
     { to: "/agentplus", icon: Bot, label: "AgentPlus", eyebrow: "AI agent fleet" },
     { to: "/copy", icon: Copy, label: "Copy Trading", eyebrow: "Live mirror" },
     { to: "/ai-hub", icon: Sparkles, label: "AI Hub", eyebrow: "Chat · Trade · Launch" },
+    { to: "/mcp", icon: Plug, label: "MCP", eyebrow: "Connect AI agents" },
     { id: "community", icon: Hash, label: "Social", eyebrow: "Chat · Rooms · Spaces" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
   ];
