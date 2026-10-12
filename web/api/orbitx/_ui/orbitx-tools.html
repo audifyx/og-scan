@@ -129,12 +129,18 @@ const Bridge = {
       return await window.OrbitX.callTool(name, args);
     }
     const res = await fetch(MCP_URL, {
-      method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"},
-      body: JSON.stringify({jsonrpc:"2.0", id:"w"+Date.now(), method:"tools/call",
+      method:"POST",
+      headers:{"Content-Type":"application/json","Accept":"application/json, text/event-stream"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"w"+Date.now()+Math.floor(Math.random()*999), method:"tools/call",
         params:{name, arguments:args||{}}})
     });
     if(!res.ok) throw new Error("MCP HTTP "+res.status);
-    const j = await res.json();
+    const raw = await res.text();
+    let j;
+    try{
+      const lines = raw.split(/\r?\n/).filter(l=>l.indexOf("data:")===0);
+      j = JSON.parse((lines.length?lines[lines.length-1].slice(5):raw).trim());
+    }catch(e){ throw new Error("bad MCP response"); }
     if(j.error) throw new Error(j.error.message||"tool error");
     const r = j.result||{};
     if(r.structuredContent) return r.structuredContent;

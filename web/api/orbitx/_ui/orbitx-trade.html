@@ -151,14 +151,21 @@ const Bridge = {
     if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
       return await window.OrbitX.callTool(name, args); // hosted bridge (CONTRACT.md)
     }
-    // standalone fallback: JSON-RPC over postMessage is N/A here; POST directly
+    // standalone fallback: POST MCP JSON-RPC directly (no bridge).
+    // Sends Accept for both plain JSON and SSE; parses either.
     const res = await fetch(MCP_URL, {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({jsonrpc:"2.0", id:"t"+Date.now(), method:"tools/call",
+      method:"POST",
+      headers:{"Content-Type":"application/json","Accept":"application/json, text/event-stream"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"t"+Date.now()+Math.floor(Math.random()*999), method:"tools/call",
         params:{name, arguments:args||{}}})
     });
     if(!res.ok) throw new Error("MCP HTTP "+res.status);
-    const j = await res.json();
+    const raw = await res.text();
+    let j;
+    try{
+      const lines = raw.split(/\r?\n/).filter(l=>l.indexOf("data:")===0);
+      j = JSON.parse((lines.length?lines[lines.length-1].slice(5):raw).trim());
+    }catch(e){ throw new Error("bad MCP response"); }
     if(j.error) throw new Error(j.error.message||"tool error");
     const content = j.result && j.result.content;
     if(Array.isArray(content)){
@@ -170,8 +177,37 @@ const Bridge = {
   }
 };
 const AUTH_KEY = "orbitx_auth_code";
-const getAuth = ()=>{ try{ return localStorage.getItem(AUTH_KEY)||""; }catch(e){ return ""; } };
-const setAuth = (c)=>{ try{ localStorage.setItem(AUTH_KEY,c); }catch(e){} };
+const AUTH_KEYS_T = ["orbitx.authCode","orbitx_auth_code"];
+const getAuth = ()=>{ try{ for(const k of AUTH_KEYS_T){ const v=localStorage.getItem(k); if(v) return v; } }catch(e){} return ""; };
+const setAuth = (c)=>{ try{ localStorage.setItem("orbitx.authCode",c); }catch(e){} try{ localStorage.setItem(AUTH_KEY,c); }catch(e){} };
+function openUrl(href){ if(!href) return;
+  try{
+    if(window.openai&&typeof window.openai.openExternal==="function"){ window.openai.openExternal({href}); return; }
+    if(window.OrbitX&&typeof window.OrbitX.openUrl==="function"){ window.OrbitX.openUrl(href); return; }
+  }catch(e){}
+  window.open(href,"_blank","noopener"); }
+
+/* ---------- Standalone auth: link → wallet sign-in → paste code ---------- */
+const SA = { link:"", busy:false };
+function saIsStandalone(){
+  return !((window.openai&&typeof window.openai.callTool==="function")
+    || (window.OrbitX&&typeof window.OrbitX.callTool==="function"));
+}
+async function saGetLink(){
+  if(SA.busy) return; SA.busy=true; render();
+  try{
+    const r = await Bridge.callTool("orbitx_auth_link", {});
+    const u = r && (r.url||r.authUrl||r.auth_url||r.authLink||r.link);
+    if(!u) throw new Error("no auth URL returned");
+    SA.link = u; openUrl(u);
+  }catch(e){ SA.link=""; }
+  SA.busy=false; render();
+}
+function saSaveTrade(){
+  const el=document.getElementById("authin");
+  const v=el && el.value ? el.value.trim() : "";
+  if(!v) return; setAuth(v); S.authCode=v; SA.link=""; S.screen="search"; render();
+}
 
 /* ================= State ================= */
 const S = {
@@ -218,15 +254,19 @@ function scrAuth(el){
   <div class="card neon center">
     <h2>Connect OrbitX</h2>
     <p class="sub">Trading runs on your connected OrbitX wallet.<br>Connect once — your session key stays on this device.</p>
-    <button class="btn btn-neon" onclick="location.href='https://www.orbitx.world'">Connect on orbitx.world</button>
-    <div class="divider"></div>
+    ${saIsStandalone()
+      ? (SA.link
+        ? `<p class="tiny mut">Sign-in link opened — complete wallet sign-in there, then paste your code:</p>`
+        : `<button class="btn btn-neon" onclick="saGetLink()">${SA.busy?"…":"Get sign-in link"}</button>
+           <div class="divider"></div>`)
+      : `<button class="btn btn-neon" onclick="location.href='https://www.orbitx.world'">Connect on orbitx.world</button>
+         <div class="divider"></div>`}
     <p class="tiny mut">Already have a session code? Paste it:</p>
-    <input type="text" id="authin" placeholder="paste authCode" style="margin-bottom:10px">
-    <button class="btn btn-ghost" onclick="saveAuth()">Save session</button>
+    <input type="text" id="authin" placeholder="paste authCode" style="margin-bottom:10px" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="btn btn-ghost" onclick="saSaveTrade()">Save session</button>
+    ${saIsStandalone()&&SA.link?`<p class="tiny mut" style="margin-top:8px"><a href="#" onclick="openUrl(SA.link);return false;">re-open sign-in link</a></p>`:""}
   </div>`;
 }
-function saveAuth(){ const v=document.getElementById("authin").value.trim();
-  if(!v) return; setAuth(v); S.authCode=v; S.screen="search"; render(); }
 
 /* ---- token search ---- */
 function scrSearch(el){

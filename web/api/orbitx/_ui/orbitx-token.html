@@ -148,14 +148,21 @@ const Bridge = {
     if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
       return await window.OrbitX.callTool(name, args); // hosted bridge (CONTRACT.md)
     }
-    // standalone fallback: POST MCP JSON-RPC directly
+    // standalone fallback: POST MCP JSON-RPC directly (no bridge).
+    // Sends Accept for both plain JSON and SSE; parses either.
     const res = await fetch(MCP_URL, {
-      method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"},
-      body: JSON.stringify({jsonrpc:"2.0", id:"t"+Date.now(), method:"tools/call",
+      method:"POST",
+      headers:{"Content-Type":"application/json","Accept":"application/json, text/event-stream"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"t"+Date.now()+Math.floor(Math.random()*999), method:"tools/call",
         params:{name, arguments:args||{}}})
     });
     if(!res.ok) throw new Error("MCP HTTP "+res.status);
-    const j = await res.json();
+    const raw = await res.text();
+    let j;
+    try{
+      const lines = raw.split(/\r?\n/).filter(l=>l.indexOf("data:")===0);
+      j = JSON.parse((lines.length?lines[lines.length-1].slice(5):raw).trim());
+    }catch(e){ throw new Error("bad MCP response"); }
     if(j.error) throw new Error(j.error.message||"tool error");
     const r = j.result||{};
     if(r.structuredContent) return r.structuredContent;
@@ -184,7 +191,7 @@ function openUrl(href){ if(!href) return;
   }catch(e){}
   window.open(href,"_blank","noopener"); }
 function standaloneNote(){ const hosted=(window.openai&&window.openai.callTool)||(window.OrbitX&&window.OrbitX.callTool);
-  return hosted?"":`<div class="mut" style="text-align:center;font-size:11px;margin-bottom:10px;opacity:.8">⚙ standalone preview — reads work live; writes need the OrbitX bridge</div>`; }
+  return hosted?"":`<div class="mut" style="text-align:center;font-size:11px;margin-bottom:10px;opacity:.8">⚙ standalone mode — reads live · paste your authCode from the Auth widget to enable writes</div>`; }
 document.addEventListener("click",e=>{
   const a=e.target&&e.target.closest?e.target.closest("a[target='_blank']"):null;
   if(a&&a.href){ e.preventDefault(); openUrl(a.href); } });
@@ -657,6 +664,17 @@ async function loadDiscover(){
 }
 /* ---------- Boot ---------- */
 renderExplore();
+/* Standalone (no host bridge): auto-load trending so the widget shows real
+   data immediately instead of an empty shell. Bridge mode keeps the
+   toolOutput-driven flow untouched. */
+(function(){
+  const bridged = (window.openai&&typeof window.openai.callTool==="function")
+    || (window.OrbitX&&typeof window.OrbitX.callTool==="function");
+  const hasBootstrap = !!(window.openai && window.openai.toolOutput);
+  if(!bridged && !hasBootstrap){
+    S.screen="discover"; render(); loadDiscover();
+  }
+})();
 </script>
 </body>
 </html>

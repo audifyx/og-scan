@@ -107,12 +107,18 @@ const Bridge = {
       return await window.OrbitX.callTool(name, args);
     }
     const res = await fetch(MCP_URL, {
-      method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"},
-      body: JSON.stringify({jsonrpc:"2.0", id:"w"+Date.now(), method:"tools/call",
+      method:"POST",
+      headers:{"Content-Type":"application/json","Accept":"application/json, text/event-stream"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"w"+Date.now()+Math.floor(Math.random()*999), method:"tools/call",
         params:{name, arguments:args||{}}})
     });
     if(!res.ok) throw new Error("MCP HTTP "+res.status);
-    const j = await res.json();
+    const raw = await res.text();
+    let j;
+    try{
+      const lines = raw.split(/\r?\n/).filter(l=>l.indexOf("data:")===0);
+      j = JSON.parse((lines.length?lines[lines.length-1].slice(5):raw).trim());
+    }catch(e){ throw new Error("bad MCP response"); }
     if(j.error) throw new Error(j.error.message||"tool error");
     const r = j.result||{};
     if(r.structuredContent) return r.structuredContent;
@@ -138,6 +144,32 @@ function openUrl(href){ if(!href) return;
 function standaloneNote(){ const hosted=(window.openai&&window.openai.callTool)||(window.OrbitX&&window.OrbitX.callTool);
   return hosted?"":`<div class="mut" style="text-align:center;font-size:11px;margin-bottom:10px;opacity:.8">⚙ standalone preview — reads work live; posting needs the OrbitX bridge</div>`; }
 window.addEventListener("orbitx-auth-changed",()=>{ boot(true); });
+
+/* ---------- Standalone auth (no bridge): link → wallet sign-in → paste code ---------- */
+const SA = { link:"", busy:false };
+function saIsStandalone(){
+  return !((window.openai&&typeof window.openai.callTool==="function")
+    || (window.OrbitX&&typeof window.OrbitX.callTool==="function"));
+}
+async function saGetLink(){
+  if(SA.busy) return; SA.busy=true; render();
+  try{
+    const r = await Bridge.callTool("orbitx_auth_link", {});
+    const u = r && (r.url||r.authUrl||r.auth_url||r.authLink||r.link);
+    if(!u) throw new Error("no auth URL returned");
+    SA.link = u; openUrl(u);
+  }catch(e){ SA.link=""; }
+  SA.busy=false; render();
+}
+function saSave(){
+  const el=document.getElementById("sacode");
+  const v=el && el.value ? el.value.trim() : "";
+  if(!v) return;
+  try{ localStorage.setItem("orbitx.authCode", v); }catch(e){}
+  try{ localStorage.setItem("orbitx_auth_code", v); }catch(e){}
+  SA.link=""; SA.busy=false;
+  boot(true);
+}
 
 /* ================= State ================= */
 const S = { phase:"boot", chat:null, chats:[], messages:[], msgIds:{},
@@ -187,11 +219,19 @@ function bootView(){
     <div class="skel" style="height:44px"></div>`;
 }
 function noAuthView(){
+  const linkFlow = saIsStandalone() ? (
+    SA.link
+    ? `<div class="mut" style="line-height:1.6;margin-bottom:10px">Sign-in link opened — complete wallet sign-in there, then paste your code:</div>
+       <div style="display:flex;gap:8px;max-width:420px;margin:0 auto 8px"><input id="sacode" placeholder="paste authCode" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0">
+       <button class="btn sm" onclick="saSave()">Save</button></div>
+       <div class="mut" style="font-size:12px"><a href="#" onclick="openUrl(SA.link);return false;">re-open sign-in link</a></div>`
+    : `<button class="btn" onclick="saGetLink()">${SA.busy?"…":"Get sign-in link"}</button>`
+  ) : `<button class="btn" onclick="document.dispatchEvent(new CustomEvent('orbitx-show-auth'))">Open connect widget</button>`;
   app.innerHTML = header() + `<div class="card" style="text-align:center;padding:30px 18px">
     <div style="font-size:44px;margin-bottom:12px">🔐</div>
     <div style="font-weight:800;font-size:16px;margin-bottom:8px">Link OrbitX to join the chat</div>
-    <div class="mut" style="line-height:1.6;margin-bottom:16px">Group chat needs your OrbitX session.<br>Connect once in the auth widget — this widget picks it up automatically.</div>
-    <button class="btn" onclick="document.dispatchEvent(new CustomEvent('orbitx-show-auth'))">Open connect widget</button>
+    <div class="mut" style="line-height:1.6;margin-bottom:16px">Group chat needs your OrbitX session.</div>
+    ${linkFlow}
   </div>`;
 }
 function joinView(){

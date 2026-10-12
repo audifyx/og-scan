@@ -352,11 +352,17 @@ let rpcId=1;
 async function hostCallTool(name,args){
   if(window.OrbitX&&typeof window.OrbitX.callTool==='function')
     return window.OrbitX.callTool(name,args||{});
-  // standalone fallback: MCP JSON-RPC over HTTPS
-  const res=await fetch(RPC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({jsonrpc:'2.0',id:rpcId++,method:'tools/call',params:{name,arguments:args||{}}})});
+  // standalone fallback: MCP JSON-RPC over HTTPS (Accept JSON + SSE, parse either)
+  const res=await fetch(RPC_URL,{method:'POST',
+    headers:{'Content-Type':'application/json','Accept':'application/json, text/event-stream'},
+    body:JSON.stringify({jsonrpc:'2.0',id:'a'+(rpcId++)+'_'+Date.now(),method:'tools/call',params:{name,arguments:args||{}}})});
   if(!res.ok) throw new Error('network '+res.status);
-  const data=await res.json();
+  const raw=await res.text();
+  let data;
+  try{
+    const lines=raw.split(/\r?\n/).filter(l=>l.indexOf('data:')===0);
+    data=JSON.parse((lines.length?lines[lines.length-1].slice(5):raw).trim());
+  }catch(e){ throw new Error('bad rpc response'); }
   if(data.error) throw new Error(data.error.message||'rpc error');
   const r=data.result||{};
   if(r.structuredContent) return r.structuredContent;
