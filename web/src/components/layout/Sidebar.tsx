@@ -1,6 +1,6 @@
 import {
   Coins, Compass, FlaskConical, Hash, LogOut, Mail, Pencil,
-  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home, FileText, Bell, Trophy, Radar, LineChart, Sparkles, Gamepad2} from "lucide-react";
+  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home, FileText, Bell, Trophy, Radar, LineChart, Sparkles, Gamepad2, Plug} from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,7 @@ const primaryItems: NavItem[] = [
   { to: "/app",           icon: Home,     label: "Home",         eyebrow: "Command hub" },
   { to: "/community",     icon: Hash,     label: "Social",       eyebrow: "Channels · Rooms · Spaces" },
   { to: "/messages",      icon: Mail,     label: "Messages",     eyebrow: "Direct messages" },
+  { to: "/mcp",           icon: Plug,     label: "MCP",          eyebrow: "Connect AI agents" },
 ];
 
 const accountItems: NavItem[] = [

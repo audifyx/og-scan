@@ -2,7 +2,7 @@ import {
   Wallet, Coins, LineChart, Wrench, Rocket, Radio, Users, Bell, 
   Sparkles, LogOut, Zap, User, ChevronRight, MessageSquare, Settings,
   Crown, Shield, Webhook, Headphones, Globe2, ArrowLeftRight,
-  Gamepad2,
+  Gamepad2, Plug,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ import { SheetClose } from "@/components/ui/sheet";
 
 const mainNavItems = [
   { to: "/communities", icon: Globe2, label: "Communities" },
+  { to: "/mcp", icon: Plug, label: "MCP" },
 ];
 
 const socialNavItems = [

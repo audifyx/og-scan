@@ -245,6 +245,8 @@ const CityGate = lazyWithRetry(() => import("./pages/orbitxcity/CityGate"));
 const McpMarketplacePage = lazyWithRetry(() => import("./pages/orbitxmcp/MarketplaceHome"));
 const McpDetailPage = lazyWithRetry(() => import("./pages/orbitxmcp/McpDetailPage"));
 const McpSubmitPage = lazyWithRetry(() => import("./pages/orbitxmcp/SubmitMcpPage"));
+const McpSetupPage = lazyWithRetry(() => import("./pages/mcp/McpSetupPage"));
+const McpGuidePage = lazyWithRetry(() => import("./pages/mcp/McpGuidePage"));
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
 
@@ -714,7 +716,8 @@ const App = () => (
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             {/* Public shell — page handles wallet sign-in (avoids mobile auth spinner traps) */}
             <Route path="/supercomputer" element={<McpSuperComputer />} />
-            <Route path="/mcp" element={<RedirectPreserveSearch to="/supercomputer" />} />
+            <Route path="/mcp" element={<Suspense fallback={<RouteFallback label="MCP" />}><McpSetupPage /></Suspense>} />
+            <Route path="/mcp/guide" element={<Suspense fallback={<RouteFallback label="MCP Guide" />}><McpGuidePage /></Suspense>} />
             <Route path="/vc" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/vc/:slug" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/voice" element={<Suspense fallback={<RouteFallback label="Voice" />}><VoiceLobbyBrowser /></Suspense>} />
