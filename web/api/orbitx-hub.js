@@ -6062,13 +6062,21 @@ async function handleMcp(req, res, parts) {
 
     if (method === "initialize") {
       // Clean handshake only — do NOT advertise "unauthenticated" (Claude treats that as a hard error).
+      // Negotiate protocol version: return the client's version when we support it,
+      // else fall back to 2024-11-05. ChatGPT's Apps SDK requires 2025-06-18 and
+      // fails discovery when answered with an older version.
+      const SUPPORTED_PROTOCOLS = ["2024-11-05", "2025-03-26", "2025-06-18"];
+      const requestedVersion = params?.protocolVersion;
+      const negotiatedVersion = SUPPORTED_PROTOCOLS.includes(requestedVersion)
+        ? requestedVersion
+        : "2024-11-05";
       return json(
         res,
         {
           jsonrpc: "2.0",
           id,
           result: {
-            protocolVersion: "2024-11-05",
+            protocolVersion: negotiatedVersion,
             capabilities: { tools: {}, resources: {} },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
