@@ -6433,10 +6433,27 @@ async function handleMcp(req, res, parts) {
         const wrapped = wrapMcpToolContent(result);
         // ChatGPT Mini App: attach widget _meta to the RESULT (not just the
         // tool definition) so ChatGPT renders the UI widget instead of raw JSON.
+        // Also embed the widget as a resource in content (Method C from Apps SDK spec)
+        // for hosts that need the actual resource reference.
         try {
           const widgetMeta = toolListingMeta({ name });
           if (widgetMeta && typeof wrapped === "object" && wrapped) {
             wrapped._meta = { ...(wrapped._meta && typeof wrapped._meta === "object" ? wrapped._meta : {}), ...widgetMeta };
+            // Embed widget resource in content for ChatGPT to render
+            const widgetUri = widgetMeta?.ui?.resourceUri || widgetMeta?.["openai/outputTemplate"];
+            if (widgetUri && Array.isArray(wrapped.content)) {
+              // Only add if not already present
+              const hasWidget = wrapped.content.some(c => c?.type === "resource" && c?.resource?.uri === widgetUri);
+              if (!hasWidget) {
+                wrapped.content.push({
+                  type: "resource",
+                  resource: {
+                    uri: widgetUri,
+                    mimeType: "text/html",
+                  },
+                });
+              }
+            }
           }
         } catch {}
         return json(res, {
