@@ -91,6 +91,36 @@ a.tx{color:var(--neon2);text-decoration:none;font-size:12px}
 .holdrow:last-child{border-bottom:0}
 .warnbar{background:rgba(255,176,46,.07);border:1px solid rgba(255,176,46,.35);border-radius:14px;
   padding:12px 14px;font-size:12.5px;color:#ffd9a0;margin-bottom:12px;line-height:1.5}
+/* ---------- #21 Shop & Boosts ---------- */
+.tabbar{display:flex;gap:6px;margin:2px 0 12px;background:#080d12;border:1px solid var(--line);border-radius:14px;padding:5px}
+.tab{flex:1;background:transparent;border:0;color:var(--dim);font-weight:800;font-size:12.5px;padding:12px 4px;border-radius:10px;cursor:pointer;min-height:44px}
+.tab.on{background:rgba(23,255,77,.12);color:var(--neon);box-shadow:inset 0 0 0 1px rgba(23,255,77,.35)}
+.shopgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.shopitem{background:#080d12;border:1px solid var(--line);border-radius:14px;padding:14px 10px;text-align:center;display:flex;flex-direction:column}
+.shopitem .ico{font-size:30px;margin-bottom:6px}
+.shopitem .t{font-weight:800;font-size:14px}
+.shopitem .d{color:var(--dim);font-size:11.5px;margin:6px 0 10px;line-height:1.45;flex:1}
+.shopitem .c{font-size:13px;font-weight:800;color:var(--neon);margin-bottom:10px}
+.btn.buy{width:100%;padding:11px;font-size:13px}
+.btn.danger{background:linear-gradient(135deg,#ff4d5e,#c81e3a);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.balrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #0f1720;font-size:13px;gap:8px}
+.balrow:last-child{border-bottom:0}
+.balrow .k{color:var(--dim)} .balrow .v{font-weight:800;text-align:right}
+.badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1px;padding:4px 10px;border-radius:8px;background:rgba(23,255,77,.12);color:var(--neon);border:1px solid rgba(23,255,77,.4)}
+.badge.exp{background:rgba(255,77,94,.1);color:var(--red);border-color:rgba(255,77,94,.35)}
+.badge.warn{background:rgba(255,176,46,.1);color:var(--amber);border-color:rgba(255,176,46,.4)}
+.confirmcard{border:1px solid rgba(255,176,46,.5);background:rgba(255,176,46,.05);border-radius:16px;padding:16px;margin-bottom:12px}
+.confirmcard h3{margin:0 0 10px;font-size:16px}
+.resultcard{border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid var(--line);background:#080d12}
+.resultcard.ok{border-color:rgba(23,255,77,.5)}
+.resultcard.bad{border-color:rgba(255,77,94,.5)}
+.field{width:100%;background:#080d12;border:1px solid var(--line);border-radius:12px;color:var(--txt);padding:12px 14px;font-size:14px;outline:none;font-family:inherit}
+.field:focus{border-color:var(--neon)}
+.copybtn{background:none;border:1px solid var(--line);color:var(--neon2);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;margin-left:6px}
+.boostform{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.histrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #0f1720;font-size:13px}
+.histrow:last-child{border-bottom:0}
 </style>
 </head>
 <body>
@@ -159,7 +189,11 @@ window.addEventListener("orbitx-auth-changed",()=>{ if(typeof render==="function
 
 /* ================= State ================= */
 const S = { addr:"", valid:null, wallet:null, pnlAgg:null, swaps:[],
-  chartPts:[], fetchedAt:0, error:"", loading:false, addrErr:"" };
+  chartPts:[], fetchedAt:0, error:"", loading:false, addrErr:"",
+  tab:"wallet",
+  shop:{loaded:false,loading:false,error:"",catalog:null,status:null,tiers:null,boosts:null,
+    credits:null,usage:null,confirmId:null,confirmBoost:null,boostMint:"",boostSymbol:"",
+    creditsSol:"0.1",buying:false,result:null} };
 
 /* ================= Helpers ================= */
 const app = document.getElementById("app");
@@ -269,6 +303,11 @@ function render(){
   </div>
   <div id="addrmsg"></div>
   <div style="margin:6px 0 14px"><button class="btn ghost sm" style="width:100%" onclick="loadConnected()">⚡ Use my connected OrbitX wallet</button></div>
+  <div class="tabbar">
+    <button class="tab ${S.tab==="wallet"?"on":""}" onclick="setTab('wallet')">💼 Wallet</button>
+    <button class="tab ${S.tab==="pnl"?"on":""}" onclick="setTab('pnl')">📊 PnL</button>
+    <button class="tab ${S.tab==="shop"?"on":""}" onclick="setTab('shop')">🛒 Shop</button>
+  </div>
   ${S.error?`<div class="err">⚠️ ${esc(S.error)}<div style="margin-top:8px"><button class="btn sm ghost" onclick="loadAll(${!S.addr})">Retry</button></div></div>`:""}
   <div id="body">${S.loading?bodySkel():bodyHTML()}</div>
   ${staleBar()}`;
@@ -281,14 +320,23 @@ function bodySkel(){
   <div class="card"><div class="skel" style="height:180px"></div></div>`;
 }
 function bodyHTML(){
+  if(S.tab==="shop") return shopTabHTML();
   const w=S.wallet;
   if(!w) return `<div class="empty"><div class="big">👛</div>
     Paste any Solana wallet address and hit <b>Track</b> —<br>
     portfolio value, per-token PnL, trade history & win-rate,<br>all live from OrbitX.</div>`;
+  if(S.tab==="pnl") return pnlHTML(w);
+  return walletHTML(w);
+}
+function walletData(w){
   const pnl=w.pnl||{};
   const holdings=(w.holdings||[]).filter(h=>(h.usd??h.valueUsd??0)>0.5);
   const perToken=pnl.perToken||pnl.positions||[];
   const emptyWallet=(w.totalUsd||0)<0.5&&!holdings.length&&!perToken.length&&!S.swaps.length;
+  return {pnl,holdings,perToken,emptyWallet};
+}
+function walletHTML(w){
+  const {pnl,holdings,emptyWallet}=walletData(w);
   if(emptyWallet) return emptyWalletHTML(w);
   return `
   <div class="card glow">
@@ -305,6 +353,12 @@ function bodyHTML(){
     </div>
   </div>
 
+  <div class="sect">💱 Holdings <span class="tag">${holdings.length} positions</span></div>
+  <div class="card">${holdings.length?holdings.map(holdRow).join(""):'<div class="mut">No token holdings above dust.</div>'}</div>`;
+}
+function pnlHTML(w){
+  const {pnl,holdings,perToken}=walletData(w);
+  return `
   <div class="sect">📊 PnL Over Time <span class="tag">from live trade history</span></div>
   <div class="card"><div id="pnlChartWrap">${pnlChartHTML()}</div>
     <div class="mut" style="margin-top:6px">Cumulative realized PnL per trade. Only real trade data — never interpolated.</div></div>
@@ -315,12 +369,10 @@ function bodyHTML(){
   <div class="sect">🪙 Per-Token PnL <span class="tag">realized + unrealized</span></div>
   <div class="card">${perToken.length?perToken.map(perTokenRow).join(""):holdings.length?holdings.map(holdRow).join(""):'<div class="mut">No per-token PnL reported.</div>'}</div>
 
-  <div class="sect">💱 Holdings <span class="tag">${holdings.length} positions</span></div>
-  <div class="card">${holdings.length?holdings.map(holdRow).join(""):'<div class="mut">No token holdings above dust.</div>'}</div>
-
   <div class="sect">📜 Trade History <span class="tag">${S.swaps.length} recent swaps</span></div>
   <div class="card">${S.swaps.length?S.swaps.map(swapRow).join(""):'<div class="mut">No recent swaps found for this wallet.</div>'}</div>`;
 }
+
 function emptyWalletHTML(w){
   return `<div class="card glow"><div class="empty"><div class="big">🌵</div>
     <b>No positions yet</b><br>
@@ -415,6 +467,368 @@ function drawPnLChart(){
   const el=document.getElementById("pnlLast");
   if(el) el.innerHTML=`Cumulative: <b class="${pctCls(last)}">${esc(signedUSD(last))}</b> across ${pts.length} trades`;
 }
+"use strict";
+/* ================= #21 Shop & Boosts =================
+   Real data only: orbitx_shop (catalog + purchases), orbitx_mcp_access_status
+   (active access + burn ledger), orbitx_mcp_access_confirm (Phantom-sign verify),
+   orbitx_credits_balance / orbitx_credits_usage / orbitx_credits_confirm,
+   orbitx_boost_tiers / orbitx_boosts / orbitx_request_boost.
+   Purchases are WRITE ops: authCode required, mandatory confirm screen. */
+const SHOP_HIST_KEY="orbitx_shop_history";
+const PKG_ICON={hour:"⏳",day:"📅",week:"🗓️",month:"🌙",credits:"⚡"};
+function shopHist(){ try{ return JSON.parse(localStorage.getItem(SHOP_HIST_KEY)||"[]"); }catch(e){ return []; } }
+function pushShopHist(e){ const h=shopHist(); h.unshift(e); try{ localStorage.setItem(SHOP_HIST_KEY,JSON.stringify(h.slice(0,50))); }catch(x){} }
+function setTab(t){ S.tab=t; if(t==="shop") loadShop(); render(); }
+function copyTxt(t){ try{ navigator.clipboard.writeText(t).then(()=>toast("Copied")); }catch(e){ toast("Copy failed"); } }
+function intStr(n){ const x=Number(n); return isNaN(x)?"—":x.toLocaleString("en-US"); }
+
+async function loadShop(){
+  if(S.shop.loading||S.shop.loaded) return;
+  S.shop.loading=true; S.shop.error=""; render();
+  const a={}; const ac=getAuth(); if(ac) a.authCode=ac;
+  try{
+    const [cat,st,tiers,boosts]=await Promise.all([
+      Bridge.callTool("orbitx_shop",{}).catch(e=>({ok:false,error:String(e.message||e)})),
+      Bridge.callTool("orbitx_mcp_access_status",a).catch(e=>({ok:false,error:String(e.message||e)})),
+      Bridge.callTool("orbitx_boost_tiers",a).catch(e=>({ok:false,error:String(e.message||e)})),
+      Bridge.callTool("orbitx_boosts",a).catch(e=>({ok:false,error:String(e.message||e)}))
+    ]);
+    if(cat&&cat.ok!==false) S.shop.catalog=cat;
+    if(st&&st.ok!==false) S.shop.status=st;
+    if(tiers&&tiers.tiers) S.shop.tiers=tiers;
+    if(boosts&&boosts.ok!==false) S.shop.boosts=boosts;
+    if(ac){
+      const c=await Bridge.callTool("orbitx_credits_balance",{authCode:ac}).catch(()=>null);
+      if(c&&c.ok!==false&&!c.error) S.shop.credits=c;
+      const u=await Bridge.callTool("orbitx_credits_usage",{authCode:ac,period:"all",limit:20}).catch(()=>null);
+      if(u&&u.ok!==false&&!u.error) S.shop.usage=u;
+    }
+    S.shop.loaded=true;
+  }catch(e){
+    if(authFail(e)) S.shop.error="Session expired — reconnect via the OrbitX auth widget, then retry.";
+    else S.shop.error=String(e.message||e);
+  }
+  S.shop.loading=false; render();
+}
+function shopPackages(){
+  const out=[];
+  const stPkgs=((S.shop.status||{}).packages)||[];
+  const catPkgs=((S.shop.catalog||{}).packages)||[];
+  for(const sp of stPkgs){
+    const cp=catPkgs.find(c=>c.id===sp.id)||{};
+    out.push({id:sp.id,title:cp.title||sp.label,label:sp.label,
+      tokens:sp.tokens,duration:sp.durationLabel||"",
+      desc:(sp.durationLabel||"MCP")+" of Agent MCP access. Burns destroy supply — non-custodial, you sign in Phantom."});
+  }
+  return out;
+}
+function orbitxBalance(){
+  const hs=(S.wallet&&S.wallet.holdings)||[];
+  for(const h of hs){ if(String(h.symbol||"").toUpperCase()==="ORBITX") return Number(h.amount??h.balance??h.uiAmount??0)||0; }
+  return null;
+}
+function tierUsd(id){ const t=((S.shop.tiers||{}).tiers||[]).find(x=>x.id===id); return t?t.usd:null; }
+
+/* ---------- tab render ---------- */
+function shopTabHTML(){
+  const sh=S.shop;
+  if(sh.loading||(!sh.loaded&&!sh.error)){
+    return `<div class="card glow"><div class="skel" style="height:90px"></div></div>
+    <div class="card"><div class="skel" style="height:200px"></div></div>`;
+  }
+  let h=`<div class="card glow">${shopBalanceHTML()}</div>`;
+  if(sh.error) h+=`<div class="err">⚠️ ${esc(sh.error)}</div>`;
+  if(sh.confirmId) h+=shopConfirmHTML();
+  if(sh.confirmBoost) h+=boostConfirmHTML();
+  if(sh.result) h+=shopResultHTML();
+  h+=`<div class="sect">🔥 MCP Access <span class="tag">burn $ORBITX · live catalog</span></div>`;
+  h+=shopAccessHTML();
+  h+=`<div class="sect">⚡ Credits <span class="tag">buy with SOL</span></div>`;
+  h+=`<div class="card">${shopCreditsHTML()}</div>`;
+  h+=`<div class="sect">🚀 Token Boosts <span class="tag">OG DEX placement</span></div>`;
+  h+=shopBoostsHTML();
+  h+=`<div class="sect">🧾 Purchase History <span class="tag">this device</span></div>`;
+  h+=`<div class="card">${shopHistoryHTML()}</div>`;
+  return h;
+}
+function shopBalanceHTML(){
+  const sh=S.shop, st=sh.status, bal=orbitxBalance(), cr=sh.credits;
+  const burned=st?(st.lifetimeTokensBurned??st.tokensBurned):null;
+  return `<div class="hero" style="padding:10px 6px 4px">
+      <div class="mut">$ORBITX BALANCE</div>
+      <div class="total" style="font-size:32px">${bal==null?"—":intStr(bal)}</div>
+      <div class="sub">${S.wallet?("wallet <span class='mono'>"+shortA(S.wallet.address||"")+"</span>"):"wallet not loaded — buys use your linked OrbitX wallet"}</div>
+    </div>
+    <div class="balrow"><span class="k">🔥 Lifetime $ORBITX burned</span><span class="v up">${burned==null?"—":intStr(burned)}</span></div>
+    <div class="balrow"><span class="k">⚡ Credits balance</span><span class="v">${cr?esc(String(cr.balance??cr.credits??cr.total??"—")):(getAuth()?"—":"🔒 locked")}</span></div>
+    ${st?`<div class="balrow"><span class="k">MCP access</span><span class="v">${st.active?'<span class="badge">ACTIVE</span>':'<span class="badge exp">'+esc(st.remainingLabel||"inactive")+'</span>'}</span></div>`:""}`;
+}
+function shopAccessHTML(){
+  const pkgs=shopPackages();
+  if(!pkgs.length) return `<div class="card"><div class="mut">Catalog unavailable.</div>
+    <div style="margin-top:8px"><button class="btn sm ghost" onclick="S.shop.loaded=false;loadShop()">↻ Retry</button></div></div>`;
+  return `<div class="shopgrid">${pkgs.map(p=>`
+    <div class="shopitem">
+      <div class="ico">${PKG_ICON[p.id]||"🎁"}</div>
+      <div class="t">${esc(p.title||p.label)}</div>
+      <div class="d">${esc(p.desc)}</div>
+      <div class="c">${intStr(p.tokens)} $ORBITX</div>
+      <button class="btn buy" onclick="buyPackage('${p.id}')">Buy</button>
+    </div>`).join("")}</div>
+  <div class="mut" style="margin-top:8px">Burns destroy supply. Non-custodial — you sign the burn in Phantom. Full shop: <a class="tx" target="_blank" href="${esc((S.shop.catalog&&S.shop.catalog.openUrl)||"https://www.orbitx.world/shop")}">orbitx.world/shop ↗</a></div>`;
+}
+
+/* ---------- MCP package purchase (mandatory confirm) ---------- */
+function buyPackage(id){ S.shop.confirmId=id; S.shop.confirmBoost=null; S.shop.result=null; render(); }
+function cancelBuy(){ S.shop.confirmId=null; S.shop.result=null; render(); }
+function shopConfirmHTML(){
+  const p=shopPackages().find(x=>x.id===S.shop.confirmId);
+  if(!p) return "";
+  const bal=orbitxBalance();
+  const afford=bal==null?null:bal>=p.tokens;
+  const after=bal==null?null:bal-p.tokens;
+  return `<div class="confirmcard">
+    <h3>⚠️ Confirm purchase</h3>
+    <div class="balrow"><span class="k">Item</span><span class="v">${esc(p.title||p.label)} — ${esc(p.duration)}</span></div>
+    <div class="balrow"><span class="k">Cost</span><span class="v" style="color:var(--amber)">${intStr(p.tokens)} $ORBITX</span></div>
+    <div class="balrow"><span class="k">Your balance</span><span class="v">${bal==null?"— (load wallet to check)":intStr(bal)+" $ORBITX"}</span></div>
+    <div class="balrow"><span class="k">Balance after</span><span class="v ${after!=null&&after<0?"down":""}">${after==null?"—":intStr(after)+" $ORBITX"}</span></div>
+    <div class="mut" style="margin:10px 0">This is a <b>WRITE</b> operation: ${intStr(p.tokens)} $ORBITX will be <b>burned</b> (destroyed, not transferred). Non-custodial — you sign in Phantom.</div>
+    ${afford===false?`<div class="err" style="margin-bottom:10px">⚠️ Insufficient balance — you need ${intStr(p.tokens)} $ORBITX.</div>`:""}
+    ${!getAuth()?`<div class="err" style="margin-bottom:10px">🔒 No authCode — connect via the OrbitX Auth widget first.</div>`:""}
+    <div class="row" style="gap:8px">
+      <button class="btn ghost sm" style="flex:1" onclick="cancelBuy()">Cancel</button>
+      <button class="btn danger sm" style="flex:2" ${S.shop.buying||afford===false||!getAuth()?"disabled":""} onclick="confirmBuy()">${S.shop.buying?"Working…":"Confirm & Burn"}</button>
+    </div></div>`;
+}
+async function confirmBuy(){
+  const id=S.shop.confirmId; if(!id||S.shop.buying) return;
+  S.shop.buying=true; S.shop.result=null; render();
+  try{
+    const r=await Bridge.callTool("orbitx_shop",{package:id,authCode:getAuth()});
+    const p=shopPackages().find(x=>x.id===id)||{};
+    shopHandleResult(r,{kind:"access",id,label:(p.title||p.label||id)+" — "+(p.duration||""),costStr:intStr(p.tokens)+" $ORBITX"});
+  }catch(e){
+    S.shop.result=authFail(e)?{ok:false,msg:"Session expired — reconnect via the OrbitX auth widget, then retry."}
+      :{ok:false,msg:String(e.message||e)};
+  }
+  S.shop.buying=false; render();
+}
+function shopHandleResult(r,meta){
+  if(!r||r.ok===false||r.error){
+    S.shop.result={ok:false,msg:String(r?(r.message||r.error):"empty response"),
+      fixUrl:(r&&(r.fixUrl||r.openUrl))||null,meta};
+    return;
+  }
+  const sig=r.signature||r.txSignature||r.tx||r.txHash||null;
+  const url=r.openUrl||r.signUrl||r.jupUrl||r.jupiterUrl||null;
+  if(sig){
+    pushShopHist({ts:Date.now(),kind:meta.kind,label:meta.label,costStr:meta.costStr,sig});
+    S.shop.result={ok:true,msg:"Purchase confirmed on-chain.",sig,meta};
+    refreshShopStatus();
+    return;
+  }
+  if(r.action==="ask_amount"||r.payTo){
+    const perSol=r.creditsPerSol||10000;
+    S.shop.result={ok:false,pending:true,creditsPay:true,
+      msg:String(r.message||"Send SOL to the desk wallet, then paste the tx signature."),
+      payTo:r.payTo,sol:meta.cost,costStr:meta.costStr,
+      credits:Math.round((Number(meta.cost)||0)*perSol),meta};
+    return;
+  }
+  if(url){
+    S.shop.result={ok:false,pending:true,msg:String(r.message||"Signature required — complete the burn in Phantom."),url,meta};
+    return;
+  }
+  S.shop.result={ok:false,msg:String(r.message||"Unexpected response from orbitx_shop."),meta};
+}
+function refreshShopStatus(){
+  const a={}; const ac=getAuth(); if(ac) a.authCode=ac;
+  Bridge.callTool("orbitx_mcp_access_status",a).then(r=>{ if(r&&r.ok!==false){ S.shop.status=r; if(S.tab==="shop") render(); } }).catch(()=>{});
+}
+
+/* ---------- result card ---------- */
+function shopResultHTML(){
+  const r=S.shop.result;
+  if(r.ok){
+    return `<div class="resultcard ok"><div class="badge">✓ DONE</div>
+      <div style="margin-top:8px;font-size:14px">${esc(r.msg)}</div>
+      ${r.meta&&r.meta.label?`<div class="mut" style="margin-top:4px">${esc(r.meta.label)}</div>`:""}
+      ${r.sig?`<div style="margin-top:6px"><a class="tx" target="_blank" href="https://solscan.io/tx/${esc(r.sig)}">View on Solscan ↗</a></div>`:""}
+      <div style="margin-top:10px"><button class="btn sm" onclick="S.shop.result=null;render()">Done</button></div></div>`;
+  }
+  if(r.pending&&r.creditsPay){
+    const sigId="creditsSig";
+    return `<div class="resultcard"><div class="badge warn">⏳ PAYMENT NEEDED</div>
+      <div style="margin-top:8px;font-size:14px">${esc(r.msg)}</div>
+      <div class="balrow"><span class="k">Send</span><span class="v" style="color:var(--amber)">${esc(String(r.sol))} SOL</span></div>
+      <div class="balrow"><span class="k">To desk wallet</span><span class="v mono" style="font-size:11px">${esc(r.payTo)}<button class="copybtn" onclick="copyTxt('${esc(r.payTo)}')">copy</button></span></div>
+      <div class="balrow"><span class="k">You get</span><span class="v up">≈ ${intStr(r.credits)} credits</span></div>
+      <div class="mut" style="margin:8px 0">After sending, paste the Solana transaction signature to credit your balance:</div>
+      <input class="field mono" id="${sigId}" placeholder="Solana tx signature…" autocapitalize="off" spellcheck="false">
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="btn ghost sm" style="flex:1" onclick="S.shop.result=null;render()">Cancel</button>
+        <button class="btn sm" style="flex:2" onclick="verifyCredits('${sigId}')">Verify payment</button>
+      </div></div>`;
+  }
+  if(r.pending){
+    const sigId="shopSig";
+    return `<div class="resultcard"><div class="badge warn">⏳ SIGNATURE NEEDED</div>
+      <div style="margin-top:8px;font-size:14px">${esc(r.msg)}</div>
+      ${r.url?`<div style="margin:10px 0"><button class="btn" onclick="openUrl('${esc(r.url)}')">Sign in Phantom →</button></div>`:""}
+      <div class="mut" style="margin:6px 0">After signing, paste the transaction signature to confirm the burn:</div>
+      <input class="field mono" id="${sigId}" placeholder="Solana tx signature…" autocapitalize="off" spellcheck="false">
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="btn ghost sm" style="flex:1" onclick="S.shop.result=null;render()">Cancel</button>
+        <button class="btn sm" style="flex:2" onclick="verifyMcpBurn('${sigId}','${esc(r.meta.id)}')">Verify burn</button>
+      </div></div>`;
+  }
+  return `<div class="resultcard bad"><div class="badge exp">✕ FAILED</div>
+    <div style="margin-top:8px;font-size:14px">${esc(r.msg)}</div>
+    ${r.fixUrl?`<div style="margin:10px 0"><button class="btn ghost" onclick="openUrl('${esc(r.fixUrl)}')">Open shop page →</button></div>`:""}
+    <div class="mut">No $ORBITX was moved.</div>
+    <div style="margin-top:10px"><button class="btn sm ghost" onclick="S.shop.result=null;render()">Dismiss</button></div></div>`;
+}
+async function verifyMcpBurn(inputId,pkgId){
+  const sig=((document.getElementById(inputId)||{}).value||"").trim();
+  if(!sig){ toast("Paste the tx signature first"); return; }
+  S.shop.buying=true; render();
+  try{
+    const r=await Bridge.callTool("orbitx_mcp_access_confirm",{signature:sig,package:pkgId,authCode:getAuth()});
+    if(r&&r.ok!==false&&!r.error){
+      const p=shopPackages().find(x=>x.id===pkgId)||{};
+      pushShopHist({ts:Date.now(),kind:"access",label:(p.title||p.label||pkgId)+" — "+(p.duration||""),costStr:intStr(p.tokens)+" $ORBITX",sig});
+      S.shop.result={ok:true,msg:"Burn confirmed — MCP access granted.",sig,meta:{label:p.title||p.label||pkgId}};
+      S.shop.confirmId=null; refreshShopStatus();
+    }else S.shop.result={ok:false,msg:String((r&&(r.message||r.error))||"Confirm failed"),meta:{id:pkgId}};
+  }catch(e){ S.shop.result={ok:false,msg:String(e.message||e),meta:{id:pkgId}}; }
+  S.shop.buying=false; render();
+}
+
+/* ---------- credits ---------- */
+function shopCreditsHTML(){
+  const cr=S.shop.credits, sol=S.shop.creditsSol||"0.1";
+  let h=`<div class="balrow"><span class="k">Credits balance</span><span class="v">${cr?esc(String(cr.balance??cr.credits??cr.total??"—")):"—"}</span></div>`;
+  h+=`<div class="mut" style="margin:10px 0">10,000 credits / 1 SOL — shared across Agent MCP + X MCP. Non-custodial Phantom sign.</div>`;
+  h+=`<div class="row" style="gap:8px"><input class="field mono" id="creditsSol" type="text" inputmode="decimal" value="${esc(sol)}" oninput="S.shop.creditsSol=this.value" autocapitalize="off" spellcheck="false" style="flex:1"><button class="btn sm" style="flex:1.4" onclick="buyCredits()">Buy credits</button></div>`;
+  h+=`<div class="mut" style="margin-top:6px">≈ ${intStr(Number(sol)*10000)} credits</div>`;
+  if(!getAuth()) h+=`<div class="mut" style="margin-top:6px">🔒 Connect via the OrbitX Auth widget to buy.</div>`;
+  return h;
+}
+async function buyCredits(){
+  if(!getAuth()){ S.shop.error="Connect via the OrbitX Auth widget first — credits purchase needs your authCode."; render(); return; }
+  const sol=parseFloat(S.shop.creditsSol);
+  if(!(sol>=0.001&&sol<=100)){ toast("Amount must be 0.001 – 100 SOL"); return; }
+  S.shop.buying=true; S.shop.result=null; render();
+  try{
+    const r=await Bridge.callTool("orbitx_shop",{package:"credits",amountSol:sol,authCode:getAuth()});
+    shopHandleResult(r,{kind:"credits",id:"credits",label:intStr(sol*10000)+" credits",cost:sol,costStr:String(sol)+" SOL"});
+  }catch(e){
+    S.shop.result=authFail(e)?{ok:false,msg:"Session expired — reconnect via the OrbitX auth widget, then retry."}
+      :{ok:false,msg:String(e.message||e)};
+  }
+  S.shop.buying=false; render();
+}
+async function verifyCredits(inputId){
+  const sig=((document.getElementById(inputId)||{}).value||"").trim();
+  if(!sig){ toast("Paste the tx signature first"); return; }
+  S.shop.buying=true; render();
+  try{
+    const r=await Bridge.callTool("orbitx_credits_confirm",{signature:sig,authCode:getAuth()});
+    if(r&&r.ok!==false&&!r.error){
+      pushShopHist({ts:Date.now(),kind:"credits",label:"Credits purchase",costStr:"—",sig});
+      S.shop.result={ok:true,msg:"Credits payment confirmed.",sig,meta:{label:"Credits"}};
+      const c=await Bridge.callTool("orbitx_credits_balance",{authCode:getAuth()}).catch(()=>null);
+      if(c&&c.ok!==false&&!c.error) S.shop.credits=c;
+    }else S.shop.result={ok:false,msg:String((r&&(r.message||r.error))||"Confirm failed"),meta:{id:"credits"}};
+  }catch(e){ S.shop.result={ok:false,msg:String(e.message||e),meta:{id:"credits"}}; }
+  S.shop.buying=false; render();
+}
+
+/* ---------- token boosts ---------- */
+function shopBoostsHTML(){
+  const sh=S.shop, tiers=((sh.tiers||{}).tiers)||[], active=((sh.boosts||{}).boosts)||[];
+  let h=`<div class="card">`;
+  if(!tiers.length) h+=`<div class="mut">Boost tiers unavailable.</div>`;
+  else h+=`<div class="shopgrid">${tiers.map(t=>`
+    <div class="shopitem">
+      <div class="ico">🚀</div><div class="t">${esc(t.label)}</div>
+      <div class="d">${t.hours}h of OG DEX token placement. Request goes pending — admin approves after payment.</div>
+      <div class="c">$${esc(String(t.usd))} USD</div>
+      <button class="btn buy" onclick="boostFormToggle('${esc(t.id)}')">Request</button>
+      ${sh.boostForm===t.id?boostFormHTML(t):""}
+    </div>`).join("")}</div>`;
+  if(sh.tiers&&sh.tiers.payWallet) h+=`<div class="mut" style="margin-top:8px">Pay wallet: <span class="mono" style="font-size:11px">${esc(sh.tiers.payWallet)}</span><button class="copybtn" onclick="copyTxt('${esc(sh.tiers.payWallet)}')">copy</button></div>`;
+  h+=`</div>`;
+  h+=`<div class="card" style="margin-top:12px"><div class="sect" style="margin:0 0 8px">Active boosts <span class="tag">${sh.boosts?(sh.boosts.count??active.length):"—"}</span></div>`;
+  h+=active.length?active.map(b=>`<div class="histrow"><div style="flex:1;min-width:0">
+      <div style="font-weight:700">${esc(b.symbol||b.tokenSymbol||shortA(b.mint||""))}</div>
+      <div class="mut">${esc(b.tier||b.label||"boost")}${b.expiresAt?" · ends "+esc(timeAgo(b.expiresAt)):""}</div></div>
+      <span class="badge">LIVE</span></div>`).join("")
+    :`<div class="mut">No active token boosts.</div>`;
+  h+=`</div>`;
+  return h;
+}
+function boostFormToggle(tierId){ S.shop.boostForm=S.shop.boostForm===tierId?null:tierId; render(); }
+function boostFormHTML(t){
+  return `<div class="boostform">
+    <input class="field mono" id="boostMint" placeholder="Token mint address…" value="${esc(S.shop.boostMint)}" oninput="S.shop.boostMint=this.value" autocapitalize="off" spellcheck="false">
+    <input class="field" id="boostSymbol" placeholder="Symbol (optional)" value="${esc(S.shop.boostSymbol)}" oninput="S.shop.boostSymbol=this.value" autocapitalize="off" spellcheck="false">
+    <button class="btn buy" onclick="reviewBoost('${esc(t.id)}','${esc(t.label)}')">Review request</button>
+  </div>`;
+}
+function reviewBoost(tierId,label){
+  const mint=(S.shop.boostMint||"").trim();
+  if(!isAddr(mint)){ toast("Enter a valid token mint"); return; }
+  if(!getAuth()){ S.shop.error="Connect via the OrbitX Auth widget first — boost requests need your authCode."; render(); return; }
+  S.shop.confirmBoost={tier:tierId,label,mint,symbol:(S.shop.boostSymbol||"").trim()};
+  S.shop.boostForm=null; render();
+}
+function boostConfirmHTML(){
+  const b=S.shop.confirmBoost; if(!b) return "";
+  const usd=tierUsd(b.tier);
+  return `<div class="confirmcard"><h3>⚠️ Confirm boost request</h3>
+    <div class="balrow"><span class="k">Tier</span><span class="v">${esc(b.label)} — $${esc(String(usd==null?"?":usd))} USD</span></div>
+    <div class="balrow"><span class="k">Token</span><span class="v mono">${esc(shortA(b.mint))}${b.symbol?" ("+esc(b.symbol)+")":""}</span></div>
+    <div class="mut" style="margin:10px 0">This is a <b>WRITE</b> operation. The request goes <b>pending</b> — an admin approves it after payment to the pay wallet. Token address shown, never any key.</div>
+    <div class="row" style="gap:8px">
+      <button class="btn ghost sm" style="flex:1" onclick="S.shop.confirmBoost=null;render()">Cancel</button>
+      <button class="btn danger sm" style="flex:2" ${S.shop.buying?"disabled":""} onclick="confirmBoost()">${S.shop.buying?"Working…":"Submit request"}</button>
+    </div></div>`;
+}
+async function confirmBoost(){
+  const b=S.shop.confirmBoost; if(!b||S.shop.buying) return;
+  S.shop.buying=true; S.shop.result=null; render();
+  try{
+    const args={mint:b.mint,tier:b.tier,authCode:getAuth()};
+    if(b.symbol) args.symbol=b.symbol;
+    const r=await Bridge.callTool("orbitx_request_boost",args);
+    if(r&&r.ok!==false&&!r.error){
+      const usd=tierUsd(b.tier);
+      pushShopHist({ts:Date.now(),kind:"boost",label:b.label+" — "+(b.symbol||shortA(b.mint)),costStr:usd==null?"—":"$"+usd+" USD",sig:null});
+      S.shop.result={ok:true,msg:String(r.message||"Boost request submitted — pending admin approval."),meta:{label:b.label}};
+      S.shop.confirmBoost=null;
+      const bb=await Bridge.callTool("orbitx_boosts",{authCode:getAuth()}).catch(()=>null);
+      if(bb&&bb.ok!==false) S.shop.boosts=bb;
+    }else S.shop.result={ok:false,msg:String((r&&(r.message||r.error))||"Request failed"),meta:{id:b.tier}};
+  }catch(e){
+    S.shop.result=authFail(e)?{ok:false,msg:"Session expired — reconnect via the OrbitX auth widget, then retry."}
+      :{ok:false,msg:String(e.message||e)};
+  }
+  S.shop.buying=false; render();
+}
+
+/* ---------- purchase history (this device) ---------- */
+function shopHistoryHTML(){
+  const h=shopHist();
+  if(!h.length) return `<div class="mut">No purchases from this device yet. Lifetime burn totals above are from the live access ledger.</div>`;
+  return h.map(e=>`<div class="histrow"><div style="flex:1;min-width:0">
+      <div style="font-weight:700">${esc(e.label||e.kind)}</div>
+      <div class="mut">${e.costStr?esc(e.costStr)+" · ":""}${esc(timeAgo(e.ts))}</div></div>
+      ${e.sig?`<a class="tx" target="_blank" href="https://solscan.io/tx/${esc(e.sig)}">Solscan ↗</a>`:'<span class="badge warn">PENDING</span>'}
+    </div>`).join("");
+}
+
 /* ---------- Boot ---------- */
 render();
 /* Standalone: if a saved authCode exists, validate + auto-load the linked
