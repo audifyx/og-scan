@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>OrbitX Trade Ticket</title>
+<!--
+  OrbitX ChatGPT Mini App — Trade Ticket
+  resourceUri: ui://widget/orbitx-trade.html
+  Bridge: window.OrbitX.callTool(name, args) when hosted in the OrbitX bridge,
+  standalone fallback: POST JSON-RPC tools/call -> https://www.orbitx.world/api/mcp
+  Trading law: NOTHING executes without explicit user confirmation on the CONFIRM screen.
+-->
+<style>
+:root{
+  --neon:#00ff88; --neon-dim:#00cc6a; --bg:#05080a; --card:#0b1116;
+  --card2:#0e151b; --line:#1b2a33; --txt:#eafff2; --mut:#8fa3ad;
+  --red:#ff5470; --amber:#ffb02e;
+  --r:18px; --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,"Segoe UI",Roboto,sans-serif;
+  min-height:100vh;overscroll-behavior:none}
+body{padding:var(--sat) 0 var(--sab) 0;display:flex;justify-content:center}
+#app{width:100%;max-width:480px;min-height:calc(100vh - var(--sat) - var(--sab));
+  position:relative;overflow:hidden;padding:18px 16px 28px}
+/* ambient background */
+#bgfx{position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(600px 300px at 50% -80px, rgba(0,255,136,.10), transparent 70%),
+    radial-gradient(400px 240px at 90% 110%, rgba(0,255,136,.05), transparent 70%);}
+#bgfx::after{content:"";position:absolute;inset:0;opacity:.5;
+  background-image:linear-gradient(rgba(0,255,136,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,255,136,.05) 1px,transparent 1px);
+  background-size:36px 36px;
+  mask-image:radial-gradient(500px 500px at 50% 0%, #000 30%, transparent 80%);}
+.screen{position:relative;z-index:1;animation:rise .35s cubic-bezier(.2,.9,.25,1)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#062b1a,#03120b);border:1px solid rgba(0,255,136,.35);
+  box-shadow:0 0 22px rgba(0,255,136,.25), inset 0 0 12px rgba(0,255,136,.12)}
+.logo svg{width:22px;height:22px}
+.brand{font-weight:800;letter-spacing:.14em;font-size:15px}
+.brand small{display:block;font-weight:500;letter-spacing:.32em;font-size:9px;color:var(--mut)}
+.back{margin-left:auto;background:var(--card2);border:1px solid var(--line);color:var(--mut);
+  border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer}
+.card{background:linear-gradient(180deg,rgba(17,26,32,.92),rgba(10,16,20,.96));
+  border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px;
+  box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.card.neon{border-color:rgba(0,255,136,.35);box-shadow:0 0 0 1px rgba(0,255,136,.08),0 14px 40px rgba(0,0,0,.5),0 0 34px rgba(0,255,136,.08)}
+h2{margin:0 0 4px;font-size:20px;font-weight:800}
+.sub{color:var(--mut);font-size:13px;margin:0 0 14px;line-height:1.5}
+input[type=text],input[type=number]{width:100%;background:#060b0e;border:1px solid var(--line);
+  color:var(--txt);border-radius:14px;padding:14px;font-size:16px;outline:none;transition:.2s}
+input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,255,136,.12)}
+.btn{display:block;width:100%;border:none;cursor:pointer;border-radius:16px;padding:16px;
+  font-size:16px;font-weight:800;letter-spacing:.02em;transition:transform .12s, box-shadow .2s, opacity .2s}
+.btn:active{transform:scale(.98)}
+.btn-neon{background:linear-gradient(180deg,#0bff96,#00d970);color:#03130b;
+  box-shadow:0 8px 28px rgba(0,255,136,.35)}
+.btn-neon:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
+.btn-ghost{background:var(--card2);color:var(--txt);border:1px solid var(--line)}
+.btn-danger{background:rgba(255,84,112,.1);color:var(--red);border:1px solid rgba(255,84,112,.4)}
+.row{display:flex;gap:10px}.row .btn{padding:14px}
+.mut{color:var(--mut)}.tiny{font-size:11px}.center{text-align:center}
+/* search results */
+.tok{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;
+  border:1px solid transparent;cursor:pointer;transition:.15s}
+.tok:hover,.tok:active{background:rgba(0,255,136,.05);border-color:rgba(0,255,136,.25)}
+.tok .avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none;
+  font-weight:800;font-size:15px;color:#03130b;background:linear-gradient(135deg,#0bff96,#00b4ff)}
+.tok .meta{flex:1;min-width:0}.tok .sym{font-weight:800;font-size:15px}
+.tok .name{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tok .num{text-align:right;font-size:13px}.tok .num b{display:block;font-size:14px}
+.tok .num span{color:var(--mut);font-size:11px}
+.verified{font-size:10px;color:var(--neon);border:1px solid rgba(0,255,136,.4);
+  border-radius:6px;padding:1px 5px;margin-left:6px}
+/* side toggle */
+.side-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#060b0e;
+  border:1px solid var(--line);border-radius:16px;padding:6px;margin-bottom:12px}
+.side-toggle button{border:none;background:transparent;color:var(--mut);font-weight:800;
+  font-size:15px;padding:12px;border-radius:12px;cursor:pointer;transition:.2s}
+.side-toggle button.on-buy{background:linear-gradient(180deg,#0bff96,#00d970);color:#03130b;
+  box-shadow:0 4px 18px rgba(0,255,136,.35)}
+.side-toggle button.on-sell{background:linear-gradient(180deg,#ff6b8a,#e83a5f);color:#fff;
+  box-shadow:0 4px 18px rgba(255,84,112,.35)}
+/* amount */
+.amtwrap{display:flex;gap:8px;margin-bottom:12px}
+.amtwrap input{flex:1;font-size:22px;font-weight:800;text-align:right}
+.curtog{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;flex:none}
+.curtog button{background:#060b0e;border:none;color:var(--mut);padding:8px 14px;font-weight:800;font-size:13px;cursor:pointer}
+.curtog button.on{background:rgba(0,255,136,.14);color:var(--neon)}
+/* slippage */
+.slips{display:flex;gap:8px;flex-wrap:wrap}
+.slip{border:1px solid var(--line);background:#060b0e;color:var(--mut);border-radius:12px;
+  padding:10px 14px;font-weight:700;font-size:14px;cursor:pointer;transition:.15s}
+.slip.on{border-color:var(--neon);color:var(--neon);background:rgba(0,255,136,.08);
+  box-shadow:0 0 14px rgba(0,255,136,.15)}
+/* quote rows */
+.qrow{display:flex;justify-content:space-between;align-items:center;padding:11px 2px;
+  border-bottom:1px dashed rgba(27,42,51,.8);font-size:14px}
+.qrow:last-child{border-bottom:none}
+.qrow .k{color:var(--mut)}.qrow .v{font-weight:700;font-variant-numeric:tabular-nums}
+.big-out{text-align:center;padding:14px 0 6px}
+.big-out .amt{font-size:34px;font-weight:900;letter-spacing:-.02em}
+.big-out .lbl{font-size:12px;color:var(--mut);letter-spacing:.2em;margin-top:4px}
+/* confirm */
+.confirm-box{border:1px solid rgba(255,176,46,.4);background:rgba(255,176,46,.05);
+  border-radius:var(--r);padding:16px;margin-bottom:12px}
+.warn{display:flex;gap:10px;align-items:flex-start;background:rgba(255,84,112,.08);
+  border:1px solid rgba(255,84,112,.35);border-radius:14px;padding:12px;font-size:13px;
+  color:#ffb3c2;margin-bottom:12px;line-height:1.5}
+/* status */
+.status-hero{text-align:center;padding:26px 0 10px}
+.spinner{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;
+  border:3px solid rgba(0,255,136,.15);border-top-color:var(--neon);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.checkmark{width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(0,255,136,.12);border:2px solid var(--neon);box-shadow:0 0 30px rgba(0,255,136,.4);
+  animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.xmark{width:64px;height:64px;margin:0 auto 12px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(255,84,112,.1);border:2px solid var(--red)}
+.sig{font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;
+  background:#060b0e;border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0;color:var(--neon)}
+/* skeleton */
+.skel{border-radius:12px;background:linear-gradient(90deg,#0c141a 25%,#14202a 50%,#0c141a 75%);
+  background-size:200% 100%;animation:shim 1.2s infinite}
+@keyframes shim{to{background-position:-200% 0}}
+.err{background:rgba(255,84,112,.08);border:1px solid rgba(255,84,112,.35);color:#ffb3c2;
+  border-radius:14px;padding:13px;font-size:13.5px;line-height:1.5;margin-bottom:12px}
+.countdown{font-variant-numeric:tabular-nums;font-weight:800;color:var(--amber)}
+.link{color:var(--neon);text-decoration:none;font-weight:700}
+.divider{height:1px;background:var(--line);margin:14px 0}
+.chip{display:inline-block;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);
+  color:var(--neon);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="bgfx"></div>
+<div id="app"></div>
+<script>
+"use strict";
+/* ================= Bridge ================= */
+const MCP_URL = "https://www.orbitx.world/api/mcp";
+const Bridge = {
+  async callTool(name, args){
+    if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
+      return await window.OrbitX.callTool(name, args); // hosted bridge (CONTRACT.md)
+    }
+    // standalone fallback: JSON-RPC over postMessage is N/A here; POST directly
+    const res = await fetch(MCP_URL, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"t"+Date.now(), method:"tools/call",
+        params:{name, arguments:args||{}}})
+    });
+    if(!res.ok) throw new Error("MCP HTTP "+res.status);
+    const j = await res.json();
+    if(j.error) throw new Error(j.error.message||"tool error");
+    const content = j.result && j.result.content;
+    if(Array.isArray(content)){
+      const t = content.find(c=>c.type==="text");
+      if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
+      return content;
+    }
+    return j.result;
+  }
+};
+const AUTH_KEY = "orbitx_auth_code";
+const getAuth = ()=>{ try{ return localStorage.getItem(AUTH_KEY)||""; }catch(e){ return ""; } };
+const setAuth = (c)=>{ try{ localStorage.setItem(AUTH_KEY,c); }catch(e){} };
+
+/* ================= State ================= */
+const S = {
+  screen:"boot", authCode:getAuth(),
+  query:"", tokens:[], token:null,
+  side:"buy", amount:"", currency:"SOL", slip:1, customSlip:"",
+  quote:null, quoteExpires:0, timer:null, error:"", execSig:"", execStatus:""
+};
+
+/* ================= Helpers ================= */
+const app = document.getElementById("app");
+const esc = s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n,d)=>{ if(n==null||n===""||isNaN(Number(n))) return "—";
+  const x=Number(n); return x>=1e9?(x/1e9).toFixed(2)+"B":x>=1e6?(x/1e6).toFixed(2)+"M":
+  x>=1e3?(x/1e3).toFixed(2)+"K":x.toFixed(d!=null?d:(x<1?6:2)); };
+const fmtUSD = n=>{ if(n==null||isNaN(Number(n))) return "—"; const x=Number(n);
+  return x<0.01&&x>0 ? "$"+x.toExponential(2) : "$"+fmt(x); };
+const shortMint = m=>m&&m.length>10?m.slice(0,4)+"…"+m.slice(-4):esc(m||"");
+function header(showBack){
+  return `<div class="header">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7L12 2z" stroke="#00ff88" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="#00ff88"/></svg></div>
+    <div class="brand">ORBITX<small>TRADE TICKET</small></div>
+    ${showBack?'<button class="back" onclick="goBack()">← Back</button>':""}
+  </div>`;
+}
+function goBack(){ /* wired per-screen via window handlers below */ }
+function clearTimer(){ if(S.timer){clearInterval(S.timer); S.timer=null;} }
+
+/* ================= Screens ================= */
+function render(){ app.innerHTML = ""; const d=document.createElement("div"); d.className="screen";
+  ({boot:scrBoot, auth:scrAuth, search:scrSearch, ticket:scrTicket, quote:scrQuote,
+    confirm:scrConfirm, exec:scrExec, done:scrDone}[S.screen]||scrBoot)(d); app.appendChild(d); }
+
+function scrBoot(el){
+  el.innerHTML = header(false)+`<div class="card"><div class="skel" style="height:22px;margin-bottom:10px"></div>
+    <div class="skel" style="height:14px;width:70%;margin-bottom:14px"></div>
+    <div class="skel" style="height:52px"></div></div>`;
+  setTimeout(()=>{ S.screen = S.authCode ? "search" : "auth"; render(); }, 500);
+}
+
+/* ---- not authed ---- */
+function scrAuth(el){
+  el.innerHTML = header(false)+`
+  <div class="card neon center">
+    <h2>Connect OrbitX</h2>
+    <p class="sub">Trading runs on your connected OrbitX wallet.<br>Connect once — your session key stays on this device.</p>
+    <button class="btn btn-neon" onclick="location.href='https://www.orbitx.world'">Connect on orbitx.world</button>
+    <div class="divider"></div>
+    <p class="tiny mut">Already have a session code? Paste it:</p>
+    <input type="text" id="authin" placeholder="paste authCode" style="margin-bottom:10px">
+    <button class="btn btn-ghost" onclick="saveAuth()">Save session</button>
+  </div>`;
+}
+function saveAuth(){ const v=document.getElementById("authin").value.trim();
+  if(!v) return; setAuth(v); S.authCode=v; S.screen="search"; render(); }
+
+/* ---- token search ---- */
+function scrSearch(el){
+  el.innerHTML = header(false)+`
+  <div class="card">
+    <h2>Pick a token</h2>
+    <p class="sub">Search by name, symbol, or paste a mint address.</p>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" id="q" placeholder="e.g. BONK or So111…pump" value="${esc(S.query)}" style="flex:1"
+        onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="btn btn-neon" style="width:auto;padding:14px 20px" onclick="doSearch()">Search</button>
+    </div>
+    <div id="results"></div>
+    ${S.error?`<div class="err">${esc(S.error)}</div>`:""}
+  </div>
+  <p class="tiny mut center">Prices & safety data from <b>orbitx_crypto_scan</b> — every number on this ticket is live.</p>`;
+}
+async function doSearch(){
+  const q=document.getElementById("q").value.trim(); if(!q) return;
+  S.query=q; S.error=""; const box=document.getElementById("results");
+  box.innerHTML=`<div class="skel" style="height:66px;margin-bottom:8px"></div><div class="skel" style="height:66px"></div>`;
+  try{
+    const r = await Bridge.callTool("orbitx_crypto_scan",{query:q, mint:q, authCode:S.authCode});
+    const list = normTokens(r);
+    S.tokens=list;
+    if(!list.length){ box.innerHTML=`<div class="err">No token found for “${esc(q)}”. Check the mint or symbol and try again.</div>`; return; }
+    box.innerHTML = list.map((t,i)=>`
+      <div class="tok" onclick="pickToken(${i})">
+        <div class="avatar">${esc((t.symbol||"?").slice(0,3).toUpperCase())}</div>
+        <div class="meta"><div class="sym">${esc(t.symbol||"???")}${t.verified?'<span class="verified">✓</span>':""}</div>
+          <div class="name">${esc(t.name||"")} · ${shortMint(t.mint)}</div></div>
+        <div class="num"><b>${fmtUSD(t.price)}</b><span>mcap ${fmtUSD(t.mcap)}</span></div>
+      </div>`).join("");
+  }catch(e){ box.innerHTML=`<div class="err">Lookup failed: ${esc(e.message)}</div>`; }
+}
+function normTokens(r){
+  const arr = Array.isArray(r)?r:(r&&(r.tokens||r.results||r.data)||[]);
+  const list = Array.isArray(arr)?arr:[r].filter(Boolean);
+  return list.map(t=>({mint:t.mint||t.address||t.ca||"", symbol:t.symbol||t.ticker||"",
+    name:t.name||"", price:t.price??t.priceUsd??t.price_usd,
+    mcap:t.mcap??t.marketCap??t.market_cap, liquidity:t.liquidity??t.liq??t.liquidityUsd,
+    verified:!!(t.verified||t.isVerified)}));
+}
+function pickToken(i){ S.token=S.tokens[i]; S.screen="ticket"; render(); }
+</script>
+
+<script>
+"use strict";
+/* ---- trade ticket ---- */
+function scrTicket(el){
+  const t=S.token;
+  el.innerHTML = header(true)+`
+  <div class="card neon">
+    <div class="tok" style="cursor:default;padding:4px 0 12px">
+      <div class="avatar">${esc((t.symbol||"?").slice(0,3).toUpperCase())}</div>
+      <div class="meta"><div class="sym">${esc(t.symbol)}</div>
+        <div class="name">${esc(t.name||"")} · ${shortMint(t.mint)}</div></div>
+      <div class="num"><b>${fmtUSD(t.price)}</b><span>liq ${fmtUSD(t.liquidity)}</span></div>
+    </div>
+    <div class="divider"></div>
+    <p class="tiny mut" style="margin:0 0 8px;letter-spacing:.18em">SIDE</p>
+    <div class="side-toggle">
+      <button id="sb" class="${S.side==="buy"?"on-buy":""}" onclick="setSide('buy')">BUY</button>
+      <button id="ss" class="${S.side==="sell"?"on-sell":""}" onclick="setSide('sell')">SELL</button>
+    </div>
+    <p class="tiny mut" style="margin:0 0 8px;letter-spacing:.18em">AMOUNT</p>
+    <div class="amtwrap">
+      <div class="curtog">
+        <button class="${S.currency==="SOL"?"on":""}" onclick="setCur('SOL')">SOL</button>
+        <button class="${S.currency==="USD"?"on":""}" onclick="setCur('USD')">USD</button>
+      </div>
+      <input type="number" id="amt" inputmode="decimal" min="0" placeholder="0.00" value="${esc(S.amount)}" oninput="S.amount=this.value;gateQuote()">
+    </div>
+    <p class="tiny mut" style="margin:0 0 8px;letter-spacing:.18em">SLIPPAGE</p>
+    <div class="slips" id="slips">
+      ${[0.5,1,5,10].map(v=>`<button class="slip ${S.slip===v?"on":""}" onclick="setSlip(${v})">${v}%</button>`).join("")}
+      <input type="number" id="cslip" placeholder="custom %" inputmode="decimal" min="0.1" max="50"
+        style="width:96px;padding:10px;font-size:14px" value="${esc(S.customSlip)}" oninput="setSlipCustom(this.value)">
+    </div>
+  </div>
+  <button class="btn btn-neon" id="qbtn" onclick="getQuote()" disabled>Get quote</button>
+  ${S.error?`<div class="err" style="margin-top:12px">${esc(S.error)}</div>`:""}`;
+  goBack=()=>{ S.screen="search"; S.error=""; render(); };
+  gateQuote();
+}
+function setSide(s){ S.side=s; render(); }
+function setCur(c){ S.currency=c; render(); }
+function setSlip(v){ S.slip=v; S.customSlip=""; render(); }
+function setSlipCustom(v){ S.customSlip=v; const n=parseFloat(v); if(n>0){S.slip=n;}
+  document.querySelectorAll("#slips .slip").forEach(b=>{
+    b.classList.toggle("on", parseFloat(b.textContent)===S.slip); });
+}
+function gateQuote(){ const b=document.getElementById("qbtn"); if(b) b.disabled = !(parseFloat(S.amount)>0); }
+
+/* ---- quote preview ---- */
+async function getQuote(){
+  const amt=parseFloat(S.amount); if(!(amt>0)) return;
+  S.screen="quote"; S.error=""; render();
+  const t=S.token;
+  try{
+    // slippage-aware quote lanes: pick the lane matching slippage
+    const tool = S.slip>=10 ? "orbitx_quote_slip10_auto" : "orbitx_trade_quote";
+    const r = await Bridge.callTool(tool,{
+      mint:t.mint, side:S.side, amount:amt, amountCurrency:S.currency,
+      slippagePct:S.slip, slippageBps:Math.round(S.slip*100), authCode:S.authCode});
+    S.quote=normQuote(r, amt, S.currency, S.side);
+    S.quoteExpires = Date.now()+30000;
+    startQuoteTimer();
+  }catch(e){
+    S.error = mapErr(e); S.screen="ticket"; render();
+  }
+  render();
+}
+function normQuote(r, amt, cur, side){
+  const q=r&&r.quote?r.quote:r;
+  return {raw:r,
+    inAmt:amt, inCur:cur, side,
+    outAmt:q.expectedOut??q.outAmount??q.amountOut??q.estimatedOut,
+    outSym:q.outSymbol||q.outputSymbol||"",
+    price:q.price??q.executionPrice, impact:q.priceImpact??q.priceImpactPct,
+    minOut:q.minReceived??q.minimumReceived??q.minOut,
+    fee:q.fee??q.fees??q.networkFee, feeUsd:q.feeUsd,
+    route:q.route||q.venue||q.dex, quoteId:q.quoteId||q.id||null,
+    validMs:q.validMs||30000};
+}
+function startQuoteTimer(){
+  clearTimer();
+  S.timer=setInterval(()=>{
+    const el=document.getElementById("cd");
+    if(el) el.textContent=Math.max(0,Math.ceil((S.quoteExpires-Date.now())/1000))+"s";
+    if(Date.now()>S.quoteExpires){ clearTimer(); S.error="Quote expired — refresh for a live price."; S.quote=null; S.screen="ticket"; render(); }
+  },500);
+}
+function scrQuote(el){
+  const t=S.token, q=S.quote;
+  if(!q){ // loading
+    el.innerHTML=header(true)+`<div class="card"><div class="skel" style="height:40px;margin-bottom:10px"></div>
+      <div class="skel" style="height:14px;margin-bottom:8px"></div><div class="skel" style="height:14px;margin-bottom:8px"></div>
+      <div class="skel" style="height:14px;width:60%"></div></div>`;
+    goBack=()=>{S.screen="ticket";render();}; return;
+  }
+  const sideC = S.side==="buy"?"var(--neon)":"var(--red)";
+  el.innerHTML=header(true)+`
+  <div class="card neon">
+    <div class="center tiny mut" style="letter-spacing:.24em;margin-bottom:2px">QUOTE PREVIEW</div>
+    <div class="big-out">
+      <div class="amt" style="color:${sideC}">≈ ${fmt(q.outAmt)} <span style="font-size:18px">${esc(q.outSym||(S.side==="buy"?t.symbol:S.currency))}</span></div>
+      <div class="lbl">YOU ${S.side==="buy"?"RECEIVE":"PAY"} FOR ${fmt(q.inAmt)} ${esc(q.inCur)}</div>
+    </div>
+    <div class="divider"></div>
+    <div class="qrow"><span class="k">Price</span><span class="v">${fmtUSD(q.price)}</span></div>
+    <div class="qrow"><span class="k">Price impact</span><span class="v" style="color:${Number(q.impact)>5?"var(--red)":"var(--txt)"}">${q.impact==null?"—":Number(q.impact).toFixed(2)+"%"}</span></div>
+    <div class="qrow"><span class="k">Minimum received</span><span class="v">${fmt(q.minOut)} ${esc(q.outSym||"")}</span></div>
+    <div class="qrow"><span class="k">Slippage</span><span class="v">${S.slip}%</span></div>
+    <div class="qrow"><span class="k">Fees</span><span class="v">${q.feeUsd!=null?fmtUSD(q.feeUsd):(q.fee!=null?esc(String(q.fee)):"included")}</span></div>
+    <div class="qrow"><span class="k">Route</span><span class="v">${esc(q.route||"best route")}</span></div>
+    <div class="qrow"><span class="k">Quote expires in</span><span class="v countdown" id="cd">30s</span></div>
+  </div>
+  <div class="row">
+    <button class="btn btn-ghost" onclick="getQuote()">↻ Refresh</button>
+    <button class="btn btn-neon" onclick="toConfirm()">Review order →</button>
+  </div>`;
+  goBack=()=>{clearTimer();S.screen="ticket";render();};
+}
+function toConfirm(){ if(!S.quote){S.error="Quote expired.";S.screen="ticket";render();return;} S.screen="confirm"; render(); }
+</script>
+
+<script>
+"use strict";
+/* ---- CONFIRM (the gate — nothing executes before this) ---- */
+function scrConfirm(el){
+  const t=S.token, q=S.quote;
+  const sideC = S.side==="buy"?"var(--neon)":"var(--red)";
+  const sideT = S.side==="buy"?"BUY":"SELL";
+  el.innerHTML=header(true)+`
+  <div class="confirm-box">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--amber);font-weight:800;margin-bottom:8px">⚠ CONFIRM THIS TRADE</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:${sideC}">${sideT} ${fmt(q.inAmt)} ${esc(q.inCur)}</div>
+      <div class="lbl">${esc(t.symbol)} · ${shortMint(t.mint)}</div>
+    </div>
+    <div class="divider"></div>
+    <div class="qrow"><span class="k">You ${S.side==="buy"?"receive ≈":"get ≈"}</span><span class="v">${fmt(q.outAmt)} ${esc(q.outSym||t.symbol)}</span></div>
+    <div class="qrow"><span class="k">Price</span><span class="v">${fmtUSD(q.price)}</span></div>
+    <div class="qrow"><span class="k">Min received (${S.slip}% slip)</span><span class="v">${fmt(q.minOut)} ${esc(q.outSym||"")}</span></div>
+    <div class="qrow"><span class="k">Price impact</span><span class="v">${q.impact==null?"—":Number(q.impact).toFixed(2)+"%"}</span></div>
+    <div class="qrow"><span class="k">Fees</span><span class="v">${q.feeUsd!=null?fmtUSD(q.feeUsd):(q.fee!=null?esc(String(q.fee)):"included")}</span></div>
+    <div class="qrow"><span class="k">Expires in</span><span class="v countdown" id="cd">—</span></div>
+  </div>
+  <div class="warn">⛓ <span>This signs a <b>real on-chain transaction</b> from your connected OrbitX wallet. Review every number above — it cannot be reversed.</span></div>
+  <div class="row">
+    <button class="btn btn-ghost" onclick="cancelConfirm()">Cancel</button>
+    <button class="btn btn-neon" id="confirmBtn" onclick="executeTrade()">✓ Confirm ${sideT}</button>
+  </div>
+  ${S.error?`<div class="err" style="margin-top:12px">${esc(S.error)}</div>`:""}`;
+  goBack=()=>cancelConfirm();
+  S.timer=setInterval(()=>{const c=document.getElementById("cd");
+    if(c)c.textContent=Math.max(0,Math.ceil((S.quoteExpires-Date.now())/1000))+"s";
+    if(Date.now()>S.quoteExpires){clearTimer();S.error="Quote expired before confirmation — get a fresh quote.";S.quote=null;S.screen="ticket";render();}},500);
+}
+function cancelConfirm(){ clearTimer(); S.screen="quote"; render(); }
+
+/* ---- execution ---- */
+async function executeTrade(){
+  const btn=document.getElementById("confirmBtn");
+  if(btn){btn.disabled=true;btn.textContent="Signing…";}
+  clearTimer();
+  S.screen="exec"; S.error=""; S.execStatus="pending"; S.execSig=""; render();
+  const t=S.token, q=S.quote||{};
+  const args={mint:t.mint, side:S.side, amount:parseFloat(S.amount), amountCurrency:S.currency,
+    slippagePct:S.slip, slippageBps:Math.round(S.slip*100), authCode:S.authCode};
+  if(q.quoteId) args.quoteId=q.quoteId;
+  if(q.raw) args.quote=q.raw;
+  const tool = S.side==="buy"?"orbitx_app_buy":"orbitx_app_sell";
+  try{
+    const r = await Bridge.callTool(tool,args);
+    const sig = extractSig(r);
+    if(!sig) throw new Error("No transaction signature returned — treated as failed, nothing was verified on-chain.");
+    S.execSig=sig; S.execStatus="confirming"; render();
+    // verify: poll for confirmation; never trust "ok" alone
+    await confirmOnChain(sig);
+  }catch(e){
+    S.error=mapErr(e); S.execStatus="failed"; render();
+  }
+}
+function extractSig(r){
+  if(!r) return "";
+  if(typeof r==="string" && /^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(r)) return r;
+  const cands=[r.signature,r.txSignature,r.tx,r.txid,r.txId,r.hash,
+    r.result&&r.result.signature,r.data&&r.data.signature];
+  for(const c of cands) if(typeof c==="string"&&c.length>60) return c;
+  return "";
+}
+async function confirmOnChain(sig){
+  // best-effort on-chain verification via a scan/status tool if available
+  const t0=Date.now();
+  while(Date.now()-t0<45000){
+    try{
+      const st=await Bridge.callTool("orbitx_crypto_scan",{tx:sig,signature:sig,authCode:S.authCode});
+      const s=JSON.stringify(st).toLowerCase();
+      if(s.includes("confirmed")||s.includes("finalized")||s.includes("success")){ S.execStatus="confirmed"; render(); return; }
+    }catch(e){/* tool may not support tx lookup — fall through */}
+    await new Promise(r=>setTimeout(r,3000));
+  }
+  // timed out waiting — signature exists on-chain; user can verify via Solscan
+  S.execStatus="submitted"; render();
+}
+function scrExec(el){
+  const sideT=S.side==="buy"?"Buy":"Sell";
+  const body = S.execStatus==="failed"
+    ? `<div class="xmark"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ff5470" stroke-width="3"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+       <h2>Trade failed</h2><p class="sub">Nothing was executed.</p>
+       <div class="err">${esc(S.error||"Unknown error")}</div>
+       <div class="row"><button class="btn btn-ghost" onclick="S.screen='quote';render()">Back to quote</button>
+       <button class="btn btn-neon" onclick="S.screen='confirm';S.error='';render()">Retry</button></div>`
+    : `<div class="status-hero">
+         ${S.execStatus==="pending"?'<div class="spinner"></div><h2>Signing…</h2><p class="sub">Approve in your wallet if prompted.</p>':""}
+         ${S.execStatus==="confirming"?'<div class="spinner"></div><h2>Confirming on-chain…</h2><p class="sub">Waiting for Solana finality.</p>':""}
+       </div>
+       ${S.execSig?`<div class="tiny mut center">SIGNATURE</div><div class="sig">${esc(S.execSig)}</div>
+       <a class="link" href="https://solscan.io/tx/${esc(S.execSig)}" target="_blank" rel="noopener">View on Solscan ↗</a>`:""}`;
+  el.innerHTML=header(false)+`<div class="card neon center">${body}</div>`;
+  if(S.execStatus==="confirmed"||S.execStatus==="submitted"){ S.screen="done"; setTimeout(render,400); }
+}
+
+/* ---- done ---- */
+function scrDone(el){
+  const sideT=S.side==="buy"?"Bought":"Sold";
+  const ok=S.execStatus==="confirmed";
+  el.innerHTML=header(false)+`
+  <div class="card neon center">
+    <div class="status-hero" style="padding-top:6px">
+      ${ok?'<div class="checkmark"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="3"><path d="M4 12.5l5 5L20 6.5"/></svg></div>'
+          :'<div class="checkmark" style="border-color:var(--amber);box-shadow:0 0 30px rgba(255,176,46,.4)"><span style="font-size:28px">⏳</span></div>'}
+      <h2>${ok?sideT+" ✓":"Submitted"}</h2>
+      <p class="sub">${ok?"Confirmed on-chain.":"Broadcast — confirmation pending. Verify below."}</p>
+    </div>
+    ${S.execSig?`<div class="tiny mut">TRANSACTION SIGNATURE</div><div class="sig">${esc(S.execSig)}</div>
+    <a class="link" href="https://solscan.io/tx/${esc(S.execSig)}" target="_blank" rel="noopener">View on Solscan ↗</a>
+    <div class="divider"></div>`:""}
+    <div class="qrow"><span class="k">Side</span><span class="v">${S.side.toUpperCase()}</span></div>
+    <div class="qrow"><span class="k">Amount</span><span class="v">${fmt(parseFloat(S.amount))} ${esc(S.currency)}</span></div>
+    <div class="qrow"><span class="k">Token</span><span class="v">${esc(S.token?S.token.symbol:"")}</span></div>
+    <div style="margin-top:14px" class="row">
+      <button class="btn btn-ghost" onclick="resetAll()">New trade</button>
+    </div>
+  </div>`;
+}
+function resetAll(){ clearTimer(); S.token=null; S.amount=""; S.quote=null; S.execSig=""; S.error=""; S.screen="search"; render(); }
+
+/* ---- error mapping ---- */
+function mapErr(e){
+  const m=String(e&&(e.message||e)).toLowerCase();
+  if(m.includes("insufficient")||m.includes("balance")||m.includes("funds")) return "Insufficient funds — lower the amount or fund your wallet.";
+  if(m.includes("auth")||m.includes("401")||m.includes("unauthorized")||m.includes("session")) return "Session expired — reconnect your OrbitX wallet to continue.";
+  if(m.includes("slippage")||m.includes("price moved")) return "Price moved beyond slippage — refresh the quote and try again.";
+  if(m.includes("invalid")||m.includes("unknown mint")||m.includes("not found")) return "Invalid token — the mint wasn't recognized. Check the address.";
+  if(m.includes("expired")) return "Quote expired — get a fresh quote.";
+  return "Error: "+String(e&&(e.message||e)).slice(0,220);
+}
+
+/* ================= boot ================= */
+render();
+</script>
+</body>
+</html>
