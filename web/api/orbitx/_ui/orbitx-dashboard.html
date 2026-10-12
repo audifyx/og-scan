@@ -279,14 +279,22 @@ async function loadPortfolio(){
 }
 async function loadMarket(){
   S.mkLoading=true; S.mkError=""; render();
-  try{
-    const r=await Bridge.callTool("orbitx_screen_tokens",
-      {type:"trending", interval:"24h", limit:10, chain:"solana", authCode:getAuth()});
-    if(typeof r==="string") throw new Error(r);
-    const list=r.rows||r.results||r.tokens||r.data||[];
-    S.market=list.slice(0,10); S.mkFetchedAt=Date.now();
-    if(!S.market.length) S.mkError="Screener returned no trending tokens for 24h. Try again in a moment.";
-  }catch(e){ S.mkError=String((e&&e.message)||e||"market fetch failed"); }
+  const intervals=["24h","1h","1m"];
+  let lastErr="";
+  for(const iv of intervals){
+    try{
+      const r=await Bridge.callTool("orbitx_screen_tokens",
+        {type:"trending", interval:iv, limit:10, chain:"solana", authCode:getAuth()});
+      if(typeof r==="string") throw new Error(r);
+      const list=r.rows||r.results||r.tokens||r.data||[];
+      if(list.length){
+        S.market=list.slice(0,10); S.mkFetchedAt=Date.now(); S.mkInterval=iv;
+        S.mkLoading=false; render(); return;
+      }
+      lastErr=`No trending tokens for ${iv}`;
+    }catch(e){ lastErr=String((e&&e.message)||e||"market fetch failed"); }
+  }
+  S.mkError=`Screener empty after trying 24h/1h/1m. ${lastErr}`;
   S.mkLoading=false; render();
 }
 async function scanMint(mint){
