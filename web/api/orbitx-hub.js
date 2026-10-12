@@ -116,6 +116,12 @@ import {
   resolveLifeNaturalTool,
 } from "./orbitx/_handlers/_mcp-life-agents.js";
 import { buildLifeCmdTools, lifeCmdStats } from "./orbitx/_handlers/_mcp-life-cmds.js";
+/** ChatGPT Mini App (Apps SDK) widget registry — resources/list + resources/read + tool _meta. */
+import {
+  listUiWidgets,
+  readUiWidget,
+  toolListingMeta,
+} from "./orbitx/_ui/_widgets.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/_handlers/_mcp-ops.js");
@@ -254,15 +260,29 @@ function publicToolList(list) {
   return (list || []).filter((t) => !isPhantomListedTool(t));
 }
 
+/**
+ * Attach per-tool Apps SDK _meta (ui.resourceUri + openai/outputTemplate)
+ * to a tools/list entry. Merges with any _meta the tool already carries;
+ * returns the entry unchanged when there is nothing to attach. Additive —
+ * existing clients see the same fields plus _meta on UI-bound tools.
+ */
+function withUiListingMeta(t, listed) {
+  const m = toolListingMeta(t);
+  if (m) listed._meta = { ...(listed._meta && typeof listed._meta === "object" ? listed._meta : {}), ...m };
+  return listed;
+}
+
 function listLiveTools(cursor) {
   const PAGE = 80;
   if (!cursor || cursor === "core" || cursor === "0") {
-    const tools = publicToolList(CORE_TOOLS).map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-      annotations: toolAuthMeta(t.name),
-    }));
+    const tools = publicToolList(CORE_TOOLS).map((t) =>
+      withUiListingMeta(t, {
+        name: t.name,
+        description: t.description,
+        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+        annotations: toolAuthMeta(t.name),
+      }),
+    );
     const next = _generated.length ? "gen:0" : (_cook.length ? "cook:0" : (_life.length ? "life:0" : undefined));
     return {
       tools,
@@ -284,11 +304,13 @@ function listLiveTools(cursor) {
     const slice = _generated.slice(offset, offset + PAGE);
     const next = offset + PAGE < _generated.length ? `gen:${offset + PAGE}` : (_cook.length ? "cook:0" : (_life.length ? "life:0" : undefined));
     return {
-      tools: publicToolList(slice).map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-      })),
+      tools: publicToolList(slice).map((t) =>
+        withUiListingMeta(t, {
+          name: t.name,
+          description: t.description,
+          inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+        }),
+      ),
       nextCursor: next,
     };
   }
@@ -298,11 +320,13 @@ function listLiveTools(cursor) {
     const slice = _cook.slice(offset, offset + PAGE);
     const next = offset + PAGE < _cook.length ? `cook:${offset + PAGE}` : (_life.length ? "life:0" : undefined);
     return {
-      tools: slice.map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-      })),
+      tools: slice.map((t) =>
+        withUiListingMeta(t, {
+          name: t.name,
+          description: t.description,
+          inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+        }),
+      ),
       nextCursor: next,
     };
   }
@@ -312,21 +336,25 @@ function listLiveTools(cursor) {
     const slice = _life.slice(offset, offset + PAGE);
     const next = offset + PAGE < _life.length ? `life:${offset + PAGE}` : undefined;
     return {
-      tools: slice.map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-      })),
+      tools: slice.map((t) =>
+        withUiListingMeta(t, {
+          name: t.name,
+          description: t.description,
+          inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+        }),
+      ),
       nextCursor: next,
     };
   }
   return {
-    tools: CORE_TOOLS.map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
-      annotations: toolAuthMeta(t.name),
-    })),
+    tools: CORE_TOOLS.map((t) =>
+      withUiListingMeta(t, {
+        name: t.name,
+        description: t.description,
+        inputSchema: withAuthCodeSchema(t.inputSchema, t.name),
+        annotations: toolAuthMeta(t.name),
+      }),
+    ),
   };
 }
 
@@ -6041,7 +6069,7 @@ async function handleMcp(req, res, parts) {
           id,
           result: {
             protocolVersion: "2024-11-05",
-            capabilities: { tools: {} },
+            capabilities: { tools: {}, resources: {} },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
               "OrbitX Agent MCP. Coverage, not a tour: we do not tell users to use every surface. Each door is for a trading group. If they ask why use this MCP, why so many tools, or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
@@ -6067,6 +6095,28 @@ async function handleMcp(req, res, parts) {
           ...(listed._meta ? { _meta: listed._meta } : {}),
         },
       });
+    }
+
+    // ChatGPT Mini App (Apps SDK) widget resources — served from web/api/orbitx/_ui/.
+    if (method === "resources/list") {
+      return json(res, {
+        jsonrpc: "2.0",
+        id,
+        result: { resources: listUiWidgets() },
+      });
+    }
+
+    if (method === "resources/read") {
+      const uri = String(params?.uri || "");
+      const payload = readUiWidget(uri);
+      if (!payload) {
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: `Unknown widget resource: ${uri || "(empty)"}` },
+        });
+      }
+      return json(res, { jsonrpc: "2.0", id, result: payload });
     }
 
     if (method === "tools/call") {
