@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080e">
+<title>OrbitX · Connect</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080e;
+  --bg2:#0b0e16;
+  --surface:rgba(255,255,255,.045);
+  --surface2:rgba(255,255,255,.07);
+  --line:rgba(255,255,255,.09);
+  --neon:#34d399;
+  --neon-dim:rgba(52,211,153,.16);
+  --teal:#2dd4bf;
+  --gold:#fbbf24;
+  --txt:#e8eaf2;
+  --muted:#9aa0b8;
+  --faint:#5c6178;
+  --danger:#f87171;
+  --radius:22px;
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--txt);
+  min-height:100dvh;display:flex;align-items:center;justify-content:center;
+  padding:calc(20px + var(--sat)) 16px calc(20px + var(--sab));
+  overflow-x:hidden;position:relative;
+}
+/* ---------- ambient background ---------- */
+.aurora{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.aurora i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 14s ease-in-out infinite alternate}
+.aurora i:nth-child(1){width:340px;height:340px;left:-90px;top:-70px;background:radial-gradient(circle,rgba(52,211,153,.34),transparent 70%)}
+.aurora i:nth-child(2){width:300px;height:300px;right:-80px;top:32%;background:radial-gradient(circle,rgba(124,92,252,.30),transparent 70%);animation-delay:-5s}
+.aurora i:nth-child(3){width:280px;height:280px;left:8%;bottom:-110px;background:radial-gradient(circle,rgba(251,191,36,.16),transparent 70%);animation-delay:-9s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(46px,34px) scale(1.12)}}
+.grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse 90% 70% at 50% 40%,black 30%,transparent 100%)}
+/* ---------- shell ---------- */
+.shell{position:relative;z-index:1;width:100%;max-width:420px}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:18px;animation:rise .5s ease both}
+.logo{width:46px;height:46px;position:relative;flex:none}
+.logo svg{width:100%;height:100%;filter:drop-shadow(0 0 10px rgba(52,211,153,.55))}
+.logo .orbit{position:absolute;inset:-5px;border:1.5px solid rgba(52,211,153,.35);border-radius:50%;animation:spin 7s linear infinite}
+.logo .orbit::after{content:'';position:absolute;top:-3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--neon);box-shadow:0 0 8px var(--neon)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brand h1{font-size:21px;font-weight:700;letter-spacing:.14em}
+.brand h1 span{color:var(--neon);text-shadow:0 0 18px rgba(52,211,153,.6)}
+.brand small{display:block;font-size:10.5px;letter-spacing:.3em;color:var(--muted);font-weight:500;margin-top:2px}
+/* ---------- card ---------- */
+.card{background:linear-gradient(165deg,rgba(20,26,40,.92),rgba(10,13,22,.94));
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 22px 24px;position:relative;overflow:hidden;
+  box-shadow:0 24px 70px rgba(0,0,0,.55),0 0 0 1px rgba(52,211,153,.05),0 0 44px rgba(52,211,153,.07);
+  backdrop-filter:blur(14px)}
+.card::before{content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--neon),transparent);opacity:.8}
+.view{animation:viewIn .38s cubic-bezier(.2,.8,.25,1) both}
+@keyframes viewIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+.eyebrow{font-size:10.5px;letter-spacing:.28em;color:var(--neon);font-weight:600;margin-bottom:10px}
+h2.title{font-size:26px;font-weight:700;line-height:1.18;letter-spacing:-.01em;margin-bottom:8px}
+h2.title .glow{color:var(--neon);text-shadow:0 0 22px rgba(52,211,153,.65)}
+p.sub{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px}
+/* ---------- steps ---------- */
+.steps{display:flex;gap:6px;margin-bottom:22px}
+.step{flex:1;display:flex;flex-direction:column;gap:7px}
+.step .bar{height:3px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;position:relative}
+.step .bar i{position:absolute;inset:0;background:linear-gradient(90deg,var(--neon),var(--teal));border-radius:3px;transform:scaleX(0);transform-origin:left;transition:transform .5s cubic-bezier(.2,.8,.25,1)}
+.step.on .bar i{transform:scaleX(1);box-shadow:0 0 10px rgba(52,211,153,.7)}
+.step span{font-size:10px;letter-spacing:.12em;color:var(--faint);font-weight:600;text-transform:uppercase}
+.step.on span{color:var(--neon)}
+/* ---------- buttons ---------- */
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+  padding:15px 18px;border-radius:15px;font-family:inherit;font-size:15.5px;font-weight:700;letter-spacing:.02em;
+  border:none;cursor:pointer;transition:transform .12s ease,box-shadow .2s ease,filter .2s ease;min-height:54px}
+.btn:active{transform:scale(.975)}
+.btn-primary{background:linear-gradient(135deg,var(--neon),var(--teal));color:#04120c;
+  box-shadow:0 8px 28px rgba(52,211,153,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn-primary:hover{filter:brightness(1.08);box-shadow:0 10px 34px rgba(52,211,153,.5),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn-primary:disabled{opacity:.55;cursor:wait;filter:none}
+.btn-ghost{background:rgba(255,255,255,.05);color:var(--txt);border:1px solid var(--line);margin-top:10px;font-weight:600;font-size:14px;min-height:50px}
+.btn-ghost:hover{background:rgba(255,255,255,.09)}
+.btn-danger-ghost{background:transparent;color:var(--danger);border:1px solid rgba(248,113,113,.3);margin-top:10px;font-weight:600;font-size:14px;min-height:50px}
+.btn-danger-ghost:hover{background:rgba(248,113,113,.08)}
+.btn-row{display:flex;gap:10px;margin-top:10px}
+.btn-row .btn{margin-top:0}
+/* spinner */
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(4,18,12,.25);border-top-color:#04120c;animation:spin .7s linear infinite;flex:none}
+.spin.light{border-color:rgba(255,255,255,.2);border-top-color:#fff}
+/* ---------- auth link / QR ---------- */
+.authlink{display:block;text-decoration:none;margin-bottom:14px;border-radius:16px;padding:16px;
+  background:linear-gradient(135deg,rgba(52,211,153,.14),rgba(45,212,191,.07));
+  border:1px solid rgba(52,211,153,.4);position:relative;overflow:hidden;transition:transform .12s ease}
+.authlink:active{transform:scale(.98)}
+.authlink::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);transform:translateX(-100%);animation:sheen 3.2s ease infinite}
+@keyframes sheen{0%,60%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.authlink .lbl{font-size:10.5px;letter-spacing:.24em;color:var(--neon);font-weight:700;margin-bottom:6px}
+.authlink .go{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#fff}
+.authlink .go svg{flex:none}
+.qr-wrap{display:flex;justify-content:center;margin:4px 0 16px;position:relative}
+.qr-frame{padding:14px;background:#0d1420;border-radius:18px;border:1px solid rgba(52,211,153,.35);
+  box-shadow:0 0 34px rgba(52,211,153,.18),inset 0 0 20px rgba(0,0,0,.4);position:relative;overflow:hidden}
+.qr-frame svg{display:block;border-radius:8px}
+.qr-frame .scan{position:absolute;left:14px;right:14px;height:2px;top:14px;
+  background:linear-gradient(90deg,transparent,var(--neon),transparent);
+  box-shadow:0 0 12px var(--neon);animation:scanline 2.6s ease-in-out infinite}
+@keyframes scanline{0%,100%{top:14px}50%{top:calc(100% - 16px)}}
+.qr-cap{text-align:center;font-size:11.5px;color:var(--faint);margin-top:-8px;margin-bottom:16px;letter-spacing:.04em}
+/* ---------- input ---------- */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;letter-spacing:.2em;color:var(--muted);font-weight:600;margin-bottom:8px;text-transform:uppercase}
+.codebox{display:flex;gap:8px}
+.codebox input{flex:1;min-width:0;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:13px;
+  padding:14px;font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--neon);letter-spacing:.06em;outline:none;transition:border-color .2s,box-shadow .2s}
+.codebox input::placeholder{color:var(--faint);font-family:'Space Grotesk',sans-serif;font-size:13px;letter-spacing:0}
+.codebox input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(52,211,153,.15)}
+.paste-btn{flex:none;padding:0 16px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.paste-btn:active{transform:scale(.95)}
+.hint{font-size:12px;color:var(--faint);line-height:1.55;margin-top:10px}
+.hint b{color:var(--muted);font-weight:600}
+.backlink{display:inline-block;margin-top:16px;font-size:13px;color:var(--faint);cursor:pointer;background:none;border:none;font-family:inherit}
+.backlink:hover{color:var(--txt)}
+/* ---------- identity ---------- */
+.id-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.avatar{width:58px;height:58px;border-radius:18px;flex:none;border:1px solid rgba(52,211,153,.4);box-shadow:0 0 20px rgba(52,211,153,.25);overflow:hidden}
+.avatar svg{display:block;width:100%;height:100%}
+.id-head .who{min-width:0}
+.id-head .handle{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--neon);font-weight:600;letter-spacing:.08em;margin-top:4px}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--neon);box-shadow:0 0 8px var(--neon);animation:pulse 1.8s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.kv{background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:14px;padding:13px 15px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.kv .k{font-size:10.5px;letter-spacing:.2em;color:var(--faint);font-weight:600;text-transform:uppercase}
+.kv .v{font-family:'JetBrains Mono',monospace;font-size:13.5px;color:var(--txt);display:flex;align-items:center;gap:8px;min-width:0}
+.kv .v .mono-trunc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.copybtn{background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);color:var(--neon);border-radius:9px;padding:6px 10px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;flex:none}
+.copybtn:active{transform:scale(.93)}
+.tier{display:inline-flex;align-items:center;gap:6px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:.1em;
+  padding:6px 13px;border-radius:999px;color:#1a1206;
+  background:linear-gradient(135deg,#fde68a,var(--gold));box-shadow:0 0 16px rgba(251,191,36,.4);text-transform:uppercase}
+/* ---------- error ---------- */
+.err-ico{width:64px;height:64px;border-radius:20px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;
+  background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);box-shadow:0 0 26px rgba(248,113,113,.2)}
+.errbox{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.28);border-radius:14px;padding:13px 15px;font-size:13.5px;color:#fca5a5;line-height:1.55;margin-bottom:18px}
+/* ---------- skeleton ---------- */
+.sk{border-radius:12px;background:linear-gradient(100deg,rgba(255,255,255,.05) 40%,rgba(255,255,255,.11) 50%,rgba(255,255,255,.05) 60%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+.sk-row{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+.sk-av{width:58px;height:58px;border-radius:18px;flex:none}
+/* ---------- toast ---------- */
+.toast{position:fixed;left:50%;bottom:calc(26px + var(--sab));transform:translateX(-50%) translateY(20px);z-index:50;
+  background:#101827;border:1px solid rgba(52,211,153,.4);color:var(--txt);font-size:13.5px;font-weight:600;
+  padding:12px 20px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+  box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 20px rgba(52,211,153,.15);white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{border-color:rgba(248,113,113,.5)}
+/* ---------- footer ---------- */
+.foot{margin-top:16px;text-align:center;font-size:11px;color:var(--faint);letter-spacing:.14em;animation:rise .5s .15s ease both}
+.foot b{color:var(--muted)}
+.mode-note{margin-top:10px;text-align:center;font-size:11px;color:var(--faint)}
+.mode-note code{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:10.5px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
+}
+</style>
+</head>
+<body>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="grid-overlay"></div>
+<main class="shell">
+  <header class="brand">
+    <div class="logo">
+      <div class="orbit"></div>
+      <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#34d399"/><stop offset="1" stop-color="#fbbf24"/></linearGradient></defs>
+        <path d="M24 4 42 14v20L24 44 6 34V14L24 4z" stroke="url(#lg)" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="24" cy="24" r="5" fill="url(#lg)"/>
+        <circle cx="24" cy="24" r="9.5" stroke="#34d399" stroke-width="1.4" opacity=".55"/>
+      </svg>
+    </div>
+    <div><h1>ORBIT<span>X</span><small>TRADING TERMINAL</small></h1></div>
+  </header>
+  <section class="card" id="app" aria-live="polite"></section>
+  <footer class="foot">SECURED BY <b>ORBITX MCP</b> · WALLET SIGN-IN</footer>
+  <div class="mode-note" id="modeNote" hidden></div>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   OrbitX Auth widget — ChatGPT Mini App (Apps SDK ui:// resource)
+   Resource:  ui://widget/orbitx-auth.html
+   Bridge:    window.OrbitX.callTool(name, args) -> Promise<result>
+   Fallback:  standalone POST https://www.orbitx.world/api/mcp (JSON-RPC)
+   Never renders or logs bearer tokens / private keys. The authCode is
+   user-pasted, held in memory + localStorage, and only ever passed as a
+   tool argument — never painted into the DOM.
+   ===================================================================== */
+
+/* ---------- tiny QR encoder: byte mode, EC level L, versions 1-10 ---------- */
+const QR = (() => {
+  const EXP = new Array(512), LOG = new Array(256);
+  (() => { let x = 1; for (let i = 0; i < 255; i++) { EXP[i] = x; LOG[x] = i; x <<= 1; if (x & 0x100) x ^= 0x11d; } for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255]; })();
+  const mul = (a, b) => (a === 0 || b === 0) ? 0 : EXP[LOG[a] + LOG[b]];
+  // version -> capacity + block layout for EC level L
+  const V = {
+    1:{bytes:17,blocks:[[1,19]],ec:7,align:[]},
+    2:{bytes:32,blocks:[[1,34]],ec:10,align:[6,18]},
+    3:{bytes:53,blocks:[[1,55]],ec:15,align:[6,22]},
+    4:{bytes:78,blocks:[[1,80]],ec:20,align:[6,26]},
+    5:{bytes:106,blocks:[[1,108]],ec:26,align:[6,30]},
+    6:{bytes:134,blocks:[[2,68]],ec:18,align:[6,34]},
+    7:{bytes:154,blocks:[[2,78]],ec:20,align:[6,22,38]},
+    8:{bytes:192,blocks:[[2,97]],ec:24,align:[6,24,42]},
+    9:{bytes:230,blocks:[[2,116]],ec:30,align:[6,26,46]},
+    10:{bytes:271,blocks:[[2,68],[2,69]],ec:18,align:[6,28,50]},
+  };
+  const MASKS = [
+    (r,c)=>((r+c)%2===0),(r,c)=>(r%2===0),(r,c)=>(c%3===0),(r,c)=>((r+c)%3===0),
+    (r,c)=>(((r/2|0)+(c/3|0))%2===0),(r,c)=>(((r*c)%2+((r*c)%3))===0),
+    (r,c)=>((((r*c)%2)+((r*c)%3))%2===0),(r,c)=>((((r+c)%2)+((r*c)%3))%2===0),
+  ];
+  function rsGen(deg){ let p=[1]; for(let i=0;i<deg;i++){ const q=new Array(p.length+1).fill(0);
+    for(let j=0;j<p.length;j++){ q[j]^=mul(p[j],EXP[i]); q[j+1]^=p[j]; } p=q; } return p; }
+  function rsEC(data,deg){ const g=rsGen(deg), r=new Array(deg).fill(0);
+    // r[i] = coeff of x^{deg-1-i} (descending register); g ascending: g[k]=coeff of x^k
+    for(const b of data){ const f=b^r[0];
+      for(let i=0;i<deg-1;i++) r[i]=r[i+1];
+      r[deg-1]=0;
+      if(f!==0) for(let i=0;i<deg;i++) r[i]^=mul(g[deg-1-i],f); } return r; }
+  function encodeData(str, ver){
+    const bytes = new TextEncoder().encode(str);
+    const cap = V[ver], totalCW = cap.blocks.reduce((s,g)=>s+g[0]*g[1],0), capBits = totalCW*8;
+    const bits=[]; const push=(v,n)=>{ for(let i=n-1;i>=0;i--) bits.push((v>>i)&1); };
+    push(0b0100,4); push(bytes.length, ver>=10?16:8);
+    for(const b of bytes) push(b,8);
+    push(0, Math.min(4, capBits-bits.length));
+    while(bits.length%8) bits.push(0);
+    for(let pad=0xEC; bits.length<capBits; pad^=0xEC^0x11) push(pad,8);
+    const cw=[]; for(let i=0;i<bits.length;i+=8){ let v=0; for(let j=0;j<8;j++) v=(v<<1)|bits[i+j]; cw.push(v); }
+    // split into blocks
+    const blocks=[]; let off=0;
+    for(const [n,len] of cap.blocks) for(let k=0;k<n;k++){ blocks.push(cw.slice(off,off+len)); off+=len; }
+    const ecBlocks = blocks.map(b=>rsEC(b,cap.ec));
+    const seq=[]; const maxLen=Math.max(...blocks.map(b=>b.length));
+    for(let i=0;i<maxLen;i++) for(const b of blocks) if(i<b.length) seq.push(b[i]);
+    for(let i=0;i<cap.ec;i++) for(const b of ecBlocks) seq.push(b[i]);
+    return seq;
+  }
+  function formatBits(mask){
+    const data=(0b01<<3)|mask; let rem=data;
+    for(let i=0;i<10;i++) rem=((rem<<1)^(((rem>>>9)&1)*0x537))&0x7FF;
+    return (((data<<10)|rem)^0x5412)&0x7FFF;
+  }
+  const getBit=(x,i)=>((x>>>i)&1);
+  function baseMatrix(ver){
+    const size=4*ver+17, m=Array.from({length:size},()=>new Array(size).fill(0)),
+          f=Array.from({length:size},()=>new Array(size).fill(false));
+    const F=(r,c,v)=>{ m[r][c]=v; f[r][c]=true; };
+    const finder=(r,c)=>{ for(let dr=-1;dr<=7;dr++)for(let dc=-1;dc<=7;dc++){
+      const rr=r+dr,cc=c+dc; if(rr<0||rr>=size||cc<0||cc>=size) continue;
+      const in7=dr>=0&&dr<=6&&dc>=0&&dc<=6;
+      F(rr,cc,in7?(Math.max(Math.abs(dr-3),Math.abs(dc-3))===2?0:1):0); } };
+    finder(0,0); finder(0,size-7); finder(size-7,0);
+    for(let i=8;i<size-8;i++){ F(6,i,i%2===0?1:0); F(i,6,i%2===0?1:0); }
+    for(const r of V[ver].align) for(const c of V[ver].align){
+      if((r<9&&c<9)||(r<9&&c>size-9)||(r>size-9&&c<9)) continue;
+      for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++)
+        F(r+dr,c+dc,Math.max(Math.abs(dr),Math.abs(dc))===1?0:1);
+    }
+    // reserve format-info cells (filled later)
+    const reserve=(r,c)=>{ f[r][c]=true; };
+    for(let i=0;i<=5;i++){ reserve(i,8); reserve(8,i); }
+    reserve(7,8); reserve(8,8); reserve(8,7);
+    for(let i=9;i<15;i++){ reserve(14-i,8); }
+    for(let i=0;i<8;i++) reserve(size-1-i,8);
+    for(let i=8;i<15;i++) reserve(8,size-15+i);
+    return {m,f,size};
+  }
+  function placeFormat(m,f,size,mask){
+    const bits=formatBits(mask);
+    for(let i=0;i<=5;i++){ m[8][i]=getBit(bits,i); m[i][8]=getBit(bits,i); }
+    m[8][7]=getBit(bits,6); m[8][8]=getBit(bits,7); m[7][8]=getBit(bits,8);
+    for(let i=9;i<15;i++) m[14-i][8]=getBit(bits,i);
+    for(let i=0;i<8;i++) m[size-1-i][8]=getBit(bits,i);
+    for(let i=8;i<15;i++) m[8][size-15+i]=getBit(bits,i);
+    m[size-8][8]=1; // dark module, always dark
+  }
+  function penalty(m){
+    const n=m.length; let p=0;
+    const run=(line)=>{ let c=1; for(let i=1;i<=line.length;i++){ if(i<line.length&&line[i]===line[i-1]) c++;
+      else { if(c>=5) p+=3+(c-5); c=1; } } };
+    for(let r=0;r<n;r++) run(m[r]);
+    for(let c=0;c<n;c++) run(m.map(row=>row[c]));
+    for(let r=0;r<n-1;r++)for(let c=0;c<n-1;c++)
+      if(m[r][c]===m[r][c+1]&&m[r][c]===m[r+1][c]&&m[r][c]===m[r+1][c+1]) p+=3;
+    const pat1=[1,0,1,1,1,0,1,0,0,0,0], pat2=[0,0,0,0,1,0,1,1,1,0,1];
+    const match=(line)=>{ for(let i=0;i<=line.length-11;i++){
+      let a=true,b=true; for(let k=0;k<11;k++){ if(line[i+k]!==pat1[k])a=false; if(line[i+k]!==pat2[k])b=false; }
+      if(a||b) p+=40; } };
+    for(let r=0;r<n;r++) match(m[r]);
+    for(let c=0;c<n;c++) match(m.map(row=>row[c]));
+    let dark=0; for(let r=0;r<n;r++)for(let c=0;c<n;c++) dark+=m[r][c];
+    p+=Math.floor(Math.abs(dark*20/n/n-10))*10;
+    return p;
+  }
+  function draw(size, ver, codewords, maskIdx){
+    const {m,f}=baseMatrix(ver), maskFn=MASKS[maskIdx];
+    let bit=0; const total=codewords.length*8;
+    for(let right=size-1;right>=1;right-=2){ if(right===6) right=5;
+      for(let vert=0;vert<size;vert++) for(let j=0;j<2;j++){
+        const c=right-j, up=((right+1)&2)===0, r=up?size-1-vert:vert;
+        if(!f[r][c]&&bit<total){
+          let d=(codewords[bit>>>3]>>>(7-(bit&7)))&1;
+          if(maskFn(r,c)) d^=1;
+          m[r][c]=d; bit++;
+        }
+      }
+    }
+    return m;
+  }
+  function make(text){
+    const bytes=new TextEncoder().encode(text).length;
+    let ver=1; while(ver<=10&&V[ver].bytes<bytes) ver++;
+    if(ver>10) throw new Error('URL too long for QR (max ~271 bytes)');
+    const codewords=encodeData(text,ver);
+    const size=4*ver+17;
+    let best=0,bestP=Infinity,bestM=null;
+    for(let k=0;k<8;k++){ const m=draw(size,ver,codewords,k), p=penalty(m);
+      if(p<bestP){ bestP=p; best=k; bestM=m; } }
+    placeFormat(bestM,baseMatrix(ver).f,size,best);
+    return {matrix:bestM,size,version:ver,mask:best};
+  }
+  function svg(text,px){
+    const {matrix,size}=make(text), q=4, s=size+2*q, u=(px/s).toFixed(3);
+    let r='';
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++) if(matrix[y][x]) r+=`M${(x+q)*u} ${(y+q)*u}h${u}v${u}h-${u}z`;
+    return `<svg width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" role="img" aria-label="QR code for auth link">`
+      + `<rect width="${px}" height="${px}" fill="#eafff4" rx="8"/><path d="${r}" fill="#0a1420"/></svg>`;
+  }
+  return {make,svg,formatBits,_V:V,_rsEC:rsEC,_encodeData:encodeData};
+})();
+
+/* ---------------- bridge ---------------- */
+const RPC_URL='https://www.orbitx.world/api/mcp';
+let rpcId=1;
+async function hostCallTool(name,args){
+  if(window.OrbitX&&typeof window.OrbitX.callTool==='function')
+    return window.OrbitX.callTool(name,args||{});
+  // standalone fallback: MCP JSON-RPC over HTTPS
+  const res=await fetch(RPC_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:rpcId++,method:'tools/call',params:{name,arguments:args||{}}})});
+  if(!res.ok) throw new Error('network '+res.status);
+  const data=await res.json();
+  if(data.error) throw new Error(data.error.message||'rpc error');
+  const r=data.result||{};
+  if(r.structuredContent) return r.structuredContent;
+  const texts=(r.content||[]).filter(c=>c&&(c.type==='text'||typeof c.text==='string')).map(c=>c.text).join('\n');
+  try{ return JSON.parse(texts); }catch(e){ return {text:texts}; }
+}
+function withTimeout(p,ms){
+  return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('Request timed out — please try again.')),ms||25000))]);
+}
+function looksLikeAuthError(err){
+  const s=String((err&&err.message)||err||'').toLowerCase();
+  if(/unauthor|forbidden|expir|not[\s_-]?(linked|connected|signed)|sign[\s_-]?in[\s_-]?(required|needed)|credential/.test(s)) return true;
+  if(/invalid/.test(s)&&/(auth|code|session|token)/.test(s)) return true;
+  if(/auth/.test(s)&&/(fail|denied|invalid|expir|required|revoked|rejected)/.test(s)) return true;
+  return false;
+}
+function firstHttpString(obj){
+  if(!obj||typeof obj!=='object') return null;
+  for(const k of ['authUrl','auth_url','authLink','url','link','redirectUrl','redirect_url'])
+    if(typeof obj[k]==='string'&&/^https?:\/\//i.test(obj[k])) return obj[k];
+  for(const v of Object.values(obj))
+    if(typeof v==='string'&&/^https?:\/\//i.test(v)) return v;
+  return null;
+}
+function normalizeIdentity(r){
+  if(!r||typeof r!=='object') return null;
+  const w=r.wallet||r.address||r.pubkey||r.publicKey||r.id||'';
+  if(!w) return null;
+  return {
+    wallet:String(w),
+    handle:String(r.handle||r.username||r.name||r.displayName||r.ens||'Trader'),
+    tier:String(r.tier||r.plan||r.level||'Standard'),
+    extra:r,
+  };
+}
+const trunc=(w)=>w&&w.length>13?w.slice(0,6)+'…'+w.slice(-4):w;
+
+/* ---------------- state ---------------- */
+const LS_KEY='orbitx.authCode';
+const S={
+  view:'boot',      // boot | signed-out | link | signed-in | auth-error
+  busy:false,
+  busyLabel:'',
+  authCode:null,
+  authUrl:null,
+  identity:null,
+  error:'',
+  inlineError:'',
+  step:1,
+};
+function saveCode(c){ try{ localStorage.setItem(LS_KEY,c); }catch(e){} }
+function loadCode(){ try{ return localStorage.getItem(LS_KEY)||null; }catch(e){ return null; } }
+function clearCode(){ try{ localStorage.removeItem(LS_KEY); }catch(e){} }
+
+const app=document.getElementById('app');
+const toastEl=document.getElementById('toast');
+let toastT=null;
+function toast(msg,isErr){
+  toastEl.textContent=msg;
+  toastEl.classList.toggle('err',!!isErr);
+  toastEl.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('show'),2600);
+}
+function copyText(t,label){
+  const done=()=>toast((label||'Copied')+' ✓');
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(t).then(done).catch(()=>fallbackCopy(t,done));
+  else fallbackCopy(t,done);
+}
+function fallbackCopy(t,done){
+  const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){ toast('Copy failed — long-press to copy',true); }
+  document.body.removeChild(ta);
+}
+function identicon(seed){
+  let h=2166136261; for(const ch of seed){ h^=ch.charCodeAt(0); h=Math.imul(h,16777619); }
+  const rnd=()=>{ h=Math.imul(h^h>>>15,2246822519); h=Math.imul(h^h>>>13,3266489917); return (h^=h>>>16)>>>0; };
+  const hue=rnd()%360;
+  let cells='';
+  for(let y=0;y<5;y++)for(let x=0;x<3;x++){
+    if(rnd()%2){ const mx=4-x;
+      cells+=`<rect x="${x*20}" y="${y*20}" width="20" height="20" fill="hsl(${hue} 85% 60%)"/>`
+            + (mx!==x?`<rect x="${mx*20}" y="${y*20}" width="20" height="20" fill="hsl(${hue} 85% 60%)"/>`:''); }
+  }
+  return `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="hsl(${hue} 40% 12%)"/>${cells}</svg>`;
+}
+const openUrl=(u)=>{
+  if(window.OrbitX&&typeof window.OrbitX.openUrl==='function') window.OrbitX.openUrl(u);
+  else window.open(u,'_blank','noopener');
+};
+
+/* ---------------- views ---------------- */
+function stepsHTML(active){
+  const labels=['Connect','Sign','Activate'];
+  return `<div class="steps">${labels.map((l,i)=>
+    `<div class="step${i+1<=active?' on':''}"><div class="bar"><i></i></div><span>${l}</span></div>`).join('')}</div>`;
+}
+function skeletonView(){
+  return `<div class="view">
+    <div class="eyebrow">ORBITX</div>
+    <div class="sk" style="height:30px;width:70%;margin-bottom:10px"></div>
+    <div class="sk" style="height:16px;width:92%;margin-bottom:22px"></div>
+    <div class="sk-row"><div class="sk sk-av"></div><div style="flex:1"><div class="sk" style="height:16px;width:55%;margin-bottom:8px"></div><div class="sk" style="height:12px;width:35%"></div></div></div>
+    <div class="sk" style="height:54px;border-radius:15px"></div>
+  </div>`;
+}
+function signedOutView(){
+  return `<div class="view">
+    <div class="eyebrow">WALLET SIGN-IN</div>
+    <h2 class="title">Connect your wallet to <span class="glow">OrbitX</span></h2>
+    <p class="sub">Link your wallet once and unlock trading, launches and every write action across OrbitX — right here inside ChatGPT.</p>
+    ${stepsHTML(1)}
+    <button class="btn btn-primary" id="btnConnect" ${S.busy?'disabled':''}>
+      ${S.busy?'<span class="spin"></span> '+esc(S.busyLabel||'Contacting OrbitX…'):'Connect wallet →'}
+    </button>
+    ${S.inlineError?`<div class="errbox" style="margin-top:14px">${esc(S.inlineError)}</div>`:''}
+    <p class="hint">🔒 <b>Private keys never leave your wallet.</b> You approve a signature in your browser — OrbitX only ever sees the linked identity.</p>
+  </div>`;
+}
+function linkView(){
+  let qr=''; try{ qr=QR.svg(S.authUrl,168); }catch(e){ qr='<div class="hint">QR unavailable — use the link below.</div>'; }
+  return `<div class="view">
+    <div class="eyebrow">STEP 2 OF 3 · SIGN IN YOUR BROWSER</div>
+    <h2 class="title">Approve the <span class="glow">connection</span></h2>
+    <p class="sub">Open the link, complete the wallet sign-in, then paste the <b style="color:var(--txt)">auth code</b> it gives you below.</p>
+    ${stepsHTML(2)}
+    <a class="authlink" href="${esc(S.authUrl)}" target="_blank" rel="noopener" id="authAnchor">
+      <div class="lbl">AUTH LINK · TAP TO OPEN</div>
+      <div class="go">orbitx.world/authorize
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3h7v7M13 3 8 8M9 13H3V7" stroke="#34d399" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+    <div class="qr-wrap"><div class="qr-frame">${qr}<div class="scan"></div></div></div>
+    <div class="qr-cap">Scan with your phone camera to open the auth page</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btnCopyLink" style="margin-top:0">⧉ Copy link</button>
+      <button class="btn btn-ghost" id="btnOpenLink" style="margin-top:0">↗ Open</button>
+    </div>
+    <div class="field" style="margin-top:18px">
+      <label for="codeInput">Paste your auth code</label>
+      <div class="codebox">
+        <input id="codeInput" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. OX-8F3K-…" aria-label="Auth code">
+        <button class="paste-btn" id="btnPaste">Paste</button>
+      </div>
+    </div>
+    ${S.inlineError?`<div class="errbox">${esc(S.inlineError)}</div>`:''}
+    <button class="btn btn-primary" id="btnActivate" ${S.busy?'disabled':''}>
+      ${S.busy?'<span class="spin"></span> Activating…':'Activate connection →'}
+    </button>
+    <button class="backlink" id="btnBack">← Get a fresh link</button>
+  </div>`;
+}
+function signedInView(){
+  const id=S.identity;
+  return `<div class="view">
+    <div class="eyebrow">CONNECTED</div>
+    <div class="id-head">
+      <div class="avatar">${identicon(id.wallet)}</div>
+      <div class="who">
+        <div class="handle">${esc(id.handle)}</div>
+        <div class="live"><i></i>SESSION ACTIVE</div>
+      </div>
+    </div>
+    <div class="kv"><span class="k">Wallet</span><span class="v"><span class="mono-trunc">${esc(trunc(id.wallet))}</span><button class="copybtn" data-copy="${esc(id.wallet)}">Copy</button></span></div>
+    <div class="kv"><span class="k">Tier</span><span class="v"><span class="tier">${esc(id.tier)}</span></span></div>
+    <button class="btn btn-primary" id="btnTest" ${S.busy?'disabled':''}>${S.busy?'<span class="spin"></span> Checking…':'↻ Verify connection'}</button>
+    <button class="btn btn-danger-ghost" id="btnDisconnect">Disconnect wallet</button>
+    <p class="hint" style="text-align:center">Disconnecting clears this device's saved session only. Your wallet itself is untouched.</p>
+  </div>`;
+}
+function authErrorView(){
+  return `<div class="view">
+    <div class="err-ico">
+      <svg width="30" height="30" viewBox="0 0 30 30" fill="none"><path d="M15 4 28 25H2L15 4z" stroke="#f87171" stroke-width="2.4" stroke-linejoin="round"/><path d="M15 12v6" stroke="#f87171" stroke-width="2.4" stroke-linecap="round"/><circle cx="15" cy="21.5" r="1.4" fill="#f87171"/></svg>
+    </div>
+    <div class="eyebrow" style="color:var(--danger)">SESSION EXPIRED</div>
+    <h2 class="title">Your connection <span style="color:var(--danger);text-shadow:0 0 22px rgba(248,113,113,.5)">dropped</span></h2>
+    <p class="sub">The saved session is no longer valid — auth codes expire for security. Reconnecting takes under a minute.</p>
+    ${S.error?`<div class="errbox">${esc(S.error)}</div>`:''}
+    <button class="btn btn-primary" id="btnReconnect">Reconnect wallet →</button>
+  </div>`;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function render(){
+  let html=skeletonView();
+  if(S.view==='signed-out') html=signedOutView();
+  else if(S.view==='link') html=linkView();
+  else if(S.view==='signed-in') html=signedInView();
+  else if(S.view==='auth-error') html=authErrorView();
+  app.innerHTML=html;
+  wire();
+}
+function wire(){
+  const on=(id,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener('click',fn); };
+  on('btnConnect',startLink);
+  on('btnCopyLink',()=>copyText(S.authUrl,'Auth link copied'));
+  on('btnOpenLink',()=>openUrl(S.authUrl));
+  on('btnPaste',async()=>{
+    try{ const t=await navigator.clipboard.readText(); const inp=document.getElementById('codeInput');
+      if(inp&&t){ inp.value=t.trim(); toast('Pasted ✓'); } }catch(e){ toast('Paste blocked — type it manually',true); }
+  });
+  on('btnActivate',()=>{
+    const inp=document.getElementById('codeInput');
+    const code=(inp?inp.value:'').trim();
+    if(!code){ S.inlineError='Paste the auth code from the browser page first.'; render(); return; }
+    activate(code);
+  });
+  on('btnBack',()=>{ S.view='signed-out'; S.inlineError=''; S.authUrl=null; render(); });
+  on('btnTest',testConnection);
+  on('btnDisconnect',disconnect);
+  on('btnReconnect',()=>{ clearCode(); S.authCode=null; S.identity=null; S.error=''; S.view='signed-out'; render(); emit('orbitx-auth-changed',{connected:false}); });
+  app.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyText(b.getAttribute('data-copy'),'Wallet address copied')));
+  const anchor=document.getElementById('authAnchor');
+  if(anchor) anchor.addEventListener('click',e=>{ if(window.OrbitX&&window.OrbitX.openUrl){ e.preventDefault(); openUrl(S.authUrl); } });
+  const inp=document.getElementById('codeInput');
+  if(inp){ inp.addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('btnActivate').click(); }); }
+}
+
+/* ---------------- flow ---------------- */
+function emit(name,detail){ try{ window.dispatchEvent(new CustomEvent(name,{detail})); }catch(e){} }
+function failAuth(message){
+  clearCode(); S.authCode=null; S.identity=null;
+  S.error=message||'Session expired or invalid.';
+  S.view='auth-error'; S.busy=false; render();
+  emit('orbitx-auth-error',{message:S.error});
+}
+async function call(name,args){
+  try{ return await withTimeout(hostCallTool(name,args)); }
+  catch(e){
+    if(looksLikeAuthError(e)&&S.view==='signed-in') failAuth(e.message);
+    throw e;
+  }
+}
+async function startLink(){
+  S.busy=true; S.busyLabel='Contacting OrbitX…'; S.inlineError=''; render();
+  try{
+    const res=await call('orbitx_auth_link',{});
+    const url=firstHttpString(res);
+    if(!url) throw new Error('OrbitX did not return an auth link. Please try again.');
+    S.authUrl=url; S.step=2; S.view='link'; S.busy=false; render();
+    emit('orbitx-auth-link',{});
+  }catch(e){
+    S.busy=false; S.inlineError=e.message||'Could not reach OrbitX.'; render();
+  }
+}
+async function activate(code){
+  S.busy=true; S.inlineError=''; render();
+  try{
+    await call('orbitx_auth_status',{authCode:code});
+    // activation accepted — confirm identity
+    const who=await call('orbitx_whoami',{authCode:code});
+    const id=normalizeIdentity(who);
+    if(!id) throw new Error('Connected, but identity lookup failed. Try reconnecting.');
+    S.authCode=code; saveCode(code); S.identity=id;
+    S.view='signed-in'; S.busy=false; render();
+    toast('Wallet connected ✓');
+    emit('orbitx-auth-changed',{connected:true,identity:{wallet:id.wallet,handle:id.handle,tier:id.tier}});
+  }catch(e){
+    S.busy=false;
+    if(looksLikeAuthError(e)){
+      S.inlineError='That code was rejected or expired. Get a fresh link and try again.';
+    }else{
+      S.inlineError=e.message||'Activation failed.';
+    }
+    render();
+  }
+}
+async function testConnection(){
+  S.busy=true; render();
+  try{
+    const who=await call('orbitx_whoami',{authCode:S.authCode});
+    const id=normalizeIdentity(who);
+    if(!id) throw new Error('Identity lookup failed.');
+    S.identity=id; S.busy=false; render();
+    toast('Connection verified ✓');
+  }catch(e){
+    if(!looksLikeAuthError(e)){ S.busy=false; render(); toast(e.message||'Check failed',true); }
+    // auth errors already routed to failAuth() inside call()
+  }
+}
+function disconnect(){
+  clearCode(); S.authCode=null; S.identity=null; S.authUrl=null;
+  S.view='signed-out'; S.inlineError=''; render();
+  toast('Disconnected');
+  emit('orbitx-auth-changed',{connected:false});
+}
+async function boot(){
+  // deep-link support: ?code= / ?authCode= pre-fills activation
+  const q=new URLSearchParams(location.search);
+  const deep=q.get('authCode')||q.get('code');
+  const hadCode=!!loadCode();
+  S.authCode=loadCode();
+  if(S.authCode){
+    S.view='boot'; render();
+    try{
+      const who=await call('orbitx_whoami',{authCode:S.authCode});
+      const id=normalizeIdentity(who);
+      if(id){ S.identity=id; S.view='signed-in'; render();
+        emit('orbitx-auth-changed',{connected:true,identity:{wallet:id.wallet,handle:id.handle,tier:id.tier}}); return; }
+      throw new Error('stale session');
+    }catch(e){
+      clearCode(); S.authCode=null;
+      if(hadCode&&looksLikeAuthError(e)){
+        // returning user whose saved session died -> expired state, not silent signed-out
+        S.error='Your saved session expired. Reconnect to continue.';
+        S.view='auth-error'; render();
+        emit('orbitx-auth-error',{message:S.error});
+        return;
+      }
+    }
+  }
+  if(deep){
+    S.view='signed-out'; render();
+    // go straight to a fresh link; the pasted code waits in the input
+    await startLink();
+    const inp=document.getElementById('codeInput'); if(inp) inp.value=deep;
+    return;
+  }
+  S.view='signed-out'; render();
+}
+
+/* public surface for host / sibling widgets */
+window.OrbitXAuth={
+  state:()=>({view:S.view,connected:S.view==='signed-in',
+    identity:S.identity?{wallet:S.identity.wallet,handle:S.identity.handle,tier:S.identity.tier}:null}),
+  refresh:()=>boot(),
+  showAuthError:(msg)=>failAuth(msg||'Session expired.'),
+  disconnect:()=>disconnect(),
+};
+window.OrbitX=window.OrbitX||{};
+if(!window.OrbitX.callTool) window.OrbitX._standalone=true;
+
+if(typeof window!=='undefined'&&window.document){
+  render();
+  boot();
+  const note=document.getElementById('modeNote');
+  if(window.OrbitX._standalone&&note){
+    note.hidden=false;
+    note.innerHTML='standalone preview · host bridge not detected — calls go to <code>'+RPC_URL+'</code>';
+  }
+}
+</script>
+</body>
+</html>
