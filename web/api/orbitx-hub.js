@@ -267,8 +267,8 @@ function publicToolList(list) {
  * existing clients see the same fields plus _meta on UI-bound tools.
  */
 function withUiListingMeta(t, listed) {
-  const m = toolListingMeta(t);
-  if (m) listed._meta = { ...(listed._meta && typeof listed._meta === "object" ? listed._meta : {}), ...m };
+  // TEMP-DIAG 2026-10-12: _meta stripped to isolate ChatGPT discovery failure.
+  // Revert after diagnosis.
   return listed;
 }
 
@@ -6077,7 +6077,8 @@ async function handleMcp(req, res, parts) {
           id,
           result: {
             protocolVersion: negotiatedVersion,
-            capabilities: { tools: {}, resources: {} },
+            // TEMP-DIAG 2026-10-12: resources capability stripped to isolate ChatGPT discovery failure.
+            capabilities: { tools: {} },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
               "OrbitX Agent MCP. Coverage, not a tour: we do not tell users to use every surface. Each door is for a trading group. If they ask why use this MCP, why so many tools, or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
