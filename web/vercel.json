@@ -68,12 +68,16 @@
       "destination": "/api/orbitx-hub?path=mcp/.well-known/oauth-authorization-server"
     },
     {
-      "source": "/mcp/(.*)",
-      "destination": "/api/mcp?path=mcp/$1"
+      "source": "/mcp",
+      "destination": "/app.html"
     },
     {
-      "source": "/mcp",
-      "destination": "/api/mcp?path=mcp"
+      "source": "/mcp/guide",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/mcp/(.*)",
+      "destination": "/api/mcp?path=mcp/$1"
     },
     {
       "source": "/api/mcp/(.*)",
