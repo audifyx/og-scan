@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
+import type { WalletName } from "@solana/wallet-adapter-base";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { approveMcpOAuth, mcpOAuthCredentials, mcpPublicUrl } from "@/lib/orbitxMcp";
@@ -13,10 +14,11 @@ import { AgentLoading, AgentShell } from "@/components/agent/AgentShell";
 export default function McpAuthPage() {
   const [params] = useSearchParams();
   const { user, profile, loading: authLoading } = useAuth();
-  const { publicKey } = useWallet();
+  const { publicKey, connect, disconnect, wallets, select, wallet, connected, connecting } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   const redirectUri = params.get("redirect_uri") || "";
   const state = params.get("state") || "";
@@ -50,6 +52,22 @@ export default function McpAuthPage() {
         : cid.includes("grok") || cid.includes("xai") || cid.includes("x.ai")
           ? "Grok"
           : "your AI assistant";
+
+  const onSwitchWallet = async (adapterName: string) => {
+    setError(null);
+    setSwitching(true);
+    try {
+      if (connected) await disconnect();
+      select(adapterName as WalletName);
+      // select() is async in effect — give it a tick, then connect
+      await new Promise((r) => setTimeout(r, 150));
+      await connect();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Wallet connection failed");
+    } finally {
+      setSwitching(false);
+    }
+  };
 
   const onConfirm = async () => {
     setError(null);
@@ -126,6 +144,39 @@ export default function McpAuthPage() {
               {walletAddress
                 ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
                 : "Not connected"}
+            </div>
+            <span />
+          </div>
+          <div className="ox-agent__row">
+            <div className="ox-agent__label">Switch wallet</div>
+            <div className="ox-agent__value" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {wallets.filter((w) => w.readyState === "Installed" || w.readyState === "Loadable").length === 0 && (
+                <span className="ox-agent__note">No wallets detected — install Phantom.</span>
+              )}
+              {wallets
+                .filter((w) => w.readyState === "Installed" || w.readyState === "Loadable")
+                .map((w) => (
+                  <button
+                    key={w.adapter.name}
+                    type="button"
+                    className="ox-agent__btn ox-agent__btn--ghost"
+                    disabled={switching || connecting}
+                    onClick={() => onSwitchWallet(w.adapter.name)}
+                    title={w.adapter.name}
+                  >
+                    {switching || connecting ? "…" : w.adapter.name}
+                  </button>
+                ))}
+              {connected && (
+                <button
+                  type="button"
+                  className="ox-agent__btn ox-agent__btn--ghost"
+                  disabled={switching}
+                  onClick={() => disconnect().catch(() => {})}
+                >
+                  Disconnect
+                </button>
+              )}
             </div>
             <span />
           </div>
