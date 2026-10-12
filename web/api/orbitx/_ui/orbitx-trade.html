@@ -170,6 +170,14 @@ select:focus{border-color:var(--neon)}
 pre.raw{background:#060b0e;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:11px;
   color:var(--mut);white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:auto}
 
+/* UI polish: smooth transitions, press feedback, fade-in */
+.card,.tcard,.toolrow,.qbtn,.stat{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover,.tcard:hover{border-color:rgba(23,255,77,.25)}
+button{transition:transform .12s ease,opacity .12s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card,.tcard{animation:fadeUp .32s ease both}
+@media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
 </style>
 </head>
 <body>
@@ -181,9 +189,10 @@ pre.raw{background:#060b0e;border:1px solid var(--line);border-radius:12px;paddi
 const MCP_URL = "https://www.orbitx.world/api/mcp";
 const Bridge = {
   async callTool(name, args){
+    let out;
     if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
-      return await window.OrbitX.callTool(name, args); // hosted bridge (CONTRACT.md)
-    }
+      out = await window.OrbitX.callTool(name, args); // hosted bridge (CONTRACT.md)
+    } else {
     // standalone fallback: POST MCP JSON-RPC directly (no bridge).
     // Sends Accept for both plain JSON and SSE; parses either.
     const res = await fetch(MCP_URL, {
@@ -203,10 +212,17 @@ const Bridge = {
     const content = j.result && j.result.content;
     if(Array.isArray(content)){
       const t = content.find(c=>c.type==="text");
-      if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
-      return content;
+      if(t){ try{ out=JSON.parse(t.text); }catch(e){ out=t.text; } }
+      else out=content;
     }
-    return j.result;
+    else out=j.result;
+    }
+    // widgetAction hook (e.g. DCA schedule import from orbitx_dca_create)
+    try{
+      const wa=out&&typeof out==="object"?(out.widgetAction||(out.structuredContent&&out.structuredContent.widgetAction)):null;
+      if(wa&&typeof dcaHandleWidgetAction==="function") dcaHandleWidgetAction(wa);
+    }catch(e){}
+    return out;
   }
 };
 const AUTH_KEY = "orbitx_auth_code";
@@ -612,7 +628,7 @@ function mapErr(e){
    Auth: authCode from localStorage on every write call (CONTRACT.md).
    ============================================================ */
 const AUTH_RE2 = /auth|unauthor|expir|invalid code|session|forbidden|not (linked|connected|signed)|sign.?in|token|credential/i;
-const TABS = [["trade","⚡","Trade"],["ord","🔔","Orders"],["cpy","🪞","Copy"],["snp","🎯","Snipe"],["ppr","📄","Paper"]];
+const TABS = [["trade","⚡","Trade"],["ord","🔔","Orders"],["dca","🔁","DCA"],["cpy","🪞","Copy"],["snp","🎯","Snipe"],["ppr","📄","Paper"]];
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 function tabBar(active){
@@ -622,6 +638,7 @@ function tabBar(active){
 function goTab(t){
   clearTimer(); S.dErr=""; S.tab=t; S.screen="search";
   if(t==="ord"){ S.screen="ord"; render(); loadOrders(); return; }
+  if(t==="dca"){ S.screen="dca"; render(); loadDca(); return; }
   if(t==="cpy"){ S.screen="cpy"; render(); loadCopy(); return; }
   if(t==="snp"){ S.screen="snp"; render(); loadSnipe(); return; }
   if(t==="ppr"){ S.screen="ppr"; render(); loadPaper(); return; }
@@ -633,6 +650,10 @@ S.d14={list:[],loading:false,mint:"",otype:"tp",pct:"15",sizePct:"100",usd:"5",p
 S.d15={list:[],loading:false,prov:null,provBusy:false,wallet:"",mode:"fixed_usd",size:"1",maxUsd:"25",label:"",creating:false,unfAsk:-1,provAsk:false};
 S.d16={st:null,loading:false,cfg:null,arming:false,killBusy:false};
 S.d23={agent:"",pf:null,loading:false,mint:"",usd:"10",px:null,pxBusy:false,buying:false,sellIdx:-1,sellPct:"100",resetBusy:false};
+/* DCA — zero-SQL, widget-managed via localStorage */
+S.dca={list:[],loading:false,mint:"",amountSol:"0.1",frequency:"daily",totalBuys:"7",px:null,pxBusy:false,creating:false,cancelAsk:-1,timer:null,execBusy:false};
+const DCA_KEY="orbitx.dcaSchedules";
+const DCA_FREQ_MS={hourly:3600e3,daily:86400e3,weekly:7*86400e3};
 
 /* ---- auth helpers (CONTRACT.md error convention) ---- */
 function scrAuthGate(el, tab, resume){
@@ -847,6 +868,144 @@ function scrOrdDone(el){
     ${o.targetUsd!=null?`<div class="qrow"><span class="k">Target</span><span class="v">${fmtUSD(o.targetUsd)}</span></div>`:""}
     <div style="margin-top:14px"><button class="btn btn-neon" onclick="S.d14.armed=null;loadOrders()">Back to orders</button></div>
   </div>`;
+}
+
+/* ============================================================
+   DCA — dollar-cost averaging, zero-SQL, widget-managed.
+   Schedules live in localStorage (DCA_KEY). Auto-executes due
+   buys via orbitx_app_buy while the widget is open.
+   ============================================================ */
+function dcaLoad(){ try{ const r=localStorage.getItem(DCA_KEY); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function dcaSave(list){ try{ localStorage.setItem(DCA_KEY, JSON.stringify(list)); }catch(e){} }
+function dcaNextRun(s){
+  const freq=DCA_FREQ_MS[s.frequency]||86400e3;
+  const last=s.lastRunAt?new Date(s.lastRunAt).getTime():new Date(s.createdAt).getTime();
+  return last+freq;
+}
+function dcaImport(schedule){
+  if(!schedule||!schedule.scheduleId) return false;
+  const list=dcaLoad();
+  if(list.some(s=>s.scheduleId===schedule.scheduleId)) return false;
+  list.push(Object.assign({},schedule,{buysDone:schedule.buysDone||0,status:"active"}));
+  dcaSave(list); return true;
+}
+async function loadDca(){
+  const d=S.dca; d.loading=true; render();
+  d.list=dcaLoad();
+  d.loading=false; render();
+  startDcaTimer();
+}
+function stopDcaTimer(){ if(S.dca.timer){ clearInterval(S.dca.timer); S.dca.timer=null; } }
+function startDcaTimer(){
+  stopDcaTimer();
+  S.dca.timer=setInterval(dcaTick, 60000);
+  dcaTick();
+}
+async function dcaTick(){
+  const d=S.dca;
+  if(!S.authCode||d.execBusy) return;
+  const now=Date.now();
+  const list=dcaLoad();
+  let changed=false;
+  for(const s of list){
+    if(s.status!=="active") continue;
+    if((s.buysDone||0)>=(s.totalBuys||0)){ s.status="done"; changed=true; continue; }
+    if(dcaNextRun(s)<=now){
+      d.execBusy=true;
+      try{
+        const r=await Bridge.callTool("orbitx_app_buy",{mint:s.mint,amountSol:s.amountSol});
+        if(r&&(r.ok!==false)&&!r.error){
+          s.buysDone=(s.buysDone||0)+1;
+          s.lastRunAt=new Date().toISOString();
+          s.lastTx=r.signature||r.tx||null;
+          if(s.buysDone>=s.totalBuys) s.status="done";
+        } else {
+          s.lastError=String((r&&(r.error||r.message))||"buy failed");
+        }
+      }catch(e){ s.lastError=String(e.message||e); }
+      d.execBusy=false;
+      changed=true;
+    }
+  }
+  if(changed){ dcaSave(list); d.list=list; render(); }
+}
+async function dcaCreate(){
+  const d=S.dca;
+  const mint=String(d.mint||"").trim();
+  if(!MINT_RE.test(mint)){ S.dErr="Paste a valid token mint address."; render(); return; }
+  const amountSol=Number(d.amountSol);
+  if(!isFinite(amountSol)||amountSol<=0||amountSol>100){ S.dErr="Amount must be 0-100 SOL per buy."; render(); return; }
+  d.creating=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_dca_create",{mint:mint,amountSol:amountSol,frequency:d.frequency,totalBuys:parseInt(d.totalBuys,10)||7});
+    if(r&&r.ok&&r.schedule){
+      dcaImport(r.schedule);
+      d.mint=""; d.list=dcaLoad();
+    } else {
+      S.dErr=String((r&&(r.error||r.message))||"Could not create schedule.");
+    }
+  }catch(e){ S.dErr=String(e.message||e); }
+  d.creating=false; render();
+}
+function dcaCancel(i){
+  const list=dcaLoad();
+  if(list[i]){ list[i].status="cancelled"; dcaSave(list); S.dca.list=list; S.dca.cancelAsk=-1; render(); }
+}
+function dcaCard(s,i){
+  const freq=s.frequency||"daily";
+  const done=s.buysDone||0, total=s.totalBuys||0;
+  const pct=total?Math.round(done/total*100):0;
+  const next=s.status==="active"?new Date(dcaNextRun(s)).toLocaleString():"-";
+  const stColor=s.status==="active"?"var(--neon)":s.status==="done"?"var(--mut)":"var(--red)";
+  return '<div class="card" style="margin-bottom:10px">'
+    +'<div class="row" style="align-items:center;margin-bottom:8px">'
+    +'<div style="flex:1"><b>'+esc(s.mint.slice(0,6))+"…"+esc(s.mint.slice(-4))+'</b>'
+    +'<span class="pill" style="color:'+stColor+";border-color:"+stColor+';margin-left:8px">'+esc(s.status)+"</span></div></div>"
+    +'<div class="qrow"><span class="k">Per buy</span><span class="v">'+esc(String(s.amountSol))+" SOL</span></div>"
+    +'<div class="qrow"><span class="k">Frequency</span><span class="v">'+esc(freq)+"</span></div>"
+    +'<div class="qrow"><span class="k">Progress</span><span class="v">'+done+"/"+total+" ("+pct+'%)</span></div>'
+    +'<div style="height:6px;background:var(--line);border-radius:3px;margin:8px 0;overflow:hidden">'
+    +'<div style="height:100%;width:'+pct+'%;background:var(--neon);border-radius:3px;transition:width .4s"></div></div>'
+    +'<div class="qrow"><span class="k">Next run</span><span class="v">'+esc(next)+"</span></div>"
+    +(s.lastTx?'<div class="qrow"><span class="k">Last tx</span><span class="v"><a href="https://solscan.io/tx/'+esc(s.lastTx)+'" target="_blank" rel="noopener" style="color:var(--neon)">'+esc(String(s.lastTx).slice(0,8))+"…</a></span></div>":"")
+    +(s.lastError?'<p class="sub" style="color:var(--red)">Last error: '+esc(s.lastError)+"</p>":"")
+    +(s.status==="active"?(S.dca.cancelAsk===i
+      ? '<div class="inline-confirm"><button class="btn btn-ghost" onclick="S.dca.cancelAsk=-1;render()">Keep</button>'
+        +'<button class="btn btn-red" onclick="dcaCancel('+i+')">Confirm cancel</button></div>'
+      : '<div style="margin-top:8px"><button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="S.dca.cancelAsk='+i+';render()">Cancel schedule</button></div>'):"")
+    +"</div>";
+}
+function scrDca(el){
+  if(!S.authCode){ scrAuthGate(el,"dca",loadDca); return; }
+  const d=S.dca;
+  const active=d.list.filter(s=>s.status==="active");
+  el.innerHTML=header(false)+tabBar("dca")
+  +'<div class="card"><div class="row" style="align-items:center;margin-bottom:10px">'
+  +'<div style="flex:1"><h2 style="margin:0">DCA schedules</h2>'
+  +'<p class="sub" style="margin:2px 0 0">'+active.length+" active · auto-buys while this widget is open</p></div>"
+  +'<button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" onclick="loadDca()">↻</button></div>'
+  +(d.loading?skelList(2):(d.list.length?d.list.map(dcaCard).join("")
+    :'<div class="empty"><div class="empty-ico">🔁</div><p><b>No DCA schedules yet</b></p>'
+    +'<p class="sub">Set it and forget it — the widget buys automatically on schedule while open.</p></div>'))
+  +dErrHtml()+"</div>"
+  +'<div class="card neon"><h2>New DCA schedule</h2>'
+  +'<p class="sub">Buys <b>amount</b> SOL worth on repeat. Runs in this widget — keep it open.</p>'
+  +'<div class="field"><span class="flabel">TOKEN MINT</span>'
+  +'<input type="text" placeholder="paste mint…" value="'+esc(d.mint)+'" oninput="S.dca.mint=this.value" autocomplete="off" autocapitalize="off" spellcheck="false"></div>'
+  +'<div class="field"><span class="flabel">AMOUNT PER BUY (SOL)</span>'
+  +'<input type="number" inputmode="decimal" min="0" max="100" step="0.01" value="'+esc(d.amountSol)+'" oninput="S.dca.amountSol=this.value"></div>'
+  +'<div class="field"><span class="flabel">FREQUENCY</span><div class="seg">'
+  +["hourly","daily","weekly"].map(f=>'<button class="'+(d.frequency===f?"on":"")+'" onclick="S.dca.frequency=\''+f+"';render()\">"+f[0].toUpperCase()+f.slice(1)+"</button>").join("")
+  +'</div></div>'
+  +'<div class="field"><span class="flabel">TOTAL BUYS (1–365)</span>'
+  +'<input type="number" inputmode="numeric" min="1" max="365" value="'+esc(d.totalBuys)+'" oninput="S.dca.totalBuys=this.value"></div>'
+  +'<button class="btn btn-neon" '+(d.creating?"disabled":"")+' onclick="dcaCreate()">'+(d.creating?"Creating…":"Start DCA →")+"</button></div>";
+  goBack=function(){S.screen="search";render();};
+}
+function dcaHandleWidgetAction(action){
+  if(action&&action.tab==="dca"&&action.importSchedule){
+    if(dcaImport(action.importSchedule)){ goTab("dca"); }
+  }
 }
 
 /* ============================================================
@@ -1383,6 +1542,7 @@ function scrPprReset(el){
 
 /* ---- dashboard screen registry (merged into render()) ---- */
 const DASH_SCREENS={ord:scrOrd,ordPreview:scrOrdPreview,ordDone:scrOrdDone,
+  dca:scrDca,
   cpy:scrCpy,cpyPreview:scrCpyPreview,
   snp:scrSnp,snpCfg:scrSnpCfg,snpPreview:scrSnpPreview,snpKill:scrSnpKill,
   ppr:scrPpr,pprPreview:scrPprPreview,pprReset:scrPprReset};
