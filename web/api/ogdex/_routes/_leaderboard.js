@@ -36,6 +36,7 @@ export default async function handler(req, res) {
     // Build the wallet set + metadata.
     // Primary: static _kols.json (always available)
     // Augmented by: DB ogdex_kol_directory (adds avatars, updated handles)
+    const now = Date.now();
     let meta = {};
     let wallets = walletsParam;
     if (!wallets.length) {
