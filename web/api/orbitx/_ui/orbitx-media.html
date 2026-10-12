@@ -5,13 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>OrbitX Media Studio</title>
 <!--
-  OrbitX ChatGPT Mini App — Media Studio (image gen, X posts, token launch)
+  OrbitX ChatGPT Mini App — Media Studio (image gen, X posts, token launch, NFT marketplace)
   resourceUri: ui://widget/orbitx-media.html
   Bridge: window.OrbitX.callTool(name, args) when hosted in the OrbitX bridge,
           else standalone fallback POSTs to https://www.orbitx.world/api/mcp
-  Tools (verified live): orbitx_generate_image, orbitx_x_post, orbitx_app_launch
+  Tools (verified live): orbitx_generate_image, orbitx_x_post, orbitx_app_launch,
+    orbitx_nft_collections, orbitx_nft_listings, orbitx_nft_auctions, orbitx_nft_recent_sales,
+    orbitx_nft_items, orbitx_nft_sales, orbitx_nft_offers, orbitx_nft_make_offer, orbitx_nft_place_bid
   RULES: X posts ALWAYS require explicit confirm. Launches ALWAYS require a
-  confirmation gate. No secrets in this file.
+  confirmation gate. Bids & offers ALWAYS require a confirmation gate.
+  No secrets in this file.
 -->
 <style>
 :root{
@@ -89,6 +92,27 @@ textarea{min-height:110px;resize:vertical}
   padding:12px 14px;font-size:13px;color:#ffd9a0;margin:12px 0;line-height:1.55}
 .charcount{text-align:right;font-size:12px;color:var(--dim);margin-top:4px}
 .charcount.over{color:var(--red);font-weight:800}
+/* ================= #19 NFT Marketplace ================= */
+.nftsub{display:flex;gap:8px;margin-bottom:10px}
+.nftsubtab{flex:1;text-align:center;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:700;
+  background:var(--panel);border:1px solid var(--line);color:var(--dim);cursor:pointer}
+.nftsubtab.on{background:rgba(23,255,77,.12);border-color:var(--neon);color:var(--neon);
+  box-shadow:0 0 10px rgba(23,255,77,.15)}
+.nftgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nftcard{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--line);
+  border-radius:14px;padding:10px;cursor:pointer}
+.nftcard:active{transform:scale(.98)}
+.nftthumb{border-radius:10px;overflow:hidden;aspect-ratio:1;background:#080d12;border:1px solid var(--line)}
+.nftthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.nftname{font-weight:700;font-size:13px;margin:8px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nftmut{color:var(--dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nftrow{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:13px}
+.nftprice{color:var(--neon);font-weight:800}
+.nfttime{color:var(--amber);font-size:12px;font-weight:700;margin-top:4px}
+.chip{display:inline-block;background:#0d151c;border:1px solid var(--line);border-radius:99px;
+  padding:6px 10px;font-size:12px;margin:0 6px 6px 0}
+.chip b{color:var(--neon);font-weight:700;margin-right:5px}
+.salerow{display:flex;gap:10px;align-items:center;padding:10px 2px;border-bottom:1px solid #0f1720;cursor:pointer}
 </style>
 </head>
 <body>
@@ -220,6 +244,7 @@ function tabsHTML(){
     <div class="tab ${S.tab==="gen"?"on":""}" onclick="S.tab='gen';render()">🎨 Generate</div>
     <div class="tab ${S.tab==="x"?"on":""}" onclick="S.tab='x';render()">𝕏 Post</div>
     <div class="tab ${S.tab==="lz"?"on":""}" onclick="S.tab='lz';render()">🚀 Launch</div>
+    <div class="tab ${S.tab==="nft"?"on":""}" onclick="S.tab='nft';render()">🖼 NFT</div>
   </div>`;
 }
 function closeModal(){ modal.innerHTML=""; }
@@ -230,7 +255,7 @@ function closeModal(){ modal.innerHTML=""; }
 /* ================= Render ================= */
 function render(){
   app.innerHTML = header()+tabsHTML()+
-    (S.tab==="gen"?genHTML():S.tab==="x"?xHTML():lzHTML());
+    (S.tab==="gen"?genHTML():S.tab==="x"?xHTML():S.tab==="nft"?nftHTML():lzHTML());
 }
 function errBox(e){ return e?`<div class="err">⚠️ ${esc(e)}</div>`:""; }
 
@@ -442,6 +467,407 @@ function lzDoneHTML(){
     ${r.url?`<div style="margin-top:8px"><a href="${esc(r.url)}" target="_blank" style="color:var(--neon)">View chart ↗</a></div>`:""}
   </div>`;
 }
+</script>
+<script>
+"use strict";
+/* ================= #19 NFT Marketplace =================
+   READ: orbitx_nft_collections, orbitx_nft_listings, orbitx_nft_auctions,
+         orbitx_nft_recent_sales, orbitx_nft_items, orbitx_nft_sales, orbitx_nft_offers
+   WRITE (authCode required, always behind a confirm gate):
+         orbitx_nft_make_offer, orbitx_nft_place_bid
+   All reads are live — empty tabs render honest empty states, never mocks. */
+const NFT={sub:"collections",busy:false,err:"",cols:[],listings:[],auctions:[],sales:[],
+  loaded:{},detail:null,colView:null,bid:null,offer:null};
+
+/* ---------- data helpers ---------- */
+function nftArr(r){ if(!r) return []; if(Array.isArray(r)) return r;
+  const keys=["items","listings","collections","auctions","sales","results","data"];
+  for(let i=0;i<keys.length;i++){ if(Array.isArray(r[keys[i]])) return r[keys[i]]; }
+  return []; }
+function nftPick(o){ for(let i=1;i<arguments.length;i++){ const k=arguments[i];
+  if(o&&o[k]!=null&&o[k]!=="") return o[k]; } return undefined; }
+function nftItemOf(e){ return (e&&(e.nft||e.item))||e||{}; }
+function nftImgOf(it){ return nftPick(it,"image_url","imageUrl","image","logo_url","logoUrl")||""; }
+function nftNameOf(it){ return nftPick(it,"name","title")||"Untitled"; }
+function nftIdOf(it){ return nftPick(it,"id","nft_id","nftId","mint_address","mintAddress"); }
+function nftColOf(it){ const cid=nftPick(it,"collection_id","collectionId","collection");
+  for(let i=0;i<NFT.cols.length;i++){ if(NFT.cols[i]&&NFT.cols[i].id===cid) return NFT.cols[i]; }
+  return null; }
+function nftSol(v){ if(v==null||v===""||!isFinite(Number(v))) return "—";
+  const n=Number(v);
+  return (n>0&&n<0.01?n.toFixed(4):n.toLocaleString(undefined,{maximumFractionDigits:2}))+" SOL"; }
+function shortW(w){ w=String(w||""); return w.length>12?w.slice(0,4)+"…"+w.slice(-4):w; }
+function nftTimeLeft(ts){ const t=Date.parse(ts); if(isNaN(t)) return "";
+  const d=t-Date.now(); if(d<=0) return "ended";
+  const m=Math.floor(d/60000); if(m<60) return "⏳ "+m+"m left";
+  const h=Math.floor(m/60); if(h<48) return "⏳ "+h+"h "+(m%60)+"m left";
+  return "⏳ "+Math.floor(h/24)+"d "+(h%24)+"h left"; }
+function nftAgo(ts){ const t=Date.parse(ts); if(isNaN(t)) return "";
+  const m=Math.floor((Date.now()-t)/60000); if(m<1) return "just now";
+  if(m<60) return m+"m ago"; const h=Math.floor(m/60);
+  if(h<24) return h+"h ago"; return Math.floor(h/24)+"d ago"; }
+function nftPh(){ return "data:image/svg+xml;utf8,"+encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#0d141b"/>'
+  +'<text x="50%" y="56%" font-size="72" text-anchor="middle" fill="#17ff4d" font-family="sans-serif">🖼</text></svg>'); }
+function nftImg(src,style){ const ph=nftPh();
+  return '<img src="'+esc(src||ph)+'" loading="lazy"'+(style?' style="'+style+'"':'')
+    +' onerror="this.onerror=null;this.src=\''+ph+'\'">'; }
+
+/* ---------- browse ---------- */
+function nftSetSub(s){ if(NFT.sub!==s){ NFT.sub=s; NFT.err=""; } render(); nftLoad(s,false); }
+async function nftLoad(sub,force){
+  if(NFT.busy) return;
+  if(!force&&NFT.loaded[sub]) return;
+  NFT.busy=true; NFT.err=""; render();
+  const tool={collections:"orbitx_nft_collections",listings:"orbitx_nft_listings",
+    auctions:"orbitx_nft_auctions",sales:"orbitx_nft_recent_sales"}[sub];
+  try{
+    const r=await Bridge.callTool(tool,{limit:sub==="sales"?30:40,authCode:getAuth()});
+    const arr=nftArr(r);
+    if(sub==="collections") NFT.cols=arr;
+    else if(sub==="listings") NFT.listings=arr;
+    else if(sub==="auctions") NFT.auctions=arr;
+    else NFT.sales=arr;
+    NFT.loaded[sub]=true;
+  }catch(e){ NFT.err=friendlyErr(e); }
+  NFT.busy=false; render();
+}
+function nftHTML(){
+  if(!NFT.loaded[NFT.sub]&&!NFT.busy) setTimeout(function(){ nftLoad(NFT.sub,false); },0);
+  let h='<div class="warnbar">🖼 Browse OrbitX NFT collections, live listings, auctions and recent sales. '
+    +'Bids &amp; offers are <b>signed actions</b> — connect via the Auth widget first.</div>';
+  h+='<div class="nftsub">';
+  const tabs=[["collections","Collections"],["listings","Listings"],["auctions","Auctions"],["sales","Sales"]];
+  for(let i=0;i<tabs.length;i++){
+    h+='<div class="nftsubtab'+(NFT.sub===tabs[i][0]?" on":"")+'" onclick="nftSetSub(\''+tabs[i][0]+'\')">'+tabs[i][1]+"</div>"; }
+  h+='</div>';
+  h+='<div style="text-align:right;margin:0 0 8px"><span class="mut" style="font-size:12px">'
+    +'<a href="#" onclick="nftLoad(NFT.sub,true);return false;" style="color:var(--neon)">↻ refresh</a></span></div>';
+  h+=errBox(NFT.err);
+  h+='<div id="nftout">'+nftContentHTML()+"</div>";
+  return h;
+}
+function nftContentHTML(){
+  if(NFT.busy&&!NFT.loaded[NFT.sub]) return nftSkelHTML();
+  if(NFT.sub==="collections") return nftColsHTML();
+  if(NFT.sub==="listings") return nftListingsHTML();
+  if(NFT.sub==="auctions") return nftAuctionsHTML();
+  return nftSalesHTML();
+}
+function nftSkelHTML(){
+  let h='<div class="nftgrid">';
+  for(let i=0;i<6;i++) h+='<div class="nftcard"><div class="skel" style="aspect-ratio:1;border-radius:10px"></div>'
+    +'<div class="skel" style="height:14px;margin-top:8px"></div>'
+    +'<div class="skel" style="height:12px;margin-top:6px;width:60%"></div></div>';
+  return h+"</div>";
+}
+
+/* ---------- collections ---------- */
+function nftColsHTML(){
+  if(!NFT.cols.length) return '<div class="empty"><div class="big">🖼</div>No collections on OrbitX yet.<br>New collections surface here automatically.</div>';
+  return '<div class="nftgrid">'+NFT.cols.map(function(c,i){
+    const logo=nftPick(c,"logo_url","logoUrl","image_url","banner_url","bannerUrl");
+    return '<div class="nftcard" onclick="nftOpenCol('+i+')">'
+      +'<div class="nftthumb">'+nftImg(logo)+"</div>"
+      +'<div class="nftname">'+esc(c.name||"Unnamed")+"</div>"
+      +'<div class="nftmut">'+esc(c.symbol||"")+(c.verified?" ✓":"")+"</div>"
+      +'<div class="nftrow"><span class="nftmut">Floor</span><b class="nftprice">'
+      +esc(nftSol(nftPick(c,"floor_price_sol","floorPriceSol")))+"</b></div>"
+      +(c.volume_sol?'<div class="nftrow"><span class="nftmut">Volume</span><b>'+esc(nftSol(c.volume_sol))+"</b></div>":"")
+      +"</div>";
+  }).join("")+"</div>";
+}
+async function nftOpenCol(i){ const c=NFT.cols[i]; if(!c) return;
+  NFT.colView={c:c,items:null,busy:true,err:""}; nftRenderCol();
+  try{
+    const r=await Bridge.callTool("orbitx_nft_items",
+      {creatorWallet:nftPick(c,"creator_wallet","creatorWallet"),limit:40,authCode:getAuth()});
+    let items=nftArr(r);
+    items=items.filter(function(x){ return nftPick(x,"collection_id","collectionId")===c.id; });
+    NFT.colView.items=items;
+  }catch(e){ NFT.colView.err=friendlyErr(e); }
+  NFT.colView.busy=false; nftRenderCol();
+}
+function nftRenderCol(){ const v=NFT.colView; if(!v) return; const c=v.c;
+  let h='<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<span class="mut" style="font-size:12px">🖼 COLLECTION</span>'
+    +'<span style="font-size:20px;cursor:pointer;color:var(--dim)" onclick="closeModal()">✕</span></div>';
+  const banner=nftPick(c,"banner_url","bannerUrl")||nftPick(c,"logo_url","logoUrl");
+  h+='<div class="nftthumb" style="aspect-ratio:16/7;margin-bottom:12px">'+nftImg(banner)+"</div>";
+  h+="<h3 style=\"margin:0 0 4px\">"+esc(c.name||"Unnamed")+(c.verified?" ✓":"")+"</h3>";
+  h+='<div class="mut" style="margin-bottom:8px">'+esc(c.symbol||"")+" · "+esc(c.category||"")+"</div>";
+  if(c.description) h+='<div class="mut" style="margin-bottom:10px;line-height:1.5">'
+    +esc(String(c.description).replace(/[*_#]/g,"").slice(0,280))+"</div>";
+  h+='<div class="kv"><span class="k">Floor</span><b class="nftprice">'
+    +esc(nftSol(nftPick(c,"floor_price_sol","floorPriceSol")))+"</b></div>";
+  h+='<div class="kv"><span class="k">Volume</span><b>'+esc(nftSol(nftPick(c,"volume_sol","volumeSol")))+"</b></div>";
+  if(c.mint_price_sol!=null) h+='<div class="kv"><span class="k">Mint price</span><b>'
+    +esc(nftSol(c.mint_price_sol))+"</b></div>";
+  h+='<div class="sect">Items</div>';
+  if(v.busy) h+='<div class="nftgrid">'+'<div class="skel" style="aspect-ratio:1;border-radius:10px"></div>'.repeat(4)+"</div>";
+  else if(v.err) h+='<div class="err">⚠️ '+esc(v.err)+"</div>";
+  else if(v.items&&v.items.length) h+='<div class="nftgrid">'+v.items.map(function(it,i){
+    return '<div class="nftcard" onclick="nftOpenColItem('+i+')">'
+      +'<div class="nftthumb">'+nftImg(nftImgOf(it))+"</div>"
+      +'<div class="nftname">'+esc(nftNameOf(it))+"</div>"
+      +'<div class="nftmut">'+esc(it.status||"")+(it.rarity_tier?" · "+esc(it.rarity_tier):"")+"</div></div>";
+  }).join("")+"</div>";
+  else h+='<div class="mut">No items indexed for this collection yet.</div>';
+  h+="</div></div>"; modal.innerHTML=h;
+}
+
+/* ---------- listings ---------- */
+function nftListingPrice(l){ return nftPick(l,"price_sol","priceSol","price","list_price_sol","listPriceSol","amount_sol","amountSol"); }
+function nftListingsHTML(){
+  if(!NFT.listings.length) return '<div class="empty"><div class="big">🏷️</div>No active listings right now.<br>Listings appear here the moment sellers list — check back soon.</div>';
+  return '<div class="nftgrid">'+NFT.listings.map(function(l,i){
+    const it=nftItemOf(l), col=nftColOf(it);
+    const colName=col?col.name:(nftPick(it,"collection_name","collectionName")||"");
+    return '<div class="nftcard" onclick="nftOpenListing('+i+')">'
+      +'<div class="nftthumb">'+nftImg(nftImgOf(it))+"</div>"
+      +'<div class="nftname">'+esc(nftNameOf(it))+"</div>"
+      +'<div class="nftmut">'+esc(colName)+"</div>"
+      +'<div class="nftrow"><span class="nftmut">Price</span><b class="nftprice">'+esc(nftSol(nftListingPrice(l)))+"</b></div></div>";
+  }).join("")+"</div>";
+}
+
+/* ---------- auctions ---------- */
+function nftAuctionNorm(a){ const item=nftItemOf(a);
+  return {raw:a,item:item,
+    id:nftPick(a,"id","auction_id","auctionId"),
+    bid:Number(nftPick(a,"current_bid_sol","currentBidSol","highest_bid_sol","highestBidSol","current_bid","highest_bid")||0)||0,
+    inc:Number(nftPick(a,"min_increment_sol","minIncrementSol","increment_sol")||0.01)||0.01,
+    endsAt:nftPick(a,"ends_at","endsAt","end_time","endTime","expires_at","expiresAt")}; }
+function nftAuctionsHTML(){
+  if(!NFT.auctions.length) return '<div class="empty"><div class="big">🔨</div>No live auctions right now.<br>New auctions surface here automatically.</div>';
+  return '<div class="nftgrid">'+NFT.auctions.map(function(a,i){
+    const n=nftAuctionNorm(a), col=nftColOf(n.item);
+    return '<div class="nftcard" onclick="nftOpenAuction('+i+')">'
+      +'<div class="nftthumb">'+nftImg(nftImgOf(n.item))+"</div>"
+      +'<div class="nftname">'+esc(nftNameOf(n.item))+"</div>"
+      +'<div class="nftmut">'+esc(col?col.name:"")+"</div>"
+      +'<div class="nftrow"><span class="nftmut">Top bid</span><b class="nftprice">'+esc(nftSol(n.bid))+"</b></div>"
+      +'<div class="nfttime">'+esc(nftTimeLeft(n.endsAt)||"no timer")+"</div></div>";
+  }).join("")+"</div>";
+}
+
+/* ---------- recent sales ---------- */
+function nftSalesHTML(){
+  if(!NFT.sales.length) return '<div class="empty"><div class="big">📜</div>No recent sales on record yet.<br>Completed sales will stream in here.</div>';
+  return NFT.sales.map(function(s,i){
+    const it=nftItemOf(s);
+    const price=nftPick(s,"price_sol","priceSol","price","sale_price_sol");
+    const when=nftAgo(nftPick(s,"sold_at","soldAt","created_at","createdAt","timestamp"));
+    const buyer=shortW(nftPick(s,"buyer_wallet","buyerWallet","buyer"));
+    const seller=shortW(nftPick(s,"seller_wallet","sellerWallet","seller"));
+    const route=[buyer,seller].filter(Boolean).join(" ← ");
+    return '<div class="salerow" onclick="nftOpenSale('+i+')">'
+      +nftImg(nftImgOf(it),"width:44px;height:44px;border-radius:10px;object-fit:cover;border:1px solid var(--line)")
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      +esc(nftNameOf(it))+"</div>"
+      +'<div class="nftmut">'+esc((route?route+" ":"")+(when?"· "+when:""))+"</div></div>"
+      +'<b class="nftprice">'+esc(nftSol(price))+"</b></div>";
+  }).join("");
+}
+
+/* ---------- detail ---------- */
+function nftOpenListing(i){ const l=NFT.listings[i]; if(!l) return;
+  NFT.detail={kind:"listing",entry:l,item:nftItemOf(l),sales:null,offers:null,busy:true,err:"",msg:""};
+  nftRenderDetail(); nftLoadDetail(); }
+function nftOpenAuction(i){ const a=NFT.auctions[i]; if(!a) return;
+  const n=nftAuctionNorm(a);
+  NFT.detail={kind:"auction",entry:a,auction:n,item:n.item,sales:null,offers:null,busy:true,err:"",msg:""};
+  nftRenderDetail(); nftLoadDetail(); }
+function nftOpenSale(i){ const s=NFT.sales[i]; if(!s) return;
+  NFT.detail={kind:"sale",entry:s,item:nftItemOf(s),sales:null,offers:null,busy:true,err:"",msg:""};
+  nftRenderDetail(); nftLoadDetail(); }
+function nftOpenColItem(i){ const v=NFT.colView; const it=v&&v.items&&v.items[i]; if(!it) return;
+  NFT.detail={kind:"item",entry:it,item:it,sales:null,offers:null,busy:true,err:"",msg:""};
+  nftRenderDetail(); nftLoadDetail(); }
+async function nftLoadDetail(){
+  const d=NFT.detail; if(!d) return;
+  const nid=nftIdOf(d.item);
+  try{
+    const res=await Promise.all([
+      nid?Bridge.callTool("orbitx_nft_sales",{nftId:nid,authCode:getAuth()}):Promise.resolve([]),
+      nid?Bridge.callTool("orbitx_nft_offers",{nftId:nid,authCode:getAuth()}):Promise.resolve([])
+    ]);
+    if(NFT.detail===d){ d.sales=nftArr(res[0]); d.offers=nftArr(res[1]); }
+  }catch(e){ if(NFT.detail===d) d.err=friendlyErr(e); }
+  if(NFT.detail===d){ d.busy=false; nftRenderDetail(); }
+}
+function nftSaleRow(s){
+  const price=nftPick(s,"price_sol","priceSol","price","sale_price_sol");
+  const when=nftAgo(nftPick(s,"sold_at","soldAt","created_at","createdAt","timestamp"));
+  const from=shortW(nftPick(s,"seller_wallet","sellerWallet","seller","from"));
+  const to=shortW(nftPick(s,"buyer_wallet","buyerWallet","buyer","to"));
+  return '<div class="kv"><span class="k">'+esc(when||"sold")
+    +((from||to)?" · "+esc(from)+" → "+esc(to):"")
+    +'</span><b class="nftprice">'+esc(nftSol(price))+"</b></div>";
+}
+function nftOfferRow(o){
+  const price=nftPick(o,"price_sol","priceSol","price");
+  const exp=nftTimeLeft(nftPick(o,"expires_at","expiresAt","expiry"));
+  const by=shortW(nftPick(o,"buyer_wallet","buyerWallet","buyer","offerer"));
+  return '<div class="kv"><span class="k">'+esc(by||"offer")
+    +(exp?" · "+esc(exp):"")
+    +'</span><b class="nftprice">'+esc(nftSol(price))+"</b></div>";
+}
+function nftRenderDetail(){
+  const d=NFT.detail; if(!d) return;
+  const it=d.item, col=nftColOf(it);
+  const attrs=Array.isArray(it.attributes)?it.attributes:[];
+  const price=d.kind==="listing"?nftListingPrice(d.entry)
+    :d.kind==="auction"?d.auction.bid
+    :nftPick(d.entry,"price_sol","priceSol","price");
+  const kindLabel=d.kind==="auction"?"🔨 AUCTION":d.kind==="listing"?"🏷️ LISTING":d.kind==="sale"?"📜 SALE":"🖼 NFT";
+  let h='<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<span class="mut" style="font-size:12px">'+kindLabel+"</span>"
+    +'<span style="font-size:20px;cursor:pointer;color:var(--dim)" onclick="closeModal()">✕</span></div>';
+  h+='<div class="nftthumb" style="margin-bottom:12px">'+nftImg(nftImgOf(it))+"</div>";
+  h+="<h3 style=\"margin:0 0 4px\">"+esc(nftNameOf(it))+"</h3>";
+  h+='<div class="mut" style="margin-bottom:10px">'
+    +esc((col?col.name+" · ":"")+(nftPick(it,"symbol","collection_symbol")||""))+"</div>";
+  h+='<div class="kv"><span class="k">Price</span><b class="nftprice">'+esc(nftSol(price))+"</b></div>";
+  if(d.kind==="auction"){
+    h+='<div class="kv"><span class="k">Time left</span><b class="nfttime">'
+      +esc(nftTimeLeft(d.auction.endsAt)||"—")+"</b></div>";
+    h+='<div class="kv"><span class="k">Min increment</span><b>'+esc(nftSol(d.auction.inc))+"</b></div>";
+  }
+  if(it.rarity_tier) h+='<div class="kv"><span class="k">Rarity</span><b style="color:var(--amber)">'
+    +esc(it.rarity_tier)+(it.rarity_rank?" #"+esc(String(it.rarity_rank)):"")+"</b></div>";
+  if(it.royalty_bps!=null) h+='<div class="kv"><span class="k">Royalty</span><b>'
+    +(Number(it.royalty_bps)/100).toFixed(1)+"%</b></div>";
+  const mid=nftIdOf(it);
+  if(mid&&String(mid).length>20) h+='<div class="kv"><span class="k">Mint</span>'
+    +'<span class="mono" style="font-size:12px">'+esc(shortW(mid))+"</span></div>";
+  if(it.current_owner) h+='<div class="kv"><span class="k">Owner</span>'
+    +'<span class="mono" style="font-size:12px">'+esc(shortW(it.current_owner))+"</span></div>";
+  if(attrs.length){
+    h+='<div class="sect">Traits</div><div>';
+    h+=attrs.map(function(a){
+      return '<span class="chip"><b>'+esc(a.trait_type||a.type||"trait")+"</b>"+esc(a.value)+"</span>";
+    }).join("");
+    h+="</div>";
+  }
+  h+='<div class="sect">History</div>';
+  if(d.busy) h+='<div class="skel" style="height:40px;margin-bottom:6px"></div><div class="skel" style="height:40px"></div>';
+  else if(d.sales&&d.sales.length) h+=d.sales.slice(0,8).map(nftSaleRow).join("");
+  else h+='<div class="mut">No recorded sales for this piece yet.</div>';
+  h+='<div class="sect">Offers</div>';
+  if(d.busy) h+='<div class="skel" style="height:40px"></div>';
+  else if(d.offers&&d.offers.length) h+=d.offers.slice(0,8).map(nftOfferRow).join("");
+  else h+='<div class="mut">No open offers.</div>';
+  if(d.err) h+='<div class="err" style="margin-top:10px">⚠️ '+esc(d.err)+"</div>";
+  if(d.msg) h+='<div class="okbox" style="margin-top:10px">'+esc(d.msg)+"</div>";
+  h+='<div style="height:14px"></div><div style="display:flex;gap:8px">';
+  if(d.kind==="auction") h+='<button class="btn" style="flex:1" onclick="nftBidForm()">🔨 Place bid</button>';
+  else h+='<button class="btn" style="flex:1" onclick="nftOfferForm()">💰 Make offer</button>';
+  h+="</div></div></div>";
+  modal.innerHTML=h;
+}
+
+/* ---------- bid flow (confirm gate) ---------- */
+function nftBidForm(){ const d=NFT.detail; if(!d||!d.auction) return;
+  const min=(d.auction.bid||0)+(d.auction.inc||0.01);
+  modal.innerHTML='<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">'
+    +"<h3>🔨 Place a bid</h3>"
+    +'<div class="mut" style="margin-bottom:6px">'+esc(nftNameOf(d.item))
+    +' · top bid <b class="nftprice">'+esc(nftSol(d.auction.bid))+"</b></div>"
+    +(getAuth()?"":'<div class="warnbar">🔑 Bids are signed actions — connect via the Auth widget first, then come back.</div>')
+    +'<label class="fl">Bid amount (SOL)</label>'
+    +'<input type="number" id="nftbidamt" step="0.01" min="0" inputmode="decimal" placeholder="'+min.toFixed(2)+'">'
+    +'<div class="mut" style="margin-top:6px">Minimum '+min.toFixed(2)+" SOL (top bid + increment)</div>"
+    +'<div style="height:12px"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn ghost" style="flex:1" onclick="nftRenderDetail()">← Back</button>'
+    +'<button class="btn" style="flex:1" onclick="nftBidReview()">Review bid →</button>'
+    +"</div></div></div>";
+}
+function nftBidReview(){ const d=NFT.detail; if(!d||!d.auction) return;
+  const amt=Number((document.getElementById("nftbidamt")||{}).value||0);
+  const min=(d.auction.bid||0)+(d.auction.inc||0.01);
+  if(!(amt>0)){ toast("Enter a bid amount first."); return; }
+  if(amt<min-1e-9){ toast("Bid must be at least "+min.toFixed(2)+" SOL."); return; }
+  NFT.bid={amount:amt};
+  modal.innerHTML='<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">'
+    +"<h3>⚠️ Confirm bid</h3>"
+    +'<div class="mut">You are bidding on this NFT <b>right now</b>. Bids are binding — the top bid at close wins.</div>'
+    +'<div class="previewbox">'+esc(nftNameOf(d.item))+"</div>"
+    +'<div class="kv"><span class="k">Your bid</span><b class="nftprice">'+amt.toFixed(2)+" SOL</b></div>"
+    +'<div class="kv"><span class="k">Time left</span><b class="nfttime">'+esc(nftTimeLeft(d.auction.endsAt)||"—")+"</b></div>"
+    +(getAuth()?"":'<div class="warnbar">🔑 No authCode found — connect via the Auth widget before confirming.</div>')
+    +'<div style="height:12px"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn ghost" style="flex:1" onclick="nftBidForm()">Edit</button>'
+    +'<button class="btn danger" style="flex:1" onclick="nftBidGo()"'+(getAuth()?"":" disabled")+">🔨 Confirm bid</button>"
+    +"</div></div></div>";
+}
+async function nftBidGo(){ const d=NFT.detail,b=NFT.bid; if(!d||!b||!d.auction) return;
+  closeModal(); d.msg="⏳ Placing bid…"; d.err=""; nftRenderDetail();
+  try{
+    const r=await Bridge.callTool("orbitx_nft_place_bid",
+      {auctionId:d.auction.id,amountSol:b.amount,authCode:getAuth()});
+    if(r&&(r.ok===false)) throw new Error(r.error||r.message||"bid failed");
+    d.msg="✅ Bid placed — "+b.amount.toFixed(2)+" SOL."; toast("Bid placed 🔨");
+    NFT.loaded.auctions=false;
+    nftLoad("auctions",true); nftLoadDetail();
+  }catch(e){ d.err=friendlyErr(e); d.msg=""; nftRenderDetail(); }
+}
+
+/* ---------- offer flow (confirm gate) ---------- */
+function nftOfferForm(){ const d=NFT.detail; if(!d) return;
+  modal.innerHTML='<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">'
+    +"<h3>💰 Make an offer</h3>"
+    +'<div class="mut" style="margin-bottom:6px">'+esc(nftNameOf(d.item))+"</div>"
+    +(getAuth()?"":'<div class="warnbar">🔑 Offers are signed actions — connect via the Auth widget first, then come back.</div>')
+    +'<label class="fl">Offer price (SOL)</label>'
+    +'<input type="number" id="nftofferamt" step="0.01" min="0" inputmode="decimal" placeholder="0.50">'
+    +'<label class="fl">Expires in</label>'
+    +'<select id="nftofferexp"><option value="24">24 hours</option><option value="48">48 hours</option>'
+    +'<option value="72" selected>72 hours</option><option value="168">7 days</option></select>'
+    +'<div style="height:12px"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn ghost" style="flex:1" onclick="nftRenderDetail()">← Back</button>'
+    +'<button class="btn" style="flex:1" onclick="nftOfferReview()">Review offer →</button>'
+    +"</div></div></div>";
+}
+function nftOfferReview(){ const d=NFT.detail; if(!d) return;
+  const amt=Number((document.getElementById("nftofferamt")||{}).value||0);
+  const exp=Number((document.getElementById("nftofferexp")||{}).value||72);
+  if(!(amt>0)){ toast("Enter an offer price first."); return; }
+  NFT.offer={amount:amt,exp:exp};
+  modal.innerHTML='<div class="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">'
+    +"<h3>⚠️ Confirm offer</h3>"
+    +'<div class="mut">This sends a binding offer to the seller at the price below.</div>'
+    +'<div class="previewbox">'+esc(nftNameOf(d.item))+"</div>"
+    +'<div class="kv"><span class="k">Your offer</span><b class="nftprice">'+amt.toFixed(2)+" SOL</b></div>"
+    +'<div class="kv"><span class="k">Expires in</span><b>'+exp+" hours</b></div>"
+    +(getAuth()?"":'<div class="warnbar">🔑 No authCode found — connect via the Auth widget before confirming.</div>')
+    +'<div style="height:12px"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn ghost" style="flex:1" onclick="nftOfferForm()">Edit</button>'
+    +'<button class="btn danger" style="flex:1" onclick="nftOfferGo()"'+(getAuth()?"":" disabled")+">💰 Confirm offer</button>"
+    +"</div></div></div>";
+}
+async function nftOfferGo(){ const d=NFT.detail,o=NFT.offer; if(!d||!o) return;
+  const nid=nftIdOf(d.item);
+  if(!nid){ d.err="No NFT id on this item — cannot send the offer."; nftRenderDetail(); return; }
+  closeModal(); d.msg="⏳ Sending offer…"; d.err=""; nftRenderDetail();
+  try{
+    const r=await Bridge.callTool("orbitx_nft_make_offer",
+      {nftId:nid,priceSol:o.amount,expiresHours:o.exp,authCode:getAuth()});
+    if(r&&(r.ok===false)) throw new Error(r.error||r.message||"offer failed");
+    d.msg="✅ Offer sent — "+o.amount.toFixed(2)+" SOL, expires in "+o.exp+"h.";
+    toast("Offer sent 💰");
+    nftLoadDetail();
+  }catch(e){ d.err=friendlyErr(e); d.msg=""; nftRenderDetail(); }
+}
+</script>
+<script>
+"use strict";
 /* ---------- Boot ---------- */
 render();
 </script>
