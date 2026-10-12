@@ -132,6 +132,14 @@ input:focus,textarea:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(23
 .copybtn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
   padding:2px 8px;font-size:11px;cursor:pointer;margin-left:6px}
 .copybtn:active{color:var(--neon);border-color:var(--neon)}
+/* UI polish: smooth transitions, press feedback, fade-in */
+.card,.tcard,.toolrow,.qbtn,.stat{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover,.tcard:hover{border-color:rgba(23,255,77,.25)}
+button{transition:transform .12s ease,opacity .12s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card,.tcard{animation:fadeUp .32s ease both}
+@media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
 </style>
 </head>
 <body>
@@ -204,7 +212,9 @@ const S = { screen:"explore", q:"", results:[], token:null, mint:null,
   chartTab:"ohlc", tf:"1h", ohlc:null, dexInfo:null, tvSym:null,
   dexEmbedded:false, chartScroll:false, sparkQ:false,
   fetchedAt:0, error:"", loading:false, lastQ:"", copied:false,
-  boardSub:"traders", lb:null, lbTokens:[], lbStats:null, lbExpanded:null };
+  boardSub:"traders", lb:null, lbTokens:[], lbStats:null, lbExpanded:null,
+  whales:[], whaleAddr:"", whaleMin:"10000", whaleData:null, whaleBusy:false,
+  alerts:[], alMint:"", alCond:"above", alPrice:"", alertBusy:false, alertTimer:null };
 /* Timeframes (re-query orbitx_get_chart / orbitx_dex_chart) */
 const TF_LIST=["1m","5m","15m","1h","4h","1d"];
 /* TradingView only lists major pairs — arbitrary mints render TV's own
@@ -254,6 +264,8 @@ function render(){
   if(S.screen==="explore") renderExplore();
   else if(S.screen==="discover") renderDiscover();
   else if(S.screen==="boards") renderBoards();
+  else if(S.screen==="whales") renderWhales();
+  else if(S.screen==="alerts") renderAlerts();
   else if(S.screen==="token") renderToken();
 }
 function tabsHTML(){
@@ -261,6 +273,8 @@ function tabsHTML(){
     <div class="tab ${S.screen==="explore"?"on":""}" onclick="S.screen='explore';render()">🔍 Explore</div>
     <div class="tab ${S.screen==="discover"?"on":""}" onclick="S.screen='discover';render();loadDiscover()">🔥 Discover</div>
     <div class="tab ${S.screen==="boards"?"on":""}" onclick="S.screen='boards';render();loadBoards()">🏆 Boards</div>
+    <div class="tab ${S.screen==="whales"?"on":""}" onclick="S.screen='whales';render();loadWhales()">🐋 Whales</div>
+    <div class="tab ${S.screen==="alerts"?"on":""}" onclick="S.screen='alerts';render();loadAlerts()">🔔 Alerts</div>
     <div class="tab ${S.token?"":""}" style="${S.token?"":"opacity:.35;pointer-events:none"}" onclick="S.screen='token';render()">🪙 Token</div>
   </div>`;
 }
@@ -697,6 +711,134 @@ function boardTradersHTML(){
   if(!entries.length) return `<div class="empty"><div class="big">🏆</div>
     ${S.error?"":"Pulling the trader leaderboard…"}</div>`;
   return entries.map(traderRow).join("");
+}
+
+/* ================= Whales tab ================= */
+const WHALE_KEY="orbitx.whaleWatch";
+function whaleLoad(){ try{ const r=localStorage.getItem(WHALE_KEY); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function whaleSave(l){ try{ localStorage.setItem(WHALE_KEY, JSON.stringify(l)); }catch(e){} }
+function loadWhales(){ S.whales=whaleLoad(); S.whaleAddr=""; S.whaleMin="10000"; S.whaleData=null; S.whaleBusy=false; render(); }
+async function whaleAdd(){
+  const a=String(S.whaleAddr||"").trim();
+  if(!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)){ S.error="Paste a valid wallet address."; render(); return; }
+  const list=whaleLoad();
+  if(list.some(w=>w.wallet===a)){ S.error="Already watching this wallet."; render(); return; }
+  list.push({wallet:a,minUsd:Number(S.whaleMin)||10000,label:""});
+  whaleSave(list); S.whales=list; S.whaleAddr=""; S.error=""; render();
+}
+function whaleRemove(i){ const l=whaleLoad(); l.splice(i,1); whaleSave(l); S.whales=l; render(); }
+async function whaleCheck(i){
+  const w=S.whales[i]; if(!w) return;
+  S.whaleBusy=i; render();
+  try{
+    const r=await Bridge.callTool("orbitx_whale_watch",{wallet:w.wallet,minUsd:w.minUsd});
+    S.whaleData={idx:i,result:r};
+  }catch(e){ S.error=String(e.message||e); }
+  S.whaleBusy=false; render();
+}
+function renderWhales(){
+  const app=document.getElementById("app");
+  const wd=S.whaleData;
+  app.innerHTML=header()+tabsHTML()+`
+  <div class="card"><div class="sect" style="margin:0 0 10px">🐋 Whale watch<span class="sp"></span></div>
+    <p class="mut" style="margin-bottom:12px">Track large transfers from any wallet. Watchlist is saved on this device.</p>
+    <div class="field"><span class="flabel">WALLET ADDRESS</span>
+      <input type="text" placeholder="paste wallet…" value="${esc(S.whaleAddr||"")}" oninput="S.whaleAddr=this.value" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><span class="flabel">MIN USD PER TRANSFER</span>
+      <input type="number" inputmode="numeric" min="100" value="${esc(S.whaleMin||"10000")}" oninput="S.whaleMin=this.value"></div>
+    <button class="btn" onclick="whaleAdd()">+ Watch wallet</button>
+    ${errHTML()}
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">Watchlist (${S.whales.length})<span class="sp"></span></div>
+    ${S.whales.length?S.whales.map((w,i)=>`
+      <div class="trow"><div class="tmeta"><div class="tname">${esc(w.wallet.slice(0,6))}…${esc(w.wallet.slice(-4))}</div>
+        <div class="tsub">≥ $${Number(w.minUsd).toLocaleString()}</div></div>
+        <button class="btn sm ghost" ${S.whaleBusy===i?"disabled":""} onclick="whaleCheck(${i})">${S.whaleBusy===i?"…":"Check"}</button>
+        <button class="btn sm ghost" onclick="whaleRemove(${i})">✕</button></div>`).join("")
+    :`<div class="empty"><div class="big">🐋</div><b>No wallets watched yet</b><p class="mut">Add a wallet above to track its large moves.</p></div>`}
+  </div>
+  ${wd?`<div class="card"><div class="sect" style="margin:0 0 10px">Recent large transfers<span class="sp"></span>
+    <button onclick="S.whaleData=null;render()">✕</button></div>
+    ${wd.result&&wd.result.ok
+      ? (wd.result.largeTransfers.length?wd.result.largeTransfers.map(t=>`
+        <div class="trow"><div class="tmeta"><div class="tname" style="color:${t.direction==="in"?"var(--neon)":"var(--danger)"}">${t.direction==="in"?"↓ IN":"↑ OUT"} ${t.sol} SOL</div>
+          <div class="tsub">$${Number(t.usd).toLocaleString()} · ${t.blockTime?new Date(t.blockTime).toLocaleString():""}</div></div>
+          <a href="${esc(t.url)}" target="_blank" rel="noopener" class="chev" style="text-decoration:none">↗</a></div>`).join("")
+        :`<div class="empty"><div class="big">🌊</div>${esc(wd.result.note||"No large transfers found.")}</div>`)
+      :`<div class="err">${esc((wd.result&&wd.result.message)||"Check failed.")}</div>`}
+  </div>`:""}`;
+}
+
+/* ================= Alerts tab ================= */
+const ALERT_KEY="orbitx.priceAlerts";
+function alertLoad(){ try{ const r=localStorage.getItem(ALERT_KEY); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function alertSave(l){ try{ localStorage.setItem(ALERT_KEY, JSON.stringify(l)); }catch(e){} }
+function loadAlerts(){ S.alerts=alertLoad(); S.alMint=""; S.alCond="above"; S.alPrice=""; S.alertBusy=false; render(); startAlertPoll(); }
+function stopAlertPoll(){ if(S.alertTimer){ clearInterval(S.alertTimer); S.alertTimer=null; } }
+function startAlertPoll(){ stopAlertPoll(); S.alertTimer=setInterval(alertTick, 60000); }
+async function alertTick(){
+  const list=alertLoad().filter(a=>!a.triggered);
+  if(!list.length) return;
+  let changed=false;
+  for(const a of list){
+    try{
+      const r=await Bridge.callTool("orbitx_alert_create",{mint:a.mint,condition:a.condition,price:a.price});
+      const cur=r&&r.alert&&r.alert.currentUsd;
+      if(cur!=null){
+        const hit=a.condition==="above"?cur>=a.price:cur<=a.price;
+        if(hit){ a.triggered=true; a.triggeredAt=new Date().toISOString(); a.triggerPrice=cur; changed=true;
+          try{ if("Notification" in window&&Notification.permission==="granted") new Notification("OrbitX alert",{body:`${a.symbol||a.mint.slice(0,8)} ${a.condition} $${a.price} — now $${cur}`}); }catch(e){} }
+      }
+    }catch(e){}
+  }
+  if(changed){ alertSave(alertLoad().map(a=>{ const u=list.find(x=>x.id===a.id); return u||a; })); if(S.screen==="alerts"){ S.alerts=alertLoad(); render(); } }
+}
+async function alertAdd(){
+  const mint=String(S.alMint||"").trim();
+  if(!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)){ S.error="Paste a valid token mint."; render(); return; }
+  const price=Number(S.alPrice);
+  if(!isFinite(price)||price<=0){ S.error="Enter a valid USD price."; render(); return; }
+  S.alertBusy=true; render();
+  try{
+    const r=await Bridge.callTool("orbitx_alert_create",{mint,condition:S.alCond,price});
+    if(r&&r.ok&&r.alert){
+      const list=alertLoad(); list.push(r.alert); alertSave(list);
+      S.alerts=list; S.alMint=""; S.alPrice=""; S.error="";
+      try{ if("Notification" in window&&Notification.permission==="default") Notification.requestPermission(); }catch(e){}
+    } else S.error=String((r&&(r.error||r.message))||"Could not create alert.");
+  }catch(e){ S.error=String(e.message||e); }
+  S.alertBusy=false; render();
+}
+function alertRemove(i){ const l=alertLoad(); l.splice(i,1); alertSave(l); S.alerts=l; render(); }
+function renderAlerts(){
+  const app=document.getElementById("app");
+  const active=S.alerts.filter(a=>!a.triggered), done=S.alerts.filter(a=>a.triggered);
+  app.innerHTML=header()+tabsHTML()+`
+  <div class="card"><div class="sect" style="margin:0 0 10px">🔔 Price alerts<span class="sp"></span></div>
+    <p class="mut" style="margin-bottom:12px">Get notified when a token crosses your price. Checked every minute while this widget is open.</p>
+    <div class="field"><span class="flabel">TOKEN MINT</span>
+      <input type="text" placeholder="paste mint…" value="${esc(S.alMint||"")}" oninput="S.alMint=this.value" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><span class="flabel">CONDITION</span><div class="seg">
+      <button class="${S.alCond==="above"?"on":""}" onclick="S.alCond='above';render()">📈 Above</button>
+      <button class="${S.alCond==="below"?"on":""}" onclick="S.alCond='below';render()">📉 Below</button></div></div>
+    <div class="field"><span class="flabel">PRICE (USD)</span>
+      <input type="number" inputmode="decimal" min="0" step="any" placeholder="0.00" value="${esc(S.alPrice||"")}" oninput="S.alPrice=this.value"></div>
+    <button class="btn" ${S.alertBusy?"disabled":""} onclick="alertAdd()">${S.alertBusy?"Creating…":"+ Create alert"}</button>
+    ${errHTML()}
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">Active (${active.length})<span class="sp"></span></div>
+    ${active.length?active.map(a=>{ const i=S.alerts.indexOf(a); return `
+      <div class="trow"><div class="tmeta"><div class="tname">${esc(a.symbol||a.mint.slice(0,8)+"…")}</div>
+        <div class="tsub">${a.condition==="above"?"≥":"≤"} $${a.price}${a.currentUsd!=null?` · now $${a.currentUsd}`:""}</div></div>
+        <button class="btn sm ghost" onclick="alertRemove(${i})">✕</button></div>`; }).join("")
+    :`<div class="empty"><div class="big">🔔</div><b>No active alerts</b><p class="mut">Create one above — we'll watch the price for you.</p></div>`}
+  </div>
+  ${done.length?`<div class="card"><div class="sect" style="margin:0 0 10px">Triggered (${done.length})<span class="sp"></span></div>
+    ${done.map(a=>{ const i=S.alerts.indexOf(a); return `
+      <div class="trow"><div class="tmeta"><div class="tname">✅ ${esc(a.symbol||a.mint.slice(0,8)+"…")}</div>
+        <div class="tsub">${a.condition} $${a.price} hit at $${a.triggerPrice!=null?a.triggerPrice:"?"}</div></div>
+        <button class="btn sm ghost" onclick="alertRemove(${i})">✕</button></div>`; }).join("")}
+  </div>`:""}`;
 }
 function traderRow(e){
   const name=e.name||(e.twitter?"@"+e.twitter:null)||shortMint(e.address);
