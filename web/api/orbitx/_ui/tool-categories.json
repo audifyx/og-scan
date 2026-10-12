@@ -37,7 +37,7 @@
       "uri": "ui://widget/orbitx-token.html"
     },
     {
-      "description": "Full forensics split — VERIFIED / RISK / MISSING. Never promises safety, shows the evidence.",
+      "description": "Full forensics split \u2014 VERIFIED / RISK / MISSING. Never promises safety, shows the evidence.",
       "name": "Token Forensics",
       "num": 5,
       "status": "available",
@@ -46,7 +46,7 @@
       "uri": "ui://widget/orbitx-token.html"
     },
     {
-      "description": "Real DEX candles on the actual pair address — DexScreener, TradingView and OrbitX OHLC.",
+      "description": "Real DEX candles on the actual pair address \u2014 DexScreener, TradingView and OrbitX OHLC.",
       "name": "DEX Charts",
       "num": 6,
       "status": "available",
@@ -82,7 +82,7 @@
       "uri": "ui://widget/orbitx-media.html"
     },
     {
-      "description": "Launch a token with the full confirmation gate — name, supply, liquidity going live.",
+      "description": "Launch a token with the full confirmation gate \u2014 name, supply, liquidity going live.",
       "name": "Token Launch",
       "num": 10,
       "status": "available",
@@ -127,7 +127,7 @@
       "uri": "ui://widget/orbitx-trade.html"
     },
     {
-      "description": "Mirror top wallets automatically — follow, provision and unfollow copy targets.",
+      "description": "Mirror top wallets automatically \u2014 follow, provision and unfollow copy targets.",
       "name": "Copy Trading",
       "num": 15,
       "status": "available",
@@ -145,7 +145,7 @@
       "uri": "ui://widget/orbitx-trade.html"
     },
     {
-      "description": "Communities, feeds, posts and members — the social layer of OrbitX.",
+      "description": "Communities, feeds, posts and members \u2014 the social layer of OrbitX.",
       "name": "Social",
       "num": 17,
       "status": "available",
@@ -190,7 +190,7 @@
       "uri": "ui://widget/orbitx-wallet.html"
     },
     {
-      "description": "Top traders, top tokens and platform stats — the competitive layer.",
+      "description": "Top traders, top tokens and platform stats \u2014 the competitive layer.",
       "name": "Leaderboards",
       "num": 22,
       "status": "available",
@@ -215,6 +215,60 @@
       "thumbnail": "bot",
       "tool": "orbitx_agentplus_task",
       "uri": "ui://widget/orbitx-auth.html"
+    },
+    {
+      "num": 25,
+      "name": "Sniper Agent",
+      "tool": "orbitx_agent_snipe",
+      "uri": "ui://widget/orbitx-trade.html",
+      "description": "Autonomous sniper: watches new launches, auto-buys ones passing safety filters. Live feed, configurable thresholds.",
+      "status": "available",
+      "thumbnail": "bot"
+    },
+    {
+      "num": 26,
+      "name": "Market Analyst",
+      "tool": "orbitx_agent_analyst",
+      "uri": "ui://widget/orbitx-token.html",
+      "description": "24/7 market watcher: high-conviction calls with reasoning and track record. Momentum + volume + liquidity scored.",
+      "status": "available",
+      "thumbnail": "chart"
+    },
+    {
+      "num": 27,
+      "name": "Portfolio Guardian",
+      "tool": "orbitx_agent_guardian",
+      "uri": "ui://widget/orbitx-wallet.html",
+      "description": "Protects your portfolio: auto take-profit and stop-loss on your rules. Action log, profit saved tracker.",
+      "status": "available",
+      "thumbnail": "shield"
+    },
+    {
+      "num": 28,
+      "name": "Research Agent",
+      "tool": "orbitx_agent_research",
+      "uri": "ui://widget/orbitx-token.html",
+      "description": "Deep-dive any token: safety audit, holder analysis, whale activity, verdict (BUY/WAIT/AVOID) with confidence %.",
+      "status": "available",
+      "thumbnail": "forensics"
+    },
+    {
+      "num": 29,
+      "name": "Alpha Finder",
+      "tool": "orbitx_agent_alpha",
+      "uri": "ui://widget/orbitx-trade.html",
+      "description": "Finds the hottest copy-trade wallets right now, ranked by hot-streak score. One-tap follow.",
+      "status": "available",
+      "thumbnail": "trophy"
+    },
+    {
+      "num": 30,
+      "name": "Launchpad",
+      "tool": "orbitx_launchpad",
+      "uri": "ui://widget/orbitx-media.html",
+      "description": "Live feed of new token launches with safety scores, one-tap buy, forensics, and launch wizard.",
+      "status": "available",
+      "thumbnail": "rocket"
     }
   ],
   "meta": {

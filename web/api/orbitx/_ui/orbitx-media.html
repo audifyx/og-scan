@@ -233,7 +233,8 @@ const S = { tab:"gen",
   genPrompt:"", genAR:"1:1", genState:"idle", genImgs:[], genErr:"", genTask:null, genStarted:0,
   xText:"", xLink:"", xState:"idle", xErr:"", xResult:null,
   lz:{name:"",symbol:"",desc:"",img:"",tw:"",tg:"",web:"",pair:"sol",devBuy:""},
-  lzState:"idle", lzErr:"", lzResult:null };
+  lzState:"idle", lzErr:"", lzResult:null,
+  pad:{ feed:[], loading:true, err:"", sort:"mcap", filter:"all", q:"", timer:null, fails:0, lastUpd:0, buying:"" } };
 
 /* ================= Helpers ================= */
 const app = document.getElementById("app"), modal=document.getElementById("modal");
@@ -252,6 +253,7 @@ function tabsHTML(){
     <div class="tab ${S.tab==="gen"?"on":""}" onclick="S.tab='gen';render()">🎨 Generate</div>
     <div class="tab ${S.tab==="x"?"on":""}" onclick="S.tab='x';render()">𝕏 Post</div>
     <div class="tab ${S.tab==="lz"?"on":""}" onclick="S.tab='lz';render()">🚀 Launch</div>
+    <div class="tab ${S.tab==="pad"?"on":""}" onclick="S.tab='pad';padInit();render()">🔥 Launchpad</div>
     <div class="tab ${S.tab==="nft"?"on":""}" onclick="S.tab='nft';render()">🖼 NFT</div>
   </div>`;
 }
@@ -263,7 +265,7 @@ function closeModal(){ modal.innerHTML=""; }
 /* ================= Render ================= */
 function render(){
   app.innerHTML = header()+tabsHTML()+
-    (S.tab==="gen"?genHTML():S.tab==="x"?xHTML():S.tab==="nft"?nftHTML():lzHTML());
+    (S.tab==="gen"?genHTML():S.tab==="x"?xHTML():S.tab==="nft"?nftHTML():S.tab==="pad"?padHTML():lzHTML());
 }
 function errBox(e){ return e?`<div class="err">⚠️ ${esc(e)}</div>`:""; }
 
@@ -463,6 +465,12 @@ async function lzGo(){
     if(r.ok===false) throw new Error(r.error||r.message||"launch failed");
     S.lzResult={ mint:r.mint||r.tokenMint||r.ca, sig:r.signature||r.tx||r.txSignature,
       url:r.url||r.dexscreener||((r.mint||r.ca)?"https://dexscreener.com/solana/"+(r.mint||r.ca):null) };
+    // Track in My Launches (localStorage)
+    try{
+      const mine=JSON.parse(localStorage.getItem("orbitx.myLaunches")||"[]");
+      mine.unshift({ mint:S.lzResult.mint, name:L.name, symbol:L.symbol, sig:S.lzResult.sig, at:new Date().toISOString() });
+      localStorage.setItem("orbitx.myLaunches", JSON.stringify(mine.slice(0,50)));
+    }catch(e){}
     toast("Token launched 🚀");
   }catch(e){ S.lzErr=friendlyErr(e); }
   S.lzState="idle"; render();
@@ -872,6 +880,154 @@ async function nftOfferGo(){ const d=NFT.detail,o=NFT.offer; if(!d||!o) return;
     toast("Offer sent 💰");
     nftLoadDetail();
   }catch(e){ d.err=friendlyErr(e); d.msg=""; nftRenderDetail(); }
+}
+</script>
+<script>
+"use strict";
+/* ================= Launchpad Feed (🔥 tab) =================
+   Live new-launch feed via orbitx_launchpad{action:"feed"}.
+   Auto-refresh 20s (30s on ChatGPT bridge to dodge rate limits).
+   Filter by safety grade, sort by mcap/liquidity/volume, search ticker.
+   Quick-buy calls orbitx_app_buy via Bridge. Forensics via orbitx_get_forensics. */
+function padIsBridge(){ return !!((window.openai&&typeof window.openai.callTool==="function")||(window.OrbitX&&typeof window.OrbitX.callTool==="function")); }
+function padPollMs(){ return padIsBridge()?30000:20000; }
+function padInit(){
+  padStop();
+  if(!S.pad.feed.length) padLoad();
+  S.pad.timer=setInterval(padLoad, padPollMs());
+  S.pad.fails=0;
+}
+function padStop(){ if(S.pad.timer){ clearInterval(S.pad.timer); S.pad.timer=null; } }
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden) padStop();
+  else if(S.tab==="pad") padInit();
+});
+async function padLoad(){
+  if(S.tab!=="pad") return;
+  S.pad.loading = !S.pad.feed.length;
+  if(S.tab==="pad") render();
+  try{
+    const r = await Bridge.callTool("orbitx_launchpad",{action:"feed",limit:30});
+    if(r&&r.ok===false) throw new Error(r.message||r.error||"feed failed");
+    S.pad.feed = (r&&r.launches)||[];
+    S.pad.err=""; S.pad.fails=0; S.pad.lastUpd=Date.now();
+  }catch(e){
+    S.pad.fails=(S.pad.fails||0)+1;
+    S.pad.err=friendlyErr(e);
+    if(S.pad.fails>=3){ padStop(); S.pad.err+=" — auto-refresh paused, tap ↻ to retry."; }
+  }
+  S.pad.loading=false;
+  if(S.tab==="pad") render();
+}
+function padFiltered(){
+  const P=S.pad; const q=P.q.trim().toLowerCase();
+  let list=P.feed.slice();
+  if(P.filter!=="all") list=list.filter(t=>t.safety&&t.safety.grade===P.filter);
+  if(q) list=list.filter(t=>((t.name||"")+" "+(t.symbol||"")).toLowerCase().includes(q));
+  const key=P.sort;
+  list.sort((a,b)=>{
+    if(key==="mcap") return (b.mcap||0)-(a.mcap||0);
+    if(key==="liq") return (b.liquidity||0)-(a.liquidity||0);
+    if(key==="vol") return (b.volume24h||0)-(a.volume24h||0);
+    if(key==="safety") return ((b.safety&&b.safety.score)||0)-((a.safety&&a.safety.score)||0);
+    return 0;
+  });
+  return list;
+}
+function fmtUsd(n){
+  if(n==null||!isFinite(n)) return "—";
+  if(n>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
+  if(n>=1e3) return "$"+(n/1e3).toFixed(1)+"K";
+  return "$"+Number(n).toFixed(n<10?2:0);
+}
+function safetyBadge(s){
+  if(!s) return `<span class="pill soon">? safety</span>`;
+  const cls=s.grade==="green"?"avail":s.grade==="yellow"?"warn":"soon";
+  const dot=s.grade==="green"?"🟢":s.grade==="yellow"?"🟡":"🔴";
+  return `<span class="pill ${cls}" title="${esc((s.reasons||[]).join(", "))}">${dot} ${s.score}</span>`;
+}
+function padCard(t){
+  const s=t.safety||{};
+  return `<div class="card" style="margin-bottom:10px">
+    <div class="row" style="gap:10px;align-items:center">
+      <div style="width:40px;height:40px;border-radius:12px;background:#141a28;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;overflow:hidden">${
+        t.icon?`<img src="${esc(t.icon)}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.remove()">`:"🪙"}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.name||"?")} <span class="mut">$${esc(t.symbol||"")}</span></div>
+        <div class="mut" style="font-size:12px">MC ${fmtUsd(t.mcap)} · Liq ${fmtUsd(t.liquidity)} · Vol ${fmtUsd(t.volume24h)}</div>
+      </div>
+      ${safetyBadge(s)}
+    </div>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn sm" style="flex:1" onclick="padBuy('${esc(t.mint)}','${esc(t.symbol||"")}')" ${S.pad.buying?"disabled":""}>${S.pad.buying===t.mint?"⏳":"⚡ Quick buy"}</button>
+      <button class="btn sm ghost" onclick="padForensics('${esc(t.mint)}')">🔍 Forensics</button>
+      <button class="btn sm ghost" onclick="openUrl('${esc(t.dexUrl||("https://dexscreener.com/solana/"+t.mint))}')">📈</button>
+    </div>
+    <div id="padfx-${esc(t.mint)}"></div>
+  </div>`;
+}
+function padMyLaunchesHTML(){
+  const mine=padMyLaunches();
+  if(!mine.length) return "";
+  return `<div class="card" style="margin-bottom:10px"><div style="font-weight:800;margin-bottom:8px">🚀 My launches (${mine.length})</div>`+
+    mine.slice(0,5).map(m=>`<div class="row" style="font-size:13px;padding:6px 0;border-top:1px solid #1a2233">
+      <b>${esc(m.name||"?")} <span class="mut">$${esc(m.symbol||"")}</span></b>
+      <span style="margin-left:auto;display:flex;gap:6px">
+        ${m.mint?`<button class="btn sm ghost" onclick="openUrl('https://dexscreener.com/solana/${esc(m.mint)}')">📈</button>`:""}
+        ${m.sig?`<button class="btn sm ghost" onclick="openUrl('https://solscan.io/tx/${esc(m.sig)}')">🧾</button>`:""}
+      </span></div>`).join("")+`</div>`;
+}
+function padHTML(){
+  const P=S.pad;
+  const list=padFiltered();
+  const upd=P.lastUpd?`<span class="mut" style="font-size:11px"> · updated ${Math.max(1,Math.round((Date.now()-P.lastUpd)/1000))}s ago</span>`:"";
+  return standaloneNote()+`
+  <div class="warnbar">🔥 <b>Live launch feed</b> — new pump.fun launches with safety scores. Tap ⚡ to buy, 🔍 for full forensics.${upd}</div>
+  ${padMyLaunchesHTML()}
+  ${P.err?`<div class="err">${esc(P.err)} <button class="btn sm ghost" onclick="padLoad()">↻ Retry</button></div>`:""}
+  <div class="card" style="margin-bottom:10px">
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <input type="text" placeholder="🔎 search ticker…" value="${esc(P.q)}" oninput="S.pad.q=this.value;render()" style="flex:1">
+      <button class="btn sm ghost" onclick="padLoad()">↻</button>
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      ${["all","green","yellow","red"].map(g=>`<button class="btn sm ${P.filter===g?"":"ghost"}" onclick="S.pad.filter='${g}';render()">${g==="all"?"All":g==="green"?"🟢 Safe":g==="yellow"?"🟡 Caution":"🔴 Risky"}</button>`).join("")}
+    </div>
+    <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
+      ${[["mcap","MCap"],["liq","Liquidity"],["vol","Volume"],["safety","Safety"]].map(([k,l])=>`<button class="btn sm ${P.sort===k?"":"ghost"}" onclick="S.pad.sort='${k}';render()">${l}</button>`).join("")}
+    </div>
+  </div>
+  ${P.loading?`<div class="card"><div class="mut" style="text-align:center;padding:20px">⏳ Loading live launches…</div></div>`:
+    list.length?list.map(padCard).join(""):`<div class="card"><div class="mut" style="text-align:center;padding:20px">${P.feed.length?"No launches match your filters.":"No launches right now — check back soon."}</div></div>`}`;
+}
+async function padBuy(mint, symbol){
+  if(S.pad.buying) return;
+  const amt=prompt(`Buy ${symbol||"token"} — amount in SOL:`, "0.1");
+  if(amt==null) return;
+  const n=Number(amt);
+  if(!isFinite(n)||n<=0){ toast("Invalid amount"); return; }
+  S.pad.buying=mint; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_buy",{mint, amountSol:n, authCode:getAuth()});
+    if(r&&(r.ok===false)) throw new Error(r.message||r.error||"buy failed");
+    toast(`✅ Bought ${symbol} — ${r.signature?r.signature.slice(0,8)+"…":"done"}`);
+    if(r&&r.solscan) openUrl(r.solscan);
+  }catch(e){ toast("❌ "+friendlyErr(e)); }
+  S.pad.buying=""; render();
+}
+async function padForensics(mint){
+  const el=document.getElementById("padfx-"+mint);
+  if(el) el.innerHTML=`<div class="mut" style="font-size:12px;padding:8px 0">⏳ Loading forensics…</div>`;
+  try{
+    const r=await Bridge.callTool("orbitx_launchpad",{action:"status",mint});
+    const f=(r&&(r.forensics||r.safety))||null;
+    const rows=f?Object.entries(f).slice(0,10).map(([k,v])=>`<div class="row" style="font-size:12px;padding:3px 0"><span class="mut">${esc(k)}</span><b style="margin-left:auto;max-width:60%;overflow:hidden;text-overflow:ellipsis">${esc(typeof v==="object"?JSON.stringify(v):String(v))}</b></div>`).join(""):`<div class="mut" style="font-size:12px">No forensics data yet.</div>`;
+    if(el) el.innerHTML=`<div class="card" style="margin-top:8px;background:#0d1420">${rows}<div style="margin-top:6px"><button class="btn sm ghost" onclick="openUrl('${esc((r&&r.dexUrl)||("https://dexscreener.com/solana/"+mint))}')">Open DexScreener →</button></div></div>`;
+  }catch(e){ if(el) el.innerHTML=`<div class="err" style="font-size:12px">${esc(friendlyErr(e))}</div>`; }
+}
+/* My launches — tracked in localStorage when user launches via widget */
+function padMyLaunches(){
+  try{ return JSON.parse(localStorage.getItem("orbitx.myLaunches")||"[]"); }catch(e){ return []; }
 }
 </script>
 <script>
