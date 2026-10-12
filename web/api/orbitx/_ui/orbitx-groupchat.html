@@ -3,19 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>OrbitX Group Chat</title>
+<title>OrbitX Social Hub</title>
 <!--
-  OrbitX ChatGPT Mini App — Group Chat (real-time message feed + composer)
+  OrbitX ChatGPT Mini App — Social Hub (4 tabs, dark neon)
   resourceUri: ui://widget/orbitx-groupchat.html
+  Tabs:
+    #12 Group Chat — live feed + composer            (tool: orbitx_gc_chat)
+    #17 Social     — communities, feed, post, members (tools: orbitx_social_communities,
+                     orbitx_social_feed, orbitx_social_post, orbitx_social_join,
+                     orbitx_social_leave, orbitx_social_create_community,
+                     orbitx_social_members)
+    #18 Voice Chat — live LiveKit rooms, join, start  (tools: orbitx_vc_list,
+                     orbitx_vc_join, orbitx_vc_start, orbitx_vc_end)
+    #20 Telegram   — @theorbitxmcpbot link + DM alerts (tools: orbitx_telegram_status,
+                     orbitx_telegram_send, orbitx_telegram_cmds)
   Bridge: window.OrbitX.callTool(name, args) when hosted, else window.openai.callTool,
           else standalone fallback POSTs to https://www.orbitx.world/api/mcp
-  Tool (verified live): orbitx_gc_chat
-    {authCode}            -> focus current chat, returns transcript {messages:[{id,body,author_label,created_at}]}
-    {authCode, slug|name} -> join that chat
-    {authCode, text}      -> post message, returns fresh transcript
-  Real-time: polling every 5s (honest auto-refresh, "updated Xs ago" indicator).
+  Real-time: polling (chat 5s, social feed 8s, voice list 15s; honest auto-refresh).
   No websocket/SSE inside the Apps SDK sandbox — polling is the real mechanism.
   Auth: contract key `orbitx.authCode` (shared with the auth widget via localStorage).
+  Writes (post/join/start/end/send) pass authCode; auth failures route to re-connect
+  per CONTRACT.md and dispatch `orbitx-auth-error`.
 -->
 <style>
 :root{
@@ -89,6 +97,51 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
 .sect{font-size:12px;letter-spacing:2px;color:var(--neon);font-weight:800;margin:16px 0 8px;text-transform:uppercase}
 input,textarea{autocomplete:off}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ===== Tabs (#17 Social · #18 Voice · #20 Telegram) ===== */
+.tabs{display:flex;gap:6px;margin:10px 0 12px}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 4px;min-height:50px;
+  border-radius:12px;border:1px solid var(--line);background:#080d12;color:var(--dim);
+  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.tab .tico{font-size:16px}
+.tab.on{background:rgba(23,255,77,.12);color:var(--neon);border-color:var(--neon)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:10px 14px;min-height:44px;border-radius:20px;border:1px solid var(--line);
+  background:#080d12;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.chip.on{color:var(--neon);border-color:var(--neon);background:rgba(23,255,77,.1)}
+.post{background:#0a0f14;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.prow{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.avw{position:relative;width:36px;height:36px;flex-shrink:0}
+.avw span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#14202a;border-radius:50%;font-weight:800;color:var(--neon);font-size:15px}
+.avw img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;background:#0a0f14}
+.au2{font-weight:700;font-size:13px}
+.ts2{font-size:11px;color:var(--dim)}
+.post .bd{font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
+.pimg{max-width:100%;border-radius:10px;margin-top:10px;display:block}
+.likerow{display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--dim)}
+.fld{width:100%;background:#080d12;border:1px solid var(--line);border-radius:12px;color:var(--txt);
+  padding:13px;font-size:15px;font-family:inherit;margin-bottom:8px;outline:none;resize:none}
+.fld:focus{border-color:var(--neon)}
+.okmsg{background:rgba(23,255,77,.08);border:1px solid rgba(23,255,77,.4);border-radius:14px;
+  padding:14px;color:#b6ffd0;font-size:14px;margin-bottom:12px}
+.livebadge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1px;color:#03130b;
+  background:var(--neon);border-radius:8px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.tgr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;
+  border-bottom:1px solid var(--line);font-size:14px}
+.tgr:last-child{border-bottom:0}
+.sw{width:54px;height:32px;border-radius:16px;border:1px solid var(--line);background:#0d151c;
+  position:relative;cursor:pointer;flex-shrink:0;padding:0}
+.sw .knob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+  background:var(--dim);transition:left .15s,background .15s}
+.sw.on{background:rgba(23,255,77,.18);border-color:var(--neon)}
+.sw.on .knob{left:25px;background:var(--neon);box-shadow:0 0 8px var(--neon)}
+.cmdrow{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.cmdrow:last-child{border-bottom:0}
+.cmdn{font-family:ui-monospace,monospace;color:var(--neon);font-size:12px;flex-shrink:0}
+details.card summary{cursor:pointer;font-weight:700;font-size:14px;list-style:none}
+details.card summary::-webkit-details-marker{display:none}
+.roomacts{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
 </style>
 </head>
 <body>
@@ -172,7 +225,7 @@ function saSave(){
 }
 
 /* ================= State ================= */
-const S = { phase:"boot", chat:null, chats:[], messages:[], msgIds:{},
+const S = { tab:"chat", phase:"boot", chat:null, chats:[], messages:[], msgIds:{},
   error:"", loading:true, sending:false, fetchedAt:0, pollTimer:null, lastPollOk:true };
 const POLL_MS = 5000;
 const app = document.getElementById("app");
@@ -240,7 +293,7 @@ function joinView(){
       ${c.topic?`<div class="mut" style="margin-top:4px">${esc(c.topic)}</div>`:""}</div>
       <button class="btn sm" onclick="joinChat('${esc(c.slug||"")}')">Join</button>
     </div>`).join("");
-  app.innerHTML = header("LOBBY") + `<div class="sect">Open group chats</div>` +
+  app.innerHTML = header("LOBBY") + tabsBar() + `<div class="sect">Open group chats</div>` +
     (rows || `<div class="empty"><div class="big">💬</div>No open chats right now.<br>Start one from the MCP: “start a group chat named …”</div>`) +
     (S.error?`<div class="err">${esc(S.error)}</div>`:"");
 }
@@ -257,7 +310,7 @@ function chatView(){
   const feed = S.messages.length
     ? S.messages.map(msgHtml).join("")
     : `<div class="empty"><div class="big">💬</div>No messages yet.<br>Say hi — you're first.</div>`;
-  app.innerHTML = header(c.name||"GROUP CHAT") +
+  app.innerHTML = header(c.name||"GROUP CHAT") + tabsBar() +
     `<div class="chathead"><div class="nm">${esc(c.name||"Group chat")}</div>
      ${c.topic?`<div class="tp">${esc(c.topic)}</div>`:""}
      <div class="meta"><span class="mut">slug: ${esc(c.slug||"—")}</span>
@@ -289,14 +342,23 @@ function render(){
   else if (S.phase==="noauth") noAuthView();
   else if (S.phase==="join") joinView();
   else if (S.phase==="chat") chatView();
+  else if (S.phase==="s_boot") socBootView();
+  else if (S.phase==="s_main") socView();
+  else if (S.phase==="vc_boot") vcBootView();
+  else if (S.phase==="vc_main") vcView();
+  else if (S.phase==="tg_boot") tgBootView();
+  else if (S.phase==="tg_main") tgView();
 }
 
 /* ================= Actions ================= */
 async function boot(resync){
   if (!resync){ S.phase="boot"; render(); }
-  stopPoll();
+  stopPoll(); stopSocPoll(); stopVcPoll();
   const code = getAuth();
   if (!code){ S.phase="noauth"; render(); return; }
+  if (S.tab==="social") return socBoot();
+  if (S.tab==="vc") return vcBoot();
+  if (S.tab==="tg") return tgBoot();
   S.loading = true;
   try{
     const r = await gcFocus();
@@ -393,9 +455,463 @@ async function pollNow(){
   }
 }
 document.addEventListener("visibilitychange", ()=>{
-  if (document.hidden) stopPoll();
-  else if (S.phase==="chat") startPoll();
+  if (document.hidden){ stopPoll(); stopSocPoll(); stopVcPoll(); }
+  else if (S.tab==="chat"&&S.phase==="chat") startPoll();
+  else if (S.tab==="social"&&S.phase==="s_main") startSocPoll();
+  else if (S.tab==="vc"&&S.phase==="vc_main") startVcPoll();
 });
+/* ============ Tabs: #17 Social · #18 Voice Chat · #20 Telegram ============ */
+function tabsBar(){
+  const t=S.tab||"chat";
+  const b=(id,ico,lb)=>`<button class="tab${t===id?" on":""}" onclick="goTab('${id}')"><span class="tico">${ico}</span><span>${lb}</span></button>`;
+  return `<div class="tabs" role="tablist">${b("chat","💬","Chat")}${b("social","🌐","Social")}${b("vc","🎙️","Voice")}${b("tg","✈️","Telegram")}</div>`;
+}
+async function goTab(t){
+  stopPoll(); stopSocPoll(); stopVcPoll();
+  S.tab=t; S.error=""; SOC.error=""; VC.error=""; TG.error="";
+  boot(true);
+}
+function normArr(r,keys){
+  if(Array.isArray(r)) return r;
+  if(r&&typeof r==="object"){ for(const k of keys||[]){ if(Array.isArray(r[k])) return r[k]; } }
+  return [];
+}
+function probeUrl(r,keys){
+  if(!r||typeof r!=="object") return "";
+  for(const k of keys){ if(typeof r[k]==="string"&&r[k]) return r[k]; }
+  return "";
+}
+function throwIfErr(r){
+  if(typeof r==="string"&&r) throw new Error(r);
+  if(r&&typeof r==="object"&&(r.ok===false||r.error)) throw new Error(r.message||r.error||"request failed");
+}
+function authFail(msg){
+  try{ window.dispatchEvent(new CustomEvent("orbitx-auth-error",{detail:{message:msg}})); }catch(e){}
+  S.phase="noauth"; render();
+}
+let ME_WALLET=null;
+async function meWallet(){
+  if(ME_WALLET!==null) return ME_WALLET;
+  try{
+    const r=await Bridge.callTool("orbitx_whoami",{authCode:getAuth()});
+    ME_WALLET=(r&&(r.wallet||r.address||r.pubkey||r.publicKey))||"";
+  }catch(e){ ME_WALLET=""; }
+  return ME_WALLET;
+}
+function isTyping(ids){
+  const a=document.activeElement;
+  if(!a||!a.id) return false;
+  return (ids||[]).indexOf(a.id)>=0;
+}
+
+/* ================= #17 Social ================= */
+const SOC={communities:[],commId:"",feed:[],feedIds:{},members:[],
+  posting:false,creating:false,joinBusy:"",error:"",fetchedAt:0,pollTimer:null};
+const SOC_POLL_MS=8000;
+async function socBoot(){
+  S.phase="s_boot"; render();
+  SOC.error="";
+  try{
+    const cs=await Bridge.callTool("orbitx_social_communities",{limit:20,authCode:getAuth()});
+    throwIfErr(cs);
+    SOC.communities=normArr(cs,["communities","data","items"]);
+    if(!SOC.commId&&SOC.communities.length) SOC.commId=String(SOC.communities[0].id);
+    SOC.feedIds={}; SOC.feed=[]; SOC.members=[];
+    await socRefresh();
+    S.phase="s_main"; render(); startSocPoll();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    SOC.error=m; S.phase="s_main"; render();
+  }
+}
+async function socRefresh(){
+  const cid=SOC.commId; if(!cid) return;
+  const f=await Bridge.callTool("orbitx_social_feed",{communityId:cid,limit:25,authCode:getAuth()});
+  throwIfErr(f);
+  const added=socIngest(normArr(f,["posts","feed","data","items"]));
+  try{
+    const mm=await Bridge.callTool("orbitx_social_members",{communityId:cid,limit:50,authCode:getAuth()});
+    SOC.members=normArr(mm,["members","data","items"]);
+  }catch(e){}
+  SOC.fetchedAt=Date.now();
+  return added;
+}
+function socIngest(list){
+  let added=0;
+  for(const p of (list||[])){
+    const id=p.id||(p.created_at+"|"+p.username+"|"+String(p.content||p.body||"").slice(0,40));
+    if(!SOC.feedIds[id]){ SOC.feedIds[id]=1; SOC.feed.push(p); added++; }
+  }
+  if(added) SOC.feed.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
+  return added;
+}
+function startSocPoll(){ stopSocPoll(); SOC.pollTimer=setInterval(socPollNow,SOC_POLL_MS); }
+function stopSocPoll(){ if(SOC.pollTimer){ clearInterval(SOC.pollTimer); SOC.pollTimer=null; } }
+async function socPollNow(){
+  if(S.tab!=="social"||S.phase!=="s_main"||SOC.posting||SOC.creating) return;
+  try{
+    const added=await socRefresh();
+    const el=document.getElementById("s_upd");
+    if(el) el.textContent="🕐 Updated just now";
+    if(added&&!isTyping(["s_postin","s_cname","s_cdesc"])) render();
+  }catch(e){
+    const el=document.getElementById("s_upd");
+    if(el) el.textContent="⚠️ refresh failed — retrying…";
+  }
+}
+function socBootView(){
+  app.innerHTML=header("SOCIAL")+tabsBar()+
+    `<div class="skel" style="height:44px"></div><div class="skel" style="height:120px"></div>
+     <div class="skel" style="height:90px"></div><div class="skel" style="height:90px"></div>`;
+}
+function postHtml(p){
+  const un=p.username||p.author_label||"anon";
+  const initial=esc(String(un).trim().charAt(0).toUpperCase()||"?");
+  const av=`<span>${initial}</span>`+(p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`:"");
+  const img=p.image_url?`<img class="pimg" src="${esc(p.image_url)}" alt="" loading="lazy" onerror="this.remove()">`:"";
+  const likes=(p.likes_count!=null?p.likes_count:(p.likes!=null?p.likes:0));
+  const replies=(p.replies_count!=null?p.replies_count:(p.replies!=null?p.replies:0));
+  return `<div class="post"><div class="prow"><div class="avw">${av}</div>
+    <div><div class="au2">${esc(un)}</div><div class="ts2">${esc(timeAgo(p.created_at))}</div></div></div>
+    <div class="bd">${esc(p.content||p.body||"")}</div>${img}
+    <div class="likerow"><span>❤️ ${likes}</span><span>💬 ${replies}</span></div></div>`;
+}
+function socView(){
+  const chips=SOC.communities.map(c=>
+    `<button class="chip${String(c.id)===String(SOC.commId)?" on":""}" onclick="socSelect('${esc(String(c.id))}')">${esc(c.name||"Community")}</button>`).join("");
+  const sel=SOC.communities.find(c=>String(c.id)===String(SOC.commId))||{};
+  const posts=SOC.feed.length
+    ? SOC.feed.slice().reverse().map(postHtml).join("")
+    : `<div class="empty"><div class="big">🌐</div>No posts yet here.<br>Be the first to post.</div>`;
+  const memRows=SOC.members.map(m=>
+    `<div class="cmdrow"><span class="cmdn">${esc(String(m.user_id||m.id||"").slice(0,8))}…</span><span class="mut">${esc(m.role||"member")} · joined ${esc(timeAgo(m.joined_at))}</span></div>`).join("");
+  app.innerHTML=header("SOCIAL")+tabsBar()+
+   `<div class="sect" style="margin-top:2px">Communities</div><div class="chips">${chips||'<span class="mut">none</span>'}</div>`+
+   (sel&&sel.id?`<div class="chathead"><div class="nm">${esc(sel.name||"")}</div>
+     ${sel.description?`<div class="tp">${esc(sel.description)}</div>`:""}
+     <div class="meta"><span class="mut">👥 ${sel.member_count!=null?sel.member_count:"—"} members${sel.category?` · ${esc(sel.category)}`:""}${sel.privacy?` · ${esc(sel.privacy)}`:""}</span>
+     <span class="roomacts">
+       <button class="btn sm" ${SOC.joinBusy?"disabled":""} onclick="socJoin('${esc(String(sel.id))}')">Join</button>
+       <button class="btn sm ghost" ${SOC.joinBusy?"disabled":""} onclick="socLeave('${esc(String(sel.id))}')">Leave</button>
+     </span></div></div>`:"")+
+   (SOC.error?`<div class="err">${esc(SOC.error)}</div>`:"")+
+   `<div class="sect">Feed</div>
+    <div class="card"><textarea id="s_postin" class="fld" rows="2" maxlength="2000"
+      placeholder="Post to ${esc(sel.name||"community")}…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <button class="btn sm" style="width:100%" ${SOC.posting?"disabled":""} onclick="socPost()">${SOC.posting?"Posting…":"📣 Post"}</button></div>
+    <div id="sfeed">${posts}</div>
+    <div class="upd"><span id="s_upd">🕐 Updated ${esc(timeAgo(SOC.fetchedAt))}</span><button onclick="socPollNow()">↻ Refresh now</button></div>
+    <details class="card"><summary>👥 Members (${SOC.members.length})</summary>
+      <div style="margin-top:8px">${memRows||'<div class="mut">No members listed.</div>'}</div></details>
+    <details class="card"><summary>➕ Create community</summary>
+      <div style="margin-top:10px">
+      <input id="s_cname" class="fld" maxlength="80" placeholder="Community name" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <textarea id="s_cdesc" class="fld" rows="2" maxlength="500" placeholder="Description (optional)" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <button class="btn sm" style="width:100%" ${SOC.creating?"disabled":""} onclick="socCreate()">${SOC.creating?"Creating…":"Create community"}</button>
+      </div></details>`;
+}
+async function socSelect(id){
+  if(String(id)===String(SOC.commId)) return;
+  stopSocPoll();
+  SOC.commId=id; SOC.feedIds={}; SOC.feed=[]; SOC.members=[]; SOC.error="";
+  S.phase="s_boot"; render();
+  try{ await socRefresh(); S.phase="s_main"; render(); startSocPoll(); }
+  catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    SOC.error=m; S.phase="s_main"; render();
+  }
+}
+async function socPost(){
+  const ta=document.getElementById("s_postin");
+  const body=(ta?ta.value:"").trim();
+  if(!body||SOC.posting||!SOC.commId) return;
+  SOC.posting=true; SOC.error=""; render();
+  try{
+    const pk=await meWallet();
+    const args={authCode:getAuth(),communityId:SOC.commId,body};
+    if(pk) args.publicKey=pk;
+    const r=await Bridge.callTool("orbitx_social_post",args);
+    throwIfErr(r);
+    socIngest(normArr(r,["posts","messages","data","items"]));
+    await socRefresh();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    SOC.error=m;
+  }
+  SOC.posting=false; render();
+}
+async function socJoin(id){
+  if(!id||SOC.joinBusy) return;
+  SOC.joinBusy=id; SOC.error=""; render();
+  try{
+    const pk=await meWallet();
+    const args={authCode:getAuth(),communityId:id};
+    if(pk) args.publicKey=pk;
+    const r=await Bridge.callTool("orbitx_social_join",args);
+    throwIfErr(r);
+    await socRefresh();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    SOC.error=m;
+  }
+  SOC.joinBusy=""; render();
+}
+async function socLeave(id){
+  if(!id||SOC.joinBusy) return;
+  if(!confirm("Leave this community?")) return;
+  SOC.joinBusy=id; SOC.error=""; render();
+  try{
+    const pk=await meWallet();
+    const args={authCode:getAuth(),communityId:id};
+    if(pk) args.publicKey=pk;
+    const r=await Bridge.callTool("orbitx_social_leave",args);
+    throwIfErr(r);
+    await socRefresh();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    SOC.error=m;
+  }
+  SOC.joinBusy=""; render();
+}
+async function socCreate(){
+  const ni=document.getElementById("s_cname"), di=document.getElementById("s_cdesc");
+  const name=(ni&&ni.value||"").trim(), description=(di&&di.value||"").trim();
+  if(!name||SOC.creating) return;
+  SOC.creating=true; SOC.error=""; render();
+  try{
+    const pk=await meWallet();
+    const args={authCode:getAuth(),name,description,visibility:"public"};
+    if(pk) args.publicKey=pk;
+    const r=await Bridge.callTool("orbitx_social_create_community",args);
+    throwIfErr(r);
+    const cs=await Bridge.callTool("orbitx_social_communities",{limit:20,authCode:getAuth()});
+    SOC.communities=normArr(cs,["communities","data","items"]);
+    SOC.error="";
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    SOC.error=m;
+  }
+  SOC.creating=false; render();
+}
+
+/* ================= #18 Voice Chat ================= */
+const VC={rooms:[],error:"",fetchedAt:0,pollTimer:null,starting:false,joining:""};
+const VC_POLL_MS=15000;
+async function vcBoot(){
+  S.phase="vc_boot"; render();
+  VC.error="";
+  try{
+    await vcRefresh();
+    S.phase="vc_main"; render(); startVcPoll();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    VC.error=m; S.phase="vc_main"; render();
+  }
+}
+async function vcRefresh(){
+  const r=await Bridge.callTool("orbitx_vc_list",{limit:20,authCode:getAuth()});
+  throwIfErr(r);
+  VC.rooms=normArr(r,["rooms","data","items"]);
+  VC.fetchedAt=Date.now();
+}
+function startVcPoll(){ stopVcPoll(); VC.pollTimer=setInterval(vcPollNow,VC_POLL_MS); }
+function stopVcPoll(){ if(VC.pollTimer){ clearInterval(VC.pollTimer); VC.pollTimer=null; } }
+async function vcPollNow(){
+  if(S.tab!=="vc"||S.phase!=="vc_main"||VC.starting||VC.joining) return;
+  try{
+    const before=VC.rooms.map(x=>x.slug).join(",");
+    await vcRefresh();
+    const after=VC.rooms.map(x=>x.slug).join(",");
+    const el=document.getElementById("v_upd");
+    if(el) el.textContent="🕐 Updated just now";
+    if(before!==after&&!isTyping(["vc_name","vc_topic"])) render();
+  }catch(e){
+    const el=document.getElementById("v_upd");
+    if(el) el.textContent="⚠️ refresh failed — retrying…";
+  }
+}
+function vcBootView(){
+  app.innerHTML=header("VOICE CHAT")+tabsBar()+
+    `<div class="skel" style="height:64px"></div><div class="skel" style="height:64px"></div>
+     <div class="skel" style="height:120px"></div>`;
+}
+function vcRoomHtml(rm){
+  const slug=String(rm.slug||"");
+  const live=String(rm.status||"").toLowerCase()==="live";
+  const lk=rm.livekitConfigured||rm.livekitUrl||rm.livekitRoom;
+  return `<div class="chatrow"><div style="flex:1;min-width:0">
+    <div class="nm">${esc(rm.name||slug||"Voice chat")}${live?'<span class="livebadge">● LIVE</span>':""}</div>
+    ${rm.topic?`<div class="mut" style="margin-top:3px">${esc(rm.topic)}</div>`:""}
+    <div class="sl" style="margin-top:5px">${esc(slug)}${lk?" · 🎧 LiveKit audio":""} · ${esc(timeAgo(rm.createdAt||rm.created_at))}</div></div>
+    <div class="roomacts">
+      <button class="btn sm" ${VC.joining===slug?"disabled":""} onclick="vcJoin('${esc(slug)}')">${VC.joining===slug?"…":"Join"}</button>
+      <button class="btn sm ghost" onclick="vcEnd('${esc(slug)}')">End</button>
+    </div></div>`;
+}
+function vcView(){
+  const rows=VC.rooms.length
+    ? VC.rooms.map(vcRoomHtml).join("")
+    : `<div class="empty"><div class="big">🎙️</div>No live voice chats right now.<br>Start one below.</div>`;
+  app.innerHTML=header("VOICE CHAT")+tabsBar()+
+   (VC.error?`<div class="err">${esc(VC.error)}</div>`:"")+
+   `<div class="sect" style="margin-top:2px">Live now (${VC.rooms.length})</div>${rows}
+    <div class="upd"><span id="v_upd">🕐 Updated ${esc(timeAgo(VC.fetchedAt))}</span><button onclick="vcManual()">↻ Refresh now</button></div>
+    <div class="sect">Start a voice chat</div>
+    <div class="card">
+      <input id="vc_name" class="fld" maxlength="80" placeholder="Room name" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <input id="vc_topic" class="fld" maxlength="140" placeholder="Topic (optional)" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn" ${VC.starting?"disabled":""} onclick="vcStart()">${VC.starting?"Starting…":"🎙️ Start voice chat"}</button>
+    </div>`;
+}
+async function vcManual(){
+  try{ await vcRefresh(); VC.error=""; }
+  catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    VC.error=m;
+  }
+  render();
+}
+async function vcJoin(slug){
+  if(!slug||VC.joining) return;
+  VC.joining=slug; VC.error=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_vc_join",{slug,authCode:getAuth()});
+    throwIfErr(r);
+    const url=probeUrl(r,["joinUrl","url","link"]);
+    if(!url) throw new Error("no join URL returned");
+    openUrl(url);
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    VC.error=m;
+  }
+  VC.joining=""; render();
+}
+async function vcStart(){
+  const ni=document.getElementById("vc_name"), ti=document.getElementById("vc_topic");
+  const name=(ni&&ni.value||"").trim(), topic=(ti&&ti.value||"").trim();
+  if(!name||VC.starting) return;
+  VC.starting=true; VC.error=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_vc_start",{name,topic,authCode:getAuth()});
+    throwIfErr(r);
+    const url=probeUrl(r,["joinUrl","url","link"]);
+    if(!url) throw new Error(r.message||"voice chat created but no join URL returned");
+    await vcRefresh(); render(); openUrl(url);
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    VC.error=m; render();
+  }
+  VC.starting=false;
+}
+async function vcEnd(slug){
+  if(!slug||!confirm("End this voice chat for everyone?")) return;
+  try{
+    await Bridge.callTool("orbitx_vc_end",{slug,authCode:getAuth()});
+    await vcRefresh(); VC.error=""; render();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    VC.error=m; render();
+  }
+}
+
+/* ================= #20 Telegram ================= */
+const TG_CATS=[["trades","💸 Trade executions"],["price","📈 Price alerts"],["vc","🎙️ Voice chat invites"],
+  ["mentions","💬 Social mentions"],["raids","⚔️ Community raids"],["results","🤖 MCP results"]];
+const TG={status:null,cmds:[],cmdCount:0,error:"",pingOk:"",pinging:false,alerts:tgLoadAlerts()};
+function tgLoadAlerts(){
+  try{ const j=JSON.parse(localStorage.getItem("orbitx.tgAlerts")||"null");
+    if(j&&typeof j==="object") return j; }catch(e){}
+  const d={}; for(const c of TG_CATS) d[c[0]]=true; return d;
+}
+function tgSaveAlerts(){ try{ localStorage.setItem("orbitx.tgAlerts",JSON.stringify(TG.alerts)); }catch(e){} }
+async function tgBoot(){
+  S.phase="tg_boot"; render();
+  TG.error=""; TG.pingOk="";
+  try{
+    const r=await Bridge.callTool("orbitx_telegram_status",{authCode:getAuth()});
+    throwIfErr(r);
+    TG.status=r||{};
+    try{
+      const c=await Bridge.callTool("orbitx_telegram_cmds",{authCode:getAuth()});
+      if(c&&typeof c==="object"){ TG.cmds=normArr(c,["tools","cmds","commands"]); TG.cmdCount=c.count||TG.cmds.length; }
+    }catch(e2){}
+    S.phase="tg_main"; render();
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    TG.error=m; S.phase="tg_main"; render();
+  }
+}
+function tgBootView(){
+  app.innerHTML=header("TELEGRAM")+tabsBar()+
+    `<div class="skel" style="height:120px"></div><div class="skel" style="height:160px"></div>
+     <div class="skel" style="height:120px"></div>`;
+}
+function tgToggle(k){
+  TG.alerts[k]=!TG.alerts[k]; TG.pingOk=""; tgSaveAlerts(); render();
+}
+async function tgPing(){
+  if(TG.pinging) return;
+  TG.pinging=true; TG.error=""; TG.pingOk=""; render();
+  try{
+    const on=TG_CATS.filter(c=>TG.alerts[c[0]]).map(c=>c[1]);
+    const text="🔔 OrbitX test ping — your Telegram DM pipe is live.\nEnabled alert categories: "+(on.length?on.join(", "):"(none enabled)");
+    const r=await Bridge.callTool("orbitx_telegram_send",{text,authCode:getAuth()});
+    throwIfErr(r);
+    TG.pingOk="✅ Sent — check your DM with @theorbitxmcpbot.";
+  }catch(e){
+    const m=String(e.message||e);
+    if(AUTH_ERR_RE.test(m)) return authFail(m);
+    TG.error=m;
+  }
+  TG.pinging=false; render();
+}
+function tgView(){
+  const st=TG.status||{};
+  const linked=!!st.linked;
+  const botUrl=st.botUrl||"https://t.me/theorbitxmcpbot";
+  const page=st.page||"https://www.orbitx.world/telegram";
+  const botHandle=st.bot||"theorbitxmcpbot";
+  const toggles=TG_CATS.map(c=>
+    `<div class="tgr"><span>${c[1]}</span>
+     <button class="sw${TG.alerts[c[0]]?" on":""}" role="switch" aria-checked="${!!TG.alerts[c[0]]}" onclick="tgToggle('${c[0]}')"><span class="knob"></span></button>
+    </div>`).join("");
+  const cmds=TG.cmds.slice(0,30).map(c=>
+    `<div class="cmdrow"><span class="cmdn">/${esc(c.name||"")}</span><span class="mut">${esc(String(c.description||"").slice(0,100))}</span></div>`).join("");
+  app.innerHTML=header("TELEGRAM")+tabsBar()+
+   `<div class="card">
+      <div style="font-weight:800;font-size:16px;margin-bottom:6px">${linked?"✅ Telegram linked":"🔗 Telegram not linked"}</div>
+      <div class="mut" style="line-height:1.7">Bot: <b style="color:var(--neon)">@${esc(botHandle)}</b>${st.telegramUsername?` · as <b>@${esc(st.telegramUsername)}</b>`:""}${st.telegramUserId?` · id ${esc(String(st.telegramUserId))}`:""}</div>
+      ${st.message?`<div class="mut" style="margin-top:8px;line-height:1.6">${esc(st.message)}</div>`:""}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn sm" onclick="openUrl('${botUrl}')">Open @${esc(botHandle)}</button>
+        <button class="btn sm ghost" onclick="openUrl('${page}')">Link page</button>
+        <button class="btn sm ghost" onclick="tgBoot()">↻ Refresh</button>
+      </div>
+      ${linked?"":`<div class="mut" style="margin-top:10px;font-size:12px;line-height:1.7">1️⃣ Open the bot → 2️⃣ DM <b>/login</b> → 3️⃣ tap <b>Refresh</b> here.</div>`}
+    </div>`+
+   (TG.error?`<div class="err">${esc(TG.error)}</div>`:"")+
+   (TG.pingOk?`<div class="okmsg">${esc(TG.pingOk)}</div>`:"")+
+   `<div class="sect">DM alert categories</div>
+    <div class="card" style="padding:4px 16px">${toggles}</div>
+    <div class="mut" style="font-size:12px;margin:-4px 2px 10px;line-height:1.6">Only enabled categories are pushed by this widget. Preferences are saved on this device.</div>
+    <button class="btn" ${(!linked||TG.pinging)?"disabled":""} onclick="tgPing()">${TG.pinging?"Sending…":"🔔 Send test alert to DM"}</button>`+
+   (linked?"":`<div class="mut" style="text-align:center;margin-top:8px;font-size:12px">Link Telegram first to send a test alert.</div>`)+
+   `<div class="sect">Bot commands (${TG.cmdCount||TG.cmds.length})</div>
+    <div class="card">${cmds||'<div class="mut">No commands listed.</div>'}${TG.cmdCount>30?`<div class="mut" style="margin-top:8px">…and ${TG.cmdCount-30} more — run /cmds in Telegram for the full list.</div>`:""}</div>`;
+}
+
 boot(false);
 </script>
 </body>
