@@ -893,9 +893,13 @@ export async function appSendSol(auth, args = {}) {
   }
   const funds = await getDeskFunds(row.public_key);
   const lamports = Math.floor(amountSol * 1e9);
+  const balanceLamports = Number(funds?.sol) * 1e9;
+  if (!Number.isFinite(balanceLamports)) {
+    return { ok: false, error: "balance_unavailable", message: "Could not read wallet balance — try again." };
+  }
   // Keep ~0.01 SOL for fees
-  if (funds.sol * 1e9 < lamports + 10000000) {
-    return { ok: false, error: "insufficient_balance", message: `Insufficient SOL. Balance: ${funds.sol.toFixed(4)} SOL, need ${amountSol} + fees.` };
+  if (balanceLamports < lamports + 10000000) {
+    return { ok: false, error: "insufficient_balance", message: `Insufficient SOL. Balance: ${(balanceLamports / 1e9).toFixed(4)} SOL, need ${amountSol} + fees.` };
   }
   try {
     const result = await buildAndSendTransfer(row, { toPubkey: destination, lamports });
@@ -938,7 +942,11 @@ export async function appTip(auth, args = {}) {
     if (token === "SOL") {
       const lamports = Math.floor(amount * 1e9);
       const funds = await getDeskFunds(row.public_key);
-      if (funds.sol * 1e9 < lamports + 10000000) {
+      const balanceLamports = Number(funds?.sol) * 1e9;
+      if (!Number.isFinite(balanceLamports)) {
+        return { ok: false, error: "balance_unavailable", message: "Could not read wallet balance — try again." };
+      }
+      if (balanceLamports < lamports + 10000000) {
         return { ok: false, error: "insufficient_balance", message: `Insufficient SOL.` };
       }
       const result = await buildAndSendTransfer(row, { toPubkey: recipient, lamports });

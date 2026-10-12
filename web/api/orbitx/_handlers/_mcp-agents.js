@@ -96,11 +96,9 @@ const DEFAULT_SNIPE_FILTERS = {
 async function snipeScan(args) {
   const filters = { ...DEFAULT_SNIPE_FILTERS, ...(args.filters || {}) };
   const maxBuySol = Math.min(10, Math.max(0.01, num(args.maxBuySol || 0.5, 0.5)));
-  // New pairs from DexScreener (Solana, sorted by creation)
+  // New pairs from DexScreener token profiles (new tokens)
   let pairs = [];
   try {
-    const j = await jget("https://api.dexscreener.com/latest/dex/search?q=SOLANA&order=desc", 12_000).catch(() => null);
-    // Fallback: token profiles (new tokens)
     const profiles = await jget("https://api.dexscreener.com/token-profiles/latest/v1", 12_000).catch(() => []);
     const solNew = (Array.isArray(profiles) ? profiles : []).filter((p) => String(p.chainId || "").toLowerCase() === "solana").slice(0, 15);
     for (const p of solNew) {
@@ -211,7 +209,7 @@ async function analystBrief(args) {
           mint: p.baseToken?.address || "",
           symbol: p.baseToken?.symbol || "?",
           priceUsd: num(p.priceUsd, 0),
-          chg5m: Number(chg5m.toFixed(1),),
+          chg5m: Number(chg5m.toFixed(1)),
           chg1h: Number(chg1h.toFixed(1)),
           chg24h: Number(chg24h.toFixed(1)),
           vol24h: Math.round(vol24h),

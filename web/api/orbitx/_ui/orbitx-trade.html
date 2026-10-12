@@ -516,6 +516,7 @@ function scrConfirm(el){
   </div>
   ${S.error?`<div class="err" style="margin-top:12px">${esc(S.error)}</div>`:""}`;
   goBack=()=>cancelConfirm();
+  clearTimer();
   S.timer=setInterval(()=>{const c=document.getElementById("cd");
     if(c)c.textContent=Math.max(0,Math.ceil((S.quoteExpires-Date.now())/1000))+"s";
     if(Date.now()>S.quoteExpires){clearTimer();S.error="Quote expired before confirmation — get a fresh quote.";S.quote=null;S.screen="ticket";render();}},500);

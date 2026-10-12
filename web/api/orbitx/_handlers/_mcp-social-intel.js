@@ -48,8 +48,10 @@ async function whaleWatch(args) {
   if (!PUBKEY_RE.test(wallet)) {
     return { ok: false, error: "invalid_wallet", message: "Pass a valid Solana wallet address." };
   }
-  const minUsd = Math.max(0, Number(args.minUsd || 10000));
-  const limit = Math.min(50, Math.max(5, Number(args.limit || 20)));
+  const minUsdRaw = Number(args.minUsd ?? 10000);
+  const minUsd = Number.isFinite(minUsdRaw) ? Math.max(0, minUsdRaw) : 10000;
+  const limitRaw = Number(args.limit ?? 20);
+  const limit = Number.isFinite(limitRaw) ? Math.min(50, Math.max(5, limitRaw)) : 20;
 
   // Recent signatures, then fetch parsed transactions to find large transfers
   let sigs;
