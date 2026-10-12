@@ -962,15 +962,9 @@ export async function appTip(auth, args = {}) {
   }
 }
 
-/* DCA schedules — stored in Supabase ox_dca_schedules */
-async function dcaClient() {
-  try {
-    return await sb();
-  } catch {
-    return null;
-  }
-}
-
+/* DCA schedules — NO SQL. Schedules are created by this tool (validated + formatted),
+   stored in the widget's localStorage, and executed by the widget while open.
+   For 24/7 server-side DCA, ask Scout to set up a cron. */
 export async function appDcaCreate(auth, args = {}) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
@@ -978,54 +972,53 @@ export async function appDcaCreate(auth, args = {}) {
   if (!validPubkey(mint)) return { ok: false, error: "bad_mint", message: "mint must be a valid Solana token address." };
   const amountSol = Number(args.amountSol || args.amount);
   if (!Number.isFinite(amountSol) || amountSol <= 0) return { ok: false, error: "bad_amount" };
+  if (amountSol > 100) return { ok: false, error: "amount_too_large", message: "Max 100 SOL per DCA buy." };
   const frequency = String(args.frequency || "daily").toLowerCase();
   if (!["hourly", "daily", "weekly"].includes(frequency)) {
     return { ok: false, error: "bad_frequency", message: "frequency must be hourly, daily, or weekly." };
   }
   const totalBuys = Math.min(Math.max(parseInt(args.totalBuys || args.duration || "7", 10) || 7, 1), 365);
-  const sb = await dcaClient();
-  if (!sb) return { ok: false, error: "db_unavailable", message: "Schedule storage unavailable." };
-  const { data, error } = await sb.from("ox_dca_schedules").insert({
-    user_id: gate.userId,
+  const scheduleId = `dca_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const schedule = {
+    scheduleId,
     mint,
-    amount_sol: amountSol,
+    amountSol,
     frequency,
-    total_buys: totalBuys,
-    buys_done: 0,
+    totalBuys,
+    buysDone: 0,
     status: "active",
-    next_run_at: new Date().toISOString(),
-  }).select("id").single();
-  if (error) return { ok: false, error: "db_error", message: String(error.message || error) };
-  return { ok: true, scheduleId: data.id, mint, amountSol, frequency, totalBuys, message: `DCA scheduled: ${amountSol} SOL → ${mint.slice(0, 8)}… every ${frequency}, ${totalBuys} buys.` };
+    createdAt: new Date().toISOString(),
+    nextRunAt: new Date().toISOString(),
+  };
+  return {
+    ok: true,
+    schedule,
+    message: `DCA ready: ${amountSol} SOL → ${mint.slice(0, 8)}… every ${frequency}, ${totalBuys} buys. Save this schedule in the Trade widget's DCA tab (it runs while the widget is open). For 24/7 execution, ask Scout to set up a cron.`,
+    widgetAction: { tab: "dca", importSchedule: schedule },
+  };
 }
 
 export async function appDcaList(auth, args = {}) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
-  const sb = await dcaClient();
-  if (!sb) return { ok: false, error: "db_unavailable" };
-  const { data, error } = await sb.from("ox_dca_schedules")
-    .select("id,mint,amount_sol,frequency,total_buys,buys_done,status,next_run_at,created_at")
-    .eq("user_id", gate.userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-  if (error) return { ok: false, error: "db_error", message: String(error.message || error) };
-  return { ok: true, schedules: data || [] };
+  return {
+    ok: true,
+    schedules: [],
+    message: "DCA schedules are stored in the Trade widget (localStorage) — open the widget's DCA tab to view and manage them. No server database.",
+  };
 }
 
 export async function appDcaCancel(auth, args = {}) {
   const gate = needAuth(auth);
   if (!gate.userId) return gate;
   const scheduleId = String(args.scheduleId || args.id || "").trim();
-  if (!scheduleId) return { ok: false, error: "id_required", message: "Pass scheduleId from orbitx_dca_list." };
-  const sb = await dcaClient();
-  if (!sb) return { ok: false, error: "db_unavailable" };
-  const { error } = await sb.from("ox_dca_schedules")
-    .update({ status: "cancelled" })
-    .eq("id", scheduleId)
-    .eq("user_id", gate.userId);
-  if (error) return { ok: false, error: "db_error", message: String(error.message || error) };
-  return { ok: true, scheduleId, status: "cancelled" };
+  return {
+    ok: true,
+    scheduleId,
+    message: scheduleId
+      ? `Cancel schedule ${scheduleId} in the Trade widget's DCA tab.`
+      : "Open the Trade widget's DCA tab to cancel schedules.",
+  };
 }
 
 export function isAppWalletTool(name) {
