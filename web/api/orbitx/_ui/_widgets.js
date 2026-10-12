@@ -171,6 +171,7 @@ export const UI_TOOL_WIDGET = {
   orbitx_generate_image: "ui://widget/orbitx-media.html",
   orbitx_x_post: "ui://widget/orbitx-media.html",
   orbitx_app_launch: "ui://widget/orbitx-media.html",
+  orbitx_launchpad: "ui://widget/orbitx-media.html",
   // group chat
   orbitx_gc_chat: "ui://widget/orbitx-groupchat.html",
   // transfers + tipping + DCA
@@ -187,6 +188,12 @@ export const UI_TOOL_WIDGET = {
   orbitx_unlocks: "ui://widget/orbitx-token.html",
   orbitx_airdrops: "ui://widget/orbitx-wallet.html",
   orbitx_portfolio_multi: "ui://widget/orbitx-wallet.html",
+  // autonomous agents
+  orbitx_agent_snipe: "ui://widget/orbitx-trade.html",
+  orbitx_agent_analyst: "ui://widget/orbitx-token.html",
+  orbitx_agent_guardian: "ui://widget/orbitx-wallet.html",
+  orbitx_agent_research: "ui://widget/orbitx-token.html",
+  orbitx_agent_alpha: "ui://widget/orbitx-trade.html",
   // dashboard (home) + tools directory
   orbitx_menu: "ui://widget/orbitx-dashboard.html",
   orbitx_tools_help: "ui://widget/orbitx-tools.html",

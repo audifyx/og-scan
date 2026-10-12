@@ -72,6 +72,21 @@ import {
   dispatchSocialIntelTool,
   isSocialIntelTool,
 } from "./orbitx/_handlers/_mcp-social-intel.js";
+import {
+  LAUNCHPAD_TOOLS,
+  dispatchLaunchpadTool,
+  isLaunchpadTool,
+} from "./orbitx/_handlers/_mcp-launchpad.js";
+import {
+  DEFI_PLUS_TOOLS,
+  dispatchDefiPlusTool,
+  isDefiPlusTool,
+} from "./orbitx/_handlers/_mcp-defi-plus.js";
+import {
+  AGENT_TOOLS,
+  dispatchAgentTool,
+  isAgentTool,
+} from "./orbitx/_handlers/_mcp-agents.js";
 // Strategy feature families: copy-trading, trailing stops + take-profit
 // ladders, launch sniper, alert-triggered trades, PnL. Registered here (not
 // in _mcp-app-wallet.js) to avoid an ESM import cycle — they import helpers
@@ -1885,6 +1900,10 @@ const TOOL_ALIASES = {
   airdrop: "orbitx_airdrops",
   portfolio_multi: "orbitx_portfolio_multi",
   multi_wallet: "orbitx_portfolio_multi",
+  launchpad: "orbitx_launchpad",
+  new_launches: "orbitx_launchpad",
+  new_coins: "orbitx_launchpad",
+  token_feed: "orbitx_launchpad",
   grok_buy: "orbitx_app_buy",
   grok_sell: "orbitx_app_sell",
   launch: "orbitx_app_launch",
@@ -3827,6 +3846,8 @@ const CORE_TOOLS = [
   ...LIVE_CORE_TOOLS,
   ...APP_WALLET_CORE_TOOLS,
   ...SOCIAL_INTEL_TOOLS,
+  ...LAUNCHPAD_TOOLS,
+  ...AGENT_TOOLS,
   // Strategy families (see import note above).
   ...COPY_TOOLS,
   ...TRAILING_TOOLS,
@@ -4015,6 +4036,18 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
   if (isSocialIntelTool(name)) {
     const out = await dispatchSocialIntelTool(name, args, { auth, base });
+    if (out) return out;
+  }
+  if (isLaunchpadTool(name)) {
+    const out = await dispatchLaunchpadTool(name, args, { auth, base });
+    if (out) return out;
+  }
+  if (isDefiPlusTool(name)) {
+    const out = await dispatchDefiPlusTool(name, args, { auth, base });
+    if (out) return out;
+  }
+  if (isAgentTool(name)) {
+    const out = await dispatchAgentTool(name, args, { auth, base });
     if (out) return out;
   }
   if (name === "orbitx_auth_link") {
