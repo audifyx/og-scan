@@ -101,12 +101,54 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
 .inlineres{margin-top:10px;border:1px dashed var(--line);border-radius:12px;padding:12px;
   font-size:12px;color:var(--muted);max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word}
 .standalone{text-align:center;font-size:11px;color:var(--muted);opacity:.85;margin-bottom:10px}
+/* Command palette (Cmd+K) */
+#cmdk{position:fixed;inset:0;z-index:50;display:none;align-items:flex-start;justify-content:center;
+  padding:calc(60px + env(safe-area-inset-top)) 16px 16px;background:rgba(0,0,0,.72);backdrop-filter:blur(6px)}
+#cmdk.open{display:flex;animation:fadein .15s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.cmdk-box{width:100%;max-width:520px;background:var(--panel);border:1px solid rgba(23,255,77,.35);
+  border-radius:18px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(23,255,77,.08)}
+.cmdk-input{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.cmdk-input input{flex:1;background:none;border:0;outline:0;color:var(--txt);font-size:16px;font-family:inherit}
+.cmdk-input input::placeholder{color:var(--faint)}
+.cmdk-list{max-height:320px;overflow-y:auto;padding:8px}
+.cmdk-item{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;cursor:pointer;min-height:56px}
+.cmdk-item.sel,.cmdk-item:active{background:rgba(23,255,77,.08);border:1px solid rgba(23,255,77,.25)}
+.cmdk-item .ic{font-size:20px;width:32px;text-align:center;flex:none}
+.cmdk-item .nm{font-weight:700;font-size:14px}
+.cmdk-item .ds{font-size:11px;color:var(--muted);margin-top:2px}
+.cmdk-item kbd{margin-left:auto;font-family:ui-monospace,monospace;font-size:10px;color:var(--faint);
+  border:1px solid var(--line);border-radius:6px;padding:3px 7px;flex:none}
+.cmdk-hint{padding:10px 16px;font-size:11px;color:var(--faint);border-top:1px solid var(--line);
+  display:flex;gap:14px}
+.cmdk-hint kbd{font-family:ui-monospace,monospace;border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.cmdk-fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));right:16px;z-index:40;
+  width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#17ff4d,#0fce43);
+  border:0;color:#03130b;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 28px rgba(23,255,77,.35)}
+.cmdk-fab:active{transform:scale(.94)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* UI polish: smooth transitions, press feedback, fade-in */
+.card,.tcard,.toolrow,.qbtn,.stat{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover,.tcard:hover{border-color:rgba(23,255,77,.25)}
+button{transition:transform .12s ease,opacity .12s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card,.tcard{animation:fadeUp .32s ease both}
+@media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
 </style>
 </head>
 <body>
 <div id="bgfx"></div>
 <div id="app"></div>
+<div id="cmdk" role="dialog" aria-label="Command palette">
+  <div class="cmdk-box">
+    <div class="cmdk-input"><span style="font-size:18px">🔍</span><input id="cmdk-q" placeholder="Search tools, actions…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="cmdk-list" id="cmdk-list"></div>
+    <div class="cmdk-hint"><span><kbd>↑↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+  </div>
+</div>
+<button class="cmdk-fab" onclick="cmdkOpen()" aria-label="Quick actions">⌘</button>
 <script>
 "use strict";
 /* ================= Bridge (CONTRACT.md v1 — task order: OrbitX -> openai -> standalone) ================= */
@@ -388,6 +430,62 @@ function render(){
       + quickActions()
       + (S.inlineResult?`<div class="inlineres">${esc(S.inlineResult)}</div>`:""));
 }
+/* ================= Command palette (Cmd+K) ================= */
+const CMDK_CMDS=[
+  {ic:"⚡",nm:"Trade",ds:"Quotes · buy · sell · swap",run:()=>quickGo(0)},
+  {ic:"🔭",nm:"Token Intel",ds:"Scans · screeners · charts",run:()=>quickGo(1)},
+  {ic:"👛",nm:"Wallet",ds:"Balances · PnL · swaps",run:()=>quickGo(2)},
+  {ic:"🎨",nm:"Studio",ds:"Images · X posts · launches",run:()=>quickGo(3)},
+  {ic:"💬",nm:"Group Chat",ds:"Live chat feed + composer",run:()=>quickGo(4)},
+  {ic:"🔑",nm:"Connect",ds:"Link wallet · session",run:()=>quickGo(5)},
+  {ic:"🔄",nm:"Refresh market",ds:"Reload trending tokens",run:()=>loadMarket()},
+  {ic:"💼",nm:"Refresh portfolio",ds:"Reload wallet balances",run:()=>loadPortfolio()},
+  {ic:"🐋",nm:"Whale watch",ds:"Large transfers for a wallet",run:()=>cmdkCall("orbitx_whale_watch",{wallet:prompt("Wallet address to watch:")||""})},
+  {ic:"🔔",nm:"Price alert",ds:"Alert when a token crosses a price",run:()=>cmdkCall("orbitx_alert_create",{})},
+  {ic:"📅",nm:"Unlock calendar",ds:"Vesting schedules for a token",run:()=>cmdkCall("orbitx_unlocks",{mint:prompt("Token mint (blank for general):")||""})},
+  {ic:"🎁",nm:"Airdrop checker",ds:"Unclaimed drops for a wallet",run:()=>cmdkCall("orbitx_airdrops",{wallet:prompt("Wallet address:")||""})},
+  {ic:"🗂",nm:"Multi-wallet portfolio",ds:"Aggregate up to 10 wallets",run:()=>cmdkCall("orbitx_portfolio_multi",{wallets:(prompt("Wallet addresses, comma-separated:")||"").split(",").map(s=>s.trim()).filter(Boolean)})},
+  {ic:"🧰",nm:"Browse all tools",ds:"Open the tools drawer",run:()=>{ if(!S.toolsOpen) toggleTools(); cmdkClose(); document.getElementById("toolsdrawer")?.scrollIntoView({behavior:"smooth"}); }},
+];
+let cmdkSel=0;
+async function cmdkCall(tool,args){
+  cmdkClose();
+  S.inlineResult=""; render();
+  try{
+    const r=await Bridge.callTool(tool,args);
+    if(!isHosted()) S.inlineResult=tool+" result:\n"+JSON.stringify(r,null,1).slice(0,1500);
+  }catch(e){ S.inlineResult=tool+" failed: "+String((e&&e.message)||e); }
+  render();
+}
+function cmdkFiltered(){
+  const q=(document.getElementById("cmdk-q").value||"").toLowerCase().trim();
+  if(!q) return CMDK_CMDS;
+  return CMDK_CMDS.filter(c=>(c.nm+" "+c.ds).toLowerCase().includes(q));
+}
+function cmdkRender(){
+  const list=cmdkFiltered();
+  cmdkSel=Math.min(cmdkSel,Math.max(0,list.length-1));
+  document.getElementById("cmdk-list").innerHTML=list.length
+    ? list.map((c,i)=>`<div class="cmdk-item${i===cmdkSel?" sel":""}" data-i="${i}" onclick="cmdkPick(${i})">
+        <span class="ic">${c.ic}</span><span><div class="nm">${esc(c.nm)}</div><div class="ds">${esc(c.ds)}</div></span></div>`).join("")
+    : `<div class="empty" style="padding:20px">No matches</div>`;
+}
+function cmdkOpen(){ document.getElementById("cmdk").classList.add("open"); cmdkSel=0;
+  const q=document.getElementById("cmdk-q"); q.value=""; cmdkRender(); setTimeout(()=>q.focus(),50); }
+function cmdkClose(){ document.getElementById("cmdk").classList.remove("open"); }
+function cmdkPick(i){ const c=cmdkFiltered()[i]; if(c) c.run(); }
+document.getElementById("cmdk-q").addEventListener("input",()=>{ cmdkSel=0; cmdkRender(); });
+document.getElementById("cmdk").addEventListener("click",e=>{ if(e.target.id==="cmdk") cmdkClose(); });
+document.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){ e.preventDefault();
+    document.getElementById("cmdk").classList.contains("open")?cmdkClose():cmdkOpen(); return; }
+  if(!document.getElementById("cmdk").classList.contains("open")) return;
+  if(e.key==="Escape") cmdkClose();
+  else if(e.key==="ArrowDown"){ e.preventDefault(); cmdkSel++; cmdkRender(); }
+  else if(e.key==="ArrowUp"){ e.preventDefault(); cmdkSel=Math.max(0,cmdkSel-1); cmdkRender(); }
+  else if(e.key==="Enter"){ const c=cmdkFiltered()[cmdkSel]; if(c) c.run(); }
+});
+
 async function boot(rebind){
   if(!rebind){ S.bootCount++; render(); }
   await checkAuth();
