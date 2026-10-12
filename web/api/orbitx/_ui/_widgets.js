@@ -173,6 +173,12 @@ export const UI_TOOL_WIDGET = {
   orbitx_app_launch: "ui://widget/orbitx-media.html",
   // group chat
   orbitx_gc_chat: "ui://widget/orbitx-groupchat.html",
+  // transfers + tipping + DCA
+  orbitx_send_sol: "ui://widget/orbitx-wallet.html",
+  orbitx_tip: "ui://widget/orbitx-wallet.html",
+  orbitx_dca_create: "ui://widget/orbitx-trade.html",
+  orbitx_dca_list: "ui://widget/orbitx-trade.html",
+  orbitx_dca_cancel: "ui://widget/orbitx-trade.html",
   // dashboard (home) + tools directory
   orbitx_menu: "ui://widget/orbitx-dashboard.html",
   orbitx_tools_help: "ui://widget/orbitx-tools.html",
