@@ -137,6 +137,39 @@ input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(23,255,77,.12)}
 .chip{display:inline-block;background:rgba(23,255,77,.1);border:1px solid rgba(23,255,77,.3);
   color:var(--neon);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700}
 .hidden{display:none!important}
+/* ===== dashboards #14/#15/#16/#23 ===== */
+.tabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;border:1px solid var(--line);background:var(--card2);color:var(--mut);
+  border-radius:12px;padding:11px 10px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;text-align:center}
+.tab.on{border-color:var(--neon);color:var(--neon);background:rgba(23,255,77,.08);
+  box-shadow:0 0 14px rgba(23,255,77,.12)}
+select{width:100%;background:#060b0e;border:1px solid var(--line);color:var(--txt);
+  border-radius:14px;padding:14px;font-size:16px;outline:none;appearance:none}
+select:focus{border-color:var(--neon)}
+.flabel{display:block;margin:0 0 8px;letter-spacing:.18em;font-size:11px;color:var(--mut);font-weight:700}
+.field{margin-bottom:12px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#060b0e;border:1px solid var(--line);
+  border-radius:16px;padding:6px;margin-bottom:12px}
+.seg button{border:none;background:transparent;color:var(--mut);font-weight:800;font-size:14px;
+  padding:12px;border-radius:12px;cursor:pointer;transition:.2s}
+.seg button.on{background:rgba(23,255,77,.14);color:var(--neon);box-shadow:0 0 14px rgba(23,255,77,.12)}
+.ocard{background:#0a1116;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px}
+.ocard .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ocard .ttl{font-weight:800;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip2{display:inline-block;border:1px solid;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800}
+.pbar{height:8px;background:#0a1216;border-radius:99px;overflow:hidden;border:1px solid var(--line);margin:8px 0}
+.pbar i{display:block;height:100%;background:linear-gradient(90deg,#17ff4d,#00cc6a);border-radius:99px;transition:width .4s}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.kv .cell{background:#060b0e;border:1px solid var(--line);border-radius:12px;padding:10px}
+.kv .k{font-size:10px;letter-spacing:.14em;color:var(--mut);margin-bottom:4px}
+.kv .v{font-weight:800;font-size:15px}
+.pos{color:var(--neon)}.neg{color:var(--red)}
+.inline-confirm{display:flex;gap:8px;margin-top:10px}
+.inline-confirm .btn{padding:10px;font-size:13px}
+pre.raw{background:#060b0e;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:11px;
+  color:var(--mut);white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:auto}
+
 </style>
 </head>
 <body>
@@ -239,7 +272,8 @@ function clearTimer(){ if(S.timer){clearInterval(S.timer); S.timer=null;} }
 /* ================= Screens ================= */
 function render(){ app.innerHTML = ""; const d=document.createElement("div"); d.className="screen";
   ({boot:scrBoot, auth:scrAuth, search:scrSearch, ticket:scrTicket, quote:scrQuote,
-    confirm:scrConfirm, exec:scrExec, done:scrDone}[S.screen]||scrBoot)(d); app.appendChild(d); }
+    confirm:scrConfirm, exec:scrExec, done:scrDone,
+    ...(typeof DASH_SCREENS!=="undefined"?DASH_SCREENS:{})}[S.screen]||scrBoot)(d); app.appendChild(d); }
 
 function scrBoot(el){
   el.innerHTML = header(false)+`<div class="card"><div class="skel" style="height:22px;margin-bottom:10px"></div>
@@ -270,7 +304,7 @@ function scrAuth(el){
 
 /* ---- token search ---- */
 function scrSearch(el){
-  el.innerHTML = header(false)+`
+  el.innerHTML = header(false)+tabBar("trade")+`
   <div class="card">
     <h2>Pick a token</h2>
     <p class="sub">Search by name, symbol, or paste a mint address.</p>
@@ -567,7 +601,795 @@ function mapErr(e){
   if(m.includes("expired")) return "Quote expired — get a fresh quote.";
   return "Error: "+String(e&&(e.message||e)).slice(0,220);
 }
+</script>
 
+<script>
+"use strict";
+/* ============================================================
+   Dashboards: #14 Orders & Alerts · #15 Copy Trading ·
+              #16 Sniping · #23 Paper Trading
+   Transport: Bridge.callTool (window.OrbitX → window.openai → standalone POST).
+   Auth: authCode from localStorage on every write call (CONTRACT.md).
+   ============================================================ */
+const AUTH_RE2 = /auth|unauthor|expir|invalid code|session|forbidden|not (linked|connected|signed)|sign.?in|token|credential/i;
+const TABS = [["trade","⚡","Trade"],["ord","🔔","Orders"],["cpy","🪞","Copy"],["snp","🎯","Snipe"],["ppr","📄","Paper"]];
+const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+function tabBar(active){
+  return `<div class="tabs">`+TABS.map(t=>
+    `<button class="tab${t[0]===active?" on":""}" onclick="goTab('${t[0]}')">${t[1]} ${t[2]}</button>`).join("")+`</div>`;
+}
+function goTab(t){
+  clearTimer(); S.dErr=""; S.tab=t; S.screen="search";
+  if(t==="ord"){ S.screen="ord"; render(); loadOrders(); return; }
+  if(t==="cpy"){ S.screen="cpy"; render(); loadCopy(); return; }
+  if(t==="snp"){ S.screen="snp"; render(); loadSnipe(); return; }
+  if(t==="ppr"){ S.screen="ppr"; render(); loadPaper(); return; }
+  render();
+}
+/* dashboard state */
+S.tab="trade"; S.dErr="";
+S.d14={list:[],loading:false,mint:"",otype:"tp",pct:"15",sizePct:"100",usd:"5",px:null,pxBusy:false,creating:false,cancelAsk:-1};
+S.d15={list:[],loading:false,prov:null,provBusy:false,wallet:"",mode:"fixed_usd",size:"1",maxUsd:"25",label:"",creating:false,unfAsk:-1,provAsk:false};
+S.d16={st:null,loading:false,cfg:null,arming:false,killBusy:false};
+S.d23={agent:"",pf:null,loading:false,mint:"",usd:"10",px:null,pxBusy:false,buying:false,sellIdx:-1,sellPct:"100",resetBusy:false};
+
+/* ---- auth helpers (CONTRACT.md error convention) ---- */
+function scrAuthGate(el, tab, resume){
+  el.innerHTML=header(false)+tabBar(tab)+`
+  <div class="card neon center"><h2>Connect OrbitX</h2>
+  <p class="sub">This dashboard needs your connected wallet session.<br>Paste your OrbitX session code to continue.</p>
+  <input type="text" id="dg_auth" placeholder="paste authCode" style="margin-bottom:10px" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <button class="btn btn-neon" onclick="dgSaveAuth()">Save session</button>
+  ${S.dErr?`<div class="err" style="margin-top:12px;text-align:left">${esc(S.dErr)}</div>`:""}</div>`;
+  window._dgResume=resume;
+}
+function dgSaveAuth(){
+  const el=document.getElementById("dg_auth"); const v=el&&el.value.trim(); if(!v) return;
+  setAuth(v); S.authCode=v; S.dErr="";
+  const r=window._dgResume; window._dgResume=null; if(r) r();
+}
+/* returns true when the error was an auth failure (caller should re-render) */
+function dashAuthErr(e){
+  const m=String((e&&(e.message||e))||"");
+  if(AUTH_RE2.test(m)){
+    try{ window.dispatchEvent(new CustomEvent("orbitx-auth-error",{detail:{message:m}})); }catch(_){}
+    S.authCode=""; try{ localStorage.removeItem("orbitx.authCode"); localStorage.removeItem("orbitx_auth_code"); }catch(_){}
+    S.dErr="Session expired or not linked — reconnect to continue."; return true;
+  }
+  S.dErr=mapErr(e); return false;
+}
+function ago(ts){
+  if(!ts) return "—"; const s=(Date.now()-new Date(ts).getTime())/1000;
+  if(!(s>=0)) return "—"; if(s<60) return "just now";
+  if(s<3600) return Math.floor(s/60)+"m ago"; if(s<86400) return Math.floor(s/3600)+"h ago";
+  return Math.floor(s/86400)+"d ago";
+}
+function stChip(st){
+  st=String(st||"").toLowerCase();
+  const m={open:["OPEN","var(--neon)"],filled:["FILLED","var(--mut)"],cancelled:["CANCELLED","var(--mut)"],
+           failed:["FAILED","var(--red)"],stopped:["STOPPED","var(--red)"],active:["ACTIVE","var(--neon)"]};
+  const x=m[st]||[st.toUpperCase()||"?","var(--mut)"];
+  return `<span class="chip2" style="color:${x[1]};border-color:currentColor">${x[0]}</span>`;
+}
+function skelList(n){ let h=""; for(let i=0;i<(n||3);i++) h+=`<div class="skel" style="height:74px;margin-bottom:10px"></div>`; return h; }
+function dErrHtml(){ return S.dErr?`<div class="err">${esc(S.dErr)}</div>`:""; }
+async function lookupToken(mint){
+  const r=await Bridge.callTool("orbitx_crypto_scan",{query:mint,mint:mint,authCode:S.authCode});
+  const list=normTokens(r); return list.length?list[0]:null;
+}
+
+/* ============================================================
+   #14 ORDERS & ALERTS — orbitx_app_limit / _cancel_order / _orders
+   Server semantics: side=sell → sell when price UP pct%;
+   side=buy → buy when price DOWN pct%. Backend auto-signs the fill.
+   ============================================================ */
+async function loadOrders(){
+  if(!S.authCode){ render(); return; }
+  S.d14.loading=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_orders",{authCode:S.authCode});
+    const arr=r&&(r.orders||r.data)||[];
+    S.d14.list=Array.isArray(arr)?arr:[];
+  }catch(e){ dashAuthErr(e); }
+  S.d14.loading=false; render();
+}
+function ordSizeTxt(o){
+  const side=String(o.side||"sell").toLowerCase(); const sz=o.size||{};
+  if(side==="sell"){
+    if(sz.fraction!=null) return Math.round(Number(sz.fraction)*100)+"% of position";
+    if(sz.amount) return fmt(sz.amount)+" tokens";
+    return "100% of position";
+  }
+  if(sz.usd!=null) return "$"+fmt(sz.usd)+" buy";
+  if(sz.amountSol!=null) return fmt(sz.amountSol)+" SOL buy";
+  if(sz.amountUsdc!=null) return "$"+fmt(sz.amountUsdc)+" buy";
+  return "buy";
+}
+function ordCard(o,i){
+  const open=String(o.status||"").toLowerCase()==="open";
+  const side=String(o.side||"sell").toLowerCase();
+  const trig=o.triggerPct!=null?Number(o.triggerPct):null;
+  const dirTxt=side==="sell"?"sell ↑ +":"buy ↓ −";
+  const sideC=side==="sell"?"var(--neon)":"var(--amber)";
+  return `<div class="ocard">
+    <div class="top"><div class="ttl">${esc(o.symbol||"???")}</div>${stChip(o.status)}</div>
+    <div class="qrow"><span class="k">Trigger</span><span class="v" style="color:${sideC}">${dirTxt}${trig!=null?trig+"%":"?"}</span></div>
+    <div class="qrow"><span class="k">Entry → target</span><span class="v">${fmtUSD(o.entryUsd)} → ${fmtUSD(o.targetUsd)}</span></div>
+    <div class="qrow"><span class="k">Size</span><span class="v">${esc(ordSizeTxt(o))}</span></div>
+    <div class="qrow"><span class="k">Opened</span><span class="v">${ago(o.at)} · <span class="tiny mut">${shortMint(o.mint)}</span></span></div>
+    ${open?(S.d14.cancelAsk===i
+      ? `<div class="inline-confirm"><button class="btn btn-ghost" onclick="S.d14.cancelAsk=-1;render()">Keep</button>
+         <button class="btn btn-danger" onclick="ordCancel(${i})">Confirm cancel</button></div>`
+      : `<div style="margin-top:10px"><button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="S.d14.cancelAsk=${i};render()">Cancel order</button></div>`):""}
+  </div>`;
+}
+async function ordCancel(i){
+  const o=S.d14.list[i]; if(!o) return;
+  S.d14.cancelAsk=-1; S.dErr=""; render();
+  try{
+    await Bridge.callTool("orbitx_app_cancel_order",{orderId:o.orderId,mint:o.mint,authCode:S.authCode});
+    await loadOrders();
+  }catch(e){ dashAuthErr(e); render(); }
+}
+async function ordLookup(){
+  const m=S.d14.mint.trim(); if(!MINT_RE.test(m)){ S.dErr="Enter a valid Solana mint address."; render(); return; }
+  S.d14.pxBusy=true; S.dErr=""; render();
+  try{ S.d14.px=await lookupToken(m); if(!S.d14.px) S.dErr="Token not found — you can still arm the order; the backend resolves it."; }
+  catch(e){ S.d14.px=null; S.dErr="Price lookup failed — you can still arm the order; the backend resolves it."; }
+  S.d14.pxBusy=false; render();
+}
+function ordReview(){
+  const m=S.d14.mint.trim();
+  if(!MINT_RE.test(m)){ S.dErr="Enter a valid Solana mint address."; render(); return; }
+  const p=parseFloat(S.d14.pct);
+  if(!(p>0&&p<=100)){ S.dErr="Trigger must be between 1 and 100 (% price move)."; render(); return; }
+  if(S.d14.otype==="tp"){
+    const f=parseFloat(S.d14.sizePct);
+    if(!(f>0&&f<=100)){ S.dErr="Sell size must be 1–100% of the position."; render(); return; }
+  }else{
+    const u=parseFloat(S.d14.usd);
+    if(!(u>0)){ S.dErr="Buy size must be > $0."; render(); return; }
+  }
+  S.dErr=""; S.screen="ordPreview"; render();
+}
+function ordPreviewCalc(){
+  const px=S.d14.px&&S.d14.px.price?Number(S.d14.px.price):null;
+  const p=parseFloat(S.d14.pct); const sell=S.d14.otype==="tp";
+  const target=px!=null?(sell?px*(1+p/100):px*(1-p/100)):null;
+  return {px,target,sell,p};
+}
+async function ordArm(){
+  const m=S.d14.mint.trim(); const c=ordPreviewCalc();
+  const args={mint:m,side:c.sell?"sell":"buy",percent:c.p,slippageBps:200,authCode:S.authCode};
+  if(c.sell) args.fraction=parseFloat(S.d14.sizePct)/100; else args.usd=parseFloat(S.d14.usd);
+  S.d14.creating=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_limit",args);
+    S.d14.armed=r; S.screen="ordDone"; S.d14.px=null;
+  }catch(e){ dashAuthErr(e); S.screen="ordPreview"; }
+  S.d14.creating=false; render();
+}
+function scrOrd(el){
+  if(!S.authCode){ scrAuthGate(el,"ord",loadOrders); return; }
+  const d=S.d14;
+  const open=d.list.filter(o=>String(o.status||"").toLowerCase()==="open");
+  el.innerHTML=header(false)+tabBar("ord")+`
+  <div class="card">
+    <div class="row" style="align-items:center;margin-bottom:10px">
+      <div style="flex:1"><h2 style="margin:0">Limit orders</h2>
+      <p class="sub" style="margin:2px 0 0">${open.length} open · backend auto-fills when the trigger move hits</p></div>
+      <button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" onclick="loadOrders()">↻</button>
+    </div>
+    ${d.loading?skelList(3):(d.list.length?d.list.map(ordCard).join(""):`<p class="sub center">No orders yet — arm your first take-profit below.</p>`)}
+    ${dErrHtml()}
+  </div>
+  <div class="card neon">
+    <h2>New order</h2>
+    <p class="sub">Take-profit: auto-sell when price is <b>up</b> X%. Limit-buy: auto-buy when price is <b>down</b> X%. The backend signs the fill — no further click.</p>
+    <div class="field"><span class="flabel">TOKEN MINT</span>
+      <div class="row"><input type="text" id="o_mint" placeholder="paste mint…" value="${esc(d.mint)}" style="flex:1"
+        oninput="S.d14.mint=this.value" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn btn-ghost" style="width:auto;padding:14px 16px" onclick="ordLookup()">${d.pxBusy?"…":"🔍"}</button></div></div>
+    ${d.px?`<div class="qrow"><span class="k">${esc(d.px.symbol)} · ${esc(d.px.name||"")}</span><span class="v">${fmtUSD(d.px.price)}</span></div>`:""}
+    <div class="field"><span class="flabel">ORDER TYPE</span>
+      <div class="seg">
+        <button class="${d.otype==="tp"?"on":""}" onclick="S.d14.otype='tp';render()">📈 Take-profit</button>
+        <button class="${d.otype==="lb"?"on":""}" onclick="S.d14.otype='lb';render()">📉 Limit-buy</button>
+      </div></div>
+    <div class="field"><span class="flabel">TRIGGER — % PRICE MOVE (1–100)</span>
+      <input type="number" id="o_pct" inputmode="decimal" min="1" max="100" value="${esc(d.pct)}" oninput="S.d14.pct=this.value"></div>
+    ${d.otype==="tp"
+      ? `<div class="field"><span class="flabel">SELL SIZE — % OF POSITION</span>
+         <input type="number" id="o_sz" inputmode="decimal" min="1" max="100" value="${esc(d.sizePct)}" oninput="S.d14.sizePct=this.value"></div>`
+      : `<div class="field"><span class="flabel">BUY SIZE — USD</span>
+         <input type="number" id="o_usd" inputmode="decimal" min="0" value="${esc(d.usd)}" oninput="S.d14.usd=this.value"></div>`}
+    <button class="btn btn-neon" onclick="ordReview()">Review order →</button>
+  </div>`;
+  goBack=()=>{S.screen="search";render();};
+}
+function scrOrdPreview(el){
+  const d=S.d14, c=ordPreviewCalc();
+  const sym=d.px?d.px.symbol:"token";
+  const sizeTxt=c.sell?Math.round(parseFloat(d.sizePct))+"% of position":"$"+fmt(parseFloat(d.usd));
+  el.innerHTML=header(false)+tabBar("ord")+`
+  <div class="confirm-box">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--amber);font-weight:800;margin-bottom:8px">⚠ ARM THIS LIMIT ORDER</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:${c.sell?"var(--neon)":"var(--amber)"}">${c.sell?"SELL":"BUY"} ${esc(sizeTxt)}</div>
+      <div class="lbl">${esc(sym)} · ${shortMint(d.mint.trim())}</div>
+    </div>
+    <div class="divider"></div>
+    <div class="qrow"><span class="k">Trigger</span><span class="v">${c.sell?"price UP":"price DOWN"} ${c.p}%</span></div>
+    ${c.target!=null?`<div class="qrow"><span class="k">Target price</span><span class="v">${fmtUSD(c.target)}</span></div>`:`<div class="qrow"><span class="k">Target price</span><span class="v">computed at arm time</span></div>`}
+    <div class="qrow"><span class="k">Fill</span><span class="v">backend-signed, automatic</span></div>
+  </div>
+  <div class="warn">⛓ <span>This arms a <b>real auto-fill</b> from your connected OrbitX wallet. When the trigger move hits, the backend signs the swap — no further click from you.</span></div>
+  ${dErrHtml()}
+  <div class="row">
+    <button class="btn btn-ghost" onclick="S.screen='ord';render()">Cancel</button>
+    <button class="btn btn-neon" id="armBtn" onclick="ordArm()">${d.creating?"Arming…":"✓ Arm order"}</button>
+  </div>`;
+  goBack=()=>{S.screen="ord";render();};
+  const b=document.getElementById("armBtn"); if(b&&d.creating) b.disabled=true;
+}
+function scrOrdDone(el){
+  const r=S.d14.armed||{}; const o=r.order||{};
+  el.innerHTML=header(false)+tabBar("ord")+`
+  <div class="card neon center">
+    <div class="status-hero" style="padding-top:6px">
+      <div class="checkmark"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#17ff4d" stroke-width="3"><path d="M4 12.5l5 5L20 6.5"/></svg></div>
+      <h2>Order armed ✓</h2>
+      <p class="sub">${esc(r.message||"The backend watches this trigger and auto-fills when it hits.")}</p>
+    </div>
+    ${o.symbol?`<div class="qrow"><span class="k">Order</span><span class="v">${esc(o.side||"").toUpperCase()} ${esc(o.symbol)}</span></div>`:""}
+    ${o.triggerPct!=null?`<div class="qrow"><span class="k">Trigger</span><span class="v">${o.triggerPct}%</span></div>`:""}
+    ${o.targetUsd!=null?`<div class="qrow"><span class="k">Target</span><span class="v">${fmtUSD(o.targetUsd)}</span></div>`:""}
+    <div style="margin-top:14px"><button class="btn btn-neon" onclick="S.d14.armed=null;loadOrders()">Back to orders</button></div>
+  </div>`;
+}
+
+/* ============================================================
+   #15 COPY TRADING — orbitx_app_copy_follow / _unfollow / _list / _provision
+   ============================================================ */
+async function loadCopy(){
+  if(!S.authCode){ render(); return; }
+  S.d15.loading=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_copy_list",{authCode:S.authCode});
+    const arr=r&&(r.follows||r.data)||[];
+    S.d15.list=Array.isArray(arr)?arr:[];
+  }catch(e){ dashAuthErr(e); }
+  S.d15.loading=false; render();
+  loadProv();
+}
+async function loadProv(){
+  if(!S.authCode) return;
+  S.d15.provBusy=true; render();
+  try{ S.d15.prov=await Bridge.callTool("orbitx_app_copy_provision",{action:"status",authCode:S.authCode}); }
+  catch(e){ S.d15.prov={ok:false,message:String(e&&(e.message||e))}; }
+  S.d15.provBusy=false; render();
+}
+const trimNum=n=>{ const x=Number(n); if(!isFinite(x)) return "?";
+  return String(Math.round(x*100)/100); };
+const fmtSigned=n=>{ const x=Number(n); if(!isFinite(x)) return "—";
+  const a=Math.abs(x), s=x<0?"−":"+";
+  const v=a>=1000?(a/1000).toFixed(2)+"K":a>=1?a.toFixed(2):a.toFixed(4);
+  return s+"$"+v; };
+function cpyModeText(f){
+  const m=String(f.mode||""); const s=trimNum(f.sizeValue);
+  if(m==="fixed_usd") return "$"+s+" per mirrored buy";
+  if(m==="percent_of_their_size") return s+"% of their size";
+  if(m==="mirror_ratio") return s+"× their size";
+  return m;
+}
+function cpyCard(f,i){
+  return `<div class="ocard">
+    <div class="top"><div class="ttl">${esc(f.label||"Untitled target")}</div><span class="chip">LIVE</span></div>
+    <div class="tiny mut" style="margin-bottom:6px">${shortMint(f.wallet)}</div>
+    <div class="qrow"><span class="k">Mirror</span><span class="v">${esc(cpyModeText(f))}</span></div>
+    <div class="qrow"><span class="k">Max / trade</span><span class="v">$${fmt(f.maxPerTradeUsd)}</span></div>
+    <div class="qrow"><span class="k">Their trades / mirrored</span><span class="v">${f.theirTrades??"—"} / ${f.fills??0}</span></div>
+    <div class="qrow"><span class="k">Following since</span><span class="v">${ago(f.createdAt)}</span></div>
+    ${S.d15.unfAsk===i
+      ? `<div class="inline-confirm"><button class="btn btn-ghost" onclick="S.d15.unfAsk=-1;render()">Keep</button>
+         <button class="btn btn-danger" onclick="cpyUnfollow(${i})">Confirm unfollow</button></div>`
+      : `<div style="margin-top:10px"><button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="S.d15.unfAsk=${i};render()">Unfollow</button></div>`}
+  </div>`;
+}
+async function cpyUnfollow(i){
+  const f=S.d15.list[i]; if(!f) return;
+  S.d15.unfAsk=-1; S.dErr=""; render();
+  try{
+    await Bridge.callTool("orbitx_app_copy_unfollow",{wallet:f.wallet,authCode:S.authCode});
+    await loadCopy();
+  }catch(e){ dashAuthErr(e); render(); }
+}
+function cpyReview(){
+  const w=S.d15.wallet.trim();
+  if(!MINT_RE.test(w)){ S.dErr="Enter a valid Solana wallet address."; render(); return; }
+  const sz=parseFloat(S.d15.size);
+  const m=S.d15.mode;
+  if(m==="fixed_usd"&&!(sz>0)){ S.dErr="USD size must be > 0."; render(); return; }
+  if(m==="percent_of_their_size"&&!(sz>=0.01&&sz<=100)){ S.dErr="Percent must be 0.01–100."; render(); return; }
+  if(m==="mirror_ratio"&&!(sz>=0.01&&sz<=10)){ S.dErr="Ratio must be 0.01–10."; render(); return; }
+  const mx=parseFloat(S.d15.maxUsd);
+  if(!(mx>0&&mx<=1000)){ S.dErr="Max per trade must be 1–1000 USD."; render(); return; }
+  S.dErr=""; S.screen="cpyPreview"; render();
+}
+async function cpyFollow(){
+  const args={wallet:S.d15.wallet.trim(),mode:S.d15.mode,size:parseFloat(S.d15.size),
+    maxPerTradeUsd:parseFloat(S.d15.maxUsd),authCode:S.authCode};
+  const lb=S.d15.label.trim(); if(lb) args.label=lb;
+  S.d15.creating=true; S.dErr=""; render();
+  try{
+    await Bridge.callTool("orbitx_app_copy_follow",args);
+    S.d15.wallet=""; S.d15.label=""; S.d15.size="1"; S.screen="cpy";
+    await loadCopy();
+  }catch(e){ dashAuthErr(e); S.screen="cpyPreview"; }
+  S.d15.creating=false; render();
+}
+async function cpyProvision(){
+  S.d15.provAsk=false; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_copy_provision",{action:"provision",authCode:S.authCode});
+    S.d15.prov=r;
+    if(r&&r.ok===false) S.dErr=r.message||"Provision failed.";
+  }catch(e){ dashAuthErr(e); }
+  render();
+}
+function provHtml(){
+  const p=S.d15.prov;
+  if(S.d15.provBusy) return `<div class="skel" style="height:60px"></div>`;
+  if(!p) return `<p class="sub">Status unknown.</p>`;
+  if(p.ok===false) return `<div class="err">${esc(p.message||p.error||"Webhook status unavailable.")}</div>`;
+  return `<div class="qrow"><span class="k">Instant webhook</span><span class="v" style="color:${p.ours?"var(--neon)":"var(--mut)"}">${p.ours?"REGISTERED":"not registered"}</span></div>
+  <div class="qrow"><span class="k">Watched wallets</span><span class="v">${Array.isArray(p.watchedWallets)?p.watchedWallets.length:"—"}</span></div>
+  <div class="qrow"><span class="k">Secret configured</span><span class="v">${p.secretConfigured?"yes":"no"}</span></div>
+  <p class="tiny mut">Without the instant webhook, mirrors run on the 5-minute tick fallback.</p>`;
+}
+function scrCpy(el){
+  if(!S.authCode){ scrAuthGate(el,"cpy",loadCopy); return; }
+  const d=S.d15;
+  const sizeLabel=d.mode==="fixed_usd"?"USD PER MIRRORED BUY":d.mode==="percent_of_their_size"?"% OF THEIR SIZE (0.01–100)":"RATIO × THEIR SIZE (0.01–10)";
+  el.innerHTML=header(false)+tabBar("cpy")+`
+  <div class="card">
+    <div class="row" style="align-items:center;margin-bottom:10px">
+      <div style="flex:1"><h2 style="margin:0">Copy targets</h2>
+      <p class="sub" style="margin:2px 0 0">${d.list.length} wallet${d.list.length===1?"":"s"} mirrored from your desk wallet</p></div>
+      <button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" onclick="loadCopy()">↻</button>
+    </div>
+    ${d.loading?skelList(2):(d.list.length?d.list.map(cpyCard).join(""):`<p class="sub center">Not mirroring anyone yet — follow a wallet below.</p>`)}
+    ${dErrHtml()}
+  </div>
+  <div class="card">
+    <h2>Instant webhook</h2><p class="sub">Pushes their swaps to you seconds after they confirm.</p>
+    ${provHtml()}
+    ${d.provAsk
+      ? `<div class="inline-confirm"><button class="btn btn-ghost" onclick="S.d15.provAsk=false;render()">Cancel</button>
+         <button class="btn btn-neon" onclick="cpyProvision()">Confirm provision</button></div>`
+      : `<button class="btn btn-ghost" style="margin-top:8px" onclick="S.d15.provAsk=true;render()">Provision / update webhook</button>`}
+  </div>
+  <div class="card neon">
+    <h2>Follow wallet</h2>
+    <p class="sub">Mirror a Solana wallet's swaps automatically. Sells mirror as the same fraction of <b>your</b> balance. Backend signs every mirror trade.</p>
+    <div class="field"><span class="flabel">WALLET ADDRESS</span>
+      <input type="text" placeholder="paste wallet…" value="${esc(d.wallet)}" oninput="S.d15.wallet=this.value"
+        autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><span class="flabel">LABEL (OPTIONAL)</span>
+      <input type="text" placeholder="e.g. Rasmr FOMO" value="${esc(d.label)}" oninput="S.d15.label=this.value"
+        autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="field"><span class="flabel">MIRROR MODE</span>
+      <select onchange="S.d15.mode=this.value;render()">
+        <option value="fixed_usd"${d.mode==="fixed_usd"?" selected":""}>Fixed USD per buy</option>
+        <option value="percent_of_their_size"${d.mode==="percent_of_their_size"?" selected":""}>% of their size</option>
+        <option value="mirror_ratio"${d.mode==="mirror_ratio"?" selected":""}>Ratio × their size</option>
+      </select></div>
+    <div class="row">
+      <div class="field" style="flex:1"><span class="flabel">${sizeLabel}</span>
+        <input type="number" inputmode="decimal" min="0" value="${esc(d.size)}" oninput="S.d15.size=this.value"></div>
+      <div class="field" style="flex:1"><span class="flabel">MAX USD / TRADE</span>
+        <input type="number" inputmode="decimal" min="1" max="1000" value="${esc(d.maxUsd)}" oninput="S.d15.maxUsd=this.value"></div>
+    </div>
+    <button class="btn btn-neon" onclick="cpyReview()">Review follow →</button>
+  </div>`;
+  goBack=()=>{S.screen="search";render();};
+}
+function scrCpyPreview(el){
+  const d=S.d15;
+  const fake={mode:d.mode,sizeValue:parseFloat(d.size)};
+  el.innerHTML=header(false)+tabBar("cpy")+`
+  <div class="confirm-box">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--amber);font-weight:800;margin-bottom:8px">⚠ FOLLOW THIS WALLET</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:var(--neon)">${esc(cpyModeText(fake))}</div>
+      <div class="lbl">${esc(d.label||"wallet")} · ${shortMint(d.wallet.trim())}</div>
+    </div>
+    <div class="divider"></div>
+    <div class="qrow"><span class="k">Max per trade</span><span class="v">$${fmt(parseFloat(d.maxUsd))}</span></div>
+    <div class="qrow"><span class="k">Sells</span><span class="v">mirror as fraction of your balance</span></div>
+  </div>
+  <div class="warn">⛓ <span>Mirroring moves <b>real funds</b> from your desk wallet. The backend signs every mirror trade automatically once you confirm.</span></div>
+  ${dErrHtml()}
+  <div class="row">
+    <button class="btn btn-ghost" onclick="S.screen='cpy';render()">Cancel</button>
+    <button class="btn btn-neon" id="cpyBtn" onclick="cpyFollow()">${d.creating?"Following…":"✓ Start mirroring"}</button>
+  </div>`;
+  goBack=()=>{S.screen="cpy";render();};
+  const b=document.getElementById("cpyBtn"); if(b&&d.creating) b.disabled=true;
+}
+
+/* ============================================================
+   #16 SNIPING — orbitx_app_snipe / _snipe_stop / _snipe_status
+   ============================================================ */
+const SNP_DEFAULTS={minLiquidityUsd:5000,maxDevHoldingPct:20,launchpads:"pumpfun",maxBuyUsd:5,cooldownMin:30,dailyCapUsd:50,name:""};
+async function loadSnipe(){
+  if(!S.authCode){ render(); return; }
+  S.d16.loading=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_snipe_status",{authCode:S.authCode});
+    S.d16.st=(r&&(r.ok===false||r.error))?null:r;
+    if(r&&(r.ok===false||r.error)&&!/(no_sniper)/i.test(String(r.error||"")+String(r.message||""))) S.dErr=r.message||"Status unavailable.";
+    const st=S.d16.st;
+    if(!S.d16.cfg){
+      S.d16.cfg=st?{minLiquidityUsd:st.filters?.minLiquidityUsd??5000,maxDevHoldingPct:st.filters?.maxDevHoldingPct??20,
+        launchpads:(st.filters?.launchpads||["pumpfun"]).join(", "),maxBuyUsd:st.maxBuyUsd??5,
+        cooldownMin:st.cooldownMin??30,dailyCapUsd:st.dailyCapUsd??50,name:st.name||""}:{...SNP_DEFAULTS};
+    }
+  }catch(e){ dashAuthErr(e); }
+  S.d16.loading=false; render();
+}
+function snpCfgVals(){
+  const c=S.d16.cfg||{...SNP_DEFAULTS};
+  const num=(v,d)=>{const n=parseFloat(v);return isFinite(n)?n:d;};
+  return {
+    minLiquidityUsd:Math.max(0,num(c.minLiquidityUsd,5000)),
+    maxDevHoldingPct:Math.min(100,Math.max(0,num(c.maxDevHoldingPct,20))),
+    launchpads:String(c.launchpads||"pumpfun").split(",").map(s=>s.trim().toLowerCase()).filter(Boolean),
+    maxBuyUsd:Math.min(100,Math.max(0.5,num(c.maxBuyUsd,5))),
+    cooldownMin:Math.max(1,Math.round(num(c.cooldownMin,30))),
+    dailyCapUsd:Math.max(5,num(c.dailyCapUsd,50)),
+    name:String(c.name||"").slice(0,60)||undefined
+  };
+}
+function scrSnp(el){
+  if(!S.authCode){ scrAuthGate(el,"snp",loadSnipe); return; }
+  const st=S.d16.st;
+  const active=st&&String(st.status||"").toLowerCase()==="active";
+  const cap=st?Number(st.dailyCapUsd||0):0, spent=st?Number(st.spentToday||0):0;
+  const pctBar=cap>0?Math.min(100,spent/cap*100):0;
+  const fills=st&&Array.isArray(st.recentFills)?st.recentFills:[];
+  el.innerHTML=header(false)+tabBar("snp")+`
+  <div class="card ${active?"neon":""}">
+    <div class="row" style="align-items:center;margin-bottom:6px">
+      <div style="flex:1"><h2 style="margin:0">Launch sniper</h2>
+      <p class="sub" style="margin:2px 0 0">${active?"Armed — auto-buying new launches that pass all filters":"No active sniper"}</p></div>
+      ${S.d16.loading?"":stChip(st?st.status:"none")}
+      <button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" onclick="loadSnipe()">↻</button>
+    </div>
+    ${S.d16.loading?skelList(2):`
+    ${st?`
+    <div class="kv">
+      <div class="cell"><div class="k">SPENT TODAY</div><div class="v">$${fmt(spent)} <span class="tiny mut">/ $${fmt(cap)}</span></div></div>
+      <div class="cell"><div class="k">MAX / BUY</div><div class="v">$${fmt(st.maxBuyUsd)}</div></div>
+      <div class="cell"><div class="k">MIN LIQUIDITY</div><div class="v">$${fmt(st.filters?.minLiquidityUsd)}</div></div>
+      <div class="cell"><div class="k">MAX DEV HOLD</div><div class="v">${fmt(st.filters?.maxDevHoldingPct)}%</div></div>
+      <div class="cell"><div class="k">LAUNCHPADS</div><div class="v" style="font-size:13px">${esc((st.filters?.launchpads||[]).join(", ")||"—")}</div></div>
+      <div class="cell"><div class="k">COOLDOWN</div><div class="v">${fmt(st.cooldownMin)} min</div></div>
+    </div>
+    <div class="pbar"><i style="width:${pctBar}%"></i></div>
+    <div class="qrow"><span class="k">Last buy</span><span class="v">${ago(st.lastBuyAt)}</span></div>
+    <div class="qrow"><span class="k">Last check</span><span class="v">${ago(st.lastCheckAt)}</span></div>
+    ${st.lastError?`<div class="err" style="margin-top:8px">Last error: ${esc(st.lastError)}</div>`:""}
+    <p class="tiny mut" style="letter-spacing:.18em;margin:12px 0 6px">RECENT FILLS (${st.fillsCount??fills.length})</p>
+    ${fills.length?fills.map(f=>`
+      <div class="ocard"><div class="top"><div class="ttl">${esc(f.symbol||"???")}</div>
+        <span class="tiny" style="color:var(--neon);font-weight:800">$${fmt(f.usd)}</span></div>
+        <div class="tiny mut">${shortMint(f.mint)} · dev ${f.devHoldingPct!=null?f.devHoldingPct+"%":"?"} · ${ago(f.at)}</div>
+        ${f.signature?`<div style="margin-top:6px"><a class="link tiny" href="https://solscan.io/tx/${esc(f.signature)}" target="_blank" rel="noopener">Solscan ↗</a></div>`:""}
+      </div>`).join(""):`<p class="sub">No fills yet.</p>`}
+    `:`<p class="sub center" style="padding:12px 0">Arm the sniper to auto-buy qualifying launches.</p>`}
+    ${dErrHtml()}
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-ghost" onclick="S.screen='snpCfg';S.dErr='';render()">⚙ Configure</button>
+      ${active?`<button class="btn btn-danger" onclick="S.screen='snpKill';S.dErr='';render()">🛑 KILL</button>`:""}
+    </div>`}
+  </div>`;
+  goBack=()=>{S.screen="search";render();};
+}
+function scrSnpCfg(el){
+  const c=S.d16.cfg||{...SNP_DEFAULTS};
+  const inp=(id,k,label,hint)=>`<div class="field"><span class="flabel">${label}</span>
+    <input type="${id==="launchpads"||id==="name"?"text":"number"}" inputmode="${id==="launchpads"||id==="name"?"text":"decimal"}"
+      value="${esc(c[k])}" oninput="S.d16.cfg['${k}']=this.value" placeholder="${hint||""}"
+      autocomplete="off" autocapitalize="off" spellcheck="false"></div>`;
+  el.innerHTML=header(false)+tabBar("snp")+`
+  <div class="card neon">
+    <h2>Sniper config</h2>
+    <p class="sub">Auto-buys newly launched tokens that pass <b>all</b> filters. Never buys the same mint twice. Re-arming replaces the current config.</p>
+    ${inp("minLiquidityUsd","minLiquidityUsd","MIN LIQUIDITY USD","5000")}
+    ${inp("maxDevHoldingPct","maxDevHoldingPct","MAX DEV HOLDING % (0–100)","20")}
+    ${inp("launchpads","launchpads","LAUNCHPADS (COMMA-SEPARATED)","pumpfun")}
+    ${inp("maxBuyUsd","maxBuyUsd","MAX USD PER BUY (0.5–100)","5")}
+    ${inp("cooldownMin","cooldownMin","COOLDOWN BETWEEN BUYS (MIN)","30")}
+    ${inp("dailyCapUsd","dailyCapUsd","DAILY SPEND CAP USD (MIN 5)","50")}
+    ${inp("name","name","NAME (OPTIONAL)","my sniper")}
+    ${dErrHtml()}
+    <div class="row">
+      <button class="btn btn-ghost" onclick="S.screen='snp';render()">Cancel</button>
+      <button class="btn btn-neon" onclick="S.screen='snpPreview';S.dErr='';render()">Review →</button>
+    </div>
+  </div>`;
+  goBack=()=>{S.screen="snp";render();};
+}
+function scrSnpPreview(el){
+  const v=snpCfgVals();
+  el.innerHTML=header(false)+tabBar("snp")+`
+  <div class="confirm-box">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--amber);font-weight:800;margin-bottom:8px">⚠ ARM THE SNIPER</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:var(--neon)">AUTO-BUY LIVE</div>
+      <div class="lbl">${esc(v.name||"sniper")} · up to $${fmt(v.dailyCapUsd)}/day</div>
+    </div>
+    <div class="divider"></div>
+    <div class="qrow"><span class="k">Max / buy</span><span class="v">$${fmt(v.maxBuyUsd)}</span></div>
+    <div class="qrow"><span class="k">Min liquidity</span><span class="v">$${fmt(v.minLiquidityUsd)}</span></div>
+    <div class="qrow"><span class="k">Max dev holding</span><span class="v">${fmt(v.maxDevHoldingPct)}%</span></div>
+    <div class="qrow"><span class="k">Launchpads</span><span class="v">${esc(v.launchpads.join(", "))}</span></div>
+    <div class="qrow"><span class="k">Cooldown</span><span class="v">${v.cooldownMin} min</span></div>
+    <div class="qrow"><span class="k">Daily cap</span><span class="v">$${fmt(v.dailyCapUsd)}</span></div>
+  </div>
+  <div class="warn">⛓ <span>This arms <b>real automatic buys</b> from your desk wallet. The backend signs every fill that passes the filters — no further click from you.</span></div>
+  ${dErrHtml()}
+  <div class="row">
+    <button class="btn btn-ghost" onclick="S.screen='snpCfg';render()">Back</button>
+    <button class="btn btn-neon" id="snpArmBtn" onclick="snpArm()">${S.d16.arming?"Arming…":"✓ Arm sniper"}</button>
+  </div>`;
+  goBack=()=>{S.screen="snpCfg";render();};
+  const b=document.getElementById("snpArmBtn"); if(b&&S.d16.arming) b.disabled=true;
+}
+async function snpArm(){
+  S.d16.arming=true; S.dErr=""; render();
+  try{
+    const v=snpCfgVals();
+    const r=await Bridge.callTool("orbitx_app_snipe",{...v,authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.message||r.error);
+    S.d16.cfg=null; S.screen="snp"; await loadSnipe();
+  }catch(e){ dashAuthErr(e); S.screen="snpPreview"; }
+  S.d16.arming=false; render();
+}
+function scrSnpKill(el){
+  el.innerHTML=header(false)+tabBar("snp")+`
+  <div class="confirm-box" style="border-color:rgba(255,84,112,.5);background:rgba(255,84,112,.06)">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--red);font-weight:800;margin-bottom:8px">⛔ EMERGENCY KILL SWITCH</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:var(--red)">STOP ALL SNIPING</div>
+      <div class="lbl">no more auto-buys, effective immediately</div>
+    </div>
+  </div>
+  <div class="warn">⛓ <span>This <b>stops the active launch sniper now</b>. Open positions are untouched — only future auto-buys are halted. You can re-arm anytime.</span></div>
+  ${dErrHtml()}
+  <div class="row">
+    <button class="btn btn-ghost" onclick="S.screen='snp';render()">Keep sniper</button>
+    <button class="btn btn-danger" id="killBtn" onclick="snpKillGo()">${S.d16.killBusy?"Stopping…":"⛔ STOP ALL"}</button>
+  </div>`;
+  goBack=()=>{S.screen="snp";render();};
+  const b=document.getElementById("killBtn"); if(b&&S.d16.killBusy) b.disabled=true;
+}
+async function snpKillGo(){
+  S.d16.killBusy=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_app_snipe_stop",{authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.message||r.error);
+    S.screen="snp"; await loadSnipe();
+  }catch(e){ dashAuthErr(e); S.screen="snpKill"; }
+  S.d16.killBusy=false; render();
+}
+
+/* ============================================================
+   #23 PAPER TRADING — orbitx_agentplus_paper_buy/_sell/_portfolio
+   Simulated. One persistent paper agent per user; reset = archive +
+   spawn a fresh agent (fresh $10,000 paper USDC).
+   ============================================================ */
+function paperAgent(){
+  if(S.d23.agent) return S.d23.agent;
+  try{ S.d23.agent=localStorage.getItem("orbitx.paperAgent")||"paper-trader"; }catch(_){ S.d23.agent="paper-trader"; }
+  return S.d23.agent;
+}
+function paperSaveAgent(n){ S.d23.agent=n; try{ localStorage.setItem("orbitx.paperAgent",n); }catch(_){} }
+async function ensurePaperAgent(){
+  const want=paperAgent().toLowerCase();
+  let list=[];
+  try{
+    const r=await Bridge.callTool("orbitx_agentplus_list",{authCode:S.authCode});
+    list=Array.isArray(r)?r:(r&&(r.agents||r.data)||[]);
+  }catch(e){ /* fall through to spawn attempt */ }
+  const found=list.find(a=>String(a.name||"").toLowerCase()===want&&String(a.status||"active")==="active");
+  if(found){ paperSaveAgent(String(found.name).toLowerCase()); return found.name; }
+  const sp=await Bridge.callTool("orbitx_agentplus_spawn",{name:want,role:"Paper trading agent",
+    persona:"Simulated paper trading. No real money.",capabilities:["paper-trading"],authCode:S.authCode});
+  if(sp&&(sp.ok===false||sp.error)) throw new Error(sp.message||sp.error||"Could not create paper agent.");
+  const nm=(sp.agent&&sp.agent.name)||want; paperSaveAgent(nm); return nm;
+}
+async function loadPaper(){
+  S.d23.loading=true; S.dErr=""; render();
+  try{
+    const name=await ensurePaperAgent();
+    const r=await Bridge.callTool("orbitx_agentplus_paper_portfolio",{name,authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.message||r.error);
+    S.d23.pf=r;
+  }catch(e){ dashAuthErr(e); }
+  S.d23.loading=false; render();
+}
+async function pprLookup(){
+  const m=S.d23.mint.trim(); if(!MINT_RE.test(m)){ S.dErr="Enter a valid Solana mint address."; render(); return; }
+  S.d23.pxBusy=true; S.dErr=""; render();
+  try{ S.d23.px=await lookupToken(m); if(!S.d23.px) S.dErr="Price lookup failed — you can still paper-trade; the backend prices it."; }
+  catch(e){ S.d23.px=null; S.dErr="Price lookup failed — you can still paper-trade; the backend prices it."; }
+  S.d23.pxBusy=false; render();
+}
+function pprReview(){
+  const m=S.d23.mint.trim();
+  if(!MINT_RE.test(m)){ S.dErr="Enter a valid Solana mint address."; render(); return; }
+  const u=parseFloat(S.d23.usd);
+  if(!(u>0)){ S.dErr="Amount must be > $0."; render(); return; }
+  const cash=S.d23.pf?Number(S.d23.pf.cash_usdc):1e9;
+  if(u>cash){ S.dErr=`Paper cash $${fmt(cash)} < $${fmt(u)} — lower the amount.`; render(); return; }
+  S.dErr=""; S.screen="pprPreview"; render();
+}
+async function pprBuy(){
+  S.d23.buying=true; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_agentplus_paper_buy",
+      {name:paperAgent(),mint:S.d23.mint.trim(),usdc_amount:parseFloat(S.d23.usd),authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.message||r.error);
+    S.d23.mint=""; S.d23.px=null; S.screen="ppr"; await loadPaper();
+  }catch(e){ dashAuthErr(e); S.screen="pprPreview"; }
+  S.d23.buying=false; render();
+}
+async function pprSell(i){
+  const pf=S.d23.pf; const pos=pf&&pf.positions&&pf.positions[i]; if(!pos) return;
+  const pct=parseFloat(S.d23.sellPct);
+  if(!(pct>0&&pct<=100)){ S.dErr="Sell percent must be 1–100."; render(); return; }
+  S.d23.sellIdx=-1; S.dErr=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_agentplus_paper_sell",
+      {name:paperAgent(),mint:pos.mint,percent:pct,authCode:S.authCode});
+    if(r&&(r.ok===false||r.error)) throw new Error(r.message||r.error);
+    await loadPaper();
+  }catch(e){ dashAuthErr(e); render(); }
+}
+async function pprResetGo(){
+  S.d23.resetBusy=true; S.dErr=""; render();
+  try{
+    const old=paperAgent();
+    const arch=await Bridge.callTool("orbitx_agentplus_archive",{name:old,authCode:S.authCode});
+    if(arch&&(arch.ok===false||arch.error)) throw new Error(arch.message||arch.error);
+    const fresh="paper-trader-"+Date.now().toString(36);
+    const sp=await Bridge.callTool("orbitx_agentplus_spawn",{name:fresh,role:"Paper trading agent",
+      persona:"Simulated paper trading. No real money.",capabilities:["paper-trading"],authCode:S.authCode});
+    if(sp&&(sp.ok===false||sp.error)) throw new Error(sp.message||sp.error);
+    paperSaveAgent((sp.agent&&sp.agent.name)||fresh);
+    S.screen="ppr"; await loadPaper();
+  }catch(e){ dashAuthErr(e); S.screen="pprReset"; }
+  S.d23.resetBusy=false; render();
+}
+function pprPosCard(p,i){
+  const up=p.unrealized_pnl_usdc; const upC=up==null?"":(Number(up)>=0?"pos":"neg");
+  return `<div class="ocard">
+    <div class="top"><div class="ttl">${esc(p.symbol||"???")}</div>
+      <span class="${upC}" style="font-weight:800">${up==null?"—":fmtSigned(up)}</span></div>
+    <div class="qrow"><span class="k">Holdings</span><span class="v">${fmt(p.tokens)} @ ${fmtUSD(p.avg_price)}</span></div>
+    <div class="qrow"><span class="k">Live price</span><span class="v">${fmtUSD(p.price_usd)}</span></div>
+    <div class="qrow"><span class="k">Value</span><span class="v">${fmtUSD(p.value_usdc)} · <span class="tiny mut">${shortMint(p.mint)}</span></span></div>
+    ${S.d23.sellIdx===i
+      ? `<div class="field" style="margin-top:10px"><span class="flabel">SELL % OF POSITION</span>
+         <div class="row"><input type="number" inputmode="decimal" min="1" max="100" value="${esc(S.d23.sellPct)}"
+           style="flex:1" oninput="S.d23.sellPct=this.value">
+         <button class="btn btn-neon" style="width:auto;padding:14px 18px" onclick="pprSell(${i})">Sell</button>
+         <button class="btn btn-ghost" style="width:auto;padding:14px 18px" onclick="S.d23.sellIdx=-1;render()">✕</button></div></div>`
+      : `<div style="margin-top:10px"><button class="btn btn-ghost" style="padding:10px;font-size:13px"
+           onclick="S.d23.sellIdx=${i};S.d23.sellPct='100';render()">Sell position</button></div>`}
+  </div>`;
+}
+function scrPpr(el){
+  const d=S.d23, pf=d.pf;
+  const up=pf?Number(pf.unrealized_pnl_usdc||0):0, rp=pf?Number(pf.realized_pnl_usdc||0):0;
+  const eq=pf?Number(pf.equity_usdc||0):0, cash=pf?Number(pf.cash_usdc||0):0;
+  const pnl0=eq-10000;
+  el.innerHTML=header(false)+tabBar("ppr")+`
+  <div class="card neon">
+    <div class="row" style="align-items:center;margin-bottom:6px">
+      <div style="flex:1"><h2 style="margin:0">Paper portfolio</h2>
+      <p class="sub" style="margin:2px 0 0"><span class="chip">SIMULATED</span> <span class="tiny">no real money · agent <b>${esc(paperAgent())}</b></span></p></div>
+      <button class="btn btn-ghost" style="width:auto;padding:10px 14px;font-size:13px" onclick="loadPaper()">↻</button>
+    </div>
+    ${d.loading?`<div class="skel" style="height:90px;margin-bottom:10px"></div>`+skelList(2):`
+    <div class="big-out" style="padding:6px 0">
+      <div class="amt">${fmtUSD(eq)}</div>
+      <div class="lbl">EQUITY · <span class="${pnl0>=0?"pos":"neg"}">${fmtSigned(pnl0)} total</span></div>
+    </div>
+    <div class="kv">
+      <div class="cell"><div class="k">PAPER CASH</div><div class="v">${fmtUSD(cash)}</div></div>
+      <div class="cell"><div class="k">UNREALIZED</div><div class="v ${up>=0?"pos":"neg"}">${fmtSigned(up)}</div></div>
+      <div class="cell"><div class="k">REALIZED</div><div class="v ${rp>=0?"pos":"neg"}">${fmtSigned(rp)}</div></div>
+      <div class="cell"><div class="k">TRADES</div><div class="v">${pf?pf.trade_count||0:0}</div></div>
+    </div>
+    <p class="tiny mut" style="letter-spacing:.18em;margin:10px 0 6px">POSITIONS (${pf&&pf.positions?pf.positions.length:0})</p>
+    ${(pf&&pf.positions&&pf.positions.length)?pf.positions.map(pprPosCard).join(""):`<p class="sub">No paper positions — make your first simulated buy below.</p>`}`}
+    ${dErrHtml()}
+  </div>
+  <div class="card">
+    <h2>Paper buy</h2>
+    <p class="sub">Simulated buy at the live market price. Zero real money.</p>
+    <div class="field"><span class="flabel">TOKEN MINT</span>
+      <div class="row"><input type="text" placeholder="paste mint…" value="${esc(d.mint)}" style="flex:1"
+        oninput="S.d23.mint=this.value" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn btn-ghost" style="width:auto;padding:14px 16px" onclick="pprLookup()">${d.pxBusy?"…":"🔍"}</button></div></div>
+    ${d.px?`<div class="qrow"><span class="k">${esc(d.px.symbol)} · ${esc(d.px.name||"")}</span><span class="v">${fmtUSD(d.px.price)}</span></div>`:""}
+    <div class="field"><span class="flabel">PAPER USDC AMOUNT</span>
+      <input type="number" inputmode="decimal" min="0" value="${esc(d.usd)}" oninput="S.d23.usd=this.value"></div>
+    <button class="btn btn-neon" onclick="pprReview()">Review paper buy →</button>
+  </div>
+  <div class="card">
+    <h2>Reset portfolio</h2>
+    <p class="sub">Archives this paper agent and spawns a fresh one with <b>$10,000</b> paper USDC. History is kept on the archived agent.</p>
+    <button class="btn btn-danger" onclick="S.screen='pprReset';S.dErr='';render()">Reset to $10,000</button>
+  </div>`;
+  goBack=()=>{S.screen="search";render();};
+}
+function scrPprPreview(el){
+  const d=S.d23, sym=d.px?d.px.symbol:"token";
+  const u=parseFloat(d.usd);
+  const estToks=d.px&&d.px.price?u/Number(d.px.price):null;
+  el.innerHTML=header(false)+tabBar("ppr")+`
+  <div class="confirm-box">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--amber);font-weight:800;margin-bottom:8px">📄 CONFIRM PAPER BUY</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:var(--neon)">$${fmt(u)} → ${esc(sym)}</div>
+      <div class="lbl">simulated · ${shortMint(d.mint.trim())}</div>
+    </div>
+    <div class="divider"></div>
+    ${estToks!=null?`<div class="qrow"><span class="k">Est. tokens</span><span class="v">≈ ${fmt(estToks)}</span></div>`:""}
+    <div class="qrow"><span class="k">Price</span><span class="v">${d.px?fmtUSD(d.px.price):"live at fill"}</span></div>
+    <div class="qrow"><span class="k">Real money</span><span class="v" style="color:var(--neon)">none — simulated</span></div>
+  </div>
+  ${dErrHtml()}
+  <div class="row">
+    <button class="btn btn-ghost" onclick="S.screen='ppr';render()">Cancel</button>
+    <button class="btn btn-neon" id="pprBtn" onclick="pprBuy()">${d.buying?"Buying…":"✓ Paper buy"}</button>
+  </div>`;
+  goBack=()=>{S.screen="ppr";render();};
+  const b=document.getElementById("pprBtn"); if(b&&d.buying) b.disabled=true;
+}
+function scrPprReset(el){
+  el.innerHTML=header(false)+tabBar("ppr")+`
+  <div class="confirm-box" style="border-color:rgba(255,84,112,.5);background:rgba(255,84,112,.06)">
+    <div class="center tiny" style="letter-spacing:.28em;color:var(--red);font-weight:800;margin-bottom:8px">📄 RESET PAPER PORTFOLIO</div>
+    <div class="big-out" style="padding-top:4px">
+      <div class="amt" style="color:var(--amber)">$10,000 FRESH</div>
+      <div class="lbl">archive “${esc(paperAgent())}” → spawn a new paper agent</div>
+    </div>
+  </div>
+  <div class="warn">⛓ <span>This <b>archives the current paper agent</b> (positions, cash and PnL history go with it) and spawns a brand-new agent starting at <b>$10,000 paper USDC</b>. It never touches real funds.</span></div>
+  ${dErrHtml()}
+  <div class="row">
+    <button class="btn btn-ghost" onclick="S.screen='ppr';render()">Keep portfolio</button>
+    <button class="btn btn-danger" id="rstBtn" onclick="pprResetGo()">${S.d23.resetBusy?"Resetting…":"Reset portfolio"}</button>
+  </div>`;
+  goBack=()=>{S.screen="ppr";render();};
+  const b=document.getElementById("rstBtn"); if(b&&S.d23.resetBusy) b.disabled=true;
+}
+
+/* ---- dashboard screen registry (merged into render()) ---- */
+const DASH_SCREENS={ord:scrOrd,ordPreview:scrOrdPreview,ordDone:scrOrdDone,
+  cpy:scrCpy,cpyPreview:scrCpyPreview,
+  snp:scrSnp,snpCfg:scrSnpCfg,snpPreview:scrSnpPreview,snpKill:scrSnpKill,
+  ppr:scrPpr,pprPreview:scrPprPreview,pprReset:scrPprReset};
+</script>
+
+<script>
+"use strict";
 /* ================= boot ================= */
 render();
 </script>
