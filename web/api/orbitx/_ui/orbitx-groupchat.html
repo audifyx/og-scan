@@ -303,11 +303,27 @@ function joinView(){
 }
 function msgHtml(m){
   const sys = !m.author_label || /system|orbitx/i.test(m.author_label||"");
+  const wallet = m.author_wallet || m.wallet || "";
+  const tipBtn = (!sys && wallet) ? `<button class="tipbtn" onclick="tipUser('${esc(wallet)}','${esc(m.author_label||"anon")}')" title="Tip ${esc(m.author_label||"anon")}">\uD83D\uDCB0 Tip</button>` : "";
   return `<div class="msg${sys?" sys":""}">
-    <div class="au">${esc(m.author_label||"anon")}</div>
+    <div class="au">${esc(m.author_label||"anon")} ${tipBtn}</div>
     <div class="bd">${esc(m.body||"")}</div>
     <div class="ts">${esc(timeHM(m.created_at))}</div>
   </div>`;
+}
+/* Tip a message sender — opens a small prompt, calls orbitx_tip */
+async function tipUser(wallet, label){
+  const amt = prompt(`Tip ${label} (ORBITX amount):`, "10");
+  if(!amt || !(Number(amt)>0)) return;
+  try{
+    const auth = getAuth();
+    const r = await Bridge.callTool("orbitx_tip", { recipient: wallet, amount: Number(amt), token: "ORBITX", ...(auth?{authCode:auth}:{}) });
+    if(r && r.ok){
+      alert(`\u2705 Tipped ${amt} ORBITX to ${label}\n${r.solscan||""}`);
+    }else{
+      alert(`Tip failed: ${(r&&(r.message||r.error))||"unknown error"}`);
+    }
+  }catch(e){ alert("Tip failed: "+String((e&&e.message)||e)); }
 }
 function chatView(){
   const c = S.chat||{};
