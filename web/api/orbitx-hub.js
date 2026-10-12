@@ -5860,35 +5860,22 @@ async function handleMcp(req, res, parts) {
   const route = parts.join("/");
   const { base, mcpUrl, authPage } = mcpUrls(req);
 
+  // OAuth discovery DISABLED (2026-10-12, owner order: back to authCode mode).
+  // The well-known endpoints made ChatGPT force OAuth with no "None" option.
+  // /oauth/authorize, /oauth/token, /oauth/register still work for clients
+  // that know the URLs directly (the /mcp page uses hardcoded URLs).
   if (
     (route === ".well-known/oauth-protected-resource" || route === "oauth-protected-resource") &&
     req.method === "GET"
   ) {
-    return json(res, {
-      resource: mcpUrl,
-      // Prefer MCP URL as AS so path-based discovery (Grok) does not collide with X MCP.
-      authorization_servers: [mcpUrl],
-      scopes_supported: ["orbitx"],
-      bearer_methods_supported: ["header"],
-    });
+    return json(res, { error: "oauth_discovery_disabled", note: "Use orbitx_auth_link for auth." }, 404);
   }
 
   if (
     (route === ".well-known/oauth-authorization-server" || route === "oauth-authorization-server") &&
     req.method === "GET"
   ) {
-    return json(res, {
-      issuer: mcpUrl,
-      authorization_endpoint: `${mcpUrl}/oauth/authorize`,
-      token_endpoint: `${mcpUrl}/oauth/token`,
-      registration_endpoint: `${mcpUrl}/oauth/register`,
-      response_types_supported: ["code"],
-      grant_types_supported: ["authorization_code"],
-      code_challenge_methods_supported: ["S256", "plain"],
-      token_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: ["orbitx"],
-      client_id_metadata_document_supported: true,
-    });
+    return json(res, { error: "oauth_discovery_disabled", note: "Use orbitx_auth_link for auth." }, 404);
   }
 
   // Dynamic Client Registration (RFC 7591) — ChatGPT may call this when adding the connector
