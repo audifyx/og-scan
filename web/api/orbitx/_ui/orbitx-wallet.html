@@ -129,6 +129,17 @@ button:active{transform:scale(.97)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .card,.tcard{animation:fadeUp .32s ease both}
 @media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
+/* ---------- Guardian tab ---------- */
+.gdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+.gdot.on{background:var(--neon);box-shadow:0 0 12px var(--neon)}
+.gdot.off{background:var(--red);box-shadow:0 0 12px rgba(255,77,94,.6)}
+.gform{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gform .full{grid-column:1/-1}
+.grule{background:#080d12;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}
+.gbar{height:8px;background:#05090d;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:4px}
+.gbar>i{display:block;height:100%;border-radius:6px;transition:width .4s ease}
+.gbar.tp>i{background:linear-gradient(90deg,#00c86e,#17ff4d)}
+.gbar.sl>i{background:linear-gradient(90deg,#c81e3a,#ff4d5e)}
 </style>
 </head>
 <body>
@@ -316,6 +327,7 @@ function render(){
     <button class="tab ${S.tab==="pnl"?"on":""}" onclick="setTab('pnl')">📊 PnL</button>
     <button class="tab ${S.tab==="shop"?"on":""}" onclick="setTab('shop')">🛒 Shop</button>
     <button class="tab ${S.tab==="send"?"on":""}" onclick="setTab('send')">📤 Send</button>
+    <button class="tab ${S.tab==="guardian"?"on":""}" onclick="setTab('guardian')">🛡️ Guardian</button>
   </div>
   ${S.error?`<div class="err">⚠️ ${esc(S.error)}<div style="margin-top:8px"><button class="btn sm ghost" onclick="loadAll(${!S.addr})">Retry</button></div></div>`:""}
   <div id="body">${S.loading?bodySkel():bodyHTML()}</div>
@@ -331,6 +343,7 @@ function bodySkel(){
 function bodyHTML(){
   if(S.tab==="shop") return shopTabHTML();
   if(S.tab==="send") return sendTabHTML();
+  if(S.tab==="guardian"){ guardianInit(); return guardianTabHTML(); }
   const w=S.wallet;
   if(!w) return `<div class="empty"><div class="big">👛</div>
     Paste any Solana wallet address and hit <b>Track</b> —<br>
@@ -488,7 +501,7 @@ const SHOP_HIST_KEY="orbitx_shop_history";
 const PKG_ICON={hour:"⏳",day:"📅",week:"🗓️",month:"🌙",credits:"⚡"};
 function shopHist(){ try{ return JSON.parse(localStorage.getItem(SHOP_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function pushShopHist(e){ const h=shopHist(); h.unshift(e); try{ localStorage.setItem(SHOP_HIST_KEY,JSON.stringify(h.slice(0,50))); }catch(x){} }
-function setTab(t){ S.tab=t; if(t==="shop") loadShop(); render(); }
+function setTab(t){ S.tab=t; if(t==="shop") loadShop(); if(t==="guardian") guardianInit(); render(); }
 function copyTxt(t){ try{ navigator.clipboard.writeText(t).then(()=>toast("Copied")); }catch(e){ toast("Copy failed"); } }
 function intStr(n){ const x=Number(n); return isNaN(x)?"—":x.toLocaleString("en-US"); }
 
@@ -896,6 +909,285 @@ function shopHistoryHTML(){
       <div class="mut">${e.costStr?esc(e.costStr)+" · ":""}${esc(timeAgo(e.ts))}</div></div>
       ${e.sig?`<a class="tx" target="_blank" href="https://solscan.io/tx/${esc(e.sig)}">Solscan ↗</a>`:'<span class="badge warn">PENDING</span>'}
     </div>`).join("");
+}
+
+/* ================= Guardian tab: Portfolio Guardian =================
+   Auto take-profit / stop-loss agent.
+   Tools: orbitx_agent_guardian (start/check/stop) for the server-side lane,
+          orbitx_crypto_scan as per-rule price fallback,
+          orbitx_app_sell for execution (same arg pattern as the Trade widget).
+   Honest constraints: the timer runs only while this widget is open; every
+   rule needs an entry price; sells are real on-chain transactions from the
+   linked wallet and cannot be reversed. */
+const G_RULES_KEY="orbitx.agentGuardian.rules";
+const G_LOG_KEY="orbitx.agentGuardian.log";
+function guardianInit(){
+  if(S.guardian) return S.guardian;
+  let rules=[], log=[];
+  try{ rules=JSON.parse(localStorage.getItem(G_RULES_KEY)||"[]"); }catch(e){}
+  try{ log=JSON.parse(localStorage.getItem(G_LOG_KEY)||"[]"); }catch(e){}
+  S.guardian={running:false, rules:rules, log:log, timer:null, pollMs:30000,
+    prices:{}, form:{mint:"",symbol:"",entry:"",tp:"100",sl:"20"},
+    confirmStart:false, busy:false, err:"", lastTick:0};
+  return S.guardian;
+}
+function gSaveRules(){ try{ localStorage.setItem(G_RULES_KEY,JSON.stringify(((S.guardian)||{}).rules||[])); }catch(e){} }
+function gSaveLog(){ try{ localStorage.setItem(G_LOG_KEY,JSON.stringify(((S.guardian||{}).log||[]).slice(0,100))); }catch(e){} }
+function pushGLog(e){ const G=guardianInit(); G.log.unshift(e); G.log=G.log.slice(0,100); gSaveLog(); }
+function gFindHolding(mint){
+  const hs=(S.wallet&&S.wallet.holdings)||[];
+  return hs.find(h=>String(h.mint||h.address||"").toLowerCase()===String(mint||"").toLowerCase())||null;
+}
+function gExtractSig(r){
+  if(!r) return "";
+  if(typeof r==="string"&&/^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(r)) return r;
+  const cands=[r.signature,r.txSignature,r.tx,r.txid,r.txId,r.hash,
+    r.result&&r.result.signature,r.data&&r.data.signature];
+  for(const c of cands) if(typeof c==="string"&&c.length>60) return c;
+  return "";
+}
+function gTargets(rule){
+  const tpT=rule.entryPrice*(1+rule.takeProfitPct/100);
+  const slT=rule.entryPrice*(1-rule.stopLossPct/100);
+  const p=((S.guardian||{}).prices||{})[rule.mint];
+  const price=p&&p.price;
+  let tpProg=0, slProg=0;
+  if(price>0&&rule.entryPrice>0){
+    tpProg=Math.min(1,Math.max(0,(price-rule.entryPrice)/(tpT-rule.entryPrice)));
+    slProg=Math.min(1,Math.max(0,(rule.entryPrice-price)/(rule.entryPrice-slT)));
+  }
+  return {tpT,slT,price,tpProg,slProg};
+}
+function gStats(){
+  const log=((S.guardian)||{}).log||[];
+  let profit=0, loss=0;
+  for(const e of log){ const p=Number(e.pnlUsd)||0; if(p>=0) profit+=p; else loss+=-p; }
+  return {actions:log.length, profit, loss};
+}
+
+/* ---------- Guardian render ---------- */
+function guardianTabHTML(){
+  const G=guardianInit();
+  const running=G.running, st=gStats();
+  let h=`<div class="card glow">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <div><span class="gdot ${running?"on":"off"}"></span><b style="font-size:16px">${running?"🟢 Protecting":"🔴 Idle"}</b></div>
+      <span class="mut" style="font-size:11px">${running?("checks every "+Math.round(G.pollMs/1000)+"s"+(G.lastTick?" · last "+esc(timeAgo(G.lastTick)):"")):""}</span>
+    </div>`;
+  if(G.confirmStart) h+=gConfirmHTML();
+  else h+=`<button class="btn ${running?"danger":""}" style="font-size:16px;padding:15px" ${G.busy?"disabled":""}
+      onclick="${running?"gStop()":"gStartAsk()"}">${G.busy?"Working…":(running?"■ STOP Guardian":"🛡️ START Guardian")}</button>`;
+  if(!getAuth()) h+=`<div class="warnbar" style="margin-top:10px">🔒 No authCode — connect via the OrbitX Auth widget. Auto-sell needs your linked session.</div>`;
+  if(G.err) h+=`<div class="err" style="margin-top:10px">⚠️ ${esc(G.err)}</div>`;
+  h+=`</div>`;
+
+  h+=`<div class="sect">🛡️ Rules <span class="tag">${G.rules.length} armed</span></div>`;
+  h+=gAddFormHTML();
+  h+=G.rules.length?G.rules.map((r,i)=>gRuleRowHTML(r,i)).join("")
+    :`<div class="card"><div class="mut">No rules yet. Add one above — mint + your entry price, TP% and SL%.</div></div>`;
+
+  h+=`<div class="sect">📊 Guardian Stats</div>
+  <div class="card"><div class="statgrid">
+    <div class="stat"><div class="v up">${fmtUSD(st.profit)}</div><div class="l">Profit saved</div></div>
+    <div class="stat"><div class="v ${st.loss>0?"down":""}">${fmtUSD(st.loss)}</div><div class="l">Losses cut</div></div>
+    <div class="stat"><div class="v">${st.actions}</div><div class="l">Actions</div></div>
+  </div></div>`;
+
+  h+=`<div class="sect">📜 Action Log <span class="tag">this device</span></div>
+  <div class="card">${G.log.length?G.log.map(gLogRowHTML).join("")
+    :'<div class="mut">No actions yet. Triggered sells land here with their Solscan receipts.</div>'}</div>`;
+
+  h+=`<div class="card"><div class="mut" style="font-size:12px;line-height:1.65">⏱️ <b>Runs while this widget is open</b> — closing it stops the timer. Set your entry price per rule — without it, TP/SL can't be calculated. Prices come from the Guardian check lane (crypto-scan fallback). Sells execute at market, 1% slippage, full position, through the same lane as the Trade widget.</div></div>`;
+  return h;
+}
+function gConfirmHTML(){
+  const G=S.guardian;
+  return `<div class="confirmcard"><h3>⚠️ Arm the Guardian?</h3>
+    <div class="balrow"><span class="k">Rules armed</span><span class="v">${G.rules.length}</span></div>
+    <div class="balrow"><span class="k">Check cadence</span><span class="v">≈ every 30s</span></div>
+    <div class="mut" style="margin:10px 0">While running, the Guardian checks prices on a timer and <b>AUTO-SELLS your full position</b> the moment a take-profit or stop-loss triggers. These are <b>real on-chain transactions</b> from your linked wallet — they cannot be reversed.</div>
+    <div class="row" style="gap:8px">
+      <button class="btn ghost sm" style="flex:1" onclick="S.guardian.confirmStart=false;render()">Cancel</button>
+      <button class="btn sm" style="flex:2" ${G.busy?"disabled":""} onclick="gStart()">✓ Arm Guardian</button>
+    </div></div>`;
+}
+function gAddFormHTML(){
+  const f=S.guardian.form;
+  return `<div class="card" id="gAddForm">
+    <div class="sect" style="margin:0 0 10px">➕ Add rule</div>
+    <div class="gform">
+      <input class="field mono full" placeholder="Token mint address…" value="${esc(f.mint)}"
+        oninput="S.guardian.form.mint=this.value" autocapitalize="off" spellcheck="false">
+      <input class="field" placeholder="Symbol (optional)" value="${esc(f.symbol)}"
+        oninput="S.guardian.form.symbol=this.value" autocapitalize="off" spellcheck="false">
+      <input class="field mono" type="text" inputmode="decimal" placeholder="Entry price USD *" value="${esc(f.entry)}"
+        oninput="S.guardian.form.entry=this.value" autocapitalize="off" spellcheck="false">
+      <input class="field mono" type="text" inputmode="decimal" placeholder="Take-profit % (100)" value="${esc(f.tp)}"
+        oninput="S.guardian.form.tp=this.value" autocapitalize="off" spellcheck="false">
+      <input class="field mono" type="text" inputmode="decimal" placeholder="Stop-loss % (20)" value="${esc(f.sl)}"
+        oninput="S.guardian.form.sl=this.value" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn ghost sm" style="flex:1" onclick="gPrefill()">📥 Prefill from wallet</button>
+      <button class="btn sm" style="flex:1" onclick="gAddRule()">➕ Add rule</button>
+    </div>
+    <div class="mut" style="margin-top:8px;font-size:11px">Entry price is required — TP/SL are measured from it. Defaults: TP 100%, SL 20%.</div>
+  </div>`;
+}
+function gRuleRowHTML(r,i){
+  const t=gTargets(r);
+  const priceOk=(t.price||0)>0;
+  return `<div class="grule">
+    <div class="row" style="justify-content:space-between;margin-bottom:6px">
+      <div style="min-width:0"><b>${esc(r.symbol||"")}</b>
+        <span class="mono mut" style="font-size:11px">${esc(shortA(r.mint))}</span></div>
+      <button class="btn ghost sm" onclick="gDelRule(${i})">✕</button>
+    </div>
+    <div class="balrow"><span class="k">Entry</span><span class="v">${fmtUSD(r.entryPrice)}</span></div>
+    <div class="balrow"><span class="k">Now</span><span class="v">${priceOk?fmtUSD(t.price):'<span class="mut">—</span>'}</span></div>
+    <div class="mut" style="font-size:11px;margin-top:6px">🎯 TP +${esc(String(r.takeProfitPct))}% → ${fmtUSD(t.tpT)}
+      <span class="up" style="float:right">${Math.round(t.tpProg*100)}%</span></div>
+    <div class="gbar tp"><i style="width:${Math.round(t.tpProg*100)}%"></i></div>
+    <div class="mut" style="font-size:11px;margin-top:6px">🛑 SL −${esc(String(r.stopLossPct))}% → ${fmtUSD(t.slT)}
+      <span class="down" style="float:right">${Math.round(t.slProg*100)}%</span></div>
+    <div class="gbar sl"><i style="width:${Math.round(t.slProg*100)}%"></i></div>
+  </div>`;
+}
+function gLogRowHTML(e){
+  const tp=e.kind==="tp";
+  return `<div class="histrow"><div style="flex:1;min-width:0">
+      <div style="font-weight:700">${tp?"🟢 TAKE-PROFIT":"🔴 STOP-LOSS"} · ${esc(e.symbol||shortA(e.mint))}</div>
+      <div class="mut">sold ${fmt(e.qtyTokens,4)} @ ${fmtUSD(e.price)} · PnL <span class="${pctCls(e.pnlUsd)}">${signedUSD(e.pnlUsd)}</span> · ${esc(timeAgo(e.ts))}</div>
+      <div class="mut" style="font-size:11px">${esc(e.reason||"")}</div></div>
+      ${e.txUrl?`<a class="tx" target="_blank" href="${esc(e.txUrl)}">Solscan ↗</a>`:'<span class="badge warn">NO SIG</span>'}
+    </div>`;
+}
+
+/* ---------- Guardian actions ---------- */
+function gAddRule(){
+  const G=guardianInit(), f=G.form;
+  const mint=(f.mint||"").trim();
+  if(!isAddr(mint)){ G.err="Enter a valid token mint address."; render(); return; }
+  const entry=Number(f.entry), tp=Number(f.tp), sl=Number(f.sl);
+  if(!(entry>0)){ G.err="Entry price is required — without it TP/SL can't be calculated."; render(); return; }
+  if(!(tp>0)){ G.err="Take-profit % must be greater than 0."; render(); return; }
+  if(!(sl>0&&sl<100)){ G.err="Stop-loss % must be between 0 and 100."; render(); return; }
+  if(G.rules.some(r=>String(r.mint).toLowerCase()===mint.toLowerCase())){ G.err="A rule for this mint already exists."; render(); return; }
+  let symbol=(f.symbol||"").trim();
+  if(!symbol){ const h=gFindHolding(mint); symbol=h?(h.symbol||""):""; }
+  G.rules.push({mint, symbol:symbol||shortA(mint), entryPrice:entry, takeProfitPct:tp, stopLossPct:sl});
+  gSaveRules();
+  G.form={mint:"",symbol:"",entry:"",tp:"100",sl:"20"};
+  G.err=""; toast("Rule added"); render();
+}
+function gDelRule(i){ const G=guardianInit(); G.rules.splice(i,1); gSaveRules(); toast("Rule removed"); render(); }
+function gPrefill(){
+  const G=guardianInit();
+  const mint=(G.form.mint||"").trim();
+  if(!isAddr(mint)){ toast("Paste a mint first"); return; }
+  const h=gFindHolding(mint);
+  if(!h){ toast("No holding in the loaded wallet — load it via the Wallet tab first"); return; }
+  const amt=Number(h.amount??h.balance??h.uiAmount??0), usd=Number(h.usd??h.valueUsd??0);
+  if(h.symbol) G.form.symbol=h.symbol;
+  if(amt>0&&usd>0) G.form.entry=String(usd/amt);
+  else toast("Holding has no usable price");
+  render();
+}
+function gStartAsk(){ const G=guardianInit(); G.err=""; G.confirmStart=true; render(); }
+async function gStart(){
+  const G=guardianInit(), ac=getAuth();
+  if(!ac){ G.err="🔒 Connect via the OrbitX Auth widget first — auto-sell needs your authCode."; G.confirmStart=false; render(); return; }
+  if(!G.rules.length){ G.err="Add at least one rule first."; G.confirmStart=false; render(); return; }
+  const bad=G.rules.find(r=>!(Number(r.entryPrice)>0));
+  if(bad){ G.err="Every rule needs an entry price — set it for "+(bad.symbol||shortA(bad.mint))+"."; G.confirmStart=false; render(); return; }
+  G.confirmStart=false; G.busy=true; G.err=""; render();
+  try{
+    const payload=G.rules.map(r=>({mint:r.mint,takeProfitPct:r.takeProfitPct,stopLossPct:r.stopLossPct}));
+    const r=await Bridge.callTool("orbitx_agent_guardian",{action:"start",rules:payload,authCode:ac});
+    const pm=Number(r&&(r.config||{}).pollMs);
+    G.pollMs=(pm>=5000&&pm<=180000)?pm:30000;
+    G.running=true;
+    if(G.timer) clearInterval(G.timer);
+    G.timer=setInterval(gTick, G.pollMs);
+    toast("🛡️ Guardian active");
+    gTick();
+  }catch(e){
+    G.err=authFail(e)?"Session expired — reconnect via the OrbitX auth widget, then retry.":String(e.message||e);
+  }
+  G.busy=false; render();
+}
+async function gStop(){
+  const G=guardianInit();
+  if(G.timer){ clearInterval(G.timer); G.timer=null; }
+  G.running=false;
+  try{ await Bridge.callTool("orbitx_agent_guardian",{action:"stop",authCode:getAuth()}); }catch(e){}
+  toast("Guardian stopped"); render();
+}
+async function gTick(){
+  const G=guardianInit();
+  if(!G.running) return;
+  G.lastTick=Date.now();
+  const payload=G.rules.map(r=>({mint:r.mint,takeProfitPct:r.takeProfitPct,stopLossPct:r.stopLossPct}));
+  let evals=[];
+  try{
+    const r=await Bridge.callTool("orbitx_agent_guardian",{action:"check",rules:payload,authCode:getAuth()});
+    evals=(r&&r.evaluations)||[];
+  }catch(e){
+    /* per-rule crypto-scan fallback below */
+  }
+  for(const rule of [...G.rules]){
+    let price=NaN, symbol=rule.symbol;
+    const ev=evals.find(x=>String(x.mint||"").toLowerCase()===String(rule.mint).toLowerCase());
+    if(ev){ price=Number(ev.priceUsd??ev.price); if(ev.symbol) symbol=ev.symbol; }
+    if(!(price>0)){
+      try{
+        const s=await Bridge.callTool("orbitx_crypto_scan",{mint:rule.mint,authCode:getAuth()});
+        price=Number(s.priceUsd??s.price??(s.data&&s.data.priceUsd)??(s.token&&s.token.priceUsd));
+      }catch(e){}
+    }
+    G.prices[rule.mint]={price:price>0?price:null, ts:Date.now(), symbol};
+    if(!(price>0)||!(rule.entryPrice>0)) continue;
+    const tpT=rule.entryPrice*(1+rule.takeProfitPct/100);
+    const slT=rule.entryPrice*(1-rule.stopLossPct/100);
+    try{
+      if(price>=tpT) await gSell(rule,price,"tp");
+      else if(price<=slT) await gSell(rule,price,"sl");
+    }catch(e){
+      G.err="Sell failed for "+(rule.symbol||shortA(rule.mint))+": "+String(e.message||e)+" — rule stays armed.";
+    }
+  }
+  /* don't clobber the add form while the user is typing */
+  const ae=document.activeElement;
+  if(!(ae&&ae.closest&&ae.closest("#gAddForm"))&&S.tab==="guardian") render();
+}
+async function gSell(rule,price,kind){
+  const G=guardianInit(), ac=getAuth();
+  /* fresh holding so we sell the real current position */
+  let hold=null;
+  try{
+    const w=await Bridge.callTool("orbitx_get_wallet",{authCode:ac});
+    const hs=w.holdings||[];
+    hold=hs.find(h=>String(h.mint||h.address||"").toLowerCase()===String(rule.mint).toLowerCase())||null;
+  }catch(e){}
+  const qtyTokens=hold?Number(hold.amount??hold.balance??hold.uiAmount??0):0;
+  const usdAmt=hold?Number(hold.usd??hold.valueUsd??0):0;
+  if(!(usdAmt>0)){
+    pushGLog({ts:Date.now(),mint:rule.mint,symbol:rule.symbol,kind,price,qtyTokens:0,usdIn:0,pnlUsd:0,
+      sig:"",txUrl:"",reason:"Trigger hit but no position found in wallet — nothing sold, rule stays armed."});
+    return;
+  }
+  const args={mint:rule.mint, side:"sell", amount:usdAmt, amountCurrency:"USD",
+    slippagePct:1, slippageBps:100, authCode:ac};
+  const r=await Bridge.callTool("orbitx_app_sell",args);
+  const sig=gExtractSig(r);
+  if(!sig) throw new Error("No transaction signature returned — treated as failed, rule stays armed.");
+  const pnlUsd=(price-rule.entryPrice)*qtyTokens;
+  pushGLog({ts:Date.now(),mint:rule.mint,symbol:rule.symbol,kind,price,qtyTokens,usdIn:usdAmt,pnlUsd,
+    sig,txUrl:"https://solscan.io/tx/"+sig,
+    reason:(kind==="tp"?("Take-profit +"+rule.takeProfitPct+"% hit at "+fmtUSD(price)):("Stop-loss −"+rule.stopLossPct+"% hit at "+fmtUSD(price)))});
+  G.rules=G.rules.filter(x=>String(x.mint).toLowerCase()!==String(rule.mint).toLowerCase());
+  gSaveRules();
+  toast((kind==="tp"?"🟢 Take-profit":"🔴 Stop-loss")+" sold "+(rule.symbol||shortA(rule.mint)));
 }
 
 /* ---------- Boot ---------- */
