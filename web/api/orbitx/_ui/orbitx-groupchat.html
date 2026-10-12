@@ -228,6 +228,10 @@ function saSave(){
 const S = { tab:"chat", phase:"boot", chat:null, chats:[], messages:[], msgIds:{},
   error:"", loading:true, sending:false, fetchedAt:0, pollTimer:null, lastPollOk:true };
 const POLL_MS = 5000;
+const CHATGPT_POLL_MS = 30000; // ChatGPT rate-limits widget callTool; poll slower there
+const MAX_POLL_FAILURES = 3;
+function isChatGPTBridge(){ return !!(window.openai && typeof window.openai.callTool === "function"); }
+function getPollMs(){ return isChatGPTBridge() ? CHATGPT_POLL_MS : POLL_MS; }
 const app = document.getElementById("app");
 const esc = s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const timeAgo = ts=>{ if(!ts) return "—"; const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);
@@ -430,7 +434,8 @@ async function leaveChat(){
 }
 function startPoll(){
   stopPoll();
-  S.pollTimer = setInterval(pollNow, POLL_MS);
+  S.pollTimer = setInterval(pollNow, getPollMs());
+  S.pollFailures = 0;
 }
 function stopPoll(){
   if (S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer = null; }
@@ -441,7 +446,7 @@ async function pollNow(){
     const r = await gcFocus();
     if (r.ok && r.focused){
       const added = ingestMessages(r.messages||[]);
-      S.fetchedAt = Date.now(); S.lastPollOk = true;
+      S.fetchedAt = Date.now(); S.lastPollOk = true; S.pollFailures = 0;
       const el = document.getElementById("updts");
       if (el) el.textContent = "🕐 Updated just now";
       if (added){ render(); scrollFeed(false); }
@@ -450,8 +455,14 @@ async function pollNow(){
     }
   }catch(e){
     S.lastPollOk = false;
+    S.pollFailures = (S.pollFailures||0) + 1;
     const el = document.getElementById("updts");
-    if (el) el.textContent = "⚠️ refresh failed — retrying…";
+    if (S.pollFailures >= MAX_POLL_FAILURES){
+      stopPoll();
+      if (el) el.textContent = "⏸️ Auto-refresh paused (connection blocked) — tap ↻ to retry";
+    } else if (el){
+      el.textContent = "⚠️ refresh failed — retrying…";
+    }
   }
 }
 document.addEventListener("visibilitychange", ()=>{
@@ -546,7 +557,7 @@ function socIngest(list){
   if(added) SOC.feed.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));
   return added;
 }
-function startSocPoll(){ stopSocPoll(); SOC.pollTimer=setInterval(socPollNow,SOC_POLL_MS); }
+function startSocPoll(){ stopSocPoll(); SOC.pollTimer=setInterval(socPollNow, isChatGPTBridge()?45000:8000); SOC.pollFailures=0; }
 function stopSocPoll(){ if(SOC.pollTimer){ clearInterval(SOC.pollTimer); SOC.pollTimer=null; } }
 async function socPollNow(){
   if(S.tab!=="social"||S.phase!=="s_main"||SOC.posting||SOC.creating) return;
@@ -721,7 +732,7 @@ async function vcRefresh(){
   VC.rooms=normArr(r,["rooms","data","items"]);
   VC.fetchedAt=Date.now();
 }
-function startVcPoll(){ stopVcPoll(); VC.pollTimer=setInterval(vcPollNow,VC_POLL_MS); }
+function startVcPoll(){ stopVcPoll(); VC.pollTimer=setInterval(vcPollNow, isChatGPTBridge()?60000:15000); VC.pollFailures=0; }
 function stopVcPoll(){ if(VC.pollTimer){ clearInterval(VC.pollTimer); VC.pollTimer=null; } }
 async function vcPollNow(){
   if(S.tab!=="vc"||S.phase!=="vc_main"||VC.starting||VC.joining) return;
