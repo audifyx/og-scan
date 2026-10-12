@@ -307,6 +307,7 @@ function render(){
     <button class="tab ${S.tab==="wallet"?"on":""}" onclick="setTab('wallet')">💼 Wallet</button>
     <button class="tab ${S.tab==="pnl"?"on":""}" onclick="setTab('pnl')">📊 PnL</button>
     <button class="tab ${S.tab==="shop"?"on":""}" onclick="setTab('shop')">🛒 Shop</button>
+    <button class="tab ${S.tab==="send"?"on":""}" onclick="setTab('send')">📤 Send</button>
   </div>
   ${S.error?`<div class="err">⚠️ ${esc(S.error)}<div style="margin-top:8px"><button class="btn sm ghost" onclick="loadAll(${!S.addr})">Retry</button></div></div>`:""}
   <div id="body">${S.loading?bodySkel():bodyHTML()}</div>
@@ -321,6 +322,7 @@ function bodySkel(){
 }
 function bodyHTML(){
   if(S.tab==="shop") return shopTabHTML();
+  if(S.tab==="send") return sendTabHTML();
   const w=S.wallet;
   if(!w) return `<div class="empty"><div class="big">👛</div>
     Paste any Solana wallet address and hit <b>Track</b> —<br>
@@ -528,6 +530,65 @@ function orbitxBalance(){
   return null;
 }
 function tierUsd(id){ const t=((S.shop.tiers||{}).tiers||[]).find(x=>x.id===id); return t?t.usd:null; }
+
+
+/* ---------- Send tab: SOL/ORBITX transfers ---------- */
+function sendTabHTML(){
+  const s=S.send||{};
+  return `<div class="card glow">
+    <div class="chead"><span class="dot"></span><h3>Send</h3></div>
+    <div class="mut" style="margin-bottom:10px">Transfer SOL or ORBITX from your in-app wallet. Backend signs — no popup.</div>
+    <label class="mut">Token</label>
+    <div class="tabbar" style="margin:6px 0 12px">
+      <button class="tab ${(s.token||"SOL")==="SOL"?"on":""}" onclick="setSendToken('SOL')">SOL</button>
+      <button class="tab ${s.token==="ORBITX"?"on":""}" onclick="setSendToken('ORBITX')">ORBITX</button>
+    </div>
+    <label class="mut">Destination wallet</label>
+    <input id="sendDest" class="inp" placeholder="Solana address…" value="${esc(s.dest||"")}" style="margin:6px 0 12px"/>
+    <label class="mut">Amount</label>
+    <input id="sendAmt" class="inp" type="number" step="any" min="0" placeholder="0.0" value="${esc(s.amt||"")}" style="margin:6px 0 12px"/>
+    ${s.error?`<div class="err">\u26a0\ufe0f ${esc(s.error)}</div>`:""}
+    ${s.done?`<div class="ok">\u2705 Sent ${esc(s.done.amount)} ${esc(s.done.token)}<br><a href="${esc(s.done.solscan)}" target="_blank" style="color:var(--neon)">View on Solscan \u2197</a></div>`:""}
+    <button class="btn" style="width:100%;margin-top:8px" onclick="doSend()" ${s.sending?"disabled":""}>${s.sending?"Sending…":"Send"}</button>
+    ${s.confirm?`<div class="card" style="margin-top:12px;border-color:var(--gold)">
+      <div class="mut">Confirm: send <b>${esc(s.confirm.amount)} ${esc(s.confirm.token)}</b> to<br><code>${esc(s.confirm.dest)}</code>?</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" style="flex:1" onclick="confirmSend()">Confirm</button>
+        <button class="btn ghost" style="flex:1" onclick="cancelSend()">Cancel</button>
+      </div></div>`:""}
+  </div>`;
+}
+function setSendToken(t){ S.send={...(S.send||{}),token:t,error:"",done:""}; render(); }
+function doSend(){
+  const dest=(document.getElementById("sendDest")||{}).value||"";
+  const amt=(document.getElementById("sendAmt")||{}).value||"";
+  const token=(S.send&&S.send.token)||"SOL";
+  if(!dest.trim()||!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(dest.trim())){ S.send={...(S.send||{}),error:"Enter a valid Solana address.",done:""}; render(); return; }
+  if(!(Number(amt)>0)){ S.send={...(S.send||{}),error:"Enter an amount greater than 0.",done:""}; render(); return; }
+  S.send={...(S.send||{}),dest:dest.trim(),amt,token,confirm:{dest:dest.trim(),amount:amt,token},error:"",done:""};
+  render();
+}
+function cancelSend(){ S.send={...(S.send||{}),confirm:null,error:""}; render(); }
+async function confirmSend(){
+  const c=(S.send||{}).confirm; if(!c) return;
+  S.send={...(S.send||{}),sending:true,confirm:null,error:"",done:""}; render();
+  try{
+    const auth=getAuth();
+    let r;
+    if(c.token==="SOL"){
+      r=await Bridge.callTool("orbitx_send_sol",{destination:c.dest,amount:Number(c.amount),...(auth?{authCode:auth}:{})});
+    }else{
+      r=await Bridge.callTool("orbitx_tip",{recipient:c.dest,amount:Number(c.amount),token:"ORBITX",...(auth?{authCode:auth}:{})});
+    }
+    if(r&&r.ok){
+      S.send={...(S.send||{}),sending:false,done:{amount:c.amount,token:c.token,solscan:r.solscan},dest:"",amt:""};
+    }else{
+      S.send={...(S.send||{}),sending:false,error:(r&&(r.message||r.error))||"Send failed."};
+    }
+  }catch(e){ S.send={...(S.send||{}),sending:false,error:String((e&&e.message)||e)}; }
+  render();
+}
+
 
 /* ---------- tab render ---------- */
 function shopTabHTML(){
