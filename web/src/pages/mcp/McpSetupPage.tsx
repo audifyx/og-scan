@@ -493,7 +493,8 @@ export default function McpSetupPage() {
                 Endpoint: <span className="font-mono text-og-cyan">{mcpUrl}</span>
               </p>
               <p className="text-zinc-400">
-                Auth: use <span className="font-mono text-zinc-200">orbitx_auth_link</span> in-chat for the auth code (or the authorize / token / register URLs above for direct OAuth). Auth method is <span className="font-mono text-zinc-200">none</span> (public
+                OAuth discovery: append <span className="font-mono text-zinc-200">/.well-known/oauth-authorization-server</span> to the MCP URL
+                (or use the authorize / token / register URLs above). Auth method is <span className="font-mono text-zinc-200">none</span> (public
                 PKCE client).
               </p>
             </div>
