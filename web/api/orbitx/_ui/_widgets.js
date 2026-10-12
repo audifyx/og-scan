@@ -179,6 +179,14 @@ export const UI_TOOL_WIDGET = {
   orbitx_dca_create: "ui://widget/orbitx-trade.html",
   orbitx_dca_list: "ui://widget/orbitx-trade.html",
   orbitx_dca_cancel: "ui://widget/orbitx-trade.html",
+  // social intel: whales, alerts, unlocks, airdrops, multi-wallet
+  orbitx_whale_watch: "ui://widget/orbitx-token.html",
+  orbitx_whale_alerts: "ui://widget/orbitx-token.html",
+  orbitx_alert_create: "ui://widget/orbitx-token.html",
+  orbitx_alert_list: "ui://widget/orbitx-token.html",
+  orbitx_unlocks: "ui://widget/orbitx-token.html",
+  orbitx_airdrops: "ui://widget/orbitx-wallet.html",
+  orbitx_portfolio_multi: "ui://widget/orbitx-wallet.html",
   // dashboard (home) + tools directory
   orbitx_menu: "ui://widget/orbitx-dashboard.html",
   orbitx_tools_help: "ui://widget/orbitx-tools.html",

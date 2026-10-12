@@ -67,6 +67,11 @@ import {
   dispatchAppWalletTool,
   isAppWalletTool,
 } from "./orbitx/_handlers/_mcp-app-wallet.js";
+import {
+  SOCIAL_INTEL_TOOLS,
+  dispatchSocialIntelTool,
+  isSocialIntelTool,
+} from "./orbitx/_handlers/_mcp-social-intel.js";
 // Strategy feature families: copy-trading, trailing stops + take-profit
 // ladders, launch sniper, alert-triggered trades, PnL. Registered here (not
 // in _mcp-app-wallet.js) to avoid an ESM import cycle — they import helpers
@@ -1754,6 +1759,13 @@ const PUBLIC_TOOL_EXACT = new Set([
   "orbitx_telegram_cmds",
   "orbitx_shop",
   "orbitx_mcp_access_status",
+  "orbitx_whale_watch",
+  "orbitx_whale_alerts",
+  "orbitx_alert_create",
+  "orbitx_alert_list",
+  "orbitx_unlocks",
+  "orbitx_airdrops",
+  "orbitx_portfolio_multi",
 ]);
 
 const PUBLIC_TOOL_PREFIXES = [
@@ -1862,6 +1874,17 @@ const TOOL_ALIASES = {
   send_sol: "orbitx_send_sol",
   send: "orbitx_send_sol",
   tip: "orbitx_tip",
+  whale_watch: "orbitx_whale_watch",
+  watch_whale: "orbitx_whale_watch",
+  whale: "orbitx_whale_watch",
+  price_alert: "orbitx_alert_create",
+  alert: "orbitx_alert_create",
+  unlocks: "orbitx_unlocks",
+  vesting: "orbitx_unlocks",
+  airdrops: "orbitx_airdrops",
+  airdrop: "orbitx_airdrops",
+  portfolio_multi: "orbitx_portfolio_multi",
+  multi_wallet: "orbitx_portfolio_multi",
   grok_buy: "orbitx_app_buy",
   grok_sell: "orbitx_app_sell",
   launch: "orbitx_app_launch",
@@ -3803,6 +3826,7 @@ const CORE_TOOLS = [
   ...HUNTER_CORE_TOOLS,
   ...LIVE_CORE_TOOLS,
   ...APP_WALLET_CORE_TOOLS,
+  ...SOCIAL_INTEL_TOOLS,
   // Strategy families (see import note above).
   ...COPY_TOOLS,
   ...TRAILING_TOOLS,
@@ -3987,6 +4011,10 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
   }
   if (isAppWalletTool(name)) {
     const out = await dispatchAppWalletTool(name, args, auth);
+    if (out) return out;
+  }
+  if (isSocialIntelTool(name)) {
+    const out = await dispatchSocialIntelTool(name, args, { auth, base });
     if (out) return out;
   }
   if (name === "orbitx_auth_link") {
