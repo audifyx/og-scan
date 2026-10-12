@@ -8,6 +8,8 @@ import {
   exportUserWalletSecret,
   revokeUserWallet,
   signUserSwap,
+  signAndSendUserTx,
+  loadDeskKeypair,
   coerceSlippageBps,
   SLIPPAGE_BPS_DEFAULT,
   getDeskSolLamports,
@@ -803,6 +805,11 @@ export async function dispatchAppWalletTool(name, args, auth) {
   if (name === "orbitx_app_launch") return appLaunch(auth, args || {});
   if (name === "orbitx_app_claim" || name === "orbitx_app_claim_fees") return appClaimFees(auth, args || {});
   if (name === "orbitx_app_burn") return appBurn(auth, args || {});
+  if (name === "orbitx_send_sol") return appSendSol(auth, args || {});
+  if (name === "orbitx_tip") return appTip(auth, args || {});
+  if (name === "orbitx_dca_create") return appDcaCreate(auth, args || {});
+  if (name === "orbitx_dca_list") return appDcaList(auth, args || {});
+  if (name === "orbitx_dca_cancel") return appDcaCancel(auth, args || {});
   // Strategy families: copy-trading, trailing stops + ladders, sniper,
   // alerts, PnL. Dynamic import so a broken strategy module can never
   // take down the core trading dispatcher.
@@ -829,9 +836,203 @@ export async function dispatchAppWalletTool(name, args, auth) {
   return null;
 }
 
+/* ==================== SOL Transfers, Tipping & DCA ==================== */
+
+const ORBITX_MINT_ADDR = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+function validPubkey(s) {
+  return PUBKEY_RE.test(String(s || "").trim());
+}
+
+async function buildAndSendTransfer(row, { toPubkey, lamports, mint }) {
+  const { PublicKey, SystemProgram, Transaction, Connection } = await import("@solana/web3.js");
+  const from = new PublicKey(row.public_key);
+  const to = new PublicKey(toPubkey);
+  // RPC URL: reuse the same helper the trading wallet uses
+  const { rpcUrl } = await import("./_user-trading-wallet.js").catch(() => ({}));
+  const rpc = typeof rpcUrl === "function" ? rpcUrl() : (process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com");
+  const conn = new Connection(rpc, "confirmed");
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: from, recentBlockhash: blockhash });
+  if (!mint || mint === "SOL" || mint === SOL_MINT) {
+    tx.add(SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports }));
+  } else {
+    // SPL token transfer
+    const spl = await import("@solana/spl-token");
+    const mintPk = new PublicKey(mint);
+    const fromAta = await spl.getAssociatedTokenAddress(mintPk, from);
+    const toAta = await spl.getAssociatedTokenAddress(mintPk, to);
+    // Create recipient ATA if it doesn't exist
+    const toInfo = await conn.getAccountInfo(toAta);
+    if (!toInfo) {
+      tx.add(spl.createAssociatedTokenAccountInstruction(from, toAta, to, mintPk));
+    }
+    tx.add(spl.createTransferInstruction(fromAta, toAta, from, lamports));
+  }
+  const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  const txBase64 = Buffer.from(serialized).toString("base64");
+  return signAndSendUserTx(row, txBase64);
+}
+
+export async function appSendSol(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await walletRow(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet", message: "Create a wallet first via orbitx_app_wallet_create." };
+  const destination = String(args.destination || args.to || "").trim();
+  if (!validPubkey(destination)) {
+    return { ok: false, error: "bad_destination", message: "destination must be a valid Solana wallet address." };
+  }
+  const amountSol = Number(args.amount || args.amountSol);
+  if (!Number.isFinite(amountSol) || amountSol <= 0) {
+    return { ok: false, error: "bad_amount", message: "amount must be a positive number of SOL." };
+  }
+  if (amountSol > 1000) {
+    return { ok: false, error: "amount_too_large", message: "Transfers are capped at 1000 SOL per call for safety." };
+  }
+  const funds = await getDeskFunds(row.public_key);
+  const lamports = Math.floor(amountSol * 1e9);
+  // Keep ~0.01 SOL for fees
+  if (funds.sol * 1e9 < lamports + 10000000) {
+    return { ok: false, error: "insufficient_balance", message: `Insufficient SOL. Balance: ${funds.sol.toFixed(4)} SOL, need ${amountSol} + fees.` };
+  }
+  try {
+    const result = await buildAndSendTransfer(row, { toPubkey: destination, lamports });
+    if (result.ok) {
+      return {
+        ok: true,
+        signature: result.signature,
+        amount: amountSol,
+        token: "SOL",
+        destination,
+        solscan: `https://solscan.io/tx/${result.signature}`,
+        confirmed: result.confirmed,
+      };
+    }
+    return { ok: false, error: result.error || "transfer_failed", message: result.message, signature: result.signature };
+  } catch (e) {
+    return { ok: false, error: "transfer_error", message: String(e.message || e) };
+  }
+}
+
+export async function appTip(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await walletRow(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet", message: "Create a wallet first via orbitx_app_wallet_create." };
+  let recipient = String(args.recipient || args.to || args.destination || "").trim();
+  // If it's a handle (starts with @), try to resolve — for now require wallet address
+  if (recipient.startsWith("@")) {
+    return { ok: false, error: "handle_not_resolved", message: "Handle resolution isn't available yet — please provide the wallet address directly." };
+  }
+  if (!validPubkey(recipient)) {
+    return { ok: false, error: "bad_recipient", message: "recipient must be a valid Solana wallet address." };
+  }
+  const amount = Number(args.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "bad_amount", message: "amount must be a positive number." };
+  }
+  const token = String(args.token || "ORBITX").toUpperCase();
+  try {
+    if (token === "SOL") {
+      const lamports = Math.floor(amount * 1e9);
+      const funds = await getDeskFunds(row.public_key);
+      if (funds.sol * 1e9 < lamports + 10000000) {
+        return { ok: false, error: "insufficient_balance", message: `Insufficient SOL.` };
+      }
+      const result = await buildAndSendTransfer(row, { toPubkey: recipient, lamports });
+      if (result.ok) {
+        return { ok: true, signature: result.signature, amount, token: "SOL", recipient, solscan: `https://solscan.io/tx/${result.signature}` };
+      }
+      return { ok: false, error: result.error || "tip_failed", message: result.message };
+    } else if (token === "ORBITX") {
+      // ORBITX has 6 decimals (standard SPL)
+      const lamports = Math.floor(amount * 1e6);
+      const result = await buildAndSendTransfer(row, { toPubkey: recipient, lamports, mint: ORBITX_MINT_ADDR });
+      if (result.ok) {
+        return { ok: true, signature: result.signature, amount, token: "ORBITX", recipient, solscan: `https://solscan.io/tx/${result.signature}` };
+      }
+      return { ok: false, error: result.error || "tip_failed", message: result.message };
+    } else {
+      return { ok: false, error: "unsupported_token", message: "token must be SOL or ORBITX." };
+    }
+  } catch (e) {
+    return { ok: false, error: "tip_error", message: String(e.message || e) };
+  }
+}
+
+/* DCA schedules — stored in Supabase ox_dca_schedules */
+async function dcaClient() {
+  try {
+    return await sb();
+  } catch {
+    return null;
+  }
+}
+
+export async function appDcaCreate(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const mint = String(args.mint || args.ca || "").trim();
+  if (!validPubkey(mint)) return { ok: false, error: "bad_mint", message: "mint must be a valid Solana token address." };
+  const amountSol = Number(args.amountSol || args.amount);
+  if (!Number.isFinite(amountSol) || amountSol <= 0) return { ok: false, error: "bad_amount" };
+  const frequency = String(args.frequency || "daily").toLowerCase();
+  if (!["hourly", "daily", "weekly"].includes(frequency)) {
+    return { ok: false, error: "bad_frequency", message: "frequency must be hourly, daily, or weekly." };
+  }
+  const totalBuys = Math.min(Math.max(parseInt(args.totalBuys || args.duration || "7", 10) || 7, 1), 365);
+  const sb = await dcaClient();
+  if (!sb) return { ok: false, error: "db_unavailable", message: "Schedule storage unavailable." };
+  const { data, error } = await sb.from("ox_dca_schedules").insert({
+    user_id: gate.userId,
+    mint,
+    amount_sol: amountSol,
+    frequency,
+    total_buys: totalBuys,
+    buys_done: 0,
+    status: "active",
+    next_run_at: new Date().toISOString(),
+  }).select("id").single();
+  if (error) return { ok: false, error: "db_error", message: String(error.message || error) };
+  return { ok: true, scheduleId: data.id, mint, amountSol, frequency, totalBuys, message: `DCA scheduled: ${amountSol} SOL → ${mint.slice(0, 8)}… every ${frequency}, ${totalBuys} buys.` };
+}
+
+export async function appDcaList(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const sb = await dcaClient();
+  if (!sb) return { ok: false, error: "db_unavailable" };
+  const { data, error } = await sb.from("ox_dca_schedules")
+    .select("id,mint,amount_sol,frequency,total_buys,buys_done,status,next_run_at,created_at")
+    .eq("user_id", gate.userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return { ok: false, error: "db_error", message: String(error.message || error) };
+  return { ok: true, schedules: data || [] };
+}
+
+export async function appDcaCancel(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const scheduleId = String(args.scheduleId || args.id || "").trim();
+  if (!scheduleId) return { ok: false, error: "id_required", message: "Pass scheduleId from orbitx_dca_list." };
+  const sb = await dcaClient();
+  if (!sb) return { ok: false, error: "db_unavailable" };
+  const { error } = await sb.from("ox_dca_schedules")
+    .update({ status: "cancelled" })
+    .eq("id", scheduleId)
+    .eq("user_id", gate.userId);
+  if (error) return { ok: false, error: "db_error", message: String(error.message || error) };
+  return { ok: true, scheduleId, status: "cancelled" };
+}
+
 export function isAppWalletTool(name) {
   const n = String(name || "");
-  return n.startsWith("orbitx_app_") || n.startsWith("orbitx_agentplus_");
+  return n.startsWith("orbitx_app_") || n.startsWith("orbitx_agentplus_") ||
+    n === "orbitx_send_sol" || n === "orbitx_tip" ||
+    n === "orbitx_dca_create" || n === "orbitx_dca_list" || n === "orbitx_dca_cancel";
 }
 
 const authCode = { type: "string" };
@@ -863,5 +1064,30 @@ export const APP_WALLET_CORE_TOOLS = [
   },
   { name: "orbitx_app_orders", description: "List limit orders (open, filled, failed, cancelled) with orderId.", inputSchema: { type: "object", properties: { authCode } } },
   { name: "orbitx_app_limits_tick", description: "Check open limits and fill any that hit. Backend signs.", inputSchema: { type: "object", properties: { authCode } } },
+  {
+    name: "orbitx_send_sol",
+    description: "Send SOL to any wallet. Backend signs from your in-app wallet. Say 'send 0.5 sol to <address>'. Validates address and balance. Returns Solscan link.",
+    inputSchema: { type: "object", properties: { destination: { type: "string", description: "Solana wallet address" }, amount: { type: "number", description: "Amount in SOL" }, authCode }, required: ["destination", "amount"] },
+  },
+  {
+    name: "orbitx_tip",
+    description: "Tip someone SOL or ORBITX. Recipient can be a wallet address. Backend signs. Defaults to ORBITX.",
+    inputSchema: { type: "object", properties: { recipient: { type: "string" }, amount: { type: "number" }, token: { type: "string", description: "SOL or ORBITX, default ORBITX" }, authCode }, required: ["recipient", "amount"] },
+  },
+  {
+    name: "orbitx_dca_create",
+    description: "Set up a dollar-cost-average schedule. Backend buys automatically on schedule. frequency: hourly/daily/weekly. totalBuys: number of buys (1-365).",
+    inputSchema: { type: "object", properties: { mint: { type: "string" }, amountSol: { type: "number" }, frequency: { type: "string" }, totalBuys: { type: "number" }, authCode }, required: ["mint", "amountSol"] },
+  },
+  {
+    name: "orbitx_dca_list",
+    description: "List your DCA schedules with status and progress.",
+    inputSchema: { type: "object", properties: { authCode } },
+  },
+  {
+    name: "orbitx_dca_cancel",
+    description: "Cancel a DCA schedule. Pass scheduleId from orbitx_dca_list.",
+    inputSchema: { type: "object", properties: { scheduleId: { type: "string" }, authCode }, required: ["scheduleId"] },
+  },
   ...APP_DESK_OPS_TOOLS,
 ];
