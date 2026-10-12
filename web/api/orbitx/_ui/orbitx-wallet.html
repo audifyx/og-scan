@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>OrbitX Wallet Analytics</title>
+<!--
+  OrbitX ChatGPT Mini App — Wallet Portfolio + Real PnL
+  resourceUri: ui://widget/orbitx-wallet.html
+  Bridge: window.OrbitX.callTool(name, args) when hosted in the OrbitX bridge,
+          else standalone fallback POSTs to https://www.orbitx.world/api/mcp
+  Tools (verified live): orbitx_get_wallet, orbitx_app_pnl, orbitx_get_swaps
+  PnL chart: derived client-side from swap history; honest "insufficient history"
+  state when the data can't support it. Addresses only — never keys/secrets.
+-->
+<style>
+:root{
+  --bg:#04070a; --panel:#0a0f14; --panel2:#0d141b; --line:#14202a;
+  --neon:#00ff88; --neon2:#00d4ff; --dim:#8fa3b3; --txt:#eaf4ee;
+  --red:#ff4d5e; --amber:#ffb02e; --violet:#b06bff; --r:16px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;min-height:100vh}
+#bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+   radial-gradient(600px 300px at 15% -5%, rgba(0,255,136,.09), transparent 60%),
+   radial-gradient(700px 380px at 90% 10%, rgba(0,212,255,.07), transparent 60%),
+   radial-gradient(500px 500px at 50% 110%, rgba(0,255,136,.05), transparent 60%);}
+#app{position:relative;z-index:1;max-width:620px;margin:0 auto;padding:14px 14px 60px}
+.header{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+.logo svg{width:30px;height:30px;filter:drop-shadow(0 0 8px rgba(0,255,136,.7))}
+.brand{font-weight:800;letter-spacing:2px;font-size:17px}
+.brand small{display:block;font-size:9px;letter-spacing:3px;color:var(--neon);font-weight:600}
+.card{background:linear-gradient(160deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px;
+  box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.card.glow{border-color:rgba(0,255,136,.4);box-shadow:0 0 20px rgba(0,255,136,.12)}
+.row{display:flex;align-items:center;gap:10px}
+.mut{color:var(--dim);font-size:12px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all}
+input[type=text]{width:100%;background:#080d12;border:1px solid var(--line);border-radius:12px;
+  color:var(--txt);padding:12px 14px;font-size:14px;outline:none;font-family:ui-monospace,monospace}
+input:focus{border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,255,136,.2)}
+input.invalid{border-color:var(--red);box-shadow:0 0 0 2px rgba(255,77,94,.2)}
+.btn{background:linear-gradient(135deg,#00ff88,#00c86e);border:0;color:#03130b;font-weight:800;
+  border-radius:12px;padding:13px 16px;font-size:15px;cursor:pointer;width:100%}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:#0d151c;color:var(--neon);border:1px solid var(--neon)}
+.btn.sm{width:auto;padding:8px 14px;font-size:13px}
+.addrbar{display:flex;gap:8px;margin-bottom:10px}
+.addrbar .btn{width:auto;white-space:nowrap}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{background:#080d12;border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center}
+.stat .v{font-size:15px;font-weight:800}
+.stat .v.up{color:var(--neon)} .stat .v.down{color:var(--red)}
+.stat .l{font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:4px;text-transform:uppercase}
+.hero{text-align:center;padding:18px 10px 6px}
+.hero .total{font-size:40px;font-weight:800;letter-spacing:-1px}
+.hero .sub{color:var(--dim);font-size:13px;margin-top:4px}
+.pnlrow{display:flex;justify-content:space-between;align-items:center;padding:11px 2px;border-bottom:1px solid #0f1720}
+.pnlrow:last-child{border-bottom:0}
+.ptok{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.ticon{width:38px;height:38px;border-radius:50%;background:#0d151c;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--neon);flex-shrink:0;overflow:hidden}
+.ticon img{width:100%;height:100%;object-fit:cover}
+.pnum{text-align:right}
+.pnum .r{font-size:13px;font-weight:700}
+.up{color:var(--neon)} .down{color:var(--red)}
+.swaprow{display:flex;gap:10px;padding:11px 2px;border-bottom:1px solid #0f1720;font-size:13px;align-items:center}
+.swaprow:last-child{border-bottom:0}
+.side{font-weight:800;font-size:11px;letter-spacing:1px;padding:4px 9px;border-radius:8px;flex-shrink:0}
+.side.buy{background:rgba(0,255,136,.12);color:var(--neon);border:1px solid rgba(0,255,136,.4)}
+.side.sell{background:rgba(255,77,94,.12);color:var(--red);border:1px solid rgba(255,77,94,.4)}
+.skel{position:relative;overflow:hidden;background:#0d141b;border-radius:12px;min-height:18px}
+.skel::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(0,255,136,.08),transparent);animation:sh 1.2s infinite}
+@keyframes sh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.err{background:rgba(255,77,94,.08);border:1px solid rgba(255,77,94,.4);border-radius:14px;
+  padding:14px;color:#ffb9c0;font-size:14px;margin-bottom:12px}
+.empty{text-align:center;padding:34px 18px;color:var(--dim);font-size:14px}
+.empty .big{font-size:44px;margin-bottom:10px}
+.stale{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);margin-top:10px}
+.stale button{background:none;border:1px solid var(--line);color:var(--neon);border-radius:8px;
+  padding:4px 10px;font-size:11px;cursor:pointer}
+.sect{font-size:12px;letter-spacing:2px;color:var(--neon);font-weight:800;margin:18px 0 8px;text-transform:uppercase}
+.sect .tag{color:var(--dim);letter-spacing:0;text-transform:none;font-weight:400;font-size:11px;margin-left:6px}
+#pnlChart{width:100%;height:220px;display:block}
+a.tx{color:var(--neon2);text-decoration:none;font-size:12px}
+.holdrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #0f1720}
+.holdrow:last-child{border-bottom:0}
+.warnbar{background:rgba(255,176,46,.07);border:1px solid rgba(255,176,46,.35);border-radius:14px;
+  padding:12px 14px;font-size:12.5px;color:#ffd9a0;margin-bottom:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="bgfx"></div>
+<div id="app"></div>
+<script>
+"use strict";
+/* ================= Bridge (CONTRACT.md v1) ================= */
+const MCP_URL = "https://www.orbitx.world/api/mcp";
+const Bridge = {
+  async callTool(name, args){
+    if (window.openai && typeof window.openai.callTool === "function"){
+      return await window.openai.callTool(name, args);
+    }
+    if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
+      return await window.OrbitX.callTool(name, args);
+    }
+    const res = await fetch(MCP_URL, {
+      method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"},
+      body: JSON.stringify({jsonrpc:"2.0", id:"w"+Date.now(), method:"tools/call",
+        params:{name, arguments:args||{}}})
+    });
+    if(!res.ok) throw new Error("MCP HTTP "+res.status);
+    const j = await res.json();
+    if(j.error) throw new Error(j.error.message||"tool error");
+    const r = j.result||{};
+    if(r.structuredContent) return r.structuredContent;
+    const content = r.content;
+    if(Array.isArray(content)){
+      const t = content.find(c=>c.type==="text");
+      if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
+      return content;
+    }
+    return r;
+  }
+};
+/* Auth: contract key `orbitx.authCode` (legacy `orbitx_auth_code` still read) */
+const AUTH_KEYS = ["orbitx.authCode","orbitx_auth_code"];
+const getAuth = ()=>{ try{ for(const k of AUTH_KEYS){ const v=localStorage.getItem(k); if(v) return v; } }catch(e){} return ""; };
+const AUTH_ERR_RE=/auth|unauthor|expir|invalid code|session|forbidden|not (linked|connected|signed)|sign.?in|token|credential/i;
+function authFail(e){ const m=String((e&&e.message)||e||"");
+  if(AUTH_ERR_RE.test(m)){ try{ window.dispatchEvent(new CustomEvent("orbitx-auth-error",{detail:{message:m}})); }catch(x){} return true; }
+  return false; }
+function setErr(e){ if(authFail(e)) S.error="Session expired — reconnect via the OrbitX auth widget, then retry.";
+  else S.error=String(e.message||e); }
+function openUrl(href){ if(!href) return;
+  try{
+    if(window.openai&&typeof window.openai.openExternal==="function"){ window.openai.openExternal({href}); return; }
+    if(window.OrbitX&&typeof window.OrbitX.openUrl==="function"){ window.OrbitX.openUrl(href); return; }
+  }catch(e){}
+  window.open(href,"_blank","noopener"); }
+function standaloneNote(){ const hosted=(window.openai&&window.openai.callTool)||(window.OrbitX&&window.OrbitX.callTool);
+  return hosted?"":`<div class="mut" style="text-align:center;font-size:11px;margin-bottom:10px;opacity:.8">⚙ standalone preview — reads work live; writes need the OrbitX bridge</div>`; }
+document.addEventListener("click",e=>{
+  const a=e.target&&e.target.closest?e.target.closest("a[target='_blank']"):null;
+  if(a&&a.href){ e.preventDefault(); openUrl(a.href); } });
+window.addEventListener("orbitx-auth-changed",()=>{ if(typeof render==="function") render(); });
+
+/* ================= State ================= */
+const S = { addr:"", valid:null, wallet:null, pnlAgg:null, swaps:[],
+  chartPts:[], fetchedAt:0, error:"", loading:false, addrErr:"" };
+
+/* ================= Helpers ================= */
+const app = document.getElementById("app");
+const esc = s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n,d)=>{ if(n==null||n===""||isNaN(Number(n))) return "—";
+  const x=Number(n), neg=x<0?"-":"", a=Math.abs(x);
+  const s=a>=1e9?(a/1e9).toFixed(2)+"B":a>=1e6?(a/1e6).toFixed(2)+"M":a>=1e3?(a/1e3).toFixed(2)+"K":a.toFixed(d!=null?d:(a<1?4:2));
+  return neg+s; };
+const fmtUSD = n=>{ if(n==null||isNaN(Number(n))) return "—"; const x=Number(n);
+  const s=Math.abs(x)<0.01&&x!==0?"$"+Math.abs(x).toExponential(2):"$"+fmt(Math.abs(x));
+  return (x<0?"-":"")+s; };
+const fmtSigned = n=>{ if(n==null||isNaN(Number(n))) return "—";
+  return (Number(n)>=0?"+":"−")+fmtUSD(Math.abs(Number(n))).slice(1).replace("$","$"); };
+const signedUSD = n=>{ if(n==null||isNaN(Number(n))) return "—";
+  const x=Number(n); return (x<0?"−$":"+$")+fmt(Math.abs(x)); };
+const pctCls = n=>Number(n)>=0?"up":"down";
+const shortA = a=>a&&a.length>10?a.slice(0,4)+"…"+a.slice(-4):esc(a||"");
+const isAddr = a=>/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test((a||"").trim());
+const timeAgo = ts=>{ if(!ts) return "—"; const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);
+  if(s<0) return "just now"; if(s<60) return s+"s ago"; if(s<3600) return Math.floor(s/60)+"m ago";
+  if(s<86400) return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago"; };
+const timeHM = ts=>ts?new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
+function staleBar(){ return S.fetchedAt?
+  `<div class="stale"><span>🕐 Updated ${esc(timeHM(S.fetchedAt))} (${esc(timeAgo(S.fetchedAt))})</span>
+   <button onclick="loadAll()">↻ Refresh</button></div>`:""; }
+function toast(msg){ const t=document.createElement("div");
+  t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d151c;border:1px solid #00ff88;color:#00ff88;padding:10px 18px;border-radius:12px;font-size:13px;z-index:99";
+  t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
+</script>
+
+<script>
+"use strict";
+/* ================= Load ================= */
+function onAddrInput(){
+  const v=(document.getElementById("addr")||{}).value||"";
+  S.addr=v.trim();
+  const el=document.getElementById("addr");
+  if(!S.addr){ S.valid=null; S.addrErr=""; el.classList.remove("invalid"); renderAddrMsg(); return; }
+  if(isAddr(S.addr)){ S.valid=true; S.addrErr=""; el.classList.remove("invalid"); }
+  else { S.valid=false; S.addrErr="That doesn't look like a Solana address (base58, 32–44 chars)."; el.classList.add("invalid"); }
+  renderAddrMsg();
+}
+function renderAddrMsg(){
+  const m=document.getElementById("addrmsg"); if(!m) return;
+  m.innerHTML = S.addrErr?`<div style="color:var(--red);font-size:12px;margin-top:6px">⚠️ ${esc(S.addrErr)}</div>`
+    : S.valid?`<div style="color:var(--neon);font-size:12px;margin-top:6px">✓ Valid Solana address</div>`:"";
+}
+async function loadConnected(){
+  document.getElementById("addr").value=""; S.addr=""; S.valid=null;
+  await loadAll(true);
+}
+async function loadAll(connected){
+  if(!connected){
+    const v=(document.getElementById("addr")||{}).value||"";
+    S.addr=v.trim();
+    if(!S.addr){ S.addrErr="Paste a wallet address, or use your connected wallet."; renderAddrMsg(); return; }
+    if(!isAddr(S.addr)){ S.addrErr="That doesn't look like a Solana address (base58, 32–44 chars)."; renderAddrMsg(); return; }
+  }
+  S.error=""; S.loading=true; S.wallet=null; S.swaps=[]; S.chartPts=[]; S.pnlAgg=null; render();
+  const args={authCode:getAuth()}; if(!connected) args.address=S.addr;
+  try{
+    const [w,s,p]=await Promise.all([
+      Bridge.callTool("orbitx_get_wallet",args).catch(e=>({ok:false,error:String(e.message||e)})),
+      Bridge.callTool("orbitx_get_swaps",{...args,limit:50}).catch(e=>({ok:false,error:String(e.message||e)})),
+      Bridge.callTool("orbitx_app_pnl",{authCode:getAuth()}).catch(()=>null)
+    ]);
+    if(w.ok===false) throw new Error(w.error||"wallet fetch failed");
+    S.wallet=w; S.fetchedAt=Date.now();
+    if(s&&s.ok!==false){ S.swaps=(s.trades||s.swaps||s.data||[]).slice(0,50); }
+    if(p&&p.ok!==false) S.pnlAgg=p;
+    S.chartPts=derivePnLCurve(S.swaps);
+  }catch(e){ setErr(e); }
+  S.loading=false; render();
+}
+
+/* PnL curve: cumulative per-trade PnL from swap history — real points only.
+   Trade needs a numeric pnl-ish field AND a timestamp; otherwise we say so. */
+function derivePnLCurve(swaps){
+  const pts=[];
+  for(const t of (swaps||[])){
+    const ts=t.timestamp||t.time||t.blockTime||t.createdAt;
+    const pnl=t.pnlUsd??t.pnl??t.profitUsd??t.realizedPnlUsd??t.pnl_usd;
+    if(ts==null||pnl==null||isNaN(Number(pnl))) continue;
+    pts.push({t:new Date(ts).getTime(), v:Number(pnl)});
+  }
+  pts.sort((a,b)=>a.t-b.t);
+  let cum=0; return pts.map(p=>{ cum+=p.v; return {t:p.t, v:cum}; });
+}
+</script>
+
+<script>
+"use strict";
+/* ================= Render ================= */
+function render(){
+  const w=S.wallet;
+  app.innerHTML = `
+  <div class="header">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7L12 2z" stroke="#00ff88" stroke-width="2"/><circle cx="12" cy="12" r="3.2" fill="#00ff88"/></svg></div>
+    <div class="brand">ORBITX<small>WALLET ANALYTICS</small></div>
+  </div>
+  ${standaloneNote()}
+  <div class="warnbar">🔒 Addresses only — this UI never asks for keys, seed phrases or secrets. Read-only analytics.</div>
+  <div class="addrbar">
+    <input type="text" id="addr" placeholder="Paste Solana wallet address…" value="${esc(S.addr)}"
+      oninput="onAddrInput()" onkeydown="if(event.key==='Enter')loadAll(false)" autocapitalize="off" spellcheck="false">
+    <button class="btn" onclick="loadAll(false)">Track</button>
+  </div>
+  <div id="addrmsg"></div>
+  <div style="margin:6px 0 14px"><button class="btn ghost sm" style="width:100%" onclick="loadConnected()">⚡ Use my connected OrbitX wallet</button></div>
+  ${S.error?`<div class="err">⚠️ ${esc(S.error)}<div style="margin-top:8px"><button class="btn sm ghost" onclick="loadAll(${!S.addr})">Retry</button></div></div>`:""}
+  <div id="body">${S.loading?bodySkel():bodyHTML()}</div>
+  ${staleBar()}`;
+  renderAddrMsg();
+  if(!S.loading&&w) drawPnLChart();
+}
+function bodySkel(){
+  return `<div class="card glow"><div class="skel" style="height:110px"></div></div>
+  <div class="card"><div class="skel" style="height:220px"></div></div>
+  <div class="card"><div class="skel" style="height:180px"></div></div>`;
+}
+function bodyHTML(){
+  const w=S.wallet;
+  if(!w) return `<div class="empty"><div class="big">👛</div>
+    Paste any Solana wallet address and hit <b>Track</b> —<br>
+    portfolio value, per-token PnL, trade history & win-rate,<br>all live from OrbitX.</div>`;
+  const pnl=w.pnl||{};
+  const holdings=(w.holdings||[]).filter(h=>(h.usd??h.valueUsd??0)>0.5);
+  const perToken=pnl.perToken||pnl.positions||[];
+  const emptyWallet=(w.totalUsd||0)<0.5&&!holdings.length&&!perToken.length&&!S.swaps.length;
+  if(emptyWallet) return emptyWalletHTML(w);
+  return `
+  <div class="card glow">
+    <div class="hero">
+      <div class="mut">TOTAL PORTFOLIO VALUE</div>
+      <div class="total">${fmtUSD(w.totalUsd)}</div>
+      <div class="sub">◎ ${fmt(w.sol,4)} SOL · <span class="mono">${shortA(w.address)}</span></div>
+      <div class="sub" style="margin-top:4px">SOL ≈ ${fmtUSD(w.solPrice)} · ${w.tokenCount??holdings.length} tokens</div>
+    </div>
+    <div class="statgrid">
+      <div class="stat"><div class="v ${pctCls(pnl.totalPnlUsd)}">${signedUSD(pnl.totalPnlUsd)}</div><div class="l">Total PnL</div></div>
+      <div class="stat"><div class="v ${pctCls(pnl.realizedPnlUsd)}">${signedUSD(pnl.realizedPnlUsd)}</div><div class="l">Realized</div></div>
+      <div class="stat"><div class="v ${pctCls(pnl.unrealizedPnlUsd)}">${signedUSD(pnl.unrealizedPnlUsd)}</div><div class="l">Unrealized</div></div>
+    </div>
+  </div>
+
+  <div class="sect">📊 PnL Over Time <span class="tag">from live trade history</span></div>
+  <div class="card"><div id="pnlChartWrap">${pnlChartHTML()}</div>
+    <div class="mut" style="margin-top:6px">Cumulative realized PnL per trade. Only real trade data — never interpolated.</div></div>
+
+  <div class="sect">🎯 Win Rate</div>
+  <div class="card">${winRateHTML(pnl)}</div>
+
+  <div class="sect">🪙 Per-Token PnL <span class="tag">realized + unrealized</span></div>
+  <div class="card">${perToken.length?perToken.map(perTokenRow).join(""):holdings.length?holdings.map(holdRow).join(""):'<div class="mut">No per-token PnL reported.</div>'}</div>
+
+  <div class="sect">💱 Holdings <span class="tag">${holdings.length} positions</span></div>
+  <div class="card">${holdings.length?holdings.map(holdRow).join(""):'<div class="mut">No token holdings above dust.</div>'}</div>
+
+  <div class="sect">📜 Trade History <span class="tag">${S.swaps.length} recent swaps</span></div>
+  <div class="card">${S.swaps.length?S.swaps.map(swapRow).join(""):'<div class="mut">No recent swaps found for this wallet.</div>'}</div>`;
+}
+function emptyWalletHTML(w){
+  return `<div class="card glow"><div class="empty"><div class="big">🌵</div>
+    <b>No positions yet</b><br>
+    <span class="mono">${shortA(w.address)}</span> holds ~${fmtUSD(w.totalUsd)} — nothing to analyze.<br><br>
+    <button class="btn sm" onclick="openUrl('https://www.orbitx.world')">Scan tokens on OrbitX →</button>
+    <div class="mut" style="margin-top:10px">Found a gem? Track any wallet address here to see its PnL story.</div>
+  </div></div>`;
+}
+function perTokenRow(p){
+  const sym=p.symbol||p.tokenSymbol||"?", name=p.name||p.tokenName||shortA(p.mint);
+  const r=p.realizedPnlUsd??p.realizedUsd??p.realized, u=p.unrealizedPnlUsd??p.unrealizedUsd??p.unrealized;
+  const tot=(r??0)+(u??0);
+  return `<div class="pnlrow">
+    <div class="ptok"><div class="ticon">${p.icon?`<img src="${esc(p.icon)}" onerror="this.remove()">`:""}<span>${esc(sym.slice(0,3))}</span></div>
+      <div style="min-width:0"><div style="font-weight:700;font-size:14px">${esc(sym)}</div>
+      <div class="mut" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div></div></div>
+    <div class="pnum">
+      <div class="r ${pctCls(tot)}">${signedUSD(tot)}</div>
+      <div class="mut">R ${signedUSD(r)} · U ${signedUSD(u)}</div>
+    </div></div>`;
+}
+function holdRow(h){
+  const sym=h.symbol||"?", usd=h.usd??h.valueUsd??0;
+  return `<div class="holdrow">
+    <div class="ticon">${h.icon?`<img src="${esc(h.icon)}" onerror="this.remove()">`:""}<span>${esc(sym.slice(0,3))}</span></div>
+    <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(sym)}</div>
+      <div class="mut mono">${shortA(h.mint)}</div></div>
+    <div style="text-align:right"><div style="font-weight:800">${fmtUSD(usd)}</div>
+      <div class="mut">${fmt(h.amount??h.balance)} ${esc(sym)}</div></div></div>`;
+}
+function swapRow(t){
+  const side=String(t.side||t.type||"").toLowerCase();
+  const isBuy=/buy|in|receive/.test(side);
+  const sym=t.symbol||t.tokenSymbol||t.token||"?";
+  const amt=t.amount??t.tokenAmount, px=t.priceUsd??t.price, usd=t.usd??t.amountUsd??t.valueUsd;
+  const sig=t.signature||t.tx||t.txHash;
+  const ts=t.timestamp||t.time||t.blockTime||t.createdAt;
+  return `<div class="swaprow">
+    <div class="side ${isBuy?"buy":"sell"}">${isBuy?"BUY":"SELL"}</div>
+    <div style="flex:1;min-width:0"><div style="font-weight:700">${fmt(amt)} ${esc(sym)}</div>
+      <div class="mut">${px!=null?"@ "+fmtUSD(px)+" · ":""}${timeAgo(ts)}</div></div>
+    <div style="text-align:right"><div style="font-weight:800">${fmtUSD(usd)}</div>
+      ${sig?`<a class="tx" target="_blank" href="https://solscan.io/tx/${esc(sig)}">Solscan ↗</a>`:""}</div></div>`;
+}
+function winRateHTML(pnl){
+  const agg=S.pnlAgg||{};
+  const wins=pnl.wins??agg.wins??0, losses=pnl.losses??agg.losses??0;
+  const closed=pnl.closedTrades??agg.closedTrades??(wins+losses);
+  const wr=pnl.winRate??agg.winRate??(closed?100*wins/closed:null);
+  const best=agg.bestTrade??pnl.bestTrade, worst=agg.worstTrade??pnl.worstTrade;
+  const avgHold=agg.avgHoldTime??pnl.avgHoldTime;
+  return `<div class="statgrid">
+    <div class="stat"><div class="v" style="color:var(--neon)">${wr==null?"—":Number(wr).toFixed(1)+"%"}</div><div class="l">Win Rate</div></div>
+    <div class="stat"><div class="v">${wins}<span class="mut">/${losses}</span></div><div class="l">W / L</div></div>
+    <div class="stat"><div class="v">${closed||"—"}</div><div class="l">Closed Trades</div></div>
+    <div class="stat"><div class="v ${pctCls(best&&best.pnlUsd)}">${best?signedUSD(best.pnlUsd??best.pnl):"—"}</div><div class="l">Best${best&&best.symbol?" · "+esc(best.symbol):""}</div></div>
+    <div class="stat"><div class="v ${pctCls(worst&&worst.pnlUsd)}">${worst?signedUSD(worst.pnlUsd??worst.pnl):"—"}</div><div class="l">Worst${worst&&worst.symbol?" · "+esc(worst.symbol):""}</div></div>
+    <div class="stat"><div class="v">${avgHold!=null?Math.round(avgHold/3600)+"h":"—"}</div><div class="l">Avg Hold</div></div>
+  </div>
+  <div class="mut" style="margin-top:8px">Win-rate core from live wallet stats${S.pnlAgg?" + connected-wallet PnL analytics":""}. Total swaps tracked: ${pnl.totalSwaps??S.swaps.length}.</div>`;
+}
+
+/* ---------- PnL chart ---------- */
+function pnlChartHTML(){
+  if(!S.chartPts.length){
+    return `<div class="empty" style="padding:22px 12px"><div class="big" style="font-size:32px">📉</div>
+      <b>Not enough trade history</b><br>
+      <span style="font-size:12.5px">The swap feed didn't return per-trade PnL figures with timestamps, so there's no honest curve to draw. Stats above are still live.</span></div>`;
+  }
+  return `<svg id="pnlChart" viewBox="0 0 560 220" preserveAspectRatio="none"></svg>
+    <div class="row" style="justify-content:space-between;margin-top:4px">
+      <span class="mut">${esc(new Date(S.chartPts[0].t).toLocaleDateString())}</span>
+      <span class="mut" id="pnlLast"></span></div>`;
+}
+function drawPnLChart(){
+  const svg=document.getElementById("pnlChart"); if(!svg||!S.chartPts.length) return;
+  const W=560,H=220,P=14, pts=S.chartPts;
+  const vs=pts.map(p=>p.v), mx=Math.max(...vs,0), mn=Math.min(...vs,0), rg=(mx-mn)||1;
+  const X=i=>P+(W-2*P)*i/(pts.length-1||1), Y=v=>P+(H-2*P)*(1-(v-mn)/rg);
+  const line=pts.map((p,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(p.v).toFixed(1)).join(" ");
+  const area=line+` L${X(pts.length-1).toFixed(1)},${Y(0).toFixed(1)} L${X(0).toFixed(1)},${Y(0).toFixed(1)} Z`;
+  const last=pts[pts.length-1].v, col=last>=0?"#00ff88":"#ff4d5e";
+  svg.innerHTML=`
+    <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <line x1="${P}" y1="${Y(0)}" x2="${W-P}" y2="${Y(0)}" stroke="#2a3a48" stroke-dasharray="4 4"/>
+    <path d="${area}" fill="url(#pg)"/>
+    <path d="${line}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="${X(pts.length-1)}" cy="${Y(last)}" r="4.5" fill="${col}"/>
+    <text x="${W-P-4}" y="${P+12}" fill="${col}" font-size="13" font-weight="800" text-anchor="end">${esc(signedUSD(last))}</text>`;
+  const el=document.getElementById("pnlLast");
+  if(el) el.innerHTML=`Cumulative: <b class="${pctCls(last)}">${esc(signedUSD(last))}</b> across ${pts.length} trades`;
+}
+/* ---------- Boot ---------- */
+render();
+</script>
+</body>
+</html>
