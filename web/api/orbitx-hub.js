@@ -138,7 +138,19 @@ async function requireMcpAccess({ userId, wallets = [], email, base, tool } = {}
   if (isTokenGateExemptAny({ wallets: candidates, email })) {
     return { allowed: true, source: "exempt", hold: { exempt: true, meetsRequirement: true } };
   }
-  const hold = await verifyTokenHold(candidates[0] || "", base, { email });
+  // Check the hold across ALL candidate wallets, not just the first — the
+  // frontend wallet resolution order isn't guaranteed to put the holdings
+  // wallet first. First qualifying wallet wins.
+  let hold = null;
+  for (const w of candidates) {
+    const h = await verifyTokenHold(w, base, { email });
+    if (!hold) hold = h;
+    if (h?.exempt || h?.meetsRequirement) {
+      hold = h;
+      break;
+    }
+  }
+  if (!hold) hold = await verifyTokenHold("", base, { email });
   const access = await evaluateMcpAccess({ sb, userId, hold, wallets: candidates });
   if (access.allowed) return access;
   return {
