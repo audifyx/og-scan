@@ -100,6 +100,7 @@ every async step, `prefers-reduced-motion` respected.
 | `ui://widget/orbitx-token.html` | `orbitx-token.html` | Scan / screeners / forensics / chart | `orbitx_crypto_scan`, `orbitx_screen_tokens`, `orbitx_screen_trending_1m_solana`, `orbitx_adv_forensics_solana`, `orbitx_get_forensics`, `orbitx_dex_chart` |
 | `ui://widget/orbitx-wallet.html` | `orbitx-wallet.html` | Balances / PnL / swaps | `orbitx_get_wallet`, `orbitx_adv_wallet_pnl`, `orbitx_adv_wallet_swaps`, `orbitx_app_pnl`, `orbitx_get_swaps` |
 | `ui://widget/orbitx-media.html` | `orbitx-media.html` | Image gen / X post / launch | `orbitx_generate_image` ✅ schema OK, `orbitx_x_post` ✅ schema OK, `orbitx_app_launch` ✅ schema OK |
+| `ui://widget/orbitx-groupchat.html` | `orbitx-groupchat.html` | Group chat feed + composer | `orbitx_gc_chat` ✅ schema OK |
 
 ### Tool `_meta` (verified against current Apps SDK docs — set on every UI-bound tool)
 

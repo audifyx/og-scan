@@ -53,6 +53,13 @@ export const UI_WIDGETS = [
     description: "Generate images, post to X, launch a token.",
     file: "orbitx-media.html",
   },
+  {
+    uri: "ui://widget/orbitx-groupchat.html",
+    name: "orbitx-groupchat",
+    title: "OrbitX Group Chat",
+    description: "Live group-chat feed with composer. Polls the GC transcript, posts via orbitx_gc_chat.",
+    file: "orbitx-groupchat.html",
+  },
 ];
 
 const WIDGET_BY_URI = Object.fromEntries(UI_WIDGETS.map((w) => [w.uri, w]));
@@ -69,6 +76,7 @@ function loadAllWidgetHtml() {
     "ui://widget/orbitx-token.html": join(HERE, "orbitx-token.html"),
     "ui://widget/orbitx-wallet.html": join(HERE, "orbitx-wallet.html"),
     "ui://widget/orbitx-media.html": join(HERE, "orbitx-media.html"),
+    "ui://widget/orbitx-groupchat.html": join(HERE, "orbitx-groupchat.html"),
   };
   for (const [uri, path] of Object.entries(files)) {
     try {
@@ -145,6 +153,8 @@ export const UI_TOOL_WIDGET = {
   orbitx_generate_image: "ui://widget/orbitx-media.html",
   orbitx_x_post: "ui://widget/orbitx-media.html",
   orbitx_app_launch: "ui://widget/orbitx-media.html",
+  // group chat
+  orbitx_gc_chat: "ui://widget/orbitx-groupchat.html",
 };
 
 /**

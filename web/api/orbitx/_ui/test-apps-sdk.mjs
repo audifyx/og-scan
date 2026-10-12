@@ -3,7 +3,7 @@
  *
  * Drives web/api/orbitx-hub.js directly with mock req/res (no server needed):
  *  (a) tools/list → UI-bound tools carry _meta.ui.resourceUri + openai/outputTemplate
- *  (b) resources/list + resources/read → 5 widgets, valid HTML; unknown URI → -32602
+ *  (b) resources/list + resources/read → 6 widgets, valid HTML; unknown URI → -32602
  *  (c) tools/call orbitx_crypto_scan (real mint) + orbitx_get_wallet (valid + invalid)
  *      → structuredContent present; invalid wallet soft-fails with isError
  *  (d) grep all widget HTML for leaked secrets — must be zero
@@ -110,7 +110,7 @@ const { UI_TOOL_WIDGET, UI_WIDGETS } = await import("./_widgets.js");
 {
   const { json } = await rpc("resources/list", {});
   const resources = json?.result?.resources || [];
-  check("resources/list returns 5 widgets", resources.length === 5, `${resources.length}`);
+  check("resources/list returns 6 widgets", resources.length === 6, `${resources.length}`);
   const uris = new Set(resources.map((r) => r.uri));
   const wantUris = new Set(UI_WIDGETS.map((w) => w.uri));
   check("resources/list URIs match registry", [...wantUris].every((u) => uris.has(u)), [...uris].join(", "));
