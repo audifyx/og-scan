@@ -140,6 +140,31 @@ button:active{transform:scale(.97)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .card,.tcard{animation:fadeUp .32s ease both}
 @media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
+/* Analyst + Research screens */
+.conv{font-size:11px;font-weight:800;letter-spacing:1px;padding:4px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.conv.high{color:#ff6b7a;border-color:rgba(255,77,94,.5);background:rgba(255,77,94,.1)}
+.conv.medium{color:var(--amber);border-color:rgba(255,176,46,.5);background:rgba(255,176,46,.1)}
+.conv.low{color:#c8d6e0;border-color:rgba(200,214,224,.4);background:rgba(200,214,224,.07)}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.pcell{background:#080d12;border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+.pcell .l{font-size:10px;color:var(--dim);letter-spacing:1px}
+.pcell .v{font-size:14px;font-weight:800;margin-top:3px}
+.verdict{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;margin-bottom:12px;border:1px solid}
+.verdict.buy{background:rgba(23,255,77,.08);border-color:rgba(23,255,77,.5)}
+.verdict.wait{background:rgba(255,176,46,.08);border-color:rgba(255,176,46,.5)}
+.verdict.avoid{background:rgba(255,77,94,.08);border-color:rgba(255,77,94,.5)}
+.verdict .word{font-size:26px;font-weight:900;letter-spacing:2px}
+.verdict.buy .word{color:var(--neon)} .verdict.wait .word{color:var(--amber)} .verdict.avoid .word{color:var(--red)}
+.meter{height:10px;border-radius:999px;background:#0d151c;overflow:hidden;margin-top:8px}
+.meter>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#00c86e,#17ff4d)}
+.reasons{margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.6;color:#cfe0d2}
+.reasons li{margin-bottom:4px}
+.wrow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #0f1720;font-size:13px}
+.wrow:last-child{border-bottom:0}
+.dotpulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--neon);margin-right:6px;animation:pl 1.4s infinite}
+@keyframes pl{0%,100%{opacity:1}50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dotpulse{animation:none}}
+.bigstart{font-size:17px;padding:16px}
 </style>
 </head>
 <body>
@@ -214,7 +239,9 @@ const S = { screen:"explore", q:"", results:[], token:null, mint:null,
   fetchedAt:0, error:"", loading:false, lastQ:"", copied:false,
   boardSub:"traders", lb:null, lbTokens:[], lbStats:null, lbExpanded:null,
   whales:[], whaleAddr:"", whaleMin:"10000", whaleData:null, whaleBusy:false,
-  alerts:[], alMint:"", alCond:"above", alPrice:"", alertBusy:false, alertTimer:null };
+  alerts:[], alMint:"", alCond:"above", alPrice:"", alertBusy:false, alertTimer:null,
+  analyst:{running:false,minConviction:"medium",calls:[],track:[],timer:null,busy:false},
+  research:{mint:"",report:null,loading:false,depth:"full"} };
 /* Timeframes (re-query orbitx_get_chart / orbitx_dex_chart) */
 const TF_LIST=["1m","5m","15m","1h","4h","1d"];
 /* TradingView only lists major pairs — arbitrary mints render TV's own
@@ -266,6 +293,8 @@ function render(){
   else if(S.screen==="boards") renderBoards();
   else if(S.screen==="whales") renderWhales();
   else if(S.screen==="alerts") renderAlerts();
+  else if(S.screen==="analyst") renderAnalyst();
+  else if(S.screen==="research") renderResearch();
   else if(S.screen==="token") renderToken();
 }
 function tabsHTML(){
@@ -275,6 +304,8 @@ function tabsHTML(){
     <div class="tab ${S.screen==="boards"?"on":""}" onclick="S.screen='boards';render();loadBoards()">🏆 Boards</div>
     <div class="tab ${S.screen==="whales"?"on":""}" onclick="S.screen='whales';render();loadWhales()">🐋 Whales</div>
     <div class="tab ${S.screen==="alerts"?"on":""}" onclick="S.screen='alerts';render();loadAlerts()">🔔 Alerts</div>
+    <div class="tab ${S.screen==="analyst"?"on":""}" onclick="S.screen='analyst';render();analystInit()">📊 Analyst</div>
+    <div class="tab ${S.screen==="research"?"on":""}" onclick="S.screen='research';render()">🔬 Research</div>
     <div class="tab ${S.token?"":""}" style="${S.token?"":"opacity:.35;pointer-events:none"}" onclick="S.screen='token';render()">🪙 Token</div>
   </div>`;
 }
@@ -286,6 +317,8 @@ function retryLast(){
   if(S.screen==="token"&&S.mint) inspect(S.mint,true);
   else if(S.screen==="discover") loadDiscover();
   else if(S.screen==="boards") loadBoards();
+  else if(S.screen==="analyst") analystTick();
+  else if(S.screen==="research"&&S.research.mint) doResearch(S.research.mint);
   else if(S.lastQ) doSearch(S.lastQ);
 }
 
@@ -931,6 +964,256 @@ async function loadBoards(){
   }catch(e){ setErr(e); }
   S.loading=false; renderBoards();
 }
+
+/* ================= Analyst tab ================= */
+const AA_CFG_KEY="orbitx.agentAnalyst.config", AA_TRACK_KEY="orbitx.agentAnalyst.track";
+function aaCfgLoad(){ try{ const r=localStorage.getItem(AA_CFG_KEY); return r?JSON.parse(r):{}; }catch(e){ return {}; } }
+function aaCfgSave(c){ try{ localStorage.setItem(AA_CFG_KEY,JSON.stringify(c)); }catch(e){} }
+function aaTrackLoad(){ try{ const r=localStorage.getItem(AA_TRACK_KEY); return r?JSON.parse(r):[]; }catch(e){ return []; } }
+function aaTrackSave(l){ try{ localStorage.setItem(AA_TRACK_KEY,JSON.stringify(l.slice(0,60))); }catch(e){} }
+function analystInit(){
+  const cfg=aaCfgLoad();
+  if(cfg.minConviction) S.analyst.minConviction=cfg.minConviction;
+  if(!S.analyst.track.length){ const t=aaTrackLoad(); if(t.length) S.analyst.track=t; }
+}
+function convBadge(c){
+  c=String(c||"").toLowerCase();
+  if(c==="high") return `<span class="conv high">🔴 HIGH</span>`;
+  if(c==="medium") return `<span class="conv medium">🟡 MEDIUM</span>`;
+  return `<span class="conv low">⚪ LOW</span>`;
+}
+async function analystStart(){
+  const ac=getAuth();
+  if(!ac){ S.error="Reconnect via the OrbitX auth widget, then start the analyst."; render(); return; }
+  S.analyst.busy=true; S.error=""; render();
+  try{
+    const cfg=await Bridge.callTool("orbitx_agent_analyst",{action:"start",minConviction:S.analyst.minConviction,authCode:ac});
+    if(cfg&&cfg.ok===false) throw new Error(cfg.error||cfg.message||"analyst start failed");
+    aaCfgSave({minConviction:S.analyst.minConviction});
+    S.analyst.running=true;
+    await analystTick();
+    if(S.analyst.timer) clearInterval(S.analyst.timer);
+    S.analyst.timer=setInterval(analystTick,60000);
+  }catch(e){ setErr(e); }
+  S.analyst.busy=false; render();
+}
+function analystStop(){
+  if(S.analyst.timer){ clearInterval(S.analyst.timer); S.analyst.timer=null; }
+  S.analyst.running=false; render();
+}
+async function analystTick(){
+  if(!S.analyst.running) return;
+  const ac=getAuth();
+  if(!ac){ analystStop(); S.error="Session expired — reconnect via the OrbitX auth widget."; render(); return; }
+  try{
+    const r=await Bridge.callTool("orbitx_agent_analyst",{action:"brief",minConviction:S.analyst.minConviction,authCode:ac});
+    if(r&&r.ok===false) throw new Error(r.error||r.message||"brief failed");
+    const calls=(r&&r.calls)||[];
+    S.analyst.calls=calls;
+    recordTrack(calls);
+    S.error="";
+  }catch(e){ setErr(e); }
+  if(S.screen==="analyst") render();
+}
+function recordTrack(calls){
+  const now=Date.now(); let changed=false;
+  const trk=S.analyst.track;
+  for(const c of calls){
+    const mint=String(c.mint||"");
+    if(!mint) continue;
+    const cur=Number(c.priceUsd);
+    const existing=trk.find(t=>t.mint===mint);
+    if(existing){
+      /* latest brief carries current price for already-tracked mints */
+      if(isFinite(cur)&&cur>0){ existing.curPrice=cur; existing.updatedAt=now; changed=true; }
+      continue;
+    }
+    /* skip re-tracking the same mint within 30 min */
+    if(trk.some(t=>t.mint===mint&&now-t.time<30*60000)) continue;
+    trk.unshift({mint,symbol:c.symbol||"?",conviction:String(c.conviction||"medium").toLowerCase(),
+      price:(isFinite(cur)&&cur>0)?cur:null,curPrice:(isFinite(cur)&&cur>0)?cur:null,
+      time:now,updatedAt:now,url:c.url||""});
+    changed=true;
+  }
+  if(changed){ S.analyst.track=trk.slice(0,60); aaTrackSave(S.analyst.track); }
+}
+function aaWinRate(){
+  const now=Date.now(); let right=0, settled=0;
+  for(const t of S.analyst.track){
+    if(String(t.conviction)!=="high") continue;
+    if(now-t.time<3600000) continue; /* settles 1h after the call */
+    if(!(t.price>0)||!(t.curPrice>0)) continue;
+    settled++; if(t.curPrice>t.price) right++;
+  }
+  return {right,settled,rate:settled?(100*right/settled):null};
+}
+function analystConvSet(v){
+  S.analyst.minConviction=v; aaCfgSave({minConviction:v});
+  if(S.analyst.running){ analystStop(); analystStart(); } else render();
+}
+function renderAnalyst(){
+  const A=S.analyst, wr=aaWinRate();
+  app.innerHTML=header(false,"AI ANALYST")+tabsHTML()+`
+  <div class="card glow"><div class="sect" style="margin:0 0 10px">📊 Market analyst<span class="sp"></span>
+    ${A.running?'<span class="mut"><span class="dotpulse"></span><b style="color:var(--neon)">LIVE</b></span>':'<span class="mut">idle</span>'}</div>
+    <p class="mut" style="margin-bottom:12px">AI conviction calls from OrbitX scanners, refreshed every minute.<br>Runs while this widget is open — intel, not financial advice.</p>
+    <div class="field"><span class="flabel">MIN CONVICTION</span><div class="seg">
+      ${["low","medium","high"].map(v=>`<button class="${A.minConviction===v?"on":""}" onclick="analystConvSet('${v}')">${v[0].toUpperCase()+v.slice(1)}</button>`).join("")}</div></div>
+    ${A.running
+      ?`<button class="btn bigstart" style="background:linear-gradient(135deg,#ff4d5e,#c81e3a);color:#fff" onclick="analystStop()">🔴 STOP ANALYST</button>`
+      :`<button class="btn bigstart" ${A.busy?"disabled":""} onclick="analystStart()">${A.busy?"Starting…":"🟢 START ANALYST"}</button>`}
+    ${errHTML()}
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">Analyst feed<span class="sp"></span>
+    <span class="mut">${A.calls.length?A.calls.length+" calls":""}</span></div>
+    ${A.calls.length?A.calls.map(analystCard).join("")
+      :`<div class="empty"><div class="big">📊</div><b>No calls yet</b><p class="mut">Start the analyst to get live conviction calls.</p></div>`}
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">Track record<span class="sp"></span>
+    ${wr.rate!=null?`<span class="badge ${wr.rate>=50?"good":"bad"}">${wr.rate.toFixed(0)}% WIN</span>`:""}</div>
+    <div class="mut" style="margin-bottom:10px">High-conviction calls, settled 1h after the call time.
+      ${wr.settled?wr.right+"/"+wr.settled+" right":"None settled yet"}.</div>
+    ${A.track.length?A.track.map(trackRow).join("")
+      :`<div class="empty"><div class="big">🧾</div><b>No tracked calls yet</b><p class="mut">Calls you receive are tracked here against their entry price.</p></div>`}
+  </div>`;
+}
+function analystCard(c){
+  const mint=String(c.mint||""), p=Number(c.priceUsd);
+  const cell=(k,l)=>{ const v=Number(c[k]);
+    return `<div class="pcell"><div class="l">${l}</div><div class="v ${isNaN(v)?"":pctCls(v)}">${fmtPct(v)}</div></div>`; };
+  return `<div class="card" style="padding:12px;margin-bottom:8px;cursor:pointer" onclick="inspect('${esc(mint)}')">
+    <div class="row"><div style="flex:1;min-width:0">
+      <div class="tname">${esc(c.symbol||"?")} ${convBadge(c.conviction)}</div>
+      <div class="tsym mono">${shortMint(mint)}</div></div>
+      <div class="tprice"><div>${fmtUSD(p)}</div></div></div>
+    <div class="pgrid">${cell("chg5m","5M")}${cell("chg1h","1H")}${cell("chg24h","24H")}</div>
+    <div class="row"><div class="tsub">Vol 24h ${fmtUSD(Number(c.vol24h))} · Liq ${fmtUSD(Number(c.liquidity))}</div>
+      ${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener" class="chev" style="text-decoration:none" onclick="event.stopPropagation()">↗</a>`:""}</div>
+    ${(c.reasons&&c.reasons.length)?`<ul class="reasons">${c.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`:""}
+  </div>`;
+}
+function trackRow(t){
+  const settled=Date.now()-t.time>=3600000;
+  const hasPx=t.price>0&&t.curPrice>0;
+  const chg=hasPx?(100*(t.curPrice-t.price)/t.price):null;
+  const verdict=!settled?`<span class="badge info">PENDING</span>`
+    :String(t.conviction)==="high"
+      ?(chg!=null&&chg>0?`<span class="badge good">RIGHT</span>`:`<span class="badge bad">WRONG</span>`)
+      :`<span class="badge info">SETTLED</span>`;
+  return `<div class="trow" style="cursor:pointer" onclick="inspect('${esc(t.mint)}')">
+    <div class="tmeta"><div class="tname">${esc(t.symbol||"?")} ${convBadge(t.conviction)}</div>
+      <div class="tsub">${ago(t.time)} · entry ${fmtUSD(t.price)}${hasPx?` → <span class="${pctCls(chg)}">${fmtPct(chg)}</span>`:""}</div></div>
+    ${verdict}</div>`;
+}
+
+/* ================= Research tab ================= */
+function renderResearch(){
+  const R=S.research, rep=R.report;
+  app.innerHTML=header(false,"AI RESEARCH")+tabsHTML()+`
+  <div class="card glow"><div class="sect" style="margin:0 0 10px">🔬 Token research<span class="sp"></span></div>
+    <p class="mut" style="margin-bottom:12px">Full-spectrum dossier: safety audit, holders, whale flow, price action and a verdict.</p>
+    <div class="field"><span class="flabel">TOKEN MINT</span>
+      <input type="text" placeholder="paste mint…" value="${esc(R.mint||"")}" oninput="S.research.mint=this.value"
+        autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')doResearch()"></div>
+    <div class="field"><span class="flabel">DEPTH</span><div class="seg">
+      <button class="${R.depth==="quick"?"on":""}" onclick="S.research.depth='quick';render()">⚡ Quick</button>
+      <button class="${R.depth==="full"?"on":""}" onclick="S.research.depth='full';render()">🔬 Full</button></div></div>
+    <button class="btn" ${R.loading?"disabled":""} onclick="doResearch()">${R.loading?"Researching…":"🔬 Research token"}</button>
+    ${errHTML()}
+  </div>
+  ${R.loading?researchSkel():rep?researchHTML(rep):`<div class="card"><div class="empty"><div class="big">🔬</div>
+    <b>No report yet</b><p class="mut">Paste a token mint above for a full research dossier.</p></div></div>`}`;
+}
+function researchSkel(){
+  return `<div class="card"><div class="skel" style="height:110px;margin-bottom:10px"></div>
+    <div class="skel" style="height:80px;margin-bottom:10px"></div>
+    <div class="skel" style="height:80px;margin-bottom:10px"></div>
+    <div class="skel" style="height:120px"></div></div>`;
+}
+async function doResearch(mint){
+  const m=String(mint!=null?mint:(S.research.mint||"")).trim();
+  if(!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(m)){ S.error="Paste a valid token mint."; render(); return; }
+  const ac=getAuth();
+  if(!ac){ S.error="Reconnect via the OrbitX auth widget, then research."; render(); return; }
+  S.research.mint=m; S.research.loading=true; S.research.report=null; S.error=""; render();
+  try{
+    const r=await Bridge.callTool("orbitx_agent_research",{mint:m,depth:S.research.depth,authCode:ac});
+    if(r&&r.ok===false) throw new Error(r.error||r.message||"research failed");
+    S.research.report=(r&&r.report)||null;
+    if(!S.research.report) S.error="Research returned no report.";
+  }catch(e){ setErr(e); }
+  S.research.loading=false; render();
+}
+function verdictCls(v){
+  v=String(v||"").toLowerCase();
+  if(/buy|bull|strong|good/.test(v)) return "buy";
+  if(/avoid|sell|bear|scam|danger|bad/.test(v)) return "avoid";
+  return "wait";
+}
+function researchHTML(rep){
+  const s=rep.safety||{}, pa=rep.priceAction||{};
+  const vc=verdictCls(rep.verdict);
+  const conf=Math.max(0,Math.min(100,Number(rep.confidence)||0));
+  const flags=s.flags||[];
+  const whales=(rep.whaleActivity||[]);
+  const chgCell=(k,l)=>{ const v=Number(pa[k]);
+    return `<div class="pcell"><div class="l">${l}</div><div class="v ${isNaN(v)?"":pctCls(v)}">${fmtPct(v)}</div></div>`; };
+  return `
+  <div class="verdict ${vc}">
+    <div style="flex:1;min-width:0"><div class="word">${esc(String(rep.verdict||"—").toUpperCase())}</div>
+      <div class="mut" style="margin-top:4px">${esc(rep.symbol||"")} · confidence ${conf}%</div>
+      <div class="meter"><i style="width:${conf}%"></i></div></div>
+    <button class="btn sm ghost" style="white-space:nowrap" onclick="shareReport()">⤴ Share</button>
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">🛡 Safety audit<span class="sp"></span>
+    <span class="badge ${Number(s.score)>=70?"good":Number(s.score)>=40?"warn":"bad"}">${esc(String(s.score??"—"))}/100</span></div>
+    ${frow("Liquidity",fmtUSD(Number(s.liquidity??rep.liquidity)))}
+    ${frow("Holders",fmt(s.holders))}
+    ${frow("Dev %",s.devPct!=null?Number(s.devPct).toFixed(2)+"%":"—")}
+    ${flags.length?`<div class="mut" style="margin:8px 0 4px;font-size:11px;letter-spacing:1px">FLAGS</div>
+      <ul class="reasons">${flags.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>`
+      :`<div class="mut" style="margin-top:8px">No safety flags raised.</div>`}
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">🐋 Whale activity<span class="sp"></span></div>
+    ${whales.length?whales.slice(0,8).map(w=>{
+      const dir=String(w.direction||"").toLowerCase();
+      const emoji=(dir==="buy"||dir==="in")?"🟢":(dir==="sell"||dir==="out")?"🔴":"⚪";
+      return `<div class="wrow"><div>${emoji} <b>${esc(String(w.direction||"?").toUpperCase())}</b>
+        <span class="mut"> · ${fmtUSD(Number(w.usd))}</span></div>
+        <div class="mut">${esc(w.time||"")}${w.url?` <a href="${esc(w.url)}" target="_blank" rel="noopener" style="color:var(--neon)">↗</a>`:""}</div></div>`;
+    }).join("")
+      :`<div class="mut">No whale flow reported.</div>`}
+  </div>
+  <div class="card"><div class="sect" style="margin:0 0 10px">📈 Price action<span class="sp"></span></div>
+    <div class="pgrid">${chgCell("chg5m","5M")}${chgCell("chg1h","1H")}${chgCell("chg6h","6H")}${chgCell("chg24h","24H")}</div>
+    ${frow("Vol 24h",fmtUSD(Number(pa.vol24h)))}
+    ${frow("Price",fmtUSD(Number(rep.priceUsd)))}
+    ${frow("Mcap",fmtUSD(Number(rep.mcap)))}
+  </div>
+  ${rep.reasons&&rep.reasons.length?`<div class="card"><div class="sect" style="margin:0 0 10px">💡 Reasons</div>
+    <ul class="reasons">${rep.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></div>`:""}
+  <div class="mut" style="text-align:center;font-size:11px;margin:6px 0 10px">Research is intel, not financial advice.${rep.generatedAt?" Generated "+new Date(rep.generatedAt).toLocaleString():""}</div>
+  <div class="card"><button class="btn sm ghost" style="width:100%" onclick="inspect('${esc(String(rep.mint||""))}')">🪙 Open token dossier</button></div>`;
+}
+function shareReport(){
+  const rep=S.research.report; if(!rep) return;
+  const s=rep.safety||{}, pa=rep.priceAction||{};
+  const lines=[
+    `🔬 OrbitX Research: ${rep.symbol||"?"}${rep.name?" ("+rep.name+")":""}`,
+    `Verdict: ${String(rep.verdict||"—").toUpperCase()} (${Number(rep.confidence)||0}% confidence)`,
+    `Price: ${fmtUSD(Number(rep.priceUsd))} · 24h ${fmtPct(Number(pa.chg24h))} · Mcap ${fmtUSD(Number(rep.mcap))}`,
+    `Safety: ${s.score??"—"}/100 · Holders ${fmt(s.holders)} · Dev ${s.devPct!=null?Number(s.devPct).toFixed(2)+"%":"—"}`,
+    (rep.reasons&&rep.reasons.length)?"Why: "+rep.reasons.slice(0,3).map(r=>String(r)).join(" | "):"",
+    rep.url||""
+  ].filter(Boolean);
+  const txt=lines.join("\n");
+  const ok=()=>toast("Report copied to clipboard");
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok,()=>{fallbackCopy(txt);ok();});
+  else { fallbackCopy(txt); ok(); }
+}
+function fallbackCopy(t){ try{ const ta=document.createElement("textarea"); ta.value=t;
+  ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+  ta.select(); document.execCommand("copy"); ta.remove(); }catch(e){} }
 
 /* ---------- Boot ---------- */
 renderExplore();
