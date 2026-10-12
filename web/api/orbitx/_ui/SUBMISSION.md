@@ -114,7 +114,7 @@ Three credential paths, all verified in `web/api/orbitx-hub.js`:
 | # | Item | Status | Owner |
 |---|---|---|---|
 | 1 | App metadata (name, tagline, descriptions, category, publisher) | **DONE** (§1) | Builder D |
-| 2 | Icon artwork (512×512 PNG + SVG) | **PENDING** | **Parent** (generating separately) |
+| 2 | Icon artwork (512×512 PNG + SVG) | **DONE** — derived from official OrbitX logo (`web/public/orbitx-icon-512.png`, `web/public/orbitx-icon.svg`; source `web/public/orbitx-logo-official.jpg`) | Parent |
 | 3 | MCP server URL fixed + HTTPS (`https://www.orbitx.world/api/mcp`) | **DONE** — live, 4,298 tools | Builder D |
 | 4 | Domain verification for orbitx.world in the submission portal | **PENDING** | Owner (DNS/TXT step in portal) |
 | 5 | Privacy policy URL live | **DONE** (`/privacy`, 200) | Builder D |
@@ -189,7 +189,7 @@ structured with fix URLs.
 
 ## 8. Screenshot / asset checklist
 
-- [ ] Icon: 512×512 PNG (+ SVG source) — **PENDING on parent**
+- [x] Icon: 512×512 PNG (+ SVG source) — **DONE** (`web/public/orbitx-icon-512.png`, `web/public/orbitx-icon.svg`, from official logo)
 - [ ] Widget carousel screenshots (one per widget, 5 total): auth, trade (quote + confirm gate), token (scan result), wallet (PnL), media (generated images) — capture from ChatGPT Developer Mode once connected
 - [ ] Optional: 10–30s clip of the trade confirm flow (reviewers love the confirm gate)
 - [ ] All screenshots show real data, no mock content
