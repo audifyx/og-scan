@@ -523,14 +523,17 @@ function paintOHLCBox(box){
 /* DexScreener tab — honest preview card FIRST (real data), embed only on user tap.
    Never auto-renders a possibly-blocked iframe in the Apps SDK sandbox. */
 function paintDex(box,tk,pair,dx){
-  if(S.dexEmbedded&&dx&&dx.embedUrl){
+  if(true){ // auto-render embedded chart — user wants real embeds, not gated previews
+    const embedSrc=(dx&&dx.embedUrl)||(pair&&pair.address?"https://dexscreener.com/solana/"+pair.address+"?embed=1&theme=dark":null);
+    if(!embedSrc){ /* no pair — fall through to preview card */ } else {
     const page=dx.pageUrl||(pair?"https://dexscreener.com/solana/"+pair.address:"https://dexscreener.com");
-    box.innerHTML=`<iframe src="${esc(dx.embedUrl)}" title="DexScreener chart" loading="lazy"
+    box.innerHTML=`<iframe src="${esc(embedSrc)}" title="DexScreener chart" loading="lazy"
       sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
       <div style="padding:10px 14px 14px">
         <button class="btn sm ghost" style="width:100%" onclick="openUrl('${esc(page)}')">Open live chart ↗</button>
       </div>`;
     return;
+    }
   }
   const addr=pair&&pair.address;
   const page=dx&&dx.pageUrl?dx.pageUrl:(addr?"https://dexscreener.com/solana/"+addr:"https://dexscreener.com");
