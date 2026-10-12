@@ -142,6 +142,14 @@ input,textarea{autocomplete:off}
 details.card summary{cursor:pointer;font-weight:700;font-size:14px;list-style:none}
 details.card summary::-webkit-details-marker{display:none}
 .roomacts{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
+/* UI polish: smooth transitions, press feedback, fade-in */
+.card,.tcard,.toolrow,.qbtn,.stat{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover,.tcard:hover{border-color:rgba(23,255,77,.25)}
+button{transition:transform .12s ease,opacity .12s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card,.tcard{animation:fadeUp .32s ease both}
+@media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
 </style>
 </head>
 <body>

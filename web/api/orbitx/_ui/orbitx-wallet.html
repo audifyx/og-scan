@@ -121,6 +121,14 @@ a.tx{color:var(--neon2);text-decoration:none;font-size:12px}
 .boostform{margin-top:10px;display:flex;flex-direction:column;gap:8px}
 .histrow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #0f1720;font-size:13px}
 .histrow:last-child{border-bottom:0}
+/* UI polish: smooth transitions, press feedback, fade-in */
+.card,.tcard,.toolrow,.qbtn,.stat{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover,.tcard:hover{border-color:rgba(23,255,77,.25)}
+button{transition:transform .12s ease,opacity .12s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card,.tcard{animation:fadeUp .32s ease both}
+@media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
 </style>
 </head>
 <body>

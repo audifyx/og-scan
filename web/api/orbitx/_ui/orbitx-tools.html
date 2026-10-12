@@ -93,6 +93,14 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
 .mut{color:var(--muted);font-size:12px}
 input,textarea{autocomplete:off}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* UI polish: smooth transitions, press feedback, fade-in */
+.card,.tcard,.toolrow,.qbtn,.stat{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.card:hover,.tcard:hover{border-color:rgba(23,255,77,.25)}
+button{transition:transform .12s ease,opacity .12s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card,.tcard{animation:fadeUp .32s ease both}
+@media (prefers-reduced-motion:reduce){.card,.tcard{animation:none}}
 </style>
 </head>
 <body>
