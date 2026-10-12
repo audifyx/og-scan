@@ -6132,11 +6132,15 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/list") {
       const cursor = params?.cursor;
-      // ChatGPT gets a compact curated surface — the full 2,500+ catalog
-      // breaks its discovery (zero callable tools). No pagination for ChatGPT;
-      // `search` provides access to the rest.
+      // ChatGPT: return ALL tools on page 1 (no pagination). ChatGPT does not
+      // reliably follow nextCursor, so paginating hides most of the catalog.
       if (isChatGPT(req) && !cursor) {
-        const compact = publicToolList(CORE_TOOLS.filter((t) => CHATGPT_TOOL_NAMES.has(t.name))).map((t) =>
+        const all = [
+          ...publicToolList(CORE_TOOLS),
+          ...publicToolList(_generated),
+          ...publicToolList(_cook),
+          ...publicToolList(_life),
+        ].map((t) =>
           withUiListingMeta(t, {
             name: t.name,
             description: t.description,
@@ -6148,11 +6152,10 @@ async function handleMcp(req, res, parts) {
           jsonrpc: "2.0",
           id,
           result: {
-            tools: compact,
+            tools: all,
             _meta: {
-              totalAvailable: TOOLS.length,
-              compactFor: "chatgpt",
-              note: "Compact surface for ChatGPT compatibility. Use the search tool to find any of the 2,500+ tools by keyword.",
+              totalAvailable: all.length,
+              note: "Full catalog on page 1 for ChatGPT.",
             },
           },
         });
