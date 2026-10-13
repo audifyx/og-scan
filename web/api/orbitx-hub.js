@@ -6445,21 +6445,9 @@ async function handleMcp(req, res, parts) {
           const skipWidgetEmbed = name === "orbitx_auth_link";
           if (widgetMeta && typeof wrapped === "object" && wrapped && !skipWidgetEmbed) {
             wrapped._meta = { ...(wrapped._meta && typeof wrapped._meta === "object" ? wrapped._meta : {}), ...widgetMeta };
-            // Embed widget resource in content for ChatGPT to render
-            const widgetUri = widgetMeta?.ui?.resourceUri || widgetMeta?.["openai/outputTemplate"];
-            if (widgetUri && Array.isArray(wrapped.content)) {
-              // Only add if not already present
-              const hasWidget = wrapped.content.some(c => c?.type === "resource" && c?.resource?.uri === widgetUri);
-              if (!hasWidget) {
-                wrapped.content.push({
-                  type: "resource",
-                  resource: {
-                    uri: widgetUri,
-                    mimeType: "text/html",
-                  },
-                });
-              }
-            }
+            // NOTE: Do NOT embed widget as content resource — ChatGPT's MCP client
+            // can't parse type:"resource" items and fails the entire result.
+            // The _meta binding alone is the standard Apps SDK mechanism.
           }
         } catch {}
         return json(res, {
