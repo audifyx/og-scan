@@ -418,9 +418,27 @@ const QR = (() => {
 /* ---------------- bridge ---------------- */
 const RPC_URL='https://www.orbitx.world/api/mcp';
 let rpcId=1;
+/* Unwrap an MCP CallToolResult envelope into the tool's data. Bridge calls
+   (window.openai / window.OrbitX) return the raw envelope
+   {content:[...], structuredContent} — callers expect the data itself. */
+function unwrapToolResult(r){
+  if(!r || typeof r!=="object") return r;
+  if(r.isError){
+    const t=Array.isArray(r.content)?r.content.find(c=>c&&c.type==="text"&&typeof c.text==="string"):null;
+    throw new Error((t&&t.text)||"tool error");
+  }
+  if(r.structuredContent && typeof r.structuredContent==="object") return r.structuredContent;
+  if(Array.isArray(r.content) && r.content.length && r.content[0] && (r.content[0].type==="text"||r.content[0].type==="resource")){
+    const t=r.content.find(c=>c&&c.type==="text"&&typeof c.text==="string");
+    if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
+    return r.content;
+  }
+  return r;
+}
+
 async function hostCallTool(name,args){
   if(window.OrbitX&&typeof window.OrbitX.callTool==='function')
-    return window.OrbitX.callTool(name,args||{});
+    return unwrapToolResult(await window.OrbitX.callTool(name,args||{}));
   // standalone fallback: MCP JSON-RPC over HTTPS (Accept JSON + SSE, parse either)
   const res=await fetch(RPC_URL,{method:'POST',
     headers:{'Content-Type':'application/json','Accept':'application/json, text/event-stream'},

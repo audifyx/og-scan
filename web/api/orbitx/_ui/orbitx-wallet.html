@@ -149,13 +149,31 @@ button:active{transform:scale(.97)}
 "use strict";
 /* ================= Bridge (CONTRACT.md v1) ================= */
 const MCP_URL = "https://www.orbitx.world/api/mcp";
+/* Unwrap an MCP CallToolResult envelope into the tool's data. Bridge calls
+   (window.openai / window.OrbitX) return the raw envelope
+   {content:[...], structuredContent} — callers expect the data itself. */
+function unwrapToolResult(r){
+  if(!r || typeof r!=="object") return r;
+  if(r.isError){
+    const t=Array.isArray(r.content)?r.content.find(c=>c&&c.type==="text"&&typeof c.text==="string"):null;
+    throw new Error((t&&t.text)||"tool error");
+  }
+  if(r.structuredContent && typeof r.structuredContent==="object") return r.structuredContent;
+  if(Array.isArray(r.content) && r.content.length && r.content[0] && (r.content[0].type==="text"||r.content[0].type==="resource")){
+    const t=r.content.find(c=>c&&c.type==="text"&&typeof c.text==="string");
+    if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
+    return r.content;
+  }
+  return r;
+}
+
 const Bridge = {
   async callTool(name, args){
     if (window.openai && typeof window.openai.callTool === "function"){
-      return await window.openai.callTool(name, args);
+      return unwrapToolResult(await window.openai.callTool(name, args));
     }
     if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
-      return await window.OrbitX.callTool(name, args);
+      return unwrapToolResult(await window.OrbitX.callTool(name, args));
     }
     // standalone fallback: POST MCP JSON-RPC directly (no bridge).
     // Sends Accept for both plain JSON and SSE; parses either.

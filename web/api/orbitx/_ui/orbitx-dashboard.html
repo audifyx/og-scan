@@ -153,13 +153,31 @@ button:active{transform:scale(.97)}
 "use strict";
 /* ================= Bridge (CONTRACT.md v1 — task order: OrbitX -> openai -> standalone) ================= */
 const MCP_URL = "https://www.orbitx.world/api/mcp";
+/* Unwrap an MCP CallToolResult envelope into the tool's data. Bridge calls
+   (window.openai / window.OrbitX) return the raw envelope
+   {content:[...], structuredContent} — callers expect the data itself. */
+function unwrapToolResult(r){
+  if(!r || typeof r!=="object") return r;
+  if(r.isError){
+    const t=Array.isArray(r.content)?r.content.find(c=>c&&c.type==="text"&&typeof c.text==="string"):null;
+    throw new Error((t&&t.text)||"tool error");
+  }
+  if(r.structuredContent && typeof r.structuredContent==="object") return r.structuredContent;
+  if(Array.isArray(r.content) && r.content.length && r.content[0] && (r.content[0].type==="text"||r.content[0].type==="resource")){
+    const t=r.content.find(c=>c&&c.type==="text"&&typeof c.text==="string");
+    if(t){ try{ return JSON.parse(t.text); }catch(e){ return t.text; } }
+    return r.content;
+  }
+  return r;
+}
+
 const Bridge = {
   async callTool(name, args){
     if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
-      return await window.OrbitX.callTool(name, args);
+      return unwrapToolResult(await window.OrbitX.callTool(name, args));
     }
     if (window.openai && typeof window.openai.callTool === "function"){
-      return await window.openai.callTool(name, args);
+      return unwrapToolResult(await window.openai.callTool(name, args));
     }
     const res = await fetch(MCP_URL, {
       method:"POST",
@@ -237,9 +255,11 @@ function normalizeIdentity(r){
 }
 async function checkAuth(){
   const code=getAuth();
-  if(!code){ S.authState="signedout"; S.identity=null; return; }
   try{
-    const who=await Bridge.callTool("orbitx_whoami",{authCode:code});
+    // Hosted (ChatGPT/OrbitX bridge): the MCP call carries the user's OAuth
+    // session, so whoami resolves even with no localStorage code — the
+    // dashboard is connected from the start, no manual link step.
+    const who=await Bridge.callTool("orbitx_whoami", code?{authCode:code}:{});
     const id=normalizeIdentity(who);
     if(!id) throw new Error("Identity lookup returned no wallet.");
     S.identity=id; S.authState="authed";
