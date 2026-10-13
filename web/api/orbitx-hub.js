@@ -142,6 +142,12 @@ import {
   readUiWidget,
   toolListingMeta,
 } from "./orbitx/_ui/_widgets.js";
+/** MCP Skills (SEP-2640 subset) — skills/list + skills/get + skill:// resources/read. */
+import {
+  listSkills,
+  getSkill,
+  readSkillResource,
+} from "./orbitx/_skills/index.js";
 /** Lazy-load Solana tx builders — top-level @solana imports crash this function on Vercel. */
 async function mcpOps() {
   return import("./orbitx/_handlers/_mcp-ops.js");
@@ -6173,7 +6179,8 @@ async function handleMcp(req, res, parts) {
           result: {
             protocolVersion: negotiatedVersion,
             // TEMP-DIAG 2026-10-12: resources capability stripped to isolate ChatGPT discovery failure.
-            capabilities: { tools: {}, resources: {} },
+            // extensions advertises the MCP Skills (SEP-2640 subset) OpenAI imports at submission.
+            capabilities: { tools: {}, resources: {}, extensions: { "io.modelcontextprotocol/skills": {} } },
             serverInfo: { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
             instructions:
               "OrbitX Agent MCP. Coverage, not a tour: we do not tell users to use every surface. Each door is for a trading group. If they ask why use this MCP, why so many tools, or which app to use, call orbitx_why. When the user says /, menu, or asks what you can do, call orbitx_menu. If they paste an authCode from /agent, call orbitx_auth_status — do NOT open a website — then pass authCode on every tool. PAPER DESK: 10 agents × 10,000 mock SOL trading real coin tape every hour — orbitx_paper_desk / orbitx_paper_buying / orbitx_paper_agent. LIVE DESK: 3 books share one hot wallet, $1.50 real-SOL buys every 5 minutes, one open book, take-profit around +$0.30 — orbitx_live_desk / orbitx_live_positions / orbitx_live_feed / orbitx_live_world (read only, never executes). Watch the X-style feed and 3D city at https://www.orbitx.world/on-chain. LIFE CITY: “let’s create an agent that scans X” → orbitx_life_create. They get @handle.obx, think with NVIDIA, tweet, converse, marry, raise the next gen, write files/daily logs, and publish HTML desk sites. Watch the live two-pane world at https://www.orbitx.world/orbitxagents. City: orbitx_life_city. Brain: orbitx_life_think. Files: orbitx_life_files. Talk: orbitx_life_converse. 300 life cmds via tools/list cursor life:0. Hourly cron is a free-will hour of life. CHARTS: orbitx_dex_chart. TRADE: orbitx_trade_quote then prepare_buy. X: orbitx_x_connect → orbitx_x_post. VOICE: orbitx_vc_start. GROUP CHAT: orbitx_gc_start. Setup: https://www.orbitx.world/agent",
@@ -6241,12 +6248,41 @@ async function handleMcp(req, res, parts) {
 
     if (method === "resources/read") {
       const uri = String(params?.uri || "");
+      // Skill playbooks (skill://) — same handler shape as widgets.
+      if (uri.startsWith("skill://")) {
+        const payload = readSkillResource(uri);
+        if (!payload) {
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32602, message: `Unknown skill resource: ${uri || "(empty)"}` },
+          });
+        }
+        return json(res, { jsonrpc: "2.0", id, result: payload });
+      }
       const payload = readUiWidget(uri);
       if (!payload) {
         return json(res, {
           jsonrpc: "2.0",
           id,
           error: { code: -32602, message: `Unknown widget resource: ${uri || "(empty)"}` },
+        });
+      }
+      return json(res, { jsonrpc: "2.0", id, result: payload });
+    }
+
+    // MCP Skills (SEP-2640 subset) — static snapshot imported at submission.
+    if (method === "skills/list") {
+      return json(res, { jsonrpc: "2.0", id, result: listSkills() });
+    }
+
+    if (method === "skills/get") {
+      const payload = getSkill(params?.uri);
+      if (!payload) {
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: `Unknown skill: ${String(params?.uri || "(empty)")}` },
         });
       }
       return json(res, { jsonrpc: "2.0", id, result: payload });
