@@ -6452,22 +6452,11 @@ async function handleMcp(req, res, parts) {
         });
         const wrapped = wrapMcpToolContent(result);
         // ChatGPT Mini App: attach widget _meta to the RESULT (not just the
-        // tool definition) so ChatGPT renders the UI widget instead of raw JSON.
-        // Also embed the widget as a resource in content (Method C from Apps SDK spec)
-        // for hosts that need the actual resource reference.
-        try {
-          const widgetMeta = toolListingMeta({ name });
-          // Skip widget embedding for orbitx_auth_link — ChatGPT needs the raw URL,
-          // not a widget. Embedding the widget causes ChatGPT to render the widget
-          // (which errors) instead of showing the auth link.
-          const skipWidgetEmbed = name === "orbitx_auth_link";
-          if (widgetMeta && typeof wrapped === "object" && wrapped && !skipWidgetEmbed) {
-            wrapped._meta = { ...(wrapped._meta && typeof wrapped._meta === "object" ? wrapped._meta : {}), ...widgetMeta };
-            // NOTE: Do NOT embed widget as content resource — ChatGPT's MCP client
-            // can't parse type:"resource" items and fails the entire result.
-            // The _meta binding alone is the standard Apps SDK mechanism.
-          }
-        } catch {}
+        // NOTE: Do NOT attach widget _meta to results. The Apps SDK spec binds
+        // widgets via the TOOL DEFINITION's _meta (done in tools/list via
+        // withUiListingMeta). Adding _meta to results confuses ChatGPT's parser
+        // and breaks widget rendering. Results carry content + structuredContent only.
+        // (orbitx_auth_link also skips widgets — it returns a raw URL.)
         return json(res, {
           jsonrpc: "2.0",
           id,
