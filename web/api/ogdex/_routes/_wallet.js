@@ -1,4 +1,4 @@
-import { callFn, send, cache } from "../_lib.js";
+import { send, cache, resilientRpc } from "../_lib.js";
 import { computePnl } from "../_pnl.js";
 
 // Phantom-style wallet portfolio: SOL + SPL holdings with live USD values + metadata.
@@ -12,8 +12,11 @@ const GT = "https://api.geckoterminal.com/api/v2";
 const isAddr = (a) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a || "");
 
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
-  return r?.data?.result ?? r?.result ?? null;
+  // Resilient path (Helius -> public fallback). A bare callFn("rpc-proxy")
+  // returns null when the proxy is down, and every caller below treats null
+  // as "empty wallet" — that is how wallets showed sol 0 / holdings [] /
+  // trades [] while the chain had real activity.
+  return resilientRpc(method, params);
 }
 
 async function jupPrices(ids) {
@@ -197,6 +200,15 @@ export default async function handler(req, res) {
     ]);
     const sol =
       lamports == null ? 0 : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
+    // Honest degradation: null means the RPC failed, NOT "empty". A failed
+    // token-account fetch must never be reported as "0 tokens" — public
+    // RPCs block getTokenAccountsByOwner, so when Helius is down the token
+    // list is UNKNOWN, and the response says so.
+    const degradedSources = [];
+    if (lamports == null) degradedSources.push("balance");
+    if (accs1 == null && accs2 == null) degradedSources.push("tokenAccounts");
+    if (pnl == null) degradedSources.push("tradeHistory");
+    const tokenListComplete = !(accs1 == null && accs2 == null);
     const raw = [...(accs1?.value || []), ...(accs2?.value || [])];
 
     const byMint = {};
@@ -510,6 +522,9 @@ export default async function handler(req, res) {
       pnl,
       trades,
       tradeCount: trades.length,
+      degraded: degradedSources.length > 0,
+      degradedSources,
+      tokenListComplete,
     });
   } catch (e) {
     return send(res, 200, { ok: false, error: String(e?.message || e) });

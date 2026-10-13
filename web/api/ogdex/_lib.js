@@ -1,5 +1,6 @@
 // Shared backend client — reuses the OG Scan (Soltools) Supabase backend.
 import { adminCredentialOk, deskUnlockConfigured } from "../../shared/desk-unlock.js";
+import { jsonRpcWithFallback } from "../../shared/pump-claim.js";
 
 export const SUPA_URL = process.env.SUPABASE_URL || "";
 export const SUPA_FN = process.env.SUPABASE_FN_URL || (SUPA_URL ? SUPA_URL + "/functions/v1" : "");
@@ -46,6 +47,44 @@ export async function callFn(name, body) {
   });
   const txt = await r.text();
   try { return JSON.parse(txt); } catch { return { ok: false, raw: txt }; }
+}
+
+const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Resilient Solana JSON-RPC: Helius via Supabase rpc-proxy first (8s cap),
+ * then public RPCs via jsonRpcWithFallback. Returns the unwrapped result,
+ * or null when every path fails.
+ *
+ * Use this for ALL wallet/holder/PnL RPC — direct callFn("rpc-proxy") calls
+ * silently return empty wallets (sol 0, holdings [], trades []) when the
+ * proxy is down, because callers treat null as "empty". Public RPCs serve
+ * getBalance / getSignaturesForAddress / getTransaction / getMultipleAccounts;
+ * only indexed getTokenAccountsByOwner still needs Helius (public RPCs block
+ * it) — callers must flag that as degraded, never as "0 tokens".
+ */
+export async function resilientRpc(method, params) {
+  try {
+    const TIMEOUT = Symbol("timeout");
+    const r = await Promise.race([
+      callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params, provider: "helius" }),
+      _sleep(8000).then(() => TIMEOUT),
+    ]);
+    // success === false means the proxy itself failed — discard its payload.
+    if (r !== TIMEOUT && !(r && r.success === false)) {
+      const data = r?.data ?? r ?? null;
+      if (data && !data.error && data.result !== undefined) return data.result;
+    }
+  } catch {
+    /* fall through to public RPCs */
+  }
+  try {
+    const fb = await jsonRpcWithFallback({ jsonrpc: "2.0", id: 1, method, params });
+    if (fb && !fb.error && fb.result !== undefined) return fb.result;
+  } catch {
+    /* all paths failed */
+  }
+  return null;
 }
 
 export async function jup(path) {

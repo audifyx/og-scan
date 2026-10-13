@@ -1,4 +1,4 @@
-import { callFn } from "./_lib.js";
+import { resilientRpc } from "./_lib.js";
 import { parseSwap } from "./_swap.js";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -14,8 +14,8 @@ async function solPrice() {
   return SOLP_CACHE.v;
 }
 async function rpc(method, params) {
-  const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
-  return r?.data?.result ?? r?.result ?? null;
+  // Same resilient path as the wallet route — see _lib.resilientRpc.
+  return resilientRpc(method, params);
 }
 
 // One retry on null/throw — getTransaction is frequently rate-limited under load.
