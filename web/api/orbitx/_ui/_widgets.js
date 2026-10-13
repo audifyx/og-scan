@@ -17,6 +17,46 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 /** Apps SDK widget MIME type — this is what marks a resource as renderable UI. */
 export const WIDGET_MIME_TYPE = "text/html;profile=mcp-app";
 
+/**
+ * App-submission metadata for every widget resource. Both errors the portal
+ * reports ("Widget CSP is not set", "Widget domain is not set") are fixed by
+ * this _meta on resources/list + resources/read.
+ *
+ * widgetDomain: the fully-qualified domain serving the widget assets.
+ * widgetCSP: connect_domains = hosts the widget fetches (our API only);
+ * resource_domains = fonts + TradingView chart script + token-icon gateways;
+ * redirect_domains = outbound links opened via openExternal (Solscan,
+ * DexScreener, X, Telegram) so they skip the safe-link modal.
+ * frame_domains is deliberately OMITTED: the DexScreener chart iframe is
+ * user-gated with a preview-card fallback, and declaring frame_domains puts
+ * the app under higher review scrutiny / risks being held back.
+ */
+export const WIDGET_DOMAIN = "https://www.orbitx.world";
+export const WIDGET_CSP = {
+  connect_domains: ["https://www.orbitx.world"],
+  resource_domains: [
+    "https://www.orbitx.world",
+    "https://fonts.googleapis.com",
+    "https://fonts.gstatic.com",
+    "https://s3.tradingview.com",
+    "https://ipfs.io",
+    "https://arweave.net",
+  ],
+  redirect_domains: [
+    "https://solscan.io",
+    "https://dexscreener.com",
+    "https://x.com",
+    "https://t.me",
+  ],
+};
+
+export function widgetResourceMeta() {
+  return {
+    "openai/widgetCSP": { ...WIDGET_CSP },
+    "openai/widgetDomain": WIDGET_DOMAIN,
+  };
+}
+
 export const UI_WIDGETS = [
   {
     uri: "ui://widget/orbitx-auth.html",
@@ -118,6 +158,7 @@ export function listUiWidgets() {
     title: w.title,
     description: w.description,
     mimeType: WIDGET_MIME_TYPE,
+    _meta: widgetResourceMeta(),
   }));
 }
 
@@ -135,6 +176,7 @@ export function readUiWidget(uri) {
         title: w.title,
         mimeType: WIDGET_MIME_TYPE,
         text,
+        _meta: widgetResourceMeta(),
       },
     ],
   };
