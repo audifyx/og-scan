@@ -6192,14 +6192,12 @@ async function handleMcp(req, res, parts) {
       // Return ALL tools on page 1 for the first request (no cursor).
       // ChatGPT does not reliably follow nextCursor, and UA detection is
       // unreliable (ChatGPT may use varying UAs). Paginated cursors still
-      // work for clients that request them explicitly.
+      // Page 1 (no cursor): return CORE tools only (~24 tools, small/fast).
+      // The 3.8MB full catalog times out ChatGPT's connector discovery.
+      // Full catalog available via cursor pagination, and orbitx_exec routes
+      // to all 4,297 tools from the visible set.
       if (!cursor) {
-        const all = [
-          ...publicToolList(CORE_TOOLS),
-          ...publicToolList(_generated),
-          ...publicToolList(_cook),
-          ...publicToolList(_life),
-        ].map((t) =>
+        const core = publicToolList(CORE_TOOLS).map((t) =>
           withUiListingMeta(t, {
             name: t.name,
             description: t.description,
@@ -6211,10 +6209,11 @@ async function handleMcp(req, res, parts) {
           jsonrpc: "2.0",
           id,
           result: {
-            tools: all,
+            tools: core,
             _meta: {
-              totalAvailable: all.length,
-              note: "Full catalog on page 1.",
+              totalAvailable: 4297,
+              visibleOnPage1: core.length,
+              note: "Core tools on page 1. Use orbitx_exec to call any of the 4,297 tools, or paginate with cursor for the full list.",
             },
           },
         });
