@@ -1,10 +1,14 @@
 /**
  * Hourly Life Agent tick — Vercel Cron GET /api/mcp-life-tick
  * Auth: Bearer CRON_SECRET or OXW_WORKER_SECRET when set.
+ *
+ * Lives in the ogdex catch-all (NOT a standalone api/ file): Vercel Hobby
+ * allows max 12 serverless functions per deployment, and a standalone
+ * mcp-life-tick.js was the 13th — it blocked EVERY deploy. Routed via
+ * vercel.json rewrite /api/mcp-life-tick -> /api/ogdex?path=mcp-life-tick.
+ * ogdex.js maxDuration is 90s so the tick keeps its original time budget.
  */
-import { tickDueLifeAgents } from "./orbitx/_handlers/_mcp-life-agents.js";
-
-export const config = { maxDuration: 90 };
+import { tickDueLifeAgents } from "../../orbitx/_handlers/_mcp-life-agents.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";

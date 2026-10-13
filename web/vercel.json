@@ -236,6 +236,10 @@
       "destination": "/api/orbitx-hub?path=mcp/.well-known/oauth-authorization-server"
     },
     {
+      "source": "/api/mcp-life-tick",
+      "destination": "/api/ogdex?path=mcp-life-tick"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

@@ -40,6 +40,7 @@ import platformStats from "./ogdex/_routes/_platform-stats.js";
 import traders from "./ogdex/_routes/_traders.js";
 import waitlist from "./ogdex/_routes/_waitlist.js";
 import mcp from "./ogdex/_routes/_mcp.js";
+import mcpLifeTick from "./ogdex/_routes/_mcp-life-tick.js";
 import { createHmac, timingSafeEqual } from "crypto";
 
 const ROUTES = {
@@ -51,9 +52,10 @@ const ROUTES = {
   traders,
   waitlist,
   mcp,
+  "mcp-life-tick": mcpLifeTick,
 };
 
-const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock"]);
+const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock", "mcp-life-tick"]);
 const LIMITS = { chat: 12, forensics: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30, mcp: 30 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
@@ -445,4 +447,4 @@ export default async function handler(req, res) {
   return route(req, res);
 }
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 90 }; // tick route needs 90s (was standalone maxDuration 90)
