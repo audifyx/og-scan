@@ -6439,7 +6439,11 @@ async function handleMcp(req, res, parts) {
         // for hosts that need the actual resource reference.
         try {
           const widgetMeta = toolListingMeta({ name });
-          if (widgetMeta && typeof wrapped === "object" && wrapped) {
+          // Skip widget embedding for orbitx_auth_link — ChatGPT needs the raw URL,
+          // not a widget. Embedding the widget causes ChatGPT to render the widget
+          // (which errors) instead of showing the auth link.
+          const skipWidgetEmbed = name === "orbitx_auth_link";
+          if (widgetMeta && typeof wrapped === "object" && wrapped && !skipWidgetEmbed) {
             wrapped._meta = { ...(wrapped._meta && typeof wrapped._meta === "object" ? wrapped._meta : {}), ...widgetMeta };
             // Embed widget resource in content for ChatGPT to render
             const widgetUri = widgetMeta?.ui?.resourceUri || widgetMeta?.["openai/outputTemplate"];
