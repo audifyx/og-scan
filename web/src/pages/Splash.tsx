@@ -538,6 +538,7 @@ export default function Splash() {
           <a href="#build">Build</a>
           <a href="#roadmap">Roadmap</a>
           <a href="#ca">CA</a>
+          <a href="/connect-chatgpt">Connect to ChatGPT</a>
         </div>
         <div className="sp-nav-cta">
           <a className="sp-btn-ghost sm" href={LINKS.signin}>Sign in</a>
@@ -748,6 +749,7 @@ export default function Splash() {
               <a href={LINKS.ogdex}>OrbitX DEX</a>
               <a href={LINKS.launchpad}>Launchpad</a>
               <a href={LINKS.orbitxPrediction} target="_blank" rel="noreferrer">Prediction Market</a>
+              <a href="/connect-chatgpt">Connect to ChatGPT</a>
               <a href={LINKS.signup}>Sign up</a>
             </div>
             <div>

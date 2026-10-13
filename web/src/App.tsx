@@ -247,6 +247,7 @@ const McpDetailPage = lazyWithRetry(() => import("./pages/orbitxmcp/McpDetailPag
 const McpSubmitPage = lazyWithRetry(() => import("./pages/orbitxmcp/SubmitMcpPage"));
 const McpSetupPage = lazyWithRetry(() => import("./pages/mcp/McpSetupPage"));
 const McpGuidePage = lazyWithRetry(() => import("./pages/mcp/McpGuidePage"));
+const ConnectChatGptPage = lazyWithRetry(() => import("./pages/mcp/ConnectChatGptPage"));
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
 
@@ -718,6 +719,7 @@ const App = () => (
             <Route path="/supercomputer" element={<McpSuperComputer />} />
             <Route path="/mcp" element={<Suspense fallback={<RouteFallback label="MCP" />}><McpSetupPage /></Suspense>} />
             <Route path="/mcp/guide" element={<Suspense fallback={<RouteFallback label="MCP Guide" />}><McpGuidePage /></Suspense>} />
+            <Route path="/connect-chatgpt" element={<Suspense fallback={<RouteFallback label="Connect to ChatGPT" />}><ConnectChatGptPage /></Suspense>} />
             <Route path="/vc" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/vc/:slug" element={<Suspense fallback={<RouteFallback label="Voice" />}><McpVoiceRoom /></Suspense>} />
             <Route path="/voice" element={<Suspense fallback={<RouteFallback label="Voice" />}><VoiceLobbyBrowser /></Suspense>} />
