@@ -2512,59 +2512,6 @@ const CORE_TOOLS = [
     },
   },
   {
-    name: "orbitx_x_connect",
-    description:
-      "Connect the user's X account to OrbitX so this MCP can post. Returns /auth (Supabase Continue with X) and /x (tweet.write) links.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "orbitx_x_status",
-    description: "Show whether X is connected for this OrbitX user and if tweet.write is granted.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "orbitx_x_post",
-    description:
-      "Post a tweet on the connected X account. Requires OrbitX auth + X connected via /auth Continue with X or /x.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string", description: "Tweet body" },
-        linkUrl: { type: "string" },
-        replyToTweetId: { type: "string" },
-        quoteTweetId: { type: "string" },
-      },
-      required: ["text"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_x_reply",
-    description: "Reply to a tweet id from the connected X account.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string" },
-        replyToTweetId: { type: "string" },
-      },
-      required: ["text", "replyToTweetId"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "orbitx_x_quote",
-    description: "Quote-tweet by id from the connected X account.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string" },
-        quoteTweetId: { type: "string" },
-      },
-      required: ["text", "quoteTweetId"],
-      additionalProperties: false,
-    },
-  },
-  {
     name: "orbitx_trade_quote",
     description:
       "Jupiter quote SOL → mint (no signature). When the user asks price impact / how much they get — call this. Then orbitx_prepare_buy to sign.",
