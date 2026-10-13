@@ -547,7 +547,7 @@ async function meWallet(){
   if(ME_WALLET!==null) return ME_WALLET;
   try{
     const r=await Bridge.callTool("orbitx_whoami",{authCode:getAuth()});
-    ME_WALLET=(r&&(r.wallet||r.address||r.pubkey||r.publicKey))||"";
+    ME_WALLET=(r&&(r.walletAddress||r.wallet||r.address||r.pubkey||r.publicKey))||"";
   }catch(e){ ME_WALLET=""; }
   return ME_WALLET;
 }

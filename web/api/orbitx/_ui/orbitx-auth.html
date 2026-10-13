@@ -439,6 +439,11 @@ function unwrapToolResult(r){
 async function hostCallTool(name,args){
   if(window.OrbitX&&typeof window.OrbitX.callTool==='function')
     return unwrapToolResult(await window.OrbitX.callTool(name,args||{}));
+  // ChatGPT Apps SDK bridge — carries the user's OAuth session, so calls
+  // resolve as the already-authorized user. Without this the widget always
+  // fell back to anonymous direct fetch and demanded a fresh wallet connect.
+  if(window.openai&&typeof window.openai.callTool==='function')
+    return unwrapToolResult(await window.openai.callTool(name,args||{}));
   // standalone fallback: MCP JSON-RPC over HTTPS (Accept JSON + SSE, parse either)
   const res=await fetch(RPC_URL,{method:'POST',
     headers:{'Content-Type':'application/json','Accept':'application/json, text/event-stream'},
@@ -476,12 +481,14 @@ function firstHttpString(obj){
 }
 function normalizeIdentity(r){
   if(!r||typeof r!=='object') return null;
-  const w=r.wallet||r.address||r.pubkey||r.publicKey||r.id||'';
+  // orbitx_whoami returns walletAddress + agentName — NOT wallet/name.
+  // Reading the wrong keys meant the OAuth session's identity never resolved.
+  const w=r.walletAddress||r.wallet||r.address||r.pubkey||r.publicKey||r.id||'';
   if(!w) return null;
   return {
     wallet:String(w),
-    handle:String(r.handle||r.username||r.name||r.displayName||r.ens||'Trader'),
-    tier:String(r.tier||r.plan||r.level||'Standard'),
+    handle:String(r.handle||r.username||r.agentName||r.name||r.displayName||r.ens||'Trader'),
+    tier:String(r.tier||r.plan||r.level||r.badge||'Standard'),
     extra:r,
   };
 }
@@ -496,6 +503,7 @@ const S={
   authCode:null,
   authUrl:null,
   identity:null,
+  viaOAuth:false, // identity came from the host OAuth session, not a saved authCode
   error:'',
   inlineError:'',
   step:1,
@@ -618,8 +626,10 @@ function signedInView(){
     <div class="kv"><span class="k">Tier</span><span class="v"><span class="tier">${esc(id.tier)}</span></span></div>
     <button class="btn btn-primary" id="btnTest" ${S.busy?'disabled':''}>${S.busy?'<span class="spin"></span> Checking…':'↻ Verify connection'}</button>
     <button class="btn btn-ghost" id="btnAgents">🤖 My Agents</button>
-    <button class="btn btn-danger-ghost" id="btnDisconnect">Disconnect wallet</button>
-    <p class="hint" style="text-align:center">Disconnecting clears this device's saved session only. Your wallet itself is untouched.</p>
+    ${S.viaOAuth
+      ? `<p class="hint" style="text-align:center">✅ Already authorized via your ChatGPT connection — no wallet connect needed. Manage the grant in ChatGPT's connector settings.</p>`
+      : `<button class="btn btn-danger-ghost" id="btnDisconnect">Disconnect wallet</button>
+    <p class="hint" style="text-align:center">Disconnecting clears this device's saved session only. Your wallet itself is untouched.</p>`}
   </div>`;
 }
 function authErrorView(){
@@ -679,7 +689,7 @@ function wire(){
 /* ---------------- flow ---------------- */
 function emit(name,detail){ try{ window.dispatchEvent(new CustomEvent(name,{detail})); }catch(e){} }
 function failAuth(message){
-  clearCode(); S.authCode=null; S.identity=null;
+  clearCode(); S.authCode=null; S.viaOAuth=false; S.identity=null;
   S.error=message||'Session expired or invalid.';
   S.view='auth-error'; S.busy=false; render();
   emit('orbitx-auth-error',{message:S.error});
@@ -711,7 +721,7 @@ async function activate(code){
     const who=await call('orbitx_whoami',{authCode:code});
     const id=normalizeIdentity(who);
     if(!id) throw new Error('Connected, but identity lookup failed. Try reconnecting.');
-    S.authCode=code; saveCode(code); S.identity=id;
+    S.authCode=code; saveCode(code); S.viaOAuth=false; S.identity=id;
     S.view='signed-in'; S.busy=false; render();
     toast('Wallet connected ✓');
     emit('orbitx-auth-changed',{connected:true,identity:{wallet:id.wallet,handle:id.handle,tier:id.tier}});
@@ -739,7 +749,7 @@ async function testConnection(){
   }
 }
 function disconnect(){
-  clearCode(); S.authCode=null; S.identity=null; S.authUrl=null;
+  clearCode(); S.authCode=null; S.viaOAuth=false; S.identity=null; S.authUrl=null;
   S.view='signed-out'; S.inlineError=''; render();
   toast('Disconnected');
   emit('orbitx-auth-changed',{connected:false});
@@ -755,7 +765,7 @@ async function boot(){
     try{
       const who=await call('orbitx_whoami',{authCode:S.authCode});
       const id=normalizeIdentity(who);
-      if(id){ S.identity=id; S.view='signed-in'; render();
+      if(id){ S.viaOAuth=false; S.identity=id; S.view='signed-in'; render();
         emit('orbitx-auth-changed',{connected:true,identity:{wallet:id.wallet,handle:id.handle,tier:id.tier}}); return; }
       throw new Error('stale session');
     }catch(e){
@@ -775,6 +785,23 @@ async function boot(){
     await startLink();
     const inp=document.getElementById('codeInput'); if(inp) inp.value=deep;
     return;
+  }
+  // No saved code — but the host (ChatGPT) may already hold an OAuth session
+  // for this connector. The bridge call carries it, so whoami resolves with
+  // no code at all. Never demand a wallet connect from an already-authorized user.
+  const hosted=(window.OrbitX&&typeof window.OrbitX.callTool==='function')||
+               (window.openai&&typeof window.openai.callTool==='function');
+  if(hosted){
+    S.view='boot'; render();
+    try{
+      const who=await call('orbitx_whoami',{});
+      const id=normalizeIdentity(who);
+      if(id){
+        S.viaOAuth=true; S.identity=id; S.view='signed-in'; render();
+        emit('orbitx-auth-changed',{connected:true,identity:{wallet:id.wallet,handle:id.handle,tier:id.tier}});
+        return;
+      }
+    }catch(e){ /* no usable OAuth session — fall through to signed-out */ }
   }
   S.view='signed-out'; render();
 }

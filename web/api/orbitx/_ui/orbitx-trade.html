@@ -210,6 +210,10 @@ const Bridge = {
     let out;
     if (window.OrbitX && typeof window.OrbitX.callTool === "function"){
       out = unwrapToolResult(await window.OrbitX.callTool(name, args)); // hosted bridge (CONTRACT.md)
+    } else if (window.openai && typeof window.openai.callTool === "function"){
+      // ChatGPT Apps SDK bridge — carries the user's OAuth session. Without
+      // this the widget always fell back to anonymous direct fetch.
+      out = unwrapToolResult(await window.openai.callTool(name, args));
     } else {
     // standalone fallback: POST MCP JSON-RPC directly (no bridge).
     // Sends Accept for both plain JSON and SSE; parses either.

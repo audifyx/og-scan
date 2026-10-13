@@ -247,11 +247,12 @@ const timeHM = ts=>ts?new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute
 /* ================= Auth ================= */
 function normalizeIdentity(r){
   if(!r||typeof r!=="object") return null;
-  const w=r.wallet||r.address||r.pubkey||r.publicKey||r.id||"";
+  // orbitx_whoami returns walletAddress + agentName — NOT wallet/name.
+  const w=r.walletAddress||r.wallet||r.address||r.pubkey||r.publicKey||r.id||"";
   if(!w) return null;
   return { wallet:String(w),
-    handle:String(r.handle||r.username||r.name||r.displayName||r.ens||"Trader"),
-    tier:String(r.tier||r.plan||r.level||"Standard") };
+    handle:String(r.handle||r.username||r.agentName||r.name||r.displayName||r.ens||"Trader"),
+    tier:String(r.tier||r.plan||r.level||r.badge||"Standard") };
 }
 async function checkAuth(){
   const code=getAuth();
