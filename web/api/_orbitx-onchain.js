@@ -1,4 +1,11 @@
 /**
+ * Moved from web/api/orbitx-onchain.js into the web.js connector (LAZY).
+ * Vercel Hobby allows max 12 serverless functions — standalone api/ files
+ * are folded into connectors instead. Route stays PAUSED (vercel.json sends
+ * /api/orbitx-onchain to web.js ?path=paused); to unpause, point the rewrite
+ * at ?path=orbitx-onchain. NOTE: when unpaused, web.js maxDuration applies.
+ */
+/**
  * OrbitX on-chain attestation + indexer.
  * Route: /api/orbitx-onchain  (NOT /api/orbitx/* — that rewrites to orbitx-hub)
  *

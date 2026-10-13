@@ -1,4 +1,12 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+/**
+ * Moved from web/api/vanity-mint.ts into the ogdex.js connector (ROUTES).
+ * Vercel Hobby allows max 12 serverless functions — standalone api/ files
+ * are folded into connectors instead. Routed via vercel.json:
+ * /api/vanity-mint -> /api/ogdex?path=vanity-mint.
+ * Converted TS -> JS to match the ogdex route convention. ogdex.js
+ * maxDuration (90s) covers the 55s search budget. The @solana/web3.js
+ * import ban still applies (see original comment): only @noble/curves.
+ */
 import { ed25519 } from "@noble/curves/ed25519";
 import bs58 from "bs58";
 
@@ -16,15 +24,9 @@ import bs58 from "bs58";
 // which reliably blows past Vercel's default function timeout. Hobby plan
 // allows up to 60s — use all of it, and bail out cleanly with a clear error
 // before Vercel kills the function, instead of returning a random address.
-export const config = {
-  maxDuration: 60,
-};
-
 const TIME_BUDGET_MS = 55_000; // leave headroom under the 60s hard limit
 
-interface EdKeypair { publicKey: Uint8Array; secretKey64: Uint8Array }
-
-function generateKeypair(): EdKeypair {
+function generateKeypair() {
   const kp = ed25519.keygen(); // { secretKey: 32-byte seed, publicKey: 32-byte pubkey }
   const secretKey64 = new Uint8Array(64);
   secretKey64.set(kp.secretKey, 0);
@@ -56,7 +58,7 @@ function generateKeypair(): EdKeypair {
  * }
  */
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -72,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startTime = Date.now();
 
     const suffixLower = suffix.toLowerCase();
-    let keypair: EdKeypair | null = null;
+    let keypair = null;
     let attempts = 0;
 
     // Intensive search for vanity address — bounded by both attempt count
@@ -128,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       attempts,
       timeMs: Date.now() - startTime,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[v0] Vanity mint API error:", err);
     return res.status(500).json({ error: err.message || "Internal server error" });
   }

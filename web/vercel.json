@@ -236,6 +236,14 @@
       "destination": "/api/orbitx-hub?path=mcp/.well-known/oauth-authorization-server"
     },
     {
+      "source": "/api/mcps",
+      "destination": "/api/ogdex?path=mcps"
+    },
+    {
+      "source": "/api/vanity-mint",
+      "destination": "/api/ogdex?path=vanity-mint"
+    },
+    {
       "source": "/api/mcp-life-tick",
       "destination": "/api/ogdex?path=mcp-life-tick"
     },
@@ -245,11 +253,11 @@
     },
     {
       "source": "/share/:mint",
-      "destination": "/api/share?mint=:mint"
+      "destination": "/api/web?path=share&mint=:mint"
     },
     {
       "source": "/sharew/:address",
-      "destination": "/api/share-wallet?address=:address"
+      "destination": "/api/web?path=share-wallet&address=:address"
     },
     {
       "source": "/ORBITX_DEX",
@@ -476,10 +484,7 @@
       "maxDuration": 60
     },
     "api/ogdex.js": {
-      "maxDuration": 60
-    },
-    "api/orbitx-onchain.js": {
-      "maxDuration": 60
+      "maxDuration": 90
     },
     "api/auth-login.ts": {
       "maxDuration": 25

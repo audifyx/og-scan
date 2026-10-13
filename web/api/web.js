@@ -12,6 +12,8 @@ function pausedFeature(req, res) {
 }
 
 // Lazy-load every route so one broken module can't crash all /api/web routes.
+// CONNECTOR RULE (Vercel Hobby max 12 serverless functions): new endpoints
+// plug in here — NEVER add a new standalone api/ file.
 const LAZY = {
   "admin-tokens": () => import("./_admin-tokens.ts"),
   "signup-check": () => import("./_signup-check.ts"),
@@ -20,6 +22,9 @@ const LAZY = {
   "orbitx-world": () => import("./_orbitx-world.ts"),
   "kol": () => import("./_kol.ts"),
   "city-property": () => import("./_city-property.js"),
+  "share": () => import("./_share.ts"),
+  "share-wallet": () => import("./_share-wallet.ts"),
+  "orbitx-onchain": () => import("./_orbitx-onchain.js"),
 };
 
 export default async function handler(req, res) {

@@ -1,3 +1,9 @@
+/**
+ * Moved from web/api/share-wallet.ts into the web.js connector (LAZY).
+ * Vercel Hobby allows max 12 serverless functions — standalone api/ files
+ * are folded into connectors instead. Routed via vercel.json:
+ * /sharew/:address -> /api/web?path=share-wallet&address=:address.
+ */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 // Serves the OG-meta page for /sharew/:address (wallet PnL flex card) with a

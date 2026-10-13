@@ -80,3 +80,9 @@ Smoke: `bash scripts/qa/run-smoke.sh`
 - `git fetch origin main` BEFORE `git reset --hard origin/main` — the local origin/main ref goes stale (missed 5 commits once); resetting to a stale ref wipes uncommitted work. Never reset with uncommitted changes on disk: commit/stash first.
 - `node --check` PASSES on template-literal-breaking backticks inside `hubSystemPrompt` (e.g. a raw backtick pair around `<mint>` makes `<mint>` parse as a JS identifier) — it throws `ReferenceError` at runtime on EVERY hub turn instead. Always eval `hubSystemPrompt` directly after editing it.
 - Hub chat turns: Nvidia dark spells are the #1 latency killer. Design turns to degrade gracefully — deterministic server-side fallbacks (bare-CA dossier), one hotter bad_json retry (same single model, no fallback chain), 30s LLM timeout, streaming SSE so the user sees words immediately.
+
+## Vercel Hobby: max 12 serverless functions — connectors only (2026-10-13)
+- HARD CAP: 12 functions/deployment. A 13th api/ file blocks EVERY deploy (2026-10-13: `mcp-life-tick.js` rename did this; live server stayed on old build 30+ min).
+- Architecture: connectors only. `web.js` (LAZY map) + `ogdex.js` (ROUTES map) + `orbitx-hub` + `mcp.js` (delegates) + `x-mcp.js` + 2 auth files = 7 functions. New endpoints plug into a connector — NEVER a new standalone api/ file. Underscore-prefixed files/dirs (`_*.js`, `_routes/`) are NOT functions.
+- Before any commit touching web/api/: run `bash scripts/check-function-count.sh` (fails if >10 — headroom below the hard cap).
+- Unpausing orbitx-onchain: change the vercel.json rewrite from `?path=paused` to `?path=orbitx-onchain` (module already lives in web.js LAZY). Note web.js maxDuration then applies.

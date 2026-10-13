@@ -1,4 +1,10 @@
 /**
+ * Moved from web/api/mcps.js into the ogdex.js connector (ROUTES).
+ * Vercel Hobby allows max 12 serverless functions — standalone api/ files
+ * are folded into connectors instead. Routed via vercel.json:
+ * /api/mcps -> /api/ogdex?path=mcps.
+ */
+/**
  * GET /api/mcps — machine-readable OrbitX MCP marketplace registry.
  * Agents: fetch this, pick an MCP, connect to its `endpoint` with the
  * MCP Streamable-HTTP handshake (initialize → tools/list → tools/call).

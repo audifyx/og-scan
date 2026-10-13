@@ -41,6 +41,8 @@ import traders from "./ogdex/_routes/_traders.js";
 import waitlist from "./ogdex/_routes/_waitlist.js";
 import mcp from "./ogdex/_routes/_mcp.js";
 import mcpLifeTick from "./ogdex/_routes/_mcp-life-tick.js";
+import mcps from "./ogdex/_routes/_mcps.js";
+import vanityMint from "./ogdex/_routes/_vanity-mint.js";
 import { createHmac, timingSafeEqual } from "crypto";
 
 const ROUTES = {
@@ -53,6 +55,8 @@ const ROUTES = {
   waitlist,
   mcp,
   "mcp-life-tick": mcpLifeTick,
+  mcps,
+  "vanity-mint": vanityMint,
 };
 
 const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt", "desk-unlock", "mcp-life-tick"]);

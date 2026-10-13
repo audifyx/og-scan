@@ -1,3 +1,9 @@
+/**
+ * Moved from web/api/share.ts into the web.js connector (LAZY).
+ * Vercel Hobby allows max 12 serverless functions — standalone api/ files
+ * are folded into connectors instead. Routed via vercel.json:
+ * /share/:mint -> /api/web?path=share&mint=:mint.
+ */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 // Serves the OG-meta page for /share/:mint with a guaranteed text/html content-type.
