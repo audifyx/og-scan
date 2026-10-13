@@ -62,7 +62,11 @@ export default async function handler(req, res) {
       });
       const data = r && r.success ? r.data : null;
       if (data && !(data.error && (isRpcUnavailableError(data.error) || isRpcQuotaError(data.error)))) return data;
-      if (proxyNeedsPublicFallback(r) || (data && data.error && (isRpcUnavailableError(data.error) || isRpcQuotaError(data.error)))) {
+      // If Helius/Supabase failed (no data), ALWAYS try public fallback — not just
+      // for quota errors. The old logic returned "rpc proxy error" when callFn
+      // failed with a non-quota error, breaking all wallet scans.
+      const needsFallback = !data || proxyNeedsPublicFallback(r) || (data && data.error && (isRpcUnavailableError(data.error) || isRpcQuotaError(data.error)));
+      if (needsFallback) {
         try {
           return await jsonRpcWithFallback(b);
         } catch {
@@ -72,12 +76,11 @@ export default async function handler(req, res) {
       if (data) return data;
       return { jsonrpc: "2.0", id: b.id ?? 1, error: { code: -32603, message: r?.error || r?.raw || "rpc proxy error" } };
     } catch (e) {
-      if (isRpcUnavailableError(e) || isRpcQuotaError(e)) {
-        try {
-          return await jsonRpcWithFallback(b);
-        } catch {
-          /* keep original */
-        }
+      // On exception, always try public fallback before giving up
+      try {
+        return await jsonRpcWithFallback(b);
+      } catch {
+        /* keep original */
       }
       return { jsonrpc: "2.0", id: b?.id ?? 1, error: { code: -32603, message: String(e?.message || e) } };
     }
