@@ -6196,9 +6196,11 @@ async function handleMcp(req, res, parts) {
 
     if (method === "tools/list") {
       const cursor = params?.cursor;
-      // ChatGPT: return ALL tools on page 1 (no pagination). ChatGPT does not
-      // reliably follow nextCursor, so paginating hides most of the catalog.
-      if (isChatGPT(req) && !cursor) {
+      // Return ALL tools on page 1 for the first request (no cursor).
+      // ChatGPT does not reliably follow nextCursor, and UA detection is
+      // unreliable (ChatGPT may use varying UAs). Paginated cursors still
+      // work for clients that request them explicitly.
+      if (!cursor) {
         const all = [
           ...publicToolList(CORE_TOOLS),
           ...publicToolList(_generated),
@@ -6219,7 +6221,7 @@ async function handleMcp(req, res, parts) {
             tools: all,
             _meta: {
               totalAvailable: all.length,
-              note: "Full catalog on page 1 for ChatGPT.",
+              note: "Full catalog on page 1.",
             },
           },
         });
