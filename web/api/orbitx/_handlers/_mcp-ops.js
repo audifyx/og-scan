@@ -216,44 +216,87 @@ export async function prepareBurn(publicKey, mint, amount, percent) {
   const {
     TOKEN_PROGRAM_ID,
     TOKEN_2022_PROGRAM_ID,
+    getAssociatedTokenAddressSync,
     createCloseAccountInstruction,
     createBurnInstruction,
   } = spl;
-  const conn = new Connection(rpcUrl(), "confirmed");
   const owner = new PublicKey(publicKey);
   const mintPk = new PublicKey(mint);
 
-  const [legacy, token22] = await Promise.all([
-    conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
-    conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }),
-  ]);
+  // getAccountInfo across every RPC candidate (non-indexed — works on public
+  // RPCs). A null from one node is not trusted: try the rest before concluding
+  // the account does not exist. Throws only if every candidate errors.
+  async function fetchAccount(pubkey) {
+    let lastErr = null;
+    let sawNull = false;
+    for (const url of rpcCandidates()) {
+      try {
+        const info = await new Connection(url, "confirmed").getAccountInfo(pubkey);
+        if (info) return info;
+        sawNull = true;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (sawNull) return null;
+    throw lastErr || new Error("No Solana RPC available");
+  }
+
+  // SPL token-account layout (both Token + Token-2022 base): mint 0..32,
+  // owner 32..64, amount u64LE 64..72. Mint layout: decimals u8 at byte 44.
+  function parseTokenAccount(info) {
+    if (!info || !info.data || info.data.length < 72) return null;
+    const data = Buffer.from(info.data);
+    if (!new PublicKey(data.subarray(0, 32)).equals(mintPk)) return null;
+    if (!new PublicKey(data.subarray(32, 64)).equals(owner)) return null;
+    return { amount: data.readBigUInt64LE(64) };
+  }
 
   let found = null;
-  for (const a of legacy.value) {
-    if (a.account.data.parsed.info.mint === mint) {
-      found = {
-        tokenAccount: a.pubkey,
-        programId: TOKEN_PROGRAM_ID,
-        decimals: a.account.data.parsed.info.tokenAmount.decimals,
-        balanceRaw: BigInt(a.account.data.parsed.info.tokenAmount.amount),
-      };
+  // 1. ATA derivation first — no indexed RPC needed, works on public RPCs.
+  // getParsedTokenAccountsByOwner (the old path) is blocked on public RPCs
+  // ("Indexed requests require a personal token") and was the burn-tool bug.
+  for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+    const ata = getAssociatedTokenAddressSync(mintPk, owner, true, programId);
+    const parsed = parseTokenAccount(await fetchAccount(ata));
+    if (parsed) {
+      found = { tokenAccount: ata, programId, balanceRaw: parsed.amount };
       break;
     }
   }
+  // 2. Indexed fallback — covers non-ATA token accounts when the RPC
+  // supports it (e.g. Helius). Expected to fail on public RPCs; ignore.
   if (!found) {
-    for (const a of token22.value) {
-      if (a.account.data.parsed.info.mint === mint) {
-        found = {
-          tokenAccount: a.pubkey,
-          programId: TOKEN_2022_PROGRAM_ID,
-          decimals: a.account.data.parsed.info.tokenAmount.decimals,
-          balanceRaw: BigInt(a.account.data.parsed.info.tokenAmount.amount),
-        };
-        break;
+    try {
+      const conn = new Connection(rpcUrl(), "confirmed");
+      const [legacy, token22] = await Promise.all([
+        conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
+        conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }),
+      ]);
+      for (const [list, programId] of [[legacy.value, TOKEN_PROGRAM_ID], [token22.value, TOKEN_2022_PROGRAM_ID]]) {
+        const hit = list.find((a) => a.account.data.parsed.info.mint === mint);
+        if (hit) {
+          found = {
+            tokenAccount: hit.pubkey,
+            programId,
+            balanceRaw: BigInt(hit.account.data.parsed.info.tokenAmount.amount),
+          };
+          break;
+        }
       }
+    } catch {
+      /* indexed lookup unavailable on this RPC — ATA path already tried */
     }
   }
   if (!found || found.balanceRaw <= 0n) throw new Error("No balance for this mint in wallet");
+
+  // Decimals from the mint account (same non-indexed getAccountInfo path).
+  const mintInfo = await fetchAccount(mintPk);
+  if (!mintInfo || !mintInfo.data || mintInfo.data.length < 45) {
+    throw new Error("Could not read mint decimals");
+  }
+  const decimals = Buffer.from(mintInfo.data)[44];
+  found.decimals = decimals;
 
   let amountRaw;
   if (percent != null && Number(percent) > 0) {
@@ -280,7 +323,7 @@ export async function prepareBurn(publicKey, mint, amount, percent) {
     closesAccount = true;
   }
 
-  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const { blockhash } = await latestBlockhash(Connection);
   return {
     ok: true,
     mint,
