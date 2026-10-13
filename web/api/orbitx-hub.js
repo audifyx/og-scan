@@ -2094,6 +2094,27 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_exec",
+    description:
+      "Universal OrbitX tool dispatcher. Call ANY of the 4,300+ OrbitX tools by name. Use this when the specific tool you need isn't in the visible list. Pass the target tool name and its arguments. Example: {\"tool\": \"orbitx_life_list\", \"arguments\": {}}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tool: {
+          type: "string",
+          description: "The OrbitX tool to call (e.g. orbitx_life_list, orbitx_agent_snipe, orbitx_whale_watch). Use search to find tool names.",
+        },
+        arguments: {
+          type: "object",
+          description: "Arguments for the target tool, as a JSON object.",
+          additionalProperties: true,
+        },
+      },
+      required: ["tool"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "fetch",
     description: "Fetch a document by id from search (menu, help, auth, tool:<name>, or a mint).",
     inputSchema: {
@@ -6279,6 +6300,32 @@ async function handleMcp(req, res, parts) {
       if (paperNat) {
         name = paperNat.name;
         Object.assign(args, paperNat.args);
+      }
+      // orbitx_exec: universal dispatcher — routes to any OrbitX tool by name.
+      // Prevents infinite recursion by blocking exec-of-exec.
+      if (name === "orbitx_exec") {
+        const targetTool = args.tool;
+        const targetArgs = args.arguments && typeof args.arguments === "object" ? args.arguments : {};
+        if (!targetTool || typeof targetTool !== "string") {
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: wrapMcpToolContent({ ok: false, error: "orbitx_exec requires a 'tool' name. Use search to find available tools." }),
+          });
+        }
+        const resolvedTarget = resolveOrbitXToolName(targetTool) || TOOL_ALIASES[targetTool] || targetTool;
+        if (resolvedTarget === "orbitx_exec") {
+          return json(res, {
+            jsonrpc: "2.0",
+            id,
+            result: wrapMcpToolContent({ ok: false, error: "orbitx_exec cannot call itself." }),
+          });
+        }
+        // Rewrite as a direct call to the target tool
+        name = resolvedTarget;
+        // Clear args and replace with target arguments
+        for (const k of Object.keys(args)) delete args[k];
+        Object.assign(args, targetArgs);
       }
       const liveNat = resolveLiveNaturalTool(rawName, args);
       if (liveNat) {
