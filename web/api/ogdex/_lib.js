@@ -61,9 +61,11 @@ const _sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * proxy is down, because callers treat null as "empty". Public RPCs serve
  * getBalance / getSignaturesForAddress / getTransaction / getMultipleAccounts;
  * only indexed getTokenAccountsByOwner still needs Helius (public RPCs block
- * it) — callers must flag that as degraded, never as "0 tokens".
+ * it) — and the rpc-proxy itself rejects that method ("Method not
+ * allowed"), so callers must fall back to the tx-derived holdings scan
+ * in _txscan.js and flag the list as degraded, never as "0 tokens".
  */
-export async function resilientRpc(method, params) {
+export async function resilientRpcDetailed(method, params) {
   try {
     const TIMEOUT = Symbol("timeout");
     const r = await Promise.race([
@@ -73,18 +75,26 @@ export async function resilientRpc(method, params) {
     // success === false means the proxy itself failed — discard its payload.
     if (r !== TIMEOUT && !(r && r.success === false)) {
       const data = r?.data ?? r ?? null;
-      if (data && !data.error && data.result !== undefined) return data.result;
+      if (data && !data.error && data.result !== undefined) {
+        return { result: data.result, source: "helius-proxy" };
+      }
     }
   } catch {
     /* fall through to public RPCs */
   }
   try {
     const fb = await jsonRpcWithFallback({ jsonrpc: "2.0", id: 1, method, params });
-    if (fb && !fb.error && fb.result !== undefined) return fb.result;
+    if (fb && !fb.error && fb.result !== undefined) {
+      return { result: fb.result, source: "public-rpc" };
+    }
   } catch {
     /* all paths failed */
   }
-  return null;
+  return { result: null, source: null };
+}
+
+export async function resilientRpc(method, params) {
+  return (await resilientRpcDetailed(method, params)).result;
 }
 
 export async function jup(path) {

@@ -1,5 +1,6 @@
 import { send, cache, resilientRpc } from "../_lib.js";
 import { computePnl } from "../_pnl.js";
+import { scanWalletTxs, ataHoldings } from "../_txscan.js";
 
 // Phantom-style wallet portfolio: SOL + SPL holdings with live USD values + metadata.
 // Sources: rpc-proxy for balances, Jupiter price v3 + DexScreener backfill for prices,
@@ -208,7 +209,9 @@ export default async function handler(req, res) {
     if (lamports == null) degradedSources.push("balance");
     if (accs1 == null && accs2 == null) degradedSources.push("tokenAccounts");
     if (pnl == null) degradedSources.push("tradeHistory");
-    const tokenListComplete = !(accs1 == null && accs2 == null);
+    let tokenListComplete = !(accs1 == null && accs2 == null);
+    let holdingsSource = tokenListComplete ? "token-accounts" : null;
+    let txScan = null;
     const raw = [...(accs1?.value || []), ...(accs2?.value || [])];
 
     const byMint = {};
@@ -225,6 +228,40 @@ export default async function handler(req, res) {
         decimals: Number(info.tokenAmount?.decimals || 0),
       };
       byMint[m].uiAmount += ui;
+    }
+    // TX-DERIVED HOLDINGS FALLBACK: indexed getTokenAccountsByOwner is
+    // rejected by the rpc-proxy AND blocked on public RPCs, so when it fails
+    // the holdings list would otherwise be []. Reconstruct from the tx
+    // scan instead: every mint the wallet touched -> ATA balance via
+    // getMultipleAccounts (non-indexed). Complete only when the sig scan
+    // covered the full history; otherwise the list is partial and stays
+    // flagged. Never report [] as "0 tokens" when the scan is incomplete.
+    if (accs1 == null && accs2 == null) {
+      try {
+        const scan = await scanWalletTxs(address, { limit: 150 });
+        txScan = {
+          scanned: scan.scanned,
+          complete: scan.complete,
+          hasMore: scan.hasMore,
+          failedFetches: scan.failedFetches,
+          source: scan.source,
+          retrievedAt: scan.retrievedAt,
+        };
+        const derived = await ataHoldings(address, scan.touchedMints, {
+          decimalsByMint: scan.decimalsByMint,
+        });
+        for (const h of derived) {
+          if (!(h.uiAmount > 0)) continue;
+          byMint[h.mint] = byMint[h.mint] || { mint: h.mint, uiAmount: 0, decimals: h.decimals };
+          byMint[h.mint].uiAmount += h.uiAmount;
+          byMint[h.mint].decimals = h.decimals;
+        }
+        holdingsSource = "tx-derived";
+        if (scan.complete) tokenListComplete = true;
+      } catch {
+        holdingsSource = "unknown";
+        txScan = txScan || { scanned: 0, complete: false, hasMore: null, error: "tx-scan failed" };
+      }
     }
     const mints = Object.keys(byMint);
 
@@ -525,6 +562,9 @@ export default async function handler(req, res) {
       degraded: degradedSources.length > 0,
       degradedSources,
       tokenListComplete,
+      holdingsSource,
+      txScan,
+      retrievedAt: new Date().toISOString(),
     });
   } catch (e) {
     return send(res, 200, { ok: false, error: String(e?.message || e) });

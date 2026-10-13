@@ -322,7 +322,7 @@ const CHATGPT_TOOL_NAMES = new Set([
   "orbitx_crypto_scan", "orbitx_screen_tokens", "orbitx_screen_trending_1m_solana",
   "orbitx_adv_forensics_solana", "orbitx_get_forensics", "orbitx_dex_chart",
   // wallet
-  "orbitx_get_wallet", "orbitx_adv_wallet_pnl", "orbitx_adv_wallet_swaps", "orbitx_app_pnl", "orbitx_get_swaps",
+  "orbitx_get_wallet", "orbitx_adv_wallet_pnl", "orbitx_adv_wallet_swaps", "orbitx_app_pnl", "orbitx_get_swaps", "orbitx_wallet_transactions",
   // media
   "orbitx_generate_image", "orbitx_x_post", "orbitx_app_launch",
   // group chat
@@ -2594,8 +2594,8 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_crypto_scan",
-    description: "One-shot aggregator: safety + forensics + token payload for a mint.",
-    inputSchema: { type: "object", properties: { mint: { type: "string" } }, required: ["mint"] },
+    description: "One-shot aggregator: safety + forensics + token payload for a TOKEN mint (contract address). Requires mint — a wallet address is NOT a mint. For wallet analysis use orbitx_get_wallet / orbitx_wallet_transactions.",
+    inputSchema: { type: "object", properties: { mint: { type: "string", description: "Token mint (contract address), 32-44 base58 chars. NOT a wallet address." } }, required: ["mint"] },
   },
   {
     name: "orbitx_get_ath",
@@ -2671,6 +2671,18 @@ const CORE_TOOLS = [
       properties: {
         address: { type: "string", description: "Omit to use linked agent wallet" },
         limit: { type: "integer", default: 25 },
+      },
+    },
+  },
+  {
+    name: "orbitx_wallet_transactions",
+    description: "Full wallet transaction history with pagination: every scanned tx classified as swap / transfer / failed / other, with fees, token deltas, and explicit completeness (scanned, hasMore, nextBefore). Use before to page through the entire history. This is the research tool — use it when orbitx_get_swaps shows 0 to verify whether the wallet ever traded.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "Omit to use linked agent wallet" },
+        limit: { type: "integer", default: 50 },
+        before: { type: "string", description: "Signature cursor from a previous page's nextBefore" },
       },
     },
   },
@@ -4343,8 +4355,13 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
       }`,
     orbitx_get_safety: () =>
       `${base}/api/ogdex/safety?mint=${encodeURIComponent(String(args.mint || ""))}`,
-    orbitx_crypto_scan: () =>
-      `${base}/api/orbitx/crypto-scan?mint=${encodeURIComponent(String(args.mint || ""))}`,
+    orbitx_crypto_scan: () => {
+      const mint = String(args.mint || "").trim();
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) {
+        throw new Error("orbitx_crypto_scan needs a token mint (contract address, 32-44 base58 chars). A wallet address is not a mint — for wallet analysis use orbitx_get_wallet or orbitx_wallet_transactions.");
+      }
+      return `${base}/api/orbitx/crypto-scan?mint=${encodeURIComponent(mint)}`;
+    },
     orbitx_get_ath: () => `${base}/api/ogdex/ath?mint=${encodeURIComponent(String(args.mint || ""))}`,
     orbitx_get_chart: () =>
       `${base}/api/ogdex/chart?mint=${encodeURIComponent(String(args.mint || ""))}&interval=${encodeURIComponent(String(args.interval || "1h"))}&limit=${Number(args.limit) || 200}&chain=${encodeURIComponent(String(args.chain || "solana"))}`,
@@ -4355,6 +4372,11 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     orbitx_get_swaps: () => {
       if (!wallet) throw new Error("address required (or link wallet on /agent)");
       return `${base}/api/ogdex/swaps?address=${encodeURIComponent(wallet)}&limit=${Number(args.limit) || 25}`;
+    },
+    orbitx_wallet_transactions: () => {
+      if (!wallet) throw new Error("address required (or link wallet on /agent)");
+      const before = args.before ? `&before=${encodeURIComponent(String(args.before))}` : "";
+      return `${base}/api/ogdex/wallet-tx?address=${encodeURIComponent(wallet)}&limit=${Number(args.limit) || 50}${before}`;
     },
     orbitx_get_balance: () => {
       if (!wallet) throw new Error("address required (or link wallet on /agent)");
@@ -6551,7 +6573,7 @@ async function handleCryptoScan(req, res) {
   const u = new URL(req.url || "/", "http://x");
   const mint = String(u.searchParams.get("mint") || (req.query && req.query.mint) || "");
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) {
-    return json(res, { ok: false, error: "valid mint required" }, 400);
+    return json(res, { ok: false, error: "valid mint required — pass a token mint (contract address, 32-44 base58 chars). A wallet address is not a mint." }, 400);
   }
 
   const proto = header(req, "x-forwarded-proto") || "https";

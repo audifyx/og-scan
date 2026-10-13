@@ -33,6 +33,7 @@ import balance from "./ogdex/_routes/_balance.js";
 import safety from "./ogdex/_routes/_safety.js";
 import xray from "./ogdex/_routes/_xray.js";
 import swaps from "./ogdex/_routes/_swaps.js";
+import walletTx from "./ogdex/_routes/_wallet-tx.js";
 import llms from "./ogdex/_routes/_llms.js";
 import leaderboard from "./ogdex/_routes/_leaderboard.js";
 import research from "./ogdex/_routes/_research.js";
@@ -48,7 +49,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
   config: configRoute, listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath, openapi,
-  "openapi.json": openapi, health, balance, safety, xray, swaps, llms, "llms.txt": llms, leaderboard,
+  "openapi.json": openapi, health, balance, safety, xray, swaps, "wallet-tx": walletTx, llms, "llms.txt": llms, leaderboard,
   "alerts-run": alertsRun, research,
   "platform-stats": platformStats,
   traders,
