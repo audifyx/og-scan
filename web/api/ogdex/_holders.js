@@ -2,12 +2,44 @@
 // only efficient "top N" source but its account-index service intermittently
 // returns -32603 "overloaded" (esp. for tokens with millions of accounts) and
 // rpc-proxy can cold-start slowly. So we: retry with backoff, resolve owners
-// (token account -> wallet), label whales, bound every call with a timeout, and
-// keep a last-known-good copy in KV so a transient failure never blanks the UI.
+// (token account -> wallet), classify pool vaults by the program that owns
+// the owner account, bound every call with a timeout, and keep a
+// last-known-good copy in KV so a transient failure never blanks the UI.
+//
+// Liquidity pools are NOT holders: a pool vault's owner account is owned by
+// an AMM program (Raydium / Orca / PumpSwap / pump.fun), while a real
+// wallet's account is owned by the System Program. Pool rows are labeled
+// "liquidity pool" (isPool) and excluded from holder-distribution math;
+// other program-owned owners are labeled "program vault", not mislabeled
+// as LPs and not counted as regular holders.
+//
+// NOTE: public RPCs cannot substitute for Helius here — their
+// getTokenLargestAccounts returns empty / 429s, so there is no live
+// fallback when rpc-proxy is down; the KV cache is the fallback.
 import { SUPA_FN, ANON, kvGet, kvPut } from "./_lib.js";
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// AMM program ids — every one verified, none guessed:
+// Raydium CLMM / Orca Whirlpool / PumpSwap from live pool-account owners;
+// pump.fun + Raydium AMM v4 from multi-source docs + on-chain executable check.
+export const AMM_PROGRAMS = new Set([
+  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", // pump.fun bonding curve
+  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA", // PumpSwap
+  "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mb", // Raydium AMM v4
+  "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK", // Raydium CLMM
+  "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc", // Orca Whirlpool
+]);
+const SYSTEM_PROGRAM = "11111111111111111111111111111111";
+
+// "liquidity pool" | "program vault" | null (real wallet / unknown).
+export function poolKindFor(ownerProgram) {
+  if (!ownerProgram) return null;
+  if (AMM_PROGRAMS.has(ownerProgram)) return "liquidity pool";
+  if (ownerProgram !== SYSTEM_PROGRAM) return "program vault";
+  return null;
+}
 
 // Single JSON-RPC call through the Helius-backed rpc-proxy, with a hard timeout.
 async function rpc(method, params, timeout = 9000) {
@@ -55,6 +87,22 @@ async function resolveOwners(tokenAccounts) {
   return out;
 }
 
+// Owner wallet -> program that owns that account. System Program = real
+// wallet; AMM program = pool vault; anything else = program vault.
+// Returns {} on failure — callers treat unknown owners as normal holders.
+export async function classifyHolderOwners(ownerAddresses) {
+  const uniq = [...new Set((ownerAddresses || []).filter(Boolean))];
+  const out = {};
+  if (!uniq.length) return out;
+  try {
+    const { result } = await rpc("getMultipleAccounts", [uniq, { encoding: "jsonParsed" }], 8000);
+    (result?.value || []).forEach((acc, i) => {
+      if (acc?.owner) out[uniq[i]] = acc.owner;
+    });
+  } catch { /* unknown owners stay unclassified */ }
+  return out;
+}
+
 function labelFor(pct) {
   if (pct == null) return "holder";
   if (pct >= 1) return "whale";
@@ -62,7 +110,8 @@ function labelFor(pct) {
   return "holder";
 }
 
-// Live fetch: largest accounts -> supply -> owners -> labeled rows. Returns [] on failure.
+// Live fetch: largest accounts -> supply -> owners -> owner programs -> rows.
+// Returns [] on failure.
 async function fetchHoldersLive(mint, price, limit = 20) {
   const accts = await largestAccounts(mint);
   if (!accts?.length) return [];
@@ -70,10 +119,14 @@ async function fetchHoldersLive(mint, price, limit = 20) {
   const supplyRes = await rpc("getTokenSupply", [mint], 6000);
   const total = num(supplyRes.result?.value?.uiAmount) || top.reduce((s, a) => s + (num(a.uiAmount) || 0), 0) || 0;
   const owners = await resolveOwners(top.map((a) => a.address));
+  const ownerPrograms = await classifyHolderOwners(Object.values(owners));
   return top.map((a, i) => {
     const amt = num(a.uiAmount) || 0;
     const pct = total ? (amt / total) * 100 : null;
     const owner = owners[a.address] || a.address;
+    const ownerProgram = ownerPrograms[owner] || null;
+    const kind = poolKindFor(ownerProgram);
+    const isPool = kind === "liquidity pool";
     return {
       rank: i + 1,
       owner,
@@ -81,23 +134,28 @@ async function fetchHoldersLive(mint, price, limit = 20) {
       uiAmount: amt,
       pct,
       usdValue: price != null ? amt * price : null,
-      label: labelFor(pct),
+      label: isPool ? "liquidity pool" : kind === "program vault" ? "program vault" : labelFor(pct),
+      ...(isPool ? { isPool: true, poolProgram: ownerProgram } : {}),
+      ...(kind === "program vault" ? { isProgramVault: true, vaultProgram: ownerProgram } : {}),
     };
   });
 }
 
 // Public: resilient labeled holders with last-known-good fallback.
-// Returns { holders: [...], source: "live"|"cache"|"none", stale: bool }.
+// Returns { holders: [...], pools: [...], source: "live"|"cache"|"none", stale: bool }.
+// Pools stay IN holders (marked isPool) so the list shows them correctly,
+// and are ALSO split out in `pools` for distribution math.
 export async function getLabeledHolders(mint, price = null, limit = 20) {
   const live = await fetchHoldersLive(mint, price, limit).catch(() => []);
   if (live.length) {
-    kvPut(`holders/${mint}.json`, { ts: Date.now(), holders: live }).catch(() => {});
-    return { holders: live, source: "live", stale: false };
+    const pools = live.filter((h) => h.isPool);
+    kvPut(`holders/${mint}.json`, { ts: Date.now(), holders: live, pools }).catch(() => {});
+    return { holders: live, pools, source: "live", stale: false };
   }
   const cached = await kvGet(`holders/${mint}.json`).catch(() => null);
   if (cached?.holders?.length) {
     const holders = cached.holders.map((h) => ({ ...h, usdValue: price != null ? (num(h.uiAmount) || 0) * price : h.usdValue, stale: true }));
-    return { holders, source: "cache", stale: true };
+    return { holders, pools: holders.filter((h) => h.isPool), source: "cache", stale: true };
   }
-  return { holders: [], source: "none", stale: false };
+  return { holders: [], pools: [], source: "none", stale: false };
 }

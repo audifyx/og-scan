@@ -1,4 +1,5 @@
 import { callFn, send, cache, INTEL_FN } from "../_lib.js";
+import { getLabeledHolders, classifyHolderOwners, poolKindFor } from "../_holders.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -95,8 +96,32 @@ export default async function handler(req, res) {
     ]);
 
     const safety = intel?.safety || {};
-    const holders = intel?.holders || [];
+    let holders = intel?.holders || [];
+    // Intel edge fn down/empty -> local holders fallback (same backfill the
+    // token route uses) so a dead upstream doesn't blank forensics.
+    if (!holders.length) {
+      const local = await getLabeledHolders(mint).catch(() => ({ holders: [] }));
+      if (local.holders?.length) holders = local.holders;
+    }
     const dev = pump?.creator || safety.creator || null;
+
+    // Liquidity pools are NOT holders. A pool vault's owner account is owned
+    // by an AMM program; classify owners and drop pools from distribution.
+    const ownerPrograms = holders.length
+      ? await classifyHolderOwners(holders.map((h) => h.owner)).catch(() => ({}))
+      : {};
+    const isPool = (h) =>
+      h.isPool === true ||
+      poolKindFor(h.poolProgram) === "liquidity pool" ||
+      poolKindFor(ownerPrograms[h.owner]) === "liquidity pool";
+    const pools = holders.filter(isPool).map((h) => ({
+      owner: h.owner,
+      tokenAccount: h.tokenAccount || null,
+      uiAmount: h.uiAmount ?? null,
+      pct: h.pct ?? null,
+      poolProgram: h.poolProgram || ownerPrograms[h.owner] || null,
+    }));
+    const realHolders = holders.filter((h) => !isPool(h));
 
     // Dev current position from the holder list.
     let devHolding = null, devSold = null, devRank = null;
@@ -116,9 +141,9 @@ export default async function handler(req, res) {
       if (!first) first = await firstBuyer(mint); // last-resort local trace
     }
 
-    // Concentration snapshot.
-    const top10Pct = holders.length ? holders.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
-    const whales = holders.filter((h) => (h.pct || 0) >= 1).length;
+    // Concentration snapshot — real holders only, pools excluded.
+    const top10Pct = realHolders.length ? realHolders.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0) : null;
+    const whales = realHolders.filter((h) => (h.pct || 0) >= 1).length;
 
     return send(res, 200, {
       ok: true,
@@ -137,7 +162,7 @@ export default async function handler(req, res) {
       isPumpFun: !!pump || !!safety.isPumpFun,
       bondingComplete: pump ? !!pump.complete : null,
       concentration: {
-        top10Pct, whales,
+        top10Pct, whales, pools,
         // Prefer Rugcheck / intel totals — never the top-N sample length.
         totalHolders: safety.totalHolders ??
           (intel?.holderCount != null &&
