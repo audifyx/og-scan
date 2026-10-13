@@ -1,4 +1,4 @@
-import { send, cache, resilientRpc } from "../_lib.js";
+import { send, cache, resilientRpc, resilientRpcDetailed } from "../_lib.js";
 import { computePnl } from "../_pnl.js";
 import { scanWalletTxs, ataHoldings } from "../_txscan.js";
 
@@ -185,8 +185,8 @@ export default async function handler(req, res) {
   try {
     // Holdings + PnL in parallel. PnL uses capped sig history so we stay under
     // the ~30s serverless budget (previously 504'd on large wallets).
-    const [lamports, accs1, accs2, pnl] = await Promise.all([
-      rpc("getBalance", [address, { commitment: "confirmed" }]).catch(() => null),
+    const [balRes, accs1, accs2, pnl] = await Promise.all([
+      resilientRpcDetailed("getBalance", [address, { commitment: "confirmed" }]).catch(() => null),
       rpc("getTokenAccountsByOwner", [
         address,
         { programId: TOKEN_PROGRAM },
@@ -199,8 +199,12 @@ export default async function handler(req, res) {
       ]).catch(() => null),
       computePnl(address, { sigLimit: 80 }).catch(() => null),
     ]);
+    // No silent SOL zero (2026-10-13): when the balance fetch fails, sol is
+    // null (unknown), NEVER 0 — a failed RPC must not read as "empty wallet".
+    const lamports = balRes?.result;
+    const solSource = balRes?.source ?? null;
     const sol =
-      lamports == null ? 0 : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
+      lamports == null ? null : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
     // Honest degradation: null means the RPC failed, NOT "empty". A failed
     // token-account fetch must never be reported as "0 tokens" — public
     // RPCs block getTokenAccountsByOwner, so when Helius is down the token
@@ -405,6 +409,26 @@ export default async function handler(req, res) {
         t.holdingAmount = holdingAmt || 0;
         t.holdingUsd = holdingAmt > 0 ? holdingUsd : 0;
 
+        // PHANTOM-POSITION KILL (2026-10-13, E33u/LILANSEM): PnL says an
+        // open position but the live chain holding is 0 — the PnL window
+        // missed a transfer-out that closed the position. Trust the chain:
+        // close the position, zero the mark, write off the cost basis.
+        // Tokens were MOVED, not sold, so no realized P&L is fabricated.
+        if (holdingAmt === 0 && t.open && t.tokens > 0) {
+          const phantomTokens = t.tokens;
+          t.costWrittenOff = (t.costWrittenOff || 0) + (t.costUsd || 0);
+          t.open = false;
+          t.tokens = 0;
+          t.curValueUsd = 0;
+          t.potUsd = null;
+          t.costUsd = null;
+          t.costSol = null;
+          t.unrealizedUsd = 0;
+          t.unrealizedPct = null;
+          t.positionReconciled = "live-holding-0";
+          t.reconcileNote = `PnL showed ${phantomTokens} tokens open but the live chain holding is 0 — a transfer-out outside the scanned history closed this position. Tokens were moved, not sold, so no realized P&L is counted.`;
+        }
+
         // Prefer live chain balance for size / mark.
         if (holdingAmt > 0) {
           t.tokens = holdingAmt;
@@ -468,6 +492,18 @@ export default async function handler(req, res) {
         const u = t.unrealizedUsd;
         t.totalUsd =
           (t.realizedUsd || 0) + (u != null && Number.isFinite(u) ? u : 0);
+      }
+
+      // Drop phantom positions from the positions array too (same kill as the
+      // perToken reconciliation above): a position survives only if its
+      // perToken row is still open or the chain actually holds it.
+      {
+        const rowByMint = new Map((pnl.perToken || []).map((t) => [t.mint, t]));
+        pnl.positions = (pnl.positions || []).filter((p) => {
+          const t = rowByMint.get(p.mint);
+          if (t) return Boolean(t.open || t.holding);
+          return (holdByMint[p.mint]?.uiAmount || 0) > 0;
+        });
       }
 
       // Aggregates from enriched per-token rows (not stale swap-only positions).
@@ -546,11 +582,14 @@ export default async function handler(req, res) {
     }
 
     const tokenUsd = holdings.reduce((s, h) => s + (h.usdValue || 0), 0);
-    const solUsd = sol * solPrice;
+    const solUsd = (sol ?? 0) * solPrice;
     return send(res, 200, {
       ok: true,
       address,
       sol,
+      // sol === null means the balance fetch failed (unknown), NOT 0.
+      solUnknown: sol == null,
+      solSource,
       solPrice,
       solUsd,
       totalUsd: tokenUsd + solUsd,
@@ -559,6 +598,15 @@ export default async function handler(req, res) {
       pnl,
       trades,
       tradeCount: trades.length,
+      // PnL history-window completeness (see computePnl): when complete is
+      // false, the PnL window missed older buys/sells/transfers.
+      pnlScan: pnl
+        ? {
+            scanned: pnl.scanned ?? null,
+            complete: pnl.complete ?? null,
+            hasMore: pnl.hasMore ?? null,
+          }
+        : null,
       degraded: degradedSources.length > 0,
       degradedSources,
       tokenListComplete,

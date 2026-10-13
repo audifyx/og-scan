@@ -20,7 +20,8 @@ export const DEX_PROGRAMS = new Set([
 ]);
 
 const SOL = "So11111111111111111111111111111111111111112";
-const STABLE = new Set(["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"]);
+export const STABLE_MINTS = new Set(["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"]);
+const STABLE = STABLE_MINTS;
 const DUST = 1e-9;
 
 /** All program IDs invoked by the tx (top-level + inner instructions). */

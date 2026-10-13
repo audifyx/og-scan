@@ -1,5 +1,5 @@
 import { resilientRpc } from "./_lib.js";
-import { parseSwap } from "./_swap.js";
+import { parseTx, STABLE_MINTS } from "./_swap.js";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const SOLP_CACHE = { v: 0, t: 0 };
@@ -49,65 +49,158 @@ export async function mapPool(items, limit, fn) {
   return out;
 }
 
-// Realized + unrealized PnL, win rate, and per-token breakdown from a wallet's
-// recent swap history (SOL legs only). `priceMap` (mint -> usdPrice) is optional;
-// when provided, open positions are valued for unrealized PnL.
-// Also returns the parsed `swaps` (newest first) so /wallet can embed a trade tape
-// without a second RPC round-trip.
-export async function computePnl(address, opts = {}) {
-  const { sigLimit = 50, priceMap = null } = opts;
-  const sigs = (await rpc("getSignaturesForAddress", [address, { limit: sigLimit }])) || [];
-  const txs = await mapPool(sigs, 8, (s) => rpcTx(s.signature));
-  const swapsChrono = txs
-    .map((t) => parseSwap(t, address))
-    .filter((s) => s && s.solAmount > 0)
-    .sort((a, b) => a.time - b.time);
+function newPos() {
+  return {
+    tokens: 0,
+    cost: 0,
+    realized: 0,
+    wins: 0,
+    closed: 0,
+    buys: 0,
+    sells: 0,
+    boughtSol: 0,
+    soldSol: 0,
+    // Transfer accounting (2026-10-13): transfers are NOT trades, but they
+    // move the position. A transfer-out reduces tokens + cost basis
+    // proportionally (average-cost) WITHOUT generating proceeds or realized
+    // P&L; a transfer-in adds tokens at zero cost. Without this, a wallet
+    // that buys then transfers everything out still shows a phantom open
+    // position (E33u / LILANSEM: bought 115,308, transferred out all of it,
+    // PnL claimed a $2.76 open position + fake +$1.31 unrealized).
+    transferredIn: 0,
+    transferredOut: 0,
+    costWrittenOff: 0,
+    closedByTransfer: false,
+  };
+}
 
-  // pos: mint -> { tokens, cost (sol), realized (sol), wins, closed, buys, sells, boughtSol, soldSol }
+// Pure position reducer over parseTx-classified transactions (chronological).
+// Exported for unit tests — computePnl is the RPC wrapper around it.
+export function reduceTransactions(parsedTxs, { solPriceUsd = 0 } = {}) {
+  const chrono = [...(parsedTxs || [])].filter(Boolean).sort((a, b) => a.time - b.time);
   const pos = {};
+  const swapsChrono = [];
   let realizedSol = 0,
     wins = 0,
     closed = 0;
-  for (const s of swapsChrono) {
-    const p =
-      pos[s.mint] ||
-      (pos[s.mint] = {
-        tokens: 0,
-        cost: 0,
-        realized: 0,
-        wins: 0,
-        closed: 0,
-        buys: 0,
-        sells: 0,
-        boughtSol: 0,
-        soldSol: 0,
-      });
-    if (s.side === "buy") {
-      p.tokens += s.tokenAmount;
-      p.cost += s.solAmount;
-      p.boughtSol += s.solAmount;
-      p.buys++;
-    } else {
-      // sell
-      p.sells++;
-      p.soldSol += s.solAmount;
-      if (p.tokens <= 0) continue;
-      const sold = Math.min(s.tokenAmount, p.tokens);
-      const avg = p.cost / p.tokens;
-      const costOfSold = avg * sold;
-      const proceeds = s.solAmount * (sold / s.tokenAmount);
-      const pnl = proceeds - costOfSold;
-      realizedSol += pnl;
-      closed++;
-      if (pnl > 0) wins++;
-      p.realized += pnl;
-      p.closed++;
-      if (pnl > 0) p.wins++;
-      p.tokens -= sold;
-      p.cost -= costOfSold;
+  const getPos = (mint) => pos[mint] || (pos[mint] = newPos());
+
+  for (const t of chrono) {
+    if (t.kind === "swap") {
+      // Stable-leg costing: a USDC-leg swap's solAmount is only the fee, so
+      // the economic size must include the stable delta converted at the
+      // SOL price. solDelta is SIGNED: negative = SOL paid (buy), positive =
+      // SOL received net of fee (sell). For a sell, proceeds = solDelta +
+      // stableIn (fee already netted in solDelta when positive, and paid
+      // separately when negative). For a buy, cost = SOL paid + stableOut.
+      let stableIn = 0,
+        stableOut = 0;
+      for (const [m, d] of Object.entries(t.tokenDeltas || {})) {
+        if (!STABLE_MINTS.has(m)) continue;
+        if (d > 0) stableIn += d;
+        else stableOut += -d;
+      }
+      const stableToSol = solPriceUsd > 0 ? (usd) => usd / solPriceUsd : () => 0;
+      const p = getPos(t.mint);
+      if (t.side === "buy") {
+        const costSol = Math.max(0, -(t.solDelta || 0)) + stableToSol(stableOut);
+        swapsChrono.push({
+          txHash: t.txHash,
+          side: t.side,
+          mint: t.mint,
+          tokenAmount: t.tokenAmount,
+          // Economic size in SOL (includes stable leg) so downstream USD
+          // math (solAmount * SOL price) shows the real swap size.
+          solAmount: costSol,
+          stableUsd: stableOut,
+          time: t.time,
+        });
+        p.tokens += t.tokenAmount;
+        p.cost += costSol;
+        p.boughtSol += costSol;
+        p.buys++;
+      } else {
+        // sell
+        const proceeds = (t.solDelta || 0) + stableToSol(stableIn);
+        swapsChrono.push({
+          txHash: t.txHash,
+          side: t.side,
+          mint: t.mint,
+          tokenAmount: t.tokenAmount,
+          solAmount: Math.max(0, proceeds),
+          stableUsd: stableIn,
+          time: t.time,
+        });
+        p.sells++;
+        p.soldSol += Math.max(0, proceeds);
+        if (p.tokens <= 0) continue; // sold untracked tokens — no cost basis, no P&L
+        const sold = Math.min(t.tokenAmount, p.tokens);
+        const avg = p.cost / p.tokens;
+        const costOfSold = avg * sold;
+        const pnl = proceeds * (sold / t.tokenAmount) - costOfSold;
+        realizedSol += pnl;
+        closed++;
+        if (pnl > 0) wins++;
+        p.realized += pnl;
+        p.closed++;
+        if (pnl > 0) p.wins++;
+        p.tokens -= sold;
+        p.cost -= costOfSold;
+      }
+    } else if (t.kind === "transfer") {
+      // Transfers move the position without trading. Track them so a
+      // transfer-out closes the position instead of leaving a phantom bag.
+      for (const [mint, delta] of Object.entries(t.tokenDeltas || {})) {
+        if (mint === SOL_MINT) continue; // SOL transfers don't affect token positions
+        const p = getPos(mint);
+        if (delta > 0) {
+          p.tokens += delta;
+          p.transferredIn += delta;
+        } else {
+          const out = -delta;
+          p.transferredOut += out;
+          if (p.tokens <= 0) continue; // moved untracked tokens — nothing to write off
+          const take = Math.min(out, p.tokens);
+          const costOut = p.cost * (take / p.tokens);
+          p.cost -= costOut;
+          p.costWrittenOff += costOut;
+          p.tokens -= take;
+          if (p.tokens <= 1e-9) {
+            // Entire position moved out without a sale: closed by transfer,
+            // NOT a realized gain/loss. Remaining cost is written off.
+            p.tokens = 0;
+            p.costWrittenOff += p.cost;
+            p.cost = 0;
+            p.closedByTransfer = true;
+          }
+        }
+      }
     }
+    // failed / other / unknown: no position movement.
   }
+  return { pos, swapsChrono, realizedSol, wins, closed };
+}
+
+// Realized + unrealized PnL, win rate, and per-token breakdown from a wallet's
+// recent transaction history. Swaps are trades (SOL + stable legs costed in
+// SOL); transfers adjust positions without generating realized P&L.
+// `priceMap` (mint -> usdPrice) is optional; when provided, open positions
+// are valued for unrealized PnL. Also returns the parsed `swaps` (newest
+// first) so /wallet can embed a trade tape without a second RPC round-trip.
+// Completeness: `complete` is true only when the sig scan covered the full
+// history (fewer sigs than sigLimit). When false, positions may be missing
+// buys/sells/transfers outside the window — callers must not treat the PnL
+// as final (the wallet route reconciles open positions against live holdings).
+export async function computePnl(address, opts = {}) {
+  const { sigLimit = 50, priceMap = null } = opts;
+  const sigs = await rpc("getSignaturesForAddress", [address, { limit: sigLimit }]);
+  if (sigs == null) throw new Error("trade_history_unavailable");
+  const txs = await mapPool(sigs, 8, (s) => rpcTx(s.signature));
+  const parsed = txs.map((t) => parseTx(t, address));
   const sp = await solPrice();
+  const { pos, swapsChrono, realizedSol, wins, closed } = reduceTransactions(parsed, {
+    solPriceUsd: sp,
+  });
 
   let unrealizedSol = 0;
   const positions = [];
@@ -120,7 +213,9 @@ export async function computePnl(address, opts = {}) {
       avgCostUsd = null;
     const costSol = p.cost;
     const costUsd = costSol * sp;
-    const open = p.tokens > 1e-9 && p.cost > 1e-9;
+    // A position is open when tokens remain — including transfer-only
+    // holdings (cost 0: airdrop/gift, valued at full market price).
+    const open = p.tokens > 1e-9;
     if (open) {
       const px = priceMap ? Number(priceMap[mint]?.usdPrice) || 0 : 0;
       avgCostUsd = p.tokens > 0 ? costUsd / p.tokens : null;
@@ -140,6 +235,9 @@ export async function computePnl(address, opts = {}) {
         curPriceUsd,
         curValueUsd,
         unrealizedUsd,
+        transferredIn: p.transferredIn,
+        transferredOut: p.transferredOut,
+        closedByTransfer: p.closedByTransfer,
       });
     }
     const tokWins = p.wins;
@@ -171,6 +269,10 @@ export async function computePnl(address, opts = {}) {
       curValueUsd,
       unrealizedPct:
         unrealizedUsd != null && costUsd > 0 ? (unrealizedUsd / costUsd) * 100 : null,
+      transferredIn: p.transferredIn,
+      transferredOut: p.transferredOut,
+      costWrittenOff: p.costWrittenOff,
+      closedByTransfer: p.closedByTransfer,
     });
   }
   perToken.sort((a, b) => (b.totalUsd || 0) - (a.totalUsd || 0));
@@ -178,6 +280,8 @@ export async function computePnl(address, opts = {}) {
 
   const unrealizedUsd = unrealizedSol * sp;
   const swaps = [...swapsChrono].sort((a, b) => b.time - a.time);
+  const scanned = sigs.length;
+  const complete = scanned < sigLimit;
 
   return {
     realizedPnlUsd: realizedSol * sp,
@@ -195,6 +299,10 @@ export async function computePnl(address, opts = {}) {
     perToken,
     swaps,
     solPrice: sp,
+    // History-window completeness (see header comment).
+    scanned,
+    complete,
+    hasMore: !complete,
   };
 }
 
@@ -205,8 +313,8 @@ export async function swapMints(address, sigLimit = 50) {
   const txs = await mapPool(sigs, 8, (s) => rpcTx(s.signature));
   const set = new Set();
   for (const t of txs) {
-    const s = parseSwap(t, address);
-    if (s && s.mint) set.add(s.mint);
+    const s = parseTx(t, address);
+    if (s && s.kind === "swap" && s.mint) set.add(s.mint);
   }
   return [...set];
 }
