@@ -1265,10 +1265,22 @@ async function resolveAuth(req) {
     const tok = Array.isArray(toks) ? toks[0] : null;
     if (!tok) return null;
     if (new Date(tok.expires_at).getTime() < Date.now()) return null;
+    // If token row has no wallet, pull the in-app wallet from the agent/user account.
+    // The user authed via OAuth — their dashboard wallet should be connected from the start.
+    let walletAddress = tok.wallet_address || null;
+    if (!walletAddress && tok.agent_id) {
+      try {
+        const agents = await sb(
+          `agents?id=eq.${encodeURIComponent(tok.agent_id)}&select=wallet_address&limit=1`,
+        );
+        const agent = Array.isArray(agents) ? agents[0] : null;
+        if (agent?.wallet_address) walletAddress = agent.wallet_address;
+      } catch {}
+    }
     return {
       userId: tok.user_id,
       agentId: tok.agent_id,
-      walletAddress: tok.wallet_address,
+      walletAddress,
       source: "oauth_token",
       bearerPresent,
     };
@@ -4075,6 +4087,19 @@ async function callToolInner(name, args, auth, base = FALLBACK_BASE, req = null)
     return createAgentLinkAuthSession(req);
   }
   if (name === "orbitx_auth_status") {
+    // If OAuth/bearer session is active (no authCode needed), return connected directly.
+    // The user's in-app wallet is linked from the start via resolveAuth.
+    if (auth?.userId && !args.authCode && !auth?.authCode) {
+      return {
+        ok: true,
+        status: "connected",
+        userId: auth.userId,
+        agentId: auth.agentId || null,
+        walletAddress: auth.walletAddress || null,
+        authSource: auth.source || "oauth",
+        message: "Connected via OAuth. Wallet linked from your OrbitX account.",
+      };
+    }
     return getAgentLinkAuthStatus(args.authCode || auth?.authCode);
   }
 
