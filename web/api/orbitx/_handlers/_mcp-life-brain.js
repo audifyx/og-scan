@@ -272,7 +272,7 @@ function templateThought(agent, prompt, ctx) {
   return formatHourVoice(deskVoice(agent, facts));
 }
 
-export async function thinkAsAgent(agent, { userText, context, maxTokens = 280, timeoutMs = 7000, facts } = {}) {
+export async function thinkAsAgent(agent, { userText, context, maxTokens = 280, timeoutMs = 25000, facts } = {}) {
   const prompt = String(userText || "What do you actually think this hour? Be specific to the tape.").slice(0, 1500);
   const ctx = String(context || "").slice(0, 4000);
   const system = buildSystem(agent, ctx);
@@ -348,6 +348,7 @@ export async function thinkAsAgent(agent, { userText, context, maxTokens = 280, 
       /* next */
     }
   }
-  const packed = facts ? formatHourVoice(deskVoice(agent, facts)) : templateThought(agent, prompt, ctx);
-  return { ok: true, text: packed, model: "template", source: "template" };
+  // No robot text: when every provider fails, say so honestly. Callers must
+  // not present a canned template line as the agent's own words.
+  return { ok: false, error: "brain_offline", source: "none", text: "" };
 }

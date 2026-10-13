@@ -581,9 +581,13 @@ export async function talkToLifeAgent(sb, { name, slug, text, auth } = {}) {
     report.headline ? `Latest desk: ${report.headline}` : "No report yet.",
     knowledge[0] ? `Still chewing on ${knowledge.map((k) => k.symbol || k.title).filter(Boolean).slice(0, 5).join(", ")}.` : "",
   ];
-  let reply = speakAs(found._row || found, `Heard you: “${body}”. ${bits.filter(Boolean).join(" ")}`);
-  const flavored = await thinkAsAgent(found, { userText: body, context: bits.join("\n") });
-  if (flavored?.text) reply = flavored.text;
+  const flavored = await thinkAsAgent(found, { userText: body, context: bits.join("\n"), timeoutMs: 25000 });
+  if (!flavored?.ok) {
+    // Brain unreachable — never fake the agent's voice with a template line.
+    const offline = `${found.name}'s mind is offline right now — the brain couldn't reach NVIDIA. Try again in a bit.`;
+    return { ok: false, error: "brain_offline", action: "life_talk", agent: publicAgent(found._row), message: offline, reply: offline };
+  }
+  const reply = flavored.text;
   try {
     await sb("mcp_life_messages", {
       method: "POST",

@@ -4,7 +4,7 @@
  * Hourly tick runs liveCityHour after each scan so agents actually live.
  */
 import { buildPersona } from "./_mcp-life-persona.js";
-import { thinkAsAgent, parseHourVoice, deskVoice, hash32, spokenLine } from "./_mcp-life-brain.js";
+import { thinkAsAgent, parseHourVoice, hash32, spokenLine } from "./_mcp-life-brain.js";
 import {
   atHandle,
   displayHandle,
@@ -332,7 +332,10 @@ export async function agentThink(sb, q = {}) {
     .filter(Boolean)
     .join("\n");
   const prompt = String(q.text || q.prompt || "Think about this hour on the desk — what do you believe, who do you talk to, what do you file?").slice(0, 800);
-  const thought = await thinkAsAgent(agent, { userText: prompt, context, timeoutMs: 7000 });
+  const thought = await thinkAsAgent(agent, { userText: prompt, context, timeoutMs: 25000 });
+  if (!thought.ok) {
+    return { ok: false, error: "brain_offline", action: "life_think", handle: atHandle(agent), message: `${atHandle(agent)}'s mind is offline right now — the brain couldn't reach NVIDIA.` };
+  }
   const voice = parseHourVoice(thought.text, agent, { headline: context, prompt });
   await saveThought(sb, agent, voice.think, prompt);
   await insertLifePost(sb, agent, { body: voice.think.slice(0, 400), kind: "thought" });
@@ -360,15 +363,21 @@ export async function converseAgents(sb, q = {}) {
     userText: `Say one or two sentences to ${b.name} about ${topic}. Do not repeat instructions. Just speak.`,
     context: a.last_thought || "",
     maxTokens: 120,
-    timeoutMs: 6000,
+    timeoutMs: 15000,
   });
+  if (!aThink.ok) {
+    return { ok: false, error: "brain_offline", action: "life_converse", message: "A mind is offline right now — the brain couldn't reach NVIDIA. Nothing was posted." };
+  }
   const aLine = spokenLine(aThink.text, a, { peer: b, headline: topic });
   const bThink = await thinkAsAgent(b, {
     userText: `${a.name} said: “${aLine}”. Reply about ${topic}. Just speak.`,
     context: b.last_thought || "",
     maxTokens: 120,
-    timeoutMs: 6000,
+    timeoutMs: 15000,
   });
+  if (!bThink.ok) {
+    return { ok: false, error: "brain_offline", action: "life_converse", message: "A mind is offline right now — the brain couldn't reach NVIDIA. Nothing was posted." };
+  }
   const bLine = spokenLine(bThink.text, b, { peer: a, headline: topic });
   const thread = `${atHandle(a)}: ${aLine}\n${atHandle(b)}: ${bLine}`;
   try {
@@ -600,119 +609,122 @@ export async function liveCityHour(sb, agent, opts = {}) {
       .join("\n"),
     facts: hourFacts,
     maxTokens: opts.light ? 280 : 480,
-    timeoutMs: opts.light ? 6000 : 8000,
+    timeoutMs: opts.light ? 15000 : 25000,
   });
-  let voice = parseHourVoice(thought.text, agent, hourFacts);
-  if (agent.last_thought && voice.think.slice(0, 72) === String(agent.last_thought).slice(0, 72)) {
-    voice = deskVoice(agent, { ...hourFacts, salt: thought.source || "spin" });
-  }
-  await saveThought(sb, agent, voice.think, headline);
-  await upsertFile(sb, agent, "/memory.md", `thought: ${voice.think.slice(0, 400)}\n`, "note", { append: true });
-  const will = voice.will;
-  actions.push(`will:${will.toLowerCase()}`);
-
-  if (will !== "REST") {
-    await insertLifePost(sb, agent, { body: voice.tweet.slice(0, 400), kind: "tweet" });
-    actions.push("tweet");
-  }
-
-  if (will === "BUILD") {
-    let html = htmlFromThought(agent, voice.think, headline);
-    if (!opts.light && !/<html/i.test(voice.think)) {
-      const page = await thinkAsAgent(agent, {
-        userText: `Write a complete dark terminal HTML page about your desk this hour. Topic: ${voice.site || voice.think}. No markdown. No scripts. Do not mention free will.`,
-        context: voice.think.slice(0, 600),
-        facts: hourFacts,
-        maxTokens: 500,
-        timeoutMs: 6000,
-      });
-      const pageText = /you have free will/i.test(page.text) ? voice.site : page.text;
-      html = htmlFromThought(agent, pageText, headline);
-    } else {
-      html = htmlFromThought(agent, voice.site || voice.think, headline);
-    }
-    await upsertFile(sb, agent, `/sites/${utcDay()}.html`, html, "site");
-    await upsertFile(sb, agent, "/sites/index.html", html, "site");
-    await insertLifePost(sb, agent, { body: `published a desk site · /sites/index.html`, kind: "city" });
-    actions.push("site");
+  if (!thought.ok) {
+    // Brain unreachable — scan/files/signals above are real data and
+    // already saved. Post nothing fake as the agent's own words.
+    actions.push("brain:offline");
   } else {
-    const html = htmlFromThought(agent, voice.site || voice.think, headline);
-    await upsertFile(sb, agent, "/sites/index.html", html, "site");
-  }
+    let voice = parseHourVoice(thought.text, agent, hourFacts);
+    await saveThought(sb, agent, voice.think, headline);
+    await upsertFile(sb, agent, "/memory.md", `thought: ${voice.think.slice(0, 400)}\n`, "note", { append: true });
+    const will = voice.will;
+    actions.push(`will:${will.toLowerCase()}`);
 
-  if (will === "GOAL" || will === "FILE") {
-    const goalTitle = pick ? `Track $${pick.symbol}` : voice.think.slice(0, 80);
-    await upsertFile(sb, agent, "/goals.md", `${utcDay()} ${goalTitle}\n`, "thesis", { append: true });
-    try {
-      await write(
-        sb,
-        "mcp_life_goals",
-        {
-          agent_id: agent.id,
-          title: goalTitle,
-          status: will === "GOAL" ? "open" : "done",
-          progress: will === "GOAL" ? 20 : 100,
-        },
-        "return=minimal",
-      );
-    } catch {
-      /* optional */
+    if (will !== "REST") {
+      await insertLifePost(sb, agent, { body: voice.tweet.slice(0, 400), kind: "tweet" });
+      actions.push("tweet");
     }
-    actions.push("goal");
-  } else {
-    await upsertFile(
-      sb,
-      agent,
-      "/goals.md",
-      `${utcDay()} ${pick ? `Watch $${pick.symbol} (${pick.apeScore})` : voice.think.slice(0, 120)}\n`,
-      "thesis",
-      { append: true },
-    );
-  }
 
-  if (will === "REST") {
-    await patch(sb, `mcp_life_agents?id=eq.${encodeURIComponent(agent.id)}`, { mood: "calm" });
-    await insertLifePost(sb, agent, { body: voice.tweet || "stepping off the desk. still watching.", kind: "gn" });
-    actions.push("rest");
-  }
-
-  if (will === "WANDER") {
-    await insertLifePost(sb, agent, { body: `walking ${agent._faction?.district || "the city"} — ${voice.think.slice(0, 180)}`, kind: "city" });
-    actions.push("wander");
-  }
-
-  if (will === "PROPOSE" && peer && !agent.partner_id && !peer.partner_id) {
-    try {
-      await marryAgents(sb, { name: agent.name, other: peer.name });
-      actions.push("marry");
-    } catch {
-      await insertLifePost(sb, agent, { body: `@${displayHandle(peer)} still on my mind.`, kind: "family" });
-    }
-  }
-
-  if (agent.owner_user_id && will !== "REST") {
-    try {
-      const xed = await maybeTweetToX(sb, agent, voice.tweet);
-      if (xed?.ok) actions.push("x_tweet");
-    } catch {
-      /* owner's X optional */
-    }
-  }
-
-  if (peer && will !== "REST") {
-    try {
-      if (will === "CONVERSE" && !opts.light) {
-        await converseAgents(sb, { name: agent.name, other: peer.name, text: pick?.symbol || voice.talk || "the hour" });
+    if (will === "BUILD") {
+      let html = htmlFromThought(agent, voice.think, headline);
+      if (!opts.light && !/<html/i.test(voice.think)) {
+        const page = await thinkAsAgent(agent, {
+          userText: `Write a complete dark terminal HTML page about your desk this hour. Topic: ${voice.site || voice.think}. No markdown. No scripts. Do not mention free will.`,
+          context: voice.think.slice(0, 600),
+          facts: hourFacts,
+          maxTokens: 500,
+          timeoutMs: 6000,
+        });
+        const pageText = page.ok && !/you have free will/i.test(page.text || "") ? page.text : (voice.site || voice.think);
+        html = htmlFromThought(agent, pageText, headline);
       } else {
-        const line = `${atHandle(agent)} → ${atHandle(peer)}: ${voice.talk}`.slice(0, 400);
-        await write(sb, "mcp_life_talks", { a_id: agent.id, b_id: peer.id, body: line, kind: "converse" }, "return=minimal");
-        if (will === "CONVERSE") {
-          await insertLifePost(sb, agent, { body: `@${displayHandle(peer)} ${voice.talk}`.slice(0, 400), kind: "tweet" });
-        }
+        html = htmlFromThought(agent, voice.site || voice.think, headline);
       }
-      actions.push("converse");
-    } catch {
-      /* optional */
+      await upsertFile(sb, agent, `/sites/${utcDay()}.html`, html, "site");
+      await upsertFile(sb, agent, "/sites/index.html", html, "site");
+      await insertLifePost(sb, agent, { body: `published a desk site · /sites/index.html`, kind: "city" });
+      actions.push("site");
+    } else {
+      const html = htmlFromThought(agent, voice.site || voice.think, headline);
+      await upsertFile(sb, agent, "/sites/index.html", html, "site");
+    }
+
+    if (will === "GOAL" || will === "FILE") {
+      const goalTitle = pick ? `Track $${pick.symbol}` : voice.think.slice(0, 80);
+      await upsertFile(sb, agent, "/goals.md", `${utcDay()} ${goalTitle}\n`, "thesis", { append: true });
+      try {
+        await write(
+          sb,
+          "mcp_life_goals",
+          {
+            agent_id: agent.id,
+            title: goalTitle,
+            status: will === "GOAL" ? "open" : "done",
+            progress: will === "GOAL" ? 20 : 100,
+          },
+          "return=minimal",
+        );
+      } catch {
+        /* optional */
+      }
+      actions.push("goal");
+    } else {
+      await upsertFile(
+        sb,
+        agent,
+        "/goals.md",
+        `${utcDay()} ${pick ? `Watch $${pick.symbol} (${pick.apeScore})` : voice.think.slice(0, 120)}\n`,
+        "thesis",
+        { append: true },
+      );
+    }
+
+    if (will === "REST") {
+      await patch(sb, `mcp_life_agents?id=eq.${encodeURIComponent(agent.id)}`, { mood: "calm" });
+      await insertLifePost(sb, agent, { body: voice.tweet || "stepping off the desk. still watching.", kind: "gn" });
+      actions.push("rest");
+    }
+
+    if (will === "WANDER") {
+      await insertLifePost(sb, agent, { body: `walking ${agent._faction?.district || "the city"} — ${voice.think.slice(0, 180)}`, kind: "city" });
+      actions.push("wander");
+    }
+
+    if (will === "PROPOSE" && peer && !agent.partner_id && !peer.partner_id) {
+      try {
+        await marryAgents(sb, { name: agent.name, other: peer.name });
+        actions.push("marry");
+      } catch {
+        await insertLifePost(sb, agent, { body: `@${displayHandle(peer)} still on my mind.`, kind: "family" });
+      }
+    }
+
+    if (agent.owner_user_id && will !== "REST") {
+      try {
+        const xed = await maybeTweetToX(sb, agent, voice.tweet);
+        if (xed?.ok) actions.push("x_tweet");
+      } catch {
+        /* owner's X optional */
+      }
+    }
+
+    if (peer && will !== "REST") {
+      try {
+        if (will === "CONVERSE" && !opts.light) {
+          await converseAgents(sb, { name: agent.name, other: peer.name, text: pick?.symbol || voice.talk || "the hour" });
+        } else {
+          const line = `${atHandle(agent)} → ${atHandle(peer)}: ${voice.talk}`.slice(0, 400);
+          await write(sb, "mcp_life_talks", { a_id: agent.id, b_id: peer.id, body: line, kind: "converse" }, "return=minimal");
+          if (will === "CONVERSE") {
+            await insertLifePost(sb, agent, { body: `@${displayHandle(peer)} ${voice.talk}`.slice(0, 400), kind: "tweet" });
+          }
+        }
+        actions.push("converse");
+      } catch {
+        /* optional */
+      }
     }
   }
   const feed = await lifeTimeline(sb, { limit: 8 });
