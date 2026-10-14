@@ -205,7 +205,6 @@ export const PlatformGlyph = {
 export const PLATFORM_APPS: PlatformApp[] = [
   { key: "dex", name: "OrbitX DEX", caption: "Scanner & trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(145deg, #5BA8FF 0%, #1A6CFF 48%, #0037A3 100%)", glyph: PlatformGlyph.dex, dock: true },
   { key: "trade", name: "Trade", caption: "Phantom buy & sell", href: "/trade", tone: "#AB9FF2", iconBg: "linear-gradient(145deg, #C9BFFF 0%, #AB9FF2 46%, #6B5FD4 100%)", glyph: PlatformGlyph.trade },
-  { key: "shop", name: "Shop", caption: "Credits + burn access", href: "/shop", tone: "#2DD4BF", iconBg: "linear-gradient(145deg, #5EEAD4 0%, #14B8A6 48%, #115E59 100%)", glyph: PlatformGlyph.shop, dock: true },
   { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
@@ -229,7 +228,7 @@ export const PLATFORM_SECTIONS: PlatformSection[] = [
   { id: "world", title: "World", subtitle: "City, agents, play, and education", keys: ["city", "gaming", "education"] },
   { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, launch", keys: ["dex", "trade", "scanner", "vamp"] },
   { id: "intel", title: "Intelligence", subtitle: "Trackers and alerts", keys: ["koltracker", "pnltracker"] },
-  { id: "mcp", title: "AI Connectors", subtitle: "Super Computer, Telegram, and shop", keys: ["supercomputer", "shop"] },
+  { id: "mcp", title: "AI Connectors", subtitle: "Super Computer and Telegram", keys: ["supercomputer"] },
   { id: "social", title: "Social", subtitle: "Feed, HQ, and support", keys: ["social", "hq", "support"] },
   { id: "play", title: "Play & Earn", subtitle: "NFTs and tasks", keys: ["nft", "bagwork"] },
 ];

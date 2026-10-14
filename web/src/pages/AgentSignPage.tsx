@@ -27,7 +27,7 @@ import {
   sortAgentSignWallets,
 } from "@/lib/orbitx/agentSignWallets";
 
-type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access" | "shop";
+type Kind = "trade" | "claim" | "burn" | "rent" | "credits" | "mcp-access";
 
 function decodeTx(b64: string): VersionedTransaction | Transaction {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -99,8 +99,7 @@ export default function AgentSignPage() {
     kindParam === "credit" ||
     kindParam === "mcp-access" ||
     kindParam === "mcp_access" ||
-    kindParam === "access" ||
-    kindParam === "shop"
+    kindParam === "access"
       ? kindParam === "credit"
         ? "credits"
         : kindParam === "mcp_access" || kindParam === "access"
@@ -140,7 +139,6 @@ export default function AgentSignPage() {
       const credits = Number.isFinite(sol) ? Math.floor(sol * 10_000) : 0;
       return `${amountRaw || "—"} SOL → ~${credits.toLocaleString()} credits`;
     }
-    if (kind === "shop") return sku ? `Desk shop ${sku} — buy $ORBITX + burn` : "Desk shop buy & burn";
     if (kind === "mcp-access") {
       const pkg: McpAccessPackageId = isMcpAccessPackageId(packageId) ? packageId : "hour";
       const fromAmount = Number(amountRaw);
@@ -164,7 +162,6 @@ export default function AgentSignPage() {
       const sol = Number(amountRaw);
       return Number.isFinite(sol) && sol >= 0.001;
     }
-    if (kind === "shop") return Boolean(sku);
     if (kind === "mcp-access") return isMcpAccessPackageId(packageId);
     if (kind === "claim" || kind === "rent") return true;
     if (kind === "burn") return Boolean(mint && (amountRaw || percentRaw));
@@ -186,8 +183,6 @@ export default function AgentSignPage() {
             ? "Burn tokens"
             : kind === "rent"
               ? "Rent refund"
-              : kind === "shop"
-                ? "Buy & burn"
                 : action.toUpperCase();
 
   const sendOpts = { skipPreflight: true as const };
@@ -312,42 +307,6 @@ export default function AgentSignPage() {
         return;
       }
 
-      if (kind === "shop") {
-        const prepRes = await fetch("/api/orbitx/shop/prepare", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wallet: pk, publicKey: pk, sku, mint }),
-        });
-        const prep = await prepRes.json().catch(() => ({}));
-        if (!prepRes.ok || prep?.ok === false || typeof prep.transaction !== "string") {
-          throw new Error(prep?.error || prep?.message || "Could not build shop buy-and-burn");
-        }
-        const sig = await sendOne(prep.transaction);
-        await confirmSentTransaction(connection, sig);
-        finish(sig);
-        try {
-          await fetch("/api/orbitx/shop", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              wallet: pk,
-              sku,
-              signature: sig,
-              mint,
-              sol: prep.sol,
-              solUsd: prep.solUsd,
-              orbitxBurned: prep.orbitxBurned,
-            }),
-          });
-        } catch {
-          /* receipt is optional */
-        }
-        setExtraNote(
-          prep.message ||
-            "Buy-and-burn confirmed. Copy the Solscan link — 90% of the $ORBITX bought is burned in this tx.",
-        );
-        return;
-      }
 
       if (kind === "trade") {
         const amount = parseAgentSignTradeAmount(action, amountRaw);

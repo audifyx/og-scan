@@ -60,13 +60,12 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "account", label: "Settings" },
 ];
 
-const GATE_KEYS = ["city", "dex", "agent", "shop"] as const;
+const GATE_KEYS = ["city", "dex", "agent"] as const;
 
 const GATE_COPY: Record<(typeof GATE_KEYS)[number], { kicker: string; line: string }> = {
   city: { kicker: "01 · World", line: "Walk the living 3D city" },
   dex: { kicker: "02 · Markets", line: "Scanner, tape, and execution" },
   agent: { kicker: "03 · Mesh", line: "Claude, ChatGPT, and Grok" },
-  shop: { kicker: "04 · Access", line: "Credits and $ORBITX burn" },
 };
 
 const TAB_GLYPH: Record<TabId, ReactNode> = {
@@ -723,7 +722,7 @@ export default function Hub() {
           </>
         )}
 
-        {(show("agent mcp claude chatgpt grok") || (showOwnerSurfaces && show("x mcp twitter")) || show("shop credits burn")) && (
+        {(show("agent mcp claude chatgpt grok") || (showOwnerSurfaces && show("x mcp twitter"))) && (
           <>
             <div className="ios-group__head">Connectors</div>
             <div className="ios-group">
@@ -748,18 +747,6 @@ export default function Hub() {
                     <span className="ios-cell__title">Channels</span>
                   </span>
                   <span className="ios-cell__value">Post</span>
-                  <IosChevron />
-                </Link>
-              )}
-              {show("shop credits burn") && (
-                <Link to="/shop" className="ios-cell">
-                  <Badge bg="linear-gradient(180deg,#5eead4,#115e59)">
-                    <svg viewBox="0 0 24 24" fill="none"><path d="M7 9h10l-1 10H8L7 9z" stroke="currentColor" strokeWidth="1.8" /><path d="M9 9V7a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
-                  </Badge>
-                  <span className="ios-cell__meta">
-                    <span className="ios-cell__title">Shop</span>
-                  </span>
-                  <span className="ios-cell__value">Credits</span>
                   <IosChevron />
                 </Link>
               )}

@@ -54,7 +54,6 @@ import CommunityClassic from "./pages/CommunityClassic";
 // Premium removed
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
-import Launch from "./pages/Launch";
 import LaunchpadLayout from "./pages/orbitx/LaunchpadLayout";
 import LaunchpadHome from "./pages/orbitx/LaunchpadHome";
 import LaunchpadCreate from "./pages/orbitx/LaunchpadCreate";
@@ -64,7 +63,6 @@ import LaunchpadTerminal from "./pages/orbitx/LaunchpadTerminal";
 import TerminalHome from "./pages/orbitx/TerminalHome";
 import TerminalTrade from "./pages/orbitx/TerminalTrade";
 import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
-import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
 import TradeApp from "./trade/TradeApp";
 import TradeHome from "./trade/TradeHome";
 import TradeDeskPage from "./trade/TradeDeskPage";
@@ -105,7 +103,6 @@ const PortfolioDesk = lazyWithRetry(() => import("./crypto/pages/PortfolioDesk")
 const TrendingIntel = lazyWithRetry(() => import("./crypto/pages/TrendingIntel"));
 const WhaleIntel = lazyWithRetry(() => import("./crypto/pages/WhaleIntel"));
 const SentimentIntel = lazyWithRetry(() => import("./crypto/pages/SentimentIntel"));
-const LaunchStudio = lazyWithRetry(() => import("./crypto/pages/LaunchStudio"));
 const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker"));
 const SocialAppPage = lazyWithRetry(() => import("./pages/SocialAppPage"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
@@ -477,7 +474,6 @@ const App = () => (
               <Route index element={<TerminalHome />} />
               <Route path="trade" element={<TerminalTrade />} />
               <Route path="portfolio" element={<TerminalPortfolio />} />
-              <Route path="launch" element={<TerminalLaunch />} />
             </Route>
 
             {/* ── OrbitX Crypto Intelligence Command Center ── */}
@@ -490,7 +486,6 @@ const App = () => (
               <Route path="trending" element={<Suspense fallback={<RouteFallback label="Trending" />}><TrendingIntel /></Suspense>} />
               <Route path="whales" element={<Suspense fallback={<RouteFallback label="Whales" />}><WhaleIntel /></Suspense>} />
               <Route path="sentiment" element={<Suspense fallback={<RouteFallback label="Sentiment" />}><SentimentIntel /></Suspense>} />
-              <Route path="launch" element={<Suspense fallback={<RouteFallback label="Launch" />}><LaunchStudio /></Suspense>} />
               <Route path="wallet/:address" element={<Suspense fallback={<RouteFallback label="Wallet" />}><WalletTracker /></Suspense>} />
             </Route>
 
@@ -725,7 +720,6 @@ const App = () => (
             <Route path="/voice" element={<Suspense fallback={<RouteFallback label="Voice" />}><VoiceLobbyBrowser /></Suspense>} />
             <Route path="/gc" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
             <Route path="/gc/:slug" element={<Suspense fallback={<RouteFallback label="Group chat" />}><McpGroupChat /></Suspense>} />
-            <Route path="/shop" element={<Navigate to="/supercomputer?tab=shop" replace />} />
             <Route path="/onchain" element={<OwnerPreviewRoute><OnChainProofPage /></OwnerPreviewRoute>} />
             <Route path="/world" element={<Navigate to="/on-chain" replace />} />
             <Route path="/on-chain" element={<Navigate to="/orbitxagents?tab=chain" replace />} />

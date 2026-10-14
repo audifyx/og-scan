@@ -47,7 +47,6 @@ export default function IntelHome() {
         {[
           { t: "Token scanner", d: "Contract, liquidity, holders, rug & clone signals.", href: "/intel/scan" },
           { t: "Trading terminal", d: "Live charts, Jupiter routes, balances, history.", href: "/intel/trade" },
-          { t: "Launchpad studio", d: "SPL create, metadata, anti-clone, creator fees.", href: "/intel/launch" },
         ].map((c) => (
           <Link key={c.href} to={c.href} className="oxc-panel" style={{ textDecoration: "none", color: "inherit" }}>
             <h3>{c.t}</h3>
