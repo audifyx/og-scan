@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Apply ox_calls_* DDL to production project xkfpwydcpdbgfpmiypfd.
+ * Apply ox_calls_* DDL to production project ffjipnkhcebjvttliptb.
  * Usage: SUPABASE_ACCESS_TOKEN=sbp_... node scripts/apply-ox-calls-sql.mjs
  */
 import { CALLS_DDL, CALLS_PROJECT_REF } from "../web/api/orbitx/calls-schema.js";

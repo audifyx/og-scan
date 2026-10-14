@@ -17,8 +17,8 @@ describe("fetchTimeout", () => {
   });
 
   it("recognizes GoTrue auth URLs", () => {
-    expect(isAuthApiUrl("https://xkfpwydcpdbgfpmiypfd.supabase.co/auth/v1/token?grant_type=password")).toBe(true);
-    expect(isAuthApiUrl("https://xkfpwydcpdbgfpmiypfd.supabase.co/rest/v1/profiles")).toBe(false);
+    expect(isAuthApiUrl("https://ffjipnkhcebjvttliptb.supabase.co/auth/v1/token?grant_type=password")).toBe(true);
+    expect(isAuthApiUrl("https://ffjipnkhcebjvttliptb.supabase.co/rest/v1/profiles")).toBe(false);
   });
 
   it("aborts when the server never responds", async () => {

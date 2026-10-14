@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { supabaseAwareFetch } from "@/lib/fetchTimeout";
 
 // Shared Supabase project — syncs data across web + mobile
-// Project: xkfpwydcpdbgfpmiypfd
+// Project: ffjipnkhcebjvttliptb
 const env = import.meta.env as Record<string, string | undefined>;
 
 export const SUPABASE_URL =

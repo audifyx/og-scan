@@ -59,7 +59,7 @@ catch status-aware → json(status, { error })
 
 ## Deploy checklist
 
-1. Apply SQL migrations (`20260725190000`, `20260725190100`, `20260725220000`) — **applied on prod `xkfpwydcpdbgfpmiypfd`** (see `docs/omega/OPS_APPLY_STATUS.md`)
+1. Apply SQL migrations (`20260725190000`, `20260725190100`, `20260725220000`) — **applied on prod `ffjipnkhcebjvttliptb`** (see `docs/omega/OPS_APPLY_STATUS.md`)
 2. Set `OXW_WORKER_SECRET` in Vercel + Supabase function secrets — **Supabase set; Vercel still requires dashboard**
 3. Deploy edge functions `oxw-*` — **deployed to prod**
 4. Confirm vercel rewrite for `/api/orbitx-world/(.*)`

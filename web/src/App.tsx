@@ -14,7 +14,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { OwnerPreviewRoute } from "@/components/OwnerPreviewRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
-import { BackendMigrationBanner } from "@/components/BackendMigrationBanner";
 import { HumanGate } from "@/components/HumanGate";
 import { IntercomSync } from "@/components/IntercomSync";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -299,7 +298,6 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
 const App = () => (
   <ErrorBoundary>
   <MaintenanceLock>
-    <BackendMigrationBanner />
         <HumanGate />
   <QueryClientProvider client={queryClient}>
     <AuthProvider>

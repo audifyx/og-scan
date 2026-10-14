@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const BEARER_TOKEN = Deno.env.get("X_BEARER_TOKEN")!;
 const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")!;
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://ffjipnkhcebjvttliptb.supabase.co";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const BOT_USERNAME = "audifyx";

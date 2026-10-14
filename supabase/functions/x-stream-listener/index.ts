@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const BEARER_TOKEN = Deno.env.get("X_BEARER_TOKEN")!;
-const BOT_ENDPOINT = "https://xkfpwydcpdbgfpmiypfd.functions.supabase.co/x-reply-bot";
+const BOT_ENDPOINT = "https://ffjipnkhcebjvttliptb.functions.supabase.co/x-reply-bot";
 const BOT_USERNAME = "audifyx";
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 999;

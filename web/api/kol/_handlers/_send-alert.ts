@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 //  1) { botConfigId | trackerId } — resolves the stored bot token server-side
 //     via Supabase service role (token never leaves the server).
 //  2) { botToken, chatId } — direct dispatch (used before migration is applied).
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 type Payload = {

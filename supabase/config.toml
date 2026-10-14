@@ -1,4 +1,4 @@
-project_id = "xkfpwydcpdbgfpmiypfd"
+project_id = "ffjipnkhcebjvttliptb"
 
 [functions.telegram-invite-bot]
 verify_jwt = false

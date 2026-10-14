@@ -167,7 +167,7 @@ async function handleOwnerApi(req, res) {
     return res.end(JSON.stringify(obj));
   }
 
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
   async function sb(path) {

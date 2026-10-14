@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     ping("jupiter", "https://lite-api.jup.ag/price/v3?ids=So11111111111111111111111111111111111111112"),
     ping("geckoterminal", "https://api.geckoterminal.com/api/v2/networks?page=1", { headers: { Accept: "application/json;version=20230302" } }),
     ping("dexscreener", "https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112"),
-    ping("supabase-fn", "https://xkfpwydcpdbgfpmiypfd.supabase.co/functions/v1/ogdex-chat", { method: "OPTIONS" }),
+    ping("supabase-fn", "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/ogdex-chat", { method: "OPTIONS" }),
   ]);
   const ok = checks.every((c) => c.ok);
   const degraded = !ok && checks.some((c) => c.ok);

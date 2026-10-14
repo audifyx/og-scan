@@ -40,7 +40,7 @@ describe("surface harden + leak scan", () => {
     const lib = readFileSync(resolve(WEB, "api/ogdex/_lib.js"), "utf8");
     expect(lib).not.toMatch(/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9/);
     expect(lib).toContain('export const ANON = process.env.SUPABASE_ANON_KEY || ""');
-    expect(lib).not.toContain("xkfpwydcpdbgfpmiypfd.supabase.co");
+    expect(lib).not.toContain("ffjipnkhcebjvttliptb.supabase.co");
   });
 
   it("requires an MCP session for image/video tools", () => {
