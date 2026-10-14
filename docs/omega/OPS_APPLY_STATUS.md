@@ -1,6 +1,6 @@
 # OrbitX OMEGA — ops apply status
 
-Last applied: 2026-09-05 (production Supabase project `ffjipnkhcebjvttliptb` / Soltools).
+Last applied: 2026-09-05 (production Supabase project `xkfpwydcpdbgfpmiypfd` / Soltools).
 
 ## Done (production Supabase)
 
@@ -48,7 +48,7 @@ bash scripts/qa/run-smoke.sh
 
 Web3 SIWS and password-reset links both require **Site URL** + **Redirect URLs** to include the www host. Apex `https://orbitx.world` 308s to www and drops recovery hashes.
 
-Intended production values (project `ffjipnkhcebjvttliptb`):
+Intended production values (project `xkfpwydcpdbgfpmiypfd`):
 
 - Site URL: `https://www.orbitx.world`
 - Redirect URLs: `https://www.orbitx.world/**`, `https://orbitx.world/**`, `https://ogscan.fun/**`, `https://www.ogscan.fun/**`, `https://orbitxcity.vercel.app/**`, `http://localhost:5173/**`, `http://localhost:3000/**`, `http://localhost:8080/**`

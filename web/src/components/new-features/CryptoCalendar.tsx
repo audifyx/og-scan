@@ -97,7 +97,7 @@ const NEWS_CACHE_KEY = "ogscan_intel_news_v2";
 const NEWS_CACHE_TTL = 15 * 60 * 1000;
 const MAX_PER_CATEGORY = 40;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
-const EDGE_NEWS_URL = "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/news-fetcher";
+const EDGE_NEWS_URL = "https://xkfpwydcpdbgfpmiypfd.supabase.co/functions/v1/news-fetcher";
 
 const RSS_FEEDS = [
   { name: "CoinTelegraph", url: "https://cointelegraph.com/rss" },

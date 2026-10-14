@@ -1,5 +1,5 @@
 /** DDL for ox_calls_* — inlined so Vercel can apply without the migrations folder. */
-export const CALLS_PROJECT_REF = "ffjipnkhcebjvttliptb";
+export const CALLS_PROJECT_REF = "xkfpwydcpdbgfpmiypfd";
 
 export const CALLS_DDL = `
 create table if not exists public.ox_calls_desk (

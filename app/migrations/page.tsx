@@ -61,7 +61,7 @@ ADD COLUMN IF NOT EXISTS is_owner BOOLEAN GENERATED ALWAYS AS (auth.uid() = owne
 ];
 
 export default function MigrationsPage() {
-  const [host, setHost] = useState('db.ffjipnkhcebjvttliptb.supabase.co');
+  const [host, setHost] = useState('db.xkfpwydcpdbgfpmiypfd.supabase.co');
   const [user, setUser] = useState('postgres');
   const [password, setPassword] = useState('Janescra127!');
   const [database, setDatabase] = useState('postgres');

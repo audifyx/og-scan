@@ -9,7 +9,7 @@ import { sendTelegram } from "./_send-alert.js";
 //      whose interval has elapsed. Topic-aware (message_thread_id).
 // POST { botToken, chatId, threadId?, minAgeHours?, maxAgeHours? }:
 //   Sends a digest immediately with the provided bot (manual / test).
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const CRON_SECRET = process.env.CRON_SECRET || "";
 

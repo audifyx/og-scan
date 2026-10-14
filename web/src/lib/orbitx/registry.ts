@@ -1,5 +1,5 @@
 // Orbitx Launchpad — token registry client (anti-vamp backed).
-// Talks to the same Supabase project the app already uses (ffjipnkhcebjvttliptb).
+// Talks to the same Supabase project the app already uses (xkfpwydcpdbgfpmiypfd).
 // Table `orbitx_tokens` enforces unique CA / name / ticker at the DB level and
 // exposes an `orbitx_vamp_check` RPC for look-alike (vamp) detection.
 import { supabase } from "@/lib/supabase";

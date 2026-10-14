@@ -24,7 +24,7 @@ const SOL = "So11111111111111111111111111111111111111112";
 const MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
 const JUP = "https://lite-api.jup.ag";
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const SUPA = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SUPA = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
 
 function rpcUrl() {
   return (

@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
  *
  * Actions: "list" | "set_featured" | "set_hidden"  (value: boolean, mint: string)
  */
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const OWNER_EMAILS = ["audifyx@gmail.com"];

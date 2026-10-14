@@ -22,7 +22,7 @@ or any custom wallet list and sends Telegram alerts through a user-branded bot.
 |---|---|---|
 | `HELIUS_SECRET` | Helius API key (txs + webhook management) | added by user |
 | `SUPABASE_SERVICE_ROLE_KEY` | server-side config lookup for 24/7 webhook alerts + alert log | **must be added** |
-| `SUPABASE_URL` | defaults to ffjipnkhcebjvttliptb.supabase.co if unset | optional |
+| `SUPABASE_URL` | defaults to xkfpwydcpdbgfpmiypfd.supabase.co if unset | optional |
 | `HELIUS_WEBHOOK_SECRET` | optional shared secret; also set as authHeader on the Helius webhook | optional |
 
 ## Setup checklist

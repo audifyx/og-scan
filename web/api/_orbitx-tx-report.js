@@ -11,7 +11,7 @@ import { appFromPath, recordOwnerEvent, upsertLedger } from "./orbitx/_handlers/
 export const config = { maxDuration: 30 };
 
 const SUPABASE_URL =
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 

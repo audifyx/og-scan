@@ -21,7 +21,7 @@ import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 const CITY_DB_URL =
-  process.env.CITY_SUPABASE_URL || "https://rhqvtqygrjmcuggftrtu.supabase.co";
+  process.env.CITY_SUPABASE_URL || "https://xkfpwydcpdbgfpmiypfd.supabase.co";
 const SERVICE_KEY = process.env.CITY_SUPABASE_SERVICE_KEY || "";
 const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 const UI_EPS = 1e-6;
