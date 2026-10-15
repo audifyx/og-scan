@@ -708,7 +708,7 @@
 }
 
 .font-display {
-  font-family: "Bricolage Grotesque", "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* .glass-bottom-nav mirrors the .glass-tab device rules (this app's dock). */

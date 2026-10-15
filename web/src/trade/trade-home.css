@@ -560,12 +560,21 @@
 .th__chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  padding: 10px 16px;
+  min-height: 44px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 10px;
-  color: rgba(244, 244, 242, 0.5);
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(244, 244, 242, 0.7);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.th__chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(90, 162, 255, 0.4);
+  color: #fff;
 }
 
 .th__stats {

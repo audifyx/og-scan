@@ -20,11 +20,12 @@ export default function ShareButton({ mint, symbol, score, mcap, verdict }: { mi
   return (
     <span className="inline-flex items-center gap-1.5">
       <a href={intent} target="_blank" rel="noreferrer" onClick={(e) => { /* prefer native sheet on mobile */ if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) { e.preventDefault(); native(); } }}
-        className="btn bg-white text-black font-semibold inline-flex items-center gap-1.5 hover:opacity-90">
+        className="btn inline-flex items-center gap-1.5 font-semibold text-white hover:opacity-90"
+        style={{ background: "linear-gradient(135deg, #3b82f6, #5aa2ff)", boxShadow: "0 4px 14px rgba(59,130,246,0.35)" }}>
         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
         Share on X
       </a>
-      <button onClick={copy} title="Copy share link" className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1">{copied ? <Check className="w-3.5 h-3.5 text-up" /> : <Copy className="w-3.5 h-3.5" />}</button>
+      <button onClick={copy} title="Copy share link" className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>{copied ? <Check className="w-3.5 h-3.5 text-up" /> : <Copy className="w-3.5 h-3.5" />}</button>
     </span>
   );
 }

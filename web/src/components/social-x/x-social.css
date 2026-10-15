@@ -7,8 +7,8 @@
 
 .ox-x-social,
 .osc-shell {
-  --osc-font-display: "Syne", "Manrope", system-ui, sans-serif;
-  --osc-font-body: "Manrope", system-ui, sans-serif;
+  --osc-font-display: "Bricolage Grotesque", "Instrument Sans", system-ui, sans-serif;
+  --osc-font-body: "Instrument Sans", system-ui, sans-serif;
   --osc-font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 
   --osc-bg: #000000;
