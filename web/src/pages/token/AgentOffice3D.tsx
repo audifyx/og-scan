@@ -180,8 +180,6 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
 }
 
 // ── Office ─────────────────────────────────────────────────────────────────
-import { useScreenTexture, type ScreenKind } from "./MonitorScreens";
-
 function Monitor({ position, rotationY = 0, hue = "#22d3ee", chart = false }: { position: [number, number, number]; rotationY?: number; hue?: string; chart?: boolean }) {
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
@@ -201,334 +199,7 @@ function Monitor({ position, rotationY = 0, hue = "#22d3ee", chart = false }: { 
   );
 }
 
-/** Monitor with a LIVE screen: real price, X scanner, build terminal, radar. */
-function LiveMonitor({ position, rotationY = 0, screen, stats }: { position: [number, number, number]; rotationY?: number; screen: ScreenKind; stats: AvatarStats }) {
-  const tex = useScreenTexture(screen, stats);
-  return (
-    <group position={position} rotation={[0, rotationY, 0]}>
-      <mesh><boxGeometry args={[1.15, 0.72, 0.07]} /><meshStandardMaterial color="#0d1220" roughness={0.5} /></mesh>
-      <mesh position={[0, 0, 0.04]}>
-        <planeGeometry args={[1.05, 0.62]} />
-        <meshBasicMaterial map={tex} toneMapped={false} />
-      </mesh>
-      {/* glow spill */}
-      <mesh position={[0, 0, -0.02]}><planeGeometry args={[1.3, 0.85]} /><meshBasicMaterial color="#22d3ee" transparent opacity={0.08} /></mesh>
-      <mesh position={[0, -0.46, 0]}><boxGeometry args={[0.09, 0.24, 0.09]} /><meshStandardMaterial color="#1a2138" /></mesh>
-      <mesh position={[0, -0.58, 0.05]}><boxGeometry args={[0.5, 0.04, 0.3]} /><meshStandardMaterial color="#1a2138" /></mesh>
-    </group>
-  );
-}
-
-// ── world growth: office → city ──────────────────────────────────────────────
-const WORLD_NAMES = ["Pod", "Office", "Studio", "Headquarters", "Sky Tower", "Metropolis"];
-const AGENTS_PER_STAGE = [0, 0, 1, 3, 5, 7];
-
-function seededRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
-}
-
-const CITIZEN_COLORS = ["#7c3aed", "#f59e0b", "#ec4899", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"];
-
-/** A simple AI citizen: blocky body, glowing visor, patrols a small loop. */
-function MiniAgent({ seed, center, radius, color, speed = 0.4 }: { seed: number; center: [number, number]; radius: number; color: string; speed?: number }) {
-  const g = useRef<THREE.Group>(null);
-  const legL = useRef<THREE.Mesh>(null);
-  const legR = useRef<THREE.Mesh>(null);
-  const bob = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime() * speed + seed * 2.4;
-    const x = center[0] + Math.cos(t) * radius;
-    const z = center[1] + Math.sin(t) * radius;
-    if (g.current) {
-      g.current.position.set(x, 0, z);
-      g.current.rotation.y = -t;
-    }
-    const sw = Math.sin(clock.getElapsedTime() * 7 + seed * 5) * 0.55;
-    if (legL.current) legL.current.rotation.x = sw;
-    if (legR.current) legR.current.rotation.x = -sw;
-    if (bob.current) bob.current.position.y = Math.abs(Math.sin(clock.getElapsedTime() * 7 + seed * 5)) * 0.05;
-  });
-  return (
-    <group ref={g}>
-      <group ref={bob}>
-        {/* legs */}
-        <mesh ref={legL} position={[-0.11, 0.28, 0]}><boxGeometry args={[0.16, 0.56, 0.2]} /><meshStandardMaterial color="#141a30" roughness={0.7} /></mesh>
-        <mesh ref={legR} position={[0.11, 0.28, 0]}><boxGeometry args={[0.16, 0.56, 0.2]} /><meshStandardMaterial color="#141a30" roughness={0.7} /></mesh>
-        {/* torso */}
-        <mesh position={[0, 0.85, 0]}><boxGeometry args={[0.52, 0.62, 0.32]} /><meshStandardMaterial color={color} roughness={0.5} metalness={0.2} /></mesh>
-        <mesh position={[0, 0.85, 0.17]}><boxGeometry args={[0.3, 0.3, 0.02]} /><meshStandardMaterial color="#0b0f1c" emissive={color} emissiveIntensity={0.7} /></mesh>
-        {/* head */}
-        <mesh position={[0, 1.35, 0]}><boxGeometry args={[0.36, 0.32, 0.34]} /><meshStandardMaterial color="#1c2440" roughness={0.5} /></mesh>
-        <mesh position={[0, 1.36, 0.18]}><boxGeometry args={[0.26, 0.1, 0.02]} /><meshStandardMaterial color="#000" emissive="#7df9ff" emissiveIntensity={2} /></mesh>
-        {/* antenna */}
-        <mesh position={[0.12, 1.6, 0]}><cylinderGeometry args={[0.015, 0.015, 0.18, 6]} /><meshStandardMaterial color="#39415f" /></mesh>
-        <mesh position={[0.12, 1.72, 0]}><sphereGeometry args={[0.035, 8, 8]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} /></mesh>
-      </group>
-    </group>
-  );
-}
-
-function Citizens({ stage }: { stage: number }) {
-  const spots = useMemo(() => {
-    const n = AGENTS_PER_STAGE[stage] ?? 0;
-    const base: Array<{ center: [number, number]; radius: number; speed: number }> = [
-      { center: [4.6, 0.8], radius: 1.2, speed: 0.45 },
-      { center: [-9.5, 2], radius: 1.6, speed: 0.35 },
-      { center: [-9.5, 2], radius: 2.2, speed: 0.28 },
-      { center: [-1.5, -2.5], radius: 1.8, speed: 0.4 },
-      { center: [3.5, 3.2], radius: 1.4, speed: 0.5 },
-      { center: [-9.5, 2], radius: 1.0, speed: 0.55 },
-      { center: [-4.5, 2.5], radius: 1.5, speed: 0.38 },
-    ];
-    return base.slice(0, n);
-  }, [stage]);
-  return (
-    <group>
-      {spots.map((s, i) => (
-        <MiniAgent key={i} seed={i + 1} center={s.center} radius={s.radius} color={CITIZEN_COLORS[i % CITIZEN_COLORS.length]} speed={s.speed} />
-      ))}
-    </group>
-  );
-}
-
-function useBuildingTexture() {
-  return useMemo(() => {
-    const c = document.createElement("canvas");
-    c.width = 64; c.height = 128;
-    const g = c.getContext("2d")!;
-    g.fillStyle = "#0b1120"; g.fillRect(0, 0, 64, 128);
-    const rand = seededRand(7);
-    for (let y = 6; y < 122; y += 12) {
-      for (let x = 6; x < 58; x += 12) {
-        const lit = rand() > 0.5;
-        g.fillStyle = lit ? ["#5eead4", "#fbbf24", "#7dd3fc"][Math.floor(rand() * 3)] : "#141c30";
-        g.fillRect(x, y, 7, 7);
-      }
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    return t;
-  }, []);
-}
-
-/** Ring of lit towers floating around the office — the growing city. */
-function CityBuildings({ stage }: { stage: number }) {
-  const tex = useBuildingTexture();
-  const buildings = useMemo(() => {
-    const rand = seededRand(42);
-    const count = stage >= 5 ? 14 : 8;
-    return Array.from({ length: count }, (_, i) => {
-      const angle = (i / count) * Math.PI * 2 + rand() * 0.5;
-      const radius = 12 + rand() * (stage >= 5 ? 9 : 5);
-      const w = 1.7 + rand() * 1.5;
-      const h = (stage >= 5 ? 5 : 3.5) + rand() * (stage >= 5 ? 10 : 5);
-      const d = 1.7 + rand() * 1.5;
-      return { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius, w, h, d, rot: rand() * Math.PI, rep: 1 + Math.floor(rand() * 2) };
-    });
-  }, [stage]);
-  return (
-    <group>
-      {buildings.map((b, i) => (
-        <group key={i} position={[b.x, 0, b.z]} rotation={[0, b.rot, 0]}>
-          {/* glowing base pad */}
-          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[Math.max(b.w, b.d) * 0.85, 24]} />
-            <meshStandardMaterial color="#0a0e1c" emissive="#2dd4bf" emissiveIntensity={0.35} transparent opacity={0.85} />
-          </mesh>
-          <mesh position={[0, b.h / 2, 0]}>
-            <boxGeometry args={[b.w, b.h, b.d]} />
-            <meshStandardMaterial color="#0d1428" roughness={0.6} metalness={0.3} emissiveMap={tex} emissive="#ffffff" emissiveIntensity={0.85} />
-          </mesh>
-          {/* roof beacon */}
-          <mesh position={[0, b.h + 0.15, 0]}>
-            <sphereGeometry args={[0.09, 8, 8]} />
-            <meshStandardMaterial color="#f43f5e" emissive="#f43f5e" emissiveIntensity={2.5} />
-          </mesh>
-        </group>
-      ))}
-      {/* central spire at max stage */}
-      {stage >= 5 && (
-        <group position={[0, 0, -17]}>
-          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[2.6, 32]} />
-            <meshStandardMaterial color="#0a0e1c" emissive="#a78bfa" emissiveIntensity={0.5} transparent opacity={0.9} />
-          </mesh>
-          <mesh position={[0, 8, 0]}>
-            <boxGeometry args={[3, 16, 3]} />
-            <meshStandardMaterial color="#0d1428" roughness={0.5} metalness={0.4} emissiveMap={tex} emissive="#ffffff" emissiveIntensity={1} />
-          </mesh>
-          <mesh position={[0, 16.6, 0]} rotation={[0, 0, Math.PI / 4]}>
-            <octahedronGeometry args={[0.9]} />
-            <meshStandardMaterial color="#2dd4bf" emissive="#2dd4bf" emissiveIntensity={2} />
-          </mesh>
-        </group>
-      )}
-    </group>
-  );
-}
-
-/** Flying vehicles crossing the skyline. */
-function SkyTraffic({ stage }: { stage: number }) {
-  const count = stage >= 5 ? 7 : 4;
-  const ships = useMemo(() => {
-    const rand = seededRand(99);
-    return Array.from({ length: count }, (_, i) => ({
-      y: 5.5 + (i % 3) * 1.8 + rand() * 0.8,
-      z: -15 + rand() * 24,
-      speed: 2.2 + rand() * 2.4,
-      offset: rand() * 44,
-      color: ["#22d3ee", "#f472b6", "#a78bfa"][i % 3],
-    }));
-  }, [count]);
-  const refs = useRef<Array<THREE.Group | null>>([]);
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    ships.forEach((s, i) => {
-      const g = refs.current[i];
-      if (!g) return;
-      const x = ((t * s.speed + s.offset) % 48) - 24;
-      g.position.set(x, s.y, s.z);
-    });
-  });
-  return (
-    <group>
-      {ships.map((s, i) => (
-        <group key={i} ref={(el) => { refs.current[i] = el; }}>
-          <mesh><boxGeometry args={[1.15, 0.22, 0.42]} /><meshStandardMaterial color="#0d1326" emissive={s.color} emissiveIntensity={1.4} /></mesh>
-          <mesh position={[0.72, 0, 0]}><boxGeometry args={[0.22, 0.1, 0.18]} /><meshStandardMaterial color="#fff" emissive="#ffffff" emissiveIntensity={2.2} /></mesh>
-          <mesh position={[-0.75, 0, 0]}><boxGeometry args={[0.3, 0.06, 0.5]} /><meshStandardMaterial color={s.color} emissive={s.color} emissiveIntensity={1} transparent opacity={0.7} /></mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-/** Second workstation (stage 2+). */
-function SecondDesk({ stats }: { stats: AvatarStats }) {
-  return (
-    <group position={[4.9, 0, 0.9]} rotation={[0, -Math.PI / 2, 0]}>
-      <mesh position={[0, 0.72, 0]}><boxGeometry args={[1.9, 0.09, 0.95]} /><meshStandardMaterial color="#182036" roughness={0.4} metalness={0.3} /></mesh>
-      {[[-0.85, -0.38], [0.85, -0.38], [-0.85, 0.38], [0.85, 0.38]].map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.34, z]}><boxGeometry args={[0.08, 0.68, 0.08]} /><meshStandardMaterial color="#0d1326" /></mesh>
-      ))}
-      <mesh position={[0, 0.65, 0]}><boxGeometry args={[1.8, 0.02, 0.85]} /><meshStandardMaterial color="#000" emissive="#a78bfa" emissiveIntensity={0.9} /></mesh>
-      <LiveMonitor position={[-0.5, 1.3, -0.1]} rotationY={0.18} screen="radar" stats={stats} />
-      <LiveMonitor position={[0.5, 1.3, -0.1]} rotationY={-0.18} screen="terminal" stats={stats} />
-      <mesh position={[0, 0.45, 0.55]}><boxGeometry args={[0.55, 0.5, 0.1]} /><meshStandardMaterial color="#1e2a4a" roughness={0.6} /></mesh>
-    </group>
-  );
-}
-
-/** Floating plaza disc with meeting table + hologram (stage 3+). */
-function Plaza() {
-  const holo = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
-    if (holo.current) {
-      holo.current.rotation.y = clock.getElapsedTime() * 0.8;
-      holo.current.position.y = 1.5 + Math.sin(clock.getElapsedTime() * 1.5) * 0.08;
-    }
-  });
-  return (
-    <group>
-      {/* light bridge from main floor */}
-      <mesh position={[-7.6, 0.04, 2]}><boxGeometry args={[2.2, 0.08, 1.2]} /><meshStandardMaterial color="#0d1428" emissive="#2dd4bf" emissiveIntensity={0.5} /></mesh>
-      {/* disc */}
-      <group position={[-10.5, 0, 2]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]}><cylinderGeometry args={[3.4, 3.1, 0.35, 36]} /><meshStandardMaterial color="#0a0e1c" roughness={0.35} metalness={0.6} /></mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.19, 0]}>
-          <ringGeometry args={[2.9, 3.25, 40]} />
-          <meshStandardMaterial color="#2dd4bf" emissive="#2dd4bf" emissiveIntensity={0.6} />
-        </mesh>
-        {/* meeting table */}
-        <mesh position={[0, 0.75, 0]}><cylinderGeometry args={[1.15, 1.15, 0.09, 24]} /><meshStandardMaterial color="#182036" roughness={0.35} metalness={0.35} /></mesh>
-        <mesh position={[0, 0.4, 0]}><cylinderGeometry args={[0.16, 0.3, 0.7, 12]} /><meshStandardMaterial color="#0d1326" metalness={0.6} /></mesh>
-        <mesh position={[0, 0.68, 0]}><cylinderGeometry args={[1.05, 1.05, 0.02, 24]} /><meshStandardMaterial color="#000" emissive="#38bdf8" emissiveIntensity={0.7} /></mesh>
-        {/* stools */}
-        {[0, 1, 2, 3].map((i) => {
-          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-          return (
-            <mesh key={i} position={[Math.cos(a) * 1.9, 0.55, Math.sin(a) * 1.9]}>
-              <cylinderGeometry args={[0.28, 0.24, 0.5, 12]} />
-              <meshStandardMaterial color="#232c4e" roughness={0.7} />
-            </mesh>
-          );
-        })}
-        {/* hologram projector */}
-        <mesh position={[0, 0.85, 0]}><cylinderGeometry args={[0.12, 0.16, 0.1, 12]} /><meshStandardMaterial color="#39415f" metalness={0.7} /></mesh>
-        <group ref={holo}>
-          <mesh rotation={[0, 0, Math.PI / 4]}>
-            <octahedronGeometry args={[0.42]} />
-            <meshStandardMaterial color="#38bdf8" emissive="#38bdf8" emissiveIntensity={1.6} transparent opacity={0.85} wireframe />
-          </mesh>
-        </group>
-      </group>
-    </group>
-  );
-}
-
-/** The AI Core — holographic heart of the office. Pulses with market mood. */
-function AICore({ mood, change }: { mood: AvatarMood; change: number | null }) {
-  const core = useRef<THREE.Group>(null);
-  const ring1 = useRef<THREE.Mesh>(null);
-  const ring2 = useRef<THREE.Mesh>(null);
-  const color = mood === "ecstatic" ? "#34d399" : mood === "happy" ? "#22d3ee" : mood === "sleepy" ? "#fbbf24" : "#6366f1";
-  const energy = Math.min(1.6, 0.7 + Math.abs(change ?? 0) / 12);
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (core.current) {
-      core.current.rotation.y = t * 0.9;
-      core.current.rotation.x = Math.sin(t * 0.6) * 0.25;
-      core.current.position.y = 1.9 + Math.sin(t * 2.2) * 0.12;
-      const s = 1 + Math.sin(t * 3.5 * energy) * 0.08 * energy;
-      core.current.scale.setScalar(s);
-    }
-    if (ring1.current) ring1.current.rotation.z = t * 0.7;
-    if (ring2.current) ring2.current.rotation.z = -t * 0.5;
-  });
-  return (
-    <group position={[-2.1, 0, -3.1]}>
-      {/* pedestal */}
-      <mesh position={[0, 0.35, 0]}><cylinderGeometry args={[0.5, 0.65, 0.7, 16]} /><meshStandardMaterial color="#10172c" metalness={0.6} roughness={0.35} /></mesh>
-      <mesh position={[0, 0.72, 0]}><cylinderGeometry args={[0.52, 0.52, 0.05, 16]} /><meshStandardMaterial color="#000" emissive={color} emissiveIntensity={1.4} /></mesh>
-      {/* holo brain */}
-      <group ref={core}>
-        <mesh>
-          <icosahedronGeometry args={[0.42, 1]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.8} wireframe transparent opacity={0.9} />
-        </mesh>
-        <mesh>
-          <icosahedronGeometry args={[0.26, 1]} />
-          <meshStandardMaterial color="#ffffff" emissive={color} emissiveIntensity={2.4} transparent opacity={0.95} />
-        </mesh>
-      </group>
-      {/* orbit rings */}
-      <mesh ref={ring1} position={[0, 1.9, 0]} rotation={[Math.PI / 2.4, 0, 0]}>
-        <torusGeometry args={[0.72, 0.02, 8, 48]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} transparent opacity={0.8} />
-      </mesh>
-      <mesh ref={ring2} position={[0, 1.9, 0]} rotation={[Math.PI / 1.7, 0.4, 0]}>
-        <torusGeometry args={[0.9, 0.015, 8, 48]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} transparent opacity={0.6} />
-      </mesh>
-      {/* light beam */}
-      <mesh position={[0, 1.3, 0]}>
-        <cylinderGeometry args={[0.3, 0.45, 1.1, 16, 1, true]} />
-        <meshBasicMaterial color={color} transparent opacity={0.12} side={THREE.DoubleSide} />
-      </mesh>
-      {/* label */}
-      <mesh position={[0, 0.15, 0.62]}>
-        <planeGeometry args={[0.9, 0.22]} />
-        <meshBasicMaterial color="#04070f" transparent opacity={0.85} />
-      </mesh>
-    </group>
-  );
-}
-
-function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats: AvatarStats }) {
+function Office({ stage, mood }: { stage: number; mood: AvatarMood }) {
   const crystal = useRef<THREE.Group>(null);
   useFrame((s) => {
     if (crystal.current) {
@@ -573,9 +244,9 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
         <mesh position={[0, 0.82, 0.15]}><boxGeometry args={[0.9, 0.04, 0.35]} /><meshStandardMaterial color="#0d1326" /></mesh>
         {/* under-glow */}
         <mesh position={[0, 0.68, 0]}><boxGeometry args={[2.5, 0.02, 1.0]} /><meshStandardMaterial color="#000" emissive="#2dd4bf" emissiveIntensity={0.9} /></mesh>
-        <LiveMonitor position={[-0.62, 1.32, -0.12]} rotationY={0.22} screen="orbitx" stats={stats} />
-        <LiveMonitor position={[0.62, 1.32, -0.18]} rotationY={-0.22} screen="xscan" stats={stats} />
-        {stage >= 2 && <LiveMonitor position={[1.55, 1.28, 0.05]} rotationY={-0.5} screen="terminal" stats={stats} />}
+        <Monitor position={[-0.7, 1.25, -0.15]} rotationY={0.25} hue="#22d3ee" chart />
+        <Monitor position={[0.1, 1.28, -0.25]} hue="#4ade80" chart />
+        {stage >= 2 && <Monitor position={[0.9, 1.25, -0.15]} rotationY={-0.25} hue="#a78bfa" />}
         {/* mug */}
         <mesh position={[1.05, 0.88, 0.3]}><cylinderGeometry args={[0.07, 0.06, 0.14, 12]} /><meshStandardMaterial color="#f43f5e" /></mesh>
       </group>
@@ -585,13 +256,6 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
         <mesh position={[0, 1.0, -0.28]}><boxGeometry args={[0.6, 0.8, 0.12]} /><meshStandardMaterial color="#1e2a4a" roughness={0.6} /></mesh>
         <mesh position={[0, 0.28, 0]}><cylinderGeometry args={[0.05, 0.05, 0.5, 8]} /><meshStandardMaterial color="#0d1326" metalness={0.6} /></mesh>
       </group>
-
-      {/* team workstation (stage 2+) */}
-      {stage >= 2 && <SecondDesk stats={stats} />}
-      {/* meeting plaza (stage 3+) */}
-      {stage >= 3 && <Plaza />}
-      {/* AI core — always on, grows brighter with stage */}
-      <AICore mood={mood} change={stats.change24h} />
 
       {/* trophy shelf */}
       <group position={[2.9, 0, -2.6]} rotation={[0, -0.5, 0]}>
@@ -675,15 +339,12 @@ function fmtUsd(n: number | null): string {
 }
 
 const THOUGHTS: Array<(s: AvatarStats) => string | null> = [
-  (s) => s.mcap != null ? `MCap ${fmtUsd(s.mcap)} — my world gets bigger as we grow.` : null,
+  (s) => s.mcap != null ? `MCap ${fmtUsd(s.mcap)} — my office gets nicer as we grow.` : null,
   (s) => s.change24h != null && s.change24h >= 0 ? `Up ${s.change24h.toFixed(1)}% today. I'm pacing — can't sit still.` : null,
   (s) => s.change24h != null && s.change24h < 0 ? `Down ${Math.abs(s.change24h).toFixed(1)}%. I'll be at my desk, watching the charts.` : null,
   (s) => s.burned != null && s.burned > 0 ? `${Math.round(s.burned).toLocaleString()} ORBITX burned. My shelves feel lighter.` : null,
   () => "This office floats in deep space. Best commute in crypto.",
   (s) => s.liquidity != null ? `Liquidity ${fmtUsd(s.liquidity)} — the lights stay on.` : null,
-  (s) => (s.mcap ?? 0) >= 10_000 ? "Hired my first AI agent. We're a team now — say hi." : null,
-  (s) => (s.mcap ?? 0) >= 1_000_000 ? "Look outside — that's all us. The towers keep rising." : null,
-  (s) => (s.mcap ?? 0) >= 10_000_000 ? "From one desk to a whole metropolis. This community built it." : null,
 ];
 
 export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
@@ -703,8 +364,6 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
   }, []);
 
   const nextAt = [10_000, 25_000, 100_000, 500_000, 2_000_000][stage];
-  const isCity = stage >= 4;
-  const agentCount = AGENTS_PER_STAGE[stage] ?? 0;
 
   return (
     <div>
@@ -717,37 +376,33 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
       <div className="relative overflow-hidden rounded-3xl border border-white/10" style={{ height: 420 }}>
         <Canvas
           dpr={[1, 1.75]}
-          camera={{ position: isCity ? [0, 4.4, 11.5] : [0, 3.6, 8.6], fov: 46 }}
+          camera={{ position: [0, 3.6, 8.6], fov: 46 }}
           gl={{ antialias: true, alpha: false }}
           onCreated={({ gl }) => gl.setClearColor("#02040c")}
         >
           <Suspense fallback={null}>
-            <fog attach="fog" args={["#02040c", isCity ? 15 : 12, isCity ? 38 : 26]} />
+            <fog attach="fog" args={["#02040c", 12, 26]} />
             <ambientLight intensity={0.55} />
             <directionalLight position={[5, 8, 4]} intensity={1.1} color="#dbeafe" />
             <pointLight position={[-3, 3, 2]} intensity={12} color="#2dd4bf" distance={12} />
             <pointLight position={[3, 2.5, -2]} intensity={8} color="#3b82f6" distance={12} />
             {mood === "dormant" && <pointLight position={[0, 2, 0]} intensity={4} color="#1e2a4a" distance={10} />}
             <Stars radius={60} depth={30} count={2200} factor={3.5} saturation={0} fade speed={0.6} />
-            <Office stage={stage} mood={mood} stats={stats} />
+            <Office stage={stage} mood={mood} />
             <BlockyAgent mood={mood} stage={stage} />
-            <Citizens stage={stage} />
-            {isCity && <CityBuildings stage={stage} />}
-            {isCity && <SkyTraffic stage={stage} />}
             <OrbitControls
               enablePan={false}
-              minDistance={5} maxDistance={isCity ? 17 : 13}
+              minDistance={5} maxDistance={13}
               minPolarAngle={Math.PI / 5} maxPolarAngle={Math.PI / 2.15}
-              target={isCity ? [0, 1.6, -1] : [0, 1.3, 0]}
+              target={[0, 1.3, 0]}
             />
           </Suspense>
         </Canvas>
         <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-white/15 bg-black/50 px-3 py-1 text-[11px] font-semibold text-white/75 backdrop-blur">
-          {isCity ? "🌆 Orbit's city · drag to look around" : "🛰️ Orbit's office · drag to look around"}
+          🛰️ Orbit's office · drag to look around
         </div>
         <div className="pointer-events-none absolute bottom-3 right-3 rounded-full border border-white/15 bg-black/50 px-3 py-1 text-[11px] text-white/60 backdrop-blur">
           {mood === "ecstatic" ? "⚡ feeling electric" : mood === "happy" ? "😊 in good spirits" : mood === "sleepy" ? "😴 taking it slow" : "💤 resting"}
-          {agentCount > 0 && <span className="ml-1 text-teal-300">· {agentCount} agent{agentCount > 1 ? "s" : ""} on duty</span>}
         </div>
       </div>
 
@@ -756,7 +411,7 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
         <div className="flex items-center justify-center gap-2">
           <Sparkles className="h-3.5 w-3.5 text-teal-300" />
           <span className="text-sm font-bold uppercase tracking-[0.18em] text-white">{STAGE_NAMES[stage]}</span>
-          <span className="text-[11px] text-white/40">· {WORLD_NAMES[stage]} · {stage + 1}/6</span>
+          <span className="text-[11px] text-white/40">Stage {stage + 1}/6</span>
         </div>
         {nextAt != null ? (
           <div className="mt-2">
@@ -764,10 +419,10 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
               <div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-amber-300 transition-all duration-1000"
                 style={{ width: `${Math.min(100, Math.max(2, ((stats.mcap ?? 0) / nextAt) * 100))}%` }} />
             </div>
-            <p className="mt-1 text-[11px] text-white/40">{fmtUsd(nextAt - (stats.mcap ?? 0))} to {WORLD_NAMES[stage + 1]} → {STAGE_NAMES[stage + 1]}</p>
+            <p className="mt-1 text-[11px] text-white/40">{fmtUsd(nextAt - (stats.mcap ?? 0))} to next office upgrade → {STAGE_NAMES[stage + 1]}</p>
           </div>
         ) : (
-          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-300">👑 Metropolis achieved — the city is yours</p>
+          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-300">Penthouse achieved</p>
         )}
       </div>
     </div>
