@@ -181,3 +181,25 @@
     font-size: 26px;
   }
 }
+
+/* Trading hub: swap + discovery side by side */
+.ox-trading-hub__grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.ox-trading-hub__swap {
+  position: sticky;
+  top: 90px;
+}
+
+@media (max-width: 968px) {
+  .ox-trading-hub__grid {
+    grid-template-columns: 1fr;
+  }
+  .ox-trading-hub__swap {
+    position: static;
+  }
+}

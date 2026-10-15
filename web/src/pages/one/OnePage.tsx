@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
 import "./one.css";
 
-const TradeSection = lazy(() => import("./TradeSection"));
+const TradingHub = lazy(() => import("./TradingHub"));
 const NftSection = lazy(() => import("./NftSection"));
 const EarnSection = lazy(() => import("./EarnSection"));
 
@@ -42,7 +42,7 @@ export default function OnePage() {
             <span>Solana DEX · live swaps</span>
           </div>
           <Suspense fallback={<Loading />}>
-            <TradeSection />
+            <TradingHub />
           </Suspense>
         </section>
 
