@@ -150,6 +150,7 @@ export function TokenGatingVerifier({
               type="button"
               className="ox-agent__btn ox-agent__btn--primary"
               disabled={checking || !walletAddress}
+              title={!walletAddress ? "Connect a wallet first" : undefined}
               onClick={verify}
             >
               {checking ? "Checking…" : "Verify holdings"}

@@ -1966,11 +1966,16 @@ export default function OrbitXAI() {
   const [chartModal, setChartModal] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const refreshAccess = useCallback(async () => {
+  const refreshAccess = useCallback(async (manual = false) => {
     if (!userId) {
       setAccessLoading(false);
       setGate(null);
       setBootstrap(null);
+      if (manual) {
+        toast.info("Connect your wallet and sign in to check AI access.", {
+          action: { label: "Sign in", onClick: () => (window.location.href = "/auth?mode=wallet") },
+        });
+      }
       return;
     }
     setAccessLoading(true);
@@ -2309,7 +2314,7 @@ export default function OrbitXAI() {
   if (authLoading || accessLoading) return <LoadingScreen />;
   if (!bootstrap || !gate?.hasAccess) {
     return (
-      <LockedScreen gate={gate} error={accessError} onRetry={() => void refreshAccess()} />
+      <LockedScreen gate={gate} error={accessError} onRetry={() => void refreshAccess(true)} />
     );
   }
 

@@ -59,6 +59,10 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
   }, []);
 
   const refresh = async () => {
+    if (!wallet) {
+      setError("Connect a Solana wallet to check burn access.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -186,7 +190,7 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
         )}
 
         <div className="ox-agent__pkg-grid">
-          {packages.map((pkg) => {
+          {packages.map((pkg, idx) => {
             const on = selected === pkg.id;
             return (
               <button
@@ -195,7 +199,7 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
                 className={`ox-agent__pkg${on ? " is-on" : ""}`}
                 onClick={() => setSelected(pkg.id)}
               >
-                <span className="ox-agent__pkg-k">{pkg.id === "day" ? "Option A" : "Option B"}</span>
+                <span className="ox-agent__pkg-k">Option {String.fromCharCode(65 + idx)}</span>
                 <strong className="ox-agent__pkg-title">{pkg.label}</strong>
                 <span className="ox-agent__pkg-cost">{pkg.tokens.toLocaleString()} $ORBITX</span>
                 <span className="ox-agent__pkg-meta">{pkg.durationLabel}</span>
@@ -227,6 +231,7 @@ export function McpBurnAccessCard({ walletAddress, onAccessGranted, compact = fa
             type="button"
             className="ox-agent__btn ox-agent__btn--primary"
             disabled={burning || !wallet || !selectedPkg}
+            title={!wallet ? "Connect a Solana wallet first" : undefined}
             onClick={() => void onBurn()}
           >
             {burning
