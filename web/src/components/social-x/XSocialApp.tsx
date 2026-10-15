@@ -248,12 +248,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ── Feed data ── */
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("social_messages")
-      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of")
-      .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false }).limit(100);
-    if (data) setPosts(data as Post[]);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("social_messages")
+        .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of")
+        .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false }).limit(100);
+      if (error) {
+        console.error("[social] feed load error:", error.message);
+      }
+      if (data) setPosts(data as Post[]);
+    } catch (e) {
+      console.error("[social] feed load failed:", e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
