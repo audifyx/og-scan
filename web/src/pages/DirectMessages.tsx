@@ -957,6 +957,7 @@ const DirectMessages: React.FC = () => {
         )}
       </div>
     </div>
+  );
 }
 
 export default DirectMessages;
