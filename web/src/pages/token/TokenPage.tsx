@@ -9,6 +9,8 @@ import { fetchRpcSupply } from "./rpcFeed";
 import { TokenArticle } from "./TokenArticle";
 import { TokenChart } from "./TokenChart";
 import { BurnTracker } from "./BurnTracker";
+import { TickerTape, StageProgress, StatCard, useCountUp, fmtUsdShort } from "./TokenWidgets";
+import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -116,6 +118,7 @@ export default function TokenPage() {
   };
 
   const change = stats?.change24h;
+  const stage = stageForMcap(stats?.mcap ?? null);
   const changeUp = (change ?? 0) >= 0;
 
   const tabs: { id: Tab; label: string; icon: typeof Info; badge?: number }[] = [
@@ -206,18 +209,15 @@ export default function TokenPage() {
 
           {/* stat grid */}
           <div className="mt-4 grid grid-cols-4 gap-2">
-            {[
-              { label: "Price", value: fmtPrice(stats?.price), sub: null },
-              { label: "MCap", value: fmtUsd(stats?.mcap), sub: change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : null, subUp: changeUp },
-              { label: "Liquidity", value: fmtUsd(stats?.liquidity), sub: null },
-              { label: "24h Vol", value: fmtUsd(stats?.volume24h), sub: null },
-            ].map((s) => (
-              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-2 py-3 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">{s.label}</p>
-                <p className="mt-1 truncate text-[15px] font-extrabold">{s.value}</p>
-                {s.sub && <p className={cn("text-[11px] font-bold", s.subUp ? "text-emerald-400" : "text-rose-400")}>{s.sub}</p>}
-              </div>
-            ))}
+            <StatCard label="Price" value={fmtPrice(stats?.price)} />
+            <StatCard label="MCap" value={fmtUsdShort(useCountUp(stats?.mcap))} sub={change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : null} subUp={changeUp} />
+            <StatCard label="Liquidity" value={fmtUsdShort(useCountUp(stats?.liquidity))} />
+            <StatCard label="24h Vol" value={fmtUsdShort(useCountUp(stats?.volume24h))} />
+          </div>
+
+          {/* evolution progress */}
+          <div className="mt-3">
+            <StageProgress mcap={stats?.mcap} stage={stage} />
           </div>
 
           {/* links */}
@@ -234,6 +234,18 @@ export default function TokenPage() {
               </a>
             ))}
           </div>
+        </div>
+
+        {/* live ticker tape */}
+        <div className="mt-5 overflow-hidden rounded-2xl">
+          <TickerTape items={[
+            `ORBITX ${fmtPrice(stats?.price)}`,
+            `MCAP ${fmtUsdShort(stats?.mcap)}`,
+            `24H ${change != null ? `${changeUp ? "+" : ""}${change.toFixed(1)}%` : "—"}`,
+            `LIQ ${fmtUsdShort(stats?.liquidity)}`,
+            `BURNED ${fmtUsdShort(burned)}`,
+            `STAGE ${stage + 1}/6 · ${["EGG","SPROUT","WHELP","GUARDIAN","TITAN","COSMIC"][stage]}`,
+          ]} />
         </div>
 
         {/* tabs */}

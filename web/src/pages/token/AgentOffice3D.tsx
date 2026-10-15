@@ -528,6 +528,113 @@ function AICore({ mood, change }: { mood: AvatarMood; change: number | null }) {
   );
 }
 
+/** Giant holographic ORBITX billboard (stage 3+). */
+function HoloBillboard() {
+  const tex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 128;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "rgba(2,8,16,0.85)";
+    g.fillRect(0, 0, 512, 128);
+    g.font = "bold 72px monospace";
+    g.textAlign = "center";
+    g.fillStyle = "#5eead4";
+    g.shadowColor = "#2dd4bf";
+    g.shadowBlur = 24;
+    g.fillText("ORBITX", 256, 82);
+    g.font = "bold 20px monospace";
+    g.fillStyle = "#a5b4fc";
+    g.fillText("· TO THE STARS ·", 256, 112);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  const ref = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.position.y = 6.4 + Math.sin(clock.getElapsedTime() * 0.8) * 0.15;
+  });
+  return (
+    <group ref={ref} position={[-7.5, 6.4, -14]}>
+      <mesh>
+        <planeGeometry args={[7, 1.75]} />
+        <meshBasicMaterial map={tex} transparent opacity={0.92} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* support poles */}
+      {[-3.2, 3.2].map((x, i) => (
+        <mesh key={i} position={[x, -3.4, 0]}>
+          <cylinderGeometry args={[0.09, 0.09, 5.2, 8]} />
+          <meshStandardMaterial color="#1a2138" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Rising ember particles. */
+function Embers({ count = 90, area = 16 }: { count?: number; area?: number }) {
+  const ref = useRef<THREE.Points>(null);
+  const { geo, speeds } = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const spd: number[] = [];
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * area;
+      pos[i * 3 + 1] = Math.random() * 9;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * area;
+      spd.push(0.25 + Math.random() * 0.7);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return { geo: g, speeds: spd };
+  }, [count, area]);
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    const p = ref.current.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < count; i++) {
+      let y = p.getY(i) + speeds[i] * dt;
+      if (y > 9.5) y = 0;
+      p.setY(i, y);
+      p.setX(i, p.getX(i) + Math.sin(y * 2 + i) * dt * 0.25);
+    }
+    p.needsUpdate = true;
+  });
+  return (
+    <points ref={ref} geometry={geo}>
+      <pointsMaterial color="#5eead4" size={0.09} transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </points>
+  );
+}
+
+/** Rocket on a launch pad (stage 4+). */
+function RocketPad() {
+  const rocket = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (rocket.current) rocket.current.position.y = Math.sin(clock.getElapsedTime() * 1.4) * 0.06;
+  });
+  return (
+    <group position={[9.5, 0, -9]}>
+      {/* pad */}
+      <mesh position={[0, 0.15, 0]}><cylinderGeometry args={[1.6, 1.9, 0.3, 20]} /><meshStandardMaterial color="#1a2138" metalness={0.5} roughness={0.5} /></mesh>
+      <mesh position={[0, 0.32, 0]}><cylinderGeometry args={[1.62, 1.62, 0.04, 20]} /><meshStandardMaterial color="#000" emissive="#22d3ee" emissiveIntensity={1.1} /></mesh>
+      {/* rocket */}
+      <group ref={rocket} position={[0, 0.35, 0]}>
+        <mesh position={[0, 1.1, 0]}><cylinderGeometry args={[0.42, 0.42, 1.7, 16]} /><meshStandardMaterial color="#e2e8f0" metalness={0.7} roughness={0.3} /></mesh>
+        <mesh position={[0, 2.25, 0]}><coneGeometry args={[0.42, 0.8, 16]} /><meshStandardMaterial color="#f43f5e" metalness={0.5} roughness={0.4} /></mesh>
+        <mesh position={[0, 0.35, 0]}><cylinderGeometry args={[0.3, 0.42, 0.35, 16]} /><meshStandardMaterial color="#0d1220" /></mesh>
+        {/* fins */}
+        {[0, 1.4, 2.8, 4.2].map((a, i) => (
+          <mesh key={i} position={[Math.cos(a) * 0.5, 0.55, Math.sin(a) * 0.5]} rotation={[0, -a, 0]}>
+            <boxGeometry args={[0.08, 0.7, 0.4]} /><meshStandardMaterial color="#f43f5e" metalness={0.5} roughness={0.4} />
+          </mesh>
+        ))}
+        {/* engine glow */}
+        <mesh position={[0, 0.12, 0]}><coneGeometry args={[0.22, 0.5, 12]} /><meshBasicMaterial color="#5eead4" transparent opacity={0.85} /></mesh>
+        {/* window */}
+        <mesh position={[0, 1.5, 0.4]}><circleGeometry args={[0.14, 16]} /><meshStandardMaterial color="#0ea5e9" emissive="#38bdf8" emissiveIntensity={1.6} /></mesh>
+      </group>
+    </group>
+  );
+}
+
 function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats: AvatarStats }) {
   const crystal = useRef<THREE.Group>(null);
   useFrame((s) => {
@@ -592,6 +699,12 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
       {stage >= 3 && <Plaza />}
       {/* AI core — always on, grows brighter with stage */}
       <AICore mood={mood} change={stats.change24h} />
+      {/* hologram billboard (stage 3+) */}
+      {stage >= 3 && <HoloBillboard />}
+      {/* rocket pad (stage 4+) */}
+      {stage >= 4 && <RocketPad />}
+      {/* rising embers */}
+      <Embers count={stage >= 4 ? 130 : 70} area={stage >= 4 ? 24 : 14} />
 
       {/* trophy shelf */}
       <group position={[2.9, 0, -2.6]} rotation={[0, -0.5, 0]}>
