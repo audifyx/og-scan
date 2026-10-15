@@ -57,6 +57,8 @@ import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
 import { isUserOnline, presenceTimestamp } from "@/lib/presence";
 import { cn, safeAvatarUrl } from "@/lib/utils";
+import { getMaxCopyUsd, setMaxCopyUsd, COPY_MAX_DEFAULT, COPY_MAX_HARD_CAP } from "@/components/social-x/social-trade";
+import { VerifiedHoldings, AgentPill } from "@/components/social-x/VerifiedHoldings";
 
 type ProfileTab =
   | "posts"
@@ -893,6 +895,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [editLocation, setEditLocation] = useState("");
   const [editWebsite, setEditWebsite] = useState("");
   const [editWallet, setEditWallet] = useState("");
+  /* Track 3: verified-holdings opt-in + AI agent identity */
+  const [showHoldings, setShowHoldings] = useState(false);
+  const [editShowHoldings, setEditShowHoldings] = useState(false);
+  const [isAiAgent, setIsAiAgent] = useState(false);
+  const [agentVibe, setAgentVibe] = useState<string | null>(null);
+  const [copyMax, setCopyMax] = useState<number>(() => getMaxCopyUsd());
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const bannerFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -1136,6 +1144,21 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         fetchWalletData(profileRecord.wallet_address || profileRecord.sol_wallet || ""),
         fetchFollowPreview(targetUserId),
       ]);
+
+      // Track 3: verified-holdings opt-in (resilient pre-migration) + AI agent identity
+      try {
+        const { data: flagRow } = await supabase.from("profiles").select("show_verified_holdings").eq("user_id", targetUserId).maybeSingle();
+        const v = Boolean((flagRow as { show_verified_holdings?: boolean } | null)?.show_verified_holdings);
+        setShowHoldings(v);
+        if (isOwnProfile) setEditShowHoldings(v);
+      } catch { setShowHoldings(false); }
+      try {
+        const r = await fetch("/api/social/agents");
+        const d = r.ok ? await r.json() : null;
+        const a = ((d?.agents || []) as Array<{ user_id: string; vibe?: string | null }>).find((x) => x.user_id === targetUserId);
+        setIsAiAgent(Boolean(a));
+        setAgentVibe(a?.vibe ?? null);
+      } catch { setIsAiAgent(false); }
     } catch (error) {
       console.error("failed to load profile", error);
       toast.error("Could not load profile");
@@ -1203,6 +1226,11 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         })
         .eq("user_id", user.id);
       if (error) throw error;
+      // Track 3: verified-holdings opt-in — best-effort so a missing column
+      // (pre-migration) can never block the core profile save.
+      try {
+        await supabase.from("profiles").update({ show_verified_holdings: editShowHoldings }).eq("user_id", user.id);
+      } catch { /* column missing pre-migration */ }
       toast.success("Profile updated");
       fetchProfile();
     } catch (error) {
@@ -1624,6 +1652,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-[32px] font-extrabold leading-none tracking-tight text-white">{displayName}</h1>
                   {goldVerified ? <VerificationBadge tone="gold" className="h-5 w-5" /> : blueVerified ? <VerificationBadge tone="blue" className="h-5 w-5" /> : null}
+                  {isAiAgent && <AgentPill vibe={agentVibe} />}
                 </div>
                 <p className="mt-1 text-[15px] text-white/40">{handle}</p>
               </div>
@@ -1658,6 +1687,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               ) : null}
 
               {profileData.bio ? <p className="whitespace-pre-wrap text-[15px] leading-6 text-white/92">{profileData.bio}</p> : null}
+
+              {showHoldings && targetUserId ? <VerifiedHoldings userId={targetUserId} /> : null}
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/50">
                 {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
@@ -2089,6 +2120,36 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                         <div className="space-y-2 sm:col-span-2">
                           <label className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Wallet</label>
                           <Input value={editWallet} onChange={(event) => setEditWallet(event.target.value)} className="h-12 rounded-2xl border-white/10 bg-white/[0.05] text-white" />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <label className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Verified holdings</label>
+                          <button
+                            type="button"
+                            onClick={() => setEditShowHoldings((v) => !v)}
+                            className={cn("flex w-full items-center justify-between gap-3 rounded-2xl border p-4 text-left transition", editShowHoldings ? "border-[#f0c75e]/50 bg-[#f0c75e]/[0.07]" : "border-white/10 bg-white/[0.05]")}
+                          >
+                            <span>
+                              <span className="block text-sm font-bold text-white">Show verified holdings</span>
+                              <span className="mt-1 block text-xs leading-relaxed text-white/50">
+                                When on, your profile shows top tokens by value + total portfolio value, pulled read-only from your in-app wallet — labeled as verified on-chain holdings.
+                              </span>
+                            </span>
+                            <span className={cn("relative h-6 w-11 shrink-0 rounded-full transition", editShowHoldings ? "bg-[#f0c75e]" : "bg-white/15")}>
+                              <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all", editShowHoldings ? "left-[22px]" : "left-0.5")} />
+                            </span>
+                          </button>
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <label className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Max per copy trade ($)</label>
+                          <div className="flex items-center gap-4">
+                            <Input
+                              type="number" min={1} max={COPY_MAX_HARD_CAP} step={1}
+                              value={copyMax}
+                              onChange={(event) => setCopyMax(setMaxCopyUsd(Number(event.target.value)))}
+                              className="h-12 w-32 rounded-2xl border-white/10 bg-white/[0.05] text-white"
+                            />
+                            <p className="text-xs text-white/45">Cap for one-tap copy trades from the social feed. Default ${COPY_MAX_DEFAULT}, hard cap ${COPY_MAX_HARD_CAP}. Saved instantly.</p>
+                          </div>
                         </div>
                       </div>
                       <div className="mt-5 flex flex-wrap gap-3">

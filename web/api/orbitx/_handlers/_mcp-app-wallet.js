@@ -814,6 +814,8 @@ export async function dispatchAppWalletTool(name, args, auth) {
   if (name === "orbitx_app_nft_approve_delegate") return appNftApproveDelegate(auth, args || {});
   if (name === "orbitx_send_sol") return appSendSol(auth, args || {});
   if (name === "orbitx_tip") return appTip(auth, args || {});
+  if (name === "orbitx_app_tip") return appTipUsd(auth, args || {});
+  if (name === "orbitx_app_airdrop") return appAirdrop(auth, args || {});
   if (name === "orbitx_dca_create") return appDcaCreate(auth, args || {});
   if (name === "orbitx_dca_list") return appDcaList(auth, args || {});
   if (name === "orbitx_dca_cancel") return appDcaCancel(auth, args || {});
@@ -977,6 +979,318 @@ export async function appTip(auth, args = {}) {
   }
 }
 
+/* ==================== USD Tips & Follower Airdrops ==================== */
+/* orbitx_app_tip: tip SOL to another OrbitX user by user id, $1-$10.    */
+/* orbitx_app_airdrop: batch-send SOL/SPL to your followers. Backend      */
+/* signs everything; amounts are USD-denominated and priced at exec time. */
+/* F3: broadcast acceptance is NOT success — pending/failed never come    */
+/* back as ok:true.                                                       */
+
+const TIP_MIN_USD = 1;
+const TIP_MAX_USD = 10;
+const AIRDROP_MAX_RECIPIENTS = 500;
+const AIRDROP_DEFAULT_RECIPIENTS = 25;
+const AIRDROP_MAX_USD_PER_RECIPIENT = 5;
+// Stop starting new airdrop chunks with headroom before the 120s fn cap.
+const AIRDROP_DEADLINE_MS = 100000;
+
+function transferOutcome(live, success) {
+  const base = {
+    signature: live?.signature || null,
+    tx: live?.signature ? `https://solscan.io/tx/${live.signature}` : null,
+    confirmationStatus: live?.confirmationStatus || null,
+    ...(success || {}),
+  };
+  if (live?.pending) {
+    return {
+      ...base,
+      ok: false,
+      pending: true,
+      status: "pending",
+      error: live.error || "tx_unconfirmed",
+      message:
+        live.message ||
+        "Broadcast accepted but not confirmed yet. Check the explorer before retrying; do NOT re-submit.",
+    };
+  }
+  if (!live?.ok) {
+    return {
+      ...base,
+      ok: false,
+      status: "failed",
+      error: live?.error || "transfer_failed",
+      message: live?.message || "The transfer did not complete.",
+    };
+  }
+  return { ...base, ok: true, confirmed: true };
+}
+
+function solanaRpcUrl() {
+  return process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+}
+
+async function splMintDecimals(mint) {
+  const key = String(process.env.REACT_APP_HELIUS_KEY || process.env.HELIUS_API_KEY || "").trim();
+  const rpc = key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : solanaRpcUrl();
+  try {
+    const r = await fetch(rpc, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getAccountInfo", params: [mint, { encoding: "jsonParsed" }] }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json();
+    const d = j?.result?.value?.data?.parsed?.info?.decimals;
+    if (Number.isInteger(d)) return d;
+  } catch {}
+  return 6;
+}
+
+/**
+ * orbitx_app_tip — send SOL from the caller's in-app wallet to another
+ * user's in-app wallet. USD-denominated, priced at execution via the same
+ * DexScreener source the buy/sell tools use. Enforced: $1 min / $10 max.
+ */
+export async function appTipUsd(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await walletRow(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet", message: "Create a wallet first via orbitx_app_wallet_create." };
+  const recipientUserId = String(args.recipient_user_id || args.recipientUserId || args.user_id || "").trim();
+  if (!recipientUserId) {
+    return { ok: false, error: "need_recipient", message: "Pass recipient_user_id (the OrbitX user id of the person you're tipping)." };
+  }
+  if (recipientUserId === gate.userId) return { ok: false, error: "self_tip", message: "You can't tip yourself." };
+  const usd = Number(args.amount_usd ?? args.amountUsd ?? args.usd);
+  if (!Number.isFinite(usd) || usd < TIP_MIN_USD || usd > TIP_MAX_USD) {
+    return { ok: false, error: "amount_out_of_range", message: `Tips must be between $${TIP_MIN_USD} and $${TIP_MAX_USD} USD.` };
+  }
+  // Resolve the recipient's in-app wallet (wallet_secrets via getUserWallet —
+  // the same store every other app-wallet tool reads).
+  const recip = await getUserWallet(recipientUserId);
+  const recipAddr = recip?.public_key;
+  if (!validPubkey(recipAddr)) {
+    return { ok: false, error: "recipient_has_no_wallet", message: "That user hasn't created an in-app wallet yet." };
+  }
+  const px = await solUsd();
+  if (!px || px <= 0) return { ok: false, error: "price_unavailable", message: "SOL price unavailable — try again." };
+  const lamports = Math.floor((usd / px) * 1e9);
+  if (lamports <= 0) return { ok: false, error: "amount_too_small" };
+  const funds = await getDeskFunds(row.public_key);
+  if (Number(funds.sol) * 1e9 < lamports + 10000000) {
+    return { ok: false, error: "insufficient_balance", message: `Insufficient SOL. Balance: ${Number(funds.sol).toFixed(4)} SOL.` };
+  }
+  let live;
+  try {
+    live = await buildAndSendTransfer(row, { toPubkey: recipAddr, lamports });
+  } catch (e) {
+    return { ok: false, error: "tip_error", message: String(e.message || e) };
+  }
+  return transferOutcome(live, {
+    tool: "orbitx_app_tip",
+    signedOn: "backend",
+    clickToSign: false,
+    amountUsd: usd,
+    amountSol: lamports / 1e9,
+    solPriceUsd: px,
+    recipientUserId,
+    recipientWallet: recipAddr,
+  });
+}
+
+/* Build one legacy tx carrying several transfers (native SOL or SPL). */
+async function buildAirdropChunkTx(row, chunk) {
+  const { PublicKey, SystemProgram, Transaction, Connection } = await import("@solana/web3.js");
+  const from = new PublicKey(row.public_key);
+  const conn = new Connection(solanaRpcUrl(), "confirmed");
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: from, recentBlockhash: blockhash });
+  const native = chunk[0]?.mint === "SOL";
+  if (native) {
+    for (const t of chunk) {
+      tx.add(SystemProgram.transfer({ fromPubkey: from, toPubkey: new PublicKey(t.to), lamports: t.amount }));
+    }
+  } else {
+    const spl = await import("@solana/spl-token");
+    const mintPk = new PublicKey(chunk[0].mint);
+    const fromAta = await spl.getAssociatedTokenAddress(mintPk, from);
+    for (const t of chunk) {
+      const toPk = new PublicKey(t.to);
+      const toAta = await spl.getAssociatedTokenAddress(mintPk, toPk);
+      const info = await conn.getAccountInfo(toAta);
+      if (!info) tx.add(spl.createAssociatedTokenAccountInstruction(from, toAta, toPk, mintPk));
+      tx.add(spl.createTransferInstruction(fromAta, toAta, from, t.amount));
+    }
+  }
+  const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  return Buffer.from(serialized).toString("base64");
+}
+
+/**
+ * orbitx_app_airdrop — send SOL or an SPL token to N followers (people who
+ * follow the caller). Recipients are batched into a few transactions
+ * instead of one blocking tx per recipient. Caps: 500 recipients max,
+ * $5 per recipient max. Amounts are USD-denominated at execution.
+ */
+export async function appAirdrop(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await walletRow(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet", message: "Create a wallet first via orbitx_app_wallet_create." };
+  const client = await sb();
+  if (!client) return { ok: false, error: "db_unavailable" };
+
+  const mintArg = String(args.token_mint || args.mint || "").trim();
+  const isSol = !mintArg || /^sol$/i.test(mintArg);
+  const mint = isSol ? "SOL" : mintArg;
+  if (!isSol && !validPubkey(mint)) {
+    return { ok: false, error: "bad_mint", message: 'token_mint must be "SOL" or a valid SPL mint address.' };
+  }
+  const perUsd = Number(args.amount_per_recipient_usd ?? args.amountPerRecipientUsd ?? args.amount_usd);
+  if (!Number.isFinite(perUsd) || perUsd <= 0) {
+    return { ok: false, error: "bad_amount", message: "amount_per_recipient_usd must be a positive number." };
+  }
+  if (perUsd > AIRDROP_MAX_USD_PER_RECIPIENT) {
+    return { ok: false, error: "amount_too_large", message: `Max $${AIRDROP_MAX_USD_PER_RECIPIENT} per recipient.` };
+  }
+  let maxN = parseInt(args.max_recipients ?? args.maxRecipients ?? AIRDROP_DEFAULT_RECIPIENTS, 10);
+  if (!Number.isFinite(maxN) || maxN < 1) maxN = AIRDROP_DEFAULT_RECIPIENTS;
+  maxN = Math.min(maxN, AIRDROP_MAX_RECIPIENTS);
+
+  // Followers OF the caller.
+  const { data: frows, error: ferr } = await client.from("followers").select("follower_id").eq("followee_id", gate.userId).limit(maxN);
+  if (ferr) return { ok: false, error: "followers_unavailable", message: "Could not read your followers — try again." };
+  const followerIds = [...new Set((frows || []).map((r) => r.follower_id).filter(Boolean))].filter((id) => String(id) !== String(gate.userId));
+  if (!followerIds.length) return { ok: false, error: "no_followers", message: "No followers found to airdrop to." };
+
+  // Resolve in-app wallets in bulk (one query per 100 ids, not per user).
+  const walletMap = new Map();
+  for (let i = 0; i < followerIds.length; i += 100) {
+    const ids = followerIds.slice(i, i + 100);
+    const { data } = await client.from("wallet_secrets").select("user_id,address").eq("chain", "solana").in("user_id", ids);
+    for (const r of data || []) if (r?.address && validPubkey(r.address)) walletMap.set(String(r.user_id), String(r.address));
+  }
+  const recipients = followerIds.filter((id) => walletMap.has(String(id)));
+  const skippedNoWallet = followerIds.length - recipients.length;
+  if (!recipients.length) return { ok: false, error: "no_wallets", message: "None of your followers have an in-app wallet yet." };
+
+  // Price + per-recipient raw amount.
+  let perRaw, decimals, priceUsd, symbol;
+  if (isSol) {
+    priceUsd = await solUsd();
+    if (!priceUsd || priceUsd <= 0) return { ok: false, error: "price_unavailable" };
+    decimals = 9;
+    symbol = "SOL";
+    perRaw = Math.floor((perUsd / priceUsd) * 1e9);
+  } else {
+    const info = await tokenInfo(mint);
+    priceUsd = info.priceUsd;
+    symbol = info.symbol || "SPL";
+    if (!priceUsd || priceUsd <= 0) return { ok: false, error: "price_unavailable", message: "Could not price that token — try again." };
+    decimals = await splMintDecimals(mint);
+    perRaw = Math.floor((perUsd / priceUsd) * Math.pow(10, decimals));
+  }
+  if (!perRaw || perRaw <= 0) return { ok: false, error: "amount_too_small", message: "Per-recipient amount rounds to zero at current price." };
+
+  // Balance check up front.
+  const funds = await getDeskFunds(row.public_key);
+  if (isSol) {
+    const need = BigInt(perRaw) * BigInt(recipients.length) + 10000000n;
+    if (BigInt(Math.floor(Number(funds.sol) * 1e9)) < need) {
+      return { ok: false, error: "insufficient_balance", message: `Need ${(Number(need) / 1e9).toFixed(4)} SOL for ${recipients.length} recipients.` };
+    }
+  } else {
+    const haveRaw = await tokenBalance(row.public_key, mint);
+    if (haveRaw < perRaw * recipients.length) {
+      return { ok: false, error: "insufficient_balance", message: `Need ${(perRaw * recipients.length / Math.pow(10, decimals)).toFixed(4)} ${symbol}.` };
+    }
+    if (Number(funds.sol) < 0.05) {
+      return { ok: false, error: "insufficient_sol_for_fees", message: "Need at least 0.05 SOL for fees/ATA rent." };
+    }
+  }
+
+  const transfers = recipients.map((id) => ({ to: walletMap.get(String(id)), userId: id, amount: perRaw, mint }));
+  const chunkSize = isSol ? 15 : 10;
+  const chunks = [];
+  for (let i = 0; i < transfers.length; i += chunkSize) chunks.push(transfers.slice(i, i + chunkSize));
+
+  const start = Date.now();
+  const signatures = [];
+  const failed = [];
+  let sent = 0;
+  let truncated = false;
+  for (let ci = 0; ci < chunks.length; ci++) {
+    if (Date.now() - start > AIRDROP_DEADLINE_MS) { truncated = true; break; }
+    let live;
+    try {
+      const txB64 = await buildAirdropChunkTx(row, chunks[ci]);
+      live = await signAndSendUserTx(row, txB64);
+    } catch (e) {
+      live = { ok: false, error: "chunk_threw", message: String(e.message || e) };
+    }
+    if (live?.ok) {
+      signatures.push(live.signature);
+      sent += chunks[ci].length;
+    } else {
+      failed.push({
+        chunk: ci,
+        recipients: chunks[ci].length,
+        error: live?.error || "chunk_failed",
+        message: live?.message || null,
+        signature: live?.signature || null,
+        pending: !!live?.pending,
+      });
+      if (live?.pending) { truncated = true; break; } // unconfirmed broadcast — stop, don't keep spending
+    }
+  }
+  const allOk = failed.length === 0 && !truncated;
+  return {
+    ok: allOk,
+    ...(allOk ? {} : { partial: true }),
+    tool: "orbitx_app_airdrop",
+    signedOn: "backend",
+    clickToSign: false,
+    token: symbol,
+    mint: isSol ? "SOL" : mint,
+    amountPerRecipientUsd: perUsd,
+    amountPerRecipient: perRaw / Math.pow(10, decimals),
+    recipients: recipients.length,
+    skippedNoWallet,
+    sent,
+    chunks: chunks.length,
+    signatures,
+    ...(failed.length ? { failed } : {}),
+    ...(truncated ? { truncated: true, note: "Stopped early (time budget or unconfirmed broadcast). Re-run to continue with remaining recipients." } : {}),
+    message: allOk
+      ? `Airdropped ${perRaw / Math.pow(10, decimals)} ${symbol} ($${perUsd}) to ${sent} followers in ${signatures.length} tx${signatures.length === 1 ? "" : "s"}.`
+      : `Partial airdrop: ${sent}/${recipients.length} sent.`,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Token-gate read helper (powers token-gated posts; no signing).      */
+/* checkTokenGate(wallet, mint, minAmount) → { ok, holds, balance, ...} */
+/* mint: "SOL" (or the SOL mint) for native SOL, else an SPL mint.      */
+/* minAmount is in UI units (SOL, or whole tokens for SPL).             */
+/* ------------------------------------------------------------------ */
+export async function checkTokenGate(wallet, mint, minAmount) {
+  const w = String(wallet || "").trim();
+  const m = String(mint || "").trim();
+  if (!validPubkey(w)) return { ok: false, error: "bad_wallet", message: "wallet must be a valid Solana address." };
+  const need = Number(minAmount);
+  if (!Number.isFinite(need) || need < 0) return { ok: false, error: "bad_min", message: "min must be a non-negative number." };
+  if (!m || /^sol$/i.test(m) || m === SOL_MINT) {
+    const funds = await getDeskFunds(w);
+    const bal = Number(funds.sol) || 0;
+    return { ok: true, holds: bal >= need, wallet: w, mint: "SOL", balance: bal, required: need, unit: "SOL" };
+  }
+  if (!validPubkey(m)) return { ok: false, error: "bad_mint", message: "mint must be a valid Solana token address." };
+  const decimals = await splMintDecimals(m);
+  const raw = await tokenBalance(w, m);
+  const bal = raw / Math.pow(10, decimals);
+  return { ok: true, holds: bal >= need, wallet: w, mint: m, balance: bal, required: need, decimals };
+}
+
 /* DCA schedules — NO SQL. Schedules are created by this tool (validated + formatted),
    stored in the widget's localStorage, and executed by the widget while open.
    For 24/7 server-side DCA, ask Scout to set up a cron. */
@@ -1096,6 +1410,16 @@ export const APP_WALLET_CORE_TOOLS = [
     name: "orbitx_dca_cancel",
     description: "Cancel a DCA schedule. Pass scheduleId from orbitx_dca_list.",
     inputSchema: { type: "object", properties: { scheduleId: { type: "string" }, authCode }, required: ["scheduleId"] },
+  },
+  {
+    name: "orbitx_app_tip",
+    description: "Tip another OrbitX user SOL from your in-app wallet by their user id. Backend signs. USD-denominated: $1 min / $10 max per tip, priced at execution. Resolves their in-app wallet automatically.",
+    inputSchema: { type: "object", properties: { recipient_user_id: { type: "string", description: "OrbitX user id of the recipient" }, amount_usd: { type: "number", description: "USD value to tip, $1-$10" }, authCode }, required: ["recipient_user_id", "amount_usd"] },
+  },
+  {
+    name: "orbitx_app_airdrop",
+    description: "Airdrop SOL or an SPL token to your followers (people who follow you). Backend signs batched transactions — no popup. Max $5 per recipient, max 500 recipients (default 25). token_mint: \"SOL\" or SPL mint address.",
+    inputSchema: { type: "object", properties: { token_mint: { type: "string", description: "\"SOL\" or SPL mint address" }, amount_per_recipient_usd: { type: "number", description: "USD per recipient, max $5" }, max_recipients: { type: "number", description: "Cap on recipients, default 25, max 500" }, authCode }, required: ["token_mint", "amount_per_recipient_usd"] },
   },
   ...APP_DESK_OPS_TOOLS,
 ];

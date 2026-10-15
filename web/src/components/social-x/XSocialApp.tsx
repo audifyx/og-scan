@@ -13,6 +13,7 @@ import {
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
   ArrowDownRight, Users, Bookmark, LogOut, Settings, Coins, Image as ImageIcon, Smile,
   Sparkles, Zap, Shield, Wallet, ChevronRight, Check, BarChart3, ExternalLink,
+  Gift, ArrowLeftRight, TrendingDown, Siren, Lock, Gem,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
@@ -21,6 +22,15 @@ import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 import "./x-social.css";
 import { embedSnippet } from "./embeds";
+import { AgentBadge } from "./VerifiedHoldings";
+import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
+import { callSupercomputerTool } from "@/tokenomics/mcpClient";
+import { getBillingAuthCode } from "@/tokenomics/auth";
+import {
+  TradeSheet, TipSheet, SirenCard, extractCallTokens, isSirenContent,
+  fetchRugFlaggers, hasFlagged, RUG_SIREN_THRESHOLD,
+  type TradeMode,
+} from "./social-trade";
 
 /* ── Lazy heavy tabs (reuse existing pages — zero functionality lost) ── */
 const ChatHub = lazy(() => import("@/pages/SocialHub"));
@@ -38,6 +48,14 @@ export type XTab =
 interface Post {
   id: string; user_id: string; username: string | null; avatar_url: string | null;
   content: string; likes_count: number | null; liked_by: string[] | null; created_at: string; reply_to?: string | null; repost_of?: string | null;
+  gate_meta?: GateMeta | null; nft_mint?: string | null; nft_price_usd?: number | null;
+}
+/** Token gate for a "Holders only" post (social_messages.gate_meta JSONB). */
+interface GateMeta {
+  kind?: string | null;
+  mint: string;
+  symbol?: string | null;
+  min_amount: number;
 }
 interface Suggestion { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; is_official_account?: boolean | null; bio?: string | null; }
 interface Ticker { mint: string; symbol: string | null; priceUsd: number | null; change24h: number | null; }
@@ -491,7 +509,7 @@ function ChartCard({ mint }: { mint: string }) {
 }
 
 /* ═══════════ Token picker (chart attach) ═══════════ */
-function TokenPicker({ onPick, onClose }: { onPick: (c: CoinLite) => void; onClose: () => void }) {
+function TokenPicker({ onPick, onClose, title }: { onPick: (c: CoinLite) => void; onClose: () => void; title?: string }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<CoinLite[]>([]);
   const [busy, setBusy] = useState(false);
@@ -510,7 +528,7 @@ function TokenPicker({ onPick, onClose }: { onPick: (c: CoinLite) => void; onClo
       <div className="osc-modal__card x-fade-in" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
         <div className="osc-modal__head">
           <BarChart3 className="h-5 w-5 text-[#60a5fa]" />
-          <span className="text-[16px] font-extrabold text-white" style={{ fontFamily: "var(--osc-font-display)" }}>Attach a chart</span>
+          <span className="text-[16px] font-extrabold text-white" style={{ fontFamily: "var(--osc-font-display)" }}>{title || "Attach a chart"}</span>
           <button type="button" onClick={onClose} className="ml-auto rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white"><XIcon className="h-5 w-5" /></button>
         </div>
         <div className="p-3">
@@ -597,7 +615,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [chartPickerOpen, setChartPickerOpen] = useState(false);
   const [cashtag, setCashtag] = useState<{ query: string; results: CoinLite[]; index: number; busy: boolean } | null>(null);
+  /* Feed superpowers (trade / tip / copy / rug siren) */
+  const [tradeSheet, setTradeSheet] = useState<{ mint: string; symbol: string; mode: TradeMode; post: { id: string; username: string | null; created_at: string } | null } | null>(null);
+  const [tipSheet, setTipSheet] = useState<Post | null>(null);
+  const [tipped, setTipped] = useState<Record<string, number>>({});
   const cashtagTimer = useRef<number | null>(null);
+  /* Token-gated posts ("Holders only") */
+  const [gateOn, setGateOn] = useState(false);
+  const [gateToken, setGateToken] = useState<CoinLite | null>(null);
+  const [gateMin, setGateMin] = useState("1");
+  const [gatePickerOpen, setGatePickerOpen] = useState(false);
+  const [gateStatus, setGateStatus] = useState<Record<string, { loading: boolean; allowed: boolean }>>({});
+  const gateCheckedRef = useRef<Set<string>>(new Set());
+  /* Tweet-as-NFT */
+  const [mintPost, setMintPost] = useState<Post | null>(null);
+  /* AI agent accounts (user_id -> info) */
+  const [agentMap, setAgentMap] = useState<Map<string, { username: string; vibe: string | null }>>(new Map());
+  const { wallet: deskWallet } = useOrbitxBilling();
   const feedScrollRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef(tab); tabRef.current = tab;
   const uidRef = useRef(user?.id); uidRef.current = user?.id;
@@ -842,16 +876,30 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const media = pendingImages.length ? pendingImages.join("\n") : "";
     const content = [base, media].filter(Boolean).join("\n").trim();
     if (!content || !user || posting) return;
+    const gate_meta: GateMeta | null = gateOn && gateToken
+      ? { kind: "token_holders", mint: gateToken.mint, symbol: gateToken.symbol || null, min_amount: Math.max(0, Number(gateMin) || 0) }
+      : null;
     setPosting(true); setText("");
     const imgsSnapshot = pendingImages;
     setPendingImages([]);
-    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString() };
+    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString(), gate_meta };
     setPosts((prev) => [optimistic, ...prev]);
-    const { data, error } = await supabase.from("social_messages")
-      .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [] })
+    const payload: Record<string, unknown> = { channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [] };
+    if (gate_meta) payload.gate_meta = gate_meta;
+    let res = await supabase.from("social_messages")
+      .insert(payload)
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
+    if (res.error && gate_meta && /gate_meta/i.test(res.error.message || "")) {
+      // Pre-migration: gate_meta column doesn't exist yet — post without the gate.
+      delete payload.gate_meta;
+      res = await supabase.from("social_messages")
+        .insert(payload)
+        .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
+    }
+    const { data, error } = res;
     if (error) { toast.error("Could not post. Try again."); setPosts((prev) => prev.filter((p) => p.id !== optimistic.id)); setText(base); setPendingImages(imgsSnapshot); }
-    else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? (data as Post) : p));
+    else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? ({ ...(data as Post), gate_meta } as Post) : p));
+    if (!error) { setGateOn(false); setGateToken(null); setGateMin("1"); }
     setPosting(false);
     setComposeOpen(false);
   };
@@ -906,6 +954,88 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       });
     return () => { cancelled = true; };
   }, [feedIdsKey]);
+
+  /* ═══════════ Track 3: token gates, NFT extras, AI agents ═══════════ */
+  /** Is the viewer allowed to see a gated post? Fails closed (locked). */
+  const checkGateAllowed = useCallback(async (p: Post): Promise<boolean> => {
+    const g = p.gate_meta;
+    if (!g?.mint) return true;
+    if (user && p.user_id === user.id) return true; // authors always see their own
+    // 1) Contracted gate-check endpoint (Track 1): GET /api/social/gate-check?post_id=X
+    try {
+      const r = await fetch(`/api/social/gate-check?post_id=${encodeURIComponent(p.id)}${user ? `&viewer_id=${encodeURIComponent(user.id)}` : ""}`);
+      if (r.ok) {
+        const d = await r.json();
+        if (typeof d?.allowed === "boolean") return d.allowed;
+      }
+    } catch { /* not deployed yet — fall through to tokengate */ }
+    // 2) Live fallback: Track 1's tokengate against the viewer's in-app wallet
+    if (deskWallet) {
+      try {
+        const r = await fetch(`/api/social/tokengate?wallet=${encodeURIComponent(deskWallet)}&mint=${encodeURIComponent(g.mint)}&min=${encodeURIComponent(String(g.min_amount ?? 0))}`);
+        const d = await r.json();
+        if (d && typeof d.holds === "boolean") return d.holds;
+      } catch { /* fall through to locked */ }
+    }
+    return false;
+  }, [user, deskWallet]);
+
+  useEffect(() => {
+    const targets = posts.filter((p) => p.gate_meta?.mint && !gateCheckedRef.current.has(p.id) && !p.id.startsWith("tmp-"));
+    if (!targets.length) return;
+    for (const t of targets) {
+      gateCheckedRef.current.add(t.id);
+      setGateStatus((prev) => ({ ...prev, [t.id]: { loading: true, allowed: false } }));
+    }
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(targets.map(async (t) => ({ id: t.id, allowed: await checkGateAllowed(t) })));
+      if (cancelled) return;
+      setGateStatus((prev) => {
+        const n = { ...prev };
+        for (const r of results) n[r.id] = { loading: false, allowed: r.allowed };
+        return n;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [posts, checkGateAllowed]);
+
+  /** Post extras (gate_meta, nft_mint, nft_price_usd) via a separate query so the
+   *  feed keeps rendering before the migration lands — failures are silent. */
+  const fetchPostExtras = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    try {
+      const { data, error } = await supabase.from("social_messages").select("id,gate_meta,nft_mint,nft_price_usd").in("id", ids.slice(0, 100));
+      if (error || !data) return;
+      const m: Record<string, Partial<Post>> = {};
+      for (const r of data as Array<{ id: string; gate_meta?: GateMeta | null; nft_mint?: string | null; nft_price_usd?: number | null }>) {
+        m[r.id] = { gate_meta: r.gate_meta ?? null, nft_mint: r.nft_mint ?? null, nft_price_usd: r.nft_price_usd ?? null };
+      }
+      setPosts((prev) => prev.map((p) => (m[p.id] ? { ...p, ...m[p.id] } : p)));
+      setDetailPost((prev) => (prev && m[prev.id] ? { ...prev, ...m[prev.id] } : prev));
+    } catch { /* pre-migration: columns don't exist yet */ }
+  }, []);
+
+  useEffect(() => {
+    const ids = posts.map((p) => p.id).filter((id) => !id.startsWith("tmp-"));
+    if (ids.length) void fetchPostExtras(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedIdsKey]);
+
+  /** AI agent accounts directory (public; no key material). */
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/social/agents")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.agents) return;
+        const m = new Map<string, { username: string; vibe: string | null }>();
+        for (const a of d.agents) m.set(a.user_id, { username: a.username, vibe: a.vibe ?? null });
+        setAgentMap(m);
+      })
+      .catch(() => { /* directory unavailable — badges just don't show */ });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const ids = [...new Set(posts.filter((p) => p.repost_of).map((p) => p.repost_of as string))].filter((id) => !repostOriginals[id]);
@@ -986,6 +1116,58 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   const share = async (p: Post) => {
     try { await navigator.clipboard.writeText(`${p.content}\n\n${window.location.origin}/orbitx-social`); toast.success("Copied to clipboard"); } catch { toast.error("Copy failed"); }
+  };
+
+  /* ── Feed superpowers: one-tap trade / tip / copy-trade / rug flag ── */
+  const openTrade = (mint: string, symbol: string, mode: TradeMode, p: Post | null) => {
+    if (!requireAuth(mode === "copy" ? "copy this trade" : "trade")) return;
+    setTradeSheet({
+      mint, symbol, mode,
+      post: p ? { id: p.id, username: p.username, created_at: p.created_at } : null,
+    });
+  };
+
+  const openTip = (p: Post) => {
+    if (!requireAuth("tip")) return;
+    setTipSheet(p);
+  };
+
+  /** Flag a $cashtag post as a potential rug. At 5 distinct flaggers, auto-post a siren alert. */
+  const flagRug = async (p: Post) => {
+    if (!requireAuth("flag a post as a potential rug")) return;
+    if (p.id.startsWith("tmp-") || !user) return;
+    try {
+      if (await hasFlagged(p.id, user.id)) { toast.info("You already flagged this post"); return; }
+      const { error } = await supabase.from("rug_flags").insert({ post_id: p.id, flagger_user_id: user.id });
+      if (error) throw error;
+      toast.success("Flagged — thanks for keeping the trenches safe");
+      const flaggers = await fetchRugFlaggers(p.id);
+      if (flaggers && flaggers.length >= RUG_SIREN_THRESHOLD) {
+        // Dedupe: only one siren post per flagged post.
+        const { data: existing } = await supabase.from("social_messages").select("id")
+          .eq("channel", FEED_CHANNEL).like("content", `%[ORIG:${p.id}]%`).limit(1);
+        if (existing && existing.length > 0) return;
+        const sym = extractCallTokens(p.content, 1)[0]?.symbol;
+        const body = `[RUGSIREN]\n🚨 RUG SIREN: $${sym || "TOKEN"} has been flagged as a potential rug by ${flaggers.length} users. Trade with extreme caution.\n[ORIG:${p.id}]`;
+        const { error: postErr } = await supabase.from("social_messages").insert({
+          channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon",
+          avatar_url: profile?.avatar_url, content: body, likes_count: 0, liked_by: [],
+        });
+        if (postErr) throw postErr;
+        for (const fid of flaggers) {
+          void notify(fid, "rug_siren", "🚨 Rug siren",
+            `$${sym || "TOKEN"} was flagged as a potential rug by ${flaggers.length} users. Tread carefully.`, p.id);
+        }
+        toast.error(`🚨 RUG SIREN: $${sym || "TOKEN"} flagged by ${flaggers.length} users`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/rug_flags|relation|does not exist/i.test(msg)) {
+        toast.error("Rug flagging isn't live yet — try again soon");
+      } else {
+        toast.error("Could not flag this post");
+      }
+    }
   };
 
   /* ── Derived ── */
@@ -1094,6 +1276,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     toast.success(`Chart attached — $${coin.symbol || "token"}`);
   };
 
+  const pickGateToken = (coin: CoinLite) => {
+    setGatePickerOpen(false);
+    setGateToken(coin);
+    if (coin.symbol) saveCashtagMint(coin.symbol, coin.mint);
+  };
+
   const Composer = ({ inline, refEl }: { inline?: boolean; refEl: React.RefObject<HTMLTextAreaElement> }) => {
     if (!user) {
       return (
@@ -1171,6 +1359,35 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             ))}
           </div>
         )}
+        {gateOn && (
+          <div className="osc-gate">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setGatePickerOpen(true)} className="osc-gate__pick">
+                {gateToken ? (
+                  <>{gateToken.icon ? <img src={gateToken.icon} alt="" className="h-5 w-5 rounded-full object-cover" /> : null}<span>${gateToken.symbol}</span></>
+                ) : (
+                  <><Lock className="h-3.5 w-3.5" /><span>Pick token</span></>
+                )}
+              </button>
+              <input
+                value={gateMin}
+                onChange={(e) => setGateMin(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="Min amount"
+                inputMode="decimal"
+                className="osc-gate__min"
+              />
+              {gateToken && (
+                <button type="button" onClick={() => setGateToken(null)} className="osc-gate__clear" title="Clear token">
+                  <XIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button type="button" onClick={() => setGateOn(false)} className="osc-gate__off">Everyone</button>
+            </div>
+            <div className="osc-gate__hint">
+              {gateToken ? <>Only wallets holding ≥ {gateMin || "0"} ${gateToken.symbol} can view this post.</> : "Pick a token — only wallets holding it will be able to view this post."}
+            </div>
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.08] pt-2.5">
           <span className="relative flex items-center gap-0.5">
             <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-9 w-9 place-items-center rounded-full text-[#3b82f6] transition hover:bg-[#3b82f6]/10 disabled:opacity-50" title="Add image">
@@ -1181,6 +1398,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </button>
             <button type="button" onClick={() => setChartPickerOpen(true)} className="grid h-9 w-9 place-items-center rounded-full text-[#f0c75e] transition hover:bg-[#f0c75e]/10" title="Attach price chart">
               <BarChart3 className="h-[18px] w-[18px]" />
+            </button>
+            <button type="button" onClick={() => setGateOn((v) => !v)} className={cn("grid h-9 w-9 place-items-center rounded-full transition", gateOn ? "bg-[#f0c75e]/15 text-[#f0c75e]" : "text-[#3b82f6] hover:bg-[#3b82f6]/10")} title="Holders only — gate this post to token holders">
+              <Lock className="h-[18px] w-[18px]" />
             </button>
             {emojiOpen && (
               <>
@@ -1198,13 +1418,169 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <span className="ml-1 text-[12px] font-bold text-orange-400">{MAX_LEN - text.length}</span>
             )}
           </span>
-          <button type="button" disabled={(!text.trim() && pendingImages.length === 0) || posting} onClick={() => submit()} className="osc-btn-primary">
+          <button type="button" disabled={(!text.trim() && pendingImages.length === 0) || posting || (gateOn && !gateToken)} onClick={() => submit()} className="osc-btn-primary" title={gateOn && !gateToken ? "Pick a token for the holders-only gate" : undefined}>
             {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post"}
           </button>
         </div>
       </div>
     </div>
   );
+  };
+
+  /* ═══════════ Tweet-as-NFT: unlock progress + mint ═══════════ */
+  const renderNftZone = (p: Post) => {
+    const likes = p.likes_count ?? 0;
+    if (likes < 500 || p.id.startsWith("tmp-")) return null;
+    const comments = replyCounts[p.id] ?? 0;
+    const ownPost = Boolean(user && p.user_id === user.id);
+    const tier = Math.floor(likes / 1000);
+    const priceUsd = 5 * tier;
+    if (p.nft_mint) {
+      return (
+        <div className="osc-nftzone osc-nftzone--minted">
+          <Gem className="h-4 w-4 shrink-0 text-[#f0c75e]" />
+          <span className="truncate">Minted as NFT{typeof p.nft_price_usd === "number" ? ` · $${p.nft_price_usd}` : ""}</span>
+          <a href={`https://solscan.io/token/${p.nft_mint}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="osc-nftzone__link">
+            {p.nft_mint.slice(0, 4)}…{p.nft_mint.slice(-4)} <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      );
+    }
+    if (likes >= 1000 && comments >= 100) {
+      if (!ownPost) return null;
+      return (
+        <div className="osc-nftzone osc-nftzone--unlocked">
+          <Gem className="h-4 w-4 shrink-0 text-[#f0c75e]" />
+          <span className="min-w-0 flex-1 truncate">🔓 NFT mint unlocked · <b>${priceUsd}</b></span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setMintPost(p); }} className="osc-nftzone__btn">
+            Mint as NFT
+          </button>
+        </div>
+      );
+    }
+    const nextMilestone = (tier + 1) * 1000;
+    const pct = Math.min(100, Math.round((likes / nextMilestone) * 100));
+    return (
+      <div className="osc-nftzone">
+        <div className="osc-nftzone__bar"><span style={{ width: `${pct}%` }} /></div>
+        <div className="osc-nftzone__labels">
+          <span>🔥 {likes.toLocaleString()}/{nextMilestone.toLocaleString()} likes to unlock NFT mint</span>
+          {comments < 100 && <span>💬 {comments}/100 comments</span>}
+        </div>
+      </div>
+    );
+  };
+
+  const NftMintModal = ({ p, onClose, onMinted }: { p: Post; onClose: () => void; onMinted: (mint: string, priceUsd: number) => void }) => {
+    const likes = p.likes_count ?? 0;
+    const comments = replyCounts[p.id] ?? 0;
+    const priceUsd = 5 * Math.floor(likes / 1000);
+    const [solPrice, setSolPrice] = useState<number | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [step, setStep] = useState("");
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const postUrl = `https://orbitx.world/social/embed/post/${p.id}`;
+
+    useEffect(() => {
+      let cancelled = false;
+      fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          const v = Number(d?.[SOL_MINT]?.usdPrice);
+          if (!cancelled && v > 0) setSolPrice(v);
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }, []);
+
+    const priceSol = solPrice ? priceUsd / solPrice : null;
+
+    const doMint = async () => {
+      const authCode = getBillingAuthCode();
+      if (!authCode) { toast.error("Link your in-app wallet first (Trade tab → wallet)."); return; }
+      setBusy(true);
+      try {
+        setStep("Uploading post metadata…");
+        const { imgs } = splitMedia(p.content);
+        const meta = {
+          name: `OrbitX Post by @${p.username || "anon"}`,
+          symbol: "ORBITXPOST",
+          description: `${(p.content || "").slice(0, 280)} — Minted from OrbitX Social Center. ${likes.toLocaleString()} likes · ${comments} comments.`,
+          image: imgs[0] || "",
+          attributes: [
+            { trait_type: "Post ID", value: p.id },
+            { trait_type: "Author", value: `@${p.username || "anon"}` },
+            { trait_type: "Likes", value: String(likes) },
+            { trait_type: "Comments", value: String(comments) },
+            { trait_type: "Mint Price USD", value: `$${priceUsd}` },
+            { trait_type: "Mint Price SOL", value: priceSol != null ? priceSol.toFixed(6) : "n/a" },
+            { trait_type: "Post URL", value: postUrl },
+          ],
+          properties: { post_id: p.id, post_url: postUrl, author: p.username || null, likes, comments, category: "social" },
+        };
+        const blob = new Blob([JSON.stringify(meta)], { type: "application/json" });
+        const path = `nft-meta/${p.id}.json`;
+        const { error: upErr } = await supabase.storage.from("profile-media").upload(path, blob, { contentType: "application/json", upsert: true });
+        if (upErr) throw new Error("metadata upload failed");
+        const { data: pub } = supabase.storage.from("profile-media").getPublicUrl(path);
+        const uri = pub?.publicUrl;
+        if (!uri) throw new Error("metadata URL unavailable");
+
+        setStep("Minting NFT from your in-app wallet…");
+        const res = await callSupercomputerTool("orbitx_app_nft_mint", {
+          name: meta.name,
+          symbol: "ORBITXPOST",
+          uri,
+          ...(imgs[0] ? { imageUrl: imgs[0] } : {}),
+          attributes: meta.attributes,
+          authCode,
+        });
+        if (!res?.ok || typeof res.mint !== "string" || !res.mint) {
+          throw new Error(typeof res.error === "string" ? res.error : (typeof res.message === "string" ? res.message : "mint failed"));
+        }
+        const mint = res.mint;
+        setStep("Recording the mint…");
+        try {
+          await supabase.from("social_messages").update({ nft_mint: mint, nft_price_usd: priceUsd }).eq("id", p.id);
+        } catch { /* pre-migration: columns missing — UI still updates */ }
+        toast.success("NFT minted!", { description: `Mint price $${priceUsd}${priceSol != null ? ` (≈ ${priceSol.toFixed(4)} SOL)` : ""}` });
+        onMinted(mint, priceUsd);
+      } catch (e) {
+        toast.error("Mint failed", { description: String((e as Error)?.message || e).slice(0, 160) });
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    return (
+      <div className="osc-modal" onClick={onClose}>
+        <div className="osc-modal__card x-fade-in" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="osc-modal__head">
+            <Gem className="h-5 w-5 text-[#f0c75e]" />
+            <span className="text-[16px] font-extrabold text-white" style={{ fontFamily: "var(--osc-font-display)" }}>Mint post as NFT</span>
+            <button type="button" onClick={onClose} className="ml-auto rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white"><XIcon className="h-5 w-5" /></button>
+          </div>
+          <div className="osc-nftmint">
+            <div className="osc-nftmint__stats">
+              <div><b>{likes.toLocaleString()}</b><span>likes</span></div>
+              <div><b>{comments}</b><span>comments</span></div>
+            </div>
+            <div className="osc-nftmint__price">
+              <span>Mint price</span>
+              <b>${priceUsd}{priceSol != null && <i> ≈ {priceSol.toFixed(4)} SOL</i>}</b>
+            </div>
+            <p className="osc-nftmint__note">
+              Mints a real Metaplex NFT from your in-app wallet — backend-signed, no popup.
+              The metadata references this post (content, author, like count, post URL) and
+              records the mint price. Tiers: $5 per 1,000 likes.
+            </p>
+            <button type="button" disabled={busy} onClick={doMint} className="osc-btn-primary w-full">
+              {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> {step}</> : `Mint NFT — $${priceUsd}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const PostCard = ({ p: raw, onOpen }: { p: Post; onOpen?: (id: string) => void }) => {
@@ -1222,6 +1598,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const marked = bookmarks.has(p.id);
     const own = user && p.user_id === user.id;
     const isOfficial = officialIds.has(p.user_id);
+    const agent = agentMap.get(p.user_id);
+    const gate = p.gate_meta;
+    const gated = Boolean(gate?.mint);
+    const gs = gateStatus[p.id];
+    const gateLocked = gated && !own && (!gs || gs.loading || !gs.allowed);
+    /* Rug siren alerts render as their own red/pulsing card. */
+    if (isSirenContent(p.content)) {
+      return <SirenCard content={p.content} onOpenOrig={onOpen} />;
+    }
+    const callTokens = extractCallTokens(p.content);
     return (
       <article onClick={() => onOpen?.(p.id)} className={cn("osc-post x-fade-in group/post relative", onOpen && "osc-post--click")}>
         <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="osc-post__avatar transition group-hover/post:ring-[#3b82f6]/50" />
@@ -1230,12 +1616,30 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <div className="osc-post__head">
             <span className="osc-post__name">{p.username || "Anon"}</span>
             {(isOfficial || officialIds.has(p.user_id)) && <BadgeCheck className="osc-verified h-4 w-4" />}
+            {agent && <AgentBadge vibe={agent.vibe} />}
             <span className="osc-post__meta">@{(p.username || "anon").toLowerCase().replace(/\s+/g, "")} · {timeAgo(p.created_at)}</span>
             <button type="button" onClick={(e) => { e.stopPropagation(); setMenuId(menuId === p.id ? null : p.id); }} className="ml-auto rounded-full p-1.5 text-white/30 transition hover:bg-[#3b82f6]/10 hover:text-[#60a5fa]">
               <MoreHorizontal className="h-4 w-4" />
             </button>
           </div>
-          {(() => { const { text: chartStripped, charts } = splitCharts(p.content); const { text: body, imgs } = splitMedia(chartStripped); return (
+          {gateLocked ? (
+            <div className="osc-gated">
+              <div className="osc-gated__veil" aria-hidden="true">
+                <span /><span /><span />
+              </div>
+              <div className="osc-gated__lock">
+                <Lock className="h-5 w-5 text-[#f0c75e]" />
+                <div className="osc-gated__title">🔒 Holders only</div>
+                <div className="osc-gated__sub">Hold {gate?.min_amount ?? 0} ${gate?.symbol || "tokens"} to view this post</div>
+                {gate?.mint && (
+                  <a href={`/trade/token/${gate.mint}`} onClick={(e) => e.stopPropagation()} className="osc-gated__cta">
+                    View ${gate.symbol || "token"}
+                  </a>
+                )}
+                {user && !deskWallet && <div className="osc-gated__hint">Link your in-app wallet to verify holdings</div>}
+              </div>
+            </div>
+          ) : ((() => { const { text: chartStripped, charts } = splitCharts(p.content); const { text: body, imgs } = splitMedia(chartStripped); return (
             <>
               {body && <div className="osc-post__body">{renderContent(body, onSelectMint)}</div>}
               {imgs.length > 0 && (
@@ -1249,7 +1653,27 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               )}
               {charts.map((mint) => <ChartCard key={mint} mint={mint} />)}
             </>
-          ); })()}
+          ); })())}
+          {callTokens.length > 0 && (
+            <div className="osc-tradebar" onClick={(e) => e.stopPropagation()}>
+              {callTokens.map((ct) => (
+                <div key={ct.mint} className="osc-tradebar__row">
+                  <span className="osc-tradebar__sym">${ct.symbol}</span>
+                  <span className="osc-tradebar__spacer" />
+                  <button type="button" onClick={() => openTrade(ct.mint, ct.symbol, "buy", p)} className="osc-tradebar__btn osc-tradebar__btn--buy">
+                    <TrendingUp className="h-3.5 w-3.5" /> Buy
+                  </button>
+                  <button type="button" onClick={() => openTrade(ct.mint, ct.symbol, "sell", p)} className="osc-tradebar__btn osc-tradebar__btn--sell">
+                    <TrendingDown className="h-3.5 w-3.5" /> Sell
+                  </button>
+                  <button type="button" onClick={() => openTrade(ct.mint, ct.symbol, "copy", p)} className="osc-tradebar__btn osc-tradebar__btn--copy">
+                    <ArrowLeftRight className="h-3.5 w-3.5" /> Copy
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {!gateLocked && (
           <div className="osc-actions">
             <button type="button" onClick={(e) => { e.stopPropagation(); onOpen ? onOpen(p.id) : replyTo(p); }} className="osc-act group">
               <span className="osc-act__pill"><MessageCircle className="h-[18px] w-[18px]" /></span>
@@ -1265,10 +1689,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <button type="button" onClick={(e) => { e.stopPropagation(); toggleBookmark(p); }} className={cn("osc-act osc-act--gold group", marked && "osc-act--on")}>
               <span className="osc-act__pill"><Bookmark className={cn("h-[18px] w-[18px]", marked && "fill-current")} /></span>
             </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); openTip(p); }} className={cn("osc-act osc-act--gold group", tipped[p.id] && "osc-act--on")} title="Tip the author">
+              <span className="osc-act__pill"><Gift className={cn("h-[18px] w-[18px]", tipped[p.id] && "fill-current")} /></span>
+              {tipped[p.id] ? <span className="text-[#f0c75e]">${tipped[p.id]}</span> : null}
+            </button>
             <button type="button" onClick={(e) => { e.stopPropagation(); share(p); }} className="osc-act group">
               <span className="osc-act__pill"><Share className="h-[18px] w-[18px]" /></span>
             </button>
           </div>
+          )}
+          {!gateLocked && renderNftZone(p)}
         </div>
         {menuId === p.id && (
           <div className="absolute right-3 top-10 z-20 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#0d1219] shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1288,6 +1718,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <button type="button" onClick={() => { setMenuId(null); toast.success("Thanks — this post has been reported."); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] font-bold text-white/70 transition hover:bg-white/[0.04]">
               <Flag className="h-4 w-4" /> Report
             </button>
+            {!isSirenContent(p.content) && (
+              <button type="button" onClick={() => { setMenuId(null); void flagRug(p); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-[13px] font-bold text-rose-300/90 transition hover:bg-white/[0.04]">
+                <Siren className="h-4 w-4" /> Flag as rug
+              </button>
+            )}
           </div>
         )}
       </article>
@@ -1301,6 +1736,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <div className="flex items-center gap-1 text-[14px] font-extrabold text-white">
           <span className="truncate">{s.display_name || s.username}</span>
           {s.is_official_account && <BadgeCheck className="h-4 w-4 shrink-0 text-[#f0c75e]" />}
+          {agentMap.get(s.user_id) && <AgentBadge vibe={agentMap.get(s.user_id)?.vibe} />}
         </div>
         <div className="truncate text-[13px] text-white/35">@{s.username}</div>
         {s.bio && <div className="mt-0.5 line-clamp-1 text-[12px] text-white/50">{s.bio}</div>}
@@ -2023,6 +2459,40 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
       {/* ── Chart picker ── */}
       {chartPickerOpen && <TokenPicker onPick={attachChart} onClose={() => setChartPickerOpen(false)} />}
+
+      {/* ── Holders-only token picker ── */}
+      {gatePickerOpen && <TokenPicker title="Pick a token for holders-only" onPick={pickGateToken} onClose={() => setGatePickerOpen(false)} />}
+
+      {/* ── Tweet-as-NFT mint modal ── */}
+      {mintPost && (
+        <NftMintModal
+          p={mintPost}
+          onClose={() => setMintPost(null)}
+          onMinted={(mint, priceUsd) => {
+            setPosts((prev) => prev.map((x) => (x.id === mintPost.id ? { ...x, nft_mint: mint, nft_price_usd: priceUsd } : x)));
+            setDetailPost((prev) => (prev && prev.id === mintPost.id ? { ...prev, nft_mint: mint, nft_price_usd: priceUsd } : prev));
+            setMintPost(null);
+          }}
+        />
+      )}
+
+      {/* ── Feed superpowers: trade / tip bottom sheets ── */}
+      {tradeSheet && (
+        <TradeSheet
+          mint={tradeSheet.mint}
+          symbol={tradeSheet.symbol}
+          mode={tradeSheet.mode}
+          post={tradeSheet.post}
+          onClose={() => setTradeSheet(null)}
+        />
+      )}
+      {tipSheet && (
+        <TipSheet
+          post={tipSheet}
+          onClose={() => setTipSheet(null)}
+          onTipped={(amt) => setTipped((prev) => ({ ...prev, [tipSheet.id]: amt }))}
+        />
+      )}
 
       {/* ── Onboarding ── */}
       {onboardOpen && (
