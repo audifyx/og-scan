@@ -528,6 +528,66 @@ function AICore({ mood, change }: { mood: AvatarMood; change: number | null }) {
   );
 }
 
+/** Floating holographic live price above the office. */
+function PriceHologram({ stats, stage }: { stats: AvatarStats; stage: number }) {
+  const tex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 160;
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  const ref = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const draw = () => {
+      if (!alive) return;
+      const c = tex.image as HTMLCanvasElement;
+      const g = c.getContext("2d")!;
+      const up = (stats.change24h ?? 0) >= 0;
+      g.clearRect(0, 0, 512, 160);
+      g.fillStyle = "rgba(2,10,18,0.72)";
+      g.beginPath(); g.roundRect(4, 4, 504, 152, 24); g.fill();
+      g.strokeStyle = up ? "rgba(52,211,153,0.6)" : "rgba(251,113,133,0.6)";
+      g.lineWidth = 3;
+      g.beginPath(); g.roundRect(4, 4, 504, 152, 24); g.stroke();
+      g.textAlign = "center";
+      g.fillStyle = "#5eead4";
+      g.font = "bold 30px monospace";
+      g.fillText("ORBITX / USD", 256, 48);
+      const p = stats.price;
+      g.fillStyle = up ? "#34d399" : "#fb7185";
+      g.font = "bold 56px monospace";
+      g.shadowColor = g.fillStyle as string;
+      g.shadowBlur = 18;
+      g.fillText(p != null && p > 0 ? (p < 0.0001 ? p.toExponential(2) : `$${p.toFixed(6)}`) : "—", 256, 112);
+      g.shadowBlur = 0;
+      g.fillStyle = "rgba(255,255,255,0.55)";
+      g.font = "bold 24px monospace";
+      const chg = stats.change24h;
+      g.fillText(chg != null ? `${up ? "▲" : "▼"} ${Math.abs(chg).toFixed(1)}%` : "", 256, 144);
+      tex.needsUpdate = true;
+    };
+    draw();
+    const id = setInterval(draw, 4000);
+    return () => { alive = false; clearInterval(id); };
+  }, [tex, stats.price, stats.change24h]);
+
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.position.y = (stage >= 4 ? 8.2 : 5.6) + Math.sin(clock.getElapsedTime() * 1.1) * 0.18;
+  });
+
+  return (
+    <group ref={ref} position={[0, stage >= 4 ? 8.2 : 5.6, -3.5]}>
+      <mesh>
+        <planeGeometry args={[4.6, 1.44]} />
+        <meshBasicMaterial map={tex} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 /** Giant holographic ORBITX billboard (stage 3+). */
 function HoloBillboard() {
   const tex = useMemo(() => {
@@ -705,6 +765,8 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
       {stage >= 4 && <RocketPad />}
       {/* rising embers */}
       <Embers count={stage >= 4 ? 130 : 70} area={stage >= 4 ? 24 : 14} />
+      {/* floating live price hologram */}
+      <PriceHologram stats={stats} stage={stage} />
 
       {/* trophy shelf */}
       <group position={[2.9, 0, -2.6]} rotation={[0, -0.5, 0]}>

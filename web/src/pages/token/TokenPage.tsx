@@ -9,7 +9,7 @@ import { fetchRpcSupply } from "./rpcFeed";
 import { TokenArticle } from "./TokenArticle";
 import { TokenChart } from "./TokenChart";
 import { BurnTracker } from "./BurnTracker";
-import { TickerTape, StageProgress, StatCard, useCountUp, fmtUsdShort } from "./TokenWidgets";
+import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort } from "./TokenWidgets";
 import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
 
@@ -130,6 +130,7 @@ export default function TokenPage() {
 
   return (
     <div className="min-h-screen bg-[#04070d] text-white">
+      <EvolutionCelebration stage={stage} />
       {/* sticky top bar */}
       <div className="sticky top-0 z-40 border-b border-white/10 bg-[#04070d]/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
