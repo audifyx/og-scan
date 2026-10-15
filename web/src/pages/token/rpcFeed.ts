@@ -88,49 +88,24 @@ export function useRpcTrades(mint: string, limit = 15, intervalMs = 20000) {
   const [error, setError] = useState<string | null>(null);
   const seen = useRef<Set<string>>(new Set());
 
-  const fetchDirect = useCallback(async () => {
-    const sigs = await rpc<SigInfo[]>("getSignaturesForAddress", [mint, { limit }]);
-    const fresh = sigs.filter((s) => !s.err && !seen.current.has(s.signature)).slice(0, limit);
-    const parsed: RpcTrade[] = [];
-    for (const s of fresh) {
-      seen.current.add(s.signature);
-      try {
-        const tx = await rpc<any>("getTransaction", [
-          s.signature,
-          { encoding: "json", maxSupportedTransactionVersion: 1 },
-        ]);
-        if (!tx) continue;
-        const t = parseTrade({ ...tx, blockTime: tx.blockTime ?? s.blockTime }, mint);
-        if (t) parsed.push(t);
-      } catch {
-        /* skip unparseable tx */
-      }
-    }
-    return parsed;
-  }, [mint, limit]);
-
-  const fetchServer = useCallback(async () => {
-    const r = await fetch(`/api/token-feed?action=trades&mint=${mint}&limit=${limit}`);
-    if (!r.ok) throw new Error(`feed ${r.status}`);
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || "feed failed");
-    const parsed: RpcTrade[] = [];
-    for (const t of j.trades ?? []) {
-      if (seen.current.has(t.signature)) continue;
-      seen.current.add(t.signature);
-      parsed.push(t);
-    }
-    return parsed;
-  }, [mint, limit]);
-
   const poll = useCallback(async () => {
     try {
-      // Prefer the server feed (reliable RPC + CDN cache); fall back to direct RPC.
-      let parsed: RpcTrade[];
-      try {
-        parsed = await fetchServer();
-      } catch {
-        parsed = await fetchDirect();
+      const sigs = await rpc<SigInfo[]>("getSignaturesForAddress", [mint, { limit }]);
+      const fresh = sigs.filter((s) => !s.err && !seen.current.has(s.signature)).slice(0, limit);
+      const parsed: RpcTrade[] = [];
+      for (const s of fresh) {
+        seen.current.add(s.signature);
+        try {
+          const tx = await rpc<any>("getTransaction", [
+            s.signature,
+            { encoding: "json", maxSupportedTransactionVersion: 1 },
+          ]);
+          if (!tx) continue;
+          const t = parseTrade({ ...tx, blockTime: tx.blockTime ?? s.blockTime }, mint);
+          if (t) parsed.push(t);
+        } catch {
+          /* skip unparseable tx */
+        }
       }
       if (parsed.length > 0) {
         setTrades((prev) =>
@@ -148,7 +123,7 @@ export function useRpcTrades(mint: string, limit = 15, intervalMs = 20000) {
     } finally {
       setLoading(false);
     }
-  }, [fetchServer, fetchDirect]);
+  }, [mint, limit]);
 
   useEffect(() => {
     seen.current.clear();
@@ -165,15 +140,6 @@ export function useRpcTrades(mint: string, limit = 15, intervalMs = 20000) {
 }
 
 export async function fetchRpcSupply(mint: string): Promise<number | null> {
-  try {
-    const r = await fetch(`/api/token-feed?action=supply&mint=${mint}`);
-    if (r.ok) {
-      const j = await r.json();
-      if (j.ok && typeof j.supply === "number") return j.supply;
-    }
-  } catch {
-    /* fall through to direct RPC */
-  }
   try {
     const r = await rpc<{ value?: { uiAmount?: number } }>("getTokenSupply", [mint]);
     return r?.value?.uiAmount ?? null;

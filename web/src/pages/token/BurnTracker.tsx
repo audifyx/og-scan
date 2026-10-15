@@ -1,25 +1,26 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { ExternalLink, Flame } from "lucide-react";
-import { heliusTxs, shortAddr, timeAgo } from "@/lib/og";
+import { fetchRpcSupply, shortSig, timeAgo, useRpcTrades } from "./rpcFeed";
 import { cn } from "@/lib/utils";
 
 interface Props {
   mint: string;
-  burned: number | null;
-  supply: number | null;
 }
 
 const INITIAL_SUPPLY = 1_000_000_000;
 
-export function BurnTracker({ mint, burned, supply }: Props) {
-  const { data: txs, isLoading } = useQuery({
-    queryKey: ["orbitx-burn-txs", mint],
-    queryFn: () => heliusTxs(mint, 60),
-    refetchInterval: 60_000,
-    retry: 1,
-  });
+export function BurnTracker({ mint }: Props) {
+  const { burns, loading } = useRpcTrades(mint, 40, 60000);
+  const [supply, setSupply] = useState<number | null>(null);
 
-  const burns = (txs ?? []).filter((t) => t.type === "BURN");
+  useEffect(() => {
+    let alive = true;
+    fetchRpcSupply(mint).then((s) => { if (alive) setSupply(s); });
+    const id = setInterval(() => { fetchRpcSupply(mint).then((s) => { if (alive) setSupply(s); }); }, 120000);
+    return () => { alive = false; clearInterval(id); };
+  }, [mint]);
+
+  const burned = supply != null ? Math.max(0, INITIAL_SUPPLY - supply) : null;
   const burnPct = burned != null ? (burned / INITIAL_SUPPLY) * 100 : null;
 
   return (
@@ -58,7 +59,7 @@ export function BurnTracker({ mint, burned, supply }: Props) {
       </p>
 
       {/* burn feed */}
-      {isLoading ? (
+      {loading ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/5" />)}
         </div>
@@ -70,29 +71,25 @@ export function BurnTracker({ mint, burned, supply }: Props) {
         </div>
       ) : (
         <div className="space-y-2">
-          {burns.map((b) => {
-            const transfer = b.tokenTransfers?.find((tr) => tr.mint === mint) ?? b.tokenTransfers?.[0];
-            const amount = transfer?.tokenAmount;
-            return (
-              <a
-                key={b.signature}
-                href={`https://solscan.io/tx/${b.signature}`}
-                target="_blank" rel="noreferrer"
-                className={cn("flex items-center gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/[0.06] p-3.5 transition hover:bg-orange-500/[0.1]")}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 shadow-[0_0_16px_rgba(249,115,22,0.4)]">
-                  <Flame className="h-5 w-5 text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-orange-100">
-                    {amount != null ? `🔥 ${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ORBITX` : "🔥 Burn"}
-                  </p>
-                  <p className="truncate font-mono text-[11px] text-white/40">{shortAddr(b.signature, 6)} · {timeAgo(b.timestamp)}</p>
-                </div>
-                <ExternalLink className="h-4 w-4 shrink-0 text-white/40" />
-              </a>
-            );
-          })}
+          {burns.map((b) => (
+            <a
+              key={b.signature}
+              href={`https://solscan.io/tx/${b.signature}`}
+              target="_blank" rel="noreferrer"
+              className={cn("flex items-center gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/[0.06] p-3.5 transition hover:bg-orange-500/[0.1]")}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 shadow-[0_0_16px_rgba(249,115,22,0.4)]">
+                <Flame className="h-5 w-5 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-orange-100">
+                  🔥 {b.tokenAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ORBITX
+                </p>
+                <p className="truncate font-mono text-[11px] text-white/40">{shortSig(b.signature)} · {timeAgo(b.timestamp)}</p>
+              </div>
+              <ExternalLink className="h-4 w-4 shrink-0 text-white/40" />
+            </a>
+          ))}
         </div>
       )}
     </div>
