@@ -144,7 +144,7 @@ function splitCharts(content: string): { text: string; charts: string[] } {
   return { text, charts: [...new Set(charts)].slice(0, 2) };
 }
 
-interface CoinLite { mint: string; symbol: string | null; name: string | null; icon: string | null; priceUsd: number | null; change24h: number | null; }
+interface CoinLite { mint: string; symbol: string | null; name: string | null; icon: string | null; banner: string | null; priceUsd: number | null; change24h: number | null; }
 
 /* Search Solana tokens by symbol/name — DexScreener, highest liquidity first. */
 async function searchCoins(q: string): Promise<CoinLite[]> {
@@ -356,20 +356,16 @@ function OnboardingFlow({ suggestions, onFollow, onDone, onConnectWallet, onFirs
 
 /* ═══════════ Tweetable chart card — real interactive chart ═══════════ */
 const TF_OPTS = [
-  { id: "1h", label: "1H", interval: "5m", limit: 12 },
-  { id: "24h", label: "24H", interval: "1h", limit: 24 },
-  { id: "7d", label: "7D", interval: "4h", limit: 42 },
+  { id: "1h", label: "1H", interval: "5m", limit: 12, ds: 5 },
+  { id: "24h", label: "24H", interval: "1h", limit: 24, ds: 60 },
+  { id: "7d", label: "7D", interval: "4h", limit: 42, ds: 240 },
 ] as const;
 
 function ChartCard({ mint }: { mint: string }) {
   const [coin, setCoin] = useState<CoinLite | null>(null);
   const [tf, setTf] = useState<(typeof TF_OPTS)[number]>(TF_OPTS[1]);
-  const [points, setPoints] = useState<{ time: number; value: number }[]>([]);
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartApi = useRef<any>(null);
-  const seriesApi = useRef<any>(null);
 
-  // Live token snapshot
+  // Live token snapshot (icon + banner from DexScreener metadata)
   useEffect(() => {
     let on = true;
     fetch(`/api/ogdex/token?mint=${mint}`)
@@ -379,6 +375,7 @@ function ChartCard({ mint }: { mint: string }) {
         const t = d.token;
         const c: CoinLite = {
           mint, symbol: t.symbol ?? null, name: t.name ?? null, icon: t.icon ?? null,
+          banner: t.banner ?? null,
           priceUsd: t.priceUsd ?? null,
           change24h: t.priceChange24h ?? t.change24h ?? null,
         };
@@ -389,83 +386,21 @@ function ChartCard({ mint }: { mint: string }) {
     return () => { on = false; };
   }, [mint]);
 
-  // Candles for the selected timeframe
-  useEffect(() => {
-    let on = true;
-    setPoints([]);
-    fetch(`/api/ogdex/chart?mint=${mint}&interval=${tf.interval}&limit=${tf.limit}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!on || !d?.candles?.length) return;
-        const pts = (d.candles as any[])
-          .map((k) => ({
-            time: Math.floor(new Date(k.time ?? k[0]).getTime() / 1000) as any,
-            value: Number(k.close ?? k[4] ?? 0),
-          }))
-          .filter((p) => p.value > 0 && p.time > 0)
-          .sort((a, b) => a.time - b.time);
-        setPoints(pts);
-      })
-      .catch(() => {});
-    return () => { on = false; };
-  }, [mint, tf]);
-
-  // Build the lightweight-charts instance once
-  useEffect(() => {
-    let chart: any = null;
-    let ro: ResizeObserver | null = null;
-    (async () => {
-      const { createChart, ColorType } = await import("lightweight-charts");
-      if (!chartRef.current) return;
-      const el = chartRef.current;
-      chart = createChart(el, {
-        layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "rgba(255,255,255,0.35)", fontSize: 10 },
-        grid: { vertLines: { visible: false }, horzLines: { color: "rgba(255,255,255,0.05)" } },
-        width: el.clientWidth, height: 148,
-        timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
-        rightPriceScale: { borderVisible: false },
-        crosshair: { horzLine: { visible: false } },
-      });
-      const up = true;
-      const series = chart.addAreaSeries({
-        lineColor: "#60a5fa", lineWidth: 2,
-        topColor: "rgba(59,130,246,0.35)", bottomColor: "rgba(59,130,246,0.0)",
-        priceLineVisible: false, lastValueVisible: false,
-      });
-      chartApi.current = chart;
-      seriesApi.current = series;
-      if (points.length) series.setData(points);
-      ro = new ResizeObserver(() => { try { chart.applyOptions({ width: el.clientWidth }); } catch {} });
-      ro.observe(el);
-    })();
-    return () => { ro?.disconnect(); try { chart?.remove(); } catch {} chartApi.current = null; seriesApi.current = null; };
-  }, []);
-
-  // Push new data + recolor by trend
-  useEffect(() => {
-    const s = seriesApi.current;
-    if (!s || !points.length) return;
-    try {
-      s.setData(points);
-      const up = points[points.length - 1].value >= points[0].value;
-      s.applyOptions({
-        lineColor: up ? "#34d399" : "#fb7185",
-        topColor: up ? "rgba(52,211,153,0.30)" : "rgba(251,113,133,0.30)",
-        bottomColor: up ? "rgba(52,211,153,0.0)" : "rgba(251,113,133,0.0)",
-      });
-      chartApi.current?.timeScale().fitContent();
-    } catch {}
-  }, [points]);
-
   const chg = coin?.change24h;
   const up = (chg ?? 0) >= 0;
+  const dsSrc = `https://dexscreener.com/solana/${mint}?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=${tf.ds}`;
   return (
     <div className="osc-chartcard x-fade-in" onClick={(e) => e.stopPropagation()}>
+      {coin?.banner && (
+        <div className="-mx-[14px] -mt-[14px] mb-3 h-[92px] overflow-hidden rounded-t-[18px]">
+          <img src={coin.banner} alt="" className="h-full w-full object-cover" loading="lazy" />
+        </div>
+      )}
       <div className="flex items-center gap-3">
         {coin?.icon ? (
-          <img src={coin.icon} alt="" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
+          <img src={coin.icon} alt="" className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10" />
         ) : (
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-[#3b82f6]/15 text-[14px] font-extrabold text-[#60a5fa]">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#3b82f6]/15 text-[16px] font-extrabold text-[#60a5fa]">
             {(coin?.symbol || "?").slice(0, 2)}
           </span>
         )}
@@ -495,13 +430,13 @@ function ChartCard({ mint }: { mint: string }) {
             style={{ padding: "4px 12px", fontSize: 11.5 }}
           >{o.label}</button>
         ))}
-        <span className="ml-auto self-center text-[10px] font-semibold text-white/25">drag to explore · live</span>
+        <span className="ml-auto self-center text-[10px] font-semibold text-white/25">live · DexScreener</span>
       </div>
-      <div ref={chartRef} className="mt-1 w-full" style={{ height: 148 }}>
-        {points.length === 0 && <div className="x-shim h-[148px] rounded-xl" />}
+      <div className="relative mt-1 w-full overflow-hidden rounded-xl bg-black" style={{ height: 300 }}>
+        <iframe key={tf.id} title="DexScreener chart" src={dsSrc} className="absolute inset-0 h-full w-full border-0" style={{ colorScheme: "dark" }} allow="clipboard-write" loading="lazy" />
       </div>
       <div className="mt-1 flex items-center justify-between text-[10.5px] font-semibold text-white/30">
-        <span>{tf.label} · via OrbitX</span>
+        <span>{tf.label} · via DexScreener</span>
         <span className="font-mono">{mint.slice(0, 4)}…{mint.slice(-4)}</span>
       </div>
     </div>
