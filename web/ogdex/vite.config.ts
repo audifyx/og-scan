@@ -21,12 +21,11 @@ export default defineConfig({
         // Only split clearly leaf-level libs used on the initial load.
         // @solana stays in the async Launch chunk (its only importer), so it
         // never ships in the initial Discovery bundle.
+        // NOTE: Do NOT manually chunk react/react-dom — it breaks named imports (lazy, Suspense).
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
           if (id.includes("lightweight-charts")) return "charts";
           if (id.includes("lucide-react")) return "icons";
-          if (id.includes("react-router") || id.includes("/react/") ||
-              id.includes("react-dom") || id.includes("scheduler")) return "react";
         },
       },
     },
