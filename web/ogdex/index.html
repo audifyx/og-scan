@@ -33,12 +33,26 @@
       </div>
     </div>
     <script>
+      // Capture boot errors so they become visible instead of a silent black page.
+      window.__bootError = null;
+      window.addEventListener("error", function (e) {
+        window.__bootError = (e && e.message) || String(e);
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        window.__bootError = "unhandled: " + ((e && e.reason && e.reason.message) || String(e.reason || e));
+      });
       // Boot watchdog: if React hasn't rendered in 12s, show the fallback above.
       setTimeout(function () {
         var root = document.getElementById("root");
         if (root && root.childNodes.length === 0) {
           var fb = document.getElementById("boot-fallback");
-          if (fb) fb.style.display = "grid";
+          if (fb) {
+            fb.style.display = "grid";
+            if (window.__bootError) {
+              var p = fb.querySelector("p");
+              if (p) p.textContent = "Error: " + String(window.__bootError).slice(0, 200);
+            }
+          }
         }
       }, 12000);
     </script>
