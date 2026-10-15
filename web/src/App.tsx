@@ -416,8 +416,8 @@ const App = () => (
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
             {/* Rescue Console — standalone, launchpad hidden */}
             <Route path="/orbitxlaunch/rescue" element={<RescuePage />} />
-            <Route path="/orbitxlaunch/claim" element={<Navigate to="/orbitxlaunch/rescue" replace />} />
-            <Route path="/orbitxlaunch/*" element={<Navigate to="/orbitxlaunch/rescue" replace />} />
+            <Route path="/orbitxlaunch" element={<Navigate to="/" replace />} />
+            <Route path="/orbitxlaunch/*" element={<Navigate to="/" replace />} />
 
             {/* ── Bagwork — earn USDC for tasks ── */}
             <Route path="/bagwork" element={<BagworkLayout />}>
