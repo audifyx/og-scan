@@ -71,18 +71,18 @@ export default function TradeWalletManager() {
     <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-black text-white">In-app wallet</h1>
-        <p className="mt-1 text-sm text-white/40">
+        <p className="mt-1 text-sm text-white/70">
           The only wallet across OrbitX — same address on every surface. Backend-signed, no popups.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-6">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-og-cyan/10">
             <Wallet className="h-6 w-6 text-og-cyan" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-white/70">
               {linked ? "Linked desk wallet" : "No wallet linked"}
             </p>
             {linked ? (
@@ -93,7 +93,7 @@ export default function TradeWalletManager() {
                 title="Copy address"
               >
                 <span className="truncate">{shortAddr(address!, 8)}</span>
-                {copied ? <Check className="h-4 w-4 text-og-lime" /> : <Copy className="h-4 w-4 text-white/30" />}
+                {copied ? <Check className="h-4 w-4 text-og-lime" /> : <Copy className="h-4 w-4 text-white/60" />}
               </button>
             ) : (
               <p className="mt-0.5 text-sm text-white/50">Link it once — trades and burns become seamless.</p>
@@ -125,13 +125,13 @@ export default function TradeWalletManager() {
         {linked && (
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-white/[0.07] bg-black/30 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-white/35">SOL</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-white/65">SOL</p>
               <p className="mt-1 font-mono text-xl font-black text-white">
                 {sol === null ? "—" : sol.toFixed(4)}
               </p>
             </div>
             <div className="rounded-xl border border-white/[0.07] bg-black/30 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-white/35">ORBITX</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-white/65">ORBITX</p>
               <p className="mt-1 font-mono text-xl font-black text-white">
                 {orbitx === null ? "—" : orbitx.toLocaleString()}
               </p>
@@ -144,21 +144,21 @@ export default function TradeWalletManager() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="mt-4 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-white/40 hover:text-white/70 disabled:opacity-50"
+            className="mt-4 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-white/70 hover:text-white/70 disabled:opacity-50"
           >
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Refresh balances
           </button>
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.06] p-5">
         <p className="text-xs font-bold uppercase tracking-widest text-white/50">What changed</p>
         <p className="mt-2 text-sm leading-relaxed text-white/45">
           Phantom, Jupiter, and imported browser keypairs are retired. Your in-app wallet is now the
           only wallet — the same address in the hub, the city, the trade terminal, and the shop.
           It signs on the backend, so there's nothing to install and no popups.
         </p>
-        <p className="mt-2 font-mono text-[11px] text-white/30">
+        <p className="mt-2 font-mono text-[11px] text-white/60">
           RPC: {browserWalletRpcUrl().replace(/^https?:\/\//, "").slice(0, 42)}…
         </p>
       </div>

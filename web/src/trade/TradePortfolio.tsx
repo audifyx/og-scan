@@ -273,20 +273,20 @@ export default function TradePortfolio() {
 
         <Link
           to="/trade/wallets"
-          className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
+          className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2.5"
         >
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-white/10">
             <KeyRound className="h-4 w-4 text-white/55" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold">Trading wallets</p>
-            <p className="truncate text-[11px] text-white/40">
+            <p className="truncate text-[11px] text-white/70">
               {localWallets.length
                 ? `${localWallets.length} local · default ${defaultWallet ? shortAddr(defaultWallet.publicKey, 4) : "—"} · ${tradeMode === "local" ? "local mode" : "connected mode"}`
                 : "Import / export keys · set default for Trade"}
             </p>
           </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-white/60" />
         </Link>
 
         <div className="tp__tabs" role="tablist">
@@ -335,7 +335,7 @@ export default function TradePortfolio() {
               </div>
             ) : mineLoading ? (
               <div className="flex justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+                <Loader2 className="h-6 w-6 animate-spin text-white/60" />
               </div>
             ) : (
               <>
@@ -347,7 +347,7 @@ export default function TradePortfolio() {
                   </div>
                   <p className="tp__label">Net worth</p>
                   <p className="tp__hero-val mt-2">{fmtUsd(mine?.totalUsd)}</p>
-                  <p className="mt-2 font-mono text-[11px] text-white/35">
+                  <p className="mt-2 font-mono text-[11px] text-white/65">
                     {activeLabel || shortAddr(myAddr, 6)}
                   </p>
 
@@ -379,7 +379,7 @@ export default function TradePortfolio() {
                   </div>
 
                   {(mine?.pnl?.winRate != null || mine?.pnl?.closedTrades != null) && (
-                    <p className="mt-3 text-[12px] text-white/40">
+                    <p className="mt-3 text-[12px] text-white/70">
                       WR {wrLabel(mine?.pnl?.winRate)}
                       {" · "}
                       {mine?.pnl?.closedTrades ?? 0} closed
@@ -407,7 +407,7 @@ export default function TradePortfolio() {
                 <section className="tp__section">
                   <div className="tp__section-head">
                     <h2 className="tp__section-title">Holdings</h2>
-                    <span className="text-[11px] text-white/35">{holdings.length}</span>
+                    <span className="text-[11px] text-white/65">{holdings.length}</span>
                   </div>
                   {!holdings.length ? (
                     <p className="tp__empty py-8">No token holdings found</p>
@@ -431,16 +431,16 @@ export default function TradePortfolio() {
                             <p className="truncate text-[14px] font-bold">{tokenLabel(h)}</p>
                             <p className="tp__row-name">{tokenName(h)}</p>
                             {!h.isSol && (
-                              <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                              <p className="mt-0.5 font-mono text-[10px] text-white/60">
                                 {shortAddr(h.mint || "", 4)}
                               </p>
                             )}
-                            <p className="mt-0.5 font-mono text-[11px] text-white/35">
+                            <p className="mt-0.5 font-mono text-[11px] text-white/65">
                               {fmtTok(h.uiAmount, 4)}
                               {h.unpriced ? " · unpriced" : ""}
                             </p>
                             {!h.isSol && (
-                              <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                              <p className="mt-0.5 font-mono text-[10px] text-white/60">
                                 Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
                                 {" · "}Bought{" "}
                                 {h.boughtUsd != null ? fmtUsd(h.boughtUsd) : "—"}
@@ -518,7 +518,7 @@ export default function TradePortfolio() {
                 <button
                   type="button"
                   onClick={() => void refreshWatch()}
-                  className="text-[11px] text-white/40 underline"
+                  className="text-[11px] text-white/70 underline"
                 >
                   {watchLoading ? "Refreshing…" : "Refresh"}
                 </button>
@@ -541,14 +541,14 @@ export default function TradePortfolio() {
                           className="min-w-0 flex-1 text-left"
                         >
                           <p className="text-[14px] font-bold">{w.label || shortAddr(w.address, 6)}</p>
-                          <p className="mt-0.5 font-mono text-[11px] text-white/35">
+                          <p className="mt-0.5 font-mono text-[11px] text-white/65">
                             {shortAddr(w.address, 8)}
                           </p>
                           <p className="mt-1.5 font-mono text-[15px] font-bold">
                             {snap ? fmtUsd(snap.totalUsd) : watchLoading ? "…" : "—"}
                           </p>
                           {snap && (
-                            <p className="mt-1 font-mono text-[11px] text-white/40">
+                            <p className="mt-1 font-mono text-[11px] text-white/70">
                               {snap.tokenCount ?? snap.holdings?.length ?? 0} tok
                               {" · "}
                               R{" "}
@@ -613,7 +613,7 @@ export default function TradePortfolio() {
                       clearRecentWallets();
                       setRecent([]);
                     }}
-                    className="text-[11px] text-white/35"
+                    className="text-[11px] text-white/65"
                   >
                     Clear
                   </button>
@@ -632,7 +632,7 @@ export default function TradePortfolio() {
         {tab === "holders" && (
           <div>
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
               <input
                 value={holderQ}
                 onChange={(e) => setHolderQ(e.target.value)}
@@ -669,11 +669,11 @@ export default function TradePortfolio() {
                       <p className="truncate text-[13px] font-bold">
                         ${(c.symbol || shortAddr(c.mint, 4)).trim()}
                       </p>
-                      <p className="truncate text-[11px] text-white/35">
+                      <p className="truncate text-[11px] text-white/65">
                         {(c.name || "Token").trim()}
                       </p>
                     </div>
-                    <span className="ml-auto font-mono text-[11px] text-white/30">
+                    <span className="ml-auto font-mono text-[11px] text-white/60">
                       {shortAddr(c.mint, 4)}
                     </span>
                   </button>
@@ -690,7 +690,7 @@ export default function TradePortfolio() {
                     {holderMeta.symbol ? ` · $${holderMeta.symbol}` : ""}
                   </h2>
                   {holderMeta.holderCount != null && (
-                    <span className="font-mono text-[11px] text-white/35">
+                    <span className="font-mono text-[11px] text-white/65">
                       {holderMeta.holderCount.toLocaleString()} total
                     </span>
                   )}
@@ -698,7 +698,7 @@ export default function TradePortfolio() {
                 {holdersErr && <div className="tp__err">{holdersErr}</div>}
                 {holdersLoading ? (
                   <div className="flex justify-center py-12">
-                    <Loader2 className="h-5 w-5 animate-spin text-white/30" />
+                    <Loader2 className="h-5 w-5 animate-spin text-white/60" />
                   </div>
                 ) : (
                   <div>
@@ -711,7 +711,7 @@ export default function TradePortfolio() {
                           onClick={() => addr && openWallet(addr)}
                           className="tp__row"
                         >
-                          <span className="font-mono text-[12px] text-white/40">
+                          <span className="font-mono text-[12px] text-white/70">
                             #{h.rank || i + 1}
                           </span>
                           <span className="font-mono text-[13px]">{shortAddr(addr || "", 5)}</span>

@@ -85,25 +85,25 @@ export default function TradeProfile() {
       >
         You
       </h1>
-      <p className="mt-0.5 text-[12px] text-white/40">OrbitX identity · wallet · shortcuts</p>
+      <p className="mt-0.5 text-[12px] text-white/70">OrbitX identity · wallet · shortcuts</p>
 
       {/* OrbitX account */}
-      <div className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="mt-5 rounded-3xl border border-white/20 bg-white/[0.08] p-4">
         <div className="flex items-center gap-3">
           {avatar ? (
             <img src={avatar} alt="" className="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/15" />
           ) : (
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10">
-              <User className="h-7 w-7 text-white/40" />
+              <User className="h-7 w-7 text-white/70" />
             </div>
           )}
           <div className="min-w-0 flex-1">
             {authLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-white/30" />
+              <Loader2 className="h-4 w-4 animate-spin text-white/80" />
             ) : username ? (
               <>
                 <p className="truncate text-lg font-bold tracking-tight">@{username}</p>
-                <p className="mt-0.5 text-[11px] text-white/40">
+                <p className="mt-0.5 text-[11px] text-white/70">
                   {profile?.verified || profile?.is_official_account ? "Verified · " : ""}
                   OrbitX account
                 </p>
@@ -111,7 +111,7 @@ export default function TradeProfile() {
             ) : (
               <>
                 <p className="text-sm font-semibold text-white/70">Not signed in</p>
-                <p className="mt-0.5 text-[11px] text-white/40">Sign in to show username & avatar</p>
+                <p className="mt-0.5 text-[11px] text-white/70">Sign in to show username & avatar</p>
               </>
             )}
           </div>
@@ -119,16 +119,16 @@ export default function TradeProfile() {
 
         {profile && (
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-black/40 px-2 py-2">
-              <p className="text-[9px] text-white/30">Level</p>
+            <div className="rounded-xl bg-black/70 px-2 py-2">
+              <p className="text-[9px] text-white/80">Level</p>
               <p className="font-mono text-sm font-bold">{profile.current_level ?? "—"}</p>
             </div>
-            <div className="rounded-xl bg-black/40 px-2 py-2">
-              <p className="text-[9px] text-white/30">Streak</p>
+            <div className="rounded-xl bg-black/70 px-2 py-2">
+              <p className="text-[9px] text-white/80">Streak</p>
               <p className="font-mono text-sm font-bold">{profile.daily_streak ?? "—"}</p>
             </div>
-            <div className="rounded-xl bg-black/40 px-2 py-2">
-              <p className="text-[9px] text-white/30">Rep</p>
+            <div className="rounded-xl bg-black/70 px-2 py-2">
+              <p className="text-[9px] text-white/80">Rep</p>
               <p className="font-mono text-sm font-bold">{profile.reputation_score ?? "—"}</p>
             </div>
           </div>
@@ -138,7 +138,7 @@ export default function TradeProfile() {
           {user ? (
             <Link
               to="/profile"
-              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-white/12 text-xs font-semibold"
+              className="flex h-10 flex-1 items-center justify-center rounded-xl border border-white/25 text-xs font-semibold"
             >
               Edit profile
             </Link>
@@ -154,20 +154,20 @@ export default function TradeProfile() {
       </div>
 
       {/* Local trading wallets — separate from login / Phantom */}
-      <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="mt-3 rounded-3xl border border-white/20 bg-white/[0.08] p-4">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10">
-            <KeyRound className="h-5 w-5 text-white/50" />
+            <KeyRound className="h-5 w-5 text-white/75" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">Trading wallets</p>
-            <p className="mt-0.5 text-[11px] text-white/40">
+            <p className="mt-0.5 text-[11px] text-white/70">
               {localWallets.length
                 ? `${localWallets.length} local · ${tradeMode === "local" ? "signing local" : "connected mode"}`
                 : "Import keys to trade with several wallets"}
             </p>
             {defaultWallet && (
-              <p className="mt-1 font-mono text-[11px] text-white/55">
+              <p className="mt-1 font-mono text-[11px] text-white/80">
                 Default {shortAddr(defaultWallet.publicKey, 4)}
               </p>
             )}
@@ -175,7 +175,7 @@ export default function TradeProfile() {
         </div>
         <Link
           to="/trade/wallets"
-          className="mt-3 flex h-11 items-center justify-center rounded-2xl border border-white/15 text-xs font-semibold"
+          className="mt-3 flex h-11 items-center justify-center rounded-2xl border border-white/30 text-xs font-semibold"
         >
           Manage · Import / Export
         </Link>
@@ -183,9 +183,9 @@ export default function TradeProfile() {
 
       {/* Active trading wallet (Local default or Phantom) */}
       {!addr ? (
-        <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-center">
-          <Wallet className="mx-auto h-9 w-9 text-white/25" />
-          <p className="mt-3 text-sm text-white/55">
+        <div className="mt-3 rounded-3xl border border-white/20 bg-white/[0.08] p-6 text-center">
+          <Wallet className="mx-auto h-9 w-9 text-white/50" />
+          <p className="mt-3 text-sm text-white/80">
             {localActive
               ? "Set a default local trading wallet"
               : "Connect a wallet for balances & trading"}
@@ -210,10 +210,10 @@ export default function TradeProfile() {
         </div>
       ) : (
         <div className="mt-3 space-y-3">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-3xl border border-white/20 bg-white/[0.08] p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30">
+                <p className="text-[10px] uppercase tracking-wider text-white/80">
                   {activeLabel || (localActive ? "Local trading wallet" : "Wallet")}
                 </p>
                 <p className="mt-1 font-mono text-sm font-semibold">{shortAddr(addr, 6)}</p>
@@ -222,7 +222,7 @@ export default function TradeProfile() {
                 <button
                   type="button"
                   onClick={copy}
-                  className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"
+                  className="rounded-full border border-white/20 p-2 text-white/75 hover:text-white"
                 >
                   {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                 </button>
@@ -230,7 +230,7 @@ export default function TradeProfile() {
                   <button
                     type="button"
                     onClick={() => disconnect()}
-                    className="rounded-full border border-white/10 p-2 text-white/50 hover:text-white"
+                    className="rounded-full border border-white/20 p-2 text-white/75 hover:text-white"
                   >
                     <LogOut className="h-4 w-4" />
                   </button>
@@ -238,21 +238,21 @@ export default function TradeProfile() {
               </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-black/50 px-3 py-2.5">
-                <p className="text-[9px] text-white/30">SOL</p>
+              <div className="rounded-xl bg-black/70 px-3 py-2.5">
+                <p className="text-[9px] text-white/80">SOL</p>
                 <p className="font-mono text-lg font-bold">
                   {loadingBal ? <Loader2 className="h-4 w-4 animate-spin" /> : sol != null ? sol.toFixed(3) : "—"}
                 </p>
               </div>
-              <div className="rounded-xl bg-black/50 px-3 py-2.5">
-                <p className="text-[9px] text-white/30">Portfolio</p>
+              <div className="rounded-xl bg-black/70 px-3 py-2.5">
+                <p className="text-[9px] text-white/80">Portfolio</p>
                 <p className="font-mono text-lg font-bold">{fmtUsd(walletData?.totalUsd)}</p>
               </div>
             </div>
             {walletData?.pnl && (
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <p className="text-[9px] text-white/30">Realized</p>
+                  <p className="text-[9px] text-white/80">Realized</p>
                   <p
                     className={`font-mono text-xs ${
                       (walletData.pnl.realizedPnlUsd || 0) >= 0 ? "text-emerald-400" : "text-red-400"
@@ -262,7 +262,7 @@ export default function TradeProfile() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-white/30">Win rate</p>
+                  <p className="text-[9px] text-white/80">Win rate</p>
                   <p className="font-mono text-xs">
                     {walletData.pnl.winRate != null
                       ? `${
@@ -274,7 +274,7 @@ export default function TradeProfile() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-white/30">Closed</p>
+                  <p className="text-[9px] text-white/80">Closed</p>
                   <p className="font-mono text-xs">{walletData.pnl.closedTrades ?? "—"}</p>
                 </div>
               </div>
@@ -283,7 +283,7 @@ export default function TradeProfile() {
               href={`https://solscan.io/account/${addr}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
+              className="mt-4 inline-flex items-center gap-1 text-[11px] text-white/70 hover:text-white"
             >
               Solscan <ExternalLink className="h-3 w-3" />
             </a>
@@ -297,13 +297,13 @@ export default function TradeProfile() {
           </Link>
           <Link
             to="/trade/portfolio"
-            className="flex h-12 items-center justify-center rounded-2xl border border-white/15 text-sm font-semibold"
+            className="flex h-12 items-center justify-center rounded-2xl border border-white/30 text-sm font-semibold"
           >
             Portfolio hub · track wallets
           </Link>
           <Link
             to="/trade/desk"
-            className="flex h-12 items-center justify-center rounded-2xl border border-white/15 text-sm font-semibold"
+            className="flex h-12 items-center justify-center rounded-2xl border border-white/30 text-sm font-semibold"
           >
             Trade desk
           </Link>

@@ -46,7 +46,7 @@ export default function TradeDeskPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
         <p className="text-lg font-bold">Pick a coin to trade</p>
-        <p className="max-w-xs text-sm text-white/40">
+        <p className="max-w-xs text-sm text-white/70">
           Open Home, tap a token, then hit Trade — or browse markets first.
         </p>
         <Link

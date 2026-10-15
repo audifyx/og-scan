@@ -1198,7 +1198,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
   const renderSwapPanel = () => (
     <div className="space-y-3 border-b border-white/[0.07] p-4">
       {/* Order type */}
-      <div className="grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+      <div className="grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-white/[0.08] p-1">
         {(
           [
             ["market", "Market"],
@@ -1222,7 +1222,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               if (id === "tp" || id === "stop") setSwapMode("sell");
             }}
             className={`rounded-lg py-2 text-[11px] font-bold transition-colors ${
-              orderMode === id ? "bg-white text-black" : "text-white/40 hover:text-white/70"
+              orderMode === id ? "bg-white text-black" : "text-white/70 hover:text-white/70"
             }`}
             title={id === "market" ? "Instant swap" : "Price alert ? Telegram / webhook"}
           >
@@ -1240,7 +1240,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               className={`flex-1 py-2 text-xs font-semibold transition-colors ${
                 swapMode === "buy"
                   ? "border-b-2 border-green-400 bg-green-500/20 text-green-400"
-                  : "text-white/40 hover:text-white/60"
+                  : "text-white/70 hover:text-white/60"
               }`}
             >
               Buy
@@ -1251,7 +1251,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               className={`flex-1 py-2 text-xs font-semibold transition-colors ${
                 swapMode === "sell"
                   ? "border-b-2 border-red-400 bg-red-500/20 text-red-400"
-                  : "text-white/40 hover:text-white/60"
+                  : "text-white/70 hover:text-white/60"
               }`}
             >
               Sell
@@ -1261,14 +1261,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           {swapMode === "buy" ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] uppercase tracking-wide text-white/35">Amount (SOL)</label>
+                <label className="text-[10px] uppercase tracking-wide text-white/65">Amount (SOL)</label>
                 <button
                   type="button"
                   onClick={() => {
                     setPresetDraft(buyPresets.join(", "));
                     setEditPresetsOpen((v) => !v);
                   }}
-                  className="text-[10px] font-semibold text-white/40 underline hover:text-white/70"
+                  className="text-[10px] font-semibold text-white/70 underline hover:text-white/70"
                 >
                   {editPresetsOpen ? "Close" : "Edit presets"}
                 </button>
@@ -1283,7 +1283,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 placeholder="0.25"
               />
               <div className="flex items-center justify-between gap-2 px-0.5">
-                <span className="text-[10px] uppercase tracking-wide text-white/35">You receive</span>
+                <span className="text-[10px] uppercase tracking-wide text-white/65">You receive</span>
                 <span className="font-mono text-[12px] font-semibold tabular-nums text-white/80">
                   {buyReceiveLoading && buyReceiveUi == null
                     ? "?"
@@ -1310,7 +1310,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </div>
               {editPresetsOpen && (
                 <div className="rounded-xl border border-white/10 bg-black/50 p-2.5 space-y-2">
-                  <p className="text-[10px] text-white/40">Comma-separated SOL amounts (2?6)</p>
+                  <p className="text-[10px] text-white/70">Comma-separated SOL amounts (2?6)</p>
                   <Input
                     value={presetDraft}
                     onChange={(e) => setPresetDraft(e.target.value)}
@@ -1342,7 +1342,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             </div>
           ) : (
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-wide text-white/35">Sell %</label>
+              <label className="text-[10px] uppercase tracking-wide text-white/65">Sell %</label>
               <div className="grid grid-cols-4 gap-2">
                 {sellPresets.map((p) => (
                   <button
@@ -1363,7 +1363,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           )}
 
           <div className="flex items-center gap-2">
-            <label className="shrink-0 text-[10px] uppercase tracking-wide text-white/35">Slippage</label>
+            <label className="shrink-0 text-[10px] uppercase tracking-wide text-white/65">Slippage</label>
             <Input
               type="number"
               min="0.1"
@@ -1373,7 +1373,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               onChange={(e) => setSlippage(Number(e.target.value) || 10)}
               className="h-8 w-20 border-white/[0.07] bg-white/[0.04] font-mono text-xs"
             />
-            <span className="text-[10px] text-white/30">%</span>
+            <span className="text-[10px] text-white/60">%</span>
           </div>
 
           {/* Active trading identity ? Local default keypair vs Phantom */}
@@ -1395,14 +1395,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   {livePosLoading && !livePos ? "?" : ""}
                 </span>
               ) : (
-                <span className="text-[10px] text-white/35">
+                <span className="text-[10px] text-white/65">
                   "Link wallet to track"
                 </span>
               )}
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
               <div>
-                <p className="text-[9px] uppercase tracking-wider text-white/30">Holding</p>
+                <p className="text-[9px] uppercase tracking-wider text-white/60">Holding</p>
                 <p className="font-mono text-[13px] font-bold tabular-nums">
                   {tradeReady
                     ? livePos
@@ -1411,13 +1411,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                         ? "?"
                         : "0"
                     : "?"}
-                  <span className="ml-1 text-[10px] font-medium text-white/35">
+                  <span className="ml-1 text-[10px] font-medium text-white/65">
                     {t?.symbol || ""}
                   </span>
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] uppercase tracking-wider text-white/30">Worth</p>
+                <p className="text-[9px] uppercase tracking-wider text-white/60">Worth</p>
                 <p className="font-mono text-[13px] font-bold tabular-nums">
                   {tradeReady
                     ? livePos
@@ -1431,11 +1431,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 </p>
               </div>
               <div>
-                <p className="text-[9px] uppercase tracking-wider text-white/30">Unrealized</p>
+                <p className="text-[9px] uppercase tracking-wider text-white/60">Unrealized</p>
                 <p
                   className={`font-mono text-[12px] font-semibold tabular-nums ${
                     !tradeReady || livePos?.unrealizedUsd == null
-                      ? "text-white/40"
+                      ? "text-white/70"
                       : livePos.unrealizedUsd >= 0
                         ? "text-emerald-400"
                         : "text-red-400"
@@ -1456,7 +1456,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] uppercase tracking-wider text-white/30">
+                <p className="text-[9px] uppercase tracking-wider text-white/60">
                   {livePos?.boughtUsd != null ? "Bought" : "Cost basis"}
                 </p>
                 <p className="font-mono text-[12px] font-semibold tabular-nums text-white/70">
@@ -1544,7 +1544,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           </div>
           <ActiveTradingWalletChip />
           <div>
-            <label className="text-[10px] uppercase tracking-wide text-white/35">Target price (USD)</label>
+            <label className="text-[10px] uppercase tracking-wide text-white/65">Target price (USD)</label>
             <Input
               value={alertPrice}
               onChange={(e) => setAlertPrice(e.target.value.replace(/[^0-9.]/g, ""))}
@@ -1554,7 +1554,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             />
             {curPrice > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <span className="text-[10px] text-white/30">
+                <span className="text-[10px] text-white/60">
                   Now ${curPrice < 0.01 ? curPrice.toPrecision(4) : curPrice.toFixed(curPrice < 1 ? 6 : 4)}
                 </span>
                 {(orderMode === "limit" || orderMode === "stop"
@@ -1578,12 +1578,12 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1">
+          <div className="grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-white/[0.08] p-1">
             <button
               type="button"
               onClick={() => setAlertChan("telegram")}
               className={`rounded-md py-2 text-[11px] font-semibold ${
-                alertChan === "telegram" ? "bg-white text-black" : "text-white/40"
+                alertChan === "telegram" ? "bg-white text-black" : "text-white/70"
               }`}
             >
               Telegram
@@ -1592,7 +1592,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               type="button"
               onClick={() => setAlertChan("webhook")}
               className={`rounded-md py-2 text-[11px] font-semibold ${
-                alertChan === "webhook" ? "bg-white text-black" : "text-white/40"
+                alertChan === "webhook" ? "bg-white text-black" : "text-white/70"
               }`}
             >
               Webhook
@@ -1609,7 +1609,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             className="h-10 border-white/10 bg-white/[0.04] text-sm"
           />
           {alertChan === "telegram" && (
-            <p className="text-[10px] leading-relaxed text-white/30">
+            <p className="text-[10px] leading-relaxed text-white/60">
               Open @Theogsupportbot ? Start, then paste your numeric chat ID from @userinfobot.
             </p>
           )}
@@ -1649,7 +1649,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
           {mintAlerts.length > 0 && (
             <div className="space-y-1.5 rounded-xl border border-white/10 bg-black/40 p-2">
-              <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/35">
+              <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/65">
                 Active on this coin
               </p>
               {mintAlerts.map((a) => (
@@ -1670,11 +1670,11 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                               : "Below"}{" "}
                       ${a.value}
                     </p>
-                    <p className="text-[10px] text-white/30">{a.channel}</p>
+                    <p className="text-[10px] text-white/60">{a.channel}</p>
                   </div>
                   <button
                     type="button"
-                    className="text-white/35 hover:text-red-400"
+                    className="text-white/65 hover:text-red-400"
                     onClick={() => {
                       setAlertMsg({ ok: false, text: "Alert management is moving to the in-app wallet — not live yet." });
                     }}
@@ -1717,18 +1717,18 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
           onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold">In-app wallet</h3>
-            <button type="button" onClick={() => setShowWalletPicker(false)} className="text-white/30 hover:text-white/60">
+            <button type="button" onClick={() => setShowWalletPicker(false)} className="text-white/60 hover:text-white/60">
               <X className="h-5 w-5" />
             </button>
           </div>
-          <p className="text-xs text-white/40">Your OrbitX in-app wallet is the only wallet. Link it once — trades sign on the backend, no popups, no extensions.</p>
+          <p className="text-xs text-white/70">Your OrbitX in-app wallet is the only wallet. Link it once — trades sign on the backend, no popups, no extensions.</p>
           <div className="space-y-2">
             <button
               type="button"
               onClick={() => void linkOne()}
               className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] hover:border-[#ffffff]/40 transition-all group"
             >
-              <Wallet className="w-8 h-8 text-white/40" />
+              <Wallet className="w-8 h-8 text-white/70" />
               <span className="font-semibold text-sm">In-App Wallet</span>
               <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">
                 {linked ? "Linked" : "Link"}
@@ -1767,7 +1767,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 className={`shrink-0 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
                   marketCategory === cat.id
                     ? "text-white border-b-2 border-white"
-                    : "text-white/35 hover:text-white/60"
+                    : "text-white/65 hover:text-white/60"
                 }`}
               >
                 {cat.label}
@@ -1783,7 +1783,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 className={`shrink-0 px-2.5 py-2 text-[10px] font-medium transition-colors ${
                   marketTab === tab.id
                     ? "text-white border-b border-white"
-                    : "text-white/40 hover:text-white/65"
+                    : "text-white/70 hover:text-white/65"
                 }`}
               >
                 {tab.label}
@@ -1809,7 +1809,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             />
             {searchQuery && (
               <button onClick={() => { setSearchQuery(""); setSearchResults([]); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/60">
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
@@ -1831,7 +1831,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold truncate">{sr.symbol}</p>
-                  <p className="text-[10px] text-white/30 truncate">{sr.name}</p>
+                  <p className="text-[10px] text-white/60 truncate">{sr.name}</p>
                 </div>
               </button>
             ))}
@@ -1842,7 +1842,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         <ScrollArea className="flex-1">
           {loadingTokens ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-white/30" />
+              <Loader2 className="h-5 w-5 animate-spin text-white/60" />
             </div>
           ) : marketTab !== "positions" ? (
             tokens.map((token) => (
@@ -1870,14 +1870,14 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       <span className="text-[9px] text-white/25 font-mono shrink-0">{fmtMcap(token.volume24h)}</span>
                     )}
                   </div>
-                  <p className="text-[10px] text-white/30 truncate">{token.name}</p>
+                  <p className="text-[10px] text-white/60 truncate">{token.name}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-xs font-mono ${token.mcap > 0 ? "text-white/80" : "text-white/30"}`}>
+                  <p className={`text-xs font-mono ${token.mcap > 0 ? "text-white/80" : "text-white/60"}`}>
                     {token.mcap > 0 ? fmtMcap(token.mcap) : "?"}
                   </p>
                   <p className={`text-[10px] font-mono ${
-                    token.change24h > 0 ? "text-green-400" : token.change24h < 0 ? "text-red-400" : "text-white/30"
+                    token.change24h > 0 ? "text-green-400" : token.change24h < 0 ? "text-red-400" : "text-white/60"
                   }`}>
                     {token.change24h !== 0 ? fmtPct(token.change24h) : "?"}
                   </p>
@@ -1913,7 +1913,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                 <Wallet className="h-8 w-8 text-white/20 mb-3" />
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-white/70">
                   {tradeReady ? "No token positions" : "Link in-app wallet to view positions"}
                 </p>
                 {!tradeReady && (
@@ -1955,7 +1955,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       <img src={(sr as any).logoURI || sr.icon} alt="" className="w-5 h-5 rounded-full" />
                     )}
                     <span className="text-xs font-semibold">{sr.symbol}</span>
-                    <span className="text-[10px] text-white/30 truncate">{sr.name}</span>
+                    <span className="text-[10px] text-white/60 truncate">{sr.name}</span>
                   </button>
                 ))}
               </div>
@@ -1985,7 +1985,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold">{t.symbol}</h2>
-                <span className="text-[11px] text-white/30 hidden sm:inline">{t.name}</span>
+                <span className="text-[11px] text-white/60 hidden sm:inline">{t.name}</span>
                 <button onClick={copyMint} className="text-white/25 hover:text-white/50 transition-colors">
                   {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
@@ -1997,7 +1997,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   href={`https://dexscreener.com/solana/${t.pairAddress || selectedMint}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[10px] text-white/35 hover:text-white transition-colors font-medium"
+                  className="text-[10px] text-white/65 hover:text-white transition-colors font-medium"
                 >
                   DX
                 </a>
@@ -2011,15 +2011,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
             </div>
             <div className="ml-auto flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <span className="text-[10px] text-white/30">MCap</span>
+                <span className="text-[10px] text-white/60">MCap</span>
                 <p className="text-sm font-semibold font-mono">{fmtMcap(t.mcap)}</p>
               </div>
               <div className="text-right hidden sm:block">
-                <span className="text-[10px] text-white/30">24h Vol</span>
+                <span className="text-[10px] text-white/60">24h Vol</span>
                 <p className="text-sm font-semibold font-mono">{fmtMcap(t.volume24h)}</p>
               </div>
               <div className="text-right hidden md:block">
-                <span className="text-[10px] text-white/30">Liq</span>
+                <span className="text-[10px] text-white/60">Liq</span>
                 <p className="text-sm font-semibold font-mono text-[#ffffff]">{fmtMcap(t.liquidity)}</p>
               </div>
               {/* Wallet status ? active trading identity */}
@@ -2055,7 +2055,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                 timeframe === tf
                   ? "bg-white text-black"
-                  : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
+                  : "text-white/65 hover:text-white/60 hover:bg-white/[0.04]"
               }`}
             >
               {TIMEFRAME_CONFIG[tf].label}
@@ -2067,7 +2067,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               href={`https://dexscreener.com/solana/${chartRef}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] text-white/35 hover:text-white transition-colors"
+              className="inline-flex items-center gap-1 text-[10px] text-white/65 hover:text-white transition-colors"
             >
               DexScreener <ExternalLink className="h-3 w-3" />
             </a>
@@ -2090,8 +2090,8 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         <div className="relative min-h-[180px] flex-1 bg-black lg:min-h-[240px]">
           {(!mountChart || !chartReady) && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
-              <Loader2 className="h-6 w-6 animate-spin text-white/30" />
-              <p className="text-[11px] text-white/30">Loading chart?</p>
+              <Loader2 className="h-6 w-6 animate-spin text-white/60" />
+              <p className="text-[11px] text-white/60">Loading chart?</p>
             </div>
           )}
           {mountChart && dexChartSrc ? (
@@ -2105,7 +2105,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               onLoad={() => setChartReady(true)}
             />
           ) : !dexChartSrc ? (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-white/30">
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">
               Select a token to load chart
             </div>
           ) : null}
@@ -2128,7 +2128,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 className={`shrink-0 px-3 py-2.5 text-xs font-medium transition-colors sm:px-4 ${
                   bottomTab === tab
                     ? "border-b-2 border-white text-white"
-                    : "text-white/35 hover:text-white/60"
+                    : "text-white/65 hover:text-white/60"
                 }`}
               >
                 {tab === "Clusters" ? (
@@ -2156,9 +2156,9 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   trades.map((trade, i) => (
                     <div
                       key={trade.txHash + i}
-                      className="grid grid-cols-6 items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-white/[0.03]"
+                      className="grid grid-cols-6 items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-white/[0.08]"
                     >
-                      <span className="font-mono text-white/40">{fmtAgo(trade.time)}</span>
+                      <span className="font-mono text-white/70">{fmtAgo(trade.time)}</span>
                       <span className={`font-semibold ${trade.side === "buy" ? "text-green-400" : "text-red-400"}`}>
                         {trade.side === "buy" ? "Buy" : "Sell"}
                       </span>
@@ -2167,7 +2167,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       <span className="font-mono text-white/50">${fmtNum(trade.value)}</span>
                       <a
                         href={`/trade/wallet/${trade.wallet}`}
-                        className="truncate font-mono text-white/30 hover:text-white"
+                        className="truncate font-mono text-white/60 hover:text-white"
                       >
                         {shortAddr(trade.wallet, 4)}
                       </a>
@@ -2181,7 +2181,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               !tradeReady ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Activity className="mb-2 h-6 w-6 text-white/15" />
-                  <p className="text-xs text-white/30">
+                  <p className="text-xs text-white/60">
                     Link in-app wallet to see your trades
                   </p>
                   <Button size="sm" type="button" onClick={() => setShowWalletPicker(true)} className="mt-3 bg-white text-xs text-black">
@@ -2189,12 +2189,12 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                   </Button>
                 </div>
               ) : myTradesLoading ? (
-                <div className="flex items-center justify-center py-8 text-xs text-white/30">
+                <div className="flex items-center justify-center py-8 text-xs text-white/60">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading your swaps?
                 </div>
               ) : myTrades.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <p className="text-xs text-white/30">No recent swaps found for this wallet</p>
+                  <p className="text-xs text-white/60">No recent swaps found for this wallet</p>
                 </div>
               ) : (
                 myTrades.map((tr: any, i: number) => (
@@ -2207,7 +2207,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                       <p className={`text-xs font-bold ${tr.side === "buy" ? "text-green-400" : "text-red-400"}`}>
                         {(tr.side || "swap").toUpperCase()} {tr.symbol || shortAddr(tr.mint || "", 4)}
                       </p>
-                      <p className="font-mono text-[10px] text-white/30">
+                      <p className="font-mono text-[10px] text-white/60">
                         {tr.solAmount != null ? `${Number(tr.solAmount).toFixed(3)} SOL` : ""}
                       </p>
                     </div>
@@ -2248,7 +2248,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Wallet className="mb-2 h-6 w-6 text-white/15" />
-                  <p className="text-xs text-white/30">
+                  <p className="text-xs text-white/60">
                     {tradeReady ? "No positions found" : "Link in-app wallet to view positions"}
                   </p>
                   {!tradeReady && (
@@ -2262,13 +2262,13 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
 
             {bottomTab === "Top Traders" && (
               topTradersLoading ? (
-                <div className="flex items-center justify-center py-8 text-xs text-white/30">
+                <div className="flex items-center justify-center py-8 text-xs text-white/60">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading traders?
                 </div>
               ) : topTraders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Users className="mb-2 h-6 w-6 text-white/15" />
-                  <p className="text-xs text-white/30">No top trader data yet</p>
+                  <p className="text-xs text-white/60">No top trader data yet</p>
                 </div>
               ) : (
                 topTraders.slice(0, 40).map((tr: any, i: number) => {
@@ -2284,7 +2284,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                         <p className="font-mono text-xs">
                           #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
                         </p>
-                        <p className="text-[10px] text-white/30">
+                        <p className="text-[10px] text-white/60">
                           {tr.buys ?? 0}B / {tr.sells ?? 0}S
                         </p>
                       </div>
@@ -2301,7 +2301,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 {loadingXray ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Loader2 className="mb-2 h-6 w-6 animate-spin text-white/20" />
-                    <p className="text-xs text-white/30">Tracing early buyers, holders & clusters…</p>
+                    <p className="text-xs text-white/60">Tracing early buyers, holders & clusters…</p>
                   </div>
                 ) : xray || clusterHolders.length > 0 ? (
                   <Suspense
@@ -2344,7 +2344,7 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
                 ) : (
                   <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
                     <Crosshair className="mb-2 h-6 w-6 text-white/15" />
-                    <p className="text-xs text-white/30">
+                    <p className="text-xs text-white/60">
                       {xray?.note || "No early-buyer or holder graph for this mint yet — try a newer launch or wait for X-ray to finish indexing."}
                     </p>
                   </div>
@@ -2362,19 +2362,19 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         {t && (
           <div className="grid grid-cols-3 border-b border-white/[0.07]">
             <div className="p-3 text-center border-r border-white/[0.05]">
-              <p className="text-[10px] text-white/30">5m Vol</p>
+              <p className="text-[10px] text-white/60">5m Vol</p>
               <p className="text-xs font-bold font-mono text-white/80">{fmtMcap(t.volume5m)}</p>
             </div>
             <div className="p-3 text-center border-r border-white/[0.05]">
-              <p className="text-[10px] text-white/30">Buys</p>
+              <p className="text-[10px] text-white/60">Buys</p>
               <p className="text-xs font-bold font-mono text-green-400">
-                {t.buys5m} <span className="text-white/30">?</span> {fmtMcap(t.buyVol5m)}
+                {t.buys5m} <span className="text-white/60">?</span> {fmtMcap(t.buyVol5m)}
               </p>
             </div>
             <div className="p-3 text-center">
-              <p className="text-[10px] text-white/30">Sells</p>
+              <p className="text-[10px] text-white/60">Sells</p>
               <p className="text-xs font-bold font-mono text-red-400">
-                {t.sells5m} <span className="text-white/30">?</span> {fmtMcap(t.sellVol5m)}
+                {t.sells5m} <span className="text-white/60">?</span> {fmtMcap(t.sellVol5m)}
               </p>
             </div>
           </div>
@@ -2438,15 +2438,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
         {t && (
           <div className="grid grid-cols-3 border-b border-white/[0.07]">
             <div className="p-3 text-center border-r border-white/[0.05]">
-              <p className="text-[10px] text-white/30">5m Vol</p>
+              <p className="text-[10px] text-white/60">5m Vol</p>
               <p className="text-xs font-bold font-mono text-white/80">{fmtMcap(t.volume5m)}</p>
             </div>
             <div className="p-3 text-center border-r border-white/[0.05]">
-              <p className="text-[10px] text-white/30">Buys</p>
+              <p className="text-[10px] text-white/60">Buys</p>
               <p className="text-xs font-bold font-mono text-green-400">{t.buys5m}</p>
             </div>
             <div className="p-3 text-center">
-              <p className="text-[10px] text-white/30">Sells</p>
+              <p className="text-[10px] text-white/60">Sells</p>
               <p className="text-xs font-bold font-mono text-red-400">{t.sells5m}</p>
             </div>
           </div>
@@ -2500,10 +2500,10 @@ function InfoCell({ label, value, color }: { label: string; value: string; color
     color === "good" ? "text-green-400" :
     color === "warn" ? "text-amber-400" :
     color === "bad" ? "text-red-400" :
-    "text-white/40";
+    "text-white/70";
   return (
     <div className="text-center">
-      <p className="text-[10px] text-white/30 mb-0.5">{label}</p>
+      <p className="text-[10px] text-white/60 mb-0.5">{label}</p>
       <p className={`text-xs font-semibold ${clr}`}>{value}</p>
     </div>
   );

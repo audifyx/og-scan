@@ -119,7 +119,7 @@ export default function TradeMore() {
           </h1>
           <p className="mt-0.5 text-[12px] text-white/65">{TOOL_COUNT} tools · structured by category</p>
         </div>
-        <Wrench className="h-5 w-5 text-white/40" />
+        <Wrench className="h-5 w-5 text-white/70" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -141,7 +141,7 @@ export default function TradeMore() {
       </div>
 
       <div className="relative mt-4">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -181,7 +181,7 @@ export default function TradeMore() {
                 >
                   <div className="flex items-start justify-between gap-1">
                     <span className="text-[13px] font-bold leading-tight">{t.name}</span>
-                    {t.kind === "link" ? <ExternalLink className="h-3 w-3 shrink-0 text-white/40" /> : null}
+                    {t.kind === "link" ? <ExternalLink className="h-3 w-3 shrink-0 text-white/70" /> : null}
                   </div>
                   <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-white/65">{t.description}</p>
                 </button>
@@ -193,7 +193,7 @@ export default function TradeMore() {
 
       {!filtered.length && <p className="mt-10 text-center text-sm text-white/55">No tools match</p>}
 
-      <p className="mt-8 text-center text-[10px] text-white/40">
+      <p className="mt-8 text-center text-[10px] text-white/70">
         Full rescue suite →{" "}
         <Link to="/orbitxlaunch/rescue" className="underline hover:text-white/70">
           Rescue Console

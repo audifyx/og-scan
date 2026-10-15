@@ -89,29 +89,29 @@ export function BubbleMapPreview({
               />
             ))
           ) : (
-            <span className="text-[11px] text-white/35">Pulling cluster data…</span>
+            <span className="text-[11px] text-white/65">Pulling cluster data…</span>
           )}
         </div>
       </div>
       <div className="grid grid-cols-4 gap-2 border-t border-white/10 px-3 py-2 text-[10px]">
         <div>
-          <p className="text-white/30">Nodes</p>
+          <p className="text-white/60">Nodes</p>
           <p className="font-mono text-white/80">{n || "—"}</p>
         </div>
         <div>
-          <p className="text-white/30">Snipers</p>
+          <p className="text-white/60">Snipers</p>
           <p className="font-mono text-white/80">{sniper != null ? `${Number(sniper).toFixed(0)}%` : "—"}</p>
         </div>
         <div>
-          <p className="text-white/30">Holders</p>
+          <p className="text-white/60">Holders</p>
           <p className="font-mono text-white/80">{holderCount ?? holders?.length ?? "—"}</p>
         </div>
         <div>
-          <p className="text-white/30">Score</p>
+          <p className="text-white/60">Score</p>
           <p className="font-mono text-white/80">{score ?? "—"}</p>
         </div>
         {bundle != null && (
-          <div className="col-span-4 text-[10px] text-white/35">
+          <div className="col-span-4 text-[10px] text-white/65">
             Bundle concentration {Number(bundle).toFixed(0)}% · same map engine as OrbitX DEX
           </div>
         )}
@@ -160,12 +160,12 @@ export function BubbleMap({
     : "";
 
   if (!address) {
-    return <p className="py-10 text-center text-xs text-white/35">No token address for map</p>;
+    return <p className="py-10 text-center text-xs text-white/65">No token address for map</p>;
   }
 
   if (!report) {
     return (
-      <div className="rounded-xl border border-white/10 bg-black/40 p-8 text-center text-xs text-white/40">
+      <div className="rounded-xl border border-white/10 bg-black/70 p-8 text-center text-xs text-white/70">
         Waiting on x-ray / holder data…
         {onRefresh && (
           <button
@@ -183,11 +183,11 @@ export function BubbleMap({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
-        <p className="text-[11px] text-white/35">
+        <p className="text-[11px] text-white/65">
           OrbitX advanced cluster map · force / radial / timeline / hulls · PNG export
         </p>
         <div className="flex items-center gap-3">
-          <Link to={`/trade/token/${address}`} className="text-[10px] text-white/35 hover:text-white/60">
+          <Link to={`/trade/token/${address}`} className="text-[10px] text-white/65 hover:text-white/60">
             Token
           </Link>
           {ext && (
@@ -195,7 +195,7 @@ export function BubbleMap({
               href={ext}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] text-white/40 hover:text-white"
+              className="inline-flex items-center gap-1 text-[10px] text-white/70 hover:text-white"
             >
               Bubblemaps.io <ExternalLink className="h-3 w-3" />
             </a>

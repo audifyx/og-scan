@@ -49,7 +49,7 @@ function cell(v: any): string {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
   return (
     <div className="min-w-[96px] shrink-0 rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5">
-      <p className="text-[9px] uppercase tracking-wider text-white/30">{label}</p>
+      <p className="text-[9px] uppercase tracking-wider text-white/60">{label}</p>
       <p
         className={`font-mono text-sm font-semibold ${
           tone === "up" ? "text-green-400" : tone === "down" ? "text-red-400" : "text-white"
@@ -86,8 +86,8 @@ function DexChart({ refId }: { refId: string }) {
     <div className="relative mx-4 mt-3 overflow-hidden rounded-xl border border-white/10 bg-black" style={{ height: 360 }}>
       {(!mount || !ready) && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
-          <Loader2 className="h-6 w-6 animate-spin text-white/30" />
-          <p className="text-[11px] text-white/30">Loading chart…</p>
+          <Loader2 className="h-6 w-6 animate-spin text-white/60" />
+          <p className="text-[11px] text-white/60">Loading chart…</p>
         </div>
       )}
       {mount && (
@@ -109,7 +109,7 @@ function KvGrid({ rows }: { rows: [string, any][] }) {
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {rows.map(([label, val]) => (
         <div key={label} className="rounded-lg bg-black/50 px-2.5 py-2">
-          <p className="text-[9px] text-white/30">{label}</p>
+          <p className="text-[9px] text-white/60">{label}</p>
           <p className="break-all font-mono text-xs text-white/90">{cell(val)}</p>
         </div>
       ))}
@@ -429,7 +429,7 @@ export default function TradeToken() {
   if (!d || (!d.token && !d.meta)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#05080c] px-6 text-center">
-        <p className="text-sm text-white/40">No token found for this address</p>
+        <p className="text-sm text-white/70">No token found for this address</p>
         <button type="button" onClick={() => navigate("/trade")} className="text-sm text-[#3de7ff] underline">
           Back to markets
         </button>
@@ -460,7 +460,7 @@ export default function TradeToken() {
               Live
             </span>
           </div>
-          <p className="truncate text-[11px] text-white/35">{name}</p>
+          <p className="truncate text-[11px] text-white/65">{name}</p>
         </div>
         <Link
           to={`/trade/desk/${mint}`}
@@ -496,7 +496,7 @@ export default function TradeToken() {
               </span>
             )}
             {(t.tags || []).slice(0, 3).map((tg: string) => (
-              <span key={tg} className="rounded-lg border border-white/10 px-2 py-0.5 text-[10px] text-white/40 capitalize">
+              <span key={tg} className="rounded-lg border border-white/10 px-2 py-0.5 text-[10px] text-white/70 capitalize">
                 {tg}
               </span>
             ))}
@@ -571,7 +571,7 @@ export default function TradeToken() {
           )}
           {buyPct != null && (
             <div className="min-w-[130px] shrink-0 rounded-xl border border-white/10 bg-[#050505] px-3 py-2.5">
-              <p className="text-[9px] uppercase tracking-wider text-white/30">Buy pressure</p>
+              <p className="text-[9px] uppercase tracking-wider text-white/60">Buy pressure</p>
               <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-red-500/30">
                 <div className="h-full bg-green-400" style={{ width: `${buyPct}%` }} />
               </div>
@@ -592,7 +592,7 @@ export default function TradeToken() {
           <span className={safetyApi.canSell ? "text-green-400" : "text-red-400"}>Sell {safetyApi.canSell ? "OK" : "BLOCK"}</span>
           {safetyApi.verdict && <span className="text-white/70">{safetyApi.verdict}</span>}
           {safetyApi.roundTripLossPct != null && (
-            <span className="text-white/40">Round-trip loss {Number(safetyApi.roundTripLossPct).toFixed(2)}%</span>
+            <span className="text-white/70">Round-trip loss {Number(safetyApi.roundTripLossPct).toFixed(2)}%</span>
           )}
         </div>
       )}
@@ -608,7 +608,7 @@ export default function TradeToken() {
               type="button"
               onClick={() => setTab(id)}
               className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-bold tracking-wide transition-colors ${
-                tab === id ? "bg-white text-black" : "bg-white/[0.04] text-white/40 hover:text-white/70"
+                tab === id ? "bg-white text-black" : "bg-white/[0.08] text-white/70 hover:text-white/70"
               }`}
             >
               {label}
@@ -617,9 +617,9 @@ export default function TradeToken() {
         </div>
       </div>
 
-      <div className="mx-3 mt-3 mb-28 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="mx-3 mt-3 mb-28 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/35">{tab}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/65">{tab}</p>
           <button
             type="button"
             disabled={tabLoading}
@@ -627,7 +627,7 @@ export default function TradeToken() {
               setTabLoading(true);
               void loadBundle(mint).finally(() => setTabLoading(false));
             }}
-            className="text-[10px] font-semibold text-white/40 underline hover:text-white/70"
+            className="text-[10px] font-semibold text-white/70 underline hover:text-white/70"
           >
             {tabLoading ? "Refreshing…" : "Refresh data"}
           </button>
@@ -660,13 +660,13 @@ export default function TradeToken() {
             />
             {d?.flags && (
               <>
-                <h4 className="text-[11px] font-semibold text-white/40">Flags</h4>
+                <h4 className="text-[11px] font-semibold text-white/70">Flags</h4>
                 <KvGrid rows={Object.entries(d.flags).map(([k, v]) => [k, v] as [string, any])} />
               </>
             )}
             {intel && Object.keys(intel).length > 0 && (
               <>
-                <h4 className="text-[11px] font-semibold text-white/40">Intel summary</h4>
+                <h4 className="text-[11px] font-semibold text-white/70">Intel summary</h4>
                 <KvGrid
                   rows={[
                     ["Whales", whales],
@@ -680,8 +680,8 @@ export default function TradeToken() {
             )}
             <Suspense
               fallback={
-                <div className="flex h-36 items-center justify-center rounded-xl border border-white/10 bg-black/40">
-                  <Loader2 className="h-4 w-4 animate-spin text-white/30" />
+                <div className="flex h-36 items-center justify-center rounded-xl border border-white/10 bg-black/70">
+                  <Loader2 className="h-4 w-4 animate-spin text-white/60" />
                 </div>
               }
             >
@@ -694,7 +694,7 @@ export default function TradeToken() {
             </Suspense>
             {research && (
               <>
-                <h4 className="text-[11px] font-semibold text-white/40">Research</h4>
+                <h4 className="text-[11px] font-semibold text-white/70">Research</h4>
                 <pre className="max-h-64 overflow-auto rounded-lg bg-black/60 p-2 font-mono text-[10px] text-white/50">
                   {JSON.stringify(research, null, 2).slice(0, 4000)}
                 </pre>
@@ -711,12 +711,12 @@ export default function TradeToken() {
                   <BarChart2 className="h-3.5 w-3.5" />
                   Advanced bubble map
                 </h3>
-                <p className="mt-1 text-[11px] text-white/35">
+                <p className="mt-1 text-[11px] text-white/65">
                   Same engine as OrbitX DEX — force / radial / timeline layouts, hulls, filters, PNG export. Drag to pan, scroll to zoom.
                 </p>
               </div>
               {bubbleBusy && (
-                <span className="inline-flex items-center gap-1.5 text-[10px] text-white/40">
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-white/70">
                   <Loader2 className="h-3 w-3 animate-spin" /> Pulling holders &amp; x-ray…
                 </span>
               )}
@@ -724,7 +724,7 @@ export default function TradeToken() {
             <Suspense
               fallback={
                 <div className="flex h-[640px] items-center justify-center rounded-xl border border-white/10 bg-black">
-                  <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+                  <Loader2 className="h-6 w-6 animate-spin text-white/60" />
                 </div>
               }
             >
@@ -748,14 +748,14 @@ export default function TradeToken() {
               <Users className="h-3.5 w-3.5" />
               Top holders
               {totalHolders != null && (
-                <span className="font-normal normal-case tracking-normal text-white/35">
+                <span className="font-normal normal-case tracking-normal text-white/65">
                   · {fmtNum(totalHolders)} total
                 </span>
               )}
             </h3>
             {!holderList.length ? (
               <div className="space-y-2 py-6 text-center">
-                <p className="text-xs text-white/35">No holder data yet</p>
+                <p className="text-xs text-white/65">No holder data yet</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -780,14 +780,14 @@ export default function TradeToken() {
                   <Link
                     key={addr || i}
                     to={`/trade/wallet/${addr}`}
-                    className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.03] px-2.5 py-2 hover:border-[rgba(61,231,255,0.2)] hover:bg-[rgba(61,231,255,0.06)]"
+                    className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-white/[0.08] px-2.5 py-2 hover:border-[rgba(61,231,255,0.2)] hover:bg-[rgba(61,231,255,0.06)]"
                   >
                     <div>
                       <p className="font-mono text-xs">
                         #{h.rank || i + 1} {shortAddr(addr || "", 5)}
                         {h.label ? <span className="ml-1 text-[#3de7ff]/70">· {h.label}</span> : null}
                       </p>
-                      <p className="text-[10px] text-white/30">
+                      <p className="text-[10px] text-white/60">
                         {amt != null ? fmtTok(Number(amt)) : "—"}
                         {bought != null ? ` · bought ${fmtUsd(bought)}` : ""}
                         {sold != null ? ` · sold ${fmtUsd(sold)}` : ""}
@@ -796,7 +796,7 @@ export default function TradeToken() {
                     </div>
                     <div className="text-right font-mono text-xs">
                       <p>{pct != null ? `${Number(pct).toFixed(2)}%` : "—"}</p>
-                      <p className="text-white/40">{fmtUsd(val)}</p>
+                      <p className="text-white/70">{fmtUsd(val)}</p>
                       {pnl != null && (
                         <p className={Number(pnl) >= 0 ? "text-[#17ff4d]" : "text-[#ff4d5e]"}>{fmtPnl(Number(pnl))}</p>
                       )}
@@ -812,13 +812,13 @@ export default function TradeToken() {
           <div className="space-y-2">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
               <Activity className="h-3.5 w-3.5" /> Top traders
-              <span className="font-normal normal-case tracking-normal text-white/35">
+              <span className="font-normal normal-case tracking-normal text-white/65">
                 · bought · sold · holding · PnL
               </span>
             </h3>
             {!traders.length ? (
               <div className="space-y-2 py-6 text-center">
-                <p className="text-xs text-white/35">No trader data yet</p>
+                <p className="text-xs text-white/65">No trader data yet</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -854,15 +854,15 @@ export default function TradeToken() {
                     <Link
                       key={addr || i}
                       to={`/trade/wallet/${addr}`}
-                      className="block rounded-lg bg-black/40 px-2.5 py-2 hover:bg-white/5"
+                      className="block rounded-lg bg-black/70 px-2.5 py-2 hover:bg-white/5"
                     >
                       <div className="flex items-start justify-between gap-2 sm:grid sm:grid-cols-[2fr_repeat(6,1fr)] sm:items-center">
                         <div className="min-w-0">
                           <p className="font-mono text-xs">
                             #{tr.rank || i + 1} {shortAddr(addr || "", 5)}
-                            {tr.isHolder ? <span className="ml-1 text-white/30">· holder</span> : null}
+                            {tr.isHolder ? <span className="ml-1 text-white/60">· holder</span> : null}
                           </p>
-                          <p className="text-[10px] text-white/30">
+                          <p className="text-[10px] text-white/60">
                             {tr.buys ?? 0}B / {tr.sells ?? 0}S
                             {tr.volume != null ? ` · vol ${fmtUsd(tr.volume)}` : ""}
                             {tr.holdingPct != null ? ` · ${Number(tr.holdingPct).toFixed(2)}%` : ""}
@@ -881,7 +881,7 @@ export default function TradeToken() {
                         <p className="hidden text-right font-mono text-[11px] text-white/70 sm:block">{fmtUsd(holdUsd)}</p>
                         <p
                           className={`hidden text-right font-mono text-[11px] sm:block ${
-                            realized == null ? "text-white/30" : Number(realized) >= 0 ? "text-green-400" : "text-red-400"
+                            realized == null ? "text-white/60" : Number(realized) >= 0 ? "text-green-400" : "text-red-400"
                           }`}
                         >
                           {realized != null ? fmtPnl(Number(realized)) : "—"}
@@ -889,13 +889,13 @@ export default function TradeToken() {
                         <div className="shrink-0 text-right sm:contents">
                           <p
                             className={`font-mono text-xs ${
-                              pnl == null ? "text-white/30" : Number(pnl) >= 0 ? "text-green-400" : "text-red-400"
+                              pnl == null ? "text-white/60" : Number(pnl) >= 0 ? "text-green-400" : "text-red-400"
                             }`}
                           >
                             {pnl != null ? fmtPnl(Number(pnl)) : "—"}
                           </p>
                           {unrealized != null && (
-                            <p className="text-[9px] text-white/30 sm:hidden">U {fmtPnl(Number(unrealized))}</p>
+                            <p className="text-[9px] text-white/60 sm:hidden">U {fmtPnl(Number(unrealized))}</p>
                           )}
                         </div>
                       </div>
@@ -918,7 +918,7 @@ export default function TradeToken() {
             </h3>
             {!trades.length ? (
               <div className="space-y-2 py-6 text-center">
-                <p className="text-xs text-white/35">No recent trades yet</p>
+                <p className="text-xs text-white/65">No recent trades yet</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -952,9 +952,9 @@ export default function TradeToken() {
                   return (
                     <div
                       key={tx || `${addr}-${ts}-${i}`}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-black/40 px-2.5 py-2 sm:grid sm:grid-cols-[72px_52px_1fr_1fr_1.2fr_40px]"
+                      className="flex items-center justify-between gap-2 rounded-lg bg-black/70 px-2.5 py-2 sm:grid sm:grid-cols-[72px_52px_1fr_1fr_1.2fr_40px]"
                     >
-                      <p className="text-[10px] text-white/35">{timeAgo(typeof ts === "number" ? ts : null)}</p>
+                      <p className="text-[10px] text-white/65">{timeAgo(typeof ts === "number" ? ts : null)}</p>
                       <p className={`text-xs font-bold ${isBuy ? "text-green-400" : side === "sell" ? "text-red-400" : "text-white/50"}`}>
                         {side.toUpperCase()}
                       </p>
@@ -979,7 +979,7 @@ export default function TradeToken() {
                           href={`https://solscan.io/tx/${tx}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex justify-end text-white/30 hover:text-white"
+                          className="inline-flex justify-end text-white/60 hover:text-white"
                           aria-label="View transaction"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -1028,19 +1028,19 @@ export default function TradeToken() {
               <AlertTriangle className="h-3.5 w-3.5" /> Risk X-ray
             </h3>
             {!xray?.ok && !xray?.verdict ? (
-              <p className="text-xs text-white/30">{xray?.error || "X-ray unavailable"}</p>
+              <p className="text-xs text-white/60">{xray?.error || "X-ray unavailable"}</p>
             ) : (
               <>
-                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                <div className="rounded-lg border border-white/10 bg-black/70 p-3">
                   <p className="text-sm font-bold">{xray.verdict}</p>
                   <p className="mt-1 text-xs text-white/50">{xray.summary}</p>
-                  <p className="mt-1 font-mono text-[11px] text-white/40">Score {xray.score} · {xray.tone}</p>
+                  <p className="mt-1 font-mono text-[11px] text-white/70">Score {xray.score} · {xray.tone}</p>
                 </div>
                 {Array.isArray(xray.flags) && xray.flags.length > 0 && (
                   <div className="space-y-1">
                     {xray.flags.map((f: any, i: number) => (
                       <p key={i} className="text-[11px] text-white/60">
-                        <span className="font-bold uppercase text-white/40">{f.level}</span> — {f.text}
+                        <span className="font-bold uppercase text-white/70">{f.level}</span> — {f.text}
                       </p>
                     ))}
                   </div>
@@ -1066,12 +1066,12 @@ export default function TradeToken() {
                 />
                 {Array.isArray(xray.earlyBuyers) && xray.earlyBuyers.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-[11px] font-semibold text-white/40">Early buyers</p>
+                    <p className="text-[11px] font-semibold text-white/70">Early buyers</p>
                     {xray.earlyBuyers.slice(0, 15).map((b: any) => (
                       <Link
                         key={b.wallet}
                         to={`/trade/wallet/${b.wallet}`}
-                        className="flex justify-between rounded bg-black/40 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5"
+                        className="flex justify-between rounded bg-black/70 px-2 py-1.5 font-mono text-[10px] hover:bg-white/5"
                       >
                         <span>
                           #{b.rank} {shortAddr(b.wallet, 4)}
@@ -1092,7 +1092,7 @@ export default function TradeToken() {
           <div className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Forensics</h3>
             {!forensics ? (
-              <p className="text-xs text-white/30">Forensics unavailable</p>
+              <p className="text-xs text-white/60">Forensics unavailable</p>
             ) : (
               <>
                 <KvGrid
@@ -1111,7 +1111,7 @@ export default function TradeToken() {
                     ["Error", forensics.error],
                   ]}
                 />
-                <pre className="max-h-72 overflow-auto rounded-lg bg-black/60 p-2 font-mono text-[10px] text-white/40">
+                <pre className="max-h-72 overflow-auto rounded-lg bg-black/60 p-2 font-mono text-[10px] text-white/70">
                   {JSON.stringify(forensics, null, 2).slice(0, 6000)}
                 </pre>
               </>
@@ -1123,7 +1123,7 @@ export default function TradeToken() {
           <div className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">All-time high</h3>
             {!ath?.ok && ath?.athPrice == null ? (
-              <p className="text-xs text-white/30">{ath?.error || "ATH data unavailable"}</p>
+              <p className="text-xs text-white/60">{ath?.error || "ATH data unavailable"}</p>
             ) : (
               <KvGrid
                 rows={[
@@ -1142,7 +1142,7 @@ export default function TradeToken() {
           <div className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Ask AI about this coin</h3>
             <div className="max-h-64 space-y-2 overflow-y-auto">
-              {!aiMsgs.length && <p className="text-xs text-white/30">Ask about risk, narrative, holders, or trade setup.</p>}
+              {!aiMsgs.length && <p className="text-xs text-white/60">Ask about risk, narrative, holders, or trade setup.</p>}
               {aiMsgs.map((m, i) => (
                 <div
                   key={i}
@@ -1207,23 +1207,23 @@ export default function TradeToken() {
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-white/30">Hold</p>
+                <p className="text-[8px] uppercase tracking-wider text-white/60">Hold</p>
                 <p className="font-mono text-[11px] font-bold">
                   {tradeReady ? fmtTok(posAmount) : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-white/30">Worth</p>
+                <p className="text-[8px] uppercase tracking-wider text-white/60">Worth</p>
                 <p className="font-mono text-[11px] font-bold">
                   {tradeReady ? (posWorth != null ? fmtUsd(posWorth) : "—") : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-white/30">PnL</p>
+                <p className="text-[8px] uppercase tracking-wider text-white/60">PnL</p>
                 <p
                   className={`font-mono text-[11px] font-bold ${
                     posUnreal == null
-                      ? "text-white/40"
+                      ? "text-white/70"
                       : posUnreal >= 0
                         ? "text-emerald-400"
                         : "text-red-400"
@@ -1233,7 +1233,7 @@ export default function TradeToken() {
                 </p>
               </div>
               <div>
-                <p className="text-[8px] uppercase tracking-wider text-white/30">Cost</p>
+                <p className="text-[8px] uppercase tracking-wider text-white/60">Cost</p>
                 <p className="font-mono text-[11px] font-bold text-white/70">
                   {tradeReady && posCost != null ? fmtUsd(posCost) : "—"}
                   {tradeReady && posUnrealPct != null ? (

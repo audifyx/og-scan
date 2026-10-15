@@ -45,8 +45,8 @@ function StatCell({
   const color =
     tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : "text-white";
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
-      <p className="text-[9px] uppercase tracking-wider text-white/30">{label}</p>
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.08] px-3 py-2.5">
+      <p className="text-[9px] uppercase tracking-wider text-white/60">{label}</p>
       <p className={`mt-0.5 font-mono text-xs font-semibold ${color}`}>{value}</p>
     </div>
   );
@@ -169,7 +169,7 @@ export default function TradeWallet() {
   if (loading) {
     return (
       <div className="tp flex h-full items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-white/30" />
+        <Loader2 className="h-7 w-7 animate-spin text-white/60" />
       </div>
     );
   }
@@ -178,7 +178,7 @@ export default function TradeWallet() {
     return (
       <div className="tp flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <Wallet className="h-8 w-8 text-white/20" />
-        <p className="text-sm text-white/40">{d?.error || "Could not load wallet"}</p>
+        <p className="text-sm text-white/70">{d?.error || "Could not load wallet"}</p>
         <p className="max-w-xs break-all font-mono text-[10px] text-white/25">{address}</p>
         <button
           type="button"
@@ -214,7 +214,7 @@ export default function TradeWallet() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/65">
               Wallet
             </p>
             <p className="font-mono text-sm font-semibold">{shortAddr(address, 6)}</p>
@@ -249,7 +249,7 @@ export default function TradeWallet() {
         >
           {fmtUsd(d.totalUsd)}
         </p>
-        <div className="relative mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-white/40">
+        <div className="relative mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[11px] text-white/70">
           <span>{(d.sol || 0).toFixed(3)} SOL</span>
           <span>·</span>
           <span>{d.tokenCount ?? Math.max(0, holdings.length - 1)} tokens</span>
@@ -304,7 +304,7 @@ export default function TradeWallet() {
             type="button"
             onClick={() => setTab(id)}
             className={`flex-1 rounded-xl py-2.5 text-xs font-bold ${
-              tab === id ? "bg-white text-black" : "bg-white/[0.03] text-white/40"
+              tab === id ? "bg-white text-black" : "bg-white/[0.08] text-white/70"
             }`}
           >
             {label}
@@ -316,7 +316,7 @@ export default function TradeWallet() {
         {tab === "holdings" && (
           <>
             <div className="mb-2 flex items-center justify-between px-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/35">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/65">
                 {holdings.length} assets
                 {d.tokenCount != null && d.tokenCount + 1 !== holdings.length
                   ? ` · ${d.tokenCount} tokens on-chain`
@@ -325,7 +325,7 @@ export default function TradeWallet() {
               <button
                 type="button"
                 onClick={() => setHideDust((v) => !v)}
-                className="text-[10px] font-medium text-white/40 underline"
+                className="text-[10px] font-medium text-white/70 underline"
               >
                 {hideDust ? "Show dust" : "Hide dust <$0.01"}
               </button>
@@ -343,17 +343,17 @@ export default function TradeWallet() {
                       if (h.isSol || h.mint === SOL_MINT) return;
                       navigate(`/trade/token/${h.mint}`);
                     }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.06] px-3 py-3 text-left hover:bg-white/[0.05]"
                   >
                     <TokenAvatar image={img} symbol={sym} mint={h.mint} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-bold">{sym}</p>
-                      <p className="truncate text-[10px] text-white/35">
+                      <p className="truncate text-[10px] text-white/65">
                         {name}
                         {h.unpriced ? " · no quote" : ""}
                       </p>
                       {!h.isSol && (
-                        <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                        <p className="mt-0.5 font-mono text-[10px] text-white/60">
                           {shortAddr(h.mint, 4)}
                         </p>
                       )}
@@ -362,7 +362,7 @@ export default function TradeWallet() {
                         {h.pctSupply != null ? ` · ${Number(h.pctSupply).toFixed(3)}% supply` : ""}
                       </p>
                       {!h.isSol && (
-                        <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                        <p className="mt-0.5 font-mono text-[10px] text-white/60">
                           Cost {h.costUsd != null ? fmtUsd(h.costUsd) : "—"}
                           {" · "}Bought{" "}
                           {h.boughtUsd != null ? fmtUsd(h.boughtUsd) : "—"}
@@ -397,7 +397,7 @@ export default function TradeWallet() {
                           {fmtPct(h.change24h)}
                         </p>
                       ) : !h.isSol ? (
-                        <p className="font-mono text-[10px] text-white/35">uPnL —</p>
+                        <p className="font-mono text-[10px] text-white/65">uPnL —</p>
                       ) : null}
                       {!h.isSol && h.realizedUsd != null && (
                         <p
@@ -418,11 +418,11 @@ export default function TradeWallet() {
 
         {tab === "pnl" && (
           <div className="space-y-2">
-            <p className="px-0.5 text-[10px] text-white/30">
+            <p className="px-0.5 text-[10px] text-white/60">
               Per-token PnL from recent SOL-leg swaps · cost basis when computable
             </p>
             {!pnlRows.length ? (
-              <p className="py-12 text-center text-xs text-white/35">
+              <p className="py-12 text-center text-xs text-white/65">
                 No PnL rows yet — need more swap history on this wallet
               </p>
             ) : (
@@ -470,14 +470,14 @@ export default function TradeWallet() {
                     ? (p.realizedUsd || 0) >= 0
                       ? "text-emerald-400"
                       : "text-red-400"
-                    : "text-white/40";
+                    : "text-white/70";
 
                 return (
                   <button
                     key={p.mint}
                     type="button"
                     onClick={() => navigate(`/trade/token/${p.mint}`)}
-                    className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
+                    className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.06] px-3 py-3 text-left hover:bg-white/[0.05]"
                   >
                     <div className="flex items-start gap-3">
                       <TokenAvatar
@@ -491,10 +491,10 @@ export default function TradeWallet() {
                             <p className="truncate text-sm font-bold">
                               {pickTokenSymbol(p) || shortAddr(p.mint, 4)}
                             </p>
-                            <p className="truncate text-[10px] text-white/35">
+                            <p className="truncate text-[10px] text-white/65">
                               {pickTokenName(p) || "Token"}
                             </p>
-                            <p className="mt-0.5 font-mono text-[10px] text-white/30">
+                            <p className="mt-0.5 font-mono text-[10px] text-white/60">
                               {shortAddr(p.mint, 4)}
                             </p>
                           </div>
@@ -509,7 +509,7 @@ export default function TradeWallet() {
                                   )
                                 : "—"}
                             </p>
-                            <p className="text-[9px] uppercase tracking-wider text-white/30">
+                            <p className="text-[9px] uppercase tracking-wider text-white/60">
                               {isHolding ? "Holding" : "Closed"}
                             </p>
                           </div>
@@ -517,22 +517,22 @@ export default function TradeWallet() {
 
                         <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px]">
                           <div>
-                            <span className="text-white/30">W / L </span>
+                            <span className="text-white/60">W / L </span>
                             <span className="font-mono text-emerald-400">{pWins ?? "—"}</span>
                             <span className="text-white/20"> / </span>
                             <span className="font-mono text-red-400">{pLosses ?? "—"}</span>
                             {wrLabel(p.winRate) && (
-                              <span className="text-white/30"> · {wrLabel(p.winRate)}</span>
+                              <span className="text-white/60"> · {wrLabel(p.winRate)}</span>
                             )}
                           </div>
                           <div className="text-right">
-                            <span className="text-white/30">Bought </span>
+                            <span className="text-white/60">Bought </span>
                             <span className="font-mono">
                               {p.boughtUsd != null ? fmtUsd(p.boughtUsd) : "—"}
                             </span>
                           </div>
                           <div>
-                            <span className="text-white/30">Hold </span>
+                            <span className="text-white/60">Hold </span>
                             <span className="font-mono">
                               {isHolding
                                 ? `${fmtTok(holdAmt, 4)} · ${
@@ -546,32 +546,32 @@ export default function TradeWallet() {
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-white/30">Pot </span>
+                            <span className="text-white/60">Pot </span>
                             <span className="font-mono">
                               {pot != null && pot > 0 ? fmtUsd(pot) : "—"}
                             </span>
                           </div>
                           <div>
-                            <span className="text-white/30">Cost </span>
+                            <span className="text-white/60">Cost </span>
                             <span className="font-mono">
                               {cost != null ? fmtUsd(cost) : "—"}
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-white/30">uPnL </span>
+                            <span className="text-white/60">uPnL </span>
                             <span className={`font-mono ${uTone}`}>
                               {fmtPnl(uPnl)}
                               {uPct != null ? ` (${fmtPct(uPct)})` : ""}
                             </span>
                           </div>
                           <div>
-                            <span className="text-white/30">Realized </span>
+                            <span className="text-white/60">Realized </span>
                             <span className={`font-mono ${rTone}`}>
                               {(p.closedTrades || 0) > 0 ? fmtPnl(p.realizedUsd) : "—"}
                             </span>
                           </div>
                           <div className="text-right">
-                            <span className="text-white/30">Supply </span>
+                            <span className="text-white/60">Supply </span>
                             <span className="font-mono">
                               {p.pctSupply != null ? `${Number(p.pctSupply).toFixed(3)}%` : "—"}
                             </span>
@@ -588,11 +588,11 @@ export default function TradeWallet() {
 
         {tab === "trades" && (
           <div className="space-y-1.5">
-            <p className="px-0.5 text-[10px] text-white/30">
+            <p className="px-0.5 text-[10px] text-white/60">
               All recent buy/sell swaps detected on-chain (SOL-leg)
             </p>
             {!trades.length ? (
-              <p className="py-12 text-center text-xs text-white/35">
+              <p className="py-12 text-center text-xs text-white/65">
                 No recent swaps found for this wallet
               </p>
             ) : (
@@ -601,7 +601,7 @@ export default function TradeWallet() {
                   key={tr.txHash || `${tr.mint}-${tr.time}-${i}`}
                   type="button"
                   onClick={() => tr.mint && navigate(`/trade/token/${tr.mint}`)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-left hover:bg-white/[0.05]"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.06] px-3 py-3 text-left hover:bg-white/[0.05]"
                 >
                   <TokenAvatar
                     image={pickTokenImage(tr)}
@@ -625,7 +625,7 @@ export default function TradeWallet() {
                         {pickTokenSymbol(tr) || shortAddr(tr.mint || "", 4)}
                       </p>
                     </div>
-                    <p className="mt-0.5 font-mono text-[10px] text-white/35">
+                    <p className="mt-0.5 font-mono text-[10px] text-white/65">
                       {tr.tokenAmount != null ? `${fmtTok(tr.tokenAmount, 4)} tok` : ""}
                       {tr.solAmount != null ? ` · ${Number(tr.solAmount).toFixed(3)} SOL` : ""}
                       {tr.txHash ? ` · ${shortAddr(tr.txHash, 4)}` : ""}
@@ -635,7 +635,7 @@ export default function TradeWallet() {
                     <p className="font-mono text-xs font-semibold">
                       {tr.usd != null ? fmtUsd(tr.usd) : "—"}
                     </p>
-                    <p className="font-mono text-[10px] text-white/30">{timeAgo(tr.time)}</p>
+                    <p className="font-mono text-[10px] text-white/60">{timeAgo(tr.time)}</p>
                   </div>
                 </button>
               ))
@@ -645,7 +645,7 @@ export default function TradeWallet() {
 
         <Link
           to="/trade/portfolio"
-          className="mt-4 block text-center text-[11px] text-white/30 hover:text-white/50"
+          className="mt-4 block text-center text-[11px] text-white/60 hover:text-white/50"
         >
           ← Portfolio hub
         </Link>

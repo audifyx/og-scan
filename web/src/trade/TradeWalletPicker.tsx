@@ -60,11 +60,11 @@ export function TradeWalletPickerModal({
       >
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-white">In-app wallet</h3>
-          <button type="button" onClick={onClose} className="text-white/30 hover:text-white/60" aria-label="Close">
+          <button type="button" onClick={onClose} className="text-white/60 hover:text-white/60" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-white/70">
           Your OrbitX in-app wallet is the only wallet. One link — trades sign
           on the backend, no popups, no extensions.
         </p>
@@ -75,7 +75,7 @@ export function TradeWalletPickerModal({
             onClick={() => void onPick()}
             className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-left transition hover:border-white/25 hover:bg-white/[0.1] disabled:opacity-50"
           >
-            <Wallet className="h-8 w-8 text-white/40" />
+            <Wallet className="h-8 w-8 text-white/70" />
             <span className="flex-1 text-sm font-semibold text-white">
               {linked && billing.wallet ? shortAddr(billing.wallet) : "In-App Wallet"}
             </span>
