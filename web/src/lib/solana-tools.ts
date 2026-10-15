@@ -79,36 +79,64 @@ export async function getTokenHolders(tokenAddress: string, limit = 20) {
 /* ───────── action: analyzeToken ─────────────────────────────────────── */
 export async function analyzeToken(tokenAddress: string) {
   try {
-    const [priceMap, supply, holders, search] = await Promise.all([
-      jupPrice([tokenAddress, SOL_MINT]),
-      heliusTokenSupply(tokenAddress),
-      heliusLargestAccounts(tokenAddress),
-      jupSearchToken(tokenAddress),
+    // Use the real backend APIs which have authority data
+    const [tokenRes, safetyRes, priceMap, supply, holders, search] = await Promise.all([
+      fetch(`/api/ogdex/token?mint=${encodeURIComponent(tokenAddress)}`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/ogdex/safety?mint=${encodeURIComponent(tokenAddress)}`).then((r) => r.json()).catch(() => null),
+      jupPrice([tokenAddress, SOL_MINT]).catch(() => ({})),
+      heliusTokenSupply(tokenAddress).catch(() => null),
+      heliusLargestAccounts(tokenAddress).catch(() => []),
+      jupSearchToken(tokenAddress).catch(() => []),
     ]);
 
+    const t = tokenRes?.token || tokenRes || {};
+    const s = safetyRes?.safety || safetyRes || {};
+    
     const price = priceMap[tokenAddress];
     const solPrice = priceMap[SOL_MINT]?.usdPrice ?? 0;
     const info = search?.[0];
-    const totalSupply = supply?.uiAmount ?? 0;
+    const totalSupply = supply?.uiAmount ?? Number(t.supply || 0);
     const top10 = (holders || []).slice(0, 10);
     const top10Pct = totalSupply > 0
       ? top10.reduce((s, h) => s + h.uiAmount, 0) / totalSupply * 100
-      : 0;
+      : Number(s.topHoldersPct || s.top10Pct || 0);
+
+    // Authorities: null means renounced
+    const mintAuth = t.mintAuthority ?? t.mint_authority ?? null;
+    const freezeAuth = t.freezeAuthority ?? t.freeze_authority ?? null;
 
     return {
       address: tokenAddress,
-      name: info?.name ?? "Unknown",
-      symbol: info?.symbol ?? "???",
-      decimals: supply?.decimals ?? 9,
-      price: price?.usdPrice ?? 0,
-      priceChange24h: price?.priceChange24h ?? 0,
+      name: info?.name ?? t.name ?? "Unknown",
+      symbol: info?.symbol ?? t.symbol ?? "???",
+      decimals: supply?.decimals ?? t.decimals ?? 9,
+      supply: t.supply ? String(t.supply) : String(totalSupply),
       totalSupply,
+      price: price?.usdPrice ?? Number(t.priceUsd || 0),
+      priceChange24h: price?.priceChange24h ?? 0,
       mcap: totalSupply * (price?.usdPrice ?? 0),
       fdv: totalSupply * (price?.usdPrice ?? 0),
       holders: holders?.length ?? 0,
       top10HolderPct: top10Pct,
-      logoURI: info?.logoURI ?? null,
+      top10Percent: top10Pct,
+      logoURI: info?.logoURI ?? t.icon ?? null,
       solPrice,
+      // Security fields (what the UI expects)
+      mintAuthority: mintAuth,
+      freezeAuthority: freezeAuth,
+      isMutable: !!(t.isMutable ?? s.mutable ?? true),
+      // Risk score computed from flags
+      riskScore: (() => {
+        let r = 0;
+        const mintRenounced = !mintAuth || mintAuth === "11111111111111111111111111111111";
+        const freezeRenounced = !freezeAuth || freezeAuth === "11111111111111111111111111111111";
+        if (!mintRenounced) r += 30;
+        if (!freezeRenounced) r += 25;
+        if (top10Pct > 50) r += 25;
+        else if (top10Pct > 30) r += 15;
+        if (s.canSell === false) r += 20;
+        return Math.min(100, r);
+      })(),
     };
   } catch (e) {
     console.error("analyzeToken error:", e);
