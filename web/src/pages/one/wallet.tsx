@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Connection, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
-import { SOLANA_RPC } from "../config";
+import { SOLANA_RPC } from "./config";
 
 interface InjectedProvider {
   isPhantom?: boolean;

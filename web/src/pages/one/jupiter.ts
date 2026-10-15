@@ -1,4 +1,4 @@
-import { JUPITER_QUOTE_API } from "../config";
+import { JUPITER_QUOTE_API } from "./config";
 
 export interface QuoteResult {
   inAmount: string;
