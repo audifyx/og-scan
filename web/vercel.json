@@ -168,10 +168,6 @@
       "destination": "/api/web?path=orbitx-ai"
     },
     {
-      "source": "/api/token-feed",
-      "destination": "/api/web?path=token-feed"
-    },
-    {
       "source": "/api/hunter-agent",
       "destination": "/api/ogdex?path=hunter"
     },
