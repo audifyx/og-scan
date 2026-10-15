@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Search, Star, Wallet, Palette, Users, Send, Layers, BarChart3 } from "lucide-react";
 import GlobalSearch from "./GlobalSearch";
 import { DexThemeButton } from "./SharedAtmosphere";
+import AppSwitcher from "./AppSwitcher";
 import { useWallet } from "../lib/wallet";
 
 interface Stats {
@@ -68,6 +69,7 @@ export default function UnifiedHeader({ stats }: { stats: Stats }) {
         </div>
 
         <div className="unified-header__actions">
+          <AppSwitcher />
           <button className="unified-header__iconbtn" title="Search">
             <Search size={18} />
           </button>
