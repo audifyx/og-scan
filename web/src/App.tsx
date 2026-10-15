@@ -443,7 +443,6 @@ const App = () => (
               <Route index element={<Suspense fallback={<RouteFallback label="Intel" />}><IntelHome /></Suspense>} />
               <Route path="scan" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
               <Route path="scan/:mint" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
-              <Route path="trade" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeDesk /></Suspense>} />
               <Route path="portfolio" element={<Suspense fallback={<RouteFallback label="Portfolio" />}><PortfolioDesk /></Suspense>} />
               <Route path="trending" element={<Suspense fallback={<RouteFallback label="Trending" />}><TrendingIntel /></Suspense>} />
               <Route path="whales" element={<Suspense fallback={<RouteFallback label="Whales" />}><WhaleIntel /></Suspense>} />
