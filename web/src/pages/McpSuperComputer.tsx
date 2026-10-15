@@ -75,7 +75,7 @@ export default function McpSuperComputer() {
   const bottomTabs: IosTabItem[] = mainTabs.map((t) => ({ id: t.id, label: t.short, ico: t.icon }));
 
   return (
-    <IosAppShell accent="gold" wide className="supercomputer-ios sc-gold" stageClassName="supercomputer-stage">
+    <IosAppShell accent="blue" wide className="supercomputer-ios sc-gold" stageClassName="supercomputer-stage">
       <div className="supercomputer-frame">
         <aside className="supercomputer-rail" aria-label="Supercomputer navigation">
           <IosRailBrand href="/supercomputer" title="OrbitX" subtitle="Supercomputer" />

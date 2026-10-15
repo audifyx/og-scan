@@ -85,7 +85,7 @@ export default function TradeApp() {
               decoding="async"
             />
             <div>
-              <p className="tx-header__name">OrbitX</p>
+              <p className="tx-header__name">Orbit<span className="tx-header__x">X</span></p>
               <p className="tx-header__sub">{title}</p>
             </div>
           </div>

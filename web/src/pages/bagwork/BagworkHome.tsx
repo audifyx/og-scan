@@ -126,13 +126,13 @@ function SubmitModal({
               </div>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-[#A8B0BC] hover:text-white">
+          <button type="button" onClick={onClose} className="text-white/55 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {task.instructions && (
-          <p className="mb-4 text-sm leading-relaxed text-[#A8B0BC]">{task.instructions}</p>
+          <p className="mb-4 text-sm leading-relaxed text-white/55">{task.instructions}</p>
         )}
 
         <label className="mb-3 block">
@@ -150,7 +150,7 @@ function SubmitModal({
           <input
             type="file"
             accept="image/*,video/*,.pdf"
-            className="bw-input text-sm file:mr-3 file:rounded file:border-0 file:bg-[#1a1a1a] file:px-3 file:py-1 file:text-xs file:text-white"
+            className="bw-input text-sm file:mr-3 file:rounded file:border-0 file:bg-[#14141c] file:px-3 file:py-1 file:text-xs file:text-white"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
         </label>
@@ -287,9 +287,9 @@ export default function BagworkHome() {
           </button>
         )}
         {user?.id && (
-          <p className="mt-4 text-xs text-[#A8B0BC]">
+          <p className="mt-4 text-xs text-white/55">
             Track submissions on{" "}
-            <Link to="/bagwork/my" className="text-[#60A5FA] underline-offset-2 hover:underline">My work</Link>.
+            <Link to="/bagwork/my" className="text-[#5AA2FF] underline-offset-2 hover:underline">My work</Link>.
           </p>
         )}
       </div>
@@ -310,11 +310,11 @@ export default function BagworkHome() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20 text-[#A8B0BC]">
+        <div className="flex justify-center py-20 text-white/55">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
       ) : !filtered.length ? (
-        <div className="bw-card py-16 text-center text-[#A8B0BC]">
+        <div className="bw-card py-16 text-center text-white/55">
           {tasks?.length ? "No cards in this category." : "No active task cards yet — check back soon."}
         </div>
       ) : (

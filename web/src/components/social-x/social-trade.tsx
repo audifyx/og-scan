@@ -565,3 +565,34 @@ export function SirenCard({ content, onOpenOrig }: { content: string; onOpenOrig
     </article>
   );
 }
+
+/* ═══════════ Call receipt badge — provable $cashtag P&L on every post ═══════════
+ * Entry = the 15m candle containing the post timestamp (verified, can't be faked).
+ * Shows live P&L vs now. This is what X can never do: receipts, not screenshots. */
+export function CallPnlBadge({ mint, symbol, postIso }: { mint: string; symbol: string; postIso: string }) {
+  const [entry, setEntry] = useState<number | null>(null);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    let on = true;
+    setEntry(null);
+    setNow(null);
+    fetchEntryPrice(mint, postIso).then((v) => { if (on) setEntry(v); });
+    fetchTokenQuote(mint).then((q) => { if (on) setNow(q?.priceUsd ?? null); });
+    return () => { on = false; };
+  }, [mint, postIso]);
+  if (entry == null || !entry || now == null || !now) return null;
+  const pct = ((now - entry) / entry) * 100;
+  if (!Number.isFinite(pct)) return null;
+  const up = pct >= 0;
+  const fmt = (v: number) =>
+    v === 0 ? "$0" : v < 0.0001 ? "$" + v.toExponential(1) : "$" + v.toLocaleString(undefined, { maximumFractionDigits: v < 1 ? 4 : 2 });
+  return (
+    <span
+      className={cn("osc-callbadge", up ? "osc-callbadge--up" : "osc-callbadge--down")}
+      title={`$${symbol} called at ${fmt(entry)} · now ${fmt(now)} — verified entry, can't be edited`}
+    >
+      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {up ? "+" : ""}{pct >= 1000 ? (pct / 100).toFixed(1) + "x" : pct.toFixed(pct >= 100 ? 0 : 1) + "%"}
+    </span>
+  );
+}

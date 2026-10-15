@@ -125,7 +125,7 @@ export default function GlobalSearch() {
 
             {/* Search input */}
             <div className="relative flex items-center rounded-2xl overflow-hidden"
-              style={{ background: "#0a0a0a", border: "1.5px solid rgba(96, 165, 250, 0.45)", boxShadow: "0 0 40px rgba(59, 130, 246, 0.15)" }}>
+              style={{ background: "#0b0b10", border: "1.5px solid rgba(96, 165, 250, 0.45)", boxShadow: "0 0 40px rgba(59, 130, 246, 0.15)" }}>
               <Search className="w-5 h-5 absolute left-4 text-[var(--ox-blue-hi)] pointer-events-none" />
               <input
                 ref={inputRef}

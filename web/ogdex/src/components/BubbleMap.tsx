@@ -152,10 +152,10 @@ const C = {
   bundle: "#ff9f1c",
   sniper: "#ffd60a",
   clean: "#2dd4bf",
-  dev: "#c084fc",
+  dev: "#F0C75E",
   funder: "#FF5C5C",
   bundleHub: "#ff9f1c",
-  accent: "#22d3ee",
+  accent: "#60a5fa",
   whale: "#f0abfc",
 } as const;
 
@@ -1178,7 +1178,7 @@ export default function BubbleMap({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="mt-3 rounded-lg border border-cyan-400/30 px-3 py-1.5 text-[11px] font-bold text-cyan-300/90 hover:bg-cyan-400/10 disabled:opacity-50"
+            className="mt-3 rounded-lg border border-blue-400/30 px-3 py-1.5 text-[11px] font-bold text-blue-300/90 hover:bg-blue-400/10 disabled:opacity-50"
           >
             {refreshing ? "Refreshing…" : "Refresh x-ray & holders"}
           </button>
@@ -1195,7 +1195,7 @@ export default function BubbleMap({
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: "rgba(34,211,238,0.08)", border: "1px solid rgba(34,211,238,0.18)" }}>
-              <Crosshair className="w-4.5 h-4.5 text-cyan-400" />
+              <Crosshair className="w-4.5 h-4.5 text-blue-400" />
             </div>
             <div>
               <div className="text-sm font-bold text-white/85 leading-tight">Wallet Relationship Bubble Map</div>
@@ -1313,12 +1313,12 @@ export default function BubbleMap({
         }}
           className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0"
           style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.25)" }}>
-          {playing ? <Pause className="w-3.5 h-3.5 text-cyan-300" /> : <Play className="w-3.5 h-3.5 text-cyan-300" />}
+          {playing ? <Pause className="w-3.5 h-3.5 text-blue-300" /> : <Play className="w-3.5 h-3.5 text-blue-300" />}
         </button>
         <input type="range" min={-1} max={analytics.maxSec} step={0.5}
           value={timelineGate ?? analytics.maxSec}
           onChange={(e) => { setTimelineGate(Number(e.target.value)); setPlaying(false); }}
-          className="flex-1 accent-cyan-400 h-1"
+          className="flex-1 accent-blue-400 h-1"
         />
         <span className="text-[10px] font-mono text-white/40 w-16 text-right">
           {timelineGate != null && timelineGate >= 0 ? "+" + timelineGate.toFixed(0) + "s" : "all"}
@@ -1379,7 +1379,7 @@ export default function BubbleMap({
               <button key={i} onClick={fn} title={t}
                 className="h-8 w-8 rounded-lg flex items-center justify-center transition-all hover:scale-105"
                 style={{ background: "rgba(8,10,20,0.7)", border: "1px solid rgba(34,211,238,0.18)", backdropFilter: "blur(8px)" }}>
-                <I className="w-3.5 h-3.5 text-cyan-300/80" />
+                <I className="w-3.5 h-3.5 text-blue-300/80" />
               </button>
             ))}
           </div>

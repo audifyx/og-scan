@@ -37,7 +37,7 @@ export function labelKindClass(kind: WalletLabel["kind"]): string {
     case "amm": return "bg-accent2/15 text-accent2";
     case "launchpad": return "bg-accent/15 text-accent";
     case "burn": return "bg-panel2 text-muted";
-    case "bridge": return "bg-purple-500/15 text-purple-300";
+    case "bridge": return "bg-blue-400/15 text-blue-300";
     default: return "bg-panel2 text-muted";
   }
 }

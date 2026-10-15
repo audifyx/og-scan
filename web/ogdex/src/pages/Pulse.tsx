@@ -29,9 +29,9 @@ const TYPE_META: Record<string, { label: string; Icon: typeof Zap }> = {
 
 const TONE: Record<string, { text: string; bg: string; ring: string; bar: string }> = {
   lime: { text: "text-accent", bg: "bg-accent/12", ring: "border-accent/30", bar: "bg-accent" },
-  cyan: { text: "text-cyan-300", bg: "bg-cyan-400/12", ring: "border-cyan-400/30", bar: "bg-cyan-400" },
+  cyan: { text: "text-blue-300", bg: "bg-blue-400/12", ring: "border-blue-400/30", bar: "bg-blue-400" },
   violet: { text: "text-accent2", bg: "bg-accent2/12", ring: "border-accent2/30", bar: "bg-accent2" },
-  gold: { text: "text-yellow-300", bg: "bg-yellow-400/12", ring: "border-yellow-400/30", bar: "bg-yellow-400" },
+  gold: { text: "text-accent2", bg: "bg-accent2/12", ring: "border-accent2/30", bar: "bg-accent2" },
   red: { text: "text-down", bg: "bg-down/12", ring: "border-down/30", bar: "bg-down" },
 };
 

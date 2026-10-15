@@ -161,7 +161,7 @@ export function NftCard({
       </div>
       <div className="mkt-nft-card__body">
         <div className="mkt-nft-card__title">
-          {flagged && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#ff5c7a]" aria-label="Possible copy" />}
+          {flagged && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#fb7185]" aria-label="Possible copy" />}
           <span className="truncate">{name}</span>
         </div>
         {collection && <div className="mkt-nft-card__sub truncate">{collection}</div>}
@@ -186,11 +186,11 @@ export function ViewToggle({ mode, onChange }: { mode: NftViewMode; onChange: (m
   return (
     <div className="inline-flex items-center gap-0.5 rounded-xl border border-white/10 bg-white/[0.03] p-0.5">
       <button type="button" onClick={() => onChange("grid")} title="Grid view" aria-label="Grid view"
-        className={`rounded-lg p-1.5 transition ${mode === "grid" ? "bg-cyan-400 text-black" : "text-white/50 hover:text-white"}`}>
+        className={`rounded-lg p-1.5 transition ${mode === "grid" ? "bg-[#3B82F6] text-black" : "text-white/50 hover:text-white"}`}>
         <LayoutGrid className="h-4 w-4" />
       </button>
       <button type="button" onClick={() => onChange("list")} title="List view" aria-label="List view"
-        className={`rounded-lg p-1.5 transition ${mode === "list" ? "bg-cyan-400 text-black" : "text-white/50 hover:text-white"}`}>
+        className={`rounded-lg p-1.5 transition ${mode === "list" ? "bg-[#3B82F6] text-black" : "text-white/50 hover:text-white"}`}>
         <ListIcon className="h-4 w-4" />
       </button>
     </div>
@@ -211,7 +211,7 @@ export function SortSelect({ value, onChange }: { value: NftSortKey; onChange: (
     <label className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/70">
       <ArrowUpDown className="h-3.5 w-3.5 text-white/40" />
       <select value={value} onChange={(e) => onChange(e.target.value as NftSortKey)}
-        className="bg-transparent font-semibold outline-none [&>option]:bg-[#0a1220]">
+        className="bg-transparent font-semibold outline-none [&>option]:bg-[#101016]">
         {NFT_SORT_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
@@ -243,14 +243,14 @@ export function NftListRow({
   to, name, image, priceSol, rarityTier, rarityRank, flagged, views, favorites, collection, meta,
 }: NftCardProps & { meta?: string }) {
   return (
-    <Link to={to} className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-2.5 transition hover:border-cyan-400/30 hover:bg-white/[0.04]">
+    <Link to={to} className="group flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-2.5 transition hover:border-[#3B82F6]/30 hover:bg-white/[0.04]">
       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-black/40">
         <Media src={image} className="h-full w-full" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          {flagged && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#ff5c7a]" />}
-          <span className="truncate text-[13px] font-bold text-white group-hover:text-cyan-300">{name}</span>
+          {flagged && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#fb7185]" />}
+          <span className="truncate text-[13px] font-bold text-white group-hover:text-[#5AA2FF]">{name}</span>
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[11px] mkt-muted">
           {collection && <span className="truncate">{collection}</span>}

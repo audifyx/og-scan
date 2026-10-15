@@ -28,7 +28,7 @@ import { callSupercomputerTool } from "@/tokenomics/mcpClient";
 import { getBillingAuthCode } from "@/tokenomics/auth";
 import {
   TradeSheet, TipSheet, SirenCard, extractCallTokens, isSirenContent,
-  fetchRugFlaggers, hasFlagged, RUG_SIREN_THRESHOLD,
+  fetchRugFlaggers, hasFlagged, RUG_SIREN_THRESHOLD, CallPnlBadge,
   type TradeMode,
 } from "./social-trade";
 
@@ -364,10 +364,13 @@ const TF_OPTS = [
 function ChartCard({ mint }: { mint: string }) {
   const [coin, setCoin] = useState<CoinLite | null>(null);
   const [tf, setTf] = useState<(typeof TF_OPTS)[number]>(TF_OPTS[1]);
+  const [pool, setPool] = useState<string | null>(null);
+  const [imgOk, setImgOk] = useState(true);
 
   // Live token snapshot (icon + banner from DexScreener metadata)
   useEffect(() => {
     let on = true;
+    setImgOk(true);
     fetch(`/api/ogdex/token?mint=${mint}`)
       .then((r) => r.json())
       .then((d) => {
@@ -386,19 +389,31 @@ function ChartCard({ mint }: { mint: string }) {
     return () => { on = false; };
   }, [mint]);
 
+  // Resolve the token's top liquidity pool so the DexScreener embed loads the right pair
+  useEffect(() => {
+    let on = true;
+    setPool(null);
+    fetch(`/api/ogdex/chart?mint=${mint}&interval=1h&limit=1`)
+      .then((r) => r.json())
+      .then((d) => { if (on && d?.pool) setPool(d.pool); })
+      .catch(() => {});
+    return () => { on = false; };
+  }, [mint]);
+
   const chg = coin?.change24h;
   const up = (chg ?? 0) >= 0;
-  const dsSrc = `https://dexscreener.com/solana/${mint}?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=${tf.ds}`;
+  const dsRef = pool || mint;
+  const dsSrc = `https://dexscreener.com/solana/${dsRef}?embed=1&loadChartSettings=0&trades=0&tabs=0&info=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=dark&theme=dark&chartStyle=1&chartType=usd&interval=${tf.ds}`;
   return (
     <div className="osc-chartcard x-fade-in" onClick={(e) => e.stopPropagation()}>
       {coin?.banner && (
         <div className="-mx-[14px] -mt-[14px] mb-3 h-[92px] overflow-hidden rounded-t-[18px]">
-          <img src={coin.banner} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <img src={coin.banner} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} className="h-full w-full object-cover" loading="lazy" />
         </div>
       )}
       <div className="flex items-center gap-3">
-        {coin?.icon ? (
-          <img src={coin.icon} alt="" className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10" />
+        {coin?.icon && imgOk ? (
+          <img src={coin.icon} alt="" onError={() => setImgOk(false)} className="h-12 w-12 rounded-2xl object-cover ring-1 ring-white/10" />
         ) : (
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#3b82f6]/15 text-[16px] font-extrabold text-[#60a5fa]">
             {(coin?.symbol || "?").slice(0, 2)}
@@ -1594,6 +1609,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               {callTokens.map((ct) => (
                 <div key={ct.mint} className="osc-tradebar__row">
                   <span className="osc-tradebar__sym">${ct.symbol}</span>
+                  <CallPnlBadge mint={ct.mint} symbol={ct.symbol} postIso={p.created_at} />
                   <span className="osc-tradebar__spacer" />
                   <button type="button" onClick={() => openTrade(ct.mint, ct.symbol, "buy", p)} className="osc-tradebar__btn osc-tradebar__btn--buy">
                     <TrendingUp className="h-3.5 w-3.5" /> Buy

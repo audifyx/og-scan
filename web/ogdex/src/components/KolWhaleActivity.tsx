@@ -149,9 +149,9 @@ export default function KolWhaleActivity({ d, dir, holders: holdersProp }: { d: 
                   {t.kol
                     ? <KolBadge kol={t.kol} />
                     : <span className="inline-flex items-center gap-1.5">
-                        <Crown className="w-3.5 h-3.5 text-purple-300" />
+                        <Crown className="w-3.5 h-3.5 text-accent2" />
                         <WalletLink address={t.owner} icon={false} className="text-xs" />
-                        <span className="pill bg-purple-500/15 text-purple-300 text-[9px] !px-1.5 !py-0">Whale</span>
+                        <span className="pill bg-accent2/15 text-accent2 text-[9px] !px-1.5 !py-0">Whale</span>
                       </span>}
                   <div className="text-xs text-muted mt-0.5">
                     {t.side === "buy" ? "bought" : "sold"} · {compact(t.tokenAmount)} · {fmtUsd(t.volumeUsd ?? t.usdValue, { compact: true })}

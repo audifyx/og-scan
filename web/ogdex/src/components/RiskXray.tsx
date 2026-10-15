@@ -30,7 +30,7 @@ function SolscanLink({ kind, id, label, className = "" }: { kind:"account"|"tx"|
   return (
     <a href={href} target="_blank" rel="noreferrer"
        className={`inline-flex items-center gap-1 transition-opacity hover:opacity-100 opacity-70 ${className}`}
-       style={{ color:"#22d3ee", fontSize:"11px" }}>
+       style={{ color:"#60a5fa", fontSize:"11px" }}>
       {label || short(id)} <ExternalLink className="w-2.5 h-2.5" />
     </a>
   );
@@ -175,7 +175,7 @@ function RiskGauge({ score, tone }: { score: number; tone: "red"|"yellow"|"green
 
 // ── Stat Card ─────────────────────────────────────────────────────────
 function Stat({ icon, label, value, tone, sub }: { icon:React.ReactNode; label:string; value:React.ReactNode; tone?:"red"|"yellow"|"green"|"cyan"; sub?:string }) {
-  const c = tone==="red"?"#ef4444":tone==="yellow"?"#f59e0b":tone==="green"?"#22c55e":"#22d3ee";
+  const c = tone==="red"?"#ef4444":tone==="yellow"?"#f59e0b":tone==="green"?"#22c55e":"#60a5fa";
   return (
     <div className="rounded-xl p-3.5 relative overflow-hidden" style={{ background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)" }}>
       <div className="absolute top-0 right-0 w-12 h-12 rounded-full opacity-15 blur-xl" style={{ background:c }} />
@@ -192,7 +192,7 @@ function pctTone(p:number|null, warn=30, bad=60): "red"|"yellow"|"green" {
 }
 
 // ── Shared section header (consistent across every tab) ───────────────
-function SectionHeader({ icon, title, sub, color="#22d3ee", pct }:
+function SectionHeader({ icon, title, sub, color="#60a5fa", pct }:
   { icon:React.ReactNode; title:string; sub:string; color?:string; pct?:number|null }) {
   return (
     <div className="flex items-center gap-3.5">
@@ -228,14 +228,14 @@ interface NavCard { id:Section; icon:React.ReactNode; label:string; sub:string; 
 
 function SectionNav({ active, onChange, x, buyers }: { active:Section; onChange:(s:Section)=>void; x:XrayReport; buyers:RichBuyer[] }) {
   const cards: NavCard[] = [
-    { id:"overview",  icon:<Activity  className="w-4.5 h-4.5"/>, label:"Overview",    sub:`Score ${x.score??"-"}`,                        color:"#22d3ee" },
-    { id:"timeline",  icon:<Clock     className="w-4.5 h-4.5"/>, label:"Timeline",    sub:`${buyers.length} events`,                       color:"#a855f7" },
-    { id:"map",       icon:<Network   className="w-4.5 h-4.5"/>, label:"Graph",       sub:`${buyers.length} nodes`,                        color:"#06b6d4" },
+    { id:"overview",  icon:<Activity  className="w-4.5 h-4.5"/>, label:"Overview",    sub:`Score ${x.score??"-"}`,                        color:"#60a5fa" },
+    { id:"timeline",  icon:<Clock     className="w-4.5 h-4.5"/>, label:"Timeline",    sub:`${buyers.length} events`,                       color:"#F0C75E" },
+    { id:"map",       icon:<Network   className="w-4.5 h-4.5"/>, label:"Graph",       sub:`${buyers.length} nodes`,                        color:"#3b82f6" },
     { id:"snipers",   icon:<Crosshair className="w-4.5 h-4.5"/>, label:"Snipers",     sub:`${x.snipers.count??0} · ${x.snipers.pct??0}%`,  color:"#eab308" },
     { id:"bundles",   icon:<Boxes     className="w-4.5 h-4.5"/>, label:"Bundles",     sub:`${x.bundles.count??0} clusters`,                color:"#f59e0b" },
     { id:"insiders",  icon:<Share2    className="w-4.5 h-4.5"/>, label:"Insiders",    sub:`${x.insiders?.count??0} · ${x.insiders?.pct??0}%`, color:"#ef4444" },
     { id:"devsafety", icon:<Lock      className="w-4.5 h-4.5"/>, label:"Dev+Safety",  sub:x.dev?short(x.dev.wallet):"—",                   color:"#22c55e" },
-    { id:"buyers",    icon:<Users     className="w-4.5 h-4.5"/>, label:"All Buyers",  sub:`${buyers.length} wallets`,                      color:"#8b5cf6" },
+    { id:"buyers",    icon:<Users     className="w-4.5 h-4.5"/>, label:"All Buyers",  sub:`${buyers.length} wallets`,                      color:"#3b82f6" },
   ];
 
   return (
@@ -330,7 +330,7 @@ function OverviewSection({ x, buyers }: { x:XrayReport; buyers:RichBuyer[] }) {
       {(x.flags?.length??0)>0 && (
         <div className="rounded-xl p-4" style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)" }}>
           <div className="text-[10px] font-black tracking-widest text-white/35 flex items-center gap-1.5 mb-3">
-            <Target className="w-3.5 h-3.5 text-cyan-400"/>RISK SIGNALS
+            <Target className="w-3.5 h-3.5 text-blue-400"/>RISK SIGNALS
           </div>
           <div className="space-y-2">
             {x.flags.map((f,i) => {
@@ -381,7 +381,7 @@ function TimelineSection({ x, buyers }: { x:XrayReport; buyers:RichBuyer[] }) {
 
   return (
     <div className="space-y-4">
-      <SectionHeader icon={<Clock className="w-5 h-5"/>} color="#a855f7"
+      <SectionHeader icon={<Clock className="w-5 h-5"/>} color="#F0C75E"
         title="Launch Attack Timeline"
         sub="Chronological order of every early buy — top = first in, bottom = latest. Bar length = relative size." />
 
@@ -439,7 +439,7 @@ function TimelineSection({ x, buyers }: { x:XrayReport; buyers:RichBuyer[] }) {
                       <span className="text-white/20 font-mono w-16 text-right hidden sm:inline">slot {b.slot}</span>
                       {b.txHash
                         ? <a href={SS_TX(b.txHash)} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
-                            className="opacity-0 group-hover:opacity-70 transition-opacity shrink-0"><ExternalLink className="w-3 h-3 text-cyan-400" /></a>
+                            className="opacity-0 group-hover:opacity-70 transition-opacity shrink-0"><ExternalLink className="w-3 h-3 text-blue-400" /></a>
                         : <span className="w-3 shrink-0" />}
                     </div>
                   </div>
@@ -537,7 +537,7 @@ function BundlesSection({ x, buyers }: { x:XrayReport; buyers:RichBuyer[] }) {
                   <a key={w} href={SS_ACCOUNT(w)} target="_blank" rel="noreferrer"
                     className="text-[10px] font-mono px-2 py-1 rounded-lg transition-all hover:opacity-100 opacity-60 flex items-center gap-1"
                     style={{ background:"rgba(245,158,11,0.07)", border:"1px solid rgba(245,158,11,0.15)", color:"rgba(255,255,255,0.7)" }}>
-                    {short(w)} <ExternalLink className="w-2.5 h-2.5 text-cyan-400" />
+                    {short(w)} <ExternalLink className="w-2.5 h-2.5 text-blue-400" />
                   </a>
                 ))}
               </div>
@@ -574,7 +574,7 @@ function InsidersSection({ x }: { x:XrayReport }) {
               <a key={w} href={SS_ACCOUNT(w)} target="_blank" rel="noreferrer"
                 className="text-[10px] font-mono px-2 py-1 rounded-lg flex items-center gap-1 opacity-60 hover:opacity-100 transition-all"
                 style={{ background:"rgba(239,68,68,0.07)", border:"1px solid rgba(239,68,68,0.15)", color:"rgba(255,255,255,0.7)" }}>
-                {short(w)} <ExternalLink className="w-2.5 h-2.5 text-cyan-400" />
+                {short(w)} <ExternalLink className="w-2.5 h-2.5 text-blue-400" />
               </a>
             ))}
           </div>
@@ -615,13 +615,13 @@ function DevSafetySection({ x }: { x:XrayReport }) {
       {/* Deployer wallet */}
       {dev && (
         <div className="rounded-xl p-5" style={{ background:"rgba(34,211,238,0.04)", border:"1px solid rgba(34,211,238,0.12)" }}>
-          <div className="text-[10px] font-black tracking-widest text-cyan-400/60 flex items-center gap-2 mb-4">
+          <div className="text-[10px] font-black tracking-widest text-blue-400/60 flex items-center gap-2 mb-4">
             <Code2 className="w-3.5 h-3.5"/>DEPLOYER WALLET
           </div>
           <div className="flex items-center gap-3 mb-4">
             <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ background:"rgba(34,211,238,0.08)", border:"1px solid rgba(34,211,238,0.15)" }}>
-              <Code2 className="w-5 h-5 text-cyan-400" />
+              <Code2 className="w-5 h-5 text-blue-400" />
             </div>
             <div>
               <SolscanLink kind="account" id={dev.wallet} label={dev.wallet} className="font-mono text-[11px] break-all" />
@@ -671,7 +671,7 @@ function BuyersSection({ x, buyers }: { x:XrayReport; buyers:RichBuyer[] }) {
   const shown = activeTag==="all" ? buyers : buyers.filter(b=>b.tag===activeTag);
 
   const tabs: { id:RiskTag|"all"; label:string; color:string; n:number }[] = [
-    { id:"all",     label:"All",     color:"#22d3ee", n:buyers.length },
+    { id:"all",     label:"All",     color:"#60a5fa", n:buyers.length },
     { id:"sniper",  label:"Sniper",  color:"#eab308", n:buyers.filter(b=>b.sniper).length },
     { id:"bundle",  label:"Bundle",  color:"#f59e0b", n:buyers.filter(b=>b.bundled).length },
     { id:"insider", label:"Insider", color:"#ef4444", n:buyers.filter(b=>b.insider).length },
@@ -751,7 +751,7 @@ function LoadingState() {
     <div className="flex flex-col items-center justify-center h-52 gap-4">
       <div className="relative w-14 h-14">
         <div className="absolute inset-0 rounded-full" style={{ border:"2px solid rgba(34,211,238,0.1)" }} />
-        <div className="absolute inset-0 rounded-full animate-spin" style={{ border:"2px solid transparent", borderTopColor:"#22d3ee", filter:"drop-shadow(0 0 6px #22d3ee)" }} />
+        <div className="absolute inset-0 rounded-full animate-spin" style={{ border:"2px solid transparent", borderTopColor:"#60a5fa", filter:"drop-shadow(0 0 6px #60a5fa)" }} />
         <div className="absolute inset-3 rounded-full animate-pulse" style={{ background:"rgba(34,211,238,0.07)" }} />
       </div>
       <div className="text-xs text-white/30 tracking-widest animate-pulse">SCANNING ON-CHAIN DATA…</div>

@@ -163,7 +163,7 @@ export function TokenFeedCard({
   return (
     <article
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-panel/90 via-[#0a0a0a] to-[#060606] p-4 transition-all hover:border-[var(--ox-blue)]/40 hover:shadow-[0_0_24px_rgba(59,130,246,0.08)] ${onClick ? "cursor-pointer" : "cursor-default"}`}
+      className={`group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-panel/90 via-[#0c0c10] to-[#060609] p-4 transition-all hover:border-[var(--ox-blue)]/40 hover:shadow-[0_0_24px_rgba(59,130,246,0.08)] ${onClick ? "cursor-pointer" : "cursor-default"}`}
     >
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[var(--ox-blue)]/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
       <TokenIdentity r={r} rank={rank} chainLabel={chainLabel} />

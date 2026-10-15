@@ -242,7 +242,7 @@ export default function Layout() {
                     ref={dropRef}
                     style={{
                       position: "fixed", top: watchPos.top, right: watchPos.right, zIndex: 1000,
-                      background: "#0e0e0e", border: "1px solid var(--ox-silver-dim)", borderRadius: 14,
+                      background: "#101016", border: "1px solid var(--ox-silver-dim)", borderRadius: 14,
                       width: 260, padding: 6, boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
                     }}
                   >
@@ -302,7 +302,7 @@ export default function Layout() {
             </div>
           </main>
 
-          <footer className="mt-auto border-t" style={{ borderColor: "var(--ox-silver-dim)", background: "linear-gradient(180deg, #080808, #050505)" }}>
+          <footer className="mt-auto border-t" style={{ borderColor: "var(--ox-silver-dim)", background: "linear-gradient(180deg, #0c0c10, #060609)" }}>
             <div className="brand-hairline" />
             <div className="max-w-[1600px] mx-auto px-5 py-12">
               <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">

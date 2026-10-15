@@ -456,6 +456,14 @@ button.osc-chip:hover { background: rgba(255,255,255,0.1); color: #fff; }
   background: linear-gradient(180deg, rgba(59,130,246,0.09), rgba(0,0,0,0.18));
 }
 .osc-tradebar__sym { font-size: 13.5px; font-weight: 800; color: var(--osc-blue-hi); }
+.osc-callbadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid transparent; cursor: default;
+}
+.osc-callbadge--up { color: #34d399; background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.3); }
+.osc-callbadge--down { color: #fb7185; background: rgba(251, 113, 133, 0.1); border-color: rgba(251, 113, 133, 0.3); }
 .osc-tradebar__spacer { flex: 1; }
 .osc-tradebar__btn {
   display: inline-flex; align-items: center; gap: 5px;

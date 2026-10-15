@@ -4,7 +4,7 @@ import { BadgeCheck } from "lucide-react";
 
 export function tagClass(tag: string): string {
   const t = tag.toLowerCase();
-  if (t.includes("whale")) return "bg-purple-500/15 text-purple-300";
+  if (t.includes("whale")) return "bg-accent2/15 text-accent2";
   if (t.includes("smart")) return "bg-accent2/15 text-accent2";
   if (t.includes("top holder")) return "bg-yellow-500/15 text-yellow-400";
   if (t.includes("pump")) return "bg-panel2 text-muted";

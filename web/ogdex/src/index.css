@@ -6,20 +6,20 @@
 
 :root {
   color-scheme: dark;
-  --ox-gold: #d4af37;
+  --ox-gold: #F0C75E;
   --ox-gold-hi: #f0c75e;
   --ox-blue: #3b82f6;
-  --ox-blue-hi: #60a5fa;
+  --ox-blue-hi: #5AA2FF;
   --ox-silver: #a8b0bc;
-  --ox-silver-dim: rgba(192, 198, 210, 0.16);
+  --ox-silver-dim: rgba(255, 255, 255, 0.09);
   --ox-text: #ffffff;
-  --ox-text-dim: rgba(255, 255, 255, 0.72);
-  --ox-text-muted: rgba(255, 255, 255, 0.58);
-  --ox-text-faint: rgba(255, 255, 255, 0.38);
-  --ox-black: #050505;
-  --ox-black-2: #0a0a0a;
+  --ox-text-dim: rgba(255, 255, 255, 0.55);
+  --ox-text-muted: rgba(255, 255, 255, 0.55);
+  --ox-text-faint: rgba(255, 255, 255, 0.32);
+  --ox-black: #060609;
+  --ox-black-2: #0b0b10;
   --accent-rgb: 59, 130, 246;
-  --gold-rgb: 212, 175, 55;
+  --gold-rgb: 240, 199, 94;
   --term-rgb: 96, 165, 250;
   --dex-chrome-h: 108px;
 }
@@ -35,7 +35,7 @@ html {
 html, body, #root { height: 100%; }
 
 body {
-  background: #050505;
+  background: #060609;
   color: var(--ox-text);
   font-family: "Manrope", system-ui, sans-serif;
   font-size: 14px;
@@ -56,10 +56,10 @@ body::before {
   z-index: 0;
   opacity: 0.72;
   background:
-    linear-gradient(180deg, rgba(5, 5, 5, 0.72), rgba(5, 5, 5, 0.88)),
+    linear-gradient(180deg, rgba(6, 6, 9, 0.72), rgba(6, 6, 9, 0.88)),
     radial-gradient(900px 500px at 12% -8%, rgba(59, 130, 246, 0.14), transparent 55%),
-    radial-gradient(800px 480px at 92% 0%, rgba(212, 175, 55, 0.1), transparent 55%),
-    #050505;
+    radial-gradient(800px 480px at 92% 0%, rgba(240, 199, 94, 0.1), transparent 55%),
+    #060609;
 }
 body.ox-has-wallpaper::before {
   opacity: 0.45;
@@ -87,7 +87,7 @@ body.ox-has-wallpaper::before {
 .dex-shared-atm__veil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(5, 5, 5, 0.35), rgba(5, 5, 5, 0.7));
+  background: linear-gradient(180deg, rgba(6, 6, 9, 0.35), rgba(6, 6, 9, 0.7));
 }
 .dex-theme-btn {
   display: inline-flex;
@@ -110,7 +110,7 @@ body.ox-has-wallpaper::before {
   padding: 10px;
   border-radius: 14px;
   border: 1px solid var(--ox-silver-dim);
-  background: rgba(10, 10, 12, 0.96);
+  background: rgba(11, 11, 16, 0.96);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
 }
 .dex-theme-pop__title {
@@ -164,7 +164,7 @@ body.ox-has-wallpaper::before {
   padding: 6px 8px;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(12, 16, 22, 0.82);
+  background: rgba(16, 16, 22, 0.85);
   backdrop-filter: blur(20px);
 }
 @media (max-width: 900px) {
@@ -228,16 +228,16 @@ h3 { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.015em; }
 .text-muted-ox { color: var(--ox-text-muted); }
 .text-faint-ox { color: var(--ox-text-faint); }
 
-* { scrollbar-width: thin; scrollbar-color: rgba(212, 175, 55, 0.35) transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgba(240, 199, 94, 0.35) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.35); border-radius: 99px; }
+*::-webkit-scrollbar-thumb { background: rgba(240, 199, 94, 0.35); border-radius: 99px; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @layer components {
   .card {
     @apply rounded-2xl border relative;
-    background: linear-gradient(180deg, #0e0e0e, #090909);
+    background: linear-gradient(180deg, #101016, #0c0c10);
     border-color: var(--ox-silver-dim);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
@@ -287,7 +287,7 @@ select, textarea {
   z-index: 30;
 }
 .dex-shell-header {
-  background: rgba(5, 5, 5, 0.92);
+  background: rgba(6, 6, 9, 0.92);
   backdrop-filter: blur(20px) saturate(1.25);
   border-bottom: 1px solid var(--ox-silver-dim);
 }
@@ -374,7 +374,7 @@ select, textarea {
   font-size: 11px;
   font-weight: 700;
   color: var(--ox-blue-hi);
-  background: linear-gradient(180deg, #121212, #0c0c0c);
+  background: linear-gradient(180deg, #14141c, #101016);
   border: 1px solid var(--ox-silver-dim);
 }
 .dex-store-btn {
@@ -390,7 +390,7 @@ select, textarea {
   border: 1px solid rgba(59, 130, 246, 0.5);
 }
 .dex-status-strip {
-  background: rgba(8, 8, 8, 0.96);
+  background: rgba(6, 6, 9, 0.96);
   border-bottom: 1px solid var(--ox-silver-dim);
 }
 
@@ -425,7 +425,7 @@ select, textarea {
   overflow: hidden;
   border-radius: 20px;
   border: 1px solid var(--ox-silver-dim);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), transparent 42%), linear-gradient(225deg, rgba(212, 175, 55, 0.08), transparent 40%), linear-gradient(180deg, #0e0e0e, #080808);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), transparent 42%), linear-gradient(225deg, rgba(240, 199, 94, 0.08), transparent 40%), linear-gradient(180deg, #101016, #0c0c10);
   padding: 24px 22px;
 }
 .dex-kicker {
@@ -450,7 +450,7 @@ select, textarea {
 .dex-panel {
   border-radius: 16px;
   border: 1px solid var(--ox-silver-dim);
-  background: linear-gradient(180deg, #0e0e0e, #090909);
+  background: linear-gradient(180deg, #101016, #0c0c10);
   padding: 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -530,7 +530,7 @@ td, .tabular { font-variant-numeric: tabular-nums; }
 .dex-feed-tab--on {
   color: var(--ox-text);
   border-color: rgba(240, 199, 94, 0.45);
-  background: rgba(212, 175, 55, 0.1);
+  background: rgba(240, 199, 94, 0.1);
   box-shadow: inset 0 1px 0 rgba(240, 199, 94, 0.12);
 }
 .dex-feed-tab--on svg { color: var(--ox-gold-hi); }

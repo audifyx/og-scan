@@ -208,8 +208,8 @@ export default function BagworkAdmin() {
                       <div className="font-semibold">{t.title}</div>
                       <div className="font-mono text-xs text-[#F0C75E]">${Number(t.reward_usdc).toFixed(2)} · {t.active ? "live" : "hidden"}</div>
                     </div>
-                    <button type="button" className="text-[#60A5FA] text-xs font-bold uppercase" onClick={() => onEdit(t)}>Edit</button>
-                    <button type="button" className="text-[#ff4d6d]" onClick={() => onDelete(t.id)}><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" className="text-[#5AA2FF] text-xs font-bold uppercase" onClick={() => onEdit(t)}>Edit</button>
+                    <button type="button" className="text-[#fb7185]" onClick={() => onDelete(t.id)}><Trash2 className="h-4 w-4" /></button>
                   </li>
                 ))}
               </ul>
@@ -250,11 +250,11 @@ export default function BagworkAdmin() {
                       <td className="max-w-[120px] truncate font-mono text-xs" title={s.wallet_address}>{s.wallet_address}</td>
                       <td className="max-w-[180px] text-xs">
                         {s.proof_url && (
-                          <a href={s.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline">
+                          <a href={s.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#5AA2FF] hover:underline">
                             File <ExternalLink className="h-3 w-3" />
                           </a>
                         )}
-                        {s.proof_text && <div className="mt-1 text-[#A8B0BC]">{s.proof_text}</div>}
+                        {s.proof_text && <div className="mt-1 text-white/55">{s.proof_text}</div>}
                       </td>
                       <td><StatusBadge status={s.status} /></td>
                       <td>
@@ -277,7 +277,7 @@ export default function BagworkAdmin() {
                   ))}
                 </tbody>
               </table>
-              {!filteredSubs.length && <p className="py-8 text-center text-[#A8B0BC]">No submissions in this filter.</p>}
+              {!filteredSubs.length && <p className="py-8 text-center text-white/55">No submissions in this filter.</p>}
             </div>
           )}
         </>

@@ -3,7 +3,7 @@ export default function HeroBanner() {
   return (
     <div className="mb-4 overflow-hidden rounded-lg term-panel bg-term-grid">
       {/* window chrome */}
-      <div className="flex items-center gap-2 px-4 h-8 border-b" style={{ borderColor: "#1C2320", background: "#050505" }}>
+      <div className="flex items-center gap-2 px-4 h-8 border-b" style={{ borderColor: "rgba(255,255,255,0.09)", background: "#060609" }}>
         <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#FF5C5C" }} />
         <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#FFC53D" }} />
         <span className="w-2.5 h-2.5 rounded-full" style={{ background: "#00FFA3" }} />

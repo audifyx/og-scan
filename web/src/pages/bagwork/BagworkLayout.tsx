@@ -51,11 +51,11 @@ function WalletBar() {
       <span className="bw-wallet-dot" />
       <div className="leading-none">
         <div className="font-mono text-[11px] font-bold">{shortAddr(addr)}</div>
-        <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-[#A8B0BC]">sol</div>
+        <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-white/55">sol</div>
       </div>
       <button
         type="button"
-        className="font-mono text-[9px] uppercase tracking-widest text-[#A8B0BC] hover:text-white"
+        className="font-mono text-[9px] uppercase tracking-widest text-white/55 hover:text-white"
         onClick={() => disconnect().catch(() => undefined)}
       >
         Exit

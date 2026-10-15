@@ -31,12 +31,12 @@ export default function Launchpad() {
       </PageHero>
 
       {/* Official Platform Token Banner */}
-      <DexPanel className="border-violet-500/40 bg-gradient-to-r from-violet-500/10 to-indigo-500/10">
+      <DexPanel className="border-accent2/40 bg-gradient-to-r from-accent2/10 to-accent/10">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <Crown className="h-5 w-5 text-violet-400" />
-              <span className="font-display font-bold text-violet-300">Official Platform Token</span>
+              <Crown className="h-5 w-5 text-accent2" />
+              <span className="font-display font-bold text-accent2">Official Platform Token</span>
             </div>
             <p className="mt-1 text-sm text-[var(--ox-silver)]">{PLATFORM_TOKEN_NAME} ({PLATFORM_TOKEN_SYMBOL}) — Featured on all decks and the trade app.</p>
             <p className="mt-2 text-xs font-mono text-white/60 break-all">{PLATFORM_TOKEN_MINT}</p>

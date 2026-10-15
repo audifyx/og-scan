@@ -20,7 +20,7 @@ export function CommandHero({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[var(--ox-silver-dim)] bg-gradient-to-br from-[#0c0c0c] via-[#080808] to-[#050505] p-5 sm:p-6 mb-5">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--ox-silver-dim)] bg-gradient-to-br from-[#101016] via-[#0c0c10] to-[#060609] p-5 sm:p-6 mb-5">
       <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[var(--ox-blue)]/10 blur-[80px]" />
       <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-[var(--ox-gold)]/8 blur-[60px]" />
       <div className="relative flex flex-wrap items-start justify-between gap-4">

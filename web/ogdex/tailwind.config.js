@@ -4,18 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg:      "#050505",
-        panel:   "#0e0e0e",
-        panel2:  "#121212",
-        line:    "rgba(192, 198, 210, 0.16)",
+        bg:      "#060609",
+        panel:   "#101016",
+        panel2:  "#14141c",
+        line:    "rgba(255, 255, 255, 0.09)",
         accent:  "#60A5FA",
         accent2: "#F0C75E",
         gold:    "#F0C75E",
         term:    "#60A5FA",
-        up:      "#60A5FA",
-        down:    "#ff4d6d",
-        muted:   "rgba(255, 255, 255, 0.65)",
-        faint:   "rgba(255, 255, 255, 0.42)",
+        up:      "#34d399",
+        down:    "#fb7185",
+        muted:   "rgba(255, 255, 255, 0.55)",
+        faint:   "rgba(255, 255, 255, 0.32)",
       },
       fontFamily: {
         sans:    ["Manrope", "system-ui", "sans-serif"],

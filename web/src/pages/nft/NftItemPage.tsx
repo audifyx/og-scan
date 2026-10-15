@@ -22,9 +22,9 @@ const sol = (n: number | null | undefined) =>
   n == null ? "—" : `${Number(n).toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL`;
 
 const RARITY_COLOR: Record<string, string> = {
-  Mythic: "text-fuchsia-400 border-fuchsia-400/40 bg-fuchsia-400/10",
-  Legendary: "text-amber-400 border-amber-400/40 bg-amber-400/10",
-  Epic: "text-cyan-400 border-cyan-400/40 bg-cyan-400/10",
+  Mythic: "text-[#F0C75E] border-[#F0C75E]/40 bg-[#F0C75E]/10",
+  Legendary: "text-[#F0C75E] border-[#F0C75E]/40 bg-[#F0C75E]/10",
+  Epic: "text-[#3B82F6] border-[#3B82F6]/40 bg-[#3B82F6]/10",
   Rare: "text-emerald-400 border-emerald-400/40 bg-emerald-400/10",
   Common: "text-white/40 border-white/10 bg-white/[0.02]",
 };
@@ -239,7 +239,7 @@ export default function NftItemPage() {
             </div>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-white">{nft.name}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] mkt-muted">
-              {nft.symbol && <span className="font-mono font-bold text-cyan-300">${nft.symbol}</span>}
+              {nft.symbol && <span className="font-mono font-bold text-[#5AA2FF]">${nft.symbol}</span>}
               <button onClick={() => { navigator.clipboard?.writeText(nft.mint_address); toast.success("Mint copied"); }} className="inline-flex items-center gap-1 font-mono hover:text-white">
                 <Copy className="h-3 w-3" /> {shortAddr(nft.mint_address, 6)}
               </button>
@@ -247,11 +247,11 @@ export default function NftItemPage() {
             <div className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
               <div className="rounded-xl border border-white/5 bg-white/[0.02] p-2.5">
                 <div className="font-mono text-[9px] uppercase tracking-widest mkt-muted">Creator</div>
-                <Link to={`/nft/profile/${nft.creator_wallet}`} className="font-mono font-bold text-white hover:text-cyan-300">{shortAddr(nft.creator_wallet, 6)}</Link>
+                <Link to={`/nft/profile/${nft.creator_wallet}`} className="font-mono font-bold text-white hover:text-[#5AA2FF]">{shortAddr(nft.creator_wallet, 6)}</Link>
               </div>
               <div className="rounded-xl border border-white/5 bg-white/[0.02] p-2.5">
                 <div className="font-mono text-[9px] uppercase tracking-widest mkt-muted">Owner</div>
-                <Link to={`/nft/profile/${nft.current_owner}`} className="font-mono font-bold text-white hover:text-cyan-300">{shortAddr(nft.current_owner, 6)}</Link>
+                <Link to={`/nft/profile/${nft.current_owner}`} className="font-mono font-bold text-white hover:text-[#5AA2FF]">{shortAddr(nft.current_owner, 6)}</Link>
               </div>
             </div>
           </div>
@@ -302,8 +302,8 @@ export default function NftItemPage() {
               <div className="mb-2 font-mono text-[10px] uppercase tracking-widest mkt-muted">Traits</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {nft.attributes.map((a, i) => (
-                  <div key={i} className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-2.5 text-center">
-                    <div className="font-mono text-[9px] uppercase tracking-widest text-cyan-300/70">{a.trait_type}</div>
+                  <div key={i} className="rounded-xl border border-[#3B82F6]/20 bg-[#3B82F6]/5 p-2.5 text-center">
+                    <div className="font-mono text-[9px] uppercase tracking-widest text-[#5AA2FF]/70">{a.trait_type}</div>
                     <div className="mt-0.5 truncate text-[13px] font-bold text-white">{a.value}</div>
                   </div>
                 ))}

@@ -293,7 +293,7 @@ export default function TokenDetail() {
             <span className="text-muted text-sm">{name}</span>
             {verified && <Verified size={14} />}
             {d.verdict && <span className="pill bg-accent/15 text-accent text-[10px] font-bold">{d.verdict}</span>}
-            {meta.isPumpFun && <span className="pill text-[10px]" style={{ background: "rgba(0,209,255,0.15)", color: "#c084fc" }}>pump.fun</span>}
+            {meta.isPumpFun && <span className="pill text-[10px]" style={{ background: "rgba(96,165,250,0.15)", color: "#F0C75E" }}>pump.fun</span>}
             {(t.tags || []).slice(0, 3).map((tg: string) => (
               <span key={tg} className="pill bg-panel2 text-muted text-[10px] capitalize">{tg}</span>
             ))}

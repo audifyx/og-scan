@@ -108,9 +108,9 @@ export default function CollectionPage() {
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={stats} margin={{ top: 6, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#8a93a6" }} tickFormatter={(d: string) => d.slice(5)} minTickGap={24} />
-              <YAxis tick={{ fontSize: 10, fill: "#8a93a6" }} width={44} />
-              <Tooltip contentStyle={{ background: "#0a1220", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} labelStyle={{ color: "#8a93a6" }} />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: "rgba(255,255,255,0.32)" }} tickFormatter={(d: string) => d.slice(5)} minTickGap={24} />
+              <YAxis tick={{ fontSize: 10, fill: "rgba(255,255,255,0.32)" }} width={44} />
+              <Tooltip contentStyle={{ background: "#101016", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} labelStyle={{ color: "rgba(255,255,255,0.32)" }} />
               <Line type="monotone" dataKey="volume_sol" name="Volume (SOL)" stroke="hsl(var(--og-lime))" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="floor_sol" name="Floor (SOL)" stroke="hsl(var(--og-cyan))" strokeWidth={2} dot={false} />
             </LineChart>
