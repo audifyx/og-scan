@@ -114,13 +114,13 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
 
     // blinking (skip when sleepy/dormant — eyes already half closed)
     if (eyeL.current && eyeR.current && mood !== "sleepy" && mood !== "dormant") {
-      blinkT.current -= dt;
+      blinkT.current -= delta;
       if (blinkT.current <= 0) {
         blinkT.current = 1.6 + Math.random() * 3.2;
         blinkP.current = 0.22; // blink duration
       }
       if (blinkP.current > 0) {
-        blinkP.current -= dt;
+        blinkP.current -= delta;
         const k = Math.sin((1 - blinkP.current / 0.22) * Math.PI);
         eyeL.current.scale.y = eyeR.current.scale.y = Math.max(0.08, 1 - k * 0.95);
       } else {
