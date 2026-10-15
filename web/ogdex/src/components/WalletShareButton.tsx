@@ -11,12 +11,12 @@ export default function WalletShareButton({ address, pnl, win, trades }: { addre
   if (trades != null) qs.set("trades", String(trades));
   const shareUrl = `https://ogscan.fun/sharew/${address}?${qs.toString()}`;
   const pnlStr = pnl != null ? (pnl >= 0 ? "+$" : "-$") + Math.abs(pnl).toLocaleString(undefined, { maximumFractionDigits: 0 }) : null;
-  const lines = ["💰 My wallet PnL on OrbitX DEX"];
+  const lines = ["💰 My wallet PnL on OrbitX Terminal"];
   if (pnlStr) lines.push(`${pnlStr}${win != null ? ` · ${win}% win rate` : ""}${trades != null ? ` · ${trades} trades` : ""}`);
   lines.push("Tracked with the tools most platforms hide 👇");
   const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(lines.join("\n"))}&url=${encodeURIComponent(shareUrl)}`;
   const copy = () => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 1200); };
-  const native = async () => { try { if (navigator.share) { await navigator.share({ title: "My PnL — OrbitX DEX", text: lines.join(" "), url: shareUrl }); return true; } } catch {} return false; };
+  const native = async () => { try { if (navigator.share) { await navigator.share({ title: "My PnL — OrbitX Terminal", text: lines.join(" "), url: shareUrl }); return true; } } catch {} return false; };
   return (
     <span className="inline-flex items-center gap-1.5">
       <a href={intent} target="_blank" rel="noreferrer" onClick={(e) => { if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) { e.preventDefault(); native(); } }}

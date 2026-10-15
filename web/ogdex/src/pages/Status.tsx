@@ -80,7 +80,7 @@ export default function Status() {
         <Activity className="w-5 h-5 text-accent" />
         <h1 className="text-2xl font-black tracking-tight">System Status</h1>
       </div>
-      <p className="text-xs text-muted mb-6">Live status of OrbitX DEX services. Auto-refreshes every 30 seconds.</p>
+      <p className="text-xs text-muted mb-6">Live status of OrbitX Terminal services. Auto-refreshes every 30 seconds.</p>
 
       {/* Overall Banner */}
       <div className={`card p-5 mb-5 flex items-center justify-between border ${overallBg}`}>

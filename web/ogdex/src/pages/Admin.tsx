@@ -60,7 +60,7 @@ const TABS: { id: Tab; label: string; icon: any; cat: Cat }[] = [
   { id: "communities",  label: "Communities",    icon: Globe,          cat: "social" },
   { id: "notifications",label: "Notifications",   icon: Bell,           cat: "social" },
 ];
-const CAT_LABEL: Record<Cat, string> = { dex: "OrbitX DEX", social: "Social" };
+const CAT_LABEL: Record<Cat, string> = { dex: "OrbitX Terminal", social: "Social" };
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function Admin() {
@@ -679,7 +679,7 @@ function BannersTab({ data, act }: any) {
         <div className="text-sm font-bold mb-3">Set new banner</div>
         <div className="space-y-3">
           <textarea value={text} onChange={e => setText(e.target.value)}
-            placeholder="Banner message — appears site-wide at the top of OrbitX DEX…"
+            placeholder="Banner message — appears site-wide at the top of OrbitX Terminal…"
             rows={2} className="inp w-full resize-none" />
           <div className="flex gap-1.5 flex-wrap">
             {TYPES.map((t) => (
@@ -704,7 +704,7 @@ function BannersTab({ data, act }: any) {
       </div>
 
       <div className="text-xs text-muted">
-        The banner renders at the top of OrbitX DEX for all visitors. Use Urgent sparingly — it's red and catches attention immediately.
+        The banner renders at the top of OrbitX Terminal for all visitors. Use Urgent sparingly — it's red and catches attention immediately.
       </div>
     </div>
   );

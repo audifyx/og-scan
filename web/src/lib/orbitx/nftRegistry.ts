@@ -67,6 +67,27 @@ export async function listNftCollections(limit = 60): Promise<OrbitxNftCollectio
   return (data ?? []) as OrbitxNftCollection[];
 }
 
+/** Fetch a single NFT by id (for the detail page). */
+export async function getNftById(id: string): Promise<OrbitxNft | null> {
+  const { data, error } = await supabase.from("orbitx_nfts").select("*").eq("id", id).single();
+  if (error) return null;
+  return data as OrbitxNft;
+}
+
+/** Active listing for an NFT, if any. */
+export async function getListingForNft(nftId: string): Promise<OrbitxNftListing | null> {
+  const { data, error } = await supabase
+    .from("orbitx_nft_listings")
+    .select("*")
+    .eq("nft_id", nftId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as OrbitxNftListing;
+}
+
 export async function listNfts(limit = 100): Promise<OrbitxNft[]> {
   const { data, error } = await supabase.from("orbitx_nfts").select("*").order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;

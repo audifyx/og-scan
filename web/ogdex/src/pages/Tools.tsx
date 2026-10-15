@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Shield, Users, Droplets, Wallet2, Calculator, Search, Loader2, ArrowRight,
   Crosshair, ExternalLink, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
-  Clock, TrendingUp, TrendingDown, Flame, Rocket, DollarSign, Star, Share2, Check,
+  Clock, TrendingUp, TrendingDown, Flame, DollarSign, Star, Share2, Check,
   Percent, BarChart3, Layers,
 } from "lucide-react";
 import {
@@ -11,15 +11,13 @@ import {
   type Holder, type Pool, type WalletProfile,
 } from "../lib/scan";
 import { getScreener, fmtUsd, compact, type Row } from "../lib/api";
-import { DexPanel } from "../components/PageShell";
 import { CommandHero, QuickToolGrid, StatDeck } from "../components/DexAdvanced";
 
 const Launch = lazy(() => import("./Launch"));
 
-type ToolId = "create" | "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il" | "tax" | "mcap" | "dca";
+type ToolId = "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il" | "tax" | "mcap" | "dca";
 
 const TOOLS: { id: ToolId; label: string; desc: string; cmd: string; Icon: typeof Shield; kind: "feed" | "mint" | "wallet" | "calc" | "create"; ph: string }[] = [
-  { id: "create",    label: "Create token",      desc: "Multi-chain launcher",       cmd: "launch --chain",    Icon: Rocket,        kind: "create", ph: "" },
   { id: "sniper",    label: "Token Sniper",      desc: "Live pump.fun launches",     cmd: "snipe --live",      Icon: Crosshair,     kind: "feed",   ph: "" },
   { id: "holders",   label: "Holder Analysis",   desc: "Top holder distribution",    cmd: "holders --top 20",  Icon: Users,         kind: "mint",   ph: "paste token contract address" },
   { id: "liquidity", label: "Liquidity Scanner", desc: "Pools & liquidity depth",    cmd: "liq --depth",       Icon: Droplets,      kind: "mint",   ph: "paste token contract address" },
@@ -70,14 +68,14 @@ export default function Tools() {
       <CommandHero
         kicker="Terminal toolbox"
         title="Tools"
-        sub="Sniper feeds, holder analysis, liquidity scans, wallet profiles, calculators, and multi-chain token create."
+        sub="Sniper feeds, holder analysis, liquidity scans, wallet profiles, and calculators."
         icon={Crosshair}
       />
 
       <StatDeck items={[
         { label: "TOOLS", value: TOOLS.length, sub: "built-in utilities", tone: "blue" },
         { label: "SNIPER", value: "Live", sub: "pump.fun feeds", tone: "up" },
-        { label: "CHAINS", value: "16+", sub: "create token", tone: "gold" },
+        { label: "CHAINS", value: "16+", sub: "chains covered", tone: "gold" },
         { label: "API", value: "Free", sub: "public endpoints", tone: "plain" },
       ]} />
 
@@ -101,13 +99,6 @@ export default function Tools() {
         ))}
       </div>
 
-      {tool === "create" ? (
-        <DexPanel className="p-2 sm:p-4">
-          <Suspense fallback={<div className="grid place-items-center py-16 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>}>
-            <Launch />
-          </Suspense>
-        </DexPanel>
-      ) : (
       <>
       <div className="dex-panel px-4 sm:px-5 py-4">
         <div className="term text-[11px] text-[var(--ox-silver)]">
@@ -137,11 +128,6 @@ export default function Tools() {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/launchpad" className="card card-hover-lift flex items-center gap-3 p-4">
-          <Rocket className="h-5 w-5 text-accent" />
-          <div><div className="text-sm font-bold text-white">Launchpad</div><div className="term text-[10px] text-faint">Real OrbitX desk</div></div>
-          <ArrowRight className="ml-auto h-4 w-4 text-muted" />
-        </Link>
         <Link to="/pulse" className="card card-hover-lift flex items-center gap-3 p-4">
           <Flame className="h-5 w-5 text-accent" />
           <div><div className="text-sm font-bold text-white">Market Pulse</div><div className="term text-[10px] text-faint">Live signals</div></div>
@@ -149,7 +135,6 @@ export default function Tools() {
         </Link>
       </div>
       </>
-      )}
     </div>
   );
 }

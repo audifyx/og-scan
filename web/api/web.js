@@ -25,6 +25,7 @@ const LAZY = {
   "share": () => import("./_share.ts"),
   "share-wallet": () => import("./_share-wallet.ts"),
   "orbitx-onchain": () => import("./_orbitx-onchain.js"),
+  "social": () => import("./_social.js"),
 };
 
 export default async function handler(req, res) {

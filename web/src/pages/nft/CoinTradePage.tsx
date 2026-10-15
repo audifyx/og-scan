@@ -1,20 +1,18 @@
 // OrbitX — trade an NFT's coin. If the NFT's collection launched a pump.fun coin
 // (one per collection), trade it for real in-app (Jupiter) with a live
 // DexScreener chart. Otherwise fall back to the DB-tracked preview curve.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { toast } from "sonner";
 import { ArrowLeft, Flame, Loader2, Rocket, TrendingUp, Info, ExternalLink, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { HELIUS_RPC } from "@/lib/og";
 import { getMarketWithNft, getHoldings, listCoinTrades, tradeCoin, enableNftCoin } from "./nftCoin";
 import { Media, Empty } from "./_ui";
 import { fmtSol, fmtInt, shortAddr, timeAgo } from "./nftMarketData";
 import { PriceText } from "./currency";
 
-const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 async function fetchNftCoin(nftId: string): Promise<{ nft: any; coinMint: string | null }> {
   const { data } = await supabase.from("orbitx_nfts").select("*, collection:orbitx_nft_collections(coin_mint, name)").eq("id", nftId).maybeSingle();
@@ -31,7 +29,11 @@ export default function CoinTradePage() {
 
 /* ── Real pump.fun coin: DexScreener chart + in-app Jupiter swap ── */
 function RealCoinTrade({ nft, coinMint }: { nft: any; coinMint: string }) {
-  const walletCtx = useWallet();
+  const { address, ready, buy, sell, solscanTxUrl } = useActiveTradingWallet();
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [lastTx, setLastTx] = useState<string | null>(null);
   const { data: ds } = useQuery({
     queryKey: ["dexscreener", coinMint], refetchInterval: 30_000,
     queryFn: async () => {
@@ -41,23 +43,20 @@ function RealCoinTrade({ nft, coinMint }: { nft: any; coinMint: string }) {
     },
   });
 
-  // Jupiter Terminal (in-app swap) with wallet passthrough.
-  useEffect(() => {
-    const ID = "jup-terminal-v3";
-    const init = () => {
-      (window as any).Jupiter?.init?.({
-        displayMode: "integrated", integratedTargetId: "jup-embed", endpoint: HELIUS_RPC,
-        enableWalletPassthrough: true, formProps: { initialInputMint: SOL_MINT, initialOutputMint: coinMint },
-      });
-    };
-    if (!document.getElementById(ID)) {
-      const sc = document.createElement("script"); sc.id = ID; sc.src = "https://terminal.jup.ag/main-v3.js"; sc.async = true;
-      sc.onload = init; document.body.appendChild(sc);
-    } else init();
-  }, [coinMint]);
-  useEffect(() => {
-    (window as any).Jupiter?.syncProps?.({ passthroughWalletContextState: walletCtx });
-  }, [walletCtx.connected, walletCtx.publicKey]); // eslint-disable-line
+  // Backend-signed swap through the in-app wallet (no Phantom).
+  const onSwap = async () => {
+    if (!ready || !address) return toast.error("Link your in-app wallet first");
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return toast.error("Enter an amount");
+    setBusy(true);
+    try {
+      const sig = side === "buy" ? await buy(coinMint, amt) : await sell(coinMint, amt);
+      setLastTx(sig);
+      toast.success(`${side === "buy" ? "Bought" : "Sold"} — confirmed on-chain`);
+      setAmount("");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Swap failed"); }
+    finally { setBusy(false); }
+  };
 
   return (
     <div>
@@ -83,9 +82,24 @@ function RealCoinTrade({ nft, coinMint }: { nft: any; coinMint: string }) {
           )}
         </div>
         <div className="space-y-3">
-          <div className="mkt-panel p-3">
-            <div className="mb-2 flex items-center gap-1.5 text-sm font-black"><Rocket className="h-4 w-4 text-[hsl(var(--og-cyan))]" /> Swap in-app</div>
-            <div id="jup-embed" style={{ minHeight: 340 }} />
+          <div className="mkt-panel p-4">
+            <div className="mb-3 flex items-center gap-1.5 text-sm font-black"><Rocket className="h-4 w-4 text-[hsl(var(--og-cyan))]" /> Swap in-app</div>
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-white/5 p-1">
+              {(["buy", "sell"] as const).map((s) => (
+                <button key={s} type="button" onClick={() => setSide(s)}
+                  className={`rounded-lg py-2 text-[12px] font-black uppercase tracking-widest transition ${side === s ? (s === "buy" ? "bg-[hsl(var(--og-lime))] text-black" : "bg-red-500/80 text-white") : "text-white/50 hover:text-white"}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={side === "buy" ? "SOL amount" : "% of position"}
+              className="mkt-input mb-3 w-full" />
+            <button type="button" onClick={onSwap} disabled={busy || !ready}
+              className="mkt-btn primary w-full justify-center py-3">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : side === "buy" ? `Buy ${nft?.symbol ?? "coin"}` : `Sell ${nft?.symbol ?? "coin"}`}
+            </button>
+            {!ready && <div className="mt-2 text-center text-[11px] mkt-muted">Link your in-app wallet to trade.</div>}
+            {lastTx && <a href={solscanTxUrl(lastTx)} target="_blank" rel="noreferrer" className="mt-2 block text-center mkt-mono text-[11px] text-[hsl(var(--og-cyan))] hover:underline">View transaction</a>}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <a href={`https://jup.ag/swap/SOL-${coinMint}`} target="_blank" rel="noreferrer" className="mkt-btn ghost justify-center text-[12px]">Jupiter <ExternalLink className="h-3.5 w-3.5" /></a>
@@ -102,8 +116,7 @@ function RealCoinTrade({ nft, coinMint }: { nft: any; coinMint: string }) {
 
 /* ── Fallback: DB-tracked preview curve (no pump.fun coin for this collection) ── */
 function PaperMarket({ nftId }: { nftId: string }) {
-  const { publicKey } = useWallet();
-  const wallet = publicKey?.toBase58();
+  const { address: wallet } = useActiveTradingWallet();
   const qc = useQueryClient();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");

@@ -1,13 +1,13 @@
 // OrbitX NFT Marketplace — iOS mobile + desktop web-app shell
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useQuery } from "@tanstack/react-query";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { useRecentSales, shortAddr, fmtSol } from "./nftMarketData";
 import {
-  Search, Wallet, Sparkles, Compass, Rocket, Activity, PlusCircle, LayoutGrid,
+  Search, Sparkles, Compass, Rocket, Activity, PlusCircle, LayoutGrid,
   Bell, ChevronRight, Twitter, Send, Github, ShieldCheck, User,
 } from "lucide-react";
 import { CurrencyProvider, CurrencyToggle } from "./currency";
@@ -62,46 +62,44 @@ function titleFor(pathname: string): string {
 }
 
 function WalletLogin() {
-  const { connection } = useConnection();
-  const { publicKey, connected, connect, disconnect } = useWallet();
-  const addr = publicKey?.toBase58();
+  const { address, ready } = useActiveTradingWallet();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (addr) localStorage.setItem("orbitx_nft_identity", addr);
-  }, [addr]);
+    if (address) localStorage.setItem("orbitx_nft_identity", address);
+  }, [address]);
 
   const { data: sol } = useQuery({
-    queryKey: ["nftmkt-balance", addr],
-    enabled: !!addr,
+    queryKey: ["nftmkt-balance", address],
+    enabled: !!address,
     refetchInterval: 30_000,
-    queryFn: async () => (addr ? (await connection.getBalance(publicKey!)) / 1e9 : null),
+    queryFn: async () => {
+      if (!address) return null;
+      try {
+        const r = await fetch("https://api.mainnet-beta.solana.com", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [address] }),
+        });
+        const j = await r.json();
+        return typeof j?.result?.value === "number" ? j.result.value / 1e9 : null;
+      } catch { return null; }
+    },
   });
 
-  const onClick = async () => {
-    if (connected) { await disconnect().catch(() => undefined); return; }
-    try { await connect(); }
-    catch { /* in-app wallet link handles its own flow */ }
-  };
-
-  if (!connected || !addr) {
+  if (!ready || !address) {
     return <WalletConnectButton />;
   }
   return (
-    <div className="flex items-center gap-2">
-      <button type="button" onClick={() => navigate("/nft/me")} className="mkt-wallet-chip">
-        <span className="mkt-wallet-dot" />
-        <div className="leading-none text-left">
-          <div className="mkt-mono text-[11px] font-bold text-white">{shortAddr(addr)}</div>
-          <div className="mkt-mono mt-0.5 text-[9px] uppercase tracking-widest mkt-dim">
-            {sol != null ? `${sol.toFixed(2)} SOL` : "linked"}
-          </div>
+    <button type="button" onClick={() => navigate("/nft/me")} className="mkt-wallet-chip">
+      <span className="mkt-wallet-dot" />
+      <div className="leading-none text-left">
+        <div className="mkt-mono text-[11px] font-bold text-white">{shortAddr(address)}</div>
+        <div className="mkt-mono mt-0.5 text-[9px] uppercase tracking-widest mkt-dim">
+          {sol != null ? `${sol.toFixed(2)} SOL` : "in-app wallet"}
         </div>
-      </button>
-      <button type="button" onClick={onClick} title="Disconnect" className="mkt-btn ghost px-2.5 py-2">
-        <Wallet className="h-4 w-4" />
-      </button>
-    </div>
+      </div>
+    </button>
   );
 }
 

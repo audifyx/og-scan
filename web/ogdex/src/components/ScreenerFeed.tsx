@@ -163,7 +163,7 @@ export function TokenFeedCard({
   return (
     <article
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-panel/90 via-[#0a0a0a] to-[#060606] p-4 transition-all hover:border-[var(--ox-blue)]/40 hover:shadow-[0_0_24px_rgba(59,130,246,0.08)] ${onClick ? "cursor-pointer" : "cursor-default"}`}
+      className={`group relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-panel/90 via-[#0a0a0a] to-[#060606] p-4 transition-all hover:border-[var(--ox-blue)]/40 hover:shadow-[0_0_24px_rgba(59,130,246,0.08)] ${onClick ? "cursor-pointer" : "cursor-default"}`}
     >
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[var(--ox-blue)]/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
       <TokenIdentity r={r} rank={rank} chainLabel={chainLabel} />
@@ -384,7 +384,7 @@ export function SocialFeedPro({ items, loading }: { items: SocialItem[]; loading
     return (
       <div className="grid gap-3 sm:grid-cols-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-line bg-panel/50 p-4 animate-pulse h-40" />
+          <div key={i} className="rounded-3xl border border-line bg-panel/50 p-4 animate-pulse h-40" />
         ))}
       </div>
     );
@@ -399,7 +399,7 @@ export function SocialFeedPro({ items, loading }: { items: SocialItem[]; loading
           <article
             key={(item.mint || item.symbol || i) + i}
             onClick={() => canNav && item.mint && nav(`/token/${item.mint}`)}
-            className={`rounded-2xl border border-line bg-gradient-to-br from-panel/80 to-[#080808] p-4 transition hover:border-accent/35 ${canNav ? "cursor-pointer" : ""}`}
+            className={`rounded-3xl border border-line bg-gradient-to-br from-panel/80 to-[#080808] p-4 transition hover:border-accent/35 ${canNav ? "cursor-pointer" : ""}`}
           >
             <div className="flex gap-3">
               <TokenLogo src={item.icon} sym={item.symbol || "?"} size={48} />
@@ -462,11 +462,11 @@ export function ListedFeedPro({ listings, loading }: { listings: Listing[]; load
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {listings.map((a) => {
         const inner = (
-          <article className="group h-full rounded-2xl border border-line bg-panel/60 p-4 transition hover:border-[var(--ox-gold)]/40">
+          <article className="group h-full rounded-3xl border border-line bg-panel/60 p-4 transition hover:border-[var(--ox-gold)]/40">
             <div className="flex gap-3">
               {a.logo_url
-                ? <img src={a.logo_url} alt="" className="h-12 w-12 rounded-xl object-cover border border-line shrink-0" />
-                : <div className="grid h-12 w-12 place-items-center rounded-xl bg-panel2 text-xs font-bold text-muted shrink-0">{(a.symbol || "?").slice(0, 3)}</div>}
+                ? <img src={a.logo_url} alt="" className="h-12 w-12 rounded-2xl object-cover border border-line shrink-0" />
+                : <div className="grid h-12 w-12 place-items-center rounded-2xl bg-panel2 text-xs font-bold text-muted shrink-0">{(a.symbol || "?").slice(0, 3)}</div>}
               <div className="min-w-0 flex-1">
                 <div className="font-bold truncate flex items-center gap-1.5">
                   {a.project_name || a.symbol}
@@ -504,7 +504,7 @@ export function FeedSkeleton({ layout, count = 9 }: { layout: FeedLayout; count?
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-line bg-panel/40 p-4 animate-pulse h-52" />
+        <div key={i} className="rounded-3xl border border-line bg-panel/40 p-4 animate-pulse h-52" />
       ))}
     </div>
   );

@@ -20,6 +20,12 @@ import {
   Empty,
   NftGrid,
   NftCard,
+  NftListRow,
+  ViewToggle,
+  SortSelect,
+  sortNfts,
+  type NftViewMode,
+  type NftSortKey,
   CollectionCard,
   CoinMarketCard,
   CardSkeleton,
@@ -47,10 +53,20 @@ export default function MarketplaceHome() {
       )
       .slice(0, 10);
   }, [listings]);
+  const sortedListings = useMemo(() => {
+    return sortNfts(listings ?? [], listingSort, {
+      price: (l) => l.price_sol,
+      views: (l) => l.nft?.view_count ?? 0,
+      favorites: (l) => l.nft?.favorite_count ?? 0,
+      createdAt: (l) => l.created_at,
+    }).slice(0, 12);
+  }, [listings, listingSort]);
   const { ids: watched, toggle: toggleWatch } = useNftWatchlist();
 
   const [tab, setTab] = useState<TopTab>("trending");
   const [range, setRange] = useState<Range>("7d");
+  const [viewMode, setViewMode] = useState<NftViewMode>("grid");
+  const [listingSort, setListingSort] = useState<NftSortKey>("newest");
 
   const rows = useMemo(() => {
     let list = [...(collections ?? [])];
@@ -195,7 +211,7 @@ export default function MarketplaceHome() {
             {trendingNfts.map((l, i) => (
               <NftCard
                 key={l.id}
-                to="/nft/explore"
+                to={l.nft?.id ? `/nft/item/${l.nft.id}` : "/nft/explore"}
                 name={l.nft?.name ?? "NFT"}
                 image={l.nft?.image_url}
                 priceSol={l.price_sol}
@@ -246,21 +262,42 @@ export default function MarketplaceHome() {
           title="Recently listed"
           sub="Live listings — buy now"
           action={
-            <Link to="/nft/explore" className="mkt-btn ghost text-[12px]">
-              Explore <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <SortSelect value={listingSort} onChange={setListingSort} />
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+              <Link to="/nft/explore" className="mkt-btn ghost text-[12px]">
+                Explore <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           }
         />
         {listingsLoading ? (
           <CardSkeleton count={5} />
-        ) : (listings ?? []).length === 0 ? (
+        ) : sortedListings.length === 0 ? (
           <Empty label="No active listings right now." />
+        ) : viewMode === "list" ? (
+          <div className="space-y-2">
+            {sortedListings.map((l) => (
+              <NftListRow
+                key={l.id}
+                to={l.nft?.id ? `/nft/item/${l.nft.id}` : "/nft/explore"}
+                name={l.nft?.name ?? "NFT"}
+                image={l.nft?.image_url}
+                priceSol={l.price_sol}
+                rarityTier={l.nft?.rarity_tier}
+                rarityRank={l.nft?.rarity_rank}
+                flagged={l.nft?.is_flagged_duplicate}
+                views={l.nft?.view_count}
+                favorites={l.nft?.favorite_count}
+              />
+            ))}
+          </div>
         ) : (
           <NftGrid cols={5}>
-            {(listings ?? []).slice(0, 10).map((l) => (
+            {sortedListings.map((l) => (
               <NftCard
                 key={l.id}
-                to="/nft/explore"
+                to={l.nft?.id ? `/nft/item/${l.nft.id}` : "/nft/explore"}
                 name={l.nft?.name ?? "NFT"}
                 image={l.nft?.image_url}
                 priceSol={l.price_sol}

@@ -20,7 +20,7 @@ export default function Activity() {
           {sales.map((s) => (
             <div key={s.id} className="mkt-row grid grid-cols-[1fr_90px_120px] items-center gap-2 border-b mkt-hairline px-4 py-3 text-sm last:border-0 sm:grid-cols-[24px_1fr_110px_140px_100px]">
               <ShoppingCart className="hidden h-4 w-4 text-[hsl(var(--og-lime))] sm:block" />
-              <Link to="/nft/explore" className="flex min-w-0 items-center gap-3">
+              <Link to={s.nft?.id ? `/nft/item/${s.nft.id}` : "/nft/explore"} className="flex min-w-0 items-center gap-3">
                 <Media src={s.nft?.image_url} className="h-9 w-9 rounded-lg" />
                 <span className="truncate font-semibold">{s.nft?.name ?? "NFT"}</span>
               </Link>

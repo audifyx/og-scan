@@ -40,7 +40,7 @@ export default function Submit() {
     <div className="max-w-5xl mx-auto">
       <div className="text-center mb-6">
         <div className="inline-flex items-center gap-1.5 pill bg-accent/15 text-accent mb-3"><Rocket className="w-3.5 h-3.5" /> Project Listing</div>
-        <h1 className="text-3xl font-bold tracking-tight">Get your token listed on OrbitX DEX</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Get your token listed on OrbitX Terminal</h1>
         <p className="text-muted mt-2 max-w-2xl mx-auto">Permanently listed and shared to our community every time new tokens drop. We post to our X community (200+) and Telegram. Visible to 55+ and growing users on OrbitX.</p>
       </div>
 
@@ -50,7 +50,7 @@ export default function Submit() {
         <div className="flex items-start gap-3 relative">
           <div className="w-10 h-10 rounded-full bg-accent/15 grid place-items-center shrink-0"><BadgeCheck className="w-5 h-5 text-accent" /></div>
           <div>
-            <div className="font-semibold flex items-center gap-1.5">Every listing gets the OrbitX DEX Verified badge <Verified size={16} /></div>
+            <div className="font-semibold flex items-center gap-1.5">Every listing gets the OrbitX Terminal Verified badge <Verified size={16} /></div>
             <p className="text-sm text-muted mt-1">Listed projects display the blue verified checkmark <Verified size={12} className="inline align-[-1px]" /> across the screener and your token page. It signals to traders that your project is reviewed, on-chain-scanned, and officially listed, building instant trust and standing out from the thousands of unverified tokens.</p>
             <div className="flex flex-wrap gap-2 mt-3 text-xs">
               <span className="pill bg-up/10 text-up inline-flex items-center gap-1"><Check className="w-3 h-3" /> Trust signal in search results</span>
@@ -99,7 +99,7 @@ export default function Submit() {
           <p className="text-xs text-muted mt-4">Our tech automatically scans your CA and pulls all metadata + on-chain data into our backend — no manual typing needed.</p>
           <div className="mt-4 pt-4 border-t border-line text-xs text-muted">
             <div className="flex items-center gap-1.5 font-semibold text-white mb-1"><ShieldCheck className="w-3.5 h-3.5 text-accent" /> Free updates anytime</div>
-            Update links, banner, etc. for free. To verify you're the dev: DM <a className="text-accent" href="https://t.me/ogscanofficial" target="_blank">@ogscanofficial</a> and post on X: "I verify I am the developer of this project requesting to update our links on OrbitX DEX".
+            Update links, banner, etc. for free. To verify you're the dev: DM <a className="text-accent" href="https://t.me/ogscanofficial" target="_blank">@ogscanofficial</a> and post on X: "I verify I am the developer of this project requesting to update our links on OrbitX Terminal".
           </div>
         </div>
 

@@ -140,6 +140,10 @@
       "destination": "/api/web?path=kol/$1"
     },
     {
+      "source": "/api/social/:path*",
+      "destination": "/api/web?path=social/:path*"
+    },
+    {
       "source": "/api/orbitx-agent/(.*)",
       "destination": "/api/orbitx-hub?path=agent/$1"
     },

@@ -125,7 +125,7 @@ curl -X POST ${BASE}/api/mcp \\
           <Code className="w-4 h-4 text-accent" /> AI Agent / MCP Integration
         </div>
         <p className="text-xs text-muted mb-4">
-          Any MCP-compatible AI — Claude, GPT-4, custom LLM agents — can discover and call OrbitX DEX tools directly via the manifest endpoint.
+          Any MCP-compatible AI — Claude, GPT-4, custom LLM agents — can discover and call OrbitX Terminal tools directly via the manifest endpoint.
         </p>
         <div className="space-y-2">
           {[

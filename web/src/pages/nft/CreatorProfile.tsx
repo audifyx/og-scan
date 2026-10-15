@@ -2,7 +2,7 @@
 // /nft/me  -> connected wallet;  /nft/profile/:wallet -> any creator.
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -22,8 +22,7 @@ type Tab = "created" | "owned" | "collections" | "fees" | "activity";
 
 export default function CreatorProfile() {
   const { wallet: routeWallet } = useParams();
-  const { publicKey } = useWallet();
-  const me = publicKey?.toBase58();
+  const { address: me } = useActiveTradingWallet();
   const wallet = routeWallet || me || undefined;
   const isMe = !!wallet && wallet === me;
   const [params, setParams] = useSearchParams();
@@ -94,8 +93,7 @@ export default function CreatorProfile() {
 }
 
 function ProfileHeader({ wallet, isMe, verified }: { wallet: string; isMe: boolean; verified?: boolean }) {
-  const { publicKey } = useWallet();
-  const me = publicKey?.toBase58();
+  const { address: me } = useActiveTradingWallet();
   const qc = useQueryClient();
   const { data: counts } = useQuery({ queryKey: ["cp-follow", wallet], queryFn: () => getFollowCounts(wallet) });
   const { data: following } = useQuery({ queryKey: ["cp-isfollowing", me, wallet], enabled: !!me && !isMe, queryFn: () => isFollowing(me!, wallet) });

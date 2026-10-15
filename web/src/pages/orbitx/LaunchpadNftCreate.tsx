@@ -1,18 +1,17 @@
 // OrbitX NFT Creator Studio — real on-chain NFT + collection creation.
-// Every mint here is a genuine Metaplex Token Metadata NFT signed by the
-// connected wallet (Phantom, etc.) and registered in the OrbitX NFT registry.
+// Every mint here is a genuine Metaplex Token Metadata NFT, backend-signed by
+// the in-app wallet and registered in the OrbitX NFT registry.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { mintNft, verifyNftInCollection } from "@/lib/orbitx/nftMint";
-import { launchPumpCoin } from "@/lib/orbitx/pumpLaunch";
+import { deskNftMint } from "@/lib/nftDesk";
 import CreatorInventory from "@/components/orbitx/CreatorInventory";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { isAcceptedNftMedia, uploadNftAssets } from "./nftUpload";
 import {
-  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality, setCollectionCategory, setCollectionCoin,
+  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality, setCollectionCategory,
   checkNftContentDuplicate, sha256Hex, type OrbitxNftCollection,
 } from "@/lib/orbitx/nftRegistry";
 import {
@@ -48,8 +47,8 @@ function Field({ label, children, hint }: { label: string; children: React.React
 const inputClass = "w-full rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-3 py-2 text-sm text-[hsl(var(--pf-ink))] outline-none focus:border-[hsl(var(--pf-green))]";
 
 export default function LaunchpadNftCreate() {
-  const { connected, publicKey, wallet, sendTransaction } = useWallet();
-  const { connection } = useConnection();
+  const { address, ready } = useActiveTradingWallet();
+  const connected = ready;
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>("nft");
@@ -57,7 +56,7 @@ export default function LaunchpadNftCreate() {
   const [statusMsg, setStatusMsg] = useState("");
   const [success, setSuccess] = useState<MintSuccess | null>(null);
 
-  const addr = publicKey?.toBase58();
+  const addr = address;
   const { data: myCollections } = useQuery({
     queryKey: ["orbitx-nft-my-collections", addr],
     queryFn: () => listCollectionsByCreator(addr!),
@@ -145,58 +144,32 @@ export default function LaunchpadNftCreate() {
   const [coinDevBuy, setCoinDevBuy] = useState("0");
 
   const createCollection = async () => {
-    if (!connected || !publicKey || !wallet) { toast.error("Connect a wallet first"); return; }
+    if (!ready || !address) { toast.error("Link your in-app wallet first"); return; }
     if (!name.trim() || !symbol.trim() || !colBanner) { toast.error("Name, symbol, and a banner/logo image are required"); return; }
     if (collectionNameBlocked) { toast.error(`Too close to existing collection "${collectionNameBlocked.name}" ($${collectionNameBlocked.symbol}). Choose a different name.`); return; }
     setBusy(true);
     try {
       setStatusMsg("Uploading collection artwork…");
       const royaltyBps = Math.round(Number(royaltyPct) * 100);
-      const { mediaUrl, uri } = await uploadNftAssets(`col-${publicKey.toBase58()}-${Date.now()}`, colBanner, {
+      const { mediaUrl, uri } = await uploadNftAssets(`col-${address}-${Date.now()}`, colBanner, {
         name: name.trim(), symbol: symbol.trim().toUpperCase(), description: description.trim(),
-        externalUrl: externalUrl.trim(), attributes: [], creatorWallet: publicKey.toBase58(), royaltyBps,
+        externalUrl: externalUrl.trim(), attributes: [], creatorWallet: address, royaltyBps,
       });
 
-      setStatusMsg("Approve the collection mint in your wallet…");
-      const { mintAddress } = await mintNft({
-        connection, wallet: wallet.adapter, name: name.trim(), symbol: symbol.trim().toUpperCase(),
-        uri, royaltyBps, isCollection: true,
+      setStatusMsg("Minting on-chain via your in-app wallet…");
+      const { mint: mintAddress } = await deskNftMint({
+        name: name.trim(), symbol: symbol.trim().toUpperCase(),
+        uri, royaltyBps, imageUrl: mediaUrl,
       });
 
       setStatusMsg("Registering collection…");
       const newCollectionId = await registerNftCollection({
-        creator_wallet: publicKey.toBase58(), name: name.trim(), symbol: symbol.trim().toUpperCase(),
+        creator_wallet: address, name: name.trim(), symbol: symbol.trim().toUpperCase(),
         description: description.trim(), banner_url: mediaUrl, logo_url: mediaUrl, royalty_bps: royaltyBps,
         mint_price_sol: Number(mintPrice) || 0, mint_limit: mintLimit ? Number(mintLimit) : null, mint_address: mintAddress,
       });
       if (category && newCollectionId) {
-        await setCollectionCategory(newCollectionId, category, publicKey.toBase58()).catch(() => undefined);
-      }
-
-      // Optional same-session coin (advanced). Default path is NFT first, token later.
-      if (launchCoinNow && newCollectionId) {
-        try {
-          const b64 = await new Promise<string>((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(String(r.result).split(",")[1] || "");
-            r.onerror = reject; r.readAsDataURL(colBanner);
-          });
-          const { mint } = await launchPumpCoin({
-            connection, publicKey,
-            signTransaction: wallet.adapter.signTransaction!.bind(wallet.adapter) as any,
-            sendTransaction: sendTransaction ?? undefined,
-            walletName: wallet.adapter.name,
-            imageBase64: b64, imageMimeType: colBanner.type || "image/png",
-            name: name.trim(), symbol: symbol.trim().toUpperCase(), description: description.trim(),
-            website: externalUrl.trim() || undefined, devBuySol: Number(coinDevBuy) || 0,
-            onStatus: setStatusMsg,
-          });
-          await setCollectionCoin(newCollectionId, mint, publicKey.toBase58()).catch(() => undefined);
-          toast.success("Collection coin launched on pump.fun!");
-        } catch (coinErr) {
-          console.warn("[orbitx] collection coin launch skipped:", coinErr);
-          toast.message("Collection created. Create the token next — details will auto-fill.");
-        }
+        await setCollectionCategory(newCollectionId, category, address).catch(() => undefined);
       }
 
       toast.success("Collection minted on-chain!");
@@ -219,36 +192,32 @@ export default function LaunchpadNftCreate() {
   };
 
   const createNftItems = async () => {
-    if (!connected || !publicKey || !wallet) { toast.error("Connect a wallet first"); return; }
+    if (!ready || !address) { toast.error("Link your in-app wallet first"); return; }
     if (!name.trim() || !mediaFile) { toast.error("Name and media file are required"); return; }
     const copies = Math.max(1, Math.min(10, Number(supply) || 1));
     setBusy(true);
     try {
       setStatusMsg("Uploading media + metadata…");
       const royaltyBps = Math.round(Number(royaltyPct) * 100);
-      const { mediaUrl, uri } = await uploadNftAssets(`nft-${publicKey.toBase58()}-${Date.now()}`, mediaFile, {
+      const { mediaUrl, uri } = await uploadNftAssets(`nft-${address}-${Date.now()}`, mediaFile, {
         name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT", description: description.trim(),
-        externalUrl: externalUrl.trim(), attributes, creatorWallet: publicKey.toBase58(), royaltyBps,
+        externalUrl: externalUrl.trim(), attributes, creatorWallet: address, royaltyBps,
         collectionName: selectedCollection?.name,
       });
 
       for (let i = 0; i < copies; i++) {
-        setStatusMsg(copies > 1 ? `Approve mint ${i + 1} of ${copies} in your wallet…` : "Approve the mint in your wallet…");
-        const { mintAddress } = await mintNft({
-          connection, wallet: wallet.adapter, name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT",
-          uri, royaltyBps, collectionMint: selectedCollection?.mint_address ?? undefined,
+        setStatusMsg(copies > 1 ? `Minting ${i + 1} of ${copies} via your in-app wallet…` : "Minting via your in-app wallet…");
+        const { mint: mintAddress } = await deskNftMint({
+          name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT",
+          uri, royaltyBps, imageUrl: mediaUrl,
+          collectionId: selectedCollection?.id ?? undefined,
+          collectionMint: selectedCollection?.mint_address ?? undefined,
+          attributes: attributes.filter((a) => a.trait_type.trim() && a.value.trim()),
         });
-
-        if (selectedCollection?.mint_address) {
-          setStatusMsg("Verifying collection membership…");
-          await verifyNftInCollection(connection, wallet.adapter, mintAddress, selectedCollection.mint_address).catch((e) =>
-            console.warn("[orbitx] collection verification failed (item still minted, just unverified):", e)
-          );
-        }
 
         setStatusMsg("Registering NFT…");
         await registerNft({
-          collection_id: selectedCollection?.id ?? null, mint_address: mintAddress, creator_wallet: publicKey.toBase58(),
+          collection_id: selectedCollection?.id ?? null, mint_address: mintAddress, creator_wallet: address,
           name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT", image_url: mediaUrl, metadata_uri: uri, royalty_bps: royaltyBps,
           attributes: attributes.filter((a) => a.trait_type.trim() && a.value.trim()), content_hash: contentHash ?? undefined,
         });
@@ -279,7 +248,7 @@ export default function LaunchpadNftCreate() {
         <div className="pf-card flex flex-col items-center gap-4 py-20 text-center">
           <Wallet className="h-8 w-8 text-[hsl(var(--pf-green))]" />
           <div className="text-lg font-black text-[hsl(var(--pf-ink))]">Connect your wallet</div>
-          <div className="mx-auto max-w-sm text-sm text-[hsl(var(--pf-muted))]">Connect up top to mint real, on-chain NFTs and collections.</div>
+          <div className="mx-auto max-w-sm text-sm text-[hsl(var(--pf-muted))]">Link your in-app wallet up top to mint real, on-chain NFTs and collections.</div>
         </div>
       </div>
     );
@@ -431,36 +400,18 @@ export default function LaunchpadNftCreate() {
 
         <div className="flex items-start gap-2 rounded-lg border border-[hsl(var(--pf-border))] bg-white/[0.02] p-3 text-[11px] text-[hsl(var(--pf-muted))]">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--pf-green))]" />
-          Your connected wallet becomes the verified creator on-chain. After minting, use <b className="text-[hsl(var(--pf-ink))]">Create token</b> — name, ticker, and art auto-fill so you do not retype anything.
+          Your in-app wallet becomes the verified creator on-chain — mints are backend-signed, no popups. After minting, use <b className="text-[hsl(var(--pf-ink))]">Create token</b> — name, ticker, and art auto-fill so you do not retype anything.
         </div>
 
-        {mode === "collection" && (
-          <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
-            <label className="flex items-start gap-2 text-[13px] text-[hsl(var(--pf-ink))]">
-              <input type="checkbox" checked={launchCoinNow} onChange={(e) => setLaunchCoinNow(e.target.checked)} className="mt-0.5" />
-              <span>
-                Also launch the coin <b>in this same session</b>{" "}
-                <span className="text-[hsl(var(--pf-muted))]">(optional — needs a second signature + extra SOL. Recommended: mint first, then Create token.)</span>
-              </span>
-            </label>
-            {launchCoinNow && (
-              <div className="mt-2 flex items-center gap-2 text-[12px] text-[hsl(var(--pf-muted))]">
-                Dev-buy (SOL)
-                <input value={coinDevBuy} onChange={(e) => setCoinDevBuy(e.target.value)} inputMode="decimal" placeholder="0"
-                  className="w-24 rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-2 py-1 text-[hsl(var(--pf-ink))]" />
-              </div>
-            )}
-          </div>
-        )}
         <button onClick={mode === "collection" ? createCollection : createNftItems} disabled={busy || (mode === "collection" && !!collectionNameBlocked) || checkingCollectionName}
           className="pf-btn w-full justify-center">
           {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> {statusMsg || "Minting…"}</> : <><Rocket className="h-4 w-4" /> {mode === "collection" ? "Mint collection" : "Mint NFT"}</>}
         </button>
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-lg border border-[hsl(var(--og-gold))]/25 bg-[hsl(var(--og-gold))]/5 p-3 text-[11px] text-[hsl(var(--pf-muted))]">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--og-gold))]" />
-        Buying/selling on the marketplace (escrowed listings, offers, auctions) is being built on Metaplex Auction House and isn't live yet — minting and ownership here are fully real today. <Link to="/nft" className="underline">Back to NFT Market</Link>
+      <div className="mt-4 flex items-start gap-2 rounded-lg border border-[hsl(var(--pf-green))]/25 bg-[hsl(var(--pf-green))]/5 p-3 text-[11px] text-[hsl(var(--pf-muted))]">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--pf-green))]" />
+        Minted NFTs can be listed, auctioned, and sold on the <Link to="/nft/explore" className="underline">NFT marketplace</Link> — atomic on-chain settlement, backend-signed. <Link to="/nft" className="underline">Back to NFT Market</Link>
       </div>
     </div>
   );

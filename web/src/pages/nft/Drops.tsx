@@ -27,7 +27,7 @@ export default function Drops() {
       <SectionHeader
         title="Launch drops"
         sub="Scheduled mints — whitelist, public, and private, with wallet + supply caps"
-        action={<Link to="/nft/create" className="mkt-btn"><PlusCircle className="h-4 w-4" /> Create a drop</Link>}
+        action={<Link to="/nft/create" className="mkt-btn"><PlusCircle className="h-4 w-4" /> Mint NFTs</Link>}
       />
       {isLoading ? <div className="px-4 py-10 text-center text-sm mkt-muted">Loading…</div> :
         drops.length === 0 ? (
@@ -35,7 +35,7 @@ export default function Drops() {
             <Rocket className="h-8 w-8 text-[hsl(var(--og-cyan))]" />
             <div className="text-sm font-bold">No drops scheduled yet</div>
             <p className="max-w-sm text-[12px] mkt-muted">Schedule a mint with whitelist and public phases, per-wallet limits, and a total supply cap. Buyers get a live countdown.</p>
-            <Link to="/nft/create" className="mkt-btn mt-1"><PlusCircle className="h-4 w-4" /> Create your first drop</Link>
+            <Link to="/nft/create" className="mkt-btn mt-1"><PlusCircle className="h-4 w-4" /> Mint your first NFT</Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

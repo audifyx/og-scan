@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { toast } from "sonner";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { listNftCollections, listNfts } from "@/lib/orbitx/nftRegistry";
@@ -18,8 +18,7 @@ import { saveTokenCreatePrefill, buildCreateTokenHref } from "@/lib/orbitx/token
 export default function CollectionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { publicKey } = useWallet();
-  const wallet = publicKey?.toBase58();
+  const { address: wallet } = useActiveTradingWallet();
   const { data: collections } = useQuery({ queryKey: ["nftmkt-collections"], queryFn: () => listNftCollections(200), staleTime: 30_000 });
   const { data: allNfts } = useQuery({ queryKey: ["nftmkt-nfts", 500], queryFn: () => listNfts(500), staleTime: 30_000 });
   const { data: stats } = useCollectionStats(id);
@@ -130,7 +129,7 @@ export default function CollectionPage() {
             {items.map((n) => (
               <NftCard
                 key={n.id}
-                to="/nft/explore"
+                to={`/nft/item/${n.id}`}
                 name={n.name}
                 image={n.image_url}
                 rarityTier={n.rarity_tier}

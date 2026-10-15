@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Code2, Copy, Check, Terminal, Link2, ExternalLink, ChevronDown, Sparkles, Bot } from "lucide-react";
 
-const BASE = "https://ogscan.fun/api/ogdex";
-const OPENAPI = "https://ogscan.fun/api/ogdex/openapi.json";
-const LLMS = "https://ogscan.fun/api/ogdex/llms.txt";
+const BASE = "https://orbitx.world/api/ogdex";
+const OPENAPI = "https://orbitx.world/api/ogdex/openapi.json";
+const LLMS = "https://orbitx.world/api/ogdex/llms.txt";
 
 const ENDPOINTS = [
   { m: "GET", path: "/screener?type=trending&chain=solana&limit=100", desc: "Token screener. type: trending|runners|new|fomo|jupiter|unbonded|migrated|moonshot|newpairs|og|kols|celebrity|organic|listed|multichain|social." },
@@ -22,7 +22,6 @@ const ENDPOINTS = [
   { m: "GET", path: "/kols", desc: "Tracked KOL / smart-money directory. Add ?feed=1 for activity, ?token=<MINT> to filter." },
   { m: "GET", path: "/search?q=<QUERY>", desc: "Search tokens by name, ticker, or mint." },
   { m: "GET", path: "/listings?featured=1", desc: "Featured / boosted listings from the Store." },
-  { m: "GET", path: "/launches?limit=50", desc: "Tokens launched through the OrbitX DEX launcher." },
   { m: "GET", path: "/metadata?mint=<MINT>", desc: "On-chain metadata + update authority + mutability." },
   { m: "POST", path: "/chat", desc: "Chat with the AI for a coin — answers from live on-chain data + web search. Body: { mint, messages:[{role,content}] }." },
 ];
@@ -36,8 +35,8 @@ export default function ApiDocs() {
     <div className="max-w-3xl mx-auto py-8 px-4">
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-accent/20 bg-accent/10"><Code2 className="h-7 w-7 text-accent" /></div>
-        <h1 className="text-2xl font-black tracking-tight">OrbitX DEX Public API</h1>
-        <p className="mt-2 text-sm text-muted">All of OrbitX DEX, free over HTTPS. No key required. One link plugs the whole tool into ChatGPT, Claude, Postman, or your app — no copy-pasting endpoints.</p>
+        <h1 className="text-2xl font-black tracking-tight">OrbitX Terminal Public API</h1>
+        <p className="mt-2 text-sm text-muted">All of OrbitX Terminal, free over HTTPS. No key required. One link plugs the whole tool into ChatGPT, Claude, Postman, or your app — no copy-pasting endpoints.</p>
       </div>
 
       {/* ONE LINK */}
@@ -89,7 +88,7 @@ export default function ApiDocs() {
       <div className="card mb-4 p-4">
         <div className="mb-2 text-sm font-bold flex items-center gap-2"><Sparkles className="h-4 w-4 text-accent" /> Try it</div>
         <pre className="overflow-x-auto rounded-lg bg-panel2/60 p-3 font-mono text-[11px] text-white/80">{`curl "${BASE}/token?mint=EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"`}</pre>
-        <p className="mt-2 text-[11px] text-muted/70">JSON responses, edge-cached. Need streaming or higher limits? Reach us on Telegram @ogscanner.</p>
+        <p className="mt-2 text-[11px] text-muted/70">JSON responses, edge-cached. Need streaming or higher limits? Reach us on Telegram @orbitxwrld.</p>
       </div>
 
       {/* Full reference (collapsed) */}

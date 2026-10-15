@@ -3,24 +3,24 @@
 // rarity badges and fraud/duplicate warnings throughout.
 import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useWalletNfts } from "./nfts";
 import { shortAddr } from "./_shared";
 import {
   listNftCollections, listNfts, listNftsByCreator, listCollectionsByCreator,
-  listNft, cancelNftListing, listActiveListings, listActiveAuctions, listOffersForNft,
+  cancelNftListing, listActiveListings, listActiveAuctions, listOffersForNft,
   makeNftOffer, respondNftOffer, createNftAuction, placeNftBid,
-  setNftDelegateApproved, listMyFavoriteIds, toggleNftFavorite, listRecentSales, type OrbitxNft, type NftOffer,
+  listMyFavoriteIds, toggleNftFavorite, listRecentSales, type OrbitxNft, type NftOffer,
 } from "@/lib/orbitx/nftRegistry";
-import { approveMarketplaceDelegate, executeSale } from "@/lib/orbitx/nftMarketplace";
+import { deskNftList, deskNftBuy, deskNftApproveDelegate } from "@/lib/nftDesk";
 import NftDetailModal from "@/components/orbitx/NftDetailModal";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import {
   Wallet, Loader2, Image as ImageIcon, Layers, Sparkles, Send, Twitter, ExternalLink,
   ShieldCheck, Plus, Tag, X, Rocket, ShoppingCart, Gavel, HandCoins, AlertTriangle, Crown,
-  Heart, Eye, Search, Flame,
+  Heart, Eye, Search, Flame, LayoutGrid, List as ListIcon,
 } from "lucide-react";
 
 type Tab = "explore" | "market" | "mine" | "created";
@@ -40,26 +40,19 @@ function RarityBadge({ tier, rank }: { tier?: string | null; rank?: number | nul
 function ListModal({ nft, onClose, onListed }: { nft: OrbitxNft; onClose: () => void; onListed: () => void }) {
   const [price, setPrice] = useState("1");
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<"idle" | "approving">("idle");
-  const [currency, setCurrency] = useState<"SOL" | "USDC">("SOL");
-  const { publicKey, signTransaction } = useWallet();
-  const { connection } = useConnection();
+  const { ready } = useActiveTradingWallet();
   const submit = async () => {
-    if (!publicKey || !signTransaction) return;
+    if (!ready) return toast.error("Link your in-app wallet first");
+    const p = Number(price);
+    if (!p || p <= 0) return toast.error("Enter a valid price");
     setBusy(true);
     try {
-      if (!nft.delegate_approved) {
-        setStep("approving");
-        await approveMarketplaceDelegate(connection, signTransaction, publicKey, nft.mint_address);
-        await setNftDelegateApproved(nft.id, publicKey.toBase58());
-      }
-      setStep("idle");
-      await listNft(nft.id, publicKey.toBase58(), Number(price), currency);
-      toast.success(`Listed ${nft.name} for ${price} ${currency}`);
+      await deskNftList({ nftId: nft.id, mint: nft.mint_address, priceSol: p });
+      toast.success(`Listed ${nft.name} for ${p} SOL — backend-signed, no popup`);
       onListed(); onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Listing failed");
-    } finally { setBusy(false); setStep("idle"); }
+    } finally { setBusy(false); }
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
@@ -68,24 +61,15 @@ function ListModal({ nft, onClose, onListed }: { nft: OrbitxNft; onClose: () => 
           <h3 className="text-sm font-black text-[hsl(var(--pf-ink))]">List "{nft.name}" for sale</h3>
           <button onClick={onClose}><X className="h-4 w-4 text-[hsl(var(--pf-muted))]" /></button>
         </div>
-        {!nft.delegate_approved && (
-          <div className="mb-3 flex items-start gap-2 rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-2.5 text-[11px] text-[hsl(var(--pf-muted))]">
-            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--og-gold))]" />
-            First-time listing: you'll approve OrbitX's marketplace authority as a delegate over just this 1 NFT (a normal, revocable Solana approval — it stays in your wallet). This lets a buyer complete checkout atomically later without you being online.
-          </div>
-        )}
-        <div className="mb-1 flex items-center justify-between">
-          <span className="pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Price ({currency})</span>
-          <span className="flex items-center rounded-md border border-[hsl(var(--pf-border))] p-0.5">
-            {(["SOL", "USDC"] as const).map((c) => (
-              <button key={c} type="button" onClick={() => setCurrency(c)} className={`rounded px-2 py-0.5 pf-mono text-[10px] font-bold ${currency === c ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"}`}>{c}</button>
-            ))}
-          </span>
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-2.5 text-[11px] text-[hsl(var(--pf-muted))]">
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--og-gold))]" />
+          Listing approves OrbitX's marketplace authority as a delegate over just this 1 NFT (a normal, revocable Solana approval — it stays in your wallet). Signed by your in-app wallet on the backend, no popup.
         </div>
+        <div className="mb-1 pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Price (SOL)</div>
         <input type="number" min="0" step="0.0001" value={price} onChange={(e) => setPrice(e.target.value)}
           className="w-full rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-3 py-2 text-sm text-[hsl(var(--pf-ink))] outline-none focus:border-[hsl(var(--pf-green))]" />
-        <button onClick={submit} disabled={busy} className="pf-btn mt-4 w-full justify-center">
-          {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> {step === "approving" ? "Approve delegate in wallet…" : "Listing…"}</> : <><Tag className="h-4 w-4" /> List for sale</>}
+        <button onClick={submit} disabled={busy || !ready} className="pf-btn mt-4 w-full justify-center">
+          {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Listing…</> : <><Tag className="h-4 w-4" /> List for sale</>}
         </button>
       </div>
     </div>
@@ -95,12 +79,12 @@ function ListModal({ nft, onClose, onListed }: { nft: OrbitxNft; onClose: () => 
 function OfferModal({ nft, onClose }: { nft: OrbitxNft; onClose: () => void }) {
   const [price, setPrice] = useState("1");
   const [busy, setBusy] = useState(false);
-  const { publicKey } = useWallet();
+  const { address } = useActiveTradingWallet();
   const submit = async () => {
-    if (!publicKey) return;
+    if (!address) return toast.error("Link your in-app wallet first");
     setBusy(true);
     try {
-      await makeNftOffer(nft.id, publicKey.toBase58(), Number(price));
+      await makeNftOffer(nft.id, address, Number(price));
       toast.success(`Offer of ${price} SOL sent`);
       onClose();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Offer failed"); } finally { setBusy(false); }
@@ -123,18 +107,14 @@ function AuctionModal({ nft, onClose }: { nft: OrbitxNft; onClose: () => void })
   const [increment, setIncrement] = useState("0.1");
   const [hours, setHours] = useState("24");
   const [busy, setBusy] = useState(false);
-  const { publicKey, signTransaction } = useWallet();
-  const { connection } = useConnection();
+  const { address, ready } = useActiveTradingWallet();
   const submit = async () => {
-    if (!publicKey || !signTransaction) return;
+    if (!ready || !address) return toast.error("Link your in-app wallet first");
     setBusy(true);
     try {
-      if (!nft.delegate_approved) {
-        await approveMarketplaceDelegate(connection, signTransaction, publicKey, nft.mint_address);
-        await setNftDelegateApproved(nft.id, publicKey.toBase58());
-      }
-      await createNftAuction(nft.id, publicKey.toBase58(), Number(start), Number(increment), Number(hours));
-      toast.success("Auction started");
+      await deskNftApproveDelegate(nft.mint_address);
+      await createNftAuction(nft.id, address, Number(start), Number(increment), Number(hours));
+      toast.success("Auction started — delegate approved, backend-signed");
       onClose();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Auction creation failed"); } finally { setBusy(false); }
   };
@@ -154,7 +134,7 @@ function AuctionModal({ nft, onClose }: { nft: OrbitxNft; onClose: () => void })
 }
 
 function OffersPanel({ nft }: { nft: OrbitxNft }) {
-  const { publicKey } = useWallet();
+  const { address } = useActiveTradingWallet();
   const qc = useQueryClient();
   const { data: offers } = useQuery({ queryKey: ["orbitx-nft-offers", nft.id], queryFn: () => listOffersForNft(nft.id) });
   const active = (offers ?? []).filter((o) => o.status === "active");
@@ -164,10 +144,10 @@ function OffersPanel({ nft }: { nft: OrbitxNft }) {
       {active.map((o: NftOffer) => (
         <div key={o.id} className="flex items-center justify-between rounded-md bg-white/[0.03] px-1.5 py-1 text-[10px]">
           <span className="text-[hsl(var(--pf-ink))]">{shortAddr(o.buyer_wallet, 3)} offered {o.price_sol} SOL</span>
-          {nft.current_owner === publicKey?.toBase58() && (
+          {nft.current_owner === address && (
             <div className="flex gap-1">
-              <button onClick={() => respondNftOffer(o.id, publicKey!.toBase58(), true).then(() => qc.invalidateQueries({ queryKey: ["orbitx-nft-offers", nft.id] }))} className="rounded bg-[hsl(var(--pf-green))] px-1.5 py-0.5 font-bold text-black">Accept</button>
-              <button onClick={() => respondNftOffer(o.id, publicKey!.toBase58(), false).then(() => qc.invalidateQueries({ queryKey: ["orbitx-nft-offers", nft.id] }))} className="rounded border border-[hsl(var(--pf-border))] px-1.5 py-0.5 text-[hsl(var(--pf-muted))]">Reject</button>
+              <button onClick={() => respondNftOffer(o.id, address!, true).then(() => qc.invalidateQueries({ queryKey: ["orbitx-nft-offers", nft.id] }))} className="rounded bg-[hsl(var(--pf-green))] px-1.5 py-0.5 font-bold text-black">Accept</button>
+              <button onClick={() => respondNftOffer(o.id, address!, false).then(() => qc.invalidateQueries({ queryKey: ["orbitx-nft-offers", nft.id] }))} className="rounded border border-[hsl(var(--pf-border))] px-1.5 py-0.5 text-[hsl(var(--pf-muted))]">Reject</button>
             </div>
           )}
         </div>
@@ -179,9 +159,8 @@ function OffersPanel({ nft }: { nft: OrbitxNft }) {
 const chipCls = (a: boolean) => `rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition ${a ? "bg-[hsl(var(--pf-green))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"}`;
 
 export default function LaunchpadNftHub() {
-  const { connected, publicKey, signTransaction } = useWallet();
-  const { connection } = useConnection();
-  const addr = publicKey?.toBase58();
+  const { address: addr, ready } = useActiveTradingWallet();
+  const connected = ready;
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("explore");
   const [filterCollection, setFilterCollection] = useState<string | null>(null);
@@ -193,6 +172,8 @@ export default function LaunchpadNftHub() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [exploreSort, setExploreSort] = useState<"new" | "volume" | "floor">("new");
+  const [nftView, setNftView] = useState<"grid" | "list">("grid");
+  const [nftSort, setNftSort] = useState<"new" | "views" | "favorites">("new");
   const [detailNft, setDetailNft] = useState<OrbitxNft | null>(null);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
 
@@ -227,8 +208,10 @@ export default function LaunchpadNftHub() {
   const displayNfts = useMemo(() => {
     let list = allNfts ?? [];
     if (q) list = list.filter((n) => n.name.toLowerCase().includes(q) || n.mint_address.toLowerCase().includes(q) || n.creator_wallet.toLowerCase().includes(q));
+    if (nftSort === "views") list = [...list].sort((a, b) => (b.view_count ?? 0) - (a.view_count ?? 0));
+    else if (nftSort === "favorites") list = [...list].sort((a, b) => (b.favorite_count ?? 0) - (a.favorite_count ?? 0));
     return list;
-  }, [allNfts, q]);
+  }, [allNfts, q, nftSort]);
 
   useEffect(() => { if (addr) listMyFavoriteIds(addr).then(setFavIds).catch(() => undefined); }, [addr]);
   const handleFav = async (n: OrbitxNft) => {
@@ -241,11 +224,11 @@ export default function LaunchpadNftHub() {
   };
 
   const buyListing = async (listingId: string, nftId: string) => {
-    if (!publicKey || !signTransaction) { toast.error("Connect a wallet first"); return; }
+    if (!ready) { toast.error("Link your in-app wallet first"); return; }
     setBusySale(listingId);
     try {
-      const { signature, breakdown } = await executeSale(connection, signTransaction, "listing", listingId, publicKey);
-      toast.success(`Purchased! ${breakdown.totalSol} SOL settled on-chain — tx ${signature.slice(0, 8)}…`);
+      const { signature, totalSol } = await deskNftBuy({ listingId, mode: "listing" });
+      toast.success(`Purchased!${totalSol ? ` ${totalSol} SOL` : ""} settled on-chain — tx ${signature.slice(0, 8)}…`);
       qc.invalidateQueries({ queryKey: ["orbitx-nft-active-listings"] });
       qc.invalidateQueries({ queryKey: ["orbitx-nfts-all"] });
     } catch (e) {
@@ -254,11 +237,11 @@ export default function LaunchpadNftHub() {
   };
 
   const settleAuction = async (auctionId: string) => {
-    if (!publicKey || !signTransaction) { toast.error("Connect a wallet first"); return; }
+    if (!ready) { toast.error("Link your in-app wallet first"); return; }
     setBusySale(auctionId);
     try {
-      const { signature, breakdown } = await executeSale(connection, signTransaction, "auction", auctionId, publicKey);
-      toast.success(`Auction settled! ${breakdown.totalSol} SOL — tx ${signature.slice(0, 8)}…`);
+      const { signature, totalSol } = await deskNftBuy({ auctionId, mode: "auction" });
+      toast.success(`Auction settled!${totalSol ? ` ${totalSol} SOL` : ""} — tx ${signature.slice(0, 8)}…`);
       qc.invalidateQueries({ queryKey: ["orbitx-nft-active-auctions"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Settlement failed");
@@ -281,7 +264,7 @@ export default function LaunchpadNftHub() {
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2"><Layers className="h-5 w-5 text-[hsl(var(--pf-green))]" /><h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">NFT Hub</h1></div>
-        <Link to="/orbitxlaunch/nft/create" className="pf-btn text-xs"><Plus className="h-3.5 w-3.5" /> Create NFT / Collection</Link>
+        <Link to="/nft/create" className="pf-btn text-xs"><Plus className="h-3.5 w-3.5" /> Create NFT / Collection</Link>
       </div>
       <p className="mb-6 max-w-2xl text-sm text-[hsl(var(--pf-muted))]">Real, on-chain NFTs minted through OrbitX — mint, list, offer, auction, and buy, all settled atomically on Solana.</p>
 
@@ -330,13 +313,42 @@ export default function LaunchpadNftHub() {
                   <div className="p-2"><div className="flex items-center gap-1 truncate text-xs font-bold text-[hsl(var(--pf-ink))]">{c.name} {c.verified && <ShieldCheck className="h-3 w-3 shrink-0 text-[hsl(var(--pf-green))]" />}</div><div className="pf-mono text-[9px] text-[hsl(var(--pf-muted))]">by {shortAddr(c.creator_wallet, 4)}</div></div>
                 </div>
               ))}</div>}
-          <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Recently minted</div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Recently minted</div>
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-0.5 rounded-lg border border-[hsl(var(--pf-border))] p-0.5">
+                {(["new", "views", "favorites"] as const).map((m) => (
+                  <button key={m} onClick={() => setNftSort(m)} className={`rounded px-2 py-1 pf-mono text-[9px] font-bold uppercase ${nftSort === m ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"}`}>
+                    {m === "new" ? "New" : m === "views" ? "Views" : "Favs"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-0.5 rounded-lg border border-[hsl(var(--pf-border))] p-0.5">
+                <button onClick={() => setNftView("grid")} title="Grid view" className={`rounded p-1 ${nftView === "grid" ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"}`}><LayoutGrid className="h-3.5 w-3.5" /></button>
+                <button onClick={() => setNftView("list")} title="List view" className={`rounded p-1 ${nftView === "list" ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"}`}><ListIcon className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          </div>
           {loadingAllNfts ? <div className="flex items-center justify-center gap-2 py-10 text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> loading…</div>
             : !allNfts?.length ? <div className="pf-card py-10 text-center text-sm text-[hsl(var(--pf-muted))]">No NFTs minted through OrbitX yet.</div>
             : !displayNfts.length ? <div className="pf-card py-10 text-center text-sm text-[hsl(var(--pf-muted))]">No NFTs match.</div>
+            : nftView === "list" ? <div className="space-y-2">{displayNfts.map((n) => (
+                <Link key={n.id} to={`/nft/item/${n.id}`} className="pf-card flex items-center gap-3 p-2.5 transition hover:border-[hsl(var(--pf-green))]/40">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[hsl(var(--pf-bg))]">{n.image_url ? <img src={n.image_url} alt={n.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-5 w-5 text-[hsl(var(--pf-muted))]" /></div>}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5"><span className="truncate text-xs font-bold text-[hsl(var(--pf-ink))]">{n.name}</span>{n.is_flagged_duplicate && <AlertTriangle className="h-3 w-3 shrink-0 text-[hsl(var(--og-blood))]" />}</div>
+                    <div className="mt-0.5 flex items-center gap-2 pf-mono text-[9px] text-[hsl(var(--pf-muted))]">
+                      <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> {n.view_count ?? 0}</span>
+                      <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {n.favorite_count ?? 0}</span>
+                      <span>{new Date(n.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <RarityBadge tier={n.rarity_tier} rank={n.rarity_rank} />
+                </Link>
+              ))}</div>
             : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">{displayNfts.map((n) => (
-                <div key={n.id} onClick={() => setDetailNft(n)} className="pf-card group relative cursor-pointer overflow-hidden transition-transform hover:-translate-y-0.5">
-                  <button onClick={(e) => { e.stopPropagation(); handleFav(n); }} title="Favorite" className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/60 p-1.5 backdrop-blur transition hover:bg-black/80">
+                <Link key={n.id} to={`/nft/item/${n.id}`} className="pf-card group relative block overflow-hidden transition-transform hover:-translate-y-0.5">
+                  <button onClick={(e) => { e.preventDefault(); handleFav(n); }} title="Favorite" className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/60 p-1.5 backdrop-blur transition hover:bg-black/80">
                     <Heart className={`h-3.5 w-3.5 ${favIds.has(n.id) ? "fill-[hsl(var(--og-blood))] text-[hsl(var(--og-blood))]" : "text-white"}`} />
                   </button>
                   <div className="aspect-square w-full bg-[hsl(var(--pf-bg))]">{n.image_url ? <img src={n.image_url} alt={n.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-6 w-6 text-[hsl(var(--pf-muted))]" /></div>}</div>
@@ -347,7 +359,7 @@ export default function LaunchpadNftHub() {
                       <span className="inline-flex items-center gap-1 pf-mono text-[9px] text-[hsl(var(--pf-muted))]"><Eye className="h-3 w-3" /> {n.view_count ?? 0}</span>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}</div>}
 
           {recentSales && recentSales.length > 0 && (
@@ -458,7 +470,7 @@ export default function LaunchpadNftHub() {
             )}
             <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">NFTs you minted</div>
             {loadingCreated ? <div className="flex items-center justify-center gap-2 py-16 text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> loading…</div>
-              : !createdNfts?.length ? <div className="pf-card flex flex-col items-center gap-3 py-16 text-center"><Sparkles className="h-8 w-8 text-[hsl(var(--pf-muted))]" /><div className="text-sm font-bold text-[hsl(var(--pf-muted))]">You haven't minted an NFT through OrbitX yet</div><Link to="/orbitxlaunch/nft/create" className="pf-btn text-xs"><Rocket className="h-3.5 w-3.5" /> Create one</Link></div>
+              : !createdNfts?.length ? <div className="pf-card flex flex-col items-center gap-3 py-16 text-center"><Sparkles className="h-8 w-8 text-[hsl(var(--pf-muted))]" /><div className="text-sm font-bold text-[hsl(var(--pf-muted))]">You haven't minted an NFT through OrbitX yet</div><Link to="/nft/create" className="pf-btn text-xs"><Rocket className="h-3.5 w-3.5" /> Create one</Link></div>
               : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{createdNfts.map((n) => (
                   <div key={n.id} className="pf-card overflow-hidden">
                     <div className="aspect-square w-full bg-[hsl(var(--pf-bg))]">{n.image_url ? <img src={n.image_url} alt={n.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-6 w-6 text-[hsl(var(--pf-muted))]" /></div>}</div>
@@ -494,7 +506,7 @@ export default function LaunchpadNftHub() {
         <div className="flex flex-wrap gap-2">
           <a href="https://t.me/ogscan" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--pf-border))] px-3 py-2 text-xs font-bold text-[hsl(var(--pf-ink))] hover:border-[hsl(var(--og-cyan))]"><Send className="h-3.5 w-3.5" /> Follow progress</a>
           <a href="https://x.com/ogscan" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--pf-border))] px-3 py-2 text-xs font-bold text-[hsl(var(--pf-ink))] hover:border-[hsl(var(--og-cyan))]"><Twitter className="h-3.5 w-3.5" /> X / Twitter</a>
-          <Link to="/orbitxlaunch/nft/create" className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/15 px-3 py-2 text-xs font-bold text-[hsl(var(--og-gold))] hover:bg-[hsl(var(--og-gold))]/25"><ExternalLink className="h-3.5 w-3.5" /> Mint an NFT now</Link>
+          <Link to="/nft/create" className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/15 px-3 py-2 text-xs font-bold text-[hsl(var(--og-gold))] hover:bg-[hsl(var(--og-gold))]/25"><ExternalLink className="h-3.5 w-3.5" /> Mint an NFT now</Link>
         </div>
       </div>
     </div>

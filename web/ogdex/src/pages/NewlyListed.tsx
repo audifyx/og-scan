@@ -31,9 +31,9 @@ export default function NewlyListed() {
             <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@dex</span>:~$ launches --fresh --live</div>
             <h1 className="text-2xl font-black">NEW_LISTINGS</h1>
           </div>
-          <p className="text-muted text-sm">Fresh tokens launched through OrbitX DEX. Unverified and unboosted — do your own research.</p>
+          <p className="text-muted text-sm">Fresh tokens on OrbitX Terminal. Unverified and unboosted — do your own research.</p>
         </div>
-        <Link to="/launch" className="btn bg-accent text-black font-bold inline-flex items-center gap-1.5 px-4 py-2">
+        <Link to="/submit" className="btn bg-accent text-black font-bold inline-flex items-center gap-1.5 px-4 py-2">
           <Rocket className="w-4 h-4" /> Launch a Token
         </Link>
       </div>
@@ -48,8 +48,8 @@ export default function NewlyListed() {
       ) : rows.length === 0 ? (
         <div className="card p-10 text-center space-y-3">
           <Rocket className="w-8 h-8 text-muted mx-auto" />
-          <div className="font-semibold">No tokens launched yet</div>
-          <p className="text-sm text-muted">Be the first to launch a token on OrbitX DEX.</p>
+          <div className="font-semibold">No new listings yet</div>
+          <p className="text-sm text-muted">Submit your token to get listed.</p>
           <Link to="/launch" className="btn bg-accent text-black font-bold inline-flex items-center gap-1.5 px-4 py-2 mt-1">
             Launch now <ArrowRight className="w-4 h-4" />
           </Link>

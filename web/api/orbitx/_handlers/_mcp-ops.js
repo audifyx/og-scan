@@ -17,7 +17,7 @@ import {
   WSOL_MINT,
 } from "../../../shared/pump-claim.js";
 
-async function loadSolana() {
+export async function loadSolana() {
   const [web3, spl] = await Promise.all([
     import("@solana/web3.js"),
     import("@solana/spl-token"),
@@ -38,7 +38,7 @@ function rpcCandidates() {
   return out;
 }
 
-function rpcUrl() {
+export function rpcUrl() {
   return rpcCandidates()[0] || PUBLIC_SOLANA_RPC;
 }
 
@@ -88,7 +88,7 @@ function collectCreatorFeeV2Ix(web3, spl, creatorPk) {
   });
 }
 
-function serializeTx(tx, recentBlockhash, feePayer) {
+export function serializeTx(tx, recentBlockhash, feePayer) {
   tx.feePayer = feePayer;
   tx.recentBlockhash = recentBlockhash;
   return Buffer.from(tx.serialize({ requireAllSignatures: false, verifySignatures: false })).toString("base64");

@@ -24,7 +24,7 @@ export default function InstallPWA() {
     setDeferred(null);
   };
   return (
-    <button onClick={install} title="Install OrbitX DEX" className="btn bg-white/5 border border-white/10 text-white hover:bg-white/10 inline-flex items-center gap-1.5 shrink-0">
+    <button onClick={install} title="Install OrbitX Terminal" className="btn bg-white/5 border border-white/10 text-white hover:bg-white/10 inline-flex items-center gap-1.5 shrink-0">
       <Download className="w-3.5 h-3.5" /> <span className="hidden lg:inline">Install</span>
     </button>
   );

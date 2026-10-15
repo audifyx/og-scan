@@ -1,18 +1,16 @@
 import { Link } from "react-router-dom";
 import {
-  Rocket, ShoppingBag, Zap, Send, Bell, Megaphone, FileText, Code,
-  Trophy, BookOpen, Map, Activity, Copy, Users, Crosshair, Wrench, Sparkles, LayoutGrid,
+  ShoppingBag, Zap, Send, Bell, Megaphone, FileText, Code,
+  Trophy, BookOpen, Map, Activity, Copy, Users, Crosshair, Wrench, LayoutGrid,
 } from "lucide-react";
 import { PageHero, DexPanel } from "../components/PageShell";
 
 type Item = { to: string; label: string; desc: string; Icon: typeof Rocket };
 const GROUPS: { title: string; items: Item[] }[] = [
   {
-    title: "Trade & Launch",
+    title: "Trade",
     items: [
-      { to: "/launchpad", label: "Launchpad", desc: "Real OrbitX launch desk", Icon: Rocket },
-      { to: "/tools?tab=create", label: "Create token", desc: "Multi-chain DEX launcher", Icon: Sparkles },
-      { to: "/store", label: "Store · List & Boost", desc: "Featured placement", Icon: ShoppingBag },
+      { to: "/store", label: "Store", desc: "Listings & featured placement", Icon: ShoppingBag },
       { to: "/boost", label: "Boost", desc: "Promote a token", Icon: Zap },
       { to: "/submit", label: "Submit Token", desc: "Add your project", Icon: Send },
     ],

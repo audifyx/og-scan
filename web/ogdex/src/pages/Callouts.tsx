@@ -53,7 +53,7 @@ export default function Callouts() {
         <div className="grid place-items-center py-20 text-muted"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : !SUPABASE_ANON_KEY ? (
         <div className="rounded-xl border border-line bg-panel2/60 p-6 text-sm text-muted">
-          Callouts feed needs <span className="font-mono text-white">VITE_SUPABASE_ANON_KEY</span> in the OrbitX DEX build env.
+          Callouts feed needs <span className="font-mono text-white">VITE_SUPABASE_ANON_KEY</span> in the OrbitX Terminal build env.
         </div>
       ) : err || rows.length === 0 ? (
         <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">

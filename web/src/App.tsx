@@ -141,6 +141,7 @@ const NftNotifications = lazyWithRetry(() => import("./pages/nft/Notifications")
 const NftCreatorProfile = lazyWithRetry(() => import("./pages/nft/CreatorProfile"));
 const NftCollectionPage = lazyWithRetry(() => import("./pages/nft/CollectionPage"));
 const NftCoinTrade = lazyWithRetry(() => import("./pages/nft/CoinTradePage"));
+const NftItemPage = lazyWithRetry(() => import("./pages/nft/NftItemPage"));
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -171,6 +172,7 @@ import PublicSpaceListen from "./pages/PublicSpaceListen";
 import UserPublicPage from "./pages/UserPublicPage";
 import UserPageWidget from "./pages/UserPageWidget";
 import EmbedSpace from "./pages/EmbedSpace";
+import { SocialPostEmbed, SocialProfileEmbed, SocialFeedEmbed } from "./components/social-x/embeds";
 import EmbedProfile from "./pages/EmbedProfile";
 import EmbedSpaces from "./pages/EmbedSpaces";
 import EmbedSpacePlayer from "./pages/EmbedSpacePlayer";
@@ -336,7 +338,7 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/vamp" element={<OwnerPreviewRoute><VampPortal /></OwnerPreviewRoute>} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
-            <Route path="/roadmap" element={<PlatformRoadmap />} />
+            <Route path="/roadmap" element={<Navigate to="/" replace />} />
             <Route path="/predictions/*" element={<PredictionsRedirect />} />
             <Route path="/r/:id" element={<ReportView />} />
             <Route path="/t/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
@@ -439,6 +441,7 @@ const App = () => (
               <Route path="profile/:wallet" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
               <Route path="collection/:id" element={<Suspense fallback={null}><NftCollectionPage /></Suspense>} />
               <Route path="coin/:nftId" element={<Suspense fallback={null}><NftCoinTrade /></Suspense>} />
+              <Route path="item/:id" element={<Suspense fallback={null}><NftItemPage /></Suspense>} />
             </Route>
 
             {/* ── OrbitX Trade App (Home · Trade · Leaderboard · Profile) ── */}
@@ -479,18 +482,23 @@ const App = () => (
               <Route path="wallet/:address" element={<Suspense fallback={<RouteFallback label="Wallet" />}><WalletTracker /></Suspense>} />
             </Route>
 
-            {/* ── OrbitX Social (live Supabase feed via XSocialApp) ── */}
+            {/* ── OrbitX Social Center — PUBLIC by default (read = public, write = X auth) ── */}
             <Route
               path="/orbitx-social"
               element={
-                <ProtectedRoute>
-                  <Suspense fallback={SOCIAL_FALLBACK}>
-                    <SocialAppPage />
-                  </Suspense>
-                </ProtectedRoute>
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <SocialAppPage />
+                </Suspense>
               }
             />
-            <Route path="/social" element={<Navigate to="/orbitx-social" replace />} />
+            <Route
+              path="/social"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <SocialAppPage />
+                </Suspense>
+              }
+            />
             <Route path="/social-hub" element={<Navigate to="/orbitx-social" replace />} />
             <Route path="/hq" element={<Navigate to="/orbitx-social" replace />} />
             <Route path="/hq/feed" element={<Navigate to="/orbitx-social" replace />} />
@@ -636,6 +644,13 @@ const App = () => (
             {/* ── Public: Combined embed (Spaces + Profile) ── */}
             <Route path="/embed/combined/:username" element={<EmbedCombined />} />
             <Route path="/embed/w/:username" element={<EmbedCombined />} />
+            {/* ── Public: OrbitX Social Center embeds (no auth, no chrome) ── */}
+            <Route path="/embed/social/post/:id" element={<SocialPostEmbed />} />
+            <Route path="/embed/social/profile/:username" element={<SocialProfileEmbed />} />
+            <Route path="/embed/social/feed" element={<SocialFeedEmbed />} />
+            <Route path="/social/embed/post/:id" element={<SocialPostEmbed />} />
+            <Route path="/social/embed/profile/:username" element={<SocialProfileEmbed />} />
+            <Route path="/social/embed/feed" element={<SocialFeedEmbed />} />
 
             {/* ── Protected: Spaces — advanced features ── */}
             <Route path="/discovery" element={<OwnerPreviewRoute><ProtectedRoute><DiscoveryFeed /></ProtectedRoute></OwnerPreviewRoute>} />

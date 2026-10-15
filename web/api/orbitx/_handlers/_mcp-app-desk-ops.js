@@ -2,8 +2,8 @@
  * Desk-signed pump launch, creator-fee claim, and flexible burn.
  * Same model as orbitx_app_buy: backend signs, no Phantom popup.
  */
-import { getUserWallet, getDeskFunds, signAndSendUserTx, SOL_MINT, isSigningAuth } from "./_user-trading-wallet.js";
-import { prepareBurn, preparePumpClaim, prepareRentRefund, prepareUnwrapWsol } from "./_mcp-ops.js";
+import { getUserWallet, getDeskFunds, signAndSendUserTx, loadDeskKeypair, SOL_MINT, isSigningAuth } from "./_user-trading-wallet.js";
+import { prepareBurn, preparePumpClaim, prepareRentRefund, prepareUnwrapWsol, prepareNftMint } from "./_mcp-ops.js";
 
 const DASH = "https://www.orbitx.world/supercomputer?tab=inapp";
 const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -492,6 +492,285 @@ export async function appUnwrapWsol(auth, args = {}) {
   });
 }
 
+/* ── NFT marketplace: backend-signed flows for the in-app wallet ── */
+
+const SB_URL = process.env.SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+
+async function sbRpc(fn, params = {}) {
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+  if (!secret) throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(j?.message || j?.hint || `sb rpc ${fn} failed`);
+  return j;
+}
+
+async function nftEdgeFn(body) {
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+  const r = await fetch(`${SB_URL}/functions/v1/nft-execute-sale`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${anon}`, apikey: anon },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error || "nft-execute-sale failed");
+  return j;
+}
+
+/** Verify an NFT into a collection on-chain (VerifyCollection ix, backend-signed). */
+async function verifyNftCollection(row, nftMint, collectionMint) {
+  const { loadSolana, serializeTx, rpcUrl } = await import("./_mcp-ops.js");
+  const { web3 } = await loadSolana();
+  const { Connection, PublicKey, Transaction, TransactionInstruction } = web3;
+  const METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+  const payerPk = new PublicKey(row.public_key);
+  const nftMintPk = new PublicKey(nftMint);
+  const colMintPk = new PublicKey(collectionMint);
+  const pda = (seeds) => PublicKey.findProgramAddressSync(seeds, METADATA_PROGRAM_ID)[0];
+  const metadataPda = pda([Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), nftMintPk.toBuffer()]);
+  const colMetadataPda = pda([Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), colMintPk.toBuffer()]);
+  const colEditionPda = pda([Buffer.from("metadata"), METADATA_PROGRAM_ID.toBuffer(), colMintPk.toBuffer(), Buffer.from("edition")]);
+  // VerifyCollection discriminator 18, no args
+  const tx = new Transaction().add(
+    new TransactionInstruction({
+      programId: METADATA_PROGRAM_ID,
+      keys: [
+        { pubkey: metadataPda, isSigner: false, isWritable: true },
+        { pubkey: payerPk, isSigner: true, isWritable: false }, // collectionAuthority
+        { pubkey: payerPk, isSigner: true, isWritable: true }, // payer
+        { pubkey: colMintPk, isSigner: false, isWritable: false },
+        { pubkey: colMetadataPda, isSigner: false, isWritable: false },
+        { pubkey: colEditionPda, isSigner: false, isWritable: false },
+      ],
+      data: Buffer.from([18]),
+    })
+  );
+  const conn = new Connection(rpcUrl(), "confirmed");
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const live = await signAndSendUserTx(row, serializeTx(tx, blockhash, payerPk));
+  return !!live.ok;
+}
+
+/** Mint a real Metaplex NFT from the in-app wallet. Backend signs.
+ * Optional collectionMint: verifies the NFT into the collection on-chain. */
+export async function appNftMint(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  const name = String(args.name || "").trim();
+  const symbol = String(args.symbol || "NFT").trim();
+  const uri = String(args.uri || args.metadataUri || "").trim();
+  const royaltyBps = Math.min(10000, Math.max(0, Math.round(Number(args.royaltyBps ?? args.royaltyPct * 100 ?? 500))));
+  const collectionMint = String(args.collectionMint || "").trim() || null;
+  if (!name) return { ok: false, error: "need_name", message: "NFT name is required." };
+  if (!/^https?:\/\//i.test(uri)) return { ok: false, error: "need_uri", message: "A public metadata URI is required." };
+  let built;
+  try {
+    built = await prepareNftMint({ payer: row.public_key, name, symbol, uri, royaltyBps });
+  } catch (e) {
+    return { ok: false, error: "mint_build_failed", message: String(e?.message || e) };
+  }
+  const { Keypair } = await import("@solana/web3.js");
+  const mintKp = Keypair.fromSecretKey(Buffer.from(built.mintSecretKey, "base64"));
+  const live = await signAndSendUserTx(row, built.transaction, [mintKp]);
+  if (!live.ok) return sendOutcome(live, { action: "nft_mint" });
+  // Optional: verify into a collection (separate tx, collection authority = user)
+  let verified = false;
+  if (collectionMint && live.ok) {
+    try {
+      verified = await verifyNftCollection(row, built.mint, collectionMint);
+    } catch (e) {
+      // Mint succeeded; verification is best-effort
+    }
+  }
+  // Register in the OrbitX NFT registry
+  try {
+    await sbRpc("orbitx_register_nft", {
+      p_collection_id: args.collectionId || null,
+      p_mint_address: built.mint,
+      p_creator_wallet: row.public_key,
+      p_name: name,
+      p_symbol: symbol.toUpperCase().slice(0, 10),
+      p_image_url: args.imageUrl || null,
+      p_metadata_uri: uri,
+      p_royalty_bps: royaltyBps,
+      p_attributes: args.attributes || [],
+      p_content_hash: null,
+    });
+  } catch (e) {
+    // Mint succeeded on-chain; registry is best-effort
+  }
+  return sendOutcome(live, {
+    action: "nft_mint",
+    mint: built.mint,
+    name, symbol,
+    collectionVerified: verified,
+    explorer: `https://solscan.io/token/${built.mint}`,
+    message: `"${name}" minted on-chain to your in-app wallet.${verified ? " Verified into the collection." : ""}`,
+  });
+}
+
+/** Buy an NFT listing/auction via the delegated-authority settlement. Backend signs buyer side. */
+export async function appNftBuy(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  const mode = args.mode === "auction" ? "auction" : "listing";
+  const sourceId = String(args.listingId || args.auctionId || args.sourceId || "");
+  if (!sourceId) return { ok: false, error: "need_listing", message: "listingId is required." };
+  let built;
+  try {
+    built = await nftEdgeFn({ action: "build", mode, sourceId, buyerWallet: row.public_key });
+  } catch (e) {
+    return { ok: false, error: "build_failed", message: String(e?.message || e) };
+  }
+  // Sign buyer side with the backend-held key, then hand to edge fn to submit + record
+  const kp = await loadDeskKeypair(row);
+  const { Transaction } = await import("@solana/web3.js");
+  const raw = Buffer.from(String(built.transactionBase64 || ""), "base64");
+  const tx = Transaction.from(raw);
+  tx.partialSign(kp);
+  const signedBase64 = tx.serialize({ requireAllSignatures: false }).toString("base64");
+  let submitted;
+  try {
+    submitted = await nftEdgeFn({ action: "submit", pendingSaleId: built.pendingSaleId, signedTransactionBase64: signedBase64 });
+  } catch (e) {
+    return { ok: false, error: "submit_failed", message: String(e?.message || e) };
+  }
+  return {
+    ok: true, signedOn: "backend", clickToSign: false, confirmed: true,
+    action: "nft_buy", mode,
+    signature: submitted.signature,
+    tx: submitted.signature ? `https://solscan.io/tx/${submitted.signature}` : null,
+    breakdown: built.breakdown || null,
+    message: `Purchased! ${built.breakdown?.totalSol ?? ""} SOL settled on-chain.`,
+  };
+}
+
+/** List an NFT for sale: approve marketplace delegate (backend-signed) + create listing row. */
+export async function appNftList(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  const nftId = String(args.nftId || "");
+  const mint = String(args.mint || args.mintAddress || "");
+  const priceSol = Number(args.priceSol || args.price);
+  if (!nftId || !mint) return { ok: false, error: "need_nft", message: "nftId and mint are required." };
+  if (!priceSol || priceSol <= 0) return { ok: false, error: "need_price", message: "A positive priceSol is required." };
+  // Build approve-delegate instruction server-side
+  const { web3, spl } = await import("./_mcp-ops.js").then((m) => m.loadSolana());
+  const { PublicKey, Transaction } = web3;
+  const { getAssociatedTokenAddressSync, createApproveInstruction } = spl;
+  let authority;
+  try {
+    authority = await nftEdgeFn({ action: "authority" });
+  } catch (e) {
+    return { ok: false, error: "authority_failed", message: String(e?.message || e) };
+  }
+  const owner = new PublicKey(row.public_key);
+  const mintPk = new PublicKey(mint);
+  const ownerAta = getAssociatedTokenAddressSync(mintPk, owner);
+  const tx = new Transaction().add(
+    createApproveInstruction(ownerAta, new PublicKey(authority.authorityPubkey), owner, 1)
+  );
+  const { Connection } = web3;
+  const conn = new Connection(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", "confirmed");
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = owner;
+  const { serializeTx } = await import("./_mcp-ops.js");
+  const live = await signAndSendUserTx(row, serializeTx(tx, blockhash, owner));
+  if (!live.ok) return sendOutcome(live, { action: "nft_list" });
+  try {
+    await sbRpc("orbitx_nft_list", {
+      p_nft_id: nftId, p_seller_wallet: row.public_key,
+      p_price_sol: priceSol, p_currency: "SOL",
+    });
+  } catch (e) {
+    return { ok: false, error: "listing_row_failed", signature: live.signature, message: "Delegate approved on-chain but the listing row failed: " + String(e?.message || e) };
+  }
+  return sendOutcome(live, {
+    action: "nft_list", nftId, priceSol,
+    message: `Listed for ${priceSol} SOL. Buyers can now check out atomically.`,
+  });
+}
+
+/** Transfer an SPL NFT from the in-app wallet. Backend signs. */
+export async function appNftTransfer(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  const mint = String(args.mint || args.mintAddress || "");
+  const dest = String(args.destination || args.to || "");
+  if (!mint) return { ok: false, error: "need_mint" };
+  if (!dest) return { ok: false, error: "need_destination", message: "Recipient wallet address is required." };
+  const { loadSolana, serializeTx, rpcUrl } = await import("./_mcp-ops.js");
+  const { web3, spl } = await loadSolana();
+  const { Connection, PublicKey, Transaction } = web3;
+  const { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, createTransferInstruction } = spl;
+  const owner = new PublicKey(row.public_key);
+  const mintPk = new PublicKey(mint);
+  const destPk = new PublicKey(dest);
+  const conn = new Connection(rpcUrl(), "confirmed");
+  const mintInfo = await conn.getAccountInfo(mintPk);
+  if (!mintInfo) return { ok: false, error: "mint_not_found" };
+  const programId = mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  const fromAta = getAssociatedTokenAddressSync(mintPk, owner, false, programId);
+  const toAta = getAssociatedTokenAddressSync(mintPk, destPk, false, programId);
+  const tx = new Transaction();
+  if (!(await conn.getAccountInfo(toAta))) {
+    tx.add(createAssociatedTokenAccountInstruction(owner, toAta, destPk, mintPk, programId));
+  }
+  tx.add(createTransferInstruction(fromAta, toAta, owner, 1, [], programId));
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const live = await signAndSendUserTx(row, serializeTx(tx, blockhash, owner));
+  return sendOutcome(live, {
+    action: "nft_transfer", mint, destination: dest,
+    message: "NFT transferred.",
+  });
+}
+
+/** Approve the marketplace delegate over one NFT (for auctions). Backend signs. */
+export async function appNftApproveDelegate(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  const mint = String(args.mint || args.mintAddress || "");
+  if (!mint) return { ok: false, error: "need_mint" };
+  const { loadSolana, serializeTx, rpcUrl } = await import("./_mcp-ops.js");
+  const { web3, spl } = await loadSolana();
+  const { Connection, PublicKey, Transaction } = web3;
+  const { getAssociatedTokenAddressSync, createApproveInstruction } = spl;
+  let authority;
+  try {
+    authority = await nftEdgeFn({ action: "authority" });
+  } catch (e) {
+    return { ok: false, error: "authority_failed", message: String(e?.message || e) };
+  }
+  const owner = new PublicKey(row.public_key);
+  const mintPk = new PublicKey(mint);
+  const ownerAta = getAssociatedTokenAddressSync(mintPk, owner);
+  const tx = new Transaction().add(
+    createApproveInstruction(ownerAta, new PublicKey(authority.authorityPubkey), owner, 1)
+  );
+  const conn = new Connection(rpcUrl(), "confirmed");
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const live = await signAndSendUserTx(row, serializeTx(tx, blockhash, owner));
+  return sendOutcome(live, {
+    action: "nft_approve_delegate", mint,
+    message: "Marketplace delegate approved for this NFT.",
+  });
+}
+
 export const APP_DESK_OPS_TOOLS = [
   {
     name: "orbitx_app_launch",
@@ -555,6 +834,67 @@ export const APP_DESK_OPS_TOOLS = [
     inputSchema: {
       type: "object",
       properties: { authCode: { type: "string" } },
+    },
+  },
+  {
+    name: "orbitx_app_nft_mint",
+    description: "Mint a real Metaplex NFT from the in-app wallet. Backend signs. Needs name + public metadata uri. Optional symbol, royaltyBps, imageUrl, collectionId, collectionMint (verifies into collection on-chain), attributes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" }, symbol: { type: "string" },
+        uri: { type: "string", description: "Public metadata JSON URL" },
+        royaltyBps: { type: "number" }, imageUrl: { type: "string" },
+        collectionId: { type: "string" }, collectionMint: { type: "string" },
+        attributes: { type: "array" },
+        authCode: { type: "string" },
+      },
+      required: ["name", "uri"],
+    },
+  },
+  {
+    name: "orbitx_app_nft_buy",
+    description: "Buy an NFT listing or settle an auction via the delegated-authority marketplace. Backend signs the buyer side. mode: listing|auction.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        listingId: { type: "string" }, auctionId: { type: "string" },
+        mode: { type: "string", description: "listing or auction" },
+        authCode: { type: "string" },
+      },
+    },
+  },
+  {
+    name: "orbitx_app_nft_list",
+    description: "List an owned NFT for sale: approves the marketplace delegate (backend-signed) and creates the listing. Needs nftId, mint, priceSol.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        nftId: { type: "string" }, mint: { type: "string" },
+        priceSol: { type: "number" }, authCode: { type: "string" },
+      },
+      required: ["nftId", "mint", "priceSol"],
+    },
+  },
+  {
+    name: "orbitx_app_nft_approve_delegate",
+    description: "Approve the OrbitX marketplace delegate over one owned NFT (needed before starting an auction). Backend signs. Needs mint.",
+    inputSchema: {
+      type: "object",
+      properties: { mint: { type: "string" }, authCode: { type: "string" } },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_app_nft_transfer",
+    description: "Transfer an SPL NFT from the in-app wallet to another wallet. Backend signs. Needs mint + destination.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" }, destination: { type: "string" },
+        authCode: { type: "string" },
+      },
+      required: ["mint", "destination"],
     },
   },
 ];

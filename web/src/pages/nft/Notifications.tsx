@@ -1,5 +1,5 @@
 // OrbitX NFT Marketplace — notifications (Phase 2). Wallet-scoped.
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useQuery } from "@tanstack/react-query";
 import { listNotifications } from "./social";
 import { SectionHeader, Empty } from "./_ui";
@@ -7,8 +7,7 @@ import { timeAgo } from "./nftMarketData";
 import { Bell } from "lucide-react";
 
 export default function Notifications() {
-  const { publicKey } = useWallet();
-  const wallet = publicKey?.toBase58();
+  const { address: wallet } = useActiveTradingWallet();
   const { data } = useQuery({ queryKey: ["nftmkt-notifs", wallet], enabled: !!wallet, queryFn: () => listNotifications(wallet!) });
   const items = data ?? [];
   if (!wallet) return <div><SectionHeader title="Notifications" /><Empty label="Connect your wallet to see notifications." /></div>;

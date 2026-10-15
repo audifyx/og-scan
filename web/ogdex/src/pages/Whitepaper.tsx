@@ -44,7 +44,7 @@ export default function Whitepaper() {
 
       <PageBanner
         title="The OrbitX Whitepaper"
-        subtitle="One on-chain operating system for trading, community, and everything in between."
+        subtitle="One terminal for trading intelligence, community, and everything in between."
       />
 
       <div className="flex items-center gap-2 mb-1">
@@ -60,8 +60,7 @@ export default function Whitepaper() {
         <P>
           <b className="text-white">OrbitX is one destination for everything crypto trading actually requires</b> — forensic-grade token
           intelligence, a social feed, live voice and video, prediction markets, and games, all under a single wallet-based identity.
-          It's non-custodial, free to use, ships weekly, and now lets you launch a token straight to pump.fun — for free — from the
-          same place you research one. Everything below is public information about how it works, why it exists, and where it's headed.
+          It's non-custodial, free to use, and ships weekly. Everything below is public information about how it works, why it exists, and where it's headed.
         </P>
       </div>
 
@@ -100,9 +99,9 @@ export default function Whitepaper() {
       <P>
         OrbitX is an on-chain operating system for crypto — one destination that unifies trading intelligence, a social layer,
         live streaming, prediction markets, and gaming, connected by a single identity and powered by real on-chain data and AI.
-        Its core, <b className="text-white">OrbitX DEX</b>, aggregates already-public blockchain and market data across 16 chains,
+        Its core, <b className="text-white">OrbitX Terminal</b>, aggregates already-public blockchain and market data across 16 chains,
         enriches and cross-references it, and surfaces what most tools hide. Around that intelligence, OrbitX adds the things
-        traders actually do all day: post and discuss, host voice Spaces, go live, follow smart money, launch a token, and play —
+        traders actually do all day: post and discuss, host voice Spaces, go live, follow smart money, and play —
         without ever leaving the platform.
       </P>
       <P>
@@ -132,7 +131,7 @@ export default function Whitepaper() {
       <H>The product suite</H>
       <P>This is where OrbitX stops being an idea and becomes something you actually use every day.</P>
 
-      <Sub>OrbitX DEX — trading intelligence</Sub>
+      <Sub>OrbitX Terminal — trading intelligence</Sub>
       <P>
         The forensic core of the platform. A screener with curated, garbage-filtered categories —
         Trending, Runners, New, FOMO, Jupiter-verified, the full Pump.fun set, OG, KOL Picks, Celebrity, Organic, Listed,
@@ -144,7 +143,6 @@ export default function Whitepaper() {
         <LI><b className="text-white">Forensics</b> — developer wallet and dev-sold status, the first on-chain buyer with the exact transaction, paid-listing status, concentration and safety flags, plus bundle and sniper detection.</LI>
         <LI><b className="text-white">Token Sniper & Tools</b> — a multi-source live feed (newest, bonding, trending, gainers, migrated) with safety chips, plus the full tool suite: Snipe Feed, Scanner, New Pairs, OG Finder, Migrations, Trending, and Swap.</LI>
         <LI><b className="text-white">Pulse, KOL/whale intel, Portfolio & copy-tracking</b> — real-time momentum signals, a smart-money directory with a live buy/sell feed, holdings with realized and unrealized PnL, and following up to 10 wallets to watch what they do next.</LI>
-        <LI><b className="text-white">Launchpad</b> — create and launch a token straight to pump.fun from inside OrbitX DEX, free of charge, with an optional custom vanity mint address so your contract address itself carries the brand.</LI>
       </ul>
 
       <Sub>OrbitX Social — the community layer</Sub>

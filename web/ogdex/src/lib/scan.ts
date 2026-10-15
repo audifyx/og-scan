@@ -1,4 +1,4 @@
-// OrbitX tools — self-contained data layer for the OrbitX DEX Tools page.
+// OrbitX tools — self-contained data layer for the OrbitX Terminal Tools page.
 // Uses Jupiter (no key), Helius RPC (VITE_HELIUS_API_KEY), and DexScreener.
 const HELIUS = (import.meta as any).env?.VITE_HELIUS_API_KEY || "";
 const RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS}`;

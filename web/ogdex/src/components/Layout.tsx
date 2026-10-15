@@ -2,8 +2,8 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut,
-  Flame, Users, Rocket, Wrench, Crosshair, LayoutGrid, Feather, ChevronRight,
+  Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut,
+  Flame, Users, Wrench, Crosshair, LayoutGrid, Feather, ChevronRight,
 } from "lucide-react";
 import { getWatchlist, short } from "../lib/api";
 import { useWallet } from "../lib/wallet";
@@ -37,7 +37,6 @@ const STAT_FALLBACK: PlatformStats = { activeUsers: 55, tokenCount: 847, volume:
 
 const NAV_LINKS = [
   { to: "/", label: "Home", Icon: Coins, exact: true },
-  { to: "/launchpad", label: "Launchpad", Icon: Rocket, exact: false },
   { to: "/robinhood", label: "Robinhood", Icon: Feather, exact: false },
   { to: "/pulse", label: "Pulse", Icon: Flame, exact: false },
   { to: "/scanner", label: "Scanner", Icon: Crosshair, exact: false },
@@ -57,7 +56,6 @@ const MOBILE_TABS = [
 
 const ROOT_PATHS = new Set([
   "/",
-  "/launchpad",
   "/robinhood",
   "/pulse",
   "/scanner",
@@ -78,7 +76,6 @@ const FOOTER_PRODUCT = [
   { to: "/tools", label: "Tools" },
   { to: "/wallet", label: "Wallets" },
   { to: "/kol", label: "KOL" },
-  { to: "/launchpad", label: "Launchpad" },
 ];
 const FOOTER_RESOURCES = [
   { to: "/leaderboard", label: "Leaderboard" },
@@ -91,7 +88,6 @@ const FOOTER_RESOURCES = [
 ];
 const FOOTER_ECOSYSTEM = [
   { href: "/app", label: "App Hub" },
-  { href: "/orbitxlaunch", label: "OrbitX Launchpad" },
   { href: "/nft", label: "NFT Market" },
   { href: "/agent", label: "Agent MCP" },
   { href: "/x", label: "X MCP" },
@@ -101,8 +97,7 @@ const FOOTER_ECOSYSTEM = [
 
 const PLATFORM_LINKS = [
   { href: "/app", label: "Hub" },
-  { href: "/ORBITX_DEX/", label: "DEX", on: true },
-  { href: "/orbitxlaunch", label: "Launch" },
+  { href: "/ORBITX_DEX/", label: "Terminal", on: true },
   { href: "/nft", label: "NFT" },
   { href: "/orbitx-social", label: "Social" },
   { href: "/agent", label: "Agent" },
@@ -277,27 +272,11 @@ export default function Layout() {
               )}
               <DexThemeButton />
               <InstallPWA />
-              <a href="/app" className="dex-store-btn hidden lg:inline-flex !no-underline">Hub</a>
-              <Link to="/store" className="dex-store-btn hidden lg:inline-flex">
-                <ShoppingBag className="w-3.5 h-3.5" /> Store
-              </Link>
             </div>
           </header>
 
           <div className="dex-ios-desk-tabs dex-sticky-chrome">
             <div className="brand-hairline" />
-            <div className="dex-shell-header py-2">
-              <div className="max-w-[1600px] mx-auto px-3 md:px-5">
-                <nav className="dex-tab-segment-wrap no-scrollbar" aria-label="Terminal">
-                  {NAV_LINKS.map(({ to, label, Icon, exact }) => (
-                    <Link key={to} to={to} className={`dex-tab-segment ${isActive(to, exact) ? "dex-tab-segment--on" : ""}`}>
-                      <Icon className="w-3.5 h-3.5 shrink-0" />
-                      {label}
-                    </Link>
-                  ))}
-                </nav>
-              </div>
-            </div>
             <div className="hidden md:block dex-status-strip">
               <div className="max-w-[1600px] mx-auto px-5 h-7 flex items-center gap-4 term text-[10px] font-semibold text-white/65">
                 <span className="flex items-center gap-1.5">
