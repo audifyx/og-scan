@@ -649,12 +649,12 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
         </mesh>
       ))}
 
-      {/* cosmic crystals (stage 5) */}
+      {/* cosmic crystals (stage 5) — flanking the office */}
       {stage >= 5 && (
         <group ref={crystal}>
-          {[[-1.5, 0.5], [1.8, -0.6]].map(([x, z], i) => (
+          {[[-5.2, 2.2], [5.4, 1.4]].map(([x, z], i) => (
             <mesh key={i} position={[x, 0, z]}>
-              <octahedronGeometry args={[0.28]} />
+              <octahedronGeometry args={[0.34]} />
               <meshStandardMaterial color="#a78bfa" emissive="#a78bfa" emissiveIntensity={1.2} transparent opacity={0.9} />
             </mesh>
           ))}
@@ -717,7 +717,7 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
       <div className="relative overflow-hidden rounded-3xl border border-white/10" style={{ height: 420 }}>
         <Canvas
           dpr={[1, 1.75]}
-          camera={{ position: isCity ? [0, 4.4, 11.5] : [0, 3.6, 8.6], fov: 46 }}
+          camera={{ position: isCity ? [0, 6, 14.5] : [0, 3.6, 8.6], fov: 46 }}
           gl={{ antialias: true, alpha: false }}
           onCreated={({ gl }) => gl.setClearColor("#02040c")}
         >
@@ -736,9 +736,9 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
             {isCity && <SkyTraffic stage={stage} />}
             <OrbitControls
               enablePan={false}
-              minDistance={5} maxDistance={isCity ? 17 : 13}
+              minDistance={5} maxDistance={isCity ? 20 : 13}
               minPolarAngle={Math.PI / 5} maxPolarAngle={Math.PI / 2.15}
-              target={isCity ? [0, 1.6, -1] : [0, 1.3, 0]}
+              target={isCity ? [0, 2.2, -2] : [0, 1.3, 0]}
             />
           </Suspense>
         </Canvas>
