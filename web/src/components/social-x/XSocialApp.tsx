@@ -1115,7 +1115,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   };
 
   const share = async (p: Post) => {
-    try { await navigator.clipboard.writeText(`${p.content}\n\n${window.location.origin}/orbitx-social`); toast.success("Copied to clipboard"); } catch { toast.error("Copy failed"); }
+    try { await navigator.clipboard.writeText(`${window.location.origin}/social/t/${p.id}`); toast.success("Link copied to clipboard"); } catch { toast.error("Copy failed"); }
   };
 
   /* ── Feed superpowers: one-tap trade / tip / copy-trade / rug flag ── */
@@ -1308,7 +1308,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           onChange={(e) => { setText(e.target.value.slice(0, MAX_LEN)); detectCashtag(e.target); }}
           onKeyUp={(e) => detectCashtag(e.currentTarget)}
           onClick={(e) => detectCashtag(e.currentTarget)}
-          placeholder="What's happening on chain?"
+          placeholder="What's happening?"
           rows={inline ? 2 : 4}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { submit(); return; }
@@ -1786,8 +1786,39 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     </button>
   );
 
+  /* ── Auth-gated 404: shown when a logged-out user hits Messages / Notifications / Bookmarks / Profile ── */
+  const AuthGate404 = ({ label }: { label: string }) => (
+    <div className="flex h-full min-h-[60dvh] flex-col items-center justify-center px-8 text-center">
+      <div className="text-[28px] font-extrabold tracking-tight text-white" style={{ fontFamily: "var(--osc-font-display)" }}>
+        {label} doesn't exist
+      </div>
+      <p className="mx-auto mt-2 max-w-xs text-[14px] leading-relaxed text-white/45">
+        This page requires login. Sign in with X to access your {label.toLowerCase()}.
+      </p>
+      <button
+        type="button"
+        onClick={() => { window.location.href = `/auth?return=${encodeURIComponent(window.location.pathname)}`; }}
+        className="osc-btn-primary mt-6"
+      >
+        Log in with X
+      </button>
+      <button
+        type="button"
+        onClick={() => setTab("home")}
+        className="mt-3 text-[13px] font-bold text-[#60a5fa] hover:underline"
+      >
+        Back to home
+      </button>
+    </div>
+  );
+
   /* ═══════════ Center column content ═══════════ */
   const renderCenter = () => {
+    /* Auth-gated tabs 404 for logged-out users (public: feed, tweet detail, public profiles, explore, embeds). */
+    if (!user && (tab === "messages" || tab === "notifications" || tab === "bookmarks" || tab === "profile")) {
+      const label = tab === "messages" ? "Messages" : tab === "notifications" ? "Notifications" : tab === "bookmarks" ? "Bookmarks" : "Profile";
+      return <AuthGate404 label={label} />;
+    }
     switch (tab) {
       case "home":
         return (
@@ -2329,7 +2360,35 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       {/* ── Mobile bottom tab bar — centered ── */}
       <nav className="osc-dock-wrap" aria-label="Social navigation">
         <div className="osc-dock">
-          {CORE_TABS.map((id) => {
+          {CORE_TABS.slice(0, 2).map((id) => {
+            const n = NAV.find((x) => x.id === id)!;
+            const on = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => goTab(id)}
+                className={cn("osc-dock__item", on && "osc-dock__item--on")}
+                aria-current={on ? "page" : undefined}
+              >
+                <span className="osc-dock__icon">
+                  <n.Icon className="h-[20px] w-[20px]" strokeWidth={on ? 2.4 : 2} />
+                  {id === "notifications" && unread > 0 && <span className="osc-dock__dot" />}
+                </span>
+                <span className="osc-dock__label">{TAB_SHORT[id]}</span>
+              </button>
+            );
+          })}
+          {/* ── Big center compose button ── */}
+          <button
+            type="button"
+            onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
+            className="osc-dock__compose"
+            aria-label="Compose post"
+          >
+            <Feather className="h-7 w-7" />
+          </button>
+          {CORE_TABS.slice(2).map((id) => {
             const n = NAV.find((x) => x.id === id)!;
             const on = tab === id;
             return (

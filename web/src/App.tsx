@@ -108,6 +108,7 @@ const SentimentIntel = lazyWithRetry(() => import("./crypto/pages/SentimentIntel
 const LaunchStudio = lazyWithRetry(() => import("./crypto/pages/LaunchStudio"));
 const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker"));
 const SocialAppPage = lazyWithRetry(() => import("./pages/SocialAppPage"));
+const SocialTweetPage = lazyWithRetry(() => import("./pages/SocialTweetPage"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -496,6 +497,31 @@ const App = () => (
               element={
                 <Suspense fallback={SOCIAL_FALLBACK}>
                   <SocialAppPage />
+                </Suspense>
+              }
+            />
+            {/* ── Public: shareable tweet detail pages (no login needed) ── */}
+            <Route
+              path="/social/t/:id"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <SocialTweetPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/orbitx-social/t/:id"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <SocialTweetPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/social/:username/status/:id"
+              element={
+                <Suspense fallback={SOCIAL_FALLBACK}>
+                  <SocialTweetPage />
                 </Suspense>
               }
             />
