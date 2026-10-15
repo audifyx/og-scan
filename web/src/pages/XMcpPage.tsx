@@ -595,7 +595,7 @@ export default function XMcpPage({ embedded = false, initialTab = "home", initia
         footerBrand="OrbitX Super Computer"
         footerNote="Connect X. Train an agent. Post from Claude, ChatGPT, or Grok."
         mcpUrl={oauth.mcpUrl}
-        siblingHref="/supercomputer?tab=workspace"
+        siblingHref="/supercomputer?tab=agent"
         siblingLabel="Agent workspace"
         siblingIcon="◆"
         statusLabel="Sign in"
@@ -652,7 +652,7 @@ export default function XMcpPage({ embedded = false, initialTab = "home", initia
       footerBrand="OrbitX Super Computer"
       footerNote="Post, DM, buy credits, and run your NVIDIA agent from Claude, ChatGPT, or Grok. Non-custodial X OAuth — you authorize scopes on X."
       mcpUrl={oauth.mcpUrl}
-      siblingHref="/supercomputer?tab=workspace"
+      siblingHref="/supercomputer?tab=agent"
       siblingLabel="Agent workspace"
       siblingIcon="◆"
       topSubtitle="X channel · Claude · ChatGPT · Grok"

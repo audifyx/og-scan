@@ -223,7 +223,7 @@ export default function McpAuthPage() {
           )}
 
           <p className="ox-agent__note">
-            Revoke keys anytime from <Link to="/supercomputer?tab=workspace&focus=keys">Super Computer Keys</Link>
+            Revoke keys anytime from <Link to="/supercomputer?tab=agent&focus=keys">Super Computer Keys</Link>
             {!redirectUri && oauth.authorizationUrl ? (
               <span style={{ display: "block", marginTop: 6, opacity: 0.6 }}>
                 {oauth.authorizationUrl}

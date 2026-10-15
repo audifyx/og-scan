@@ -111,13 +111,16 @@ function parseAgentTab(raw: string): AgentTabId {
   return AGENT_TABS.has(t as AgentTabId) ? (t as AgentTabId) : "setup";
 }
 
-export function AgentDashboard({ embedded = false, initialTab = "setup", onWorkspaceChange }: { embedded?: boolean; initialTab?: AgentTabId; onWorkspaceChange?: (tab: AgentTabId) => void }) {
+export function AgentDashboard({ embedded = false, initialTab = "setup", onWorkspaceChange, hideTabs = [] }: { embedded?: boolean; initialTab?: AgentTabId; onWorkspaceChange?: (tab: AgentTabId) => void; hideTabs?: AgentTabId[] }) {
   const { user, profile } = useAuth();
   const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<AgentTabId>(() => embedded ? initialTab : parseAgentTab(searchParams.get("tab") || ""));
+  const [tab, setTab] = useState<AgentTabId>(() => {
+    const t = embedded ? initialTab : parseAgentTab(searchParams.get("tab") || "");
+    return (hideTabs as string[]).includes(t) ? "setup" : t;
+  });
   const [creditsUsage, setCreditsUsage] = useState<XCreditsUsage | null>(null);
   const [boot, setBoot] = useState<AgentBootstrap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -187,7 +190,8 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
 
   const selectTab = useCallback(
     (id: string) => {
-      const next = parseAgentTab(id);
+      let next = parseAgentTab(id);
+      if ((hideTabs as string[]).includes(next)) next = "setup";
       setTab(next);
       if (embedded) {
         onWorkspaceChange?.(next);
@@ -324,6 +328,11 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
     <AgentShell
       activeTab={tab}
       onTabChange={selectTab}
+      tabs={hideTabs.length ? [
+        { id: "setup", label: "Setup", ico: "⌂" },
+        { id: "keys", label: "API keys", ico: "✦" },
+        { id: "connect", label: "Connect AI", ico: "⬡" },
+      ].filter((t) => !(hideTabs as string[]).includes(t.id)) : undefined}
       statusLabel={statusLabel}
       statusWarn={!hasKey || !linkedWallet}
       onRefresh={refresh}

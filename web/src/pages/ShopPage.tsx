@@ -38,7 +38,7 @@ export default function ShopPage() {
       brandSub="Shop"
       footerBrand="OrbitX Shop"
       footerNote="Your in-app wallet buys $ORBITX and burns it. Same items as the Solana-betting shop. Then copy the note and send it to the team."
-      siblingHref="/supercomputer?tab=shop"
+      siblingHref="/supercomputer?tab=access"
       siblingLabel="Super Computer"
       siblingIcon="◆"
       statusLabel={user ? "Shop ready" : "Sign in to buy"}

@@ -124,7 +124,7 @@ export default function AgentLinkAuthPage() {
 
           {done ? (
             <div className="ox-agent__btn-row">
-              <Link to="/supercomputer?tab=workspace" className="ox-agent__btn ox-agent__btn--primary">
+              <Link to="/supercomputer?tab=agent" className="ox-agent__btn ox-agent__btn--primary">
                 Open Super Computer
               </Link>
             </div>
@@ -154,7 +154,7 @@ export default function AgentLinkAuthPage() {
           )}
 
           <p className="ox-agent__note">
-            Manage keys and connected channels from the unified <Link to="/supercomputer?tab=workspace">Super Computer</Link>.
+            Manage keys and connected channels from the unified <Link to="/supercomputer?tab=agent">Super Computer</Link>.
           </p>
         </div>
       </section>

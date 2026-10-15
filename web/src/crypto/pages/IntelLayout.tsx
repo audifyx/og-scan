@@ -49,7 +49,7 @@ export default function IntelLayout() {
             <Link to="/orbitxlaunch/rescue" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Launchpad →
             </Link>
-            <Link to="/supercomputer?tab=workspace" className="oxc-link" style={{ fontSize: "0.75rem" }}>
+            <Link to="/supercomputer?tab=agent" className="oxc-link" style={{ fontSize: "0.75rem" }}>
               Super Computer →
             </Link>
             <Link to="/on-chain" className="oxc-link" style={{ fontSize: "0.75rem" }}>

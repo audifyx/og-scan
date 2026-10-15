@@ -9,7 +9,7 @@
  */
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Home, Search, Bell, Mail, Hash, MessageSquare, Radio, Globe, User,
+  Home, Search, Bell, Mail, Globe, User,
   Feather, X as XIcon, Heart, MessageCircle, Repeat2, Share, MoreHorizontal,
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
   ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins, Image as ImageIcon, Smile,
@@ -26,7 +26,6 @@ import "./x-social.css";
 const ChatHub = lazy(() => import("@/pages/SocialHub"));
 const RoomsPage = lazy(() => import("@/pages/CommunityRooms"));
 const SpacesPage = lazy(() => import("@/pages/Spaces"));
-const TradingLobbiesPage = lazy(() => import("@/pages/TradingLobbies"));
 const CoinCommunitiesPage = lazy(() => import("@/pages/CoinCommunitiesPage"));
 const CommunitiesPage = lazy(() => import("@/pages/Communities"));
 const MessagesPage = lazy(() => import("@/pages/DirectMessages"));
@@ -35,7 +34,7 @@ const ProfilePage = lazy(() => import("@/components/profile-20x/UserProfile"));
 /* ═══════════ Types ═══════════ */
 export type XTab =
   | "home" | "explore" | "notifications" | "messages"
-  | "chat" | "rooms" | "spaces" | "communities" | "profile" | "bookmarks";
+  | "communities" | "profile" | "bookmarks";
 
 interface Post {
   id: string; user_id: string; username: string | null; avatar_url: string | null;
@@ -105,35 +104,30 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "explore", label: "Explore", Icon: Search },
   { id: "notifications", label: "Notifications", Icon: Bell },
   { id: "messages", label: "Messages", Icon: Mail },
-  { id: "chat", label: "Chat", Icon: Hash },
-  { id: "rooms", label: "Rooms", Icon: MessageSquare },
-  { id: "spaces", label: "Spaces", Icon: Radio },
-  { id: "communities", label: "Communities", Icon: Globe },
+  { id: "communities", label: "Communities", Icon: Users },
+  { id: "bookmarks", label: "Saved", Icon: Bookmark },
   { id: "profile", label: "Profile", Icon: User },
-  { id: "bookmarks", label: "Bookmarks", Icon: Bookmark },
 ];
 
 /* Mobile dock: 5 core tabs; overflow + Notifications in More sheet (bell also opens Notifications). */
 const CORE_TABS: XTab[] = ["home", "explore", "communities", "messages", "profile"];
-const MORE_TABS: XTab[] = ["notifications", "chat", "rooms", "spaces", "bookmarks"];
+const MORE_TABS: XTab[] = ["notifications", "bookmarks"];
 
 const TAB_SHORT: Partial<Record<XTab, string>> = {
   home: "Home",
   explore: "Explore",
-  communities: "Communities",
+  communities: "Groups",
   messages: "Messages",
   profile: "Profile",
   notifications: "Alerts",
-  chat: "Chat",
-  rooms: "Rooms",
-  spaces: "Spaces",
   bookmarks: "Saved",
 };
 
 /* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
 const ENTRY_MAP: Record<string, XTab> = {
-  channels: "chat", social: "chat", rooms: "rooms", voice: "rooms",
-  spaces: "spaces", communities: "communities", discover: "communities",
+  channels: "messages", social: "messages", chat: "messages",
+  rooms: "communities", voice: "communities", spaces: "communities",
+  communities: "communities", discover: "communities",
 };
 
 function resolveInitialTab(preferred?: XTab): XTab {
@@ -201,8 +195,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [foundDexCoins, setFoundDexCoins] = useState<Ticker[]>([]);
   const [topComms, setTopComms] = useState<CommunityLite[]>([]);
   const [searching, setSearching] = useState(false);
-  const [commView, setCommView] = useState<"token" | "og">("token");
-  const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
+  const [commView, setCommView] = useState<"groups" | "token" | "rooms" | "spaces">("groups");
+  const [msgView, setMsgView] = useState<"direct" | "groups">("direct");
   const [moreOpen, setMoreOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState<"all" | "mentions" | "likes" | "follows">("all");
   const [newPosts, setNewPosts] = useState(0);
@@ -900,25 +894,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               </div>
             ) : (
               <>
-                {shownPosts.map((p, i) => (
+                {shownPosts.map((p) => (
                   <React.Fragment key={p.id}>
                     <PostCard p={p} onOpen={setOpenPostId} />
-                    {/* One quiet “Who to follow” card, Twitter-style — not a carousel wall */}
-                    {i === 3 && feedMode === "foryou" && whoToFollow.length > 0 && (
-                      <section className="border-b border-white/[0.08] py-1">
-                        <div className="px-4 py-3 text-[18px] font-black text-white">Who to follow</div>
-                        {whoToFollow.slice(0, 3).map((s) => (
-                          <FollowCard key={s.user_id} s={s} />
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setTab("explore")}
-                          className="w-full px-4 py-3.5 text-left text-[14px] text-[#ffffff] transition hover:bg-white/[0.03]"
-                        >
-                          Show more
-                        </button>
-                      </section>
-                    )}
                   </React.Fragment>
                 ))}
               </>
@@ -1190,65 +1168,41 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
       case "messages":
         return (
-          <Suspense fallback={<Spinner />}>
-            <div className="h-full min-h-0 overflow-hidden"><MessagesPage /></div>
-          </Suspense>
-        );
-
-      case "chat":
-        return (
-          <Suspense fallback={<Spinner />}>
-            <div className="h-full min-h-0 overflow-hidden"><ChatHub /></div>
-          </Suspense>
-        );
-
-      case "rooms":
-        return (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.06] bg-black/55 px-4 py-3 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
-              <span className="mr-2 text-[19px] font-black text-white">Rooms</span>
-              {([["rooms", "Community Rooms"], ["trading", "Trading Lobbies"]] as const).map(([id, label]) => (
-                <button key={id} type="button" onClick={() => setRoomsView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", roomsView === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
-                  {label}
-                </button>
-              ))}
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/80 backdrop-blur-2xl">
+              <div className="px-4 pt-3 pb-2">
+                <div className="text-[20px] font-black tracking-tight text-white">Messages</div>
+              </div>
+              <div className="flex items-center gap-1.5 px-4 pb-3">
+                {([["direct", "Direct"], ["groups", "Groups"]] as const).map(([id, label]) => (
+                  <button key={id} type="button" onClick={() => setMsgView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", msgView === id ? "bg-white text-black" : "text-white/50 hover:text-white")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden">
               <Suspense fallback={<Spinner />}>
-                {roomsView === "rooms" ? <RoomsPage /> : <TradingLobbiesPage inline />}
+                {msgView === "direct" ? (
+                  <div className="h-full min-h-0 overflow-hidden"><MessagesPage /></div>
+                ) : (
+                  <div className="h-full min-h-0 overflow-hidden"><ChatHub /></div>
+                )}
               </Suspense>
             </div>
           </div>
         );
 
-      case "spaces":
-        return (
-          <Suspense fallback={<Spinner />}>
-            <div className="h-full min-h-0 overflow-y-auto px-3 py-4"><SpacesPage /></div>
-          </Suspense>
-        );
-
       case "communities":
         return (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
-              <div className="flex items-center justify-between px-4 pt-3">
-                <div>
-                  <div className="text-[19px] font-black leading-tight text-white">Communities</div>
-                  <div className="text-[11px] text-white/35">Token rooms & OG groups — find your people</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setSearchScope("communities"); setTab("explore"); }}
-                  aria-label="Search communities"
-                  className="grid h-9 w-9 place-items-center rounded-full bg-white/[0.06] text-white/60 ring-1 ring-white/[0.08] transition hover:bg-white/[0.1] hover:text-white active:scale-95"
-                >
-                  <Search className="h-4 w-4" />
-                </button>
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/80 backdrop-blur-2xl">
+              <div className="px-4 pt-3 pb-2">
+                <div className="text-[20px] font-black tracking-tight text-white">Communities</div>
               </div>
-              <div className="flex items-center gap-2 px-4 py-3">
-                {([["token", "Token Communities"], ["og", "OG Communities"]] as const).map(([id, label]) => (
-                  <button key={id} type="button" onClick={() => setCommView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", commView === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
+              <div className="flex items-center gap-1.5 overflow-x-auto px-4 pb-3 [scrollbar-width:none]">
+                {([["groups", "Groups"], ["token", "Token"], ["rooms", "Rooms"], ["spaces", "Spaces"]] as const).map(([id, label]) => (
+                  <button key={id} type="button" onClick={() => setCommView(id)} className={cn("shrink-0 rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", commView === id ? "bg-white text-black" : "text-white/50 hover:text-white")}>
                     {label}
                   </button>
                 ))}
@@ -1256,7 +1210,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <Suspense fallback={<Spinner />}>
-                {commView === "token" ? <CoinCommunitiesPage /> : <CommunitiesPage />}
+                {commView === "groups" && <CommunitiesPage />}
+                {commView === "token" && <CoinCommunitiesPage />}
+                {commView === "rooms" && <RoomsPage />}
+                {commView === "spaces" && <div className="px-3 py-4"><SpacesPage /></div>}
               </Suspense>
             </div>
           </div>
