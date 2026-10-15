@@ -1,24 +1,6 @@
-/**
- * OrbitX Markets — home screen.
- * Layout: featured top token · category tabs · filter chips · search · ranked token list.
- * Theme: black / white / blue / gold.
- */
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ChevronRight,
-  Flame,
-  Globe,
-  Loader2,
-  RefreshCw,
-  Rocket,
-  Search,
-  SlidersHorizontal,
-  Sparkles,
-  TrendingUp,
-  X,
-} from "lucide-react";
+import { Loader2, RefreshCw, Search, X } from "lucide-react";
 import { fetchScreener, searchCoins, type MarketCoin } from "./tradeApi";
 import { fmtNum, fmtPct, fmtUsd } from "./tradeFmt";
 import TokenAvatar from "./TokenAvatar";
@@ -55,120 +37,31 @@ const TABS: Record<Cat, { id: string; label: string }[]> = {
   ],
 };
 
-const CHIP_ICONS: Record<string, typeof TrendingUp> = {
-  trending: TrendingUp,
-  runners: Rocket,
-  new: Globe,
-  fomo: Flame,
-  jupiter: Sparkles,
-};
-
 const LAST_MINT_KEY = "orbitx.trade.lastMint";
 
 function chgClass(n: number) {
-  if (n > 0) return "mk__chg--up";
-  if (n < 0) return "mk__chg--down";
-  return "mk__chg--flat";
+  if (n > 0) return "th__chg--up";
+  if (n < 0) return "th__chg--down";
+  return "th__chg--flat";
 }
 
-/** Live 24h sparkline for the featured token (DexScreener-backed candles). */
-function Sparkline({ mint }: { mint: string }) {
-  const [pts, setPts] = useState<number[]>([]);
-  useEffect(() => {
-    let on = true;
-    fetch(`/api/ogdex/chart?mint=${mint}&interval=1h&limit=24`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!on) return;
-        const vals = ((d?.candles || []) as any[])
-          .map((k) => Number(k.close ?? k[4] ?? 0))
-          .filter((v) => v > 0);
-        if (vals.length > 1) setPts(vals);
-      })
-      .catch(() => {});
-    return () => {
-      on = false;
-    };
-  }, [mint]);
-  if (pts.length < 2) return <div className="mk-spark mk-spark--empty" aria-hidden />;
-  const w = 240;
-  const h = 72;
-  const min = Math.min(...pts);
-  const max = Math.max(...pts);
-  const rng = max - min || 1;
-  const step = w / (pts.length - 1);
-  const d = pts
-    .map(
-      (v, i) =>
-        `${(i * step).toFixed(1)},${(h - 5 - ((v - min) / rng) * (h - 12)).toFixed(1)}`,
-    )
-    .join(" ");
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mk-spark" preserveAspectRatio="none" aria-hidden>
-      <polyline
-        points={d}
-        fill="none"
-        stroke="#5aa2ff"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+function pctClass(n: number) {
+  if (n > 0) return "th__chg--up";
+  if (n < 0) return "th__chg--down";
+  return "th__chg--flat";
 }
 
-function FeaturedCard({ coin, onOpen }: { coin: MarketCoin; onOpen: (mint: string) => void }) {
-  const [desc, setDesc] = useState<string | null>(null);
-  useEffect(() => {
-    let on = true;
-    fetch(`/api/ogdex/token?mint=${coin.mint}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!on) return;
-        const t = d?.meta?.description || d?.token?.description || null;
-        if (typeof t === "string" && t.trim()) setDesc(t.trim().slice(0, 140));
-      })
-      .catch(() => {});
-    return () => {
-      on = false;
-    };
-  }, [coin.mint]);
-  const sym = coin.symbol?.trim() || coin.mint.slice(0, 4);
-  const name = coin.name?.trim() || "Unknown token";
+function CoinLogo({ coin, size = "card" }: { coin: MarketCoin; size?: "card" | "feat" }) {
+  const px = size === "feat" ? 44 : 36;
   return (
-    <section className="mk-feat" aria-label="Featured top token">
-      <p className="mk-feat__kicker">Featured top token</p>
-      <div className="mk-feat__grid">
-        <div className="mk-feat__left">
-          <TokenAvatar image={coin.image} symbol={sym} mint={coin.mint} size={76} className="mk-feat__img" />
-          <div className="min-w-0">
-            <h2 className="mk-feat__sym">{sym}</h2>
-            <p className="mk-feat__name">{name}</p>
-            {desc && <p className="mk-feat__desc">{desc}</p>}
-          </div>
-        </div>
-        <div className="mk-feat__right">
-          <p className={`mk-feat__chg ${chgClass(coin.change24h)}`}>
-            {coin.change24h > 0 ? "+" : ""}
-            {coin.change24h.toFixed(2)}% <span>24h</span>
-          </p>
-          <Sparkline mint={coin.mint} />
-        </div>
-      </div>
-      <div className="mk-feat__foot">
-        <div>
-          <p className="mk-feat__label">Price</p>
-          <p className="mk-feat__price">{fmtUsd(coin.price)}</p>
-        </div>
-        <div>
-          <p className="mk-feat__label">Market Cap</p>
-          <p className="mk-feat__mcap">{fmtUsd(coin.mcap)}</p>
-        </div>
-        <button type="button" className="mk-feat__view" onClick={() => onOpen(coin.mint)}>
-          View Token <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-    </section>
+    <TokenAvatar
+      image={coin.image}
+      symbol={coin.symbol}
+      mint={coin.mint}
+      size={px}
+      className={size === "feat" ? "th__feat-img" : "th__logo"}
+      fallbackClassName={size === "feat" ? "th__feat-fallback" : "th__logo-fallback"}
+    />
   );
 }
 
@@ -196,7 +89,9 @@ export default function TradeHome() {
       if (!on) return;
       setCoins(rows);
       setLoading(false);
-      if (!rows.length) setLoadErr("No coins returned — feed may be unavailable");
+      if (!rows.length) {
+        setLoadErr("No coins returned — feed may be unavailable");
+      }
     });
     return () => {
       on = false;
@@ -221,7 +116,7 @@ export default function TradeHome() {
   const searchingMode = q.trim().length >= 2;
   const list = searchingMode ? results : coins;
   const subTabs = TABS[cat];
-  const featured = !searchingMode && !loading && coins.length > 0 ? coins[0] : null;
+  const featured = !searchingMode && !loading ? coins.slice(0, 3) : [];
 
   const openCoin = (mint: string) => {
     try {
@@ -236,109 +131,201 @@ export default function TradeHome() {
   const displayName = (c: MarketCoin) => c.name?.trim() || "Unknown token";
 
   return (
-    <div className="mk">
-      {featured && <FeaturedCard coin={featured} onOpen={openCoin} />}
+    <div className="th">
+      <div className="th__glow" />
+      <div className="th__noise" aria-hidden />
 
-      <div className="mk-cats" role="tablist" aria-label="Market categories">
-        {CATS.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            role="tab"
-            aria-selected={cat === c.id}
-            className={`mk-cat ${cat === c.id ? "mk-cat--on" : ""}`}
-            onClick={() => setCat(c.id)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <div className="th__top">
+        <div className="th__brand-row">
+          <div>
+            <p className="th__kicker">OrbitX Trade</p>
+            <h1 className="th__title">Markets</h1>
+            <p className="th__subtitle">
+              {loading || searching
+                ? "Syncing…"
+                : searchingMode
+                  ? `${list.length} results`
+                  : `${list.length} coins in ${subTabs.find((t) => t.id === tab)?.label || "feed"}`}
+            </p>
+          </div>
+          <div className="th__live" aria-live="polite">
+            <span className="th__live-dot" />
+            Live
+          </div>
+        </div>
 
-      <div className="mk-chips" role="tablist" aria-label="Feed filters">
-        {subTabs.map((t) => {
-          const Icon = CHIP_ICONS[t.id];
-          return (
+        {featured.length > 0 && (
+          <section className="th__spotlight" aria-label="Top in feed">
+            <button
+              type="button"
+              className="th__spot-mobile"
+              onClick={() => openCoin(featured[0].mint)}
+            >
+              <CoinLogo coin={featured[0]} size="feat" />
+              <div className="th__spot-mobile-body">
+                <div className="th__spot-mobile-top">
+                  <span className="th__spot-tag">Lead</span>
+                  <span className={`th__chg ${chgClass(featured[0].change24h)}`}>
+                    {fmtPct(featured[0].change24h)}
+                  </span>
+                </div>
+                <p className="th__spot-sym">{displaySym(featured[0])}</p>
+                <p className="th__spot-meta">
+                  {fmtUsd(featured[0].price)}
+                  <span className="th__spot-dot">·</span>
+                  MCap {fmtUsd(featured[0].mcap)}
+                </p>
+              </div>
+            </button>
+
+            <div className="th__spot-desk">
+              {featured.map((c, i) => (
+                <button
+                  key={c.mint}
+                  type="button"
+                  className="th__spot-tile"
+                  onClick={() => openCoin(c.mint)}
+                >
+                  <div className="th__spot-tile-head">
+                    <span className="th__spot-tag">{i === 0 ? "Lead" : `Top ${i + 1}`}</span>
+                    <span className={`th__chg ${chgClass(c.change24h)}`}>{fmtPct(c.change24h)}</span>
+                  </div>
+                  <div className="th__spot-tile-row">
+                    <CoinLogo coin={c} size="feat" />
+                    <div className="min-w-0">
+                      <p className="th__spot-sym truncate">{displaySym(c)}</p>
+                      <p className="th__spot-meta truncate">{displayName(c)}</p>
+                    </div>
+                  </div>
+                  <div className="th__spot-tile-foot">
+                    <span>{fmtUsd(c.price)}</span>
+                    <span>MCap {fmtUsd(c.mcap)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="th__cats" role="tablist" aria-label="Market categories">
+          {CATS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="tab"
+              aria-selected={cat === c.id}
+              className={`th__cat ${cat === c.id ? "th__cat--on" : ""}`}
+              onClick={() => setCat(c.id)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="th__subs" role="tablist" aria-label="Feed filters">
+          {subTabs.map((t) => (
             <button
               key={t.id}
               type="button"
               role="tab"
               aria-selected={tab === t.id}
-              className={`mk-chip ${tab === t.id ? "mk-chip--on" : ""}`}
+              className={`th__sub ${tab === t.id ? "th__sub--on" : ""}`}
               onClick={() => setTab(t.id)}
             >
-              {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />}
               {t.label}
             </button>
-          );
-        })}
+          ))}
+        </div>
+
+        <div className="th__search-wrap">
+          <Search className="th__search-icon" strokeWidth={2} />
+          <input
+            className="th__search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search ticker or paste mint"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          {q ? (
+            <button type="button" className="th__search-clear" onClick={() => setQ("")} aria-label="Clear search">
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="th__cols">
+          <span>#</span>
+          <span>Token</span>
+          <span>Mcap</span>
+          <span>24h</span>
+        </div>
       </div>
 
-      <div className="mk-search">
-        <Search className="mk-search__icon" strokeWidth={2} />
-        <input
-          className="mk-search__input"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search tokens, pairs or addresses..."
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-        />
-        {q ? (
-          <button type="button" className="mk-search__clear" onClick={() => setQ("")} aria-label="Clear search">
-            <X className="h-4 w-4" />
-          </button>
-        ) : (
-          <SlidersHorizontal className="mk-search__filter" strokeWidth={2} />
-        )}
-      </div>
-
-      <div className="mk-list">
+      <div className="th__list">
         {loading && !list.length ? (
-          <div className="mk-loading">
-            <Loader2 className="mk-spin" />
+          <div className="th__loading">
+            <Loader2 className="th__spin" />
             <p>Loading markets…</p>
           </div>
         ) : !list.length ? (
-          <div className="mk-empty">
-            <p className="mk-empty__title">{searchingMode ? "No matches" : "Feed empty"}</p>
-            <p className="mk-empty__copy">
-              {searchingMode ? "Try another ticker or paste a mint address" : loadErr || "No coins in this feed right now"}
+          <div className="th__empty">
+            <p className="th__empty-title">
+              {searchingMode ? "No matches" : "Feed empty"}
+            </p>
+            <p className="th__empty-copy">
+              {searchingMode
+                ? "Try another ticker or paste a mint address"
+                : loadErr || "No coins in this feed right now"}
             </p>
             {!searchingMode && (
-              <button type="button" className="mk-retry" onClick={() => setReloadTick((n) => n + 1)}>
+              <button
+                type="button"
+                className="th__retry"
+                onClick={() => setReloadTick((n) => n + 1)}
+              >
                 <RefreshCw className="h-3.5 w-3.5" />
                 Retry feed
               </button>
             )}
           </div>
         ) : (
-          list.map((c, i) => (
-            <button key={c.mint} type="button" className="mk-row" onClick={() => openCoin(c.mint)}>
-              <span className="mk-rank">{i + 1}</span>
-              <TokenAvatar image={c.image} symbol={displaySym(c)} mint={c.mint} size={48} className="mk-row__img" />
-              <span className="mk-row__main">
-                <span className="mk-row__sym">{displaySym(c)}</span>
-                <span className="mk-row__name">{displayName(c)}</span>
-                <span className="mk-row__chain">
-                  <i className="mk-dot" /> Solana
-                </span>
-              </span>
-              <span className="mk-row__side">
-                <span className="mk-row__price">{fmtUsd(c.price)}</span>
-                <span className={`mk-row__chg ${chgClass(c.change24h)}`}>{fmtPct(c.change24h)}</span>
-                <span className="mk-row__meta">
-                  Vol: {fmtUsd(c.volume24h)} <b>|</b> Liq: {fmtUsd(c.liquidity)}{" "}
-                  {c.holders != null && c.holders > 0 && (
-                    <>
-                      <b>|</b> Holders: {fmtNum(c.holders)}
-                    </>
-                  )}
-                </span>
-              </span>
-            </button>
-          ))
+          <div className="th__cards">
+            {list.map((c, i) => (
+              <button key={c.mint} type="button" className="th__card" onClick={() => openCoin(c.mint)}>
+                <span className="th__rank">{i + 1}</span>
+                <CoinLogo coin={c} />
+                <div className="th__main">
+                  <div className="th__row1">
+                    <span className="th__sym">{displaySym(c)}</span>
+                    <span className="th__name">{displayName(c)}</span>
+                  </div>
+                  <div className="th__row2">
+                    <span>{fmtUsd(c.price)}</span>
+                    <span className="th__chip">Vol {fmtUsd(c.volume24h)}</span>
+                    {c.liquidity > 0 && <span className="th__chip">Liq {fmtUsd(c.liquidity)}</span>}
+                    {c.holders != null && c.holders > 0 ? (
+                      <span className="th__chip">H {fmtNum(c.holders)}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="th__stats">
+                  <p className="th__mcap">{fmtUsd(c.mcap)}</p>
+                  <span className={`th__pct ${pctClass(c.change24h)}`}>{fmtPct(c.change24h)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         )}
+
+        <footer className="th__footer">
+          <p className="th__footer-brand">OrbitX Trade</p>
+          <p className="th__footer-copy">Live Solana markets · non-custodial desk</p>
+          <p className="th__footer-meta">
+            {searchingMode ? "Search" : subTabs.find((t) => t.id === tab)?.label || "Feed"} · updated live
+          </p>
+        </footer>
       </div>
     </div>
   );
