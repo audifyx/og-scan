@@ -1,268 +1,110 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Loader2, RefreshCw, HandCoins, ExternalLink, Rocket } from "lucide-react";
+import { useState } from "react";
+import { Loader2, HandCoins, ExternalLink, CheckCircle2, Rocket } from "lucide-react";
 import { toast } from "sonner";
-import { listByCreator, type OrbitxToken } from "@/lib/orbitx/registry";
-import {
-  getPumpClaimableSol,
-  getCustomClaimable,
-  buildCustomClaimTransactions,
-  buildPumpClaimWithSkim,
-  buildCustomSwapToSolWithSkim,
-  getClaimBlockhash,
-  type CustomClaimable,
-} from "@/lib/orbitx/claim";
-import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
-import { useTradeWalletPicker } from "../TradeWalletPicker";
-
-const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+import { callSupercomputerTool } from "@/tokenomics/mcpClient";
+import { getBillingAuthCode } from "@/tokenomics/auth";
 
 export default function CreatorFeeClaimPanel() {
-  const { connection } = useConnection();
-  const {
-    publicKey,
-    ready,
-    localActive,
-    label,
-    shortAddress,
-    sendTx,
-  } = useActiveTradingWallet();
-  const { openPicker, picker } = useTradeWalletPicker();
-  const [pumpSol, setPumpSol] = useState<number | null>(null);
-  const [pumpLoading, setPumpLoading] = useState(false);
-  const [pumpClaiming, setPumpClaiming] = useState(false);
-  const [pumpSig, setPumpSig] = useState("");
-  const [tokens, setTokens] = useState<OrbitxToken[]>([]);
-  const [claimables, setClaimables] = useState<Record<string, CustomClaimable | "loading" | "error">>({});
-  const [claiming, setClaiming] = useState<Record<string, boolean>>({});
+  const { publicKey, ready, label } = useActiveTradingWallet();
+  const [claiming, setClaiming] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [sig, setSig] = useState("");
 
-  const refreshPump = useCallback(async () => {
-    if (!publicKey) return;
-    setPumpLoading(true);
-    try {
-      setPumpSol(await getPumpClaimableSol(connection, publicKey));
-    } catch {
-      setPumpSol(null);
-    } finally {
-      setPumpLoading(false);
-    }
-  }, [connection, publicKey]);
-
-  const refreshTokens = useCallback(async () => {
-    if (!publicKey) return;
-    try {
-      const list = await listByCreator(publicKey.toBase58());
-      setTokens(list);
-      for (const t of list.filter((x) => x.launch_type === "custom")) {
-        setClaimables((c) => ({ ...c, [t.mint_address]: "loading" }));
-        getCustomClaimable(connection, t.mint_address)
-          .then((info) => setClaimables((c) => ({ ...c, [t.mint_address]: info })))
-          .catch(() => setClaimables((c) => ({ ...c, [t.mint_address]: "error" })));
-      }
-    } catch {
-      toast.error("Could not load launched tokens");
-    }
-  }, [connection, publicKey]);
-
-  useEffect(() => {
-    if (ready && publicKey) {
-      void refreshPump();
-      void refreshTokens();
-    }
-  }, [ready, publicKey, refreshPump, refreshTokens]);
-
-  const claimPump = async () => {
-    if (!publicKey || !ready) return;
-    setPumpClaiming(true);
-    try {
-      const plan = await buildPumpClaimWithSkim(connection, publicKey);
-      if (plan.grossLamports <= 0) {
-        toast.error("Nothing to claim");
-        return;
-      }
-      const sig = await sendTx(connection, plan.tx);
-      await connection.confirmTransaction(sig, "confirmed");
-      setPumpSig(sig);
-      toast.success(
-        `Claimed ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL (${bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee)`,
-      );
-      void refreshPump();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("User rejected")) toast.error("Cancelled");
-      else toast.error(msg || "Claim failed");
-    } finally {
-      setPumpClaiming(false);
-    }
-  };
-
-  const claimCustom = async (t: OrbitxToken) => {
-    const info = claimables[t.mint_address];
-    if (!publicKey || !ready || !info || info === "loading" || info === "error") return;
-    if (info.withdrawAuthority && info.withdrawAuthority !== publicKey.toBase58()) {
-      toast.error("Only the fee authority can claim");
+  const claimFees = async () => {
+    if (!publicKey || !ready) {
+      toast.error("Link your in-app wallet first");
       return;
     }
-    setClaiming((c) => ({ ...c, [t.mint_address]: true }));
+    const authCode = getBillingAuthCode();
+    if (!authCode) {
+      toast.error("Link your in-app wallet first");
+      return;
+    }
+    setClaiming(true);
+    setResult(null);
     try {
-      const txs = buildCustomClaimTransactions(t.mint_address, publicKey, info);
-      let lastSig = "";
-      for (const tx of txs) {
-        tx.feePayer = publicKey;
-        const { blockhash, lastValidBlockHeight } = await getClaimBlockhash(connection);
-        tx.recentBlockhash = blockhash;
-        lastSig = await sendTx(connection, tx);
-        await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
+      const res = await callSupercomputerTool("orbitx_app_claim", { authCode });
+      if (!res.ok) {
+        throw new Error(res.message || res.error || "Claim failed");
       }
-      try {
-        const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
-        lastSig = await sendTx(connection, plan.tx);
-        await connection.confirmTransaction(lastSig, "confirmed");
-        toast.success(`${t.ticker} claimed → ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
-      } catch {
-        toast.success(`${t.ticker} fees claimed as tokens`);
-      }
-      const fresh = await getCustomClaimable(connection, t.mint_address).catch(() => null);
-      if (fresh) setClaimables((c) => ({ ...c, [t.mint_address]: fresh }));
+      setResult(res);
+      if (res.signature) setSig(res.signature);
+      toast.success(res.message || "Creator fees claimed!");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("User rejected")) toast.error("Cancelled");
-      else toast.error(msg || "Claim failed");
+      toast.error(msg || "Claim failed");
     } finally {
-      setClaiming((c) => ({ ...c, [t.mint_address]: false }));
+      setClaiming(false);
     }
   };
 
   if (!ready || !publicKey) {
     return (
-      <div className="rounded-2xl border border-white/20 bg-[#050505] p-6 text-center">
-        <HandCoins className="mx-auto h-8 w-8 text-white/70" />
-        <p className="mt-3 text-sm text-white/75">
-          {localActive
-            ? "Set a default local trading wallet to claim creator fees"
-            : "Connect the wallet you launched with to claim creator fees"}
+      <div className="rounded-2xl border border-white/20 bg-black/60 p-6 text-center">
+        <HandCoins className="mx-auto h-8 w-8 text-white/50" />
+        <p className="mt-3 text-sm text-white/80">
+          Link your in-app wallet to claim creator fees
         </p>
-        {localActive ? (
-          <Link
-            to="/trade/wallets"
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Manage wallets
-          </Link>
-        ) : (
-          <>
-            {picker}
-            <button
-              type="button"
-              onClick={openPicker}
-              className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-            >
-              Connect wallet
-            </button>
-          </>
-        )}
+        <p className="mt-1 text-xs text-white/60">
+          One wallet across OrbitX — no separate connection needed
+        </p>
       </div>
     );
   }
 
-  const custom = tokens.filter((t) => t.launch_type === "custom");
-
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/20 bg-[#050505] p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Rocket className="h-4 w-4 text-white/70" />
-            <span className="text-sm font-bold">Pump.fun creator fees</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {shortAddress ? (
-              <span className="rounded-full border border-white/25 px-2 py-0.5 font-mono text-[10px] text-white/70">
-                {label || shortAddress}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                void refreshPump();
-                void refreshTokens();
-              }}
-              className="rounded-full border border-white/30 p-2 text-white/80"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${pumpLoading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
+      <div className="rounded-2xl border border-white/20 bg-black/60 p-5">
+        <div className="flex items-center gap-2">
+          <Rocket className="h-5 w-5 text-white" />
+          <span className="text-base font-bold text-white">Creator Fee Claim</span>
         </div>
-        <p className="mt-2 text-xs text-white/65">
-          One claim collects fees across all pump coins this wallet created.
+        <p className="mt-2 text-sm text-white/70">
+          Claims pump.fun creator fees accrued to your in-app wallet.
+          Backend-signed — no popups, fees land directly in your wallet.
         </p>
-        <div className="mt-3 text-2xl font-bold">
-          {pumpLoading ? "…" : pumpSol != null ? `${pumpSol.toFixed(4)} SOL` : "—"}
-        </div>
+
+        {result && (
+          <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+              <span className="text-sm font-bold text-emerald-200">Claimed!</span>
+            </div>
+            <p className="mt-1 text-xs text-white/70">{result.message}</p>
+          </div>
+        )}
+
         <button
           type="button"
-          disabled={pumpClaiming || !pumpSol}
-          onClick={() => void claimPump()}
+          disabled={claiming}
+          onClick={() => void claimFees()}
           className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black disabled:opacity-40"
         >
-          {pumpClaiming ? (
+          {claiming ? (
             <span className="inline-flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" /> Claiming…
             </span>
           ) : (
-            "Claim pump fees"
+            "Claim creator fees"
           )}
         </button>
-        {pumpSig ? (
+
+        {sig && (
           <a
-            href={`https://solscan.io/tx/${pumpSig}`}
+            href={`https://solscan.io/tx/${sig}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-xs text-white/70"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-white/70 hover:text-white"
           >
             View tx <ExternalLink className="h-3 w-3" />
           </a>
-        ) : null}
+        )}
       </div>
 
-      {custom.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-white/75">Custom lane (Token-2022)</div>
-          {custom.map((t) => {
-            const info = claimables[t.mint_address];
-            const ui =
-              info && info !== "loading" && info !== "error" ? `${info.totalUi.toFixed(4)} ${t.ticker}` : "—";
-            return (
-              <div key={t.mint_address} className="rounded-2xl border border-white/20 bg-[#050505] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-bold">${t.ticker}</div>
-                    <div className="font-mono text-[10px] text-white/75">{short(t.mint_address)}</div>
-                  </div>
-                  <div className="text-right text-xs text-white/80">{info === "loading" ? "…" : ui}</div>
-                </div>
-                <button
-                  type="button"
-                  disabled={
-                    claiming[t.mint_address] ||
-                    !info ||
-                    info === "loading" ||
-                    info === "error" ||
-                    (info !== "error" && info.totalRaw <= BigInt(0))
-                  }
-                  onClick={() => void claimCustom(t)}
-                  className="mt-3 h-10 w-full rounded-xl bg-white/90 text-xs font-bold text-black disabled:opacity-40"
-                >
-                  {claiming[t.mint_address] ? "Claiming…" : "Claim fees"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <p className="text-center text-[11px] text-white/50">
+        Wallet: {label || publicKey.toBase58().slice(0, 8) + "…"}
+      </p>
     </div>
   );
 }

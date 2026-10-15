@@ -19,7 +19,7 @@ import {
   TICK_AUTH_SOURCE,
   getTxConfirmationStatus,
 } from "./_user-trading-wallet.js";
-import { appLaunch, appClaimFees, appBurn, APP_DESK_OPS_TOOLS } from "./_mcp-app-desk-ops.js";
+import { appLaunch, appClaimFees, appBurn, appRentRefund, appUnwrapWsol, APP_DESK_OPS_TOOLS } from "./_mcp-app-desk-ops.js";
 // NOTE: strategy feature modules (_mcp-copy, _mcp-trailing, _mcp-sniper,
 // _mcp-alerts, _mcp-pnl) import helpers from THIS file. This file must NOT
 // statically import them back (ESM cycle → TDZ crash when a feature module
@@ -805,6 +805,8 @@ export async function dispatchAppWalletTool(name, args, auth) {
   if (name === "orbitx_app_launch") return appLaunch(auth, args || {});
   if (name === "orbitx_app_claim" || name === "orbitx_app_claim_fees") return appClaimFees(auth, args || {});
   if (name === "orbitx_app_burn") return appBurn(auth, args || {});
+  if (name === "orbitx_app_rent_refund") return appRentRefund(auth, args || {});
+  if (name === "orbitx_app_unwrap_wsol") return appUnwrapWsol(auth, args || {});
   if (name === "orbitx_send_sol") return appSendSol(auth, args || {});
   if (name === "orbitx_tip") return appTip(auth, args || {});
   if (name === "orbitx_dca_create") return appDcaCreate(auth, args || {});

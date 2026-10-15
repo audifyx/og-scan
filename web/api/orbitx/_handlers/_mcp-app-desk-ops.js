@@ -3,7 +3,7 @@
  * Same model as orbitx_app_buy: backend signs, no Phantom popup.
  */
 import { getUserWallet, getDeskFunds, signAndSendUserTx, SOL_MINT, isSigningAuth } from "./_user-trading-wallet.js";
-import { prepareBurn, preparePumpClaim } from "./_mcp-ops.js";
+import { prepareBurn, preparePumpClaim, prepareRentRefund, prepareUnwrapWsol } from "./_mcp-ops.js";
 
 const DASH = "https://www.orbitx.world/supercomputer?tab=inapp";
 const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -438,6 +438,60 @@ export async function appBurn(auth, args = {}) {
   });
 }
 
+export async function appRentRefund(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  let built;
+  try {
+    built = await prepareRentRefund(row.public_key);
+  } catch (e) {
+    return { ok: false, error: "scan_failed", message: String(e?.message || "Could not scan empty accounts.") };
+  }
+  if (!built.transactions.length) {
+    return { ok: true, action: "rent_refund", reclaimedSol: 0, message: "No empty token accounts — nothing to reclaim." };
+  }
+  let totalSig = "";
+  let totalReclaimed = 0;
+  for (const txBase64 of built.transactions) {
+    const live = await signAndSendUserTx(row, txBase64);
+    if (!live.ok) {
+      return { ok: false, error: "tx_failed", message: live.message || "Transaction failed.", reclaimedSol: totalReclaimed };
+    }
+    totalSig = live.signature || totalSig;
+    totalReclaimed += built.reclaimableSol / built.transactions.length;
+  }
+  return sendOutcome({ ok: true, signature: totalSig }, {
+    action: "rent_refund",
+    accountsClosed: built.accounts.length,
+    reclaimedSol: built.reclaimableSol,
+    message: `Closed ${built.accounts.length} empty accounts, reclaimed ${built.reclaimableSol.toFixed(4)} SOL.`,
+  });
+}
+
+export async function appUnwrapWsol(auth, args = {}) {
+  const gate = needAuth(auth);
+  if (!gate.userId) return gate;
+  const row = await getUserWallet(gate.userId);
+  if (!row) return { ok: false, error: "no_wallet" };
+  let built;
+  try {
+    built = await prepareUnwrapWsol(row.public_key);
+  } catch (e) {
+    return { ok: false, error: "scan_failed", message: String(e?.message || "Could not scan wSOL.") };
+  }
+  if (!built.transactions.length) {
+    return { ok: true, action: "unwrap_wsol", unwrappedSol: 0, message: built.note };
+  }
+  const live = await signAndSendUserTx(row, built.transactions[0]);
+  return sendOutcome(live, {
+    action: "unwrap_wsol",
+    unwrappedSol: built.unwrappableSol,
+    message: `Unwrapped ${built.unwrappableSol.toFixed(4)} wSOL to SOL.`,
+  });
+}
+
 export const APP_DESK_OPS_TOOLS = [
   {
     name: "orbitx_app_launch",
@@ -485,6 +539,22 @@ export const APP_DESK_OPS_TOOLS = [
         authCode: { type: "string" },
       },
       required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_app_rent_refund",
+    description: "Close empty token accounts and reclaim rent SOL to the desk wallet. Backend signs. No args needed.",
+    inputSchema: {
+      type: "object",
+      properties: { authCode: { type: "string" } },
+    },
+  },
+  {
+    name: "orbitx_app_unwrap_wsol",
+    description: "Unwrap wSOL back to native SOL in the desk wallet. Backend signs. No args needed.",
+    inputSchema: {
+      type: "object",
+      properties: { authCode: { type: "string" } },
     },
   },
 ];

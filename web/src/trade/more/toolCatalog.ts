@@ -16,6 +16,7 @@ export type TradeTool = {
 };
 
 export const TOOL_CATEGORIES = [
+  "Actions",
   "Analytics",
   "Security",
   "Wallet",
@@ -24,7 +25,38 @@ export const TOOL_CATEGORIES = [
 ] as const;
 
 export const TRADE_TOOLS: TradeTool[] = [
-  // Actions (interactive)
+  // Actions (interactive, backend-signed via in-app wallet)
+  {
+    id: "rent-refund",
+    name: "Rent Refund",
+    description: "Close empty ATAs and reclaim SOL rent",
+    category: "Actions",
+    kind: "panel",
+    featured: true,
+  },
+  {
+    id: "creator-fee-claim",
+    name: "Creator Fee Claim",
+    description: "Claim pump + custom-lane creator fees",
+    category: "Actions",
+    kind: "panel",
+    featured: true,
+  },
+  {
+    id: "token-burner",
+    name: "Token Burner",
+    description: "Burn holdings; reclaim rent when emptied",
+    category: "Actions",
+    kind: "panel",
+    featured: true,
+  },
+  {
+    id: "unwrap-wsol",
+    name: "Unwrap wSOL",
+    description: "Close wrapped SOL accounts",
+    category: "Actions",
+    kind: "panel",
+  },
 
   // Analytics
   { id: "jupiter-routes", name: "Jupiter Routes", description: "Swap routes & slippage", category: "Analytics", kind: "advanced", advancedKey: "Jupiter Routes" },

@@ -209,6 +209,48 @@ export async function prepareRentRefund(publicKey) {
   };
 }
 
+/** Build unwrap wSOL transactions for a wallet. */
+export async function prepareUnwrapWsol(publicKey) {
+  const { web3, spl } = await loadSolana();
+  const { Connection, PublicKey, Transaction } = web3;
+  const {
+    TOKEN_PROGRAM_ID,
+    getAssociatedTokenAddressSync,
+    createCloseAccountInstruction,
+  } = spl;
+  const conn = new Connection(rpcUrl(), "confirmed");
+  const owner = new PublicKey(publicKey);
+  const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+  
+  // Find wSOL token accounts
+  const wsolAta = getAssociatedTokenAddressSync(WSOL_MINT, owner);
+  const ataInfo = await conn.getAccountInfo(wsolAta);
+  
+  if (!ataInfo) {
+    return { ok: true, accounts: [], unwrappableSol: 0, transactions: [], note: "No wSOL account found." };
+  }
+  
+  // Check balance
+  const balance = await conn.getTokenAccountBalance(wsolAta);
+  const amount = Number(balance?.value?.amount || 0);
+  if (amount <= 0) {
+    return { ok: true, accounts: [], unwrappableSol: 0, transactions: [], note: "wSOL account is empty." };
+  }
+  
+  const { blockhash } = await conn.getLatestBlockhash("confirmed");
+  const tx = new Transaction();
+  tx.add(createCloseAccountInstruction(wsolAta, owner, owner, []));
+  const transactions = [serializeTx(tx, blockhash, owner)];
+  
+  return {
+    ok: true,
+    accounts: [{ mint: WSOL_MINT.toBase58(), account: wsolAta.toBase58() }],
+    unwrappableSol: amount / 1e9,
+    transactions,
+    note: "Unsigned unwrap tx. Sign to convert wSOL back to SOL.",
+  };
+}
+
 /** Build burn (+ optional close) for a mint amount. */
 export async function prepareBurn(publicKey, mint, amount, percent) {
   const { web3, spl } = await loadSolana();
