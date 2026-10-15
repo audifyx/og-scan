@@ -92,7 +92,7 @@ function thoughtFor(stats: AvatarStats, stage: number, mood: AvatarMood): string
   return pool[Math.floor(Math.random() * pool.length)] ?? "Orbiting. Always orbiting.";
 }
 
-export function LivingAvatar({ stats, size = 220 }: { stats: AvatarStats; size?: number }) {
+export function LivingAvatar({ stats, size = 220, compact = false }: { stats: AvatarStats; size?: number; compact?: boolean }) {
   const stage = stageForMcap(stats.mcap);
   const mood = moodForChange(stats.change24h);
   const [thought, setThought] = useState(() => thoughtFor(stats, stage, mood));
@@ -159,10 +159,12 @@ export function LivingAvatar({ stats, size = 220 }: { stats: AvatarStats; size?:
       `}</style>
 
       {/* Thought bubble */}
+      {!compact && (
       <div className="relative mb-2 max-w-[260px] rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-4 py-2.5 text-center backdrop-blur-md">
         <p key={thought} className="text-[13px] leading-snug text-white/85">{thought}</p>
         <div className="absolute -bottom-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-white/10 bg-[#0b0f1a]" />
       </div>
+      )}
 
       <div className="relative" style={{ width: size, height: size }}>
         {/* aura */}
@@ -320,6 +322,7 @@ export function LivingAvatar({ stats, size = 220 }: { stats: AvatarStats; size?:
       </div>
 
       {/* stage + progress */}
+      {!compact && (
       <div className="mt-3 w-full max-w-[260px] text-center">
         <div className="flex items-center justify-center gap-2">
           <Sparkles className="h-3.5 w-3.5 text-teal-300" />
@@ -346,6 +349,7 @@ export function LivingAvatar({ stats, size = 220 }: { stats: AvatarStats; size?:
         )}
         <p className="mt-2 text-[11px] italic text-white/35">{memoryLine}</p>
       </div>
+      )}
     </div>
   );
 }
