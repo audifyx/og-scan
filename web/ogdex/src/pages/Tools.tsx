@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Shield, Users, Droplets, Wallet2, Calculator, Search, Loader2, ArrowRight,
