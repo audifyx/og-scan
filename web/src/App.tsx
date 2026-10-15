@@ -254,6 +254,7 @@ const McpGuidePage = lazyWithRetry(() => import("./pages/mcp/McpGuidePage"));
 const ConnectChatGptPage = lazyWithRetry(() => import("./pages/mcp/ConnectChatGptPage"));
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
+const TokenPage = lazyWithRetry(() => import("./pages/token/TokenPage"));
 
 function RouteFallback({ label }: { label: string }) {
   return (
@@ -346,6 +347,9 @@ const App = () => (
             <Route path="/track-record" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/cc-callback" element={<CCCallbackPage />} />
             <Route path="/x-callback" element={<XCallbackPage />} />
+
+            {/* ── Public: ORBITX official token page ── */}
+            <Route path="/token" element={<Suspense fallback={<RouteFallback label="Token" />}><TokenPage /></Suspense>} />
 
             {/* ── Public: App install page ── */}
             <Route path="/install" element={<InstallApp />} />
