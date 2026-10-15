@@ -134,7 +134,7 @@ import OrbitXAI from "./pages/OrbitXAI";
 import TelegramOrbitX from "./pages/TelegramOrbitX";
 const LaunchpadNftHub = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftCreate"));
-const NftMarketLayout = lazyWithRetry(() => import("./pages/nft/MarketplaceLayout"));
+import NftMarketLayout from "./pages/nft/MarketplaceLayout";
 const NftMarketHome = lazyWithRetry(() => import("./pages/nft/MarketplaceHome"));
 const NftDrops = lazyWithRetry(() => import("./pages/nft/Drops"));
 const NftActivity = lazyWithRetry(() => import("./pages/nft/Activity"));
@@ -431,7 +431,7 @@ const App = () => (
 
             {/* ── Terminal UI: Trading Platform Style ── */}
             {/* ── OrbitX NFT Marketplace (dedicated /nft route) ── */}
-            <Route path="/nft" element={<Suspense fallback={null}><NftMarketLayout /></Suspense>}>
+            <Route path="/nft" element={<NftMarketLayout />}>
               <Route index element={<Suspense fallback={null}><NftMarketHome /></Suspense>} />
               <Route path="explore" element={<Suspense fallback={null}><LaunchpadNftHub /></Suspense>} />
               <Route path="drops" element={<Suspense fallback={null}><NftDrops /></Suspense>} />
