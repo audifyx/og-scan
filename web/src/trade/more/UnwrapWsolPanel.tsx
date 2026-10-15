@@ -1,149 +1,115 @@
-import { useCallback, useState } from "react";
-import { Link } from "react-router-dom";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { Loader2, RefreshCw, Droplets, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Droplets, ExternalLink, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  scanNativeSolAccounts,
-  buildUnwrapTransactions,
-  type NativeSolAccount,
-} from "@/lib/orbitx/rescue";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
-import { useTradeWalletPicker } from "../TradeWalletPicker";
-
-const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+import { callSupercomputerTool } from "@/tokenomics/mcpClient";
+import { getBillingAuthCode } from "@/tokenomics/auth";
 
 export default function UnwrapWsolPanel() {
-  const { connection } = useConnection();
-  const {
-    publicKey,
-    ready,
-    localActive,
-    label,
-    shortAddress,
-    sendTx,
-  } = useActiveTradingWallet();
-  const { openPicker, picker } = useTradeWalletPicker();
-  const [accounts, setAccounts] = useState<NativeSolAccount[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { publicKey, ready, label } = useActiveTradingWallet();
+  const [unwrapping, setUnwrapping] = useState(false);
+  const [result, setResult] = useState<any>(null);
   const [sig, setSig] = useState("");
 
-  const scan = useCallback(async () => {
-    if (!publicKey) return;
-    setLoading(true);
-    try {
-      const native = await scanNativeSolAccounts(connection, publicKey);
-      setAccounts(native);
-      if (!native.length) toast.message("No wrapped SOL accounts found");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Scan failed");
-    } finally {
-      setLoading(false);
-    }
-  }, [connection, publicKey]);
-
   const unwrap = async () => {
-    if (!publicKey || !ready || !accounts.length) return;
-    setBusy(true);
+    if (!publicKey || !ready) {
+      toast.error("Link your in-app wallet first");
+      return;
+    }
+    const authCode = getBillingAuthCode();
+    if (!authCode) {
+      toast.error("Link your in-app wallet first");
+      return;
+    }
+    setUnwrapping(true);
+    setResult(null);
     try {
-      const txs = buildUnwrapTransactions(publicKey, accounts);
-      let last = "";
-      for (const tx of txs) {
-        tx.feePayer = publicKey;
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-        tx.recentBlockhash = blockhash;
-        last = await sendTx(connection, tx);
-        await connection.confirmTransaction({ signature: last, blockhash, lastValidBlockHeight }, "confirmed");
+      const res = await callSupercomputerTool("orbitx_app_unwrap_wsol", { authCode });
+      if (!res.ok) {
+        throw new Error(res.message || res.error || "Unwrap failed");
       }
-      setSig(last);
-      const sol = accounts.reduce((s, a) => s + a.lamports, 0) / 1e9;
-      toast.success(`Unwrapped ~${sol.toFixed(4)} SOL`);
-      setAccounts([]);
+      setResult(res);
+      if (res.signature) setSig(res.signature);
+      toast.success(res.message || "wSOL unwrapped!");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("User rejected")) toast.error("Cancelled");
-      else toast.error(msg || "Unwrap failed");
+      toast.error(msg || "Unwrap failed");
     } finally {
-      setBusy(false);
+      setUnwrapping(false);
     }
   };
 
-  const total = accounts.reduce((s, a) => s + a.lamports, 0) / 1e9;
-
   if (!ready || !publicKey) {
     return (
-      <div className="rounded-2xl border border-white/20 bg-[#050505] p-6 text-center">
-        <Droplets className="mx-auto h-8 w-8 text-white/70" />
-        <p className="mt-3 text-sm text-white/75">
-          {localActive
-            ? "Set a default local trading wallet to unwrap wSOL"
-            : "Connect a wallet to unwrap wSOL"}
+      <div className="rounded-2xl border border-white/20 bg-black/60 p-6 text-center">
+        <Droplets className="mx-auto h-8 w-8 text-white/50" />
+        <p className="mt-3 text-sm text-white/80">
+          Link your in-app wallet to unwrap wSOL
         </p>
-        {localActive ? (
-          <Link
-            to="/trade/wallets"
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-bold text-black"
-          >
-            Manage wallets
-          </Link>
-        ) : (
-          <>
-            {picker}
-            <button
-              type="button"
-              onClick={openPicker}
-              className="mt-4 h-11 w-full rounded-2xl bg-white text-sm font-bold text-black"
-            >
-              Connect wallet
-            </button>
-          </>
-        )}
+        <p className="mt-1 text-xs text-white/60">
+          One wallet across OrbitX — no separate connection needed
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-white/20 bg-[#050505] p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-white/75">wSOL accounts</div>
-          <div className="text-xl font-bold">{accounts.length}</div>
-          {shortAddress ? (
-            <div className="mt-0.5 font-mono text-[10px] text-white/65">{label || shortAddress}</div>
-          ) : null}
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-white/20 bg-black/60 p-5">
+        <div className="flex items-center gap-2">
+          <Droplets className="h-5 w-5 text-white" />
+          <span className="text-base font-bold text-white">Unwrap wSOL</span>
         </div>
+        <p className="mt-2 text-sm text-white/70">
+          Converts wrapped SOL (wSOL) back to native SOL in your in-app wallet.
+          Backend-signed — no popups.
+        </p>
+
+        {result && (
+          <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+              <span className="text-sm font-bold text-emerald-200">Unwrapped!</span>
+            </div>
+            <p className="mt-1 text-xs text-white/70">{result.message}</p>
+            {result.unwrappedSol > 0 && (
+              <p className="mt-2 text-xl font-black text-white">
+                +{result.unwrappedSol.toFixed(4)} SOL
+              </p>
+            )}
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={() => void scan()}
-          disabled={loading}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/30 px-3 text-xs text-white/70"
+          disabled={unwrapping}
+          onClick={() => void unwrap()}
+          className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black disabled:opacity-40"
         >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Scan
+          {unwrapping ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Unwrapping…
+            </span>
+          ) : (
+            "Unwrap wSOL"
+          )}
         </button>
+
+        {sig && (
+          <a
+            href={`https://solscan.io/tx/${sig}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-white/70 hover:text-white"
+          >
+            View tx <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </div>
-      <p className="mt-2 text-sm text-white/70">
-        Closing returns wrapped balance + rent (~{total.toFixed(4)} SOL)
+
+      <p className="text-center text-[11px] text-white/50">
+        Wallet: {label || publicKey.toBase58().slice(0, 8) + "…"}
       </p>
-      <button
-        type="button"
-        disabled={!accounts.length || busy}
-        onClick={() => void unwrap()}
-        className="mt-4 h-12 w-full rounded-2xl bg-white text-sm font-bold text-black disabled:opacity-40"
-      >
-        {busy ? "Unwrapping…" : `Unwrap ${total.toFixed(4)} SOL`}
-      </button>
-      {sig ? (
-        <a
-          href={`https://solscan.io/tx/${sig}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 text-xs text-white/70"
-        >
-          View tx <ExternalLink className="h-3 w-3" /> · {short(sig)}
-        </a>
-      ) : null}
     </div>
   );
 }
