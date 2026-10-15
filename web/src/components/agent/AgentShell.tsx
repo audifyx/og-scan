@@ -12,12 +12,13 @@ import {
 } from "@/components/app-shell/IosAppShell";
 import "./agent-shell.css";
 
-export type AgentTabId = "setup" | "wallet" | "keys" | "connect" | "agent" | "queue";
+export type AgentTabId = "setup" | "shop" | "wallet" | "keys" | "connect" | "agent" | "queue";
 
 export type ShellTab = { id: string; label: string; ico?: string };
 
 const DEFAULT_TABS: ShellTab[] = [
   { id: "setup", label: "Home", ico: "⌂" },
+  { id: "shop", label: "Shop", ico: "◈" },
   { id: "wallet", label: "Wallet", ico: "◎" },
   { id: "keys", label: "Keys", ico: "✦" },
   { id: "connect", label: "Connect", ico: "⬡" },

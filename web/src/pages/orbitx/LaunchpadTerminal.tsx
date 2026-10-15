@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { icon: Home, label: "HOME", href: "/terminal" },
   { icon: BarChart3, label: "TRADE", href: "/terminal/trade" },
   { icon: Briefcase, label: "PORTFOLIO", href: "/terminal/portfolio" },
+  { icon: Rocket, label: "LAUNCH", href: "/terminal/launch" },
 ];
 
 export default function LaunchpadTerminal() {

@@ -62,8 +62,12 @@ import LaunchpadChoose from "./pages/orbitx/LaunchpadChoose";
 // Terminal / Trading Platform UI
 import LaunchpadTerminal from "./pages/orbitx/LaunchpadTerminal";
 import TerminalHome from "./pages/orbitx/TerminalHome";
+import TerminalTrade from "./pages/orbitx/TerminalTrade";
 import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
 import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
+import TradeApp from "./trade/TradeApp";
+import TradeHome from "./trade/TradeHome";
+import TradeDeskPage from "./trade/TradeDeskPage";
 import TradeToken from "./trade/TradeToken";
 import TradeLeaderboard from "./trade/TradeLeaderboard";
 import TradeProfile from "./trade/TradeProfile";
@@ -95,8 +99,8 @@ function RedirectPreserveSearch({ to }: { to: string }) {
 }
 const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
 const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
-const HubPage = lazyWithRetry(() => import("./pages/hub/HubPage"));
 const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
+const TradeDesk = lazyWithRetry(() => import("./crypto/pages/TradeDesk"));
 const PortfolioDesk = lazyWithRetry(() => import("./crypto/pages/PortfolioDesk"));
 const TrendingIntel = lazyWithRetry(() => import("./crypto/pages/TrendingIntel"));
 const WhaleIntel = lazyWithRetry(() => import("./crypto/pages/WhaleIntel"));
@@ -113,6 +117,10 @@ import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
 import LaunchpadLeaderboard from "./pages/orbitx/LaunchpadLeaderboard";
 import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
 import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
+import BagworkLayout from "./pages/bagwork/BagworkLayout";
+import BagworkHome from "./pages/bagwork/BagworkHome";
+import BagworkMyWork from "./pages/bagwork/BagworkMyWork";
+import BagworkAdmin from "./pages/bagwork/BagworkAdmin";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
@@ -427,14 +435,47 @@ const App = () => (
             </Route>
 
             {/* ── Bagwork — earn USDC for tasks ── */}
+            <Route path="/bagwork" element={<BagworkLayout />}>
+              <Route index element={<BagworkHome />} />
+              <Route path="my" element={<BagworkMyWork />} />
+              <Route path="admin" element={<AdminRoute><BagworkAdmin /></AdminRoute>} />
+            </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
             {/* ── OrbitX NFT Marketplace (dedicated /nft route) ── */}
+            <Route path="/nft" element={<Suspense fallback={null}><NftMarketLayout /></Suspense>}>
+              <Route index element={<Suspense fallback={null}><NftMarketHome /></Suspense>} />
+              <Route path="explore" element={<Suspense fallback={null}><LaunchpadNftHub /></Suspense>} />
+              <Route path="drops" element={<Suspense fallback={null}><NftDrops /></Suspense>} />
+              <Route path="activity" element={<Suspense fallback={null}><NftActivity /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={null}><NftNotifications /></Suspense>} />
+              <Route path="create" element={<Suspense fallback={null}><LaunchpadNftCreate /></Suspense>} />
+              <Route path="me" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
+              <Route path="profile/:wallet" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
+              <Route path="collection/:id" element={<Suspense fallback={null}><NftCollectionPage /></Suspense>} />
+              <Route path="coin/:nftId" element={<Suspense fallback={null}><NftCoinTrade /></Suspense>} />
+            </Route>
 
             {/* ── OrbitX Trade App (Home · Trade · Leaderboard · Profile) ── */}
+            <Route path="/trade" element={<TradeApp />}>
+              <Route index element={<TradeHome />} />
+              <Route path="home" element={<TradeHome />} />
+              <Route path="desk" element={<TradeDeskPage />} />
+              <Route path="desk/:mint" element={<TradeDeskPage />} />
+              <Route path="leaderboard" element={<TradeLeaderboard />} />
+              <Route path="portfolio" element={<TradePortfolio />} />
+              <Route path="profile" element={<TradeProfile />} />
+              <Route path="wallets" element={<TradeWalletManager />} />
+              <Route path="token/:mint" element={<TradeToken />} />
+              <Route path="wallet/:address" element={<TradeWallet />} />
+              <Route path="notifications" element={<TradeNotifications />} />
+              <Route path="more" element={<TradeMore />} />
+              <Route path=":mint" element={<TradeMintRedirect />} />
+            </Route>
 
             <Route path="/terminal" element={<OwnerPreviewRoute><LaunchpadTerminal /></OwnerPreviewRoute>}>
               <Route index element={<TerminalHome />} />
+              <Route path="trade" element={<TerminalTrade />} />
               <Route path="portfolio" element={<TerminalPortfolio />} />
               <Route path="launch" element={<TerminalLaunch />} />
             </Route>
@@ -444,6 +485,7 @@ const App = () => (
               <Route index element={<Suspense fallback={<RouteFallback label="Intel" />}><IntelHome /></Suspense>} />
               <Route path="scan" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
               <Route path="scan/:mint" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
+              <Route path="trade" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeDesk /></Suspense>} />
               <Route path="portfolio" element={<Suspense fallback={<RouteFallback label="Portfolio" />}><PortfolioDesk /></Suspense>} />
               <Route path="trending" element={<Suspense fallback={<RouteFallback label="Trending" />}><TrendingIntel /></Suspense>} />
               <Route path="whales" element={<Suspense fallback={<RouteFallback label="Whales" />}><WhaleIntel /></Suspense>} />
@@ -485,7 +527,6 @@ const App = () => (
             <Route path="/hq/*" element={<Navigate to="/orbitx-social" replace />} />
 
             {/* ── Protected: App shell ── */}
-            <Route path="/one" element={<Suspense fallback={null}><HubPage /></Suspense>} />
             <Route path="/app" element={<Hub />} />
             <Route path="/koltelebot" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/kol-tracker" element={<OwnerPreviewRoute><ProtectedRoute><KOLTracker /></ProtectedRoute></OwnerPreviewRoute>} />
@@ -518,6 +559,7 @@ const App = () => (
             <Route path="/tape" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/transactions" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/transaction-feed" element={<OgdexRedirect to="/ORBITX_DEX" />} />
+            <Route path="/swap" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
             <Route path="/news-signal" element={<OgdexRedirect to="/ORBITX_DEX/pulse" />} />
             <Route path="/memes" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
             <Route path="/art-feed" element={<OwnerPreviewRoute><ProtectedRoute><Index /></ProtectedRoute></OwnerPreviewRoute>} />
@@ -728,3 +770,4 @@ const App = () => (
 );
 
 export default App;
+

@@ -20,6 +20,7 @@ const NAV = [
   { to: "/intel/trending", end: false, label: "Trending", icon: Activity },
   { to: "/intel/whales", end: false, label: "Whales", icon: Waves },
   { to: "/intel/sentiment", end: false, label: "Sentiment", icon: MessageSquareText },
+  { to: "/intel/launch", end: false, label: "Launchpad", icon: Rocket },
 ];
 
 export default function IntelLayout() {

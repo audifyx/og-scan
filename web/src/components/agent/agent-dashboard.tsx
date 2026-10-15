@@ -22,6 +22,7 @@ import {
 } from "@/lib/orbitxMcp";
 import { AgentShell, type AgentTabId } from "./AgentShell";
 import { TelegramMcpCard } from "./TelegramMcpCard";
+import { McpShop } from "./McpShop";
 
 function maskSecret(value: string, kind: "key" | "header" = "key") {
   if (!value) return "—";
@@ -102,11 +103,11 @@ function FieldRow({
   );
 }
 
-const AGENT_TABS = new Set<AgentTabId>(["setup", "wallet", "keys", "connect"]);
+const AGENT_TABS = new Set<AgentTabId>(["setup", "shop", "wallet", "keys", "connect"]);
 
 function parseAgentTab(raw: string): AgentTabId {
   const t = String(raw || "").toLowerCase();
-  if (t === "shop" || t === "credits" || t === "usage" || t === "access") return "setup";
+  if (t === "shop" || t === "credits" || t === "usage" || t === "access") return "shop";
   return AGENT_TABS.has(t as AgentTabId) ? (t as AgentTabId) : "setup";
 }
 
@@ -234,6 +235,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
   }, [embedded, initialTab, searchParams, tab]);
 
   useEffect(() => {
+    if (tab === "shop") void refreshCredits();
   }, [tab, refreshCredits]);
 
   const copy = async (label: string, value: string) => {
@@ -374,7 +376,7 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
           <button
             type="button"
             className={`ox-agent__kpi${burnActive ? " is-ok" : ""}`}
-            onClick={() => selectTab("setup")}
+            onClick={() => selectTab("shop")}
           >
             <span className="ox-agent__kpi-k">Access</span>
             <span className="ox-agent__kpi-v">
@@ -468,7 +470,15 @@ export function AgentDashboard({ embedded = false, initialTab = "setup", onWorks
         </>
       )}
 
-      
+      {tab === "shop" && (
+        <McpShop
+          variant="agent"
+          walletAddress={linkedWallet}
+          creditsUsage={creditsUsage}
+          onAccessGranted={() => void refresh()}
+          onCreditsPurchased={() => void refreshCredits()}
+        />
+      )}
 
       {tab === "wallet" && (
         <section className="ox-agent__panel">
