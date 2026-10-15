@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import {
   Copy, Check, LogOut, Wallet, ExternalLink, Loader2, User, KeyRound,
@@ -25,8 +24,8 @@ interface Holding {
 }
 
 export default function TradeProfile() {
-  const { publicKey, connected, disconnect } = useWallet();
-  const { connection } = useConnection();
+  const { address: walletAddress, connected } = useActiveTradingWallet();
+  const publicKey = walletAddress ? new PublicKey(walletAddress) : null;
   const { profile, user, loading: authLoading } = useAuth();
   const {
     address: activeAddr,
@@ -316,15 +315,7 @@ export default function TradeProfile() {
               </a>
             </div>
 
-            {connected && !localActive && (
-              <button
-                type="button"
-                onClick={() => disconnect()}
-                className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl text-xs text-white/60 hover:text-white"
-              >
-                <LogOut className="h-3.5 w-3.5" /> Disconnect
-              </button>
-            )}
+
           </>
         )}
       </div>

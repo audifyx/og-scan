@@ -6,7 +6,8 @@
  * (desk) wallet with live balances, plus link/unlink.
  */
 import { useEffect, useState } from "react";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { Connection } from "@solana/web3.js";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Wallet, Copy, Check, Unlink, RefreshCw } from "lucide-react";
@@ -16,7 +17,7 @@ import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import { shortAddr } from "./tradeFmt";
 
 export default function TradeWalletManager() {
-  const { connection } = useConnection();
+  const connection = new Connection(browserWalletRpcUrl(), "confirmed");
   const billing = useOrbitxBilling();
   const [sol, setSol] = useState<number | null>(null);
   const [orbitx, setOrbitx] = useState<number | null>(null);

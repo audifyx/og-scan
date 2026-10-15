@@ -4,7 +4,8 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { Connection } from "@solana/web3.js";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { useTradeWalletPicker } from "./TradeWalletPicker";
 import { PublicKey } from "@solana/web3.js";
@@ -128,7 +129,7 @@ export default function TradeToken() {
     shortAddress,
   } = useActiveTradingWallet();
   const { openPicker, picker } = useTradeWalletPicker();
-  const { connection } = useConnection();
+  const connection = new Connection(browserWalletRpcUrl(), "confirmed");
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<TabId>("overview");

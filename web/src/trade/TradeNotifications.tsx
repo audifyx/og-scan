@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useActiveTradingWallet } from "@/hooks/useActiveTradingWallet";
 import { Bell, Loader2, Zap, ArrowLeft } from "lucide-react";
 import { fetchMarketSignals, type MarketCoin } from "./tradeApi";
 import { fmtPct, fmtUsd } from "./tradeFmt";
@@ -19,7 +19,7 @@ function reasonFor(c: MarketCoin): string {
 
 export default function TradeNotifications() {
   const navigate = useNavigate();
-  const { connected } = useWallet();
+  const { connected } = useActiveTradingWallet();
   const [rows, setRows] = useState<MarketCoin[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -12,7 +12,8 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { Connection } from "@solana/web3.js";
+import { browserWalletRpcUrl } from "@/lib/solanaRpc";
 import { PublicKey } from "@solana/web3.js";
 import {
   Search, Copy, ExternalLink, RefreshCw,
@@ -403,8 +404,7 @@ type LivePosition = {
 };
 
 export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: TradeTerminalProps = {}) => {
-  const { disconnect } = useWallet();
-  const { connection } = useConnection();
+  const connection = new Connection(browserWalletRpcUrl(), "confirmed");
   const billing = useOrbitxBilling();
   const deskMode = mode === "desk";
   const {
@@ -2024,16 +2024,15 @@ export const TradingTerminal = ({ initialMint, onMintChange, mode = "full" }: Tr
               </div>
               {/* Wallet status ? active trading identity */}
               {tradeReady && tradePk ? (
-                <button
-                  onClick={() => disconnect()}
-                  title="Unlink in-app wallet"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.07] hover:bg-white/[0.08] transition-colors"
+                <div
+                  title="In-app wallet"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.07]"
                 >
                   <div className="w-2 h-2 rounded-full bg-green-400" />
                   <span className="text-[11px] text-white/60 font-mono">
                     {shortAddr(tradePk.toBase58(), 4)}
                   </span>
-                </button>
+                </div>
               ) : (
                 <Button size="sm" onClick={() => setShowWalletPicker(true)}
                   className="bg-[#ffffff] hover:bg-[#e5e5e5] text-black text-xs font-semibold rounded-lg">
