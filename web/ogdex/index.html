@@ -25,6 +25,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-fallback" style="display:none;min-height:100dvh;place-items:center;background:#060609;color:#fff;text-align:center;padding:24px;">
+      <div>
+        <p style="font-size:18px;font-weight:800;margin:0 0 8px;">Terminal is taking too long to load</p>
+        <p style="color:rgba(255,255,255,.5);font-size:14px;margin:0 0 20px;">The app may have loaded stale files. A reload usually fixes it.</p>
+        <button onclick="window.location.reload()" style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:12px 28px;font-weight:800;font-size:15px;cursor:pointer;">Reload terminal</button>
+      </div>
+    </div>
+    <script>
+      // Boot watchdog: if React hasn't rendered in 12s, show the fallback above.
+      setTimeout(function () {
+        var root = document.getElementById("root");
+        if (root && root.childNodes.length === 0) {
+          var fb = document.getElementById("boot-fallback");
+          if (fb) fb.style.display = "grid";
+        }
+      }, 12000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

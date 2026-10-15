@@ -1,13 +1,40 @@
-import React, { Suspense, lazy, useEffect } from "react";
+import React, { Suspense, lazy, useEffect, Component, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import "./index.css";
 import Layout from "./components/Layout";
 import { WalletProvider } from "./lib/wallet";
 import Screener from "./pages/Screener";
 import Tools from "./pages/Tools";
 import OgScanner from "./pages/OgScanner";
+
+/** Catches render crashes so a bad deploy/data can never leave a black page. */
+class BootBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error("[ogdex boot]", error); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#060609", color: "#fff", padding: 24, textAlign: "center" }}>
+        <div>
+          <AlertTriangle style={{ width: 40, height: 40, color: "#f0c75e", margin: "0 auto 16px" }} />
+          <h1 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 8px" }}>Terminal failed to load</h1>
+          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, margin: "0 0 20px", maxWidth: 320 }}>
+            {String(this.state.error?.message || "Unexpected error").slice(0, 160)}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 12, padding: "12px 24px", fontWeight: 800, fontSize: 15, cursor: "pointer" }}
+          >
+            <RefreshCw style={{ width: 16, height: 16 }} /> Reload terminal
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
 
 // Heavy / less-frequent routes are code-split so the Discovery page loads fast.
 const Pulse = lazy(() => import("./pages/Pulse"));
@@ -50,6 +77,7 @@ function PlatformDocRedirect({ path }: { path: string }) {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <BootBoundary>
       <WalletProvider>
         <BrowserRouter basename="/ORBITX_DEX">
           <Routes>
@@ -108,6 +136,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       </Routes>
     </BrowserRouter>
       </WalletProvider>
+    </BootBoundary>
   </React.StrictMode>
 );
 

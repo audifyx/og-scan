@@ -29,6 +29,24 @@ async function gt(path) {
   return r.json();
 }
 
+// In-memory pool resolution cache: pool addresses rarely change, and every
+// chart request otherwise burns a GeckoTerminal call just to resolve the pool.
+// 10-minute TTL slashes our GT call volume roughly in half.
+const POOL_CACHE = new Map(); // `${net}:${mint}` -> { pool, at }
+const POOL_TTL_MS = 10 * 60 * 1000;
+function poolCacheGet(net, mint) {
+  const hit = POOL_CACHE.get(`${net}:${mint}`);
+  if (hit && Date.now() - hit.at < POOL_TTL_MS) return hit.pool;
+  return null;
+}
+function poolCacheSet(net, mint, pool) {
+  POOL_CACHE.set(`${net}:${mint}`, { pool, at: Date.now() });
+  if (POOL_CACHE.size > 2000) {
+    const first = POOL_CACHE.keys().next().value;
+    POOL_CACHE.delete(first);
+  }
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url, "http://x");
   const mint = url.searchParams.get("mint") || "";
@@ -43,17 +61,21 @@ export default async function handler(req, res) {
   cache(res, 30, 120);
 
   try {
-    // 1. Resolve the deepest pool for this token if not supplied.
+    // 1. Resolve the deepest pool for this token if not supplied (cached).
     let poolMeta = null;
     if (!pool) {
-      const pools = await gt(`/networks/${net}/tokens/${mint}/pools?page=1`);
-      const arr = (pools?.data || []);
-      if (!arr.length) return send(res, 200, { ok: true, candles: [], pool: null, note: "no pool found" });
-      // pick the most-traded pool (deepest real price discovery): 24h volume, then liquidity.
-      const score = (p) => Number(p.attributes?.volume_usd?.h24 || 0) * 1e6 + Number(p.attributes?.reserve_in_usd || 0);
-      arr.sort((a, b) => score(b) - score(a));
-      poolMeta = arr[0];
-      pool = poolMeta.attributes?.address || poolMeta.id?.split("_").pop();
+      pool = poolCacheGet(net, mint);
+      if (!pool) {
+        const pools = await gt(`/networks/${net}/tokens/${mint}/pools?page=1`);
+        const arr = (pools?.data || []);
+        if (!arr.length) return send(res, 200, { ok: true, candles: [], pool: null, note: "no pool found" });
+        // pick the most-traded pool (deepest real price discovery): 24h volume, then liquidity.
+        const score = (p) => Number(p.attributes?.volume_usd?.h24 || 0) * 1e6 + Number(p.attributes?.reserve_in_usd || 0);
+        arr.sort((a, b) => score(b) - score(a));
+        poolMeta = arr[0];
+        pool = poolMeta.attributes?.address || poolMeta.id?.split("_").pop();
+        poolCacheSet(net, mint, pool);
+      }
     }
 
     // 2. Fetch OHLCV for that pool.
