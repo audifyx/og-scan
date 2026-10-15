@@ -25,6 +25,7 @@ const LAZY = {
   "share": () => import("./_share.ts"),
   "share-wallet": () => import("./_share-wallet.ts"),
   "orbitx-onchain": () => import("./_orbitx-onchain.js"),
+  "orbitx-ai": () => import("./_orbitx-ai.js"),
   "social": () => import("./_social.js"),
   "telegram-mcp": () => import("./_telegram-mcp.js"),
 };

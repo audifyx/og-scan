@@ -164,6 +164,10 @@
       "destination": "/api/ogdex?path=desk-unlock"
     },
     {
+      "source": "/api/orbitx-ai",
+      "destination": "/api/web?path=orbitx-ai"
+    },
+    {
       "source": "/api/hunter-agent",
       "destination": "/api/ogdex?path=hunter"
     },
