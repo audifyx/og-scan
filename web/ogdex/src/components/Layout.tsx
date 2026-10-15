@@ -11,6 +11,7 @@ import LiveStats, { fetchPlatformStats } from "./LiveStats";
 import InstallPWA from "./InstallPWA";
 import GlobalSearch from "./GlobalSearch";
 import { SharedAtmosphere, DexThemeButton } from "./SharedAtmosphere";
+import UnifiedHeader from "./UnifiedHeader";
 import "../ios-app-shell.css";
 
 function Brand() {
@@ -198,82 +199,7 @@ export default function Layout() {
         </aside>
 
         <div className="dex-ios-main">
-          <header className="dex-ios-nav">
-            {isRoot ? (
-              <span />
-            ) : (
-              <button
-                type="button"
-                className="dex-ios-nav__back"
-                onClick={() => {
-                  if (window.history.length > 1) navigate(-1);
-                  else navigate("/");
-                }}
-              >
-                <span className="dex-ios-nav__back-ico" aria-hidden>‹</span>
-                Back
-              </button>
-            )}
-            <h1 className="dex-ios-nav__title">{title}</h1>
-            <div className="dex-ios-nav__trail">
-              <GlobalSearch />
-              <div className="relative" ref={ref}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    setWatch(getWatchlist());
-                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setWatchPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
-                    setWatchOpen((o) => !o);
-                  }}
-                  className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-sm font-semibold text-white/70 hover:text-white transition-all"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--ox-silver-dim)" }}
-                >
-                  <Star className="w-3.5 h-3.5" />
-                  {watch.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "rgba(59,130,246,0.15)", color: "var(--ox-blue-hi)" }}>
-                      {watch.length}
-                    </span>
-                  )}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-                {watchOpen && watchPos && createPortal(
-                  <div
-                    ref={dropRef}
-                    style={{
-                      position: "fixed", top: watchPos.top, right: watchPos.right, zIndex: 1000,
-                      background: "#101016", border: "1px solid var(--ox-silver-dim)", borderRadius: 14,
-                      width: 260, padding: 6, boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
-                    }}
-                  >
-                    <div className="term-label px-2 py-1.5">Watched wallets</div>
-                    {watch.length ? watch.map((w) => (
-                      <Link key={w} to={`/wallet/${w}`} onClick={() => setWatchOpen(false)} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/5 text-sm font-mono text-white">
-                        <Wallet className="w-3.5 h-3.5 text-[var(--ox-blue-hi)]" /> {short(w)}
-                      </Link>
-                    )) : (
-                      <div className="px-2 py-3 text-xs text-white/55">No watched wallets yet.</div>
-                    )}
-                  </div>,
-                  document.body,
-                )}
-              </div>
-              {address ? (
-                <button type="button" onClick={disconnect} title={address} className="dex-wallet-chip">
-                  <Wallet2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{short(address)}</span>
-                  <LogOut className="w-3 h-3 opacity-70" />
-                </button>
-              ) : (
-                <button type="button" onClick={connect} disabled={connecting} className="dex-wallet-btn disabled:opacity-60">
-                  <Wallet2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect"}</span>
-                </button>
-              )}
-              <DexThemeButton />
-              <InstallPWA />
-            </div>
-          </header>
+          <UnifiedHeader stats={{ activeUsers: pstats.activeUsers, tokenCount: pstats.tokenCount, volume: pstats.volume }} />
 
           <div className="dex-ios-desk-tabs dex-sticky-chrome">
             <div className="brand-hairline" />
