@@ -3,11 +3,10 @@ import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, Candles
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LivingAvatar, type AvatarStats } from "./LivingAvatar";
-import { AgentOffice3D } from "./AgentOffice3D";
-import { LiveTrades } from "./LiveTrades";
-import { fetchRpcSupply } from "./rpcFeed";
+import { OurCoinBuyFeed } from "@/components/OurCoinBuyFeed";
 import { TokenArticle } from "./TokenArticle";
 import { BurnTracker } from "./BurnTracker";
+import { heliusTokenSupply, heliusTxs } from "@/lib/og";
 import { cn } from "@/lib/utils";
 
 export const ORBITX_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
@@ -38,7 +37,6 @@ async function fetchTokenStats(mint: string) {
     volume24h: best.volume?.h24 ?? null,
     change24h: best.priceChange?.h24 ?? null,
     dexUrl: best.url ?? `https://dexscreener.com/solana/${mint}`,
-    pairAddress: best.pairAddress ?? null,
   };
 }
 
@@ -72,14 +70,21 @@ export default function TokenPage() {
 
   const { data: supply } = useQuery({
     queryKey: ["orbitx-token-supply"],
-    queryFn: () => fetchRpcSupply(ORBITX_MINT),
+    queryFn: () => heliusTokenSupply(ORBITX_MINT),
     refetchInterval: 120_000,
     retry: 1,
   });
 
+  const { data: txs } = useQuery({
+    queryKey: ["orbitx-token-txs", 40],
+    queryFn: () => heliusTxs(ORBITX_MINT, 40),
+    refetchInterval: 20_000,
+    retry: 1,
+  });
+
   const burned = useMemo(() => {
-    if (supply == null) return null;
-    return Math.max(0, INITIAL_SUPPLY - supply);
+    if (!supply?.uiAmount) return null;
+    return Math.max(0, INITIAL_SUPPLY - supply.uiAmount);
   }, [supply]);
 
   const avatarStats: AvatarStats = useMemo(
@@ -92,6 +97,8 @@ export default function TokenPage() {
     }),
     [stats, burned]
   );
+
+  const burnCount = useMemo(() => (txs ?? []).filter((t) => t.type === "BURN").length, [txs]);
 
   useEffect(() => {
     document.title = "ORBITX · Official Token";
@@ -121,7 +128,7 @@ export default function TokenPage() {
     { id: "about", label: "About", icon: Info },
     { id: "chart", label: "Chart", icon: CandlestickChart },
     { id: "buys", label: "Live buys", icon: Activity },
-    { id: "burns", label: "Burns", icon: Flame },
+    { id: "burns", label: "Burns", icon: Flame, badge: burnCount || undefined },
   ];
 
   return (
@@ -169,7 +176,7 @@ export default function TokenPage() {
         <div className="px-4">
           <div className="-mt-16 flex items-end justify-between">
             <div className="rounded-full border-4 border-[#04070d] bg-[#0a0f1a] p-1">
-              <LivingAvatar stats={avatarStats} size={104} compact />
+              <LivingAvatar stats={avatarStats} size={128} />
             </div>
             <div className="mb-2 flex gap-2">
               <button
@@ -261,12 +268,8 @@ export default function TokenPage() {
         <div className="px-4 pb-24 pt-5">
           {tab === "about" && (
             <div className="space-y-8">
-              <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-4 sm:p-6">
-                <div className="mb-3 flex items-center gap-2 px-1">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-teal-300">Meet Orbit</span>
-                  <span className="text-[11px] text-white/35">· the living agent of $ORBITX</span>
-                </div>
-                <AgentOffice3D stats={avatarStats} />
+              <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-6">
+                <LivingAvatar stats={avatarStats} size={200} />
               </div>
               <TokenArticle />
             </div>
@@ -276,7 +279,7 @@ export default function TokenPage() {
               <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/40" style={{ height: 560 }}>
                 <iframe
                   title="ORBITX chart"
-                  src={`https://dexscreener.com/solana/${stats?.pairAddress ?? ORBITX_MINT}?embed=1&theme=dark&trades=0&info=0`}
+                  src={`https://dexscreener.com/solana/${ORBITX_MINT}?embed=1&theme=dark&trades=0&info=0`}
                   className="h-full w-full border-0"
                   allow="clipboard-write"
                 />
@@ -285,10 +288,10 @@ export default function TokenPage() {
             </div>
           )}
           {tab === "buys" && (
-            <LiveTrades mint={ORBITX_MINT} />
+            <OurCoinBuyFeed mint={ORBITX_MINT} limit={30} buysOnly={false} compact={false} title="Live trades" subtitle="Every fill on the official mint, as it happens." />
           )}
           {tab === "burns" && (
-            <BurnTracker mint={ORBITX_MINT} />
+            <BurnTracker mint={ORBITX_MINT} burned={burned} supply={supply?.uiAmount ?? null} />
           )}
         </div>
       </div>
