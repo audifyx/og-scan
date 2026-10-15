@@ -9,6 +9,7 @@ import { fetchRpcSupply } from "./rpcFeed";
 import { TokenArticle } from "./TokenArticle";
 import { TokenChart } from "./TokenChart";
 import { BurnTracker } from "./BurnTracker";
+import { AIBrief } from "./AIBrief";
 import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort } from "./TokenWidgets";
 import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
@@ -250,22 +251,23 @@ export default function TokenPage() {
         </div>
 
         {/* tabs */}
-        <div className="sticky top-[57px] z-30 mt-5 border-b border-white/10 bg-[#04070d]/90 backdrop-blur-xl">
-          <div className="flex">
+        <div className="sticky top-[57px] z-30 mt-5 bg-[#04070d]/90 backdrop-blur-xl">
+          <div className="flex gap-1 rounded-2xl border border-white/10 bg-white/[0.03] p-1.5">
             {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={cn("relative flex flex-1 items-center justify-center gap-1.5 px-2 py-3.5 text-sm font-semibold transition",
-                  tab === t.id ? "text-white" : "text-white/40 hover:bg-white/5 hover:text-white/70")}
+                className={cn("relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[13px] font-bold transition-all duration-300",
+                  tab === t.id
+                    ? "bg-gradient-to-br from-teal-400/25 to-sky-500/20 text-white shadow-[0_0_18px_rgba(45,212,191,0.25)]"
+                    : "text-white/40 hover:bg-white/5 hover:text-white/75")}
               >
-                <t.icon className="h-4 w-4" />
+                <t.icon className={cn("h-4 w-4 transition-transform duration-300", tab === t.id && "scale-110")} />
                 <span className="hidden sm:inline">{t.label}</span>
                 <span className="sm:hidden">{t.label.split(" ")[0]}</span>
                 {t.badge != null && (
                   <span className="rounded-full bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">{t.badge}</span>
                 )}
-                {tab === t.id && <span className="absolute inset-x-8 bottom-0 h-[3px] rounded-full bg-gradient-to-r from-teal-400 to-sky-500" />}
               </button>
             ))}
           </div>
@@ -281,6 +283,9 @@ export default function TokenPage() {
                   <span className="text-[11px] text-white/35">· the living agent of $ORBITX</span>
                 </div>
                 <AgentOffice3D stats={avatarStats} />
+              </div>
+              <div className="mt-4">
+                <AIBrief stats={avatarStats} burned={burned} />
               </div>
               <TokenArticle />
             </div>

@@ -39,6 +39,10 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
   const armR = useRef<THREE.Group>(null);
   const headG = useRef<THREE.Group>(null);
   const bodyG = useRef<THREE.Group>(null);
+  const eyeL = useRef<THREE.Mesh>(null);
+  const eyeR = useRef<THREE.Mesh>(null);
+  const blinkT = useRef(2);
+  const blinkP = useRef(0);
 
   const walk = useRef({
     x: 0, z: 0.6, rotY: 0,
@@ -107,6 +111,22 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
     }
     g.position.set(w.x, w.hop, w.z);
     g.rotation.y = w.rotY;
+
+    // blinking (skip when sleepy/dormant — eyes already half closed)
+    if (eyeL.current && eyeR.current && mood !== "sleepy" && mood !== "dormant") {
+      blinkT.current -= dt;
+      if (blinkT.current <= 0) {
+        blinkT.current = 1.6 + Math.random() * 3.2;
+        blinkP.current = 0.22; // blink duration
+      }
+      if (blinkP.current > 0) {
+        blinkP.current -= dt;
+        const k = Math.sin((1 - blinkP.current / 0.22) * Math.PI);
+        eyeL.current.scale.y = eyeR.current.scale.y = Math.max(0.08, 1 - k * 0.95);
+      } else {
+        eyeL.current.scale.y = eyeR.current.scale.y = 1;
+      }
+    }
   });
 
   const eyeScaleY = mood === "sleepy" || mood === "dormant" ? 0.25 : 1;
@@ -147,8 +167,8 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
         <group ref={headG} position={[0, 1.92, 0]}>
           <mesh><boxGeometry args={[0.56, 0.52, 0.5]} /><meshStandardMaterial color={SKIN} roughness={0.6} /></mesh>
           {/* eyes */}
-          <mesh position={[-0.13, 0.05, 0.26]} scale={[1, eyeScaleY, 1]}><boxGeometry args={[0.09, 0.11, 0.02]} /><meshStandardMaterial color="#10131c" /></mesh>
-          <mesh position={[0.13, 0.05, 0.26]} scale={[1, eyeScaleY, 1]}><boxGeometry args={[0.09, 0.11, 0.02]} /><meshStandardMaterial color="#10131c" /></mesh>
+          <mesh ref={eyeL} position={[-0.13, 0.05, 0.26]} scale={[1, eyeScaleY, 1]}><boxGeometry args={[0.09, 0.11, 0.02]} /><meshStandardMaterial color="#10131c" /></mesh>
+          <mesh ref={eyeR} position={[0.13, 0.05, 0.26]} scale={[1, eyeScaleY, 1]}><boxGeometry args={[0.09, 0.11, 0.02]} /><meshStandardMaterial color="#10131c" /></mesh>
           {/* brows */}
           <mesh position={[-0.13, 0.17, 0.26]} rotation={[0, 0, mood === "dormant" ? 0.3 : -0.12]}><boxGeometry args={[0.12, 0.03, 0.02]} /><meshStandardMaterial color={HAIR} /></mesh>
           <mesh position={[0.13, 0.17, 0.26]} rotation={[0, 0, mood === "dormant" ? -0.3 : 0.12]}><boxGeometry args={[0.12, 0.03, 0.02]} /><meshStandardMaterial color={HAIR} /></mesh>
@@ -232,13 +252,30 @@ function seededRand(seed: number) {
 }
 
 const CITIZEN_COLORS = ["#7c3aed", "#f59e0b", "#ec4899", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"];
+const AGENT_ROLES = ["BUILDER", "SCOUT", "TRADER", "GUARD", "MINER", "ORACLE", "PILOT"];
 
 /** A simple AI citizen: blocky body, glowing visor, patrols a small loop. */
-function MiniAgent({ seed, center, radius, color, speed = 0.4 }: { seed: number; center: [number, number]; radius: number; color: string; speed?: number }) {
+function MiniAgent({ seed, center, radius, color, speed = 0.4, role = "AGENT" }: { seed: number; center: [number, number]; radius: number; color: string; speed?: number; role?: string }) {
   const g = useRef<THREE.Group>(null);
   const legL = useRef<THREE.Mesh>(null);
   const legR = useRef<THREE.Mesh>(null);
   const bob = useRef<THREE.Group>(null);
+  const tag = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 64;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "rgba(2,8,16,0.8)";
+    ctx.beginPath(); ctx.roundRect(2, 6, 252, 52, 14); ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(2, 6, 252, 52, 14); ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 30px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(role, 128, 44);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [role, color]);
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime() * speed + seed * 2.4;
     const x = center[0] + Math.cos(t) * radius;
@@ -267,6 +304,16 @@ function MiniAgent({ seed, center, radius, color, speed = 0.4 }: { seed: number;
         {/* antenna */}
         <mesh position={[0.12, 1.6, 0]}><cylinderGeometry args={[0.015, 0.015, 0.18, 6]} /><meshStandardMaterial color="#39415f" /></mesh>
         <mesh position={[0.12, 1.72, 0]}><sphereGeometry args={[0.035, 8, 8]} /><meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} /></mesh>
+        {/* role tag */}
+        <mesh position={[0, 2.05, 0]}>
+          <planeGeometry args={[0.9, 0.225]} />
+          <meshBasicMaterial map={tag} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+        {/* carried data cube */}
+        <mesh position={[0.42, 0.85, 0.1]}>
+          <boxGeometry args={[0.16, 0.16, 0.16]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.8} transparent opacity={0.92} />
+        </mesh>
       </group>
     </group>
   );
@@ -289,7 +336,7 @@ function Citizens({ stage }: { stage: number }) {
   return (
     <group>
       {spots.map((s, i) => (
-        <MiniAgent key={i} seed={i + 1} center={s.center} radius={s.radius} color={CITIZEN_COLORS[i % CITIZEN_COLORS.length]} speed={s.speed} />
+        <MiniAgent key={i} seed={i + 1} center={s.center} radius={s.radius} color={CITIZEN_COLORS[i % CITIZEN_COLORS.length]} speed={s.speed} role={AGENT_ROLES[i % AGENT_ROLES.length]} />
       ))}
     </group>
   );
