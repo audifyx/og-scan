@@ -85,7 +85,7 @@
   html, body, #root {
     @apply bg-background text-foreground;
     min-height: 100%;
-    font-family: "Outfit", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
       "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
