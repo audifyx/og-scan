@@ -192,35 +192,35 @@ export default async function handler(req, res) {
         })),
       },
       bundles: {
-        pct:      bundlePct,
-        count:    c.bundles ?? null,
+        pct:      bundlePct ?? 0,
+        count:    c.bundles ?? bundles.length ?? 0,
         clusters: bundles.slice(0, 20).map(b => ({ slot: b.slot, size: b.size, wallets: b.wallets })),
       },
       insiders: {
         pct:      insiderPct,
-        count:    c.insiders ?? null,
+        count:    c.insiders ?? insiderClusters.length ?? 0,
         clusters: insiderClusters.slice(0, 20).map(cl => ({ funder: cl.funder, size: cl.size, wallets: cl.wallets })),
       },
       earlyBuyers: earlyBuyers.slice(0, 80),
       concentration: {
-        top10Pct:     top10Pct,          // real wallets only — LP excluded
-        lpSupplyPct:  lpSupplyPct,       // LP vault share — NOT a holder
-        whales,
-        totalHolders,
+        top10Pct:     top10Pct ?? 0,          // real wallets only — LP excluded
+        lpSupplyPct:  lpSupplyPct ?? 0,       // LP vault share — NOT a holder
+        whales:       whales ?? 0,
+        totalHolders: totalHolders ?? 0,
       },
       dev: dev ? {
         wallet:         dev,
-        pct:            pct1(devPct),
-        sold:           devSold,
-        serial:         devSerial,
-        tokensCreated:  safety.creatorTokensCount ?? null,
+        pct:            pct1(devPct) ?? 0,
+        sold:           devSold ?? false,
+        serial:         devSerial ?? false,
+        tokensCreated:  safety.creatorTokensCount ?? 1,
       } : null,
       safety: {
-        mintRenounced:   safety.mintAuthorityRenounced   ?? null,
-        freezeRenounced: safety.freezeAuthorityRenounced ?? null,
-        lpLockedPct:     safety.lpLockedPct              ?? null,
-        rugged:          safety.rugged                   ?? null,
-        riskScore:       num(safety.riskScore),
+        mintRenounced:   safety.mintAuthorityRenounced   ?? false,
+        freezeRenounced: safety.freezeAuthorityRenounced ?? false,
+        lpLockedPct:     safety.lpLockedPct              ?? 0,
+        rugged:          safety.rugged                   ?? false,
+        riskScore:       num(safety.riskScore) ?? 0,
       },
       traced: !!xray?.traced,
       note:   xray?.traced ? null : "Early-buyer trace unavailable for this token (non-pump.fun or history too large); verdict uses holder + safety data only.",
