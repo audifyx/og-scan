@@ -3,6 +3,7 @@ import { ArrowLeft, BadgeCheck, Bell, Copy, ExternalLink, Flame, Share2, Candles
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LivingAvatar, type AvatarStats } from "./LivingAvatar";
+import { AgentOffice3D } from "./AgentOffice3D";
 import { OurCoinBuyFeed } from "@/components/OurCoinBuyFeed";
 import { TokenArticle } from "./TokenArticle";
 import { BurnTracker } from "./BurnTracker";
@@ -176,7 +177,7 @@ export default function TokenPage() {
         <div className="px-4">
           <div className="-mt-16 flex items-end justify-between">
             <div className="rounded-full border-4 border-[#04070d] bg-[#0a0f1a] p-1">
-              <LivingAvatar stats={avatarStats} size={128} />
+              <LivingAvatar stats={avatarStats} size={104} compact />
             </div>
             <div className="mb-2 flex gap-2">
               <button
@@ -268,8 +269,12 @@ export default function TokenPage() {
         <div className="px-4 pb-24 pt-5">
           {tab === "about" && (
             <div className="space-y-8">
-              <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-6">
-                <LivingAvatar stats={avatarStats} size={200} />
+              <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent p-4 sm:p-6">
+                <div className="mb-3 flex items-center gap-2 px-1">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-teal-300">Meet Orbit</span>
+                  <span className="text-[11px] text-white/35">· the living agent of $ORBITX</span>
+                </div>
+                <AgentOffice3D stats={avatarStats} />
               </div>
               <TokenArticle />
             </div>
