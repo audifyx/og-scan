@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import {
   ShoppingBag, Zap, Send, Bell, Megaphone, FileText, Code,
-  Trophy, BookOpen, Map, Activity, Copy, Users, Crosshair, Wrench, LayoutGrid,
+  Trophy, BookOpen, Activity, Copy, Users, Crosshair, Wrench, LayoutGrid,
 } from "lucide-react";
 import { PageHero, DexPanel } from "../components/PageShell";
 
@@ -39,7 +39,6 @@ const GROUPS: { title: string; items: Item[] }[] = [
     items: [
       { to: "/api", label: "API Docs", desc: "Public API & MCP", Icon: Code },
       { to: "/whitepaper", label: "Whitepaper", desc: "How OrbitX works", Icon: BookOpen },
-      { to: "/roadmap", label: "Roadmap", desc: "What's shipping", Icon: Map },
       { to: "/status", label: "Status", desc: "System health", Icon: Activity },
     ],
   },
