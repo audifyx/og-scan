@@ -42,8 +42,7 @@ export default function AppSwitcher() {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button onClick={() => setOpen(o => !o)} className="app-switcher-btn" aria-label="All apps" title="All apps">
-        <span className="app-switcher-btn__icon"><LayoutGrid size={18} /></span>
-        <span className="app-switcher-btn__label">Apps</span>
+        <LayoutGrid size={20} />
       </button>
 
       {open && (
@@ -68,35 +67,25 @@ export default function AppSwitcher() {
 
       <style>{`
         .app-switcher-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 16px 10px 12px;
-          border-radius: 14px;
-          background: linear-gradient(135deg, rgba(59,130,246,0.22), rgba(90,162,255,0.08));
-          border: 1px solid rgba(90,162,255,0.35);
-          color: #fff;
-          font-size: 14px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
-          box-shadow: 0 4px 16px rgba(59,130,246,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
-        }
-        .app-switcher-btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 8px 24px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
-          border-color: rgba(90,162,255,0.55);
-        }
-        .app-switcher-btn:active { transform: translateY(0); }
-        .app-switcher-btn__icon {
           display: grid;
           place-items: center;
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          background: rgba(59,130,246,0.3);
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(90,162,255,0.1));
+          border: 1px solid rgba(90,162,255,0.4);
           color: #7db4ff;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+          box-shadow: 0 4px 16px rgba(59,130,246,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
         }
+        .app-switcher-btn:hover {
+          transform: translateY(-1px) scale(1.05);
+          box-shadow: 0 8px 24px rgba(59,130,246,0.45), inset 0 1px 0 rgba(255,255,255,0.2);
+          border-color: rgba(90,162,255,0.6);
+          color: #a8ccff;
+        }
+        .app-switcher-btn:active { transform: translateY(0) scale(0.98); }
         .app-switcher-overlay {
           position: fixed;
           inset: 0;
