@@ -34,7 +34,7 @@ interface PlatformStats {
   volume: string;
   daysLive: number;
 }
-const STAT_FALLBACK: PlatformStats = { activeUsers: 55, tokenCount: 847, volume: "$2.4M", daysLive: 47 };
+const STAT_FALLBACK: PlatformStats = { activeUsers: 154, tokenCount: 3, volume: "$2.4M", daysLive: 47 };
 
 const NAV_LINKS = [
   { to: "/", label: "Home", Icon: Coins, exact: true },
