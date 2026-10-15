@@ -192,7 +192,7 @@ export function AgentShell({
                 <Link to="/supercomputer">Super Computer</Link>
                 <Link to="/shop">Shop</Link>
                 <a href="/ORBITX_DEX">DEX</a>
-                <Link to="/orbitxlaunch">Launch</Link>
+                <Link to="/orbitxlaunch/rescue">Launch</Link>
                 <Link to="/nft">NFT</Link>
                 <a href={mcpUrl} target="_blank" rel="noopener noreferrer">
                   MCP URL

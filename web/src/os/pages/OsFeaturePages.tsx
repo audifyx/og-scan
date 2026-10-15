@@ -144,12 +144,12 @@ export function OsLaunchpadPage() {
       kicker="Launchpad"
       title="Fair launch console"
       lead="Create, monitor, and graduate tokens with OrbitX anti-vamp protections."
-      primaryHref="/orbitxlaunch"
+      primaryHref="/orbitxlaunch/rescue"
       primaryLabel="Open launchpad"
       secondaryHref="/orbitxlaunch/create"
       secondaryLabel="Create token"
     >
-      <PreviewFrame label="Launchpad Console" href="/orbitxlaunch" />
+      <PreviewFrame label="Launchpad Console" href="/orbitxlaunch/rescue" />
     </FeatureShell>
   );
 }

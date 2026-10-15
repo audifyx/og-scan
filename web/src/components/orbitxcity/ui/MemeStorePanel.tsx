@@ -192,7 +192,7 @@ export function MemeStorePanel() {
 
       <div className="oxc-actions">
         <Link className="oxc-btn ghost" to="/ORBITX_DEX">Open full DEX <ExternalLink className="h-3.5 w-3.5" /></Link>
-        <Link className="oxc-btn ghost" to="/orbitxlaunch">Launchpad</Link>
+        <Link className="oxc-btn ghost" to="/orbitxlaunch/rescue">Launchpad</Link>
       </div>
     </div>
   );

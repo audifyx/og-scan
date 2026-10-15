@@ -77,7 +77,7 @@ export function PlatformDocLayout({
               </Link>
             ))}
             <a href="/ORBITX_DEX" className="text-[13px] text-white/45 hover:text-[#F0C75E] transition-colors">DEX</a>
-            <a href="/orbitxlaunch" className="text-[13px] text-white/45 hover:text-[#F0C75E] transition-colors">Launchpad</a>
+            <a href="/orbitxlaunch/rescue" className="text-[13px] text-white/45 hover:text-[#F0C75E] transition-colors">Launchpad</a>
           </div>
           <p className="mt-4 text-center sm:text-left text-[11px] text-white/30">
             © {new Date().getFullYear()} OrbitX · ogscan.fun · Not financial advice
