@@ -1,68 +1,63 @@
-/* OrbitX One — signature UI */
-.ox-one {
+/* OrbitX One — unified market hub */
+.ox-hub {
   min-height: 100vh;
   background: #050807;
   color: #e8f5ee;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  display: flex;
-  flex-direction: column;
 }
 
 /* Header */
-.ox-one__header {
+.ox-hub__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 16px 32px;
   border-bottom: 1px solid rgba(23, 255, 77, 0.12);
   background: rgba(5, 8, 7, 0.95);
   position: sticky;
   top: 0;
   z-index: 100;
+  backdrop-filter: blur(12px);
 }
 
-.ox-one__brand {
+.ox-hub__brand {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
 }
 
-.ox-one__logo {
-  font-size: 22px;
+.ox-hub__logo {
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 
-.ox-one__one {
-  font-size: 22px;
+.ox-hub__one {
+  font-size: 20px;
   font-weight: 800;
   color: #17ff4d;
 }
 
-.ox-one__topnav {
+.ox-hub__nav {
   display: flex;
-  gap: 4px;
+  gap: 24px;
 }
 
-.ox-one__topnav-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
+.ox-hub__nav a {
   color: #e8f5ee;
+  text-decoration: none;
   opacity: 0.6;
-  cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  transition: opacity 0.2s;
 }
 
-.ox-one__topnav-btn.is-active {
+.ox-hub__nav a:hover {
   opacity: 1;
-  background: rgba(23, 255, 77, 0.1);
   color: #17ff4d;
 }
 
-.ox-one__connect {
+.ox-hub__connect {
   padding: 10px 20px;
   border-radius: 10px;
   border: 1px solid #17ff4d;
@@ -73,159 +68,116 @@
   font-size: 14px;
 }
 
-/* Body layout */
-.ox-one__body {
-  display: flex;
-  flex: 1;
-  max-width: 1400px;
+/* Hero */
+.ox-hub__hero {
+  text-align: center;
+  padding: 72px 24px 48px;
+  max-width: 800px;
   margin: 0 auto;
-  width: 100%;
 }
 
-/* Sidebar */
-.ox-one__sidebar {
-  width: 240px;
-  padding: 24px 16px;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.ox-hub__hero h1 {
+  font-size: clamp(36px, 6vw, 64px);
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  margin: 0 0 16px;
+  line-height: 1.05;
 }
 
-.ox-one__side-btn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #e8f5ee;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s;
+.ox-hub__hero h1 span {
+  color: #17ff4d;
 }
 
-.ox-one__side-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.ox-one__side-btn.is-active {
-  border-color: rgba(23, 255, 77, 0.3);
-  background: rgba(23, 255, 77, 0.06);
-}
-
-.ox-one__side-icon {
-  font-size: 20px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: rgba(23, 255, 77, 0.1);
-}
-
-.ox-one__side-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.ox-one__side-label {
-  font-weight: 700;
-  font-size: 15px;
-}
-
-.ox-one__side-desc {
-  font-size: 12px;
-  opacity: 0.5;
+.ox-hub__hero p {
+  font-size: 18px;
+  opacity: 0.6;
+  margin: 0;
 }
 
 /* Main */
-.ox-one__main {
-  flex: 1;
-  padding: 24px;
-  min-width: 0;
+.ox-hub__main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 72px;
 }
 
-.ox-one__loading {
-  padding: 64px;
+.ox-hub__section {
+  scroll-margin-top: 90px;
+}
+
+.ox-hub__section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ox-hub__section-head h2 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.ox-hub__section-head span {
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.ox-hub__loading {
+  padding: 48px;
   text-align: center;
   opacity: 0.5;
 }
 
 /* Footer */
-.ox-one__footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 13px;
-  opacity: 0.6;
-}
-
-.ox-one__footer a {
-  color: #17ff4d;
-  text-decoration: none;
-}
-
-/* Bottom nav (mobile) */
-.ox-one__bottomnav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(5, 8, 7, 0.98);
-  border-top: 1px solid rgba(23, 255, 77, 0.12);
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-  z-index: 100;
-}
-
-.ox-one__bottom-btn {
-  flex: 1;
+.ox-hub__footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 48px 32px;
+  text-align: center;
   display: flex;
   flex-direction: column;
+  gap: 12px;
   align-items: center;
-  gap: 4px;
-  padding: 8px;
-  border: none;
-  background: transparent;
-  color: #e8f5ee;
+}
+
+.ox-hub__footer p {
   opacity: 0.5;
-  font-size: 11px;
-  cursor: pointer;
+  font-size: 14px;
+  margin: 0;
 }
 
-.ox-one__bottom-btn.is-active {
-  opacity: 1;
+.ox-hub__footer a {
   color: #17ff4d;
-}
-
-.ox-one__bottom-icon {
-  font-size: 20px;
+  text-decoration: none;
+  font-size: 14px;
 }
 
 /* Mobile */
 @media (max-width: 768px) {
-  .ox-one__sidebar {
+  .ox-hub__header {
+    padding: 14px 16px;
+  }
+
+  .ox-hub__nav {
     display: none;
   }
 
-  .ox-one__topnav {
-    display: none;
+  .ox-hub__hero {
+    padding: 48px 20px 32px;
   }
 
-  .ox-one__bottomnav {
-    display: flex;
+  .ox-hub__main {
+    padding: 0 16px 60px;
+    gap: 56px;
   }
 
-  .ox-one__main {
-    padding: 16px 16px 90px;
-  }
-
-  .ox-one__footer {
-    display: none;
+  .ox-hub__section-head h2 {
+    font-size: 26px;
   }
 }
