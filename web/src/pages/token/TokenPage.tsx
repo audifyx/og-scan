@@ -7,6 +7,7 @@ import { AgentOffice3D } from "./AgentOffice3D";
 import { LiveTrades } from "./LiveTrades";
 import { fetchRpcSupply } from "./rpcFeed";
 import { TokenArticle } from "./TokenArticle";
+import { TokenChart } from "./TokenChart";
 import { BurnTracker } from "./BurnTracker";
 import { cn } from "@/lib/utils";
 
@@ -272,17 +273,7 @@ export default function TokenPage() {
             </div>
           )}
           {tab === "chart" && (
-            <div className="space-y-4">
-              <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/40" style={{ height: 560 }}>
-                <iframe
-                  title="ORBITX chart"
-                  src={`https://dexscreener.com/solana/${stats?.pairAddress ?? ORBITX_MINT}?embed=1&theme=dark&trades=0&info=0`}
-                  className="h-full w-full border-0"
-                  allow="clipboard-write"
-                />
-              </div>
-              <p className="text-center text-xs text-white/35">Live chart via DexScreener · {fmtPrice(stats?.price)} · {changeUp ? "+" : ""}{change?.toFixed(2) ?? "—"}% 24h</p>
-            </div>
+            <TokenChart pool={stats?.pairAddress ?? null} fallbackMint={ORBITX_MINT} />
           )}
           {tab === "buys" && (
             <LiveTrades mint={ORBITX_MINT} />

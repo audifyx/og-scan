@@ -180,6 +180,8 @@ function BlockyAgent({ mood, stage }: { mood: AvatarMood; stage: number }) {
 }
 
 // ── Office ─────────────────────────────────────────────────────────────────
+import { useScreenTexture, type ScreenKind } from "./MonitorScreens";
+
 function Monitor({ position, rotationY = 0, hue = "#22d3ee", chart = false }: { position: [number, number, number]; rotationY?: number; hue?: string; chart?: boolean }) {
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
@@ -195,6 +197,24 @@ function Monitor({ position, rotationY = 0, hue = "#22d3ee", chart = false }: { 
         </mesh>
       )}
       <mesh position={[0, -0.38, 0]}><boxGeometry args={[0.08, 0.2, 0.08]} /><meshStandardMaterial color="#1a2138" /></mesh>
+    </group>
+  );
+}
+
+/** Monitor with a LIVE screen: real price, X scanner, build terminal, radar. */
+function LiveMonitor({ position, rotationY = 0, screen, stats }: { position: [number, number, number]; rotationY?: number; screen: ScreenKind; stats: AvatarStats }) {
+  const tex = useScreenTexture(screen, stats);
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      <mesh><boxGeometry args={[1.15, 0.72, 0.07]} /><meshStandardMaterial color="#0d1220" roughness={0.5} /></mesh>
+      <mesh position={[0, 0, 0.04]}>
+        <planeGeometry args={[1.05, 0.62]} />
+        <meshBasicMaterial map={tex} toneMapped={false} />
+      </mesh>
+      {/* glow spill */}
+      <mesh position={[0, 0, -0.02]}><planeGeometry args={[1.3, 0.85]} /><meshBasicMaterial color="#22d3ee" transparent opacity={0.08} /></mesh>
+      <mesh position={[0, -0.46, 0]}><boxGeometry args={[0.09, 0.24, 0.09]} /><meshStandardMaterial color="#1a2138" /></mesh>
+      <mesh position={[0, -0.58, 0.05]}><boxGeometry args={[0.5, 0.04, 0.3]} /><meshStandardMaterial color="#1a2138" /></mesh>
     </group>
   );
 }
@@ -388,7 +408,7 @@ function SkyTraffic({ stage }: { stage: number }) {
 }
 
 /** Second workstation (stage 2+). */
-function SecondDesk() {
+function SecondDesk({ stats }: { stats: AvatarStats }) {
   return (
     <group position={[4.9, 0, 0.9]} rotation={[0, -Math.PI / 2, 0]}>
       <mesh position={[0, 0.72, 0]}><boxGeometry args={[1.9, 0.09, 0.95]} /><meshStandardMaterial color="#182036" roughness={0.4} metalness={0.3} /></mesh>
@@ -396,8 +416,8 @@ function SecondDesk() {
         <mesh key={i} position={[x, 0.34, z]}><boxGeometry args={[0.08, 0.68, 0.08]} /><meshStandardMaterial color="#0d1326" /></mesh>
       ))}
       <mesh position={[0, 0.65, 0]}><boxGeometry args={[1.8, 0.02, 0.85]} /><meshStandardMaterial color="#000" emissive="#a78bfa" emissiveIntensity={0.9} /></mesh>
-      <Monitor position={[-0.45, 1.18, -0.12]} rotationY={0.2} hue="#a78bfa" chart />
-      <Monitor position={[0.45, 1.18, -0.12]} rotationY={-0.2} hue="#f472b6" />
+      <LiveMonitor position={[-0.5, 1.3, -0.1]} rotationY={0.18} screen="radar" stats={stats} />
+      <LiveMonitor position={[0.5, 1.3, -0.1]} rotationY={-0.18} screen="terminal" stats={stats} />
       <mesh position={[0, 0.45, 0.55]}><boxGeometry args={[0.55, 0.5, 0.1]} /><meshStandardMaterial color="#1e2a4a" roughness={0.6} /></mesh>
     </group>
   );
@@ -450,7 +470,65 @@ function Plaza() {
   );
 }
 
-function Office({ stage, mood }: { stage: number; mood: AvatarMood }) {
+/** The AI Core — holographic heart of the office. Pulses with market mood. */
+function AICore({ mood, change }: { mood: AvatarMood; change: number | null }) {
+  const core = useRef<THREE.Group>(null);
+  const ring1 = useRef<THREE.Mesh>(null);
+  const ring2 = useRef<THREE.Mesh>(null);
+  const color = mood === "ecstatic" ? "#34d399" : mood === "happy" ? "#22d3ee" : mood === "sleepy" ? "#fbbf24" : "#6366f1";
+  const energy = Math.min(1.6, 0.7 + Math.abs(change ?? 0) / 12);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (core.current) {
+      core.current.rotation.y = t * 0.9;
+      core.current.rotation.x = Math.sin(t * 0.6) * 0.25;
+      core.current.position.y = 1.9 + Math.sin(t * 2.2) * 0.12;
+      const s = 1 + Math.sin(t * 3.5 * energy) * 0.08 * energy;
+      core.current.scale.setScalar(s);
+    }
+    if (ring1.current) ring1.current.rotation.z = t * 0.7;
+    if (ring2.current) ring2.current.rotation.z = -t * 0.5;
+  });
+  return (
+    <group position={[-2.1, 0, -3.1]}>
+      {/* pedestal */}
+      <mesh position={[0, 0.35, 0]}><cylinderGeometry args={[0.5, 0.65, 0.7, 16]} /><meshStandardMaterial color="#10172c" metalness={0.6} roughness={0.35} /></mesh>
+      <mesh position={[0, 0.72, 0]}><cylinderGeometry args={[0.52, 0.52, 0.05, 16]} /><meshStandardMaterial color="#000" emissive={color} emissiveIntensity={1.4} /></mesh>
+      {/* holo brain */}
+      <group ref={core}>
+        <mesh>
+          <icosahedronGeometry args={[0.42, 1]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.8} wireframe transparent opacity={0.9} />
+        </mesh>
+        <mesh>
+          <icosahedronGeometry args={[0.26, 1]} />
+          <meshStandardMaterial color="#ffffff" emissive={color} emissiveIntensity={2.4} transparent opacity={0.95} />
+        </mesh>
+      </group>
+      {/* orbit rings */}
+      <mesh ref={ring1} position={[0, 1.9, 0]} rotation={[Math.PI / 2.4, 0, 0]}>
+        <torusGeometry args={[0.72, 0.02, 8, 48]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1.2} transparent opacity={0.8} />
+      </mesh>
+      <mesh ref={ring2} position={[0, 1.9, 0]} rotation={[Math.PI / 1.7, 0.4, 0]}>
+        <torusGeometry args={[0.9, 0.015, 8, 48]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} transparent opacity={0.6} />
+      </mesh>
+      {/* light beam */}
+      <mesh position={[0, 1.3, 0]}>
+        <cylinderGeometry args={[0.3, 0.45, 1.1, 16, 1, true]} />
+        <meshBasicMaterial color={color} transparent opacity={0.12} side={THREE.DoubleSide} />
+      </mesh>
+      {/* label */}
+      <mesh position={[0, 0.15, 0.62]}>
+        <planeGeometry args={[0.9, 0.22]} />
+        <meshBasicMaterial color="#04070f" transparent opacity={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
+function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats: AvatarStats }) {
   const crystal = useRef<THREE.Group>(null);
   useFrame((s) => {
     if (crystal.current) {
@@ -495,9 +573,9 @@ function Office({ stage, mood }: { stage: number; mood: AvatarMood }) {
         <mesh position={[0, 0.82, 0.15]}><boxGeometry args={[0.9, 0.04, 0.35]} /><meshStandardMaterial color="#0d1326" /></mesh>
         {/* under-glow */}
         <mesh position={[0, 0.68, 0]}><boxGeometry args={[2.5, 0.02, 1.0]} /><meshStandardMaterial color="#000" emissive="#2dd4bf" emissiveIntensity={0.9} /></mesh>
-        <Monitor position={[-0.7, 1.25, -0.15]} rotationY={0.25} hue="#22d3ee" chart />
-        <Monitor position={[0.1, 1.28, -0.25]} hue="#4ade80" chart />
-        {stage >= 2 && <Monitor position={[0.9, 1.25, -0.15]} rotationY={-0.25} hue="#a78bfa" />}
+        <LiveMonitor position={[-0.62, 1.32, -0.12]} rotationY={0.22} screen="orbitx" stats={stats} />
+        <LiveMonitor position={[0.62, 1.32, -0.18]} rotationY={-0.22} screen="xscan" stats={stats} />
+        {stage >= 2 && <LiveMonitor position={[1.55, 1.28, 0.05]} rotationY={-0.5} screen="terminal" stats={stats} />}
         {/* mug */}
         <mesh position={[1.05, 0.88, 0.3]}><cylinderGeometry args={[0.07, 0.06, 0.14, 12]} /><meshStandardMaterial color="#f43f5e" /></mesh>
       </group>
@@ -509,9 +587,11 @@ function Office({ stage, mood }: { stage: number; mood: AvatarMood }) {
       </group>
 
       {/* team workstation (stage 2+) */}
-      {stage >= 2 && <SecondDesk />}
+      {stage >= 2 && <SecondDesk stats={stats} />}
       {/* meeting plaza (stage 3+) */}
       {stage >= 3 && <Plaza />}
+      {/* AI core — always on, grows brighter with stage */}
+      <AICore mood={mood} change={stats.change24h} />
 
       {/* trophy shelf */}
       <group position={[2.9, 0, -2.6]} rotation={[0, -0.5, 0]}>
@@ -649,7 +729,7 @@ export function AgentOffice3D({ stats }: { stats: AvatarStats }) {
             <pointLight position={[3, 2.5, -2]} intensity={8} color="#3b82f6" distance={12} />
             {mood === "dormant" && <pointLight position={[0, 2, 0]} intensity={4} color="#1e2a4a" distance={10} />}
             <Stars radius={60} depth={30} count={2200} factor={3.5} saturation={0} fade speed={0.6} />
-            <Office stage={stage} mood={mood} />
+            <Office stage={stage} mood={mood} stats={stats} />
             <BlockyAgent mood={mood} stage={stage} />
             <Citizens stage={stage} />
             {isCity && <CityBuildings stage={stage} />}
