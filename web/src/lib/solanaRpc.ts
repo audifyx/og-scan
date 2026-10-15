@@ -12,8 +12,15 @@ import {
  */
 export function browserWalletRpcUrl(): string {
   const custom = import.meta.env.VITE_SOLANA_RPC_URL;
+  // AllNodes now requires a personal token for indexed requests (403).
+  // If the custom URL is AllNodes, prefer the backend proxy which has fallbacks.
   if (typeof custom === "string" && /^https?:\/\//i.test(custom.trim())) {
-    return custom.trim();
+    const url = custom.trim().toLowerCase();
+    if (url.includes("allnodes")) {
+      // Skip AllNodes, use backend proxy with fallback logic
+    } else {
+      return custom.trim();
+    }
   }
   if (typeof window === "undefined") return PUBLIC_SOLANA_RPC;
   const host = window.location.hostname;

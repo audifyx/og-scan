@@ -69,6 +69,8 @@ export function isRpcUnavailableError(err) {
   if (!m) return false;
   if (/\b429\b/.test(m) || /too many requests|rate.?limit/.test(m)) return true;
   if (/forbidden|access denied|\b403\b/.test(m)) return true;
+  // AllNodes requires personal token for indexed requests - treat as unavailable, try next RPC
+  if (/personal token|allnodes/.test(m)) return true;
   if (/\b50[234]\b/.test(m) || /bad gateway|service unavailable/.test(m)) return true;
   if (/failed to fetch|networkerror|econnreset|etimedout|timed out|timeout|fetch failed/.test(m)) return true;
   if (/unhealthy|try again later|node is behind/.test(m)) return true;
