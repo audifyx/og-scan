@@ -575,6 +575,92 @@ function AICore({ mood, change }: { mood: AvatarMood; change: number | null }) {
   );
 }
 
+/** Firework bursts in the city sky (stage 4+). */
+function Fireworks({ count = 5 }: { count?: number }) {
+  const ref = useRef<THREE.Points>(null);
+  const data = useMemo(() => {
+    const bursts: Array<{ cx: number; cy: number; cz: number; color: string }> = [];
+    const colors = ["#5eead4", "#a78bfa", "#fbbf24", "#f472b6", "#38bdf8"];
+    for (let i = 0; i < count; i++) {
+      bursts.push({
+        cx: (Math.random() - 0.5) * 30,
+        cy: 7 + Math.random() * 5,
+        cz: -8 - Math.random() * 14,
+        color: colors[i % colors.length],
+      });
+    }
+    const per = 60;
+    const pos = new Float32Array(count * per * 3);
+    const vel: number[] = [];
+    for (let b = 0; b < count; b++) {
+      for (let i = 0; i < per; i++) {
+        const th = Math.random() * Math.PI * 2;
+        const ph = Math.acos(2 * Math.random() - 1);
+        const sp = 1.5 + Math.random() * 2;
+        vel.push(Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return { geo: g, bursts, vel, per };
+  }, [count]);
+  const t0 = useRef(0);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    const cycle = 4.5;
+    const local = (t + t0.current) % cycle;
+    const p = ref.current.geometry.attributes.position as THREE.BufferAttribute;
+    const { bursts, vel, per } = data;
+    for (let b = 0; b < bursts.length; b++) {
+      const { cx, cy, cz } = bursts[b];
+      const delay = b * 0.7;
+      const lt = Math.max(0, local - delay);
+      for (let i = 0; i < per; i++) {
+        const idx = b * per + i;
+        const k = Math.min(1, lt / 1.6);
+        const fade = 1 - k;
+        p.setXYZ(
+          idx,
+          cx + vel[idx * 3] * lt * fade + vel[idx * 3] * 0.4,
+          cy + vel[idx * 3 + 1] * lt - 1.2 * lt * lt,
+          cz + vel[idx * 3 + 2] * lt * fade + vel[idx * 3 + 2] * 0.4,
+        );
+      }
+    }
+    p.needsUpdate = true;
+    (ref.current.material as THREE.PointsMaterial).opacity = local < 3.4 ? 0.9 : Math.max(0, 0.9 - (local - 3.4) * 2);
+  });
+  return (
+    <points ref={ref} geometry={data.geo}>
+      <pointsMaterial color="#a5f3fc" size={0.14} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </points>
+  );
+}
+
+/** Street lamps ringing the city (stage 4+). */
+function StreetLamps() {
+  const lamps = useMemo(() => {
+    const arr: Array<[number, number]> = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      arr.push([Math.cos(a) * 10.5, Math.sin(a) * 10.5]);
+    }
+    return arr;
+  }, []);
+  return (
+    <group>
+      {lamps.map(([x, z], i) => (
+        <group key={i} position={[x, 0, z]}>
+          <mesh position={[0, 1.5, 0]}><cylinderGeometry args={[0.06, 0.09, 3, 8]} /><meshStandardMaterial color="#141a30" metalness={0.6} roughness={0.4} /></mesh>
+          <mesh position={[0, 3.05, 0]}><sphereGeometry args={[0.16, 12, 12]} /><meshStandardMaterial color="#fef9c3" emissive="#fde68a" emissiveIntensity={2.2} /></mesh>
+          <mesh position={[0, 3.05, 0]}><sphereGeometry args={[0.3, 12, 12]} /><meshBasicMaterial color="#fde68a" transparent opacity={0.18} /></mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 /** Floating holographic live price above the office. */
 function PriceHologram({ stats, stage }: { stats: AvatarStats; stage: number }) {
   const tex = useMemo(() => {
@@ -814,6 +900,9 @@ function Office({ stage, mood, stats }: { stage: number; mood: AvatarMood; stats
       <Embers count={stage >= 4 ? 130 : 70} area={stage >= 4 ? 24 : 14} />
       {/* floating live price hologram */}
       <PriceHologram stats={stats} stage={stage} />
+      {/* city dressing (stage 4+) */}
+      {stage >= 4 && <StreetLamps />}
+      {stage >= 4 && <Fireworks />}
 
       {/* trophy shelf */}
       <group position={[2.9, 0, -2.6]} rotation={[0, -0.5, 0]}>

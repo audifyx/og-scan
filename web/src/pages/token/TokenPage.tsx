@@ -10,6 +10,7 @@ import { TokenArticle } from "./TokenArticle";
 import { TokenChart } from "./TokenChart";
 import { BurnTracker } from "./BurnTracker";
 import { AIBrief } from "./AIBrief";
+import { ShareButton, PriceAlerts, TokenomicsBars, DiamondHands } from "./TokenExtras";
 import { TickerTape, StageProgress, StatCard, EvolutionCelebration, useCountUp, fmtUsdShort } from "./TokenWidgets";
 import { stageForMcap } from "./LivingAvatar";
 import { cn } from "@/lib/utils";
@@ -198,6 +199,9 @@ export default function TokenPage() {
             <div className="flex items-center gap-1.5">
               <h1 className="text-xl font-extrabold tracking-tight">ORBITX</h1>
               <BadgeCheck className="h-5 w-5 text-sky-400" />
+              <span className="ml-auto">
+                <ShareButton price={stats?.price} change={stats?.change24h} mcap={stats?.mcap} />
+              </span>
             </div>
             <p className="text-sm text-white/45">$ORBITX · The fuel of the OrbitX universe</p>
           </div>
@@ -286,6 +290,11 @@ export default function TokenPage() {
               </div>
               <div className="mt-4">
                 <AIBrief stats={avatarStats} burned={burned} />
+              </div>
+              <div className="mt-4 grid gap-3">
+                <DiamondHands />
+                <PriceAlerts price={stats?.price} />
+                <TokenomicsBars burned={burned} supply={supply} />
               </div>
               <TokenArticle />
             </div>

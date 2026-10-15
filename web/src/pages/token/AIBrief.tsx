@@ -34,7 +34,8 @@ function buildBrief(s: AvatarStats, burned: number | null): string[] {
 
   // burns
   if (burned != null && burned > 0) {
-    lines.push(`${fmtUsdShort(burned)} ORBITX burned forever. Supply only goes one direction.`);
+    const b = burned >= 1_000_000 ? `${(burned / 1_000_000).toFixed(2)}M` : burned >= 1_000 ? `${(burned / 1_000).toFixed(1)}k` : burned.toFixed(0);
+    lines.push(`${b} ORBITX burned forever. Supply only goes one direction.`);
   }
 
   // stage outlook
