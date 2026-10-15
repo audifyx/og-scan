@@ -264,7 +264,15 @@
       "destination": "/api/web?path=share-wallet&address=:address"
     },
     {
+      "source": "/[Oo][Rr][Bb][Ii][Tt][Xx]_[Dd][Ee][Xx]",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
       "source": "/ORBITX_DEX",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
+      "source": "/[Oo][Rr][Bb][Ii][Tt][Xx]_[Dd][Ee][Xx]/(.*)",
       "destination": "/ORBITX_DEX/index.html"
     },
     {
