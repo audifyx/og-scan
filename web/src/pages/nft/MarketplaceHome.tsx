@@ -42,6 +42,12 @@ export default function MarketplaceHome() {
   const { data: listings, isLoading: listingsLoading } = useActiveListings();
   const { data: sales } = useRecentSales(10);
   const { data: coinMarkets } = useQuery({ queryKey: ["coin-markets-home"], staleTime: 20_000, queryFn: listCoinMarkets });
+
+  const [tab, setTab] = useState<TopTab>("trending");
+  const [range, setRange] = useState<Range>("7d");
+  const [viewMode, setViewMode] = useState<NftViewMode>("grid");
+  const [listingSort, setListingSort] = useState<NftSortKey>("newest");
+
   const trendingNfts = useMemo(() => {
     return [...(listings ?? [])]
       .filter((l) => l.nft)
@@ -62,11 +68,6 @@ export default function MarketplaceHome() {
     }).slice(0, 12);
   }, [listings, listingSort]);
   const { ids: watched, toggle: toggleWatch } = useNftWatchlist();
-
-  const [tab, setTab] = useState<TopTab>("trending");
-  const [range, setRange] = useState<Range>("7d");
-  const [viewMode, setViewMode] = useState<NftViewMode>("grid");
-  const [listingSort, setListingSort] = useState<NftSortKey>("newest");
 
   const rows = useMemo(() => {
     let list = [...(collections ?? [])];
