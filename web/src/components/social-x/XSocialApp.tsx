@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 import "./x-social.css";
 import { embedSnippet } from "./embeds";
+import MoneyTab from "./MoneyTab";
 import { AgentBadge } from "./VerifiedHoldings";
 import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { callSupercomputerTool } from "@/tokenomics/mcpClient";
@@ -522,7 +523,7 @@ function TokenPicker({ onPick, onClose, title }: { onPick: (c: CoinLite) => void
 export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?: (m: string) => void; initialTab?: XTab }) {
   const { user, profile, signOut } = useAuth();
   const [tab, setTab] = useState<XTab>(() => resolveInitialTab(initialTab));
-  const [feedMode, setFeedMode] = useState<"foryou" | "following">("foryou");
+  const [feedMode, setFeedMode] = useState<"foryou" | "following" | "money">("foryou");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState(() => { try { return localStorage.getItem(DRAFT_KEY) || ""; } catch { return ""; } });
@@ -1776,12 +1777,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <>
             <div className="osc-sticky">
               <div className="flex">
-                {([["foryou", "For you"], ["following", "Following"]] as const).map(([id, label]) => (
+                {([["foryou", "For you"], ["following", "Following"], ["money", "Money"]] as const).map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
                     onClick={() => setFeedMode(id)}
-                    className={cn("osc-feedtab", feedMode === id && "osc-feedtab--on")}
+                    className={cn("osc-feedtab", feedMode === id && "osc-feedtab--on", id === "money" && "osc-feedtab--money")}
                   >
                     {label}
                   </button>
@@ -1791,7 +1792,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
             <div className="hidden lg:block"><Composer inline refEl={composerRef} /></div>
 
-            {loading ? (
+            {feedMode === "money" ? (
+              <MoneyTab
+                posts={posts}
+                onTrade={(mint, symbol) => openTrade(mint, symbol, "buy", null)}
+                onOpenPost={(id) => setOpenPostId(id)}
+                onOpenToken={(mint) => { try { sessionStorage.setItem("orbitx.trade.lastMint", mint); } catch {} window.location.href = `/trade/token/${mint}`; }}
+              />
+            ) : loading ? (
               <div>
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="osc-post">

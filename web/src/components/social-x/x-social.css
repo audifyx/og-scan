@@ -722,3 +722,77 @@ button.osc-chip:hover { background: rgba(255,255,255,0.1); color: #fff; }
 }
 .osc-holdings__empty { margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.4); }
 .osc-holdings__foot { margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.35); }
+
+/* ── Money tab — live buy-pressure feed ── */
+.osc-feedtab--money.osc-feedtab--on { color: #34d399; }
+.osc-feedtab--money.osc-feedtab--on::after, .osc-feedtab--money.osc-feedtab--on { border-color: #34d399; }
+.osc-money { padding: 4px 0 24px; }
+.osc-money__head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px 6px;
+  position: sticky; top: 0; z-index: 5;
+}
+.osc-money__live {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 14px; font-weight: 800; color: #34d399;
+}
+.osc-money__sub { font-size: 11.5px; color: rgba(255,255,255,0.35); flex: 1; }
+.osc-money__refresh {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.55); cursor: pointer;
+}
+.osc-money__refresh:hover { color: #fff; border-color: rgba(52,211,153,0.4); }
+.osc-money__loading, .osc-money__empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 60px 20px; color: rgba(255,255,255,0.5); text-align: center;
+}
+.osc-money__empty-title { margin: 0; font-size: 16px; font-weight: 800; color: #fff; }
+.osc-money__empty-copy { margin: 0; font-size: 13px; }
+.osc-money__retry {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.4);
+  color: #34d399; font-weight: 700; font-size: 13px;
+  padding: 9px 16px; border-radius: 999px; cursor: pointer;
+}
+.osc-money__list { display: flex; flex-direction: column; gap: 10px; padding: 6px 12px 0; }
+.osc-money__card {
+  background: #101016; border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 18px; padding: 12px 14px;
+}
+.osc-money__top {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: none; border: none; color: #fff; cursor: pointer; text-align: left; padding: 0;
+}
+.osc-money__rank { font-size: 17px; font-weight: 800; color: #34d399; width: 20px; text-align: center; flex-shrink: 0; }
+.osc-money__sym { display: block; font-size: 15.5px; font-weight: 800; }
+.osc-money__price { display: block; font-size: 12.5px; color: rgba(255,255,255,0.55); margin-top: 1px; }
+.osc-money__pressure-num { font-size: 19px; font-weight: 800; color: #34d399; text-align: right; line-height: 1.1; }
+.osc-money__pressure-num span { display: block; font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.35); }
+.osc-money__bar {
+  height: 6px; border-radius: 999px; background: rgba(251,113,133,0.18);
+  margin-top: 10px; overflow: hidden;
+}
+.osc-money__bar-buy {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  box-shadow: 0 0 8px rgba(52,211,153,0.5);
+}
+.osc-money__meta {
+  display: flex; justify-content: space-between; margin-top: 7px;
+  font-size: 11.5px; color: rgba(255,255,255,0.45);
+}
+.osc-money__actions { display: flex; gap: 8px; margin-top: 10px; }
+.osc-money__buy {
+  flex: 1; border: none; cursor: pointer; border-radius: 12px; padding: 10px;
+  font-size: 13.5px; font-weight: 800; color: #06281c;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  box-shadow: 0 4px 14px rgba(52,211,153,0.3);
+}
+.osc-money__buy:active { transform: scale(0.98); }
+.osc-money__posts {
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.6); border-radius: 12px; padding: 10px 12px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.osc-money__posts:hover { color: #fff; border-color: rgba(90,162,255,0.4); }
