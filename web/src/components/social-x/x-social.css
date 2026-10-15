@@ -796,3 +796,45 @@ button.osc-chip:hover { background: rgba(255,255,255,0.1); color: #fff; }
   font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .osc-money__posts:hover { color: #fff; border-color: rgba(90,162,255,0.4); }
+
+/* ── Position posts — the post IS the position ── */
+.osc-pos {
+  margin-top: 10px; border-radius: 18px; padding: 14px;
+  background: #101016; border: 1px solid rgba(255,255,255,0.09);
+  position: relative; overflow: hidden;
+}
+.osc-pos--long { border-color: rgba(52,211,153,0.35); box-shadow: 0 0 24px rgba(52,211,153,0.08); }
+.osc-pos--short { border-color: rgba(251,113,133,0.35); box-shadow: 0 0 24px rgba(251,113,133,0.08); }
+.osc-pos__head { display: flex; align-items: center; gap: 10px; }
+.osc-pos__dir {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
+  padding: 5px 11px; border-radius: 999px;
+}
+.osc-pos__dir--long { color: #34d399; background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.35); }
+.osc-pos__dir--short { color: #fb7185; background: rgba(251,113,133,0.12); border: 1px solid rgba(251,113,133,0.35); }
+.osc-pos__token {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: none; border: none; color: #fff; cursor: pointer;
+  font-size: 14.5px; font-weight: 800; padding: 0;
+}
+.osc-pos__token:hover { color: #5aa2ff; }
+.osc-pos__locked {
+  margin-left: auto; font-size: 10.5px; font-weight: 700;
+  color: rgba(255,255,255,0.32); text-transform: uppercase; letter-spacing: 0.08em;
+}
+.osc-pos__loading { display: grid; place-items: center; padding: 22px; color: rgba(255,255,255,0.4); }
+.osc-pos__pnl-row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 12px; }
+.osc-pos__pnl { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.osc-pos__pnl--win { color: #34d399; text-shadow: 0 0 18px rgba(52,211,153,0.4); }
+.osc-pos__pnl--loss { color: #fb7185; text-shadow: 0 0 18px rgba(251,113,133,0.4); }
+.osc-pos__prices { font-size: 12.5px; color: rgba(255,255,255,0.45); font-variant-numeric: tabular-nums; }
+.osc-pos__mirror {
+  width: 100%; margin-top: 12px; border: none; cursor: pointer;
+  border-radius: 13px; padding: 11px; font-size: 14px; font-weight: 800; color: #fff;
+  transition: transform 0.1s, filter 0.15s;
+}
+.osc-pos__mirror:active { transform: scale(0.98); }
+.osc-pos__mirror--long { background: linear-gradient(135deg, #10b981, #34d399); box-shadow: 0 4px 16px rgba(52,211,153,0.3); }
+.osc-pos__mirror--short { background: linear-gradient(135deg, #f43f5e, #fb7185); box-shadow: 0 4px 16px rgba(251,113,133,0.3); }
+.osc-pos__mirror:hover { filter: brightness(1.1); }

@@ -13,7 +13,7 @@ import {
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
   ArrowDownRight, Users, Bookmark, LogOut, Settings, Coins, Image as ImageIcon, Smile,
   Sparkles, Zap, Shield, Wallet, ChevronRight, Check, BarChart3, ExternalLink,
-  Gift, ArrowLeftRight, TrendingDown, Siren, Lock, Gem,
+  Gift, ArrowLeftRight, TrendingDown, Siren, Lock, Gem, CandlestickChart,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { validateUploadFile, safeExtForMime } from "@/lib/safeUpload";
@@ -23,6 +23,7 @@ import { cn, safeAvatarUrl } from "@/lib/utils";
 import "./x-social.css";
 import { embedSnippet } from "./embeds";
 import MoneyTab from "./MoneyTab";
+import PositionCard from "./PositionCard";
 import { AgentBadge } from "./VerifiedHoldings";
 import { useOrbitxBilling } from "@/tokenomics/useOrbitxBilling";
 import { callSupercomputerTool } from "@/tokenomics/mcpClient";
@@ -143,6 +144,20 @@ function splitCharts(content: string): { text: string; charts: string[] } {
   while ((m = CHART_RE.exec(safe)) !== null) charts.push(m[1]);
   const text = safe.replace(CHART_RE, "").replace(/\n{3,}/g, "\n\n").trim();
   return { text, charts: [...new Set(charts)].slice(0, 2) };
+}
+
+/* ── Position posts: [pos:long:<mint>] / [pos:short:<mint>] ── */
+export type PosDirection = "long" | "short";
+const POS_RE = /\[pos:(long|short):([1-9A-HJ-NP-Za-km-z]{32,44})\]/g;
+function splitPositions(content: string): { text: string; positions: { mint: string; direction: PosDirection }[] } {
+  const safe = content || "";
+  const positions: { mint: string; direction: PosDirection }[] = [];
+  let m: RegExpExecArray | null;
+  POS_RE.lastIndex = 0;
+  while ((m = POS_RE.exec(safe)) !== null) positions.push({ direction: m[1] as PosDirection, mint: m[2] });
+  const text = safe.replace(POS_RE, "").replace(/\n{3,}/g, "\n\n").trim();
+  const seen = new Set<string>();
+  return { text, positions: positions.filter((p) => (seen.has(p.mint) ? false : (seen.add(p.mint), true))).slice(0, 2) };
 }
 
 interface CoinLite { mint: string; symbol: string | null; name: string | null; icon: string | null; banner: string | null; priceUsd: number | null; change24h: number | null; }
@@ -565,6 +580,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [newPosts, setNewPosts] = useState(0);
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [chartPickerOpen, setChartPickerOpen] = useState(false);
+  const [posDir, setPosDir] = useState<PosDirection | null>(null);
+  const [posPickerOpen, setPosPickerOpen] = useState(false);
   const [cashtag, setCashtag] = useState<{ query: string; results: CoinLite[]; index: number; busy: boolean } | null>(null);
   /* Feed superpowers (trade / tip / copy / rug siren) */
   const [tradeSheet, setTradeSheet] = useState<{ mint: string; symbol: string; mode: TradeMode; post: { id: string; username: string | null; created_at: string } | null } | null>(null);
@@ -1233,6 +1250,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (coin.symbol) saveCashtagMint(coin.symbol, coin.mint);
   };
 
+  const attachPosition = (coin: CoinLite) => {
+    setPosPickerOpen(false);
+    const dir = posDir || "long";
+    setPosDir(null);
+    if (coin.symbol) saveCashtagMint(coin.symbol, coin.mint);
+    setText((t) => {
+      const marker = `[pos:${dir}:${coin.mint}]`;
+      if (t.includes(marker)) return t;
+      const sep = t.trim() ? "\n" : "";
+      return (t + sep + marker).slice(0, MAX_LEN + 100);
+    });
+    toast.success(`Position opened — ${dir.toUpperCase()} $${coin.symbol || "token"}`);
+  };
+
   const Composer = ({ inline, refEl }: { inline?: boolean; refEl: React.RefObject<HTMLTextAreaElement> }) => {
     if (!user) {
       return (
@@ -1350,6 +1381,31 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <button type="button" onClick={() => setChartPickerOpen(true)} className="grid h-9 w-9 place-items-center rounded-full text-[#f0c75e] transition hover:bg-[#f0c75e]/10" title="Attach price chart">
               <BarChart3 className="h-[18px] w-[18px]" />
             </button>
+            <span className="relative">
+              <button type="button" onClick={() => setPosDir((v) => (v ? null : "long"))} className={cn("grid h-9 w-9 place-items-center rounded-full transition", posDir ? "bg-[#34d399]/15 text-[#34d399]" : "text-[#34d399] hover:bg-[#34d399]/10")} title="Open a position post">
+                <CandlestickChart className="h-[18px] w-[18px]" />
+              </button>
+              {posDir && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setPosDir(null)} />
+                  <div className="absolute bottom-10 left-0 z-30 flex gap-1 rounded-2xl border border-white/10 bg-[#0d1219] p-1.5 shadow-2xl">
+                    {(["long", "short"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => { setPosPickerOpen(true); setPosDir(d); }}
+                        className={cn(
+                          "rounded-xl px-4 py-2 text-[13px] font-extrabold uppercase tracking-wide transition",
+                          d === "long" ? "bg-[#34d399]/15 text-[#34d399] hover:bg-[#34d399]/25" : "bg-[#fb7185]/15 text-[#fb7185] hover:bg-[#fb7185]/25",
+                        )}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </span>
             <button type="button" onClick={() => setGateOn((v) => !v)} className={cn("grid h-9 w-9 place-items-center rounded-full transition", gateOn ? "bg-[#f0c75e]/15 text-[#f0c75e]" : "text-[#3b82f6] hover:bg-[#3b82f6]/10")} title="Holders only — gate this post to token holders">
               <Lock className="h-[18px] w-[18px]" />
             </button>
@@ -1590,7 +1646,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 {user && !deskWallet && <div className="osc-gated__hint">Link your in-app wallet to verify holdings</div>}
               </div>
             </div>
-          ) : ((() => { const { text: chartStripped, charts } = splitCharts(p.content); const { text: body, imgs } = splitMedia(chartStripped); return (
+          ) : ((() => { const { text: chartStripped, charts } = splitCharts(p.content); const { text: posStripped, positions } = splitPositions(chartStripped); const { text: body, imgs } = splitMedia(posStripped); return (
             <>
               {body && <div className="osc-post__body">{renderContent(body, onSelectMint)}</div>}
               {imgs.length > 0 && (
@@ -1603,6 +1659,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 </div>
               )}
               {charts.map((mint) => <ChartCard key={mint} mint={mint} />)}
+              {positions.map((pos) => (
+                <PositionCard
+                  key={`${pos.direction}-${pos.mint}`}
+                  mint={pos.mint}
+                  direction={pos.direction}
+                  postIso={p.created_at}
+                  onMirror={(mint, symbol, direction) => openTrade(mint, symbol, direction === "long" ? "buy" : "sell", p)}
+                  onOpenToken={(mint) => { window.location.href = `/trade/token/${mint}`; }}
+                />
+              ))}
             </>
           ); })())}
           {callTokens.length > 0 && (
@@ -2477,6 +2543,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
       {/* ── Chart picker ── */}
       {chartPickerOpen && <TokenPicker onPick={attachChart} onClose={() => setChartPickerOpen(false)} />}
+      {posPickerOpen && <TokenPicker title={`Pick a token to ${posDir || "long"}`} onPick={attachPosition} onClose={() => { setPosPickerOpen(false); setPosDir(null); }} />}
 
       {/* ── Holders-only token picker ── */}
       {gatePickerOpen && <TokenPicker title="Pick a token for holders-only" onPick={pickGateToken} onClose={() => setGatePickerOpen(false)} />}
