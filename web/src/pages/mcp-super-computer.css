@@ -1294,3 +1294,47 @@
 @media (max-width: 899px) {
   .supercomputer-system-strip { margin-top: 0.35rem; margin-bottom: 0.55rem; padding-inline: 0.35rem; font-size: 0.5rem; }
 }
+
+/* ── Simplified 5-tab redesign: blue / black / white / gold ── */
+.sc-gold { --sc-gold: #f0c75e; --sc-blue: #3b82f6; }
+
+.sc-eyebrow { font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sc-gold, #f0c75e); font-weight: 700; margin: 0 0 0.5rem; }
+.sc-live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; margin-right: 6px; animation: pulse 2s infinite; }
+@keyframes pulse { 50% { opacity: 0.5; } }
+
+.sc-home { display: flex; flex-direction: column; gap: 1.25rem; }
+.sc-hero { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.5rem; border-radius: 1.25rem; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(0,0,0,0.4) 50%, rgba(240,199,94,0.08)); border: 1px solid rgba(255,255,255,0.1); }
+.sc-hero h1 { font-size: 1.75rem; font-weight: 800; color: #fff; margin: 0 0 0.5rem; line-height: 1.15; }
+.sc-hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--sc-blue), var(--sc-gold)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.sc-hero .sc-sub { color: rgba(255,255,255,0.6); font-size: 0.9rem; margin: 0; max-width: 32rem; }
+.sc-hero-orb { width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 30% 30%, rgba(59,130,246,0.4), rgba(0,0,0,0.8)); border: 2px solid rgba(240,199,94,0.4); color: var(--sc-gold); flex-shrink: 0; position: relative; }
+.sc-hero-orb span { position: absolute; bottom: -1.4rem; font-size: 0.55rem; letter-spacing: 0.2em; color: rgba(255,255,255,0.5); }
+
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.9rem; }
+.sc-card { text-align: left; padding: 1.25rem; border-radius: 1rem; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); color: #fff; cursor: pointer; transition: transform 0.15s, border-color 0.15s, background 0.15s; display: flex; flex-direction: column; gap: 0.5rem; }
+.sc-card:hover { transform: translateY(-2px); border-color: rgba(240,199,94,0.4); background: rgba(255,255,255,0.06); }
+.sc-card-icon { width: 44px; height: 44px; border-radius: 0.75rem; display: grid; place-items: center; background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(240,199,94,0.15)); color: var(--sc-gold); border: 1px solid rgba(240,199,94,0.25); }
+.sc-card strong { font-size: 1.05rem; }
+.sc-card p { font-size: 0.82rem; color: rgba(255,255,255,0.55); margin: 0; flex: 1; }
+.sc-card-cta { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600; color: var(--sc-blue); }
+
+.sc-section-head { margin-bottom: 1.1rem; }
+.sc-section-head h2 { font-size: 1.5rem; font-weight: 800; color: #fff; margin: 0 0 0.4rem; }
+.sc-section-head p { color: rgba(255,255,255,0.55); font-size: 0.88rem; margin: 0; max-width: 36rem; }
+.sc-section-head .supercomputer-status { margin-top: 0.6rem; display: inline-flex; }
+
+.sc-pills { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.sc-pills button { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.6rem 1rem; border-radius: 999px; font-size: 0.82rem; font-weight: 600; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.15s; }
+.sc-pills button:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+.sc-pills button.is-active { background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(240,199,94,0.2)); border-color: var(--sc-gold); color: #fff; }
+
+.sc-embedded { border-radius: 1rem; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.3); }
+
+.sc-connect, .sc-wallet, .sc-trade, .sc-shop { display: flex; flex-direction: column; }
+.sc-shop-grid { display: grid; gap: 1rem; }
+
+/* Shop: real shop look */
+.sc-shop .ox-mcp-shop { background: transparent; }
+.sc-shop .ox-agent__hero { text-align: left; padding: 0 0 1rem; }
+.sc-shop .ox-agent__title { font-size: 1.5rem; color: #fff; }
+.sc-shop .ox-agent__lead { color: rgba(255,255,255,0.6); }
