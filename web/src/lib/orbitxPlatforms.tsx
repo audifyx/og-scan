@@ -203,7 +203,7 @@ export const PlatformGlyph = {
 };
 
 export const PLATFORM_APPS: PlatformApp[] = [
-  { key: "orbitx-one", name: "OrbitX One", caption: "Earn · Trade · Collect", href: "https://orbitx-czkmnte9b-audifyxbeta-4145s-projects.vercel.app", tone: "#17FF4D", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #17FF4D 48%, #065F46 100%)", glyph: PlatformGlyph.dex, dock: true },
+  { key: "orbitx-one", name: "OrbitX One", caption: "Earn · Trade · Collect", href: "/one", tone: "#17FF4D", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #17FF4D 48%, #065F46 100%)", glyph: PlatformGlyph.dex, dock: true },
   { key: "supercomputer", name: "Super Computer", caption: "One MCP · every channel", href: "/supercomputer", tone: "#5EEAD4", iconBg: "linear-gradient(145deg, #99F6E4 0%, #2DD4BF 48%, #0F766E 100%)", glyph: PlatformGlyph.ai, dock: true },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#A78BFA", iconBg: "linear-gradient(145deg, #C4B5FD 0%, #8B5CF6 48%, #5B21B6 100%)", glyph: PlatformGlyph.social },
   { key: "city", name: "City", caption: "3D OrbitX city", href: "/Orbitxcity", tone: "#34D399", iconBg: "linear-gradient(145deg, #6EE7B7 0%, #10B981 48%, #065F46 100%)", glyph: PlatformGlyph.city, dock: true },
