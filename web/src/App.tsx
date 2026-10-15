@@ -123,6 +123,7 @@ import BagworkMyWork from "./pages/bagwork/BagworkMyWork";
 import BagworkAdmin from "./pages/bagwork/BagworkAdmin";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
+import RescuePage from "./pages/RescuePage";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
 import LaunchpadApiLaunch from "./pages/orbitx/LaunchpadApiLaunch";
 import LaunchpadCurveEvm from "./pages/orbitx/LaunchpadCurveEvm";
@@ -413,26 +414,10 @@ const App = () => (
             />
 
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
-            <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
-              <Route index element={<LaunchpadHome />} />
-              <Route path="create" element={<LaunchpadChoose />} />
-              <Route path="create/custom" element={<LaunchpadCreate />} />
-              <Route path="create/pump" element={<LaunchpadPump />} />
-              <Route path="create/api" element={<LaunchpadApiLaunch />} />
-              <Route path="create/curve" element={<LaunchpadCurveEvm />} />
-              <Route path="curve/:token" element={<LaunchpadCurveTrade />} />
-              <Route path="curves" element={<LaunchpadCurveMarkets />} />
-              <Route path="token/:mint" element={<LaunchpadToken />} />
-              <Route path="claim" element={<LaunchpadClaim />} />
-              <Route path="rescue" element={<LaunchpadRescue />} />
-              <Route path="about" element={<LaunchpadAbout />} />
-              <Route path="profile" element={<LaunchpadProfile />} />
-              <Route path="leaderboard" element={<LaunchpadLeaderboard />} />
-              <Route path="creator/:wallet" element={<LaunchpadCreator />} />
-              <Route path="portfolio" element={<LaunchpadPortfolio />} />
-              <Route path="ox-desk-m4k9q" element={<AdminRoute><LaunchpadAdmin /></AdminRoute>} />
-              <Route path="admin" element={<NotFound />} />
-            </Route>
+            {/* Rescue Console — standalone, launchpad hidden */}
+            <Route path="/orbitxlaunch/rescue" element={<RescuePage />} />
+            <Route path="/orbitxlaunch/claim" element={<Navigate to="/orbitxlaunch/rescue" replace />} />
+            <Route path="/orbitxlaunch/*" element={<Navigate to="/orbitxlaunch/rescue" replace />} />
 
             {/* ── Bagwork — earn USDC for tasks ── */}
             <Route path="/bagwork" element={<BagworkLayout />}>
